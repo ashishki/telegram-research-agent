@@ -9,6 +9,7 @@ from config.settings import PROJECT_ROOT, load_settings
 from db.migrate import run_migrations
 from ingestion.bootstrap_ingest import run_bootstrap
 from ingestion.incremental_ingest import run_incremental
+from bot.bot import run_bot
 from output.generate_digest import run_digest
 from output.generate_insight import OUTPUT_DIR as INSIGHT_OUTPUT_DIR
 from output.generate_insight import generate_insight
@@ -50,6 +51,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     normalize_parser = subparsers.add_parser("normalize")
     normalize_parser.set_defaults(handler=handle_normalize)
+
+    bot_parser = subparsers.add_parser("bot", help="Start Telegram bot interface (long-polling)")
+    bot_parser.set_defaults(handler=handle_bot)
 
     return parser
 
@@ -196,6 +200,21 @@ def handle_digest(_: argparse.Namespace) -> int:
     except Exception:
         LOGGER.exception("Project mapping failed but digest succeeded")
 
+    return 0
+
+
+def handle_bot(_: argparse.Namespace) -> int:
+    settings = load_settings()
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+        LOGGER.info("Starting step=run_bot")
+        run_bot(settings)
+        LOGGER.info("Finished step=run_bot")
+    except Exception:
+        LOGGER.exception("Bot runtime failed")
+        return 1
     return 0
 
 

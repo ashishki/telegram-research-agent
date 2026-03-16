@@ -1,9 +1,11 @@
 import json
 import logging
+import os
 import re
 import sqlite3
 from datetime import timezone, date, datetime, timedelta
 from pathlib import Path
+from urllib import parse, request
 
 from config.settings import PROJECT_ROOT, Settings
 from llm.client import complete
@@ -21,6 +23,7 @@ LOGGER = logging.getLogger(__name__)
 PROMPT_PATH = PROJECT_ROOT / "docs" / "prompts" / "digest_generation.md"
 OUTPUT_DIR = PROJECT_ROOT / "data" / "output" / "digests"
 TEXT_EXCERPT_LENGTH = 200
+TELEGRAM_MESSAGE_CHUNK_SIZE = 4000
 
 
 def _utc_now() -> datetime:
@@ -81,9 +84,61 @@ def _write_digest_file(week_label: str, content_md: str) -> Path:
     return output_path
 
 
-def _append_github_section(content_md: str, settings: Settings) -> str:
-    import os
+def _chunk_text(text: str, chunk_size: int = TELEGRAM_MESSAGE_CHUNK_SIZE) -> list[str]:
+    if not text:
+        return [""]
 
+    chunks: list[str] = []
+    remaining = text
+    while remaining:
+        if len(remaining) <= chunk_size:
+            chunks.append(remaining)
+            break
+
+        split_at = remaining.rfind("\n", 0, chunk_size)
+        if split_at <= 0:
+            split_at = remaining.rfind(" ", 0, chunk_size)
+        if split_at <= 0:
+            split_at = chunk_size
+
+        chunk = remaining[:split_at].rstrip()
+        if not chunk:
+            chunk = remaining[:chunk_size]
+            split_at = len(chunk)
+        chunks.append(chunk)
+        remaining = remaining[split_at:].lstrip()
+
+    return chunks
+
+
+def _send_digest_to_telegram_owner(content_md: str, week_label: str) -> None:
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+    chat_id = os.environ.get("TELEGRAM_OWNER_CHAT_ID", "").strip()
+    if not token or not chat_id:
+        return
+
+    for chunk in _chunk_text(content_md):
+        payload = parse.urlencode(
+            {
+                "chat_id": chat_id,
+                "text": chunk,
+                "parse_mode": "Markdown",
+                "disable_web_page_preview": "true",
+            }
+        ).encode("utf-8")
+        http_request = request.Request(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            data=payload,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            method="POST",
+        )
+        with request.urlopen(http_request, timeout=60) as response:
+            response.read()
+
+    LOGGER.info("Digest sent to Telegram owner week=%s", week_label)
+
+
+def _append_github_section(content_md: str, settings: Settings) -> str:
     if not os.environ.get("GITHUB_USERNAME"):
         return content_md
     if sync_github_projects is None or crossref_repos_to_topics is None:
@@ -189,6 +244,10 @@ def run_digest(settings: Settings) -> dict:
             connection.execute("BEGIN")
             _store_digest(connection, week_label, empty_digest, 0)
             connection.commit()
+            try:
+                _send_digest_to_telegram_owner(content_md=empty_digest, week_label=week_label)
+            except Exception:
+                LOGGER.warning("Failed to send digest to Telegram owner week=%s", week_label, exc_info=True)
             return {
                 "week_label": week_label,
                 "output_path": str(output_path),
@@ -236,6 +295,11 @@ def run_digest(settings: Settings) -> dict:
         connection.commit()
 
     LOGGER.info("Digest generation complete week=%s posts=%d output=%s", week_label, post_count, output_path)
+    try:
+        _send_digest_to_telegram_owner(content_md=content_md, week_label=week_label)
+    except Exception:
+        LOGGER.warning("Failed to send digest to Telegram owner week=%s", week_label, exc_info=True)
+
     return {
         "week_label": week_label,
         "output_path": str(output_path),

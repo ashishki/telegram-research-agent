@@ -253,3 +253,7 @@ def run_recommendations(settings: Settings) -> dict:
         len(digest_row["content_md"]),
     )
     return {"week_label": week_label, "output_path": str(output_path)}
+
+
+def generate_recommendations(settings: Settings) -> dict:
+    return run_recommendations(settings)
