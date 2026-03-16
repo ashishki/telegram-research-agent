@@ -8,11 +8,12 @@ source /srv/openclaw-you/.env
 set +a
 
 export PYTHONPATH="${PROJECT_ROOT}"
+PYTHON="/srv/openclaw-you/venv/bin/python3"
 
 start_ts="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 echo "weekly pipeline start=${start_ts}"
 
-if python3 "${PROJECT_ROOT}/src/main.py" ingest; then
+if "$PYTHON" "${PROJECT_ROOT}/src/main.py" ingest; then
   exit_code=0
 else
   exit_code=$?

@@ -43,7 +43,9 @@ if [[ ! -r "$SESSION_PATH" ]]; then
   exit 1
 fi
 
-db_check_output="$(python3 -c '
+PYTHON="/srv/openclaw-you/venv/bin/python3"
+
+db_check_output="$("$PYTHON" -c '
 import os
 import sqlite3
 import sys
@@ -65,7 +67,7 @@ if [[ -z "$db_check_output" ]]; then
   exit 1
 fi
 
-last_ingested_at="$(python3 -c '
+last_ingested_at="$("$PYTHON" -c '
 import os
 import sqlite3
 import sys

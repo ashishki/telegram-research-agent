@@ -12,8 +12,10 @@ else
   echo "Warning: $ENV_FILE not found. Continuing with current environment."
 fi
 
+PYTHON="/srv/openclaw-you/venv/bin/python3"
+
 cd "$PROJECT_ROOT"
-python3 src/db/migrate.py
+"$PYTHON" src/db/migrate.py
 
 DB_PATH="${AGENT_DB_PATH:-$PROJECT_ROOT/data/agent.db}"
 chmod 640 "$DB_PATH"

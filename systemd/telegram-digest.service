@@ -10,7 +10,7 @@ Group=oc_you
 WorkingDirectory=/srv/openclaw-you/workspace/telegram-research-agent
 EnvironmentFile=/srv/openclaw-you/.env
 Environment=PYTHONPATH=/srv/openclaw-you/workspace/telegram-research-agent
-ExecStart=/usr/bin/python3 src/main.py digest
+ExecStart=/srv/openclaw-you/venv/bin/python3 src/main.py digest
 Restart=no
 StandardOutput=journal
 StandardError=journal

@@ -7,5 +7,6 @@ set -a
 set +a
 
 export PYTHONPATH="/srv/openclaw-you/workspace/telegram-research-agent/src"
+PYTHON="/srv/openclaw-you/venv/bin/python3"
 
-python3 /srv/openclaw-you/workspace/telegram-research-agent/src/main.py bootstrap
+"$PYTHON" /srv/openclaw-you/workspace/telegram-research-agent/src/main.py bootstrap
