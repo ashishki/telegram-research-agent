@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # Run this script ONCE interactively in an SSH terminal to authorize Telethon.
-# It will prompt for your phone number and the code Telegram sends you.
 set -euo pipefail
 
 set -a
@@ -9,7 +8,7 @@ set +a
 
 mkdir -p /srv/openclaw-you/secrets
 
-/srv/openclaw-you/venv/bin/python3 - << 'PYEOF'
+cat > /tmp/tg_auth.py << 'PYEOF'
 import asyncio, os
 from telethon import TelegramClient
 
@@ -19,11 +18,13 @@ session  = os.environ.get("TELEGRAM_SESSION_PATH", "/srv/openclaw-you/secrets/te
 
 async def main():
     client = TelegramClient(session, api_id, api_hash)
-    await client.start()          # prompts phone + code interactively
+    await client.start()
     me = await client.get_me()
-    print(f"✓ Authorized as: {me.first_name} (@{me.username}), id={me.id}")
-    print(f"✓ Session saved to: {session}")
+    print(f"Authorized as: {me.first_name} (@{me.username}), id={me.id}")
+    print(f"Session saved to: {session}")
     await client.disconnect()
 
 asyncio.run(main())
 PYEOF
+
+exec /srv/openclaw-you/venv/bin/python3 /tmp/tg_auth.py
