@@ -1,0 +1,16 @@
+channels:
+  - username: "@exampletechnews"
+    label: "Example Tech News"
+    language: "en"
+    priority: high
+    active: true
+  - username: "@exampledevupdates"
+    label: "Example Dev Updates"
+    language: "en"
+    priority: medium
+    active: true
+  - username: "@exampleinfrawatch"
+    label: "Example Infra Watch"
+    language: "mixed"
+    priority: low
+    active: false

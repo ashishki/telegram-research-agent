@@ -34,16 +34,16 @@
 
 | ID | Task | Owner | Status | Depends On |
 |---|---|---|---|---|
-| P1-01 | Create `src/config/channels.yaml` with placeholder entries | Codex | `[ ]` | P0-02 |
-| P1-02 | Create `src/config/settings.py` (env var config loader) | Codex | `[ ]` | P1-01 |
-| P1-03 | Create `src/db/schema.sql` (all tables: raw_posts, posts, topics, post_topics, digests, recommendations, projects, post_project_links) | Codex | `[ ]` | P0-02 |
-| P1-04 | Create `src/db/migrate.py` (idempotent migration runner) | Codex | `[ ]` | P1-03 |
-| P1-05 | Create `src/llm/client.py` (Anthropic SDK wrapper with `complete()` and `complete_json()`, reads LLM_API_KEY and MODEL_PROVIDER from env) | Codex | `[ ]` | P0-02 |
-| P1-06 | Create `requirements.txt` with pinned deps: anthropic, telethon, scikit-learn, pyyaml | Codex | `[ ]` | P1-05 |
-| P1-07 | Create `src/main.py` (CLI entry point with subcommands: `ingest`, `digest`, `bootstrap`) | Codex | `[ ]` | P1-02 |
-| P1-08 | Create `scripts/setup.sh` (interactive Telethon auth, first-run schema migration) | Codex | `[ ]` | P1-04 |
-| P1-09 | Create `data/` directory structure (agent.db excluded from git, output dirs present) | Codex | `[ ]` | P1-04 |
-| P1-10 | Create `.gitignore` for `data/agent.db`, `*.session`, `*.env`, `__pycache__` | Codex | `[ ]` | P1-09 |
+| P1-01 | Create `src/config/channels.yaml` with placeholder entries | Codex | `[x]` | P0-02 |
+| P1-02 | Create `src/config/settings.py` (env var config loader) | Codex | `[x]` | P1-01 |
+| P1-03 | Create `src/db/schema.sql` (all tables: raw_posts, posts, topics, post_topics, digests, recommendations, projects, post_project_links) | Codex | `[x]` | P0-02 |
+| P1-04 | Create `src/db/migrate.py` (idempotent migration runner) | Codex | `[x]` | P1-03 |
+| P1-05 | Create `src/llm/client.py` (Anthropic SDK wrapper with `complete()` and `complete_json()`, reads LLM_API_KEY and MODEL_PROVIDER from env) | Codex | `[x]` | P0-02 |
+| P1-06 | Create `requirements.txt` with pinned deps: anthropic, telethon, scikit-learn, pyyaml | Codex | `[x]` | P1-05 |
+| P1-07 | Create `src/main.py` (CLI entry point with subcommands: `ingest`, `digest`, `bootstrap`) | Codex | `[x]` | P1-02 |
+| P1-08 | Create `scripts/setup.sh` (interactive Telethon auth, first-run schema migration) | Codex | `[x]` | P1-04 |
+| P1-09 | Create `data/` directory structure (agent.db excluded from git, output dirs present) | Codex | `[x]` | P1-04 |
+| P1-10 | Create `.gitignore` for `data/agent.db`, `*.session`, `*.env`, `__pycache__` | Codex | `[x]` | P1-09 |
 
 **Phase 1 Review Criteria:**
 - `src/db/migrate.py` runs without error on a fresh environment.

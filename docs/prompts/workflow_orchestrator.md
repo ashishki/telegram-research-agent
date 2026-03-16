@@ -61,7 +61,18 @@ Identify which files Codex must create or modify in this phase (use the Phase Re
 
 ### Step 2 — Spawn Codex Implementer
 
-Spawn a **general-purpose** agent with the following prompt (fill in the bracketed values from your state assessment):
+**IMPORTANT — Codex invocation method:**
+Always pass the prompt as a shell variable, NOT via stdin (`-`).
+Stdin mode (`codex exec - < file`) forces model `gpt-5.3-codex` which returns 401 Unauthorized.
+Correct form:
+```bash
+PROMPT=$(cat /tmp/codex_phaseN_prompt.txt)
+codex exec -s workspace-write "$PROMPT"
+```
+
+Write the prompt to `/tmp/codex_phaseN_prompt.txt` first, then invoke via variable expansion.
+
+Spawn Codex with the following prompt (fill in the bracketed values from your state assessment):
 
 ```
 You are Codex, the implementation agent for the Telegram Research Agent project.
@@ -117,7 +128,13 @@ Write the updated `docs/tasks.md`.
 
 ### Step 4 — Spawn Claude Reviewer
 
-Spawn an **Explore** agent with the following prompt (fill in bracketed values):
+**IMPORTANT — same invocation rule applies:**
+```bash
+PROMPT=$(cat /tmp/reviewer_phaseN_prompt.txt)
+codex exec -s read-only "$PROMPT"
+```
+
+Spawn the reviewer with the following prompt (fill in bracketed values):
 
 ```
 You are the Claude Reviewer for the Telegram Research Agent project.

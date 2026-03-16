@@ -1,0 +1,10 @@
+data/agent.db
+data/agent.db-wal
+data/agent.db-shm
+*.session
+.env
+__pycache__/
+*.pyc
+*.pyo
+dist/
+*.egg-info

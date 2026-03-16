@@ -1,0 +1,5 @@
+anthropic>=0.40.0
+telethon>=1.36.0
+scikit-learn>=1.4.0
+pyyaml>=6.0.0
+numpy>=1.26.0
