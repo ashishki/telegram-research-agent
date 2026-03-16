@@ -15,6 +15,10 @@ fi
 cd "$PROJECT_ROOT"
 python3 src/db/migrate.py
 
+DB_PATH="${AGENT_DB_PATH:-$PROJECT_ROOT/data/agent.db}"
+chmod 640 "$DB_PATH"
+find "$PROJECT_ROOT/data/output" -type f -name "*.md" -exec chmod 640 {} \; 2>/dev/null || true
+
 cat <<'EOF'
 
 Database scaffold is ready.

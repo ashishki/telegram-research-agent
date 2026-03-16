@@ -1,3 +1,4 @@
+# Validated: systemd-analyze verify (run manually before deploying)
 [Unit]
 Description=Telegram Research Agent — Digest Generator
 After=network.target

@@ -77,10 +77,12 @@ def complete(prompt: str, system: str = "", max_tokens: int = 2048) -> str:
                 raise LLMError("Anthropic completion failed") from exc
 
             delay = 2 ** (attempt - 1)
+            remaining_attempts = MAX_RETRIES - attempt
             LOGGER.warning(
-                "Anthropic completion retrying in %s second(s) after %s",
+                "Anthropic completion retrying in %s second(s) after %s remaining_attempts=%s",
                 delay,
                 exc.__class__.__name__,
+                remaining_attempts,
             )
             time.sleep(delay)
 

@@ -191,14 +191,14 @@
 
 | ID | Task | Owner | Status | Depends On |
 |---|---|---|---|---|
-| P9-01 | Add retry logic to OpenClaw WS client (max 3 attempts, exponential backoff) | Codex | `[ ]` | P1-05 |
-| P9-02 | Add `FloodWaitError` handling with configurable max wait ceiling | Codex | `[ ]` | P2-03 |
-| P9-03 | Add structured logging throughout all pipeline stages | Codex | `[ ]` | All prior |
-| P9-04 | Add healthcheck script (`scripts/healthcheck.sh`) validating DB, gateway, session | Codex | `[ ]` | All prior |
-| P9-05 | Add graceful shutdown handling (SIGTERM) in main process | Codex | `[ ]` | P1-07 |
-| P9-06 | Validate all systemd units with `systemd-analyze verify` | Codex | `[ ]` | P5-03, P6-06 |
-| P9-07 | Ensure DB WAL mode enabled for concurrent reads during timer runs | Codex | `[ ]` | P1-04 |
-| P9-08 | Set DB file permissions to 640, owner oc_you:oc_you | Codex | `[ ]` | P1-09 |
+| P9-01 | Add retry logic to OpenClaw WS client (max 3 attempts, exponential backoff) | Codex | `[x]` | P1-05 |
+| P9-02 | Add `FloodWaitError` handling with configurable max wait ceiling | Codex | `[x]` | P2-03 |
+| P9-03 | Add structured logging throughout all pipeline stages | Codex | `[x]` | All prior |
+| P9-04 | Add healthcheck script (`scripts/healthcheck.sh`) validating DB, gateway, session | Codex | `[x]` | All prior |
+| P9-05 | Add graceful shutdown handling (SIGTERM) in main process | Codex | `[x]` | P1-07 |
+| P9-06 | Validate all systemd units with `systemd-analyze verify` | Codex | `[x]` | P5-03, P6-06 |
+| P9-07 | Ensure DB WAL mode enabled for concurrent reads during timer runs | Codex | `[x]` | P1-04 |
+| P9-08 | Set DB file permissions to 640, owner oc_you:oc_you | Codex | `[x]` | P1-09 |
 
 ---
 
