@@ -7,6 +7,7 @@ from db.migrate import run_migrations
 from ingestion.bootstrap_ingest import run_bootstrap
 from ingestion.incremental_ingest import run_incremental
 from output.generate_digest import run_digest
+from output.map_project_insights import run_project_mapping
 from output.generate_recommendations import run_recommendations
 from processing.cluster import cluster_posts
 from processing.detect_topics import run_topic_detection
@@ -142,6 +143,16 @@ def handle_digest(_: argparse.Namespace) -> int:
             )
     except Exception:
         LOGGER.exception("Recommendations generation failed but digest succeeded")
+
+    try:
+        project_mapping_summary = run_project_mapping(settings)
+        LOGGER.info(
+            "Project mapping complete projects_processed=%d links_created=%d",
+            project_mapping_summary["projects_processed"],
+            project_mapping_summary["links_created"],
+        )
+    except Exception:
+        LOGGER.exception("Project mapping failed but digest succeeded")
 
     LOGGER.info(
         "Digest generation complete week=%s posts=%d output=%s",

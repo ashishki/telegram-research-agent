@@ -171,13 +171,13 @@
 
 | ID | Task | Owner | Status | Depends On |
 |---|---|---|---|---|
-| P8-01 | Write `docs/prompts/project_insights.md` (prompt template) | Codex | `[ ]` | P0-06 |
-| P8-02 | Create `src/output/map_project_insights.py` | Codex | `[ ]` | P3-05, P1-05 |
-| P8-03 | Implement FTS5 keyword search against current week's posts per project | Codex | `[ ]` | P8-02 |
-| P8-04 | Implement relevance scoring (keyword overlap + view_count weighting) | Codex | `[ ]` | P8-02 |
-| P8-05 | Implement batched LLM call for relevance rationale per project | Codex | `[ ]` | P8-02 |
-| P8-06 | Write results to `post_project_links` | Codex | `[ ]` | P8-05 |
-| P8-07 | Append project insights section to current week's digest file | Codex | `[ ]` | P8-06 |
+| P8-01 | Write `docs/prompts/project_insights.md` (prompt template) | Codex | `[x]` | P0-06 |
+| P8-02 | Create `src/output/map_project_insights.py` | Codex | `[x]` | P3-05, P1-05 |
+| P8-03 | Implement FTS5 keyword search against current week's posts per project | Codex | `[x]` | P8-02 |
+| P8-04 | Implement relevance scoring (keyword overlap + view_count weighting) | Codex | `[x]` | P8-02 |
+| P8-05 | Implement batched LLM call for relevance rationale per project | Codex | `[x]` | P8-02 |
+| P8-06 | Write results to `post_project_links` | Codex | `[x]` | P8-05 |
+| P8-07 | Append project insights section to current week's digest file | Codex | `[x]` | P8-06 |
 
 **Phase 8 Review Criteria:**
 - FTS5 query returns plausible matches for test projects.

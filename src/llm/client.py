@@ -85,7 +85,7 @@ def complete(prompt: str, system: str = "", max_tokens: int = 2048) -> str:
             time.sleep(delay)
 
 
-def complete_json(prompt: str, system: str = "") -> dict[str, Any]:
+def complete_json(prompt: str, system: str = "") -> dict[str, Any] | list[Any]:
     response_text = complete(prompt=prompt, system=system, max_tokens=2048)
     try:
         data = json.loads(response_text)
@@ -93,6 +93,6 @@ def complete_json(prompt: str, system: str = "") -> dict[str, Any]:
         LOGGER.exception("Anthropic JSON response parsing failed")
         raise LLMSchemaError("Anthropic response was not valid JSON") from exc
 
-    if not isinstance(data, dict):
-        raise LLMSchemaError("Anthropic response JSON must decode to an object")
+    if not isinstance(data, (dict, list)):
+        raise LLMSchemaError("Anthropic response JSON must decode to an object or array")
     return data
