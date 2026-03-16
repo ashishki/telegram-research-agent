@@ -10,6 +10,21 @@ from anthropic import APIConnectionError, APIStatusError, APITimeoutError, Anthr
 LOGGER = logging.getLogger(__name__)
 DEFAULT_MODEL_PROVIDER = "claude-haiku-4-5"
 MAX_RETRIES = 3
+
+# Model routing by task category.
+# Override any entry via env var: LLM_MODEL_DIGEST, LLM_MODEL_BOT_ASK, etc.
+CATEGORY_MODEL_MAP: dict[str, str] = {
+    # Deep synthesis — quality over cost
+    "digest":            "claude-sonnet-4-6",
+    "recommendations":   "claude-sonnet-4-6",
+    "insight":           "claude-sonnet-4-6",
+    "project_insights":  "claude-sonnet-4-6",
+    "bot_ask":           "claude-sonnet-4-6",
+    # Fast + cheap — called many times per run
+    "topic_detection":   "claude-haiku-4-5",
+    "unknown":           "claude-haiku-4-5",
+    "test":              "claude-haiku-4-5",
+}
 MODEL_PRICING: dict[str, dict[str, float]] = {
     "claude-haiku-4-5": {"input": 0.80, "output": 4.00},
     "claude-haiku-4-5-20251001": {"input": 0.80, "output": 4.00},
@@ -64,7 +79,15 @@ def _get_client() -> Anthropic:
     return Anthropic(api_key=api_key)
 
 
-def _get_model() -> str:
+def _get_model(category: str = "unknown") -> str:
+    # Per-category env override: LLM_MODEL_DIGEST, LLM_MODEL_TOPIC_DETECTION, etc.
+    env_key = f"LLM_MODEL_{category.upper()}"
+    if os.environ.get(env_key):
+        return os.environ[env_key]
+    # Category routing table
+    if category in CATEGORY_MODEL_MAP:
+        return CATEGORY_MODEL_MAP[category]
+    # Global fallback
     return os.environ.get("MODEL_PROVIDER", DEFAULT_MODEL_PROVIDER)
 
 
@@ -82,7 +105,7 @@ def _extract_text(response: Any) -> str:
 
 def complete(prompt: str, system: str = "", max_tokens: int = 2048, category: str = "unknown") -> str:
     client = _get_client()
-    model = _get_model()
+    model = _get_model(category)
     attempt = 0
 
     while True:
