@@ -24,23 +24,30 @@ Read tasks.md
   │
   └─▶ Find current phase (lowest phase with [ ] tasks)
         │
-        ├─▶ Spawn Codex Implementer (general-purpose agent)
+        ├─▶ codex exec -s workspace-write   ← Codex Implementer
         │     └─▶ Implements all tasks in phase
         │
         ├─▶ Update tasks.md: [ ] → [~]
         │
-        ├─▶ Spawn Claude Reviewer (Explore agent)
+        ├─▶ Agent tool (subagent_type: Explore)  ← Claude Reviewer
         │     ├─▶ PASS → continue
         │     └─▶ ISSUES FOUND:
-        │               ├─▶ Spawn Codex Fixer (general-purpose agent)
-        │               └─▶ Spawn Reviewer again (targeted re-check)
+        │               ├─▶ codex exec -s workspace-write  ← Codex Fixer
+        │               └─▶ Agent tool (Explore) again — targeted re-check
         │                     ├─▶ PASS → continue
-        │                     └─▶ SAME ISSUES AGAIN → mark [!], stop, report to user
+        │                     └─▶ SAME ISSUES → mark [!], stop, report to user
         │
         ├─▶ Update tasks.md: [~] → [x]
         │
         └─▶ Loop to next phase
 ```
+
+**Tool split — hard rule:**
+| Role | Tool | Reason |
+|---|---|---|
+| Implementer | `codex exec -s workspace-write` | writes files |
+| Reviewer | `Agent tool` (Explore, Claude) | reasoning + checklist |
+| Fixer | `codex exec -s workspace-write` | writes fixes |
 
 ---
 

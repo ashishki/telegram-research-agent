@@ -128,84 +128,87 @@ Write the updated `docs/tasks.md`.
 
 ### Step 4 — Spawn Claude Reviewer
 
-**IMPORTANT — same invocation rule applies:**
-```bash
-PROMPT=$(cat /tmp/reviewer_phaseN_prompt.txt)
-codex exec -s read-only "$PROMPT"
-```
+Use the **Agent tool** with `subagent_type: "Explore"`.
 
-Spawn the reviewer with the following prompt (fill in bracketed values):
+This is a Claude subagent — NOT codex exec. Claude does reasoning and checklist verification.
+Codex writes code. Claude reviews it.
+
+Spawn with the following prompt (fill in bracketed values from Codex's completion report):
 
 ```
 You are the Claude Reviewer for the Telegram Research Agent project.
-Review Phase [N] — [Phase Name] implemented by Codex.
+Project root: /srv/openclaw-you/workspace/telegram-research-agent
 
-Read these files first:
+Review Phase [N] — [Phase Name].
+
+First read these reference documents:
 - docs/spec.md (Section 20: Claude Review Checklist)
-- docs/architecture.md (components relevant to Phase [N])
-- docs/tasks.md (Phase [N] — read the task list and Phase Review Criteria)
+- docs/architecture.md (sections covering Phase [N] components)
+- docs/tasks.md (Phase [N] task list and Phase Review Criteria block)
 
-Then read ALL files created or modified in this phase:
-[list the files from Codex's completion report]
+Then read every file created or modified in this phase:
+[list files from Codex completion report]
 
-Universal checklist — check every item:
+Apply the universal checklist to every file:
 
 ARCHITECTURE:
-- Nothing written to /opt/openclaw/src
-- No project files outside /srv/openclaw-you/workspace/telegram-research-agent
-- LLM calls only via ws://127.0.0.1:18789 loaded from env var
-- Raw Telegram corpus NOT passed wholesale to LLM
+- [ ] Nothing written to /opt/openclaw/src
+- [ ] No project files outside /srv/openclaw-you/workspace/telegram-research-agent
+- [ ] LLM calls use anthropic Python SDK with LLM_API_KEY from os.environ (NOT hardcoded, NOT via WebSocket)
+- [ ] Raw Telegram corpus not passed wholesale to LLM in any single call
 
 SECRETS:
-- No API keys, tokens, passwords hardcoded in any file
-- No .session files in workspace
-- No .env files in workspace
-- Credentials read from os.environ exclusively
-- .gitignore covers: data/agent.db, *.session, *.env, __pycache__/, *.pyc
+- [ ] No API keys, tokens, or passwords hardcoded in any source file
+- [ ] No .session files present inside the workspace
+- [ ] No .env files present inside the workspace
+- [ ] All credentials read exclusively via os.environ
+- [ ] Default session path is /srv/openclaw-you/secrets/telegram.session (not inside data/)
+- [ ] .gitignore covers: data/agent.db, *.session, .env, __pycache__/, *.pyc
 
 DATA INTEGRITY:
-- Multi-row DB writes wrapped in transactions
-- Deduplication at DB layer (unique constraints), not only in app logic
+- [ ] Multi-row DB writes are wrapped in transactions
+- [ ] Deduplication enforced at DB layer via unique constraints, not only in application logic
 
-SYSTEMD (if units exist in this phase):
-- User=oc_you in every [Service] section
-- NoNewPrivileges=true present
-- No secrets in unit files
-- EnvironmentFile points to /srv/openclaw-you/.env
+SYSTEMD (skip if no unit files in this phase):
+- [ ] User=oc_you in every [Service] section
+- [ ] NoNewPrivileges=true present
+- [ ] No secrets embedded in unit files
+- [ ] EnvironmentFile=/srv/openclaw-you/.env present
 
-CODE:
-- No print() calls for logging — logging module used
-- No dead code or debugging artifacts
-- Error handling present on all external calls (Telegram, LLM, DB)
-- No hardcoded paths that should be config-driven
+CODE QUALITY:
+- [ ] logging module used throughout — no print() calls for status/debug output
+- [ ] No dead code, commented-out blocks, or debugging artifacts left in files
+- [ ] Error handling present on all calls to external systems (Telegram API, Anthropic API, SQLite)
+- [ ] No file paths hardcoded that should come from config or environment variables
 
 PHASE-SPECIFIC:
-Read and check every criterion in the "Phase Review Criteria" block for Phase [N] in docs/tasks.md.
+- [ ] Read the "Phase Review Criteria" block at the bottom of Phase [N] in docs/tasks.md
+- [ ] Check each criterion listed there
 
-Output format — choose one:
+Return your result in exactly this format:
 
 If all checks pass:
 PHASE_REVIEW_RESULT: PASS
-All checks passed. Phase [N] complete.
+All checks passed. Phase [N] — [Phase Name] complete.
 
 If any check fails:
 PHASE_REVIEW_RESULT: ISSUES_FOUND
-ISSUE_COUNT: [N]
+ISSUE_COUNT: [number]
 
 ISSUE_1:
-File: [path:line]
-Check: [which checklist item]
+File: [relative/path/to/file.py:line_number]
+Check: [exact checklist item that failed]
 Description: [what is wrong]
-Expected: [what it should be]
-Actual: [what it is]
+Expected: [what the code should look like]
+Actual: [what it currently is]
 
 ISSUE_2:
-...
+[same format]
 
-Do not suggest improvements. Only report violations of the stated contracts.
+Do not suggest style improvements or refactors. Report only contract violations.
 ```
 
-Wait for the reviewer agent to return output.
+Wait for the Claude agent to return output.
 
 Parse the result:
 - If `PHASE_REVIEW_RESULT: PASS` → proceed to Step 6
@@ -215,34 +218,41 @@ Parse the result:
 
 ### Step 5 — Spawn Codex Fixer (only if issues found)
 
-Spawn a **general-purpose** agent with the following prompt:
+Use **codex exec** — NOT the Agent tool. Codex writes the fixes.
+
+```bash
+PROMPT=$(cat /tmp/codex_fixer_phaseN_prompt.txt)
+codex exec -s workspace-write "$PROMPT"
+```
+
+Write the fixer prompt to the temp file with this content (fill in bracketed values):
 
 ```
 You are the Codex Fixer for the Telegram Research Agent project.
-Phase [N] — [Phase Name] review found issues. Fix them exactly as described.
-
 Project root: /srv/openclaw-you/workspace/telegram-research-agent
 
-Review issues to fix:
-[paste the full ISSUES section from the reviewer output]
+Phase [N] — [Phase Name] Claude review found issues. Fix them exactly as described below.
+
+ISSUES TO FIX:
+[paste the full ISSUES block verbatim from the Claude reviewer output]
 
 Rules:
-- Fix ONLY what is listed above
-- Do not refactor code that was not flagged
-- Do not change files not mentioned in the issues
-- Do not add features or improvements
-- If a hardcoded value appears in multiple places, fix all occurrences of that specific issue
+- Fix ONLY what is listed above — nothing else
+- Do not refactor, restructure, or improve code not mentioned in the issues
+- Do not modify files not mentioned in the issues
+- Do not add comments explaining the fix
+- If an issue appears in multiple places in the same file, fix all occurrences
+- Credentials always via os.environ
 - Use logging module, not print()
-- Credentials always from os.environ
 
-When done: return a fix report listing each issue ID and the file+line where it was fixed.
+When done: return a fix report with each issue ID and the file:line that was changed.
 ```
 
-Wait for the Fixer to return a fix report.
+Wait for Codex to return the fix report.
 
-Then re-run Step 4 (Reviewer) targeted at only the fixed files.
-If reviewer returns PASS → proceed to Step 6.
-If reviewer returns ISSUES_FOUND again on the same issues: mark them `[!]` in `docs/tasks.md`, stop the loop, report to user.
+Then re-run Step 4 (Claude Reviewer agent) targeted at only the fixed files.
+- If PASS → proceed to Step 6
+- If ISSUES_FOUND again on the same issues → mark them `[!]` in `docs/tasks.md`, stop, report to user
 
 ---
 
