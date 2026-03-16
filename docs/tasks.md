@@ -77,12 +77,12 @@
 
 | ID | Task | Owner | Status | Depends On |
 |---|---|---|---|---|
-| P3-01 | Create `src/processing/normalize_posts.py` (reads raw_posts, writes posts) | Codex | `[ ]` | P1-04 |
-| P3-02 | Implement text cleaning (whitespace, Markdown artifacts) | Codex | `[ ]` | P3-01 |
-| P3-03 | Implement metadata extraction (URL count, code block detection, word count) | Codex | `[ ]` | P3-01 |
-| P3-04 | Implement lightweight language detection (heuristic: character set analysis) | Codex | `[ ]` | P3-01 |
-| P3-05 | Implement FTS5 virtual table population for `posts.content` | Codex | `[ ]` | P1-03 |
-| P3-06 | Wire `normalize` step into `ingest` subcommand pipeline in `main.py` | Codex | `[ ]` | P3-01, P1-07 |
+| P3-01 | Create `src/processing/normalize_posts.py` (reads raw_posts, writes posts) | Codex | `[x]` | P1-04 |
+| P3-02 | Implement text cleaning (whitespace, Markdown artifacts) | Codex | `[x]` | P3-01 |
+| P3-03 | Implement metadata extraction (URL count, code block detection, word count) | Codex | `[x]` | P3-01 |
+| P3-04 | Implement lightweight language detection (heuristic: character set analysis) | Codex | `[x]` | P3-01 |
+| P3-05 | Implement FTS5 virtual table population for `posts.content` | Codex | `[x]` | P1-03 |
+| P3-06 | Wire `normalize` step into `ingest` subcommand pipeline in `main.py` | Codex | `[x]` | P3-01, P1-07 |
 
 **Phase 3 Review Criteria:**
 - All `raw_posts` rows without a `posts` entry are processed.
@@ -96,7 +96,7 @@
 
 | ID | Task | Owner | Status | Depends On |
 |---|---|---|---|---|
-| P4-01 | Create `src/processing/cluster.py` (TF-IDF + K-Means, outputs keyword sets per cluster) | Codex | `[ ]` | P3-01 |
+| P4-01 | Create `src/processing/cluster.py` (TF-IDF + K-Means, outputs keyword sets per cluster) | Codex | `[ ]` | P3-01 | Create `src/processing/normalize_posts.py` (reads raw_posts, writes posts) | Codex | `[x]` | P1-04 |
 | P4-02 | Implement elbow heuristic or fixed-k config for cluster count | Codex | `[ ]` | P4-01 |
 | P4-03 | Create `src/processing/detect_topics.py` (matches clusters to existing topics or creates new via LLM) | Codex | `[ ]` | P4-01, P1-05 |
 | P4-04 | Implement overlap check between new cluster keywords and existing topic keywords | Codex | `[ ]` | P4-03 |
