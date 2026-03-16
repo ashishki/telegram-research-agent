@@ -53,7 +53,11 @@ def _request_json(url: str, accept: str = "application/vnd.github+json") -> tupl
 
 
 def _fetch_repos(username: str) -> tuple[list[dict[str, Any]], bool]:
-    url = f"{GITHUB_API_BASE}/users/{urllib.parse.quote(username)}/repos?per_page=100&type=owner"
+    # /user/repos (authenticated) returns private repos; /users/{u}/repos returns public only
+    if os.environ.get("GITHUB_TOKEN"):
+        url = f"{GITHUB_API_BASE}/user/repos?per_page=100&type=owner"
+    else:
+        url = f"{GITHUB_API_BASE}/users/{urllib.parse.quote(username)}/repos?per_page=100&type=owner"
     payload, rate_limited = _request_json(url)
     if not isinstance(payload, list):
         return [], rate_limited
