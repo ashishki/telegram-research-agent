@@ -57,13 +57,13 @@
 
 | ID | Task | Owner | Status | Depends On |
 |---|---|---|---|---|
-| P2-01 | Create `src/ingestion/telegram_client.py` (Telethon session factory, credential loading) | Codex | `[ ]` | P1-02 |
-| P2-02 | Create `src/ingestion/bootstrap_ingest.py` (90-day historical pull, all channels) | Codex | `[ ]` | P2-01, P1-04 |
-| P2-03 | Implement `FloodWaitError` handling in ingestion client | Codex | `[ ]` | P2-01 |
-| P2-04 | Implement idempotency check (`(channel_id, message_id)` unique constraint) | Codex | `[ ]` | P1-03 |
-| P2-05 | Implement per-channel progress logging (inserted, skipped, errors) | Codex | `[ ]` | P2-02 |
-| P2-06 | Wire `bootstrap` subcommand in `src/main.py` to `bootstrap_ingest.py` | Codex | `[ ]` | P2-02, P1-07 |
-| P2-07 | Create `scripts/run_bootstrap.sh` (wrapper to run bootstrap with env loaded) | Codex | `[ ]` | P2-06 |
+| P2-01 | Create `src/ingestion/telegram_client.py` (Telethon session factory, credential loading) | Codex | `[x]` | P1-02 |
+| P2-02 | Create `src/ingestion/bootstrap_ingest.py` (90-day historical pull, all channels) | Codex | `[x]` | P2-01, P1-04 |
+| P2-03 | Implement `FloodWaitError` handling in ingestion client | Codex | `[x]` | P2-01 |
+| P2-04 | Implement idempotency check (`(channel_id, message_id)` unique constraint) | Codex | `[x]` | P1-03 |
+| P2-05 | Implement per-channel progress logging (inserted, skipped, errors) | Codex | `[x]` | P2-02 |
+| P2-06 | Wire `bootstrap` subcommand in `src/main.py` to `bootstrap_ingest.py` | Codex | `[x]` | P2-02, P1-07 |
+| P2-07 | Create `scripts/run_bootstrap.sh` (wrapper to run bootstrap with env loaded) | Codex | `[x]` | P2-06 |
 
 **Phase 2 Review Criteria:**
 - Bootstrap script runs end-to-end on at least one test channel.
