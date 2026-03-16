@@ -1,16 +1,96 @@
 channels:
-  - username: "@exampletechnews"
-    label: "Example Tech News"
-    language: "en"
+  - username: "@gleb_pro_ai"
+    label: "Gleb про AI"
+    language: "ru"
     priority: high
     active: true
-  - username: "@exampledevupdates"
-    label: "Example Dev Updates"
-    language: "en"
+  - username: "@tired_glebmikheev"
+    label: "Tired Gleb Mikheev"
+    language: "ru"
+    priority: high
+    active: true
+  - username: "@ai_newz"
+    label: "AI Newz"
+    language: "ru"
+    priority: high
+    active: true
+  - username: "@neuraldeep"
+    label: "Neural Deep"
+    language: "ru"
+    priority: high
+    active: true
+  - username: "@cryptoEssay"
+    label: "Crypto Essay"
+    language: "ru"
+    priority: high
+    active: true
+  - username: "@llm_under_hood"
+    label: "LLM Under the Hood"
+    language: "ru"
+    priority: high
+    active: true
+  - username: "@silent_ai_cto"
+    label: "Silent AI CTO"
+    language: "ru"
+    priority: high
+    active: true
+  - username: "@its_capitan"
+    label: "Its Capitan"
+    language: "ru"
+    priority: high
+    active: true
+  - username: "@log_OS_ru"
+    label: "log OS ru"
+    language: "ru"
     priority: medium
     active: true
-  - username: "@exampleinfrawatch"
-    label: "Example Infra Watch"
-    language: "mixed"
+  - username: "@data_secrets"
+    label: "Data Secrets"
+    language: "ru"
+    priority: medium
+    active: true
+  - username: "@leadgr"
+    label: "Leadgr"
+    language: "ru"
+    priority: medium
+    active: true
+  - username: "@Redmadnews"
+    label: "Redmad News"
+    language: "ru"
+    priority: medium
+    active: true
+  - username: "@doronin_aiforfriends"
+    label: "Doronin AI for Friends"
+    language: "ru"
+    priority: medium
+    active: true
+  - username: "@max_about_ai"
+    label: "Max About AI"
+    language: "ru"
+    priority: medium
+    active: true
+  - username: "@oestick"
+    label: "Oestick"
+    language: "ru"
+    priority: medium
+    active: true
+  - username: "@codecamp"
+    label: "Code Camp"
+    language: "ru"
     priority: low
-    active: false
+    active: true
+  - username: "@NeuralShit"
+    label: "Neural Shit"
+    language: "ru"
+    priority: low
+    active: true
+  - username: "@kyrillic"
+    label: "Kyrillic"
+    language: "ru"
+    priority: low
+    active: true
+  - username: "@exitsexist"
+    label: "Exits Exist"
+    language: "ru"
+    priority: low
+    active: true
