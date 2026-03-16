@@ -115,11 +115,11 @@
 
 | ID | Task | Owner | Status | Depends On |
 |---|---|---|---|---|
-| P5-01 | Create `src/ingestion/incremental_ingest.py` (delta pull since MAX(posted_at) per channel) | Codex | `[ ]` | P2-01, P1-04 |
-| P5-02 | Wire `ingest` subcommand to run: incremental → normalize → cluster → detect_topics | Codex | `[ ]` | P5-01, P3-06, P4-06 |
-| P5-03 | Create `systemd/telegram-ingest.service` | Codex | `[ ]` | P5-02 |
-| P5-04 | Create `systemd/telegram-ingest.timer` (Monday 07:00, Persistent=true) | Codex | `[ ]` | P5-03 |
-| P5-05 | Create `scripts/run_weekly.sh` (manual trigger for full weekly pipeline) | Codex | `[ ]` | P5-02 |
+| P5-01 | Create `src/ingestion/incremental_ingest.py` (delta pull since MAX(posted_at) per channel) | Codex | `[x]` | P2-01, P1-04 |
+| P5-02 | Wire `ingest` subcommand to run: incremental → normalize → cluster → detect_topics | Codex | `[x]` | P5-01, P3-06, P4-06 |
+| P5-03 | Create `systemd/telegram-ingest.service` | Codex | `[x]` | P5-02 |
+| P5-04 | Create `systemd/telegram-ingest.timer` (Monday 07:00, Persistent=true) | Codex | `[x]` | P5-03 |
+| P5-05 | Create `scripts/run_weekly.sh` (manual trigger for full weekly pipeline) | Codex | `[x]` | P5-02 |
 
 **Phase 5 Review Criteria:**
 - Incremental run after bootstrap fetches only new posts.

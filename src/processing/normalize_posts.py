@@ -77,7 +77,7 @@ def run_normalization(settings: Settings) -> dict:
         while True:
             rows = _fetch_unprocessed_batch(read_cursor)
             if not rows:
-                continue
+                break
 
             batch_records: list[tuple[object, ...]] = []
             for row in rows:

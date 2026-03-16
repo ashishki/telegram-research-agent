@@ -159,9 +159,10 @@ def _coerce_response(response: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def run_topic_detection(settings: Settings) -> dict:
+def run_topic_detection(settings: Settings, clusters: list[dict] | None = None) -> dict:
     result = {"new_topics": 0, "merged": 0, "skipped": 0}
-    clusters = cluster_posts(settings)
+    if clusters is None:
+        clusters = cluster_posts(settings)
     if not clusters:
         LOGGER.info("Topic detection skipped: no clusters available")
         return result

@@ -5,6 +5,9 @@ import logging
 from config.settings import load_settings
 from db.migrate import run_migrations
 from ingestion.bootstrap_ingest import run_bootstrap
+from ingestion.incremental_ingest import run_incremental
+from processing.cluster import cluster_posts
+from processing.detect_topics import run_topic_detection
 from processing.normalize_posts import run_normalization
 
 
@@ -18,9 +21,11 @@ def build_parser() -> argparse.ArgumentParser:
     bootstrap_parser = subparsers.add_parser("bootstrap")
     bootstrap_parser.set_defaults(handler=handle_bootstrap)
 
-    for command in ("ingest", "digest"):
-        subparser = subparsers.add_parser(command)
-        subparser.set_defaults(handler=handle_placeholder)
+    ingest_parser = subparsers.add_parser("ingest")
+    ingest_parser.set_defaults(handler=handle_ingest)
+
+    digest_parser = subparsers.add_parser("digest")
+    digest_parser.set_defaults(handler=handle_placeholder)
 
     normalize_parser = subparsers.add_parser("normalize")
     normalize_parser.set_defaults(handler=handle_normalize)
@@ -30,6 +35,51 @@ def build_parser() -> argparse.ArgumentParser:
 
 def handle_placeholder(_: argparse.Namespace) -> int:
     LOGGER.info("Not yet implemented")
+    return 0
+
+
+def handle_ingest(_: argparse.Namespace) -> int:
+    settings = load_settings()
+
+    try:
+        run_migrations()
+
+        LOGGER.info("Starting step=incremental_ingest")
+        incremental_summary = asyncio.run(run_incremental(settings))
+        LOGGER.info(
+            "Finished step=incremental_ingest inserted=%d skipped=%d errors=%d",
+            incremental_summary["inserted"],
+            incremental_summary["skipped"],
+            incremental_summary["errors"],
+        )
+
+        LOGGER.info("Starting step=normalize_posts")
+        normalization_summary = run_normalization(settings)
+        LOGGER.info(
+            "Finished step=normalize_posts processed=%d skipped=%d errors=%d",
+            normalization_summary["processed"],
+            normalization_summary["skipped"],
+            normalization_summary["errors"],
+        )
+
+        LOGGER.info("Starting step=cluster")
+        clusters = cluster_posts(settings)
+        LOGGER.info("Finished step=cluster clusters=%d", len(clusters))
+
+        LOGGER.info("Starting step=detect_topics")
+        topic_summary = run_topic_detection(settings, clusters=clusters)
+        LOGGER.info(
+            "Finished step=detect_topics new_topics=%d merged=%d skipped=%d",
+            topic_summary["new_topics"],
+            topic_summary["merged"],
+            topic_summary["skipped"],
+        )
+    except Exception:
+        LOGGER.exception("Ingest pipeline failed")
+        return 1
+
+    if incremental_summary["errors"] or normalization_summary["errors"]:
+        return 1
     return 0
 
 
