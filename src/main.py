@@ -10,6 +10,7 @@ from db.migrate import run_migrations
 from ingestion.bootstrap_ingest import run_bootstrap
 from ingestion.incremental_ingest import run_incremental
 from bot.bot import run_bot
+from llm.client import set_usage_db_path
 from output.generate_digest import run_digest
 from output.generate_insight import OUTPUT_DIR as INSIGHT_OUTPUT_DIR
 from output.generate_insight import generate_insight
@@ -253,6 +254,7 @@ def main() -> int:
     parser = build_parser()
     try:
         settings = load_settings()
+        set_usage_db_path(settings.db_path)
         LOGGER.info(
             "Startup python_version=%s project_root=%s db_path=%s model_provider=%s",
             sys.version.split()[0],

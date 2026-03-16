@@ -35,6 +35,22 @@ def run_migrations() -> Path:
             except sqlite3.OperationalError as exc:
                 if "duplicate column name" not in str(exc).lower():
                     raise
+        connection.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS llm_usage (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                called_at TEXT NOT NULL,
+                category TEXT NOT NULL,
+                model TEXT NOT NULL,
+                input_tokens INTEGER NOT NULL DEFAULT 0,
+                output_tokens INTEGER NOT NULL DEFAULT 0,
+                cost_usd REAL NOT NULL DEFAULT 0.0,
+                duration_ms INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE INDEX IF NOT EXISTS idx_llm_usage_called_at ON llm_usage(called_at);
+            CREATE INDEX IF NOT EXISTS idx_llm_usage_category ON llm_usage(category);
+            """
+        )
         connection.commit()
 
     LOGGER.info("Database migrations complete")

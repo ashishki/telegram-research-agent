@@ -284,7 +284,7 @@ def run_digest(settings: Settings) -> dict:
             .replace("{channel_count}", str(channel_count))
         )
 
-        content_md = complete(prompt=prompt, system=system_prompt)
+        content_md = complete(prompt=prompt, system=system_prompt, category="digest")
         if not content_md.lstrip().startswith(f"## Weekly Digest — {week_label}"):
             LOGGER.warning("Digest response did not match expected heading for week=%s", week_label)
         content_md = _append_github_section(content_md, settings)

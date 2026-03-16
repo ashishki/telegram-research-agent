@@ -237,7 +237,7 @@ def run_recommendations(settings: Settings) -> dict:
             .replace("{last_recommendations}", json.dumps(last_recommendations, ensure_ascii=True))
         )
 
-        content_md = complete(prompt=prompt, system=system_prompt)
+        content_md = complete(prompt=prompt, system=system_prompt, category="recommendations")
         if not content_md.lstrip().startswith(f"## Study Recommendations — {week_label}"):
             LOGGER.warning("Recommendations response did not match expected heading for week=%s", week_label)
 

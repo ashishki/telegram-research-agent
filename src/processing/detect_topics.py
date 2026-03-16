@@ -210,7 +210,9 @@ def run_topic_detection(settings: Settings, clusters: list[dict] | None = None) 
             )
 
             try:
-                llm_response = _coerce_response(complete_json(prompt=prompt, system=system_prompt))
+                llm_response = _coerce_response(
+                    complete_json(prompt=prompt, system=system_prompt, category="topic_detection")
+                )
             except (LLMError, LLMSchemaError):
                 result["skipped"] += 1
                 LOGGER.exception("LLM topic labeling failed for cluster_id=%d", cluster_id)

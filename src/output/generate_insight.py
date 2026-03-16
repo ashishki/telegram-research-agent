@@ -149,7 +149,7 @@ def generate_insight(db_path: str, lookback_days: int = 90) -> str:
                 .replace("{POSTS_EXCERPT}", _format_posts_excerpt(matched_rows))
             )
             try:
-                insight_md = LLMClient.complete(prompt=prompt)
+                insight_md = LLMClient.complete(prompt=prompt, category="insight")
             except Exception:
                 LOGGER.warning("LLM insight generation failed for project=%s", project["name"], exc_info=True)
                 continue

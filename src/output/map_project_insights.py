@@ -285,7 +285,9 @@ def run_project_mapping(settings: Settings) -> dict:
             prompt = _render_user_prompt(user_template=user_template, project=project, matched_posts=top_posts)
 
             try:
-                response = _coerce_llm_response(complete_json(prompt=prompt, system=system_prompt))
+                response = _coerce_llm_response(
+                    complete_json(prompt=prompt, system=system_prompt, category="project_insights")
+                )
             except (LLMError, LLMSchemaError, ValueError):
                 LOGGER.exception("Project insight LLM call failed for project_id=%d", project["id"])
                 continue

@@ -10,6 +10,14 @@ from anthropic import APIConnectionError, APIStatusError, APITimeoutError, Anthr
 LOGGER = logging.getLogger(__name__)
 DEFAULT_MODEL_PROVIDER = "claude-haiku-4-5"
 MAX_RETRIES = 3
+MODEL_PRICING: dict[str, dict[str, float]] = {
+    "claude-haiku-4-5": {"input": 0.80, "output": 4.00},
+    "claude-haiku-4-5-20251001": {"input": 0.80, "output": 4.00},
+    "claude-sonnet-4-6": {"input": 3.00, "output": 15.00},
+    "claude-opus-4-6": {"input": 15.00, "output": 75.00},
+}
+DEFAULT_PRICING = {"input": 0.80, "output": 4.00}
+_usage_db_path: str = ""
 
 
 class LLMError(Exception):
@@ -18,6 +26,35 @@ class LLMError(Exception):
 
 class LLMSchemaError(LLMError):
     pass
+
+
+def set_usage_db_path(path: str) -> None:
+    global _usage_db_path
+    _usage_db_path = path
+
+
+def _record_usage(category: str, model: str, input_tokens: int, output_tokens: int, duration_ms: int) -> None:
+    if not _usage_db_path:
+        return
+
+    pricing = MODEL_PRICING.get(model, DEFAULT_PRICING)
+    cost = (input_tokens * pricing["input"] + output_tokens * pricing["output"]) / 1_000_000
+    try:
+        import sqlite3
+        from datetime import datetime, timezone
+
+        now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        with sqlite3.connect(_usage_db_path) as conn:
+            conn.execute(
+                (
+                    "INSERT INTO llm_usage "
+                    "(called_at, category, model, input_tokens, output_tokens, cost_usd, duration_ms) "
+                    "VALUES (?,?,?,?,?,?,?)"
+                ),
+                (now, category, model, input_tokens, output_tokens, round(cost, 8), duration_ms),
+            )
+    except Exception:
+        LOGGER.warning("Failed to record LLM usage", exc_info=True)
 
 
 def _get_client() -> Anthropic:
@@ -43,13 +80,14 @@ def _extract_text(response: Any) -> str:
     return "".join(text_parts).strip()
 
 
-def complete(prompt: str, system: str = "", max_tokens: int = 2048) -> str:
+def complete(prompt: str, system: str = "", max_tokens: int = 2048, category: str = "unknown") -> str:
     client = _get_client()
     model = _get_model()
     attempt = 0
 
     while True:
         attempt += 1
+        start_time = time.time()
         try:
             LOGGER.debug(
                 "Anthropic completion request model=%s prompt_length=%s max_tokens=%s attempt=%s",
@@ -65,6 +103,10 @@ def complete(prompt: str, system: str = "", max_tokens: int = 2048) -> str:
                 messages=[{"role": "user", "content": prompt}],
             )
             text = _extract_text(response)
+            duration_ms = int((time.time() - start_time) * 1000)
+            input_tokens = getattr(getattr(response, "usage", None), "input_tokens", 0)
+            output_tokens = getattr(getattr(response, "usage", None), "output_tokens", 0)
+            _record_usage(category, model, input_tokens, output_tokens, duration_ms)
             LOGGER.debug(
                 "Anthropic completion response model=%s response_length=%s",
                 model,
@@ -99,8 +141,8 @@ def _strip_code_fence(text: str) -> str:
     return text
 
 
-def complete_json(prompt: str, system: str = "") -> dict[str, Any] | list[Any]:
-    response_text = _strip_code_fence(complete(prompt=prompt, system=system, max_tokens=2048))
+def complete_json(prompt: str, system: str = "", category: str = "unknown") -> dict[str, Any] | list[Any]:
+    response_text = _strip_code_fence(complete(prompt=prompt, system=system, max_tokens=2048, category=category))
     try:
         data = json.loads(response_text)
     except json.JSONDecodeError as exc:
@@ -114,9 +156,9 @@ def complete_json(prompt: str, system: str = "") -> dict[str, Any] | list[Any]:
 
 class LLMClient:
     @staticmethod
-    def complete(prompt: str, system: str = "", max_tokens: int = 2048) -> str:
-        return complete(prompt=prompt, system=system, max_tokens=max_tokens)
+    def complete(prompt: str, system: str = "", max_tokens: int = 2048, category: str = "unknown") -> str:
+        return complete(prompt=prompt, system=system, max_tokens=max_tokens, category=category)
 
     @staticmethod
-    def complete_json(prompt: str, system: str = "") -> dict[str, Any] | list[Any]:
-        return complete_json(prompt=prompt, system=system)
+    def complete_json(prompt: str, system: str = "", category: str = "unknown") -> dict[str, Any] | list[Any]:
+        return complete_json(prompt=prompt, system=system, category=category)

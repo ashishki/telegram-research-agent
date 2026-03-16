@@ -27,6 +27,7 @@ COMMAND_DOCS: dict[str, tuple[str, str]] = {
     "/insight": ("handle_insight", "Ретроспективные инсайты по активным проектам"),
     "/project <имя>": ("handle_project", "Найти проект по части имени"),
     "/ask <вопрос>": ("handle_ask", "Ответ по данным Telegram за последние 7 дней"),
+    "/costs": ("handle_costs", "Статистика затрат и производительности LLM"),
     "/run_digest": ("handle_run_digest", "Сгенерировать новый дайджест и рекомендации"),
     "/status": ("handle_status", "Краткий статус базы и пайплайна"),
 }
@@ -392,10 +393,87 @@ def handle_ask(chat_id: str, args: str, settings: Settings) -> None:
         "Be concise (max 300 words). Answer in the same language as the question."
     )
 
-    response_text = LLMClient.complete(prompt=prompt, system=system, max_tokens=600).strip()
+    response_text = LLMClient.complete(prompt=prompt, system=system, max_tokens=600, category="bot_ask").strip()
     if not response_text:
         response_text = "Не нашёл достаточно данных, чтобы ответить по последним постам."
     send_message(_get_bot_token(), chat_id, response_text, parse_mode=None)
+
+
+def handle_costs(chat_id: str, args: str, settings: Settings) -> None:
+    del args
+    cutoff_30d = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat().replace("+00:00", "Z")
+
+    with _with_db(settings) as connection:
+        total_row = connection.execute(
+            """
+            SELECT
+                COUNT(*) AS calls,
+                SUM(input_tokens) AS total_input,
+                SUM(output_tokens) AS total_output,
+                SUM(cost_usd) AS total_cost,
+                AVG(duration_ms) AS avg_ms
+            FROM llm_usage
+            """
+        ).fetchone()
+        category_rows = connection.execute(
+            """
+            SELECT
+                category,
+                COUNT(*) AS calls,
+                SUM(cost_usd) AS cost,
+                AVG(duration_ms) AS avg_ms
+            FROM llm_usage
+            WHERE called_at >= ?
+            GROUP BY category
+            ORDER BY cost DESC
+            """,
+            (cutoff_30d,),
+        ).fetchall()
+        month_rows = connection.execute(
+            """
+            SELECT
+                substr(called_at, 1, 7) AS month,
+                SUM(cost_usd) AS cost,
+                COUNT(*) AS calls
+            FROM llm_usage
+            GROUP BY month
+            ORDER BY month DESC
+            LIMIT 8
+            """
+        ).fetchall()
+
+    total_calls = int(total_row["calls"] or 0)
+    total_cost = float(total_row["total_cost"] or 0.0)
+    avg_ms = float(total_row["avg_ms"] or 0.0)
+
+    lines = [
+        "💰 LLM Usage Statistics",
+        "",
+        "📊 All time:",
+        f"  Calls: {total_calls} | Cost: ${total_cost:.4f} | Avg: {avg_ms / 1000:.1f}s",
+        "",
+        "📋 By category (last 30 days):",
+    ]
+
+    if category_rows:
+        for row in category_rows:
+            lines.append(
+                f"  {row['category']:<16} {int(row['calls'] or 0)} calls  "
+                f"${float(row['cost'] or 0.0):.4f}  avg {float(row['avg_ms'] or 0.0) / 1000:.1f}s"
+            )
+    else:
+        lines.append("  No usage in the last 30 days.")
+
+    lines.extend(["", "📅 By month:"])
+    if month_rows:
+        for row in month_rows:
+            lines.append(
+                f"  {row['month']}  {int(row['calls'] or 0)} calls  ${float(row['cost'] or 0.0):.4f}"
+            )
+    else:
+        lines.append("  No usage recorded yet.")
+
+    send_message(_get_bot_token(), chat_id, "\n".join(lines), parse_mode=None)
 
 
 def handle_run_digest(chat_id: str, args: str, settings: Settings) -> None:
@@ -447,6 +525,7 @@ HANDLERS: dict[str, Callable[[str, str, Settings], None]] = {
     "/insight": handle_insight,
     "/project": handle_project,
     "/ask": handle_ask,
+    "/costs": handle_costs,
     "/run_digest": handle_run_digest,
     "/status": handle_status,
 }
