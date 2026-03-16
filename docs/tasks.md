@@ -153,12 +153,12 @@
 
 | ID | Task | Owner | Status | Depends On |
 |---|---|---|---|---|
-| P7-01 | Write `docs/prompts/recommendations.md` (prompt template) | Codex | `[ ]` | P0-06 |
-| P7-02 | Create `src/output/generate_recommendations.py` | Codex | `[ ]` | P6-02, P1-05 |
-| P7-03 | Implement recurring topic query (topics appearing in last 4 weeks) | Codex | `[ ]` | P7-02 |
-| P7-04 | Implement project context loading from `projects` table | Codex | `[ ]` | P7-02 |
-| P7-05 | Implement output to `data/output/recommendations/YYYY-WXX.md` | Codex | `[ ]` | P7-02 |
-| P7-06 | Wire recommendations generation into `digest` subcommand | Codex | `[ ]` | P7-02 |
+| P7-01 | Write `docs/prompts/recommendations.md` (prompt template) | Codex | `[x]` | P0-06 |
+| P7-02 | Create `src/output/generate_recommendations.py` | Codex | `[x]` | P6-02, P1-05 |
+| P7-03 | Implement recurring topic query (topics appearing in last 4 weeks) | Codex | `[x]` | P7-02 |
+| P7-04 | Implement project context loading from `projects` table | Codex | `[x]` | P7-02 |
+| P7-05 | Implement output to `data/output/recommendations/YYYY-WXX.md` | Codex | `[x]` | P7-02 |
+| P7-06 | Wire recommendations generation into `digest` subcommand | Codex | `[x]` | P7-02 |
 
 **Phase 7 Review Criteria:**
 - Recommendations reference topics from this and prior weeks.

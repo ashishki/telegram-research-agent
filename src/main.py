@@ -7,6 +7,7 @@ from db.migrate import run_migrations
 from ingestion.bootstrap_ingest import run_bootstrap
 from ingestion.incremental_ingest import run_incremental
 from output.generate_digest import run_digest
+from output.generate_recommendations import run_recommendations
 from processing.cluster import cluster_posts
 from processing.detect_topics import run_topic_detection
 from processing.normalize_posts import run_normalization
@@ -128,6 +129,20 @@ def handle_digest(_: argparse.Namespace) -> int:
     except Exception:
         LOGGER.exception("Digest generation failed")
         return 1
+
+    try:
+        recommendation_summary = run_recommendations(settings)
+        if recommendation_summary["output_path"] is None:
+            LOGGER.warning("Recommendations skipped week=%s", recommendation_summary["week_label"])
+        else:
+            LOGGER.info(
+                "Recommendations generation complete week=%s output=%s",
+                recommendation_summary["week_label"],
+                recommendation_summary["output_path"],
+            )
+    except Exception:
+        LOGGER.exception("Recommendations generation failed but digest succeeded")
+
     LOGGER.info(
         "Digest generation complete week=%s posts=%d output=%s",
         summary["week_label"],
