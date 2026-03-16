@@ -17,6 +17,7 @@ CATEGORY_MODEL_MAP: dict[str, str] = {
     # Deep synthesis — quality over cost
     "digest":            "claude-sonnet-4-6",
     "recommendations":   "claude-sonnet-4-6",
+    "study_plan":        "claude-sonnet-4-6",
     "insight":           "claude-sonnet-4-6",
     "project_insights":  "claude-sonnet-4-6",
     "bot_ask":           "claude-sonnet-4-6",

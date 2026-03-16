@@ -1,0 +1,11 @@
+[Unit]
+Description=Study reminder — Tuesday 10:00
+Requires=telegram-study-reminder.service
+
+[Timer]
+OnCalendar=Tue *-*-* 10:00:00
+Persistent=true
+Unit=telegram-study-reminder.service
+
+[Install]
+WantedBy=timers.target

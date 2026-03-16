@@ -14,6 +14,7 @@ from llm.client import LLMClient
 from output.generate_digest import _compute_week_label, run_digest
 from output.generate_insight import generate_insight
 from output.generate_recommendations import generate_recommendations
+from output.generate_study_plan import generate_study_plan
 
 
 LOGGER = logging.getLogger(__name__)
@@ -27,6 +28,7 @@ COMMAND_DOCS: dict[str, tuple[str, str]] = {
     "/insight": ("handle_insight", "Ретроспективные инсайты по активным проектам"),
     "/project <имя>": ("handle_project", "Найти проект по части имени"),
     "/ask <вопрос>": ("handle_ask", "Ответ по данным Telegram за последние 7 дней"),
+    "/study [часы]": ("handle_study", "Показать недельный учебный план"),
     "/costs": ("handle_costs", "Статистика затрат и производительности LLM"),
     "/run_digest": ("handle_run_digest", "Сгенерировать новый дайджест и рекомендации"),
     "/status": ("handle_status", "Краткий статус базы и пайплайна"),
@@ -476,6 +478,22 @@ def handle_costs(chat_id: str, args: str, settings: Settings) -> None:
     send_message(_get_bot_token(), chat_id, "\n".join(lines), parse_mode=None)
 
 
+def handle_study(chat_id: str, args: str, settings: Settings) -> None:
+    requested_hours = None
+    for token in args.split():
+        if token.isdigit():
+            requested_hours = token
+            break
+
+    content_md = generate_study_plan(settings)
+    if requested_hours is not None:
+        content_md = (
+            f"_Запрос на {requested_hours} ч. принят; пока доступен фиксированный план на 3 x 60 минут._\n\n"
+            f"{content_md}"
+        )
+    send_message(_get_bot_token(), chat_id, content_md, parse_mode="Markdown", escape_markdown=False)
+
+
 def handle_run_digest(chat_id: str, args: str, settings: Settings) -> None:
     del args
     summary = run_digest(settings)
@@ -525,6 +543,7 @@ HANDLERS: dict[str, Callable[[str, str, Settings], None]] = {
     "/insight": handle_insight,
     "/project": handle_project,
     "/ask": handle_ask,
+    "/study": handle_study,
     "/costs": handle_costs,
     "/run_digest": handle_run_digest,
     "/status": handle_status,

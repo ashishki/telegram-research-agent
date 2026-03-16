@@ -51,6 +51,19 @@ def run_migrations() -> Path:
             CREATE INDEX IF NOT EXISTS idx_llm_usage_category ON llm_usage(category);
             """
         )
+        connection.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS study_plans (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                week_label TEXT NOT NULL UNIQUE,
+                generated_at TEXT NOT NULL,
+                content_md TEXT NOT NULL,
+                topics_covered TEXT,
+                reminder_sent_tue INTEGER NOT NULL DEFAULT 0,
+                reminder_sent_fri INTEGER NOT NULL DEFAULT 0
+            );
+            """
+        )
         connection.commit()
 
     LOGGER.info("Database migrations complete")

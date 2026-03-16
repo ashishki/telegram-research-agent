@@ -16,6 +16,8 @@ from output.generate_insight import OUTPUT_DIR as INSIGHT_OUTPUT_DIR
 from output.generate_insight import generate_insight
 from output.map_project_insights import run_project_mapping
 from output.generate_recommendations import run_recommendations
+from output.generate_study_plan import OUTPUT_DIR as STUDY_PLAN_OUTPUT_DIR
+from output.generate_study_plan import generate_study_plan, send_study_reminder
 from processing.cluster import cluster_posts
 from processing.detect_topics import run_topic_detection
 from processing.normalize_posts import run_normalization
@@ -41,6 +43,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     digest_parser = subparsers.add_parser("digest")
     digest_parser.set_defaults(handler=handle_digest)
+
+    study_parser = subparsers.add_parser("study", help="Generate or send the weekly study plan")
+    study_parser.add_argument("--remind", action="store_true")
+    study_parser.add_argument("--friday", action="store_true")
+    study_parser.set_defaults(handler=handle_study)
 
     insight_parser = subparsers.add_parser(
         "insight",
@@ -191,6 +198,13 @@ def handle_digest(_: argparse.Namespace) -> int:
         LOGGER.exception("Recommendations generation failed but digest succeeded")
 
     try:
+        LOGGER.info("Starting step=generate_study_plan")
+        generate_study_plan(settings)
+        LOGGER.info("Finished step=generate_study_plan output_dir=%s", STUDY_PLAN_OUTPUT_DIR)
+    except Exception:
+        LOGGER.exception("Study plan generation failed but digest succeeded")
+
+    try:
         LOGGER.info("Starting step=map_project_insights")
         project_mapping_summary = run_project_mapping(settings)
         LOGGER.info(
@@ -215,6 +229,29 @@ def handle_bot(_: argparse.Namespace) -> int:
         LOGGER.info("Finished step=run_bot")
     except Exception:
         LOGGER.exception("Bot runtime failed")
+        return 1
+    return 0
+
+
+def handle_study(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+        if args.remind:
+            LOGGER.info("Starting step=send_study_reminder is_friday=%s", getattr(args, "friday", False))
+            send_study_reminder(settings, is_friday=getattr(args, "friday", False))
+            LOGGER.info("Finished step=send_study_reminder")
+            return 0
+
+        LOGGER.info("Starting step=generate_study_plan")
+        generate_study_plan(settings)
+        output_path = STUDY_PLAN_OUTPUT_DIR / f"{_current_week_label()}.md"
+        LOGGER.info("Finished step=generate_study_plan output=%s", output_path)
+        sys.stdout.write(f"{output_path}\n")
+    except Exception:
+        LOGGER.exception("Study plan command failed")
         return 1
     return 0
 

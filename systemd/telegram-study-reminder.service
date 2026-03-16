@@ -1,0 +1,23 @@
+[Unit]
+Description=Telegram Research Agent — Study Reminder
+After=network.target
+
+[Service]
+Type=oneshot
+User=oc_you
+Group=oc_you
+WorkingDirectory=/srv/openclaw-you/workspace/telegram-research-agent
+EnvironmentFile=/srv/openclaw-you/.env
+Environment=PYTHONPATH=/srv/openclaw-you/workspace/telegram-research-agent
+ExecStart=/srv/openclaw-you/venv/bin/python3 src/main.py study --remind
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=telegram-study-reminder
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/openclaw-you/workspace/telegram-research-agent/data
+
+[Install]
+WantedBy=multi-user.target
