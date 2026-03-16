@@ -96,12 +96,12 @@
 
 | ID | Task | Owner | Status | Depends On |
 |---|---|---|---|---|
-| P4-01 | Create `src/processing/cluster.py` (TF-IDF + K-Means, outputs keyword sets per cluster) | Codex | `[ ]` | P3-01 | Create `src/processing/normalize_posts.py` (reads raw_posts, writes posts) | Codex | `[x]` | P1-04 |
-| P4-02 | Implement elbow heuristic or fixed-k config for cluster count | Codex | `[ ]` | P4-01 |
-| P4-03 | Create `src/processing/detect_topics.py` (matches clusters to existing topics or creates new via LLM) | Codex | `[ ]` | P4-01, P1-05 |
-| P4-04 | Implement overlap check between new cluster keywords and existing topic keywords | Codex | `[ ]` | P4-03 |
-| P4-05 | Implement LLM call for new topic label generation using `docs/prompts/rubric_discovery.md` | Codex | `[ ]` | P4-03, P0-06 |
-| P4-06 | Write results to `topics` and `post_topics` tables | Codex | `[ ]` | P4-05 |
+| P4-01 | Create `src/processing/cluster.py` (TF-IDF + K-Means, outputs keyword sets per cluster) | Codex | `[x]` | P3-01 |
+| P4-02 | Implement elbow heuristic or fixed-k config for cluster count | Codex | `[x]` | P4-01 |
+| P4-03 | Create `src/processing/detect_topics.py` (matches clusters to existing topics or creates new via LLM) | Codex | `[x]` | P4-01, P1-05 |
+| P4-04 | Implement overlap check between new cluster keywords and existing topic keywords | Codex | `[x]` | P4-03 |
+| P4-05 | Implement LLM call for new topic label generation using `docs/prompts/rubric_discovery.md` | Codex | `[x]` | P4-03, P0-06 |
+| P4-06 | Write results to `topics` and `post_topics` tables | Codex | `[x]` | P4-05 |
 
 **Phase 4 Review Criteria:**
 - Clusters contain sensible keyword groupings.
