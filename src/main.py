@@ -6,6 +6,7 @@ from config.settings import load_settings
 from db.migrate import run_migrations
 from ingestion.bootstrap_ingest import run_bootstrap
 from ingestion.incremental_ingest import run_incremental
+from output.generate_digest import run_digest
 from processing.cluster import cluster_posts
 from processing.detect_topics import run_topic_detection
 from processing.normalize_posts import run_normalization
@@ -25,17 +26,12 @@ def build_parser() -> argparse.ArgumentParser:
     ingest_parser.set_defaults(handler=handle_ingest)
 
     digest_parser = subparsers.add_parser("digest")
-    digest_parser.set_defaults(handler=handle_placeholder)
+    digest_parser.set_defaults(handler=handle_digest)
 
     normalize_parser = subparsers.add_parser("normalize")
     normalize_parser.set_defaults(handler=handle_normalize)
 
     return parser
-
-
-def handle_placeholder(_: argparse.Namespace) -> int:
-    LOGGER.info("Not yet implemented")
-    return 0
 
 
 def handle_ingest(_: argparse.Namespace) -> int:
@@ -122,6 +118,23 @@ def handle_normalize(_: argparse.Namespace) -> int:
         summary["errors"],
     )
     return 0 if summary["errors"] == 0 else 1
+
+
+def handle_digest(_: argparse.Namespace) -> int:
+    settings = load_settings()
+    try:
+        run_migrations()
+        summary = run_digest(settings)
+    except Exception:
+        LOGGER.exception("Digest generation failed")
+        return 1
+    LOGGER.info(
+        "Digest generation complete week=%s posts=%d output=%s",
+        summary["week_label"],
+        summary["post_count"],
+        summary["output_path"],
+    )
+    return 0
 
 
 def main() -> int:

@@ -1,5 +1,5 @@
 [Unit]
-Description=Telegram Research Agent — Ingestion Pipeline
+Description=Telegram Research Agent — Digest Generator
 After=network.target
 
 [Service]
@@ -9,17 +9,16 @@ Group=oc_you
 WorkingDirectory=/srv/openclaw-you/workspace/telegram-research-agent
 EnvironmentFile=/srv/openclaw-you/.env
 Environment=PYTHONPATH=/srv/openclaw-you/workspace/telegram-research-agent
-ExecStart=/usr/bin/python3 src/main.py ingest
+ExecStart=/usr/bin/python3 src/main.py digest
 Restart=no
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=telegram-ingest
+SyslogIdentifier=telegram-digest
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
 ReadWritePaths=/srv/openclaw-you/workspace/telegram-research-agent/data
-ReadWritePaths=/srv/openclaw-you/secrets
 
 [Install]
 WantedBy=multi-user.target

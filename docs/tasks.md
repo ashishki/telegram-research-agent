@@ -133,13 +133,13 @@
 
 | ID | Task | Owner | Status | Depends On |
 |---|---|---|---|---|
-| P6-01 | Write `docs/prompts/digest_generation.md` (prompt template) | Codex | `[ ]` | P0-06 |
-| P6-02 | Create `src/output/generate_digest.py` (query posts + topics, call LLM, write output) | Codex | `[ ]` | P4-06, P1-05 |
-| P6-03 | Implement week_label computation (ISO week format `YYYY-WXX`) | Codex | `[ ]` | P6-02 |
-| P6-04 | Implement digest output to `data/output/digests/YYYY-WXX.md` | Codex | `[ ]` | P6-02 |
-| P6-05 | Implement digest storage in `digests` table | Codex | `[ ]` | P6-02 |
-| P6-06 | Create `systemd/telegram-digest.service` | Codex | `[ ]` | P6-02 |
-| P6-07 | Create `systemd/telegram-digest.timer` (Monday 09:00) | Codex | `[ ]` | P6-06 |
+| P6-01 | Write `docs/prompts/digest_generation.md` (prompt template) | Codex | `[x]` | P0-06 |
+| P6-02 | Create `src/output/generate_digest.py` (query posts + topics, call LLM, write output) | Codex | `[x]` | P4-06, P1-05 |
+| P6-03 | Implement week_label computation (ISO week format `YYYY-WXX`) | Codex | `[x]` | P6-02 |
+| P6-04 | Implement digest output to `data/output/digests/YYYY-WXX.md` | Codex | `[x]` | P6-02 |
+| P6-05 | Implement digest storage in `digests` table | Codex | `[x]` | P6-02 |
+| P6-06 | Create `systemd/telegram-digest.service` | Codex | `[x]` | P6-02 |
+| P6-07 | Create `systemd/telegram-digest.timer` (Monday 09:00) | Codex | `[x]` | P6-06 |
 
 **Phase 6 Review Criteria:**
 - Digest file created at correct path with correct week label.

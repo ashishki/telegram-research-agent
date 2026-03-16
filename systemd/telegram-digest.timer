@@ -1,0 +1,11 @@
+[Unit]
+Description=Telegram Research Agent — Weekly Digest Timer
+Requires=telegram-digest.service
+
+[Timer]
+OnCalendar=Mon *-*-* 09:00:00
+Persistent=true
+Unit=telegram-digest.service
+
+[Install]
+WantedBy=timers.target
