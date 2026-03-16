@@ -98,3 +98,13 @@ def complete_json(prompt: str, system: str = "") -> dict[str, Any] | list[Any]:
     if not isinstance(data, (dict, list)):
         raise LLMSchemaError("Anthropic response JSON must decode to an object or array")
     return data
+
+
+class LLMClient:
+    @staticmethod
+    def complete(prompt: str, system: str = "", max_tokens: int = 2048) -> str:
+        return complete(prompt=prompt, system=system, max_tokens=max_tokens)
+
+    @staticmethod
+    def complete_json(prompt: str, system: str = "") -> dict[str, Any] | list[Any]:
+        return complete_json(prompt=prompt, system=system)

@@ -29,6 +29,12 @@ def run_migrations() -> Path:
         connection.execute("PRAGMA foreign_keys = ON;")
         connection.execute("PRAGMA journal_mode = WAL;")
         connection.executescript(schema_sql)
+        for column_name in ("github_repo", "last_commit_at", "github_synced_at"):
+            try:
+                connection.execute(f"ALTER TABLE projects ADD COLUMN {column_name} TEXT")
+            except sqlite3.OperationalError as exc:
+                if "duplicate column name" not in str(exc).lower():
+                    raise
         connection.commit()
 
     LOGGER.info("Database migrations complete")

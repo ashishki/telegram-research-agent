@@ -202,6 +202,29 @@
 
 ---
 
+## Phase 10 — GitHub Integration
+
+| ID | Task | Owner | Status | Depends On |
+|---|---|---|---|---|
+| P10-01 | Add `github_repo`, `last_commit_at`, `github_synced_at` columns to `projects` table via idempotent migration in `src/db/migrate.py` | Codex | `[x]` | P1-04 |
+| P10-02 | Create `src/integrations/__init__.py` (empty) | Codex | `[x]` | P1-02 |
+| P10-03 | Create `src/integrations/github_sync.py` — fetches all repos for GITHUB_USERNAME, weekly commit activity, languages and topics per repo; syncs to `projects` table | Codex | `[x]` | P10-01 |
+| P10-04 | Create `src/integrations/github_crossref.py` — matches repo languages/topics against Telegram topic clusters; returns per-repo relevance map | Codex | `[x]` | P10-03 |
+| P10-05 | Write `docs/prompts/github_insights.md` — LLM prompt for retroactive insight (posts × project relevance) | Codex | `[x]` | P10-03 |
+| P10-06 | Create `src/output/generate_insight.py` — FTS5 search posts for each project over configurable lookback window; batched LLM call; outputs `data/output/insights/YYYY-WXX.md` | Codex | `[x]` | P10-04, P10-05 |
+| P10-07 | Add `github-projects` section to `src/output/generate_digest.py` — calls github_sync + crossref, appends "## Your Projects × Telegram" to digest | Codex | `[x]` | P10-04 |
+| P10-08 | Add `insight` subcommand to `src/main.py` with `--since-bootstrap` flag (lookback 90 days) and `--weeks N` flag | Codex | `[x]` | P10-06 |
+
+**Phase 10 Review Criteria:**
+- `github_sync.py` reads GITHUB_USERNAME and GITHUB_TOKEN from os.environ (token optional, graceful degradation to unauthenticated).
+- No credentials hardcoded anywhere.
+- `projects` table populated from GitHub without wiping manually added rows (INSERT OR IGNORE on name).
+- Digest appends GitHub section without replacing existing content.
+- `insight` subcommand runs without error even if `projects` table is empty.
+- All HTTP calls to GitHub API have error handling (rate limit, 404, network error).
+
+---
+
 ## Prompt Template Tasks (docs/prompts/)
 
 | ID | Task | Owner | Status |

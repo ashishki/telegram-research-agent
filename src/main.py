@@ -3,12 +3,15 @@ import asyncio
 import logging
 import signal
 import sys
+from datetime import datetime, timezone
 
 from config.settings import PROJECT_ROOT, load_settings
 from db.migrate import run_migrations
 from ingestion.bootstrap_ingest import run_bootstrap
 from ingestion.incremental_ingest import run_incremental
 from output.generate_digest import run_digest
+from output.generate_insight import OUTPUT_DIR as INSIGHT_OUTPUT_DIR
+from output.generate_insight import generate_insight
 from output.map_project_insights import run_project_mapping
 from output.generate_recommendations import run_recommendations
 from processing.cluster import cluster_posts
@@ -36,6 +39,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     digest_parser = subparsers.add_parser("digest")
     digest_parser.set_defaults(handler=handle_digest)
+
+    insight_parser = subparsers.add_parser(
+        "insight",
+        help="Generate retroactive project insights from Telegram history",
+    )
+    insight_parser.add_argument("--since-bootstrap", action="store_true")
+    insight_parser.add_argument("--weeks", type=int, default=4)
+    insight_parser.set_defaults(handler=handle_insight)
 
     normalize_parser = subparsers.add_parser("normalize")
     normalize_parser.set_defaults(handler=handle_normalize)
@@ -184,6 +195,35 @@ def handle_digest(_: argparse.Namespace) -> int:
         )
     except Exception:
         LOGGER.exception("Project mapping failed but digest succeeded")
+
+    return 0
+
+
+def _current_week_label() -> str:
+    year, week, _ = datetime.now(timezone.utc).isocalendar()
+    return f"{year}-W{week:02d}"
+
+
+def handle_insight(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    lookback_days = 90 if args.since_bootstrap else max(1, args.weeks) * 7
+
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+
+        LOGGER.info("Starting step=generate_insight lookback_days=%d", lookback_days)
+        output_md = generate_insight(settings.db_path, lookback_days=lookback_days)
+        output_path = INSIGHT_OUTPUT_DIR / f"{_current_week_label()}.md"
+        if output_md:
+            LOGGER.info("Finished step=generate_insight output=%s", output_path)
+            sys.stdout.write(f"{output_path}\n")
+        else:
+            LOGGER.info("Insight generation produced no output")
+    except Exception:
+        LOGGER.exception("Insight generation failed")
+        return 1
 
     return 0
 

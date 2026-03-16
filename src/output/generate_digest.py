@@ -8,6 +8,14 @@ from pathlib import Path
 from config.settings import PROJECT_ROOT, Settings
 from llm.client import complete
 
+try:
+    from integrations.github_crossref import NO_OVERLAP_NOTE, crossref_repos_to_topics
+    from integrations.github_sync import sync_github_projects
+except Exception:  # pragma: no cover - graceful import fallback
+    NO_OVERLAP_NOTE = "active this week, no Telegram overlap found"
+    crossref_repos_to_topics = None
+    sync_github_projects = None
+
 
 LOGGER = logging.getLogger(__name__)
 PROMPT_PATH = PROJECT_ROOT / "docs" / "prompts" / "digest_generation.md"
@@ -71,6 +79,45 @@ def _write_digest_file(week_label: str, content_md: str) -> Path:
     output_path = OUTPUT_DIR / f"{week_label}.md"
     output_path.write_text(content_md, encoding="utf-8")
     return output_path
+
+
+def _append_github_section(content_md: str, settings: Settings) -> str:
+    import os
+
+    if not os.environ.get("GITHUB_USERNAME"):
+        return content_md
+    if sync_github_projects is None or crossref_repos_to_topics is None:
+        LOGGER.warning("GitHub integrations unavailable; skipping digest GitHub section")
+        return content_md
+
+    try:
+        repos = sync_github_projects(settings.db_path)
+        if not repos:
+            return content_md
+        topic_matches = crossref_repos_to_topics(repos, settings.db_path)
+    except Exception:
+        LOGGER.warning("GitHub digest section skipped due to integration failure", exc_info=True)
+        return content_md
+
+    lines = ["", "## Your Projects × Telegram", ""]
+    for repo in repos:
+        repo_name = repo["name"]
+        github_repo = repo.get("github_repo") or repo_name
+        commits_label = (
+            f"{int(repo.get('weekly_commits') or 0)} commits this week"
+            if int(repo.get("weekly_commits") or 0) > 0
+            else "no activity"
+        )
+        matched_topics = topic_matches.get(repo_name, [])
+        if not matched_topics:
+            match_label = "no Telegram topic matches"
+        elif matched_topics == [NO_OVERLAP_NOTE]:
+            match_label = NO_OVERLAP_NOTE
+        else:
+            match_label = ", ".join(matched_topics)
+        lines.append(f"- [{repo_name}](https://github.com/{github_repo}) — {commits_label} — {match_label}")
+
+    return content_md.rstrip() + "\n\n" + "\n".join(lines).strip() + "\n"
 
 
 def _store_digest(connection: sqlite3.Connection, week_label: str, content_md: str, post_count: int) -> None:
@@ -137,6 +184,7 @@ def run_digest(settings: Settings) -> dict:
         if post_count == 0:
             LOGGER.warning("Digest generation found no posts since cutoff=%s", cutoff_iso)
             empty_digest = _render_empty_digest(week_label, date_range)
+            empty_digest = _append_github_section(empty_digest, settings)
             output_path = _write_digest_file(week_label, empty_digest)
             connection.execute("BEGIN")
             _store_digest(connection, week_label, empty_digest, 0)
@@ -180,6 +228,7 @@ def run_digest(settings: Settings) -> dict:
         content_md = complete(prompt=prompt, system=system_prompt)
         if not content_md.lstrip().startswith(f"## Weekly Digest — {week_label}"):
             LOGGER.warning("Digest response did not match expected heading for week=%s", week_label)
+        content_md = _append_github_section(content_md, settings)
 
         output_path = _write_digest_file(week_label, content_md)
         connection.execute("BEGIN")
