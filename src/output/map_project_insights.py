@@ -1,17 +1,18 @@
 import json
 import logging
-import re
 import sqlite3
 from datetime import timezone, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 from config.settings import PROJECT_ROOT, Settings
 from llm.client import LLMError, LLMSchemaError, complete_json
+from output.report_utils import _extract_markdown_section
 
 
 LOGGER = logging.getLogger(__name__)
 PROMPT_PATH = PROJECT_ROOT / "docs" / "prompts" / "project_insights.md"
-DIGEST_OUTPUT_DIR = PROJECT_ROOT / "data" / "output" / "digests"
+PROJECT_INSIGHTS_OUTPUT_DIR = PROJECT_ROOT / "data" / "output" / "project_insights"
 TEXT_EXCERPT_LENGTH = 200
 FTS_MATCH_LIMIT = 20
 LLM_POST_LIMIT = 10
@@ -39,14 +40,6 @@ def _start_of_current_iso_week(now: datetime | None = None) -> datetime:
     )
 
 
-def _extract_markdown_section(text: str, heading: str) -> str:
-    pattern = re.compile(rf"^## {re.escape(heading)}\n(.*?)(?=^## |\Z)", re.MULTILINE | re.DOTALL)
-    match = pattern.search(text)
-    if not match:
-        raise ValueError(f"Section not found in prompt file: {heading}")
-    return match.group(1).strip()
-
-
 def _load_prompt_sections() -> tuple[str, str]:
     prompt_markdown = PROMPT_PATH.read_text(encoding="utf-8")
     system_prompt = _extract_markdown_section(prompt_markdown, "System Prompt")
@@ -55,7 +48,15 @@ def _load_prompt_sections() -> tuple[str, str]:
 
 
 def _split_keywords(keywords: str | None) -> list[str]:
-    values = [part.strip() for part in (keywords or "").split(",")]
+    if not keywords:
+        return []
+    try:
+        parsed = json.loads(keywords)
+        if isinstance(parsed, list):
+            return [str(item).strip() for item in parsed if str(item).strip()]
+    except (json.JSONDecodeError, ValueError):
+        pass
+    values = [part.strip() for part in keywords.split(",")]
     return [value for value in values if value]
 
 
@@ -92,6 +93,7 @@ def _score_post(row: sqlite3.Row, keywords: list[str]) -> dict[str, Any]:
         "content": row["content"] or "",
         "text_excerpt": _make_excerpt(row["content"]),
         "view_count": view_count,
+        "message_url": row["message_url"],
         "topic_label": "",
         "final_score": final_score,
     }
@@ -111,7 +113,7 @@ def _search_project_posts(
 
     return connection.execute(
         """
-        SELECT posts.id, posts.content, posts.channel_username, raw_posts.view_count
+        SELECT posts.id, posts.content, posts.channel_username, raw_posts.view_count, raw_posts.message_url
         FROM posts_fts
         JOIN posts ON posts.id = posts_fts.rowid
         JOIN raw_posts ON raw_posts.id = posts.raw_post_id
@@ -134,6 +136,7 @@ def _render_user_prompt(
             "channel_username": post["channel_username"],
             "text_excerpt": post["text_excerpt"],
             "view_count": post["view_count"],
+            "message_url": post["message_url"],
             "topic_label": post["topic_label"],
         }
         for post in matched_posts
@@ -207,43 +210,33 @@ def _insert_project_links(
     return cursor.rowcount if cursor.rowcount != -1 else 0
 
 
-def _replace_or_append_project_insights_section(content: str, section: str) -> str:
-    pattern = re.compile(r"\n\n## Project Insights\n.*\Z", re.DOTALL)
-    if pattern.search(content):
-        return pattern.sub(section, content)
-    return content.rstrip() + section
-
-
-def _append_digest_project_insights(
-    week_label: str,
-    project_notes: dict[str, list[str]],
-) -> None:
+def _render_project_insights_report(week_label: str, project_notes: dict[str, list[str]]) -> str:
+    lines = [f"## Project Insights — {week_label}", ""]
     if not project_notes:
-        LOGGER.info("No project insights to append for week=%s", week_label)
-        return
+        lines.append("No project insights were identified this week.")
+        return "\n".join(lines).rstrip() + "\n"
 
-    digest_path = DIGEST_OUTPUT_DIR / f"{week_label}.md"
-    if not digest_path.exists():
-        LOGGER.warning("Skipping project insights append because digest file is missing: %s", digest_path)
-        return
-
-    content = digest_path.read_text(encoding="utf-8")
-    section_parts = ["\n\n## Project Insights\n"]
     for project_name, notes in project_notes.items():
         if not notes:
             continue
-        section_parts.append(f"\n### {project_name}\n")
-        section_parts.extend(f"- {note}\n" for note in notes)
+        lines.append(f"### {project_name}")
+        lines.extend(f"- {note}" for note in notes)
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
 
-    updated_content = _replace_or_append_project_insights_section(content, "".join(section_parts).rstrip() + "\n")
-    digest_path.write_text(updated_content, encoding="utf-8")
-    LOGGER.info("Appended project insights to digest file %s", digest_path)
+
+def _write_project_insights_file(week_label: str, content_md: str) -> Path:
+    PROJECT_INSIGHTS_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    output_path = PROJECT_INSIGHTS_OUTPUT_DIR / f"{week_label}.md"
+    output_path.write_text(content_md, encoding="utf-8")
+    return output_path
 
 
 def run_project_mapping(settings: Settings) -> dict:
-    result = {"projects_processed": 0, "links_created": 0}
+    result = {"projects_processed": 0, "links_created": 0, "output_path": None}
     week_label = _compute_week_label()
     week_start_iso = _start_of_current_iso_week().isoformat().replace("+00:00", "Z")
+    project_notes: dict[str, list[str]] = {}
 
     with sqlite3.connect(settings.db_path) as connection:
         connection.row_factory = sqlite3.Row
@@ -260,69 +253,100 @@ def run_project_mapping(settings: Settings) -> dict:
         ).fetchall()
 
         if not projects:
-            LOGGER.info("Project mapping skipped: no active projects")
-            return result
+            LOGGER.info("Project mapping found no active projects for week=%s", week_label)
+        else:
+            system_prompt, user_template = _load_prompt_sections()
 
-        system_prompt, user_template = _load_prompt_sections()
-        project_notes: dict[str, list[str]] = {}
+            for project in projects:
+                result["projects_processed"] += 1
+                keywords = _split_keywords(project["keywords"])
+                if not keywords:
+                    LOGGER.info(
+                        "Skipping project_id=%d name=%r because it has no keywords",
+                        project["id"],
+                        project["name"],
+                    )
+                    continue
 
-        for project in projects:
-            result["projects_processed"] += 1
-            keywords = _split_keywords(project["keywords"])
-            if not keywords:
-                LOGGER.info("Skipping project_id=%d name=%r because it has no keywords", project["id"], project["name"])
-                continue
+                matched_rows = _search_project_posts(connection, keywords, week_start_iso)
+                if not matched_rows:
+                    LOGGER.info("No keyword matches for project_id=%d name=%r", project["id"], project["name"])
+                    continue
 
-            matched_rows = _search_project_posts(connection, keywords, week_start_iso)
-            if not matched_rows:
-                LOGGER.info("No keyword matches for project_id=%d name=%r", project["id"], project["name"])
-                continue
-
-            scored_posts = [_score_post(row, keywords) for row in matched_rows]
-            ranked_posts = sorted(scored_posts, key=lambda post: (-post["final_score"], -post["view_count"], post["post_id"]))
-            top_posts = ranked_posts[:LLM_POST_LIMIT]
-
-            prompt = _render_user_prompt(user_template=user_template, project=project, matched_posts=top_posts)
-
-            try:
-                response = _coerce_llm_response(
-                    complete_json(prompt=prompt, system=system_prompt, category="project_insights")
+                scored_posts = [_score_post(row, keywords) for row in matched_rows]
+                ranked_posts = sorted(
+                    scored_posts,
+                    key=lambda post: (-post["final_score"], -post["view_count"], post["post_id"]),
                 )
-            except (LLMError, LLMSchemaError, ValueError):
-                LOGGER.exception("Project insight LLM call failed for project_id=%d", project["id"])
-                continue
+                top_posts = ranked_posts[:LLM_POST_LIMIT]
 
-            allowed_post_ids = {post["post_id"] for post in top_posts}
-            relevant_entries = [
-                entry
-                for entry in response
-                if entry["post_id"] in allowed_post_ids
-                and entry["relevant"]
-                and entry["relevance_score"] >= 0.4
-                and entry["rationale"]
-            ]
+                prompt = _render_user_prompt(user_template=user_template, project=project, matched_posts=top_posts)
 
-            try:
-                connection.execute("BEGIN")
-                inserted_count = _insert_project_links(connection, project["id"], relevant_entries)
-                connection.commit()
-            except Exception:
-                connection.rollback()
-                LOGGER.exception("Failed to persist project links for project_id=%d", project["id"])
-                continue
+                try:
+                    raw_response = complete_json(prompt=prompt, system=system_prompt, category="project_insights")
+                except (LLMError, LLMSchemaError):
+                    LOGGER.warning(
+                        "Project insight LLM call failed for project_id=%d; returning empty",
+                        project["id"],
+                        exc_info=True,
+                    )
+                    project_notes[project["name"]] = []
+                    continue
 
-            if relevant_entries:
-                project_notes[project["name"]] = [entry["rationale"] for entry in relevant_entries if entry["rationale"]]
+                if not isinstance(raw_response, list):
+                    LOGGER.warning(
+                        "Project insight LLM response is not a list for project_id=%d type=%s; returning empty",
+                        project["id"],
+                        type(raw_response).__name__,
+                    )
+                    project_notes[project["name"]] = []
+                    continue
 
-            result["links_created"] += inserted_count
-            LOGGER.info(
-                "Project mapping complete for project_id=%d name=%r matched=%d relevant=%d inserted=%d",
-                project["id"],
-                project["name"],
-                len(matched_rows),
-                len(relevant_entries),
-                inserted_count,
-            )
+                try:
+                    response = _coerce_llm_response(raw_response)
+                except (LLMSchemaError, ValueError):
+                    LOGGER.warning(
+                        "Project insight LLM response coercion failed for project_id=%d; returning empty",
+                        project["id"],
+                        exc_info=True,
+                    )
+                    project_notes[project["name"]] = []
+                    continue
 
-    _append_digest_project_insights(week_label, project_notes)
+                allowed_post_ids = {post["post_id"] for post in top_posts}
+                relevant_entries = [
+                    entry
+                    for entry in response
+                    if entry["post_id"] in allowed_post_ids
+                    and entry["relevant"]
+                    and entry["relevance_score"] >= 0.4
+                    and entry["rationale"]
+                ]
+
+                try:
+                    connection.execute("BEGIN")
+                    inserted_count = _insert_project_links(connection, project["id"], relevant_entries)
+                    connection.commit()
+                except Exception:
+                    connection.rollback()
+                    LOGGER.exception("Failed to persist project links for project_id=%d", project["id"])
+                    continue
+
+                if relevant_entries:
+                    project_notes[project["name"]] = [entry["rationale"] for entry in relevant_entries if entry["rationale"]]
+
+                result["links_created"] += inserted_count
+                LOGGER.info(
+                    "Project mapping complete for project_id=%d name=%r matched=%d relevant=%d inserted=%d",
+                    project["id"],
+                    project["name"],
+                    len(matched_rows),
+                    len(relevant_entries),
+                    inserted_count,
+                )
+
+    content_md = _render_project_insights_report(week_label, project_notes)
+    output_path = _write_project_insights_file(week_label, content_md)
+    LOGGER.info("Project insights report written week=%s output=%s", week_label, output_path)
+    result["output_path"] = str(output_path)
     return result

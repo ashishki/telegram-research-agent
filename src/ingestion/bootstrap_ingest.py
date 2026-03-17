@@ -43,11 +43,19 @@ def _detect_media_type(message) -> str:
     return "none"
 
 
+def _build_message_url(channel_username: str, message_id: int) -> str | None:
+    normalized = channel_username.strip().lstrip("@")
+    if not normalized or normalized.startswith("+") or normalized.isdigit():
+        return None
+    return f"https://t.me/{normalized}/{message_id}"
+
+
 def _extract_message_row(message, channel_username: str, ingested_at: str) -> dict:
     text = message.message or ""
     media_type = _detect_media_type(message)
     media_caption = text if media_type != "none" else None
     forward_from = str(message.fwd_from.from_id) if message.fwd_from else None
+    message_url = _build_message_url(channel_username, int(message.id))
 
     payload = {
         "channel_username": channel_username,
@@ -59,6 +67,7 @@ def _extract_message_row(message, channel_username: str, ingested_at: str) -> di
         "media_caption": media_caption,
         "forward_from": forward_from,
         "view_count": message.views or 0,
+        "message_url": message_url,
     }
     payload["raw_json"] = json.dumps(payload, ensure_ascii=True, sort_keys=True)
     payload["ingested_at"] = ingested_at
@@ -78,9 +87,10 @@ def _insert_message(cursor: sqlite3.Cursor, row: dict) -> None:
             media_caption,
             forward_from,
             view_count,
+            message_url,
             raw_json,
             ingested_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             row["channel_username"],
@@ -92,6 +102,7 @@ def _insert_message(cursor: sqlite3.Cursor, row: dict) -> None:
             row["media_caption"],
             row["forward_from"],
             row["view_count"],
+            row["message_url"],
             row["raw_json"],
             row["ingested_at"],
         ),

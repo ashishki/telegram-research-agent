@@ -5,7 +5,8 @@ from datetime import datetime, timedelta
 
 import numpy as np
 from sklearn.cluster import KMeans
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, TfidfVectorizer
+from sklearn.metrics import silhouette_score
 
 from config.settings import Settings
 
@@ -16,6 +17,23 @@ MIN_CLUSTER_K = 2
 MIN_POST_COUNT = 10
 MAX_FEATURES = 500
 TOP_KEYWORD_COUNT = 10
+ENGLISH_STOPWORDS = list(ENGLISH_STOP_WORDS)
+RUSSIAN_STOPWORDS = [
+    "и", "в", "во", "не", "что", "он", "на", "я", "с", "со", "как", "а", "то", "все", "она",
+    "так", "его", "но", "да", "ты", "к", "у", "же", "вы", "за", "бы", "по", "только", "ее",
+    "мне", "было", "вот", "от", "меня", "еще", "нет", "о", "из", "ему", "теперь", "когда",
+    "даже", "ну", "вдруг", "ли", "если", "уже", "или", "ни", "быть", "был", "него", "до",
+    "вас", "нибудь", "опять", "уж", "вам", "ведь", "там", "потом", "себя", "ничего", "ей",
+    "может", "они", "тут", "где", "есть", "надо", "ней", "для", "мы", "тебя", "их", "чем",
+    "была", "сам", "чтоб", "без", "будто", "чего", "раз", "тоже", "себе", "под", "будет",
+    "ж", "тогда", "кто", "этот", "того", "потому", "этого", "какой", "совсем", "ним", "здесь",
+    "этом", "один", "почти", "мой", "тем", "чтобы", "нее", "сейчас", "были", "куда", "зачем",
+    "всех", "никогда", "можно", "при", "наконец", "два", "об", "другой", "хоть", "после",
+    "над", "больше", "тот", "через", "эти", "нас", "про", "всего", "них", "какая", "много",
+    "разве", "три", "эту", "моя", "впрочем", "хорошо", "свою", "этой", "перед", "иногда",
+    "лучше", "чуть", "том", "нельзя", "такой", "им", "более", "всегда", "конечно", "всю",
+    "между",
+]
 
 
 def _utc_now() -> datetime:
@@ -76,7 +94,11 @@ def cluster_posts(settings: Settings, since_days: int = 30) -> list[dict]:
         cluster_k,
     )
 
-    vectorizer = TfidfVectorizer(max_features=MAX_FEATURES, stop_words="english")
+    vectorizer = TfidfVectorizer(
+        max_features=MAX_FEATURES,
+        stop_words=ENGLISH_STOPWORDS + RUSSIAN_STOPWORDS,
+        token_pattern=r"(?u)\b\w+\b",
+    )
     try:
         matrix = vectorizer.fit_transform(documents)
     except ValueError:
@@ -88,9 +110,16 @@ def cluster_posts(settings: Settings, since_days: int = 30) -> list[dict]:
 
     model = KMeans(n_clusters=cluster_k, n_init=10, random_state=42)
     labels = model.fit_predict(matrix)
+    inertia = float(model.inertia_)
+    try:
+        sil_score: float | None = float(silhouette_score(matrix, labels))
+    except Exception:
+        sil_score = None
+        LOGGER.warning("Failed to compute silhouette score", exc_info=True)
     feature_names = np.asarray(vectorizer.get_feature_names_out())
 
     clusters: list[dict] = []
+    unlabeled_count = 0
     for cluster_id in range(cluster_k):
         cluster_indexes = np.where(labels == cluster_id)[0]
         if cluster_indexes.size == 0:
@@ -101,6 +130,8 @@ def cluster_posts(settings: Settings, since_days: int = 30) -> list[dict]:
         mean_weights = matrix[cluster_indexes].mean(axis=0).A1
         top_indexes = np.argsort(mean_weights)[::-1][:TOP_KEYWORD_COUNT]
         top_keywords = [feature_names[index] for index in top_indexes if mean_weights[index] > 0]
+        if not top_keywords:
+            unlabeled_count += len(cluster_post_ids)
 
         clusters.append(
             {
@@ -110,5 +141,20 @@ def cluster_posts(settings: Settings, since_days: int = 30) -> list[dict]:
             }
         )
 
+    LOGGER.info(
+        "Clustering complete unlabeled_ratio=%.2f unlabeled=%d total=%d",
+        unlabeled_count / total_posts,
+        unlabeled_count,
+        total_posts,
+    )
+    try:
+        with sqlite3.connect(settings.db_path) as conn:
+            conn.execute(
+                "INSERT INTO cluster_runs (run_at, post_count, cluster_count, unlabeled_count, inertia, silhouette_score) VALUES (?, ?, ?, ?, ?, ?)",
+                (_utc_now().isoformat() + "Z", total_posts, len(clusters), unlabeled_count, inertia, sil_score),
+            )
+            conn.commit()
+    except Exception:
+        LOGGER.warning("Failed to persist cluster run diagnostics", exc_info=True)
     LOGGER.info("Generated %d non-empty clusters", len(clusters))
     return clusters
