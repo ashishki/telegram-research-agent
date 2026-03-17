@@ -225,6 +225,29 @@
 
 ---
 
+## Phase 14 — Architecture Quick Wins (from review 2026-03-17)
+
+Source: `docs/reviews/architecture-modernization-review-2026-03-17.md`, Section 6 (Quick wins).
+
+| ID | Task | Owner | Status | Depends On |
+|---|---|---|---|---|
+| P14-01 | Fix `_fetch_topics_this_week()` in `src/output/generate_study_plan.py` to filter by current week bounds — add `week_label` param, join `post_topics` → `posts` with `WHERE posts.posted_at >= ? AND posts.posted_at < ?` (same pattern as `_fetch_top_posts`). Pass `week_label` at call site (line 257). | Codex | `[ ]` | P13 |
+| P14-02 | Fix `_split_keywords()` in `src/output/map_project_insights.py` to parse JSON-encoded arrays first (try `json.loads(keywords)`), falling back to comma-split only when the value is not valid JSON. `github_sync.py` stores keywords as `json.dumps(list)` but `_split_keywords` splits on commas — they disagree. | Codex | `[ ]` | P14-01 |
+| P14-03 | Fix `_extract_recommendation_labels()` in `src/output/generate_recommendations.py` (line 75) to match both `## N.` and `### N.` heading shapes. Current regex `^###\s+\d+\.\s+` misses `##`-level headings that the LLM actually generates. Pattern should be: `^##\s+\d+\.\s+(.+?)\s*$` (accepts both levels). | Codex | `[ ]` | P14-01 |
+| P14-04 | Strengthen digest validation in `src/output/generate_digest.py` (line 288): after the existing heading check, also assert that all five required subsections are present — `### Overview`, `### Top Topics`, `### Signal Posts`, `### Noise Patterns`, `### One Thing to Act On`. Log a `WARNING` for each missing section (do not raise, just warn). | Codex | `[ ]` | P14-01 |
+| P14-05 | Strengthen recommendations validation in `src/output/generate_recommendations.py` (line 241): after the heading check, assert that at least one `### [N].` or `## [N].` recommendation block is present. Log `WARNING` if none found. | Codex | `[ ]` | P14-03 |
+
+**Phase 14 Review Criteria:**
+- `generate_study_plan` uses date-bounded topic query; running it in week X returns only topics active that week.
+- `_split_keywords` correctly parses both `'["python","ml"]'` (JSON) and `'python, ml'` (CSV) inputs.
+- `_extract_recommendation_labels` returns labels from `## 1. Foo` headings (not only `### 1. Foo`).
+- Digest generation logs a WARNING for each missing required section, not just for a mismatched heading.
+- Recommendations generation logs a WARNING when zero recommendation blocks are found in the output.
+- No new external dependencies introduced.
+- All changed functions have correct type annotations consistent with the rest of the file.
+
+---
+
 ## Prompt Template Tasks (docs/prompts/)
 
 | ID | Task | Owner | Status |
