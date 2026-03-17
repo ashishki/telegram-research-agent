@@ -1,6 +1,6 @@
 # Telegram Research Agent
 
-Персональная AI-система для непрерывного мониторинга технологического ландшафта через Telegram-каналы. Агент автоматически собирает посты, кластеризует темы, генерирует еженедельные дайджесты и составляет индивидуальный план обучения — всё доступно через Telegram-бота.
+Персональная AI-система для непрерывного мониторинга технологического ландшафта через Telegram-каналы. Агент автоматически собирает посты, кластеризует темы, генерирует структурированные PDF-дайджесты с источниками и составляет индивидуальный план обучения — всё доступно через Telegram-бота.
 
 ---
 
@@ -10,11 +10,11 @@
 
 Решение: агент делает это автоматически. Каждую неделю он:
 - Забирает новые посты из 19 Telegram-каналов
-- Кластеризует их в темы (TF-IDF + KMeans, без LLM)
-- Генерирует структурированный дайджест (Claude Sonnet)
+- Кластеризует их в темы (TF-IDF + KMeans, без LLM, с поддержкой русского и английского)
+- Генерирует структурированный дайджест в формате JSON → Markdown → PDF (Claude Sonnet)
 - Сопоставляет темы с твоими GitHub-проектами
 - Составляет персональный 3-часовой план обучения с конкретными ссылками
-- Присылает всё это в Telegram-бот
+- Присылает всё это в Telegram-бот — текстом или PDF-файлом
 
 ---
 
@@ -23,18 +23,18 @@
 ```
 Telegram MTProto (Telethon)
     ↓
-SQLite (2 376+ постов, WAL mode, FTS5)
+SQLite (WAL mode, FTS5, message permalinks)
     ↓
-TF-IDF + KMeans → тематические кластеры
+TF-IDF + KMeans → тематические кластеры (RU+EN stopwords)
     ↓
 Anthropic Claude API (Haiku / Sonnet — роутинг по задаче)
     ↓
-Дайджест · Рекомендации · Study Plan · Project Insights
+ResearchReport JSON → Markdown + PDF (Jinja2 + WeasyPrint)
     ↓
 Telegram Bot (long-polling, только owner)
 ```
 
-**Стек:** Python 3.10, Telethon, scikit-learn, Anthropic SDK, SQLite, systemd
+**Стек:** Python 3.10, Telethon, scikit-learn, Anthropic SDK, SQLite, Jinja2, WeasyPrint, systemd
 
 ---
 
@@ -42,7 +42,7 @@ Telegram Bot (long-polling, только owner)
 
 | Команда бота | Что делает |
 |---|---|
-| `/digest` | Дайджест текущей недели |
+| `/digest` | Дайджест текущей недели — PDF-файл или текст |
 | `/topics` | Список обнаруженных тем с весами |
 | `/study` | 3-часовой план обучения с книгами и ссылками |
 | `/insight` | Что из 90 дней истории релевантно твоим проектам |
@@ -58,14 +58,17 @@ Telegram Bot (long-polling, только owner)
 
 ---
 
-## Роль OpenClaw
+## Формат PDF-дайджеста
 
-Проект развёрнут на инфраструктуре [OpenClaw](https://github.com/openclaw) — multi-protocol agent framework. OpenClaw предоставляет:
-- VPS-окружение с изолированным пользователем `oc_you`
-- Управление секретами (`/srv/openclaw-you/secrets/`, `/srv/openclaw-you/.env`)
-- Сетевую инфраструктуру и systemd-окружение
+Каждый дайджест — это структурированный документ:
 
-Изначально планировалось использовать OpenClaw WebSocket gateway как прокси к LLM. После анализа исходников (`/opt/openclaw/src`) принято архитектурное решение: использовать Anthropic Python SDK напрямую — протокол OpenClaw gateway написан на TypeScript и не имеет Python-клиента. OpenClaw остаётся платформой деплоя; LLM-вызовы идут напрямую через `anthropic` SDK.
+- **Обложка** — неделя, диапазон дат, количество источников
+- **Executive Summary** — 3–5 ключевых тезисов недели
+- **Key Findings** — карточки находок с привязкой к источникам
+- **Тематические секции** — по каждому кластеру
+- **График распределения тем** — inline SVG
+- **Приложение: источники** — список S1..Sn с каналом, датой, цитатой и ссылкой `t.me/...`
+- **Оценка уверенности** — что хорошо подтверждено, что выведено по косвенным признакам
 
 ---
 
@@ -75,16 +78,18 @@ Telegram Bot (long-polling, только owner)
 src/
   config/          — настройки, channels.yaml
   db/              — schema.sql, migrate.py
-  ingestion/       — Telethon bootstrap + incremental
-  processing/      — normalize, cluster, detect_topics
+  ingestion/       — Telethon bootstrap + incremental (сохраняет message_url)
+  processing/      — normalize, cluster (RU+EN), detect_topics
   output/          — digest, recommendations, insight, study_plan
+  reporting/       — HTML/PDF рендерер (Jinja2 + WeasyPrint)
   integrations/    — github_sync, github_crossref
   llm/             — client.py (роутинг моделей, трекинг стоимости)
-  bot/             — Telegram bot (long-polling)
+  bot/             — Telegram bot (long-polling, telegram_delivery.py)
 docs/prompts/      — LLM prompt templates
 systemd/           — service + timer units
 scripts/           — setup, bootstrap, healthcheck
-data/output/       — дайджесты, планы, рекомендации (gitignored)
+tests/             — unit tests (unittest)
+data/output/       — дайджесты .md/.json/.pdf, планы, рекомендации (gitignored)
 ```
 
 ---
@@ -130,6 +135,14 @@ sudo systemctl enable --now telegram-ingest.timer telegram-digest.timer \
 
 ---
 
+## Тесты
+
+```bash
+python3 -m unittest discover tests/
+```
+
+---
+
 ## Мониторинг расходов
 
 Каждый LLM-вызов логируется в таблицу `llm_usage`. Модели подобраны по сложности задачи:
@@ -140,3 +153,15 @@ sudo systemctl enable --now telegram-ingest.timer telegram-digest.timer \
 | Дайджест, рекомендации, план обучения | claude-sonnet-4-6 |
 
 Типичная стоимость полного недельного цикла: **~$0.07–0.15**
+
+---
+
+## Технические решения
+
+**Почему SQLite, не PostgreSQL** — один файл, WAL mode для параллельных чтений, FTS5 для полнотекстового поиска. Достаточно для 10k–100k постов на VPS.
+
+**Почему Telethon, не Bot API** — Bot API не даёт доступа к истории каналов. Telethon работает по MTProto от имени пользователя.
+
+**Почему JSON → PDF, не просто Markdown** — структурированный промежуточный формат даёт валидируемый контракт между LLM и рендерером, позволяет собирать источники с permalinks и строить приложение с цитатами.
+
+**Роутинг моделей** — Haiku для простых JSON-задач (классификация тем), Sonnet для глубокого синтеза. Переключение без изменения кода через env vars `LLM_MODEL_{CATEGORY}`.
