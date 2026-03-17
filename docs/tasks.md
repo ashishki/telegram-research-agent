@@ -248,6 +248,78 @@ Source: `docs/reviews/architecture-modernization-review-2026-03-17.md`, Section 
 
 ---
 
+## Phase 15 — Short-term Improvements + Code Consolidation (from review 2026-03-17)
+
+Source: `docs/reviews/architecture-modernization-review-2026-03-17.md`, Section 6 (Short-term) + Section 7 (Concrete Refactoring suggestions 2, 5, 6, 11, 12).
+
+| ID | Task | Owner | Status | Depends On |
+|---|---|---|---|---|
+| P15-01 | Fix project insights delivery in `src/output/map_project_insights.py`: instead of appending a free-text block after the fact (`_append_digest_project_insights`, line 217), build the `## Project Insights` section as a structured part of the main report assembly inside `run_map_project_insights()` before the file is written. The section must use a consistent template: `### {project_name}` heading + bullet notes. Remove the post-hoc file-append path. | Codex | `[ ]` | P14 |
+| P15-02 | Extract a `src/bot/telegram_delivery.py` module with three public functions: `send_text(chat_id, text, token)`, `send_document(chat_id, file_path, caption, token)`, `send_report_preview(chat_id, title, summary_lines, week_label, token)`. Replace all inline chunking + HTTP send logic in `src/bot/handlers.py` (lines 52+), `src/output/generate_digest.py` (lines 87+), and `src/output/generate_study_plan.py` (lines 206+) with calls to this module. No new external dependencies — use `urllib` only. | Codex | `[ ]` | P15-01 |
+| P15-03 | Add `message_url` column to `raw_posts` table via idempotent migration in `src/db/migrate.py`. Populate it during ingestion: `https://t.me/{channel_username}/{message_id}` for public channels, `None` for private. Update `src/ingestion/bootstrap_ingest.py` (line 46) and `src/ingestion/incremental_ingest.py` to set this column on insert. Pass `message_url` through `posts` view/query so report assembly can reference it. | Codex | `[ ]` | P15-01 |
+| P15-04 | Move the duplicated `_extract_markdown_section(text, heading)` helper into a new `src/output/report_utils.py` module. Remove the local copies from `src/output/generate_digest.py` (line 60), `src/output/generate_recommendations.py` (line 32), `src/output/generate_study_plan.py` (line 47), and `src/output/map_project_insights.py` (line 38). Import from `report_utils` in each. | Codex | `[ ]` | P15-01 |
+| P15-05 | Fix `src/output/generate_recommendations.py`: remove `del settings` and any `get_db_path()` calls (line 203 area); accept the `Settings` object as the single source of truth for DB path and config, consistent with all other output modules. | Codex | `[ ]` | P15-01 |
+| P15-06 | Add a `tests/` directory with focused unit tests (use `unittest`, no new test framework dependencies): `tests/test_report_utils.py` — tests for `_extract_markdown_section` edge cases; `tests/test_keyword_parsing.py` — tests that JSON-encoded and CSV-encoded keyword strings both parse correctly after P14-02; `tests/test_week_bounds.py` — tests for `_week_bounds` and the study plan week query filter. Each test file must be runnable via `python3 -m pytest tests/` or `python3 -m unittest discover tests/`. | Codex | `[ ]` | P15-04 |
+| P15-07 | Rewrite stale sections in `docs/spec.md` (line 19 area) and `docs/architecture.md` (line 126 area) to reflect the actual runtime: LLM calls go through the `anthropic` Python SDK with `LLM_API_KEY`, not through an OpenClaw WebSocket gateway. Document the current model routing (haiku for topic detection, sonnet for digest/recommendations/study plan) and note that gateway migration is a future option, not current state. | Codex | `[ ]` | P15-01 |
+
+**Phase 15 Review Criteria:**
+- `map_project_insights.py` no longer appends to an already-written file; insights section is written in the initial output pass.
+- `telegram_delivery.py` exists and exports `send_text`, `send_document`, `send_report_preview`; no inline HTTP/chunk logic remains in handlers.py, generate_digest.py, or generate_study_plan.py.
+- `raw_posts` has `message_url` column; bootstrap and incremental ingest set it on every insert.
+- `_extract_markdown_section` exists only in `report_utils.py`; no local copies remain in other modules.
+- `generate_recommendations.py` does not use `del settings` or `get_db_path()`.
+- `tests/` directory exists with at least 3 test files; `python3 -m unittest discover tests/` exits 0.
+- `docs/spec.md` and `docs/architecture.md` mention `anthropic` SDK, not OpenClaw gateway, as the LLM transport.
+
+---
+
+## Phase 16 — Medium Refactors: Report Schema + Topic Quality (from review 2026-03-17)
+
+Source: `docs/reviews/architecture-modernization-review-2026-03-17.md`, Sections 4.2, 4.3, 6 (Medium refactor), Section 7 (suggestions 1, 7, 8, 9).
+
+| ID | Task | Owner | Status | Depends On |
+|---|---|---|---|---|
+| P16-01 | Create `src/output/report_schema.py` with a `ResearchReport` dataclass (or `TypedDict`) matching this shape: `meta` (week_label, date_range, generated_at, post_count, channel_count), `executive_summary` (list[str] bullets), `key_findings` (list[dict] with title, body, evidence_ids), `sections` (list[dict] with heading, body), `evidence` (list[dict] with id `S1..Sn`, channel, date, excerpt, url), `project_relevance` (list[dict] with name, score, notes), `confidence_notes` (str). No rendering logic in this file — schema only. | Codex | `[ ]` | P15 |
+| P16-02 | Update `src/output/generate_digest.py` to produce a `ResearchReport` JSON object first (`report.json` in `data/output/digests/`), then render Markdown from the structured object. The LLM prompt should request JSON output (update `docs/prompts/digest_generation.md` to specify JSON schema). Validate with `report_schema.py`. Store `content_json` in the `digests` table (add column via idempotent migration). The existing Markdown file output path must still be produced (render from JSON). | Codex | `[ ]` | P16-01 |
+| P16-03 | Replace the raw `dict` return of `run_digest()` in `src/output/generate_digest.py` (line 196) with a typed `DigestResult` dataclass: fields `week_label: str`, `output_path: str`, `post_count: int`, `json_path: str`. Update all call sites in `src/main.py` and `src/bot/handlers.py` to use the typed result. | Codex | `[ ]` | P16-02 |
+| P16-04 | Improve multilingual topic detection in `src/processing/cluster.py` (line 79): replace the English-only `stop_words="english"` in `TfidfVectorizer` with a combined stopword list covering Russian and English (use `sklearn`'s built-in lists plus a hardcoded Russian stopword list — no new NLP library). In `src/processing/detect_topics.py` (line 15), replace the ASCII-only tokenizer with a Unicode-aware word tokenizer (`re.findall(r'\b\w+\b', text)` with `re.UNICODE` flag). Log the ratio of posts falling into "Unlabeled" bucket after each clustering run. | Codex | `[ ]` | P16-01 |
+| P16-05 | Persist cluster run diagnostics in `src/processing/cluster.py` (line 93): after each clustering run, insert a row into a new `cluster_runs` table (add via migration: `id`, `run_at`, `post_count`, `cluster_count`, `unlabeled_count`, `inertia`, `silhouette_score` nullable). This makes topic quality debuggable over time without re-running the pipeline. | Codex | `[ ]` | P16-01 |
+| P16-06 | Add JSON schema validation in `src/processing/detect_topics.py` (line 212) and `src/output/map_project_insights.py` (line 287) around all `complete_json()` consumer call sites: after parsing the LLM JSON response, assert that required keys are present (log WARNING and fall back gracefully if not, do not crash). | Codex | `[ ]` | P16-01 |
+
+**Phase 16 Review Criteria:**
+- `report_schema.py` exists and imports cleanly; `ResearchReport` can be instantiated with sample data.
+- `generate_digest.py` writes a `YYYY-WXX.json` file alongside the `.md`; JSON validates against `ResearchReport`.
+- `run_digest()` returns a `DigestResult` dataclass, not a plain dict.
+- Topic clustering uses a combined Russian+English stopword list; `detect_topics.py` tokenizer is Unicode-aware.
+- After a clustering run, a row is inserted into `cluster_runs` table.
+- `detect_topics.py` and `map_project_insights.py` do not crash on malformed LLM JSON — log WARNING and return empty/default value.
+- No new pip dependencies beyond what is already in `requirements.txt`.
+
+---
+
+## Phase 17 — Larger Redesign: HTML/PDF Renderer + Evidence Appendix (from review 2026-03-17)
+
+Source: `docs/reviews/architecture-modernization-review-2026-03-17.md`, Sections 4.5, 5, 6 (Larger redesign).
+
+| ID | Task | Owner | Status | Depends On |
+|---|---|---|---|---|
+| P17-01 | Add `jinja2` and `weasyprint` to `requirements.txt`. Create `src/reporting/` package with: `src/reporting/__init__.py` (empty), `src/reporting/renderer.py` (functions `render_html(report: ResearchReport) -> str` and `render_pdf(report: ResearchReport, output_path: Path) -> Path`), `src/reporting/templates/digest.html.j2` (Jinja2 template: cover section, exec summary, findings, evidence table, project scorecard, confidence/risks, sources appendix). CSS must be inline or in a `<style>` block — no external files. | Codex | `[ ]` | P16 |
+| P17-02 | Wire PDF rendering into `generate_digest.py`: after producing `YYYY-WXX.json` and `YYYY-WXX.md`, call `render_pdf()` to produce `data/output/digests/YYYY-WXX.pdf`. Log a WARNING (do not crash) if WeasyPrint fails — PDF is optional, Markdown is always the fallback. Store `pdf_path` in the `digests` table (add column via migration). | Codex | `[ ]` | P17-01 |
+| P17-03 | Update `src/bot/telegram_delivery.py` (`send_report_preview` and add `send_digest_bundle`): when a PDF exists, send a short executive summary text message followed by the PDF as a document attachment via Telegram `sendDocument`. When PDF is absent, fall back to chunked Markdown text. Update `/digest` handler in `src/bot/handlers.py` to use `send_digest_bundle`. | Codex | `[ ]` | P17-02 |
+| P17-04 | Extend the Jinja2 digest template with a Sources Appendix section: ordered `S1..Sn` list, each entry with channel name, date, excerpt (first 200 chars), and `message_url` (from the `message_url` column added in P15-03). Pull evidence items from `ResearchReport.evidence`. Add a basic topic distribution bar chart rendered as an inline SVG (Python string generation, no matplotlib dependency). | Codex | `[ ]` | P17-01 |
+
+**Phase 17 Review Criteria:**
+- `src/reporting/` package exists and imports cleanly.
+- `render_html(report)` returns a non-empty string containing `<html`.
+- `render_pdf(report, path)` produces a file at the given path when WeasyPrint is installed.
+- `generate_digest.py` writes `YYYY-WXX.pdf` when rendering succeeds; gracefully skips on WeasyPrint error.
+- `/digest` bot command sends PDF as attachment when available, chunked text otherwise.
+- Sources appendix lists evidence items with `S1..Sn` ids and `message_url` links.
+- Inline SVG bar chart is present in the HTML output.
+- `jinja2` and `weasyprint` are pinned in `requirements.txt`.
+
+---
+
 ## Prompt Template Tasks (docs/prompts/)
 
 | ID | Task | Owner | Status |
@@ -272,6 +344,14 @@ P0 (Architecture)
         │                             ├─▶ P7 (Recommendations)
         │                             └─▶ P8 (Project Mapping)
         │                                   └─▶ P9 (Hardening)
+        │                                         └─▶ P10 (GitHub)
+        │                                               └─▶ P11 (Bot)
+        │                                                     └─▶ P12 (Cost Tracking)
+        │                                                           └─▶ P13 (Study Plan)
+        │                                                                 └─▶ P14 (Quick Wins)
+        │                                                                       └─▶ P15 (Short-term)
+        │                                                                             └─▶ P16 (Medium Refactor)
+        │                                                                                   └─▶ P17 (PDF Renderer)
         └─▶ P1-05 (LLM Client) ──▶ P4, P6, P7, P8 (all LLM phases)
 ```
 
