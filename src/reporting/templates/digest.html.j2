@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Weekly Digest {{ report.meta.week_label }}</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 18mm 16mm 18mm 16mm;
+    }
+    body {
+      margin: 0;
+      color: #201a12;
+      background: #f7f3eb;
+      font-family: "DejaVu Sans", sans-serif;
+      font-size: 11pt;
+      line-height: 1.45;
+    }
+    .cover, .card {
+      background: #fffaf2;
+      border: 1px solid #dbcdbd;
+      border-radius: 18px;
+      padding: 18px 20px;
+      margin-bottom: 14px;
+    }
+    .cover {
+      background: linear-gradient(135deg, #f4d8b8 0%, #fff7eb 48%, #e8f0eb 100%);
+      padding: 28px 24px;
+    }
+    h1, h2, h3 {
+      margin: 0 0 10px;
+      font-weight: 700;
+      color: #201a12;
+    }
+    h1 {
+      font-size: 26pt;
+      line-height: 1.1;
+    }
+    h2 {
+      font-size: 16pt;
+      margin-bottom: 12px;
+      border-bottom: 2px solid #d8c4ac;
+      padding-bottom: 6px;
+    }
+    h3 {
+      font-size: 12pt;
+    }
+    p, li, td, th {
+      color: #342b21;
+    }
+    .meta {
+      margin-top: 14px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    .meta-box {
+      background: rgba(255, 250, 242, 0.85);
+      border: 1px solid #d8c4ac;
+      border-radius: 12px;
+      padding: 10px 12px;
+    }
+    .meta-label {
+      display: block;
+      font-size: 8pt;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #6f6252;
+      margin-bottom: 4px;
+    }
+    ul, ol {
+      margin: 0;
+      padding-left: 20px;
+    }
+    li + li {
+      margin-top: 6px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    th, td {
+      border: 1px solid #dacbb8;
+      padding: 8px;
+      vertical-align: top;
+      word-wrap: break-word;
+    }
+    th {
+      background: #f0e3d4;
+      text-align: left;
+      font-size: 9pt;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .finding {
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: #f5ede2;
+      border: 1px solid #e1d3c2;
+      margin-bottom: 10px;
+    }
+    .eyebrow {
+      font-size: 9pt;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #7a6853;
+      margin-bottom: 6px;
+    }
+    .small {
+      font-size: 9pt;
+      color: #665847;
+    }
+    .appendix-item {
+      margin-bottom: 10px;
+      page-break-inside: avoid;
+    }
+    .svg-wrap {
+      margin-top: 8px;
+      border: 1px solid #dacbb8;
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    a {
+      color: #9b4716;
+      text-decoration: none;
+    }
+    .muted {
+      color: #6f6252;
+    }
+  </style>
+</head>
+<body>
+  <section class="cover">
+    <div class="eyebrow">Telegram Research Agent</div>
+    <h1>Weekly Digest {{ report.meta.week_label }}</h1>
+    <p>{{ report.meta.date_range }}</p>
+    <div class="meta">
+      <div class="meta-box">
+        <span class="meta-label">Generated</span>
+        <strong>{{ report.meta.generated_at }}</strong>
+      </div>
+      <div class="meta-box">
+        <span class="meta-label">Posts Reviewed</span>
+        <strong>{{ report.meta.post_count }}</strong>
+      </div>
+      <div class="meta-box">
+        <span class="meta-label">Channels Covered</span>
+        <strong>{{ report.meta.channel_count }}</strong>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Executive Summary</h2>
+    {% if report.executive_summary %}
+    <ul>
+      {% for item in report.executive_summary %}
+      <li>{{ item }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="muted">No executive summary was generated for this digest.</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>Findings</h2>
+    {% if report.key_findings %}
+      {% for finding in report.key_findings %}
+      <div class="finding">
+        <h3>{{ finding.title }}</h3>
+        <p>{{ finding.body or "No finding notes were stored." }}</p>
+        {% if finding.evidence_ids %}
+        <p class="small">Evidence: {{ finding.evidence_ids | join(", ") }}</p>
+        {% endif %}
+      </div>
+      {% endfor %}
+    {% else %}
+    <p class="muted">No key findings were stored.</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>Topic Distribution</h2>
+    <div class="svg-wrap">{{ topic_chart_svg | safe }}</div>
+  </section>
+
+  <section class="card">
+    <h2>Digest Sections</h2>
+    {% for heading, paragraphs in section_map.items() %}
+    <h3>{{ heading }}</h3>
+      {% if paragraphs %}
+        {% for paragraph in paragraphs %}
+        <p>{{ paragraph }}</p>
+        {% endfor %}
+      {% else %}
+      <p class="muted">No content captured for this section.</p>
+      {% endif %}
+    {% endfor %}
+  </section>
+
+  <section class="card">
+    <h2>Evidence Table</h2>
+    {% if report.evidence %}
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 8%;">ID</th>
+          <th style="width: 18%;">Channel</th>
+          <th style="width: 16%;">Date</th>
+          <th>Excerpt</th>
+          <th style="width: 18%;">Link</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in report.evidence %}
+        <tr>
+          <td>{{ item.id }}</td>
+          <td>{{ item.channel }}</td>
+          <td>{{ item.date }}</td>
+          <td>{{ item.excerpt }}</td>
+          <td>{% if item.url %}<a href="{{ item.url }}">{{ item.url }}</a>{% else %}<span class="muted">n/a</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted">No evidence rows were stored.</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>Project Scorecard</h2>
+    {% if report.project_relevance %}
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 30%;">Project</th>
+          <th style="width: 15%;">Score</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in report.project_relevance %}
+        <tr>
+          <td>{{ item.name }}</td>
+          <td>{{ "%.2f"|format(item.score) }}</td>
+          <td>{{ item.notes }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted">No project relevance scorecard entries were stored.</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>Confidence & Risks</h2>
+    <p>{{ report.confidence_notes or "Confidence notes were not provided. Treat the digest as a weekly synthesis and verify key claims against the linked evidence." }}</p>
+  </section>
+
+  <section class="card">
+    <h2>Sources Appendix</h2>
+    {% if report.evidence %}
+    <ol>
+      {% for item in report.evidence %}
+      <li class="appendix-item">
+        <strong>{{ item.id }}</strong> · {{ item.channel }} · {{ item.date }}<br>
+        {{ item.excerpt[:200] }}{% if item.excerpt|length > 200 %}...{% endif %}<br>
+        {% if item.url %}<a href="{{ item.url }}">{{ item.url }}</a>{% else %}<span class="muted">No message URL available.</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+    {% else %}
+    <p class="muted">No appendix sources were stored.</p>
+    {% endif %}
+  </section>
+</body>
+</html>

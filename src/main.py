@@ -174,10 +174,11 @@ def handle_digest(_: argparse.Namespace) -> int:
         LOGGER.info("Starting step=generate_digest")
         summary = run_digest(settings)
         LOGGER.info(
-            "Finished step=generate_digest week=%s posts=%d output=%s",
-            summary["week_label"],
-            summary["post_count"],
-            summary["output_path"],
+            "Finished step=generate_digest week=%s posts=%d output=%s json=%s",
+            summary.week_label,
+            summary.post_count,
+            summary.output_path,
+            summary.json_path or "",
         )
     except Exception:
         LOGGER.exception("Digest generation failed")

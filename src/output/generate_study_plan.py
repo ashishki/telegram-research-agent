@@ -2,6 +2,7 @@
 import json
 import logging
 import os
+import re
 import sqlite3
 import urllib.error
 import urllib.parse
@@ -12,6 +13,12 @@ from typing import Any
 
 from config.settings import PROJECT_ROOT, Settings
 from llm.client import LLMClient
+from output.report_utils import _extract_markdown_section
+
+try:
+    from bot.telegram_delivery import send_text
+except ImportError:  # pragma: no cover - direct module execution fallback
+    from src.bot.telegram_delivery import send_text
 
 
 LOGGER = logging.getLogger(__name__)
@@ -28,9 +35,6 @@ RELEVANT_BOOKS = {
     "A Common-Sense Guide to Data Structures and Algorithms - Level Up Your Core Programming Skills": "data structures foundation",
     "The_Managers_Path_A_Guide_for_Tech_Leade": "engineering growth path",
 }
-TELEGRAM_MESSAGE_CHUNK_SIZE = 4000
-
-
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -42,16 +46,6 @@ def _utc_now_iso() -> str:
 def _compute_week_label() -> str:
     year, week, _ = _utc_now().isocalendar()
     return f"{year}-W{week:02d}"
-
-
-def _extract_markdown_section(text: str, heading: str) -> str:
-    import re
-
-    pattern = re.compile(rf"^## {re.escape(heading)}\n(.*?)(?=^## |\Z)", re.MULTILINE | re.DOTALL)
-    match = pattern.search(text)
-    if not match:
-        raise ValueError(f"Section not found in prompt file: {heading}")
-    return match.group(1).strip()
 
 
 def _load_prompt_sections() -> tuple[str, str]:
@@ -127,7 +121,7 @@ def _fetch_top_posts(connection: sqlite3.Connection, week_label: str, limit: int
     week_start_iso, week_end_iso = _week_bounds(week_label)
     rows = connection.execute(
         """
-        SELECT posts.channel_username, posts.posted_at, posts.content
+        SELECT posts.channel_username, posts.posted_at, posts.content, raw_posts.message_url
         FROM posts
         INNER JOIN raw_posts ON raw_posts.id = posts.raw_post_id
         WHERE posts.posted_at >= ? AND posts.posted_at < ?
@@ -139,18 +133,25 @@ def _fetch_top_posts(connection: sqlite3.Connection, week_label: str, limit: int
     results: list[str] = []
     for row in rows:
         content = " ".join((row["content"] or "").split())
-        results.append(f"{row['channel_username']} | {row['posted_at'][:10]}: {content[:200]}")
+        suffix = f" | {row['message_url']}" if row["message_url"] else ""
+        results.append(f"{row['channel_username']} | {row['posted_at'][:10]}: {content[:200]}{suffix}")
     return results
 
 
-def _fetch_topics_this_week(connection: sqlite3.Connection) -> list[dict[str, Any]]:
+def _fetch_topics_this_week(connection: sqlite3.Connection, week_label: str) -> list[dict[str, Any]]:
+    week_start_iso, week_end_iso = _week_bounds(week_label)
     rows = connection.execute(
         """
-        SELECT t.label, t.description, t.post_count
-        FROM topics t
-        ORDER BY t.post_count DESC
+        SELECT t.label, t.description, COUNT(*) AS post_count
+        FROM post_topics pt
+        INNER JOIN topics t ON t.id = pt.topic_id
+        INNER JOIN posts p ON p.id = pt.post_id
+        WHERE p.posted_at >= ? AND p.posted_at < ?
+        GROUP BY t.id, t.label, t.description
+        ORDER BY post_count DESC
         LIMIT 10
-        """
+        """,
+        (week_start_iso, week_end_iso),
     ).fetchall()
     return [
         {
@@ -203,33 +204,6 @@ def _write_study_plan_file(week_label: str, content_md: str) -> Path:
     return output_path
 
 
-def _chunk_text(text: str, chunk_size: int = TELEGRAM_MESSAGE_CHUNK_SIZE) -> list[str]:
-    if not text:
-        return [""]
-
-    chunks: list[str] = []
-    remaining = text
-    while remaining:
-        if len(remaining) <= chunk_size:
-            chunks.append(remaining)
-            break
-
-        split_at = remaining.rfind("\n", 0, chunk_size)
-        if split_at <= 0:
-            split_at = remaining.rfind(" ", 0, chunk_size)
-        if split_at <= 0:
-            split_at = chunk_size
-
-        chunk = remaining[:split_at].rstrip()
-        if not chunk:
-            chunk = remaining[:chunk_size]
-            split_at = len(chunk)
-        chunks.append(chunk)
-        remaining = remaining[split_at:].lstrip()
-
-    return chunks
-
-
 def generate_study_plan(settings: Settings) -> str:
     week_label = _compute_week_label()
     output_path = OUTPUT_DIR / f"{week_label}.md"
@@ -254,7 +228,7 @@ def generate_study_plan(settings: Settings) -> str:
             return content_md
 
         system_prompt, user_template = _load_prompt_sections()
-        topics = _fetch_topics_this_week(connection)
+        topics = _fetch_topics_this_week(connection, week_label)
         top_posts = _fetch_top_posts(connection, week_label)
         books_catalog = _fetch_books_catalog()
         projects = _fetch_active_projects(connection)
@@ -324,23 +298,7 @@ def send_study_reminder(settings: Settings, is_friday: bool = False) -> None:
             LOGGER.warning("Study reminder skipped because Telegram bot credentials are not configured")
             return
 
-        for chunk in _chunk_text(message):
-            payload = urllib.parse.urlencode(
-                {
-                    "chat_id": chat_id,
-                    "text": chunk,
-                    "parse_mode": "Markdown",
-                    "disable_web_page_preview": "true",
-                }
-            ).encode("utf-8")
-            request_obj = urllib.request.Request(
-                f"https://api.telegram.org/bot{bot_token}/sendMessage",
-                data=payload,
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
-                method="POST",
-            )
-            with urllib.request.urlopen(request_obj, timeout=60) as response:
-                response.read()
+        send_text(chat_id=chat_id, text=message, token=bot_token)
         LOGGER.info("Study reminder sent week=%s is_friday=%s", week_label, is_friday)
     except Exception:
         LOGGER.warning("Failed to send study reminder", exc_info=True)

@@ -6,8 +6,8 @@ from datetime import timezone, date, datetime, timedelta
 from pathlib import Path
 
 from config.settings import PROJECT_ROOT, Settings
-from db.migrate import get_db_path
 from llm.client import complete
+from output.report_utils import _extract_markdown_section
 
 
 LOGGER = logging.getLogger(__name__)
@@ -27,14 +27,6 @@ def _compute_week_label(now: datetime | None = None) -> str:
     current = now or datetime.now(timezone.utc)
     year, week, _ = current.isocalendar()
     return f"{year}-W{week:02d}"
-
-
-def _extract_markdown_section(text: str, heading: str) -> str:
-    pattern = re.compile(rf"^## {re.escape(heading)}\n(.*?)(?=^## |\Z)", re.MULTILINE | re.DOTALL)
-    match = pattern.search(text)
-    if not match:
-        raise ValueError(f"Section not found in prompt file: {heading}")
-    return match.group(1).strip()
 
 
 def _load_prompt_sections() -> tuple[str, str]:
@@ -73,7 +65,7 @@ def _write_recommendations_file(week_label: str, content_md: str) -> Path:
 
 
 def _extract_recommendation_labels(content_md: str) -> list[str]:
-    labels = re.findall(r"^###\s+\d+\.\s+(.+?)\s*$", content_md, flags=re.MULTILINE)
+    labels = re.findall(r"^#{2,3}\s+\d+\.\s+(.+?)\s*$", content_md, flags=re.MULTILINE)
     return labels
 
 
@@ -201,10 +193,8 @@ def _store_recommendations(connection: sqlite3.Connection, week_label: str, cont
 
 
 def run_recommendations(settings: Settings) -> dict:
-    del settings
-
     week_label = _compute_week_label()
-    db_path = get_db_path()
+    db_path = settings.db_path
 
     with sqlite3.connect(db_path) as connection:
         connection.row_factory = sqlite3.Row
@@ -240,6 +230,12 @@ def run_recommendations(settings: Settings) -> dict:
         content_md = complete(prompt=prompt, system=system_prompt, category="recommendations")
         if not content_md.lstrip().startswith(f"## Study Recommendations — {week_label}"):
             LOGGER.warning("Recommendations response did not match expected heading for week=%s", week_label)
+        recommendation_blocks = re.findall(r"^#{2,3}\s+\d+\.\s+", content_md, flags=re.MULTILINE)
+        if not recommendation_blocks:
+            LOGGER.warning(
+                "Recommendations response contains zero recommendation blocks for week=%s",
+                week_label,
+            )
 
         output_path = _write_recommendations_file(week_label, content_md)
         connection.execute("BEGIN")

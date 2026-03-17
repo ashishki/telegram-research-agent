@@ -16,7 +16,7 @@ The Telegram Research Agent is a private, server-side AI assistant that ingests 
 - Project insight mappings (connections to ongoing work)
 - Experiment proposals (ideas worth prototyping)
 
-The system runs on a private VPS. There are no public-facing endpoints. All LLM calls are routed through the local OpenClaw gateway at `ws://127.0.0.1:18789`. The pipeline is deterministic except where LLM interpretation is explicitly invoked.
+The system runs on a private VPS. There are no public-facing endpoints. LLM calls go through the `anthropic` Python SDK using `LLM_API_KEY` from the environment. The pipeline is deterministic except where LLM interpretation is explicitly invoked.
 
 ---
 
@@ -34,7 +34,7 @@ The system runs on a private VPS. There are no public-facing endpoints. All LLM 
 | Env | `/srv/openclaw-you/.env` |
 | State dir | `/srv/openclaw-you/state` |
 | Secrets dir | `/srv/openclaw-you/secrets` |
-| Gateway | `ws://127.0.0.1:18789` |
+| LLM transport | `anthropic` Python SDK |
 | Service | `openclaw-you.service` |
 
 ### Invariants That Must Never Be Violated
@@ -79,13 +79,15 @@ The system runs on a private VPS. There are no public-facing endpoints. All LLM 
 
 ### AD-03: LLM Calls via Anthropic Python SDK Directly
 
-**Decision:** LLM calls use the `anthropic` Python library. API key loaded from `LLM_API_KEY` env var. Model loaded from `MODEL_PROVIDER` env var (default: `claude-haiku-4-5`).
+**Decision:** LLM calls use the `anthropic` Python SDK. API key loaded from `LLM_API_KEY` env var. Category-specific model routing is implemented in `src/llm/client.py`.
 
 **Rationale:** The OpenClaw gateway at `ws://127.0.0.1:18789` implements a custom TypeScript WebSocket protocol (RequestFrame, EventFrame, session management) designed for the OpenClaw plugin ecosystem — not for external Python clients. No Python SDK exists for this protocol. Implementing a conformant client would be fragile and undocumented. The Anthropic API key is already present in the environment and is the authoritative credential. Direct SDK usage is simpler, tested, and well-documented.
 
-**Credential source:** `/srv/openclaw-you/.env` loaded via `EnvironmentFile=` in systemd. Key: `LLM_API_KEY`. Model: `MODEL_PROVIDER`.
+**Credential source:** `/srv/openclaw-you/.env` loaded via `EnvironmentFile=` in systemd. Key: `LLM_API_KEY`.
 
-**Rejected alternative:** Direct WebSocket calls to OpenClaw gateway — protocol is TypeScript-native, no Python binding, not designed for external clients.
+**Current routing:** `topic_detection` and `project_insights` use Haiku. `digest`, `recommendations`, `study_plan`, `insight`, and `bot_ask` use Sonnet. Environment overrides such as `LLM_MODEL_DIGEST` remain supported.
+
+**Future option:** A gateway migration remains possible later if OpenClaw exposes a stable Python-facing interface, but it is not the current transport.
 
 ### AD-04: Deterministic Pipelines, LLM Only Where Necessary
 
@@ -188,9 +190,9 @@ The system runs on a private VPS. There are no public-facing endpoints. All LLM 
        ▼                ▼                    ▼
 ┌──────────────┐ ┌──────────────┐  ┌────────────────────┐
 │ Normalizer   │ │ Topic        │  │ Digest Generator   │
-│ (Python,     │ │ Detector     │  │ (LLM via OpenClaw) │
-│ deterministic│ │ (LLM via     │  │                    │
-│ )            │ │ OpenClaw)    │  └────────┬───────────┘
+│ (Python,     │ │ Detector     │  │ (LLM via           │
+│ deterministic│ │ (LLM via     │  │ anthropic SDK)     │
+│ )            │ │ anthropic SDK)│ └────────┬───────────┘
 └──────┬───────┘ └──────┬───────┘           │
        │                │                   │
        └────────────────┴───────────────────┘
@@ -205,8 +207,8 @@ The system runs on a private VPS. There are no public-facing endpoints. All LLM 
                         │
                         ▼
 ┌───────────────────────────────────────────────────────┐
-│              OpenClaw Gateway                          │
-│              ws://127.0.0.1:18789                      │
+│              Anthropic API via SDK                     │
+│              authenticated with LLM_API_KEY            │
 └───────────────────────────────────────────────────────┘
 ```
 
@@ -379,7 +381,7 @@ Rubrics are persistent topic categories that emerge from the data over time.
 
 1. After normalization, cluster posts by TF-IDF similarity (deterministic, no LLM).
 2. For each cluster: extract top N keywords.
-3. Submit keyword sets to LLM (via OpenClaw) for label and description generation.
+3. Submit keyword sets to LLM via the `anthropic` SDK for label and description generation.
 4. Store generated rubrics in `topics` table.
 5. On subsequent runs: compare new clusters to existing rubrics; extend or create new ones.
 
@@ -406,7 +408,7 @@ generate_digest.py
 │   ├── Section: Notable posts (top 10 by views, with excerpts)
 │   └── Section: Signal vs noise (topic clusters, low-signal indicator)
 │
-├── Submit to LLM via OpenClaw gateway
+├── Submit to LLM via anthropic SDK
 ├── Receive Markdown digest response
 │
 ├── Insert into digests table
@@ -434,7 +436,7 @@ generate_recommendations.py
 │   ├── Active projects and their keywords
 │   └── Instruction: suggest 3-5 concrete study items with rationale
 │
-├── Submit to LLM via OpenClaw
+├── Submit to LLM via anthropic SDK
 ├── Receive structured Markdown
 │
 ├── Insert into recommendations table
@@ -470,7 +472,7 @@ map_project_insights.py
 ├── For linked posts: submit to LLM for relevance rationale
 │   └── Prompt: "Given project X, explain how this post is relevant"
 │
-└── Append project section to weekly digest
+└── Write structured project insights report to `data/output/project_insights/YYYY-WXX.md`
 ```
 
 **Keyword match is deterministic (FTS5). LLM only writes the rationale sentence.**
@@ -483,7 +485,7 @@ map_project_insights.py
 
 | Unit | Type | Purpose |
 |---|---|---|
-| `openclaw-you.service` | Service | OpenClaw gateway (pre-existing) |
+| `openclaw-you.service` | Service | OpenClaw runtime on host (not used for current LLM transport) |
 | `telegram-ingest.service` | Service | Runs incremental ingestion |
 | `telegram-digest.service` | Service | Runs digest + recommendations |
 
@@ -512,6 +514,8 @@ data/output/
 ├── digests/
 │   └── YYYY-WXX.md
 ├── recommendations/
+│   └── YYYY-WXX.md
+├── project_insights/
 │   └── YYYY-WXX.md
 └── experiments/
     └── YYYY-WXX.md
@@ -552,7 +556,7 @@ Summary:
 | Phase | Name | Deliverables |
 |---|---|---|
 | 0 | Architecture | All 5 living docs written |
-| 1 | Project Scaffold | `src/` structure, config loader, DB schema migration, OpenClaw WS client |
+| 1 | Project Scaffold | `src/` structure, config loader, DB schema migration, Anthropic client wrapper |
 | 2 | Bootstrap Ingestion | `bootstrap_ingest.py`, Telethon client, raw_posts table |
 | 3 | Normalization | `normalize_posts.py`, posts table population |
 | 4 | Topic Detection | TF-IDF clustering, LLM rubric labeling, topics + post_topics tables |
@@ -603,7 +607,7 @@ See `docs/tasks.md` for full graph with dependencies.
 │   │   ├── generate_recommendations.py
 │   │   └── map_project_insights.py
 │   ├── llm/
-│   │   └── client.py          ← OpenClaw WS client wrapper
+│   │   └── client.py          ← Anthropic SDK client wrapper
 │   └── main.py
 ├── scripts/
 │   ├── setup.sh
@@ -619,6 +623,7 @@ See `docs/tasks.md` for full graph with dependencies.
     └── output/
         ├── digests/
         ├── recommendations/
+        ├── project_insights/
         └── experiments/
 ```
 
@@ -631,7 +636,7 @@ Per phase, the Claude Reviewer must verify:
 **Architecture adherence:**
 - [ ] No writes to `/srv/openclaw-you/state`
 - [ ] No modifications to `/opt/openclaw/src`
-- [ ] All LLM calls via `ws://127.0.0.1:18789`
+- [ ] All LLM calls via `anthropic` SDK using `LLM_API_KEY`
 - [ ] No hardcoded secrets in source code
 - [ ] Secrets referenced from environment variables or secrets directory
 
@@ -658,11 +663,11 @@ Per phase, the Claude Reviewer must verify:
 
 ## 21. Final Recommendations
 
-1. **Start with Phase 1 (scaffold) before any network calls.** Validate schema migration and OpenClaw client before touching Telegram.
+1. **Start with Phase 1 (scaffold) before any network calls.** Validate schema migration and the Anthropic client before touching Telegram.
 
 2. **Treat the Telethon session as a secret.** One leaked session = full account read access. Store in `/srv/openclaw-you/secrets/telegram.session`, never in the workspace.
 
-3. **Validate OpenClaw client in isolation first.** Write a standalone test that sends a minimal prompt and receives a response before wiring it into any pipeline.
+3. **Validate the Anthropic client in isolation first.** Write a standalone test that sends a minimal prompt and receives a response before wiring it into any pipeline.
 
 4. **Bootstrap ingestion is one-shot; make it resumable.** If it fails midway, re-running must not duplicate posts. The unique constraint handles this, but logging the last successfully ingested message ID per channel is recommended.
 

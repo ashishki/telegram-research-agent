@@ -3,12 +3,12 @@ import logging
 import os
 import re
 import sqlite3
-import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable
-from urllib import error, parse, request
+from urllib import error
 
+from bot.telegram_delivery import _send_text_internal, send_digest_bundle, send_document, send_report_preview
 from config.settings import PROJECT_ROOT, Settings
 from llm.client import LLMClient
 from output.generate_digest import _compute_week_label, run_digest
@@ -18,8 +18,6 @@ from output.generate_study_plan import generate_study_plan
 
 
 LOGGER = logging.getLogger(__name__)
-BOT_API_BASE = "https://api.telegram.org"
-MESSAGE_CHUNK_SIZE = 4000
 QUESTION_WORD_RE = re.compile(r"[^\W_]+", re.UNICODE)
 MARKDOWN_V2_SPECIAL_CHARS = r"_*[]()~`>#+-=|{}.!"
 COMMAND_DOCS: dict[str, tuple[str, str]] = {
@@ -49,43 +47,6 @@ def _escape_markdown_v2(text: str) -> str:
     return "".join(escaped)
 
 
-def _chunk_text(text: str, chunk_size: int = MESSAGE_CHUNK_SIZE) -> list[str]:
-    if not text:
-        return [""]
-
-    chunks: list[str] = []
-    remaining = text
-    while remaining:
-        if len(remaining) <= chunk_size:
-            chunks.append(remaining)
-            break
-
-        split_at = remaining.rfind("\n", 0, chunk_size)
-        if split_at <= 0:
-            split_at = remaining.rfind(" ", 0, chunk_size)
-        if split_at <= 0:
-            split_at = chunk_size
-
-        chunk = remaining[:split_at].rstrip()
-        if not chunk:
-            chunk = remaining[:chunk_size]
-            split_at = len(chunk)
-        chunks.append(chunk)
-        remaining = remaining[split_at:].lstrip()
-
-    return chunks
-
-
-def _telegram_request(url: str, data: bytes | None = None, headers: dict[str, str] | None = None) -> dict:
-    http_request = request.Request(url, data=data, headers=headers or {}, method="POST" if data is not None else "GET")
-    with request.urlopen(http_request, timeout=60) as response:
-        payload = response.read().decode("utf-8")
-    decoded = json.loads(payload)
-    if not decoded.get("ok"):
-        raise RuntimeError(f"Telegram API returned error: {decoded!r}")
-    return decoded
-
-
 def send_message(
     token: str,
     chat_id: str,
@@ -93,73 +54,18 @@ def send_message(
     parse_mode: str | None = "MarkdownV2",
     escape_markdown: bool = True,
 ) -> None:
-    if not token:
-        LOGGER.warning("Telegram send skipped because TELEGRAM_BOT_TOKEN is not set")
-        return
-
-    for chunk in _chunk_text(text):
-        payload = {
-            "chat_id": chat_id,
-            "text": _escape_markdown_v2(chunk) if parse_mode == "MarkdownV2" and escape_markdown else chunk,
-            "disable_web_page_preview": "true",
-        }
-        if parse_mode:
-            payload["parse_mode"] = parse_mode
-        data = parse.urlencode(payload).encode("utf-8")
-        url = f"{BOT_API_BASE}/bot{token}/sendMessage"
-        try:
-            _telegram_request(
-                url=url,
-                data=data,
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
-            )
-        except Exception:
-            LOGGER.warning("Failed to send Telegram message to chat_id=%s", chat_id, exc_info=True)
+    message_text = _escape_markdown_v2(text) if escape_markdown else text
+    try:
+        _send_text_internal(chat_id=chat_id, text=message_text, token=token, parse_mode=parse_mode)
+    except Exception:
+        LOGGER.warning("Failed to send Telegram message to chat_id=%s", chat_id, exc_info=True)
 
 
 def send_file(token: str, chat_id: str, filepath: str, caption: str = "") -> None:
-    if not token:
-        LOGGER.warning("Telegram file send skipped because TELEGRAM_BOT_TOKEN is not set")
-        return
-
-    path = Path(filepath)
-    if not path.exists():
-        LOGGER.warning("Telegram file send skipped because file does not exist path=%s", path)
-        return
-
-    boundary = f"----codex-{uuid.uuid4().hex}"
-    body = bytearray()
-
-    def add_field(name: str, value: str) -> None:
-        body.extend(f"--{boundary}\r\n".encode("utf-8"))
-        body.extend(f'Content-Disposition: form-data; name="{name}"\r\n\r\n'.encode("utf-8"))
-        body.extend(value.encode("utf-8"))
-        body.extend(b"\r\n")
-
-    add_field("chat_id", chat_id)
-    if caption:
-        add_field("caption", caption)
-
-    body.extend(f"--{boundary}\r\n".encode("utf-8"))
-    body.extend(
-        (
-            f'Content-Disposition: form-data; name="document"; filename="{path.name}"\r\n'
-            "Content-Type: application/octet-stream\r\n\r\n"
-        ).encode("utf-8")
-    )
-    body.extend(path.read_bytes())
-    body.extend(b"\r\n")
-    body.extend(f"--{boundary}--\r\n".encode("utf-8"))
-
-    url = f"{BOT_API_BASE}/bot{token}/sendDocument"
     try:
-        _telegram_request(
-            url=url,
-            data=bytes(body),
-            headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
-        )
+        send_document(chat_id=chat_id, file_path=filepath, caption=caption, token=token)
     except Exception:
-        LOGGER.warning("Failed to send Telegram document chat_id=%s file=%s", chat_id, path, exc_info=True)
+        LOGGER.warning("Failed to send Telegram document chat_id=%s file=%s", chat_id, filepath, exc_info=True)
 
 
 def _with_db(settings: Settings) -> sqlite3.Connection:
@@ -226,7 +132,18 @@ def handle_digest(chat_id: str, args: str, settings: Settings) -> None:
     del args
     week_label = _compute_week_label()
     digest_path = PROJECT_ROOT / "data" / "output" / "digests" / f"{week_label}.md"
-    if not digest_path.exists():
+
+    with _with_db(settings) as connection:
+        row = connection.execute(
+            """
+            SELECT content_json, pdf_path
+            FROM digests
+            WHERE week_label = ?
+            """,
+            (week_label,),
+        ).fetchone()
+
+    if row is None:
         send_message(
             _get_bot_token(),
             chat_id,
@@ -235,7 +152,29 @@ def handle_digest(chat_id: str, args: str, settings: Settings) -> None:
         )
         return
 
-    send_message(_get_bot_token(), chat_id, digest_path.read_text(encoding="utf-8"), parse_mode="Markdown", escape_markdown=False)
+    executive_summary: list[str] = []
+    content_json = row["content_json"] or ""
+    if content_json:
+        try:
+            payload = json.loads(content_json)
+            executive_summary = [
+                str(item).strip() for item in payload.get("executive_summary", []) if str(item).strip()
+            ]
+        except json.JSONDecodeError:
+            LOGGER.warning("Failed to parse digest content_json for week=%s", week_label, exc_info=True)
+
+    try:
+        send_digest_bundle(
+            chat_id=chat_id,
+            week_label=week_label,
+            executive_summary=executive_summary,
+            pdf_path=row["pdf_path"],
+            markdown_path=str(digest_path),
+            token=_get_bot_token(),
+        )
+    except Exception:
+        LOGGER.warning("Failed to send digest bundle chat_id=%s week=%s", chat_id, week_label, exc_info=True)
+        _friendly_handler_error(chat_id)
 
 
 def handle_topics(chat_id: str, args: str, settings: Settings) -> None:
@@ -498,11 +437,15 @@ def handle_run_digest(chat_id: str, args: str, settings: Settings) -> None:
     del args
     summary = run_digest(settings)
     generate_recommendations(settings)
-    send_message(
-        _get_bot_token(),
-        chat_id,
-        f"Дайджест сгенерирован: {summary['week_label']}\n{summary['output_path']}",
-        parse_mode=None,
+    summary_lines = [summary.output_path]
+    if summary.json_path:
+        summary_lines.append(summary.json_path)
+    send_report_preview(
+        chat_id=chat_id,
+        title="Дайджест сгенерирован",
+        summary_lines=summary_lines,
+        week_label=summary.week_label,
+        token=_get_bot_token(),
     )
 
 

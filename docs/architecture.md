@@ -21,10 +21,10 @@ It does not contain implementation code. It is the contract that Codex implement
 │                     Runtime Host (VPS)                         │
 │                                                                │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │              openclaw-you.service                        │  │
-│  │         ws://127.0.0.1:18789 (LLM gateway)               │  │
+│  │           Anthropic Python SDK client                    │  │
+│  │           authenticated with LLM_API_KEY                 │  │
 │  └─────────────────────────┬────────────────────────────────┘  │
-│                            │ WebSocket (local only)             │
+│                            │ HTTPS API calls                  │
 │  ┌─────────────────────────┴────────────────────────────────┐  │
 │  │           Telegram Research Agent                        │  │
 │  │                                                          │  │
@@ -73,7 +73,7 @@ It does not contain implementation code. It is the contract that Codex implement
 - Must deduplicate on `(channel_id, message_id)`.
 - Must log inserted count and skipped count per channel.
 - Must handle `FloodWaitError` by sleeping the required time, then retrying.
-- Must not call the LLM gateway.
+- Must not call the LLM transport from ingestion.
 
 **Failure behavior:**
 - On Telegram connection failure: log error, exit with code 1. Timer will retry next scheduled run.
@@ -127,7 +127,7 @@ It does not contain implementation code. It is the contract that Codex implement
 
 - Queries posts + topics for the target week.
 - Assembles structured prompt from `docs/prompts/digest_generation.md`.
-- Calls LLM via OpenClaw client.
+- Calls LLM via the Anthropic Python SDK.
 - Parses response as Markdown.
 - Writes to `digests` table and `data/output/digests/YYYY-WXX.md`.
 
@@ -136,7 +136,7 @@ It does not contain implementation code. It is the contract that Codex implement
 - Reads current week's digest from DB.
 - Reads recurring topics (last 4 weeks).
 - Reads active projects from `projects` table.
-- Calls LLM via OpenClaw client.
+- Calls LLM via the Anthropic Python SDK.
 - Writes to `recommendations` table and `data/output/recommendations/YYYY-WXX.md`.
 
 #### Project Insight Mapper (`src/output/map_project_insights.py`)
@@ -145,7 +145,8 @@ It does not contain implementation code. It is the contract that Codex implement
 - Scores and ranks matches.
 - Calls LLM for relevance rationale (one call per project, batched post excerpts).
 - Writes to `post_project_links` table.
-- Appends project section to current week's digest file.
+- Calls LLM via the Anthropic Python SDK.
+- Writes `post_project_links` and `data/output/project_insights/YYYY-WXX.md`.
 
 ---
 
@@ -172,14 +173,15 @@ def complete_json(prompt: str, system: str = "", schema: dict = None) -> dict:
 
 **Behavior:**
 - Uses `anthropic.Anthropic(api_key=os.environ["LLM_API_KEY"])`.
-- Model from `os.environ.get("MODEL_PROVIDER", "claude-haiku-4-5")`.
+- Category routing from `src/llm/client.py` with env overrides such as `LLM_MODEL_DIGEST`.
 - Implements retry with exponential backoff (max 3 attempts) on rate limit / 5xx errors.
 - Logs every call at DEBUG level (prompt length, model, response length).
 - Never logs the API key or full response content at INFO or above.
 
 **Configuration:**
 - `LLM_API_KEY` — Anthropic API key (from `/srv/openclaw-you/.env`)
-- `MODEL_PROVIDER` — model ID (default: `claude-haiku-4-5`)
+- `LLM_API_KEY` — Anthropic API key
+- `LLM_MODEL_<CATEGORY>` — optional per-category override
 
 ---
 
@@ -255,20 +257,24 @@ telegram-digest.service
     └─ map_project_insights.py
         ├─ FTS5 keyword match
         ├─ LLM → rationale per project
-        └─ Write → post_project_links + append to digest file
+        └─ Write → post_project_links + data/output/project_insights/
 ```
 
 ---
 
 ## Integration Points and Contracts
 
-### OpenClaw Gateway Protocol
+### LLM Transport
 
-The OpenClaw gateway accepts WebSocket connections at `ws://127.0.0.1:18789`.
+The LLM client (`src/llm/client.py`) uses the `anthropic` Python SDK directly and authenticates with `LLM_API_KEY` from the environment.
 
-The LLM client (`src/llm/client.py`) is responsible for implementing the correct wire protocol. This must be validated in Phase 1 before any production use. The specific message format must be verified against the OpenClaw runtime docs or source at `/opt/openclaw/src` (read-only).
+Current routing is category-based:
+- `topic_detection`, `project_insights` → Haiku
+- `digest`, `recommendations`, `study_plan`, `insight`, `bot_ask` → Sonnet
 
-**Critical:** Do not assume the wire format. Read the source before implementing the client.
+Per-category overrides remain available through environment variables such as `LLM_MODEL_DIGEST`.
+
+Gateway migration is a future option only. It is not part of the current runtime contract.
 
 ### Telethon Session Management
 
@@ -323,15 +329,12 @@ Persistent=true
 ## Dependency Graph (Runtime)
 
 ```
-openclaw-you.service  ←── (must be running before digest runs)
-         ▲
-         │ After=
 telegram-digest.service
          ▲
          │ (timer trigger)
 telegram-digest.timer
 
-telegram-ingest.service  (no dependency on openclaw; ingestion is pure Telethon + SQLite)
+telegram-ingest.service  (ingestion is pure Telethon + SQLite)
          ▲
 telegram-ingest.timer
 ```
@@ -342,7 +345,7 @@ telegram-ingest.timer
 
 | Constraint | Rule |
 |---|---|
-| LLM gateway | `ws://127.0.0.1:18789` only |
+| LLM transport | `anthropic` SDK with `LLM_API_KEY` |
 | Secrets location | `/srv/openclaw-you/secrets/` |
 | DB location | `data/agent.db` (project workspace) |
 | Output location | `data/output/` (project workspace) |

@@ -1,14 +1,28 @@
 import json
 import logging
 import os
-import re
 import sqlite3
+from dataclasses import asdict
 from datetime import timezone, date, datetime, timedelta
 from pathlib import Path
-from urllib import parse, request
 
 from config.settings import PROJECT_ROOT, Settings
 from llm.client import complete
+from output.report_schema import (
+    DigestResult,
+    EvidenceItem,
+    KeyFinding,
+    ReportMeta,
+    ReportSection,
+    ResearchReport,
+)
+from output.report_utils import _extract_markdown_section
+from reporting.renderer import render_pdf
+
+try:
+    from bot.telegram_delivery import send_text
+except ImportError:  # pragma: no cover - direct module execution fallback
+    from src.bot.telegram_delivery import send_text
 
 try:
     from integrations.github_crossref import NO_OVERLAP_NOTE, crossref_repos_to_topics
@@ -23,7 +37,6 @@ LOGGER = logging.getLogger(__name__)
 PROMPT_PATH = PROJECT_ROOT / "docs" / "prompts" / "digest_generation.md"
 OUTPUT_DIR = PROJECT_ROOT / "data" / "output" / "digests"
 TEXT_EXCERPT_LENGTH = 200
-TELEGRAM_MESSAGE_CHUNK_SIZE = 4000
 
 
 def _utc_now() -> datetime:
@@ -57,14 +70,6 @@ def _format_date_range(week_label: str) -> str:
     )
 
 
-def _extract_markdown_section(text: str, heading: str) -> str:
-    pattern = re.compile(rf"^## {re.escape(heading)}\n(.*?)(?=^## |\Z)", re.MULTILINE | re.DOTALL)
-    match = pattern.search(text)
-    if not match:
-        raise ValueError(f"Section not found in prompt file: {heading}")
-    return match.group(1).strip()
-
-
 def _load_prompt_sections() -> tuple[str, str]:
     prompt_markdown = PROMPT_PATH.read_text(encoding="utf-8")
     system_prompt = _extract_markdown_section(prompt_markdown, "System Prompt")
@@ -84,31 +89,11 @@ def _write_digest_file(week_label: str, content_md: str) -> Path:
     return output_path
 
 
-def _chunk_text(text: str, chunk_size: int = TELEGRAM_MESSAGE_CHUNK_SIZE) -> list[str]:
-    if not text:
-        return [""]
-
-    chunks: list[str] = []
-    remaining = text
-    while remaining:
-        if len(remaining) <= chunk_size:
-            chunks.append(remaining)
-            break
-
-        split_at = remaining.rfind("\n", 0, chunk_size)
-        if split_at <= 0:
-            split_at = remaining.rfind(" ", 0, chunk_size)
-        if split_at <= 0:
-            split_at = chunk_size
-
-        chunk = remaining[:split_at].rstrip()
-        if not chunk:
-            chunk = remaining[:chunk_size]
-            split_at = len(chunk)
-        chunks.append(chunk)
-        remaining = remaining[split_at:].lstrip()
-
-    return chunks
+def _write_digest_json_file(week_label: str, report: ResearchReport) -> Path:
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    output_path = OUTPUT_DIR / f"{week_label}.json"
+    output_path.write_text(json.dumps(asdict(report), ensure_ascii=False, indent=2), encoding="utf-8")
+    return output_path
 
 
 def _send_digest_to_telegram_owner(content_md: str, week_label: str) -> None:
@@ -117,23 +102,7 @@ def _send_digest_to_telegram_owner(content_md: str, week_label: str) -> None:
     if not token or not chat_id:
         return
 
-    for chunk in _chunk_text(content_md):
-        payload = parse.urlencode(
-            {
-                "chat_id": chat_id,
-                "text": chunk,
-                "parse_mode": "Markdown",
-                "disable_web_page_preview": "true",
-            }
-        ).encode("utf-8")
-        http_request = request.Request(
-            f"https://api.telegram.org/bot{token}/sendMessage",
-            data=payload,
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-            method="POST",
-        )
-        with request.urlopen(http_request, timeout=60) as response:
-            response.read()
+    send_text(chat_id=chat_id, text=content_md, token=token)
 
     LOGGER.info("Digest sent to Telegram owner week=%s", week_label)
 
@@ -175,13 +144,107 @@ def _append_github_section(content_md: str, settings: Settings) -> str:
     return content_md.rstrip() + "\n\n" + "\n".join(lines).strip() + "\n"
 
 
-def _store_digest(connection: sqlite3.Connection, week_label: str, content_md: str, post_count: int) -> None:
+def _extract_markdown_subsection(text: str, heading: str) -> str:
+    import re
+
+    pattern = re.compile(rf"^### {re.escape(heading)}\n(.*?)(?=^### |\Z)", re.MULTILINE | re.DOTALL)
+    match = pattern.search(text)
+    if not match:
+        return ""
+    return match.group(1).strip()
+
+
+def _extract_executive_summary(content_md: str) -> list[str]:
+    overview = _extract_markdown_subsection(content_md, "Overview")
+    if not overview:
+        return []
+    normalized = " ".join(overview.split())
+    parts = [part.strip() for part in normalized.split(". ") if part.strip()]
+    sentences: list[str] = []
+    for part in parts:
+        sentence = part if part.endswith(".") else f"{part}."
+        sentences.append(sentence)
+    return sentences
+
+
+def _extract_sections(content_md: str, headings: list[str]) -> list[ReportSection]:
+    return [
+        ReportSection(heading=heading, body=_extract_markdown_subsection(content_md, heading))
+        for heading in headings
+    ]
+
+
+def _build_research_report(
+    week_label: str,
+    date_range: str,
+    generated_at: str,
+    post_count: int,
+    channel_count: int,
+    content_md: str,
+    top_topics: list[dict[str, object]],
+    notable_posts: list[dict[str, object]],
+) -> ResearchReport:
+    section_headings = [
+        "Overview",
+        "Top Topics",
+        "Signal Posts",
+        "Noise Patterns",
+        "One Thing to Act On",
+    ]
+    evidence_by_topic: dict[str, list[str]] = {}
+    for index, post in enumerate(notable_posts, start=1):
+        topic_label = str(post.get("topic_label") or "Unlabeled")
+        evidence_by_topic.setdefault(topic_label, []).append(f"S{index}")
+    return ResearchReport(
+        meta=ReportMeta(
+            week_label=week_label,
+            date_range=date_range,
+            generated_at=generated_at,
+            post_count=post_count,
+            channel_count=channel_count,
+        ),
+        executive_summary=_extract_executive_summary(content_md),
+        key_findings=[
+            KeyFinding(
+                title=str(topic["label"]),
+                body=f"{int(topic['post_count'])} posts captured this week.",
+                evidence_ids=evidence_by_topic.get(str(topic["label"]), []),
+            )
+            for topic in top_topics
+        ],
+        sections=_extract_sections(content_md, section_headings),
+        evidence=[
+            EvidenceItem(
+                id=f"S{index}",
+                channel=str(post["channel_username"]),
+                date=str(post["posted_at"]),
+                excerpt=str(post["text_excerpt"]),
+                url=str(post["message_url"] or ""),
+            )
+            for index, post in enumerate(notable_posts, start=1)
+        ],
+        project_relevance=[],
+        confidence_notes=(
+            "This report reflects the last 7 days of ingested Telegram posts. "
+            "Coverage is strongest for the highest-volume topics and most-viewed evidence."
+        ),
+    )
+
+
+def _store_digest(
+    connection: sqlite3.Connection,
+    week_label: str,
+    content_md: str,
+    content_json: str,
+    pdf_path: str | None,
+    post_count: int,
+) -> None:
     connection.execute(
         """
-        INSERT OR REPLACE INTO digests (week_label, generated_at, content_md, post_count)
-        VALUES (?, ?, ?, ?)
+        INSERT OR REPLACE INTO digests (week_label, generated_at, content_md, content_json, pdf_path, post_count)
+        VALUES (?, ?, ?, ?, ?, ?)
         """,
-        (week_label, _utc_now_iso(), content_md, post_count),
+        (week_label, _utc_now_iso(), content_md, content_json, pdf_path, post_count),
     )
 
 
@@ -193,7 +256,7 @@ def _render_empty_digest(week_label: str, date_range: str) -> str:
     )
 
 
-def run_digest(settings: Settings) -> dict:
+def run_digest(settings: Settings) -> DigestResult:
     week_label = _compute_week_label()
     date_range = _format_date_range(week_label)
     cutoff_iso = (_utc_now() - timedelta(days=7)).isoformat().replace("+00:00", "Z")
@@ -211,6 +274,7 @@ def run_digest(settings: Settings) -> dict:
                 posts.content,
                 posts.posted_at,
                 COALESCE(raw_posts.view_count, 0) AS view_count,
+                raw_posts.message_url,
                 topics.label AS topic_label
             FROM posts
             INNER JOIN raw_posts ON raw_posts.id = posts.raw_post_id
@@ -242,17 +306,13 @@ def run_digest(settings: Settings) -> dict:
             empty_digest = _append_github_section(empty_digest, settings)
             output_path = _write_digest_file(week_label, empty_digest)
             connection.execute("BEGIN")
-            _store_digest(connection, week_label, empty_digest, 0)
+            _store_digest(connection, week_label, empty_digest, "", None, 0)
             connection.commit()
             try:
                 _send_digest_to_telegram_owner(content_md=empty_digest, week_label=week_label)
             except Exception:
                 LOGGER.warning("Failed to send digest to Telegram owner week=%s", week_label, exc_info=True)
-            return {
-                "week_label": week_label,
-                "output_path": str(output_path),
-                "post_count": 0,
-            }
+            return DigestResult(week_label=week_label, output_path=str(output_path), post_count=0, json_path="")
 
         top_topics = [
             {"label": label, "post_count": count}
@@ -268,6 +328,7 @@ def run_digest(settings: Settings) -> dict:
                 "channel_username": row["channel_username"],
                 "text_excerpt": _make_excerpt(row["content"]),
                 "view_count": int(row["view_count"] or 0),
+                "message_url": row["message_url"],
                 "topic_label": topic_by_post.get(row["id"], "Unlabeled"),
             }
             for row in sorted_posts[:10]
@@ -287,11 +348,55 @@ def run_digest(settings: Settings) -> dict:
         content_md = complete(prompt=prompt, system=system_prompt, category="digest")
         if not content_md.lstrip().startswith(f"## Weekly Digest — {week_label}"):
             LOGGER.warning("Digest response did not match expected heading for week=%s", week_label)
+        required_digest_sections = [
+            "### Overview",
+            "### Top Topics",
+            "### Signal Posts",
+            "### Noise Patterns",
+            "### One Thing to Act On",
+        ]
+        for section_heading in required_digest_sections:
+            if section_heading not in content_md:
+                LOGGER.warning(
+                    "Digest response missing required section %r for week=%s",
+                    section_heading,
+                    week_label,
+                )
         content_md = _append_github_section(content_md, settings)
 
+        generated_at = _utc_now_iso()
+        report = _build_research_report(
+            week_label=week_label,
+            date_range=date_range,
+            generated_at=generated_at,
+            post_count=post_count,
+            channel_count=channel_count,
+            content_md=content_md,
+            top_topics=top_topics,
+            notable_posts=[
+                {
+                    "channel_username": row["channel_username"],
+                    "posted_at": row["posted_at"],
+                    "text_excerpt": _make_excerpt(row["content"]),
+                    "message_url": row["message_url"],
+                }
+                for row in sorted_posts[:10]
+            ],
+        )
+        content_json = json.dumps(asdict(report), ensure_ascii=False)
+        json_path = _write_digest_json_file(week_label, report)
         output_path = _write_digest_file(week_label, content_md)
+        pdf_output_path = OUTPUT_DIR / f"{week_label}.pdf"
+        rendered_pdf_path = render_pdf(report, pdf_output_path)
         connection.execute("BEGIN")
-        _store_digest(connection, week_label, content_md, post_count)
+        _store_digest(
+            connection,
+            week_label,
+            content_md,
+            content_json,
+            str(rendered_pdf_path) if rendered_pdf_path else None,
+            post_count,
+        )
         connection.commit()
 
     LOGGER.info("Digest generation complete week=%s posts=%d output=%s", week_label, post_count, output_path)
@@ -300,8 +405,9 @@ def run_digest(settings: Settings) -> dict:
     except Exception:
         LOGGER.warning("Failed to send digest to Telegram owner week=%s", week_label, exc_info=True)
 
-    return {
-        "week_label": week_label,
-        "output_path": str(output_path),
-        "post_count": post_count,
-    }
+    return DigestResult(
+        week_label=week_label,
+        output_path=str(output_path),
+        post_count=post_count,
+        json_path=str(json_path),
+    )

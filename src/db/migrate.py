@@ -35,6 +35,21 @@ def run_migrations() -> Path:
             except sqlite3.OperationalError as exc:
                 if "duplicate column name" not in str(exc).lower():
                     raise
+        try:
+            connection.execute("ALTER TABLE raw_posts ADD COLUMN message_url TEXT")
+        except sqlite3.OperationalError as exc:
+            if "duplicate column name" not in str(exc).lower():
+                raise
+        try:
+            connection.execute("ALTER TABLE digests ADD COLUMN content_json TEXT")
+        except sqlite3.OperationalError as exc:
+            if "duplicate column name" not in str(exc).lower():
+                raise
+        try:
+            connection.execute("ALTER TABLE digests ADD COLUMN pdf_path TEXT")
+        except sqlite3.OperationalError as exc:
+            if "duplicate column name" not in str(exc).lower():
+                raise
         connection.executescript(
             """
             CREATE TABLE IF NOT EXISTS llm_usage (
@@ -61,6 +76,19 @@ def run_migrations() -> Path:
                 topics_covered TEXT,
                 reminder_sent_tue INTEGER NOT NULL DEFAULT 0,
                 reminder_sent_fri INTEGER NOT NULL DEFAULT 0
+            );
+            """
+        )
+        connection.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS cluster_runs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_at TEXT NOT NULL,
+                post_count INTEGER NOT NULL DEFAULT 0,
+                cluster_count INTEGER NOT NULL DEFAULT 0,
+                unlabeled_count INTEGER NOT NULL DEFAULT 0,
+                inertia REAL,
+                silhouette_score REAL
             );
             """
         )

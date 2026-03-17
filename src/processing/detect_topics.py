@@ -12,7 +12,7 @@ from processing.cluster import cluster_posts
 
 LOGGER = logging.getLogger(__name__)
 PROMPT_PATH = PROJECT_ROOT / "docs" / "prompts" / "rubric_discovery.md"
-TOKEN_RE = re.compile(r"[a-z0-9]+")
+TOKEN_RE = re.compile(r"\b\w+\b", re.UNICODE)
 OVERLAP_THRESHOLD = 3
 MERGE_CONFIDENCE = 0.7
 NEW_TOPIC_CONFIDENCE_MIN = 0.5
@@ -210,13 +210,31 @@ def run_topic_detection(settings: Settings, clusters: list[dict] | None = None) 
             )
 
             try:
-                llm_response = _coerce_response(
-                    complete_json(prompt=prompt, system=system_prompt, category="topic_detection")
-                )
+                raw_response = complete_json(prompt=prompt, system=system_prompt, category="topic_detection")
             except (LLMError, LLMSchemaError):
                 result["skipped"] += 1
                 LOGGER.exception("LLM topic labeling failed for cluster_id=%d", cluster_id)
                 continue
+            if not isinstance(raw_response, dict):
+                LOGGER.warning(
+                    "LLM response is not an object for cluster_id=%d type=%s; skipping",
+                    cluster_id,
+                    type(raw_response).__name__,
+                )
+                result["skipped"] += 1
+                continue
+            required_keys = {"label", "description", "is_new", "confidence"}
+            missing_keys = required_keys - set(raw_response.keys())
+            if missing_keys:
+                LOGGER.warning(
+                    "LLM response missing required keys %r for cluster_id=%d; skipping",
+                    missing_keys,
+                    cluster_id,
+                )
+                result["skipped"] += 1
+                continue
+
+            llm_response = _coerce_response(raw_response)
 
             if llm_response["merged_into"]:
                 merged_topic = topic_lookup.get(llm_response["merged_into"])

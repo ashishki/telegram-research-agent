@@ -13,6 +13,18 @@ Generate a structured weekly digest from a curated set of top posts and topics f
 - `{total_post_count}`: Integer total posts ingested this week
 - `{channel_count}`: Integer number of channels with activity
 
+## JSON Schema
+
+The generated Markdown is also used to populate a `ResearchReport` JSON artifact for downstream rendering and validation.
+
+- `meta`: object with `week_label`, `date_range`, `generated_at`, `post_count`, `channel_count`
+- `executive_summary`: array of summary bullets
+- `key_findings`: array of objects with `title`, `body`, `evidence_ids`
+- `sections`: array of objects with `heading`, `body`
+- `evidence`: array of objects with `id`, `channel`, `date`, `excerpt`, `url`
+- `project_relevance`: array of objects with `name`, `score`, `notes`
+- `confidence_notes`: string
+
 ## System Prompt
 
 You are a senior technology research analyst. You synthesize information from Telegram technology channels into structured, actionable weekly digests.

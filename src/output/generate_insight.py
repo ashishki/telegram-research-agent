@@ -1,12 +1,12 @@
 import json
 import logging
-import re
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from config.settings import PROJECT_ROOT
 from llm.client import LLMClient
+from output.report_utils import _extract_markdown_section
 
 
 LOGGER = logging.getLogger(__name__)
@@ -27,14 +27,6 @@ def _compute_week_label(now: datetime | None = None) -> str:
     current = now or _utc_now()
     year, week, _ = current.isocalendar()
     return f"{year}-W{week:02d}"
-
-
-def _extract_markdown_section(text: str, heading: str) -> str:
-    pattern = re.compile(rf"^## {re.escape(heading)}\n(.*?)(?=^## |\Z)", re.MULTILINE | re.DOTALL)
-    match = pattern.search(text)
-    if not match:
-        raise ValueError(f"Section not found in prompt file: {heading}")
-    return match.group(1).strip()
 
 
 def _load_prompt_template() -> str:

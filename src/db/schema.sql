@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS raw_posts (
     media_caption TEXT,
     forward_from TEXT,
     view_count INTEGER,
+    message_url TEXT,
     raw_json TEXT NOT NULL,
     ingested_at TEXT NOT NULL,
     UNIQUE(channel_id, message_id)
@@ -53,6 +54,8 @@ CREATE TABLE IF NOT EXISTS digests (
     week_label TEXT NOT NULL UNIQUE,
     generated_at TEXT NOT NULL,
     content_md TEXT NOT NULL,
+    content_json TEXT,
+    pdf_path TEXT,
     post_count INTEGER NOT NULL DEFAULT 0
 );
 
