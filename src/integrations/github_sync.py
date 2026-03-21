@@ -6,12 +6,17 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
+
+import yaml
 
 
 LOGGER = logging.getLogger(__name__)
 GITHUB_API_BASE = "https://api.github.com"
 DEFAULT_TIMEOUT_SECONDS = 30
+
+_PROJECTS_YAML = Path(__file__).resolve().parents[1] / "config" / "projects.yaml"
 
 
 def _utc_now() -> datetime:
@@ -52,40 +57,23 @@ def _request_json(url: str, accept: str = "application/vnd.github+json") -> tupl
     return None, False
 
 
-def _fetch_repos(username: str) -> tuple[list[dict[str, Any]], bool]:
-    # /user/repos (authenticated) returns private repos; /users/{u}/repos returns public only
-    if os.environ.get("GITHUB_TOKEN"):
-        url = f"{GITHUB_API_BASE}/user/repos?per_page=100&type=owner"
-    else:
-        url = f"{GITHUB_API_BASE}/users/{urllib.parse.quote(username)}/repos?per_page=100&type=owner"
-    payload, rate_limited = _request_json(url)
-    if not isinstance(payload, list):
-        return [], rate_limited
-    return [repo for repo in payload if isinstance(repo, dict)], rate_limited
+def _load_curated_projects() -> list[dict[str, Any]]:
+    with open(_PROJECTS_YAML, "r", encoding="utf-8") as fh:
+        data = yaml.safe_load(fh)
+    return [p for p in data.get("projects", []) if isinstance(p, dict)]
 
 
-def _fetch_languages(owner: str, repo_name: str) -> tuple[list[str], bool]:
-    url = f"{GITHUB_API_BASE}/repos/{urllib.parse.quote(owner)}/{urllib.parse.quote(repo_name)}/languages"
+def _fetch_repo_metadata(repo_full_name: str) -> tuple[dict[str, Any] | None, bool]:
+    url = f"{GITHUB_API_BASE}/repos/{repo_full_name}"
     payload, rate_limited = _request_json(url)
     if not isinstance(payload, dict):
-        return [], rate_limited
-    return [str(language) for language in payload.keys()], rate_limited
+        return None, rate_limited
+    return payload, rate_limited
 
 
-def _fetch_topics(owner: str, repo_name: str) -> tuple[list[str], bool]:
-    url = f"{GITHUB_API_BASE}/repos/{urllib.parse.quote(owner)}/{urllib.parse.quote(repo_name)}/topics"
-    payload, rate_limited = _request_json(url, accept="application/vnd.github.mercy-preview+json")
-    if not isinstance(payload, dict):
-        return [], rate_limited
-    names = payload.get("names", [])
-    if not isinstance(names, list):
-        return [], rate_limited
-    return [str(topic) for topic in names], rate_limited
-
-
-def _fetch_weekly_commits(owner: str, repo_name: str, since_iso: str) -> tuple[int, bool]:
+def _fetch_weekly_commits(repo_full_name: str, since_iso: str) -> tuple[int, bool]:
     query = urllib.parse.urlencode({"since": since_iso, "per_page": 100})
-    url = f"{GITHUB_API_BASE}/repos/{urllib.parse.quote(owner)}/{urllib.parse.quote(repo_name)}/commits?{query}"
+    url = f"{GITHUB_API_BASE}/repos/{repo_full_name}/commits?{query}"
     payload, rate_limited = _request_json(url)
     if not isinstance(payload, list):
         return 0, rate_limited
@@ -132,48 +120,54 @@ def _sync_project(
 
 
 def sync_github_projects(db_path: str) -> list[dict]:
-    username = os.environ.get("GITHUB_USERNAME", "").strip()
-    if not username:
-        raise ValueError("GITHUB_USERNAME is required for GitHub sync")
     if not os.environ.get("GITHUB_TOKEN"):
         LOGGER.warning("GITHUB_TOKEN is not set; GitHub sync will use unauthenticated requests")
 
     synced_at = _utc_now_iso()
     since_iso = (_utc_now() - timedelta(days=7)).isoformat().replace("+00:00", "Z")
-    repos, rate_limited = _fetch_repos(username)
+
+    curated = _load_curated_projects()
     results: list[dict[str, Any]] = []
-    if rate_limited:
-        return results
 
     with sqlite3.connect(db_path) as connection:
         connection.execute("PRAGMA foreign_keys = ON;")
         connection.execute("PRAGMA journal_mode = WAL;")
 
-        for repo in repos:
-            owner = str((repo.get("owner") or {}).get("login") or username)
-            repo_name = str(repo.get("name") or "").strip()
-            full_name = str(repo.get("full_name") or "").strip()
-            if not repo_name or not full_name:
+        for project in curated:
+            repo_full_name = str(project.get("repo") or "").strip()
+            focus = str(project.get("focus") or "")
+            if not repo_full_name:
                 continue
 
-            languages, rate_limited = _fetch_languages(owner, repo_name)
+            repo_meta, rate_limited = _fetch_repo_metadata(repo_full_name)
+            if rate_limited:
+                break
+            if repo_meta is None:
+                LOGGER.warning("Could not fetch metadata for repo=%s", repo_full_name)
+                continue
+
+            weekly_commits, rate_limited = _fetch_weekly_commits(repo_full_name, since_iso)
             if rate_limited:
                 break
 
-            topics, rate_limited = _fetch_topics(owner, repo_name)
-            if rate_limited:
-                break
+            keywords_list = [kw.strip() for kw in focus.split(",") if kw.strip()]
 
-            weekly_commits, rate_limited = _fetch_weekly_commits(owner, repo_name, since_iso)
-            if rate_limited:
-                break
+            # Use description from yaml if GitHub description is empty
+            github_description = str(repo_meta.get("description") or "")
+            yaml_description = str(project.get("description") or "")
+            description = github_description if github_description else yaml_description
 
-            keywords_list = sorted({value for value in topics + languages if value})
+            repo_dict = {
+                "full_name": repo_full_name,
+                "description": description,
+                "pushed_at": str(repo_meta.get("pushed_at") or ""),
+            }
+
             try:
                 connection.execute("BEGIN")
                 _sync_project(
                     connection=connection,
-                    repo=repo,
+                    repo=repo_dict,
                     keywords_json=json.dumps(keywords_list, ensure_ascii=True),
                     synced_at=synced_at,
                 )
@@ -192,35 +186,33 @@ def sync_github_projects(db_path: str) -> list[dict]:
                         WHERE name = ?
                         """,
                         (
-                            full_name,
-                            str(repo.get("pushed_at") or ""),
+                            repo_full_name,
+                            str(repo_meta.get("pushed_at") or ""),
                             synced_at,
                             json.dumps(keywords_list, ensure_ascii=True),
-                            full_name,
+                            repo_full_name,
                         ),
                     )
                     connection.commit()
                 except Exception:
                     connection.rollback()
-                    LOGGER.warning("Failed to update existing project row for repo=%s", full_name, exc_info=True)
+                    LOGGER.warning("Failed to update existing project row for repo=%s", repo_full_name, exc_info=True)
                     continue
             except Exception:
                 connection.rollback()
-                LOGGER.warning("Failed to sync repo=%s into projects table", full_name, exc_info=True)
+                LOGGER.warning("Failed to sync repo=%s into projects table", repo_full_name, exc_info=True)
                 continue
 
             results.append(
                 {
-                    "name": full_name,
-                    "description": str(repo.get("description") or ""),
+                    "name": repo_full_name,
+                    "description": description,
                     "keywords_list": keywords_list,
                     "weekly_commits": weekly_commits,
-                    "languages": languages,
-                    "topics": topics,
-                    "last_commit_at": str(repo.get("pushed_at") or ""),
-                    "github_repo": full_name,
+                    "last_commit_at": str(repo_meta.get("pushed_at") or ""),
+                    "github_repo": repo_full_name,
                 }
             )
 
-    LOGGER.info("GitHub sync complete repos_synced=%d username=%s", len(results), username)
+    LOGGER.info("GitHub sync complete repos_synced=%d", len(results))
     return results

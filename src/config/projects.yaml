@@ -1,0 +1,20 @@
+projects:
+  - name: gdev-agent
+    repo: ashishki/gdev-agent
+    description: "Multi-tenant AI triage service. FastAPI, PostgreSQL/pgvector, Redis, Claude API. Webhook ingestion, LLM classification, approval workflow."
+    focus: "service layer patterns, eval pipeline, cost control, multi-tenant RLS, async FastAPI"
+
+  - name: telegram-research-agent
+    repo: ashishki/telegram-research-agent
+    description: "Weekly AI/tech digest from Telegram channels. Telethon ingestion, TF-IDF clustering, Claude synthesis, PDF/text delivery."
+    focus: "digest quality, insight generation, clustering accuracy, delivery UX"
+
+  - name: film-school-assistant
+    repo: ashishki/film-school-assistant
+    description: "Film school learning assistant bot. Early stage — currently a basic bot, evolving toward a structured learning companion."
+    focus: "learning path design, content structuring, bot UX, AI tutoring patterns"
+
+  - name: ai-workflow-playbook
+    repo: ashishki/AI_workflow_playbook
+    description: "Reusable AI-assisted development workflow. Phase-based orchestration, review cycles, implementation contracts."
+    focus: "workflow automation, agent orchestration, quality gates, developer tooling"
