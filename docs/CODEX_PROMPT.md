@@ -20,7 +20,9 @@ empty
 
 ## Open Findings
 
-none
+- CODE-2 (P2): src/bot/telegram_delivery.py:73 — parse_mode="HTML" global; LLM may return Markdown, render may mangle
+- CODE-3 (P2): src/bot/handlers.py:164 — handle_digest sends Markdown content via HTML parse_mode
+- CODE-4 (P2): src/output/generate_digest.py:411 — bare except Exception swallows DB errors in insights block
 
 ## Completed Phases
 
