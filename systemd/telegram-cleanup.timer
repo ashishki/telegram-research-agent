@@ -1,0 +1,11 @@
+[Unit]
+Description=Telegram Research Agent — Weekly DB Cleanup Timer
+Requires=telegram-cleanup.service
+
+[Timer]
+OnCalendar=Mon *-*-* 10:00:00
+Persistent=true
+Unit=telegram-cleanup.service
+
+[Install]
+WantedBy=timers.target

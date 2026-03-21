@@ -18,6 +18,7 @@ from output.map_project_insights import run_project_mapping
 from output.generate_recommendations import run_recommendations
 from output.generate_study_plan import OUTPUT_DIR as STUDY_PLAN_OUTPUT_DIR
 from output.generate_study_plan import generate_study_plan, send_study_reminder
+from processing.cleanup import run_cleanup
 from processing.cluster import cluster_posts
 from processing.detect_topics import run_topic_detection
 from processing.normalize_posts import run_normalization
@@ -59,6 +60,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     normalize_parser = subparsers.add_parser("normalize")
     normalize_parser.set_defaults(handler=handle_normalize)
+
+    cleanup_parser = subparsers.add_parser("cleanup", help="Strip raw_json and delete posts older than 100 days")
+    cleanup_parser.set_defaults(handler=handle_cleanup)
 
     bot_parser = subparsers.add_parser("bot", help="Start Telegram bot interface (long-polling)")
     bot_parser.set_defaults(handler=handle_bot)
@@ -216,6 +220,39 @@ def handle_digest(_: argparse.Namespace) -> int:
     except Exception:
         LOGGER.exception("Project mapping failed but digest succeeded")
 
+    try:
+        LOGGER.info("Starting step=cleanup")
+        cleanup_summary = run_cleanup(settings.db_path)
+        LOGGER.info(
+            "Finished step=cleanup raw_json_nulled=%d posts_deleted=%d vacuum=%s",
+            cleanup_summary["raw_json_nulled"],
+            cleanup_summary["posts_deleted"],
+            cleanup_summary["vacuum"],
+        )
+    except Exception:
+        LOGGER.exception("Cleanup failed but digest succeeded")
+
+    return 0
+
+
+def handle_cleanup(_: argparse.Namespace) -> int:
+    settings = load_settings()
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+
+        LOGGER.info("Starting step=cleanup")
+        summary = run_cleanup(settings.db_path)
+        LOGGER.info(
+            "Finished step=cleanup raw_json_nulled=%d posts_deleted=%d vacuum=%s",
+            summary["raw_json_nulled"],
+            summary["posts_deleted"],
+            summary["vacuum"],
+        )
+    except Exception:
+        LOGGER.exception("Cleanup failed")
+        return 1
     return 0
 
 
