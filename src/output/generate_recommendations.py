@@ -1,9 +1,9 @@
-import json
 import logging
-import re
 import sqlite3
 from datetime import timezone, date, datetime, timedelta
 from pathlib import Path
+
+import yaml
 
 from config.settings import PROJECT_ROOT, Settings
 from llm.client import complete
@@ -11,8 +11,9 @@ from output.report_utils import _extract_markdown_section
 
 
 LOGGER = logging.getLogger(__name__)
-PROMPT_PATH = PROJECT_ROOT / "docs" / "prompts" / "recommendations.md"
+PROMPT_PATH = PROJECT_ROOT / "docs" / "prompts" / "insights.md"
 OUTPUT_DIR = PROJECT_ROOT / "data" / "output" / "recommendations"
+PROJECTS_YAML_PATH = Path(__file__).resolve().parents[2] / "config" / "projects.yaml"
 
 
 def _utc_now() -> datetime:
@@ -27,13 +28,6 @@ def _compute_week_label(now: datetime | None = None) -> str:
     current = now or datetime.now(timezone.utc)
     year, week, _ = current.isocalendar()
     return f"{year}-W{week:02d}"
-
-
-def _load_prompt_sections() -> tuple[str, str]:
-    prompt_markdown = PROMPT_PATH.read_text(encoding="utf-8")
-    system_prompt = _extract_markdown_section(prompt_markdown, "System Prompt")
-    user_template = _extract_markdown_section(prompt_markdown, "User Prompt Template")
-    return system_prompt, user_template
 
 
 def _week_start(week_label: str) -> datetime:
@@ -51,27 +45,40 @@ def _week_bounds(week_label: str) -> tuple[str, str]:
     )
 
 
-def _previous_week_label(week_label: str) -> str:
-    previous = _week_start(week_label) - timedelta(days=7)
-    year, week, _ = previous.isocalendar()
-    return f"{year}-W{week:02d}"
+def _load_prompt_sections() -> tuple[str, str]:
+    prompt_markdown = PROMPT_PATH.read_text(encoding="utf-8")
+    system_prompt = _extract_markdown_section(prompt_markdown, "System Prompt")
+    user_template = _extract_markdown_section(prompt_markdown, "User Prompt Template")
+    return system_prompt, user_template
 
 
-def _write_recommendations_file(week_label: str, content_md: str) -> Path:
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    output_path = OUTPUT_DIR / f"{week_label}.md"
-    output_path.write_text(content_md, encoding="utf-8")
-    return output_path
+def _load_projects_context() -> str:
+    data = yaml.safe_load(PROJECTS_YAML_PATH.read_text(encoding="utf-8"))
+    projects = data.get("projects", [])
+    lines = []
+    for project in projects:
+        name = project.get("name", "")
+        description = project.get("description", "")
+        focus = project.get("focus", "")
+        lines.append(f"{name}: {description}. Фокус: {focus}")
+    return "\n".join(lines)
 
 
-def _extract_recommendation_labels(content_md: str) -> list[str]:
-    labels = re.findall(r"^#{2,3}\s+\d+\.\s+(.+?)\s*$", content_md, flags=re.MULTILINE)
-    return labels
+def _load_digest_summary(connection: sqlite3.Connection, week_label: str) -> tuple[str | None, str]:
+    row = connection.execute(
+        """
+        SELECT content_md
+        FROM digests
+        WHERE week_label = ?
+        """,
+        (week_label,),
+    ).fetchone()
+    if row is None:
+        return None, ""
+    digest_md = row["content_md"]
 
-
-def _load_this_week_topics(connection: sqlite3.Connection, week_label: str) -> list[dict]:
     week_start_iso, week_end_iso = _week_bounds(week_label)
-    rows = connection.execute(
+    topic_rows = connection.execute(
         """
         SELECT topics.label, COUNT(*) AS post_count
         FROM post_topics
@@ -80,106 +87,49 @@ def _load_this_week_topics(connection: sqlite3.Connection, week_label: str) -> l
         WHERE posts.posted_at >= ? AND posts.posted_at < ?
         GROUP BY topics.id, topics.label
         ORDER BY post_count DESC, topics.label ASC
+        LIMIT 10
         """,
         (week_start_iso, week_end_iso),
     ).fetchall()
-    return [{"label": row["label"], "post_count": row["post_count"]} for row in rows]
 
-
-def _load_recurring_topics(connection: sqlite3.Connection, week_label: str) -> list[dict]:
-    week_starts = [_week_start(week_label) - timedelta(days=7 * offset) for offset in range(4)]
-    week_ranges = []
-    for index, start in enumerate(week_starts):
-        week_ranges.extend(
-            [
-                start.isoformat().replace("+00:00", "Z"),
-                (start + timedelta(days=7)).isoformat().replace("+00:00", "Z"),
-                f"week_{index}",
-            ]
-        )
-    rows = connection.execute(
+    notable_rows = connection.execute(
         """
-        WITH bucketed_topic_posts AS (
-            SELECT
-                topics.id AS topic_id,
-                topics.label AS label,
-                topics.description AS description,
-                CASE
-                    WHEN posts.posted_at >= ? AND posts.posted_at < ? THEN ?
-                    WHEN posts.posted_at >= ? AND posts.posted_at < ? THEN ?
-                    WHEN posts.posted_at >= ? AND posts.posted_at < ? THEN ?
-                    WHEN posts.posted_at >= ? AND posts.posted_at < ? THEN ?
-                END AS week_bucket
-            FROM post_topics
-            INNER JOIN topics ON topics.id = post_topics.topic_id
-            INNER JOIN posts ON posts.id = post_topics.post_id
-        ),
-        weekly_topic_counts AS (
-            SELECT
-                topic_id,
-                label,
-                description,
-                week_bucket,
-                COUNT(*) AS weekly_post_count
-            FROM bucketed_topic_posts
-            WHERE week_bucket IS NOT NULL
-            GROUP BY topic_id, label, description, week_bucket
-        )
         SELECT
-            label,
-            description,
-            COUNT(*) AS week_count,
-            SUM(weekly_post_count) AS total_post_count
-        FROM weekly_topic_counts
-        GROUP BY topic_id, label, description
-        HAVING COUNT(*) >= 3
-        ORDER BY week_count DESC, total_post_count DESC, label ASC
+            posts.channel_username,
+            posts.content,
+            raw_posts.message_url,
+            COALESCE(raw_posts.view_count, 0) AS view_count
+        FROM posts
+        INNER JOIN raw_posts ON raw_posts.id = posts.raw_post_id
+        WHERE posts.posted_at >= ? AND posts.posted_at < ?
+        ORDER BY view_count DESC, posts.posted_at DESC
+        LIMIT 10
         """,
-        tuple(week_ranges),
+        (week_start_iso, week_end_iso),
     ).fetchall()
-    return [
-        {
-            "label": row["label"],
-            "description": row["description"],
-            "week_count": row["week_count"],
-            "total_post_count": row["total_post_count"],
-        }
-        for row in rows
-    ]
+
+    lines = []
+    if topic_rows:
+        lines.append("Топ тем:")
+        for row in topic_rows:
+            lines.append(f"  - {row['label']} ({row['post_count']} постов)")
+
+    if notable_rows:
+        lines.append("\nПримечательные посты:")
+        for row in notable_rows:
+            excerpt = " ".join((row["content"] or "").split())[:200]
+            url = row["message_url"] or ""
+            channel = row["channel_username"] or ""
+            lines.append(f"  - [{channel}] {excerpt} {url}".strip())
+
+    return digest_md, "\n".join(lines)
 
 
-def _load_active_projects(connection: sqlite3.Connection) -> list[dict]:
-    rows = connection.execute(
-        """
-        SELECT name, description, keywords
-        FROM projects
-        WHERE active = 1
-        ORDER BY name ASC
-        """
-    ).fetchall()
-    return [
-        {
-            "name": row["name"],
-            "description": row["description"],
-            "keywords": row["keywords"],
-        }
-        for row in rows
-    ]
-
-
-def _load_last_recommendations(connection: sqlite3.Connection, week_label: str) -> list[str]:
-    previous_week_label = _previous_week_label(week_label)
-    row = connection.execute(
-        """
-        SELECT content_md
-        FROM recommendations
-        WHERE week_label = ?
-        """,
-        (previous_week_label,),
-    ).fetchone()
-    if row is None:
-        return []
-    return _extract_recommendation_labels(row["content_md"])
+def _write_insights_file(week_label: str, content: str) -> Path:
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    output_path = OUTPUT_DIR / f"{week_label}_insights.md"
+    output_path.write_text(content, encoding="utf-8")
+    return output_path
 
 
 def _store_recommendations(connection: sqlite3.Connection, week_label: str, content_md: str) -> None:
@@ -201,54 +151,32 @@ def run_recommendations(settings: Settings) -> dict:
         connection.execute("PRAGMA foreign_keys = ON;")
         connection.execute("PRAGMA journal_mode = WAL;")
 
-        digest_row = connection.execute(
-            """
-            SELECT content_md
-            FROM digests
-            WHERE week_label = ?
-            """,
-            (week_label,),
-        ).fetchone()
-        if digest_row is None:
-            LOGGER.warning("Recommendations skipped because no digest exists for week=%s", week_label)
-            return {"week_label": week_label, "output_path": None}
+        digest_md, digest_summary = _load_digest_summary(connection, week_label)
+        if digest_md is None:
+            LOGGER.warning("Insights skipped because no digest exists for week=%s", week_label)
+            return {"week_label": week_label, "output_path": None, "text": ""}
 
-        this_week_topics = _load_this_week_topics(connection, week_label)
-        recurring_topics = _load_recurring_topics(connection, week_label)
-        active_projects = _load_active_projects(connection)
-        last_recommendations = _load_last_recommendations(connection, week_label)
-
+        projects_context = _load_projects_context()
         system_prompt, user_template = _load_prompt_sections()
         prompt = (
             user_template.replace("{week_label}", week_label)
-            .replace("{this_week_topics}", json.dumps(this_week_topics, ensure_ascii=True))
-            .replace("{recurring_topics}", json.dumps(recurring_topics, ensure_ascii=True))
-            .replace("{active_projects}", json.dumps(active_projects, ensure_ascii=True))
-            .replace("{last_recommendations}", json.dumps(last_recommendations, ensure_ascii=True))
+            .replace("{digest_summary}", digest_summary)
+            .replace("{projects_context}", projects_context)
         )
 
-        content_md = complete(prompt=prompt, system=system_prompt, category="recommendations")
-        if not content_md.lstrip().startswith(f"## Study Recommendations — {week_label}"):
-            LOGGER.warning("Recommendations response did not match expected heading for week=%s", week_label)
-        recommendation_blocks = re.findall(r"^#{2,3}\s+\d+\.\s+", content_md, flags=re.MULTILINE)
-        if not recommendation_blocks:
-            LOGGER.warning(
-                "Recommendations response contains zero recommendation blocks for week=%s",
-                week_label,
-            )
+        insights_text = complete(prompt=prompt, system=system_prompt, category="insight")
 
-        output_path = _write_recommendations_file(week_label, content_md)
+        output_path = _write_insights_file(week_label, insights_text)
         connection.execute("BEGIN")
-        _store_recommendations(connection, week_label, content_md)
+        _store_recommendations(connection, week_label, insights_text)
         connection.commit()
 
     LOGGER.info(
-        "Recommendations generation complete week=%s output=%s digest_length=%d",
+        "Insights generation complete week=%s output=%s",
         week_label,
         output_path,
-        len(digest_row["content_md"]),
     )
-    return {"week_label": week_label, "output_path": str(output_path)}
+    return {"week_label": week_label, "output_path": str(output_path), "text": insights_text}
 
 
 def generate_recommendations(settings: Settings) -> dict:

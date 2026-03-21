@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 import re
@@ -8,7 +7,7 @@ from pathlib import Path
 from typing import Callable
 from urllib import error
 
-from bot.telegram_delivery import _send_text_internal, send_digest_bundle, send_document, send_report_preview
+from bot.telegram_delivery import _send_text_internal, send_document, send_report_preview, send_text
 from config.settings import PROJECT_ROOT, Settings
 from llm.client import LLMClient
 from output.generate_digest import _compute_week_label, run_digest
@@ -131,49 +130,40 @@ def handle_start(chat_id: str, args: str, settings: Settings) -> None:
 def handle_digest(chat_id: str, args: str, settings: Settings) -> None:
     del args
     week_label = _compute_week_label()
-    digest_path = PROJECT_ROOT / "data" / "output" / "digests" / f"{week_label}.md"
 
     with _with_db(settings) as connection:
         row = connection.execute(
             """
-            SELECT content_json, pdf_path
+            SELECT content_md
             FROM digests
             WHERE week_label = ?
             """,
             (week_label,),
         ).fetchone()
 
-    if row is None:
+        if row is None:
+            row = connection.execute(
+                """
+                SELECT content_md
+                FROM digests
+                ORDER BY week_label DESC
+                LIMIT 1
+                """
+            ).fetchone()
+
+    if row is None or not row["content_md"]:
         send_message(
             _get_bot_token(),
             chat_id,
-            "Дайджест за текущую неделю ещё не сгенерирован. Попробуй /run_digest",
+            "Дайджест за эту неделю ещё не готов. Запусти /run_digest",
             parse_mode=None,
         )
         return
 
-    executive_summary: list[str] = []
-    content_json = row["content_json"] or ""
-    if content_json:
-        try:
-            payload = json.loads(content_json)
-            executive_summary = [
-                str(item).strip() for item in payload.get("executive_summary", []) if str(item).strip()
-            ]
-        except json.JSONDecodeError:
-            LOGGER.warning("Failed to parse digest content_json for week=%s", week_label, exc_info=True)
-
     try:
-        send_digest_bundle(
-            chat_id=chat_id,
-            week_label=week_label,
-            executive_summary=executive_summary,
-            pdf_path=row["pdf_path"],
-            markdown_path=str(digest_path),
-            token=_get_bot_token(),
-        )
+        send_text(chat_id=chat_id, text=row["content_md"], token=_get_bot_token())
     except Exception:
-        LOGGER.warning("Failed to send digest bundle chat_id=%s week=%s", chat_id, week_label, exc_info=True)
+        LOGGER.warning("Failed to send digest text chat_id=%s week=%s", chat_id, week_label, exc_info=True)
         _friendly_handler_error(chat_id)
 
 
