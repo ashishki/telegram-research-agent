@@ -5,15 +5,14 @@ _v1.0 · 2026-03-21 · telegram-research-agent_
 
 ## Current State
 
-- Phase: 17 (complete — all planned phases done)
+- Phase: 18 (active — Focused Intel Redesign)
 - Baseline: 12 passing tests
-- Ruff: not yet enforced (pre-playbook project)
-- Last CI: no CI configured (added in this session)
+- Ruff: not enforced (pre-playbook project)
+- Last CI: green (added 2026-03-21)
 
 ## Next Task
 
-Awaiting instructions from human. No active task queue.
-See docs/tasks.md for phase history.
+T18 — Curated projects config
 
 ## Fix Queue
 
@@ -21,7 +20,7 @@ empty
 
 ## Open Findings
 
-none (pre-playbook — no review cycles run yet)
+none
 
 ## Completed Phases
 

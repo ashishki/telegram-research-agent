@@ -365,3 +365,86 @@ P0 (Architecture)
 - Never modify OpenClaw source at `/opt/openclaw/src`.
 - Read `/opt/openclaw/src` to understand the gateway wire protocol before implementing `client.py`.
 - Session and API credential files go in `/srv/openclaw-you/secrets/`, not in this workspace.
+
+---
+
+## Phase 18 — Focused Intel Redesign
+
+_Owner: codex · Date: 2026-03-21 · Depends on: P17_
+
+| ID | Task | Owner | Status | Depends On |
+|---|---|---|---|---|
+| T18 | Curated projects config (`projects.yaml` + github_sync refactor) | codex | `[x]` | — |
+| T19 | New digest format (5 categories, Telegram HTML, no PDF) | codex | `[x]` | T18 |
+| T20 | New insights prompt (Implement + Build types, separate message) | codex | `[x]` | T19 |
+| T21 | Remove PDF from delivery path, text-primary | codex | `[x]` | T20 |
+
+### T18 — Curated projects config
+
+**Objective:** Replace "all repos" GitHub sync with curated 4-project config. Each project has a context card used by the insights prompt.
+
+**Acceptance Criteria:**
+- [ ] `src/config/projects.yaml` exists with 4 projects: gdev-agent, telegram-research-agent, film-school-assistant, ai-workflow-playbook
+- [ ] Each project has: `name`, `repo`, `description`, `focus` fields
+- [ ] `github_sync.py` reads from `projects.yaml` instead of fetching all user repos
+- [ ] Projects table still populated correctly (existing schema unchanged)
+- [ ] 12 tests still pass
+
+**Files:**
+- Create: `src/config/projects.yaml`
+- Modify: `src/integrations/github_sync.py`
+
+---
+
+### T19 — New digest format
+
+**Objective:** Replace 400-700 word essay digest with 5-category Telegram-native format. Target: 1-2 messages (~3500 chars max).
+
+**Acceptance Criteria:**
+- [ ] `docs/prompts/digest_generation.md` updated with new 5-category prompt
+- [ ] Categories: 🤖 Агенты/подходы, 🛠️ Инструменты, 💡 Идеи, 🧠 Психология/культура, 📰 Индустрия
+- [ ] Each category: 1-2 items, format: `<b>Заголовок</b>\nСуть в 2 строки\n<a href="...">источник</a>`
+- [ ] Output is Telegram HTML (not MarkdownV2)
+- [ ] Total output ≤ 3500 characters
+- [ ] `generate_digest.py` passes `parse_mode="HTML"` to send_message
+- [ ] 12 tests still pass
+
+**Files:**
+- Modify: `docs/prompts/digest_generation.md`
+- Modify: `src/output/generate_digest.py`
+
+---
+
+### T20 — New insights prompt (Implement + Build)
+
+**Objective:** Replace generic study recommendations with project-specific insights. Two types: Implement (idea for existing project) and Build (new portfolio idea). Sent as separate message after digest.
+
+**Acceptance Criteria:**
+- [ ] `docs/prompts/insights.md` created with Implement/Build format
+- [ ] Each insight: type tag + project name + idea title + 3-4 sentence justification + source
+- [ ] Max 3 insights total per week
+- [ ] `generate_recommendations.py` uses new prompt and reads from `projects.yaml` for project context
+- [ ] Weekly automation sends insights as second message, 1 minute after digest
+- [ ] 12 tests still pass
+
+**Files:**
+- Create: `docs/prompts/insights.md`
+- Modify: `src/output/generate_recommendations.py`
+- Modify: `src/output/generate_digest.py` (add second message send)
+
+---
+
+### T21 — Remove PDF from delivery path
+
+**Objective:** Text-first delivery. Remove PDF dependency from weekly automation and `/digest` command. PDF generation can remain as dead code for now — just not called automatically.
+
+**Acceptance Criteria:**
+- [ ] Weekly digest send uses `send_message(..., parse_mode="HTML")` not `send_digest_bundle()`
+- [ ] `/digest` bot command returns formatted HTML text, not PDF bundle
+- [ ] No WeasyPrint import errors block the digest pipeline
+- [ ] `handle_digest` in `handlers.py` works without PDF file present
+- [ ] 12 tests still pass
+
+**Files:**
+- Modify: `src/bot/handlers.py`
+- Modify: `src/output/generate_digest.py`
