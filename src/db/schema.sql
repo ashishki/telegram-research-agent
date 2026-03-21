@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS raw_posts (
     message_url TEXT,
     raw_json TEXT NOT NULL,
     ingested_at TEXT NOT NULL,
+    image_description TEXT,
     UNIQUE(channel_id, message_id)
 );
 

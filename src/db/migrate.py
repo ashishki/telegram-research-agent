@@ -45,6 +45,11 @@ def run_migrations() -> Path:
             if "duplicate column name" not in str(exc).lower():
                 raise
         try:
+            connection.execute("ALTER TABLE raw_posts ADD COLUMN image_description TEXT")
+        except sqlite3.OperationalError as exc:
+            if "duplicate column name" not in str(exc).lower():
+                raise
+        try:
             connection.execute("ALTER TABLE digests ADD COLUMN content_json TEXT")
         except sqlite3.OperationalError as exc:
             if "duplicate column name" not in str(exc).lower():

@@ -52,7 +52,8 @@ def _fetch_unprocessed_batch(cursor: sqlite3.Cursor) -> list[sqlite3.Row]:
             raw_posts.channel_username,
             raw_posts.posted_at,
             raw_posts.text,
-            raw_posts.media_caption
+            raw_posts.media_caption,
+            raw_posts.image_description
         FROM raw_posts
         LEFT JOIN posts ON posts.raw_post_id = raw_posts.id
         WHERE posts.raw_post_id IS NULL
@@ -81,7 +82,7 @@ def run_normalization(settings: Settings) -> dict:
 
             batch_records: list[tuple[object, ...]] = []
             for row in rows:
-                source_text = row["text"] or row["media_caption"] or ""
+                source_text = row["text"] or row["image_description"] or row["media_caption"] or ""
                 content = _clean_content(source_text)
 
                 url_count, has_code, word_count = _extract_metadata(content)

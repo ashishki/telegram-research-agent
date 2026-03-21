@@ -23,6 +23,7 @@ CATEGORY_MODEL_MAP: dict[str, str] = {
     # Fast + cheap — called many times per run
     "project_insights":  "claude-haiku-4-5",
     "topic_detection":   "claude-haiku-4-5",
+    "photo_analysis":    "claude-haiku-4-5",
     "unknown":           "claude-haiku-4-5",
     "test":              "claude-haiku-4-5",
 }

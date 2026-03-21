@@ -10,6 +10,7 @@ from telethon.errors import FloodWaitError
 
 from config.settings import PROJECT_ROOT, Settings
 from ingestion.telegram_client import make_client
+from llm.vision import analyze_photo
 
 
 LOGGER = logging.getLogger(__name__)
@@ -89,8 +90,9 @@ def _insert_message(cursor: sqlite3.Cursor, row: dict) -> None:
             view_count,
             message_url,
             raw_json,
-            ingested_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ingested_at,
+            image_description
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             row["channel_username"],
@@ -105,6 +107,7 @@ def _insert_message(cursor: sqlite3.Cursor, row: dict) -> None:
             row["message_url"],
             row["raw_json"],
             row["ingested_at"],
+            row.get("image_description"),
         ),
     )
 
@@ -129,6 +132,13 @@ async def _ingest_channel(client, connection: sqlite3.Connection, channel: dict,
                     continue
 
                 row = _extract_message_row(message, channel_username, ingested_at)
+                if row["media_type"] == "photo" and len((row["text"] or "").strip()) < 20:
+                    try:
+                        photo_bytes = await client.download_media(message, bytes)
+                        if photo_bytes:
+                            row["image_description"] = analyze_photo(photo_bytes)
+                    except Exception:
+                        LOGGER.warning("Photo analysis failed channel=%s message_id=%s", channel_username, message.id)
                 try:
                     _insert_message(cursor, row)
                 except sqlite3.IntegrityError:

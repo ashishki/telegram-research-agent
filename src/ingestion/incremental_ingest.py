@@ -12,6 +12,7 @@ from ingestion.bootstrap_ingest import (
     _load_active_channels,
 )
 from ingestion.telegram_client import make_client
+from llm.vision import analyze_photo
 from telethon.errors import FloodWaitError
 
 
@@ -61,6 +62,13 @@ async def _ingest_channel(client, connection: sqlite3.Connection, channel: dict)
                     continue
 
                 row = _extract_message_row(message, channel_username, ingested_at)
+                if row["media_type"] == "photo" and len((row["text"] or "").strip()) < 20:
+                    try:
+                        photo_bytes = await client.download_media(message, bytes)
+                        if photo_bytes:
+                            row["image_description"] = analyze_photo(photo_bytes)
+                    except Exception:
+                        LOGGER.warning("Photo analysis failed channel=%s message_id=%s", channel_username, message.id)
                 try:
                     _insert_message(cursor, row)
                 except sqlite3.IntegrityError:
