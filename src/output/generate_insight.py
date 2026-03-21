@@ -14,6 +14,13 @@ PROMPT_PATH = PROJECT_ROOT / "docs" / "prompts" / "github_insights.md"
 OUTPUT_DIR = PROJECT_ROOT / "data" / "output" / "insights"
 POST_LIMIT = 20
 
+INSIGHT_PROJECTS = {
+    "ashishki/gdev-agent",
+    "ashishki/telegram-research-agent",
+    "ashishki/film-school-assistant",
+    "ashishki/AI_workflow_playbook",
+}
+
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
@@ -117,6 +124,7 @@ def generate_insight(db_path: str, lookback_days: int = 90) -> str:
             ORDER BY name ASC
             """
         ).fetchall()
+        projects = [p for p in projects if p["name"] in INSIGHT_PROJECTS]
         if not projects:
             LOGGER.info("Insight generation skipped: no active projects")
             return ""
