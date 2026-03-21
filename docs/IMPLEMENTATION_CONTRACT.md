@@ -1,0 +1,86 @@
+# Implementation Contract
+_v1.0 · telegram-research-agent · Immutable rules. Require ADR to change._
+
+---
+
+## Universal Rules
+
+### SQL Safety
+- All SQLite queries parameterized — `cursor.execute("... WHERE id = ?", (value,))`
+- Never f-strings or string concatenation in SQL
+- FTS5 queries use `MATCH ?` with bound params
+
+### Secrets & Credentials
+- No credentials in source code
+- All secrets via environment variables: `LLM_API_KEY`, `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_OWNER_CHAT_ID`, `GITHUB_TOKEN`
+- Telethon session file (`.session`) never committed to git
+
+### LLM Calls
+- All LLM calls go through `src/llm/client.py` — never call Anthropic SDK directly from modules
+- Model routing: Haiku for classification/labeling, Sonnet for synthesis/digest
+- Every LLM call logged to `llm_usage` table (model, tokens_in, tokens_out, cost_usd, category)
+- Cost tracking is mandatory — no untracked LLM calls
+
+### Bot Access
+- Telegram bot responds only to `TELEGRAM_OWNER_CHAT_ID`
+- No public access, no group access, no unauthenticated commands
+
+### PII Policy
+- No user data in logs beyond owner's own messages
+- Telegram post content stored in SQLite only — not in logs or external services
+
+### Error Handling
+- Telethon `FloodWaitError` — always sleep + retry, never abort
+- LLM failures — log, return fallback (empty digest, error message), never propagate exception to bot
+- PDF rendering failure — graceful fallback to Markdown text
+
+### CI
+- CI must pass before any PR is merged
+- `python3 -m unittest discover tests/` must exit 0
+
+---
+
+## Project-Specific Rules
+
+| ID | Rule | Reason |
+|----|------|--------|
+| A | SQLite WAL mode always on | Parallel reads from bot + ingest without locking |
+| B | Clustering is deterministic (no LLM in cluster step) | Reproducible results across runs; LLM only for labeling |
+| C | `message_url` stored as `t.me/channel/message_id` | Audit trail; source attribution in PDF appendix |
+| D | Output files written to `data/output/` only (gitignored) | Keeps repo clean; data is ephemeral |
+| E | systemd timers define the schedule — never cron | Consistent with existing deployment |
+
+---
+
+## Forbidden Actions
+
+- String interpolation in SQL
+- Direct `anthropic.Anthropic()` calls outside `src/llm/client.py`
+- Committing `.session` files or `.env` files
+- Responding to non-owner Telegram IDs in bot handlers
+- Skipping pre-task baseline capture
+- Self-closing review findings without code verification
+
+---
+
+## Mandatory Pre-Task Protocol
+
+1. Read full task entry in docs/tasks.md
+2. Run `python3 -m unittest discover tests/` — record baseline
+3. Check no uncommitted changes: `git status`
+4. Write tests before or alongside implementation
+5. Every acceptance criterion must have a passing test
+
+---
+
+## Governing Documents
+
+| Document | Role |
+|---|---|
+| `docs/architecture.md` | System design, data flow, component table |
+| `docs/spec.md` | Feature specification |
+| `docs/tasks.md` | Task graph — authoritative |
+| `docs/CODEX_PROMPT.md` | Session handoff — current state |
+| `docs/IMPLEMENTATION_CONTRACT.md` | This file — immutable rules |
+| `docs/audit/` | Review cycle reports (append-only) |
+| `docs/adr/` | Architectural Decision Records (append-only) |
