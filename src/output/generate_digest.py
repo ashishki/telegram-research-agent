@@ -387,7 +387,9 @@ def run_digest(settings: Settings) -> DigestResult:
         json_path = _write_digest_json_file(week_label, report)
         output_path = _write_digest_file(week_label, content_md)
         pdf_output_path = OUTPUT_DIR / f"{week_label}.pdf"
-        rendered_pdf_path = render_pdf(report, pdf_output_path)
+        # T21: removed from delivery path
+        # rendered_pdf_path = render_pdf(report, pdf_output_path)
+        rendered_pdf_path = None
         connection.execute("BEGIN")
         _store_digest(
             connection,
@@ -404,6 +406,18 @@ def run_digest(settings: Settings) -> DigestResult:
         _send_digest_to_telegram_owner(content_md=content_md, week_label=week_label)
     except Exception:
         LOGGER.warning("Failed to send digest to Telegram owner week=%s", week_label, exc_info=True)
+
+    # Send insights as second message (1 message after digest)
+    try:
+        from output.generate_recommendations import run_recommendations
+        insights_result = run_recommendations(settings)
+        insights_text = insights_result.get("text", "") if isinstance(insights_result, dict) else str(insights_result)
+        token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+        chat_id = os.environ.get("TELEGRAM_OWNER_CHAT_ID", "").strip()
+        if insights_text and token and chat_id:
+            send_text(token=token, chat_id=chat_id, text=insights_text)
+    except Exception as e:
+        LOGGER.warning("Insights generation failed, skipping: %s", e)
 
     return DigestResult(
         week_label=week_label,

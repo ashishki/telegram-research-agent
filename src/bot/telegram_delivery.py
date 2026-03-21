@@ -70,7 +70,7 @@ def _send_text_internal(chat_id: str, text: str, token: str, parse_mode: str | N
 
 
 def send_text(chat_id: str, text: str, token: str) -> None:
-    _send_text_internal(chat_id=chat_id, text=text, token=token, parse_mode="Markdown")
+    _send_text_internal(chat_id=chat_id, text=text, token=token, parse_mode="HTML")
 
 
 def send_document(chat_id: str, file_path: str, caption: str, token: str) -> None:
@@ -114,6 +114,7 @@ def send_document(chat_id: str, file_path: str, caption: str, token: str) -> Non
     )
 
 
+# T21: not used in delivery path
 def send_digest_bundle(
     chat_id: str,
     week_label: str,
