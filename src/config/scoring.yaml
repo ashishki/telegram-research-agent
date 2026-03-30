@@ -1,0 +1,68 @@
+# Scoring framework — drives composite signal_score for each post.
+# All weights must sum to 1.0.
+# Adjust weights here without touching code to tune ranking behavior.
+#
+# Scoring dimensions:
+#   personal_interest  — topic alignment with profile.yaml boost/downrank lists
+#   source_quality     — channel priority weight × relative view count within channel
+#   technical_depth    — proxy via has_code, url_count, word_count, cluster coherence
+#   novelty            — how different is this cluster vs. last 4 weeks
+#   actionability      — Haiku classification: does this contain an implementable pattern
+
+weights:
+  personal_interest: 0.30
+  source_quality: 0.20
+  technical_depth: 0.20
+  novelty: 0.15
+  actionability: 0.15
+
+# Channel priority → source_quality base weight
+# These multiply the within-channel normalized view count.
+channel_priority_weights:
+  high: 1.0
+  medium: 0.6
+  low: 0.2
+
+# technical_depth sub-weights (must sum to 1.0)
+technical_depth_weights:
+  has_code: 0.35        # Binary: code block detected in post
+  url_count: 0.25       # Normalized: ≥2 external links = max score
+  word_count: 0.25      # Normalized: ≥80 words = max score (filters one-liners)
+  cluster_coherence: 0.15  # Silhouette contribution from the post's cluster
+
+# Bucket thresholds
+buckets:
+  strong:
+    min_score: 0.75
+    max_items: 3
+  watch:
+    min_score: 0.45
+    max_items: 3
+  cultural:
+    # Cultural bucket: triggered by cultural_keywords match in profile.yaml
+    # Bypasses score threshold. Max 1 item per digest.
+    max_items: 1
+  noise:
+    # Everything below watch threshold that isn't cultural goes here.
+    # Counted in "Filtered Out" summary but not shown individually.
+
+# Novelty computation
+# A cluster is "new" if its top keywords have < min_overlap_weeks weeks
+# of appearance in the last lookback_weeks window.
+novelty:
+  lookback_weeks: 4
+  new_cluster_min_score: 0.80   # Score assigned to posts in brand-new clusters
+  recurring_cluster_penalty: 0.30  # Score assigned to posts in clusters appearing all 4 weeks
+
+# Actionability — Haiku classification thresholds
+# Haiku returns one of: "implement", "pattern", "awareness", "noise"
+actionability_scores:
+  implement: 1.0    # Direct implementation pattern described
+  pattern: 0.7      # Architectural or design pattern, not direct implementation
+  awareness: 0.3    # Worth knowing, nothing to act on immediately
+  noise: 0.0        # No actionable content
+
+# Output quality constraints
+output:
+  max_words: 600          # Hard limit; regenerate if exceeded
+  max_chars_telegram: 3500  # Telegram HTML hard limit

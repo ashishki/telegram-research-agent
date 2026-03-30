@@ -448,3 +448,318 @@ _Owner: codex · Date: 2026-03-21 · Depends on: P17_
 **Files:**
 - Modify: `src/bot/handlers.py`
 - Modify: `src/output/generate_digest.py`
+
+---
+
+## Phase 19 — Signal Intelligence Redesign
+
+_Owner: codex · Date: 2026-03-30 · Depends on: P18_
+_Source: Strategic redesign plan (cuddly-frolicking-lighthouse.md) — Phase 1 Signal Quality_
+_Goal: Replace view-count ranking with personal relevance scoring. LLM receives ≤6 posts, not 150+._
+
+| ID | Task | Owner | Status | Depends On |
+|---|---|---|---|---|
+| T22 | Profile & scoring config (`profile.yaml` + `scoring.yaml`) | codex | `[x]` | — |
+| T23 | Schema migration (signal_score, bucket, project_matches, interpretation, quality_metrics) | codex | `[x]` | T22 |
+| T24 | Scoring engine (`src/processing/score_posts.py`) | codex | `[x]` | T22, T23 |
+| T25 | Digest prompt redesign (value-based buckets, ≤600 words) | codex | `[x]` | T24 |
+| T26 | Project inference prompt upgrade (structural tiers, no "no overlap found") | codex | `[x]` | T24 |
+| T27 | Digest generator rewire (scoring-first, scored posts to LLM, word-count gate) | codex | `[x]` | T24, T25, T26 |
+
+---
+
+### T22 — Profile & scoring config
+
+**Objective:** Encode personal taste in config files, not in LLM prompts. Unblocks scoring engine.
+
+**Acceptance Criteria:**
+- [ ] `src/config/profile.yaml` exists with: `boost_topics`, `downrank_topics`, `downrank_sources`, `cultural_keywords`
+- [ ] `src/config/scoring.yaml` exists with: `weights` (5 dims, sum=1.0), `channel_priority_weights`, `buckets` thresholds, `novelty` params, `actionability_scores`
+- [ ] Both files are valid YAML, load cleanly with `yaml.safe_load()`
+- [ ] 12 tests still pass
+
+**Files:**
+- Create: `src/config/profile.yaml`
+- Create: `src/config/scoring.yaml`
+
+---
+
+### T23 — Schema migration
+
+**Objective:** Add scoring columns to posts table and quality_metrics table for observability.
+
+**Acceptance Criteria:**
+- [ ] `src/db/migrate.py` adds `signal_score REAL`, `bucket TEXT`, `project_matches TEXT`, `interpretation TEXT` to `posts` (idempotent — duplicate column error caught)
+- [ ] `src/db/migrate.py` adds `tier TEXT`, `rationale TEXT` to `post_project_links` (idempotent)
+- [ ] `quality_metrics` table created if not exists (week_label UNIQUE, counts per bucket, avg_signal_score, output_word_count)
+- [ ] `python3 src/db/migrate.py` runs cleanly on existing DB with no errors
+- [ ] 12 tests still pass
+
+**Files:**
+- Modify: `src/db/migrate.py`
+
+---
+
+### T24 — Scoring engine
+
+**Objective:** Assign `signal_score` and `bucket` to each post before digest synthesis.
+
+**Acceptance Criteria:**
+- [ ] `src/processing/score_posts.py` exists and is importable
+- [ ] `score_posts(settings, since_days=7)` returns dict with keys: `scored`, `strong`, `watch`, `cultural`, `noise`, `errors`, `avg_signal_score`
+- [ ] Reads `profile.yaml` and `scoring.yaml` from `src/config/` via `PROJECT_ROOT`
+- [ ] High-priority channel + boost topic → `bucket=strong`
+- [ ] Downrank source (e.g. `@NeuralShit`) → `bucket=cultural` (if cultural keyword) or `bucket=noise`
+- [ ] Downrank topic → `bucket=noise` regardless of channel priority
+- [ ] Cultural keyword in content → `bucket=cultural` override (even if signal_score < watch threshold)
+- [ ] Writes `signal_score` and `bucket` to `posts` table
+- [ ] `python3 src/main.py score` CLI command works
+- [ ] Score engine is called automatically in `ingest` pipeline after `detect_topics`
+- [ ] At least 1 unit test covering bucket assignment logic
+- [ ] 12+ tests still pass
+
+**Files:**
+- Create: `src/processing/score_posts.py`
+- Modify: `src/main.py` (add `score` subcommand, wire into `ingest`)
+
+---
+
+### T25 — Digest prompt redesign
+
+**Objective:** Replace 5-section taxonomy with value-based bucket structure. ≤600 words output.
+
+**Acceptance Criteria:**
+- [ ] `docs/prompts/digest_generation.md` uses new sections: 🔴 Сильный сигнал, 📁 Мои проекты, 👁 Watch List, 📭 Отфильтровано, 🎲 Культурный сигнал (optional)
+- [ ] User prompt template uses: `{scored_posts}`, `{noise_summary}`, `{noise_count}` (not `{notable_posts}`)
+- [ ] System prompt instructs: tone = smart colleague not editorial; ≤3500 chars total
+- [ ] Old 5-section structure (`🤖 Агенты`, `🛠️ Инструменты`, etc.) removed completely
+
+**Files:**
+- Modify: `docs/prompts/digest_generation.md`
+
+---
+
+### T26 — Project inference prompt upgrade
+
+**Objective:** Replace keyword-overlap matching with structural inference. Eliminate "no overlap found".
+
+**Acceptance Criteria:**
+- [ ] `docs/prompts/project_insights.md` uses three tiers: `implement_now`, `relevant_pattern`, `watch`
+- [ ] Prompt requires Haiku to infer structural relevance (pattern/architecture), not just keyword match
+- [ ] Prompt requires rationale sentence to name specific connection (not "relevant to your AI work")
+- [ ] Confidence thresholds documented: implement_now ≥0.80, relevant_pattern 0.60–0.79, watch 0.40–0.59
+- [ ] Output format: JSON array, only posts meeting watch threshold included (`[]` if none)
+- [ ] String "no overlap found" / "no Telegram overlap found" does NOT appear in prompt
+
+**Files:**
+- Modify: `docs/prompts/project_insights.md`
+
+---
+
+### T27 — Digest generator rewire
+
+**Objective:** Wire scoring into digest pipeline. LLM receives ≤6 pre-scored posts, not all 150+.
+
+**Acceptance Criteria:**
+- [ ] `run_digest()` calls `score_posts(settings, since_days=7)` before fetching posts for synthesis
+- [ ] Only `strong` and `watch` bucket posts (capped at 3+3) passed to LLM prompt
+- [ ] Prompt variables `{scored_posts}`, `{noise_count}`, `{noise_summary}` populated correctly
+- [ ] Old `{notable_posts}` variable removed from `generate_digest.py`
+- [ ] Old 5-section validation (`### Overview`, `### Top Topics`, etc.) removed
+- [ ] Word count check added: log WARNING if output > 600 words (do not crash)
+- [ ] `_append_github_section()` omits repos with `NO_OVERLAP_NOTE`; no "no overlap found" in any output
+- [ ] `DigestResult` return type unchanged (no breaking changes to callers)
+- [ ] 12+ tests still pass (scoring failure is non-fatal — logs warning, proceeds)
+
+**Files:**
+- Modify: `src/output/generate_digest.py`
+
+---
+
+### Phase 19 Quality Gates (must pass before Cycle 2 Deep Review)
+
+- Gate 1: `score_posts` assigns plausible signal_scores — manual spot-check on W12 data
+- Gate 2: Digest prompt produces value-bucket structure — run against test data
+- Gate 3: "no overlap found" / "no Telegram overlap found" never appears in any output
+- Gate 4: Output ≤ 600 words (validated by word count check in generate_digest.py)
+- Gate 5: At least 1 project match per digest (verify against test data)
+
+---
+
+## Phase 19 — Cycle 2 Review Fixes
+
+_Owner: codex · Date: 2026-03-30 · Source: Cycle 2 REVIEW_REPORT.md_
+_Blocking: T28 must pass before Phase 19 tasks can be marked `[x]`_
+
+| ID | Task | Owner | Status | Depends On |
+|---|---|---|---|---|
+| T28 | Add unit tests for scoring engine and digest rewire (CODE-1 — P1 stop-ship) | codex | `[x]` | T24, T27 |
+
+### T28 — Unit tests for scoring engine and digest rewire
+
+**Objective:** Satisfy T24 AC ("at least 1 unit test covering bucket assignment logic") and close CODE-1 (P1) stop-ship finding. Phase 19 cannot close without this task passing.
+
+**Acceptance Criteria:**
+- [ ] `tests/test_score_posts.py` exists and is importable
+- [ ] Bucket boundary test: post with `signal_score` 0.74 → `bucket=watch`; 0.75 → `bucket=strong`; 0.44 → `bucket=noise`
+- [ ] Cultural keyword override test: post with `signal_score` below watch threshold but cultural keyword in content → `bucket=cultural`
+- [ ] `_score_personal_interest` tests: boost topic input → score > neutral baseline; downrank topic input → score < neutral baseline; neutral topic → returns baseline
+- [ ] `tests/test_generate_digest.py` exists and is importable
+- [ ] Word-count gate test: mock LLM response with > 600 words → WARNING logged, no crash
+- [ ] `NO_OVERLAP_NOTE` guard test: repo with `matched_topics == ["NO_OVERLAP_NOTE"]` → skipped in `_append_github_section`, not present in output
+- [ ] `pytest tests/test_score_posts.py tests/test_generate_digest.py` — all green
+- [ ] 12+ existing tests still pass (no regressions)
+
+**Files:**
+- Create: `tests/test_score_posts.py`
+- Create: `tests/test_generate_digest.py`
+
+---
+
+## Phase 19 — P2 Batch Fixes (post-T28)
+
+_Owner: codex · Date: 2026-03-30 · Source: Cycle 2 findings CODE-2, CODE-3, CODE-4, CODE-6, CODE-8_
+_Prerequisite: T28 complete (37 tests passing)_
+
+| ID | Task | Owner | Status | Depends On |
+|---|---|---|---|---|
+| T29 | Fix CODE-2: `send_text()` parse_mode override | codex | `[ ]` | T28 |
+| T30 | Fix CODE-3: `handle_digest` HTML parse_mode for content_md | codex | `[ ]` | T29 |
+| T31 | Fix CODE-4: `except Exception` missing `exc_info=True` in insights block | codex | `[ ]` | T28 |
+| T32 | Fix CODE-6: duplicate insights delivery via `handle_run_digest` | codex | `[ ]` | T28 |
+| T33 | Fix CODE-8: populate `quality_metrics` table after digest runs | codex | `[ ]` | T28 |
+
+---
+
+### T29 — Fix CODE-2: send_text() parse_mode override
+
+**Objective:** Allow non-digest callers to override parse_mode. Currently `send_text()` hardcodes `parse_mode="HTML"` with no override option.
+
+**Finding:** CODE-2 (P2) — `src/bot/telegram_delivery.py:73`
+
+**Acceptance Criteria:**
+- [ ] `send_text()` accepts an optional `parse_mode` parameter (default: `"HTML"`)
+- [ ] All existing callers pass no argument (backward-compatible — default behavior unchanged)
+- [ ] 1 test: calling `send_text(text, parse_mode="Markdown")` passes the correct mode to the Telegram API mock
+- [ ] 37 tests still pass
+
+**Files:**
+- Modify: `src/bot/telegram_delivery.py`
+- Modify: `tests/` (add/update test)
+
+---
+
+### T30 — Fix CODE-3: handle_digest HTML parse_mode for content_md
+
+**Objective:** `handle_digest` sends `content_md` (historically Markdown) via HTML parse_mode. Either convert content to HTML or switch parse_mode for this call.
+
+**Finding:** CODE-3 (P2) — `src/bot/handlers.py:164`
+
+**Acceptance Criteria:**
+- [ ] `handle_digest` sends digest content with a parse_mode that matches the actual content format
+- [ ] No `BadRequest: Can't parse entities` error when sending historical Markdown content
+- [ ] 1 test: mock digest with markdown content → `send_text` called with compatible parse_mode
+- [ ] 37 tests still pass
+
+**Files:**
+- Modify: `src/bot/handlers.py`
+- Modify: `tests/` (add/update test)
+
+---
+
+### T31 — Fix CODE-4: exc_info=True in insights exception block
+
+**Objective:** `except Exception` in insights block swallows full traceback. Add `exc_info=True` to the logger call.
+
+**Finding:** CODE-4 (P2) — `src/output/generate_digest.py:461-462`
+
+**Acceptance Criteria:**
+- [ ] The `except Exception` block in the insights generation section uses `LOGGER.exception(...)` or `LOGGER.error(..., exc_info=True)`
+- [ ] Full traceback is printed on exception (verified by test: raise exception in mocked Haiku call, assert traceback in log output)
+- [ ] 37 tests still pass
+
+**Files:**
+- Modify: `src/output/generate_digest.py`
+- Modify: `tests/test_generate_digest.py` (add test)
+
+---
+
+### T32 — Fix CODE-6: duplicate insights delivery via handle_run_digest
+
+**Objective:** `handle_run_digest` calls `generate_recommendations()` after `run_digest()` which already sent insights internally — causing duplicate delivery.
+
+**Finding:** CODE-6 (P2) — `src/bot/handlers.py:428-429`
+
+**Acceptance Criteria:**
+- [ ] `handle_run_digest` does NOT call `generate_recommendations()` separately when `run_digest()` already delivers insights
+- [ ] OR: `run_digest()` accepts a flag to skip internal insights delivery, and `handle_run_digest` controls the flow
+- [ ] No duplicate insights messages sent for a single `/run` command
+- [ ] 1 test: calling `handle_run_digest` results in exactly 1 insights delivery, not 2
+- [ ] 37 tests still pass
+
+**Files:**
+- Modify: `src/bot/handlers.py`
+- Modify: `tests/` (add test)
+
+---
+
+### T33 — Fix CODE-8: populate quality_metrics after digest runs
+
+**Objective:** `quality_metrics` table is created by migration but never populated. Populate it at the end of each `run_digest()` call.
+
+**Finding:** CODE-8 (P2) — `src/db/migrate.py:127-143`, `src/output/generate_digest.py`
+
+**Acceptance Criteria:**
+- [ ] After `run_digest()` completes, 1 row inserted/updated in `quality_metrics` with: `week_label`, `strong_count`, `watch_count`, `cultural_count`, `noise_count`, `avg_signal_score`, `output_word_count`
+- [ ] Insert uses `INSERT OR REPLACE` (idempotent — re-running digest for same week updates the row)
+- [ ] 1 test: run mock digest → assert `quality_metrics` row exists with correct week_label and counts
+- [ ] 37 tests still pass
+
+**Files:**
+- Modify: `src/output/generate_digest.py`
+- Modify: `tests/test_generate_digest.py` (add test)
+
+---
+
+## Phase 20 — Multi-Model LLM Routing
+
+_Owner: codex · Date: 2026-03-30 · Source: LLM_ROUTER follow-up prompt_
+_Goal: Cost-efficient conditional routing — cheap→mid→strong pipeline with score-based branching._
+_Prerequisite: Phase 19 P2 batch complete (T29–T33)_
+
+| ID | Task | Owner | Status | Depends On |
+|---|---|---|---|---|
+| T34 | LLM_ROUTER: tier abstraction + conditional branching + cost logging | codex | `[ ]` | T33 |
+
+---
+
+### T34 — LLM_ROUTER: multi-model routing layer
+
+**Objective:** Introduce a cost-efficient LLM routing layer that dispatches calls to cheap/mid/strong models based on signal_score and task type. Must NOT rewrite existing functionality. Must NOT break any existing callers.
+
+**Background:** Currently all LLM calls route to one model. The scoring engine assigns `bucket` (strong/watch/cultural/noise) to posts. This signal can be used to dispatch cheap calls to Haiku, mid calls to Sonnet, and strong calls to Opus — reducing cost significantly.
+
+**Acceptance Criteria:**
+- [ ] `src/llm/router.py` created with `route(task_type, signal_score=None) -> str` returning a model ID
+- [ ] `src/config/settings.py` (or `scoring.yaml`) gains three model tier constants: `CHEAP_MODEL`, `MID_MODEL`, `STRONG_MODEL` — values loaded from env vars with safe defaults (`claude-haiku-4-5-20251001`, `claude-sonnet-4-6`, `claude-opus-4-6`)
+- [ ] Routing table (in `router.py` or config): `noise/cultural` bucket → CHEAP_MODEL; `watch` bucket → MID_MODEL; `strong` bucket + synthesis → STRONG_MODEL
+- [ ] `src/llm/client.py` updated: `complete()` and `complete_json()` accept optional `model` override parameter; if not passed, use existing default (backward-compatible)
+- [ ] `src/output/generate_digest.py`: synthesis call (the big digest call) routes to STRONG_MODEL; per-post interpretation (if any) routes via `route()`
+- [ ] Cost logging: after each LLM call, log `model=<id> input_tokens=<N> output_tokens=<N> est_cost_usd=<float>` at DEBUG level
+- [ ] Token counts read from Anthropic API response (`usage.input_tokens`, `usage.output_tokens`)
+- [ ] Estimated cost computed from hardcoded per-token rates (store rates in `router.py` as a dict — not in config, rates don't change often)
+- [ ] No existing test regressions — 37+ tests still pass
+- [ ] 2+ new tests: (a) `route("synthesis", signal_score=0.8)` returns STRONG_MODEL; (b) `route("per_post", signal_score=0.3)` returns CHEAP_MODEL
+
+**Files:**
+- Create: `src/llm/router.py`
+- Modify: `src/llm/client.py` (add model override param + cost logging)
+- Modify: `src/config/settings.py` (add CHEAP_MODEL, MID_MODEL, STRONG_MODEL)
+- Modify: `src/output/generate_digest.py` (wire routing into synthesis call)
+- Create/Modify: `tests/test_router.py`
+
+**Out of scope (do NOT implement in T34):**
+- Per-week cost aggregation table
+- `/cost` bot command
+- Automatic model fallback on API error
+- Vector embeddings or semantic routing

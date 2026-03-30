@@ -1,8 +1,8 @@
 # Telegram Research Agent — System Specification
 
-**Version:** 1.0.0
-**Date:** 2026-03-16
-**Status:** Baseline (Phase 0 — Architecture)
+**Version:** 1.1.0
+**Date:** 2026-03-30
+**Status:** Updated (Phase 19 — Signal Intelligence Redesign)
 
 ---
 
@@ -253,6 +253,10 @@ Normalized, processed view of `raw_posts`.
 | language_detected | TEXT | en/ru/other |
 | word_count | INTEGER | |
 | normalized_at | DATETIME | |
+| signal_score | REAL | Composite score 0.0–1.0; written by score_posts.py (Phase 19) |
+| bucket | TEXT | `strong`, `watch`, `cultural`, or `noise` (Phase 19) |
+| project_matches | TEXT | JSON list of matching project names (Phase 19) |
+| interpretation | TEXT | Free-text scoring rationale (Phase 19) |
 
 ---
 
@@ -322,6 +326,28 @@ Normalized, processed view of `raw_posts`.
 | project_id | INTEGER FK | |
 | relevance_score | REAL | |
 | note | TEXT | LLM-generated rationale |
+| tier | TEXT | Inference tier from three-tier project insight mapping (Phase 19) |
+| rationale | TEXT | LLM-generated relevance rationale (Phase 19) |
+
+---
+
+### Table: `quality_metrics` — added Phase 19
+
+Observability table for per-week scoring statistics. Created by migration (Phase 19); population is a future step.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | INTEGER PK | auto |
+| week_label | TEXT UNIQUE | e.g. `2026-W13` |
+| computed_at | TEXT | UTC ISO timestamp |
+| total_posts | INTEGER | |
+| strong_count | INTEGER | |
+| watch_count | INTEGER | |
+| cultural_count | INTEGER | |
+| noise_count | INTEGER | |
+| avg_signal_score | REAL | |
+| project_match_count | INTEGER | |
+| output_word_count | INTEGER | |
 
 ---
 
@@ -399,25 +425,31 @@ Rubrics are persistent topic categories that emerge from the data over time.
 generate_digest.py
 │
 ├── Determine week_label (ISO week of current date)
-├── Query posts from last 7 days: SELECT * FROM posts WHERE posted_at >= week_start
-├── Query associated topics for those posts
-├── Compute per-topic post counts and top posts by view_count
+├── Query pre-scored posts via _fetch_scored_posts() — posts must already have
+│   signal_score and bucket set by score_posts.py
+├── Group posts by bucket: strong, watch, cultural, noise
+├── Build scored_posts list: strong + watch + cultural (≤6 posts total)
+├── Build noise_summary from noise bucket posts + topic counts
 │
 ├── Assemble digest prompt:
-│   ├── Section: What happened this week (top topics with counts)
-│   ├── Section: Notable posts (top 10 by views, with excerpts)
-│   └── Section: Signal vs noise (topic clusters, low-signal indicator)
+│   ├── {scored_posts}: JSON list of up to 6 pre-scored posts with bucket labels
+│   ├── {noise_count}: integer count of noise-bucket posts
+│   ├── {noise_summary}: text summary of filtered content
+│   ├── {topic_summary}: top topics with post counts
+│   ├── {week_label}, {date_range}, {total_post_count}, {channel_count}
 │
 ├── Submit to LLM via anthropic SDK
-├── Receive Markdown digest response
+├── Receive HTML digest response
 │
 ├── Insert into digests table
 └── Write to data/output/digests/YYYY-WXX.md
 ```
 
-**LLM prompt contract:**
-- Input: `{week: str, topics: [...], notable_posts: [...], signal_threshold: int}`
-- Output: Markdown document (structured with headings)
+**LLM prompt contract (updated Phase 19 / T27):**
+- Input: `{week_label: str, date_range: str, total_post_count: int, channel_count: int, scored_posts: [...], noise_count: int, topic_summary: [...], noise_summary: str}`
+- Output: HTML document with value-based bucket sections — **Strong Signal / For My Projects / Watch List / Filtered Out** (replaces the previous 5-section taxonomy)
+
+_Note: the pre-Phase 19 contract `{week: str, topics: [...], notable_posts: [...], signal_threshold: int}` is no longer active._
 
 ---
 

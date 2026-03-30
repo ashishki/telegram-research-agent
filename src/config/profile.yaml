@@ -1,0 +1,89 @@
+# Personal interest profile — drives the personal_interest scoring dimension.
+# Review and update monthly to keep personalization from going stale.
+#
+# boost_topics: topic labels that increase personal_interest score (multiplier: 1.0)
+# neutral_topics: topics that score at baseline (multiplier: 0.5)
+# downrank_topics: topics that reduce personal_interest score (multiplier: 0.1)
+# downrank_sources: channel usernames whose posts get penalized in source_quality
+#   regardless of content — low signal channels
+# cultural_keywords: keywords that trigger the "cultural" bucket override
+#   (allows 1 cultural item through even if signal_score is low)
+
+boost_topics:
+  # Core focus areas — highest personal relevance
+  - "AI agents"
+  - "agent orchestration"
+  - "LLM orchestration"
+  - "evaluation"
+  - "evals"
+  - "AI infrastructure"
+  - "LLM internals"
+  - "developer tooling"
+  - "AI dev tools"
+  - "Claude"
+  - "Anthropic"
+  - "RAG"
+  - "retrieval"
+  - "vector search"
+  - "embeddings"
+  - "prompt engineering"
+  - "tool use"
+  - "function calling"
+  - "multi-agent"
+  - "workflow automation"
+  - "FastAPI"
+  - "async Python"
+  - "PostgreSQL"
+  - "Redis"
+  - "cost control"
+  - "inference optimization"
+  - "context window"
+  - "system design"
+  - "API design"
+
+downrank_topics:
+  # Generic noise — low signal relative to my interests
+  - "AI video generation"
+  - "video generation"
+  - "image generation"
+  - "text-to-image"
+  - "Midjourney"
+  - "Stable Diffusion"
+  - "crypto"
+  - "blockchain"
+  - "web3"
+  - "NFT"
+  - "celebrity AI"
+  - "AI news roundup"
+  - "model release announcement"
+  - "benchmark comparison"
+  - "funding round"
+  - "startup launch"
+  - "SEO"
+  - "marketing AI"
+  - "social media AI"
+  - "ChatGPT tips"
+  - "productivity hacks"
+
+downrank_sources:
+  # Low signal channels — penalize source_quality for all their posts
+  # They occasionally produce cultural/funny content which the cultural_keywords
+  # override can still surface, but technical signal is weak.
+  - "@NeuralShit"
+  - "@kyrillic"
+  - "@exitsexist"
+
+cultural_keywords:
+  # Posts containing these are eligible for the cultural bucket
+  # even if signal_score is below watch threshold
+  - "забавно"
+  - "смешно"
+  - "мем"
+  - "юмор"
+  - "анекдот"
+  - "вайб"
+  - "vibe coding"
+  - "situational"
+  - "культура разработки"
+  - "философия"
+  - "психология"

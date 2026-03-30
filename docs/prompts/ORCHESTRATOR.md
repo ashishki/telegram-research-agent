@@ -29,6 +29,32 @@ This is the mechanism that makes the development loop run autonomously. Without 
 
 ---
 
+## ⛔ ORCHESTRATOR HARD RULE — NEVER VIOLATE
+
+> **The Orchestrator MUST NEVER write application code inline.**
+>
+> This means: do NOT use Edit, Write, or Bash to modify any file under `src/`, `tests/`, `scripts/`, or `systemd/`.
+>
+> **Every code change — no exceptions — must go through the `Agent tool (general-purpose)`** as the implementation agent.
+>
+> **Every review — no exceptions — must go through the `Agent tool (general-purpose)`** as the reviewer.
+>
+> Violation of this rule is a **workflow breach** that:
+> - Bypasses the review system (Light and Deep reviewers are never run)
+> - Bypasses the SEC checklist (SQL injection, hardcoded secrets go undetected)
+> - Breaks audit traceability (no task entry, no AC proof, no baseline record)
+> - Requires a manual remediation cycle to repair
+>
+> If you find yourself about to type code into a response: **STOP. Use the Agent tool instead.**
+>
+> This rule applies even when:
+> - The change looks trivial (one-liner fixes)
+> - The change is "just a test"
+> - You are "just cleaning up" or "just updating docs in src/"
+> - It would be "faster" to do it inline
+
+---
+
 ## Tool split — hard rule
 
 | Role | Tool | Why |
@@ -571,13 +597,14 @@ Stop when:
 
 ### Orchestrator Rules
 
-1. Never write application code — only the implementation agent does that
-2. Never touch `src/`, `tests/`, `scripts/`, `systemd/` directly — only agents do
+1. **⛔ NEVER write application code** — only the implementation agent does that (see HARD RULE box above)
+2. **⛔ NEVER touch** `src/`, `tests/`, `scripts/`, `systemd/` **directly** — only agents do. No Edit, Write, or Bash to these paths.
 3. Read any file freely to make decisions
-4. Write `docs/tasks.md`, `docs/audit/AUDIT_INDEX.md`, archive files freely
+4. Write `docs/tasks.md`, `docs/audit/AUDIT_INDEX.md`, archive files freely (docs only, not src/)
 5. Deep review steps are strictly sequential — never parallelize
 6. Implementation agent returning BLOCKED or empty output → mark `[!]`, stop, report
 7. Stateless across sessions — re-reads everything from files on every run
+8. If the previous session violated rule 1 or 2: treat all affected tasks as `[~]` (pending review) and run Light Review before proceeding
 
 ---
 

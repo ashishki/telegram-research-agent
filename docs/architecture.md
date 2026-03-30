@@ -1,8 +1,8 @@
 # Telegram Research Agent — Architecture
 
-**Version:** 1.0.0
-**Date:** 2026-03-16
-**Status:** Baseline
+**Version:** 1.1.0
+**Date:** 2026-03-30
+**Status:** Updated (Phase 19 — Signal Intelligence Redesign)
 
 ---
 
@@ -115,6 +115,16 @@ It does not contain implementation code. It is the contract that Codex implement
 - Writes to `topics` and `post_topics` tables.
 - **LLM calls: topic labeling only (keyword sets, not full post text).**
 
+#### Scorer (`src/processing/score_posts.py`) — added Phase 19
+
+- Reads from `posts`, `raw_posts`, `post_topics`, and `topics` for a configurable lookback window.
+- Loads `src/config/scoring.yaml` (dimension weights, bucket thresholds, channel priority weights) and `src/config/profile.yaml` (personal interest boost/downrank lists, cultural keywords).
+- Computes a composite `signal_score` (0.0–1.0) across 5 dimensions: `personal_interest`, `source_quality`, `technical_depth`, `novelty`, `actionability`.
+- Assigns each post to a bucket: `strong` (score ≥ 0.75, max 3), `watch` (score ≥ 0.45, max 3), `cultural` (cultural keyword override, max 1), or `noise`.
+- Writes `signal_score`, `bucket`, `project_matches`, and `interpretation` back to the `posts` table via `executemany`.
+- **No LLM calls.** Fully deterministic heuristic.
+- Runs after `detect_topics` and before digest synthesis.
+
 ---
 
 ### Output Layer
@@ -125,10 +135,11 @@ It does not contain implementation code. It is the contract that Codex implement
 
 #### Digest Generator (`src/output/generate_digest.py`)
 
-- Queries posts + topics for the target week.
-- Assembles structured prompt from `docs/prompts/digest_generation.md`.
+- Queries pre-scored posts for the target week via `_fetch_scored_posts()`, which groups posts by bucket (`strong`, `watch`, `cultural`, `noise`).
+- Passes ≤6 posts (strong + watch + cultural buckets combined) to the LLM as `{scored_posts}`. Noise posts are excluded from the LLM input and represented only as `{noise_count}` and `{noise_summary}`.
+- Assembles structured prompt from `docs/prompts/digest_generation.md` using variables: `{week_label}`, `{date_range}`, `{total_post_count}`, `{channel_count}`, `{scored_posts}`, `{noise_count}`, `{topic_summary}`, `{noise_summary}`.
 - Calls LLM via the Anthropic Python SDK.
-- Parses response as Markdown.
+- Output uses value-based bucket structure: **Strong Signal / For My Projects / Watch List / Filtered Out** (replacing the previous 5-section taxonomy).
 - Writes to `digests` table and `data/output/digests/YYYY-WXX.md`.
 
 #### Recommendation Generator (`src/output/generate_recommendations.py`)
@@ -197,6 +208,42 @@ def complete_json(prompt: str, system: str = "", schema: dict = None) -> dict:
 - Default: `data/agent.db` relative to project root.
 - FTS5 virtual table created for `posts.content` to support keyword search.
 
+**Phase 19 schema additions (T23):**
+
+`posts` table — new columns:
+
+| Column | Type | Notes |
+|---|---|---|
+| signal_score | REAL | Composite score 0.0–1.0; written by `score_posts.py` |
+| bucket | TEXT | `strong`, `watch`, `cultural`, or `noise` |
+| project_matches | TEXT | JSON list of matching project names |
+| interpretation | TEXT | Free-text scoring rationale |
+
+`post_project_links` table — new columns:
+
+| Column | Type | Notes |
+|---|---|---|
+| tier | TEXT | Inference tier from three-tier project insight mapping |
+| rationale | TEXT | LLM-generated relevance rationale |
+
+`quality_metrics` table — new table:
+
+| Column | Type | Notes |
+|---|---|---|
+| id | INTEGER PK | auto |
+| week_label | TEXT UNIQUE | e.g. `2026-W13` |
+| computed_at | TEXT | UTC ISO timestamp |
+| total_posts | INTEGER | |
+| strong_count | INTEGER | |
+| watch_count | INTEGER | |
+| cultural_count | INTEGER | |
+| noise_count | INTEGER | |
+| avg_signal_score | REAL | |
+| project_match_count | INTEGER | |
+| output_word_count | INTEGER | |
+
+Note: `quality_metrics` was created by migration in Phase 19 but is not yet populated after digest runs (observability gap — CODE-8, open).
+
 ---
 
 ### Configuration (`src/config/`)
@@ -211,6 +258,14 @@ channels:
     priority: high          # high | medium | low
     active: true
 ```
+
+**`scoring.yaml`** — added Phase 19:
+- Defines dimension weights (must sum to 1.0), channel priority weights, `technical_depth` sub-weights, bucket thresholds (`strong`, `watch`, `cultural`, `noise`), novelty lookback parameters, actionability score mapping, and output quality constraints.
+- Read exclusively by `src/processing/score_posts.py`. No LLM involvement.
+
+**`profile.yaml`** — added Phase 19:
+- Defines personal interest boost topics, downrank topics, and cultural keywords.
+- Used by `score_posts.py` to apply per-post interest multipliers and cultural override assignments.
 
 **`settings.py`:**
 - Reads environment variables.
@@ -245,9 +300,19 @@ Monday 09:00
     ▼
 telegram-digest.service
     │
+    ├─ score_posts.py  ← Phase 19: runs before digest synthesis
+    │   ├─ Read posts + raw_posts + post_topics + topics
+    │   ├─ Load scoring.yaml + profile.yaml
+    │   ├─ Compute signal_score (5 dimensions), assign bucket
+    │   └─ Write → posts.signal_score, posts.bucket, posts.project_matches,
+    │              posts.interpretation
+    │
     ├─ generate_digest.py
-    │   ├─ Query posts + topics (this week)
-    │   ├─ LLM → Markdown digest
+    │   ├─ Query pre-scored posts via _fetch_scored_posts() (grouped by bucket)
+    │   ├─ Passes ≤6 posts (strong + watch + cultural) to LLM as {scored_posts}
+    │   ├─ Passes {noise_count} and {noise_summary} for "Filtered Out" section
+    │   ├─ LLM → HTML digest (value-based buckets: Strong Signal / For My Projects /
+    │   │         Watch List / Filtered Out)
     │   └─ Write → digests table + data/output/digests/
     │
     ├─ generate_recommendations.py

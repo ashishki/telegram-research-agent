@@ -1,0 +1,440 @@
+"""
+score_posts.py — Phase 1 scoring engine.
+
+Assigns signal_score and bucket to each post in the last N days based on 5 dimensions:
+  personal_interest, source_quality, technical_depth, novelty, actionability.
+
+All weights and thresholds are read from src/config/scoring.yaml.
+Personal taste (boost/downrank lists) is read from src/config/profile.yaml.
+
+Called before digest synthesis so the LLM receives only strong/watch-bucket posts.
+"""
+
+import logging
+import sqlite3
+from datetime import datetime, timedelta
+from pathlib import Path
+
+import yaml
+
+from config.settings import PROJECT_ROOT, Settings
+
+
+LOGGER = logging.getLogger(__name__)
+CONFIG_DIR = PROJECT_ROOT / "src" / "config"
+SCORING_PATH = CONFIG_DIR / "scoring.yaml"
+PROFILE_PATH = CONFIG_DIR / "profile.yaml"
+
+
+# ---------------------------------------------------------------------------
+# Config loading
+# ---------------------------------------------------------------------------
+
+def _load_yaml(path: Path) -> dict:
+    with open(path, encoding="utf-8") as fh:
+        return yaml.safe_load(fh) or {}
+
+
+def _load_config() -> tuple[dict, dict]:
+    scoring = _load_yaml(SCORING_PATH)
+    profile = _load_yaml(PROFILE_PATH)
+    return scoring, profile
+
+
+# ---------------------------------------------------------------------------
+# Data fetching
+# ---------------------------------------------------------------------------
+
+def _fetch_posts_window(conn: sqlite3.Connection, since_days: int) -> list[sqlite3.Row]:
+    cutoff = (datetime.utcnow() - timedelta(days=since_days)).isoformat() + "Z"
+    cursor = conn.execute(
+        """
+        SELECT
+            p.id,
+            p.channel_username,
+            p.posted_at,
+            p.content,
+            p.url_count,
+            p.has_code,
+            p.word_count,
+            r.view_count
+        FROM posts p
+        LEFT JOIN raw_posts r ON r.id = p.raw_post_id
+        WHERE p.posted_at >= ?
+        ORDER BY p.posted_at ASC
+        """,
+        (cutoff,),
+    )
+    return cursor.fetchall()
+
+
+def _fetch_post_topics(conn: sqlite3.Connection, post_ids: list[int]) -> dict[int, list[str]]:
+    """Return {post_id: [topic_label, ...]} for the given post IDs."""
+    if not post_ids:
+        return {}
+    placeholders = ",".join(["?"] * len(post_ids))
+    sql = (
+        "SELECT pt.post_id, t.label"
+        " FROM post_topics pt"
+        " JOIN topics t ON t.id = pt.topic_id"
+        " WHERE pt.post_id IN (" + placeholders + ")"
+        " ORDER BY pt.confidence DESC"
+    )
+    cursor = conn.execute(sql, post_ids)
+    result: dict[int, list[str]] = {}
+    for row in cursor.fetchall():
+        result.setdefault(row["post_id"], []).append(row["label"])
+    return result
+
+
+def _fetch_topic_history(conn: sqlite3.Connection, lookback_weeks: int) -> dict[str, int]:
+    """
+    Return {topic_label: weeks_seen} for the last lookback_weeks weeks
+    (excluding the current week).
+    """
+    cutoff = (datetime.utcnow() - timedelta(weeks=lookback_weeks)).isoformat() + "Z"
+    current_week_start = (datetime.utcnow() - timedelta(days=datetime.utcnow().weekday())).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    ).isoformat() + "Z"
+    cursor = conn.execute(
+        """
+        SELECT t.label, COUNT(DISTINCT strftime('%Y-%W', p.posted_at)) AS weeks_seen
+        FROM post_topics pt
+        JOIN topics t ON t.id = pt.topic_id
+        JOIN posts p ON p.id = pt.post_id
+        WHERE p.posted_at >= ? AND p.posted_at < ?
+        GROUP BY t.label
+        """,
+        (cutoff, current_week_start),
+    )
+    return {row["label"]: row["weeks_seen"] for row in cursor.fetchall()}
+
+
+def _fetch_channel_max_views(conn: sqlite3.Connection, since_days: int) -> dict[str, int]:
+    """Return {channel_username: max_view_count} for normalizing within-channel view counts."""
+    cutoff = (datetime.utcnow() - timedelta(days=since_days)).isoformat() + "Z"
+    cursor = conn.execute(
+        """
+        SELECT p.channel_username, MAX(r.view_count) AS max_views
+        FROM posts p
+        LEFT JOIN raw_posts r ON r.id = p.raw_post_id
+        WHERE p.posted_at >= ?
+        GROUP BY p.channel_username
+        """,
+        (cutoff,),
+    )
+    return {row["channel_username"]: row["max_views"] or 1 for row in cursor.fetchall()}
+
+
+# ---------------------------------------------------------------------------
+# Scoring dimensions
+# ---------------------------------------------------------------------------
+
+def _score_personal_interest(
+    topic_labels: list[str],
+    boost_topics: list[str],
+    downrank_topics: list[str],
+) -> float:
+    """
+    Returns a score in [0, 1] based on how well the post's topics match
+    the user's interest profile.
+
+    Strategy:
+    - Any boost match → high score (0.85 base + bonus per additional match)
+    - Any downrank match → low score (0.10 base)
+    - No match → neutral (0.45)
+    - Boost takes precedence over downrank.
+    """
+    if not topic_labels:
+        return 0.40  # unclassified posts get slightly below neutral
+
+    content_lower = " ".join(topic_labels).lower()
+
+    boost_hits = sum(
+        1 for term in boost_topics if term.lower() in content_lower
+    )
+    downrank_hits = sum(
+        1 for term in downrank_topics if term.lower() in content_lower
+    )
+
+    if boost_hits > 0:
+        # Each additional boost match adds a small bonus (capped at 1.0)
+        return min(1.0, 0.75 + boost_hits * 0.05)
+    if downrank_hits > 0:
+        return 0.10
+    return 0.45
+
+
+def _score_source_quality(
+    channel_username: str,
+    view_count: int | None,
+    channel_max_views: dict[str, int],
+    channel_priority_weights: dict[str, float],
+    downrank_sources: list[str],
+    channels_config: dict,
+) -> float:
+    """
+    Returns a score in [0, 1].
+    channel_priority_weight × (view_count / channel_max_views).
+    Downrank sources are hard-penalized regardless of view count.
+    """
+    if channel_username in downrank_sources:
+        return 0.05
+
+    # Look up priority from channels config
+    priority = "medium"
+    for ch in channels_config.get("channels", []):
+        if ch.get("username", "").lstrip("@") == channel_username.lstrip("@"):
+            priority = ch.get("priority", "medium")
+            break
+
+    base_weight = channel_priority_weights.get(priority, 0.6)
+    max_views = channel_max_views.get(channel_username, 1)
+    view_ratio = min(1.0, (view_count or 0) / max_views)
+    return round(base_weight * view_ratio, 4)
+
+
+def _score_technical_depth(
+    has_code: int,
+    url_count: int,
+    word_count: int,
+    depth_weights: dict[str, float],
+) -> float:
+    """
+    Returns a score in [0, 1] based on structural proxies for depth.
+    """
+    # has_code: binary → 0 or 1
+    code_score = float(has_code)
+
+    # url_count: 0 = 0, 1 = 0.5, ≥2 = 1.0
+    url_score = min(1.0, url_count / 2.0)
+
+    # word_count: 0 at 0 words, 1.0 at ≥80 words
+    word_score = min(1.0, word_count / 80.0)
+
+    # cluster_coherence: not available per-post cheaply, default to 0.5
+    coherence_score = 0.5
+
+    return round(
+        code_score * depth_weights.get("has_code", 0.35)
+        + url_score * depth_weights.get("url_count", 0.25)
+        + word_score * depth_weights.get("word_count", 0.25)
+        + coherence_score * depth_weights.get("cluster_coherence", 0.15),
+        4,
+    )
+
+
+def _score_novelty(
+    topic_labels: list[str],
+    topic_history: dict[str, int],
+    lookback_weeks: int,
+    new_cluster_score: float,
+    recurring_penalty: float,
+) -> float:
+    """
+    Returns a score based on how new/recurring the topic is.
+    - All topics new (0 prior weeks): new_cluster_score
+    - Any topic appearing all lookback_weeks: recurring_penalty
+    - Otherwise: linearly interpolated
+    """
+    if not topic_labels:
+        return 0.5  # unknown novelty
+
+    max_weeks_seen = max(topic_history.get(label, 0) for label in topic_labels)
+
+    if max_weeks_seen == 0:
+        return new_cluster_score
+    if max_weeks_seen >= lookback_weeks:
+        return recurring_penalty
+    # Linear interpolation between new and recurring
+    ratio = max_weeks_seen / lookback_weeks
+    return round(new_cluster_score - ratio * (new_cluster_score - recurring_penalty), 4)
+
+
+def _score_actionability(
+    has_code: int,
+    url_count: int,
+    word_count: int,
+    actionability_scores: dict[str, float],
+) -> float:
+    """
+    Phase 1 heuristic actionability (Haiku classification added in Phase 2).
+    Infers one of: implement, pattern, awareness, noise.
+    """
+    if has_code:
+        return actionability_scores.get("implement", 1.0)
+    if url_count >= 2:
+        return actionability_scores.get("pattern", 0.7)
+    if word_count >= 80:
+        return actionability_scores.get("awareness", 0.3)
+    return actionability_scores.get("noise", 0.0)
+
+
+# ---------------------------------------------------------------------------
+# Cultural bucket detection
+# ---------------------------------------------------------------------------
+
+def _is_cultural(content: str, cultural_keywords: list[str]) -> bool:
+    content_lower = content.lower()
+    return any(kw.lower() in content_lower for kw in cultural_keywords)
+
+
+# ---------------------------------------------------------------------------
+# Main scoring function
+# ---------------------------------------------------------------------------
+
+def score_posts(
+    settings: Settings,
+    since_days: int = 7,
+) -> dict:
+    """
+    Score all posts in the last `since_days` days.
+    Writes signal_score and bucket to the posts table.
+    Returns a summary dict with bucket counts and avg score.
+    """
+    scoring_cfg, profile_cfg = _load_config()
+
+    weights = scoring_cfg.get("weights", {})
+    channel_priority_weights = scoring_cfg.get("channel_priority_weights", {"high": 1.0, "medium": 0.6, "low": 0.2})
+    depth_weights = scoring_cfg.get("technical_depth_weights", {})
+    novelty_cfg = scoring_cfg.get("novelty", {})
+    actionability_scores = scoring_cfg.get("actionability_scores", {})
+    bucket_cfg = scoring_cfg.get("buckets", {})
+
+    strong_threshold = bucket_cfg.get("strong", {}).get("min_score", 0.75)
+    watch_threshold = bucket_cfg.get("watch", {}).get("min_score", 0.45)
+    strong_max = bucket_cfg.get("strong", {}).get("max_items", 3)
+    watch_max = bucket_cfg.get("watch", {}).get("max_items", 3)
+    cultural_max = bucket_cfg.get("cultural", {}).get("max_items", 1)
+
+    boost_topics = profile_cfg.get("boost_topics", [])
+    downrank_topics = profile_cfg.get("downrank_topics", [])
+    downrank_sources = profile_cfg.get("downrank_sources", [])
+    cultural_keywords = profile_cfg.get("cultural_keywords", [])
+
+    # Load channels config for priority lookup
+    channels_config_path = CONFIG_DIR / "channels.yaml"
+    channels_config = _load_yaml(channels_config_path)
+
+    lookback_weeks = novelty_cfg.get("lookback_weeks", 4)
+    new_cluster_score = novelty_cfg.get("new_cluster_min_score", 0.80)
+    recurring_penalty = novelty_cfg.get("recurring_cluster_penalty", 0.30)
+
+    w_interest = weights.get("personal_interest", 0.30)
+    w_source = weights.get("source_quality", 0.20)
+    w_depth = weights.get("technical_depth", 0.20)
+    w_novelty = weights.get("novelty", 0.15)
+    w_action = weights.get("actionability", 0.15)
+
+    summary = {"scored": 0, "strong": 0, "watch": 0, "cultural": 0, "noise": 0, "errors": 0}
+
+    with sqlite3.connect(settings.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON;")
+        conn.execute("PRAGMA journal_mode = WAL;")
+
+        posts = _fetch_posts_window(conn, since_days)
+        if not posts:
+            LOGGER.info("score_posts: no posts found in last %d days", since_days)
+            return summary
+
+        post_ids = [p["id"] for p in posts]
+        post_topics_map = _fetch_post_topics(conn, post_ids)
+        topic_history = _fetch_topic_history(conn, lookback_weeks)
+        channel_max_views = _fetch_channel_max_views(conn, since_days)
+
+        scored_rows: list[tuple[float, str, int]] = []
+
+        for post in posts:
+            try:
+                post_id = post["id"]
+                topic_labels = post_topics_map.get(post_id, [])
+
+                d_interest = _score_personal_interest(topic_labels, boost_topics, downrank_topics)
+                d_source = _score_source_quality(
+                    post["channel_username"],
+                    post["view_count"],
+                    channel_max_views,
+                    channel_priority_weights,
+                    downrank_sources,
+                    channels_config,
+                )
+                d_depth = _score_technical_depth(
+                    post["has_code"],
+                    post["url_count"],
+                    post["word_count"],
+                    depth_weights,
+                )
+                d_novelty = _score_novelty(
+                    topic_labels,
+                    topic_history,
+                    lookback_weeks,
+                    new_cluster_score,
+                    recurring_penalty,
+                )
+                d_action = _score_actionability(
+                    post["has_code"],
+                    post["url_count"],
+                    post["word_count"],
+                    actionability_scores,
+                )
+
+                signal_score = round(
+                    d_interest * w_interest
+                    + d_source * w_source
+                    + d_depth * w_depth
+                    + d_novelty * w_novelty
+                    + d_action * w_action,
+                    4,
+                )
+
+                # Bucket assignment (scores first; cultural override applied after)
+                content = post["content"] or ""
+                if signal_score >= strong_threshold:
+                    bucket = "strong"
+                elif signal_score >= watch_threshold:
+                    bucket = "watch"
+                elif _is_cultural(content, cultural_keywords):
+                    bucket = "cultural"
+                else:
+                    bucket = "noise"
+
+                scored_rows.append((signal_score, bucket, post_id))
+                summary["scored"] += 1
+
+            except Exception:
+                LOGGER.warning("Scoring failed for post_id=%s", post.get("id"), exc_info=True)
+                summary["errors"] += 1
+                continue
+
+        # Write scores to DB
+        conn.execute("BEGIN")
+        conn.executemany(
+            "UPDATE posts SET signal_score = ?, bucket = ? WHERE id = ?",
+            scored_rows,
+        )
+        conn.commit()
+
+    # Apply per-bucket caps: re-cap at max items by downgrading extras to noise
+    # (cap enforcement is done at digest-generation time, not here — we store raw scores)
+    # Count buckets for summary
+    for _, bucket, _ in scored_rows:
+        summary[bucket] = summary.get(bucket, 0) + 1
+
+    avg_score = (
+        round(sum(s for s, _, _ in scored_rows) / len(scored_rows), 4)
+        if scored_rows else 0.0
+    )
+    summary["avg_signal_score"] = avg_score
+
+    LOGGER.info(
+        "score_posts complete scored=%d strong=%d watch=%d cultural=%d noise=%d avg=%.4f errors=%d",
+        summary["scored"],
+        summary.get("strong", 0),
+        summary.get("watch", 0),
+        summary.get("cultural", 0),
+        summary.get("noise", 0),
+        avg_score,
+        summary["errors"],
+    )
+    return summary

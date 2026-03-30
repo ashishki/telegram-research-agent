@@ -22,6 +22,7 @@ from processing.cleanup import run_cleanup
 from processing.cluster import cluster_posts
 from processing.detect_topics import run_topic_detection
 from processing.normalize_posts import run_normalization
+from processing.score_posts import score_posts
 
 
 LOGGER = logging.getLogger(__name__)
@@ -63,6 +64,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     cleanup_parser = subparsers.add_parser("cleanup", help="Strip raw_json and delete posts older than 100 days")
     cleanup_parser.set_defaults(handler=handle_cleanup)
+
+    score_parser = subparsers.add_parser("score", help="Score posts by personal relevance (signal_score + bucket)")
+    score_parser.add_argument("--days", type=int, default=7, help="Lookback window in days (default: 7)")
+    score_parser.set_defaults(handler=handle_score)
 
     bot_parser = subparsers.add_parser("bot", help="Start Telegram bot interface (long-polling)")
     bot_parser.set_defaults(handler=handle_bot)
@@ -107,6 +112,18 @@ def handle_ingest(_: argparse.Namespace) -> int:
             topic_summary["new_topics"],
             topic_summary["merged"],
             topic_summary["skipped"],
+        )
+
+        LOGGER.info("Starting step=score_posts")
+        scoring_summary = score_posts(settings, since_days=7)
+        LOGGER.info(
+            "Finished step=score_posts scored=%d strong=%d watch=%d cultural=%d noise=%d avg=%.4f",
+            scoring_summary.get("scored", 0),
+            scoring_summary.get("strong", 0),
+            scoring_summary.get("watch", 0),
+            scoring_summary.get("cultural", 0),
+            scoring_summary.get("noise", 0),
+            scoring_summary.get("avg_signal_score", 0.0),
         )
     except Exception:
         LOGGER.exception("Ingest pipeline failed")
@@ -232,6 +249,31 @@ def handle_digest(_: argparse.Namespace) -> int:
     except Exception:
         LOGGER.exception("Cleanup failed but digest succeeded")
 
+    return 0
+
+
+def handle_score(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+
+        LOGGER.info("Starting step=score_posts days=%d", args.days)
+        summary = score_posts(settings, since_days=args.days)
+        LOGGER.info(
+            "Finished step=score_posts scored=%d strong=%d watch=%d cultural=%d noise=%d avg=%.4f errors=%d",
+            summary.get("scored", 0),
+            summary.get("strong", 0),
+            summary.get("watch", 0),
+            summary.get("cultural", 0),
+            summary.get("noise", 0),
+            summary.get("avg_signal_score", 0.0),
+            summary.get("errors", 0),
+        )
+    except Exception:
+        LOGGER.exception("Scoring failed")
+        return 1
     return 0
 
 

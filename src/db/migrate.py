@@ -101,6 +101,46 @@ def run_migrations() -> Path:
             );
             """
         )
+        # Phase 1: scoring columns on posts
+        for stmt in [
+            "ALTER TABLE posts ADD COLUMN signal_score REAL",
+            "ALTER TABLE posts ADD COLUMN bucket TEXT",
+            "ALTER TABLE posts ADD COLUMN project_matches TEXT",
+            "ALTER TABLE posts ADD COLUMN interpretation TEXT",
+        ]:
+            try:
+                connection.execute(stmt)
+            except sqlite3.OperationalError as exc:
+                if "duplicate column name" not in str(exc).lower():
+                    raise
+        # Phase 1: post_project_links — add inference tier and rationale columns
+        for stmt in [
+            "ALTER TABLE post_project_links ADD COLUMN tier TEXT",
+            "ALTER TABLE post_project_links ADD COLUMN rationale TEXT",
+        ]:
+            try:
+                connection.execute(stmt)
+            except sqlite3.OperationalError as exc:
+                if "duplicate column name" not in str(exc).lower():
+                    raise
+        # Phase 2: quality metrics for observability (created now, populated in Phase 2)
+        connection.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS quality_metrics (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                week_label TEXT NOT NULL UNIQUE,
+                computed_at TEXT NOT NULL,
+                total_posts INTEGER NOT NULL DEFAULT 0,
+                strong_count INTEGER NOT NULL DEFAULT 0,
+                watch_count INTEGER NOT NULL DEFAULT 0,
+                cultural_count INTEGER NOT NULL DEFAULT 0,
+                noise_count INTEGER NOT NULL DEFAULT 0,
+                avg_signal_score REAL,
+                project_match_count INTEGER NOT NULL DEFAULT 0,
+                output_word_count INTEGER NOT NULL DEFAULT 0
+            );
+            """
+        )
         connection.commit()
 
     LOGGER.info("Database migrations complete")
