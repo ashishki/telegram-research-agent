@@ -1,22 +1,27 @@
 # Telegram Research Agent — System Specification
 
-**Version:** 1.1.0
+**Version:** 2.0.0
 **Date:** 2026-03-30
-**Status:** Updated (Phase 19 — Signal Intelligence Redesign)
+**Status:** Strategic roadmap v2 aligned
 
 ---
 
 ## 1. Executive Summary
 
-The Telegram Research Agent is a private, server-side AI assistant that ingests posts from curated Telegram technology channels, structures the raw stream into persistent knowledge artifacts, and surfaces actionable outputs:
+The Telegram Research Agent is a private, server-side personal intelligence system that ingests posts from curated Telegram technology channels, structures the raw stream into persistent knowledge artifacts, and surfaces actionable outputs:
 
-- Weekly digests (what happened, what matters)
+- Signal-first intelligence reports (what matters, what is relevant, what can be ignored)
 - Study recommendations (what to learn next)
 - Topic clusters (recurring themes over time)
 - Project insight mappings (connections to ongoing work)
 - Experiment proposals (ideas worth prototyping)
 
 The system runs on a private VPS. There are no public-facing endpoints. LLM calls go through the `anthropic` Python SDK using `LLM_API_KEY` from the environment. The pipeline is deterministic except where LLM interpretation is explicitly invoked.
+
+### Legacy Bridge
+
+Legacy implementation phases remain valid as delivery history and audit context.
+Active forward development now follows `Strategic Roadmap v2` in `docs/tasks.md`, which restarts phase numbering at `Phase 1` for the new strategic sequence.
 
 ---
 

@@ -1,4 +1,4 @@
-# Telegram Research Agent — Implementation Roadmap
+# Telegram Research Agent — Strategic Roadmap v2
 
 **Version:** 2.0.0
 **Date:** 2026-03-30
@@ -17,6 +17,28 @@ It replaces the older feature-by-feature build order with a dependency-aware pla
 - user-aware prioritization
 
 This is a planning document, not a code task checklist.
+
+Legacy delivery phases remain part of project history, but they are no longer the active execution model.
+Current execution follows `Strategic Roadmap v2` below.
+
+---
+
+## Current Execution State
+
+- `Roadmap version`: v2
+- `Current phase`: Phase 1 — Baseline Stabilization
+- `Status`: ready for bounded implementation packet
+- `Primary blocker`: current CI/CD issue must be treated as a baseline blocker inside Phase 1
+- `Do not start yet`: Phase 2+ work, deep personalization, broad surface changes
+
+### Legacy Bridge
+
+- `Legacy phases 1–20`: implementation history and audit trail
+- `Roadmap v2 phases 1–8`: current strategic execution sequence
+
+Rule:
+- when docs mention old phases, treat them as historical context only
+- when orchestrating new work, use `Roadmap v2` numbering only
 
 ---
 
