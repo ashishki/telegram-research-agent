@@ -371,6 +371,52 @@ class TestRunDigestFixes(unittest.TestCase):
         finally:
             os.unlink(db_path)
 
+    def test_run_digest_sleeps_between_digest_and_insights_send(self):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+            db_path = tmp.name
+
+        try:
+            self._build_digest_db(db_path)
+            settings = self._make_settings(db_path)
+            fixed_now = datetime(2026, 3, 30, 12, 0, tzinfo=timezone.utc)
+            call_order: list[str] = []
+
+            def fake_send_digest_to_owner(*args, **kwargs):
+                call_order.append("digest")
+
+            def fake_sleep(seconds):
+                call_order.append(f"sleep:{seconds}")
+
+            def fake_send_text(*args, **kwargs):
+                call_order.append("insights")
+
+            with patch.dict(
+                os.environ,
+                {
+                    "TELEGRAM_BOT_TOKEN": "token",
+                    "TELEGRAM_OWNER_CHAT_ID": "chat",
+                },
+                clear=False,
+            ):
+                with patch.object(gd, "_utc_now", return_value=fixed_now):
+                    with patch.object(gd, "_compute_week_label", return_value="2026-W14"):
+                        with patch.object(gd, "score_posts", return_value={"strong": 1, "watch": 1, "cultural": 1, "noise": 1, "avg_signal_score": 0.475}):
+                            with patch.object(gd, "_load_prompt_sections", return_value=("system", "week={week_label}")):
+                                with patch.object(gd, "complete", return_value="digest output words"):
+                                    with patch.object(gd, "_append_github_section", side_effect=lambda content, settings: content):
+                                        with patch.object(gd, "_write_digest_file", return_value=gd.Path("/tmp/2026-W14.md")):
+                                            with patch.object(gd, "_write_digest_json_file", return_value=gd.Path("/tmp/2026-W14.json")):
+                                                with patch.object(gd, "_send_digest_to_telegram_owner", side_effect=fake_send_digest_to_owner):
+                                                    with patch.object(gd.time, "sleep", side_effect=fake_sleep) as sleep_mock:
+                                                        with patch.object(gd, "send_text", side_effect=fake_send_text):
+                                                            with patch("output.generate_recommendations.run_recommendations", return_value={"text": "insights"}):
+                                                                gd.run_digest(settings)
+
+            sleep_mock.assert_called_once_with(1)
+            self.assertEqual(call_order, ["digest", "sleep:1", "insights"])
+        finally:
+            os.unlink(db_path)
+
 
 if __name__ == "__main__":
     unittest.main()

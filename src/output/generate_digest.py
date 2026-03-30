@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import sqlite3
+import time
 from dataclasses import asdict
 from datetime import timezone, date, datetime, timedelta
 from pathlib import Path
@@ -534,6 +535,8 @@ def run_digest(settings: Settings) -> DigestResult:
         _send_digest_to_telegram_owner(content_md=content_md, week_label=week_label)
     except Exception:
         LOGGER.warning("Failed to send digest to Telegram owner week=%s", week_label, exc_info=True)
+
+    time.sleep(1)
 
     # Send insights as second message
     try:
