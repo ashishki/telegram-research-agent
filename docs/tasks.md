@@ -153,6 +153,25 @@ Turn scoring into the stable control plane for later routing, relevance, and per
 - weak/noise separation is measurable
 - score distribution is stable across multiple runs
 
+**Tasks**
+
+| ID | Task | Owner | Status | Depends On |
+|---|---|---|---|---|
+| T36 | Add `score_run_id` + `scored_at` columns to `posts`; populate in `score_posts()`; run migration idempotently | codex | `[ ]` | T35 |
+| T37 | Add `score_breakdown` JSON column to `posts` (stores per-dimension scores: channel_priority, topic_relevance, novelty, actionability, personal_interest); populate in `score_posts()` | codex | `[ ]` | T36 |
+| T38 | Expose `score_distribution` CLI command: `python3 src/main.py score-stats` — prints bucket counts, avg scores per bucket, top 3 topics per bucket for last 7 days | codex | `[ ]` | T37 |
+| T39 | Add 3 evals to `tests/test_score_posts.py`: (a) strong bucket ≤ 20% of total scored posts, (b) noise bucket ≥ 30%, (c) score_breakdown sums within ±0.05 of signal_score | codex | `[ ]` | T37 |
+| T40 | Fix CODE-9: add MID tier test to `tests/test_router.py` (`signal_score=0.6` → MID, `signal_score=0.45` boundary → MID) | codex | `[ ]` | T35 |
+| T41 | Fix CODE-11: remove dead import `generate_recommendations` from `handlers.py:15`; update test accordingly | codex | `[ ]` | T35 |
+
+**Phase 2 Review Criteria**
+- `posts` table has `score_run_id`, `scored_at`, `score_breakdown` columns; migration is idempotent
+- `score-stats` CLI command runs without error and prints non-empty output
+- `test_score_posts.py` has bucket distribution evals that would fail on a random scorer
+- `test_router.py` covers all 3 tiers
+- Dead import removed from `handlers.py`
+- 45+ tests passing
+
 ---
 
 ## Phase 3 — Model Routing
