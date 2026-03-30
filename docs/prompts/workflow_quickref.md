@@ -4,120 +4,83 @@
 
 ## Entry Point
 
-There is one way to start the development cycle:
+Use [workflow_orchestrator.md](/home/ashishki/Documents/dev/ai-stack/projects/telegram-research-agent/docs/prompts/workflow_orchestrator.md) as the master loop prompt.
 
-```
-Send docs/prompts/workflow_orchestrator.md to Claude Code (Strategist instance).
-No variables. No setup. Just paste and send.
-```
-
-The orchestrator reads `docs/tasks.md` to determine the current phase,
-drives Implement → Review → Fix automatically, updates `docs/tasks.md` after each phase,
-and loops until all phases are complete or a blocker is found.
+The orchestrator reads the roadmap from [docs/tasks.md](/home/ashishki/Documents/dev/ai-stack/projects/telegram-research-agent/docs/tasks.md) and advances phase by phase.
 
 ---
 
-## What the Orchestrator Does
+## Phase Order
 
-```
-Read tasks.md
-  │
-  └─▶ Find current phase (lowest phase with [ ] tasks)
-        │
-        ├─▶ codex exec -s workspace-write   ← Codex Implementer
-        │     └─▶ Implements all tasks in phase
-        │
-        ├─▶ Update tasks.md: [ ] → [~]
-        │
-        ├─▶ Agent tool (subagent_type: Explore)  ← Claude Reviewer
-        │     ├─▶ PASS → continue
-        │     └─▶ ISSUES FOUND:
-        │               ├─▶ codex exec -s workspace-write  ← Codex Fixer
-        │               └─▶ Agent tool (Explore) again — targeted re-check
-        │                     ├─▶ PASS → continue
-        │                     └─▶ SAME ISSUES → mark [!], stop, report to user
-        │
-        ├─▶ Update tasks.md: [~] → [x]
-        │
-        └─▶ Loop to next phase
-```
-
-**Tool split — hard rule:**
-| Role | Tool | Reason |
-|---|---|---|
-| Implementer | `codex exec -s workspace-write` | writes files |
-| Reviewer | `Agent tool` (Explore, Claude) | reasoning + checklist |
-| Fixer | `codex exec -s workspace-write` | writes fixes |
-
----
-
-## When the Loop Stops
-
-| Condition | tasks.md state | Action needed |
-|---|---|---|
-| All phases `[x]` | All done | MVP complete — proceed to ops setup |
-| Task marked `[!]` | Blocked | User must resolve blocker manually, then re-run orchestrator |
-| Agent unrecoverable error | `[!]` set on failed task | Check journal/logs, fix manually, re-run |
-
----
-
-## Resuming After a Stop
-
-The orchestrator is stateless — it reads all state from `docs/tasks.md` on every run.
-
-To resume:
-1. Resolve the blocker (fix `[!]` task manually or clear the `[!]` mark)
-2. Re-send `workflow_orchestrator.md` to Claude Code
-3. It picks up from the current state automatically
-
----
-
-## Manual Overrides
-
-If you need to re-run a specific phase without re-running previous phases:
-1. Open `docs/tasks.md`
-2. Change the phase tasks back to `[ ]`
-3. Re-send the orchestrator prompt
-
-To skip a phase (not recommended):
-1. Manually mark all its tasks `[x]` in `docs/tasks.md`
-2. The orchestrator will skip it
-
----
-
-## Phase Reference
-
-| Phase | Name | Key files Codex creates |
-|---|---|---|
-| 1 | Project Scaffold | schema.sql, migrate.py, client.py, main.py, settings.py, channels.yaml, .gitignore |
-| 2 | Bootstrap Ingestion | telegram_client.py, bootstrap_ingest.py, run_bootstrap.sh |
-| 3 | Normalization | normalize_posts.py |
-| 4 | Topic Detection | cluster.py, detect_topics.py |
-| 5 | Weekly Pipeline | incremental_ingest.py, telegram-ingest.service/timer, run_weekly.sh |
-| 6 | Digest Generation | generate_digest.py, telegram-digest.service/timer |
-| 7 | Recommendations | generate_recommendations.py |
-| 8 | Project Mapping | map_project_insights.py |
-| 9 | Hardening | healthcheck.sh + retry/logging across all modules |
-
----
-
-## Individual Agent Prompts (manual use only)
-
-These exist for ad-hoc use or debugging — the orchestrator uses them as embedded templates:
-
-| File | Use when |
+| Order | Phase |
 |---|---|
-| `workflow_codex_implementer.md` | Manually re-running a single phase implementation |
-| `workflow_claude_reviewer.md` | Manually reviewing a specific phase |
-| `workflow_codex_fixer.md` | Manually applying fixes from a review |
+| 1 | Baseline Stabilization |
+| 2 | Scoring Foundation |
+| 3 | Model Routing |
+| 4 | Signal-First Output |
+| 5 | Project Relevance Upgrade |
+| 6 | Personalization / Taste Model |
+| 7 | Learning Layer Refinement |
+| 8 | Productization / Surface Layer |
 
 ---
 
-## tasks.md Status Legend
+## What the Orchestrator Must Enforce
 
-| Symbol | Meaning |
+- dependencies before implementation
+- one bounded phase packet at a time
+- explicit non-goals
+- required documentation updates
+- quality gates before phase completion
+
+---
+
+## Hard Stops
+
+Stop the loop when:
+- the current phase has no measurable success criteria
+- dependencies are unmet
+- docs and implementation disagree
+- routing work has no cost metrics
+- personalization appears before project relevance is validated
+- product surface work starts before signal-first output is stable
+
+---
+
+## Review Focus by Phase
+
+| Phase | Mandatory review focus |
 |---|---|
-| `[ ]` | Not started |
-| `[~]` | Implemented, pending review |
-| `[x]` | Complete (implemented + reviewed) |
-| `[!]` | Blocked — needs human input |
+| Baseline Stabilization | docs/runtime alignment, baseline metrics, frozen contracts |
+| Scoring Foundation | bucket quality, stability, evidence fields |
+| Model Routing | `CHEAP / MID / STRONG` policy, escalation rate, cost awareness |
+| Signal-First Output | section completeness, readability, ignored/noise visibility |
+| Project Relevance Upgrade | relevance precision, rationale quality, separation from general importance |
+| Personalization | explainability, bounded influence, no evidence override |
+| Learning Layer | durable knowledge-gap mapping, non-generic recommendations |
+| Productization | operator clarity, surface stability, observability access |
+
+---
+
+## Task Decomposition Rule
+
+Always split work as:
+- epic
+- sub-epic
+- task unit
+
+If a task unit spans multiple roadmap phases, it is too large.
+
+---
+
+## Current Implementation Guidance
+
+Codex should start with:
+- baseline stabilization
+- measurement capture
+- contract cleanup
+
+Codex should not yet implement:
+- deep personalization
+- advanced feedback loops
+- broad product-surface expansion

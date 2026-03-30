@@ -575,11 +575,12 @@ Summary:
 See `docs/dev-cycle.md` for full process.
 
 Summary:
-1. **Strategist (Claude):** produces spec, architecture, task graph.
-2. **Codex Implementer:** implements tasks from task graph.
-3. **Claude Reviewer:** reviews each phase output against spec and architecture.
-4. **Codex Fixer:** applies review corrections.
-5. Living docs (`docs/*.md`) updated after each phase.
+1. **Strategist:** defines phase scope, dependencies, quality gates, and documentation deltas.
+2. **Orchestrator:** selects the current phase, checks readiness, and packages bounded work.
+3. **Codex:** implements only the active phase packet.
+4. **Reviewer:** checks architecture, quality gates, routing/output contracts, and regression risk.
+5. **Fixes:** address review findings only.
+6. Living docs remain synchronized after each phase.
 
 ---
 
@@ -587,16 +588,14 @@ Summary:
 
 | Phase | Name | Deliverables |
 |---|---|---|
-| 0 | Architecture | All 5 living docs written |
-| 1 | Project Scaffold | `src/` structure, config loader, DB schema migration, Anthropic client wrapper |
-| 2 | Bootstrap Ingestion | `bootstrap_ingest.py`, Telethon client, raw_posts table |
-| 3 | Normalization | `normalize_posts.py`, posts table population |
-| 4 | Topic Detection | TF-IDF clustering, LLM rubric labeling, topics + post_topics tables |
-| 5 | Weekly Pipeline | `incremental_ingest.py`, systemd units |
-| 6 | Digest Generation | `generate_digest.py`, digest output files |
-| 7 | Recommendations | `generate_recommendations.py`, recommendations output |
-| 8 | Project Mapping | `projects` table, `map_project_insights.py` |
-| 9 | Hardening | Error handling, retry logic, monitoring, log rotation |
+| 1 | Baseline Stabilization | aligned docs, baseline metrics, frozen current-state contracts |
+| 2 | Scoring Foundation | reliable signal buckets, scoring evidence, score distribution metrics |
+| 3 | Model Routing | `CHEAP / MID / STRONG` tiers, routing policy, budget-aware execution |
+| 4 | Signal-First Output | Strong signals / Project relevance / Weak signals / Think layer / Light-culture / Ignored |
+| 5 | Project Relevance Upgrade | stronger project matching, clearer relevance rationale and tiering |
+| 6 | Personalization / Taste Model | user profile, preference memory, downranking and re-ranking rules |
+| 7 | Learning Layer Refinement | learning guidance tied to validated signals, projects, and personal context |
+| 8 | Productization / Surface Layer | operator-facing delivery, observability, release-ready surfaces |
 
 ---
 
@@ -687,6 +686,21 @@ Per phase, the Claude Reviewer must verify:
 - [ ] Logging present and structured
 - [ ] No raw Telegram corpus passed to LLM in a single call
 
+**Routing / cost controls:**
+- [ ] Expensive model usage is justified by routing policy
+- [ ] Tier usage is measurable
+- [ ] Cost impact is observable for the phase
+
+**Output / product clarity:**
+- [ ] Output structure matches the current phase contract
+- [ ] Ignored/noise handling is explicit where required
+- [ ] Project relevance is kept distinct from general importance
+
+**Personalization guardrails:**
+- [ ] Personalization does not override evidence-based signal quality
+- [ ] Preference rules are explainable
+- [ ] Personalization work is not introduced before the roadmap allows it
+
 **Documentation:**
 - [ ] Living docs updated after phase
 - [ ] New modules have corresponding task entries marked complete
@@ -695,16 +709,16 @@ Per phase, the Claude Reviewer must verify:
 
 ## 21. Final Recommendations
 
-1. **Start with Phase 1 (scaffold) before any network calls.** Validate schema migration and the Anthropic client before touching Telegram.
+1. **Do baseline stabilization before new intelligence features.** Without a measurable baseline, routing and personalization will optimize the wrong thing.
 
-2. **Treat the Telethon session as a secret.** One leaked session = full account read access. Store in `/srv/openclaw-you/secrets/telegram.session`, never in the workspace.
+2. **Scoring precedes routing.** Cost-aware routing without stable signal buckets becomes arbitrary and expensive.
 
-3. **Validate the Anthropic client in isolation first.** Write a standalone test that sends a minimal prompt and receives a response before wiring it into any pipeline.
+3. **Routing precedes output redesign.** Signal-first output should reflect real filtering decisions, not pretend they exist.
 
-4. **Bootstrap ingestion is one-shot; make it resumable.** If it fails midway, re-running must not duplicate posts. The unique constraint handles this, but logging the last successfully ingested message ID per channel is recommended.
+4. **Project relevance precedes deep personalization.** The system must first know what matters to the work before it learns what the user tends to like.
 
-5. **Keep LLM prompts in `docs/prompts/`.** This makes them reviewable, versionable, and separable from code. Codex loads prompt templates; it does not inline them.
+5. **Personalization must modulate, not replace, evidence.** Do not bury objectively important signals just because they are outside recent taste.
 
-6. **Don't generate experiments until digest and recommendations are validated.** Experiment generation depends on quality upstream output.
+6. **Keep prompt contracts in `docs/prompts/`.** Scoring, routing, and output templates are part of the architecture and must stay reviewable.
 
-7. **Phase 9 (hardening) is not optional.** Retry logic for Telegram rate limits (FloodWaitError) is essential for production operation.
+7. **Do not productize unstable behavior.** Surface-layer work belongs after routing, output, relevance, and personalization have quality gates.
