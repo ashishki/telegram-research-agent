@@ -8,6 +8,7 @@ from pathlib import Path
 
 from config.settings import PROJECT_ROOT, Settings
 from llm.client import complete
+from llm.router import route
 from output.report_schema import (
     DigestResult,
     EvidenceItem,
@@ -472,7 +473,12 @@ def run_digest(settings: Settings) -> DigestResult:
             .replace("{noise_summary}", noise_summary)
         )
 
-        content_md = complete(prompt=prompt, system=system_prompt, category="digest")
+        content_md = complete(
+            prompt=prompt,
+            system=system_prompt,
+            category="digest",
+            model=route("synthesis"),
+        )
 
         # Step 4: Validate output length
         llm_word_count = _count_words(content_md)

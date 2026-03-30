@@ -6,6 +6,9 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DB_PATH = "data/agent.db"
 DEFAULT_MODEL_PROVIDER = "claude-haiku-4-5"
+CHEAP_MODEL = os.environ.get("CHEAP_MODEL", "claude-haiku-4-5-20251001")
+MID_MODEL = os.environ.get("MID_MODEL", "claude-sonnet-4-6")
+STRONG_MODEL = os.environ.get("STRONG_MODEL", "claude-opus-4-6")
 DEFAULT_TELEGRAM_SESSION_PATH = "/srv/openclaw-you/secrets/telegram.session"
 
 

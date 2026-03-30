@@ -729,7 +729,7 @@ _Prerequisite: Phase 19 P2 batch complete (T29–T33)_
 
 | ID | Task | Owner | Status | Depends On |
 |---|---|---|---|---|
-| T34 | LLM_ROUTER: tier abstraction + conditional branching + cost logging | codex | `[ ]` | T33 |
+| T34 | LLM_ROUTER: tier abstraction + conditional branching + cost logging | codex | `[x]` | T33 |
 
 ---
 
