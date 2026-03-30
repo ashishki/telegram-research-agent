@@ -117,6 +117,10 @@ Stabilize the current system, remove architecture drift, and establish documenta
 - current metrics can be collected for a full run
 - docs no longer describe the product as a digest bot
 
+**Cycle 3 fix tasks**
+
+- T35 [P1] — Add `time.sleep(1)` between digest send and insights send in `src/output/generate_digest.py:534–546`; add test asserting sleep is called between the two `send_text` calls. Blocks production digest run until resolved. (CODE-12)
+
 ---
 
 ## Phase 2 — Scoring Foundation

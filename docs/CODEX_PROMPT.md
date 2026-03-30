@@ -1,5 +1,5 @@
 # CODEX_PROMPT — Session Handoff
-_v2.0 · 2026-03-30 · telegram-research-agent_
+_v2.1 · 2026-03-30 · telegram-research-agent_
 
 ---
 
@@ -7,36 +7,69 @@ _v2.0 · 2026-03-30 · telegram-research-agent_
 
 - `Execution model`: Strategic Roadmap v2
 - `Current phase`: Phase 1 — Baseline Stabilization
-- `Phase status`: ready for bounded implementation packet
-- `Baseline`: repository state is stable enough to begin Phase 1, but CI/CD issue must be treated as a baseline blocker
-- `Last known test baseline`: 37 passing tests (legacy context, 2026-03-30)
+- `Phase status`: STOP-SHIP — CODE-12 (P1) must be resolved before next production digest run
+- `Baseline`: 44 passing tests (locked Cycle 3 baseline, 2026-03-30)
 - `Ruff`: not enforced
 
 ## Next Task
 
-Build a bounded `Phase 1 — Baseline Stabilization` implementation packet.
+Resolve T35 (CODE-12, P1): add `time.sleep(1)` between digest send and insights send in `src/output/generate_digest.py` (between lines 534 and 539), and add a test asserting the sleep is called between the two `send_text` dispatches.
 
-The first packet should cover only:
-- baseline/runtime drift capture
-- documentation/runtime reconciliation where needed
-- baseline metrics capture
-- CI/CD blocker handling as a Phase 1 baseline issue
+After T35 is merged and green: resume Phase 1 baseline stabilization packet — documentation/runtime reconciliation, architecture.md update (ARCH-3), spec.md section 19 update (ARCH-5), spec.md quality_metrics note update (ARCH-7).
 
-It must not include:
-- Phase 2 scoring redesign
-- Phase 3 routing implementation
-- signal-first output redesign in production
-- personalization logic
+Must not include Phase 2+ work until Phase 1 exit conditions are satisfied.
 
 ## Fix Queue
 
-- none formalized under Roadmap v2 yet
+### P1 — Stop-ship (must resolve before next production run)
+
+- FIX-1 [CODE-12] — `src/output/generate_digest.py:534–546`: add `time.sleep(1)` between `_send_digest_to_telegram_owner()` and the insights `send_text()` call. Add test asserting sleep is invoked between sends. Evidence: two back-to-back Telegram sends with no delay; 429 silently swallowed by `except Exception` at line 547.
+
+### P2 — Resolve before Phase 3 router wiring
+
+- FIX-2 [CODE-9] — `tests/test_router.py`: add `test_route_per_post_mid_signal_returns_mid_model` (score=0.6) and `test_route_per_post_watch_threshold_boundary` (score=0.45).
+- FIX-3 [CODE-10] — `src/llm/router.py:20`: guard `signal_score=None` — emit `LOGGER.warning` or raise `ValueError` instead of silently coercing to 0.0.
+- FIX-4 [CODE-11] — `src/bot/handlers.py:15`: remove dead import `generate_recommendations`. Update test mock accordingly.
+- FIX-5 [ARCH-1] — `src/llm/vision.py:36`: add `complete_vision()` in `client.py` with retry wrapper; route `vision.py` through it.
+- FIX-6 [ARCH-2] — `src/bot/handlers.py:287–330`: extract `handle_ask` business logic to `src/output/generate_answer.py`.
+- FIX-7 [ARCH-NEW-1] — `src/llm/router.py`: add inline comment labeling module as Phase 3 pre-wiring scaffolding; ensure Phase 3 task entry exists for per-post wiring.
+
+### P3 — Phase 1 documentation debt (required for Phase 1 exit)
+
+- FIX-8 [ARCH-3] — `docs/architecture.md`: add Component Map entry for `router.py`; add Data Model subsection for `quality_metrics`, `llm_usage`, `cluster_runs`, `study_plans`; note `scoring.yaml`/`profile.yaml` as Scoring Layer config surface.
+- FIX-9 [ARCH-5] — `docs/spec.md` section 19: update artifact structure to reflect actual source tree (add `router.py`, `vision.py`, `score_posts.py`, missing directories, systemd units).
+- FIX-10 [ARCH-7] — `docs/spec.md:341`: update `quality_metrics` note — replace “population is a future step” with description of T33 `_store_quality_metrics()` implementation.
+- FIX-11 [ARCH-4/CODE-7] — `src/config/scoring.yaml:31`: add comment stating `cluster_coherence` is stubbed at 0.5 and will not respond to config changes until Phase 2.
+- FIX-12 [CODE-13] — `tests/test_generate_digest.py:59–67`: replace tautological word-count gate tests with test that calls `run_digest` with patched `complete()` returning 601-word output.
+- FIX-13 [CODE-14] — `src/llm/router.py:28–30`: add `LOGGER.warning(“Unknown model=%s, using default rates”, model)` before `.get()` fallback.
+- FIX-14 [CODE-15] — `tests/test_telegram_delivery.py`: add `test_send_text_default_html_parse_mode` and `test_send_text_none_parse_mode`.
+
+## Open Findings
+
+| ID | Sev | Description | Status |
+|----|-----|-------------|--------|
+| CODE-12 | P1 | No sleep between digest and insights Telegram sends; 429 silently dropped | OPEN — stop-ship |
+| CODE-9 | P2 | `test_router.py` missing MID tier and WATCH_THRESHOLD boundary tests | OPEN |
+| CODE-10 | P2 | `route()` silently coerces `signal_score=None` to 0.0 | OPEN |
+| CODE-11 | P2 | Dead import `generate_recommendations` in `handlers.py:15` | OPEN |
+| ARCH-1 | P2 | `vision.py` bypasses `complete()` retry wrapper | OPEN |
+| ARCH-2 | P2 | `handle_ask` embeds business logic in bot handler | OPEN |
+| ARCH-NEW-1 | P2 | Per-post routing unwired; needs Phase 3 pre-wiring label | OPEN |
+| CODE-13 | P3 | Word-count gate tests are tautological | OPEN |
+| CODE-14 | P3 | Unknown model falls back silently to haiku rates | OPEN |
+| CODE-15 | P3 | `test_telegram_delivery.py` missing default HTML and None parse_mode tests | OPEN |
+| ARCH-3 | P3 | `architecture.md` missing scoring engine, new tables, router | OPEN — Phase 1 exit blocker |
+| ARCH-4/CODE-7 | P3 | `scoring.yaml cluster_coherence` stub undocumented | OPEN |
+| ARCH-5 | P3 | `spec.md` section 19 artifact structure stale | OPEN — Phase 1 exit blocker |
+| ARCH-7 | P3 | `spec.md:341` quality_metrics “future step” note stale after T33 | OPEN — Phase 1 exit blocker |
+| ARCH-NEW-2 | P3 | LLM cost DEBUG-only; no queryable cost-per-run summary | OPEN — deferred to Phase 3 |
 
 ## Open Context
 
 - Legacy phases and audit artifacts remain in the repo as historical context
 - Any references to `Phase 19`, `Phase 20`, `T29-T34`, or similar should be treated as legacy history, not as the current execution queue
 - Current orchestration must derive scope from `docs/tasks.md` Roadmap v2, not from legacy phase numbering
+- Cycle 3 baseline: **44 passing tests** — this is the locked entry state
 
 ## Legacy History Note
 

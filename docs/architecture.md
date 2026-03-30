@@ -130,6 +130,10 @@ Why it is required:
 
 This is now the foundation layer for all later reasoning.
 
+Implementation:
+- `src/processing/score_posts.py` — deterministic scoring engine; writes `signal_score`, `bucket`, `project_matches`, `interpretation` to the `posts` table
+- Configuration surface: `src/config/scoring.yaml` (scoring weights and thresholds), `src/config/profile.yaml` (per-user boost/downrank rules)
+
 ---
 
 ### 4. Routing Layer
@@ -152,6 +156,11 @@ Without routing:
 - cost scales with volume
 - strong models see too much low-value material
 - output quality degrades because interpretation attention is wasted on noise
+
+Implementation:
+- `src/llm/router.py` — `route(task_type, signal_score)` selects model tier; thresholds: `WATCH_THRESHOLD=0.45` (CHEAP→MID), `STRONG_THRESHOLD=0.75` (MID→STRONG); `task_type="synthesis"` always routes to STRONG_MODEL
+- Note: per-post score-based routing (`route(signal_score=score)`) is implemented but not yet wired to any production call site. This is Phase 3 pre-wiring scaffolding. Only `route("synthesis")` is active in production (`src/output/generate_digest.py`)
+- LLM calls are made via the `anthropic` SDK through `src/llm/client.py`; `client.py` records usage per call to the `llm_usage` table via `_record_usage()`, with cost estimated via `router.estimate_cost_usd()`
 
 ---
 
@@ -269,6 +278,27 @@ Responsibilities:
 Why it is required:
 - routing and personalization are unsafe without feedback loops
 - cost-aware systems fail silently if metrics are absent
+
+---
+
+## Data Model
+
+### New tables (added Phase 1 / T33–T34)
+
+| Table | Key columns | Purpose |
+|---|---|---|
+| `llm_usage` | `called_at`, `category`, `model`, `input_tokens`, `output_tokens`, `cost_usd`, `duration_ms` | Per-call LLM usage and cost tracking; written by `src/llm/client.py:_record_usage()` |
+| `quality_metrics` | `week_label`, `total_posts`, `strong_count`, `watch_count`, `cultural_count`, `noise_count`, `avg_signal_score`, `project_match_count`, `output_word_count` | Per-run digest quality observability; written by `src/output/generate_digest.py:_store_quality_metrics()` in both early-exit and normal paths |
+| `cluster_runs` | `run_at`, `post_count`, `cluster_count`, `unlabeled_count`, `inertia`, `silhouette_score` | Clustering run metadata and global silhouette score; written by `src/processing/cluster.py` |
+| `study_plans` | `week_label`, `generated_at`, `content_md`, `topics_covered`, `reminder_sent_tue`, `reminder_sent_fri` | Generated study plans with reminder delivery state |
+
+### New columns on existing tables (added Phase 1)
+
+| Table | New columns | Purpose |
+|---|---|---|
+| `posts` | `signal_score REAL`, `bucket TEXT`, `project_matches TEXT`, `interpretation TEXT` | Scoring engine output; written by `src/processing/score_posts.py` |
+| `post_project_links` | `tier TEXT`, `rationale TEXT` | Project relevance inference tier and reasoning |
+| `raw_posts` | `message_url TEXT`, `image_description TEXT` | Stable message URL (`https://t.me/{channel}/{id}`) and LLM vision analysis output |
 
 ---
 
