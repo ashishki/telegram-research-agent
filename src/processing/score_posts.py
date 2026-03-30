@@ -11,9 +11,11 @@ Called before digest synthesis so the LLM receives only strong/watch-bucket post
 """
 
 import logging
+import json
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from uuid import uuid4
 
 import yaml
 
@@ -270,6 +272,36 @@ def _score_actionability(
     return actionability_scores.get("noise", 0.0)
 
 
+def _score_recency(posted_at: str, since_days: int) -> float:
+    """Return a 0-1 score where newer posts within the scoring window rank higher."""
+    if not posted_at:
+        return 0.0
+
+    try:
+        normalized = posted_at.replace("Z", "+00:00")
+        posted_dt = datetime.fromisoformat(normalized)
+    except ValueError:
+        return 0.0
+
+    if posted_dt.tzinfo is None:
+        posted_dt = posted_dt.replace(tzinfo=timezone.utc)
+
+    age_seconds = max(0.0, (datetime.now(timezone.utc) - posted_dt).total_seconds())
+    window_seconds = max(float(since_days), 1.0) * 86400.0
+    return round(max(0.0, 1.0 - min(age_seconds / window_seconds, 1.0)), 4)
+
+
+def _score_engagement(
+    channel_username: str,
+    view_count: int | None,
+    channel_max_views: dict[str, int],
+) -> float:
+    max_views = channel_max_views.get(channel_username, 1)
+    if max_views <= 0:
+        return 0.0
+    return round(min(1.0, (view_count or 0) / max_views), 4)
+
+
 # ---------------------------------------------------------------------------
 # Cultural bucket detection
 # ---------------------------------------------------------------------------
@@ -327,6 +359,8 @@ def score_posts(
     w_action = weights.get("actionability", 0.15)
 
     summary = {"scored": 0, "strong": 0, "watch": 0, "cultural": 0, "noise": 0, "errors": 0}
+    score_run_id = str(uuid4())
+    scored_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
     with sqlite3.connect(settings.db_path) as conn:
         conn.row_factory = sqlite3.Row
@@ -343,7 +377,7 @@ def score_posts(
         topic_history = _fetch_topic_history(conn, lookback_weeks)
         channel_max_views = _fetch_channel_max_views(conn, since_days)
 
-        scored_rows: list[tuple[float, str, int]] = []
+        scored_rows: list[tuple[float, str, str, str, str, int]] = []
 
         for post in posts:
             try:
@@ -378,6 +412,12 @@ def score_posts(
                     post["word_count"],
                     actionability_scores,
                 )
+                d_recency = _score_recency(post["posted_at"], since_days)
+                d_engagement = _score_engagement(
+                    post["channel_username"],
+                    post["view_count"],
+                    channel_max_views,
+                )
 
                 signal_score = round(
                     d_interest * w_interest
@@ -399,7 +439,16 @@ def score_posts(
                 else:
                     bucket = "noise"
 
-                scored_rows.append((signal_score, bucket, post_id))
+                score_breakdown = json.dumps(
+                    {
+                        "recency": d_recency,
+                        "engagement": d_engagement,
+                        "topic_relevance": d_interest,
+                        "source_quality": d_source,
+                        "novelty": d_novelty,
+                    }
+                )
+                scored_rows.append((signal_score, bucket, score_run_id, scored_at, score_breakdown, post_id))
                 summary["scored"] += 1
 
             except Exception:
@@ -410,7 +459,10 @@ def score_posts(
         # Write scores to DB
         conn.execute("BEGIN")
         conn.executemany(
-            "UPDATE posts SET signal_score = ?, bucket = ? WHERE id = ?",
+            (
+                "UPDATE posts SET signal_score = ?, bucket = ?, score_run_id = ?, "
+                "scored_at = ?, score_breakdown = ? WHERE id = ?"
+            ),
             scored_rows,
         )
         conn.commit()
@@ -418,11 +470,11 @@ def score_posts(
     # Apply per-bucket caps: re-cap at max items by downgrading extras to noise
     # (cap enforcement is done at digest-generation time, not here — we store raw scores)
     # Count buckets for summary
-    for _, bucket, _ in scored_rows:
+    for _, bucket, _, _, _, _ in scored_rows:
         summary[bucket] = summary.get(bucket, 0) + 1
 
     avg_score = (
-        round(sum(s for s, _, _ in scored_rows) / len(scored_rows), 4)
+        round(sum(row[0] for row in scored_rows) / len(scored_rows), 4)
         if scored_rows else 0.0
     )
     summary["avg_signal_score"] = avg_score

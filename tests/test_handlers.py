@@ -78,13 +78,11 @@ class TestHandlers(unittest.TestCase):
         summary = DigestResult(week_label="2026-W14", output_path="/tmp/digest.md", post_count=3, json_path="/tmp/digest.json")
 
         with patch.object(handlers, "run_digest", return_value=summary) as mock_run_digest:
-            with patch.object(handlers, "generate_recommendations") as mock_generate_recommendations:
-                with patch.object(handlers, "send_report_preview") as mock_send_report_preview:
-                    with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
-                        handlers.handle_run_digest(chat_id="42", args="", settings=settings)
+            with patch.object(handlers, "send_report_preview") as mock_send_report_preview:
+                with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                    handlers.handle_run_digest(chat_id="42", args="", settings=settings)
 
         mock_run_digest.assert_called_once_with(settings)
-        mock_generate_recommendations.assert_not_called()
         mock_send_report_preview.assert_called_once_with(
             chat_id="42",
             title="Дайджест сгенерирован",

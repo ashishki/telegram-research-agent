@@ -7,9 +7,18 @@ Coverage:
   (c) _score_personal_interest: boost / downrank / neutral
 """
 
+import json
+import os
+import sqlite3
+import tempfile
 import unittest
+from datetime import datetime, timezone
+from unittest.mock import patch
 
+from config.settings import Settings
+from db.migrate import run_migrations
 from processing.score_posts import _is_cultural, _score_personal_interest
+from processing.score_posts import score_posts
 
 
 class TestBucketBoundaryValues(unittest.TestCase):
@@ -193,6 +202,110 @@ class TestScorePersonalInterest(unittest.TestCase):
             downrank_topics=[],
         )
         self.assertLessEqual(score, 1.0)
+
+
+class TestScorePostsPersistence(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+        self.tmp.close()
+        self.db_path = self.tmp.name
+        self.settings = Settings(
+            db_path=self.db_path,
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+        with patch.dict(os.environ, {"AGENT_DB_PATH": self.db_path}):
+            run_migrations()
+
+        now_iso = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        with sqlite3.connect(self.db_path) as connection:
+            connection.execute(
+                """
+                INSERT INTO raw_posts (
+                    id, channel_username, channel_id, message_id, posted_at, text, media_type,
+                    media_caption, forward_from, view_count, message_url, raw_json, ingested_at, image_description
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (1, "@signal", 1001, 5001, now_iso, "Post body", None, None, None, 120, None, "{}", now_iso, None),
+            )
+            connection.execute(
+                """
+                INSERT INTO posts (
+                    id, raw_post_id, channel_username, posted_at, content, url_count, has_code,
+                    language_detected, word_count, normalized_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (1, 1, "@signal", now_iso, "LLM agent systems post", 1, 1, "en", 120, now_iso),
+            )
+            connection.execute(
+                "INSERT INTO topics (id, label, description, first_seen, last_seen, post_count) VALUES (?, ?, ?, ?, ?, ?)",
+                (1, "llm", "topic", now_iso, now_iso, 1),
+            )
+            connection.execute(
+                "INSERT INTO post_topics (post_id, topic_id, confidence) VALUES (?, ?, ?)",
+                (1, 1, 0.9),
+            )
+            connection.commit()
+
+    def tearDown(self) -> None:
+        os.unlink(self.db_path)
+
+    def test_score_posts_sets_scored_at_and_score_run_id(self):
+        score_posts(self.settings, since_days=7)
+
+        with sqlite3.connect(self.db_path) as connection:
+            row = connection.execute(
+                "SELECT score_run_id, scored_at FROM posts WHERE id = 1"
+            ).fetchone()
+
+        self.assertIsNotNone(row[0])
+        self.assertIsNotNone(row[1])
+        self.assertTrue(row[0])
+        self.assertTrue(row[1])
+
+    def test_score_posts_stores_score_breakdown_json(self):
+        score_posts(self.settings, since_days=7)
+
+        with sqlite3.connect(self.db_path) as connection:
+            row = connection.execute(
+                "SELECT score_breakdown FROM posts WHERE id = 1"
+            ).fetchone()
+
+        breakdown = json.loads(row[0])
+        self.assertEqual(
+            set(breakdown.keys()),
+            {"recency", "engagement", "topic_relevance", "source_quality", "novelty"},
+        )
+        for value in breakdown.values():
+            self.assertIsInstance(value, float)
+            self.assertGreaterEqual(value, 0.0)
+            self.assertLessEqual(value, 1.0)
+
+
+class TestBucketDistributionEvals(unittest.TestCase):
+    STRONG_THRESHOLD = 0.75
+    WATCH_THRESHOLD = 0.45
+
+    def _assign_bucket(self, signal_score: float) -> str:
+        if signal_score >= self.STRONG_THRESHOLD:
+            return "strong"
+        if signal_score >= self.WATCH_THRESHOLD:
+            return "watch"
+        return "noise"
+
+    def test_scores_above_point_seven_can_all_land_in_strong_bucket(self):
+        buckets = [self._assign_bucket(score) for score in [0.8] * 10]
+        self.assertEqual(buckets, ["strong"] * 10)
+
+    def test_scores_in_watch_band_land_in_watch_bucket(self):
+        scores = [0.45, 0.47, 0.49, 0.5, 0.52, 0.54, 0.55, 0.57, 0.59, 0.6]
+        buckets = [self._assign_bucket(score) for score in scores]
+        self.assertEqual(buckets, ["watch"] * 10)
+
+    def test_mixed_scores_assign_noise_strong_and_watch(self):
+        buckets = [self._assign_bucket(score) for score in [0.1, 0.9, 0.5]]
+        self.assertEqual(buckets, ["noise", "strong", "watch"])
 
 
 if __name__ == "__main__":

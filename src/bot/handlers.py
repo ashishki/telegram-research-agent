@@ -12,7 +12,6 @@ from config.settings import PROJECT_ROOT, Settings
 from llm.client import LLMClient
 from output.generate_digest import _compute_week_label, run_digest
 from output.generate_insight import generate_insight
-from output.generate_recommendations import generate_recommendations
 from output.generate_study_plan import generate_study_plan
 
 

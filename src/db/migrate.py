@@ -107,6 +107,9 @@ def run_migrations() -> Path:
             "ALTER TABLE posts ADD COLUMN bucket TEXT",
             "ALTER TABLE posts ADD COLUMN project_matches TEXT",
             "ALTER TABLE posts ADD COLUMN interpretation TEXT",
+            "ALTER TABLE posts ADD COLUMN score_run_id TEXT",
+            "ALTER TABLE posts ADD COLUMN scored_at TEXT",
+            "ALTER TABLE posts ADD COLUMN score_breakdown TEXT",
         ]:
             try:
                 connection.execute(stmt)

@@ -2,8 +2,9 @@ import argparse
 import asyncio
 import logging
 import signal
+import sqlite3
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from config.settings import PROJECT_ROOT, load_settings
 from db.migrate import run_migrations
@@ -68,6 +69,9 @@ def build_parser() -> argparse.ArgumentParser:
     score_parser = subparsers.add_parser("score", help="Score posts by personal relevance (signal_score + bucket)")
     score_parser.add_argument("--days", type=int, default=7, help="Lookback window in days (default: 7)")
     score_parser.set_defaults(handler=handle_score)
+
+    score_stats_parser = subparsers.add_parser("score-stats", help="Print scoring bucket counts and topic stats")
+    score_stats_parser.set_defaults(handler=handle_score_stats)
 
     bot_parser = subparsers.add_parser("bot", help="Start Telegram bot interface (long-polling)")
     bot_parser.set_defaults(handler=handle_bot)
@@ -274,6 +278,68 @@ def handle_score(args: argparse.Namespace) -> int:
     except Exception:
         LOGGER.exception("Scoring failed")
         return 1
+    return 0
+
+
+def handle_score_stats(_: argparse.Namespace) -> int:
+    settings = load_settings()
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat().replace("+00:00", "Z")
+
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+
+        with sqlite3.connect(settings.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON;")
+            connection.execute("PRAGMA journal_mode = WAL;")
+
+            bucket_rows = connection.execute(
+                """
+                SELECT bucket, COUNT(*) AS post_count, AVG(signal_score) AS avg_signal_score
+                FROM posts
+                WHERE posted_at >= ? AND bucket IS NOT NULL
+                GROUP BY bucket
+                """,
+                (cutoff,),
+            ).fetchall()
+            bucket_stats = {
+                row["bucket"]: {
+                    "count": int(row["post_count"] or 0),
+                    "avg": float(row["avg_signal_score"] or 0.0),
+                }
+                for row in bucket_rows
+            }
+
+            topic_rows = connection.execute(
+                """
+                SELECT t.label, COUNT(*) AS topic_count
+                FROM post_topics pt
+                INNER JOIN topics t ON t.id = pt.topic_id
+                INNER JOIN posts p ON p.id = pt.post_id
+                WHERE p.posted_at >= ? AND p.bucket IS NOT NULL
+                GROUP BY t.id, t.label
+                ORDER BY topic_count DESC, t.label ASC
+                LIMIT 3
+                """,
+                (cutoff,),
+            ).fetchall()
+    except Exception:
+        LOGGER.exception("Score stats failed")
+        return 1
+
+    lines = ["Score stats (last 7 days)"]
+    for bucket in ("strong", "watch", "cultural", "noise"):
+        stats = bucket_stats.get(bucket, {"count": 0, "avg": 0.0})
+        lines.append(f"{bucket}: count={stats['count']} avg_signal_score={stats['avg']:.4f}")
+
+    if topic_rows:
+        lines.append("top_topics: " + ", ".join(f"{row['label']} ({int(row['topic_count'])})" for row in topic_rows))
+    else:
+        lines.append("top_topics: none")
+
+    sys.stdout.write("\n".join(lines) + "\n")
     return 0
 
 
