@@ -26,7 +26,7 @@
 | P0-03 | Write `docs/tasks.md` | Strategist | `[x]` | P0-01 |
 | P0-04 | Write `docs/dev-cycle.md` | Strategist | `[x]` | P0-01 |
 | P0-05 | Write `docs/ops-security.md` | Strategist | `[x]` | P0-01 |
-| P0-06 | Write LLM prompt templates in `docs/prompts/` | Strategist | `[ ]` | P0-02 |
+| P0-06 | Write LLM prompt templates in `docs/prompts/` | Strategist | `[x]` | P0-02 |
 
 ---
 
@@ -324,10 +324,10 @@ Source: `docs/reviews/architecture-modernization-review-2026-03-17.md`, Sections
 
 | ID | Task | Owner | Status |
 |---|---|---|---|
-| PT-01 | `docs/prompts/rubric_discovery.md` — topic labeling prompt | Strategist | `[ ]` |
-| PT-02 | `docs/prompts/digest_generation.md` — weekly digest prompt | Strategist | `[ ]` |
-| PT-03 | `docs/prompts/recommendations.md` — study recommendations prompt | Strategist | `[ ]` |
-| PT-04 | `docs/prompts/project_insights.md` — project relevance prompt | Strategist | `[ ]` |
+| PT-01 | `docs/prompts/rubric_discovery.md` — topic labeling prompt | Strategist | `[x]` |
+| PT-02 | `docs/prompts/digest_generation.md` — weekly digest prompt | Strategist | `[x]` |
+| PT-03 | `docs/prompts/recommendations.md` — study recommendations prompt | Strategist | `[x]` |
+| PT-04 | `docs/prompts/project_insights.md` — project relevance prompt | Strategist | `[x]` |
 
 ---
 
