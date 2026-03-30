@@ -623,11 +623,11 @@ _Prerequisite: T28 complete (37 tests passing)_
 
 | ID | Task | Owner | Status | Depends On |
 |---|---|---|---|---|
-| T29 | Fix CODE-2: `send_text()` parse_mode override | codex | `[ ]` | T28 |
-| T30 | Fix CODE-3: `handle_digest` HTML parse_mode for content_md | codex | `[ ]` | T29 |
-| T31 | Fix CODE-4: `except Exception` missing `exc_info=True` in insights block | codex | `[ ]` | T28 |
-| T32 | Fix CODE-6: duplicate insights delivery via `handle_run_digest` | codex | `[ ]` | T28 |
-| T33 | Fix CODE-8: populate `quality_metrics` table after digest runs | codex | `[ ]` | T28 |
+| T29 | Fix CODE-2: `send_text()` parse_mode override | codex | `[x]` | T28 |
+| T30 | Fix CODE-3: `handle_digest` HTML parse_mode for content_md | codex | `[x]` | T29 |
+| T31 | Fix CODE-4: `except Exception` missing `exc_info=True` in insights block | codex | `[x]` | T28 |
+| T32 | Fix CODE-6: duplicate insights delivery via `handle_run_digest` | codex | `[x]` | T28 |
+| T33 | Fix CODE-8: populate `quality_metrics` table after digest runs | codex | `[x]` | T28 |
 
 ---
 

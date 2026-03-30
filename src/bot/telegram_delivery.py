@@ -69,8 +69,8 @@ def _send_text_internal(chat_id: str, text: str, token: str, parse_mode: str | N
         )
 
 
-def send_text(chat_id: str, text: str, token: str) -> None:
-    _send_text_internal(chat_id=chat_id, text=text, token=token, parse_mode="HTML")
+def send_text(chat_id: str, text: str, token: str, parse_mode: str | None = "HTML") -> None:
+    _send_text_internal(chat_id=chat_id, text=text, token=token, parse_mode=parse_mode)
 
 
 def send_document(chat_id: str, file_path: str, caption: str, token: str) -> None:

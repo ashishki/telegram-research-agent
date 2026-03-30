@@ -8,9 +8,14 @@ Coverage:
 """
 
 import os
+import sqlite3
+import tempfile
 import sys
 import types
 import unittest
+from datetime import datetime, timezone
+from io import StringIO
+import logging
 from unittest.mock import MagicMock, patch
 
 
@@ -199,6 +204,172 @@ class TestAppendGithubSectionNoOverlapGuard(unittest.TestCase):
 
         self.assertNotIn(repo_name, result)
         self.assertEqual(result, content_before)
+
+
+class TestRunDigestFixes(unittest.TestCase):
+    def _make_settings(self, db_path: str):
+        from config.settings import Settings
+
+        return Settings(
+            db_path=db_path,
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+
+    def _build_digest_db(self, db_path: str) -> None:
+        with sqlite3.connect(db_path) as connection:
+            connection.executescript(
+                """
+                CREATE TABLE raw_posts (
+                    id INTEGER PRIMARY KEY,
+                    view_count INTEGER,
+                    message_url TEXT
+                );
+                CREATE TABLE posts (
+                    id INTEGER PRIMARY KEY,
+                    raw_post_id INTEGER,
+                    channel_username TEXT,
+                    content TEXT,
+                    posted_at TEXT,
+                    signal_score REAL,
+                    bucket TEXT,
+                    project_matches TEXT
+                );
+                CREATE TABLE topics (
+                    id INTEGER PRIMARY KEY,
+                    label TEXT
+                );
+                CREATE TABLE post_topics (
+                    post_id INTEGER,
+                    topic_id INTEGER
+                );
+                CREATE TABLE digests (
+                    week_label TEXT PRIMARY KEY,
+                    generated_at TEXT,
+                    content_md TEXT,
+                    content_json TEXT,
+                    pdf_path TEXT,
+                    post_count INTEGER
+                );
+                CREATE TABLE quality_metrics (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    week_label TEXT NOT NULL UNIQUE,
+                    computed_at TEXT NOT NULL,
+                    total_posts INTEGER NOT NULL DEFAULT 0,
+                    strong_count INTEGER NOT NULL DEFAULT 0,
+                    watch_count INTEGER NOT NULL DEFAULT 0,
+                    cultural_count INTEGER NOT NULL DEFAULT 0,
+                    noise_count INTEGER NOT NULL DEFAULT 0,
+                    avg_signal_score REAL,
+                    project_match_count INTEGER NOT NULL DEFAULT 0,
+                    output_word_count INTEGER NOT NULL DEFAULT 0
+                );
+                """
+            )
+            connection.executemany(
+                "INSERT INTO raw_posts (id, view_count, message_url) VALUES (?, ?, ?)",
+                [
+                    (1, 100, "https://t.me/c/1"),
+                    (2, 90, "https://t.me/c/2"),
+                    (3, 80, "https://t.me/c/3"),
+                    (4, 70, "https://t.me/c/4"),
+                ],
+            )
+            connection.executemany(
+                """
+                INSERT INTO posts (id, raw_post_id, channel_username, content, posted_at, signal_score, bucket, project_matches)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    (1, 1, "chan1", "strong post", "2026-03-29T12:00:00Z", 0.9, "strong", '["proj-a"]'),
+                    (2, 2, "chan2", "watch post", "2026-03-29T13:00:00Z", 0.6, "watch", "[]"),
+                    (3, 3, "chan3", "cultural post", "2026-03-29T14:00:00Z", 0.3, "cultural", ""),
+                    (4, 4, "chan4", "noise post", "2026-03-29T15:00:00Z", 0.1, "noise", ""),
+                ],
+            )
+            connection.executemany(
+                "INSERT INTO topics (id, label) VALUES (?, ?)",
+                [(1, "Agents"), (2, "Infra"), (3, "Culture"), (4, "Noise")],
+            )
+            connection.executemany(
+                "INSERT INTO post_topics (post_id, topic_id) VALUES (?, ?)",
+                [(1, 1), (2, 2), (3, 3), (4, 4)],
+            )
+            connection.commit()
+
+    def _run_digest(self, db_path: str):
+        settings = self._make_settings(db_path)
+        fixed_now = datetime(2026, 3, 30, 12, 0, tzinfo=timezone.utc)
+
+        with patch.object(gd, "_utc_now", return_value=fixed_now):
+            with patch.object(gd, "_compute_week_label", return_value="2026-W14"):
+                with patch.object(gd, "score_posts", return_value={"strong": 1, "watch": 1, "cultural": 1, "noise": 1, "avg_signal_score": 0.475}):
+                    with patch.object(gd, "_load_prompt_sections", return_value=("system", "week={week_label}")):
+                        with patch.object(gd, "complete", return_value="digest output words"):
+                            with patch.object(gd, "_append_github_section", side_effect=lambda content, settings: content):
+                                with patch.object(gd, "_write_digest_file", return_value=gd.Path("/tmp/2026-W14.md")):
+                                    with patch.object(gd, "_write_digest_json_file", return_value=gd.Path("/tmp/2026-W14.json")):
+                                        with patch.object(gd, "_send_digest_to_telegram_owner"):
+                                            return gd.run_digest(settings)
+
+    def test_insights_failure_logs_traceback(self):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+            db_path = tmp.name
+
+        handler = None
+        previous_level = gd.LOGGER.level
+        try:
+            self._build_digest_db(db_path)
+            log_stream = StringIO()
+            handler = logging.StreamHandler(log_stream)
+            handler.setFormatter(logging.Formatter("%(levelname)s:%(name)s:%(message)s"))
+            gd.LOGGER.addHandler(handler)
+            gd.LOGGER.setLevel(logging.WARNING)
+
+            with patch("output.generate_recommendations.run_recommendations", side_effect=ValueError("boom")):
+                self._run_digest(db_path)
+
+            handler.flush()
+            log_output = log_stream.getvalue()
+            self.assertIn("Insights generation failed, skipping: boom", log_output)
+            self.assertIn("Traceback", log_output)
+        finally:
+            gd.LOGGER.setLevel(previous_level)
+            if handler is not None:
+                gd.LOGGER.removeHandler(handler)
+            os.unlink(db_path)
+
+    def test_run_digest_populates_quality_metrics(self):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+            db_path = tmp.name
+
+        try:
+            self._build_digest_db(db_path)
+            with patch("output.generate_recommendations.run_recommendations", return_value={"text": ""}):
+                self._run_digest(db_path)
+
+            with sqlite3.connect(db_path) as connection:
+                connection.row_factory = sqlite3.Row
+                row = connection.execute(
+                    """
+                    SELECT week_label, strong_count, watch_count, cultural_count, noise_count, avg_signal_score, output_word_count
+                    FROM quality_metrics
+                    WHERE week_label = ?
+                    """,
+                    ("2026-W14",),
+                ).fetchone()
+
+            self.assertIsNotNone(row)
+            self.assertEqual(row["week_label"], "2026-W14")
+            self.assertEqual(row["strong_count"], 1)
+            self.assertEqual(row["watch_count"], 1)
+            self.assertEqual(row["cultural_count"], 1)
+            self.assertEqual(row["noise_count"], 1)
+            self.assertAlmostEqual(row["avg_signal_score"], 0.475)
+            self.assertEqual(row["output_word_count"], 3)
+        finally:
+            os.unlink(db_path)
 
 
 if __name__ == "__main__":

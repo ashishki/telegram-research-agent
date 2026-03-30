@@ -170,6 +170,7 @@ def _fetch_scored_posts(connection: sqlite3.Connection, cutoff_iso: str) -> dict
             posts.posted_at,
             posts.signal_score,
             posts.bucket,
+            posts.project_matches,
             COALESCE(raw_posts.view_count, 0) AS view_count,
             raw_posts.message_url,
             topics.label AS topic_label
@@ -198,8 +199,18 @@ def _fetch_scored_posts(connection: sqlite3.Connection, cutoff_iso: str) -> dict
         topic_counts[label] = topic_counts.get(label, 0) + 1
 
     buckets: dict[str, list[dict]] = {"strong": [], "watch": [], "cultural": [], "noise": []}
+    bucket_counts: dict[str, int] = {"strong": 0, "watch": 0, "cultural": 0, "noise": 0}
+    total_signal_score = 0.0
+    project_match_count = 0
     for post_id, row in seen.items():
         bucket = row["bucket"] or "noise"
+        if bucket not in bucket_counts:
+            bucket = "noise"
+        bucket_counts[bucket] += 1
+        total_signal_score += float(row["signal_score"] or 0.0)
+        project_matches = (row["project_matches"] or "").strip()
+        if project_matches and project_matches not in {"[]", "null"}:
+            project_match_count += 1
         entry = {
             "id": post_id,
             "channel_username": row["channel_username"],
@@ -210,10 +221,7 @@ def _fetch_scored_posts(connection: sqlite3.Connection, cutoff_iso: str) -> dict
             "signal_score": round(float(row["signal_score"] or 0.0), 4),
             "posted_at": row["posted_at"],
         }
-        if bucket in buckets:
-            buckets[bucket].append(entry)
-        else:
-            buckets["noise"].append(entry)
+        buckets[bucket].append(entry)
 
     # Sort each bucket by signal_score DESC, apply caps
     for bucket_name in ("strong", "watch", "cultural"):
@@ -228,6 +236,9 @@ def _fetch_scored_posts(connection: sqlite3.Connection, cutoff_iso: str) -> dict
         "channel_count": len({row["channel_username"] for row in seen.values()}),
         "topic_counts": topic_counts,
         "topic_by_post": topic_by_post,
+        "bucket_counts": bucket_counts,
+        "avg_signal_score": (total_signal_score / len(seen)) if seen else None,
+        "project_match_count": project_match_count,
     }
 
 
@@ -330,6 +341,49 @@ def _store_digest(
     )
 
 
+def _store_quality_metrics(
+    connection: sqlite3.Connection,
+    week_label: str,
+    total_posts: int,
+    strong_count: int,
+    watch_count: int,
+    cultural_count: int,
+    noise_count: int,
+    avg_signal_score: float | None,
+    project_match_count: int,
+    output_word_count: int,
+) -> None:
+    connection.execute(
+        """
+        INSERT OR REPLACE INTO quality_metrics (
+            week_label,
+            computed_at,
+            total_posts,
+            strong_count,
+            watch_count,
+            cultural_count,
+            noise_count,
+            avg_signal_score,
+            project_match_count,
+            output_word_count
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            week_label,
+            _utc_now_iso(),
+            total_posts,
+            strong_count,
+            watch_count,
+            cultural_count,
+            noise_count,
+            avg_signal_score,
+            project_match_count,
+            output_word_count,
+        ),
+    )
+
+
 def _render_empty_digest(week_label: str, date_range: str) -> str:
     return (
         f"## Weekly Briefing — {week_label}\n"
@@ -371,9 +425,22 @@ def run_digest(settings: Settings) -> DigestResult:
             LOGGER.warning("Digest generation found no posts since cutoff=%s", cutoff_iso)
             empty_digest = _render_empty_digest(week_label, date_range)
             empty_digest = _append_github_section(empty_digest, settings)
+            empty_word_count = _count_words(empty_digest)
             output_path = _write_digest_file(week_label, empty_digest)
             connection.execute("BEGIN")
             _store_digest(connection, week_label, empty_digest, "", None, 0)
+            _store_quality_metrics(
+                connection,
+                week_label=week_label,
+                total_posts=0,
+                strong_count=0,
+                watch_count=0,
+                cultural_count=0,
+                noise_count=0,
+                avg_signal_score=None,
+                project_match_count=0,
+                output_word_count=empty_word_count,
+            )
             connection.commit()
             try:
                 _send_digest_to_telegram_owner(content_md=empty_digest, week_label=week_label)
@@ -408,14 +475,15 @@ def run_digest(settings: Settings) -> DigestResult:
         content_md = complete(prompt=prompt, system=system_prompt, category="digest")
 
         # Step 4: Validate output length
-        word_count = _count_words(content_md)
-        if word_count > MAX_OUTPUT_WORDS:
+        llm_word_count = _count_words(content_md)
+        if llm_word_count > MAX_OUTPUT_WORDS:
             LOGGER.warning(
                 "Digest output exceeds word limit week=%s words=%d limit=%d",
-                week_label, word_count, MAX_OUTPUT_WORDS,
+                week_label, llm_word_count, MAX_OUTPUT_WORDS,
             )
 
         content_md = _append_github_section(content_md, settings)
+        output_word_count = _count_words(content_md)
 
         # Step 5: Persist
         generated_at = _utc_now_iso()
@@ -435,13 +503,25 @@ def run_digest(settings: Settings) -> DigestResult:
 
         connection.execute("BEGIN")
         _store_digest(connection, week_label, content_md, content_json, None, post_count)
+        _store_quality_metrics(
+            connection,
+            week_label=week_label,
+            total_posts=post_count,
+            strong_count=buckets["bucket_counts"]["strong"],
+            watch_count=buckets["bucket_counts"]["watch"],
+            cultural_count=buckets["bucket_counts"]["cultural"],
+            noise_count=buckets["bucket_counts"]["noise"],
+            avg_signal_score=buckets["avg_signal_score"],
+            project_match_count=buckets["project_match_count"],
+            output_word_count=output_word_count,
+        )
         connection.commit()
 
     LOGGER.info(
         "Digest generation complete week=%s posts=%d strong=%d watch=%d words=%d output=%s",
         week_label, post_count,
         len(buckets["strong"]), len(buckets["watch"]),
-        word_count, output_path,
+        output_word_count, output_path,
     )
 
     try:
@@ -459,7 +539,7 @@ def run_digest(settings: Settings) -> DigestResult:
         if insights_text and token and chat_id:
             send_text(token=token, chat_id=chat_id, text=insights_text)
     except Exception as e:
-        LOGGER.warning("Insights generation failed, skipping: %s", e)
+        LOGGER.warning("Insights generation failed, skipping: %s", e, exc_info=True)
 
     return DigestResult(
         week_label=week_label,

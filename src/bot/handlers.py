@@ -161,7 +161,7 @@ def handle_digest(chat_id: str, args: str, settings: Settings) -> None:
         return
 
     try:
-        send_text(chat_id=chat_id, text=row["content_md"], token=_get_bot_token())
+        send_text(chat_id=chat_id, text=row["content_md"], token=_get_bot_token(), parse_mode=None)
     except Exception:
         LOGGER.warning("Failed to send digest text chat_id=%s week=%s", chat_id, week_label, exc_info=True)
         _friendly_handler_error(chat_id)
@@ -426,7 +426,6 @@ def handle_study(chat_id: str, args: str, settings: Settings) -> None:
 def handle_run_digest(chat_id: str, args: str, settings: Settings) -> None:
     del args
     summary = run_digest(settings)
-    generate_recommendations(settings)
     summary_lines = [summary.output_path]
     if summary.json_path:
         summary_lines.append(summary.json_path)
