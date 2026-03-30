@@ -1,5 +1,5 @@
 # Implementation Contract
-_v1.0 · telegram-research-agent · Immutable rules. Require ADR to change._
+_v2.0 · telegram-research-agent · Immutable rules. Require ADR to change._
 
 ---
 
@@ -17,9 +17,20 @@ _v1.0 · telegram-research-agent · Immutable rules. Require ADR to change._
 
 ### LLM Calls
 - All LLM calls go through `src/llm/client.py` — never call Anthropic SDK directly from modules
-- Model routing: Haiku for classification/labeling, Sonnet for synthesis/digest
+- Model routing must be explicit and tiered: `CHEAP`, `MID`, `STRONG`
+- Strong models are reserved for filtered high-value subsets only
 - Every LLM call logged to `llm_usage` table (model, tokens_in, tokens_out, cost_usd, category)
 - Cost tracking is mandatory — no untracked LLM calls
+
+### Signal-First Product Contract
+- Output is a decision-support artifact, not a generic digest
+- The target section model is: `Strong signals`, `Project relevance`, `Weak signals`, `Think layer`, `Light/cultural`, `Ignored`
+- Ignored/noise handling must remain visible somewhere in the output contract
+
+### Personalization Guardrails
+- Personalization may re-rank but must not replace evidence-based signal quality
+- Preference memory must be explainable and reviewable
+- Personalization work must not be implemented before routing and project relevance gates are met
 
 ### Bot Access
 - Telegram bot responds only to `TELEGRAM_OWNER_CHAT_ID`
@@ -49,6 +60,8 @@ _v1.0 · telegram-research-agent · Immutable rules. Require ADR to change._
 | C | `message_url` stored as `t.me/channel/message_id` | Audit trail; source attribution in PDF appendix |
 | D | Output files written to `data/output/` only (gitignored) | Keeps repo clean; data is ephemeral |
 | E | systemd timers define the schedule — never cron | Consistent with existing deployment |
+| F | Routing policy must expose tier usage and escalation rate | Cost-aware behavior must be measurable |
+| G | Personalization cannot suppress globally important signals without explicit rule trace | Prevents opaque bias |
 
 ---
 
@@ -60,6 +73,7 @@ _v1.0 · telegram-research-agent · Immutable rules. Require ADR to change._
 - Responding to non-owner Telegram IDs in bot handlers
 - Skipping pre-task baseline capture
 - Self-closing review findings without code verification
+- Implementing future-phase capabilities inside the current phase without roadmap approval
 
 ---
 
