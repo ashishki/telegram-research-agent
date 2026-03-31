@@ -1,227 +1,189 @@
 # Telegram Research Agent
 
-Персональная intelligence-система: читает Telegram-каналы, фильтрует шум, выдаёт структурированный отчёт о том, что важно — для тебя и твоих проектов.
+A personal research intelligence system for signal filtering, project-aware relevance, and weekly decision support.
 
 ---
 
-## Зачем
+## What This Is
 
-Каждую неделю через Telegram-каналы проходит ~200–500 постов. Большинство — шум, переупаковки, объявления. Несколько штук реально влияют на то, что ты делаешь или должен изучить.
+A private, production-ready pipeline that runs on a personal VPS and processes Telegram channels you follow. Its job is to separate signal from noise and deliver a weekly review artifact that actually supports decisions — not just a summary of what was posted.
 
-Этот агент делает одно: отделяет сигнал от шума и объясняет почему.
+**This is not:**
+- a digest bot that summarizes channels
+- a generic LLM wrapper
+- a multi-user or SaaS product
 
----
-
-## Что ты получаешь
-
-После запуска digest — отчёт в Telegram и/или файл. Структура фиксированная:
-
-```
-## Strong Signals
-- [score=0.87] [model=claude-opus-4-6] Claude 4 анонсировал нативную поддержку...
-- [score=0.81] [model=claude-opus-4-6] Новый подход к eval pipeline для агентов...
-
-## Watch
-- [score=0.61] Исследование по latency в RAG системах показало...
-- [score=0.54] FastAPI 0.115 — изменения в dependency injection...
-
-## Cultural
-- Мем про vibe coding набирает обороты в сообществе...
-
-## Ignored
-3 posts filtered as noise. Top topics: ChatGPT tips, funding round, NFT
-
-## Think Layer
-Themes and patterns will be synthesized here.
-
-## Stats
-Total: 47 posts | strong: 2 | watch: 12 | cultural: 3 | noise: 30
-
-## Project Relevance
-- [gdev-agent] (score=0.71): Matches: fastapi, cost, async — Claude 4 анонсировал...
-- [telegram-research-agent] (score=0.45): Matches: eval, pipeline — Исследование по...
-
-## Learn
-- langchain (seen 4 times) → Appeared 4 times in strong/watch posts, not in any project focus
-- structured_output (seen 3 times) → Appeared 3 times in strong/watch posts, not in any project focus
-```
-
-**Strong Signals** — то, что нужно прочитать сегодня. Каждый пункт показывает score и модель, которая его обработала.
-
-**Watch** — интересно, но не срочно. Можно вернуться позже.
-
-**Cultural** — контекст сообщества, мемы, атмосфера. Полезно для понимания трендов, не требует действий.
-
-**Ignored** — только счётчик. Контент не показывается, только сколько отфильтровано и по каким темам.
-
-**Project Relevance** — какие посты из Strong/Watch касаются твоих активных проектов и почему (конкретные совпадающие ключевые слова).
-
-**Learn** — темы, которые регулярно появляются в качественных постах, но ещё не покрыты ни одним из твоих проектов. Кандидаты для следующего learning gap.
+**This is:**
+- a personal signal filtering and scoring pipeline
+- a taste-aware ranking layer driven by your explicit profile
+- a project-aware relevance engine
+- a weekly review artifact generator
+- a cost-aware, explainable AI workflow
 
 ---
 
-## Как это работает
+## Core Product Thesis
 
-```
-Telegram каналы
-  → ingestion (Telethon)
-  → scoring (signal_score 0–1, bucket, score_breakdown)
-  → routing (CHEAP / MID / STRONG модель по score)
-  → signal-first report (format_signal_report)
-  → personalization (boost/downrank по profile.yaml)
-  → project relevance (keyword matching по projects.yaml)
-  → learning gaps (темы не покрытые проектами)
-  → доставка в Telegram
-```
+The strongest design decision in this system is **deterministic scoring before any LLM call**.
 
-Scoring **детерминированный** — никаких LLM на этом этапе. LLM получает только то, что прошло через routing layer.
+Every post receives a `signal_score` computed entirely without LLMs, from five weighted dimensions: personal taste alignment, source quality, technical depth, novelty, and actionability. This score determines which model tier (if any) processes the post. The majority of posts never reach an LLM.
+
+This is not a temporary hack. It is an intentional product decision:
+- LLMs are reserved for posts that have already passed a quality gate
+- cost scales with signal quality, not with volume
+- scoring is reproducible and tunable without retraining
 
 ---
 
-## Выбор модели
+## Three Signal Value Layers
 
-### Три уровня
+Every signal is evaluated on three independent axes:
 
-| Тир | Модель (по умолчанию) | Когда используется | Стоимость |
+| Layer | Question | Driven by |
+|---|---|---|
+| **Global signal strength** | Is this objectively useful/novel content? | `scoring.yaml`, `channels.yaml` |
+| **Personal taste relevance** | Does this align with my current focus? | `profile.yaml` boost/downrank |
+| **Project relevance** | Does this affect what I am building? | `projects.yaml` focus keywords |
+
+A post can be globally important but personally irrelevant, or watch-tier globally but critical for a specific project. The weekly review surfaces all three layers explicitly.
+
+---
+
+## What You Receive
+
+After each weekly pipeline run, you get two things:
+
+**1. Telegram notification** (short)
+> 312 posts reviewed. 7 strong, 23 watch. Top signal: LLM inference optimization emerging as structural theme. 3 items relevant to gdev-agent.
+
+**2. Full review artifact** (10–15 min read)
+
+A structured readable document with:
+
+| Section | Content |
+|---|---|
+| Executive Summary | What ran, key numbers, dominant theme |
+| What Matters Now | Up to 5 strong signals with evidence and source links |
+| Decisions to Consider | Explicit action items derived from strong signals |
+| Project Action Queue | Per-project relevant signals and rationale |
+| Watch | Pending signals worth knowing, not urgent |
+| What Changed Since Last Week | Delta from previous review |
+| Ignore With Confidence | Noise count by topic — confirms nothing was missed |
+| Learning Edge | Topics recurring in strong/watch, not yet in any project focus |
+| Source Appendix | Full traceability — every signal linked back to its origin |
+
+Delivered as: a Telegraph article (target) or HTML file. Readable inside Telegram. Not a message blob.
+
+Full format specification: `docs/report_format.md`
+
+---
+
+## How Scoring Works
+
+```
+signal_score = Σ (dimension × weight)
+
+personal_interest  × 0.30   (topic match with profile.yaml boost/downrank)
+source_quality     × 0.20   (channel priority × relative view count)
+technical_depth    × 0.20   (code presence, links, word count)
+novelty            × 0.15   (how new vs. last 4 weeks)
+actionability      × 0.15   (implement / pattern / awareness / noise)
+```
+
+Buckets:
+- `strong` ≥ 0.75 → routed to Opus (STRONG_MODEL)
+- `watch` 0.45–0.74 → routed to Sonnet (MID_MODEL)
+- `cultural` — triggered by `cultural_keywords`, regardless of score → Haiku
+- `noise` < 0.45, no cultural keyword → filtered, no LLM
+
+Personalization: boost topics multiply score ×1.3 (cap 1.0), downrank ×0.5. Strong posts cannot be suppressed below watch threshold.
+
+---
+
+## Model Selection
+
+| Tier | Model | When | Cost (input/output per M tokens) |
 |---|---|---|---|
-| CHEAP | `claude-haiku-4-5-20251001` | noise / cultural посты, score < 0.45 | $0.80 / $4.00 per M tokens |
-| MID | `claude-sonnet-4-6` | watch посты, score 0.45–0.74 | $3.00 / $15.00 per M tokens |
-| STRONG | `claude-opus-4-6` | strong посты, synthesis, score ≥ 0.75 | $15.00 / $75.00 per M tokens |
+| CHEAP | `claude-haiku-4-5-20251001` | noise/cultural, score < 0.45 | $0.80 / $4.00 |
+| MID | `claude-sonnet-4-6` | watch, score 0.45–0.74 | $3.00 / $15.00 |
+| STRONG | `claude-opus-4-6` | strong, synthesis, score ≥ 0.75 | $15.00 / $75.00 |
 
-### Где твоё внимание
-
-**Если прогоны стоят слишком дорого:**
-- Проверь `python3 src/main.py cost-stats` — посмотри на долю STRONG вызовов
-- Если STRONG > 20% постов — пороговое значение `STRONG_THRESHOLD` (0.75) можно поднять через env var
-- Или понизь MID_MODEL на более дешёвую модель
-
-**Если качество Strong сигналов низкое:**
-- Скорее всего порог занижен — слишком много постов доходит до STRONG
-- Подними `STRONG_MODEL` (Opus) или убедись что scoring.yaml настроен правильно
-
-**Если хочешь сэкономить на тестах:**
+Override via env vars:
 ```bash
 export CHEAP_MODEL=claude-haiku-4-5-20251001
-export MID_MODEL=claude-haiku-4-5-20251001   # понизить MID до CHEAP
-export STRONG_MODEL=claude-sonnet-4-6         # понизить STRONG до MID
+export MID_MODEL=claude-sonnet-4-6
+export STRONG_MODEL=claude-opus-4-6
 ```
 
-**Рекомендация по умолчанию:** оставь дефолты. Haiku для фильтрации, Sonnet для watch, Opus только для strong сигналов и synthesis — это оптимальный баланс quality/cost при недельном прогоне.
+**When to adjust:**
+- If cost is too high: check `cost-stats`. If STRONG > 20% of calls, raise `strong.min_score` in `scoring.yaml`.
+- If quality is low: strong bucket may be too permissive — raise threshold or refine boost topics.
+- For testing/development: set MID_MODEL=Haiku, STRONG_MODEL=Sonnet to reduce cost.
 
-### Настройка через env vars
-
-```bash
-export CHEAP_MODEL=claude-haiku-4-5-20251001   # по умолчанию
-export MID_MODEL=claude-sonnet-4-6             # по умолчанию
-export STRONG_MODEL=claude-opus-4-6            # по умолчанию
-export AGENT_DB_PATH=/path/to/your/agent.db
-export ANTHROPIC_API_KEY=sk-ant-...
-```
+Recommended: leave defaults. They are optimized for a typical weekly run.
 
 ---
 
-## Персонализация
+## Configuration
 
-Редактируй `src/config/profile.yaml`:
-
+**`src/config/profile.yaml`** — personal taste layer
 ```yaml
-boost_topics:        # эти темы повышают score × 1.3 (cap 1.0)
+boost_topics:       # topics that raise score ×1.3
   - "AI agents"
   - "FastAPI"
-  - "cost control"
-
-downrank_topics:     # эти темы снижают score × 0.5
+downrank_topics:    # topics that lower score ×0.5
   - "crypto"
-  - "NFT"
   - "ChatGPT tips"
-
-downrank_sources:    # каналы с низким качеством сигнала
-  - "@NeuralShit"
+downrank_sources:   # low-signal channels
+  - "@SomeNoisyChannel"
 ```
 
-**Важно:** strong посты (score ≥ 0.75) не могут быть downranked ниже watch threshold (0.45). Система защищает объективно важные сигналы от подавления личными предпочтениями.
-
----
-
-## Проекты
-
-Редактируй `src/config/projects.yaml`:
-
+**`src/config/projects.yaml`** — project relevance
 ```yaml
 projects:
   - name: my-project
-    description: "Краткое описание"
-    focus: "ключевые слова через запятую, технологии, термины"
+    description: "What the project is"
+    focus: "specific keywords, technologies, patterns"
 ```
+Specificity matters: broader focus = more false positives.
 
-Чем конкретнее `focus` — тем точнее Project Relevance. Система ищет keyword overlap между постом и полем focus. Порог включения: score ≥ 0.3.
+**`src/config/scoring.yaml`** — scoring weights and thresholds. Edit to rebalance dimensions.
 
 ---
 
-## CLI команды
+## Operator Commands
 
 ```bash
-# Проверить состояние системы
-python3 src/main.py health-check
-
-# Посмотреть распределение постов по bucket
-python3 src/main.py score-stats
-
-# Посмотреть расходы на LLM по моделям
-python3 src/main.py cost-stats
-
-# Предпросмотр signal-first отчёта из текущей БД
-python3 src/main.py report-preview
+python3 src/main.py health-check      # DB connectivity + config file status
+python3 src/main.py score-stats       # bucket distribution from last run
+python3 src/main.py cost-stats        # LLM cost breakdown by model
+python3 src/main.py report-preview    # preview current signal report from DB
 ```
 
-### Пример: health-check
-
-```
-DB: /data/agent.db
-  posts: 312
-  scored_posts: 298
-  llm_usage rows: 47
-
-Config files:
-  profile.yaml: present
-  projects.yaml: present
-  scoring.yaml: present
-```
-
-### Пример: score-stats
-
-```
-strong: count=8 avg_signal_score=0.8300
-watch: count=41 avg_signal_score=0.5800
-cultural: count=12 avg_signal_score=0.3100
-noise: count=241 avg_signal_score=0.1500
-top_topics: llm_agents (12), fastapi (8), eval (6)
-```
-
-### Пример: cost-stats
-
-```
-total_cost_usd: 0.0183
-claude-opus-4-6: 3 calls | $0.0142
-claude-sonnet-4-6: 18 calls | $0.0038
-claude-haiku-4-5-20251001: 241 calls | $0.0003
-distinct days: 1
-```
+Operator workflow: `docs/operator_workflow.md`
 
 ---
 
-## Документация
+## Development Status
 
-- `docs/architecture.md` — компонентная карта, data flow, контракты слоёв
-- `docs/tasks.md` — Roadmap v2, все фазы и задачи
-- `docs/IMPLEMENTATION_CONTRACT.md` — правила для codex/implementer
-- `src/config/profile.yaml` — персонализация (boost/downrank)
-- `src/config/projects.yaml` — активные проекты
-- `src/config/scoring.yaml` — настройки scoring thresholds
+All 8 phases of Roadmap v2 complete (T29–T64). 83 tests. CI on every push.
+
+Active next direction: Phase 1 of the new roadmap — weekly report redesign toward the article artifact format defined in `docs/report_format.md`.
+
+Current roadmap: `docs/tasks.md`
 
 ---
 
-## Статус
+## Documentation
 
-Roadmap v2 реализован полностью (фазы 1–8, задачи T29–T64).
-Тестов: 83. CI: pytest на каждый push.
+| File | Role |
+|---|---|
+| `docs/architecture.md` | Component map, layer contracts, data model |
+| `docs/spec.md` | Technical decisions, runtime environment, data schema |
+| `docs/tasks.md` | Phased development roadmap |
+| `docs/report_format.md` | Weekly artifact structure and delivery spec |
+| `docs/operator_workflow.md` | Week-to-week operating guide, tuning reference |
+| `docs/IMPLEMENTATION_CONTRACT.md` | Rules for codex/implementer |
+| `src/config/profile.yaml` | Personal taste configuration |
+| `src/config/projects.yaml` | Active project definitions |
+| `src/config/scoring.yaml` | Scoring weights and thresholds |
