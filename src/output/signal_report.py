@@ -122,7 +122,7 @@ def _build_what_changed_lines(bucket_counts: Counter) -> list[str]:
     lines = []
     for bucket_name in ("strong", "watch", "noise"):
         current = int(bucket_counts.get(bucket_name, 0))
-        prior = int(previous.get(f"{bucket_name}_count", 0))
+        prior = int(previous.get(f"{bucket_name}_count") or 0)
         delta = current - prior
         delta_label = f"{delta:+d}"
         lines.append(f"{bucket_name}: {current} (was {prior}, {delta_label})")
