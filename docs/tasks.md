@@ -442,6 +442,20 @@ Package the intelligence system into a stable operator-facing product surface.
 - operators can inspect cost, routing, and quality metrics
 - the system is understandable without reading the code
 
+**Tasks**
+
+| ID | Task | Owner | Status | Depends On |
+|---|---|---|---|---|
+| T62 | Add `health-check` CLI subcommand: `python3 src/main.py health-check` — prints DB path, test DB connection, counts (posts, scored_posts, llm_usage rows), config files present (profile.yaml, projects.yaml, scoring.yaml) | codex | `[ ]` | T61 |
+| T63 | Add `report-preview` CLI subcommand: `python3 src/main.py report-preview --week YYYY-Www` — runs format_signal_report() on last 7 days of scored posts and prints to stdout; exits 0 even if no posts | codex | `[ ]` | T62 |
+| T64 | Update `README.md` operator section: document all CLI subcommands (score-stats, cost-stats, health-check, report-preview) with one-line description and example output | codex | `[ ]` | T63 |
+
+**Phase 8 Review Criteria**
+- `health-check` outputs DB stats and config presence without crashing
+- `report-preview` runs end-to-end and prints signal-first report to stdout
+- README documents all 4 CLI subcommands
+- 77+ tests passing
+
 ---
 
 ## 3. Phase Priorities

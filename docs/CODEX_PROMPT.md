@@ -6,9 +6,9 @@ _v2.2 · 2026-03-31 · telegram-research-agent_
 ## Current State
 
 - `Execution model`: Strategic Roadmap v2
-- `Current phase`: Phase 7 — Learning Layer Refinement
-- `Phase status`: IN PROGRESS — T59–T61 defined, starting implementation
-- `Baseline`: 75 passing tests (2026-03-31, after Phase 6 completion)
+- `Current phase`: Phase 8 — Productization / Surface Layer
+- `Phase status`: IN PROGRESS — T62–T64 defined, starting implementation
+- `Baseline`: 77 passing tests (2026-03-31, after Phase 7 completion)
 - `Ruff`: not enforced
 
 ## Completed Phases
@@ -19,10 +19,11 @@ _v2.2 · 2026-03-31 · telegram-research-agent_
 - **Phase 4**: Signal-First Output — T48–T51 done (signal_report.py, 6 sections, wired into generate_digest)
 - **Phase 5**: Project Relevance Upgrade — T52–T55 done (keyword scoring, Project Relevance section, project_relevance_score column)
 - **Phase 6**: Personalization — T56–T58 done (boost/downrank multipliers, strong floor, [personalized] tag in report)
+- **Phase 7**: Learning Layer — T59–T61 done (learning_layer.py, Learn section in signal report)
 
 ## Next Tasks
 
-Phase 7 — T59–T61 (see tasks.md Phase 7 task table). Start with T59 (learning_layer.py) and work in order.
+Phase 8 — T62–T64 (see tasks.md Phase 8 task table). Start with T62 (health-check CLI) and work in order.
 
 ## Fix Queue
 
