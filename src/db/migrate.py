@@ -1,6 +1,7 @@
 import logging
 import os
 import sqlite3
+from datetime import datetime
 from pathlib import Path
 
 
@@ -160,10 +161,32 @@ def run_migrations() -> Path:
             );
             """
         )
+        # Phase 3v3: feedback loop
+        connection.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS signal_feedback (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                post_id INTEGER NOT NULL,
+                feedback TEXT NOT NULL CHECK(feedback IN ('acted_on', 'skipped', 'marked_important')),
+                recorded_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_signal_feedback_post_id ON signal_feedback(post_id);
+            CREATE INDEX IF NOT EXISTS idx_signal_feedback_feedback ON signal_feedback(feedback);
+            """
+        )
         connection.commit()
 
     LOGGER.info("Database migrations complete")
     return db_path
+
+
+def record_feedback(connection: sqlite3.Connection, post_id: int, feedback: str) -> None:
+    recorded_at = datetime.utcnow().isoformat()
+    connection.execute(
+        "INSERT INTO signal_feedback (post_id, feedback, recorded_at) VALUES (?, ?, ?)",
+        (post_id, feedback, recorded_at),
+    )
+    connection.commit()
 
 
 def main() -> int:
