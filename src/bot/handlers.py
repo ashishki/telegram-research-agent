@@ -9,6 +9,7 @@ from urllib import error
 
 from bot.telegram_delivery import _send_text_internal, send_document, send_report_preview, send_text
 from config.settings import PROJECT_ROOT, Settings
+from db.migrate import record_feedback
 from output.generate_digest import _compute_week_label, run_digest
 from output.generate_answer import generate_answer
 from output.generate_insight import generate_insight
@@ -28,6 +29,8 @@ COMMAND_DOCS: dict[str, tuple[str, str]] = {
     "/costs": ("handle_costs", "Статистика затрат и производительности LLM"),
     "/run_digest": ("handle_run_digest", "Сгенерировать новый дайджест и рекомендации"),
     "/status": ("handle_status", "Краткий статус базы и пайплайна"),
+    "/mark_useful <post_id>": ("handle_mark_useful", "Отметить пост как полезный (acted_on)"),
+    "/mark_skipped <post_id>": ("handle_mark_skipped", "Отметить пост как пропущенный (skipped)"),
 }
 
 
@@ -461,6 +464,38 @@ def handle_status(chat_id: str, args: str, settings: Settings) -> None:
     send_message(_get_bot_token(), chat_id, message, parse_mode=None)
 
 
+def _handle_mark_feedback(chat_id: str, args: str, settings: Settings, feedback_value: str) -> None:
+    post_id_str = args.strip().split()[0] if args.strip() else ""
+    if not post_id_str.isdigit() or int(post_id_str) <= 0:
+        send_message(
+            _get_bot_token(),
+            chat_id,
+            f"Usage: /mark_{'useful' if feedback_value == 'acted_on' else 'skipped'} <post_id>",
+            parse_mode=None,
+        )
+        return
+    post_id = int(post_id_str)
+    try:
+        with _with_db(settings) as connection:
+            record_feedback(connection, post_id, feedback_value)
+        send_message(
+            _get_bot_token(),
+            chat_id,
+            f"Feedback recorded: {feedback_value} for post {post_id}",
+            parse_mode=None,
+        )
+    except Exception as exc:
+        send_message(_get_bot_token(), chat_id, f"Failed to record feedback: {exc}", parse_mode=None)
+
+
+def handle_mark_useful(chat_id: str, args: str, settings: Settings) -> None:
+    _handle_mark_feedback(chat_id, args, settings, "acted_on")
+
+
+def handle_mark_skipped(chat_id: str, args: str, settings: Settings) -> None:
+    _handle_mark_feedback(chat_id, args, settings, "skipped")
+
+
 HANDLERS: dict[str, Callable[[str, str, Settings], None]] = {
     "/start": handle_start,
     "/digest": handle_digest,
@@ -472,6 +507,8 @@ HANDLERS: dict[str, Callable[[str, str, Settings], None]] = {
     "/costs": handle_costs,
     "/run_digest": handle_run_digest,
     "/status": handle_status,
+    "/mark_useful": handle_mark_useful,
+    "/mark_skipped": handle_mark_skipped,
 }
 
 
