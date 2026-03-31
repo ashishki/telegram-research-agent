@@ -6,11 +6,13 @@ from pathlib import Path
 
 import yaml
 
+from output.personalize import apply_personalization
 from output.project_relevance import score_project_relevance
 
 
 LOGGER = logging.getLogger(__name__)
 PROJECTS_YAML_PATH = Path(__file__).resolve().parents[1] / "config" / "projects.yaml"
+PROFILE_YAML_PATH = Path(__file__).resolve().parents[1] / "config" / "profile.yaml"
 
 _STOPWORDS = {
     "a",
@@ -46,6 +48,15 @@ def _load_projects() -> list[dict] | None:
         return None
     projects = data.get("projects", [])
     return [project for project in projects if isinstance(project, dict)]
+
+
+def _load_profile() -> dict | None:
+    try:
+        data = yaml.safe_load(PROFILE_YAML_PATH.read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError):
+        LOGGER.warning("Failed to load profile config from %s", PROFILE_YAML_PATH, exc_info=True)
+        return None
+    return data if isinstance(data, dict) else {}
 
 
 def _truncate_words(text: str | None, limit: int) -> str:
@@ -101,27 +112,43 @@ def _derive_noise_topics(posts: list[dict]) -> str:
 
 
 def format_signal_report(posts: list[dict], settings) -> str:
-    strong_posts = sorted(
-        [post for post in posts if post.get("bucket") == "strong"],
+    indexed_posts = [
+        {
+            **post,
+            "_original_position": index,
+        }
+        for index, post in enumerate(posts)
+    ]
+    original_sorted_posts = sorted(
+        indexed_posts,
         key=lambda post: float(post.get("signal_score") or 0.0),
         reverse=True,
     )
-    watch_posts = sorted(
-        [post for post in posts if post.get("bucket") == "watch"],
-        key=lambda post: float(post.get("signal_score") or 0.0),
-        reverse=True,
-    )
-    cultural_posts = [post for post in posts if post.get("bucket") == "cultural"]
-    noise_posts = [post for post in posts if post.get("bucket") == "noise"]
+    original_rank_by_id = {
+        post.get("_original_position"): rank for rank, post in enumerate(original_sorted_posts)
+    }
+
+    profile = _load_profile()
+    ranked_posts = apply_personalization(indexed_posts, profile) if profile is not None else list(original_sorted_posts)
+    personalized_rank_by_id = {
+        post.get("_original_position"): rank for rank, post in enumerate(ranked_posts)
+    }
+
+    strong_posts = [post for post in ranked_posts if post.get("bucket") == "strong"]
+    watch_posts = [post for post in ranked_posts if post.get("bucket") == "watch"]
+    cultural_posts = [post for post in ranked_posts if post.get("bucket") == "cultural"]
+    noise_posts = [post for post in ranked_posts if post.get("bucket") == "noise"]
 
     strong_lines = [
         f"- [score={float(post.get('signal_score') or 0.0):.2f}] "
         f"[model={post.get('routed_model') or 'unknown'}] "
+        f"{'[personalized] ' if original_rank_by_id.get(post.get('_original_position')) != personalized_rank_by_id.get(post.get('_original_position')) else ''}"
         f"{_truncate_words(post.get('content'), 20)}"
         for post in strong_posts
     ]
     watch_lines = [
         f"- [score={float(post.get('signal_score') or 0.0):.2f}] "
+        f"{'[personalized] ' if original_rank_by_id.get(post.get('_original_position')) != personalized_rank_by_id.get(post.get('_original_position')) else ''}"
         f"{_truncate_words(post.get('content'), 20)}"
         for post in watch_posts
     ]
