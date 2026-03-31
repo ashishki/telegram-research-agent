@@ -36,22 +36,42 @@ def _tokenize(text: str) -> set[str]:
     }
 
 
+def _get_project_keywords(project: dict) -> list[str]:
+    """Return explicit keyword list or fall back to tokenizing focus string."""
+    keywords = project.get("keywords")
+    if isinstance(keywords, list) and keywords:
+        return [str(k).strip().lower() for k in keywords if str(k).strip()]
+    focus = str(project.get("focus") or "")
+    description = str(project.get("description") or "")
+    return list(_tokenize(f"{description} {focus}"))
+
+
 def score_project_relevance(post_content: str, projects: list[dict]) -> list[dict]:
-    post_keywords = _tokenize(post_content or "")
+    post_tokens = _tokenize(post_content or "")
     results: list[dict] = []
 
     for project in projects:
         name = str(project.get("name") or "")
-        description = str(project.get("description") or "")
-        focus = str(project.get("focus") or "")
-        project_keywords = _tokenize(f"{description} {focus}")
-        overlap_keywords = sorted(post_keywords & project_keywords)
-        score = min(len(overlap_keywords) / max(len(project_keywords), 1), 1.0)
+        project_keywords = _get_project_keywords(project)
+        project_token_set = set(project_keywords)
 
-        if score > 0:
+        overlap_keywords = sorted(post_tokens & project_token_set)
+        score = min(len(overlap_keywords) / max(len(project_token_set), 1), 1.0)
+
+        if overlap_keywords:
             rationale = f"Matches: {', '.join(overlap_keywords[:3])}"
         else:
             rationale = "No keyword overlap"
+
+        # Apply exclude_keywords suppression
+        exclude_keywords = project.get("exclude_keywords")
+        if isinstance(exclude_keywords, list) and exclude_keywords and overlap_keywords:
+            for excl in exclude_keywords:
+                excl_token = str(excl).strip().lower()
+                if excl_token and excl_token in post_tokens:
+                    score = 0.05
+                    rationale = f"{rationale}; excluded: {excl_token}"
+                    break
 
         results.append(
             {
