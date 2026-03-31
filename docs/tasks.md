@@ -205,6 +205,25 @@ Introduce cost-aware multi-model routing so only high-value items reach expensiv
 - cost per run drops or stays bounded while preserving output quality
 - routed subsets remain interpretable and reviewable
 
+**Tasks**
+
+| ID | Task | Owner | Status | Depends On |
+|---|---|---|---|---|
+| T42 | Fix CODE-10: guard `signal_score=None` in `router.py` — emit `LOGGER.warning` and return CHEAP_MODEL instead of silently coercing to 0.0 | codex | `[ ]` | T41 |
+| T43 | Wire per-post routing: `score_posts()` calls `route("per_post", signal_score=...)` and stores result in new `routed_model TEXT` column in `posts` (idempotent migration) | codex | `[ ]` | T42 |
+| T44 | Populate `llm_usage` table after each LLM call in `client.py`: insert row with `model`, `task_type`, `input_tokens`, `output_tokens`, `est_cost_usd`, `called_at` (idempotent migration) | codex | `[ ]` | T43 |
+| T45 | Add `cost-stats` CLI subcommand: `python3 src/main.py cost-stats` — prints total cost, cost by model, number of runs from `llm_usage` table | codex | `[ ]` | T44 |
+| T46 | Fix ARCH-1: add `complete_vision()` in `src/llm/client.py` with same retry wrapper as `complete()`; route `src/llm/vision.py` through it instead of calling Anthropic directly | codex | `[ ]` | T43 |
+| T47 | Fix ARCH-2: extract `handle_ask` business logic from `src/bot/handlers.py` to `src/output/generate_answer.py`; handler calls `generate_answer()` | codex | `[ ]` | T46 |
+
+**Phase 3 Review Criteria**
+- `route("per_post", signal_score=None)` returns CHEAP_MODEL with a warning (not silent coercion)
+- `posts` table has `routed_model` column populated after `score_posts()`
+- `llm_usage` table is populated after LLM calls; `cost-stats` CLI works on empty and non-empty DB
+- `vision.py` routes through `complete_vision()` retry wrapper
+- `handle_ask` business logic is in `generate_answer.py`
+- 54+ tests passing
+
 ---
 
 ## Phase 4 — Signal-First Output

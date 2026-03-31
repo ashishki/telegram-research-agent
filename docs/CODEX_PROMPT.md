@@ -1,23 +1,24 @@
 # CODEX_PROMPT — Session Handoff
-_v2.1 · 2026-03-30 · telegram-research-agent_
+_v2.2 · 2026-03-31 · telegram-research-agent_
 
 ---
 
 ## Current State
 
 - `Execution model`: Strategic Roadmap v2
-- `Current phase`: Phase 1 — Baseline Stabilization
-- `Phase status`: STOP-SHIP — CODE-12 (P1) must be resolved before next production digest run
-- `Baseline`: 44 passing tests (locked Cycle 3 baseline, 2026-03-30)
+- `Current phase`: Phase 3 — Model Routing
+- `Phase status`: IN PROGRESS — T42–T47 defined, starting implementation
+- `Baseline`: 54 passing tests (2026-03-31, after Phase 2 completion)
 - `Ruff`: not enforced
 
-## Next Task
+## Completed Phases
 
-Resolve T35 (CODE-12, P1): add `time.sleep(1)` between digest send and insights send in `src/output/generate_digest.py` (between lines 534 and 539), and add a test asserting the sleep is called between the two `send_text` dispatches.
+- **Phase 1**: Baseline stabilization, CODE-12 fix (sleep between sends), conftest.py, CI switched to pytest — T29–T35 done
+- **Phase 2**: Scoring Foundation — T36–T41 done (score_run_id, scored_at, score_breakdown, score-stats CLI, MID tier tests, dead import removed)
 
-After T35 is merged and green: resume Phase 1 baseline stabilization packet — documentation/runtime reconciliation, architecture.md update (ARCH-3), spec.md section 19 update (ARCH-5), spec.md quality_metrics note update (ARCH-7).
+## Next Tasks
 
-Must not include Phase 2+ work until Phase 1 exit conditions are satisfied.
+Phase 3 — T42–T47 (see tasks.md Phase 3 task table). Start with T42 (CODE-10 guard) and work in order.
 
 ## Fix Queue
 
