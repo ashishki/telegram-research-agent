@@ -55,12 +55,12 @@ Phase 8 — T62–T64 (see tasks.md Phase 8 task table). Start with T62 (health-
 
 | ID | Sev | Description | Status |
 |----|-----|-------------|--------|
-| CODE-12 | P1 | No sleep between digest and insights Telegram sends; 429 silently dropped | OPEN — stop-ship |
+| CODE-12 | P1 | No sleep between digest and insights Telegram sends; 429 silently dropped | RESOLVED |
 | CODE-9 | P2 | `test_router.py` missing MID tier and WATCH_THRESHOLD boundary tests | OPEN |
 | CODE-10 | P2 | `route()` silently coerces `signal_score=None` to 0.0 | OPEN |
-| CODE-11 | P2 | Dead import `generate_recommendations` in `handlers.py:15` | OPEN |
-| ARCH-1 | P2 | `vision.py` bypasses `complete()` retry wrapper | OPEN |
-| ARCH-2 | P2 | `handle_ask` embeds business logic in bot handler | OPEN |
+| CODE-11 | P2 | Dead import `generate_recommendations` in `handlers.py:15` | RESOLVED |
+| ARCH-1 | P2 | `vision.py` bypasses `complete()` retry wrapper | RESOLVED |
+| ARCH-2 | P2 | `handle_ask` embeds business logic in bot handler | RESOLVED |
 | ARCH-NEW-1 | P2 | Per-post routing unwired; needs Phase 3 pre-wiring label | OPEN |
 | CODE-13 | P3 | Word-count gate tests are tautological | OPEN |
 | CODE-14 | P3 | Unknown model falls back silently to haiku rates | OPEN |
