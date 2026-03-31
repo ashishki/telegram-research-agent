@@ -1,4 +1,7 @@
 import unittest
+from unittest.mock import patch
+
+import yaml
 
 from output.signal_report import format_signal_report
 
@@ -65,6 +68,34 @@ class TestSignalReport(unittest.TestCase):
         report = format_signal_report(posts, settings=None)
 
         self.assertLess(report.index("higher priority strong"), report.index("lower priority strong"))
+
+    def test_project_relevance_section_shows_matches_above_threshold(self):
+        posts = [
+            {
+                "id": 1,
+                "content": "Multi tenant AI triage service FastAPI Redis cost control async",
+                "signal_score": 0.85,
+                "bucket": "strong",
+                "routed_model": "claude-opus-4-6",
+                "score_breakdown": "{}",
+            }
+        ]
+
+        report = format_signal_report(posts, settings=None)
+
+        self.assertIn("## Project Relevance", report)
+        self.assertIn("[gdev-agent]", report)
+        self.assertIn("(score=", report)
+
+    def test_project_relevance_skips_section_when_projects_config_fails(self):
+        posts = [
+            {"id": 1, "content": "FastAPI async cost control", "signal_score": 0.85, "bucket": "strong", "routed_model": "m1", "score_breakdown": "{}"}
+        ]
+
+        with patch("output.signal_report.yaml.safe_load", side_effect=yaml.YAMLError("invalid yaml")):
+            report = format_signal_report(posts, settings=None)
+
+        self.assertNotIn("## Project Relevance", report)
 
 
 if __name__ == "__main__":

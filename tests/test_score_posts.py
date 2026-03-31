@@ -293,6 +293,17 @@ class TestScorePostsPersistence(unittest.TestCase):
         self.assertIsNotNone(row[0])
         self.assertTrue(row[0])
 
+    def test_score_posts_sets_project_relevance_score(self):
+        score_posts(self.settings, since_days=7)
+
+        with sqlite3.connect(self.db_path) as connection:
+            row = connection.execute(
+                "SELECT project_relevance_score FROM posts WHERE id = 1"
+            ).fetchone()
+
+        self.assertIsNotNone(row[0])
+        self.assertGreaterEqual(row[0], 0.0)
+
 
 class TestBucketDistributionEvals(unittest.TestCase):
     STRONG_THRESHOLD = 0.75

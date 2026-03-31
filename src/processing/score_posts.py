@@ -21,12 +21,14 @@ import yaml
 
 from config.settings import PROJECT_ROOT, Settings
 from llm.router import route
+from output.project_relevance import score_project_relevance
 
 
 LOGGER = logging.getLogger(__name__)
 CONFIG_DIR = PROJECT_ROOT / "src" / "config"
 SCORING_PATH = CONFIG_DIR / "scoring.yaml"
 PROFILE_PATH = CONFIG_DIR / "profile.yaml"
+PROJECTS_PATH = CONFIG_DIR / "projects.yaml"
 
 
 # ---------------------------------------------------------------------------
@@ -42,6 +44,12 @@ def _load_config() -> tuple[dict, dict]:
     scoring = _load_yaml(SCORING_PATH)
     profile = _load_yaml(PROFILE_PATH)
     return scoring, profile
+
+
+def _load_projects() -> list[dict]:
+    data = _load_yaml(PROJECTS_PATH)
+    projects = data.get("projects", [])
+    return [project for project in projects if isinstance(project, dict)]
 
 
 # ---------------------------------------------------------------------------
@@ -326,6 +334,11 @@ def score_posts(
     Returns a summary dict with bucket counts and avg score.
     """
     scoring_cfg, profile_cfg = _load_config()
+    try:
+        projects = _load_projects()
+    except Exception:
+        LOGGER.warning("Failed to load projects config from %s", PROJECTS_PATH, exc_info=True)
+        projects = []
 
     weights = scoring_cfg.get("weights", {})
     channel_priority_weights = scoring_cfg.get("channel_priority_weights", {"high": 1.0, "medium": 0.6, "low": 0.2})
@@ -378,7 +391,7 @@ def score_posts(
         topic_history = _fetch_topic_history(conn, lookback_weeks)
         channel_max_views = _fetch_channel_max_views(conn, since_days)
 
-        scored_rows: list[tuple[float, str, str, str, str, str, int]] = []
+        scored_rows: list[tuple[float, str, float, str, str, str, str, int]] = []
 
         for post in posts:
             try:
@@ -441,6 +454,11 @@ def score_posts(
                     bucket = "noise"
 
                 routed_model = route("per_post", signal_score=signal_score)
+                project_matches = score_project_relevance(content, projects)
+                project_relevance_score = max(
+                    (float(match.get("score") or 0.0) for match in project_matches),
+                    default=0.0,
+                )
                 score_breakdown = json.dumps(
                     {
                         "recency": d_recency,
@@ -451,7 +469,16 @@ def score_posts(
                     }
                 )
                 scored_rows.append(
-                    (signal_score, bucket, routed_model, score_run_id, scored_at, score_breakdown, post_id)
+                    (
+                        signal_score,
+                        bucket,
+                        project_relevance_score,
+                        routed_model,
+                        score_run_id,
+                        scored_at,
+                        score_breakdown,
+                        post_id,
+                    )
                 )
                 summary["scored"] += 1
 
@@ -464,8 +491,8 @@ def score_posts(
         conn.execute("BEGIN")
         conn.executemany(
             (
-                "UPDATE posts SET signal_score = ?, bucket = ?, routed_model = ?, score_run_id = ?, "
-                "scored_at = ?, score_breakdown = ? WHERE id = ?"
+                "UPDATE posts SET signal_score = ?, bucket = ?, project_relevance_score = ?, "
+                "routed_model = ?, score_run_id = ?, scored_at = ?, score_breakdown = ? WHERE id = ?"
             ),
             scored_rows,
         )
@@ -474,7 +501,7 @@ def score_posts(
     # Apply per-bucket caps: re-cap at max items by downgrading extras to noise
     # (cap enforcement is done at digest-generation time, not here — we store raw scores)
     # Count buckets for summary
-    for _, bucket, _, _, _, _, _ in scored_rows:
+    for _, bucket, _, _, _, _, _, _ in scored_rows:
         summary[bucket] = summary.get(bucket, 0) + 1
 
     avg_score = (

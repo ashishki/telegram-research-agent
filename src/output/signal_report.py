@@ -1,7 +1,16 @@
 import json
+import logging
 import re
 from collections import Counter
+from pathlib import Path
 
+import yaml
+
+from output.project_relevance import score_project_relevance
+
+
+LOGGER = logging.getLogger(__name__)
+PROJECTS_YAML_PATH = Path(__file__).resolve().parents[1] / "config" / "projects.yaml"
 
 _STOPWORDS = {
     "a",
@@ -27,6 +36,16 @@ _STOPWORDS = {
     "to",
     "with",
 }
+
+
+def _load_projects() -> list[dict] | None:
+    try:
+        data = yaml.safe_load(PROJECTS_YAML_PATH.read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError):
+        LOGGER.warning("Failed to load projects config from %s", PROJECTS_YAML_PATH, exc_info=True)
+        return None
+    projects = data.get("projects", [])
+    return [project for project in projects if isinstance(project, dict)]
 
 
 def _truncate_words(text: str | None, limit: int) -> str:
@@ -123,6 +142,21 @@ def format_signal_report(posts: list[dict], settings) -> str:
         ),
     ]
 
+    project_relevance_lines: list[str] = []
+    projects = _load_projects()
+    if projects is not None:
+        for post in strong_posts + watch_posts:
+            matches = score_project_relevance(post.get("content", ""), projects)
+            for match in matches:
+                if float(match.get("score") or 0.0) < 0.3:
+                    continue
+                project_relevance_lines.append(
+                    f"- [{match.get('name')}] (score={float(match.get('score') or 0.0):.2f}): "
+                    f"{match.get('rationale')} — {_truncate_words(post.get('content'), 10)}"
+                )
+        if not project_relevance_lines:
+            project_relevance_lines.append("No project matches above threshold.")
+
     sections = [
         "## Strong Signals",
         *strong_lines,
@@ -142,4 +176,12 @@ def format_signal_report(posts: list[dict], settings) -> str:
         "## Stats",
         *stats_lines,
     ]
+    if projects is not None:
+        sections.extend(
+            [
+                "",
+                "## Project Relevance",
+                *project_relevance_lines,
+            ]
+        )
     return "\n".join(sections).strip() + "\n"

@@ -120,6 +120,7 @@ def run_migrations() -> Path:
             "ALTER TABLE posts ADD COLUMN signal_score REAL",
             "ALTER TABLE posts ADD COLUMN bucket TEXT",
             "ALTER TABLE posts ADD COLUMN project_matches TEXT",
+            "ALTER TABLE posts ADD COLUMN project_relevance_score REAL",
             "ALTER TABLE posts ADD COLUMN interpretation TEXT",
             "ALTER TABLE posts ADD COLUMN score_run_id TEXT",
             "ALTER TABLE posts ADD COLUMN scored_at TEXT",
