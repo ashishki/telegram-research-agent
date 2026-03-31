@@ -397,6 +397,20 @@ Convert recurring validated signals into focused learning guidance.
 - learning outputs are sparse, concrete, and linked to validated signals
 - recommendations are clearly downstream of project and personal context
 
+**Tasks**
+
+| ID | Task | Owner | Status | Depends On |
+|---|---|---|---|---|
+| T59 | Create `src/output/learning_layer.py` with `extract_learning_gaps(posts, projects) -> list[dict]` — finds recurring strong/watch topics not yet in any project's focus, returns list of `{topic, frequency, rationale, linked_project}` (max 5 items); no LLM call | codex | `[ ]` | T58 |
+| T60 | Add `## Learn` section to `signal_report.py` — render top 3 learning gaps from extract_learning_gaps(); format: "- <topic> (seen N times) → <rationale>"; if no gaps: "No new learning gaps identified." | codex | `[ ]` | T59 |
+| T61 | 2 tests in `tests/test_learning_layer.py`: (a) 5 posts with same topic not in any project focus → gap returned with frequency=5; (b) topic already in a project focus → NOT returned as gap | codex | `[ ]` | T59 |
+
+**Phase 7 Review Criteria**
+- `extract_learning_gaps()` only surfaces topics NOT in any project focus
+- Frequency counted correctly across posts
+- Learn section appears in signal report with max 3 items
+- 75+ tests passing
+
 ---
 
 ## Phase 8 — Productization / Surface Layer

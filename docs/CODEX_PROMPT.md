@@ -6,9 +6,9 @@ _v2.2 · 2026-03-31 · telegram-research-agent_
 ## Current State
 
 - `Execution model`: Strategic Roadmap v2
-- `Current phase`: Phase 6 — Personalization / Taste Model
-- `Phase status`: IN PROGRESS — T56–T58 defined, starting implementation
-- `Baseline`: 72 passing tests (2026-03-31, after Phase 5 completion)
+- `Current phase`: Phase 7 — Learning Layer Refinement
+- `Phase status`: IN PROGRESS — T59–T61 defined, starting implementation
+- `Baseline`: 75 passing tests (2026-03-31, after Phase 6 completion)
 - `Ruff`: not enforced
 
 ## Completed Phases
@@ -18,10 +18,11 @@ _v2.2 · 2026-03-31 · telegram-research-agent_
 - **Phase 3**: Model Routing — T42–T47 done (None guard, routed_model in posts, llm_usage table, cost-stats CLI, complete_vision retry, generate_answer extracted)
 - **Phase 4**: Signal-First Output — T48–T51 done (signal_report.py, 6 sections, wired into generate_digest)
 - **Phase 5**: Project Relevance Upgrade — T52–T55 done (keyword scoring, Project Relevance section, project_relevance_score column)
+- **Phase 6**: Personalization — T56–T58 done (boost/downrank multipliers, strong floor, [personalized] tag in report)
 
 ## Next Tasks
 
-Phase 6 — T56–T58 (see tasks.md Phase 6 task table). Start with T56 (personalize.py) and work in order.
+Phase 7 — T59–T61 (see tasks.md Phase 7 task table). Start with T59 (learning_layer.py) and work in order.
 
 ## Fix Queue
 
