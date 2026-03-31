@@ -477,6 +477,17 @@ def _handle_mark_feedback(chat_id: str, args: str, settings: Settings, feedback_
     post_id = int(post_id_str)
     try:
         with _with_db(settings) as connection:
+            exists = connection.execute(
+                "SELECT 1 FROM posts WHERE id = ? LIMIT 1", (post_id,)
+            ).fetchone()
+            if exists is None:
+                send_message(
+                    _get_bot_token(),
+                    chat_id,
+                    f"Post {post_id} not found.",
+                    parse_mode=None,
+                )
+                return
             record_feedback(connection, post_id, feedback_value)
         send_message(
             _get_bot_token(),
