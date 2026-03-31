@@ -1,27 +1,33 @@
 # Telegram Research Agent — System Specification
 
-**Version:** 2.0.0
-**Date:** 2026-03-30
-**Status:** Strategic roadmap v2 aligned
+**Version:** 3.0
+**Date:** 2026-03-31
+**Status:** Active
 
 ---
 
-## 1. Executive Summary
+## 1. What This System Is
 
-The Telegram Research Agent is a private, server-side personal intelligence system that ingests posts from curated Telegram technology channels, structures the raw stream into persistent knowledge artifacts, and surfaces actionable outputs:
+The Telegram Research Agent is a personal research intelligence pipeline. It runs on a private VPS, has no public endpoints, and is designed for a single owner.
 
-- Signal-first intelligence reports (what matters, what is relevant, what can be ignored)
-- Study recommendations (what to learn next)
-- Topic clusters (recurring themes over time)
-- Project insight mappings (connections to ongoing work)
-- Experiment proposals (ideas worth prototyping)
+It is not a digest bot, not a summarizer, and not a generic Telegram LLM wrapper.
 
-The system runs on a private VPS. There are no public-facing endpoints. LLM calls go through the `anthropic` Python SDK using `LLM_API_KEY` from the environment. The pipeline is deterministic except where LLM interpretation is explicitly invoked.
+Its function: ingest posts from curated Telegram channels, score them deterministically, route only high-value items to appropriate LLM tiers, apply personal taste and project relevance filters, and produce a structured weekly review artifact that supports real decisions.
 
-### Legacy Bridge
+**Primary output:** a readable weekly review article delivered via Telegram — not a message blob, but a structured document with sections, source links, and decision-relevant framing. See `docs/report_format.md` for the full artifact specification.
 
-Legacy implementation phases remain valid as delivery history and audit context.
-Active forward development now follows `Strategic Roadmap v2` in `docs/tasks.md`, which restarts phase numbering at `Phase 1` for the new strategic sequence.
+**Core mechanism:** deterministic scoring before any LLM call. The `signal_score` is computed without LLMs from five weighted dimensions. This score controls routing. The majority of posts never reach an LLM. This is a product decision, not a cost optimization: it keeps the system auditable, reproducible, and tunable without retraining.
+
+**Three signal value layers every post carries:**
+- `signal_score` — global signal strength (deterministic, 0–1)
+- personalized adjustment — taste relevance via boost/downrank from `profile.yaml`
+- `project_relevance_score` — keyword-based relevance to active projects from `projects.yaml`
+
+The system runs on a private VPS. LLM calls use the `anthropic` Python SDK with `LLM_API_KEY` from the environment.
+
+### Development History Note
+
+Legacy phases (Phase 1–20 in the original numbering) are preserved as implementation history. The current active roadmap is in `docs/tasks.md`.
 
 ---
 
@@ -258,10 +264,15 @@ Normalized, processed view of `raw_posts`.
 | language_detected | TEXT | en/ru/other |
 | word_count | INTEGER | |
 | normalized_at | DATETIME | |
-| signal_score | REAL | Composite score 0.0–1.0; written by score_posts.py (Phase 19) |
-| bucket | TEXT | `strong`, `watch`, `cultural`, or `noise` (Phase 19) |
-| project_matches | TEXT | JSON list of matching project names (Phase 19) |
-| interpretation | TEXT | Free-text scoring rationale (Phase 19) |
+| signal_score | REAL | Composite score 0.0–1.0; written by score_posts.py |
+| bucket | TEXT | `strong`, `watch`, `cultural`, or `noise` |
+| project_matches | TEXT | JSON list of matching project names |
+| interpretation | TEXT | Free-text scoring rationale |
+| score_breakdown | TEXT | JSON with per-dimension scores: recency, engagement, topic_relevance, source_quality, novelty |
+| score_run_id | TEXT | UUID of the scoring run that set this score |
+| scored_at | TEXT | UTC ISO timestamp of when scoring ran |
+| routed_model | TEXT | Model tier selected by router.py for this post |
+| project_relevance_score | REAL | Max keyword overlap score across all active projects (0.0–1.0) |
 
 ---
 
@@ -336,9 +347,9 @@ Normalized, processed view of `raw_posts`.
 
 ---
 
-### Table: `quality_metrics` — added Phase 19
+### Table: `quality_metrics`
 
-Observability table for per-week scoring statistics. Created by migration (Phase 19); population is a future step.
+Observability table for per-week scoring statistics. Populated by `_store_quality_metrics()` in `generate_digest.py` after each digest run.
 
 | Column | Type | Notes |
 |---|---|---|
