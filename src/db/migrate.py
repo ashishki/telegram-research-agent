@@ -63,18 +63,32 @@ def run_migrations() -> Path:
             """
             CREATE TABLE IF NOT EXISTS llm_usage (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                called_at TEXT NOT NULL,
-                category TEXT NOT NULL,
                 model TEXT NOT NULL,
+                task_type TEXT,
                 input_tokens INTEGER NOT NULL DEFAULT 0,
                 output_tokens INTEGER NOT NULL DEFAULT 0,
+                est_cost_usd REAL NOT NULL DEFAULT 0.0,
+                called_at TEXT NOT NULL,
+                category TEXT,
                 cost_usd REAL NOT NULL DEFAULT 0.0,
                 duration_ms INTEGER NOT NULL DEFAULT 0
             );
             CREATE INDEX IF NOT EXISTS idx_llm_usage_called_at ON llm_usage(called_at);
             CREATE INDEX IF NOT EXISTS idx_llm_usage_category ON llm_usage(category);
+            CREATE INDEX IF NOT EXISTS idx_llm_usage_task_type ON llm_usage(task_type);
             """
         )
+        for stmt in [
+            "ALTER TABLE llm_usage ADD COLUMN task_type TEXT",
+            "ALTER TABLE llm_usage ADD COLUMN est_cost_usd REAL NOT NULL DEFAULT 0.0",
+            "ALTER TABLE llm_usage ADD COLUMN category TEXT",
+            "ALTER TABLE llm_usage ADD COLUMN cost_usd REAL NOT NULL DEFAULT 0.0",
+            "ALTER TABLE llm_usage ADD COLUMN duration_ms INTEGER NOT NULL DEFAULT 0",
+        ]:
+            try:
+                connection.execute(stmt)
+            except sqlite3.OperationalError:
+                pass
         connection.executescript(
             """
             CREATE TABLE IF NOT EXISTS study_plans (
@@ -110,6 +124,7 @@ def run_migrations() -> Path:
             "ALTER TABLE posts ADD COLUMN score_run_id TEXT",
             "ALTER TABLE posts ADD COLUMN scored_at TEXT",
             "ALTER TABLE posts ADD COLUMN score_breakdown TEXT",
+            "ALTER TABLE posts ADD COLUMN routed_model TEXT",
         ]:
             try:
                 connection.execute(stmt)

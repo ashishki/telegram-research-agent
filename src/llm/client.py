@@ -1,6 +1,8 @@
 import json
 import logging
+import mimetypes
 import os
+import sqlite3
 import time
 from typing import Any
 
@@ -44,24 +46,40 @@ def set_usage_db_path(path: str) -> None:
     _usage_db_path = path
 
 
-def _record_usage(category: str, model: str, input_tokens: int, output_tokens: int, duration_ms: int) -> None:
-    if not _usage_db_path:
+def _resolve_usage_db_path() -> str:
+    return os.environ.get("AGENT_DB_PATH", "").strip()
+
+
+def _record_usage(task_type: str, model: str, input_tokens: int, output_tokens: int, duration_ms: int) -> None:
+    db_path = _resolve_usage_db_path()
+    if not db_path:
         return
 
     cost = estimate_cost_usd(model=model, input_tokens=input_tokens, output_tokens=output_tokens)
     try:
-        import sqlite3
         from datetime import datetime, timezone
 
         now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-        with sqlite3.connect(_usage_db_path) as conn:
+        with sqlite3.connect(db_path) as conn:
             conn.execute(
                 (
                     "INSERT INTO llm_usage "
-                    "(called_at, category, model, input_tokens, output_tokens, cost_usd, duration_ms) "
-                    "VALUES (?,?,?,?,?,?,?)"
+                    "("
+                    "called_at, model, task_type, input_tokens, output_tokens, est_cost_usd, "
+                    "category, cost_usd, duration_ms"
+                    ") VALUES (?,?,?,?,?,?,?,?,?)"
                 ),
-                (now, category, model, input_tokens, output_tokens, round(cost, 8), duration_ms),
+                (
+                    now,
+                    model,
+                    task_type,
+                    input_tokens,
+                    output_tokens,
+                    round(cost, 8),
+                    task_type,
+                    round(cost, 8),
+                    duration_ms,
+                ),
             )
     except Exception:
         LOGGER.warning("Failed to record LLM usage", exc_info=True)
@@ -165,6 +183,79 @@ def complete(
             time.sleep(delay)
 
 
+def complete_vision(prompt: str, image_path: str, model: str | None = None) -> str:
+    client = _get_client()
+    selected_model = model or _get_model("photo_analysis")
+    attempt = 0
+    media_type = mimetypes.guess_type(image_path)[0] or "image/jpeg"
+
+    with open(image_path, "rb") as image_file:
+        image_payload = image_file.read()
+
+    while True:
+        attempt += 1
+        start_time = time.time()
+        try:
+            LOGGER.debug(
+                "Anthropic vision request model=%s image_path=%s attempt=%s",
+                selected_model,
+                image_path,
+                attempt,
+            )
+            response = client.messages.create(
+                model=selected_model,
+                max_tokens=150,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": media_type,
+                                    "data": __import__("base64").standard_b64encode(image_payload).decode("utf-8"),
+                                },
+                            },
+                            {"type": "text", "text": prompt},
+                        ],
+                    }
+                ],
+            )
+            text = _extract_text(response)
+            duration_ms = int((time.time() - start_time) * 1000)
+            input_tokens = getattr(getattr(response, "usage", None), "input_tokens", 0)
+            output_tokens = getattr(getattr(response, "usage", None), "output_tokens", 0)
+            est_cost_usd = estimate_cost_usd(
+                model=selected_model,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+            )
+            _record_usage("photo_analysis", selected_model, input_tokens, output_tokens, duration_ms)
+            LOGGER.debug(
+                "vision model=%s input_tokens=%s output_tokens=%s est_cost_usd=%.8f",
+                selected_model,
+                input_tokens,
+                output_tokens,
+                est_cost_usd,
+            )
+            return text
+        except Exception as exc:
+            if attempt >= MAX_RETRIES or not _should_retry(exc):
+                LOGGER.exception("Anthropic vision completion failed after %s attempt(s)", attempt)
+                raise LLMError("Anthropic vision completion failed") from exc
+
+            delay = 2 ** (attempt - 1)
+            remaining_attempts = MAX_RETRIES - attempt
+            LOGGER.warning(
+                "Anthropic vision completion retrying in %s second(s) after %s remaining_attempts=%s",
+                delay,
+                exc.__class__.__name__,
+                remaining_attempts,
+            )
+            time.sleep(delay)
+
+
 def _strip_code_fence(text: str) -> str:
     """Strip markdown code fences that models sometimes add around JSON."""
     text = text.strip()
@@ -216,3 +307,7 @@ class LLMClient:
         model: str | None = None,
     ) -> dict[str, Any] | list[Any]:
         return complete_json(prompt=prompt, system=system, category=category, model=model)
+
+    @staticmethod
+    def complete_vision(prompt: str, image_path: str, model: str | None = None) -> str:
+        return complete_vision(prompt=prompt, image_path=image_path, model=model)

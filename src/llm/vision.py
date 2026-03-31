@@ -1,7 +1,9 @@
 import base64
 import logging
+import os
+import tempfile
 
-from llm.client import _get_client, _get_model, _record_usage
+from llm.client import LLMClient
 
 
 LOGGER = logging.getLogger(__name__)
@@ -27,45 +29,27 @@ def analyze_photo(image_bytes: bytes, mime_type: str = "image/jpeg") -> str | No
     if not image_bytes or len(image_bytes) > MAX_IMAGE_BYTES:
         return None
 
-    import time
-    client = _get_client()
-    model = _get_model(CATEGORY)
-    start = time.time()
+    suffix = ".jpg"
+    if mime_type == "image/png":
+        suffix = ".png"
+    elif mime_type == "image/webp":
+        suffix = ".webp"
 
+    tmp_path = ""
     try:
-        response = client.messages.create(
-            model=model,
-            max_tokens=150,
-            system=SYSTEM_PROMPT,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": mime_type,
-                                "data": base64.standard_b64encode(image_bytes).decode("utf-8"),
-                            },
-                        },
-                        {"type": "text", "text": USER_PROMPT},
-                    ],
-                }
-            ],
-        )
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp_file:
+            tmp_file.write(image_bytes)
+            tmp_path = tmp_file.name
+        text = LLMClient.complete_vision(
+            prompt=f"{SYSTEM_PROMPT}\n\n{USER_PROMPT}",
+            image_path=tmp_path,
+        ).strip()
     except Exception:
         LOGGER.warning("Vision API call failed", exc_info=True)
         return None
-
-    duration_ms = int((time.time() - start) * 1000)
-    usage = getattr(response, "usage", None)
-    input_tokens = getattr(usage, "input_tokens", 0)
-    output_tokens = getattr(usage, "output_tokens", 0)
-    _record_usage(CATEGORY, model, input_tokens, output_tokens, duration_ms)
-
-    blocks = getattr(response, "content", [])
-    text = "".join(b.text for b in blocks if getattr(b, "type", None) == "text").strip()
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
 
     if not text or text.upper().startswith(SKIP_MARKER):
         return None

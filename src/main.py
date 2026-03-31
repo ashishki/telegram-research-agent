@@ -73,6 +73,9 @@ def build_parser() -> argparse.ArgumentParser:
     score_stats_parser = subparsers.add_parser("score-stats", help="Print scoring bucket counts and topic stats")
     score_stats_parser.set_defaults(handler=handle_score_stats)
 
+    cost_stats_parser = subparsers.add_parser("cost-stats", help="Print aggregate LLM cost statistics")
+    cost_stats_parser.set_defaults(handler=handle_cost_stats)
+
     bot_parser = subparsers.add_parser("bot", help="Start Telegram bot interface (long-polling)")
     bot_parser.set_defaults(handler=handle_bot)
 
@@ -338,6 +341,61 @@ def handle_score_stats(_: argparse.Namespace) -> int:
         lines.append("top_topics: " + ", ".join(f"{row['label']} ({int(row['topic_count'])})" for row in topic_rows))
     else:
         lines.append("top_topics: none")
+
+    sys.stdout.write("\n".join(lines) + "\n")
+    return 0
+
+
+def handle_cost_stats(_: argparse.Namespace) -> int:
+    settings = load_settings()
+
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+
+        with sqlite3.connect(settings.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON;")
+            connection.execute("PRAGMA journal_mode = WAL;")
+
+            total_row = connection.execute(
+                """
+                SELECT
+                    COUNT(*) AS call_count,
+                    COALESCE(SUM(est_cost_usd), 0.0) AS total_cost_usd,
+                    COUNT(DISTINCT substr(called_at, 1, 10)) AS distinct_days
+                FROM llm_usage
+                """
+            ).fetchone()
+            model_rows = connection.execute(
+                """
+                SELECT
+                    model,
+                    COUNT(*) AS call_count,
+                    COALESCE(SUM(est_cost_usd), 0.0) AS total_cost_usd
+                FROM llm_usage
+                GROUP BY model
+                ORDER BY total_cost_usd DESC, model ASC
+                """
+            ).fetchall()
+    except Exception:
+        LOGGER.exception("Cost stats failed")
+        return 1
+
+    lines = [
+        f"total_cost_usd={float(total_row['total_cost_usd'] or 0.0):.8f}",
+        f"distinct_days={int(total_row['distinct_days'] or 0)}",
+        "by_model:",
+    ]
+    if model_rows:
+        for row in model_rows:
+            lines.append(
+                f"{row['model']} call_count={int(row['call_count'] or 0)} "
+                f"total_cost_usd={float(row['total_cost_usd'] or 0.0):.8f}"
+            )
+    else:
+        lines.append("none")
 
     sys.stdout.write("\n".join(lines) + "\n")
     return 0

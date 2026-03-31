@@ -1,6 +1,9 @@
+import logging
+
 from config.settings import CHEAP_MODEL, MID_MODEL, STRONG_MODEL
 
 
+LOGGER = logging.getLogger(__name__)
 WATCH_THRESHOLD = 0.45
 STRONG_THRESHOLD = 0.75
 MODEL_RATES_USD_PER_MILLION: dict[str, dict[str, float]] = {
@@ -17,7 +20,11 @@ def route(task_type: str, signal_score: float | None = None) -> str:
     if normalized_task == "synthesis":
         return STRONG_MODEL
 
-    score = float(signal_score or 0.0)
+    if signal_score is None:
+        LOGGER.warning("route() received signal_score=None for task_type=%s; using cheap model", normalized_task)
+        return CHEAP_MODEL
+
+    score = float(signal_score)
     if score >= STRONG_THRESHOLD:
         return STRONG_MODEL
     if score >= WATCH_THRESHOLD:

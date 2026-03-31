@@ -282,6 +282,17 @@ class TestScorePostsPersistence(unittest.TestCase):
             self.assertGreaterEqual(value, 0.0)
             self.assertLessEqual(value, 1.0)
 
+    def test_score_posts_sets_routed_model(self):
+        score_posts(self.settings, since_days=7)
+
+        with sqlite3.connect(self.db_path) as connection:
+            row = connection.execute(
+                "SELECT routed_model FROM posts WHERE id = 1"
+            ).fetchone()
+
+        self.assertIsNotNone(row[0])
+        self.assertTrue(row[0])
+
 
 class TestBucketDistributionEvals(unittest.TestCase):
     STRONG_THRESHOLD = 0.75

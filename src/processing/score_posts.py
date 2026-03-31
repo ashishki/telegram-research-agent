@@ -20,6 +20,7 @@ from uuid import uuid4
 import yaml
 
 from config.settings import PROJECT_ROOT, Settings
+from llm.router import route
 
 
 LOGGER = logging.getLogger(__name__)
@@ -377,7 +378,7 @@ def score_posts(
         topic_history = _fetch_topic_history(conn, lookback_weeks)
         channel_max_views = _fetch_channel_max_views(conn, since_days)
 
-        scored_rows: list[tuple[float, str, str, str, str, int]] = []
+        scored_rows: list[tuple[float, str, str, str, str, str, int]] = []
 
         for post in posts:
             try:
@@ -439,6 +440,7 @@ def score_posts(
                 else:
                     bucket = "noise"
 
+                routed_model = route("per_post", signal_score=signal_score)
                 score_breakdown = json.dumps(
                     {
                         "recency": d_recency,
@@ -448,7 +450,9 @@ def score_posts(
                         "novelty": d_novelty,
                     }
                 )
-                scored_rows.append((signal_score, bucket, score_run_id, scored_at, score_breakdown, post_id))
+                scored_rows.append(
+                    (signal_score, bucket, routed_model, score_run_id, scored_at, score_breakdown, post_id)
+                )
                 summary["scored"] += 1
 
             except Exception:
@@ -460,7 +464,7 @@ def score_posts(
         conn.execute("BEGIN")
         conn.executemany(
             (
-                "UPDATE posts SET signal_score = ?, bucket = ?, score_run_id = ?, "
+                "UPDATE posts SET signal_score = ?, bucket = ?, routed_model = ?, score_run_id = ?, "
                 "scored_at = ?, score_breakdown = ? WHERE id = ?"
             ),
             scored_rows,
@@ -470,7 +474,7 @@ def score_posts(
     # Apply per-bucket caps: re-cap at max items by downgrading extras to noise
     # (cap enforcement is done at digest-generation time, not here — we store raw scores)
     # Count buckets for summary
-    for _, bucket, _, _, _, _ in scored_rows:
+    for _, bucket, _, _, _, _, _ in scored_rows:
         summary[bucket] = summary.get(bucket, 0) + 1
 
     avg_score = (

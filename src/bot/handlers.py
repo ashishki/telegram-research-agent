@@ -9,8 +9,8 @@ from urllib import error
 
 from bot.telegram_delivery import _send_text_internal, send_document, send_report_preview, send_text
 from config.settings import PROJECT_ROOT, Settings
-from llm.client import LLMClient
 from output.generate_digest import _compute_week_label, run_digest
+from output.generate_answer import generate_answer
 from output.generate_insight import generate_insight
 from output.generate_study_plan import generate_study_plan
 
@@ -312,20 +312,14 @@ def handle_ask(chat_id: str, args: str, settings: Settings) -> None:
             ]
         topics_summary = _load_topics_summary(connection)
 
-    context_block = "\n".join(excerpts) if excerpts else "Подходящих постов за последние 7 дней не найдено."
-    prompt = (
-        f"Question:\n{question}\n\n"
-        f"Topics:\n{topics_summary}\n\n"
-        f"Relevant Telegram excerpts from the last 7 days:\n{context_block}"
+    response_text = generate_answer(
+        question=question,
+        context={
+            "topics_summary": topics_summary,
+            "excerpts": excerpts,
+        },
+        settings=settings,
     )
-    system = (
-        "You are a research assistant. Answer based only on the provided Telegram channel data context. "
-        "Be concise (max 300 words). Answer in the same language as the question."
-    )
-
-    response_text = LLMClient.complete(prompt=prompt, system=system, max_tokens=600, category="bot_ask").strip()
-    if not response_text:
-        response_text = "Не нашёл достаточно данных, чтобы ответить по последним постам."
     send_message(_get_bot_token(), chat_id, response_text, parse_mode=None)
 
 
