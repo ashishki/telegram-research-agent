@@ -22,6 +22,16 @@ A private, production-ready pipeline that runs on a personal VPS and processes T
 
 ---
 
+## In Brief (for CV / interview)
+
+I follow 40+ Telegram channels — 300–500 posts/week. Most digest tools summarize everything; this system filters first, then summarizes selectively. The key architectural decision: **every post is scored deterministically before any LLM call**. ~90% of posts never reach a model. The 10% that do are processed by tier-matched models (Haiku / Sonnet / Opus). Cost scales with signal quality, not volume. Typical weekly run: $0.04–0.07.
+
+The output is not a summary. It's a structured decision-support review with explicit action items, source traceability links, project relevance mapped to what you're building, and a delta showing what changed since last week. Delivered as a Telegraph article with a short Telegram notification.
+
+Full case study: `docs/case-study.md` | Demo walkthrough: `docs/demo-walkthrough.md`
+
+---
+
 ## What the System Does
 
 ### Weekly pipeline (automated, Monday morning)
@@ -43,18 +53,18 @@ A private, production-ready pipeline that runs on a personal VPS and processes T
 
 **Full review (10–15 min read):**
 
-| Section | Content |
-|---|---|
-| Strong Signals | Up to 5 strong signals with score, model tier, and source link |
-| Decisions to Consider | Explicit action items from strong signals (≤3) |
-| Watch | Pending signals worth tracking, not urgent |
-| Cultural | Low-signal items that carry contextual value |
-| Ignored | Noise count by topic — confirms nothing important was missed |
-| Think Layer | Theme synthesis |
-| Stats | Bucket counts, avg score |
-| What Changed | Delta vs previous week's bucket distribution |
-| Project Action Queue | Per-project relevant signals with matched keywords |
-| Learn | Topics recurring in strong/watch not yet in any project focus |
+| Section | Always present | Content |
+|---|---|---|
+| Strong Signals | yes | Up to 5 strong signals with score, model tier, and source link |
+| Decisions to Consider | yes | Explicit action items from strong signals (≤3), or placeholder |
+| Watch | yes | Pending signals worth tracking, not urgent |
+| Cultural | yes | Low-signal items that carry contextual value |
+| Ignored | yes | Noise count by topic — confirms nothing important was missed |
+| Think Layer | yes | Theme synthesis |
+| Stats | yes | Bucket counts, avg score |
+| What Changed | yes | Delta vs previous week's bucket distribution |
+| Project Action Queue | if projects.yaml loads | Per-project relevant signals with matched keywords |
+| Learn | if projects.yaml loads | Topics recurring in strong/watch not yet in any project focus |
 
 ---
 

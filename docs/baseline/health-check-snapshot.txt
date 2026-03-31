@@ -1,0 +1,28 @@
+# health-check snapshot — baseline v1.0
+# Generated: 2026-03-31
+# Environment: development (no live DB — representative expected output)
+#
+# Run: python3 src/main.py health-check
+
+db_path: /home/gdev/telegram-research-agent/data/agent.db
+posts: 0
+scored_posts: 0
+llm_usage: 0
+last_ingestion: never
+last_scored: never
+last_digest: none
+profile.yaml: present
+projects.yaml: present
+scoring.yaml: present
+
+# --- Expected output after first weekly run ---
+# db_path: /home/gdev/telegram-research-agent/data/agent.db
+# posts: 312
+# scored_posts: 312
+# llm_usage: 47
+# last_ingestion: 2026-03-31T06:00:12Z
+# last_scored: 2026-03-31T06:02:44Z
+# last_digest: 2026-W13
+# profile.yaml: present
+# projects.yaml: present
+# scoring.yaml: present

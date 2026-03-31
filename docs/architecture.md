@@ -190,17 +190,21 @@ Source: `src/output/learning_layer.py`
 
 Assembles the weekly review artifact from all upstream layers.
 
-`format_signal_report()` produces a 9-section Markdown document:
+`format_signal_report()` produces a Markdown document with 8 mandatory sections and 2 conditional:
+
+**Always present:**
 1. Strong Signals (with source URLs, model tier, personalization tag)
-2. Decisions to Consider (action items from strong signals)
+2. Decisions to Consider (action items from strong signals, or "No decision-forcing signals")
 3. Watch
 4. Cultural
 5. Ignored (noise count + top topics)
 6. Think Layer
 7. Stats
-8. What Changed (delta vs previous quality_metrics row)
-9. Project Action Queue (per-project sub-sections with matched keywords)
-10. Learn (recurring topics not in any project focus)
+8. What Changed (delta vs previous quality_metrics row, or "No comparison baseline available")
+
+**Conditional (require projects.yaml to load):**
+9. Project Action Queue — per-project sub-sections; omitted if projects config fails
+10. Learn — recurring topics not in any project focus; omitted if projects config fails or no gaps found
 
 Source: `src/output/signal_report.py`, `src/output/learning_layer.py`, `src/output/project_relevance.py`, `src/output/personalize.py`
 

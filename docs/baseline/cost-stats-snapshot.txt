@@ -1,0 +1,23 @@
+# cost-stats snapshot — baseline v1.0
+# Generated: 2026-03-31
+# Representative expected output after a weekly run
+#
+# Run: python3 src/main.py cost-stats
+
+total_cost_usd=0.04821200
+distinct_days=1
+by_model:
+claude-opus-4-6          call_count=7    total_cost_usd=0.03150000
+claude-sonnet-4-6        call_count=24   total_cost_usd=0.01512000
+claude-haiku-4-5-20251001 call_count=0   total_cost_usd=0.00000000
+weekly_trend (last 4 weeks):
+  2026-W13  calls=31  cost=$0.046212
+  2026-W12  calls=28  cost=$0.039840
+  2026-W11  calls=33  cost=$0.051200
+  2026-W10  calls=22  cost=$0.031100
+
+# --- Cost health indicators ---
+# Haiku usage on noise/cultural: 0 calls (correct — these bypass LLM)
+# Opus calls = strong bucket count (7) + synthesis (1) = 8 ≈ correct
+# Typical weekly cost: $0.03–0.07 at current volumes
+# If Opus > 20% of calls: raise strong.min_score threshold

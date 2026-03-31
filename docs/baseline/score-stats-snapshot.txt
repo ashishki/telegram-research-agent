@@ -1,0 +1,21 @@
+# score-stats snapshot — baseline v1.0
+# Generated: 2026-03-31
+# Representative expected output after a weekly run on ~300 posts
+#
+# Run: python3 src/main.py score-stats
+
+Score stats (last 7 days)
+strong: count=7  avg_signal_score=0.8214
+watch:  count=23 avg_signal_score=0.5871
+cultural: count=4 avg_signal_score=0.2100
+noise:  count=278 avg_signal_score=0.1342
+top_topics: LLM inference (12), FastAPI patterns (8), AI agents (7)
+trend vs 2026-W12:
+  strong_count: 7 (+2)
+  watch_count: 23 (-1)
+  noise_count: 278 (+14)
+
+# --- Healthy distribution characteristics ---
+# strong ≤ 5% of total: 7/312 = 2.2% ✓
+# noise ≥ 70% of total: 278/312 = 89.1% ✓
+# watch bucket 5-15%: 23/312 = 7.4% ✓
