@@ -1,7 +1,7 @@
 import logging
 import os
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -181,7 +181,7 @@ def run_migrations() -> Path:
 
 
 def record_feedback(connection: sqlite3.Connection, post_id: int, feedback: str) -> None:
-    recorded_at = datetime.utcnow().isoformat()
+    recorded_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     connection.execute(
         "INSERT INTO signal_feedback (post_id, feedback, recorded_at) VALUES (?, ?, ?)",
         (post_id, feedback, recorded_at),
