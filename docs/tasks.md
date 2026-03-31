@@ -354,6 +354,20 @@ Make prioritization user-aware through explicit profile, downranking, and prefer
 - personalization improves relevance without collapsing diversity
 - user profile can downrank noise without suppressing important outliers
 
+**Tasks**
+
+| ID | Task | Owner | Status | Depends On |
+|---|---|---|---|---|
+| T56 | Create `src/output/personalize.py` with `apply_personalization(posts, profile) -> list[dict]` — re-ranks posts by multiplying signal_score by boost/downrank multipliers from `profile.yaml`; returns sorted list with `personalized_score` field; strong posts never drop below watch threshold | codex | `[ ]` | T55 |
+| T57 | Wire `apply_personalization()` into `signal_report.py` — load profile.yaml, apply personalization before formatting sections; add `[personalized]` tag to entries whose order changed | codex | `[ ]` | T56 |
+| T58 | 3 tests in `tests/test_personalize.py`: (a) boost_topic post gets higher personalized_score than neutral; (b) downrank_topic post gets lower score; (c) strong post (signal_score=0.8) with downrank_topic stays ≥ watch threshold (0.45) | codex | `[ ]` | T56 |
+
+**Phase 6 Review Criteria**
+- `apply_personalization()` uses profile.yaml boost/downrank, no LLM calls
+- Strong posts cannot be downranked below watch threshold
+- `[personalized]` tag appears in signal report for re-ranked entries
+- 72+ tests passing
+
 ---
 
 ## Phase 7 — Learning Layer Refinement
