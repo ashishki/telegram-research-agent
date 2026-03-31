@@ -260,6 +260,22 @@ Replace digest-style reporting with signal-first decision support.
 - strong signals are visibly distinct from weak/cultural items
 - ignored/noise handling is explicit and trusted
 
+**Tasks**
+
+| ID | Task | Owner | Status | Depends On |
+|---|---|---|---|---|
+| T48 | Create `src/output/signal_report.py` with `format_signal_report(posts, settings) -> str` — outputs 6 structured sections: Strong Signals, Watch, Cultural, Ignored, Think Layer (themes from strong+watch), Stats footer | codex | `[ ]` | T47 |
+| T49 | Wire `format_signal_report()` into `generate_digest.py` — prepend signal-first section to digest output; existing LLM synthesis remains but follows the structured section | codex | `[ ]` | T48 |
+| T50 | Each Strong Signals entry must show: post summary (≤20 words), signal_score, bucket, routed_model; Watch entries show summary + score; Ignored shows only count + top 3 topics | codex | `[ ]` | T48 |
+| T51 | 3 output contract tests in `tests/test_signal_report.py`: (a) empty posts → all 6 headers present; (b) mixed posts → Strong section before Watch; (c) noise posts → Ignored shows count not full content | codex | `[ ]` | T48 |
+
+**Phase 4 Review Criteria**
+- `format_signal_report()` exists and returns a string with all 6 section headers
+- Strong signals ranked by signal_score descending, each showing score + routed_model
+- Ignored/noise section shows count only (not full post text)
+- Signal-first section appears in digest output before LLM synthesis
+- 60+ tests passing
+
 ---
 
 ## Phase 5 — Project Relevance Upgrade

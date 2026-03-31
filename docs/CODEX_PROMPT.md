@@ -6,19 +6,20 @@ _v2.2 · 2026-03-31 · telegram-research-agent_
 ## Current State
 
 - `Execution model`: Strategic Roadmap v2
-- `Current phase`: Phase 3 — Model Routing
-- `Phase status`: IN PROGRESS — T42–T47 defined, starting implementation
-- `Baseline`: 54 passing tests (2026-03-31, after Phase 2 completion)
+- `Current phase`: Phase 4 — Signal-First Output
+- `Phase status`: IN PROGRESS — T48–T51 defined, starting implementation
+- `Baseline`: 60 passing tests (2026-03-31, after Phase 3 completion)
 - `Ruff`: not enforced
 
 ## Completed Phases
 
 - **Phase 1**: Baseline stabilization, CODE-12 fix (sleep between sends), conftest.py, CI switched to pytest — T29–T35 done
 - **Phase 2**: Scoring Foundation — T36–T41 done (score_run_id, scored_at, score_breakdown, score-stats CLI, MID tier tests, dead import removed)
+- **Phase 3**: Model Routing — T42–T47 done (None guard, routed_model in posts, llm_usage table, cost-stats CLI, complete_vision retry, generate_answer extracted)
 
 ## Next Tasks
 
-Phase 3 — T42–T47 (see tasks.md Phase 3 task table). Start with T42 (CODE-10 guard) and work in order.
+Phase 4 — T48–T51 (see tasks.md Phase 4 task table). Start with T48 (signal_report.py) and work in order.
 
 ## Fix Queue
 
