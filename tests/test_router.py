@@ -1,7 +1,7 @@
 import unittest
 
 from config.settings import CHEAP_MODEL, MID_MODEL, STRONG_MODEL
-from llm.router import route
+from llm.router import estimate_cost_usd, route
 
 
 class TestRouter(unittest.TestCase):
@@ -23,6 +23,12 @@ class TestRouter(unittest.TestCase):
 
         self.assertEqual(selected_model, CHEAP_MODEL)
         self.assertTrue(any("signal_score=None" in message for message in logs.output))
+
+    def test_estimate_cost_usd_unknown_model_warns(self):
+        with self.assertLogs("llm.router", level="WARNING") as logs:
+            estimate_cost_usd("unknown-model-xyz", 100, 100)
+
+        self.assertTrue(any("Unknown model=unknown-model-xyz, using default rates" in message for message in logs.output))
 
 
 if __name__ == "__main__":

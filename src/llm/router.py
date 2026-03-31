@@ -33,5 +33,7 @@ def route(task_type: str, signal_score: float | None = None) -> str:
 
 
 def estimate_cost_usd(model: str, input_tokens: int, output_tokens: int) -> float:
+    if model not in MODEL_RATES_USD_PER_MILLION:
+        LOGGER.warning("Unknown model=%s, using default rates", model)
     rates = MODEL_RATES_USD_PER_MILLION.get(model, DEFAULT_MODEL_RATES)
     return (input_tokens * rates["input"] + output_tokens * rates["output"]) / 1_000_000
