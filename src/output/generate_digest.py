@@ -10,6 +10,7 @@ from pathlib import Path
 from config.settings import PROJECT_ROOT, Settings
 from llm.client import complete
 from llm.router import route
+from output.render_report import write_report_html
 from output.signal_report import format_signal_report
 from output.report_schema import (
     DigestResult,
@@ -23,9 +24,9 @@ from output.report_utils import _extract_markdown_section
 from processing.score_posts import score_posts
 
 try:
-    from bot.telegram_delivery import send_text
+    from bot.telegram_delivery import send_document, send_text
 except ImportError:  # pragma: no cover
-    from src.bot.telegram_delivery import send_text
+    from src.bot.telegram_delivery import send_document, send_text
 
 try:
     from integrations.github_crossref import NO_OVERLAP_NOTE, crossref_repos_to_topics
@@ -114,6 +115,49 @@ def _send_digest_to_telegram_owner(content_md: str, week_label: str) -> None:
         return
     send_text(chat_id=chat_id, text=content_md, token=token)
     LOGGER.info("Digest sent to Telegram owner week=%s", week_label)
+
+
+def _build_review_notification(week_label: str, strong_count: int, watch_count: int, strongest_signal: str) -> str:
+    prefix = f"Research Review {week_label}: {strong_count} strong signals, {watch_count} watch."
+    strongest_excerpt = " ".join((strongest_signal or "").split())
+    if not strongest_excerpt:
+        return prefix[:300]
+    suffix_budget = max(0, 300 - len(prefix) - 1)
+    if suffix_budget == 0:
+        return prefix[:300]
+    return f"{prefix} {strongest_excerpt[:suffix_budget]}".strip()
+
+
+def _send_weekly_review_to_telegram_owner(
+    content_md: str,
+    week_label: str,
+    strong_count: int,
+    watch_count: int,
+    strongest_signal: str,
+    html_path: Path | None,
+) -> None:
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+    chat_id = os.environ.get("TELEGRAM_OWNER_CHAT_ID", "").strip()
+    if not token or not chat_id:
+        return
+
+    notification = _build_review_notification(week_label, strong_count, watch_count, strongest_signal)
+    send_text(chat_id=chat_id, text=notification, token=token, parse_mode=None)
+
+    if html_path is None:
+        return
+
+    try:
+        send_document(
+            chat_id=chat_id,
+            file_path=str(html_path),
+            caption=f"Research Review {week_label}",
+            token=token,
+        )
+        LOGGER.info("Weekly review sent to Telegram owner week=%s file=%s", week_label, html_path)
+    except Exception:
+        LOGGER.warning("Failed to send HTML review week=%s; falling back to text send", week_label, exc_info=True)
+        send_text(chat_id=chat_id, text=content_md, token=token, parse_mode=None)
 
 
 def _append_github_section(content_md: str, settings: Settings) -> str:
@@ -436,6 +480,11 @@ def run_digest(settings: Settings) -> DigestResult:
             empty_digest = _append_github_section(empty_digest, settings)
             empty_word_count = _count_words(empty_digest)
             output_path = _write_digest_file(week_label, empty_digest)
+            html_path = None
+            try:
+                html_path = write_report_html(week_label, empty_digest)
+            except OSError:
+                LOGGER.warning("Failed to write HTML review week=%s", week_label, exc_info=True)
             connection.execute("BEGIN")
             _store_digest(connection, week_label, empty_digest, "", None, 0)
             _store_quality_metrics(
@@ -452,7 +501,14 @@ def run_digest(settings: Settings) -> DigestResult:
             )
             connection.commit()
             try:
-                _send_digest_to_telegram_owner(content_md=empty_digest, week_label=week_label)
+                _send_weekly_review_to_telegram_owner(
+                    content_md=empty_digest,
+                    week_label=week_label,
+                    strong_count=0,
+                    watch_count=0,
+                    strongest_signal="",
+                    html_path=html_path,
+                )
             except Exception:
                 LOGGER.warning("Failed to send digest to Telegram owner week=%s", week_label, exc_info=True)
             return DigestResult(week_label=week_label, output_path=str(output_path), post_count=0, json_path="")
@@ -526,6 +582,11 @@ def run_digest(settings: Settings) -> DigestResult:
         content_json = json.dumps(asdict(report), ensure_ascii=False)
         json_path = _write_digest_json_file(week_label, report)
         output_path = _write_digest_file(week_label, content_md)
+        html_path = None
+        try:
+            html_path = write_report_html(week_label, content_md)
+        except OSError:
+            LOGGER.warning("Failed to write HTML review week=%s", week_label, exc_info=True)
 
         connection.execute("BEGIN")
         _store_digest(connection, week_label, content_md, content_json, None, post_count)
@@ -551,7 +612,15 @@ def run_digest(settings: Settings) -> DigestResult:
     )
 
     try:
-        _send_digest_to_telegram_owner(content_md=content_md, week_label=week_label)
+        strongest_signal = buckets["strong"][0]["text_excerpt"] if buckets["strong"] else ""
+        _send_weekly_review_to_telegram_owner(
+            content_md=content_md,
+            week_label=week_label,
+            strong_count=buckets["bucket_counts"]["strong"],
+            watch_count=buckets["bucket_counts"]["watch"],
+            strongest_signal=strongest_signal,
+            html_path=html_path,
+        )
     except Exception:
         LOGGER.warning("Failed to send digest to Telegram owner week=%s", week_label, exc_info=True)
 

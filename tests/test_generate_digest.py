@@ -312,8 +312,9 @@ class TestRunDigestFixes(unittest.TestCase):
                             with patch.object(gd, "_append_github_section", side_effect=lambda content, settings: content):
                                 with patch.object(gd, "_write_digest_file", return_value=gd.Path("/tmp/2026-W14.md")):
                                     with patch.object(gd, "_write_digest_json_file", return_value=gd.Path("/tmp/2026-W14.json")):
-                                        with patch.object(gd, "_send_digest_to_telegram_owner"):
-                                            return gd.run_digest(settings)
+                                        with patch.object(gd, "write_report_html", return_value=gd.Path("/tmp/2026-W14.html")):
+                                            with patch.object(gd, "_send_weekly_review_to_telegram_owner"):
+                                                return gd.run_digest(settings)
 
     def test_insights_failure_logs_traceback(self):
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
@@ -406,13 +407,14 @@ class TestRunDigestFixes(unittest.TestCase):
                             with patch.object(gd, "_load_prompt_sections", return_value=("system", "week={week_label}")):
                                 with patch.object(gd, "complete", return_value="digest output words"):
                                     with patch.object(gd, "_append_github_section", side_effect=lambda content, settings: content):
-                                        with patch.object(gd, "_write_digest_file", return_value=gd.Path("/tmp/2026-W14.md")):
-                                            with patch.object(gd, "_write_digest_json_file", return_value=gd.Path("/tmp/2026-W14.json")):
-                                                with patch.object(gd, "_send_digest_to_telegram_owner", side_effect=fake_send_digest_to_owner):
-                                                    with patch.object(gd.time, "sleep", side_effect=fake_sleep) as sleep_mock:
-                                                        with patch.object(gd, "send_text", side_effect=fake_send_text):
-                                                            with patch("output.generate_recommendations.run_recommendations", return_value={"text": "insights"}):
-                                                                gd.run_digest(settings)
+                                                with patch.object(gd, "_write_digest_file", return_value=gd.Path("/tmp/2026-W14.md")):
+                                                    with patch.object(gd, "_write_digest_json_file", return_value=gd.Path("/tmp/2026-W14.json")):
+                                                        with patch.object(gd, "write_report_html", return_value=gd.Path("/tmp/2026-W14.html")):
+                                                            with patch.object(gd, "_send_weekly_review_to_telegram_owner", side_effect=fake_send_digest_to_owner):
+                                                                with patch.object(gd.time, "sleep", side_effect=fake_sleep) as sleep_mock:
+                                                                    with patch.object(gd, "send_text", side_effect=fake_send_text):
+                                                                        with patch("output.generate_recommendations.run_recommendations", return_value={"text": "insights"}):
+                                                                            gd.run_digest(settings)
 
             sleep_mock.assert_called_once_with(1)
             self.assertEqual(call_order, ["digest", "sleep:1", "insights"])
@@ -433,12 +435,13 @@ class TestRunDigestFixes(unittest.TestCase):
                     with patch.object(gd, "score_posts", return_value={"strong": 1, "watch": 0, "cultural": 0, "noise": 1, "avg_signal_score": 0.5}):
                         with patch.object(gd, "_load_prompt_sections", return_value=("system", "week={week_label}")):
                             with patch.object(gd, "complete", return_value="llm narrative"):
-                                with patch.object(gd, "_append_github_section", side_effect=lambda content, settings: content):
-                                    with patch.object(gd, "_write_digest_json_file", return_value=gd.Path("/tmp/2026-W14.json")):
-                                        with patch.object(gd, "_send_digest_to_telegram_owner"):
-                                            with patch.object(gd, "_write_digest_file", return_value=gd.Path("/tmp/2026-W14.md")) as write_mock:
-                                                with patch("output.generate_recommendations.run_recommendations", return_value={"text": ""}):
-                                                    gd.run_digest(settings)
+                                    with patch.object(gd, "_append_github_section", side_effect=lambda content, settings: content):
+                                        with patch.object(gd, "_write_digest_json_file", return_value=gd.Path("/tmp/2026-W14.json")):
+                                            with patch.object(gd, "write_report_html", return_value=gd.Path("/tmp/2026-W14.html")):
+                                                with patch.object(gd, "_send_weekly_review_to_telegram_owner"):
+                                                    with patch.object(gd, "_write_digest_file", return_value=gd.Path("/tmp/2026-W14.md")) as write_mock:
+                                                        with patch("output.generate_recommendations.run_recommendations", return_value={"text": ""}):
+                                                            gd.run_digest(settings)
 
             written_content = write_mock.call_args.args[1]
             self.assertIn("## Strong Signals", written_content)
