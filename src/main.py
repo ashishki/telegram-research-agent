@@ -1,10 +1,12 @@
 import argparse
 import asyncio
 import logging
+import os
 import signal
 import sqlite3
 import sys
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from config.settings import PROJECT_ROOT, load_settings
 from db.migrate import run_migrations
@@ -17,6 +19,7 @@ from output.generate_insight import OUTPUT_DIR as INSIGHT_OUTPUT_DIR
 from output.generate_insight import generate_insight
 from output.map_project_insights import run_project_mapping
 from output.generate_recommendations import run_recommendations
+from output.signal_report import format_signal_report
 from output.generate_study_plan import OUTPUT_DIR as STUDY_PLAN_OUTPUT_DIR
 from output.generate_study_plan import generate_study_plan, send_study_reminder
 from processing.cleanup import run_cleanup
@@ -75,6 +78,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     cost_stats_parser = subparsers.add_parser("cost-stats", help="Print aggregate LLM cost statistics")
     cost_stats_parser.set_defaults(handler=handle_cost_stats)
+
+    health_check_parser = subparsers.add_parser("health-check", help="Print DB and config health information")
+    health_check_parser.set_defaults(handler=handle_health_check)
+
+    report_preview_parser = subparsers.add_parser(
+        "report-preview",
+        help="Render the current signal-first report preview from scored posts",
+    )
+    report_preview_parser.set_defaults(handler=handle_report_preview)
 
     bot_parser = subparsers.add_parser("bot", help="Start Telegram bot interface (long-polling)")
     bot_parser.set_defaults(handler=handle_bot)
@@ -398,6 +410,101 @@ def handle_cost_stats(_: argparse.Namespace) -> int:
         lines.append("none")
 
     sys.stdout.write("\n".join(lines) + "\n")
+    return 0
+
+
+def _config_status_lines() -> list[str]:
+    config_paths = (
+        PROJECT_ROOT / "src" / "config" / "profile.yaml",
+        PROJECT_ROOT / "src" / "config" / "projects.yaml",
+        PROJECT_ROOT / "src" / "config" / "scoring.yaml",
+    )
+    return [f"{path.name}: {'present' if path.exists() else 'missing'}" for path in config_paths]
+
+
+def handle_health_check(_: argparse.Namespace) -> int:
+    db_path_raw = os.environ.get("AGENT_DB_PATH", "").strip()
+    lines: list[str] = []
+
+    if not db_path_raw:
+        lines.append("DB_PATH not configured")
+        lines.extend(_config_status_lines())
+        sys.stdout.write("\n".join(lines) + "\n")
+        return 0
+
+    db_path = Path(db_path_raw)
+    if not db_path.is_absolute():
+        db_path = (PROJECT_ROOT / db_path).resolve()
+
+    lines.append(f"db_path: {db_path}")
+    if db_path.exists():
+        try:
+            with sqlite3.connect(db_path) as connection:
+                posts_count = int(connection.execute("SELECT COUNT(*) FROM posts").fetchone()[0])
+                scored_posts_count = int(
+                    connection.execute("SELECT COUNT(*) FROM posts WHERE scored_at IS NOT NULL").fetchone()[0]
+                )
+                llm_usage_count = int(connection.execute("SELECT COUNT(*) FROM llm_usage").fetchone()[0])
+        except Exception as exc:
+            lines.append(f"db_error: {exc}")
+        else:
+            lines.append(f"posts: {posts_count}")
+            lines.append(f"scored_posts: {scored_posts_count}")
+            lines.append(f"llm_usage: {llm_usage_count}")
+    else:
+        lines.append("db_status: missing")
+
+    lines.extend(_config_status_lines())
+    sys.stdout.write("\n".join(lines) + "\n")
+    return 0
+
+
+def handle_report_preview(_: argparse.Namespace) -> int:
+    settings = load_settings()
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat().replace("+00:00", "Z")
+
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+
+        with sqlite3.connect(settings.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON;")
+            connection.execute("PRAGMA journal_mode = WAL;")
+
+            recent_rows = connection.execute(
+                """
+                SELECT id, content, signal_score, bucket, routed_model, score_breakdown, scored_at, posted_at
+                FROM posts
+                WHERE scored_at IS NOT NULL AND posted_at >= ?
+                ORDER BY posted_at DESC
+                """,
+                (cutoff,),
+            ).fetchall()
+
+            if len(recent_rows) >= 10:
+                rows = recent_rows
+            else:
+                rows = connection.execute(
+                    """
+                    SELECT id, content, signal_score, bucket, routed_model, score_breakdown, scored_at, posted_at
+                    FROM posts
+                    WHERE scored_at IS NOT NULL
+                    ORDER BY posted_at DESC
+                    """
+                ).fetchall()
+    except Exception:
+        LOGGER.exception("Report preview failed")
+        sys.stdout.write("No scored posts found. Run score-posts first.\n")
+        return 0
+
+    if not rows:
+        sys.stdout.write("No scored posts found. Run score-posts first.\n")
+        return 0
+
+    report = format_signal_report([dict(row) for row in rows], settings)
+    sys.stdout.write(report)
     return 0
 
 

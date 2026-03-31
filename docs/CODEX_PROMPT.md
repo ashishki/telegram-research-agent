@@ -6,9 +6,9 @@ _v2.2 · 2026-03-31 · telegram-research-agent_
 ## Current State
 
 - `Execution model`: Strategic Roadmap v2
-- `Current phase`: Phase 8 — Productization / Surface Layer
-- `Phase status`: IN PROGRESS — T62–T64 defined, starting implementation
-- `Baseline`: 77 passing tests (2026-03-31, after Phase 7 completion)
+- `Current phase`: COMPLETE — all 8 phases of Roadmap v2 done
+- `Phase status`: DONE
+- `Baseline`: 81 passing tests (2026-03-31)
 - `Ruff`: not enforced
 
 ## Completed Phases
@@ -20,6 +20,7 @@ _v2.2 · 2026-03-31 · telegram-research-agent_
 - **Phase 5**: Project Relevance Upgrade — T52–T55 done (keyword scoring, Project Relevance section, project_relevance_score column)
 - **Phase 6**: Personalization — T56–T58 done (boost/downrank multipliers, strong floor, [personalized] tag in report)
 - **Phase 7**: Learning Layer — T59–T61 done (learning_layer.py, Learn section in signal report)
+- **Phase 8**: Productization — T62–T64 done (health-check, report-preview CLI, README operator docs)
 
 ## Next Tasks
 

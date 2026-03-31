@@ -98,6 +98,17 @@ Strategist -> Orchestrator -> Codex -> Review -> Fixes
 
 ---
 
+## Operator Commands
+
+| Command | Description | Example |
+|---|---|---|
+| `score-stats` | Bucket counts and average signal scores for recently scored posts | `python3 src/main.py score-stats` |
+| `cost-stats` | LLM cost breakdown grouped by model | `python3 src/main.py cost-stats` |
+| `health-check` | DB connectivity/status plus config file presence checks | `python3 src/main.py health-check` |
+| `report-preview` | Preview the current signal-first report from the DB | `python3 src/main.py report-preview` |
+
+---
+
 ## Documentation That Matters
 
 Ключевые документы:
