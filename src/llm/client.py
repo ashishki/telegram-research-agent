@@ -47,7 +47,7 @@ def set_usage_db_path(path: str) -> None:
 
 
 def _resolve_usage_db_path() -> str:
-    return os.environ.get("AGENT_DB_PATH", "").strip()
+    return _usage_db_path or os.environ.get("AGENT_DB_PATH", "").strip()
 
 
 def _record_usage(task_type: str, model: str, input_tokens: int, output_tokens: int, duration_ms: int) -> None:

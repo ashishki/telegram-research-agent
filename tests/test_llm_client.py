@@ -41,10 +41,12 @@ class TestLLMClient(unittest.TestCase):
         self.tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
         self.tmp.close()
         self.db_path = self.tmp.name
+        client.set_usage_db_path("")
         with patch.dict(os.environ, {"AGENT_DB_PATH": self.db_path}):
             run_migrations()
 
     def tearDown(self) -> None:
+        client.set_usage_db_path("")
         os.unlink(self.db_path)
 
     def test_complete_records_llm_usage_row(self):
@@ -55,6 +57,34 @@ class TestLLMClient(unittest.TestCase):
         mock_client = SimpleNamespace(messages=SimpleNamespace(create=lambda **_: response))
 
         with patch.dict(os.environ, {"AGENT_DB_PATH": self.db_path}, clear=False):
+            with patch.object(client, "_get_client", return_value=mock_client):
+                result = client.complete(prompt="hi", category="test", model="claude-haiku-4-5")
+
+        self.assertEqual(result, "hello world")
+        with sqlite3.connect(self.db_path) as connection:
+            row = connection.execute(
+                """
+                SELECT model, task_type, input_tokens, output_tokens
+                FROM llm_usage
+                ORDER BY id DESC
+                LIMIT 1
+                """
+            ).fetchone()
+
+        self.assertEqual(row[0], "claude-haiku-4-5")
+        self.assertEqual(row[1], "test")
+        self.assertEqual(row[2], 123)
+        self.assertEqual(row[3], 45)
+
+    def test_complete_records_llm_usage_row_with_set_usage_db_path(self):
+        response = SimpleNamespace(
+            content=[SimpleNamespace(type="text", text="hello world")],
+            usage=SimpleNamespace(input_tokens=123, output_tokens=45),
+        )
+        mock_client = SimpleNamespace(messages=SimpleNamespace(create=lambda **_: response))
+        client.set_usage_db_path(self.db_path)
+
+        with patch.dict(os.environ, {}, clear=True):
             with patch.object(client, "_get_client", return_value=mock_client):
                 result = client.complete(prompt="hi", category="test", model="claude-haiku-4-5")
 
