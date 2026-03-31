@@ -6,6 +6,7 @@ from pathlib import Path
 
 import yaml
 
+from output.learning_layer import extract_learning_gaps
 from output.personalize import apply_personalization
 from output.project_relevance import score_project_relevance
 
@@ -184,6 +185,22 @@ def format_signal_report(posts: list[dict], settings) -> str:
         if not project_relevance_lines:
             project_relevance_lines.append("No project matches above threshold.")
 
+    learn_lines: list[str] = []
+    if projects is not None:
+        try:
+            learning_gaps = extract_learning_gaps(posts, projects)
+        except Exception:
+            LOGGER.warning("Failed to extract learning gaps", exc_info=True)
+        else:
+            if learning_gaps:
+                learn_lines.extend(
+                    f"- {gap.get('topic')} (seen {int(gap.get('frequency') or 0)} times) "
+                    f"→ {gap.get('rationale')}"
+                    for gap in learning_gaps[:3]
+                )
+            else:
+                learn_lines.append("No new learning gaps identified.")
+
     sections = [
         "## Strong Signals",
         *strong_lines,
@@ -209,6 +226,14 @@ def format_signal_report(posts: list[dict], settings) -> str:
                 "",
                 "## Project Relevance",
                 *project_relevance_lines,
+            ]
+        )
+    if learn_lines:
+        sections.extend(
+            [
+                "",
+                "## Learn",
+                *learn_lines,
             ]
         )
     return "\n".join(sections).strip() + "\n"
