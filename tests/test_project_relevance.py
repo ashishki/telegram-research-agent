@@ -48,6 +48,50 @@ class TestProjectRelevance(unittest.TestCase):
 
         self.assertIn("cost", results[0]["rationale"].lower())
 
+    def test_exclude_keywords_suppress_score_below_threshold(self):
+        projects = [
+            {
+                "name": "telegram-research-agent",
+                "description": "Weekly digest from Telegram channels.",
+                "focus": "digest quality, clustering accuracy",
+                "keywords": ["digest", "clustering", "signal"],
+                "exclude_keywords": ["film"],
+            }
+        ]
+
+        results = score_project_relevance("Telegram digest clustering for film students", projects)
+
+        self.assertLess(results[0]["score"], 0.1)
+        self.assertIn("excluded", results[0]["rationale"].lower())
+
+    def test_explicit_keywords_list_used_for_matching(self):
+        projects = [
+            {
+                "name": "ai-workflow-playbook",
+                "description": "Reusable AI workflow.",
+                "focus": "",
+                "keywords": ["workflow", "automation", "agent"],
+            }
+        ]
+
+        results = score_project_relevance("Agent workflow automation for code review", projects)
+
+        self.assertGreaterEqual(results[0]["score"], 0.3)
+
+    def test_rationale_includes_matched_explicit_keyword(self):
+        projects = [
+            {
+                "name": "ai-workflow-playbook",
+                "description": "Reusable AI workflow.",
+                "focus": "",
+                "keywords": ["workflow", "automation", "agent"],
+            }
+        ]
+
+        results = score_project_relevance("Workflow automation for code review", projects)
+
+        self.assertIn("workflow", results[0]["rationale"].lower())
+
 
 if __name__ == "__main__":
     unittest.main()
