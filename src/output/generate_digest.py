@@ -10,6 +10,7 @@ from pathlib import Path
 from config.settings import PROJECT_ROOT, Settings
 from llm.client import complete
 from llm.router import route
+from output.signal_report import format_signal_report
 from output.report_schema import (
     DigestResult,
     EvidenceItem,
@@ -172,6 +173,8 @@ def _fetch_scored_posts(connection: sqlite3.Connection, cutoff_iso: str) -> dict
             posts.posted_at,
             posts.signal_score,
             posts.bucket,
+            posts.routed_model,
+            posts.score_breakdown,
             posts.project_matches,
             COALESCE(raw_posts.view_count, 0) AS view_count,
             raw_posts.message_url,
@@ -216,11 +219,15 @@ def _fetch_scored_posts(connection: sqlite3.Connection, cutoff_iso: str) -> dict
         entry = {
             "id": post_id,
             "channel_username": row["channel_username"],
+            "content": row["content"] or "",
             "text_excerpt": _make_excerpt(row["content"]),
             "view_count": int(row["view_count"] or 0),
             "message_url": row["message_url"] or "",
             "topic_label": topic_by_post.get(post_id, "Unlabeled"),
             "signal_score": round(float(row["signal_score"] or 0.0), 4),
+            "bucket": bucket,
+            "routed_model": row["routed_model"] or "",
+            "score_breakdown": row["score_breakdown"] or "",
             "posted_at": row["posted_at"],
         }
         buckets[bucket].append(entry)
@@ -480,6 +487,18 @@ def run_digest(settings: Settings) -> DigestResult:
             category="digest",
             model=route("synthesis"),
         )
+
+        signal_posts = [
+            *buckets["strong"],
+            *buckets["watch"],
+            *buckets["cultural"],
+            *buckets["noise"],
+        ]
+        try:
+            signal_report = format_signal_report(signal_posts, settings)
+            content_md = f"{signal_report}\n{content_md.lstrip()}"
+        except Exception:
+            LOGGER.warning("Signal-first section generation failed; continuing without it", exc_info=True)
 
         # Step 4: Validate output length
         llm_word_count = _count_words(content_md)
