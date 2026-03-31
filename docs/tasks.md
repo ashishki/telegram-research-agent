@@ -1,44 +1,49 @@
-# Telegram Research Agent — Strategic Roadmap v2
+# Telegram Research Agent — Development Roadmap
 
-**Version:** 2.0.0
-**Date:** 2026-03-30
-**Status:** Strategic redesign integrated
-
----
-
-## Purpose
-
-This document is the execution roadmap for subsequent development.
-
-It replaces the older feature-by-feature build order with a dependency-aware plan aligned to the new product definition:
-- personal intelligence system
-- cost-aware model routing
-- signal-first output
-- user-aware prioritization
-
-This is a planning document, not a code task checklist.
-
-Legacy delivery phases remain part of project history, but they are no longer the active execution model.
-Current execution follows `Strategic Roadmap v2` below.
+**Version:** 3.0
+**Date:** 2026-03-31
+**Status:** Roadmap v2 complete. Roadmap v3 starts here.
 
 ---
 
-## Current Execution State
+## Current State
 
-- `Roadmap version`: v2
-- `Current phase`: Phase 1 — Baseline Stabilization
-- `Status`: ready for bounded implementation packet
-- `Primary blocker`: current CI/CD issue must be treated as a baseline blocker inside Phase 1
-- `Do not start yet`: Phase 2+ work, deep personalization, broad surface changes
+Roadmap v2 (Phases 1–8, tasks T29–T64) is complete. 83 tests passing. CI on every push.
 
-### Legacy Bridge
+What exists now:
+- deterministic scoring pipeline (5 dimensions, configurable weights)
+- three-tier model routing (CHEAP/MID/STRONG) with cost logging
+- signal-first report format (`format_signal_report()`) with 8 sections
+- project relevance scoring (keyword matching, `project_relevance_score`)
+- personalization layer (boost/downrank with strong-post floor protection)
+- learning gap detection (`extract_learning_gaps()`)
+- CLI: `score-stats`, `cost-stats`, `health-check`, `report-preview`
+- delivery: Telegram text messages with Markdown sections
 
-- `Legacy phases 1–20`: implementation history and audit trail
-- `Roadmap v2 phases 1–8`: current strategic execution sequence
+What does NOT yet exist:
+- weekly review as a readable article artifact (Telegraph / HTML / Instant View)
+- Telegram notification + separate full artifact link delivery model
+- source traceability links in the report (t.me deep links per signal)
+- "What changed since last week" section (delta computation)
+- "Decisions to consider" section (explicit action items)
+- project action queue (per-project sub-sections)
+- feedback/taste capture (acting-on-signal tracking)
 
-Rule:
-- when docs mention old phases, treat them as historical context only
-- when orchestrating new work, use `Roadmap v2` numbering only
+---
+
+## Roadmap v3 — Next Phases
+
+### Phase 0 — Documentation Reset (COMPLETE)
+
+This phase. Repository documentation aligned with new product framing.
+
+Deliverables:
+- `README.md` rewritten — product thesis, three signal layers, model selection guide
+- `docs/architecture.md` rewritten — component contracts, design constraints
+- `docs/spec.md` updated — framing, schema, AD notes
+- `docs/report_format.md` created — full artifact specification
+- `docs/operator_workflow.md` created — week-to-week operating guide
+- `docs/tasks.md` updated — this document
 
 ---
 
@@ -455,6 +460,185 @@ Package the intelligence system into a stable operator-facing product surface.
 - `report-preview` runs end-to-end and prints signal-first report to stdout
 - README documents all 4 CLI subcommands
 - 77+ tests passing
+
+---
+
+## Roadmap v3 — New Phases
+
+> These phases start after the Phase 0 documentation reset (complete).
+> Roadmap v2 (Phases 1–8) is the foundation. Roadmap v3 builds the delivery surface on top.
+
+---
+
+## Phase 1v3 — Weekly Review Artifact Redesign
+
+**Objective:** Replace the current Markdown-blob Telegram output with a structured, readable review artifact as specified in `docs/report_format.md`.
+
+**Why now:** The scoring, routing, and signal-extraction layers are stable. The content exists. The delivery format is the remaining gap between what the system produces and what is actually useful to read.
+
+**Scope:**
+
+In scope:
+- Generate the full review artifact as an HTML file (9 sections per `docs/report_format.md`)
+- Add source links (`https://t.me/{channel}/{message_id}`) per signal in all sections
+- Split delivery: short Telegram notification (executive summary, ≤300 chars) + link to/attachment of full artifact
+- Add "What Changed Since Last Week" section (delta vs previous `quality_metrics` row)
+- Add "Decisions to Consider" section (populated from strong signals if they have clear action implications — can be static heuristic in v1)
+- Add "Project Action Queue" as per-project sub-sections within existing project relevance section
+
+Out of scope:
+- Telegraph API integration (Phase 4v3)
+- Feedback/taste capture
+- Any scoring or routing changes
+
+**Tasks**
+
+| ID | Task | Owner | Status | Depends On |
+|---|---|---|---|---|
+| T65 | Add `message_url` population in ingestion: ensure `raw_posts.message_url` is set to `https://t.me/{channel_username_clean}/{message_id}` for every ingested post | codex | `[ ]` | — |
+| T66 | Extend `format_signal_report()` to include source URL per signal entry in Strong, Watch, and Project sections | codex | `[ ]` | T65 |
+| T67 | Add "What Changed Since Last Week" section: compare current bucket counts with previous `quality_metrics` row; show delta | codex | `[ ]` | — |
+| T68 | Add "Decisions to Consider" section: for each strong signal, if `actionability_score = implement`, emit a decision-style bullet | codex | `[ ]` | — |
+| T69 | Add "Project Action Queue": restructure project relevance section into per-project sub-sections | codex | `[ ]` | — |
+| T70 | Generate report as HTML file to `data/output/reviews/YYYY-Www.html`; send Telegram notification with executive summary + file attachment | codex | `[ ]` | T66 T67 T68 T69 |
+
+**Validation criteria:**
+- report HTML file is generated and contains all 9 sections
+- every strong/watch entry has a valid `t.me` source link
+- Telegram delivery: notification message ≤ 300 chars; full report attached or linked
+- 83+ tests passing
+
+---
+
+## Phase 2v3 — Project Relevance Strengthening
+
+**Objective:** Make the project relevance layer more precise and less prone to false positives.
+
+**Why now:** Current keyword matching is functional but coarse. As the system is used weekly, project relevance false positives are the most common complaint pattern. This phase sharpens it before adding a feedback mechanism.
+
+**Scope:**
+
+In scope:
+- Add `project_focus_keywords` as an explicit list (not just a free-text field) in `projects.yaml`
+- Update `score_project_relevance()` to use the explicit keyword list with exact match + stemming
+- Add negative keywords per project: `exclude_keywords` that suppress relevance even if focus words match
+- Expose `project_relevance_score` in the report next to each match with matched keywords shown
+- Add test: post with exclude keyword scores < 0.1 despite focus match
+
+Out of scope:
+- LLM-based project matching
+- cross-project deduplication
+
+**Tasks**
+
+| ID | Task | Owner | Status | Depends On |
+|---|---|---|---|---|
+| T71 | Update `projects.yaml` schema: add `keywords: list[str]` and `exclude_keywords: list[str]` | codex | `[ ]` | — |
+| T72 | Update `score_project_relevance()` to use `keywords` list (exact) and apply `exclude_keywords` suppression | codex | `[ ]` | T71 |
+| T73 | Show matched keywords and score in report Project section | codex | `[ ]` | T72 |
+
+**Validation criteria:**
+- project with `exclude_keywords` does not match posts containing those words
+- matched keywords visible in report
+- no regression on existing project relevance tests
+
+---
+
+## Phase 3v3 — Taste / Feedback Loop
+
+**Objective:** Allow the owner to mark signals as "acted on" or "skipped" to inform future boost/downrank suggestions.
+
+**Why now:** The current profile.yaml requires manual editing to tune taste. This phase adds a lightweight feedback capture layer so the system can surface tuning suggestions without the owner having to guess.
+
+**Scope:**
+
+In scope:
+- Add `signal_feedback` table: `{post_id, feedback (acted_on/skipped/marked_important), recorded_at}`
+- Add Telegram bot command `/mark_useful <message_id>` and `/mark_skipped <message_id>` for inline feedback
+- Add `python3 src/main.py tune-suggestions` CLI: analyzes signal_feedback, suggests boost/downrank topic additions
+- Store feedback; do not auto-apply to profile.yaml (owner applies manually)
+
+Out of scope:
+- automatic profile.yaml updates
+- ML-based preference learning
+- feedback-driven scoring weight adjustment
+
+**Tasks**
+
+| ID | Task | Owner | Status | Depends On |
+|---|---|---|---|---|
+| T74 | Add `signal_feedback` table migration | codex | `[ ]` | — |
+| T75 | Add `/mark_useful` and `/mark_skipped` bot commands in `handlers.py` | codex | `[ ]` | T74 |
+| T76 | Add `tune-suggestions` CLI: show topics that frequently appear in acted-on signals but are not in boost list | codex | `[ ]` | T74 |
+
+**Validation criteria:**
+- feedback stored in DB after bot command
+- `tune-suggestions` shows non-empty output when feedback exists
+- no auto-modifications to profile.yaml
+
+---
+
+## Phase 4v3 — Article-Style Delivery Surface
+
+**Objective:** Deliver the weekly review as a Telegraph article readable inside Telegram with Instant View.
+
+**Why now:** HTML file attachment is a functional but clunky delivery. Telegraph articles are the cleanest reading experience inside Telegram — full-screen, scrollable, source links inline.
+
+**Scope:**
+
+In scope:
+- Publish weekly HTML review to Telegraph via the Telegraph API
+- Send Telegram notification with Telegraph article URL instead of file attachment
+- Telegraph article title: "Research Review — YYYY-Www"
+- Fallback: if Telegraph API unavailable, send HTML file attachment (existing Phase 1v3 behavior)
+
+Out of scope:
+- custom domain for articles
+- article editing / version history
+- multi-article archives
+
+**Tasks**
+
+| ID | Task | Owner | Status | Depends On |
+|---|---|---|---|---|
+| T77 | Add `src/delivery/telegraph.py` with `publish_article(title, html_content) -> str` returning article URL | codex | `[ ]` | T70 |
+| T78 | Wire `telegraph.py` into digest delivery: publish → get URL → send Telegram notification with URL | codex | `[ ]` | T77 |
+| T79 | Add fallback: if Telegraph publish fails, attach HTML file (existing behavior) | codex | `[ ]` | T78 |
+
+**Validation criteria:**
+- `publish_article()` returns a valid URL
+- Telegram notification contains the article URL
+- fallback to file attachment works when Telegraph API unavailable
+
+---
+
+## Phase 5v3 — Observability and Polish
+
+**Objective:** Make the system's behavior visible and trustworthy over long-term use.
+
+**Scope:**
+
+In scope:
+- Weekly `cost-per-run` trend in `cost-stats` CLI (last 4 runs comparison)
+- `score-stats` shows trend vs previous week
+- Add `cluster_coherence` score per post (currently hardcoded 0.5) using actual silhouette score from `cluster_runs`
+- Expand `health-check` to include last run timestamp, last digest week, any stuck queues
+
+Out of scope:
+- dashboards
+- external monitoring integrations
+
+---
+
+## Phase Priority Rationale
+
+| Phase | Why this order |
+|---|---|
+| 1v3 — Report redesign | Content quality exists; delivery gap is the bottleneck for weekly value |
+| 2v3 — Project relevance | Most common false-positive source; fix before adding feedback |
+| 3v3 — Feedback loop | Can only be meaningful after delivery is good enough to generate real reactions |
+| 4v3 — Telegraph delivery | Polish on top of working content; don't polish before content is right |
+| 5v3 — Observability | Ongoing; no hard dependency, can run in parallel with Phase 4v3 |
 
 ---
 
