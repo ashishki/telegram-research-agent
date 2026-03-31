@@ -1,6 +1,8 @@
 import json
 import logging
+import os
 import re
+import sqlite3
 from collections import Counter
 from pathlib import Path
 
@@ -75,6 +77,99 @@ def _parse_score_breakdown(value: str | None) -> dict:
     return parsed if isinstance(parsed, dict) else {}
 
 
+def _format_source_suffix(message_url: str | None) -> str:
+    url = (message_url or "").strip()
+    return f" | Source: {url}" if url else ""
+
+
+def _format_compact_signal_line(post: dict, include_model: bool = False) -> str:
+    prefix = f"- [score={float(post.get('signal_score') or 0.0):.2f}] "
+    if include_model:
+        prefix += f"[model={post.get('routed_model') or 'unknown'}] "
+    return (
+        f"{prefix}"
+        f"{_truncate_words(post.get('content'), 20)}"
+        f"{_format_source_suffix(post.get('message_url'))}"
+    )
+
+
+def _load_previous_quality_metrics() -> dict | None:
+    db_path = os.environ.get("AGENT_DB_PATH", "").strip()
+    if not db_path:
+        return None
+    try:
+        with sqlite3.connect(db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            row = connection.execute(
+                """
+                SELECT strong_count, watch_count, noise_count
+                FROM quality_metrics
+                ORDER BY computed_at DESC, id DESC
+                LIMIT 1
+                """
+            ).fetchone()
+    except sqlite3.Error:
+        LOGGER.warning("Failed to load previous quality metrics from %s", db_path, exc_info=True)
+        return None
+    return dict(row) if row is not None else None
+
+
+def _build_what_changed_lines(bucket_counts: Counter) -> list[str]:
+    previous = _load_previous_quality_metrics()
+    if previous is None:
+        return ["No comparison baseline available."]
+
+    lines = []
+    for bucket_name in ("strong", "watch", "noise"):
+        current = int(bucket_counts.get(bucket_name, 0))
+        prior = int(previous.get(f"{bucket_name}_count", 0))
+        delta = current - prior
+        delta_label = f"{delta:+d}"
+        lines.append(f"{bucket_name}: {current} (was {prior}, {delta_label})")
+    return lines
+
+
+def _build_decision_lines(strong_posts: list[dict]) -> list[str]:
+    items: list[str] = []
+    for post in strong_posts:
+        score_breakdown = _parse_score_breakdown(post.get("score_breakdown"))
+        topic_relevance = float(score_breakdown.get("topic_relevance", 0) or 0)
+        word_count = int(post.get("word_count") or len((post.get("content") or "").split()))
+        if topic_relevance >= 0.8 or word_count >= 80:
+            excerpt = _truncate_words(post.get("content"), 15)
+            if excerpt:
+                items.append(f"- Consider: {excerpt}.")
+        if len(items) >= 3:
+            break
+    return items or ["No decision-forcing signals this week."]
+
+
+def _build_project_action_lines(posts: list[dict], projects: list[dict]) -> list[str]:
+    grouped_matches: dict[str, list[str]] = {}
+    for post in posts:
+        matches = score_project_relevance(post.get("content", ""), projects)
+        for match in matches:
+            if float(match.get("score") or 0.0) < 0.3:
+                continue
+            grouped_matches.setdefault(str(match.get("name") or "unknown"), []).append(
+                f"- [relevance={float(match.get('score') or 0.0):.2f}] "
+                f"{match.get('rationale')} -> {_truncate_words(post.get('content'), 12)}"
+                f"{_format_source_suffix(post.get('message_url'))}"
+            )
+
+    if not grouped_matches:
+        return ["No project signals above threshold this week."]
+
+    lines: list[str] = []
+    for project_name in sorted(grouped_matches):
+        entries = grouped_matches[project_name]
+        if lines:
+            lines.append("")
+        lines.append(f"**{project_name}** ({len(entries)} signals)")
+        lines.extend(entries)
+    return lines
+
+
 def _extract_topics_from_breakdown(score_breakdown: dict) -> list[str]:
     for key in ("topics", "topic_labels"):
         value = score_breakdown.get(key)
@@ -141,16 +236,32 @@ def format_signal_report(posts: list[dict], settings) -> str:
     noise_posts = [post for post in ranked_posts if post.get("bucket") == "noise"]
 
     strong_lines = [
-        f"- [score={float(post.get('signal_score') or 0.0):.2f}] "
-        f"[model={post.get('routed_model') or 'unknown'}] "
-        f"{'[personalized] ' if original_rank_by_id.get(post.get('_original_position')) != personalized_rank_by_id.get(post.get('_original_position')) else ''}"
-        f"{_truncate_words(post.get('content'), 20)}"
+        _format_compact_signal_line(
+            {
+                **post,
+                "content": (
+                    f"[personalized] {_truncate_words(post.get('content'), 20)}"
+                    if original_rank_by_id.get(post.get("_original_position"))
+                    != personalized_rank_by_id.get(post.get("_original_position"))
+                    else post.get("content")
+                ),
+            },
+            include_model=True,
+        )
         for post in strong_posts
     ]
     watch_lines = [
-        f"- [score={float(post.get('signal_score') or 0.0):.2f}] "
-        f"{'[personalized] ' if original_rank_by_id.get(post.get('_original_position')) != personalized_rank_by_id.get(post.get('_original_position')) else ''}"
-        f"{_truncate_words(post.get('content'), 20)}"
+        _format_compact_signal_line(
+            {
+                **post,
+                "content": (
+                    f"[personalized] {_truncate_words(post.get('content'), 20)}"
+                    if original_rank_by_id.get(post.get("_original_position"))
+                    != personalized_rank_by_id.get(post.get("_original_position"))
+                    else post.get("content")
+                ),
+            }
+        )
         for post in watch_posts
     ]
     cultural_lines = [
@@ -170,20 +281,12 @@ def format_signal_report(posts: list[dict], settings) -> str:
         ),
     ]
 
+    what_changed_lines = _build_what_changed_lines(bucket_counts)
+    decision_lines = _build_decision_lines(strong_posts)
     project_relevance_lines: list[str] = []
     projects = _load_projects()
     if projects is not None:
-        for post in strong_posts + watch_posts:
-            matches = score_project_relevance(post.get("content", ""), projects)
-            for match in matches:
-                if float(match.get("score") or 0.0) < 0.3:
-                    continue
-                project_relevance_lines.append(
-                    f"- [{match.get('name')}] (score={float(match.get('score') or 0.0):.2f}): "
-                    f"{match.get('rationale')} — {_truncate_words(post.get('content'), 10)}"
-                )
-        if not project_relevance_lines:
-            project_relevance_lines.append("No project matches above threshold.")
+        project_relevance_lines = _build_project_action_lines(strong_posts + watch_posts, projects)
 
     learn_lines: list[str] = []
     if projects is not None:
@@ -205,6 +308,9 @@ def format_signal_report(posts: list[dict], settings) -> str:
         "## Strong Signals",
         *strong_lines,
         "",
+        "## Decisions to Consider",
+        *decision_lines,
+        "",
         "## Watch",
         *watch_lines,
         "",
@@ -219,12 +325,15 @@ def format_signal_report(posts: list[dict], settings) -> str:
         "",
         "## Stats",
         *stats_lines,
+        "",
+        "## What Changed",
+        *what_changed_lines,
     ]
     if projects is not None:
         sections.extend(
             [
                 "",
-                "## Project Relevance",
+                "## Project Action Queue",
                 *project_relevance_lines,
             ]
         )

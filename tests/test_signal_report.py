@@ -1,3 +1,6 @@
+import os
+import sqlite3
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -12,11 +15,13 @@ class TestSignalReport(unittest.TestCase):
 
         for header in (
             "## Strong Signals",
+            "## Decisions to Consider",
             "## Watch",
             "## Cultural",
             "## Ignored",
             "## Think Layer",
             "## Stats",
+            "## What Changed",
         ):
             self.assertIn(header, report)
 
@@ -69,7 +74,41 @@ class TestSignalReport(unittest.TestCase):
 
         self.assertLess(report.index("higher priority strong"), report.index("lower priority strong"))
 
-    def test_project_relevance_section_shows_matches_above_threshold(self):
+    def test_strong_entry_includes_source_url_when_present(self):
+        posts = [
+            {
+                "id": 1,
+                "content": "A strong post about agent workflows and inference optimization for production systems",
+                "signal_score": 0.85,
+                "bucket": "strong",
+                "routed_model": "claude-opus-4-6",
+                "score_breakdown": "{}",
+                "message_url": "https://t.me/testchan/123",
+            }
+        ]
+
+        report = format_signal_report(posts, settings=None)
+
+        self.assertIn("| Source: https://t.me/testchan/123", report)
+
+    def test_strong_entry_omits_source_url_when_missing(self):
+        posts = [
+            {
+                "id": 1,
+                "content": "A strong post without source url in the payload",
+                "signal_score": 0.85,
+                "bucket": "strong",
+                "routed_model": "claude-opus-4-6",
+                "score_breakdown": "{}",
+                "message_url": "",
+            }
+        ]
+
+        report = format_signal_report(posts, settings=None)
+
+        self.assertNotIn("| Source:", report)
+
+    def test_project_action_queue_groups_matches_by_project(self):
         posts = [
             {
                 "id": 1,
@@ -79,13 +118,24 @@ class TestSignalReport(unittest.TestCase):
                 "routed_model": "claude-opus-4-6",
                 "score_breakdown": "{}",
             }
+            ,
+            {
+                "id": 2,
+                "content": "Telegram digest quality insight generation clustering accuracy delivery UX for weekly research workflow",
+                "signal_score": 0.72,
+                "bucket": "watch",
+                "routed_model": "claude-sonnet-4-6",
+                "score_breakdown": "{}",
+                "message_url": "https://t.me/test/2",
+            }
         ]
 
         report = format_signal_report(posts, settings=None)
 
-        self.assertIn("## Project Relevance", report)
-        self.assertIn("[gdev-agent]", report)
-        self.assertIn("(score=", report)
+        self.assertIn("## Project Action Queue", report)
+        self.assertIn("**gdev-agent**", report)
+        self.assertIn("**telegram-research-agent**", report)
+        self.assertIn("[relevance=", report)
 
     def test_project_relevance_skips_section_when_projects_config_fails(self):
         posts = [
@@ -95,7 +145,77 @@ class TestSignalReport(unittest.TestCase):
         with patch("output.signal_report.yaml.safe_load", side_effect=yaml.YAMLError("invalid yaml")):
             report = format_signal_report(posts, settings=None)
 
-        self.assertNotIn("## Project Relevance", report)
+        self.assertNotIn("## Project Action Queue", report)
+
+    def test_what_changed_uses_previous_quality_metrics_row(self):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+            db_path = tmp.name
+
+        try:
+            with sqlite3.connect(db_path) as connection:
+                connection.execute(
+                    """
+                    CREATE TABLE quality_metrics (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        week_label TEXT NOT NULL UNIQUE,
+                        computed_at TEXT NOT NULL,
+                        total_posts INTEGER NOT NULL DEFAULT 0,
+                        strong_count INTEGER NOT NULL DEFAULT 0,
+                        watch_count INTEGER NOT NULL DEFAULT 0,
+                        cultural_count INTEGER NOT NULL DEFAULT 0,
+                        noise_count INTEGER NOT NULL DEFAULT 0,
+                        avg_signal_score REAL,
+                        project_match_count INTEGER NOT NULL DEFAULT 0,
+                        output_word_count INTEGER NOT NULL DEFAULT 0
+                    )
+                    """
+                )
+                connection.execute(
+                    """
+                    INSERT INTO quality_metrics (
+                        week_label, computed_at, strong_count, watch_count, noise_count
+                    ) VALUES (?, ?, ?, ?, ?)
+                    """,
+                    ("2026-W13", "2026-03-24T00:00:00Z", 3, 1, 4),
+                )
+                connection.commit()
+
+            posts = [
+                {"id": 1, "content": "strong item", "signal_score": 0.9, "bucket": "strong", "routed_model": "m1", "score_breakdown": "{}"},
+                {"id": 2, "content": "strong item two", "signal_score": 0.88, "bucket": "strong", "routed_model": "m1", "score_breakdown": "{}"},
+                {"id": 3, "content": "watch item one", "signal_score": 0.55, "bucket": "watch", "routed_model": "m2", "score_breakdown": "{}"},
+                {"id": 4, "content": "watch item two", "signal_score": 0.52, "bucket": "watch", "routed_model": "m2", "score_breakdown": "{}"},
+                {"id": 5, "content": "noise item", "signal_score": 0.05, "bucket": "noise", "routed_model": "m3", "score_breakdown": "{}"},
+            ]
+
+            with patch.dict(os.environ, {"AGENT_DB_PATH": db_path}, clear=False):
+                report = format_signal_report(posts, settings=None)
+
+            self.assertIn("## What Changed", report)
+            self.assertIn("strong: 2 (was 3, -1)", report)
+            self.assertIn("watch: 2 (was 1, +1)", report)
+            self.assertIn("noise: 1 (was 4, -3)", report)
+        finally:
+            os.unlink(db_path)
+
+    def test_decisions_section_uses_strong_long_post(self):
+        long_content = " ".join(f"word{i}" for i in range(90))
+        posts = [
+            {
+                "id": 1,
+                "content": long_content,
+                "signal_score": 0.92,
+                "bucket": "strong",
+                "routed_model": "claude-opus-4-6",
+                "score_breakdown": "{}",
+                "word_count": 90,
+            }
+        ]
+
+        report = format_signal_report(posts, settings=None)
+
+        self.assertIn("## Decisions to Consider", report)
+        self.assertIn("- Consider:", report)
 
 
 if __name__ == "__main__":
