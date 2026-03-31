@@ -1,130 +1,227 @@
 # Telegram Research Agent
 
-Персональная intelligence-система для фильтрации Telegram-сигналов, приоритизации по проектам и управляемого learning loop.
-
-Система уходит от модели "еженедельный AI-дайджест" к модели "личный слой принятия решений":
-- что действительно важно сейчас
-- что влияет на активные проекты
-- что стоит изучить глубже
-- что можно проигнорировать без потерь
+Персональная intelligence-система: читает Telegram-каналы, фильтрует шум, выдаёт структурированный отчёт о том, что важно — для тебя и твоих проектов.
 
 ---
 
-## Что изменилось
+## Зачем
 
-Новая целевая архитектура строится вокруг трёх обязательных способностей:
-- `Model routing`: дешёвые модели фильтруют поток, сильные модели получают только high-value сигналы
-- `Signal-first output`: выход больше не выглядит как информационный дайджест; он разделён на Strong signals, Project relevance, Weak signals, Think layer, Light/cultural, Ignored
-- `Personalization`: система учитывает интересы, приоритеты, anti-preferences и накопленную историю выбора
+Каждую неделю через Telegram-каналы проходит ~200–500 постов. Большинство — шум, переупаковки, объявления. Несколько штук реально влияют на то, что ты делаешь или должен изучить.
 
-Это меняет и продукт, и порядок разработки. План реализации теперь описан как поэтапный execution roadmap в [docs/tasks.md](/home/ashishki/Documents/dev/ai-stack/projects/telegram-research-agent/docs/tasks.md).
+Этот агент делает одно: отделяет сигнал от шума и объясняет почему.
 
 ---
 
-## Целевой продукт
+## Что ты получаешь
 
-На входе:
-- Telegram-каналы и их история
-- профиль пользователя
-- активные проекты
-- накопленная история сигналов, решений и learning goals
+После запуска digest — отчёт в Telegram и/или файл. Структура фиксированная:
 
-На выходе:
-- краткий weekly intelligence report
-- приоритизированные сигналы по силе и проектной релевантности
-- learning guidance по реально значимым темам
-- прозрачная стоимость каждого запуска и понятная трассировка решений
+```
+## Strong Signals
+- [score=0.87] [model=claude-opus-4-6] Claude 4 анонсировал нативную поддержку...
+- [score=0.81] [model=claude-opus-4-6] Новый подход к eval pipeline для агентов...
 
----
+## Watch
+- [score=0.61] Исследование по latency в RAG системах показало...
+- [score=0.54] FastAPI 0.115 — изменения в dependency injection...
 
-## High-Level Architecture
+## Cultural
+- Мем про vibe coding набирает обороты в сообществе...
 
-```text
-Telegram ingestion
-  -> preprocessing
-  -> deterministic scoring
-  -> model routing
-  -> interpretation
-  -> project lens
-  -> learning layer
-  -> signal-first output
-  -> Telegram / files / future surfaces
+## Ignored
+3 posts filtered as noise. Top topics: ChatGPT tips, funding round, NFT
 
-Cross-cutting:
-  personalization
-  observability
+## Think Layer
+Themes and patterns will be synthesized here.
+
+## Stats
+Total: 47 posts | strong: 2 | watch: 12 | cultural: 3 | noise: 30
+
+## Project Relevance
+- [gdev-agent] (score=0.71): Matches: fastapi, cost, async — Claude 4 анонсировал...
+- [telegram-research-agent] (score=0.45): Matches: eval, pipeline — Исследование по...
+
+## Learn
+- langchain (seen 4 times) → Appeared 4 times in strong/watch posts, not in any project focus
+- structured_output (seen 3 times) → Appeared 3 times in strong/watch posts, not in any project focus
 ```
 
-Текущее целевое описание слоёв и их контрактов находится в [docs/architecture.md](/home/ashishki/Documents/dev/ai-stack/projects/telegram-research-agent/docs/architecture.md).
+**Strong Signals** — то, что нужно прочитать сегодня. Каждый пункт показывает score и модель, которая его обработала.
+
+**Watch** — интересно, но не срочно. Можно вернуться позже.
+
+**Cultural** — контекст сообщества, мемы, атмосфера. Полезно для понимания трендов, не требует действий.
+
+**Ignored** — только счётчик. Контент не показывается, только сколько отфильтровано и по каким темам.
+
+**Project Relevance** — какие посты из Strong/Watch касаются твоих активных проектов и почему (конкретные совпадающие ключевые слова).
+
+**Learn** — темы, которые регулярно появляются в качественных постах, но ещё не покрыты ни одним из твоих проектов. Кандидаты для следующего learning gap.
 
 ---
 
-## Phased Development
+## Как это работает
 
-Актуальная последовательность разработки:
-1. Baseline stabilization
-2. Scoring foundation
-3. Model routing
-4. Signal-first output
-5. Project relevance upgrade
-6. Personalization / taste model
-7. Learning layer refinement
-8. Productization / surface layer
-
-Для каждой фазы зафиксированы:
-- цель
-- что входит и что не входит
-- зависимости
-- риски
-- критерии готовности
-- quality gates
-
-Источник истины: [docs/tasks.md](/home/ashishki/Documents/dev/ai-stack/projects/telegram-research-agent/docs/tasks.md).
-
----
-
-## Development Workflow
-
-Разработка идёт по циклу:
-
-```text
-Strategist -> Orchestrator -> Codex -> Review -> Fixes
+```
+Telegram каналы
+  → ingestion (Telethon)
+  → scoring (signal_score 0–1, bucket, score_breakdown)
+  → routing (CHEAP / MID / STRONG модель по score)
+  → signal-first report (format_signal_report)
+  → personalization (boost/downrank по profile.yaml)
+  → project relevance (keyword matching по projects.yaml)
+  → learning gaps (темы не покрытые проектами)
+  → доставка в Telegram
 ```
 
-Роли и правила handoff описаны в:
-- [docs/dev-cycle.md](/home/ashishki/Documents/dev/ai-stack/projects/telegram-research-agent/docs/dev-cycle.md)
-- [docs/prompts/workflow_orchestrator.md](/home/ashishki/Documents/dev/ai-stack/projects/telegram-research-agent/docs/prompts/workflow_orchestrator.md)
-- [docs/IMPLEMENTATION_CONTRACT.md](/home/ashishki/Documents/dev/ai-stack/projects/telegram-research-agent/docs/IMPLEMENTATION_CONTRACT.md)
+Scoring **детерминированный** — никаких LLM на этом этапе. LLM получает только то, что прошло через routing layer.
 
 ---
 
-## Operator Commands
+## Выбор модели
 
-| Command | Description | Example |
-|---|---|---|
-| `score-stats` | Bucket counts and average signal scores for recently scored posts | `python3 src/main.py score-stats` |
-| `cost-stats` | LLM cost breakdown grouped by model | `python3 src/main.py cost-stats` |
-| `health-check` | DB connectivity/status plus config file presence checks | `python3 src/main.py health-check` |
-| `report-preview` | Preview the current signal-first report from the DB | `python3 src/main.py report-preview` |
+### Три уровня
+
+| Тир | Модель (по умолчанию) | Когда используется | Стоимость |
+|---|---|---|---|
+| CHEAP | `claude-haiku-4-5-20251001` | noise / cultural посты, score < 0.45 | $0.80 / $4.00 per M tokens |
+| MID | `claude-sonnet-4-6` | watch посты, score 0.45–0.74 | $3.00 / $15.00 per M tokens |
+| STRONG | `claude-opus-4-6` | strong посты, synthesis, score ≥ 0.75 | $15.00 / $75.00 per M tokens |
+
+### Где твоё внимание
+
+**Если прогоны стоят слишком дорого:**
+- Проверь `python3 src/main.py cost-stats` — посмотри на долю STRONG вызовов
+- Если STRONG > 20% постов — пороговое значение `STRONG_THRESHOLD` (0.75) можно поднять через env var
+- Или понизь MID_MODEL на более дешёвую модель
+
+**Если качество Strong сигналов низкое:**
+- Скорее всего порог занижен — слишком много постов доходит до STRONG
+- Подними `STRONG_MODEL` (Opus) или убедись что scoring.yaml настроен правильно
+
+**Если хочешь сэкономить на тестах:**
+```bash
+export CHEAP_MODEL=claude-haiku-4-5-20251001
+export MID_MODEL=claude-haiku-4-5-20251001   # понизить MID до CHEAP
+export STRONG_MODEL=claude-sonnet-4-6         # понизить STRONG до MID
+```
+
+**Рекомендация по умолчанию:** оставь дефолты. Haiku для фильтрации, Sonnet для watch, Opus только для strong сигналов и synthesis — это оптимальный баланс quality/cost при недельном прогоне.
+
+### Настройка через env vars
+
+```bash
+export CHEAP_MODEL=claude-haiku-4-5-20251001   # по умолчанию
+export MID_MODEL=claude-sonnet-4-6             # по умолчанию
+export STRONG_MODEL=claude-opus-4-6            # по умолчанию
+export AGENT_DB_PATH=/path/to/your/agent.db
+export ANTHROPIC_API_KEY=sk-ant-...
+```
 
 ---
 
-## Documentation That Matters
+## Персонализация
 
-Ключевые документы:
-- [docs/spec.md](/home/ashishki/Documents/dev/ai-stack/projects/telegram-research-agent/docs/spec.md) — product/spec contract
-- [docs/architecture.md](/home/ashishki/Documents/dev/ai-stack/projects/telegram-research-agent/docs/architecture.md) — component boundaries and data flow
-- [docs/tasks.md](/home/ashishki/Documents/dev/ai-stack/projects/telegram-research-agent/docs/tasks.md) — phased implementation roadmap
-- [docs/dev-cycle.md](/home/ashishki/Documents/dev/ai-stack/projects/telegram-research-agent/docs/dev-cycle.md) — execution workflow
-- [docs/prompts/](/home/ashishki/Documents/dev/ai-stack/projects/telegram-research-agent/docs/prompts) — prompt contracts
+Редактируй `src/config/profile.yaml`:
+
+```yaml
+boost_topics:        # эти темы повышают score × 1.3 (cap 1.0)
+  - "AI agents"
+  - "FastAPI"
+  - "cost control"
+
+downrank_topics:     # эти темы снижают score × 0.5
+  - "crypto"
+  - "NFT"
+  - "ChatGPT tips"
+
+downrank_sources:    # каналы с низким качеством сигнала
+  - "@NeuralShit"
+```
+
+**Важно:** strong посты (score ≥ 0.75) не могут быть downranked ниже watch threshold (0.45). Система защищает объективно важные сигналы от подавления личными предпочтениями.
 
 ---
 
-## Current Priority
+## Проекты
 
-Следующий implementation focus:
-- сначала стабилизировать baseline и сделать scoring reproducible
-- потом ввести routing layer
-- только после этого перестроить output и добавлять personalization
+Редактируй `src/config/projects.yaml`:
 
-Персонализацию нельзя делать раньше устойчивого scoring и routing. Иначе система начнёт оптимизировать шум.
+```yaml
+projects:
+  - name: my-project
+    description: "Краткое описание"
+    focus: "ключевые слова через запятую, технологии, термины"
+```
+
+Чем конкретнее `focus` — тем точнее Project Relevance. Система ищет keyword overlap между постом и полем focus. Порог включения: score ≥ 0.3.
+
+---
+
+## CLI команды
+
+```bash
+# Проверить состояние системы
+python3 src/main.py health-check
+
+# Посмотреть распределение постов по bucket
+python3 src/main.py score-stats
+
+# Посмотреть расходы на LLM по моделям
+python3 src/main.py cost-stats
+
+# Предпросмотр signal-first отчёта из текущей БД
+python3 src/main.py report-preview
+```
+
+### Пример: health-check
+
+```
+DB: /data/agent.db
+  posts: 312
+  scored_posts: 298
+  llm_usage rows: 47
+
+Config files:
+  profile.yaml: present
+  projects.yaml: present
+  scoring.yaml: present
+```
+
+### Пример: score-stats
+
+```
+strong: count=8 avg_signal_score=0.8300
+watch: count=41 avg_signal_score=0.5800
+cultural: count=12 avg_signal_score=0.3100
+noise: count=241 avg_signal_score=0.1500
+top_topics: llm_agents (12), fastapi (8), eval (6)
+```
+
+### Пример: cost-stats
+
+```
+total_cost_usd: 0.0183
+claude-opus-4-6: 3 calls | $0.0142
+claude-sonnet-4-6: 18 calls | $0.0038
+claude-haiku-4-5-20251001: 241 calls | $0.0003
+distinct days: 1
+```
+
+---
+
+## Документация
+
+- `docs/architecture.md` — компонентная карта, data flow, контракты слоёв
+- `docs/tasks.md` — Roadmap v2, все фазы и задачи
+- `docs/IMPLEMENTATION_CONTRACT.md` — правила для codex/implementer
+- `src/config/profile.yaml` — персонализация (boost/downrank)
+- `src/config/projects.yaml` — активные проекты
+- `src/config/scoring.yaml` — настройки scoring thresholds
+
+---
+
+## Статус
+
+Roadmap v2 реализован полностью (фазы 1–8, задачи T29–T64).
+Тестов: 83. CI: pytest на каждый push.
