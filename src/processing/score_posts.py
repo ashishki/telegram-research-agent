@@ -205,11 +205,26 @@ def _score_source_quality(
     return round(base_weight * view_ratio, 4)
 
 
+def _fetch_latest_silhouette_score(conn: sqlite3.Connection) -> float:
+    """Return the silhouette_score from the most recent cluster run, or 0.5 as default."""
+    try:
+        row = conn.execute(
+            "SELECT silhouette_score FROM cluster_runs ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        if row and row[0] is not None:
+            score = float(row[0])
+            return max(0.0, min(1.0, score))
+    except sqlite3.Error:
+        pass
+    return 0.5
+
+
 def _score_technical_depth(
     has_code: int,
     url_count: int,
     word_count: int,
     depth_weights: dict[str, float],
+    coherence_score: float = 0.5,
 ) -> float:
     """
     Returns a score in [0, 1] based on structural proxies for depth.
@@ -222,9 +237,6 @@ def _score_technical_depth(
 
     # word_count: 0 at 0 words, 1.0 at ≥80 words
     word_score = min(1.0, word_count / 80.0)
-
-    # cluster_coherence: not available per-post cheaply, default to 0.5
-    coherence_score = 0.5
 
     return round(
         code_score * depth_weights.get("has_code", 0.35)
@@ -390,6 +402,7 @@ def score_posts(
         post_topics_map = _fetch_post_topics(conn, post_ids)
         topic_history = _fetch_topic_history(conn, lookback_weeks)
         channel_max_views = _fetch_channel_max_views(conn, since_days)
+        coherence_score = _fetch_latest_silhouette_score(conn)
 
         scored_rows: list[tuple[float, str, float, str, str, str, str, int]] = []
 
@@ -412,6 +425,7 @@ def score_posts(
                     post["url_count"],
                     post["word_count"],
                     depth_weights,
+                    coherence_score=coherence_score,
                 )
                 d_novelty = _score_novelty(
                     topic_labels,
