@@ -10,6 +10,7 @@ from pathlib import Path
 
 from config.settings import PROJECT_ROOT, load_settings
 from db.migrate import run_migrations
+from output.signal_report import PROFILE_YAML_PATH as _PROFILE_YAML_PATH
 from ingestion.bootstrap_ingest import run_bootstrap
 from ingestion.incremental_ingest import run_incremental
 from bot.bot import run_bot
@@ -90,6 +91,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     bot_parser = subparsers.add_parser("bot", help="Start Telegram bot interface (long-polling)")
     bot_parser.set_defaults(handler=handle_bot)
+
+    tune_parser = subparsers.add_parser(
+        "tune-suggestions",
+        help="Show boost topic suggestions based on acted-on signal feedback",
+    )
+    tune_parser.set_defaults(handler=handle_tune_suggestions)
 
     return parser
 
@@ -593,6 +600,70 @@ def handle_insight(args: argparse.Namespace) -> int:
         LOGGER.exception("Insight generation failed")
         return 1
 
+    return 0
+
+
+def handle_tune_suggestions(_: argparse.Namespace) -> int:
+    import json
+    import yaml
+
+    settings = load_settings()
+
+    try:
+        run_migrations()
+        with sqlite3.connect(settings.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            rows = connection.execute(
+                """
+                SELECT p.score_breakdown
+                FROM signal_feedback sf
+                JOIN posts p ON p.id = sf.post_id
+                WHERE sf.feedback = 'acted_on'
+                """
+            ).fetchall()
+    except Exception:
+        sys.stdout.write("Could not read feedback data. Run migrations and record some feedback first.\n")
+        return 0
+
+    if not rows:
+        sys.stdout.write("No acted-on feedback found. Use /mark_useful <post_id> to record feedback.\n")
+        return 0
+
+    topic_counts: dict[str, int] = {}
+    for row in rows:
+        breakdown = {}
+        try:
+            breakdown = json.loads(row["score_breakdown"] or "{}") or {}
+        except (TypeError, json.JSONDecodeError):
+            pass
+        topic = breakdown.get("topic") or ""
+        if isinstance(topic, str) and topic.strip():
+            topic_counts[topic.strip()] = topic_counts.get(topic.strip(), 0) + 1
+        for label in (breakdown.get("topics") or []):
+            if isinstance(label, str) and label.strip():
+                topic_counts[label.strip()] = topic_counts.get(label.strip(), 0) + 1
+
+    boost_topics: list[str] = []
+    try:
+        profile_data = yaml.safe_load(_PROFILE_YAML_PATH.read_text(encoding="utf-8")) or {}
+        boost_topics = [str(t).lower() for t in (profile_data.get("boost_topics") or [])]
+    except Exception:
+        pass
+
+    suggestions = [
+        (topic, count)
+        for topic, count in topic_counts.items()
+        if count >= 2 and topic.lower() not in boost_topics
+    ]
+    suggestions.sort(key=lambda x: x[1], reverse=True)
+
+    if not suggestions:
+        sys.stdout.write("No suggestions — boost list may already cover your acted-on signals.\n")
+        return 0
+
+    sys.stdout.write("Suggested boost topics (appeared in acted-on signals but not in your profile):\n")
+    for topic, count in suggestions:
+        sys.stdout.write(f"  - {topic} (seen {count} times)\n")
     return 0
 
 
