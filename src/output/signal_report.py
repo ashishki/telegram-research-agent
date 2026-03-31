@@ -289,6 +289,8 @@ def format_signal_report(posts: list[dict], settings) -> str:
         project_relevance_lines = _build_project_action_lines(strong_posts + watch_posts, projects)
 
     learn_lines: list[str] = []
+    if projects is None:
+        LOGGER.warning("Learning layer skipped: projects config unavailable")
     if projects is not None:
         try:
             learning_gaps = extract_learning_gaps(posts, projects)
