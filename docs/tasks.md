@@ -306,6 +306,22 @@ Make project relevance a first-class decision layer rather than an append-only i
 - users can see why an item matters for a specific project
 - false-positive project links are reduced
 
+**Tasks**
+
+| ID | Task | Owner | Status | Depends On |
+|---|---|---|---|---|
+| T52 | Create `src/output/project_relevance.py` with `score_project_relevance(post_content, projects) -> list[dict]` — for each project returns `{name, score (0.0-1.0), rationale (str)}` using keyword overlap from project focus/description; no LLM call | codex | `[ ]` | T51 |
+| T53 | Add `project_relevance` section to `signal_report.py` — replace or supplement existing project_matches with top 3 project matches (score ≥ 0.3 threshold), each showing project name + rationale; add after Stats section | codex | `[ ]` | T52 |
+| T54 | Add `project_relevance_score REAL` column to `posts` table (idempotent migration); populate with max project match score after scoring | codex | `[ ]` | T52 |
+| T55 | 3 tests in `tests/test_project_relevance.py`: (a) post with focus keywords returns score ≥ 0.5 for matching project; (b) post with no keyword overlap returns score < 0.2 for all projects; (c) score_project_relevance returns rationale string | codex | `[ ]` | T52 |
+
+**Phase 5 Review Criteria**
+- `score_project_relevance()` uses keyword matching (no LLM), returns score + rationale per project
+- Only matches with score ≥ 0.3 appear in signal report
+- `posts` table has `project_relevance_score` column
+- False positives reduced: unrelated posts don't appear in project section
+- 66+ tests passing
+
 ---
 
 ## Phase 6 — Personalization / Taste Model
