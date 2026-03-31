@@ -347,6 +347,16 @@ def handle_score_stats(_: argparse.Namespace) -> int:
                 """,
                 (cutoff,),
             ).fetchall()
+
+            # Trend vs previous week from quality_metrics
+            qm_rows = connection.execute(
+                """
+                SELECT week_label, strong_count, watch_count, noise_count, total_posts
+                FROM quality_metrics
+                ORDER BY week_label DESC
+                LIMIT 2
+                """
+            ).fetchall()
     except Exception:
         LOGGER.exception("Score stats failed")
         return 1
@@ -360,6 +370,17 @@ def handle_score_stats(_: argparse.Namespace) -> int:
         lines.append("top_topics: " + ", ".join(f"{row['label']} ({int(row['topic_count'])})" for row in topic_rows))
     else:
         lines.append("top_topics: none")
+
+    if len(qm_rows) >= 2:
+        current_qm, prior_qm = qm_rows[0], qm_rows[1]
+        lines.append(f"trend vs {prior_qm['week_label']}:")
+        for col in ("strong_count", "watch_count", "noise_count"):
+            cur = int(current_qm[col] or 0)
+            prev = int(prior_qm[col] or 0)
+            delta = cur - prev
+            lines.append(f"  {col}: {cur} ({delta:+d})")
+    elif len(qm_rows) == 1:
+        lines.append(f"trend: only one run recorded ({qm_rows[0]['week_label']}), no comparison yet")
 
     sys.stdout.write("\n".join(lines) + "\n")
     return 0
@@ -398,6 +419,19 @@ def handle_cost_stats(_: argparse.Namespace) -> int:
                 ORDER BY total_cost_usd DESC, model ASC
                 """
             ).fetchall()
+            # Weekly cost trend: last 4 distinct weeks
+            weekly_rows = connection.execute(
+                """
+                SELECT
+                    strftime('%Y-W%W', called_at) AS week,
+                    COALESCE(SUM(est_cost_usd), 0.0) AS week_cost,
+                    COUNT(*) AS call_count
+                FROM llm_usage
+                GROUP BY week
+                ORDER BY week DESC
+                LIMIT 4
+                """
+            ).fetchall()
     except Exception:
         LOGGER.exception("Cost stats failed")
         return 1
@@ -415,6 +449,14 @@ def handle_cost_stats(_: argparse.Namespace) -> int:
             )
     else:
         lines.append("none")
+
+    if weekly_rows:
+        lines.append("weekly_trend (last 4 weeks):")
+        for row in weekly_rows:
+            lines.append(
+                f"  {row['week']}  calls={int(row['call_count'] or 0)}  "
+                f"cost=${float(row['week_cost'] or 0.0):.6f}"
+            )
 
     sys.stdout.write("\n".join(lines) + "\n")
     return 0
@@ -447,17 +489,38 @@ def handle_health_check(_: argparse.Namespace) -> int:
     if db_path.exists():
         try:
             with sqlite3.connect(db_path) as connection:
+                connection.row_factory = sqlite3.Row
                 posts_count = int(connection.execute("SELECT COUNT(*) FROM posts").fetchone()[0])
                 scored_posts_count = int(
                     connection.execute("SELECT COUNT(*) FROM posts WHERE scored_at IS NOT NULL").fetchone()[0]
                 )
                 llm_usage_count = int(connection.execute("SELECT COUNT(*) FROM llm_usage").fetchone()[0])
+                last_ingestion = (
+                    connection.execute("SELECT MAX(ingested_at) FROM raw_posts").fetchone()[0] or "never"
+                )
+                last_scored = (
+                    connection.execute("SELECT MAX(scored_at) FROM posts").fetchone()[0] or "never"
+                )
+                last_digest_row = connection.execute(
+                    "SELECT week_label FROM digests ORDER BY week_label DESC LIMIT 1"
+                ).fetchone()
+                last_digest = last_digest_row[0] if last_digest_row else "none"
+                unscored_count = int(
+                    connection.execute(
+                        "SELECT COUNT(*) FROM posts WHERE scored_at IS NULL"
+                    ).fetchone()[0]
+                )
         except Exception as exc:
             lines.append(f"db_error: {exc}")
         else:
             lines.append(f"posts: {posts_count}")
             lines.append(f"scored_posts: {scored_posts_count}")
             lines.append(f"llm_usage: {llm_usage_count}")
+            lines.append(f"last_ingestion: {last_ingestion}")
+            lines.append(f"last_scored: {last_scored}")
+            lines.append(f"last_digest: {last_digest}")
+            if unscored_count > 0:
+                lines.append(f"WARNING: {unscored_count} posts pending scoring (stuck queue?)")
     else:
         lines.append("db_status: missing")
 
