@@ -29,6 +29,11 @@ except ImportError:  # pragma: no cover
     from src.bot.telegram_delivery import send_document, send_text
 
 try:
+    from delivery.telegraph import publish_article
+except ImportError:  # pragma: no cover
+    from src.delivery.telegraph import publish_article
+
+try:
     from integrations.github_crossref import NO_OVERLAP_NOTE, crossref_repos_to_topics
     from integrations.github_sync import sync_github_projects
 except Exception:  # pragma: no cover
@@ -142,6 +147,22 @@ def _send_weekly_review_to_telegram_owner(
         return
 
     notification = _build_review_notification(week_label, strong_count, watch_count, strongest_signal)
+
+    # Try Telegraph first
+    if html_path is not None:
+        try:
+            html_content = html_path.read_text(encoding="utf-8")
+            url = publish_article(title=f"Research Review {week_label}", html_content=html_content)
+            send_text(chat_id=chat_id, text=f"{notification}\n{url}", token=token, parse_mode=None)
+            LOGGER.info("Weekly review published to Telegraph week=%s url=%s", week_label, url)
+            return
+        except Exception:
+            LOGGER.warning(
+                "Failed to publish Telegraph article week=%s; falling back to HTML attachment",
+                week_label,
+                exc_info=True,
+            )
+
     send_text(chat_id=chat_id, text=notification, token=token, parse_mode=None)
 
     if html_path is None:
