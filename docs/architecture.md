@@ -1,6 +1,6 @@
 # Architecture
 
-**Version:** 3.0
+**Version:** 4.0
 **Date:** 2026-03-31
 
 ---
@@ -32,19 +32,21 @@ This is an intentional product decision, not a cost hack:
 
 ```text
 Telegram Channels
-  → Ingestion Layer          (Telethon, MTProto, raw storage)
+  → Ingestion Layer          (Telethon, MTProto, raw storage, message_url)
   → Preprocessing Layer      (normalize, detect language, extract metadata)
-  → Scoring Layer            (deterministic signal_score, bucket assignment)
+  → Scoring Layer            (deterministic signal_score, bucket assignment, silhouette coherence)
   → Routing Layer            (select model tier: CHEAP / MID / STRONG / skip)
   → Interpretation Layer     (LLM runs only on routed subsets)
-  → Project Lens             (keyword-based relevance per active project)
+  → Project Lens             (explicit keyword lists, exclude_keywords suppression)
   → Personalization Layer    (boost/downrank adjustments, floor protection)
   → Learning Layer           (recurring topics not covered by any project)
-  → Output Layer             (weekly review artifact assembly)
-  → Delivery                 (Telegram notification + full artifact)
+  → Output Layer             (9-section weekly review artifact with source traceability)
+  → Render Layer             (HTML generation: render_report.py)
+  → Delivery Layer           (Telegraph publish → Telegram URL; fallback: HTML file)
+  → Feedback Layer           (signal_feedback table, /mark_useful, /mark_skipped, tune-suggestions)
 
 Cross-cutting:
-  Observability Layer        (cost tracking, routing distribution, quality metrics)
+  Observability Layer        (cost tracking + 4-week trend, routing distribution + delta, health-check)
 ```
 
 ---
@@ -151,6 +153,9 @@ Zero LLM usage.
 Threshold for inclusion in report: score ≥ 0.3.
 Each match returns: `{name, score, rationale}` (rationale = matching keywords).
 
+Uses explicit `keywords` list per project if present; falls back to tokenizing `focus` + `description`.
+`exclude_keywords`: if any exclude keyword appears in post content AND there is a focus match, score is suppressed to 0.05.
+
 Source: `src/output/project_relevance.py`
 Config: `src/config/projects.yaml`
 
@@ -185,15 +190,46 @@ Source: `src/output/learning_layer.py`
 
 Assembles the weekly review artifact from all upstream layers.
 
-Target: structured readable article (see `docs/report_format.md` for full section spec).
-
-Current implementation: `format_signal_report()` produces a Markdown/HTML document with 8+ structured sections, personalized ordering, project relevance section, and learn section.
-
-Target delivery:
-1. Telegram notification: executive summary (fits in one message) + link
-2. Full artifact: Telegraph article or HTML file, readable inside Telegram
+`format_signal_report()` produces a 9-section Markdown document:
+1. Strong Signals (with source URLs, model tier, personalization tag)
+2. Decisions to Consider (action items from strong signals)
+3. Watch
+4. Cultural
+5. Ignored (noise count + top topics)
+6. Think Layer
+7. Stats
+8. What Changed (delta vs previous quality_metrics row)
+9. Project Action Queue (per-project sub-sections with matched keywords)
+10. Learn (recurring topics not in any project focus)
 
 Source: `src/output/signal_report.py`, `src/output/learning_layer.py`, `src/output/project_relevance.py`, `src/output/personalize.py`
+
+### Render Layer
+
+Converts `format_signal_report()` Markdown output to HTML.
+Writes to `data/output/reviews/YYYY-Www.html`.
+Zero LLM usage.
+
+Source: `src/output/render_report.py`
+
+### Delivery Layer
+
+Primary: publishes HTML to Telegraph via the Telegraph API.
+Returns article URL → appended to Telegram notification.
+Fallback 1: if Telegraph fails → sends HTML file as Telegram document attachment.
+Fallback 2: if document send fails → sends full Markdown text.
+
+Supports `TELEGRAPH_TOKEN` env var to reuse existing account (skip createAccount step).
+
+Source: `src/delivery/telegraph.py`, `src/output/generate_digest.py`
+
+### Feedback Layer
+
+Captures inline signal feedback from the owner via Telegram bot commands.
+Stores in `signal_feedback` table. Never auto-modifies `profile.yaml`.
+`tune-suggestions` CLI analyzes acted-on feedback and surfaces boost topic candidates.
+
+Source: `src/db/migrate.py` (record_feedback), `src/bot/handlers.py` (handle_mark_useful, handle_mark_skipped), `src/main.py` (handle_tune_suggestions)
 
 ---
 
@@ -216,14 +252,15 @@ Source: `src/llm/client.py:_record_usage()`, `src/output/generate_digest.py:_sto
 
 | Table | Purpose |
 |---|---|
-| `raw_posts` | Immutable ingestion records from Telegram |
+| `raw_posts` | Immutable ingestion records from Telegram (includes `message_url`) |
 | `posts` | Normalized, scored, routed view of raw_posts |
 | `topics` | Cluster-derived topic labels |
 | `post_topics` | Post ↔ topic membership with confidence |
 | `llm_usage` | Per-call LLM cost and token tracking |
-| `quality_metrics` | Per-run scoring distribution snapshots |
-| `cluster_runs` | Clustering run metadata |
+| `quality_metrics` | Per-run scoring distribution snapshots (used for What Changed delta) |
+| `cluster_runs` | Clustering run metadata (silhouette_score used for cluster_coherence) |
 | `study_plans` | Generated study plan artifacts |
+| `signal_feedback` | Owner feedback per post: `acted_on / skipped / marked_important` |
 
 ### Key columns on `posts`
 

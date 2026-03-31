@@ -1,33 +1,29 @@
 # Telegram Research Agent — Development Roadmap
 
-**Version:** 3.0
+**Version:** 4.0
 **Date:** 2026-03-31
-**Status:** Roadmap v2 complete. Roadmap v3 starts here.
+**Status:** Roadmap v2 complete. Roadmap v3 complete. 106 tests passing.
 
 ---
 
 ## Current State
 
-Roadmap v2 (Phases 1–8, tasks T29–T64) is complete. 83 tests passing. CI on every push.
+Roadmap v2 (Phases 1–8, tasks T29–T64) complete. Roadmap v3 (Phases 1v3–5v3, tasks T65–T79) complete. 106 tests passing. CI on every push.
 
 What exists now:
-- deterministic scoring pipeline (5 dimensions, configurable weights)
-- three-tier model routing (CHEAP/MID/STRONG) with cost logging
-- signal-first report format (`format_signal_report()`) with 8 sections
-- project relevance scoring (keyword matching, `project_relevance_score`)
+- deterministic scoring pipeline (5 dimensions, configurable weights, actual cluster coherence from silhouette_score)
+- three-tier model routing (CHEAP/MID/STRONG) with full cost logging
+- 9-section signal-first weekly review artifact with source traceability (t.me links per signal)
+- "What Changed Since Last Week" delta section vs quality_metrics history
+- "Decisions to Consider" section from strong signals
+- "Project Action Queue" per-project sub-sections with matched keywords
+- project relevance with explicit `keywords` list and `exclude_keywords` suppression
 - personalization layer (boost/downrank with strong-post floor protection)
 - learning gap detection (`extract_learning_gaps()`)
-- CLI: `score-stats`, `cost-stats`, `health-check`, `report-preview`
-- delivery: Telegram text messages with Markdown sections
-
-What does NOT yet exist:
-- weekly review as a readable article artifact (Telegraph / HTML / Instant View)
-- Telegram notification + separate full artifact link delivery model
-- source traceability links in the report (t.me deep links per signal)
-- "What changed since last week" section (delta computation)
-- "Decisions to consider" section (explicit action items)
-- project action queue (per-project sub-sections)
-- feedback/taste capture (acting-on-signal tracking)
+- feedback loop: `signal_feedback` table, `/mark_useful`, `/mark_skipped` bot commands
+- `tune-suggestions` CLI: boost topic recommendations from acted-on feedback
+- HTML render (`render_report.py`) + Telegraph publish (fallback: HTML file attachment)
+- CLI: `score-stats` (with trend), `cost-stats` (with 4-week trend), `health-check` (enriched), `report-preview`, `tune-suggestions`
 
 ---
 
@@ -495,12 +491,12 @@ Out of scope:
 
 | ID | Task | Owner | Status | Depends On |
 |---|---|---|---|---|
-| T65 | Add `message_url` population in ingestion: ensure `raw_posts.message_url` is set to `https://t.me/{channel_username_clean}/{message_id}` for every ingested post | codex | `[ ]` | — |
-| T66 | Extend `format_signal_report()` to include source URL per signal entry in Strong, Watch, and Project sections | codex | `[ ]` | T65 |
-| T67 | Add "What Changed Since Last Week" section: compare current bucket counts with previous `quality_metrics` row; show delta | codex | `[ ]` | — |
-| T68 | Add "Decisions to Consider" section: for each strong signal, if `actionability_score = implement`, emit a decision-style bullet | codex | `[ ]` | — |
-| T69 | Add "Project Action Queue": restructure project relevance section into per-project sub-sections | codex | `[ ]` | — |
-| T70 | Generate report as HTML file to `data/output/reviews/YYYY-Www.html`; send Telegram notification with executive summary + file attachment | codex | `[ ]` | T66 T67 T68 T69 |
+| T65 | Add `message_url` population in ingestion: ensure `raw_posts.message_url` is set to `https://t.me/{channel_username_clean}/{message_id}` for every ingested post | codex | `[x]` | — |
+| T66 | Extend `format_signal_report()` to include source URL per signal entry in Strong, Watch, and Project sections | codex | `[x]` | T65 |
+| T67 | Add "What Changed Since Last Week" section: compare current bucket counts with previous `quality_metrics` row; show delta | codex | `[x]` | — |
+| T68 | Add "Decisions to Consider" section: for each strong signal, if `actionability_score = implement`, emit a decision-style bullet | codex | `[x]` | — |
+| T69 | Add "Project Action Queue": restructure project relevance section into per-project sub-sections | codex | `[x]` | — |
+| T70 | Generate report as HTML file to `data/output/reviews/YYYY-Www.html`; send Telegram notification with executive summary + file attachment | codex | `[x]` | T66 T67 T68 T69 |
 
 **Validation criteria:**
 - report HTML file is generated and contains all 9 sections
@@ -533,9 +529,9 @@ Out of scope:
 
 | ID | Task | Owner | Status | Depends On |
 |---|---|---|---|---|
-| T71 | Update `projects.yaml` schema: add `keywords: list[str]` and `exclude_keywords: list[str]` | codex | `[ ]` | — |
-| T72 | Update `score_project_relevance()` to use `keywords` list (exact) and apply `exclude_keywords` suppression | codex | `[ ]` | T71 |
-| T73 | Show matched keywords and score in report Project section | codex | `[ ]` | T72 |
+| T71 | Update `projects.yaml` schema: add `keywords: list[str]` and `exclude_keywords: list[str]` | codex | `[x]` | — |
+| T72 | Update `score_project_relevance()` to use `keywords` list (exact) and apply `exclude_keywords` suppression | codex | `[x]` | T71 |
+| T73 | Show matched keywords and score in report Project section | codex | `[x]` | T72 |
 
 **Validation criteria:**
 - project with `exclude_keywords` does not match posts containing those words
@@ -567,9 +563,9 @@ Out of scope:
 
 | ID | Task | Owner | Status | Depends On |
 |---|---|---|---|---|
-| T74 | Add `signal_feedback` table migration | codex | `[ ]` | — |
-| T75 | Add `/mark_useful` and `/mark_skipped` bot commands in `handlers.py` | codex | `[ ]` | T74 |
-| T76 | Add `tune-suggestions` CLI: show topics that frequently appear in acted-on signals but are not in boost list | codex | `[ ]` | T74 |
+| T74 | Add `signal_feedback` table migration | codex | `[x]` | — |
+| T75 | Add `/mark_useful` and `/mark_skipped` bot commands in `handlers.py` | codex | `[x]` | T74 |
+| T76 | Add `tune-suggestions` CLI: show topics that frequently appear in acted-on signals but are not in boost list | codex | `[x]` | T74 |
 
 **Validation criteria:**
 - feedback stored in DB after bot command
@@ -601,9 +597,9 @@ Out of scope:
 
 | ID | Task | Owner | Status | Depends On |
 |---|---|---|---|---|
-| T77 | Add `src/delivery/telegraph.py` with `publish_article(title, html_content) -> str` returning article URL | codex | `[ ]` | T70 |
-| T78 | Wire `telegraph.py` into digest delivery: publish → get URL → send Telegram notification with URL | codex | `[ ]` | T77 |
-| T79 | Add fallback: if Telegraph publish fails, attach HTML file (existing behavior) | codex | `[ ]` | T78 |
+| T77 | Add `src/delivery/telegraph.py` with `publish_article(title, html_content) -> str` returning article URL | codex | `[x]` | T70 |
+| T78 | Wire `telegraph.py` into digest delivery: publish → get URL → send Telegram notification with URL | codex | `[x]` | T77 |
+| T79 | Add fallback: if Telegraph publish fails, attach HTML file (existing behavior) | codex | `[x]` | T78 |
 
 **Validation criteria:**
 - `publish_article()` returns a valid URL

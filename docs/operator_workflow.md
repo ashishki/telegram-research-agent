@@ -1,6 +1,6 @@
 # Operator Workflow
 
-**Version:** 1.0
+**Version:** 2.0
 **Audience:** System owner (single user, personal use)
 
 ---
@@ -51,18 +51,32 @@ Changes take effect on next scoring run. No restart required.
 ### On-Demand Commands
 
 ```bash
-# Verify system health before the week
+# Verify system health — DB, config, last run timestamps, unscored post count
 python3 src/main.py health-check
 
-# Inspect score distribution from last run
+# Inspect score distribution from last run (+ trend vs previous week)
 python3 src/main.py score-stats
 
-# Check LLM cost from last run
+# Check LLM cost from last run (+ 4-week weekly trend)
 python3 src/main.py cost-stats
 
 # Preview the report without re-running the full pipeline
 python3 src/main.py report-preview
+
+# Get boost topic suggestions based on acted-on feedback
+python3 src/main.py tune-suggestions
 ```
+
+### Inline Feedback (from Telegram)
+
+While reading the weekly review, mark signals directly:
+```
+/mark_useful <post_id>    → records acted_on feedback
+/mark_skipped <post_id>   → records skipped feedback
+```
+
+Post IDs are visible in the review source appendix. Feedback is stored in `signal_feedback` table.
+After several weeks of feedback, run `tune-suggestions` to see recommended boost topic additions.
 
 ---
 
@@ -123,18 +137,23 @@ The scoring engine re-reads YAML config on every run. Changes apply without rest
 
 ---
 
-## Feedback Loop (Current Limitations)
+## Feedback Loop
 
-The system does not currently:
-- Learn from which signals you actually acted on
-- Remember "this was useful" across weeks
-- Adjust weights based on reading behavior
+The system captures lightweight feedback without automatic profile changes.
 
-These are intentional deferments, not design failures.
+**How it works:**
+1. You read the weekly review (Telegraph article or HTML file)
+2. For signals you acted on: send `/mark_useful <post_id>` to the bot
+3. For signals you skipped: send `/mark_skipped <post_id>`
+4. After a few weeks: `python3 src/main.py tune-suggestions` surfaces topics appearing ≥2 times in acted-on signals that are not yet in your `boost_topics`
+5. You decide which suggestions to add to `profile.yaml` manually
 
-The current taste model is explicit rules in `profile.yaml`. This is auditable, predictable, and sufficient for weekly use.
+**Design constraint:** `profile.yaml` is never auto-modified. The feedback loop surfaces suggestions only. You control your taste profile explicitly.
 
-Future evolution (Phase 3): introduce a lightweight feedback capture — marking signals as "acted on" or "skipped" — to inform future boost/downrank suggestions.
+**Current limitations:**
+- Feedback is stored but not yet used to adjust scoring weights
+- No week-over-week "I acted on this theme" tracking beyond per-post marking
+- Suggestions require at least 2 acted-on signals per topic to surface
 
 ---
 

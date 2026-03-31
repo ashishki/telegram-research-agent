@@ -1,7 +1,7 @@
 # Weekly Review Artifact — Format Specification
 
-**Version:** 1.0
-**Status:** Active target — implementation in Phase 1
+**Version:** 2.0
+**Status:** Implemented — Roadmap v3 complete
 
 ---
 
@@ -24,9 +24,9 @@ Format: plain text or minimal HTML.
 
 **Tier 2 — Full review artifact**
 A well-structured, readable long-form document.
-Delivered as: a Telegraph article (preferred), an attached HTML file, or a multi-part Telegram message.
-Must be readable inside Telegram without opening an external app.
-Must be scannable — section headers, bullet points, source links inline.
+Delivered as: a Telegraph article (primary), an attached HTML file (fallback if Telegraph unavailable), or a full Markdown text (final fallback).
+Readable inside Telegram without opening an external app.
+Scannable — section headers, bullet points, source links inline per signal.
 
 ---
 
