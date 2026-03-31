@@ -1,344 +1,264 @@
-# Telegram Research Agent — Architecture
+# Architecture
 
-**Version:** 2.0.0
-**Date:** 2026-03-30
-**Status:** Strategic redesign aligned
-
----
-
-## Overview
-
-This system is no longer defined as a digest bot.
-
-It is a personal intelligence system that:
-- filters noisy Telegram flow into ranked signals
-- estimates which signals matter for active projects
-- adapts ranking to the user's evolving taste
-- produces compact decision-support output instead of a generic summary
-
-This document is the high-level architecture contract for future implementation phases.
+**Version:** 3.0
+**Date:** 2026-03-31
 
 ---
 
-## What Changed
+## System Role
 
-Previous center of gravity:
-- ingest posts
-- cluster topics
-- generate digest
+This is a personal research intelligence pipeline. It is not a digest bot, not a summarizer, not a generic AI agent.
 
-New center of gravity:
-- ingest posts
-- score and rank them deterministically
-- route only selected items to appropriate model tiers
-- interpret them through a project and personal lens
-- emit signal-first output with explicit discard handling
+Its role is to do one thing well: process a high-volume noisy Telegram stream and produce a compact, evidence-forward weekly review that directly supports the owner's decisions.
 
-Three structural additions drive the redesign:
-- `Routing layer`: required to make model usage conditional and cost-aware
-- `Personalization layer`: required to make prioritization user-specific rather than generic
-- `Updated output layer`: required to convert analysis into action-support instead of information dump
+The system is built for single-user personal use. It is production-ready in the sense that it runs reliably on a private VPS, is fully automated, and its outputs are trustworthy enough to act on. It is not production-ready in the sense of handling multiple users, high availability, or external traffic.
 
 ---
 
-## Component Map
+## Core Design Decision
+
+**Deterministic scoring before any LLM call.**
+
+Every post is scored without LLMs, using a weighted formula across five dimensions. This score controls which model tier (if any) processes the post. Most posts never reach an LLM.
+
+This is an intentional product decision, not a cost hack:
+- LLMs are expensive and add non-determinism. They should be reserved for material that has already passed a quality gate.
+- Scoring is reproducible and tunable through configuration files. No retraining, no labeled datasets.
+- The system's behavior is auditable: you can trace exactly why a post was filtered or promoted.
+
+---
+
+## Pipeline
 
 ```text
-Telegram Sources
-  ->
-Ingestion Layer
-  ->
-Preprocessing Layer
-  ->
-Scoring Layer
-  ->
-Routing Layer
-  ->
-Interpretation Layer
-  ->
-Project Lens
-  ->
-Learning Layer
-  ->
-Output Layer
-  ->
-Telegram / Files / Future UI
+Telegram Channels
+  → Ingestion Layer          (Telethon, MTProto, raw storage)
+  → Preprocessing Layer      (normalize, detect language, extract metadata)
+  → Scoring Layer            (deterministic signal_score, bucket assignment)
+  → Routing Layer            (select model tier: CHEAP / MID / STRONG / skip)
+  → Interpretation Layer     (LLM runs only on routed subsets)
+  → Project Lens             (keyword-based relevance per active project)
+  → Personalization Layer    (boost/downrank adjustments, floor protection)
+  → Learning Layer           (recurring topics not covered by any project)
+  → Output Layer             (weekly review artifact assembly)
+  → Delivery                 (Telegram notification + full artifact)
 
 Cross-cutting:
-  Personalization Layer
-  Observability Layer
+  Observability Layer        (cost tracking, routing distribution, quality metrics)
 ```
 
 ---
 
-## Layer Definitions
+## Three Signal Value Layers
 
-### 1. Ingestion Layer
+Every signal carries three independent relevance estimates:
 
-Purpose:
-- retrieve raw Telegram messages
-- preserve source metadata
-- write immutable raw records
+| Layer | Stored as | Driven by |
+|---|---|---|
+| Global signal strength | `signal_score` | `scoring.yaml` weights + `channels.yaml` priority |
+| Personal taste relevance | boost/downrank applied to `personalized_score` | `profile.yaml` boost/downrank topics |
+| Project relevance | `project_relevance_score` | `projects.yaml` keyword matching |
 
-Why it stays separate:
-- reliability and idempotency rules belong here
-- ingestion must remain independent from any model usage
-
-Core outputs:
-- raw post content
-- source/channel metadata
-- stable message identifiers and URLs
+These three axes are independent. A post can be globally strong but personally irrelevant, or watch-tier globally but project-critical. The output layer surfaces all three explicitly.
 
 ---
 
-### 2. Preprocessing Layer
+## Layer Contracts
 
-Purpose:
-- normalize text
-- derive lightweight metadata
-- prepare posts for scoring and matching
+### Ingestion Layer
 
-Responsibilities:
-- cleanup and normalization
-- language detection
-- metadata extraction
-- topic preparation and cluster support
-
-Why it is required:
-- routing and personalization need structured, comparable inputs
-- this layer keeps later decisions reproducible and cheap
-
-Constraint:
-- no expensive interpretation should happen here
+Retrieves raw Telegram messages via Telethon (MTProto user client).
+Writes immutable records to `raw_posts`. Idempotent on `(channel_id, message_id)`.
+Never modifies existing records.
+Zero LLM usage.
+Source: `src/ingestion/`
 
 ---
 
-### 3. Scoring Layer
+### Preprocessing Layer
 
-Purpose:
-- produce the first reliable estimate of signal value before any expensive model call
-
-Responsibilities:
-- deterministic scoring dimensions
-- source quality weighting
-- novelty / actionability heuristics
-- preliminary strong/weak/noise segmentation
-
-Why it is required:
-- model routing without scoring is blind
-- personalization without scoring overfits preferences onto noise
-
-This is now the foundation layer for all later reasoning.
-
-Implementation:
-- `src/processing/score_posts.py` — deterministic scoring engine; writes `signal_score`, `bucket`, `project_matches`, `interpretation` to the `posts` table
-- Configuration surface: `src/config/scoring.yaml` (scoring weights and thresholds), `src/config/profile.yaml` (per-user boost/downrank rules)
+Normalizes text, extracts structural metadata (has_code, url_count, word_count), detects language.
+Prepares posts for scoring. Assigns topics via TF-IDF clustering.
+Zero LLM usage (topic labels are cluster-derived, not LLM-generated per post).
+Source: `src/processing/normalize.py`, `src/processing/cluster.py`
 
 ---
 
-### 4. Routing Layer
+### Scoring Layer
 
-Purpose:
-- decide whether a post should be ignored, processed cheaply, escalated to a mid-tier model, or sent to a strong model
+Computes `signal_score` for each post. Fully deterministic. No LLM.
 
-Responsibilities:
-- `CHEAP / MID / STRONG` tier mapping
-- conditional execution
-- batch selection
-- budget enforcement
-- fallback behavior when confidence is low or cost budget is near limit
+Formula:
+```
+signal_score = personal_interest×0.30 + source_quality×0.20 + technical_depth×0.20 + novelty×0.15 + actionability×0.15
+```
 
-Why it is new:
-- the old system assumed synthesis first
-- the new system requires most items to die early, cheaply
+Dimensions:
+- `personal_interest`: topic label match against `profile.yaml` boost/downrank lists
+- `source_quality`: channel priority weight × normalized view count within channel
+- `technical_depth`: structural proxies — code presence, link count, word count
+- `novelty`: recency of topic relative to 4-week history
+- `actionability`: heuristic inference — implement / pattern / awareness / noise
 
-Without routing:
-- cost scales with volume
-- strong models see too much low-value material
-- output quality degrades because interpretation attention is wasted on noise
+Bucket assignment:
+- `strong` ≥ 0.75
+- `watch` 0.45–0.74
+- `cultural` — triggered by `cultural_keywords` in profile.yaml, regardless of score
+- `noise` — everything else
 
-Implementation:
-- `src/llm/router.py` — `route(task_type, signal_score)` selects model tier; thresholds: `WATCH_THRESHOLD=0.45` (CHEAP→MID), `STRONG_THRESHOLD=0.75` (MID→STRONG); `task_type="synthesis"` always routes to STRONG_MODEL
-- Note: per-post score-based routing (`route(signal_score=score)`) is implemented but not yet wired to any production call site. This is Phase 3 pre-wiring scaffolding. Only `route("synthesis")` is active in production (`src/output/generate_digest.py`)
-- LLM calls are made via the `anthropic` SDK through `src/llm/client.py`; `client.py` records usage per call to the `llm_usage` table via `_record_usage()`, with cost estimated via `router.estimate_cost_usd()`
+Also computes and stores: `score_breakdown` (JSON, per-dimension), `scored_at`, `score_run_id`, `routed_model`, `project_relevance_score`.
 
----
-
-### 5. Interpretation Layer
-
-Purpose:
-- convert routed items into concise semantic judgments
-
-Responsibilities:
-- explain why a signal matters
-- summarize implications
-- generate structured evidence objects, not free-form prose only
-
-Why it is required:
-- scoring tells us that something might matter
-- interpretation explains what it means
-
-Constraint:
-- interpretation only runs on routed subsets, never on the full corpus
+Source: `src/processing/score_posts.py`
+Config: `src/config/scoring.yaml`, `src/config/profile.yaml`
 
 ---
 
-### 6. Project Lens
+### Routing Layer
 
-Purpose:
-- estimate relevance to active projects and initiatives
+Maps scored posts to model tiers. Called by the scoring layer (per-post) and output layer (synthesis).
 
-Responsibilities:
-- project matching
-- relevance tiering
-- rationale generation
-- separation between generally important signals and project-specific signals
+```
+task_type="synthesis"        → STRONG_MODEL (always)
+signal_score >= 0.75         → STRONG_MODEL
+signal_score 0.45–0.74       → MID_MODEL
+signal_score < 0.45          → CHEAP_MODEL
+signal_score = None          → CHEAP_MODEL + warning logged
+```
 
-Why it is required:
-- users do not need "important in general"
-- they need "important for what I am building"
+Default models:
+- `CHEAP_MODEL`: `claude-haiku-4-5-20251001`
+- `MID_MODEL`: `claude-sonnet-4-6`
+- `STRONG_MODEL`: `claude-opus-4-6`
 
-Dependency:
-- depends on scoring and routing being stable enough to avoid drowning projects in false positives
+Overridable via env vars. Cost estimates per call written to `llm_usage` table.
 
----
-
-### 7. Learning Layer
-
-Purpose:
-- turn repeated or strategically important signals into guided learning actions
-
-Responsibilities:
-- detect durable knowledge gaps
-- suggest study directions
-- connect signals to explicit learning objectives
-
-Why it remains downstream:
-- learning should be informed by validated signals and project relevance
-- otherwise the system recommends studying whatever was merely noisy but recent
+Source: `src/llm/router.py`, `src/llm/client.py`
 
 ---
 
-### 8. Output Layer
+### Interpretation Layer
 
-Purpose:
-- package intelligence in a signal-first structure
-
-Target output structure:
-- `Strong signals`
-- `Project relevance`
-- `Weak signals`
-- `Think layer`
-- `Light / cultural`
-- `Ignored`
-
-Why it changed:
-- digest-style output optimizes readability but not actionability
-- the new output must make triage obvious, including what was intentionally discarded
-
-Key principle:
-- the system should surface decisions, not just summaries
+LLM interpretation runs only on posts routed to MID or STRONG tier.
+Never runs on full corpus. Budget: strong+watch bucket posts only.
+Source: `src/output/generate_digest.py`, `src/output/generate_answer.py`
 
 ---
 
-### 9. Personalization Layer
+### Project Lens
 
-Purpose:
-- adapt scoring, routing, ranking, and output ordering to the user's taste and strategic focus
+Keyword-based relevance scoring between post content and active projects.
+Zero LLM usage.
+Threshold for inclusion in report: score ≥ 0.3.
+Each match returns: `{name, score, rationale}` (rationale = matching keywords).
 
-Responsibilities:
-- maintain user profile
-- encode interests and anti-interests
-- keep preference memory
-- apply downranking and boosting rules
-
-Why it is new:
-- a generic intelligence feed is not a personal system
-- two users can see the same corpus and need different outputs
-
-Constraint:
-- personalization must modulate the system, not replace evidence
-- it cannot overrule basic signal quality or create fake relevance
+Source: `src/output/project_relevance.py`
+Config: `src/config/projects.yaml`
 
 ---
 
-### 10. Observability Layer
+### Personalization Layer
 
-Purpose:
-- make every phase measurable and reviewable
+Applies boost/downrank multipliers to `signal_score`:
+- boost topic match: score × 1.3 (cap 1.0)
+- downrank topic match: score × 0.5
+- strong posts (score ≥ 0.75): personalized_score cannot fall below 0.45 (watch floor)
 
-Responsibilities:
-- cost per run
-- routing distribution
-- escalation rate to strong models
-- signal density
-- output length and structure checks
-- relevance and personalization diagnostics
+Strong posts are protected from suppression. Personalization modulates ranking but cannot override objective signal quality.
 
-Why it is required:
-- routing and personalization are unsafe without feedback loops
-- cost-aware systems fail silently if metrics are absent
+Source: `src/output/personalize.py`
+Config: `src/config/profile.yaml`
+
+---
+
+### Learning Layer
+
+Identifies recurring topics in strong/watch posts that are not covered by any project focus.
+Minimum frequency threshold: 2 occurrences.
+Returns up to 5 learning gap candidates.
+Zero LLM usage.
+
+Source: `src/output/learning_layer.py`
+
+---
+
+### Output Layer
+
+Assembles the weekly review artifact from all upstream layers.
+
+Target: structured readable article (see `docs/report_format.md` for full section spec).
+
+Current implementation: `format_signal_report()` produces a Markdown/HTML document with 8+ structured sections, personalized ordering, project relevance section, and learn section.
+
+Target delivery:
+1. Telegram notification: executive summary (fits in one message) + link
+2. Full artifact: Telegraph article or HTML file, readable inside Telegram
+
+Source: `src/output/signal_report.py`, `src/output/learning_layer.py`, `src/output/project_relevance.py`, `src/output/personalize.py`
+
+---
+
+### Observability Layer
+
+Tracks:
+- LLM cost per call → `llm_usage` table
+- Bucket distribution per run → `quality_metrics` table
+- Routing model selection per post → `posts.routed_model`
+
+CLI access: `score-stats`, `cost-stats`, `health-check`
+
+Source: `src/llm/client.py:_record_usage()`, `src/output/generate_digest.py:_store_quality_metrics()`
 
 ---
 
 ## Data Model
 
-### New tables (added Phase 1 / T33–T34)
+### Core tables
 
-| Table | Key columns | Purpose |
+| Table | Purpose |
+|---|---|
+| `raw_posts` | Immutable ingestion records from Telegram |
+| `posts` | Normalized, scored, routed view of raw_posts |
+| `topics` | Cluster-derived topic labels |
+| `post_topics` | Post ↔ topic membership with confidence |
+| `llm_usage` | Per-call LLM cost and token tracking |
+| `quality_metrics` | Per-run scoring distribution snapshots |
+| `cluster_runs` | Clustering run metadata |
+| `study_plans` | Generated study plan artifacts |
+
+### Key columns on `posts`
+
+| Column | Type | Set by |
 |---|---|---|
-| `llm_usage` | `called_at`, `category`, `model`, `input_tokens`, `output_tokens`, `cost_usd`, `duration_ms` | Per-call LLM usage and cost tracking; written by `src/llm/client.py:_record_usage()` |
-| `quality_metrics` | `week_label`, `total_posts`, `strong_count`, `watch_count`, `cultural_count`, `noise_count`, `avg_signal_score`, `project_match_count`, `output_word_count` | Per-run digest quality observability; written by `src/output/generate_digest.py:_store_quality_metrics()` in both early-exit and normal paths |
-| `cluster_runs` | `run_at`, `post_count`, `cluster_count`, `unlabeled_count`, `inertia`, `silhouette_score` | Clustering run metadata and global silhouette score; written by `src/processing/cluster.py` |
-| `study_plans` | `week_label`, `generated_at`, `content_md`, `topics_covered`, `reminder_sent_tue`, `reminder_sent_fri` | Generated study plans with reminder delivery state |
-
-### New columns on existing tables (added Phase 1)
-
-| Table | New columns | Purpose |
-|---|---|---|
-| `posts` | `signal_score REAL`, `bucket TEXT`, `project_matches TEXT`, `interpretation TEXT` | Scoring engine output; written by `src/processing/score_posts.py` |
-| `post_project_links` | `tier TEXT`, `rationale TEXT` | Project relevance inference tier and reasoning |
-| `raw_posts` | `message_url TEXT`, `image_description TEXT` | Stable message URL (`https://t.me/{channel}/{id}`) and LLM vision analysis output |
+| `signal_score` | REAL | `score_posts()` |
+| `bucket` | TEXT | `score_posts()` |
+| `score_breakdown` | TEXT (JSON) | `score_posts()` |
+| `score_run_id` | TEXT | `score_posts()` |
+| `scored_at` | TEXT | `score_posts()` |
+| `routed_model` | TEXT | `score_posts()` via `route()` |
+| `project_relevance_score` | REAL | `score_posts()` via `score_project_relevance()` |
 
 ---
 
-## Architectural Sequencing Rules
+## Build Order Constraint
 
-The build order is strict:
-1. Baseline stabilization
-2. Scoring foundation
-3. Routing layer
-4. Signal-first output
-5. Project relevance upgrade
-6. Personalization
-7. Learning refinement
-8. Productization
+The implementation sequence is not arbitrary. Dependencies are real:
 
-Rules:
-- routing must not be introduced before scoring is measurable
-- personalization must not be introduced before routing and project relevance are stable
-- product surface work must not outrun output quality
+1. **Scoring** must be stable before routing can be calibrated
+2. **Routing** must exist before per-post model selection is meaningful
+3. **Project relevance** depends on stable scoring (avoid drowning projects in false positives)
+4. **Personalization** depends on both scoring and routing (must modulate real signals, not noise)
+5. **Output redesign** depends on all upstream layers being stable
+6. **Delivery surface** is the last layer — polishing delivery before output quality is proven is waste
 
 ---
 
 ## Design Constraints
 
-- Expensive models must only see filtered subsets
-- Output must preserve a visible ignored/noise decision
-- Personalization must be auditable
-- Project relevance must remain separable from general importance
-- Every phase must define success metrics before implementation starts
+These do not change without explicit reconsideration:
 
----
-
-## Required Documentation Alignment
-
-Any implementation change that affects this architecture must also update:
-- `README.md`
-- `docs/spec.md`
-- `docs/tasks.md`
-- `docs/dev-cycle.md`
-- relevant prompt docs in `docs/prompts/`
-- review and evaluation checklists
-
-No phase is considered complete while architecture and execution docs disagree.
+- Expensive models only see filtered subsets — never the full corpus
+- Every discarded post must be accounted for (noise section in output)
+- Personalization must be auditable — no opaque learned preferences
+- Project relevance must be separable from general importance
+- Source traceability is required — every signal in the report must link back to its origin
+- Scoring must remain deterministic — no stochastic elements in the filter stage
