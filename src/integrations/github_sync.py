@@ -11,6 +11,8 @@ from typing import Any
 
 import yaml
 
+from output.context_memory import refresh_project_context_snapshot
+
 
 LOGGER = logging.getLogger(__name__)
 GITHUB_API_BASE = "https://api.github.com"
@@ -80,6 +82,25 @@ def _fetch_weekly_commits(repo_full_name: str, since_iso: str) -> tuple[int, boo
     return len(payload), rate_limited
 
 
+def _fetch_recent_commit_messages(repo_full_name: str, since_iso: str, limit: int = 8) -> tuple[list[str], bool]:
+    query = urllib.parse.urlencode({"since": since_iso, "per_page": limit})
+    url = f"{GITHUB_API_BASE}/repos/{repo_full_name}/commits?{query}"
+    payload, rate_limited = _request_json(url)
+    if not isinstance(payload, list):
+        return [], rate_limited
+    messages: list[str] = []
+    for item in payload:
+        if not isinstance(item, dict):
+            continue
+        commit = item.get("commit") or {}
+        if not isinstance(commit, dict):
+            continue
+        message = str(commit.get("message") or "").strip()
+        if message:
+            messages.append(message.splitlines()[0][:180])
+    return messages, rate_limited
+
+
 def _sync_project(
     connection: sqlite3.Connection,
     repo: dict[str, Any],
@@ -130,6 +151,7 @@ def sync_github_projects(db_path: str) -> list[dict]:
     results: list[dict[str, Any]] = []
 
     with sqlite3.connect(db_path) as connection:
+        connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON;")
         connection.execute("PRAGMA journal_mode = WAL;")
 
@@ -147,6 +169,9 @@ def sync_github_projects(db_path: str) -> list[dict]:
                 continue
 
             weekly_commits, rate_limited = _fetch_weekly_commits(repo_full_name, since_iso)
+            if rate_limited:
+                break
+            recent_commit_messages, rate_limited = _fetch_recent_commit_messages(repo_full_name, since_iso)
             if rate_limited:
                 break
 
@@ -171,6 +196,27 @@ def sync_github_projects(db_path: str) -> list[dict]:
                     keywords_json=json.dumps(keywords_list, ensure_ascii=True),
                     synced_at=synced_at,
                 )
+                project_row = connection.execute(
+                    """
+                    SELECT id, name
+                    FROM projects
+                    WHERE name = ?
+                    LIMIT 1
+                    """,
+                    (repo_full_name,),
+                ).fetchone()
+                if project_row is not None:
+                    refresh_project_context_snapshot(
+                        connection=connection,
+                        project_id=int(project_row[0]),
+                        project_name=str(project_row[1]),
+                        description=description,
+                        focus=focus,
+                        keywords=keywords_list,
+                        github_repo=repo_full_name,
+                        last_commit_at=str(repo_meta.get("pushed_at") or ""),
+                        recent_changes=recent_commit_messages,
+                    )
                 connection.commit()
             except sqlite3.IntegrityError:
                 connection.rollback()
@@ -193,6 +239,27 @@ def sync_github_projects(db_path: str) -> list[dict]:
                             repo_full_name,
                         ),
                     )
+                    project_row = connection.execute(
+                        """
+                        SELECT id, name
+                        FROM projects
+                        WHERE name = ?
+                        LIMIT 1
+                        """,
+                        (repo_full_name,),
+                    ).fetchone()
+                    if project_row is not None:
+                        refresh_project_context_snapshot(
+                            connection=connection,
+                            project_id=int(project_row[0]),
+                            project_name=str(project_row[1]),
+                            description=description,
+                            focus=focus,
+                            keywords=keywords_list,
+                            github_repo=repo_full_name,
+                            last_commit_at=str(repo_meta.get("pushed_at") or ""),
+                            recent_changes=recent_commit_messages,
+                        )
                     connection.commit()
                 except Exception:
                     connection.rollback()
@@ -211,6 +278,7 @@ def sync_github_projects(db_path: str) -> list[dict]:
                     "weekly_commits": weekly_commits,
                     "last_commit_at": str(repo_meta.get("pushed_at") or ""),
                     "github_repo": repo_full_name,
+                    "recent_commit_messages": recent_commit_messages,
                 }
             )
 

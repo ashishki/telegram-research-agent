@@ -55,12 +55,23 @@ def run_migrations() -> Path:
         except sqlite3.OperationalError as exc:
             if "duplicate column name" not in str(exc).lower():
                 raise
+        for stmt in [
+            "ALTER TABLE digests ADD COLUMN telegraph_url TEXT",
+            "ALTER TABLE digests ADD COLUMN telegram_sent_at TEXT",
+            "ALTER TABLE recommendations ADD COLUMN telegraph_url TEXT",
+            "ALTER TABLE recommendations ADD COLUMN telegram_sent_at TEXT",
+        ]:
+            try:
+                connection.execute(stmt)
+            except sqlite3.OperationalError as exc:
+                if "duplicate column name" not in str(exc).lower():
+                    raise
         try:
             connection.execute("ALTER TABLE digests ADD COLUMN pdf_path TEXT")
         except sqlite3.OperationalError as exc:
             if "duplicate column name" not in str(exc).lower():
                 raise
-        connection.executescript(
+        connection.execute(
             """
             CREATE TABLE IF NOT EXISTS llm_usage (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -74,9 +85,6 @@ def run_migrations() -> Path:
                 cost_usd REAL NOT NULL DEFAULT 0.0,
                 duration_ms INTEGER NOT NULL DEFAULT 0
             );
-            CREATE INDEX IF NOT EXISTS idx_llm_usage_called_at ON llm_usage(called_at);
-            CREATE INDEX IF NOT EXISTS idx_llm_usage_category ON llm_usage(category);
-            CREATE INDEX IF NOT EXISTS idx_llm_usage_task_type ON llm_usage(task_type);
             """
         )
         for stmt in [
@@ -92,6 +100,13 @@ def run_migrations() -> Path:
                 pass
         connection.executescript(
             """
+            CREATE INDEX IF NOT EXISTS idx_llm_usage_called_at ON llm_usage(called_at);
+            CREATE INDEX IF NOT EXISTS idx_llm_usage_category ON llm_usage(category);
+            CREATE INDEX IF NOT EXISTS idx_llm_usage_task_type ON llm_usage(task_type);
+            """
+        )
+        connection.executescript(
+            """
             CREATE TABLE IF NOT EXISTS study_plans (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 week_label TEXT NOT NULL UNIQUE,
@@ -103,6 +118,16 @@ def run_migrations() -> Path:
             );
             """
         )
+        for stmt in [
+            "ALTER TABLE study_plans ADD COLUMN reminder_sent_at TEXT",
+            "ALTER TABLE study_plans ADD COLUMN completed_at TEXT",
+            "ALTER TABLE study_plans ADD COLUMN completion_notes TEXT",
+        ]:
+            try:
+                connection.execute(stmt)
+            except sqlite3.OperationalError as exc:
+                if "duplicate column name" not in str(exc).lower():
+                    raise
         connection.executescript(
             """
             CREATE TABLE IF NOT EXISTS cluster_runs (
@@ -127,6 +152,9 @@ def run_migrations() -> Path:
             "ALTER TABLE posts ADD COLUMN scored_at TEXT",
             "ALTER TABLE posts ADD COLUMN score_breakdown TEXT",
             "ALTER TABLE posts ADD COLUMN routed_model TEXT",
+            "ALTER TABLE posts ADD COLUMN user_preference_score REAL",
+            "ALTER TABLE posts ADD COLUMN user_adjusted_score REAL",
+            "ALTER TABLE posts ADD COLUMN user_override_tag TEXT",
         ]:
             try:
                 connection.execute(stmt)
@@ -174,6 +202,61 @@ def run_migrations() -> Path:
             CREATE INDEX IF NOT EXISTS idx_signal_feedback_feedback ON signal_feedback(feedback);
             """
         )
+        connection.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS user_post_tags (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                post_id INTEGER NOT NULL,
+                tag TEXT NOT NULL CHECK(tag IN (
+                    'strong',
+                    'interesting',
+                    'try_in_project',
+                    'funny',
+                    'low_signal',
+                    'read_later'
+                )),
+                note TEXT,
+                recorded_at TEXT NOT NULL,
+                UNIQUE(post_id, tag),
+                FOREIGN KEY(post_id) REFERENCES posts(id) ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS idx_user_post_tags_post_id ON user_post_tags(post_id);
+            CREATE INDEX IF NOT EXISTS idx_user_post_tags_tag ON user_post_tags(tag);
+            """
+        )
+        connection.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS channel_memory (
+                channel_username TEXT PRIMARY KEY,
+                summary TEXT NOT NULL DEFAULT '',
+                positive_tags INTEGER NOT NULL DEFAULT 0,
+                negative_tags INTEGER NOT NULL DEFAULT 0,
+                strong_tags INTEGER NOT NULL DEFAULT 0,
+                try_tags INTEGER NOT NULL DEFAULT 0,
+                interesting_tags INTEGER NOT NULL DEFAULT 0,
+                funny_tags INTEGER NOT NULL DEFAULT 0,
+                low_signal_tags INTEGER NOT NULL DEFAULT 0,
+                read_later_tags INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS project_context_snapshots (
+                project_id INTEGER PRIMARY KEY,
+                project_name TEXT NOT NULL,
+                github_repo TEXT,
+                source_commit_at TEXT,
+                summary TEXT NOT NULL DEFAULT '',
+                open_questions TEXT NOT NULL DEFAULT '',
+                recent_changes TEXT NOT NULL DEFAULT '',
+                context_json TEXT NOT NULL DEFAULT '{}',
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS idx_project_context_snapshots_project_name
+                ON project_context_snapshots(project_name);
+            CREATE INDEX IF NOT EXISTS idx_project_context_snapshots_updated_at
+                ON project_context_snapshots(updated_at);
+            """
+        )
         connection.commit()
 
     LOGGER.info("Database migrations complete")
@@ -186,6 +269,62 @@ def record_feedback(connection: sqlite3.Connection, post_id: int, feedback: str)
         "INSERT INTO signal_feedback (post_id, feedback, recorded_at) VALUES (?, ?, ?)",
         (post_id, feedback, recorded_at),
     )
+    connection.commit()
+
+
+def record_post_tag(connection: sqlite3.Connection, post_id: int, tag: str, note: str | None = None) -> None:
+    recorded_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    connection.execute(
+        """
+        INSERT INTO user_post_tags (post_id, tag, note, recorded_at)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(post_id, tag) DO UPDATE SET
+            note = excluded.note,
+            recorded_at = excluded.recorded_at
+        """,
+        (post_id, tag, note, recorded_at),
+    )
+    connection.commit()
+
+
+def record_study_completion(
+    connection: sqlite3.Connection,
+    week_label: str,
+    notes: str | None = None,
+) -> None:
+    completed_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    existing = connection.execute(
+        """
+        SELECT id
+        FROM study_plans
+        WHERE week_label = ?
+        """,
+        (week_label,),
+    ).fetchone()
+    if existing is None:
+        connection.execute(
+            """
+            INSERT INTO study_plans (
+                week_label,
+                generated_at,
+                content_md,
+                topics_covered,
+                completed_at,
+                completion_notes
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (week_label, completed_at, "", "[]", completed_at, notes),
+        )
+    else:
+        connection.execute(
+            """
+            UPDATE study_plans
+            SET completed_at = ?, completion_notes = ?
+            WHERE week_label = ?
+            """,
+            (completed_at, notes, week_label),
+        )
     connection.commit()
 
 

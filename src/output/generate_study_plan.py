@@ -1,4 +1,4 @@
-"""Weekly 3-hour study plan generator."""
+"""Weekly study plan generator with completion tracking and reminders."""
 import json
 import logging
 import os
@@ -11,8 +11,11 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from config.settings import PROJECT_ROOT, Settings
 from llm.client import LLMClient
+from output.context_memory import load_project_context
 from output.report_utils import _extract_markdown_section
 
 try:
@@ -24,6 +27,7 @@ except ImportError:  # pragma: no cover - direct module execution fallback
 LOGGER = logging.getLogger(__name__)
 PROMPT_PATH = PROJECT_ROOT / "docs" / "prompts" / "study_plan.md"
 OUTPUT_DIR = PROJECT_ROOT / "data" / "output" / "study_plans"
+PROJECTS_YAML_PATH = PROJECT_ROOT / "src" / "config" / "projects.yaml"
 BOOKS_API_URL = "https://api.github.com/repos/marangelologic/books/contents"
 RELEVANT_BOOKS = {
     "Designing Data Intensive Applications": "data storage, distributed systems, AI infrastructure",
@@ -184,7 +188,51 @@ def _fetch_previous_plan_topics(connection: sqlite3.Connection) -> list[str]:
     return [str(item) for item in parsed if str(item).strip()]
 
 
+def _fetch_completed_study_history(connection: sqlite3.Connection, limit: int = 8) -> list[dict[str, str]]:
+    rows = connection.execute(
+        """
+        SELECT week_label, topics_covered, COALESCE(completion_notes, '') AS completion_notes, completed_at
+        FROM study_plans
+        WHERE completed_at IS NOT NULL
+        ORDER BY completed_at DESC, id DESC
+        LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+    history: list[dict[str, str]] = []
+    for row in rows:
+        try:
+            topics = json.loads(row["topics_covered"] or "[]")
+        except json.JSONDecodeError:
+            topics = []
+        history.append(
+            {
+                "week_label": str(row["week_label"] or ""),
+                "topics": ", ".join(str(item) for item in topics if str(item).strip()),
+                "notes": str(row["completion_notes"] or "").strip(),
+                "completed_at": str(row["completed_at"] or ""),
+            }
+        )
+    return history
+
+
 def _fetch_active_projects(connection: sqlite3.Connection) -> list[str]:
+    try:
+        data = yaml.safe_load(PROJECTS_YAML_PATH.read_text(encoding="utf-8")) or {}
+        projects = data.get("projects", [])
+        lines = []
+        for project in projects:
+            if not isinstance(project, dict):
+                continue
+            name = str(project.get("name", "")).strip()
+            focus = str(project.get("focus", "")).strip()
+            if name:
+                lines.append(f"{name}: {focus}")
+        if lines:
+            return lines[:8]
+    except Exception:
+        LOGGER.warning("Failed to load active projects from config; falling back to DB", exc_info=True)
+
     rows = connection.execute(
         """
         SELECT name, keywords
@@ -197,6 +245,51 @@ def _fetch_active_projects(connection: sqlite3.Connection) -> list[str]:
     return [f"{row['name']}: {row['keywords'] or ''}".rstrip() for row in rows]
 
 
+def _fetch_project_context_snapshots(connection: sqlite3.Connection) -> list[dict[str, str]]:
+    snapshots = load_project_context(connection)
+    results: list[dict[str, str]] = []
+    for item in snapshots[:8]:
+        results.append(
+            {
+                "project_name": str(item.get("project_name") or ""),
+                "summary": str(item.get("summary") or ""),
+                "recent_changes": str(item.get("recent_changes") or ""),
+                "open_questions": str(item.get("open_questions") or ""),
+            }
+        )
+    return results
+
+
+def _fetch_tagged_posts_this_week(connection: sqlite3.Connection, week_label: str, limit: int = 10) -> list[str]:
+    week_start_iso, week_end_iso = _week_bounds(week_label)
+    rows = connection.execute(
+        """
+        SELECT
+            upt.tag,
+            COALESCE(upt.note, '') AS note,
+            p.channel_username,
+            p.content,
+            r.message_url
+        FROM user_post_tags upt
+        INNER JOIN posts p ON p.id = upt.post_id
+        INNER JOIN raw_posts r ON r.id = p.raw_post_id
+        WHERE p.posted_at >= ? AND p.posted_at < ?
+        ORDER BY upt.recorded_at DESC, upt.id DESC
+        LIMIT ?
+        """,
+        (week_start_iso, week_end_iso, limit),
+    ).fetchall()
+    results: list[str] = []
+    for row in rows:
+        excerpt = " ".join((row["content"] or "").split())[:220]
+        note = str(row["note"] or "").strip()
+        note_suffix = f" | note: {note}" if note else ""
+        url = str(row["message_url"] or "").strip()
+        url_suffix = f" | {url}" if url else ""
+        results.append(f"{row['tag']} | {row['channel_username']}: {excerpt}{note_suffix}{url_suffix}")
+    return results
+
+
 def _write_study_plan_file(week_label: str, content_md: str) -> Path:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     output_path = OUTPUT_DIR / f"{week_label}.md"
@@ -204,7 +297,7 @@ def _write_study_plan_file(week_label: str, content_md: str) -> Path:
     return output_path
 
 
-def generate_study_plan(settings: Settings) -> str:
+def generate_study_plan(settings: Settings, force: bool = False) -> str:
     week_label = _compute_week_label()
     output_path = OUTPUT_DIR / f"{week_label}.md"
 
@@ -221,7 +314,7 @@ def generate_study_plan(settings: Settings) -> str:
             """,
             (week_label,),
         ).fetchone()
-        if existing_row is not None:
+        if existing_row is not None and not force:
             content_md = str(existing_row["content_md"])
             if not output_path.exists():
                 _write_study_plan_file(week_label, content_md)
@@ -232,7 +325,10 @@ def generate_study_plan(settings: Settings) -> str:
         top_posts = _fetch_top_posts(connection, week_label)
         books_catalog = _fetch_books_catalog()
         projects = _fetch_active_projects(connection)
+        project_context_snapshots = _fetch_project_context_snapshots(connection)
         previous_topics = _fetch_previous_plan_topics(connection)
+        tagged_posts = _fetch_tagged_posts_this_week(connection, week_label)
+        completed_history = _fetch_completed_study_history(connection)
 
         post_count = sum(int(topic.get("post_count") or 0) for topic in topics)
         prompt = (
@@ -242,7 +338,10 @@ def generate_study_plan(settings: Settings) -> str:
             .replace("{top_posts}", json.dumps(top_posts, ensure_ascii=True, indent=2))
             .replace("{books_catalog}", json.dumps(books_catalog, ensure_ascii=True, indent=2))
             .replace("{projects_list}", json.dumps(projects, ensure_ascii=True, indent=2))
+            .replace("{project_context_snapshots}", json.dumps(project_context_snapshots, ensure_ascii=True, indent=2))
             .replace("{previous_topics}", json.dumps(previous_topics, ensure_ascii=True))
+            .replace("{tagged_posts}", json.dumps(tagged_posts, ensure_ascii=True, indent=2))
+            .replace("{completed_history}", json.dumps(completed_history, ensure_ascii=True, indent=2))
         )
 
         content_md = LLMClient.complete(
@@ -256,8 +355,12 @@ def generate_study_plan(settings: Settings) -> str:
         connection.execute("BEGIN")
         connection.execute(
             """
-            INSERT OR REPLACE INTO study_plans (week_label, generated_at, content_md, topics_covered)
+            INSERT INTO study_plans (week_label, generated_at, content_md, topics_covered)
             VALUES (?, ?, ?, ?)
+            ON CONFLICT(week_label) DO UPDATE SET
+                generated_at = excluded.generated_at,
+                content_md = excluded.content_md,
+                topics_covered = excluded.topics_covered
             """,
             (week_label, _utc_now_iso(), content_md, topics_covered),
         )
@@ -268,7 +371,28 @@ def generate_study_plan(settings: Settings) -> str:
     return content_md
 
 
-def send_study_reminder(settings: Settings, is_friday: bool = False) -> None:
+def mark_study_complete(settings: Settings, week_label: str | None = None, notes: str | None = None) -> str:
+    target_week = week_label or _compute_week_label()
+    with sqlite3.connect(settings.db_path) as connection:
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys = ON;")
+        connection.execute("PRAGMA journal_mode = WAL;")
+        completed_at = _utc_now_iso()
+        connection.execute(
+            """
+            INSERT INTO study_plans (week_label, generated_at, content_md, topics_covered, completed_at, completion_notes)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(week_label) DO UPDATE SET
+                completed_at = excluded.completed_at,
+                completion_notes = excluded.completion_notes
+            """,
+            (target_week, completed_at, "", "[]", completed_at, notes),
+        )
+        connection.commit()
+    return target_week
+
+
+def send_study_reminder(settings: Settings) -> None:
     try:
         week_label = _compute_week_label()
         with sqlite3.connect(settings.db_path) as connection:
@@ -277,20 +401,27 @@ def send_study_reminder(settings: Settings, is_friday: bool = False) -> None:
             connection.execute("PRAGMA journal_mode = WAL;")
             row = connection.execute(
                 """
-                SELECT content_md
+                SELECT content_md, reminder_sent_at, completed_at
                 FROM study_plans
                 WHERE week_label = ?
                 """,
                 (week_label,),
             ).fetchone()
 
-        content_md = str(row["content_md"]) if row is not None else generate_study_plan(settings)
-        prefix = (
-            "📅 Пятница — успел поучиться? Вот план на эту неделю если нет:\n\n"
-            if is_friday
-            else "📅 Вторник — время учиться! Вот твой план на эту неделю:\n\n"
+        if row is not None and row["completed_at"]:
+            LOGGER.info("Study reminder skipped week=%s because the plan is already completed", week_label)
+            return
+
+        if row is not None and row["reminder_sent_at"]:
+            LOGGER.info("Study reminder already sent week=%s", week_label)
+            return
+
+        content_md = str(row["content_md"]) if row is not None and row["content_md"] else generate_study_plan(settings)
+        message = (
+            f"Study plan for {week_label}\n"
+            "Use /study_done when you finish this week's plan.\n\n"
+            f"{content_md}"
         )
-        message = prefix + content_md
 
         bot_token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
         chat_id = os.environ.get("TELEGRAM_OWNER_CHAT_ID", "").strip()
@@ -299,6 +430,17 @@ def send_study_reminder(settings: Settings, is_friday: bool = False) -> None:
             return
 
         send_text(chat_id=chat_id, text=message, token=bot_token)
-        LOGGER.info("Study reminder sent week=%s is_friday=%s", week_label, is_friday)
+        with sqlite3.connect(settings.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            connection.execute(
+                """
+                UPDATE study_plans
+                SET reminder_sent_at = ?
+                WHERE week_label = ?
+                """,
+                (_utc_now_iso(), week_label),
+            )
+            connection.commit()
+        LOGGER.info("Study reminder sent week=%s", week_label)
     except Exception:
         LOGGER.warning("Failed to send study reminder", exc_info=True)

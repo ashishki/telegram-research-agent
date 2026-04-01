@@ -49,11 +49,12 @@ def build_parser() -> argparse.ArgumentParser:
     ingest_parser.set_defaults(handler=handle_ingest)
 
     digest_parser = subparsers.add_parser("digest")
+    digest_parser.add_argument("--force", action="store_true")
     digest_parser.set_defaults(handler=handle_digest)
 
     study_parser = subparsers.add_parser("study", help="Generate or send the weekly study plan")
     study_parser.add_argument("--remind", action="store_true")
-    study_parser.add_argument("--friday", action="store_true")
+    study_parser.add_argument("--force", action="store_true")
     study_parser.set_defaults(handler=handle_study)
 
     insight_parser = subparsers.add_parser(
@@ -211,7 +212,7 @@ def handle_normalize(_: argparse.Namespace) -> int:
     return 0 if summary["errors"] == 0 else 1
 
 
-def handle_digest(_: argparse.Namespace) -> int:
+def handle_digest(args: argparse.Namespace) -> int:
     settings = load_settings()
     try:
         LOGGER.info("Starting step=run_migrations")
@@ -219,7 +220,7 @@ def handle_digest(_: argparse.Namespace) -> int:
         LOGGER.info("Finished step=run_migrations")
 
         LOGGER.info("Starting step=generate_digest")
-        summary = run_digest(settings)
+        summary = run_digest(settings, force_delivery=getattr(args, "force", False))
         LOGGER.info(
             "Finished step=generate_digest week=%s posts=%d output=%s json=%s",
             summary.week_label,
@@ -233,7 +234,7 @@ def handle_digest(_: argparse.Namespace) -> int:
 
     try:
         LOGGER.info("Starting step=generate_recommendations")
-        recommendation_summary = run_recommendations(settings)
+        recommendation_summary = run_recommendations(settings, force_delivery=getattr(args, "force", False))
         if recommendation_summary["output_path"] is None:
             LOGGER.warning("Recommendations skipped week=%s", recommendation_summary["week_label"])
         else:
@@ -403,7 +404,8 @@ def handle_cost_stats(_: argparse.Namespace) -> int:
                 """
                 SELECT
                     COUNT(*) AS call_count,
-                    COALESCE(SUM(est_cost_usd), 0.0) AS total_cost_usd,
+                    COALESCE(SUM(cost_usd), 0.0) AS total_cost_usd,
+                    COALESCE(SUM(est_cost_usd), 0.0) AS total_est_cost_usd,
                     COUNT(DISTINCT substr(called_at, 1, 10)) AS distinct_days
                 FROM llm_usage
                 """
@@ -413,7 +415,8 @@ def handle_cost_stats(_: argparse.Namespace) -> int:
                 SELECT
                     model,
                     COUNT(*) AS call_count,
-                    COALESCE(SUM(est_cost_usd), 0.0) AS total_cost_usd
+                    COALESCE(SUM(cost_usd), 0.0) AS total_cost_usd,
+                    COALESCE(SUM(est_cost_usd), 0.0) AS total_est_cost_usd
                 FROM llm_usage
                 GROUP BY model
                 ORDER BY total_cost_usd DESC, model ASC
@@ -424,12 +427,26 @@ def handle_cost_stats(_: argparse.Namespace) -> int:
                 """
                 SELECT
                     strftime('%Y-W%W', called_at) AS week,
-                    COALESCE(SUM(est_cost_usd), 0.0) AS week_cost,
+                    COALESCE(SUM(cost_usd), 0.0) AS week_cost,
+                    COALESCE(SUM(est_cost_usd), 0.0) AS week_est_cost,
                     COUNT(*) AS call_count
                 FROM llm_usage
                 GROUP BY week
                 ORDER BY week DESC
                 LIMIT 4
+                """
+            ).fetchall()
+            weekly_category_rows = connection.execute(
+                """
+                SELECT
+                    strftime('%Y-W%W', called_at) AS week,
+                    category,
+                    COUNT(*) AS call_count,
+                    COALESCE(SUM(cost_usd), 0.0) AS week_cost
+                FROM llm_usage
+                GROUP BY week, category
+                ORDER BY week DESC, week_cost DESC, category ASC
+                LIMIT 20
                 """
             ).fetchall()
     except Exception:
@@ -438,6 +455,7 @@ def handle_cost_stats(_: argparse.Namespace) -> int:
 
     lines = [
         f"total_cost_usd={float(total_row['total_cost_usd'] or 0.0):.8f}",
+        f"total_est_cost_usd={float(total_row['total_est_cost_usd'] or 0.0):.8f}",
         f"distinct_days={int(total_row['distinct_days'] or 0)}",
         "by_model:",
     ]
@@ -445,7 +463,8 @@ def handle_cost_stats(_: argparse.Namespace) -> int:
         for row in model_rows:
             lines.append(
                 f"{row['model']} call_count={int(row['call_count'] or 0)} "
-                f"total_cost_usd={float(row['total_cost_usd'] or 0.0):.8f}"
+                f"total_cost_usd={float(row['total_cost_usd'] or 0.0):.8f} "
+                f"total_est_cost_usd={float(row['total_est_cost_usd'] or 0.0):.8f}"
             )
     else:
         lines.append("none")
@@ -455,6 +474,14 @@ def handle_cost_stats(_: argparse.Namespace) -> int:
         for row in weekly_rows:
             lines.append(
                 f"  {row['week']}  calls={int(row['call_count'] or 0)}  "
+                f"cost=${float(row['week_cost'] or 0.0):.6f}  "
+                f"est=${float(row['week_est_cost'] or 0.0):.6f}"
+            )
+    if weekly_category_rows:
+        lines.append("weekly_by_category (recent):")
+        for row in weekly_category_rows:
+            lines.append(
+                f"  {row['week']}  {row['category']}  calls={int(row['call_count'] or 0)}  "
                 f"cost=${float(row['week_cost'] or 0.0):.6f}"
             )
 
@@ -621,13 +648,13 @@ def handle_study(args: argparse.Namespace) -> int:
         run_migrations()
         LOGGER.info("Finished step=run_migrations")
         if args.remind:
-            LOGGER.info("Starting step=send_study_reminder is_friday=%s", getattr(args, "friday", False))
-            send_study_reminder(settings, is_friday=getattr(args, "friday", False))
+            LOGGER.info("Starting step=send_study_reminder")
+            send_study_reminder(settings)
             LOGGER.info("Finished step=send_study_reminder")
             return 0
 
         LOGGER.info("Starting step=generate_study_plan")
-        generate_study_plan(settings)
+        generate_study_plan(settings, force=getattr(args, "force", False))
         output_path = STUDY_PLAN_OUTPUT_DIR / f"{_current_week_label()}.md"
         LOGGER.info("Finished step=generate_study_plan output=%s", output_path)
         sys.stdout.write(f"{output_path}\n")

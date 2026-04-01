@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Generate concrete, prioritized study recommendations based on the week's topic distribution, recurring themes over the past 4 weeks, and the researcher's active projects.
+Generate concrete, prioritized recommendations based on the week's topic distribution, recurring themes over the past 4 weeks, the researcher's active projects, and what the user has already studied.
 
 ## Input Variables
 
@@ -11,6 +11,7 @@ Generate concrete, prioritized study recommendations based on the week's topic d
 - `{recurring_topics}`: JSON array of topics that appeared in at least 3 of the last 4 weeks, with cumulative post counts
 - `{active_projects}`: JSON array of active projects, each with `{name, description, keywords}`
 - `{last_recommendations}`: Optional. JSON array of last week's recommendation labels (to avoid immediate repetition)
+- `{completed_study_history}`: Previously completed weekly study topics and notes
 
 ## System Prompt
 
@@ -28,6 +29,7 @@ This week's active topics: {this_week_topics}
 Recurring topics (last 4 weeks): {recurring_topics}
 Active projects: {active_projects}
 Last week's recommendations (avoid repeating): {last_recommendations}
+Completed study history: {completed_study_history}
 
 Produce 3 to 5 concrete study recommendations using this Markdown format:
 
@@ -45,6 +47,7 @@ Rules:
 - Prioritize topics appearing in both this week AND recurring topics (multi-week signals)
 - At least one recommendation must connect to an active project if overlap exists
 - Do not recommend something from last_recommendations unless it has significantly escalated in volume
+- Avoid repeating concepts the user already completed unless the new recommendation is a clear next step
 - Prefer depth over breadth: fewer, higher-quality recommendations are better
 
 ## Expected Output Format

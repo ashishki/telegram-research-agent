@@ -1,0 +1,133 @@
+{
+  "meta": {
+    "week_label": "2026-W13",
+    "date_range": "March 23-29, 2026",
+    "generated_at": "2026-03-23T08:00:52.406531Z",
+    "post_count": 214,
+    "channel_count": 18
+  },
+  "executive_summary": [],
+  "key_findings": [
+    {
+      "title": "Startup Updates and Company Milestones",
+      "body": "177 posts captured this week.",
+      "evidence_ids": []
+    },
+    {
+      "title": "Large Language Model Training and Improvement",
+      "body": "31 posts captured this week.",
+      "evidence_ids": []
+    },
+    {
+      "title": "AI Video Generation and Tools",
+      "body": "4 posts captured this week.",
+      "evidence_ids": []
+    },
+    {
+      "title": "AI Model Comparisons and Benchmarking",
+      "body": "3 posts captured this week.",
+      "evidence_ids": []
+    },
+    {
+      "title": "Tech Industry Market Saturation Commentary",
+      "body": "2 posts captured this week.",
+      "evidence_ids": []
+    }
+  ],
+  "sections": [
+    {
+      "heading": "Overview",
+      "body": ""
+    },
+    {
+      "heading": "Top Topics",
+      "body": ""
+    },
+    {
+      "heading": "Signal Posts",
+      "body": ""
+    },
+    {
+      "heading": "Noise Patterns",
+      "body": ""
+    },
+    {
+      "heading": "One Thing to Act On",
+      "body": ""
+    }
+  ],
+  "evidence": [
+    {
+      "id": "S1",
+      "channel": "@NeuralShit",
+      "date": "2026-03-19T11:29:12+00:00",
+      "excerpt": "",
+      "url": "https://t.me/NeuralShit/7283"
+    },
+    {
+      "id": "S2",
+      "channel": "@NeuralShit",
+      "date": "2026-03-19T11:29:12+00:00",
+      "excerpt": "Это скриншот Kagi - интеллектуального переводчика с функцией синхронного отображения текста и кода. На левой панели показан русский текст с рецептом, на правой - Python-код, имитирующий приготовление ",
+      "url": "https://t.me/NeuralShit/7284"
+    },
+    {
+      "id": "S3",
+      "channel": "@NeuralShit",
+      "date": "2026-03-19T11:29:12+00:00",
+      "excerpt": "",
+      "url": "https://t.me/NeuralShit/7282"
+    },
+    {
+      "id": "S4",
+      "channel": "@NeuralShit",
+      "date": "2026-03-19T11:29:12+00:00",
+      "excerpt": "",
+      "url": "https://t.me/NeuralShit/7281"
+    },
+    {
+      "id": "S5",
+      "channel": "@NeuralShit",
+      "date": "2026-03-19T11:29:12+00:00",
+      "excerpt": "",
+      "url": "https://t.me/NeuralShit/7280"
+    },
+    {
+      "id": "S6",
+      "channel": "@NeuralShit",
+      "date": "2026-03-19T11:29:12+00:00",
+      "excerpt": "Есть такой онлайн переводчик — kagi. Разработчики прикрутили к нему LLM-ку под капот, но видимо забыли ограничить список валидных языков в адресной строке. В итоге выяснилось, что если взять прямую сс",
+      "url": "https://t.me/NeuralShit/7279"
+    },
+    {
+      "id": "S7",
+      "channel": "@codecamp",
+      "date": "2026-03-18T14:50:43+00:00",
+      "excerpt": "Ого, теперь можно превратить GitHub в удобный магазин приложений. 😱 Вышел опенсорс проект GitHub Store, который позволяет устанавливать программы из GitHub как из обычного App Store. Просто скроллишь ",
+      "url": "https://t.me/codecamp/10097"
+    },
+    {
+      "id": "S8",
+      "channel": "@ai_newz",
+      "date": "2026-03-16T19:43:45+00:00",
+      "excerpt": "Тут Хуанг опять сливает размеры моделей OpenAI Похоже в GPT-5 всего два триллиона параметров. Раньше он так же показывал количество параметров для GPT-4 (GPT MoE 1.8T). То есть у OpenAI размер флагман",
+      "url": "https://t.me/ai_newz/4475"
+    },
+    {
+      "id": "S9",
+      "channel": "@data_secrets",
+      "date": "2026-03-20T09:04:01+00:00",
+      "excerpt": "Американский политик Берни Сандерс поговорил с Claude за жизнь Он решил обсудить с чат-ботом безопасность данных и влияние ИИ на приватность. Claude, обученный на Reddit и новостниках, естественно, бл",
+      "url": "https://t.me/data_secrets/8890"
+    },
+    {
+      "id": "S10",
+      "channel": "@ai_newz",
+      "date": "2026-03-17T09:37:48+00:00",
+      "excerpt": "Партнеры Nvidia открыли предзаказы на DGX Station Это десктопная машинка с одной GB300 на 748 гигов оперативки внутри (треть из этого HBM 3E, остальное LPDDR5X). Цены начинаются на отметке в $87k. @ai",
+      "url": "https://t.me/ai_newz/4479"
+    }
+  ],
+  "project_relevance": [],
+  "confidence_notes": "This report reflects the last 7 days of ingested Telegram posts. Coverage is strongest for the highest-volume topics and most-viewed evidence."
+}

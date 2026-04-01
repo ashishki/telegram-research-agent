@@ -23,6 +23,7 @@ CATEGORY_MODEL_MAP: dict[str, str] = {
     "study_plan":        "claude-sonnet-4-6",
     "insight":           "claude-sonnet-4-6",
     "bot_ask":           "claude-sonnet-4-6",
+    "preference_judge":  "claude-sonnet-4-6",
     # Fast + cheap — called many times per run
     "project_insights":  "claude-haiku-4-5",
     "topic_detection":   "claude-haiku-4-5",
@@ -86,9 +87,9 @@ def _record_usage(task_type: str, model: str, input_tokens: int, output_tokens: 
 
 
 def _get_client() -> Anthropic:
-    api_key = os.environ.get("LLM_API_KEY", "")
+    api_key = os.environ.get("LLM_API_KEY", "") or os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key:
-        raise LLMError("LLM_API_KEY is not set")
+        raise LLMError("LLM_API_KEY or ANTHROPIC_API_KEY is not set")
     return Anthropic(api_key=api_key)
 
 

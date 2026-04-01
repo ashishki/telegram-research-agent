@@ -13,6 +13,7 @@ Called before digest synthesis so the LLM receives only strong/watch-bucket post
 import logging
 import json
 import sqlite3
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import uuid4
@@ -29,6 +30,22 @@ CONFIG_DIR = PROJECT_ROOT / "src" / "config"
 SCORING_PATH = CONFIG_DIR / "scoring.yaml"
 PROFILE_PATH = CONFIG_DIR / "profile.yaml"
 PROJECTS_PATH = CONFIG_DIR / "projects.yaml"
+TAG_WEIGHTS = {
+    "strong": 0.28,
+    "try_in_project": 0.20,
+    "interesting": 0.14,
+    "funny": 0.04,
+    "read_later": 0.08,
+    "low_signal": -0.35,
+}
+TAG_PRIORITY = {
+    "strong": 0,
+    "try_in_project": 1,
+    "interesting": 2,
+    "funny": 3,
+    "read_later": 4,
+    "low_signal": 9,
+}
 
 
 # ---------------------------------------------------------------------------
@@ -135,6 +152,58 @@ def _fetch_channel_max_views(conn: sqlite3.Connection, since_days: int) -> dict[
         (cutoff,),
     )
     return {row["channel_username"]: row["max_views"] or 1 for row in cursor.fetchall()}
+
+
+def _clamp(value: float, lower: float = 0.0, upper: float = 1.0) -> float:
+    return max(lower, min(upper, value))
+
+
+def _fetch_user_preference_signals(
+    conn: sqlite3.Connection,
+    lookback_days: int = 120,
+) -> tuple[dict[int, str], dict[str, float]]:
+    cutoff = (datetime.utcnow() - timedelta(days=lookback_days)).isoformat() + "Z"
+    rows = conn.execute(
+        """
+        SELECT
+            upt.post_id,
+            upt.tag,
+            p.channel_username,
+            upt.recorded_at
+        FROM user_post_tags upt
+        INNER JOIN posts p ON p.id = upt.post_id
+        WHERE upt.recorded_at >= ?
+        ORDER BY upt.recorded_at DESC, upt.id DESC
+        """,
+        (cutoff,),
+    ).fetchall()
+
+    post_tags: dict[int, list[str]] = defaultdict(list)
+    channel_totals: dict[str, float] = defaultdict(float)
+    channel_counts: dict[str, int] = defaultdict(int)
+    for row in rows:
+        post_id = int(row["post_id"])
+        tag = str(row["tag"] or "")
+        channel = str(row["channel_username"] or "")
+        if not tag:
+            continue
+        post_tags[post_id].append(tag)
+        if channel:
+            channel_totals[channel] += TAG_WEIGHTS.get(tag, 0.0)
+            channel_counts[channel] += 1
+
+    primary_tags = {
+        post_id: sorted(tags, key=lambda item: TAG_PRIORITY.get(item, 99))[0]
+        for post_id, tags in post_tags.items()
+        if tags
+    }
+    channel_biases: dict[str, float] = {}
+    for channel, total in channel_totals.items():
+        count = channel_counts[channel]
+        average = total / max(count, 1)
+        confidence = min(1.0, count / 4.0)
+        channel_biases[channel] = round(_clamp(average * confidence, -0.22, 0.22), 4)
+    return primary_tags, channel_biases
 
 
 # ---------------------------------------------------------------------------
@@ -404,7 +473,8 @@ def score_posts(
         channel_max_views = _fetch_channel_max_views(conn, since_days)
         coherence_score = _fetch_latest_silhouette_score(conn)
 
-        scored_rows: list[tuple[float, str, float, str, str, str, str, int]] = []
+        explicit_tags_by_post, channel_biases = _fetch_user_preference_signals(conn)
+        scored_rows: list[tuple[float, str, float, str, str, str, float, float, str | None, str, int]] = []
 
         for post in posts:
             try:
@@ -455,19 +525,42 @@ def score_posts(
                     + d_action * w_action,
                     4,
                 )
+                explicit_tag = explicit_tags_by_post.get(post_id)
+                channel_bias = channel_biases.get(post["channel_username"], 0.0)
+                explicit_bias = TAG_WEIGHTS.get(explicit_tag or "", 0.0)
+                user_preference_score = round(channel_bias + explicit_bias, 4)
+                adjusted_score = round(_clamp(signal_score + user_preference_score), 4)
 
                 # Bucket assignment (scores first; cultural override applied after)
                 content = post["content"] or ""
-                if signal_score >= strong_threshold:
+                if adjusted_score >= strong_threshold:
                     bucket = "strong"
-                elif signal_score >= watch_threshold:
+                elif adjusted_score >= watch_threshold:
                     bucket = "watch"
                 elif _is_cultural(content, cultural_keywords):
                     bucket = "cultural"
                 else:
                     bucket = "noise"
 
-                routed_model = route("per_post", signal_score=signal_score)
+                if explicit_tag == "low_signal":
+                    adjusted_score = min(adjusted_score, 0.15)
+                    bucket = "noise"
+                elif explicit_tag == "strong":
+                    adjusted_score = max(adjusted_score, strong_threshold + 0.10)
+                    bucket = "strong"
+                elif explicit_tag == "try_in_project":
+                    adjusted_score = max(adjusted_score, watch_threshold + 0.12)
+                    bucket = "watch" if adjusted_score < strong_threshold else "strong"
+                elif explicit_tag == "interesting":
+                    adjusted_score = max(adjusted_score, watch_threshold + 0.04)
+                    bucket = "watch" if adjusted_score < strong_threshold else "strong"
+                elif explicit_tag == "read_later" and bucket == "noise":
+                    adjusted_score = max(adjusted_score, watch_threshold)
+                    bucket = "watch"
+                elif explicit_tag == "funny":
+                    bucket = "cultural"
+
+                routed_model = route("per_post", signal_score=adjusted_score)
                 project_matches = score_project_relevance(content, projects)
                 project_relevance_score = max(
                     (float(match.get("score") or 0.0) for match in project_matches),
@@ -475,6 +568,11 @@ def score_posts(
                 )
                 score_breakdown = json.dumps(
                     {
+                        "base_signal_score": signal_score,
+                        "adjusted_signal_score": adjusted_score,
+                        "explicit_tag": explicit_tag or "",
+                        "channel_preference_bias": channel_bias,
+                        "explicit_preference_bias": explicit_bias,
                         "recency": d_recency,
                         "engagement": d_engagement,
                         "topic_relevance": d_interest,
@@ -490,6 +588,9 @@ def score_posts(
                         routed_model,
                         score_run_id,
                         scored_at,
+                        user_preference_score,
+                        adjusted_score,
+                        explicit_tag,
                         score_breakdown,
                         post_id,
                     )
@@ -506,7 +607,8 @@ def score_posts(
         conn.executemany(
             (
                 "UPDATE posts SET signal_score = ?, bucket = ?, project_relevance_score = ?, "
-                "routed_model = ?, score_run_id = ?, scored_at = ?, score_breakdown = ? WHERE id = ?"
+                "routed_model = ?, score_run_id = ?, scored_at = ?, user_preference_score = ?, "
+                "user_adjusted_score = ?, user_override_tag = ?, score_breakdown = ? WHERE id = ?"
             ),
             scored_rows,
         )
@@ -515,7 +617,8 @@ def score_posts(
     # Apply per-bucket caps: re-cap at max items by downgrading extras to noise
     # (cap enforcement is done at digest-generation time, not here — we store raw scores)
     # Count buckets for summary
-    for _, bucket, _, _, _, _, _, _ in scored_rows:
+    for row in scored_rows:
+        bucket = row[1]
         summary[bucket] = summary.get(bucket, 0) + 1
 
     avg_score = (

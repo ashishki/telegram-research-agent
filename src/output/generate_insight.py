@@ -6,6 +6,7 @@ from pathlib import Path
 
 from config.settings import PROJECT_ROOT
 from llm.client import LLMClient
+from output.context_memory import load_project_context
 from output.report_utils import _extract_markdown_section
 
 
@@ -130,6 +131,10 @@ def generate_insight(db_path: str, lookback_days: int = 90) -> str:
             return ""
 
         sections = [f"# Retroactive Project Insights — {week_label}", f"_Generated at {_utc_now_iso()}_\n"]
+        project_context_rows = load_project_context(connection, [str(project["name"]) for project in projects])
+        project_context_by_name = {
+            str(item["project_name"]): item for item in project_context_rows
+        }
 
         for project in projects:
             keywords = _parse_keywords(project["keywords"])
@@ -146,6 +151,10 @@ def generate_insight(db_path: str, lookback_days: int = 90) -> str:
                 prompt_template.replace("{PROJECT_NAME}", project["name"])
                 .replace("{PROJECT_DESCRIPTION}", project["description"] or "")
                 .replace("{PROJECT_KEYWORDS}", json.dumps(keywords, ensure_ascii=True))
+                .replace(
+                    "{PROJECT_CONTEXT}",
+                    json.dumps(project_context_by_name.get(str(project["name"]), {}), ensure_ascii=False, indent=2),
+                )
                 .replace("{POSTS_EXCERPT}", _format_posts_excerpt(matched_rows))
             )
             try:

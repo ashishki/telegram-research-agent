@@ -188,25 +188,21 @@ Source: `src/output/learning_layer.py`
 
 ### Output Layer
 
-Assembles the weekly review artifact from all upstream layers.
+Assembles the weekly decision brief from all upstream layers.
 
-`format_signal_report()` produces a Markdown document with 8 mandatory sections and 2 conditional:
+`format_signal_report()` now produces a Telegram-first Markdown brief built around:
 
-**Always present:**
-1. Strong Signals (with source URLs, model tier, personalization tag)
-2. Decisions to Consider (action items from strong signals, or "No decision-forcing signals")
-3. Watch
-4. Cultural
-5. Ignored (noise count + top topics)
-6. Think Layer
-7. Stats
-8. What Changed (delta vs previous quality_metrics row, or "No comparison baseline available")
+1. What Matters This Week
+2. Things To Try
+3. Keep In View
+4. Funny / Cultural
+5. Project Insights
+6. Additional Signals
+7. What Changed
 
-**Conditional (require projects.yaml to load):**
-9. Project Action Queue — per-project sub-sections; omitted if projects config fails
-10. Learn — recurring topics not in any project focus; omitted if projects config fails or no gaps found
+Reader-facing rationale comes from `preference_judge.py`, not from raw operator notes. Manual low-signal items are excluded from the main brief.
 
-Source: `src/output/signal_report.py`, `src/output/learning_layer.py`, `src/output/project_relevance.py`, `src/output/personalize.py`
+Source: `src/output/signal_report.py`, `src/output/preference_judge.py`, `src/output/project_relevance.py`, `src/output/personalize.py`
 
 ### Render Layer
 
@@ -234,6 +230,29 @@ Stores in `signal_feedback` table. Never auto-modifies `profile.yaml`.
 `tune-suggestions` CLI analyzes acted-on feedback and surfaces boost topic candidates.
 
 Source: `src/db/migrate.py` (record_feedback), `src/bot/handlers.py` (handle_mark_useful, handle_mark_skipped), `src/main.py` (handle_tune_suggestions)
+
+### Preference Memory Layer
+
+Stores explicit user tags (`strong`, `interesting`, `try_in_project`, `funny`, `low_signal`, `read_later`) in `user_post_tags`.
+
+This layer affects the system in three ways:
+- explicit post override via `posts.user_override_tag`
+- learned per-channel/source bias reflected in `posts.user_preference_score`
+- final ranking via `posts.user_adjusted_score` plus `preference_judge.py`
+
+This keeps preference learning auditable: the ground truth is still explicit user input, not a hidden model state.
+
+### Context Memory Layer
+
+Stores two lightweight, persistent context surfaces:
+
+- `channel_memory`: what each Telegram source tends to be good or bad at for this user, based on explicit tags
+- `project_context_snapshots`: current project description, focus, recent commit deltas, and relevance gaps
+
+`channel_memory` is refreshed from tagged history.
+`project_context_snapshots` is updated incrementally during GitHub sync using current metadata and recent commit messages.
+
+These memories are fed into `preference_judge.py` and project-insight generation so the reader-facing brief can explain what matters without forcing the user to open every source link.
 
 ---
 
@@ -265,6 +284,9 @@ Source: `src/llm/client.py:_record_usage()`, `src/output/generate_digest.py:_sto
 | `cluster_runs` | Clustering run metadata (silhouette_score used for cluster_coherence) |
 | `study_plans` | Generated study plan artifacts |
 | `signal_feedback` | Owner feedback per post: `acted_on / skipped / marked_important` |
+| `user_post_tags` | Explicit per-post tags used for preference learning and report shaping |
+| `channel_memory` | Source-level memory derived from manual tags |
+| `project_context_snapshots` | Incremental project context used by project-aware synthesis |
 
 ### Key columns on `posts`
 
@@ -277,6 +299,9 @@ Source: `src/llm/client.py:_record_usage()`, `src/output/generate_digest.py:_sto
 | `scored_at` | TEXT | `score_posts()` |
 | `routed_model` | TEXT | `score_posts()` via `route()` |
 | `project_relevance_score` | REAL | `score_posts()` via `score_project_relevance()` |
+| `user_preference_score` | REAL | `score_posts()` from historical manual tags |
+| `user_adjusted_score` | REAL | `score_posts()` deterministic score + preference bias |
+| `user_override_tag` | TEXT | `score_posts()` from explicit tag on that post |
 
 ---
 
@@ -298,8 +323,8 @@ The implementation sequence is not arbitrary. Dependencies are real:
 These do not change without explicit reconsideration:
 
 - Expensive models only see filtered subsets — never the full corpus
-- Every discarded post must be accounted for (noise section in output)
+- Every discarded post must still be auditable even if not shown in the reader-facing brief
 - Personalization must be auditable — no opaque learned preferences
 - Project relevance must be separable from general importance
 - Source traceability is required — every signal in the report must link back to its origin
-- Scoring must remain deterministic — no stochastic elements in the filter stage
+- Scoring must remain deterministic in the pre-filter stage; LLM judging happens only after shortlist creation

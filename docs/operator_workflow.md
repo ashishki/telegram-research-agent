@@ -11,6 +11,10 @@ The system runs automatically via systemd timers. The owner's weekly interaction
 
 ### Monday Morning — Pipeline Runs
 
+Schedule:
+- ingestion: Monday 07:00 `Asia/Tbilisi`
+- weekly delivery: Monday 09:00 `Asia/Tbilisi`
+
 The systemd timer triggers the full pipeline:
 1. Incremental ingestion (new posts since last run)
 2. Normalization and preprocessing
@@ -19,32 +23,36 @@ The systemd timer triggers the full pipeline:
 5. Delivery: Telegram notification + full artifact
 
 Owner receives:
-- Telegram message: executive summary + bucket counts + top signals
-- Link to full review artifact (HTML file or Telegraph article)
+- Telegram message: short `Research Brief` notification + Telegraph link
+- Telegram message: short `Implementation Ideas` notification + Telegraph link
 
 Expected time to read: 10–15 minutes.
 
 ---
 
-### After Reading — Optional Tuning
+### After Reading — Tag What Actually Mattered
 
-If the review contained false positives (noise in strong tier) or missed signals (important post in watch):
+Mark posts directly from Telegram with either a numeric `post_id` or a full Telegram link:
 
-**Adjust profile.yaml:**
-```yaml
-boost_topics:
-  - "topic that was important but in watch"
-downrank_topics:
-  - "topic that polluted strong tier"
+```text
+/mark_strong https://t.me/channel/123
+/mark_try https://t.me/channel/456
+/mark_interesting https://t.me/channel/789
+/mark_low https://t.me/channel/111
+/tag https://t.me/channel/222 funny
 ```
 
-**Adjust channels.yaml:**
-```yaml
-- username: "@channel"
-  priority: high   # was: medium
-```
+These tags are used to:
+- override explicitly rated posts
+- shift learned channel/source bias over time
+- guide the weekly preference judge
+- influence project insights and the next study plan
 
-Changes take effect on next scoring run. No restart required.
+The system also maintains:
+- `channel_memory` derived from your tag history
+- `project_context_snapshots` derived from GitHub sync and recent commit deltas
+
+That lets the brief explain more directly in the article and reduces the need to open the original Telegram post.
 
 ---
 
@@ -63,20 +71,32 @@ python3 src/main.py cost-stats
 # Preview the report without re-running the full pipeline
 python3 src/main.py report-preview
 
+# Generate or refresh the current study plan
+python3 src/main.py study
+python3 src/main.py study --force
+
+# Send the weekly study reminder once
+python3 src/main.py study --remind
+
 # Get boost topic suggestions based on acted-on feedback
 python3 src/main.py tune-suggestions
 ```
 
 ### Inline Feedback (from Telegram)
 
-While reading the weekly review, mark signals directly:
-```
-/mark_useful <post_id>    → records acted_on feedback
-/mark_skipped <post_id>   → records skipped feedback
+While reading the weekly brief:
+```text
+/mark_useful <post_id|link>   -> records acted_on feedback
+/mark_skipped <post_id|link>  -> records skipped feedback
+/study                        -> show the current weekly study plan
+/study refresh                -> rebuild this week's study plan
+/study_done [notes]           -> mark this week's plan as completed
 ```
 
-Post IDs are visible in the review source appendix. Feedback is stored in `signal_feedback` table.
-After several weeks of feedback, run `tune-suggestions` to see recommended boost topic additions.
+The study plan now has a weekly completion loop:
+1. The system sends one reminder per week
+2. You complete the plan and mark it with `/study_done`
+3. Completed study history is fed into future study plans and recommendations
 
 ---
 
@@ -88,8 +108,9 @@ Once a month, review:
    - If strong > 15% of total: raise `strong.min_score` in `scoring.yaml` (currently 0.75)
    - If strong is consistently 0–1 items: lower threshold or expand boost topics
 
-2. **Cost per run** — check `cost-stats`. Is STRONG model usage proportionate?
-   - Typical healthy split: 80%+ of calls on Haiku (noise filtering), <5% on Opus (strong signals only)
+2. **Cost per run** — check `cost-stats`.
+   - The output now shows actual `cost_usd`, estimated cost, weekly trend, and weekly category breakdown
+   - `preference_judge` is expected to be one of the higher-cost categories because it writes the reader-facing brief
 
 3. **Profile.yaml freshness** — are boost topics still reflecting current focus?
    - Stale interests produce phantom relevance
@@ -111,23 +132,24 @@ Every post is evaluated on three independent axes:
 | **Project relevance** | Does this affect what I am building? | `projects.yaml` name + focus |
 
 A post can score high on one layer and low on others:
-- High global signal, low taste relevance: appears in Watch but not boosted
-- High taste relevance, low global signal: boosted but still capped — strong floor protects against fabricated relevance
-- High project relevance: appears in Project Action Queue even if Watch-tier globally
+- High global signal, low taste relevance: may stay out of the main brief
+- High taste relevance, low global signal: may still surface through `user_adjusted_score` or explicit manual tags
+- High project relevance: can surface in Project Insights even if not globally strong
 
-All three scores are stored (`signal_score`, personalized adjustments, `project_relevance_score`) and visible in the report.
+All three scores are stored (`signal_score`, `user_adjusted_score`, `project_relevance_score`), but only reader-appropriate text is shown in the final brief.
 
 ---
 
 ## Tuning Without Retraining
 
-The system has no ML model to retrain. Tuning is config-file editing:
+The system has no ML model to retrain. Tuning is explicit and auditable:
 
 | Problem | Solution | File |
 |---|---|---|
 | Too much noise in strong | Raise `strong.min_score` | `scoring.yaml` |
 | Missing relevant posts | Add topics to `boost_topics` | `profile.yaml` |
 | Wrong source getting boosted | Change channel priority | `channels.yaml` |
+| Wrong source repeatedly rated well/badly | Tag more posts from that source and let channel bias adapt | Telegram bot + `user_post_tags` |
 | Topic showing up despite downrank | Check if topic label matches exactly | `profile.yaml` |
 | Project relevance too broad | Make `focus` field more specific | `projects.yaml` |
 | Project relevance too narrow | Add more keyword variants to `focus` | `projects.yaml` |
@@ -139,21 +161,33 @@ The scoring engine re-reads YAML config on every run. Changes apply without rest
 
 ## Feedback Loop
 
-The system captures lightweight feedback without automatic profile changes.
+The system captures lightweight feedback and explicit tags without automatic profile-file edits.
 
 **How it works:**
 1. You read the weekly review (Telegraph article or HTML file)
-2. For signals you acted on: send `/mark_useful <post_id>` to the bot
-3. For signals you skipped: send `/mark_skipped <post_id>`
-4. After a few weeks: `python3 src/main.py tune-suggestions` surfaces topics appearing ≥2 times in acted-on signals that are not yet in your `boost_topics`
-5. You decide which suggestions to add to `profile.yaml` manually
+2. Tag or mark signals directly from Telegram
+3. The next scoring run updates explicit overrides and channel/source bias
+4. The weekly preference judge uses those examples to reshape the final brief
+5. `tune-suggestions` can still surface profile topic candidates, but manual tags are now the primary signal
 
 **Design constraint:** `profile.yaml` is never auto-modified. The feedback loop surfaces suggestions only. You control your taste profile explicitly.
 
 **Current limitations:**
-- Feedback is stored but not yet used to adjust scoring weights
-- No week-over-week "I acted on this theme" tracking beyond per-post marking
-- Suggestions require at least 2 acted-on signals per topic to surface
+- Preference bias is source-aware, but not yet a full ML ranking model
+- Study completion is tracked at the weekly-plan level, not per individual block
+- Project insights still benefit from stronger prompts and more labeled examples
+
+## Project Context Maintenance
+
+Project context is not just a static `projects.yaml` description anymore.
+
+Current state is built from:
+- `projects.yaml` baseline description and focus
+- GitHub metadata from sync (`github_repo`, `last_commit_at`)
+- recent commit messages folded into `project_context_snapshots`
+- Telegram relevance already linked in the DB
+
+This lets study planning, recommendations, and project insights reason from recent project changes instead of from keywords alone.
 
 ---
 

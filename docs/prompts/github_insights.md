@@ -7,19 +7,20 @@ Return valid Markdown only.
 Project name: {PROJECT_NAME}
 Project description: {PROJECT_DESCRIPTION}
 Project keywords: {PROJECT_KEYWORDS}
+Project context snapshot: {PROJECT_CONTEXT}
 
 Posts excerpt:
 {POSTS_EXCERPT}
 
 Identify:
-1. Posts directly relevant to the project.
-2. Posts that might have been overlooked but are relevant.
-3. One concrete recommendation based on the Telegram activity.
+1. What exactly in the posts is relevant to the project right now.
+2. What concrete idea, workflow, or architectural move could be applied.
+3. What can be safely ignored.
 
 Requirements:
 - Cite post dates when referencing posts.
-- Keep the full response under 400 words.
+- Keep the full response under 450 words.
 - Use exactly these sections:
 ## Relevant Posts
-## Possibly Missed
-## Recommendation
+## Project Application
+## Ignore

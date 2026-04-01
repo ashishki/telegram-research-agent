@@ -27,16 +27,40 @@ class _HTMLToNodesParser(HTMLParser):
     def handle_starttag(self, tag: str, attrs: list) -> None:
         if tag in self._skip_tags:
             return
-        tag_map = {"h2": "h3", "h3": "h3", "h4": "h4", "p": "p", "ul": "ul", "li": "li", "b": "b"}
+        tag_map = {
+            "h1": "h3",
+            "h2": "h3",
+            "h3": "h3",
+            "h4": "h4",
+            "p": "p",
+            "ul": "ul",
+            "li": "li",
+            "b": "b",
+            "a": "a",
+        }
         mapped = tag_map.get(tag)
         if mapped:
             node: dict = {"tag": mapped, "children": []}
+            if mapped == "a":
+                href = dict(attrs).get("href")
+                if href:
+                    node["attrs"] = {"href": href}
             self._stack.append(node)
 
     def handle_endtag(self, tag: str) -> None:
         if tag in self._skip_tags:
             return
-        tag_map = {"h2": "h3", "h3": "h3", "h4": "h4", "p": "p", "ul": "ul", "li": "li", "b": "b"}
+        tag_map = {
+            "h1": "h3",
+            "h2": "h3",
+            "h3": "h3",
+            "h4": "h4",
+            "p": "p",
+            "ul": "ul",
+            "li": "li",
+            "b": "b",
+            "a": "a",
+        }
         if tag not in tag_map:
             return
         if not self._stack:

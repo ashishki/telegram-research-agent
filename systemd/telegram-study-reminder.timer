@@ -1,5 +1,5 @@
 [Unit]
-Description=Study reminder — Tuesday 10:00
+Description=Study reminder — weekly Tuesday 10:00
 Requires=telegram-study-reminder.service
 
 [Timer]

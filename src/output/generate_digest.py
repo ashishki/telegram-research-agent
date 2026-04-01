@@ -122,38 +122,86 @@ def _send_digest_to_telegram_owner(content_md: str, week_label: str) -> None:
     LOGGER.info("Digest sent to Telegram owner week=%s", week_label)
 
 
-def _build_review_notification(week_label: str, strong_count: int, watch_count: int, strongest_signal: str) -> str:
-    prefix = f"Research Review {week_label}: {strong_count} strong signals, {watch_count} watch."
-    strongest_excerpt = " ".join((strongest_signal or "").split())
-    if not strongest_excerpt:
-        return prefix[:300]
-    suffix_budget = max(0, 300 - len(prefix) - 1)
-    if suffix_budget == 0:
-        return prefix[:300]
-    return f"{prefix} {strongest_excerpt[:suffix_budget]}".strip()
+def _build_review_notification(week_label: str, strong_count: int, watch_count: int) -> str:
+    return (
+        f"Research Brief {week_label} is ready.\n"
+        f"{strong_count} strong signals, {watch_count} watch.\n"
+        "Open the full brief:"
+    )[:300]
+
+
+def _load_delivery_state(connection: sqlite3.Connection, week_label: str) -> dict[str, str]:
+    row = connection.execute(
+        """
+        SELECT COALESCE(telegraph_url, '') AS telegraph_url,
+               COALESCE(telegram_sent_at, '') AS telegram_sent_at
+        FROM digests
+        WHERE week_label = ?
+        LIMIT 1
+        """,
+        (week_label,),
+    ).fetchone()
+    if row is None:
+        return {"telegraph_url": "", "telegram_sent_at": ""}
+    return {
+        "telegraph_url": str(row["telegraph_url"] or ""),
+        "telegram_sent_at": str(row["telegram_sent_at"] or ""),
+    }
+
+
+def _mark_delivery_state(
+    connection: sqlite3.Connection,
+    week_label: str,
+    *,
+    telegraph_url: str | None = None,
+    telegram_sent_at: str | None = None,
+) -> None:
+    fields: list[str] = []
+    params: list[str] = []
+    if telegraph_url is not None:
+        fields.append("telegraph_url = ?")
+        params.append(telegraph_url)
+    if telegram_sent_at is not None:
+        fields.append("telegram_sent_at = ?")
+        params.append(telegram_sent_at)
+    if not fields:
+        return
+    params.append(week_label)
+    connection.execute(
+        f"UPDATE digests SET {', '.join(fields)} WHERE week_label = ?",
+        params,
+    )
 
 
 def _send_weekly_review_to_telegram_owner(
+    connection: sqlite3.Connection,
     content_md: str,
     week_label: str,
     strong_count: int,
     watch_count: int,
-    strongest_signal: str,
     html_path: Path | None,
+    force_delivery: bool = False,
 ) -> None:
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
     chat_id = os.environ.get("TELEGRAM_OWNER_CHAT_ID", "").strip()
     if not token or not chat_id:
         return
 
-    notification = _build_review_notification(week_label, strong_count, watch_count, strongest_signal)
+    delivery_state = _load_delivery_state(connection, week_label)
+    if delivery_state["telegram_sent_at"] and not force_delivery:
+        LOGGER.info("Weekly review delivery skipped week=%s because it was already sent", week_label)
+        return
+
+    notification = _build_review_notification(week_label, strong_count, watch_count)
 
     # Try Telegraph first
     if html_path is not None:
         try:
             html_content = html_path.read_text(encoding="utf-8")
-            url = publish_article(title=f"Research Review {week_label}", html_content=html_content)
+            url = publish_article(title=f"Research Brief {week_label}", html_content=html_content)
             send_text(chat_id=chat_id, text=f"{notification}\n{url}", token=token, parse_mode=None)
+            _mark_delivery_state(connection, week_label, telegraph_url=url, telegram_sent_at=_utc_now_iso())
+            connection.commit()
             LOGGER.info("Weekly review published to Telegraph week=%s url=%s", week_label, url)
             return
         except Exception:
@@ -164,6 +212,8 @@ def _send_weekly_review_to_telegram_owner(
             )
 
     send_text(chat_id=chat_id, text=notification, token=token, parse_mode=None)
+    _mark_delivery_state(connection, week_label, telegram_sent_at=_utc_now_iso())
+    connection.commit()
 
     if html_path is None:
         return
@@ -172,7 +222,7 @@ def _send_weekly_review_to_telegram_owner(
         send_document(
             chat_id=chat_id,
             file_path=str(html_path),
-            caption=f"Research Review {week_label}",
+            caption=f"Research Brief {week_label}",
             token=token,
         )
         LOGGER.info("Weekly review sent to Telegram owner week=%s file=%s", week_label, html_path)
@@ -297,7 +347,13 @@ def _fetch_scored_posts(connection: sqlite3.Connection, cutoff_iso: str) -> dict
         }
         buckets[bucket].append(entry)
 
-    # Sort each bucket by signal_score DESC, apply caps
+    # Preserve full bucket lists for signal-first reporting and metrics.
+    full_buckets = {
+        bucket_name: list(entries)
+        for bucket_name, entries in buckets.items()
+    }
+
+    # Sort each bucket by signal_score DESC, apply caps for prompt payload size.
     for bucket_name in ("strong", "watch", "cultural"):
         buckets[bucket_name].sort(key=lambda x: x["signal_score"], reverse=True)
     buckets["strong"] = buckets["strong"][:MAX_STRONG]
@@ -313,6 +369,7 @@ def _fetch_scored_posts(connection: sqlite3.Connection, cutoff_iso: str) -> dict
         "bucket_counts": bucket_counts,
         "avg_signal_score": (total_signal_score / len(seen)) if seen else None,
         "project_match_count": project_match_count,
+        "full_buckets": full_buckets,
     }
 
 
@@ -408,8 +465,14 @@ def _store_digest(
 ) -> None:
     connection.execute(
         """
-        INSERT OR REPLACE INTO digests (week_label, generated_at, content_md, content_json, pdf_path, post_count)
+        INSERT INTO digests (week_label, generated_at, content_md, content_json, pdf_path, post_count)
         VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(week_label) DO UPDATE SET
+            generated_at = excluded.generated_at,
+            content_md = excluded.content_md,
+            content_json = excluded.content_json,
+            pdf_path = excluded.pdf_path,
+            post_count = excluded.post_count
         """,
         (week_label, _utc_now_iso(), content_md, content_json, pdf_path, post_count),
     )
@@ -466,7 +529,7 @@ def _render_empty_digest(week_label: str, date_range: str) -> str:
     )
 
 
-def run_digest(settings: Settings) -> DigestResult:
+def run_digest(settings: Settings, force_delivery: bool = False) -> DigestResult:
     week_label = _compute_week_label()
     date_range = _format_date_range(week_label)
     cutoff_iso = (_utc_now() - timedelta(days=7)).isoformat().replace("+00:00", "Z")
@@ -523,12 +586,13 @@ def run_digest(settings: Settings) -> DigestResult:
             connection.commit()
             try:
                 _send_weekly_review_to_telegram_owner(
+                    connection=connection,
                     content_md=empty_digest,
                     week_label=week_label,
                     strong_count=0,
                     watch_count=0,
-                    strongest_signal="",
                     html_path=html_path,
+                    force_delivery=force_delivery,
                 )
             except Exception:
                 LOGGER.warning("Failed to send digest to Telegram owner week=%s", week_label, exc_info=True)
@@ -558,24 +622,26 @@ def run_digest(settings: Settings) -> DigestResult:
             .replace("{noise_summary}", noise_summary)
         )
 
-        content_md = complete(
+        llm_brief = complete(
             prompt=prompt,
             system=system_prompt,
             category="digest",
             model=route("synthesis"),
         )
 
+        full_buckets = buckets.get("full_buckets", {})
         signal_posts = [
-            *buckets["strong"],
-            *buckets["watch"],
-            *buckets["cultural"],
-            *buckets["noise"],
+            *full_buckets.get("strong", buckets["strong"]),
+            *full_buckets.get("watch", buckets["watch"]),
+            *full_buckets.get("cultural", buckets["cultural"]),
+            *full_buckets.get("noise", buckets["noise"]),
         ]
         try:
             signal_report = format_signal_report(signal_posts, settings)
-            content_md = f"{signal_report}\n{content_md.lstrip()}"
+            content_md = signal_report
         except Exception:
             LOGGER.warning("Signal-first section generation failed; continuing without it", exc_info=True)
+            content_md = llm_brief
 
         # Step 4: Validate output length
         llm_word_count = _count_words(content_md)
@@ -625,39 +691,25 @@ def run_digest(settings: Settings) -> DigestResult:
         )
         connection.commit()
 
-    LOGGER.info(
-        "Digest generation complete week=%s posts=%d strong=%d watch=%d words=%d output=%s",
-        week_label, post_count,
-        len(buckets["strong"]), len(buckets["watch"]),
-        output_word_count, output_path,
-    )
-
-    try:
-        strongest_signal = buckets["strong"][0]["text_excerpt"] if buckets["strong"] else ""
-        _send_weekly_review_to_telegram_owner(
-            content_md=content_md,
-            week_label=week_label,
-            strong_count=buckets["bucket_counts"]["strong"],
-            watch_count=buckets["bucket_counts"]["watch"],
-            strongest_signal=strongest_signal,
-            html_path=html_path,
+        LOGGER.info(
+            "Digest generation complete week=%s posts=%d strong=%d watch=%d words=%d output=%s",
+            week_label, post_count,
+            len(buckets["strong"]), len(buckets["watch"]),
+            output_word_count, output_path,
         )
-    except Exception:
-        LOGGER.warning("Failed to send digest to Telegram owner week=%s", week_label, exc_info=True)
 
-    time.sleep(1)
-
-    # Send insights as second message
-    try:
-        from output.generate_recommendations import run_recommendations
-        insights_result = run_recommendations(settings)
-        insights_text = insights_result.get("text", "") if isinstance(insights_result, dict) else str(insights_result)
-        token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
-        chat_id = os.environ.get("TELEGRAM_OWNER_CHAT_ID", "").strip()
-        if insights_text and token and chat_id:
-            send_text(token=token, chat_id=chat_id, text=insights_text)
-    except Exception as e:
-        LOGGER.warning("Insights generation failed, skipping: %s", e, exc_info=True)
+        try:
+            _send_weekly_review_to_telegram_owner(
+                connection=connection,
+                content_md=content_md,
+                week_label=week_label,
+                strong_count=buckets["bucket_counts"]["strong"],
+                watch_count=buckets["bucket_counts"]["watch"],
+                html_path=html_path,
+                force_delivery=force_delivery,
+            )
+        except Exception:
+            LOGGER.warning("Failed to send digest to Telegram owner week=%s", week_label, exc_info=True)
 
     return DigestResult(
         week_label=week_label,

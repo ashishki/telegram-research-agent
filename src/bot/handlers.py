@@ -9,28 +9,50 @@ from urllib import error
 
 from bot.telegram_delivery import _send_text_internal, send_document, send_report_preview, send_text
 from config.settings import PROJECT_ROOT, Settings
-from db.migrate import record_feedback
+from db.migrate import record_feedback, record_post_tag
 from output.generate_digest import _compute_week_label, run_digest
 from output.generate_answer import generate_answer
 from output.generate_insight import generate_insight
-from output.generate_study_plan import generate_study_plan
+from output.generate_recommendations import run_recommendations
+from output.generate_study_plan import generate_study_plan, mark_study_complete
 
 
 LOGGER = logging.getLogger(__name__)
 QUESTION_WORD_RE = re.compile(r"[^\W_]+", re.UNICODE)
+TELEGRAM_POST_URL_RE = re.compile(r"^https?://t\.me/([A-Za-z0-9_]+)/(\d+)(?:\?.*)?$", re.IGNORECASE)
 MARKDOWN_V2_SPECIAL_CHARS = r"_*[]()~`>#+-=|{}.!"
 COMMAND_DOCS: dict[str, tuple[str, str]] = {
-    "/digest": ("handle_digest", "Показать дайджест за текущую неделю"),
-    "/topics": ("handle_topics", "Список тем и их объём"),
-    "/insight": ("handle_insight", "Ретроспективные инсайты по активным проектам"),
-    "/project <имя>": ("handle_project", "Найти проект по части имени"),
-    "/ask <вопрос>": ("handle_ask", "Ответ по данным Telegram за последние 7 дней"),
-    "/study [часы]": ("handle_study", "Показать недельный учебный план"),
-    "/costs": ("handle_costs", "Статистика затрат и производительности LLM"),
-    "/run_digest": ("handle_run_digest", "Сгенерировать новый дайджест и рекомендации"),
-    "/status": ("handle_status", "Краткий статус базы и пайплайна"),
-    "/mark_useful <post_id>": ("handle_mark_useful", "Отметить пост как полезный (acted_on)"),
-    "/mark_skipped <post_id>": ("handle_mark_skipped", "Отметить пост как пропущенный (skipped)"),
+    "/digest": ("handle_digest", "Show the current weekly brief"),
+    "/topics": ("handle_topics", "List the strongest tracked topics"),
+    "/insight": ("handle_insight", "Show retrospective project insights"),
+    "/project <name>": ("handle_project", "Find an active project by partial name"),
+    "/ask <question>": ("handle_ask", "Answer a question from the last 7 days of Telegram data"),
+    "/study [refresh]": ("handle_study", "Show the weekly study plan or rebuild it"),
+    "/study_done [notes]": ("handle_study_done", "Mark this week's study plan as completed"),
+    "/costs": ("handle_costs", "Show LLM usage and cost statistics"),
+    "/run_digest [force]": ("handle_run_digest", "Generate a fresh weekly brief; use force to resend delivery for the same week"),
+    "/status": ("handle_status", "Show database and pipeline status"),
+    "/mark_useful <post_id|link>": ("handle_mark_useful", "Record acted_on feedback"),
+    "/mark_skipped <post_id|link>": ("handle_mark_skipped", "Record skipped feedback"),
+    "/tag <post_id|link> <tag>": ("handle_tag", "Save a tag: strong, interesting, try, funny, low, later"),
+    "/mark_strong <post_id|link>": ("handle_mark_strong", "Mark a post as strong"),
+    "/mark_interesting <post_id|link>": ("handle_mark_interesting", "Mark a post as interesting"),
+    "/mark_try <post_id|link>": ("handle_mark_try", "Mark a post as worth trying in a project"),
+    "/mark_funny <post_id|link>": ("handle_mark_funny", "Mark a post as cultural or funny"),
+    "/mark_low <post_id|link>": ("handle_mark_low", "Mark a post as low signal"),
+    "/mark_later <post_id|link>": ("handle_mark_later", "Mark a post to revisit later"),
+}
+
+TAG_ALIASES = {
+    "strong": "strong",
+    "interesting": "interesting",
+    "try": "try_in_project",
+    "try_in_project": "try_in_project",
+    "funny": "funny",
+    "low": "low_signal",
+    "low_signal": "low_signal",
+    "later": "read_later",
+    "read_later": "read_later",
 }
 
 
@@ -78,7 +100,7 @@ def _with_db(settings: Settings) -> sqlite3.Connection:
 
 
 def _friendly_handler_error(chat_id: str) -> None:
-    send_message(_get_bot_token(), chat_id, "Не получилось обработать команду. Попробуй ещё раз позже.", parse_mode=None)
+    send_message(_get_bot_token(), chat_id, "The command could not be processed right now. Try again later.", parse_mode=None)
 
 
 def _format_post_snippet(text: str | None, limit: int = 150) -> str:
@@ -86,6 +108,36 @@ def _format_post_snippet(text: str | None, limit: int = 150) -> str:
     if len(compact) <= limit:
         return compact
     return compact[: limit - 1].rstrip() + "…"
+
+
+def _normalize_tag(raw_tag: str) -> str | None:
+    return TAG_ALIASES.get(raw_tag.strip().lower())
+
+
+def _resolve_post_reference(connection: sqlite3.Connection, raw_ref: str) -> sqlite3.Row | None:
+    ref = raw_ref.strip()
+    if ref.isdigit() and int(ref) > 0:
+        return connection.execute(
+            "SELECT id, channel_username, content FROM posts WHERE id = ? LIMIT 1",
+            (int(ref),),
+        ).fetchone()
+
+    match = TELEGRAM_POST_URL_RE.match(ref)
+    if not match:
+        return None
+
+    channel_username = f"@{match.group(1)}"
+    message_id = int(match.group(2))
+    return connection.execute(
+        """
+        SELECT p.id, p.channel_username, p.content
+        FROM posts p
+        INNER JOIN raw_posts r ON r.id = p.raw_post_id
+        WHERE lower(r.channel_username) = lower(?) AND r.message_id = ?
+        LIMIT 1
+        """,
+        (channel_username, message_id),
+    ).fetchone()
 
 
 def _extract_question_terms(question: str) -> list[str]:
@@ -115,15 +167,15 @@ def _load_topics_summary(connection: sqlite3.Connection) -> str:
         """
     ).fetchall()
     if not rows:
-        return "Тем пока нет."
+        return "No topics yet."
     return "\n".join(
-        f"- {row['label']} ({row['post_count']}): {row['description'] or 'без описания'}" for row in rows
+        f"- {row['label']} ({row['post_count']}): {row['description'] or 'no description'}" for row in rows
     )
 
 
 def handle_start(chat_id: str, args: str, settings: Settings) -> None:
     del args, settings
-    lines = ["Telegram Research Agent bot.", "", "Доступные команды:"]
+    lines = ["Telegram Research Agent", "", "Available commands:"]
     for command, (_, description) in COMMAND_DOCS.items():
         lines.append(f"{command} — {description}")
     send_message(_get_bot_token(), chat_id, "\n".join(lines), parse_mode=None)
@@ -157,7 +209,7 @@ def handle_digest(chat_id: str, args: str, settings: Settings) -> None:
         send_message(
             _get_bot_token(),
             chat_id,
-            "Дайджест за эту неделю ещё не готов. Запусти /run_digest",
+            "This week's brief is not ready yet. Run /run_digest.",
             parse_mode=None,
         )
         return
@@ -181,13 +233,13 @@ def handle_topics(chat_id: str, args: str, settings: Settings) -> None:
         ).fetchall()
 
     if not rows:
-        send_message(_get_bot_token(), chat_id, "Тем пока нет.", parse_mode=None)
+        send_message(_get_bot_token(), chat_id, "No topics yet.", parse_mode=None)
         return
 
     lines = []
     for index, row in enumerate(rows, start=1):
-        description = row["description"] or "без описания"
-        lines.append(f"{index}. {row['label']} ({row['post_count']} постов) — {description}")
+        description = row["description"] or "no description"
+        lines.append(f"{index}. {row['label']} ({row['post_count']} posts) — {description}")
     send_message(_get_bot_token(), chat_id, "\n".join(lines), parse_mode=None)
 
 
@@ -195,7 +247,7 @@ def handle_insight(chat_id: str, args: str, settings: Settings) -> None:
     del args
     result = generate_insight(settings.db_path, lookback_days=90).strip()
     if not result:
-        send_message(_get_bot_token(), chat_id, "Активных проектов нет. Добавь проекты через GitHub sync.", parse_mode=None)
+        send_message(_get_bot_token(), chat_id, "No active projects found. Sync or define projects first.", parse_mode=None)
         return
     send_message(_get_bot_token(), chat_id, result, parse_mode=None)
 
@@ -203,7 +255,7 @@ def handle_insight(chat_id: str, args: str, settings: Settings) -> None:
 def handle_project(chat_id: str, args: str, settings: Settings) -> None:
     project_query = args.strip()
     if not project_query:
-        send_message(_get_bot_token(), chat_id, "Укажи часть имени: /project <часть имени>", parse_mode=None)
+        send_message(_get_bot_token(), chat_id, "Usage: /project <partial-name>", parse_mode=None)
         return
 
     with _with_db(settings) as connection:
@@ -231,7 +283,7 @@ def handle_project(chat_id: str, args: str, settings: Settings) -> None:
             send_message(
                 _get_bot_token(),
                 chat_id,
-                "Проект не найден. Используй /topics чтобы посмотреть темы, /project <часть имени> для поиска.",
+                "Project not found. Use /project <partial-name> to search active projects.",
                 parse_mode=None,
             )
             return
@@ -262,7 +314,7 @@ def handle_project(chat_id: str, args: str, settings: Settings) -> None:
                 (project["id"],),
             ).fetchall()
 
-            topics = ", ".join(row["label"] for row in topic_rows) or "нет связанных тем"
+            topics = ", ".join(row["label"] for row in topic_rows) or "no linked topics"
             last_commit = project["last_commit_at"] or "unknown"
             lines = [
                 project["name"],
@@ -289,7 +341,7 @@ def handle_project(chat_id: str, args: str, settings: Settings) -> None:
 def handle_ask(chat_id: str, args: str, settings: Settings) -> None:
     question = args.strip()
     if not question:
-        send_message(_get_bot_token(), chat_id, "Задай вопрос: /ask <вопрос>", parse_mode=None)
+        send_message(_get_bot_token(), chat_id, "Usage: /ask <question>", parse_mode=None)
         return
 
     cutoff_iso = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat().replace("+00:00", "Z")
@@ -374,12 +426,12 @@ def handle_costs(chat_id: str, args: str, settings: Settings) -> None:
     avg_ms = float(total_row["avg_ms"] or 0.0)
 
     lines = [
-        "💰 LLM Usage Statistics",
+        "LLM Usage Statistics",
         "",
-        "📊 All time:",
+        "All time:",
         f"  Calls: {total_calls} | Cost: ${total_cost:.4f} | Avg: {avg_ms / 1000:.1f}s",
         "",
-        "📋 By category (last 30 days):",
+        "By category (last 30 days):",
     ]
 
     if category_rows:
@@ -391,7 +443,7 @@ def handle_costs(chat_id: str, args: str, settings: Settings) -> None:
     else:
         lines.append("  No usage in the last 30 days.")
 
-    lines.extend(["", "📅 By month:"])
+    lines.extend(["", "By month:"])
     if month_rows:
         for row in month_rows:
             lines.append(
@@ -404,30 +456,36 @@ def handle_costs(chat_id: str, args: str, settings: Settings) -> None:
 
 
 def handle_study(chat_id: str, args: str, settings: Settings) -> None:
-    requested_hours = None
-    for token in args.split():
-        if token.isdigit():
-            requested_hours = token
-            break
-
-    content_md = generate_study_plan(settings)
-    if requested_hours is not None:
-        content_md = (
-            f"_Запрос на {requested_hours} ч. принят; пока доступен фиксированный план на 3 x 60 минут._\n\n"
-            f"{content_md}"
-        )
+    force = any(token.lower() in {"refresh", "rebuild", "force"} for token in args.split())
+    content_md = generate_study_plan(settings, force=force)
     send_message(_get_bot_token(), chat_id, content_md, parse_mode="Markdown", escape_markdown=False)
 
 
+def handle_study_done(chat_id: str, args: str, settings: Settings) -> None:
+    notes = args.strip() or None
+    try:
+        week_label = mark_study_complete(settings, notes=notes)
+        message = f"Study plan marked as completed for {week_label}."
+        if notes:
+            message += f"\nNotes: {notes}"
+        send_message(_get_bot_token(), chat_id, message, parse_mode=None)
+    except Exception as exc:
+        send_message(_get_bot_token(), chat_id, f"Failed to update study progress: {exc}", parse_mode=None)
+
+
 def handle_run_digest(chat_id: str, args: str, settings: Settings) -> None:
-    del args
-    summary = run_digest(settings)
+    force_delivery = args.strip().lower() in {"force", "--force", "redeliver"}
+    summary = run_digest(settings, force_delivery=force_delivery)
+    try:
+        run_recommendations(settings, force_delivery=force_delivery)
+    except Exception:
+        LOGGER.warning("Recommendations run failed after digest", exc_info=True)
     summary_lines = [summary.output_path]
     if summary.json_path:
         summary_lines.append(summary.json_path)
     send_report_preview(
         chat_id=chat_id,
-        title="Дайджест сгенерирован",
+        title="Weekly brief generated",
         summary_lines=summary_lines,
         week_label=summary.week_label,
         token=_get_bot_token(),
@@ -465,29 +523,27 @@ def handle_status(chat_id: str, args: str, settings: Settings) -> None:
 
 
 def _handle_mark_feedback(chat_id: str, args: str, settings: Settings, feedback_value: str) -> None:
-    post_id_str = args.strip().split()[0] if args.strip() else ""
-    if not post_id_str.isdigit() or int(post_id_str) <= 0:
+    post_ref = args.strip().split()[0] if args.strip() else ""
+    if not post_ref:
         send_message(
             _get_bot_token(),
             chat_id,
-            f"Usage: /mark_{'useful' if feedback_value == 'acted_on' else 'skipped'} <post_id>",
+            f"Usage: /mark_{'useful' if feedback_value == 'acted_on' else 'skipped'} <post_id|link>",
             parse_mode=None,
         )
         return
-    post_id = int(post_id_str)
     try:
         with _with_db(settings) as connection:
-            exists = connection.execute(
-                "SELECT 1 FROM posts WHERE id = ? LIMIT 1", (post_id,)
-            ).fetchone()
-            if exists is None:
+            row = _resolve_post_reference(connection, post_ref)
+            if row is None:
                 send_message(
                     _get_bot_token(),
                     chat_id,
-                    f"Post {post_id} not found.",
+                    f"Post not found: {post_ref}",
                     parse_mode=None,
                 )
                 return
+            post_id = int(row["id"])
             record_feedback(connection, post_id, feedback_value)
         send_message(
             _get_bot_token(),
@@ -499,12 +555,94 @@ def _handle_mark_feedback(chat_id: str, args: str, settings: Settings, feedback_
         send_message(_get_bot_token(), chat_id, f"Failed to record feedback: {exc}", parse_mode=None)
 
 
+def _handle_post_tag(chat_id: str, args: str, settings: Settings, tag_value: str | None = None) -> None:
+    parts = args.strip().split(maxsplit=2)
+    if tag_value is None:
+        if len(parts) < 2:
+            send_message(
+                _get_bot_token(),
+                chat_id,
+                "Usage: /tag <post_id|link> <strong|interesting|try|funny|low|later>",
+                parse_mode=None,
+            )
+            return
+        post_ref, raw_tag = parts[0], parts[1]
+        note = parts[2] if len(parts) > 2 else None
+        normalized_tag = _normalize_tag(raw_tag)
+    else:
+        if not parts:
+            send_message(
+                _get_bot_token(),
+                chat_id,
+                f"Usage: /mark_{tag_value} <post_id|link>",
+                parse_mode=None,
+            )
+            return
+        post_ref = parts[0]
+        note = parts[1] if len(parts) > 1 else None
+        normalized_tag = _normalize_tag(tag_value)
+
+    if not post_ref or normalized_tag is None:
+        send_message(
+            _get_bot_token(),
+            chat_id,
+            "Usage: /tag <post_id|link> <strong|interesting|try|funny|low|later>",
+            parse_mode=None,
+        )
+        return
+    try:
+        with _with_db(settings) as connection:
+            row = _resolve_post_reference(connection, post_ref)
+            if row is None:
+                send_message(_get_bot_token(), chat_id, f"Post not found: {post_ref}", parse_mode=None)
+                return
+            post_id = int(row["id"])
+            record_post_tag(connection, post_id, normalized_tag, note)
+            snippet = _format_post_snippet(row["content"], limit=100)
+        send_message(
+            _get_bot_token(),
+            chat_id,
+            f"Tag saved: {normalized_tag} for post {post_id}\n@{row['channel_username']}: {snippet}",
+            parse_mode=None,
+        )
+    except Exception as exc:
+        send_message(_get_bot_token(), chat_id, f"Failed to save tag: {exc}", parse_mode=None)
+
+
 def handle_mark_useful(chat_id: str, args: str, settings: Settings) -> None:
     _handle_mark_feedback(chat_id, args, settings, "acted_on")
 
 
 def handle_mark_skipped(chat_id: str, args: str, settings: Settings) -> None:
     _handle_mark_feedback(chat_id, args, settings, "skipped")
+
+
+def handle_tag(chat_id: str, args: str, settings: Settings) -> None:
+    _handle_post_tag(chat_id, args, settings)
+
+
+def handle_mark_strong(chat_id: str, args: str, settings: Settings) -> None:
+    _handle_post_tag(chat_id, args, settings, "strong")
+
+
+def handle_mark_interesting(chat_id: str, args: str, settings: Settings) -> None:
+    _handle_post_tag(chat_id, args, settings, "interesting")
+
+
+def handle_mark_try(chat_id: str, args: str, settings: Settings) -> None:
+    _handle_post_tag(chat_id, args, settings, "try")
+
+
+def handle_mark_funny(chat_id: str, args: str, settings: Settings) -> None:
+    _handle_post_tag(chat_id, args, settings, "funny")
+
+
+def handle_mark_low(chat_id: str, args: str, settings: Settings) -> None:
+    _handle_post_tag(chat_id, args, settings, "low")
+
+
+def handle_mark_later(chat_id: str, args: str, settings: Settings) -> None:
+    _handle_post_tag(chat_id, args, settings, "later")
 
 
 HANDLERS: dict[str, Callable[[str, str, Settings], None]] = {
@@ -515,11 +653,19 @@ HANDLERS: dict[str, Callable[[str, str, Settings], None]] = {
     "/project": handle_project,
     "/ask": handle_ask,
     "/study": handle_study,
+    "/study_done": handle_study_done,
     "/costs": handle_costs,
     "/run_digest": handle_run_digest,
     "/status": handle_status,
     "/mark_useful": handle_mark_useful,
     "/mark_skipped": handle_mark_skipped,
+    "/tag": handle_tag,
+    "/mark_strong": handle_mark_strong,
+    "/mark_interesting": handle_mark_interesting,
+    "/mark_try": handle_mark_try,
+    "/mark_funny": handle_mark_funny,
+    "/mark_low": handle_mark_low,
+    "/mark_later": handle_mark_later,
 }
 
 
@@ -531,7 +677,7 @@ def dispatch_command(chat_id: str, text: str, settings: Settings) -> None:
         send_message(
             _get_bot_token(),
             chat_id,
-            "Неизвестная команда. Используй /start чтобы посмотреть доступные команды.",
+            "Unknown command. Use /start to see the available commands.",
             parse_mode=None,
         )
         return

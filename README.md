@@ -15,18 +15,19 @@ A private, production-ready pipeline that runs on a personal VPS and processes T
 
 **This is:**
 - a personal signal filtering and scoring pipeline
-- a taste-aware ranking layer driven by your explicit profile
-- a project-aware relevance engine with keyword precision and suppression
-- a weekly review artifact generator (Telegraph article or HTML file)
+- a taste-aware ranking layer driven by your explicit profile and manual post ratings
+- a project-aware relevance engine that uses both deterministic scoring and LLM preference judging
+- persistent channel memory and project context snapshots
+- a weekly Telegraph brief plus a tracked study loop
 - a cost-aware, explainable AI workflow with feedback capture
 
 ---
 
 ## In Brief (for CV / interview)
 
-I follow 40+ Telegram channels — 300–500 posts/week. Most digest tools summarize everything; this system filters first, then summarizes selectively. The key architectural decision: **every post is scored deterministically before any LLM call**. ~90% of posts never reach a model. The 10% that do are processed by tier-matched models (Haiku / Sonnet / Opus). Cost scales with signal quality, not volume. Typical weekly run: $0.04–0.07.
+I follow 40+ Telegram channels — 300–500 posts/week. Most digest tools summarize everything; this system filters first, then synthesizes selectively. The base layer is still deterministic scoring, but the final weekly brief is now shaped by manual tags and a preference-judge pass that learns what I treat as strong, useful, project-relevant, funny, or low-signal. Cost is measured per category and tracked in SQLite.
 
-The output is not a summary. It's a structured decision-support review with explicit action items, source traceability links, project relevance mapped to what you're building, and a delta showing what changed since last week. Delivered as a Telegraph article with a short Telegram notification.
+The output is not a summary. It's a structured decision-support brief with source traceability, project-specific ideas, and a weekly study plan that compounds over time. Delivered as a Telegraph article inside Telegram with a short notification.
 
 Full case study: `docs/case-study.md` | Demo walkthrough: `docs/demo-walkthrough.md`
 
@@ -34,51 +35,62 @@ Full case study: `docs/case-study.md` | Demo walkthrough: `docs/demo-walkthrough
 
 ## What the System Does
 
-### Weekly pipeline (automated, Monday morning)
+### Weekly pipeline (automated, Monday morning, Asia/Tbilisi)
 
 1. **Ingests** new Telegram posts from configured channels via Telethon (MTProto)
 2. **Preprocesses** — normalizes text, extracts structure (code, links, word count), assigns TF-IDF topic clusters
-3. **Scores** every post with a deterministic 5-dimension formula — no LLM
-4. **Routes** posts to model tiers: Haiku (noise/cultural), Sonnet (watch), Opus (strong/synthesis)
-5. **Formats** a 9-section weekly review with source links, delta vs last week, and project relevance
+3. **Scores** every post with a deterministic 5-dimension formula plus preference bias from manual tags
+4. **Routes** posts to model tiers and a preference-judge layer for reader-facing selection
+5. **Formats** a decision brief with source links, project insights, and study cues
 6. **Renders** the review as an HTML document
 7. **Publishes** to Telegraph (with fallback to HTML file attachment)
 8. **Delivers** to Telegram: short notification (≤300 chars) + article URL or file
 
 ### What you receive
 
-**Telegram notification (short):**
-> Research Review 2026-W13: 7 strong signals, 23 watch. Analyzing FastAPI 0.112 release for potential impact on gdev-agent service layer.
-> https://telegra.ph/Research-Review-2026-W13
+**Telegram notifications (short):**
+> Research Brief 2026-W13 is ready.
+> 5 items matter, 3 are worth trying, and this week's study plan is updated.
+> https://telegra.ph/Research-Brief-2026-W13
+
+> Implementation Ideas 2026-W13 is ready.
+> https://telegra.ph/Implementation-Ideas-2026-W13
 
 **Full review (10–15 min read):**
 
 | Section | Always present | Content |
 |---|---|---|
-| Strong Signals | yes | Up to 5 strong signals with score, model tier, and source link |
-| Decisions to Consider | yes | Explicit action items from strong signals (≤3), or placeholder |
-| Watch | yes | Pending signals worth tracking, not urgent |
-| Cultural | yes | Low-signal items that carry contextual value |
-| Ignored | yes | Noise count by topic — confirms nothing important was missed |
-| Think Layer | yes | Theme synthesis |
-| Stats | yes | Bucket counts, avg score |
-| What Changed | yes | Delta vs previous week's bucket distribution |
-| Project Action Queue | if projects.yaml loads | Per-project relevant signals with matched keywords |
-| Learn | if projects.yaml loads | Topics recurring in strong/watch not yet in any project focus |
+| What Matters This Week | yes | Highest-confidence signals for this user with source links |
+| Things To Try | if present | Concrete ideas to apply in active projects |
+| Keep In View | if present | Important but not yet urgent items |
+| Funny / Cultural | if present | Context that is worth seeing but not acting on |
+| Project Insights | yes | Project-specific angles generated from the weekly feed |
+| Additional Signals | yes | High-confidence auto-selected items not yet manually tagged |
+| What Changed | yes | Delta vs previous week |
 
 ---
 
 ## Core Design Decision
 
-**Deterministic scoring before any LLM call.**
+**Deterministic scoring first, then user-shaped synthesis.**
 
-Every post receives a `signal_score` computed entirely without LLMs, from five weighted dimensions:
+Every post receives a deterministic `signal_score` computed without LLMs, from five weighted dimensions:
 
 ```
 signal_score = personal_interest×0.30 + source_quality×0.20 + technical_depth×0.20 + novelty×0.15 + actionability×0.15
 ```
 
-This score determines which model tier (if any) processes the post. The majority of posts never reach an LLM.
+Then the system adds:
+- manual tag overrides on explicitly rated posts
+- channel/source preference bias inferred from the user's historical tags
+- a `user_adjusted_score` stored on each post
+- a `preference_judge` LLM layer that writes the reader-facing "Why" and project angle for the weekly brief
+- `channel_memory` and `project_context_snapshots` so the judge sees what each source tends to be good at and what each active project is currently doing
+
+Project context is updated incrementally. The system does not need to reread the whole repo every time:
+- GitHub sync refreshes repo metadata
+- recent commit deltas are folded into `project_context_snapshots`
+- weekly recommendations, project insights, and study planning use those snapshots
 
 This is not a temporary hack. It is an intentional product decision:
 - LLMs are reserved for posts that have already passed a quality gate
@@ -154,7 +166,20 @@ Mark signals inline from Telegram:
 ```
 /mark_useful <post_id>    # records acted_on feedback
 /mark_skipped <post_id>   # records skipped feedback
+/tag <post_id|link> <strong|interesting|try|funny|low|later>
+/mark_strong <post_id|link>
+/mark_interesting <post_id|link>
+/mark_try <post_id|link>
+/mark_funny <post_id|link>
+/mark_low <post_id|link>
+/mark_later <post_id|link>
 ```
+
+Manual tags are not just annotations. They are used to:
+- override explicit post ranking where needed
+- shift learned channel/source bias over time
+- seed the weekly preference judge
+- shape the study plan and future recommendations
 
 Analyze your feedback to get boost topic suggestions:
 ```bash
@@ -167,7 +192,11 @@ Feedback is stored in `signal_feedback` table. `profile.yaml` is never auto-modi
 
 ## Delivery
 
-The weekly review is published as a **Telegraph article** (primary) or attached as an **HTML file** (fallback).
+The weekly output is published as two **Telegraph articles** by default:
+- `Research Brief`
+- `Implementation Ideas`
+
+Fallback remains an HTML attachment if Telegraph is unavailable.
 
 Set `TELEGRAPH_TOKEN` env var to reuse an existing Telegraph access token. If not set, a new anonymous account is created on each publish.
 
@@ -182,8 +211,11 @@ export TELEGRAPH_TOKEN=your_token_here
 ```bash
 python3 src/main.py health-check      # DB connectivity, config status, last run timestamps, stuck queues
 python3 src/main.py score-stats       # bucket distribution + trend vs previous week
-python3 src/main.py cost-stats        # LLM cost breakdown by model + 4-week weekly trend
-python3 src/main.py report-preview    # preview current signal report from scored posts
+python3 src/main.py cost-stats        # actual and estimated LLM cost breakdown by model/category/week
+python3 src/main.py report-preview    # preview the current Telegraph-style brief from scored posts
+python3 src/main.py study             # generate the current weekly study plan
+python3 src/main.py study --force     # rebuild the current weekly study plan from scratch
+python3 src/main.py study --remind    # send the weekly study reminder once
 python3 src/main.py tune-suggestions  # boost topic suggestions from acted-on feedback
 ```
 
@@ -201,7 +233,10 @@ System capabilities summary:
 - 9-section weekly review artifact with source traceability
 - HTML render + Telegraph publish (fallback: file attachment)
 - project relevance with explicit keyword lists and exclusion suppression
-- feedback capture (`/mark_useful`, `/mark_skipped`) + `tune-suggestions` CLI
+- manual tagging (`/tag`, `/mark_strong`, `/mark_try`, etc.) plus acted_on/skipped feedback
+- preference judge for reader-facing ranking and project-aware rationale
+- completion-aware weekly study plan with `/study_done`
+- incremental project context snapshots derived from GitHub sync and recent commits
 - observability: cost trends, score distribution trends, enriched health-check
 
 ---

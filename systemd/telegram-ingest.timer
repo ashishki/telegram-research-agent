@@ -3,7 +3,7 @@ Description=Telegram Research Agent — Weekly Ingestion Timer
 Requires=telegram-ingest.service
 
 [Timer]
-OnCalendar=Mon *-*-* 07:00:00
+OnCalendar=Mon *-*-* 07:00:00 Asia/Tbilisi
 Persistent=true
 Unit=telegram-ingest.service
 
