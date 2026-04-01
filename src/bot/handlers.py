@@ -13,7 +13,6 @@ from db.migrate import record_feedback, record_post_tag
 from output.generate_digest import _compute_week_label, run_digest
 from output.generate_answer import generate_answer
 from output.generate_insight import generate_insight
-from output.generate_recommendations import run_recommendations
 from output.generate_study_plan import generate_study_plan, mark_study_complete
 
 
@@ -475,17 +474,16 @@ def handle_study_done(chat_id: str, args: str, settings: Settings) -> None:
 
 def handle_run_digest(chat_id: str, args: str, settings: Settings) -> None:
     force_delivery = args.strip().lower() in {"force", "--force", "redeliver"}
-    summary = run_digest(settings, force_delivery=force_delivery)
-    try:
-        run_recommendations(settings, force_delivery=force_delivery)
-    except Exception:
-        LOGGER.warning("Recommendations run failed after digest", exc_info=True)
+    if force_delivery:
+        summary = run_digest(settings, force_delivery=True)
+    else:
+        summary = run_digest(settings)
     summary_lines = [summary.output_path]
     if summary.json_path:
         summary_lines.append(summary.json_path)
     send_report_preview(
         chat_id=chat_id,
-        title="Weekly brief generated",
+        title="Дайджест сгенерирован",
         summary_lines=summary_lines,
         week_label=summary.week_label,
         token=_get_bot_token(),

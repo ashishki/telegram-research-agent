@@ -19,7 +19,6 @@ from output.generate_digest import run_digest
 from output.generate_insight import OUTPUT_DIR as INSIGHT_OUTPUT_DIR
 from output.generate_insight import generate_insight
 from output.map_project_insights import run_project_mapping
-from output.generate_recommendations import run_recommendations
 from output.signal_report import format_signal_report
 from output.generate_study_plan import OUTPUT_DIR as STUDY_PLAN_OUTPUT_DIR
 from output.generate_study_plan import generate_study_plan, send_study_reminder
@@ -231,20 +230,6 @@ def handle_digest(args: argparse.Namespace) -> int:
     except Exception:
         LOGGER.exception("Digest generation failed")
         return 1
-
-    try:
-        LOGGER.info("Starting step=generate_recommendations")
-        recommendation_summary = run_recommendations(settings, force_delivery=getattr(args, "force", False))
-        if recommendation_summary["output_path"] is None:
-            LOGGER.warning("Recommendations skipped week=%s", recommendation_summary["week_label"])
-        else:
-            LOGGER.info(
-                "Finished step=generate_recommendations week=%s output=%s",
-                recommendation_summary["week_label"],
-                recommendation_summary["output_path"],
-            )
-    except Exception:
-        LOGGER.exception("Recommendations generation failed but digest succeeded")
 
     try:
         LOGGER.info("Starting step=generate_study_plan")

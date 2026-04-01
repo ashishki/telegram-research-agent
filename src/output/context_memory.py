@@ -12,23 +12,27 @@ def _utc_now_iso() -> str:
 
 
 def refresh_channel_memory(connection: sqlite3.Connection) -> None:
-    rows = connection.execute(
-        """
-        SELECT
-            p.channel_username,
-            SUM(CASE WHEN upt.tag IN ('strong', 'try_in_project', 'interesting') THEN 1 ELSE 0 END) AS positive_tags,
-            SUM(CASE WHEN upt.tag = 'low_signal' THEN 1 ELSE 0 END) AS negative_tags,
-            SUM(CASE WHEN upt.tag = 'strong' THEN 1 ELSE 0 END) AS strong_tags,
-            SUM(CASE WHEN upt.tag = 'try_in_project' THEN 1 ELSE 0 END) AS try_tags,
-            SUM(CASE WHEN upt.tag = 'interesting' THEN 1 ELSE 0 END) AS interesting_tags,
-            SUM(CASE WHEN upt.tag = 'funny' THEN 1 ELSE 0 END) AS funny_tags,
-            SUM(CASE WHEN upt.tag = 'low_signal' THEN 1 ELSE 0 END) AS low_signal_tags,
-            SUM(CASE WHEN upt.tag = 'read_later' THEN 1 ELSE 0 END) AS read_later_tags
-        FROM user_post_tags upt
-        INNER JOIN posts p ON p.id = upt.post_id
-        GROUP BY p.channel_username
-        """
-    ).fetchall()
+    try:
+        rows = connection.execute(
+            """
+            SELECT
+                p.channel_username,
+                SUM(CASE WHEN upt.tag IN ('strong', 'try_in_project', 'interesting') THEN 1 ELSE 0 END) AS positive_tags,
+                SUM(CASE WHEN upt.tag = 'low_signal' THEN 1 ELSE 0 END) AS negative_tags,
+                SUM(CASE WHEN upt.tag = 'strong' THEN 1 ELSE 0 END) AS strong_tags,
+                SUM(CASE WHEN upt.tag = 'try_in_project' THEN 1 ELSE 0 END) AS try_tags,
+                SUM(CASE WHEN upt.tag = 'interesting' THEN 1 ELSE 0 END) AS interesting_tags,
+                SUM(CASE WHEN upt.tag = 'funny' THEN 1 ELSE 0 END) AS funny_tags,
+                SUM(CASE WHEN upt.tag = 'low_signal' THEN 1 ELSE 0 END) AS low_signal_tags,
+                SUM(CASE WHEN upt.tag = 'read_later' THEN 1 ELSE 0 END) AS read_later_tags
+            FROM user_post_tags upt
+            INNER JOIN posts p ON p.id = upt.post_id
+            GROUP BY p.channel_username
+            """
+        ).fetchall()
+    except sqlite3.Error:
+        LOGGER.warning("Failed to refresh channel memory", exc_info=True)
+        return
     now = _utc_now_iso()
     connection.execute("BEGIN")
     for row in rows:
@@ -104,15 +108,19 @@ def load_channel_memory(connection: sqlite3.Connection, channels: list[str]) -> 
         return {}
     unique_channels = list(dict.fromkeys(channel for channel in channels if channel))
     placeholders = ",".join("?" for _ in unique_channels)
-    rows = connection.execute(
-        f"""
-        SELECT channel_username, summary, positive_tags, negative_tags, strong_tags, try_tags,
-               interesting_tags, funny_tags, low_signal_tags, read_later_tags, updated_at
-        FROM channel_memory
-        WHERE channel_username IN ({placeholders})
-        """,
-        unique_channels,
-    ).fetchall()
+    try:
+        rows = connection.execute(
+            f"""
+            SELECT channel_username, summary, positive_tags, negative_tags, strong_tags, try_tags,
+                   interesting_tags, funny_tags, low_signal_tags, read_later_tags, updated_at
+            FROM channel_memory
+            WHERE channel_username IN ({placeholders})
+            """,
+            unique_channels,
+        ).fetchall()
+    except sqlite3.Error:
+        LOGGER.warning("Failed to load channel memory", exc_info=True)
+        return {}
     return {
         str(row["channel_username"]): {
             "summary": str(row["summary"] or ""),
@@ -228,7 +236,11 @@ def load_project_context(connection: sqlite3.Connection, project_names: list[str
             sql += f" WHERE project_name IN ({placeholders})"
             params = tuple(names)
     sql += " ORDER BY project_name ASC"
-    rows = connection.execute(sql, params).fetchall()
+    try:
+        rows = connection.execute(sql, params).fetchall()
+    except sqlite3.Error:
+        LOGGER.warning("Failed to load project context snapshots", exc_info=True)
+        return []
     snapshots: list[dict] = []
     for row in rows:
         try:

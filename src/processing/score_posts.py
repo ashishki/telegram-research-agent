@@ -568,11 +568,6 @@ def score_posts(
                 )
                 score_breakdown = json.dumps(
                     {
-                        "base_signal_score": signal_score,
-                        "adjusted_signal_score": adjusted_score,
-                        "explicit_tag": explicit_tag or "",
-                        "channel_preference_bias": channel_bias,
-                        "explicit_preference_bias": explicit_bias,
                         "recency": d_recency,
                         "engagement": d_engagement,
                         "topic_relevance": d_interest,

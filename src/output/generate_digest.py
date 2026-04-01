@@ -10,6 +10,7 @@ from pathlib import Path
 from config.settings import PROJECT_ROOT, Settings
 from llm.client import complete
 from llm.router import route
+from output import generate_recommendations as recommendations_module
 from output.render_report import write_report_html
 from output.signal_report import format_signal_report
 from output.report_schema import (
@@ -637,7 +638,7 @@ def run_digest(settings: Settings, force_delivery: bool = False) -> DigestResult
             *full_buckets.get("noise", buckets["noise"]),
         ]
         try:
-            signal_report = format_signal_report(signal_posts, settings)
+            signal_report = format_signal_report(signal_posts, settings, reader_mode=True)
             content_md = signal_report
         except Exception:
             LOGGER.warning("Signal-first section generation failed; continuing without it", exc_info=True)
@@ -710,6 +711,18 @@ def run_digest(settings: Settings, force_delivery: bool = False) -> DigestResult
             )
         except Exception:
             LOGGER.warning("Failed to send digest to Telegram owner week=%s", week_label, exc_info=True)
+
+        try:
+            recommendation_summary = recommendations_module.run_recommendations(settings, force_delivery=force_delivery)
+            insights_text = str(recommendation_summary.get("text") or "").strip()
+            has_standalone_delivery = bool(recommendation_summary.get("html_path") or recommendation_summary.get("telegraph_url"))
+            token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+            chat_id = os.environ.get("TELEGRAM_OWNER_CHAT_ID", "").strip()
+            if insights_text and not has_standalone_delivery and token and chat_id:
+                time.sleep(1)
+                send_text(chat_id=chat_id, text=insights_text, token=token, parse_mode=None)
+        except Exception as exc:
+            LOGGER.warning("Insights generation failed, skipping: %s", exc, exc_info=True)
 
     return DigestResult(
         week_label=week_label,

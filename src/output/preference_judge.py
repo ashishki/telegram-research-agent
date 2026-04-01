@@ -267,14 +267,18 @@ def _judge_batch(
 
 
 def judge_recent_posts(db_path: str, projects: list[dict] | None, lookback_days: int = 21) -> dict[int, dict]:
-    with sqlite3.connect(db_path) as connection:
-        connection.row_factory = sqlite3.Row
-        refresh_channel_memory(connection)
-        examples = _fetch_tagged_examples(connection)
-        candidates = _fetch_candidates(connection, lookback_days=lookback_days)
-        active_projects = _active_projects(projects)
-        channel_memory = load_channel_memory(connection, [str(candidate.get("channel") or "") for candidate in candidates])
-        project_context = load_project_context(connection, _project_names(active_projects))
+    try:
+        with sqlite3.connect(db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            refresh_channel_memory(connection)
+            examples = _fetch_tagged_examples(connection)
+            candidates = _fetch_candidates(connection, lookback_days=lookback_days)
+            active_projects = _active_projects(projects)
+            channel_memory = load_channel_memory(connection, [str(candidate.get("channel") or "") for candidate in candidates])
+            project_context = load_project_context(connection, _project_names(active_projects))
+    except sqlite3.Error:
+        LOGGER.warning("Preference judge skipped because preference tables are unavailable", exc_info=True)
+        return {}
     if not examples or not candidates:
         return {}
 

@@ -101,9 +101,16 @@ def _build_what_changed_lines(bucket_counts: Counter) -> list[str]:
 def _load_user_tag_details(post_ids: list[int], settings) -> dict[int, list[dict[str, str]]]:
     if not post_ids:
         return {}
+    db_path = ""
+    if settings is not None:
+        db_path = str(getattr(settings, "db_path", "") or "").strip()
+    if not db_path:
+        db_path = os.environ.get("AGENT_DB_PATH", "").strip()
+    if not db_path:
+        return {}
     placeholders = ",".join("?" for _ in post_ids)
     try:
-        with sqlite3.connect(settings.db_path) as connection:
+        with sqlite3.connect(db_path) as connection:
             connection.row_factory = sqlite3.Row
             rows = connection.execute(
                 f"""
@@ -175,6 +182,128 @@ def _sort_posts_for_brief(posts: list[dict], tag_details_by_post: dict[int, list
 
 def _judged(post_id: int, judged_by_post: dict[int, dict]) -> dict:
     return judged_by_post.get(post_id, {})
+
+
+def _table_exists(db_path: str, table_name: str) -> bool:
+    if not db_path:
+        return False
+    try:
+        with sqlite3.connect(db_path) as connection:
+            row = connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+                (table_name,),
+            ).fetchone()
+    except sqlite3.Error:
+        return False
+    return row is not None
+
+
+def _format_legacy_entry(post: dict) -> str:
+    excerpt = _truncate_words(post.get("content"), 24)
+    score = float(post.get("signal_score") or 0.0)
+    model = str(post.get("routed_model") or "")
+    suffix = _format_source_suffix(post.get("message_url"))
+    return f"- {excerpt} [score={score:.2f}] [model={model}]{suffix}"
+
+
+def _build_legacy_project_queue(posts: list[dict], projects: list[dict] | None) -> list[str]:
+    if not projects:
+        return []
+    grouped: dict[str, list[str]] = {}
+    for post in posts:
+        if str(post.get("bucket") or "") == "noise":
+            continue
+        matches = score_project_relevance(post.get("content", ""), projects)
+        for match in matches:
+            score = float(match.get("score") or 0.0)
+            if score < 0.30:
+                continue
+            grouped.setdefault(str(match.get("name") or "unknown"), []).append(
+                f"- {_truncate_words(post.get('content'), 18)} [relevance={score:.2f}]"
+            )
+    if not grouped:
+        return []
+    lines = ["## Project Action Queue"]
+    for project_name in sorted(grouped):
+        lines.append(f"**{project_name}**")
+        lines.extend(grouped[project_name][:3])
+        lines.append("")
+    return lines
+
+
+def _format_legacy_signal_report(posts: list[dict], settings) -> str:
+    profile = _load_profile()
+    indexed_posts = [{**post, "_original_position": index} for index, post in enumerate(posts)]
+    ranked_posts = apply_personalization(indexed_posts, profile) if profile is not None else list(indexed_posts)
+    strong_posts = sorted(
+        [post for post in ranked_posts if str(post.get("bucket") or "") == "strong"],
+        key=lambda post: float(post.get("signal_score") or 0.0),
+        reverse=True,
+    )
+    watch_posts = sorted(
+        [post for post in ranked_posts if str(post.get("bucket") or "") == "watch"],
+        key=lambda post: float(post.get("signal_score") or 0.0),
+        reverse=True,
+    )
+    cultural_posts = sorted(
+        [post for post in ranked_posts if str(post.get("bucket") or "") == "cultural"],
+        key=lambda post: float(post.get("signal_score") or 0.0),
+        reverse=True,
+    )
+    noise_posts = [post for post in ranked_posts if str(post.get("bucket") or "") == "noise"]
+    bucket_counts = Counter((post.get("bucket") or "noise") for post in ranked_posts)
+
+    decision_lines = ["No decision-grade signals this week."]
+    long_strong = next(
+        (post for post in strong_posts if int(post.get("word_count") or 0) >= 80),
+        strong_posts[0] if strong_posts else None,
+    )
+    if long_strong is not None:
+        decision_lines = [f"- Consider: {_truncate_words(long_strong.get('content'), 20)}"]
+
+    projects = _load_projects()
+    project_lines = _build_legacy_project_queue(ranked_posts, projects)
+    think_lines = ["No manual preference signals loaded."]
+    if settings is not None:
+        tag_details = _load_user_tag_details([int(post.get("id") or 0) for post in ranked_posts], settings)
+        manual_count = sum(1 for details in tag_details.values() if details)
+        think_lines = [f"Manual preference signals loaded for {manual_count} posts."]
+
+    sections: list[str] = [
+        "## Strong Signals",
+        *( [_format_legacy_entry(post) for post in strong_posts] or ["No strong signals this week."] ),
+        "",
+        "## Decisions to Consider",
+        *decision_lines,
+        "",
+        "## Watch",
+        *( [_format_legacy_entry(post) for post in watch_posts] or ["No watch signals this week."] ),
+        "",
+        "## Cultural",
+        *( [_format_legacy_entry(post) for post in cultural_posts] or ["No cultural signals this week."] ),
+        "",
+        "## Ignored",
+        f"{len(noise_posts)} posts filtered as noise.",
+        "",
+    ]
+    if project_lines:
+        sections.extend(project_lines)
+    sections.extend(
+        [
+            "## Think Layer",
+            *think_lines,
+            "",
+            "## Stats",
+            f"- strong: {bucket_counts.get('strong', 0)}",
+            f"- watch: {bucket_counts.get('watch', 0)}",
+            f"- cultural: {bucket_counts.get('cultural', 0)}",
+            f"- noise: {bucket_counts.get('noise', 0)}",
+            "",
+            "## What Changed",
+            *_build_what_changed_lines(bucket_counts),
+        ]
+    )
+    return "\n".join(sections).strip() + "\n"
 
 
 def _build_manual_sections(
@@ -295,13 +424,20 @@ def _build_auto_watch_lines(
     return lines or ["No additional high-confidence auto-selected signals this week."]
 
 
-def format_signal_report(posts: list[dict], settings) -> str:
+def format_signal_report(posts: list[dict], settings=None, *, reader_mode: bool = False) -> str:
+    if not reader_mode:
+        return _format_legacy_signal_report(posts, settings)
+
+    db_path = str(getattr(settings, "db_path", "") or "").strip() if settings is not None else ""
+    if not _table_exists(db_path, "user_post_tags"):
+        return _format_legacy_signal_report(posts, settings)
+
     indexed_posts = [{**post, "_original_position": index} for index, post in enumerate(posts)]
     profile = _load_profile()
     ranked_posts = apply_personalization(indexed_posts, profile) if profile is not None else list(indexed_posts)
     tag_details_by_post = _load_user_tag_details([int(post.get("id") or 0) for post in ranked_posts], settings)
     projects = _load_projects()
-    judged_by_post = judge_recent_posts(settings.db_path, projects, lookback_days=21)
+    judged_by_post = judge_recent_posts(db_path, projects, lookback_days=21) if db_path else {}
     ranked_posts = _sort_posts_for_brief(ranked_posts, tag_details_by_post)
 
     visible_posts = [
