@@ -117,8 +117,10 @@ Legacy phases (Phase 1–20 in the original numbering) are preserved as implemen
 **Decision:** No HTTP API, no web frontend in MVP.
 
 **Output artifacts are:**
-- Markdown files committed to the repo or written to a designated output directory.
-- Future evolution may add a simple read interface.
+- `Research Brief` Markdown/HTML written to `data/output/digests` and `data/output/reviews`
+- `Implementation Ideas` Markdown/HTML written to `data/output/recommendations`
+- study plans and project-insight artifacts under `data/output/*`
+- Telegraph URLs persisted in SQLite for delivered reports
 
 ### AD-06: Systemd Timers for Scheduling
 
@@ -211,9 +213,10 @@ Legacy phases (Phase 1–20 in the original numbering) are preserved as implemen
                         ▼
 ┌───────────────────────────────────────────────────────┐
 │              Output Layer                              │
-│  data/output/digests/YYYY-WXX.md                       │
-│  data/output/recommendations/YYYY-WXX.md               │
-│  data/output/experiments/YYYY-WXX.md                   │
+│  data/output/digests/YYYY-WXX.md / .json               │
+│  data/output/reviews/YYYY-WXX.html                     │
+│  data/output/recommendations/YYYY-WXX_insights.md/html │
+│  data/output/study_plans/YYYY-WXX.md                   │
 └───────────────────────────────────────────────────────┘
                         │
                         ▼

@@ -99,9 +99,9 @@ Every signal links back to its source (`https://t.me/{channel}/{message_id}`). N
 
 ## Delivery
 
-The review is published as a Telegraph article — full-screen, scrollable, readable inside Telegram without leaving the app. A short notification (≤300 chars) with the article URL is sent to Telegram immediately.
+The weekly output is published as two Telegraph articles — `Research Brief` and `Implementation Ideas`. Both are full-screen, scrollable, and readable inside Telegram without leaving the app. Short notifications (≤300 chars) with article URLs are sent to Telegram immediately.
 
-Fallback chain if Telegraph is unavailable:
+Fallback chain for `Research Brief` if Telegraph is unavailable:
 1. HTML file attachment (generated to `data/output/reviews/YYYY-Www.html`)
 2. Full Markdown text (last resort)
 

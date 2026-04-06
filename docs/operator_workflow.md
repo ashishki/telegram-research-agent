@@ -19,8 +19,8 @@ The systemd timer triggers the full pipeline:
 1. Incremental ingestion (new posts since last run)
 2. Normalization and preprocessing
 3. Scoring (`score_posts`)
-4. Digest generation and signal report formatting
-5. Delivery: Telegram notification + full artifact
+4. Digest generation and reader-facing signal report formatting
+5. Delivery: Telegram notifications + full artifacts
 
 Owner receives:
 - Telegram message: short `Research Brief` notification + Telegraph link
@@ -68,7 +68,8 @@ python3 src/main.py score-stats
 # Check LLM cost from last run (+ 4-week weekly trend)
 python3 src/main.py cost-stats
 
-# Preview the report without re-running the full pipeline
+# Preview scored posts without re-running the full pipeline
+# Note: this is a legacy operator preview, not an exact copy of the delivered Telegraph brief
 python3 src/main.py report-preview
 
 # Generate or refresh the current study plan
@@ -164,7 +165,7 @@ The scoring engine re-reads YAML config on every run. Changes apply without rest
 The system captures lightweight feedback and explicit tags without automatic profile-file edits.
 
 **How it works:**
-1. You read the weekly review (Telegraph article or HTML file)
+1. You read the weekly `Research Brief` and `Implementation Ideas` (Telegraph articles, or HTML file for the research brief fallback)
 2. Tag or mark signals directly from Telegram
 3. The next scoring run updates explicit overrides and channel/source bias
 4. The weekly preference judge uses those examples to reshape the final brief
@@ -194,9 +195,11 @@ This lets study planning, recommendations, and project insights reason from rece
 ## Initial Setup Checklist
 
 - [ ] Set `AGENT_DB_PATH`, `ANTHROPIC_API_KEY` in environment
+- [ ] Set `TELEGRAPH_TOKEN` if you want a stable Telegraph account instead of anonymous per-publish accounts
 - [ ] Fill `src/config/channels.yaml` — your curated channel list with priorities
 - [ ] Fill `src/config/profile.yaml` — your boost/downrank topics
 - [ ] Fill `src/config/projects.yaml` — your active projects with focus keywords
+- [ ] Ensure the service user can write to `data/output/reviews`, `data/output/recommendations`, and `data/output/study_plans`
 - [ ] Run `python3 src/main.py health-check` — verify DB and config presence
 - [ ] Run bootstrap ingestion for initial data
 - [ ] Run `python3 src/main.py score-stats` — verify scoring produces expected distribution

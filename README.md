@@ -27,7 +27,7 @@ A private, production-ready pipeline that runs on a personal VPS and processes T
 
 I follow 40+ Telegram channels — 300–500 posts/week. Most digest tools summarize everything; this system filters first, then synthesizes selectively. The base layer is still deterministic scoring, but the final weekly brief is now shaped by manual tags and a preference-judge pass that learns what I treat as strong, useful, project-relevant, funny, or low-signal. Cost is measured per category and tracked in SQLite.
 
-The output is not a summary. It's a structured decision-support brief with source traceability, project-specific ideas, and a weekly study plan that compounds over time. Delivered as a Telegraph article inside Telegram with a short notification.
+The output is not a summary. It's a structured decision-support brief with source traceability, project-specific ideas, and a weekly study plan that compounds over time. Delivered as two Telegraph articles inside Telegram with short notifications.
 
 Full case study: `docs/case-study.md` | Demo walkthrough: `docs/demo-walkthrough.md`
 
@@ -43,14 +43,14 @@ Full case study: `docs/case-study.md` | Demo walkthrough: `docs/demo-walkthrough
 4. **Routes** posts to model tiers and a preference-judge layer for reader-facing selection
 5. **Formats** a decision brief with source links, project insights, and study cues
 6. **Renders** the review as an HTML document
-7. **Publishes** to Telegraph (with fallback to HTML file attachment)
-8. **Delivers** to Telegram: short notification (≤300 chars) + article URL or file
+7. **Publishes** two Telegraph articles: `Research Brief` and `Implementation Ideas`
+8. **Delivers** to Telegram: short notification (≤300 chars) + article URL, with HTML attachment fallback for the research brief if Telegraph is unavailable
 
 ### What you receive
 
 **Telegram notifications (short):**
 > Research Brief 2026-W13 is ready.
-> 5 items matter, 3 are worth trying, and this week's study plan is updated.
+> 5 strong signals, 3 watch.
 > https://telegra.ph/Research-Brief-2026-W13
 
 > Implementation Ideas 2026-W13 is ready.
@@ -196,7 +196,11 @@ The weekly output is published as two **Telegraph articles** by default:
 - `Research Brief`
 - `Implementation Ideas`
 
-Fallback remains an HTML attachment if Telegraph is unavailable.
+Delivery behavior:
+- `Research Brief`: Telegraph first, fallback to HTML attachment, then fallback to plain text if attachment send fails
+- `Implementation Ideas`: Telegraph first, fallback to short Telegram notification if publish fails
+
+Operational requirement: the service user must be able to write under `data/output/reviews`, `data/output/recommendations`, and `data/output/study_plans`, otherwise delivery can fail before Telegraph publish.
 
 Set `TELEGRAPH_TOKEN` env var to reuse an existing Telegraph access token. If not set, a new anonymous account is created on each publish.
 
@@ -212,7 +216,7 @@ export TELEGRAPH_TOKEN=your_token_here
 python3 src/main.py health-check      # DB connectivity, config status, last run timestamps, stuck queues
 python3 src/main.py score-stats       # bucket distribution + trend vs previous week
 python3 src/main.py cost-stats        # actual and estimated LLM cost breakdown by model/category/week
-python3 src/main.py report-preview    # preview the current Telegraph-style brief from scored posts
+python3 src/main.py report-preview    # legacy operator preview of scored posts (not identical to the reader-facing Telegraph brief)
 python3 src/main.py study             # generate the current weekly study plan
 python3 src/main.py study --force     # rebuild the current weekly study plan from scratch
 python3 src/main.py study --remind    # send the weekly study reminder once

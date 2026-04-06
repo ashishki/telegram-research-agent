@@ -211,7 +211,7 @@ Then `publish_article()`:
 1. Gets access token (from `TELEGRAPH_TOKEN` env var, or creates anonymous account)
 2. Converts HTML → Telegraph Node objects: `<h2>` → `{"tag": "h3", "children": ["text"]}`
 3. POSTs to `https://api.telegra.ph/createPage`
-4. Returns: `https://telegra.ph/Research-Review-2026-W13`
+4. Returns: `https://telegra.ph/Research-Brief-2026-W13`
 
 ---
 
@@ -219,12 +219,14 @@ Then `publish_article()`:
 
 Notification (≤300 chars):
 ```
-Research Review 2026-W13: 7 strong signals, 23 watch. FastAPI 0.112 drops response_model_include overhead 40% in benchmarks...
-https://telegra.ph/Research-Review-2026-W13
+Research Brief 2026-W13 is ready.
+7 strong signals, 23 watch.
+https://telegra.ph/Research-Brief-2026-W13
 ```
 
-If Telegraph fails → sends HTML as Telegram document attachment.
+If `Research Brief` Telegraph publish fails → sends HTML as Telegram document attachment.
 If document send fails → sends full Markdown text.
+`Implementation Ideas` is published separately as its own Telegraph article.
 
 ---
 

@@ -40,9 +40,9 @@ Telegram Channels
   → Project Lens             (explicit keyword lists, exclude_keywords suppression)
   → Personalization Layer    (boost/downrank adjustments, floor protection)
   → Learning Layer           (recurring topics not covered by any project)
-  → Output Layer             (9-section weekly review artifact with source traceability)
+  → Output Layer             (reader-facing Research Brief + project-shaped Implementation Ideas)
   → Render Layer             (HTML generation: render_report.py)
-  → Delivery Layer           (Telegraph publish → Telegram URL; fallback: HTML file)
+  → Delivery Layer           (Telegraph publish → Telegram URL; Research Brief fallback: HTML file)
   → Feedback Layer           (signal_feedback table, /mark_useful, /mark_skipped, tune-suggestions)
 
 Cross-cutting:
@@ -190,7 +190,10 @@ Source: `src/output/learning_layer.py`
 
 Assembles the weekly decision brief from all upstream layers.
 
-`format_signal_report()` now produces a Telegram-first Markdown brief built around:
+`format_signal_report(..., reader_mode=True)` produces the reader-facing `Research Brief` used by digest delivery.
+`format_signal_report()` without `reader_mode` is still used by `report-preview` as a legacy operator preview.
+
+The reader-facing brief is built around:
 
 1. What Matters This Week
 2. Things To Try
@@ -206,7 +209,7 @@ Source: `src/output/signal_report.py`, `src/output/preference_judge.py`, `src/ou
 
 ### Render Layer
 
-Converts `format_signal_report()` Markdown output to HTML.
+Converts reader-facing `Research Brief` Markdown output to HTML.
 Writes to `data/output/reviews/YYYY-Www.html`.
 Zero LLM usage.
 
@@ -214,10 +217,16 @@ Source: `src/output/render_report.py`
 
 ### Delivery Layer
 
-Primary: publishes HTML to Telegraph via the Telegraph API.
-Returns article URL → appended to Telegram notification.
-Fallback 1: if Telegraph fails → sends HTML file as Telegram document attachment.
-Fallback 2: if document send fails → sends full Markdown text.
+`run_digest()` owns delivery orchestration:
+- publishes `Research Brief` HTML to Telegraph
+- publishes `Implementation Ideas` HTML to Telegraph through `run_recommendations()`
+- stores `telegraph_url` and `telegram_sent_at` on both artifacts
+
+Fallback behavior is asymmetric by design:
+- `Research Brief`: Telegraph → HTML document attachment → full Markdown text
+- `Implementation Ideas`: Telegraph → short Telegram notification without article body
+
+Operational constraint: the service user must be able to write to `data/output/reviews`, `data/output/recommendations`, and `data/output/study_plans`, or delivery can fail before Telegraph publish.
 
 Supports `TELEGRAPH_TOKEN` env var to reuse existing account (skip createAccount step).
 

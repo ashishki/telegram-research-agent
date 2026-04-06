@@ -27,7 +27,7 @@ A well-structured, readable long-form document.
 Delivered as:
 - a `Research Brief` Telegraph article
 - an `Implementation Ideas` Telegraph article
-- fallback HTML attachment if Telegraph is unavailable
+- fallback HTML attachment for `Research Brief` if Telegraph is unavailable
 Readable inside Telegram without opening an external app.
 Scannable — section headers, bullet points, source links inline per signal.
 
@@ -35,7 +35,7 @@ Scannable — section headers, bullet points, source links inline per signal.
 
 ## Artifact Structure
 
-Sections in order. Reader-facing sections may be omitted if empty. Noise and operator-only metrics do not belong in the main brief.
+`Research Brief` sections stay in this order when populated. Reader-facing sections may be omitted if empty. Noise and operator-only metrics do not belong in the main brief.
 
 ---
 
@@ -51,8 +51,9 @@ For each:
 
 Format:
 ```
-**[score=0.87] Title or summary**
-Why it matters: ...
+**Title or summary**
+Key takeaway: ...
+Why now: ...
 Source: https://t.me/channel/message_id
 ```
 
@@ -112,7 +113,8 @@ If no prior week in DB: "No comparison baseline available."
 
 ## Implementation Notes
 
-`format_signal_report()` in `src/output/signal_report.py` produces the structured content.
+`format_signal_report(..., reader_mode=True)` in `src/output/signal_report.py` produces the delivered `Research Brief`.
+`format_signal_report()` without `reader_mode` is the operator-facing legacy preview used by `report-preview`.
 Telegraph is the primary reading surface.
 Source links: `https://t.me/{channel_username}/{message_id}` — already stored in `raw_posts.message_url`.
 The report is informed by:
@@ -136,3 +138,4 @@ The report is informed by:
 - Rendering the report as raw Markdown in Telegram (use HTML parse_mode or Telegraph)
 - Showing operator-only fields like `post_id`, raw scores, or manual notes in the reader-facing brief
 - Writing prose summaries per-item instead of evidence-forward bullets
+- Assuming `report-preview` is identical to the delivered Telegraph brief
