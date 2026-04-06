@@ -28,6 +28,11 @@ Owner receives:
 
 Expected time to read: 10–15 minutes.
 
+`Implementation Ideas` should be treated as a triaged surface:
+- `do now` ideas are candidate implementation moves for the current working horizon
+- `backlog` ideas are useful but not urgent
+- `reject/defer` ideas should be remembered and suppressed from repeating unchanged
+
 ---
 
 ### After Reading — Tag What Actually Mattered
@@ -119,6 +124,10 @@ Once a month, review:
 
 4. **Projects.yaml** — add new active projects, archive completed ones
    - Dead projects generate false positives in Project Relevance section
+
+5. **Implementation Ideas quality** — review whether weekly ideas are operationally useful or drifting into speculative abstractions
+   - If too many ideas feel like premature SDK/product extraction, they should move to backlog or reject/defer memory
+   - Repeated weak ideas should not resurface every week without new evidence
 
 ---
 

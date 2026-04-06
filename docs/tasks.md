@@ -626,6 +626,50 @@ Out of scope:
 
 ---
 
+## Phase 6v3 — Insight Triage and Backlog Memory
+
+**Objective:** Turn `Implementation Ideas` from a flat stream of plausible ideas into a triaged decision surface that separates `do now`, `backlog later`, and `reject/defer`.
+
+**Why now:** Current insight generation is often technically grounded but not always action-worthy. The system can overproduce portfolio-friendly abstractions, premature SDK ideas, or rebuild-as-extraction suggestions. The next step is not "more ideas", but a decision layer that judges whether an insight is actionable now, should be deferred, or should be remembered as rejected so it does not resurface unchanged every week.
+
+**Scope:**
+
+In scope:
+- Introduce an explicit insight triage layer after raw idea generation
+- Classify each idea into at least: `do_now`, `backlog`, `reject_or_defer`
+- Store structured fields such as idea type, timing, evidence strength, main risk, and recommendation
+- Add rejection/defer memory so repeated low-value ideas can be suppressed or revisited intentionally
+- Update `Implementation Ideas` output to prefer actionable items and label speculative ideas honestly
+- Add operator visibility for triaged insights and deferred/rejected items
+
+Out of scope:
+- full product-management workflow
+- auto-creating GitHub issues or roadmap tasks without operator approval
+- replacing the existing recommendation generator with a completely new product surface
+- broad LLM-agent orchestration changes outside the insight pipeline
+
+**Tasks**
+
+| ID | Task | Owner | Status | Depends On |
+|---|---|---|---|---|
+| T80 | Define triage schema for generated insights: add structured fields for `idea_type`, `timing`, `implementation_mode`, `confidence`, `evidence_strength`, `main_risk`, and `recommendation` | codex | `[ ]` | — |
+| T81 | Add persistent storage for triaged insight history and rejection/defer memory so repeated weak ideas can be recognized across weeks | codex | `[ ]` | T80 |
+| T82 | Create an insight triage step after `generate_recommendations()` raw output: classify each idea into `do_now`, `backlog`, or `reject_or_defer` with an explicit reason | codex | `[ ]` | T80 |
+| T83 | Update `Implementation Ideas` rendering so the article distinguishes actionable items from speculative or deferred ones instead of presenting all ideas as equally ready | codex | `[ ]` | T82 |
+| T84 | Add operator visibility: CLI and/or report summary showing approved, deferred, and rejected insight counts plus top reasons | codex | `[ ]` | T81 T83 |
+| T85 | Add suppression / revisit logic so rejected ideas do not resurface unchanged until a revisit condition or timeout is met | codex | `[ ]` | T81 T82 |
+| T86 | Add tests for triage quality: direct-improvement vs speculative abstraction, extract-vs-rebuild judgment, rejection memory, and rendering of `do_now` vs deferred items | codex | `[ ]` | T82 T83 T85 |
+| T87 | Update living docs (`README.md`, `docs/architecture.md`, `docs/spec.md`, `docs/operator_workflow.md`) to reflect the new triage layer and operator workflow | codex | `[ ]` | T84 |
+
+**Validation criteria:**
+- the system can distinguish `do_now`, `backlog`, and `reject_or_defer`
+- speculative "portfolio candy" no longer appears as a top implementation suggestion unless explicitly marked as deferred/longer-term
+- repeated rejected ideas are suppressed unless revisit conditions are met
+- output remains readable and clearly states why an idea is actionable now or not now
+- operator can inspect triage state without reading raw DB tables
+
+---
+
 ## Phase Priority Rationale
 
 | Phase | Why this order |
@@ -635,6 +679,7 @@ Out of scope:
 | 3v3 — Feedback loop | Can only be meaningful after delivery is good enough to generate real reactions |
 | 4v3 — Telegraph delivery | Polish on top of working content; don't polish before content is right |
 | 5v3 — Observability | Ongoing; no hard dependency, can run in parallel with Phase 4v3 |
+| 6v3 — Insight triage | Generate fewer but more decision-worthy ideas before adding more automation around idea execution |
 
 ---
 

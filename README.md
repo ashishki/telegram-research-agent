@@ -17,6 +17,7 @@ A private, production-ready pipeline that runs on a personal VPS and processes T
 - a personal signal filtering and scoring pipeline
 - a taste-aware ranking layer driven by your explicit profile and manual post ratings
 - a project-aware relevance engine that uses both deterministic scoring and LLM preference judging
+- an insight triage workflow that separates do-now ideas from backlog and reject/defer noise
 - persistent channel memory and project context snapshots
 - a weekly Telegraph brief plus a tracked study loop
 - a cost-aware, explainable AI workflow with feedback capture
@@ -42,9 +43,10 @@ Full case study: `docs/case-study.md` | Demo walkthrough: `docs/demo-walkthrough
 3. **Scores** every post with a deterministic 5-dimension formula plus preference bias from manual tags
 4. **Routes** posts to model tiers and a preference-judge layer for reader-facing selection
 5. **Formats** a decision brief with source links, project insights, and study cues
-6. **Renders** the review as an HTML document
-7. **Publishes** two Telegraph articles: `Research Brief` and `Implementation Ideas`
-8. **Delivers** to Telegram: short notification (≤300 chars) + article URL, with HTML attachment fallback for the research brief if Telegraph is unavailable
+6. **Triages** generated implementation ideas into do-now, backlog, and reject/defer buckets
+7. **Renders** the review as an HTML document
+8. **Publishes** two Telegraph articles: `Research Brief` and `Implementation Ideas`
+9. **Delivers** to Telegram: short notification (≤300 chars) + article URL, with HTML attachment fallback for the research brief if Telegraph is unavailable
 
 ### What you receive
 

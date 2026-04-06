@@ -40,7 +40,8 @@ Telegram Channels
   → Project Lens             (explicit keyword lists, exclude_keywords suppression)
   → Personalization Layer    (boost/downrank adjustments, floor protection)
   → Learning Layer           (recurring topics not covered by any project)
-  → Output Layer             (reader-facing Research Brief + project-shaped Implementation Ideas)
+  → Insight Triage Layer     (do-now / backlog / reject-or-defer judgment)
+  → Output Layer             (reader-facing Research Brief + triaged Implementation Ideas)
   → Render Layer             (HTML generation: render_report.py)
   → Delivery Layer           (Telegraph publish → Telegram URL; Research Brief fallback: HTML file)
   → Feedback Layer           (signal_feedback table, /mark_useful, /mark_skipped, tune-suggestions)
@@ -186,6 +187,28 @@ Source: `src/output/learning_layer.py`
 
 ---
 
+### Insight Triage Layer
+
+Sits between raw idea generation and the final `Implementation Ideas` surface.
+
+Its purpose is to stop technically plausible but low-priority ideas from being presented as if they are equally ready for implementation now.
+
+Expected outputs:
+- `do_now`
+- `backlog`
+- `reject_or_defer`
+
+Expected judgment dimensions:
+- direct improvement vs abstraction
+- extract vs rebuild
+- current-project value vs portfolio-only value
+- evidence strength from code / commits
+- main implementation risk
+
+This layer should also preserve rejection/defer memory so the same weak insight does not reappear unchanged every week.
+
+---
+
 ### Output Layer
 
 Assembles the weekly decision brief from all upstream layers.
@@ -204,6 +227,8 @@ The reader-facing brief is built around:
 7. What Changed
 
 Reader-facing rationale comes from `preference_judge.py`, not from raw operator notes. Manual low-signal items are excluded from the main brief.
+
+`Implementation Ideas` should prefer ideas that passed the triage layer as action-worthy now, while keeping speculative ideas explicitly marked as deferred/backlog rather than presenting them as equivalent execution candidates.
 
 Source: `src/output/signal_report.py`, `src/output/preference_judge.py`, `src/output/project_relevance.py`, `src/output/personalize.py`
 

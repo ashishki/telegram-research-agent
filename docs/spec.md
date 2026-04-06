@@ -601,6 +601,9 @@ Summary:
 5. **Fixes:** address review findings only.
 6. Living docs remain synchronized after each phase.
 
+This workflow also applies to meta-quality improvements in AI-generated artifacts themselves.
+If the system starts producing technically plausible but operationally weak implementation ideas, that becomes roadmap work only after it is expressed as a bounded phase in `docs/tasks.md`, not as an ad hoc prompt tweak.
+
 ---
 
 ## 17. Phase Implementation Plan
@@ -615,6 +618,8 @@ Summary:
 | 6 | Personalization / Taste Model | user profile, preference memory, downranking and re-ranking rules |
 | 7 | Learning Layer Refinement | learning guidance tied to validated signals, projects, and personal context |
 | 8 | Productization / Surface Layer | operator-facing delivery, observability, release-ready surfaces |
+
+Roadmap v3 extensions may add post-surface control phases when artifact quality itself becomes the bottleneck. One concrete example is an `Insight Triage` phase that separates actionable implementation ideas from backlog or reject/defer noise.
 
 ---
 
