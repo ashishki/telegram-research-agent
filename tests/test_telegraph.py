@@ -60,6 +60,17 @@ class TestTelegraph(unittest.TestCase):
         nodes = html_to_telegraph_nodes("<style>body{color:red;}</style><p>Hello</p>")
         self.assertEqual(nodes, [{"tag": "p", "children": ["Hello"]}])
 
+    def test_html_to_telegraph_nodes_preserves_body_content_in_full_document(self):
+        html = "<html><head><style>body{color:red;}</style></head><body><h2>Title</h2><p>Hello</p></body></html>"
+        nodes = html_to_telegraph_nodes(html)
+        self.assertEqual(
+            nodes,
+            [
+                {"tag": "h3", "children": ["Title"]},
+                {"tag": "p", "children": ["Hello"]},
+            ],
+        )
+
     def test_publish_article_returns_url(self):
         responses = [
             _FakeResponse({"ok": True, "result": {"access_token": "token-123"}}),

@@ -18,7 +18,8 @@ class _HTMLToNodesParser(HTMLParser):
         super().__init__()
         self.nodes: list[dict | str] = []
         self._stack: list[dict] = []
-        self._skip_tags = {"html", "body", "head", "style", "script"}
+        self._skip_tags = {"html", "body", "head"}
+        self._content_skip_tags = {"style", "script"}
         self._skip_stack: list[str] = []
 
     def _current(self) -> list | None:
@@ -28,6 +29,8 @@ class _HTMLToNodesParser(HTMLParser):
 
     def handle_starttag(self, tag: str, attrs: list) -> None:
         if tag in self._skip_tags:
+            return
+        if tag in self._content_skip_tags:
             self._skip_stack.append(tag)
             return
         if self._skip_stack:
@@ -55,6 +58,8 @@ class _HTMLToNodesParser(HTMLParser):
 
     def handle_endtag(self, tag: str) -> None:
         if tag in self._skip_tags:
+            return
+        if tag in self._content_skip_tags:
             if self._skip_stack and self._skip_stack[-1] == tag:
                 self._skip_stack.pop()
             return
