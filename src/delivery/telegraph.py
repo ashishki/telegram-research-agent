@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import urllib.request
+from urllib.error import URLError
 from html.parser import HTMLParser
 
 
@@ -17,7 +18,8 @@ class _HTMLToNodesParser(HTMLParser):
         super().__init__()
         self.nodes: list[dict | str] = []
         self._stack: list[dict] = []
-        self._skip_tags = {"html", "body", "head"}
+        self._skip_tags = {"html", "body", "head", "style", "script"}
+        self._skip_stack: list[str] = []
 
     def _current(self) -> list | None:
         if self._stack:
@@ -26,6 +28,9 @@ class _HTMLToNodesParser(HTMLParser):
 
     def handle_starttag(self, tag: str, attrs: list) -> None:
         if tag in self._skip_tags:
+            self._skip_stack.append(tag)
+            return
+        if self._skip_stack:
             return
         tag_map = {
             "h1": "h3",
@@ -36,6 +41,7 @@ class _HTMLToNodesParser(HTMLParser):
             "ul": "ul",
             "li": "li",
             "b": "b",
+            "strong": "b",
             "a": "a",
         }
         mapped = tag_map.get(tag)
@@ -49,6 +55,10 @@ class _HTMLToNodesParser(HTMLParser):
 
     def handle_endtag(self, tag: str) -> None:
         if tag in self._skip_tags:
+            if self._skip_stack and self._skip_stack[-1] == tag:
+                self._skip_stack.pop()
+            return
+        if self._skip_stack:
             return
         tag_map = {
             "h1": "h3",
@@ -59,6 +69,7 @@ class _HTMLToNodesParser(HTMLParser):
             "ul": "ul",
             "li": "li",
             "b": "b",
+            "strong": "b",
             "a": "a",
         }
         if tag not in tag_map:
@@ -73,6 +84,8 @@ class _HTMLToNodesParser(HTMLParser):
         target.append(node)  # type: ignore[union-attr]
 
     def handle_data(self, data: str) -> None:
+        if self._skip_stack:
+            return
         text = data.strip()
         if not text:
             return
@@ -85,8 +98,23 @@ def html_to_telegraph_nodes(html_content: str) -> list[dict]:
     """Convert HTML content to Telegraph Node objects."""
     parser = _HTMLToNodesParser()
     parser.feed(html_content)
-    # Filter out bare strings at top level (whitespace artifacts)
-    return [node for node in parser.nodes if isinstance(node, dict)]
+    nodes: list[dict] = []
+    text_buffer: list[str] = []
+
+    def flush_text() -> None:
+        text = " ".join(part.strip() for part in text_buffer if part.strip()).strip()
+        if text:
+            nodes.append({"tag": "p", "children": [text]})
+        text_buffer.clear()
+
+    for node in parser.nodes:
+        if isinstance(node, dict):
+            flush_text()
+            nodes.append(node)
+            continue
+        text_buffer.append(node)
+    flush_text()
+    return nodes
 
 
 def _api_post(url: str, payload: dict) -> dict:
@@ -133,7 +161,16 @@ def publish_article(title: str, html_content: str) -> str:
         "author_name": "Research Agent",
         "content": nodes,
     }
-    result = _api_post(_CREATE_PAGE_URL, payload)
-    if not result.get("ok"):
-        raise RuntimeError(f"Telegraph createPage failed: {result.get('error')}")
-    return str(result["result"]["url"])
+    last_error: Exception | None = None
+    for attempt in range(2):
+        try:
+            result = _api_post(_CREATE_PAGE_URL, payload)
+            if not result.get("ok"):
+                raise RuntimeError(f"Telegraph createPage failed: {result.get('error')}")
+            return str(result["result"]["url"])
+        except (RuntimeError, OSError, URLError) as exc:
+            last_error = exc
+            LOGGER.warning("Telegraph publish failed attempt=%d title=%s", attempt + 1, title, exc_info=True)
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("Telegraph publish failed for unknown reason")

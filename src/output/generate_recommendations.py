@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import sqlite3
 from datetime import timezone, date, datetime, timedelta
 from pathlib import Path
@@ -18,6 +19,7 @@ LOGGER = logging.getLogger(__name__)
 PROMPT_PATH = PROJECT_ROOT / "docs" / "prompts" / "insights.md"
 OUTPUT_DIR = PROJECT_ROOT / "data" / "output" / "recommendations"
 PROJECTS_YAML_PATH = Path(__file__).resolve().parents[1] / "config" / "projects.yaml"
+INLINE_URL_RE = re.compile(r"(?<![\"'>])(https?://[^\s<]+)")
 
 
 def _utc_now() -> datetime:
@@ -182,6 +184,7 @@ def _write_insights_html_file(week_label: str, content_html: str) -> Path:
     if "<html" in content_html.lower():
         html_content = content_html
     else:
+        body_content = _render_insights_fragment(content_html)
         html_content = (
             "<html><head><meta charset=\"utf-8\"></head><body style=\"font-family: Georgia, serif; "
             "line-height: 1.68; color: #18212b; background: #f7f2e8; max-width: 860px; "
@@ -194,10 +197,57 @@ def _write_insights_html_file(week_label: str, content_html: str) -> Path:
             "a{color:#0b6bcb;text-decoration:none;}"
             "b{color:#0f1720;}"
             "</style>"
-            f"<section class=\"idea\">{content_html}</section></body></html>"
+            f"<section class=\"idea\">{body_content}</section></body></html>"
         )
     output_path.write_text(html_content, encoding="utf-8")
     return output_path
+
+
+def _render_insights_fragment(content: str) -> str:
+    lines = [line.strip() for line in content.replace("\r\n", "\n").split("\n")]
+    blocks: list[str] = []
+    paragraph_parts: list[str] = []
+
+    def flush_paragraph() -> None:
+        if paragraph_parts:
+            blocks.append(" ".join(paragraph_parts).strip())
+            paragraph_parts.clear()
+
+    for line in lines:
+        if not line:
+            flush_paragraph()
+            continue
+        if line.startswith("<b>") and line.endswith("</b>"):
+            flush_paragraph()
+            blocks.append(line)
+            continue
+        if line.startswith("<a ") and line.endswith("</a>"):
+            paragraph_parts.append(line)
+            flush_paragraph()
+            continue
+        paragraph_parts.append(line)
+    flush_paragraph()
+
+    rendered_blocks: list[str] = []
+    for index, block in enumerate(blocks):
+        normalized = _normalize_inline_html(block)
+        if not normalized:
+            continue
+        if normalized.startswith("<b>") and normalized.endswith("</b>"):
+            tag = "h2" if index == 0 else "p"
+            rendered_blocks.append(f"<{tag}>{normalized}</{tag}>")
+            continue
+        if normalized.startswith("<a ") and normalized.endswith("</a>"):
+            rendered_blocks.append(f"<p>{normalized}</p>")
+            continue
+        rendered_blocks.append(f"<p>{normalized}</p>")
+    return "\n".join(rendered_blocks)
+
+
+def _normalize_inline_html(text: str) -> str:
+    normalized = text.strip()
+    normalized = INLINE_URL_RE.sub(r'<a href="\1">\1</a>', normalized)
+    return normalized
 
 
 def _load_delivery_state(connection: sqlite3.Connection, week_label: str) -> dict[str, str]:

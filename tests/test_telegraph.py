@@ -1,6 +1,7 @@
 import json
 import unittest
 from unittest.mock import patch
+from urllib.error import URLError
 
 
 from delivery.telegraph import html_to_telegraph_nodes, publish_article
@@ -44,6 +45,21 @@ class TestTelegraph(unittest.TestCase):
             ],
         )
 
+    def test_html_to_telegraph_nodes_wraps_top_level_text_in_paragraph(self):
+        nodes = html_to_telegraph_nodes("<section><b>Title</b>Body text<a href='https://x.test'>link</a></section>")
+        self.assertEqual(
+            nodes,
+            [
+                {"tag": "b", "children": ["Title"]},
+                {"tag": "p", "children": ["Body text"]},
+                {"tag": "a", "attrs": {"href": "https://x.test"}, "children": ["link"]},
+            ],
+        )
+
+    def test_html_to_telegraph_nodes_skips_style_text(self):
+        nodes = html_to_telegraph_nodes("<style>body{color:red;}</style><p>Hello</p>")
+        self.assertEqual(nodes, [{"tag": "p", "children": ["Hello"]}])
+
     def test_publish_article_returns_url(self):
         responses = [
             _FakeResponse({"ok": True, "result": {"access_token": "token-123"}}),
@@ -73,6 +89,16 @@ class TestTelegraph(unittest.TestCase):
                 os.environ.pop("TELEGRAPH_TOKEN", None)
                 with self.assertRaises(RuntimeError):
                     publish_article("Weekly Review", "<p>Hello world</p>")
+
+    def test_publish_article_retries_once_on_transient_error(self):
+        responses = [
+            URLError("temporary"),
+            _FakeResponse({"ok": True, "result": {"url": "https://telegra.ph/test-page-3"}}),
+        ]
+        with patch("urllib.request.urlopen", side_effect=responses):
+            with patch.dict("os.environ", {"TELEGRAPH_TOKEN": "my-token"}):
+                url = publish_article("Weekly Review", "<p>content</p>")
+        self.assertEqual(url, "https://telegra.ph/test-page-3")
 
 
 if __name__ == "__main__":
