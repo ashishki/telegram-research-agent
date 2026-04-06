@@ -1,7 +1,7 @@
 # Telegram Research Agent — System Specification
 
-**Version:** 3.0
-**Date:** 2026-03-31
+**Version:** 3.1
+**Date:** 2026-04-06
 **Status:** Active
 
 ---
@@ -109,6 +109,8 @@ Legacy phases (Phase 1–20 in the original numbering) are preserved as implemen
 - Study recommendation generation
 - Project insight mapping
 - Experiment idea generation
+
+The insight triage layer (`do_now` / `backlog` / `reject_or_defer`) is intentionally deterministic. It classifies LLM-generated ideas using heuristic rules with no additional LLM call.
 
 **Rationale:** Reduces cost, latency, and non-determinism. Raw Telegram history is never passed wholesale into an LLM.
 

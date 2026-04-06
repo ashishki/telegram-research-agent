@@ -224,6 +224,7 @@ python3 src/main.py study             # generate the current weekly study plan
 python3 src/main.py study --force     # rebuild the current weekly study plan from scratch
 python3 src/main.py study --remind    # send the weekly study reminder once
 python3 src/main.py tune-suggestions  # boost topic suggestions from acted-on feedback
+python3 src/main.py insight-triage-stats  # triage summary: counts by category, recent records, rejection memory
 ```
 
 Full operator guide: `docs/operator_workflow.md`
@@ -232,7 +233,7 @@ Full operator guide: `docs/operator_workflow.md`
 
 ## Development Status
 
-Roadmap v3 complete (Phases 1v3–5v3, tasks T65–T79+). 106 tests. CI on every push.
+Roadmap v3 complete (Phases 1v3–6v3, tasks T65–T87). 136 tests. CI on every push.
 
 System capabilities summary:
 - deterministic scoring pipeline with actual cluster coherence (silhouette_score from cluster_runs)
@@ -245,6 +246,7 @@ System capabilities summary:
 - completion-aware weekly study plan with `/study_done`
 - incremental project context snapshots derived from GitHub sync and recent commits
 - observability: cost trends, score distribution trends, enriched health-check
+- insight triage layer: deterministic do_now / backlog / reject_or_defer classification with 4-week rejection memory
 
 ---
 
