@@ -1,8 +1,8 @@
 # Telegram Research Agent — Development Roadmap
 
-**Version:** 4.0
-**Date:** 2026-03-31
-**Status:** Roadmap v2 complete. Roadmap v3 complete. 106 tests passing.
+**Version:** 4.1
+**Date:** 2026-04-06
+**Status:** Roadmap v2 complete. Roadmap v3 complete. Phase 6v3 complete. 136 tests passing.
 
 ---
 
@@ -652,14 +652,14 @@ Out of scope:
 
 | ID | Task | Owner | Status | Depends On |
 |---|---|---|---|---|
-| T80 | Define triage schema for generated insights: add structured fields for `idea_type`, `timing`, `implementation_mode`, `confidence`, `evidence_strength`, `main_risk`, and `recommendation` | codex | `[ ]` | — |
-| T81 | Add persistent storage for triaged insight history and rejection/defer memory so repeated weak ideas can be recognized across weeks | codex | `[ ]` | T80 |
-| T82 | Create an insight triage step after `generate_recommendations()` raw output: classify each idea into `do_now`, `backlog`, or `reject_or_defer` with an explicit reason | codex | `[ ]` | T80 |
-| T83 | Update `Implementation Ideas` rendering so the article distinguishes actionable items from speculative or deferred ones instead of presenting all ideas as equally ready | codex | `[ ]` | T82 |
-| T84 | Add operator visibility: CLI and/or report summary showing approved, deferred, and rejected insight counts plus top reasons | codex | `[ ]` | T81 T83 |
-| T85 | Add suppression / revisit logic so rejected ideas do not resurface unchanged until a revisit condition or timeout is met | codex | `[ ]` | T81 T82 |
-| T86 | Add tests for triage quality: direct-improvement vs speculative abstraction, extract-vs-rebuild judgment, rejection memory, and rendering of `do_now` vs deferred items | codex | `[ ]` | T82 T83 T85 |
-| T87 | Update living docs (`README.md`, `docs/architecture.md`, `docs/spec.md`, `docs/operator_workflow.md`) to reflect the new triage layer and operator workflow | codex | `[ ]` | T84 |
+| T80 | Define triage schema for generated insights: add structured fields for `idea_type`, `timing`, `implementation_mode`, `confidence`, `evidence_strength`, `main_risk`, and `recommendation` | codex | `[x]` | — |
+| T81 | Add persistent storage for triaged insight history and rejection/defer memory so repeated weak ideas can be recognized across weeks | codex | `[x]` | T80 |
+| T82 | Create an insight triage step after `generate_recommendations()` raw output: classify each idea into `do_now`, `backlog`, or `reject_or_defer` with an explicit reason | codex | `[x]` | T80 |
+| T83 | Update `Implementation Ideas` rendering so the article distinguishes actionable items from speculative or deferred ones instead of presenting all ideas as equally ready | codex | `[x]` | T82 |
+| T84 | Add operator visibility: CLI and/or report summary showing approved, deferred, and rejected insight counts plus top reasons | codex | `[x]` | T81 T83 |
+| T85 | Add suppression / revisit logic so rejected ideas do not resurface unchanged until a revisit condition or timeout is met | codex | `[x]` | T81 T82 |
+| T86 | Add tests for triage quality: direct-improvement vs speculative abstraction, extract-vs-rebuild judgment, rejection memory, and rendering of `do_now` vs deferred items | codex | `[x]` | T82 T83 T85 |
+| T87 | Update living docs (`README.md`, `docs/architecture.md`, `docs/spec.md`, `docs/operator_workflow.md`) to reflect the new triage layer and operator workflow | codex | `[x]` | T84 |
 
 **Validation criteria:**
 - the system can distinguish `do_now`, `backlog`, and `reject_or_defer`

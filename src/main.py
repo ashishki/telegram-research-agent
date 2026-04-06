@@ -98,6 +98,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     tune_parser.set_defaults(handler=handle_tune_suggestions)
 
+    triage_stats_parser = subparsers.add_parser(
+        "insight-triage-stats",
+        help="Show triage counts and recent rejection memory",
+    )
+    triage_stats_parser.set_defaults(handler=handle_insight_triage_stats)
+
     return parser
 
 
@@ -739,6 +745,66 @@ def handle_tune_suggestions(_: argparse.Namespace) -> int:
     sys.stdout.write("Suggested boost topics (appeared in acted-on signals but not in your profile):\n")
     for topic, count in suggestions:
         sys.stdout.write(f"  - {topic} (seen {count} times)\n")
+    return 0
+
+
+def handle_insight_triage_stats(_: argparse.Namespace) -> int:
+    settings = load_settings()
+
+    try:
+        run_migrations()
+        with sqlite3.connect(settings.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            count_rows = connection.execute(
+                """
+                SELECT recommendation, COUNT(*) AS cnt
+                FROM insight_triage_records
+                GROUP BY recommendation
+                ORDER BY recommendation ASC
+                """
+            ).fetchall()
+            recent_rows = connection.execute(
+                """
+                SELECT week_label, recommendation, title, reason
+                FROM insight_triage_records
+                ORDER BY created_at DESC
+                LIMIT 10
+                """
+            ).fetchall()
+            memory_rows = connection.execute(
+                """
+                SELECT title, reason, rejected_at
+                FROM insight_rejection_memory
+                ORDER BY rejected_at DESC
+                LIMIT 5
+                """
+            ).fetchall()
+    except Exception:
+        LOGGER.exception("Insight triage stats failed")
+        return 1
+
+    lines = ["Insight triage summary:"]
+    if count_rows:
+        for row in count_rows:
+            lines.append(f"  {row['recommendation']}: {int(row['cnt'])}")
+    else:
+        lines.append("  no triage records found")
+
+    if recent_rows:
+        lines.append("Recent triage records (last 10):")
+        for row in recent_rows:
+            lines.append(f"  [{row['week_label']}] {row['recommendation']} — {row['title'][:60]}")
+            lines.append(f"    reason: {row['reason']}")
+
+    if memory_rows:
+        lines.append("Rejection memory (last 5):")
+        for row in memory_rows:
+            lines.append(f"  {row['rejected_at'][:10]}  {row['title'][:60]}")
+            lines.append(f"    reason: {row['reason']}")
+    else:
+        lines.append("Rejection memory: empty")
+
+    sys.stdout.write("\n".join(lines) + "\n")
     return 0
 
 

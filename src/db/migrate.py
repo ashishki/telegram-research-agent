@@ -257,6 +257,41 @@ def run_migrations() -> Path:
                 ON project_context_snapshots(updated_at);
             """
         )
+        # Phase 6v3: insight triage layer
+        connection.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS insight_triage_records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                week_label TEXT NOT NULL,
+                title TEXT NOT NULL,
+                idea_type TEXT NOT NULL,
+                timing TEXT NOT NULL,
+                implementation_mode TEXT NOT NULL,
+                confidence TEXT NOT NULL,
+                evidence_strength TEXT NOT NULL,
+                main_risk TEXT NOT NULL,
+                recommendation TEXT NOT NULL
+                    CHECK(recommendation IN ('do_now', 'backlog', 'reject_or_defer')),
+                reason TEXT NOT NULL,
+                source_url TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_insight_triage_week_label
+                ON insight_triage_records(week_label);
+            CREATE INDEX IF NOT EXISTS idx_insight_triage_recommendation
+                ON insight_triage_records(recommendation);
+            CREATE TABLE IF NOT EXISTS insight_rejection_memory (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title_fingerprint TEXT NOT NULL UNIQUE,
+                title TEXT NOT NULL,
+                reason TEXT NOT NULL,
+                rejected_at TEXT NOT NULL,
+                suppressed_until TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_insight_rejection_memory_fingerprint
+                ON insight_rejection_memory(title_fingerprint);
+            """
+        )
         connection.commit()
 
     LOGGER.info("Database migrations complete")

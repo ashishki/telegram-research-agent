@@ -10,6 +10,7 @@ import yaml
 from config.settings import PROJECT_ROOT, Settings
 from llm.client import complete
 from output.context_memory import load_project_context
+from output.insight_triage import render_triaged_insights_html, triage_insights
 from output.report_utils import _extract_markdown_section
 from bot.telegram_delivery import send_text
 from delivery.telegraph import publish_article
@@ -373,16 +374,23 @@ def run_recommendations(settings: Settings, force_delivery: bool = False) -> dic
 
         insights_text = complete(prompt=prompt, system=system_prompt, category="insight")
 
-        output_path = _write_insights_file(week_label, insights_text)
-        html_path = _write_insights_html_file(week_label, insights_text)
+        # Triage: classify ideas and apply rejection memory before rendering
         connection.execute("BEGIN")
-        _store_recommendations(connection, week_label, insights_text)
+        triaged = triage_insights(insights_text, connection, week_label)
+        connection.commit()
+
+        delivery_text = render_triaged_insights_html(insights_text, triaged)
+
+        output_path = _write_insights_file(week_label, delivery_text)
+        html_path = _write_insights_html_file(week_label, delivery_text)
+        connection.execute("BEGIN")
+        _store_recommendations(connection, week_label, delivery_text)
         connection.commit()
         try:
             _send_recommendations_to_telegram_owner(
                 connection=connection,
                 week_label=week_label,
-                content_md=insights_text,
+                content_md=delivery_text,
                 html_path=html_path,
                 force_delivery=force_delivery,
             )
@@ -394,7 +402,7 @@ def run_recommendations(settings: Settings, force_delivery: bool = False) -> dic
         week_label,
         output_path,
     )
-    return {"week_label": week_label, "output_path": str(output_path), "text": insights_text, "html_path": str(html_path)}
+    return {"week_label": week_label, "output_path": str(output_path), "text": delivery_text, "html_path": str(html_path)}
 
 
 def generate_recommendations(settings: Settings) -> dict:
