@@ -86,6 +86,9 @@ python3 src/main.py study --remind
 
 # Get boost topic suggestions based on acted-on feedback
 python3 src/main.py tune-suggestions
+
+# Inspect insight triage summary — counts by category, recent records, rejection memory
+python3 src/main.py insight-triage-stats
 ```
 
 ### Inline Feedback (from Telegram)

@@ -46,6 +46,7 @@ Full case study: `docs/case-study.md` | Demo walkthrough: `docs/demo-walkthrough
 6. **Triages** generated implementation ideas into do-now, backlog, and reject/defer buckets
 7. **Renders** the review as an HTML document
 8. **Publishes** two Telegraph articles: `Research Brief` and `Implementation Ideas`
+   Implementation Ideas are triaged into `do_now`, `backlog`, and `reject_or_defer` categories before publishing.
 9. **Delivers** to Telegram: short notification (≤300 chars) + article URL, with HTML attachment fallback for the research brief if Telegraph is unavailable
 
 ### What you receive

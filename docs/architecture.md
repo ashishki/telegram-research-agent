@@ -207,6 +207,9 @@ Expected judgment dimensions:
 
 This layer should also preserve rejection/defer memory so the same weak insight does not reappear unchanged every week.
 
+Source: `src/output/insight_triage.py`
+Config: `REJECTION_MEMORY_WEEKS = 4` (constant in module)
+
 ---
 
 ### Output Layer
@@ -321,6 +324,8 @@ Source: `src/llm/client.py:_record_usage()`, `src/output/generate_digest.py:_sto
 | `user_post_tags` | Explicit per-post tags used for preference learning and report shaping |
 | `channel_memory` | Source-level memory derived from manual tags |
 | `project_context_snapshots` | Incremental project context used by project-aware synthesis |
+| `insight_triage_records` | Per-week triage classification of each generated insight |
+| `insight_rejection_memory` | Fingerprint-based suppression store for repeat low-value ideas |
 
 ### Key columns on `posts`
 

@@ -6,9 +6,9 @@ _v2.2 · 2026-03-31 · telegram-research-agent_
 ## Current State
 
 - `Execution model`: Strategic Roadmap v2
-- `Current phase`: COMPLETE — all 8 phases of Roadmap v2 done
+- `Current phase`: COMPLETE — Roadmap v2 (phases 1–8) and Roadmap v3 phases 1v3–6v3 done
 - `Phase status`: DONE
-- `Baseline`: 81 passing tests (2026-03-31)
+- `Baseline`: 136 passing tests (2026-04-06)
 - `Ruff`: not enforced
 
 ## Completed Phases
@@ -21,6 +21,7 @@ _v2.2 · 2026-03-31 · telegram-research-agent_
 - **Phase 6**: Personalization — T56–T58 done (boost/downrank multipliers, strong floor, [personalized] tag in report)
 - **Phase 7**: Learning Layer — T59–T61 done (learning_layer.py, Learn section in signal report)
 - **Phase 8**: Productization — T62–T64 done (health-check, report-preview CLI, README operator docs)
+- **Roadmap v3 Phases 1v3–6v3**: T65–T87 done — weekly review artifact redesign, project relevance strengthening, feedback loop, Telegraph delivery, observability, insight triage layer (`src/output/insight_triage.py`, `insight_triage_records`, `insight_rejection_memory` tables, `insight-triage-stats` CLI)
 
 ## Next Tasks
 
