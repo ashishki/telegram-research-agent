@@ -97,9 +97,9 @@ Define the schema boundaries, retrieval contract, and migration rules before add
 |---|---|---|---|
 | M1 | Document current canonical vs derived vs missing memory surfaces in `docs/memory_architecture.md` | `[x]` | — |
 | M2 | Define retrieval flow and scoping policy in `docs/architecture.md` and `docs/IMPLEMENTATION_CONTRACT.md` | `[x]` | M1 |
-| M3 | Define target schemas for `signal_evidence_items`, `decision_journal`, and evolved project snapshots | `[ ]` | M2 |
-| M4 | Add migration notes: how existing `channel_memory`, `project_context_snapshots`, `signal_feedback`, and triage tables map into the new model | `[ ]` | M3 |
-| M5 | Define debug/eval requirements for retrieval inspection and report usefulness checks | `[ ]` | M2 |
+| M3 | Define target schemas for `signal_evidence_items`, `decision_journal`, and evolved project snapshots | `[x]` | M2 |
+| M4 | Add migration notes: how existing `channel_memory`, `project_context_snapshots`, `signal_feedback`, and triage tables map into the new model | `[x]` | M3 |
+| M5 | Define debug/eval requirements for retrieval inspection and report usefulness checks | `[x]` | M2 |
 
 ---
 

@@ -527,6 +527,60 @@ Compatibility rule: existing rows remain valid via defaults.
 ---
 
 
+## M5 — Debug And Eval Contract
+
+### Required debug surfaces
+
+These surfaces must exist before Phase 3 output integration ships.
+
+| CLI command | What it shows |
+|---|---|
+| `memory inspect evidence --project X --week LABEL` | Evidence items for that project and week, including `source_channel`, `message_url`, and `selection_reason` |
+| `memory inspect evidence --kind strong_signal` | Evidence items of that kind sorted by `posted_at` descending |
+| `memory inspect decisions --project X` | `decision_journal` rows for the project, newest first, with `status` and `reason` |
+| `memory inspect decisions --scope insight --status rejected` | Rejected insight decisions |
+| `memory inspect stale-snapshots` | `project_context_snapshots` rows where `snapshot_week_label` is older than two weeks |
+| `memory inspect suppression --title '...'` | `insight_rejection_memory` fingerprint lookup plus matching `decision_journal` rows explaining why the idea was suppressed |
+
+### Provenance completeness eval gate
+
+- Every `signal_evidence_items` row must have non-null, non-empty `source_channel`, `posted_at`, `selection_reason`, and `excerpt_text`.
+- `excerpt_text` must be at least 10 characters.
+- Missing `message_url` is warning-only.
+- Gate: at least 99% of inserted rows must pass.
+
+### Scoped retrieval precision test
+
+- Fixture shape: two projects and two weeks.
+- Query contract: querying project A plus week W returns only rows where `project_names_json` contains A and `week_label = W`.
+- Failure condition: zero tolerance for cross-project leakage.
+- Test file: `tests/test_evidence_retrieval.py`.
+
+### Decision continuity test
+
+- Rejected insight in `insight_rejection_memory` must produce a matching `decision_journal` row with `status='rejected'`.
+- `signal_feedback` with `acted_on` must produce a corresponding `decision_journal` row on the next run.
+- Completed `study_plan` must produce a `decision_journal` row with `status='completed'`.
+- Test file: `tests/test_decision_continuity.py`.
+
+### Repeated-idea suppression test
+
+- Insert a rejected fingerprint.
+- Run recommendations.
+- Assert the candidate is absent or explicitly labeled rejected.
+
+### Report usefulness checklist
+
+Phase 3 quality gate and Phase 4 fixture:
+
+- At least one evidence citation includes source channel and date.
+- No implementation idea rejected in the last 90 days resurfaces without explicit reason.
+- Study plan references at least one acted-on evidence item or project snapshot.
+- No evidence cited outside the project/time scope for that section.
+
+---
+
+
 ## Recommended First Implementation Phase
 
 The first implementation phase should be **schema and retrieval-contract work**, not prompt tweaking.
