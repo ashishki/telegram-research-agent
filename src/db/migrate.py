@@ -4,6 +4,19 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from db.evidence import (
+        record_decision_for_feedback,
+        record_signal_evidence_for_manual_tag,
+        record_study_completion_decision,
+    )
+except ModuleNotFoundError:
+    from src.db.evidence import (
+        record_decision_for_feedback,
+        record_signal_evidence_for_manual_tag,
+        record_study_completion_decision,
+    )
+
 
 LOGGER = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -351,33 +364,31 @@ def run_migrations() -> Path:
                 ON decision_journal(recorded_at);
             """
         )
-        connection.executescript(
-            """
-            DROP TABLE IF EXISTS decision_journal;
-            CREATE TABLE decision_journal (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                decision_scope TEXT NOT NULL
-                    CHECK(decision_scope IN ('signal', 'insight', 'study', 'project')),
-                subject_ref_type TEXT NOT NULL,
-                subject_ref_id TEXT NOT NULL,
-                project_name TEXT,
-                status TEXT NOT NULL
-                    CHECK(status IN ('acted_on', 'ignored', 'deferred', 'rejected', 'completed')),
-                reason TEXT,
-                evidence_item_ids_json TEXT NOT NULL DEFAULT '[]',
-                recorded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                recorded_by TEXT NOT NULL DEFAULT 'pipeline'
-            );
-            CREATE INDEX IF NOT EXISTS idx_decision_journal_decision_scope
-                ON decision_journal(decision_scope);
-            CREATE INDEX IF NOT EXISTS idx_decision_journal_project_name
-                ON decision_journal(project_name);
-            CREATE INDEX IF NOT EXISTS idx_decision_journal_status
-                ON decision_journal(status);
-            CREATE INDEX IF NOT EXISTS idx_decision_journal_recorded_at
-                ON decision_journal(recorded_at);
-            """
-        )
+        try:
+            connection.execute(
+                "DROP INDEX IF EXISTS idx_signal_evidence_items_idempotent"
+            )
+        except sqlite3.OperationalError as exc:
+            if "no such index" not in str(exc).lower():
+                LOGGER.warning(
+                    "Failed dropping legacy signal_evidence_items index",
+                    exc_info=True,
+                )
+                raise
+        try:
+            connection.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_sei_unique_per_week
+                ON signal_evidence_items(post_id, week_label, evidence_kind)
+                """
+            )
+        except sqlite3.OperationalError as exc:
+            if "already exists" not in str(exc).lower():
+                LOGGER.warning(
+                    "Failed creating signal_evidence_items unique index",
+                    exc_info=True,
+                )
+                raise
         for stmt in [
             "ALTER TABLE project_context_snapshots ADD COLUMN linked_signal_count INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE project_context_snapshots ADD COLUMN snapshot_week_label TEXT",
@@ -400,6 +411,16 @@ def record_feedback(connection: sqlite3.Connection, post_id: int, feedback: str)
         (post_id, feedback, recorded_at),
     )
     connection.commit()
+    try:
+        record_decision_for_feedback(connection, post_id, feedback)
+        connection.commit()
+    except Exception:
+        LOGGER.warning(
+            "Decision journal write failed for feedback post_id=%s feedback=%s",
+            post_id,
+            feedback,
+            exc_info=True,
+        )
 
 
 def record_post_tag(connection: sqlite3.Connection, post_id: int, tag: str, note: str | None = None) -> None:
@@ -415,6 +436,16 @@ def record_post_tag(connection: sqlite3.Connection, post_id: int, tag: str, note
         (post_id, tag, note, recorded_at),
     )
     connection.commit()
+    try:
+        record_signal_evidence_for_manual_tag(connection, post_id, tag)
+        connection.commit()
+    except Exception:
+        LOGGER.warning(
+            "Signal evidence write failed for tag post_id=%s tag=%s",
+            post_id,
+            tag,
+            exc_info=True,
+        )
 
 
 def record_study_completion(
@@ -456,6 +487,15 @@ def record_study_completion(
             (completed_at, notes, week_label),
         )
     connection.commit()
+    try:
+        record_study_completion_decision(connection, week_label)
+        connection.commit()
+    except Exception:
+        LOGGER.warning(
+            "Decision journal write failed for study completion week_label=%s",
+            week_label,
+            exc_info=True,
+        )
 
 
 def main() -> int:
