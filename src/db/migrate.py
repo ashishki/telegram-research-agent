@@ -292,6 +292,101 @@ def run_migrations() -> Path:
                 ON insight_rejection_memory(title_fingerprint);
             """
         )
+        connection.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS signal_evidence_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                post_id INTEGER NOT NULL,
+                raw_post_id INTEGER NOT NULL,
+                week_label TEXT NOT NULL,
+                evidence_kind TEXT NOT NULL
+                    CHECK(evidence_kind IN (
+                        'strong_signal',
+                        'manual_tag',
+                        'project_insight_source',
+                        'study_source',
+                        'decision_support'
+                    )),
+                excerpt_text TEXT NOT NULL CHECK(length(trim(excerpt_text)) > 0),
+                source_channel TEXT NOT NULL CHECK(length(trim(source_channel)) > 0),
+                message_url TEXT,
+                posted_at TEXT NOT NULL CHECK(length(trim(posted_at)) > 0),
+                topic_labels_json TEXT NOT NULL DEFAULT '[]',
+                project_names_json TEXT NOT NULL DEFAULT '[]',
+                selection_reason TEXT NOT NULL CHECK(length(trim(selection_reason)) > 0),
+                last_used_at TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(post_id) REFERENCES posts(id) ON DELETE CASCADE,
+                FOREIGN KEY(raw_post_id) REFERENCES raw_posts(id) ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS idx_signal_evidence_items_post_id
+                ON signal_evidence_items(post_id);
+            CREATE INDEX IF NOT EXISTS idx_signal_evidence_items_week_label
+                ON signal_evidence_items(week_label);
+            CREATE INDEX IF NOT EXISTS idx_signal_evidence_items_evidence_kind
+                ON signal_evidence_items(evidence_kind);
+            CREATE INDEX IF NOT EXISTS idx_signal_evidence_items_source_channel
+                ON signal_evidence_items(source_channel);
+            CREATE TABLE IF NOT EXISTS decision_journal (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                decision_scope TEXT NOT NULL
+                    CHECK(decision_scope IN ('signal', 'insight', 'study', 'project')),
+                subject_ref_type TEXT NOT NULL,
+                subject_ref_id TEXT NOT NULL,
+                project_name TEXT,
+                status TEXT NOT NULL
+                    CHECK(status IN ('acted_on', 'ignored', 'deferred', 'rejected', 'completed')),
+                reason TEXT,
+                evidence_item_ids_json TEXT NOT NULL DEFAULT '[]',
+                recorded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                recorded_by TEXT NOT NULL DEFAULT 'pipeline'
+            );
+            CREATE INDEX IF NOT EXISTS idx_decision_journal_decision_scope
+                ON decision_journal(decision_scope);
+            CREATE INDEX IF NOT EXISTS idx_decision_journal_project_name
+                ON decision_journal(project_name);
+            CREATE INDEX IF NOT EXISTS idx_decision_journal_status
+                ON decision_journal(status);
+            CREATE INDEX IF NOT EXISTS idx_decision_journal_recorded_at
+                ON decision_journal(recorded_at);
+            """
+        )
+        connection.executescript(
+            """
+            DROP TABLE IF EXISTS decision_journal;
+            CREATE TABLE decision_journal (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                decision_scope TEXT NOT NULL
+                    CHECK(decision_scope IN ('signal', 'insight', 'study', 'project')),
+                subject_ref_type TEXT NOT NULL,
+                subject_ref_id TEXT NOT NULL,
+                project_name TEXT,
+                status TEXT NOT NULL
+                    CHECK(status IN ('acted_on', 'ignored', 'deferred', 'rejected', 'completed')),
+                reason TEXT,
+                evidence_item_ids_json TEXT NOT NULL DEFAULT '[]',
+                recorded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                recorded_by TEXT NOT NULL DEFAULT 'pipeline'
+            );
+            CREATE INDEX IF NOT EXISTS idx_decision_journal_decision_scope
+                ON decision_journal(decision_scope);
+            CREATE INDEX IF NOT EXISTS idx_decision_journal_project_name
+                ON decision_journal(project_name);
+            CREATE INDEX IF NOT EXISTS idx_decision_journal_status
+                ON decision_journal(status);
+            CREATE INDEX IF NOT EXISTS idx_decision_journal_recorded_at
+                ON decision_journal(recorded_at);
+            """
+        )
+        for stmt in [
+            "ALTER TABLE project_context_snapshots ADD COLUMN linked_signal_count INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE project_context_snapshots ADD COLUMN snapshot_week_label TEXT",
+        ]:
+            try:
+                connection.execute(stmt)
+            except sqlite3.OperationalError as exc:
+                if "duplicate column name" not in str(exc).lower():
+                    raise
         connection.commit()
 
     LOGGER.info("Database migrations complete")
