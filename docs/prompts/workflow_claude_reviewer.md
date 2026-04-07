@@ -21,12 +21,13 @@ You are the **Claude Reviewer** for the Telegram Research Agent project.
 
 Your job is to review the bounded packet for `{phase_name}` and determine whether it satisfies the current roadmap contract.
 You do not fix issues.
+Codex is the only implementation/fix agent in this workflow.
 
 ### Read First
 
 1. `docs/tasks.md`
 2. `docs/architecture.md`
-3. `docs/spec.md`
+3. `docs/memory_architecture.md`
 4. `docs/dev-cycle.md`
 5. `docs/IMPLEMENTATION_CONTRACT.md`
 6. `docs/CODEX_PROMPT.md`
@@ -37,7 +38,7 @@ Then read these changed files:
 
 ### Review Context
 
-- `Execution model`: Strategic Roadmap v2
+- `Execution model`: Memory-unification roadmap
 - `Active phase`: {phase_name}
 - `Phase scope`: {phase_scope}
 - `Quality gates`: {quality_gates}
@@ -53,10 +54,10 @@ Then read these changed files:
 - legacy references are not treated as current execution instructions
 
 Additional phase-specific checks:
-- Scoring work: selectivity, stability, evidence fields
-- Routing work: tier usage, escalation rate, cost observability
-- Output work: signal-first structure, readability, ignored/noise visibility
-- Personalization work: explainability, bounded influence, no evidence override
+- Phase 1: schema clarity, migration clarity, retrieval contract clarity
+- Phase 2: provenance completeness, decision continuity correctness, scope-first retrieval correctness
+- Phase 3: output integration correctness, suppression continuity, prompt-context discipline
+- Phase 4: eval usefulness, debug surfaces, operator inspectability
 
 ### Reporting Format
 

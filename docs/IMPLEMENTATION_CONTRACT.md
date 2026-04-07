@@ -1,100 +1,80 @@
 # Implementation Contract
-_v2.0 · telegram-research-agent · Immutable rules. Require ADR to change._
+_v3.0 · telegram-research-agent · change only with explicit architecture approval_
 
 ---
 
 ## Universal Rules
 
 ### SQL Safety
-- All SQLite queries parameterized — `cursor.execute("... WHERE id = ?", (value,))`
-- Never f-strings or string concatenation in SQL
-- FTS5 queries use `MATCH ?` with bound params
 
-### Secrets & Credentials
-- No credentials in source code
-- All secrets via environment variables: `LLM_API_KEY`, `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_OWNER_CHAT_ID`, `GITHUB_TOKEN`
-- Telethon session file (`.session`) never committed to git
+- All SQLite queries parameterized.
+- Never interpolate values into SQL.
+
+### Secrets And Credentials
+
+- No credentials in source control.
+- All secrets via environment variables.
+- Telegram session files never committed.
 
 ### LLM Calls
-- All LLM calls go through `src/llm/client.py` — never call Anthropic SDK directly from modules
-- Model routing must be explicit and tiered: `CHEAP`, `MID`, `STRONG`
-- Strong models are reserved for filtered high-value subsets only
-- Every LLM call logged to `llm_usage` table (model, tokens_in, tokens_out, cost_usd, category)
-- Cost tracking is mandatory — no untracked LLM calls
 
-### Signal-First Product Contract
-- Output is a decision-support artifact, not a generic digest
-- The target section model is: `Strong signals`, `Project relevance`, `Weak signals`, `Think layer`, `Light/cultural`, `Ignored`
-- Ignored/noise handling must remain visible somewhere in the output contract
+- All LLM calls go through `src/llm/client.py`.
+- LLMs may consume scoped context, not arbitrary corpus dumps.
+- New memory work must reduce prompt ambiguity, not hide logic inside prompts.
 
-### Personalization Guardrails
-- Personalization may re-rank but must not replace evidence-based signal quality
-- Preference memory must be explainable and reviewable
-- Personalization work must not be implemented before routing and project relevance gates are met
+### Memory Architecture Rules
+
+- Structured operational state remains canonical.
+- Summaries and snapshots are derived, bounded, and refreshable.
+- Verbatim evidence storage is selective and provenance-preserving.
+- Retrieval must narrow by project/topic/time/source before broad search.
+- Decision history must be explicit and inspectable.
+- No decorative memory abstractions such as wings, halls, rooms, diaries, or compression dialects.
+- No second generic memory engine unless the scoped SQLite design is proven insufficient.
+
+### Product Contract
+
+- Output remains a weekly decision-support artifact.
+- Signal intelligence and decision support remain the product center.
+- Memory exists to improve continuity and evidence quality, not to become a separate product.
 
 ### Bot Access
-- Telegram bot responds only to `TELEGRAM_OWNER_CHAT_ID`
-- No public access, no group access, no unauthenticated commands
 
-### PII Policy
-- No user data in logs beyond owner's own messages
-- Telegram post content stored in SQLite only — not in logs or external services
+- Telegram bot responds only to the owner chat id.
 
 ### Error Handling
-- Telethon `FloodWaitError` — always sleep + retry, never abort
-- LLM failures — log, return fallback (empty digest, error message), never propagate exception to bot
-- PDF rendering failure — graceful fallback to Markdown text
 
-### CI
-- CI must pass before any PR is merged
-- `python3 -m unittest discover tests/` must exit 0
+- Delivery and LLM failures degrade gracefully.
+- Missing memory context must fail safe and visibly, never silently invent facts.
 
 ---
 
-## Project-Specific Rules
+## Phase Discipline
 
-| ID | Rule | Reason |
-|----|------|--------|
-| A | SQLite WAL mode always on | Parallel reads from bot + ingest without locking |
-| B | Clustering is deterministic (no LLM in cluster step) | Reproducible results across runs; LLM only for labeling |
-| C | `message_url` stored as `t.me/channel/message_id` | Audit trail; source attribution in PDF appendix |
-| D | Output files written to `data/output/` only (gitignored) | Keeps repo clean; data is ephemeral |
-| E | systemd timers define the schedule — never cron | Consistent with existing deployment |
-| F | Routing policy must expose tier usage and escalation rate | Cost-aware behavior must be measurable |
-| G | Personalization cannot suppress globally important signals without explicit rule trace | Prevents opaque bias |
-
----
-
-## Forbidden Actions
-
-- String interpolation in SQL
-- Direct `anthropic.Anthropic()` calls outside `src/llm/client.py`
-- Committing `.session` files or `.env` files
-- Responding to non-owner Telegram IDs in bot handlers
-- Skipping pre-task baseline capture
-- Self-closing review findings without code verification
-- Implementing future-phase capabilities inside the current phase without roadmap approval
+- Do not skip from planning straight into broad implementation.
+- Do not combine schema design, retrieval redesign, and prompt rewrites in one patch set.
+- Every new memory layer must declare:
+  - source of truth
+  - refresh rule
+  - retrieval path
+  - debug surface
 
 ---
 
 ## Mandatory Pre-Task Protocol
 
-1. Read full task entry in docs/tasks.md
-2. Run `python3 -m unittest discover tests/` — record baseline
-3. Check no uncommitted changes: `git status`
-4. Write tests before or alongside implementation
-5. Every acceptance criterion must have a passing test
+1. Read `docs/tasks.md`.
+2. Read `docs/memory_architecture.md` if the task touches memory, retrieval, prompts, or weekly outputs.
+3. Verify which state is canonical versus derived before editing code.
+4. Add tests or fixtures for new retrieval/continuity behavior.
+5. Do not add broad abstractions without a concrete caller.
 
 ---
 
 ## Governing Documents
 
-| Document | Role |
-|---|---|
-| `docs/architecture.md` | System design, data flow, component table |
-| `docs/spec.md` | Feature specification |
-| `docs/tasks.md` | Task graph — authoritative |
-| `docs/CODEX_PROMPT.md` | Session handoff — current state |
-| `docs/IMPLEMENTATION_CONTRACT.md` | This file — immutable rules |
-| `docs/audit/` | Review cycle reports (append-only) |
-| `docs/adr/` | Architectural Decision Records (append-only) |
+- `README.md`
+- `docs/architecture.md`
+- `docs/memory_architecture.md`
+- `docs/tasks.md`
+- `docs/CODEX_PROMPT.md`

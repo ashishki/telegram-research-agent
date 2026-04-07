@@ -14,14 +14,10 @@ The orchestrator reads the roadmap from [docs/tasks.md](/home/ashishki/Documents
 
 | Order | Phase |
 |---|---|
-| 1 | Baseline Stabilization |
-| 2 | Scoring Foundation |
-| 3 | Model Routing |
-| 4 | Signal-First Output |
-| 5 | Project Relevance Upgrade |
-| 6 | Personalization / Taste Model |
-| 7 | Learning Layer Refinement |
-| 8 | Productization / Surface Layer |
+| 1 | Memory Contract And Inventory |
+| 2 | MVP Memory Unification |
+| 3 | Wire Memory Into Weekly Outputs |
+| 4 | Observability And Evaluation |
 
 ---
 
@@ -41,9 +37,10 @@ Stop the loop when:
 - the current phase has no measurable success criteria
 - dependencies are unmet
 - docs and implementation disagree
-- routing work has no cost metrics
-- personalization appears before project relevance is validated
-- product surface work starts before signal-first output is stable
+- canonical vs derived state ownership is unclear
+- retrieval behavior has no inspectable debug surface
+- prompt work appears before storage contracts are defined
+- memory work turns into a generic platform effort
 
 ---
 
@@ -51,14 +48,10 @@ Stop the loop when:
 
 | Phase | Mandatory review focus |
 |---|---|
-| Baseline Stabilization | docs/runtime alignment, baseline metrics, frozen contracts |
-| Scoring Foundation | bucket quality, stability, evidence fields |
-| Model Routing | `CHEAP / MID / STRONG` policy, escalation rate, cost awareness |
-| Signal-First Output | section completeness, readability, ignored/noise visibility |
-| Project Relevance Upgrade | relevance precision, rationale quality, separation from general importance |
-| Personalization | explainability, bounded influence, no evidence override |
-| Learning Layer | durable knowledge-gap mapping, non-generic recommendations |
-| Productization | operator clarity, surface stability, observability access |
+| Memory Contract And Inventory | schema clarity, migration clarity, retrieval contract clarity |
+| MVP Memory Unification | provenance completeness, decision continuity, scope-first retrieval |
+| Wire Memory Into Weekly Outputs | output integration, suppression continuity, prompt-context discipline |
+| Observability And Evaluation | eval usefulness, debug surfaces, operator inspectability |
 
 ---
 
@@ -76,11 +69,12 @@ If a task unit spans multiple roadmap phases, it is too large.
 ## Current Implementation Guidance
 
 Codex should start with:
-- baseline stabilization
-- measurement capture
-- contract cleanup
+- memory schema and retrieval contract work
+- migration mapping
+- debug/eval contract definition
 
 Codex should not yet implement:
-- deep personalization
-- advanced feedback loops
-- broad product-surface expansion
+- global memory frameworks
+- decorative abstractions
+- graph systems
+- broad semantic search over everything

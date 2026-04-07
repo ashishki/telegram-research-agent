@@ -1,228 +1,208 @@
 # Telegram Research Agent — Development Cycle
 
-**Version:** 2.0.0
-**Date:** 2026-03-30
-**Status:** Strategic redesign aligned
+**Version:** 3.0
+**Date:** 2026-04-07
+**Status:** Memory-unification workflow active
 
 ---
 
 ## Overview
 
-Development now follows a phase-gated workflow aligned to the redesigned product:
+Development follows a bounded AI-assisted loop:
 
 ```text
 Strategist -> Orchestrator -> Codex -> Review -> Fixes
 ```
 
-The purpose of the workflow is not just to ship code.
-It is to enforce sequencing, prevent premature complexity, and keep docs, implementation, and evaluation in sync.
+The active program is the memory-unification roadmap in `docs/tasks.md`, not the older roadmap generations.
+
+The workflow exists to enforce:
+
+- dependency order
+- bounded implementation packets
+- explicit architecture contracts
+- reviewable phases
+- documentation alignment before code drift accumulates
+
+---
+
+## Active Execution Model
+
+Current phase order:
+
+1. Phase 1 — Memory Contract And Inventory
+2. Phase 2 — MVP Memory Unification
+3. Phase 3 — Wire Memory Into Weekly Outputs
+4. Phase 4 — Observability And Evaluation
+
+Reference documents:
+
+- `docs/tasks.md`
+- `docs/memory_architecture.md`
+- `docs/architecture.md`
+- `docs/IMPLEMENTATION_CONTRACT.md`
 
 ---
 
 ## Roles
 
-### 1. Strategist
+### Strategist
 
 Owns:
+
 - phase design
 - architecture deltas
-- success criteria
+- sequencing
 - non-goals
 - documentation updates
 
-Produces per phase:
-- scope definition
+Must produce:
+
+- exact phase scope
 - dependencies
-- quality gates
+- success criteria
 - stop conditions
-- required document changes
+- required docs to update
 
-Must not:
-- mix multiple future phases into one implementation packet
-
----
-
-### 2. Orchestrator
+### Orchestrator
 
 Owns:
-- current-phase selection from `docs/tasks.md`
+
+- current phase selection from `docs/tasks.md`
 - dependency checks
-- packaging work for Codex
-- packaging review context for reviewer
+- bounded implementation packet for Codex
+- bounded review packet for the reviewer
 - stop/go decision after review
 
-Produces:
-- one implementation packet at a time
-- one review packet at a time
-- updated phase state after review outcome
+Must not:
 
-Must stop when:
-- prerequisites are not met
-- baseline metrics are missing
-- review fails on phase contract items
-- docs and implementation drift
+- hand Codex a multi-phase packet
+- use legacy roadmap phases as the active execution source
 
----
+Execution path:
 
-### 3. Codex
+- implementation packets are handed to Codex via `codex exec -s workspace-write`
+- fix packets are also handed to Codex via `codex exec -s workspace-write`
+
+### Codex
 
 Owns:
-- code and config changes for the active phase only
-- tests and implementation-level verification
-- task-level documentation touch-ups explicitly requested by strategist/orchestrator
 
-Must receive:
-- bounded scope
-- explicit acceptance criteria
-- clear file ownership
+- implementation for the active bounded packet only
+- tests and local validation for that packet
+- small doc touchups explicitly required by the packet
 
 Must not:
-- jump ahead to future phases
-- merge routing, output, and personalization into one change set
 
----
+- redesign roadmap during implementation
+- broaden memory scope into a generic memory system
 
-### 4. Reviewer
+Invocation contract:
+
+- Codex is invoked by the orchestrator with `codex exec -s workspace-write`
+- `workspace-write` is the default implementation sandbox unless a task explicitly requires another mode
+
+### Reviewer
 
 Owns:
-- contract verification
-- architectural drift detection
-- output/routing/personalization guardrail checks
-- regression detection against prior phase criteria
 
-Review focus:
+- architecture adherence
+- scope adherence
+- quality gate verification
+- regression risk detection
+
+Must focus on:
+
 - correctness
-- clarity of boundaries
-- measurable success
+- contract violations
+- hidden scope expansion
 
-Not responsible for:
-- writing fixes
-- speculative redesign during review
-
----
-
-### 5. Fixes
+### Fixes
 
 Owns:
-- address only review findings
-- re-verify changed surfaces
-- keep scope narrow
+
+- only reviewer findings
+- revalidation of changed surfaces
 
 Must not:
-- broaden implementation beyond review deltas unless explicitly re-scoped
+
+- silently widen scope
 
 ---
 
-## Phase Execution Rules
+## Phase Rules
 
-### Before a phase starts
+### Before implementation
 
-- confirm all dependencies in `docs/tasks.md`
-- confirm phase entry metrics exist
-- confirm architecture and prompt contracts are current
-- confirm scope excludes future-phase work
+- read `docs/tasks.md`
+- read `docs/memory_architecture.md`
+- confirm dependencies are complete
+- confirm the phase has explicit success criteria
+- confirm canonical vs derived state boundaries are understood
 
 ### During implementation
 
-- work by epic, then sub-epic, then task unit
-- keep task units reviewable in isolation
-- attach metrics/eval changes to behavior changes
+- keep changes reviewable in isolation
+- keep schema work separate from prompt rewrites where possible
+- add retrieval/debug tests alongside retrieval behavior
 
 ### Before review
 
-- verify implementation matches the current phase only
-- verify required docs are updated
-- verify quality-gate evidence exists
+- verify docs and code still match
+- verify non-goals were respected
+- verify the packet did not leak into a later phase
 
-### Before moving to next phase
+### Before advancing
 
 - review must pass
-- phase success criteria must be met
-- stop conditions must be clear for the next phase
+- phase success criteria must be evidenced
+- next phase must be startable without reinterpretation
 
 ---
 
-## Review Checklist Requirements
+## Mandatory Review Checks
 
 Every phase review must cover:
+
 - architecture adherence
 - scope adherence
-- quality-gate evidence
-- observability coverage
-- cost awareness where models are involved
-- prompt/output contract alignment
+- documentation alignment
+- validation evidence
+- observability impact
 
-Additional mandatory checks by phase type:
-- scoring work: bucket quality and reproducibility
-- routing work: tier distribution, escalation rate, budget control
-- output work: section completeness, readability, ignored/noise handling
-- personalization work: explainability, bounded influence, no evidence override
+Phase-specific additions:
+
+- Phase 1: schema clarity, migration clarity, retrieval contract clarity
+- Phase 2: provenance completeness, decision continuity correctness, retrieval scoping correctness
+- Phase 3: weekly output integration correctness, suppression continuity, prompt-context discipline
+- Phase 4: eval usefulness, debug surfaces, operator inspectability
 
 ---
 
 ## Stop Conditions
 
-Do not advance when any of the following holds:
-- no baseline metrics
-- no measurable quality gate for the phase
-- docs describe behavior that code does not implement
-- expensive model usage is introduced without routing measurement
-- personalization is added before relevance precision is acceptable
-- product surface work starts before signal-first output is stable
+Stop and do not advance when:
+
+- dependencies are missing
+- the packet spans multiple phases
+- canonical vs derived ownership is unclear
+- retrieval behavior cannot be inspected
+- prompt work is being used to hide missing storage contracts
+- a generic memory abstraction is being introduced without a concrete need
 
 ---
 
-## Task Sizing Rules
+## Living Docs
 
-- `Epic`: a phase-level capability such as routing or personalization
-- `Sub-epic`: one coherent slice inside the epic
-- `Task unit`: a bounded change that can be reviewed quickly
+These documents define the active AI-development workflow and must stay aligned:
 
-Good task unit:
-- one clear purpose
-- narrow file set
-- explicit acceptance criteria
-
-Bad task unit:
-- spans multiple phases
-- bundles architecture, implementation, and polish together
-- cannot be tested or reviewed independently
-
----
-
-## Living Document Rules
-
-The following must stay aligned:
 - `README.md`
-- `docs/spec.md`
-- `docs/architecture.md`
 - `docs/tasks.md`
-- `docs/prompts/`
-- review and evaluation docs
-
-Rules:
-- update existing docs instead of creating forks
-- remove obsolete framing instead of leaving dual truths
-- treat prompt templates as behavior contracts
-
----
-
-## Definition of Ready
-
-A phase is ready for implementation when:
-- dependencies are complete
-- non-goals are explicit
-- quality gates are defined
-- required docs are identified
-- the task packet is small enough for isolated review
-
----
-
-## Definition of Done
-
-A phase is done when:
-- implementation passes review
-- quality gates are satisfied
-- required docs are aligned
-- no blocked assumptions remain hidden
-- the next phase can start without reinterpretation
+- `docs/memory_architecture.md`
+- `docs/architecture.md`
+- `docs/IMPLEMENTATION_CONTRACT.md`
+- `docs/CODEX_PROMPT.md`
+- `docs/prompts/workflow_orchestrator.md`
+- `docs/prompts/workflow_codex_implementer.md`
+- `docs/prompts/workflow_claude_reviewer.md`
+- `docs/prompts/workflow_codex_fixer.md`

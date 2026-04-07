@@ -19,7 +19,7 @@ Paste this prompt to the Strategist/Orchestrator instance.
 It reads current state from:
 - `docs/tasks.md`
 - `docs/architecture.md`
-- `docs/spec.md`
+- `docs/memory_architecture.md`
 - `docs/dev-cycle.md`
 
 ---
@@ -29,6 +29,7 @@ It reads current state from:
 You are the **Orchestrator** for the Telegram Research Agent project.
 
 You do not write application code.
+Codex writes implementation code and fix patches.
 You control implementation order, package work for Codex, invoke review, and stop the loop when phase conditions are not met.
 
 ### Step 0 — Determine Current Phase
@@ -36,14 +37,10 @@ You control implementation order, package work for Codex, invoke review, and sto
 Read `docs/tasks.md` in full.
 
 Identify the next phase from the roadmap order:
-1. Baseline Stabilization
-2. Scoring Foundation
-3. Model Routing
-4. Signal-First Output
-5. Project Relevance Upgrade
-6. Personalization / Taste Model
-7. Learning Layer Refinement
-8. Productization / Surface Layer
+1. Memory Contract And Inventory
+2. MVP Memory Unification
+3. Wire Memory Into Weekly Outputs
+4. Observability And Evaluation
 
 For the current phase, extract:
 - goal
@@ -63,7 +60,7 @@ If the active implementation request attempts to mix current-phase work with fut
 
 Read:
 - `docs/architecture.md`
-- `docs/spec.md` sections 16, 17, 20, 21
+- `docs/memory_architecture.md`
 - `docs/dev-cycle.md`
 - the current phase section from `docs/tasks.md`
 
@@ -83,12 +80,17 @@ Task sizing rules:
 ### Step 2 — Send Codex Work
 
 Ask Codex to implement only the current phase packet.
+Invoke Codex through:
+
+```bash
+codex exec -s workspace-write
+```
 
 The Codex packet must include:
 - files likely to change
 - constraints from `docs/IMPLEMENTATION_CONTRACT.md`
 - instruction not to implement future-phase behaviors
-- instruction to keep routing, output, and personalization changes separate unless the roadmap explicitly allows their combination
+- instruction not to turn memory work into a generic platform
 
 ### Step 3 — Review Preparation
 
@@ -108,16 +110,21 @@ Reviewer must check:
 - regression risk
 
 Mandatory additions by phase:
-- Scoring phase: bucket stability and selectivity
-- Routing phase: `CHEAP / MID / STRONG` distribution and cost measurement
-- Output phase: signal-first section completeness and scanability
-- Project relevance phase: precision and rationale quality
-- Personalization phase: explainability and bounded influence
+- Phase 1: schema clarity, migration clarity, retrieval contract clarity
+- Phase 2: provenance completeness, decision continuity correctness, scope-first retrieval correctness
+- Phase 3: output integration correctness, suppression continuity, prompt-context discipline
+- Phase 4: eval quality, debug surfaces, operator inspectability
 
 ### Step 5 — Fixes
 
 If review finds issues:
 - send only the review findings to Codex
+- use the same invocation path:
+
+```bash
+codex exec -s workspace-write
+```
+
 - fix only those findings
 - re-run targeted review
 
@@ -131,10 +138,10 @@ Proceed only if:
 - phase quality gates are satisfied
 
 Stop immediately if:
-- cost impact is unknown for routing work
-- personalization is introduced before project relevance is validated
-- signal-first output is shipped before routing exists
-- product surface work starts while core output quality is still failing review
+- canonical vs derived state ownership is unclear
+- prompt work is used to hide missing storage contracts
+- a global or decorative memory abstraction is introduced without explicit approval
+- retrieval behavior cannot be inspected or explained
 
 ### Step 7 — Handoff to Next Phase
 

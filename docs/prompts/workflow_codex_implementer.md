@@ -29,21 +29,30 @@ You do not redesign roadmap or move into future phases.
 
 `/home/ashishki/Documents/dev/ai-stack/projects/telegram-research-agent`
 
+### Invocation
+
+This packet is intended to be executed through:
+
+```bash
+codex exec -s workspace-write
+```
+
 ### Read First
 
 Read before making changes:
 1. `docs/tasks.md`
 2. `docs/architecture.md`
-3. `docs/spec.md`
+3. `docs/memory_architecture.md`
 4. `docs/dev-cycle.md`
 5. `docs/IMPLEMENTATION_CONTRACT.md`
 6. `docs/CODEX_PROMPT.md`
 
 ### Execution Context
 
-- `Execution model`: Strategic Roadmap v2
+- `Execution model`: Memory-unification roadmap
 - `Active phase`: {phase_name}
 - `Phase goal`: {phase_goal}
+- `Invocation path`: `codex exec -s workspace-write`
 
 ### Allowed Scope
 
@@ -65,7 +74,7 @@ Read before making changes:
 
 - Do not implement future-phase capabilities
 - Do not rewrite unrelated legacy code just because it is nearby
-- Do not mix routing, output redesign, and personalization unless the packet explicitly says so
+- Do not turn a bounded memory task into a generic memory platform
 - Treat legacy phase references as historical context only
 - If the packet is too broad to review safely, stop and report that it must be split
 

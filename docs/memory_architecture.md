@@ -1,0 +1,361 @@
+# Memory Architecture Decision
+
+**Version:** 1.0
+**Date:** 2026-04-07
+**Status:** Active planning reference
+
+---
+
+## Architectural Verdict
+
+`telegram-research-agent` already has meaningful persistence. Its problem is not “no memory.” Its problem is that memory is split across scoring state, feedback state, derived snapshots, and output-specific prompt assembly.
+
+The right move is **not** a generic memory platform.
+
+The right move is:
+
+- keep structured operational state in SQLite
+- add a small verbatim evidence layer for high-value Telegram signals
+- add a decision journal for acted-on / ignored / deferred / rejected continuity
+- make retrieval scope-first by project, topic, time, and source
+- keep summaries bounded and derived
+
+This repo needs **memory unification**, not memory maximalism.
+
+---
+
+## Verified Current State
+
+### What already exists
+
+**Canonical operational state**
+
+- `raw_posts`: immutable Telegram source text plus source metadata and `message_url`
+- `posts`: normalized/scored post state
+- `post_topics`, `topics`: cluster-derived topical indexing
+- `post_project_links` and `project_relevance_score`: project matching state
+- `signal_feedback`: acted_on / skipped feedback events
+- `user_post_tags`: explicit ranking and preference tags
+- `insight_triage_records` and `insight_rejection_memory`: implementation-idea continuity
+- `study_plans`, `digests`, `recommendations`: generated weekly artifacts
+
+**Derived memory surfaces**
+
+- `channel_memory`: summary and counters derived from explicit post tags
+- `project_context_snapshots`: project summary text plus recent commit messages
+- `user_preference_score` and `user_adjusted_score`: derived ranking state
+
+**Current retrieval-like behavior**
+
+- project relevance uses deterministic keyword overlap, not a memory retrieval layer
+- preference judge loads recent tagged examples, derived channel memory, and project snapshots
+- recommendations and study-plan generation load digest summaries and project snapshots
+- there is FTS over `posts.content`, but no dedicated evidence retrieval layer
+
+### What is strong already
+
+- provenance is partially present: Telegram links, channel names, dates, project ids
+- explicit user feedback is preserved, not hidden inside a model
+- rejection continuity already exists for implementation ideas
+- local-first SQLite architecture is a good fit for the product
+
+### Where continuity is too lossy
+
+- raw Telegram text exists, but the system does not preserve a curated “why this mattered” evidence layer
+- weekly generation relies on prompt assembly from several disconnected tables
+- project snapshots are text-heavy and useful, but they are not clearly positioned as bounded derived state versus canonical state
+- acted-on / skipped feedback is not unified with implementation-idea triage outcomes into one decision history
+- there is no shared retrieval contract for project/topic/time/source scoped context assembly
+
+### Where docs were stale or misleading
+
+- `docs/tasks.md` was still dominated by historical roadmap phases rather than the actual next architectural bottleneck
+- `docs/CODEX_PROMPT.md` still pointed to obsolete next tasks
+- several docs described “memory” features but did not distinguish canonical state from derived summaries
+
+---
+
+## What This Repo Should Store
+
+### Structured canonical state
+
+Keep as source of truth:
+
+- raw Telegram posts and normalized posts
+- topic assignments and project links
+- explicit user tags and feedback events
+- triage outcomes and rejection suppression records
+- generated artifact records
+
+This state is deterministic or user-authored. Downstream logic depends on it. It should remain canonical.
+
+### Bounded summaries and snapshots
+
+Keep, but treat as derived and refreshable:
+
+- `channel_memory`
+- project snapshots derived from config + GitHub deltas + linked signal counts
+- weekly digest/report summaries
+
+These are working context, not source of truth. They should always be reproducible from canonical state plus current code.
+
+### Verbatim searchable memory
+
+Add a dedicated evidence layer for **selected** Telegram material:
+
+- strong/watch posts that actually enter decision support
+- explicitly tagged posts
+- excerpts referenced in recommendations or study plans
+
+Each item should preserve:
+
+- `raw_post_id` / `post_id`
+- excerpt text
+- channel/source
+- Telegram link
+- posted date
+- project/topic scope
+- evidence reason or selection reason
+- capture week / last used time
+
+Do **not** duplicate the full corpus into a second generic memory store.
+
+### Preference / ranking memory
+
+Keep lightweight:
+
+- explicit tags remain the ground truth
+- channel bias remains derived
+- optional topic-level preference summaries may be added later if clearly useful
+
+This repo does not need a learned opaque preference model.
+
+### What should not be stored
+
+- decorative wing/hall/room abstractions
+- a global knowledge graph for every topic
+- agent diaries
+- compressed dialect artifacts
+- duplicate copies of low-signal posts
+- broad semantic embeddings across everything before scoped retrieval is proven necessary
+
+---
+
+## MemPalace: What Is Verified
+
+### Verified implementation facts
+
+From the repo and code:
+
+- verbatim memory is stored in ChromaDB “drawers” with metadata for `wing` and `room`
+- retrieval supports scope filters by `wing` and `room`
+- a four-layer memory stack exists: identity, essential story, on-demand filtered retrieval, deep search
+- conversation mining chunks transcripts into exchange pairs or paragraph groups
+- room assignment is mostly heuristic in `convo_miner.py`
+- a local SQLite knowledge graph exists separately from ChromaDB
+- MCP tools expose search, filing, graph queries, navigation, and diary operations
+
+### Claims that are only partly reliable for our purposes
+
+- high benchmark claims are real in the repo, but some benchmark sections explicitly admit contamination or structural shortcuts
+- the README’s “palace” framing overstates the practical necessity of the metaphorical hierarchy
+- AAAK compression may be real inside that system, but it is not a demonstrated need for this repo
+
+### MemPalace ideas that genuinely matter here
+
+- preserve verbatim evidence instead of summarizing away the reason
+- scope retrieval before global search
+- keep a layered memory model with small always-on context and deeper on-demand retrieval
+- preserve provenance in retrieval results
+- stay local-first and avoid cloud-only memory services
+
+### MemPalace ideas that conflict with this repo
+
+- generic cross-domain memory taxonomy
+- MCP-first memory surface as a product in itself
+- large memory product surface unrelated to weekly research decisions
+- diary and specialist-agent memory layers
+
+---
+
+## Adopt / Reject / Redesign
+
+| Candidate idea | Decision | Why |
+|---|---|---|
+| Verbatim-first evidence storage | Adopt | This repo already has raw text, but needs a curated evidence layer for high-value signals |
+| Scope-first retrieval | Adopt | Project/topic/time/source scoping fits the product and improves precision |
+| Layered memory model | Adopt in lighter custom form | Useful if translated into repo-native layers, not a generic palace abstraction |
+| Clear provenance on retrieved items | Adopt | Already partly available; should become mandatory for evidence retrieval |
+| Decision continuity | Adopt | Acted-on, skipped, deferred, and rejected history are core decision-support state |
+| Bounded always-on summaries | Adopt in lighter custom form | Project snapshots and channel memory should stay small and derived |
+| Global vector memory over everything | Defer | Might help later, but only after scoped evidence retrieval is proven insufficient |
+| Knowledge graph / temporal triples | Reject for current roadmap | Too much abstraction for limited incremental value here |
+| Palace metaphor: wings / halls / rooms | Reject | Adds naming complexity without engineering leverage in this repo |
+| AAAK compression dialect | Reject | Token compression is not the current bottleneck and adds a second representation system |
+| Agent diary memory | Reject | Not aligned with the repo’s product shape |
+| Benchmark-driven universal memory optimization | Reject | This product needs reliable weekly decision support, not benchmark theater |
+
+---
+
+## Target Architecture For This Repo
+
+### Tier 1 — Canonical operational state
+
+Owner: SQLite schema and deterministic pipeline.
+
+Includes:
+
+- `raw_posts`, `posts`, `topics`, `post_topics`
+- project linkage and relevance state
+- explicit feedback and tag tables
+- triage and rejection tables
+- generated weekly artifact tables
+
+Rule: downstream systems may derive from this layer, but may not redefine it.
+
+### Tier 2 — Project and source snapshots
+
+Owner: derived refresh jobs.
+
+Includes:
+
+- refreshed source/channel summaries
+- refreshed project snapshots
+
+Rule: bounded text, refreshable, no unique facts that cannot be regenerated.
+
+### Tier 3 — Verbatim evidence memory
+
+Owner: scoped evidence builder.
+
+Proposed entity: `signal_evidence_item`
+
+Suggested fields:
+
+- `id`
+- `post_id`
+- `raw_post_id`
+- `week_label`
+- `evidence_kind` (`strong_signal`, `manual_tag`, `project_insight_source`, `study_source`, `decision_support`)
+- `excerpt_text`
+- `source_channel`
+- `message_url`
+- `posted_at`
+- `topic_labels_json`
+- `project_names_json`
+- `selection_reason`
+- `last_used_at`
+
+Rule: this is not the whole corpus. It is the subset worth resurfacing.
+
+### Tier 4 — Decision continuity
+
+Owner: feedback + triage integration.
+
+Proposed entity: `decision_journal`
+
+Suggested fields:
+
+- `id`
+- `decision_scope` (`signal`, `insight`, `study`, `project`)
+- `subject_ref_type`
+- `subject_ref_id`
+- `project_name`
+- `status` (`acted_on`, `ignored`, `deferred`, `rejected`, `completed`)
+- `reason`
+- `evidence_item_ids_json`
+- `recorded_at`
+- `recorded_by`
+
+Rule: this becomes the continuity layer for “what we did with this.”
+
+### Tier 5 — Preference memory
+
+Owner: explicit feedback and derived counters.
+
+Keep:
+
+- `user_post_tags`
+- `signal_feedback`
+- per-channel derived bias
+
+Do not add hidden learned state until the explicit system stops being sufficient.
+
+---
+
+## Retrieval Policy
+
+### Principle
+
+Narrow before deep.
+
+### Retrieval flow
+
+1. Determine scope from the caller:
+   - project
+   - topic
+   - time window
+   - source channel
+   - decision state
+2. Read canonical structured state first:
+   - recent project snapshot
+   - explicit decisions/tags/triage state
+3. Pull matching evidence items inside that scope.
+4. Only if the scoped result is weak:
+   - fallback to FTS over raw posts or evidence
+   - later, optionally fallback to embeddings over evidence items only
+5. Return provenance-rich items, not just summary text.
+
+### Example scopes
+
+- Weekly brief for project insight:
+  project `telegram-research-agent` + last 21 days + non-rejected signals + source provenance
+
+- Implementation ideas suppression:
+  recent related decisions + rejection history + recent evidence items touching that project/topic
+
+- Study plan:
+  active project snapshots + acted-on evidence + gaps not yet completed in study history
+
+---
+
+## Summary Refresh Rules
+
+- `channel_memory`: refresh from explicit tags, not from model output
+- project snapshots: refresh from project config, GitHub metadata, linked signal counts, recent commits
+- weekly summaries: rebuildable artifacts tied to a week label
+- evidence items: append/select during weekly processing; update `last_used_at` when resurfaced
+- decision journal: append-only except for explicit state transitions
+
+---
+
+## Observability And Evaluation
+
+### Needed debug surfaces
+
+- inspect evidence items by project/topic/week/source
+- inspect decision-journal history for a project or signal
+- show why a recommendation resurfaced
+- show why an item was suppressed
+
+### Minimum evaluation surfaces
+
+- scoped retrieval precision on fixture data
+- provenance completeness checks
+- repeated-idea suppression tests
+- report usefulness review against recent decision history
+
+---
+
+## Recommended First Implementation Phase
+
+The first implementation phase should be **schema and retrieval-contract work**, not prompt tweaking.
+
+Exact next step:
+
+1. finalize schema for `signal_evidence_items`
+2. finalize schema for `decision_journal`
+3. define how `project_context_snapshots` becomes the canonical project snapshot surface
+4. define the retrieval helper contract that all weekly generators must use
+
+That is the smallest step that will make later implementation coherent.

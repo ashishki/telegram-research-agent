@@ -4,6 +4,9 @@
 **Date:** 2026-04-06
 **Status:** Active
 
+> Workflow note: `docs/spec.md` is not the active source of truth for AI-development orchestration.
+> Use `docs/tasks.md`, `docs/memory_architecture.md`, `docs/dev-cycle.md`, and `docs/prompts/workflow_*.md`.
+
 ---
 
 ## 1. What This System Is

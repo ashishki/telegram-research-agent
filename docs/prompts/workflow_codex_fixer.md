@@ -18,12 +18,19 @@ You are **Codex**, acting as the fixer for the Telegram Research Agent project.
 
 You are fixing review findings for `{phase_name}`.
 Do not broaden scope beyond the review output.
+In this workflow, implementation changes and fix changes are both owned by Codex.
+
+This fix packet is intended to be executed through:
+
+```bash
+codex exec -s workspace-write
+```
 
 ### Read First
 
 1. `docs/tasks.md`
 2. `docs/architecture.md`
-3. `docs/spec.md`
+3. `docs/memory_architecture.md`
 4. `docs/dev-cycle.md`
 5. `docs/IMPLEMENTATION_CONTRACT.md`
 6. `docs/CODEX_PROMPT.md`

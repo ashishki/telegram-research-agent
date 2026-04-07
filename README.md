@@ -22,6 +22,19 @@ A private, production-ready pipeline that runs on a personal VPS and processes T
 - a weekly Telegraph brief plus a tracked study loop
 - a cost-aware, explainable AI workflow with feedback capture
 
+## Memory Direction
+
+The repository already persists useful state, but its next architecture step is not “add a memory platform.”
+
+The active design direction is:
+
+- keep structured SQLite state canonical
+- add a small verbatim evidence layer for high-value Telegram signals
+- unify acted-on / ignored / deferred / rejected continuity in one decision history
+- make retrieval scope-first by project, topic, time, and source
+
+Design reference: `docs/memory_architecture.md`
+
 ---
 
 ## In Brief (for CV / interview)
