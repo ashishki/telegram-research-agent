@@ -347,6 +347,126 @@ Narrow before deep.
 
 ---
 
+---
+
+## M3 — Target Schema Definitions
+
+### `signal_evidence_items`
+
+Full DDL:
+
+```sql
+CREATE TABLE signal_evidence_items (
+    id INTEGER PRIMARY KEY,
+    post_id INTEGER NOT NULL,
+    raw_post_id INTEGER NOT NULL,
+    week_label TEXT NOT NULL,
+    evidence_kind TEXT NOT NULL CHECK (
+        evidence_kind IN (
+            'strong_signal',
+            'manual_tag',
+            'project_insight_source',
+            'study_source',
+            'decision_support'
+        )
+    ),
+    excerpt_text TEXT NOT NULL CHECK (length(trim(excerpt_text)) > 0),
+    source_channel TEXT NOT NULL CHECK (length(trim(source_channel)) > 0),
+    message_url TEXT,
+    posted_at TEXT NOT NULL CHECK (length(trim(posted_at)) > 0),
+    topic_labels_json TEXT NOT NULL DEFAULT '[]',
+    project_names_json TEXT NOT NULL DEFAULT '[]',
+    selection_reason TEXT NOT NULL CHECK (length(trim(selection_reason)) > 0),
+    last_used_at TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+    FOREIGN KEY (raw_post_id) REFERENCES raw_posts(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_signal_evidence_items_post_id
+    ON signal_evidence_items(post_id);
+
+CREATE INDEX idx_signal_evidence_items_week_label
+    ON signal_evidence_items(week_label);
+
+CREATE INDEX idx_signal_evidence_items_evidence_kind
+    ON signal_evidence_items(evidence_kind);
+
+CREATE INDEX idx_signal_evidence_items_source_channel
+    ON signal_evidence_items(source_channel);
+```
+
+Owner rule: scoped evidence builder (Phase 2).
+
+Refresh rule: append during weekly processing; update `last_used_at` when resurfaced.
+
+Provenance requirement: `source_channel`, `posted_at`, and `selection_reason` must be non-empty on every insert.
+
+### `decision_journal`
+
+Full DDL:
+
+```sql
+CREATE TABLE decision_journal (
+    id INTEGER PRIMARY KEY,
+    decision_scope TEXT NOT NULL CHECK (
+        decision_scope IN ('signal', 'insight', 'study', 'project')
+    ),
+    subject_ref_type TEXT NOT NULL,
+    subject_ref_id TEXT NOT NULL,
+    project_name TEXT,
+    status TEXT NOT NULL CHECK (
+        status IN ('acted_on', 'ignored', 'deferred', 'rejected', 'completed')
+    ),
+    reason TEXT NOT NULL,
+    evidence_item_ids_json TEXT NOT NULL DEFAULT '[]',
+    recorded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    recorded_by TEXT NOT NULL DEFAULT 'pipeline'
+);
+
+CREATE INDEX idx_decision_journal_decision_scope
+    ON decision_journal(decision_scope);
+
+CREATE INDEX idx_decision_journal_project_name
+    ON decision_journal(project_name);
+
+CREATE INDEX idx_decision_journal_status
+    ON decision_journal(status);
+
+CREATE INDEX idx_decision_journal_recorded_at
+    ON decision_journal(recorded_at);
+```
+
+Owner rule: feedback + triage integration (Phase 2).
+
+Refresh rule: append-only except for explicit status transitions; never delete.
+
+Documented `subject_ref_type` values:
+
+- `post_id`
+- `insight_triage_id`
+- `study_plan_week`
+- `project_name`
+
+### `project_context_snapshots` evolution
+
+Additive schema change:
+
+```sql
+ALTER TABLE project_context_snapshots
+    ADD COLUMN linked_signal_count INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE project_context_snapshots
+    ADD COLUMN snapshot_week_label TEXT;
+```
+
+State: remains Tier 2 derived state; these columns support stale detection.
+
+Compatibility rule: existing rows remain valid via defaults.
+
+---
+
+
 ## Recommended First Implementation Phase
 
 The first implementation phase should be **schema and retrieval-contract work**, not prompt tweaking.
