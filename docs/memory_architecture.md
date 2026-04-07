@@ -467,6 +467,66 @@ Compatibility rule: existing rows remain valid via defaults.
 ---
 
 
+## M4 — Migration Mapping
+
+### `channel_memory`
+
+- New tier mapping: Tier 2.
+- Structural changes: none.
+- Migration strategy: no migration needed.
+
+### `project_context_snapshots`
+
+- New tier mapping: Tier 2.
+- Structural changes: add `linked_signal_count INTEGER NOT NULL DEFAULT 0` and `snapshot_week_label TEXT`.
+- Migration strategy: forward-only additive migration; no backfill needed.
+
+### `signal_feedback`
+
+- New tier mapping: stays Tier 1 canonical for explicit feedback; also feeds Tier 4 `decision_journal` going forward.
+- Structural changes: none in Phase 1.
+- Migration strategy: forward-only journal writes; no backfill required.
+- Status mapping:
+  - `acted_on` -> `acted_on`
+  - `skipped` -> `ignored`
+  - `marked_important` -> `acted_on`
+- Recorded-by rule: `recorded_by='user'`.
+
+### `insight_triage_records`
+
+- New tier mapping: stays Tier 1 canonical for triage state; also feeds Tier 4 `decision_journal`.
+- Structural changes: none in Phase 1.
+- Migration strategy: forward-only journal writes from future triage events.
+- Status mapping:
+  - `do_now` -> `acted_on`
+  - `backlog` -> `deferred`
+  - `reject_or_defer` -> `rejected`
+- Journal contract: `decision_scope='insight'` and `subject_ref_type='insight_triage_id'`.
+
+### `insight_rejection_memory`
+
+- New tier mapping: stays Tier 1 canonical fast gate.
+- Structural changes: none in Phase 1.
+- Migration strategy: forward-only dual-write in Phase 2 when a new rejection is recorded.
+- Continuity rule: Phase 2 also writes a matching `decision_journal` row with `status='rejected'`.
+- Role split: `insight_rejection_memory` remains the O(1) fingerprint lookup; `decision_journal` carries why and provenance.
+
+### `user_post_tags`
+
+- New tier mapping: Tier 1 canonical.
+- Structural changes: none.
+- Migration strategy: no migration required.
+- Downstream use: tags feed `signal_evidence_items` selection in Phase 2.
+
+### `study_plans`
+
+- New tier mapping: stays canonical generated artifact state and feeds Tier 4 `decision_journal` on completion.
+- Structural changes: deferred to Phase 2.
+- Migration strategy: forward-only journal writes on completion with `status='completed'` and `decision_scope='study'`.
+
+---
+
+
 ## Recommended First Implementation Phase
 
 The first implementation phase should be **schema and retrieval-contract work**, not prompt tweaking.
