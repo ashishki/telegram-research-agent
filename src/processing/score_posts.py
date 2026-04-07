@@ -24,6 +24,11 @@ from config.settings import PROJECT_ROOT, Settings
 from llm.router import route
 from output.project_relevance import score_project_relevance
 
+try:
+    from db.evidence import record_signal_evidence_for_scored_posts
+except ModuleNotFoundError:
+    from src.db.evidence import record_signal_evidence_for_scored_posts
+
 
 LOGGER = logging.getLogger(__name__)
 CONFIG_DIR = PROJECT_ROOT / "src" / "config"
@@ -608,6 +613,12 @@ def score_posts(
             scored_rows,
         )
         conn.commit()
+        strong_watch_post_ids = [row[10] for row in scored_rows if row[1] in {"strong", "watch"}]
+        try:
+            record_signal_evidence_for_scored_posts(conn, strong_watch_post_ids)
+            conn.commit()
+        except Exception:
+            LOGGER.warning("Signal evidence population failed after scoring", exc_info=True)
 
     # Apply per-bucket caps: re-cap at max items by downgrading extras to noise
     # (cap enforcement is done at digest-generation time, not here — we store raw scores)

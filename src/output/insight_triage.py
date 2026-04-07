@@ -5,14 +5,21 @@ Classifies raw LLM-generated insights into do_now / backlog / reject_or_defer.
 Applies rejection memory to suppress repeated low-value ideas.
 All classification logic is deterministic — no additional LLM calls.
 """
+import logging
 import re
 import sqlite3
 import unicodedata
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
+try:
+    from db.evidence import record_decisions_for_triage
+except ModuleNotFoundError:
+    from src.db.evidence import record_decisions_for_triage
+
 
 REJECTION_MEMORY_WEEKS = 4  # reject_or_defer items suppressed for this many weeks
+LOGGER = logging.getLogger(__name__)
 
 _CATEGORY_LABELS: dict[str, str] = {
     "do_now": "✅ Сделать сейчас",
@@ -237,6 +244,14 @@ def store_triage_results(
                 insight.source_url,
                 now_iso,
             ),
+        )
+    try:
+        record_decisions_for_triage(connection, week_label, insights)
+    except Exception:
+        LOGGER.warning(
+            "Decision journal write failed for triage results week_label=%s",
+            week_label,
+            exc_info=True,
         )
 
 
