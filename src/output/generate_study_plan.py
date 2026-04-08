@@ -14,6 +14,7 @@ from typing import Any
 import yaml
 
 from config.settings import PROJECT_ROOT, Settings
+from db.retrieval import fetch_decisions
 from llm.client import LLMClient
 from output.context_memory import load_project_context
 from output.report_utils import _extract_markdown_section
@@ -290,6 +291,26 @@ def _fetch_tagged_posts_this_week(connection: sqlite3.Connection, week_label: st
     return results
 
 
+def _fetch_acted_on_evidence(connection: sqlite3.Connection, limit: int = 10) -> list[str]:
+    try:
+        rows = fetch_decisions(
+            connection,
+            decision_scope="signal",
+            status="acted_on",
+            limit=limit,
+        )
+    except Exception:
+        LOGGER.warning("Failed to load acted-on evidence for study plan", exc_info=True)
+        return []
+    results: list[str] = []
+    for row in rows:
+        ref_id = str(row.get("subject_ref_id") or "")
+        reason = str(row.get("reason") or "")
+        recorded_at = str(row.get("recorded_at") or "")[:10]
+        results.append(f"[{recorded_at}] post_id={ref_id}: {reason}"[:200])
+    return results
+
+
 def _write_study_plan_file(week_label: str, content_md: str) -> Path:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     output_path = OUTPUT_DIR / f"{week_label}.md"
@@ -329,6 +350,7 @@ def generate_study_plan(settings: Settings, force: bool = False) -> str:
         previous_topics = _fetch_previous_plan_topics(connection)
         tagged_posts = _fetch_tagged_posts_this_week(connection, week_label)
         completed_history = _fetch_completed_study_history(connection)
+        acted_on_evidence = _fetch_acted_on_evidence(connection)
 
         post_count = sum(int(topic.get("post_count") or 0) for topic in topics)
         prompt = (
@@ -342,6 +364,7 @@ def generate_study_plan(settings: Settings, force: bool = False) -> str:
             .replace("{previous_topics}", json.dumps(previous_topics, ensure_ascii=True))
             .replace("{tagged_posts}", json.dumps(tagged_posts, ensure_ascii=True, indent=2))
             .replace("{completed_history}", json.dumps(completed_history, ensure_ascii=True, indent=2))
+            .replace("{acted_on_evidence}", json.dumps(acted_on_evidence, ensure_ascii=True, indent=2))
         )
 
         content_md = LLMClient.complete(

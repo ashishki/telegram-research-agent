@@ -24,7 +24,8 @@ YOUR JOB:
 9. Prioritize what the user explicitly tagged as strong / try / interesting this week over generic topic popularity
 10. Account for what the user already completed in earlier weeks so the plan compounds instead of repeating
 11. Use project context snapshots to connect study blocks to real current project state, not generic keywords
-12. Optimize for clarity and brevity. The user should be able to execute the plan without reading extra explanation
+12. Use acted-on evidence to connect study blocks to signals the user already engaged with — prefer topics grounded in real acted-on posts over generic popular topics
+13. Optimize for clarity and brevity. The user should be able to execute the plan without reading extra explanation
 
 RULES FOR LINKS:
 - Books from library: always include the exact GitHub raw URL provided
@@ -61,6 +62,9 @@ USER-TAGGED POSTS THIS WEEK (highest-value ground truth about what was actually 
 
 COMPLETED STUDY HISTORY (avoid repetition, build on what is already done):
 {completed_history}
+
+SIGNALS THE USER ACTED ON (use these to anchor study blocks to real engagement):
+{acted_on_evidence}
 
 Generate a structured weekly study plan. Return in this exact Markdown format:
 
