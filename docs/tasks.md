@@ -176,7 +176,7 @@ Make the weekly brief, implementation ideas, and study loop use the unified memo
 
 | ID | Task | Status | Depends On |
 |---|---|---|---|
-| M11 | Replace ad hoc prompt context assembly in `preference_judge.py` with scoped retrieval helpers | `[ ]` | M9 |
+| M11 | Replace ad hoc prompt context assembly in `preference_judge.py` with scoped retrieval helpers | `[x]` | M9 |
 | M12 | Update recommendations generation to consult `decision_journal` and evidence items before surfacing ideas | `[ ]` | M8 M9 |
 | M13 | Update study-plan generation to use project snapshots plus recent acted-on evidence | `[ ]` | M7 M9 |
 | M14 | Improve report sections to preserve concise provenance where evidence is materially important | `[ ]` | M11 |

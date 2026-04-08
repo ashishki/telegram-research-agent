@@ -3,6 +3,7 @@ import logging
 import sqlite3
 from datetime import datetime, timedelta, timezone
 
+from db.retrieval import fetch_evidence_items
 from llm.client import LLMClient
 from output.context_memory import load_channel_memory, load_project_context, refresh_channel_memory
 
@@ -141,6 +142,57 @@ def _project_names(projects: list[dict]) -> list[str]:
     return [str(project.get("name") or "").strip() for project in projects if str(project.get("name") or "").strip()]
 
 
+def _last_n_week_labels(n: int = 3) -> tuple[str, str]:
+    """Return (start_week, end_week) for the last n ISO weeks including current."""
+    now = _utc_now()
+    end_dt = now
+    start_dt = now - timedelta(weeks=n - 1)
+    year_end, week_end, _ = end_dt.isocalendar()
+    year_start, week_start, _ = start_dt.isocalendar()
+    return f"{year_start}-W{week_start:02d}", f"{year_end}-W{week_end:02d}"
+
+
+def _fetch_project_evidence(
+    connection: sqlite3.Connection,
+    project_names: list[str],
+    n_weeks: int = 3,
+) -> dict[str, list[dict]]:
+    """Return recent scoped evidence items keyed by project_name."""
+    if not project_names:
+        return {}
+    week_range = _last_n_week_labels(n_weeks)
+    result: dict[str, list[dict]] = {}
+    for name in project_names:
+        try:
+            items = fetch_evidence_items(
+                connection,
+                project_name=name,
+                week_range=list(week_range),
+                limit=5,
+            )
+        except Exception:
+            LOGGER.warning("Evidence fetch failed for project=%s", name, exc_info=True)
+            items = []
+        result[name] = items
+    return result
+
+
+def _compact_project_evidence(evidence_by_project: dict[str, list[dict]]) -> dict[str, list[dict]]:
+    """Compact evidence items to a token-safe representation for the prompt."""
+    compact: dict[str, list[dict]] = {}
+    for project_name, items in evidence_by_project.items():
+        compact[project_name] = [
+            {
+                "week": str(item.get("week_label") or ""),
+                "kind": str(item.get("evidence_kind") or ""),
+                "channel": str(item.get("source_channel") or ""),
+                "excerpt": str(item.get("excerpt_text") or "")[:280],
+            }
+            for item in items
+        ]
+    return compact
+
+
 def _compact_channel_memory(channel_memory: dict[str, dict]) -> dict[str, dict]:
     compact: dict[str, dict] = {}
     for channel, item in channel_memory.items():
@@ -179,6 +231,7 @@ def _judge_batch_once(
     projects: list[dict],
     channel_memory: dict[str, dict],
     project_context: list[dict],
+    project_evidence: dict | None = None,
 ) -> dict[int, dict]:
     if not candidates:
         return {}
@@ -188,12 +241,17 @@ def _judge_batch_once(
         "reader-facing categories. Use the user's notes only as training signal, not as report prose. "
         "Return strict JSON."
     )
+    _evidence_section = (
+        "Recent evidence for projects (last 3 weeks, scoped per project):\n"
+        f"{json.dumps(_compact_project_evidence(project_evidence or {}), ensure_ascii=False, indent=2)}\n\n"
+    )
     prompt = (
         "Active projects:\n"
         f"{json.dumps(projects, ensure_ascii=False, indent=2)}\n\n"
         "Project context snapshots:\n"
         f"{json.dumps(_compact_project_context(project_context), ensure_ascii=False, indent=2)}\n\n"
-        "Channel memory:\n"
+        + _evidence_section
+        + "Channel memory:\n"
         f"{json.dumps(_compact_channel_memory(channel_memory), ensure_ascii=False, indent=2)}\n\n"
         "Tagged examples showing the user's taste:\n"
         f"{json.dumps(examples, ensure_ascii=False, indent=2)}\n\n"
@@ -249,12 +307,13 @@ def _judge_batch(
     channel_memory: dict[str, dict],
     project_context: list[dict],
     batch_size: int = 4,
+    project_evidence: dict | None = None,
 ) -> dict[int, dict]:
     judged: dict[int, dict] = {}
     for start in range(0, len(candidates), batch_size):
         batch = candidates[start : start + batch_size]
         try:
-            judged.update(_judge_batch_once(batch, examples, projects, channel_memory, project_context))
+            judged.update(_judge_batch_once(batch, examples, projects, channel_memory, project_context, project_evidence))
         except Exception:
             LOGGER.warning(
                 "Preference judge batch failed start=%d size=%d; skipping batch",
@@ -276,12 +335,13 @@ def judge_recent_posts(db_path: str, projects: list[dict] | None, lookback_days:
             active_projects = _active_projects(projects)
             channel_memory = load_channel_memory(connection, [str(candidate.get("channel") or "") for candidate in candidates])
             project_context = load_project_context(connection, _project_names(active_projects))
+            project_evidence = _fetch_project_evidence(connection, _project_names(active_projects))
     except sqlite3.Error:
         LOGGER.warning("Preference judge skipped because preference tables are unavailable", exc_info=True)
         return {}
     if not examples or not candidates:
         return {}
 
-    judged = _judge_batch(candidates, examples, active_projects, channel_memory, project_context)
+    judged = _judge_batch(candidates, examples, active_projects, channel_memory, project_context, project_evidence=project_evidence)
     LOGGER.info("Preference judge evaluated candidates=%d judged=%d", len(candidates), len(judged))
     return judged
