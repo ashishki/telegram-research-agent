@@ -7,13 +7,14 @@ from pathlib import Path
 
 import yaml
 
+from db.retrieval import fetch_decisions, fetch_evidence_items
 from config.settings import PROJECT_ROOT, Settings
+from bot.telegram_delivery import send_text
+from delivery.telegraph import publish_article
 from llm.client import complete
 from output.context_memory import load_project_context
 from output.insight_triage import render_triaged_insights_html, triage_insights
 from output.report_utils import _extract_markdown_section
-from bot.telegram_delivery import send_text
-from delivery.telegraph import publish_article
 
 
 LOGGER = logging.getLogger(__name__)
@@ -69,6 +70,57 @@ def _load_projects_context() -> str:
         focus = project.get("focus", "")
         lines.append(f"{name}: {description}. Фокус: {focus}")
     return "\n".join(lines)
+
+
+def _load_project_names() -> list[str]:
+    data = yaml.safe_load(PROJECTS_YAML_PATH.read_text(encoding="utf-8"))
+    return [str(p.get("name", "")).strip() for p in data.get("projects", []) if p.get("name")]
+
+
+def _load_recent_decisions(connection: sqlite3.Connection) -> str:
+    try:
+        rows = fetch_decisions(
+            connection,
+            decision_scope="insight",
+            limit=20,
+        )
+    except Exception:
+        LOGGER.warning("Failed to load recent decisions for recommendations", exc_info=True)
+        return "No recent decision history available."
+    if not rows:
+        return "No recent decision history available."
+    lines: list[str] = []
+    for row in rows:
+        status = str(row.get("status") or "")
+        reason = str(row.get("reason") or "")
+        ref_id = str(row.get("subject_ref_id") or "")
+        recorded_at = str(row.get("recorded_at") or "")[:10]
+        lines.append(f"[{recorded_at}] {ref_id}: {status} — {reason}"[:200])
+    return "\n".join(lines)
+
+
+def _load_recent_project_evidence(connection: sqlite3.Connection) -> str:
+    project_names = _load_project_names()
+    if not project_names:
+        return "No project evidence available."
+    now = _utc_now()
+    end_year, end_week, _ = now.isocalendar()
+    start_year, start_week, _ = (now - timedelta(weeks=2)).isocalendar()
+    week_range = [f"{start_year}-W{start_week:02d}", f"{end_year}-W{end_week:02d}"]
+    lines: list[str] = []
+    for name in project_names:
+        try:
+            items = fetch_evidence_items(connection, project_name=name, week_range=week_range, limit=3)
+        except Exception:
+            LOGGER.warning("Failed to load evidence for project=%s", name, exc_info=True)
+            continue
+        for item in items:
+            kind = str(item.get("evidence_kind") or "")
+            excerpt = str(item.get("excerpt_text") or "")[:220]
+            channel = str(item.get("source_channel") or "")
+            week = str(item.get("week_label") or "")
+            lines.append(f"[{name}][{week}][{kind}] {channel}: {excerpt}"[:280])
+    return "\n".join(lines) if lines else "No recent project evidence found."
 
 
 def _load_project_context_snapshots(connection: sqlite3.Connection) -> str:
@@ -363,6 +415,8 @@ def run_recommendations(settings: Settings, force_delivery: bool = False) -> dic
         projects_context = _load_projects_context()
         project_context_snapshots = _load_project_context_snapshots(connection)
         completed_study_history = _load_completed_study_history(connection)
+        recent_decisions = _load_recent_decisions(connection)
+        recent_evidence = _load_recent_project_evidence(connection)
         system_prompt, user_template = _load_prompt_sections()
         prompt = (
             user_template.replace("{week_label}", week_label)
@@ -370,6 +424,8 @@ def run_recommendations(settings: Settings, force_delivery: bool = False) -> dic
             .replace("{projects_context}", projects_context)
             .replace("{project_context_snapshots}", project_context_snapshots)
             .replace("{completed_study_history}", completed_study_history)
+            .replace("{recent_decisions}", recent_decisions)
+            .replace("{recent_evidence}", recent_evidence)
         )
 
         insights_text = complete(prompt=prompt, system=system_prompt, category="insight")
