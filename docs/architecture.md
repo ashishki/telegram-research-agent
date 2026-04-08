@@ -1,7 +1,7 @@
 # Architecture
 
-**Version:** 5.0
-**Date:** 2026-04-07
+**Version:** 6.0
+**Date:** 2026-04-08
 
 ---
 
@@ -20,24 +20,27 @@ Telegram ingestion
   -> normalization + topic assignment
   -> deterministic scoring + project relevance
   -> explicit feedback + manual tags
+  -> evidence recording (signal_evidence_items)
   -> weekly outputs (brief / ideas / study)
+  -> decision journal (decision_journal)
 
 Cross-cutting:
   project snapshots
   channel memory
+  scope-first evidence retrieval
   cost + health observability
+  memory CLI inspection
 ```
 
-What already works:
+What the system provides:
 
 - canonical post storage and scoring
 - explicit preference capture
 - project-aware outputs
 - rejection memory for weak implementation ideas
-
-What was missing before this planning reset:
-
-- one coherent memory architecture spanning signals, evidence, feedback, and decisions
+- verbatim evidence layer: `signal_evidence_items` records curated post excerpts with provenance per week and project scope
+- decision continuity: `decision_journal` unifies signal feedback, insight triage, and study completion in one append-only log
+- scope-first retrieval: all weekly generators query by project → week → source before broader fallback
 
 ---
 
@@ -69,19 +72,21 @@ These are bounded summaries, not canonical facts.
 
 ### 3. Verbatim evidence memory
 
-New planned layer:
+Implemented as `signal_evidence_items`:
 
-- selected high-value post excerpts with provenance
-- stored only for items worth resurfacing
-- retrieved by scope before any broad search
+- selected high-value post excerpts with provenance (source channel, Telegram link, selection reason, week label, project scope)
+- written during scoring (`record_signal_evidence_for_scored_posts`) and manual tagging (`record_signal_evidence_for_manual_tag`)
+- retrieved by scope before any broad search; `fetch_evidence_items` supports project, week, source, kind, and exclude-by-status filters
 
 ### 4. Decision continuity
 
-New planned layer:
+Implemented as `decision_journal`:
 
-- acted-on / ignored / deferred / rejected history with links to evidence and project scope
-
-This is the missing architectural glue between feedback, triage, and weekly recommendations.
+- acted-on / ignored / deferred / rejected / completed history with links to project scope
+- signal feedback writes via `record_decision_for_feedback`
+- insight triage writes via `record_decisions_for_triage`
+- study-plan completion writes via `record_study_completion_decision`
+- unified continuity across all decision types; used by recommendations and study-plan generators to suppress repeated ideas
 
 ---
 
@@ -112,10 +117,10 @@ This is the main MemPalace idea worth adopting here. A flat global memory pool i
 - project snapshots
 - weekly digest/report summaries
 
-### Add in MVP
+### Implemented (Phases 1–4)
 
-- `signal_evidence_items`
-- `decision_journal`
+- `signal_evidence_items` — Tier 3 verbatim evidence memory
+- `decision_journal` — Tier 4 decision continuity
 
 ### Explicitly out of scope
 
@@ -127,16 +132,16 @@ This is the main MemPalace idea worth adopting here. A flat global memory pool i
 
 ---
 
-## Build Order Constraint
+## Build Order (Completed)
 
-The next implementation order is strict:
+Memory unification was implemented in four phases (M1–M17):
 
-1. memory schema and retrieval contract
-2. MVP memory unification tables and helpers
-3. integrate weekly generators with the new retrieval path
-4. add observability and evaluation
+1. **Phase 1 — Contract** (M1–M5): memory schema design, retrieval contract, debug/eval spec
+2. **Phase 2 — MVP Tables** (M6–M10): `signal_evidence_items` and `decision_journal` migrations, retrieval helpers, evidence writers, feedback integration
+3. **Phase 3 — Wire into Outputs** (M11–M14): preference judge evidence injection, recommendations context, study plan acted-on evidence, signal report channel attribution
+4. **Phase 4 — Observability** (M15–M17): retrieval tests, evidence writer tests, memory CLI inspection subcommands
 
-Prompt work without these storage contracts will just deepen the current fragmentation.
+All 167 tests pass. All four memory surfaces are live.
 
 ---
 

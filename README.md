@@ -17,23 +17,25 @@ A private, production-ready pipeline that runs on a personal VPS and processes T
 - a personal signal filtering and scoring pipeline
 - a taste-aware ranking layer driven by your explicit profile and manual post ratings
 - a project-aware relevance engine that uses both deterministic scoring and LLM preference judging
-- an insight triage workflow that separates do-now ideas from backlog and reject/defer noise
-- persistent channel memory and project context snapshots
-- a weekly Telegraph brief plus a tracked study loop
-- a cost-aware, explainable AI workflow with feedback capture
+- a verbatim evidence layer (`signal_evidence_items`) that preserves why each signal mattered and links it to project + week scope
+- a unified decision-continuity log (`decision_journal`) covering signal feedback, insight triage, and study-plan completion
+- an insight triage workflow that separates do-now ideas from backlog and reject/defer noise, with repeated-idea suppression
+- persistent channel memory and project context snapshots refreshed from GitHub + linked signal counts
+- a weekly Telegraph brief plus a tracked study loop informed by acted-on evidence
+- a cost-aware, explainable AI workflow with feedback capture and scope-first memory retrieval
 
-## Memory Direction
+## Memory Architecture
 
-The repository already persists useful state, but its next architecture step is not “add a memory platform.”
+Four-phase memory unification is complete. The system now has a coherent, scope-first memory stack built on top of the existing SQLite canonical state:
 
-The active design direction is:
+- **Tier 1** — canonical operational state: `raw_posts`, `posts`, scoring, explicit tags, feedback, triage, rejection memory, artifact records
+- **Tier 2** — derived snapshots: `channel_memory`, `project_context_snapshots` (refreshed from config + GitHub deltas + linked signal counts)
+- **Tier 3** — verbatim evidence memory: `signal_evidence_items` — curated high-value post excerpts with provenance (source channel, Telegram link, selection reason, week label, project scope)
+- **Tier 4** — decision continuity: `decision_journal` — acted-on / ignored / deferred / rejected / completed history unified across signal feedback, insight triage, and study-plan completion
 
-- keep structured SQLite state canonical
-- add a small verbatim evidence layer for high-value Telegram signals
-- unify acted-on / ignored / deferred / rejected continuity in one decision history
-- make retrieval scope-first by project, topic, time, and source
+Retrieval is scope-first: project → topic → time → source → status, never a global pool.
 
-Design reference: `docs/memory_architecture.md`
+Design reference: `docs/memory_architecture.md` | Operator guide: `docs/memory_inspection.md`
 
 ---
 
@@ -54,13 +56,15 @@ Full case study: `docs/case-study.md` | Demo walkthrough: `docs/demo-walkthrough
 1. **Ingests** new Telegram posts from configured channels via Telethon (MTProto)
 2. **Preprocesses** — normalizes text, extracts structure (code, links, word count), assigns TF-IDF topic clusters
 3. **Scores** every post with a deterministic 5-dimension formula plus preference bias from manual tags
-4. **Routes** posts to model tiers and a preference-judge layer for reader-facing selection
-5. **Formats** a decision brief with source links, project insights, and study cues
-6. **Triages** generated implementation ideas into do-now, backlog, and reject/defer buckets
-7. **Renders** the review as an HTML document
-8. **Publishes** two Telegraph articles: `Research Brief` and `Implementation Ideas`
-   Implementation Ideas are triaged into `do_now`, `backlog`, and `reject_or_defer` categories before publishing.
-9. **Delivers** to Telegram: short notification (≤300 chars) + article URL, with HTML attachment fallback for the research brief if Telegraph is unavailable
+4. **Records evidence** — strong/watch posts and manually tagged posts are written to `signal_evidence_items` with source channel, Telegram link, excerpt, and selection reason
+5. **Routes** posts to model tiers and a preference-judge layer for reader-facing selection; the judge sees scoped project evidence from the last 3 weeks
+6. **Formats** a decision brief with source links, project insights, and study cues; when a signal has a project application, the source line shows the originating channel
+7. **Triages** generated implementation ideas into do-now, backlog, and reject/defer buckets; triage outcomes are written to `decision_journal`
+8. **Records decisions** — signal feedback (acted_on / skipped / marked_important), insight triage, and study-plan completion are all written to `decision_journal` as a unified continuity log
+9. **Renders** the review as an HTML document
+10. **Publishes** two Telegraph articles: `Research Brief` and `Implementation Ideas`
+    Implementation Ideas are triaged into `do_now`, `backlog`, and `reject_or_defer` categories before publishing.
+11. **Delivers** to Telegram: short notification (≤300 chars) + article URL, with HTML attachment fallback for the research brief if Telegraph is unavailable
 
 ### What you receive
 
@@ -238,28 +242,37 @@ python3 src/main.py study --force     # rebuild the current weekly study plan fr
 python3 src/main.py study --remind    # send the weekly study reminder once
 python3 src/main.py tune-suggestions  # boost topic suggestions from acted-on feedback
 python3 src/main.py insight-triage-stats  # triage summary: counts by category, recent records, rejection memory
+
+# Memory inspection (scope-first, requires AGENT_DB_PATH)
+python -m src.main memory inspect-evidence [--project NAME] [--week LABEL] [--kind KIND] [--limit N]
+python -m src.main memory inspect-decisions [--scope SCOPE] [--status STATUS] [--project NAME] [--limit N]
+python -m src.main memory inspect-snapshots [--stale-only]
+python -m src.main memory inspect-suppression --title "TITLE"
 ```
 
-Full operator guide: `docs/operator_workflow.md`
+Full operator guide: `docs/operator_workflow.md` | Memory inspection guide: `docs/memory_inspection.md`
 
 ---
 
 ## Development Status
 
-Roadmap v3 complete (Phases 1v3–6v3, tasks T65–T87). 136 tests. CI on every push.
+Roadmap v3 complete (Phases 1v3–6v3) + Memory Unification complete (Phases 1–4, M1–M17). 167 tests. CI on every push.
 
 System capabilities summary:
 - deterministic scoring pipeline with actual cluster coherence (silhouette_score from cluster_runs)
 - three-tier model routing with full cost logging
-- 9-section weekly review artifact with source traceability
+- 9-section weekly review artifact with source traceability and per-signal channel attribution
 - HTML render + Telegraph publish (fallback: file attachment)
 - project relevance with explicit keyword lists and exclusion suppression
 - manual tagging (`/tag`, `/mark_strong`, `/mark_try`, etc.) plus acted_on/skipped feedback
-- preference judge for reader-facing ranking and project-aware rationale
-- completion-aware weekly study plan with `/study_done`
-- incremental project context snapshots derived from GitHub sync and recent commits
+- preference judge for reader-facing ranking and project-aware rationale, now seeded with scoped evidence from `signal_evidence_items`
+- completion-aware weekly study plan with `/study_done`, now incorporating acted-on evidence from `decision_journal`
+- incremental project context snapshots derived from GitHub sync, recent commits, and linked signal counts
 - observability: cost trends, score distribution trends, enriched health-check
 - insight triage layer: deterministic do_now / backlog / reject_or_defer classification with 4-week rejection memory
+- **Tier 3 — verbatim evidence memory**: `signal_evidence_items` records curated strong/manual-tag signals with provenance per week and project
+- **Tier 4 — decision continuity**: `decision_journal` unifies all acted-on, ignored, deferred, rejected, and completed decisions in one append-only log
+- **memory CLI**: `inspect-evidence`, `inspect-decisions`, `inspect-snapshots`, `inspect-suppression` subcommands for operator debugging
 
 ---
 
@@ -268,6 +281,8 @@ System capabilities summary:
 | File | Role |
 |---|---|
 | `docs/architecture.md` | Component map, layer contracts, data model |
+| `docs/memory_architecture.md` | Four-tier memory design: canonical, snapshots, evidence, decisions |
+| `docs/memory_inspection.md` | Operator guide for memory CLI subcommands and weekly troubleshooting |
 | `docs/spec.md` | Technical decisions, runtime environment, data schema |
 | `docs/tasks.md` | Phased development roadmap |
 | `docs/report_format.md` | Weekly artifact structure and delivery spec |

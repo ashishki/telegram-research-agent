@@ -1,8 +1,8 @@
 # Memory Architecture Decision
 
-**Version:** 1.0
-**Date:** 2026-04-07
-**Status:** Active planning reference
+**Version:** 2.0
+**Date:** 2026-04-08
+**Status:** Implemented — all four phases complete (M1–M17)
 
 ---
 
@@ -101,7 +101,7 @@ These are working context, not source of truth. They should always be reproducib
 
 ### Verbatim searchable memory
 
-Add a dedicated evidence layer for **selected** Telegram material:
+Implemented as `signal_evidence_items`. A dedicated evidence layer for **selected** Telegram material:
 
 - strong/watch posts that actually enter decision support
 - explicitly tagged posts
@@ -582,15 +582,11 @@ Phase 3 quality gate and Phase 4 fixture:
 ---
 
 
-## Recommended First Implementation Phase
+## Implementation Summary
 
-The first implementation phase should be **schema and retrieval-contract work**, not prompt tweaking.
+All phases are complete. The full build order was:
 
-Exact next step:
-
-1. finalize schema for `signal_evidence_items`
-2. finalize schema for `decision_journal`
-3. define how `project_context_snapshots` becomes the canonical project snapshot surface
-4. define the retrieval helper contract that all weekly generators must use
-
-That is the smallest step that will make later implementation coherent.
+1. **M1–M5 (Phase 1 — Contract)**: schema finalized for `signal_evidence_items` and `decision_journal`; retrieval helper contract defined; debug/eval spec written
+2. **M6–M10 (Phase 2 — MVP Tables)**: migrations applied; `fetch_evidence_items` and `fetch_decisions` retrieval helpers implemented; `record_signal_evidence_for_scored_posts`, `record_signal_evidence_for_manual_tag`, `record_decision_for_feedback`, `record_decisions_for_triage`, `record_study_completion_decision` evidence writers implemented; `project_context_snapshots` extended with `linked_signal_count` and `snapshot_week_label`
+3. **M11–M14 (Phase 3 — Wire into Outputs)**: preference judge seeded with scoped project evidence; recommendations LLM prompt includes recent decisions and recent project evidence; study plan includes acted-on evidence; signal report shows originating channel when project_application is present
+4. **M15–M17 (Phase 4 — Observability)**: `tests/test_retrieval.py` (14 tests), `tests/test_evidence.py` (15 tests), `docs/memory_inspection.md` operator guide, memory CLI subcommands
