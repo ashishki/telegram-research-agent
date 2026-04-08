@@ -104,6 +104,36 @@ def build_parser() -> argparse.ArgumentParser:
     )
     triage_stats_parser.set_defaults(handler=handle_insight_triage_stats)
 
+    memory_parser = subparsers.add_parser(
+        "memory",
+        help="Inspect memory surfaces (evidence, decisions, snapshots)",
+    )
+    memory_sub = memory_parser.add_subparsers(dest="memory_command", required=True)
+
+    ie_parser = memory_sub.add_parser("inspect-evidence")
+    ie_parser.add_argument("--project", default=None)
+    ie_parser.add_argument("--week", default=None)
+    ie_parser.add_argument("--kind", default=None)
+    ie_parser.add_argument("--limit", type=int, default=20)
+    ie_parser.set_defaults(handler=handle_memory_inspect_evidence)
+
+    id_parser = memory_sub.add_parser("inspect-decisions")
+    id_parser.add_argument("--project", default=None)
+    id_parser.add_argument("--scope", dest="decision_scope", default=None)
+    id_parser.add_argument("--status", default=None)
+    id_parser.add_argument("--limit", type=int, default=20)
+    id_parser.set_defaults(handler=handle_memory_inspect_decisions)
+
+    is_parser = memory_sub.add_parser("inspect-snapshots")
+    is_parser.add_argument("--stale-only", action="store_true")
+    is_parser.set_defaults(handler=handle_memory_inspect_snapshots)
+
+    isupp_parser = memory_sub.add_parser("inspect-suppression")
+    isupp_parser.add_argument("--title", required=True)
+    isupp_parser.set_defaults(handler=handle_memory_inspect_suppression)
+
+    memory_parser.set_defaults(handler=lambda args: memory_parser.print_help() or 0)
+
     return parser
 
 
@@ -803,6 +833,179 @@ def handle_insight_triage_stats(_: argparse.Namespace) -> int:
             lines.append(f"    reason: {row['reason']}")
     else:
         lines.append("Rejection memory: empty")
+
+    sys.stdout.write("\n".join(lines) + "\n")
+    return 0
+
+
+def handle_memory_inspect_evidence(args: argparse.Namespace) -> int:
+    from db.retrieval import fetch_evidence_items
+
+    settings = load_settings()
+
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+
+        with sqlite3.connect(settings.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON;")
+
+            items = fetch_evidence_items(
+                connection,
+                project_name=args.project,
+                week_label=args.week,
+                evidence_kind=args.kind,
+                limit=args.limit,
+            )
+    except Exception as exc:
+        sys.stdout.write(f"Error inspecting evidence items: {exc}\n")
+        return 1
+
+    if not items:
+        sys.stdout.write("No evidence items found for the given scope.\n")
+        return 0
+
+    lines: list[str] = []
+    for item in items:
+        posted_at = item.get("posted_at") or ""
+        excerpt = (item.get("excerpt_text") or "")[:120]
+        url = item.get("message_url") or "n/a"
+        lines.append(
+            f"[{item.get('week_label') or 'n/a'}] {item.get('evidence_kind') or 'n/a'} | "
+            f"{item.get('source_channel') or 'n/a'} | {posted_at[:10]}"
+        )
+        lines.append(f"  excerpt: {excerpt}")
+        lines.append(f"  url: {url}")
+        lines.append(f"  reason: {item.get('selection_reason') or 'n/a'}")
+        lines.append("")
+
+    sys.stdout.write("\n".join(lines).rstrip() + "\n")
+    return 0
+
+
+def handle_memory_inspect_decisions(args: argparse.Namespace) -> int:
+    from db.retrieval import fetch_decisions
+
+    settings = load_settings()
+
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+
+        with sqlite3.connect(settings.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON;")
+
+            decisions = fetch_decisions(
+                connection,
+                project_name=args.project,
+                decision_scope=args.decision_scope,
+                status=args.status,
+                limit=args.limit,
+            )
+    except Exception as exc:
+        sys.stdout.write(f"Error inspecting decision journal: {exc}\n")
+        return 1
+
+    if not decisions:
+        sys.stdout.write("No decision journal entries found.\n")
+        return 0
+
+    lines: list[str] = []
+    for row in decisions:
+        recorded_at = row.get("recorded_at") or ""
+        lines.append(
+            f"[{recorded_at[:10]}] {row.get('decision_scope') or 'n/a'}/{row.get('status') or 'n/a'} | "
+            f"ref={row.get('subject_ref_type') or 'n/a'}:{row.get('subject_ref_id') or 'n/a'}"
+        )
+        lines.append(f"  reason: {row.get('reason') or 'n/a'}")
+
+    sys.stdout.write("\n".join(lines) + "\n")
+    return 0
+
+
+def handle_memory_inspect_snapshots(args: argparse.Namespace) -> int:
+    from db.retrieval import fetch_stale_snapshots
+
+    settings = load_settings()
+
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+
+        with sqlite3.connect(settings.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON;")
+
+            if args.stale_only:
+                rows = fetch_stale_snapshots(connection)
+            else:
+                rows = [
+                    dict(row)
+                    for row in connection.execute(
+                        """
+                        SELECT project_id, project_name, snapshot_week_label, updated_at, linked_signal_count
+                        FROM project_context_snapshots
+                        ORDER BY project_name ASC
+                        """
+                    ).fetchall()
+                ]
+    except Exception as exc:
+        sys.stdout.write(f"Error inspecting project snapshots: {exc}\n")
+        return 1
+
+    if not rows:
+        sys.stdout.write("No project snapshots found.\n")
+        return 0
+
+    lines = [
+        f"{row.get('project_name') or 'n/a'} | week={row.get('snapshot_week_label') or 'never'} | "
+        f"signals={row.get('linked_signal_count') or 0} | updated={(row.get('updated_at') or '')[:10]}"
+        for row in rows
+    ]
+    sys.stdout.write("\n".join(lines) + "\n")
+    return 0
+
+
+def handle_memory_inspect_suppression(args: argparse.Namespace) -> int:
+    from db.retrieval import fetch_suppression_context
+    from output.insight_triage import _normalize_fingerprint
+
+    settings = load_settings()
+
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+
+        fingerprint = _normalize_fingerprint(args.title)
+
+        with sqlite3.connect(settings.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON;")
+            context = fetch_suppression_context(connection, fingerprint)
+    except Exception as exc:
+        sys.stdout.write(f"Error inspecting suppression context: {exc}\n")
+        return 1
+
+    rejection_memory = context.get("rejection_memory")
+    recent_decisions = context.get("recent_decisions") or []
+
+    lines = [
+        f"Fingerprint: {fingerprint}",
+        f"Rejection memory: {rejection_memory or 'not found'}",
+        f"Recent decisions ({len(recent_decisions)}):",
+    ]
+    for row in recent_decisions:
+        recorded_at = row.get("recorded_at") or ""
+        lines.append(f"  [{recorded_at[:10]}] {row.get('status') or 'n/a'} — {row.get('reason') or 'n/a'}")
+
+    if rejection_memory is None:
+        lines.append("No rejection memory entry found for this title.")
 
     sys.stdout.write("\n".join(lines) + "\n")
     return 0
