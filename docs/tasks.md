@@ -210,8 +210,8 @@ Measure whether the new memory architecture improves retrieval precision and wee
 
 | ID | Task | Status | Depends On |
 |---|---|---|---|
-| M15 | Add tests for scoped retrieval precision and provenance completeness | `[ ]` | M14 |
-| M16 | Add tests for decision continuity: acted-on, skipped, deferred, and rejected flows | `[ ]` | M12 |
+| M15 | Add tests for scoped retrieval precision and provenance completeness | `[x]` | M14 |
+| M16 | Add tests for decision continuity: acted-on, skipped, deferred, and rejected flows | `[x]` | M12 |
 | M17 | Add CLI/operator docs for memory inspection and weekly troubleshooting | `[ ]` | M10 M15 |
 
 ---
