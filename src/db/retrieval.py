@@ -1,7 +1,7 @@
 import json
 import logging
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 
 LOGGER = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ def _fetchone_as_dict(cursor: sqlite3.Cursor) -> dict | None:
 
 
 def _now_iso() -> str:
-    return datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def _week_label_for(dt: datetime) -> str:

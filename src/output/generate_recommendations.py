@@ -92,10 +92,10 @@ def _load_recent_decisions(connection: sqlite3.Connection) -> str:
     lines: list[str] = []
     for row in rows:
         status = str(row.get("status") or "")
-        reason = str(row.get("reason") or "")
-        ref_id = str(row.get("subject_ref_id") or "")
+        reason = str(row.get("reason") or "")[:120]
+        ref_id = str(row.get("subject_ref_id") or "")[:80]
         recorded_at = str(row.get("recorded_at") or "")[:10]
-        lines.append(f"[{recorded_at}] {ref_id}: {status} — {reason}"[:200])
+        lines.append(f"[{recorded_at}] {ref_id}: {status} — {reason}")
     return "\n".join(lines)
 
 
