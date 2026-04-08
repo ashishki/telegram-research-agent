@@ -165,7 +165,11 @@ def _render_signal(
     if project_application.strip():
         lines.append(f"  Project application: {project_application.strip()}")
     if source:
-        lines.append(f"  Source: {source}")
+        channel = (post.get("channel_username") or "").strip()
+        if project_application.strip() and channel:
+            lines.append(f"  Source: {channel} | {source}")
+        else:
+            lines.append(f"  Source: {source}")
     return "\n".join(lines)
 
 
