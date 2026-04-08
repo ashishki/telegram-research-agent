@@ -174,6 +174,7 @@ def record_decision_for_feedback(
     mapped_status = _FEEDBACK_STATUS_MAP.get(feedback)
     if mapped_status is None:
         return
+    now_iso = _now_iso()
 
     connection.execute(
         """
@@ -182,12 +183,21 @@ def record_decision_for_feedback(
             subject_ref_type,
             subject_ref_id,
             status,
+            reason,
             recorded_by,
             recorded_at
         )
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
-        ("signal", "post_id", str(post_id), mapped_status, "user", _now_iso()),
+        (
+            "signal",
+            "post_id",
+            str(post_id),
+            mapped_status,
+            f"signal_feedback={feedback}",
+            "user",
+            now_iso,
+        ),
     )
 
 
@@ -258,10 +268,19 @@ def record_study_completion_decision(
             subject_ref_type,
             subject_ref_id,
             status,
+            reason,
             recorded_by,
             recorded_at
         )
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
-        ("study", "study_plan_week", week_label, "completed", "user", _now_iso()),
+        (
+            "study",
+            "study_plan_week",
+            week_label,
+            "completed",
+            f"study plan completed for {week_label}",
+            "user",
+            _now_iso(),
+        ),
     )

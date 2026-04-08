@@ -418,7 +418,8 @@ CREATE TABLE decision_journal (
     status TEXT NOT NULL CHECK (
         status IN ('acted_on', 'ignored', 'deferred', 'rejected', 'completed')
     ),
-    reason TEXT NOT NULL,
+    reason TEXT,
+    -- nullable: pipeline writes may omit reason; all inserts should provide a non-empty value where available
     evidence_item_ids_json TEXT NOT NULL DEFAULT '[]',
     recorded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     recorded_by TEXT NOT NULL DEFAULT 'pipeline'

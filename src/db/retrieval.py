@@ -164,19 +164,44 @@ def fetch_suppression_context(connection, title_fingerprint: str) -> dict:
         """,
         (title_fingerprint,),
     )
-    recent_cursor = connection.execute(
-        """
-        SELECT *
-        FROM decision_journal
-        WHERE decision_scope = 'insight'
-          AND status = 'rejected'
-        ORDER BY recorded_at DESC
-        LIMIT 5
-        """
-    )
+    rejection_memory = _fetchone_as_dict(rejection_cursor)
+
+    recent_decisions: list[dict] = []
+    if rejection_memory is not None:
+        title = rejection_memory.get("title")
+        if title:
+            triage_cursor = connection.execute(
+                """
+                SELECT id
+                FROM insight_triage_records
+                WHERE title = ?
+                ORDER BY id DESC
+                LIMIT 10
+                """,
+                (title,),
+            )
+            triage_ids = [str(row[0]) for row in triage_cursor.fetchall()]
+
+            if triage_ids:
+                placeholders = ",".join("?" * len(triage_ids))
+                recent_cursor = connection.execute(
+                    f"""
+                    SELECT *
+                    FROM decision_journal
+                    WHERE decision_scope = 'insight'
+                      AND status = 'rejected'
+                      AND subject_ref_type = 'insight_triage_id'
+                      AND subject_ref_id IN ({placeholders})
+                    ORDER BY recorded_at DESC
+                    LIMIT 5
+                    """,
+                    triage_ids,
+                )
+                recent_decisions = _fetchall_as_dicts(recent_cursor)
+
     return {
-        "rejection_memory": _fetchone_as_dict(rejection_cursor),
-        "recent_decisions": _fetchall_as_dicts(recent_cursor),
+        "rejection_memory": rejection_memory,
+        "recent_decisions": recent_decisions,
     }
 
 
