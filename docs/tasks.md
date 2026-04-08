@@ -140,7 +140,7 @@ Introduce the minimum new storage needed to unify continuity across signals, pro
 | M7 | Populate evidence items from strong/watch posts, explicit tags, and triaged insights with source provenance | `[x]` | M6 |
 | M8 | Write decision-journal rows from feedback actions and insight triage outcomes | `[x]` | M6 |
 | M9 | Add retrieval helpers that filter by project, topic, week range, source channel, and status before fallback search | `[x]` | M7 M8 |
-| M10 | Add CLI/debug output to inspect scoped evidence and recent decision history | `[ ]` | M9 |
+| M10 | Add CLI/debug output to inspect scoped evidence and recent decision history | `[x]` | M9 |
 
 ---
 
