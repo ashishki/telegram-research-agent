@@ -204,6 +204,8 @@ def _compact_channel_memory(channel_memory: dict[str, dict]) -> dict[str, dict]:
             "try_tags": int(item.get("try_tags") or 0),
             "interesting_tags": int(item.get("interesting_tags") or 0),
             "low_signal_tags": int(item.get("low_signal_tags") or 0),
+            "channel_score": float(item.get("channel_score") or 0.5),
+            "feedback_weight": float(item.get("feedback_weight") or 0.0),
         }
     return compact
 

@@ -51,6 +51,8 @@ TAG_PRIORITY = {
     "read_later": 4,
     "low_signal": 9,
 }
+DEFAULT_CHANNEL_FEEDBACK_BLEND = 0.25
+CHANNEL_TAG_HALF_LIFE_DAYS = 45.0
 
 
 # ---------------------------------------------------------------------------
@@ -166,7 +168,7 @@ def _clamp(value: float, lower: float = 0.0, upper: float = 1.0) -> float:
 def _fetch_user_preference_signals(
     conn: sqlite3.Connection,
     lookback_days: int = 120,
-) -> tuple[dict[int, str], dict[str, float]]:
+) -> tuple[dict[int, str], dict[str, float], dict[str, float]]:
     cutoff = (datetime.utcnow() - timedelta(days=lookback_days)).isoformat() + "Z"
     rows = conn.execute(
         """
@@ -185,17 +187,19 @@ def _fetch_user_preference_signals(
 
     post_tags: dict[int, list[str]] = defaultdict(list)
     channel_totals: dict[str, float] = defaultdict(float)
-    channel_counts: dict[str, int] = defaultdict(int)
+    channel_weights: dict[str, float] = defaultdict(float)
     for row in rows:
         post_id = int(row["post_id"])
         tag = str(row["tag"] or "")
         channel = str(row["channel_username"] or "")
+        recorded_at = str(row["recorded_at"] or "")
         if not tag:
             continue
         post_tags[post_id].append(tag)
         if channel:
-            channel_totals[channel] += TAG_WEIGHTS.get(tag, 0.0)
-            channel_counts[channel] += 1
+            decay = _feedback_decay_weight(recorded_at)
+            channel_totals[channel] += TAG_WEIGHTS.get(tag, 0.0) * decay
+            channel_weights[channel] += decay
 
     primary_tags = {
         post_id: sorted(tags, key=lambda item: TAG_PRIORITY.get(item, 99))[0]
@@ -203,12 +207,30 @@ def _fetch_user_preference_signals(
         if tags
     }
     channel_biases: dict[str, float] = {}
+    channel_scores: dict[str, float] = {}
     for channel, total in channel_totals.items():
-        count = channel_counts[channel]
-        average = total / max(count, 1)
-        confidence = min(1.0, count / 4.0)
+        weight = channel_weights[channel]
+        average = total / max(weight, 1e-6)
+        confidence = min(1.0, weight / 4.0)
         channel_biases[channel] = round(_clamp(average * confidence, -0.22, 0.22), 4)
-    return primary_tags, channel_biases
+        channel_scores[channel] = round(_clamp(0.5 + average * confidence * 1.5), 4)
+    return primary_tags, channel_biases, channel_scores
+
+
+def _feedback_decay_weight(recorded_at: str, half_life_days: float = CHANNEL_TAG_HALF_LIFE_DAYS) -> float:
+    if not recorded_at:
+        return 1.0
+    try:
+        normalized = recorded_at.replace("Z", "+00:00")
+        recorded_dt = datetime.fromisoformat(normalized)
+    except ValueError:
+        return 1.0
+    if recorded_dt.tzinfo is None:
+        recorded_dt = recorded_dt.replace(tzinfo=timezone.utc)
+    age_days = max(0.0, (datetime.now(timezone.utc) - recorded_dt.astimezone(timezone.utc)).total_seconds() / 86400.0)
+    if half_life_days <= 0:
+        return 1.0
+    return round(0.5 ** (age_days / half_life_days), 6)
 
 
 # ---------------------------------------------------------------------------
@@ -257,6 +279,8 @@ def _score_source_quality(
     channel_priority_weights: dict[str, float],
     downrank_sources: list[str],
     channels_config: dict,
+    channel_score: float | None = None,
+    channel_feedback_blend: float = DEFAULT_CHANNEL_FEEDBACK_BLEND,
 ) -> float:
     """
     Returns a score in [0, 1].
@@ -276,7 +300,11 @@ def _score_source_quality(
     base_weight = channel_priority_weights.get(priority, 0.6)
     max_views = channel_max_views.get(channel_username, 1)
     view_ratio = min(1.0, (view_count or 0) / max_views)
-    return round(base_weight * view_ratio, 4)
+    static_score = base_weight * view_ratio
+    if channel_score is None:
+        return round(static_score, 4)
+    blend = _clamp(channel_feedback_blend, 0.0, 1.0)
+    return round(static_score * (1.0 - blend) + float(channel_score) * blend, 4)
 
 
 def _fetch_latest_silhouette_score(conn: sqlite3.Connection) -> float:
@@ -428,6 +456,7 @@ def score_posts(
 
     weights = scoring_cfg.get("weights", {})
     channel_priority_weights = scoring_cfg.get("channel_priority_weights", {"high": 1.0, "medium": 0.6, "low": 0.2})
+    channel_feedback_blend = float(scoring_cfg.get("channel_feedback_blend", DEFAULT_CHANNEL_FEEDBACK_BLEND))
     depth_weights = scoring_cfg.get("technical_depth_weights", {})
     novelty_cfg = scoring_cfg.get("novelty", {})
     actionability_scores = scoring_cfg.get("actionability_scores", {})
@@ -478,7 +507,7 @@ def score_posts(
         channel_max_views = _fetch_channel_max_views(conn, since_days)
         coherence_score = _fetch_latest_silhouette_score(conn)
 
-        explicit_tags_by_post, channel_biases = _fetch_user_preference_signals(conn)
+        explicit_tags_by_post, channel_biases, channel_scores = _fetch_user_preference_signals(conn)
         scored_rows: list[tuple[float, str, float, str, str, str, float, float, str | None, str, int]] = []
 
         for post in posts:
@@ -494,6 +523,8 @@ def score_posts(
                     channel_priority_weights,
                     downrank_sources,
                     channels_config,
+                    channel_score=channel_scores.get(post["channel_username"]),
+                    channel_feedback_blend=channel_feedback_blend,
                 )
                 d_depth = _score_technical_depth(
                     post["has_code"],

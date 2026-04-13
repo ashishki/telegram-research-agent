@@ -217,6 +217,87 @@ class TestSignalReport(unittest.TestCase):
         self.assertIn("## Decisions to Consider", report)
         self.assertIn("- Consider:", report)
 
+    def test_reader_mode_excludes_project_insight_posts_from_additional_signals(self):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+            db_path = tmp.name
+
+        try:
+            with sqlite3.connect(db_path) as connection:
+                connection.executescript(
+                    """
+                    CREATE TABLE user_post_tags (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        post_id INTEGER NOT NULL,
+                        tag TEXT NOT NULL,
+                        note TEXT,
+                        recorded_at TEXT NOT NULL
+                    );
+                    """
+                )
+                connection.commit()
+
+            posts = [
+                {
+                    "id": 1,
+                    "content": "Project security signal",
+                    "signal_score": 0.81,
+                    "bucket": "watch",
+                    "routed_model": "m1",
+                    "score_breakdown": "{}",
+                    "message_url": "https://t.me/test/1",
+                    "channel_username": "@test",
+                },
+                {
+                    "id": 2,
+                    "content": "Secondary workflow signal",
+                    "signal_score": 0.74,
+                    "bucket": "watch",
+                    "routed_model": "m2",
+                    "score_breakdown": "{}",
+                    "message_url": "https://t.me/test/2",
+                    "channel_username": "@test",
+                },
+            ]
+
+            class _Settings:
+                def __init__(self, path: str):
+                    self.db_path = path
+
+            judged = {
+                1: {
+                    "include": True,
+                    "category": "interesting",
+                    "title": "Project-only signal",
+                    "key_takeaway": "Important for one project.",
+                    "why_now": "Needs action now.",
+                    "project_name": "gdev-agent",
+                    "project_application": "Add security guardrails.",
+                    "confidence": 0.9,
+                },
+                2: {
+                    "include": True,
+                    "category": "interesting",
+                    "title": "Additional signal",
+                    "key_takeaway": "Separate item.",
+                    "why_now": "Still useful.",
+                    "project_name": "",
+                    "project_application": "",
+                    "confidence": 0.7,
+                },
+            }
+
+            with patch("output.signal_report._load_projects", return_value=[{"name": "gdev-agent"}]):
+                with patch("output.signal_report._load_profile", return_value={}):
+                    with patch("output.signal_report.judge_recent_posts", return_value=judged):
+                        report = format_signal_report(posts, settings=_Settings(db_path), reader_mode=True)
+
+            self.assertIn("## Project Insights", report)
+            self.assertIn("## Additional Signals", report)
+            self.assertEqual(report.count("**Project-only signal**"), 1)
+            self.assertEqual(report.count("**Additional signal**"), 1)
+        finally:
+            os.unlink(db_path)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -349,11 +349,12 @@ def _build_project_sections(
     projects: list[dict] | None,
     tag_details_by_post: dict[int, list[dict[str, str]]],
     judged_by_post: dict[int, dict],
-) -> list[str]:
+) -> tuple[list[str], set[int]]:
     if not projects:
-        return ["No project-specific signals this week."]
+        return ["No project-specific signals this week."], set()
 
     grouped: dict[str, list[str]] = {}
+    used_post_ids: set[int] = set()
     for post in posts:
         post_id = int(post.get("id") or 0)
         primary_tag = _highest_priority_tag(tag_details_by_post.get(post_id, []))
@@ -362,6 +363,7 @@ def _build_project_sections(
         judged = _judged(post_id, judged_by_post)
         judged_project = str(judged.get("project_name") or "").strip()
         if judged_project:
+            used_post_ids.add(post_id)
             grouped.setdefault(judged_project, []).append(
                 _render_signal(
                     post,
@@ -377,6 +379,7 @@ def _build_project_sections(
             score = float(match.get("score") or 0.0)
             if score < 0.30:
                 continue
+            used_post_ids.add(post_id)
             project_name = str(match.get("name") or "unknown")
             rationale = str(match.get("rationale") or "").strip()
             note = _note_for_tag(tag_details_by_post.get(post_id, []), primary_tag or "")
@@ -386,7 +389,7 @@ def _build_project_sections(
             )
 
     if not grouped:
-        return ["No project-specific signals this week."]
+        return ["No project-specific signals this week."], set()
 
     lines: list[str] = []
     for project_name in sorted(grouped):
@@ -394,18 +397,22 @@ def _build_project_sections(
             lines.append("")
         lines.append(f"**{project_name}**")
         lines.extend(grouped[project_name][:4])
-    return lines
+    return lines, used_post_ids
 
 
 def _build_auto_watch_lines(
     posts: list[dict],
     tag_details_by_post: dict[int, list[dict[str, str]]],
     judged_by_post: dict[int, dict],
+    excluded_post_ids: set[int] | None = None,
     limit: int = 4,
 ) -> list[str]:
     lines: list[str] = []
+    excluded = excluded_post_ids or set()
     for post in posts:
         post_id = int(post.get("id") or 0)
+        if post_id in excluded:
+            continue
         primary_tag = _highest_priority_tag(tag_details_by_post.get(post_id, []))
         judged = _judged(post_id, judged_by_post)
         if primary_tag in {"strong", "try_in_project", "interesting", "funny", "low_signal"}:
@@ -452,8 +459,13 @@ def format_signal_report(posts: list[dict], settings=None, *, reader_mode: bool 
     bucket_counts = Counter((post.get("bucket") or "noise") for post in posts)
 
     manual_sections = _build_manual_sections(visible_posts, tag_details_by_post, judged_by_post)
-    project_lines = _build_project_sections(visible_posts, projects, tag_details_by_post, judged_by_post)
-    auto_watch_lines = _build_auto_watch_lines(visible_posts, tag_details_by_post, judged_by_post)
+    project_lines, project_post_ids = _build_project_sections(visible_posts, projects, tag_details_by_post, judged_by_post)
+    auto_watch_lines = _build_auto_watch_lines(
+        visible_posts,
+        tag_details_by_post,
+        judged_by_post,
+        excluded_post_ids=project_post_ids,
+    )
     what_changed_lines = _build_what_changed_lines(bucket_counts)
 
     sections: list[str] = []

@@ -23,6 +23,11 @@ channel_priority_weights:
   medium: 0.6
   low: 0.2
 
+# Blend of dynamic channel_score from user feedback into source_quality.
+# 0.0 = only static channel priority and views
+# 1.0 = only user-shaped channel feedback
+channel_feedback_blend: 0.25
+
 # technical_depth sub-weights (must sum to 1.0)
 technical_depth_weights:
   has_code: 0.35        # Binary: code block detected in post

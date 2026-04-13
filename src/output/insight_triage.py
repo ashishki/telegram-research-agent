@@ -54,6 +54,13 @@ def _normalize_fingerprint(title: str) -> str:
     return " ".join(tokens)
 
 
+def _extract_project_key(title: str) -> str:
+    match = re.match(r"\[(?:Implement|Build)\]\s+([^—\-]+)", title.strip(), re.IGNORECASE)
+    if not match:
+        return ""
+    return _normalize_fingerprint(match.group(1))
+
+
 def _detect_idea_type(header: str) -> str:
     lower = header.lower()
     if "[implement]" in lower:
@@ -194,6 +201,103 @@ def classify_insight(
     )
 
 
+def _dedupe_triaged_insights(insights: list[TriagedInsight]) -> list[TriagedInsight]:
+    """
+    Keep only the first insight for each source URL and normalized title.
+
+    The LLM can emit multiple ideas from one cited Telegram post. That makes the
+    delivered report feel repetitive and inflates triage memory with near-duplicates.
+    """
+    deduped: list[TriagedInsight] = []
+    seen_sources: set[str] = set()
+    seen_titles: set[str] = set()
+
+    for insight in insights:
+        normalized_title = _normalize_fingerprint(insight.title)
+        normalized_source = insight.source_url.strip().lower()
+
+        if normalized_title and normalized_title in seen_titles:
+            continue
+        if normalized_source and normalized_source in seen_sources:
+            continue
+
+        deduped.append(insight)
+        if normalized_title:
+            seen_titles.add(normalized_title)
+        if normalized_source:
+            seen_sources.add(normalized_source)
+
+    return deduped
+
+
+def _select_reportable_insights(insights: list[TriagedInsight], max_total: int = 3) -> list[TriagedInsight]:
+    """
+    Prefer distinct, evidence-backed ideas over exhaustiveness.
+
+    Rules:
+    - better fewer items than weak padding
+    - prefer implement/do_now ideas over backlog/build ideas
+    - max 2 do_now items and max 1 backlog item
+    - avoid repeating the same project within do_now when possible
+    """
+    if not insights:
+        return []
+
+    reportable = [
+        item
+        for item in insights
+        if item.source_url.strip() and item.idea_type in {"implement", "build"}
+    ]
+    if not reportable:
+        return []
+
+    priority = {"do_now": 0, "backlog": 1, "reject_or_defer": 2}
+    ordered = sorted(
+        reportable,
+        key=lambda item: (
+            priority.get(item.recommendation, 9),
+            0 if item.idea_type == "implement" else 1,
+        ),
+    )
+
+    selected: list[TriagedInsight] = []
+    selected_sources: set[str] = set()
+    selected_projects: set[str] = set()
+    do_now_count = 0
+    backlog_count = 0
+
+    for insight in ordered:
+        source_key = insight.source_url.strip().lower()
+        project_key = _extract_project_key(insight.title)
+
+        if source_key in selected_sources:
+            continue
+        if insight.recommendation == "do_now":
+            if do_now_count >= 2:
+                continue
+            if project_key and project_key in selected_projects:
+                continue
+        elif insight.recommendation == "backlog":
+            if backlog_count >= 1:
+                continue
+        else:
+            continue
+
+        selected.append(insight)
+        selected_sources.add(source_key)
+        if insight.recommendation == "do_now":
+            do_now_count += 1
+            if project_key:
+                selected_projects.add(project_key)
+        elif insight.recommendation == "backlog":
+            backlog_count += 1
+
+        if len(selected) >= max_total:
+            break
+
+    return selected
+
+
 def load_rejection_fingerprints(connection: sqlite3.Connection) -> set[str]:
     """Load active rejection memory fingerprints (within REJECTION_MEMORY_WEEKS)."""
     cutoff = (
@@ -301,6 +405,7 @@ def triage_insights(
         )
         insights.append(insight)
 
+    insights = _select_reportable_insights(_dedupe_triaged_insights(insights))
     store_triage_results(connection, week_label, insights)
     update_rejection_memory(connection, insights)
 

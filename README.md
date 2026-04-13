@@ -21,6 +21,7 @@ A private, production-ready pipeline that runs on a personal VPS and processes T
 - a unified decision-continuity log (`decision_journal`) covering signal feedback, insight triage, and study-plan completion
 - an insight triage workflow that separates do-now ideas from backlog and reject/defer noise, with repeated-idea suppression
 - persistent channel memory and project context snapshots refreshed from GitHub + linked signal counts
+- dynamic channel scoring shaped by time-decayed manual feedback, not just static channel priority
 - a weekly Telegraph brief plus a tracked study loop informed by acted-on evidence
 - a cost-aware, explainable AI workflow with feedback capture and scope-first memory retrieval
 
@@ -43,7 +44,7 @@ Design reference: `docs/memory_architecture.md` | Operator guide: `docs/memory_i
 
 I follow 40+ Telegram channels — 300–500 posts/week. Most digest tools summarize everything; this system filters first, then synthesizes selectively. The base layer is still deterministic scoring, but the final weekly brief is now shaped by manual tags and a preference-judge pass that learns what I treat as strong, useful, project-relevant, funny, or low-signal. Cost is measured per category and tracked in SQLite.
 
-The output is not a summary. It's a structured decision-support brief with source traceability, project-specific ideas, and a weekly study plan that compounds over time. Delivered as two Telegraph articles inside Telegram with short notifications.
+The output is not a summary. It's a structured decision-support brief with source traceability, project-specific ideas, and a weekly study plan that compounds over time. `Implementation Ideas` is intentionally sparse: it should produce only the strongest 2-3 moves, and fewer if the evidence is weak. Delivered as two Telegraph articles inside Telegram with short notifications.
 
 Full case study: `docs/case-study.md` | Demo walkthrough: `docs/demo-walkthrough.md`
 
@@ -55,11 +56,11 @@ Full case study: `docs/case-study.md` | Demo walkthrough: `docs/demo-walkthrough
 
 1. **Ingests** new Telegram posts from configured channels via Telethon (MTProto)
 2. **Preprocesses** — normalizes text, extracts structure (code, links, word count), assigns TF-IDF topic clusters
-3. **Scores** every post with a deterministic 5-dimension formula plus preference bias from manual tags
+3. **Scores** every post with a deterministic 5-dimension formula plus preference bias from manual tags and a dynamic `channel_score`
 4. **Records evidence** — strong/watch posts and manually tagged posts are written to `signal_evidence_items` with source channel, Telegram link, excerpt, and selection reason
 5. **Routes** posts to model tiers and a preference-judge layer for reader-facing selection; the judge sees scoped project evidence from the last 3 weeks
 6. **Formats** a decision brief with source links, project insights, and study cues; when a signal has a project application, the source line shows the originating channel
-7. **Triages** generated implementation ideas into do-now, backlog, and reject/defer buckets; triage outcomes are written to `decision_journal`
+7. **Triages** generated implementation ideas into do-now, backlog, and reject/defer buckets; duplicate source reuse is suppressed and the final list prefers 1-2 strong project improvements over filler
 8. **Records decisions** — signal feedback (acted_on / skipped / marked_important), insight triage, and study-plan completion are all written to `decision_journal` as a unified continuity log
 9. **Renders** the review as an HTML document
 10. **Publishes** two Telegraph articles: `Research Brief` and `Implementation Ideas`
@@ -103,6 +104,7 @@ signal_score = personal_interest×0.30 + source_quality×0.20 + technical_depth�
 Then the system adds:
 - manual tag overrides on explicitly rated posts
 - channel/source preference bias inferred from the user's historical tags
+- a time-decayed `channel_score` blended into `source_quality`, so fresh feedback matters more than stale feedback
 - a `user_adjusted_score` stored on each post
 - a `preference_judge` LLM layer that writes the reader-facing "Why" and project angle for the weekly brief
 - `channel_memory` and `project_context_snapshots` so the judge sees what each source tends to be good at and what each active project is currently doing
@@ -198,8 +200,11 @@ Mark signals inline from Telegram:
 Manual tags are not just annotations. They are used to:
 - override explicit post ranking where needed
 - shift learned channel/source bias over time
+- update per-channel memory and a dynamic `channel_score` with time decay
 - seed the weekly preference judge
 - shape the study plan and future recommendations
+
+`channels.yaml` still defines the static baseline (`high` / `medium` / `low`), but it is no longer the only channel-quality signal. Recent `strong` / `try` / `interesting` / `low_signal` tags now move channel preference dynamically.
 
 Analyze your feedback to get boost topic suggestions:
 ```bash
@@ -265,11 +270,12 @@ System capabilities summary:
 - HTML render + Telegraph publish (fallback: file attachment)
 - project relevance with explicit keyword lists and exclusion suppression
 - manual tagging (`/tag`, `/mark_strong`, `/mark_try`, etc.) plus acted_on/skipped feedback
+- time-decayed channel scoring blended into source quality and exposed through `channel_memory`
 - preference judge for reader-facing ranking and project-aware rationale, now seeded with scoped evidence from `signal_evidence_items`
 - completion-aware weekly study plan with `/study_done`, now incorporating acted-on evidence from `decision_journal`
 - incremental project context snapshots derived from GitHub sync, recent commits, and linked signal counts
 - observability: cost trends, score distribution trends, enriched health-check
-- insight triage layer: deterministic do_now / backlog / reject_or_defer classification with 4-week rejection memory
+- insight triage layer: deterministic do_now / backlog / reject_or_defer classification with 4-week rejection memory, unique-source filtering, and a stronger preference for current-project improvements
 - **Tier 3 — verbatim evidence memory**: `signal_evidence_items` records curated strong/manual-tag signals with provenance per week and project
 - **Tier 4 — decision continuity**: `decision_journal` unifies all acted-on, ignored, deferred, rejected, and completed decisions in one append-only log
 - **memory CLI**: `inspect-evidence`, `inspect-decisions`, `inspect-snapshots`, `inspect-suppression` subcommands for operator debugging

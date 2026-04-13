@@ -1,6 +1,7 @@
 import json
 import logging
 import sqlite3
+from collections import defaultdict
 from datetime import datetime, timezone
 
 
@@ -11,40 +12,100 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def _feedback_decay_weight(recorded_at: str, half_life_days: float = 45.0) -> float:
+    if not recorded_at:
+        return 1.0
+    try:
+        normalized = recorded_at.replace("Z", "+00:00")
+        recorded_dt = datetime.fromisoformat(normalized)
+    except ValueError:
+        return 1.0
+    if recorded_dt.tzinfo is None:
+        recorded_dt = recorded_dt.replace(tzinfo=timezone.utc)
+    age_days = max(0.0, (datetime.now(timezone.utc) - recorded_dt.astimezone(timezone.utc)).total_seconds() / 86400.0)
+    return round(0.5 ** (age_days / max(half_life_days, 1.0)), 6)
+
+
 def refresh_channel_memory(connection: sqlite3.Connection) -> None:
     try:
         rows = connection.execute(
             """
             SELECT
                 p.channel_username,
-                SUM(CASE WHEN upt.tag IN ('strong', 'try_in_project', 'interesting') THEN 1 ELSE 0 END) AS positive_tags,
-                SUM(CASE WHEN upt.tag = 'low_signal' THEN 1 ELSE 0 END) AS negative_tags,
-                SUM(CASE WHEN upt.tag = 'strong' THEN 1 ELSE 0 END) AS strong_tags,
-                SUM(CASE WHEN upt.tag = 'try_in_project' THEN 1 ELSE 0 END) AS try_tags,
-                SUM(CASE WHEN upt.tag = 'interesting' THEN 1 ELSE 0 END) AS interesting_tags,
-                SUM(CASE WHEN upt.tag = 'funny' THEN 1 ELSE 0 END) AS funny_tags,
-                SUM(CASE WHEN upt.tag = 'low_signal' THEN 1 ELSE 0 END) AS low_signal_tags,
-                SUM(CASE WHEN upt.tag = 'read_later' THEN 1 ELSE 0 END) AS read_later_tags
+                upt.tag,
+                upt.recorded_at
             FROM user_post_tags upt
             INNER JOIN posts p ON p.id = upt.post_id
-            GROUP BY p.channel_username
+            ORDER BY p.channel_username ASC
             """
         ).fetchall()
     except sqlite3.Error:
         LOGGER.warning("Failed to refresh channel memory", exc_info=True)
         return
+    tag_weights = {
+        "strong": 0.28,
+        "try_in_project": 0.20,
+        "interesting": 0.14,
+        "funny": 0.04,
+        "read_later": 0.08,
+        "low_signal": -0.35,
+    }
+    stats: dict[str, dict[str, float]] = defaultdict(
+        lambda: {
+            "positive_tags": 0.0,
+            "negative_tags": 0.0,
+            "strong_tags": 0.0,
+            "try_tags": 0.0,
+            "interesting_tags": 0.0,
+            "funny_tags": 0.0,
+            "low_signal_tags": 0.0,
+            "read_later_tags": 0.0,
+            "weighted_total": 0.0,
+            "feedback_weight": 0.0,
+        }
+    )
+    for row in rows:
+        channel = str(row["channel_username"] or "")
+        tag = str(row["tag"] or "")
+        if not channel or not tag:
+            continue
+        decay = _feedback_decay_weight(str(row["recorded_at"] or ""))
+        item = stats[channel]
+        item["weighted_total"] += tag_weights.get(tag, 0.0) * decay
+        item["feedback_weight"] += decay
+        if tag in {"strong", "try_in_project", "interesting"}:
+            item["positive_tags"] += decay
+        if tag == "low_signal":
+            item["negative_tags"] += decay
+        if tag == "strong":
+            item["strong_tags"] += decay
+        elif tag == "try_in_project":
+            item["try_tags"] += decay
+        elif tag == "interesting":
+            item["interesting_tags"] += decay
+        elif tag == "funny":
+            item["funny_tags"] += decay
+        elif tag == "low_signal":
+            item["low_signal_tags"] += decay
+        elif tag == "read_later":
+            item["read_later_tags"] += decay
     now = _utc_now_iso()
     connection.execute("BEGIN")
-    for row in rows:
-        strong_tags = int(row["strong_tags"] or 0)
-        try_tags = int(row["try_tags"] or 0)
-        interesting_tags = int(row["interesting_tags"] or 0)
-        funny_tags = int(row["funny_tags"] or 0)
-        low_signal_tags = int(row["low_signal_tags"] or 0)
-        read_later_tags = int(row["read_later_tags"] or 0)
-        positive_tags = int(row["positive_tags"] or 0)
-        negative_tags = int(row["negative_tags"] or 0)
+    for channel_username, row in stats.items():
+        strong_tags = int(round(row["strong_tags"]))
+        try_tags = int(round(row["try_tags"]))
+        interesting_tags = int(round(row["interesting_tags"]))
+        funny_tags = int(round(row["funny_tags"]))
+        low_signal_tags = int(round(row["low_signal_tags"]))
+        read_later_tags = int(round(row["read_later_tags"]))
+        positive_tags = int(round(row["positive_tags"]))
+        negative_tags = int(round(row["negative_tags"]))
+        feedback_weight = float(row["feedback_weight"] or 0.0)
+        average = float(row["weighted_total"] or 0.0) / max(feedback_weight, 1e-6)
+        confidence = min(1.0, feedback_weight / 4.0)
+        channel_score = max(0.0, min(1.0, 0.5 + average * confidence * 1.5))
         summary_parts: list[str] = []
+        summary_parts.append(f"channel score {channel_score:.2f}")
         if strong_tags:
             summary_parts.append(f"strong source for high-value signals ({strong_tags})")
         if try_tags:
@@ -71,9 +132,11 @@ def refresh_channel_memory(connection: sqlite3.Connection) -> None:
                 funny_tags,
                 low_signal_tags,
                 read_later_tags,
+                channel_score,
+                feedback_weight,
                 updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(channel_username) DO UPDATE SET
                 summary = excluded.summary,
                 positive_tags = excluded.positive_tags,
@@ -84,10 +147,12 @@ def refresh_channel_memory(connection: sqlite3.Connection) -> None:
                 funny_tags = excluded.funny_tags,
                 low_signal_tags = excluded.low_signal_tags,
                 read_later_tags = excluded.read_later_tags,
+                channel_score = excluded.channel_score,
+                feedback_weight = excluded.feedback_weight,
                 updated_at = excluded.updated_at
             """,
             (
-                str(row["channel_username"] or ""),
+                channel_username,
                 summary,
                 positive_tags,
                 negative_tags,
@@ -97,6 +162,8 @@ def refresh_channel_memory(connection: sqlite3.Connection) -> None:
                 funny_tags,
                 low_signal_tags,
                 read_later_tags,
+                round(channel_score, 4),
+                round(feedback_weight, 4),
                 now,
             ),
         )
@@ -112,7 +179,10 @@ def load_channel_memory(connection: sqlite3.Connection, channels: list[str]) -> 
         rows = connection.execute(
             f"""
             SELECT channel_username, summary, positive_tags, negative_tags, strong_tags, try_tags,
-                   interesting_tags, funny_tags, low_signal_tags, read_later_tags, updated_at
+                   interesting_tags, funny_tags, low_signal_tags, read_later_tags,
+                   COALESCE(channel_score, 0.5) AS channel_score,
+                   COALESCE(feedback_weight, 0.0) AS feedback_weight,
+                   updated_at
             FROM channel_memory
             WHERE channel_username IN ({placeholders})
             """,
@@ -132,6 +202,8 @@ def load_channel_memory(connection: sqlite3.Connection, channels: list[str]) -> 
             "funny_tags": int(row["funny_tags"] or 0),
             "low_signal_tags": int(row["low_signal_tags"] or 0),
             "read_later_tags": int(row["read_later_tags"] or 0),
+            "channel_score": float(row["channel_score"] or 0.5),
+            "feedback_weight": float(row["feedback_weight"] or 0.0),
             "updated_at": str(row["updated_at"] or ""),
         }
         for row in rows

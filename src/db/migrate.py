@@ -250,6 +250,8 @@ def run_migrations() -> Path:
                 funny_tags INTEGER NOT NULL DEFAULT 0,
                 low_signal_tags INTEGER NOT NULL DEFAULT 0,
                 read_later_tags INTEGER NOT NULL DEFAULT 0,
+                channel_score REAL NOT NULL DEFAULT 0.5,
+                feedback_weight REAL NOT NULL DEFAULT 0.0,
                 updated_at TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS project_context_snapshots (
@@ -270,6 +272,15 @@ def run_migrations() -> Path:
                 ON project_context_snapshots(updated_at);
             """
         )
+        for stmt in [
+            "ALTER TABLE channel_memory ADD COLUMN channel_score REAL NOT NULL DEFAULT 0.5",
+            "ALTER TABLE channel_memory ADD COLUMN feedback_weight REAL NOT NULL DEFAULT 0.0",
+        ]:
+            try:
+                connection.execute(stmt)
+            except sqlite3.OperationalError as exc:
+                if "duplicate column name" not in str(exc).lower():
+                    raise
         # Phase 6v3: insight triage layer
         connection.executescript(
             """

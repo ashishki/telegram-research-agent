@@ -17,7 +17,7 @@ from unittest.mock import patch
 
 from config.settings import Settings
 from db.migrate import run_migrations
-from processing.score_posts import _is_cultural, _score_personal_interest
+from processing.score_posts import _fetch_user_preference_signals, _is_cultural, _score_personal_interest
 from processing.score_posts import score_posts
 
 
@@ -303,6 +303,45 @@ class TestScorePostsPersistence(unittest.TestCase):
 
         self.assertIsNotNone(row[0])
         self.assertGreaterEqual(row[0], 0.0)
+
+    def test_recent_channel_feedback_outweighs_old_feedback(self):
+        now_iso = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        old_iso = datetime(2025, 1, 1, tzinfo=timezone.utc).isoformat().replace("+00:00", "Z")
+
+        with sqlite3.connect(self.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            connection.execute(
+                "INSERT INTO user_post_tags (post_id, tag, note, recorded_at) VALUES (?, ?, ?, ?)",
+                (1, "strong", "", now_iso),
+            )
+            connection.execute(
+                """
+                INSERT INTO raw_posts (
+                    id, channel_username, channel_id, message_id, posted_at, text, media_type,
+                    media_caption, forward_from, view_count, message_url, raw_json, ingested_at, image_description
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (2, "@signal", 1001, 5002, now_iso, "Old post body", None, None, None, 80, None, "{}", now_iso, None),
+            )
+            connection.execute(
+                """
+                INSERT INTO posts (
+                    id, raw_post_id, channel_username, posted_at, content, url_count, has_code,
+                    language_detected, word_count, normalized_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (2, 2, "@signal", now_iso, "Older low signal post", 0, 0, "en", 20, now_iso),
+            )
+            connection.execute(
+                "INSERT INTO user_post_tags (post_id, tag, note, recorded_at) VALUES (?, ?, ?, ?)",
+                (2, "low_signal", "", old_iso),
+            )
+            connection.commit()
+
+            _, channel_biases, channel_scores = _fetch_user_preference_signals(connection)
+
+        self.assertGreater(channel_biases["@signal"], 0.0)
+        self.assertGreater(channel_scores["@signal"], 0.5)
 
 
 class TestBucketDistributionEvals(unittest.TestCase):

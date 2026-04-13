@@ -1,7 +1,7 @@
 # Architecture
 
-**Version:** 6.0
-**Date:** 2026-04-08
+**Version:** 6.1
+**Date:** 2026-04-13
 
 ---
 
@@ -26,7 +26,7 @@ Telegram ingestion
 
 Cross-cutting:
   project snapshots
-  channel memory
+  channel memory + dynamic channel_score
   scope-first evidence retrieval
   cost + health observability
   memory CLI inspection
@@ -36,8 +36,10 @@ What the system provides:
 
 - canonical post storage and scoring
 - explicit preference capture
+- dynamic per-channel preference with time decay blended into source scoring
 - project-aware outputs
 - rejection memory for weak implementation ideas
+- stricter implementation-idea selection: unique source usage, fewer stronger items, preference for current-project improvements
 - verbatim evidence layer: `signal_evidence_items` records curated post excerpts with provenance per week and project scope
 - decision continuity: `decision_journal` unifies signal feedback, insight triage, and study completion in one append-only log
 - scope-first retrieval: all weekly generators query by project → week → source before broader fallback
@@ -65,7 +67,7 @@ Stored in SQLite and treated as source of truth:
 
 Refreshable working context:
 
-- `channel_memory`
+- `channel_memory` including a dynamic `channel_score` and weighted feedback strength
 - project snapshots from config + GitHub deltas + linked signals
 
 These are bounded summaries, not canonical facts.

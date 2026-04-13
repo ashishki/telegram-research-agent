@@ -32,6 +32,8 @@ Expected time to read: 10–15 minutes.
 - `do now` ideas are candidate implementation moves for the current working horizon
 - `backlog` ideas are useful but not urgent
 - `reject/defer` ideas should be remembered and suppressed from repeating unchanged
+- the list should stay sparse: prefer 1-2 strong project improvements and at most 1 new build idea
+- if the week is weak, fewer ideas is the correct outcome
 
 ---
 
@@ -50,11 +52,12 @@ Mark posts directly from Telegram with either a numeric `post_id` or a full Tele
 These tags are used to:
 - override explicitly rated posts
 - shift learned channel/source bias over time
+- update dynamic per-channel preference with time decay, so recent signals matter more than old ones
 - guide the weekly preference judge
 - influence project insights and the next study plan
 
 The system also maintains:
-- `channel_memory` derived from your tag history
+- `channel_memory` derived from your tag history, including a dynamic `channel_score`
 - `project_context_snapshots` derived from GitHub sync and recent commit deltas
 
 That lets the brief explain more directly in the article and reduces the need to open the original Telegram post.
@@ -129,6 +132,7 @@ Once a month, review:
    - Dead projects generate false positives in Project Relevance section
 
 5. **Implementation Ideas quality** — review whether weekly ideas are operationally useful or drifting into speculative abstractions
+   - The target shape is small and strong: usually 2 project improvements, sometimes 1 extra build idea, never filler
    - If too many ideas feel like premature SDK/product extraction, they should move to backlog or reject/defer memory
    - Repeated weak ideas should not resurface every week without new evidence
 
@@ -162,7 +166,7 @@ The system has no ML model to retrain. Tuning is explicit and auditable:
 | Too much noise in strong | Raise `strong.min_score` | `scoring.yaml` |
 | Missing relevant posts | Add topics to `boost_topics` | `profile.yaml` |
 | Wrong source getting boosted | Change channel priority | `channels.yaml` |
-| Wrong source repeatedly rated well/badly | Tag more posts from that source and let channel bias adapt | Telegram bot + `user_post_tags` |
+| Wrong source repeatedly rated well/badly | Tag more posts from that source and let channel bias + channel_score adapt | Telegram bot + `user_post_tags` |
 | Topic showing up despite downrank | Check if topic label matches exactly | `profile.yaml` |
 | Project relevance too broad | Make `focus` field more specific | `projects.yaml` |
 | Project relevance too narrow | Add more keyword variants to `focus` | `projects.yaml` |
@@ -179,7 +183,7 @@ The system captures lightweight feedback and explicit tags without automatic pro
 **How it works:**
 1. You read the weekly `Research Brief` and `Implementation Ideas` (Telegraph articles, or HTML file for the research brief fallback)
 2. Tag or mark signals directly from Telegram
-3. The next scoring run updates explicit overrides and channel/source bias
+3. The next scoring run updates explicit overrides, channel/source bias, and a time-decayed `channel_score`
 4. The weekly preference judge uses those examples to reshape the final brief
 5. `tune-suggestions` can still surface profile topic candidates, but manual tags are now the primary signal
 
@@ -188,7 +192,7 @@ The system captures lightweight feedback and explicit tags without automatic pro
 **Current limitations:**
 - Preference bias is source-aware, but not yet a full ML ranking model
 - Study completion is tracked at the weekly-plan level, not per individual block
-- Project insights still benefit from stronger prompts and more labeled examples
+- Project relevance still depends on good project context and evidence quality; low-signal weeks should produce fewer ideas, not forced ones
 
 ## Project Context Maintenance
 

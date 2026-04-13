@@ -9,6 +9,8 @@ from output.insight_triage import (
     store_triage_results,
     triage_insights,
     update_rejection_memory,
+    _dedupe_triaged_insights,
+    _select_reportable_insights,
     _normalize_fingerprint,
     TriagedInsight,
 )
@@ -256,6 +258,136 @@ class TestStoreTriage(unittest.TestCase):
         ).fetchone()
         self.assertEqual(rows[0], 2)
 
+
+class TestInsightDedupe(unittest.TestCase):
+    def test_dedupe_keeps_first_item_per_source_url(self):
+        insights = [
+            TriagedInsight(
+                title="[Implement] Project A — First idea",
+                summary="Use this signal.",
+                source_url="https://t.me/chan/1",
+                idea_type="implement",
+                timing="now",
+                implementation_mode="extend",
+                confidence="high",
+                evidence_strength="strong",
+                main_risk="low",
+                recommendation="do_now",
+                reason="direct improvement",
+            ),
+            TriagedInsight(
+                title="[Implement] Project B — Second idea",
+                summary="Same source reused.",
+                source_url="https://t.me/chan/1",
+                idea_type="implement",
+                timing="now",
+                implementation_mode="extend",
+                confidence="high",
+                evidence_strength="strong",
+                main_risk="low",
+                recommendation="do_now",
+                reason="direct improvement",
+            ),
+        ]
+
+        deduped = _dedupe_triaged_insights(insights)
+
+        self.assertEqual(len(deduped), 1)
+        self.assertEqual(deduped[0].title, "[Implement] Project A — First idea")
+
+    def test_selection_prefers_two_distinct_implement_and_one_build(self):
+        insights = [
+            TriagedInsight(
+                title="[Implement] Project A — First idea",
+                summary="Use this signal.",
+                source_url="https://t.me/chan/1",
+                idea_type="implement",
+                timing="now",
+                implementation_mode="extend",
+                confidence="high",
+                evidence_strength="strong",
+                main_risk="low",
+                recommendation="do_now",
+                reason="direct improvement",
+            ),
+            TriagedInsight(
+                title="[Implement] Project A — Second idea",
+                summary="Same project should be skipped.",
+                source_url="https://t.me/chan/2",
+                idea_type="implement",
+                timing="now",
+                implementation_mode="extend",
+                confidence="high",
+                evidence_strength="strong",
+                main_risk="low",
+                recommendation="do_now",
+                reason="direct improvement",
+            ),
+            TriagedInsight(
+                title="[Implement] Project B — Third idea",
+                summary="Second distinct project.",
+                source_url="https://t.me/chan/3",
+                idea_type="implement",
+                timing="now",
+                implementation_mode="extend",
+                confidence="high",
+                evidence_strength="strong",
+                main_risk="low",
+                recommendation="do_now",
+                reason="direct improvement",
+            ),
+            TriagedInsight(
+                title="[Build] New Tool — Exploration",
+                summary="Only one build should remain.",
+                source_url="https://t.me/chan/4",
+                idea_type="build",
+                timing="quarter",
+                implementation_mode="new",
+                confidence="medium",
+                evidence_strength="moderate",
+                main_risk="distraction",
+                recommendation="backlog",
+                reason="new project concept",
+            ),
+        ]
+
+        selected = _select_reportable_insights(insights)
+
+        self.assertEqual(len(selected), 3)
+        self.assertEqual([item.title for item in selected], [
+            "[Implement] Project A — First idea",
+            "[Implement] Project B — Third idea",
+            "[Build] New Tool — Exploration",
+        ])
+
+    def test_triage_pipeline_stores_only_one_record_for_duplicate_source(self):
+        conn = _make_triage_db()
+        try:
+            html = (
+                "<b>💡 Инсайты недели</b>\n\n"
+                '<b>[Implement] Project A — First idea</b>\n'
+                "Body one.\n"
+                '<a href="https://t.me/chan/1">источник</a>\n\n'
+                '<b>[Implement] Project B — Second idea</b>\n'
+                "Body two.\n"
+                '<a href="https://t.me/chan/1">источник</a>\n\n'
+                '<b>[Build] New Tool — Third idea</b>\n'
+                "Body three.\n"
+                '<a href="https://t.me/chan/2">источник</a>'
+            )
+
+            insights = triage_insights(html, conn, "2026-W16")
+            conn.commit()
+
+            rows = conn.execute(
+                "SELECT title, source_url FROM insight_triage_records WHERE week_label = '2026-W16'"
+            ).fetchall()
+
+            self.assertEqual(len(insights), 2)
+            self.assertEqual(len(rows), 2)
+            self.assertEqual(rows[0][0], "[Implement] Project A — First idea")
+        finally:
+            conn.close()
 
 # ---------------------------------------------------------------------------
 # triage_insights (full pipeline)
