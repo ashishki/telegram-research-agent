@@ -60,7 +60,7 @@ def _normalize_fingerprint(title: str) -> str:
 
 
 def _extract_project_key(title: str) -> str:
-    match = re.match(r"\[(?:Implement|Build)\]\s+([^—\-]+)", title.strip(), re.IGNORECASE)
+    match = re.match(r"\[(?:Implement|Build)\]\s+(.+?)\s+[—–-]\s+", title.strip(), re.IGNORECASE)
     if not match:
         return ""
     return _normalize_fingerprint(match.group(1))

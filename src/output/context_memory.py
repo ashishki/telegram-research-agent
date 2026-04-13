@@ -3,13 +3,56 @@ import logging
 import sqlite3
 from collections import defaultdict
 from datetime import datetime, timezone
+from pathlib import Path
+
+import yaml
 
 
 LOGGER = logging.getLogger(__name__)
+PROJECTS_YAML_PATH = Path(__file__).resolve().parents[1] / "config" / "projects.yaml"
 
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _current_week_label() -> str:
+    year, week, _ = datetime.now(timezone.utc).isocalendar()
+    return f"{year}-W{week:02d}"
+
+
+def _load_curated_project_configs() -> list[dict]:
+    try:
+        data = yaml.safe_load(PROJECTS_YAML_PATH.read_text(encoding="utf-8")) or {}
+    except Exception:
+        LOGGER.warning("Failed to load project config from %s", PROJECTS_YAML_PATH, exc_info=True)
+        return []
+    projects = data.get("projects", [])
+    return [project for project in projects if isinstance(project, dict)]
+
+
+def _find_project_config(project_name: str, github_repo: str) -> dict:
+    normalized_name = (project_name or "").strip().lower()
+    normalized_repo = (github_repo or "").strip().lower()
+    for project in _load_curated_project_configs():
+        name = str(project.get("name") or "").strip().lower()
+        repo = str(project.get("repo") or "").strip().lower()
+        if normalized_name and normalized_name in {name, repo}:
+            return project
+        if normalized_repo and normalized_repo in {name, repo}:
+            return project
+    return {}
+
+
+def _project_aliases(project_name: str, github_repo: str) -> list[str]:
+    config = _find_project_config(project_name, github_repo)
+    aliases = {
+        str(project_name or "").strip(),
+        str(github_repo or "").strip(),
+        str(config.get("name") or "").strip(),
+        str(config.get("repo") or "").strip(),
+    }
+    return [alias for alias in aliases if alias]
 
 
 def _feedback_decay_weight(recorded_at: str, half_life_days: float = 45.0) -> float:
@@ -222,6 +265,7 @@ def refresh_project_context_snapshot(
     recent_changes: list[str] | None = None,
 ) -> None:
     recent_changes = recent_changes or []
+    aliases = _project_aliases(project_name, github_repo)
     linked_posts = connection.execute(
         """
         SELECT COUNT(*) AS linked_count, MAX(po.posted_at) AS last_posted_at
@@ -233,27 +277,78 @@ def refresh_project_context_snapshot(
     ).fetchone()
     linked_count = int(linked_posts["linked_count"] or 0) if linked_posts is not None else 0
     last_linked_post = str(linked_posts["last_posted_at"] or "") if linked_posts is not None else ""
+    recent_signal_rows = connection.execute(
+        """
+        SELECT po.posted_at, po.channel_username, po.content
+        FROM post_project_links ppl
+        INNER JOIN posts po ON po.id = ppl.post_id
+        WHERE ppl.project_id = ?
+        ORDER BY po.posted_at DESC, po.id DESC
+        LIMIT 5
+        """,
+        (project_id,),
+    ).fetchall()
+    decision_rows = []
+    if aliases:
+        placeholders = ",".join("?" for _ in aliases)
+        decision_rows = connection.execute(
+            f"""
+            SELECT project_name, status, COALESCE(reason, '') AS reason, recorded_at
+            FROM decision_journal
+            WHERE project_name IN ({placeholders})
+            ORDER BY recorded_at DESC, id DESC
+            LIMIT 8
+            """,
+            aliases,
+        ).fetchall()
+    recent_signal_summaries = [
+        f"{str(row['posted_at'] or '')[:10]} {str(row['channel_username'] or '')}: {' '.join((row['content'] or '').split())[:140]}"
+        for row in recent_signal_rows
+    ]
+    decision_summaries = [
+        f"{str(row['recorded_at'] or '')[:10]} {str(row['status'] or '')}: {str(row['reason'] or '')[:140]}"
+        for row in decision_rows
+    ]
+    acted_on_count = sum(1 for row in decision_rows if str(row["status"] or "") == "acted_on")
+    deferred_count = sum(1 for row in decision_rows if str(row["status"] or "") == "deferred")
+    rejected_count = sum(1 for row in decision_rows if str(row["status"] or "") == "rejected")
+    last_decision_at = str(decision_rows[0]["recorded_at"] or "") if decision_rows else ""
     summary = (
         f"{project_name}: {description.strip()} "
         f"Focus: {focus.strip() or 'not specified'}. "
         f"Keywords: {', '.join(keywords) if keywords else 'none'}. "
-        f"Linked Telegram signals: {linked_count}."
+        f"Linked Telegram signals: {linked_count}. "
+        f"Recent decisions: acted_on={acted_on_count}, deferred={deferred_count}, rejected={rejected_count}."
     ).strip()
-    open_questions = ""
+    open_question_parts: list[str] = []
     if not keywords:
-        open_questions = "Keywords are missing or weak; project matching may be too shallow."
+        open_question_parts.append("Keywords are missing or weak; project matching may be too shallow.")
     elif linked_count == 0:
-        open_questions = "No linked Telegram signals yet; project relevance likely needs stronger context."
+        open_question_parts.append("No linked Telegram signals yet; project relevance likely needs stronger context.")
+    if not recent_changes and not decision_rows:
+        open_question_parts.append("No recent commits or project-scoped decisions recorded; project context may be stale.")
+    elif decision_rows and acted_on_count == 0 and deferred_count > 0:
+        open_question_parts.append("Ideas are being deferred but not implemented; clarify current execution horizon.")
+    open_questions = " ".join(open_question_parts)
     context_json = json.dumps(
         {
             "description": description,
             "focus": focus,
             "keywords": keywords,
             "github_repo": github_repo,
+            "project_aliases": aliases,
             "last_commit_at": last_commit_at,
             "last_linked_post": last_linked_post,
             "recent_changes": recent_changes,
             "linked_telegram_signals": linked_count,
+            "recent_linked_signals": recent_signal_summaries,
+            "recent_decisions": decision_summaries,
+            "decision_counts": {
+                "acted_on": acted_on_count,
+                "deferred": deferred_count,
+                "rejected": rejected_count,
+            },
+            "last_decision_at": last_decision_at,
         },
         ensure_ascii=False,
     )
@@ -293,6 +388,54 @@ def refresh_project_context_snapshot(
             _utc_now_iso(),
         ),
     )
+    connection.execute(
+        """
+        UPDATE project_context_snapshots
+        SET linked_signal_count = ?,
+            snapshot_week_label = ?
+        WHERE project_id = ?
+        """,
+        (linked_count, _current_week_label(), project_id),
+    )
+
+
+def refresh_all_project_context_snapshots(connection: sqlite3.Connection) -> None:
+    rows = connection.execute(
+        """
+        SELECT id, name, description, keywords, github_repo, last_commit_at
+        FROM projects
+        WHERE active = 1
+        ORDER BY id ASC
+        """
+    ).fetchall()
+    if not rows:
+        return
+    for row in rows:
+        config = _find_project_config(str(row["name"] or ""), str(row["github_repo"] or ""))
+        raw_keywords = row["keywords"]
+        keywords: list[str] = []
+        if raw_keywords:
+            try:
+                parsed = json.loads(raw_keywords)
+            except (TypeError, ValueError):
+                parsed = raw_keywords
+            if isinstance(parsed, list):
+                keywords = [str(item).strip() for item in parsed if str(item).strip()]
+            elif isinstance(parsed, str):
+                keywords = [part.strip() for part in parsed.split(",") if part.strip()]
+        if not keywords:
+            keywords = [str(item).strip() for item in config.get("keywords", []) if str(item).strip()]
+        refresh_project_context_snapshot(
+            connection=connection,
+            project_id=int(row["id"]),
+            project_name=str(row["name"] or ""),
+            description=str(config.get("description") or row["description"] or ""),
+            focus=str(config.get("focus") or ""),
+            keywords=keywords,
+            github_repo=str(row["github_repo"] or config.get("repo") or ""),
+            last_commit_at=str(row["last_commit_at"] or ""),
+            recent_changes=[],
+        )
 
 
 def load_project_context(connection: sqlite3.Connection, project_names: list[str] | None = None) -> list[dict]:

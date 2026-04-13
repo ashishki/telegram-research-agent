@@ -12,7 +12,7 @@ from config.settings import PROJECT_ROOT, Settings
 from bot.telegram_delivery import send_text
 from delivery.telegraph import publish_article
 from llm.client import complete
-from output.context_memory import load_project_context
+from output.context_memory import load_project_context, refresh_all_project_context_snapshots
 from output.insight_triage import parse_insights_html, render_triaged_insights_html, triage_insights
 from output.report_utils import _extract_markdown_section
 
@@ -109,7 +109,7 @@ def _tokenize_match_text(text: str) -> set[str]:
 
 
 def _extract_project_name_from_header(header: str) -> str:
-    match = re.match(r"\[(?:Implement|Build)\]\s+([^—\-]+)", header.strip(), re.IGNORECASE)
+    match = re.match(r"\[(?:Implement|Build)\]\s+(.+?)\s+[—–-]\s+", header.strip(), re.IGNORECASE)
     return match.group(1).strip().lower() if match else ""
 
 
@@ -152,6 +152,7 @@ def _load_recent_project_evidence(connection: sqlite3.Connection) -> tuple[str, 
 
 
 def _load_project_context_snapshots(connection: sqlite3.Connection) -> str:
+    refresh_all_project_context_snapshots(connection)
     snapshots = load_project_context(connection)
     if not snapshots:
         return "No project context snapshots available yet."

@@ -161,6 +161,16 @@ class TestRecordDecisionsForTriage(unittest.TestCase):
         ).fetchone()
         self.assertEqual(row["decision_scope"], "insight")
 
+    def test_project_name_is_extracted_from_insight_title(self):
+        from db.evidence import record_decisions_for_triage
+        insights = [self._make_insight("do_now", title="[Implement] gdev-agent — Add routing gate")]
+        record_decisions_for_triage(self.conn, "2026-W14", insights)
+
+        row = self.conn.execute(
+            "SELECT project_name FROM decision_journal LIMIT 1"
+        ).fetchone()
+        self.assertEqual(row["project_name"], "gdev-agent")
+
 
 class TestRecordStudyCompletionDecision(unittest.TestCase):
     def setUp(self):

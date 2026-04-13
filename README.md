@@ -20,7 +20,7 @@ A private, production-ready pipeline that runs on a personal VPS and processes T
 - a verbatim evidence layer (`signal_evidence_items`) that preserves why each signal mattered and links it to project + week scope
 - a unified decision-continuity log (`decision_journal`) covering signal feedback, insight triage, and study-plan completion
 - an insight triage workflow that separates do-now ideas from backlog and reject/defer noise, with repeated-idea suppression
-- persistent channel memory and project context snapshots refreshed from GitHub + linked signal counts
+- persistent channel memory and project context snapshots refreshed from GitHub, linked signal counts, and recent project-scoped decisions
 - dynamic channel scoring shaped by time-decayed manual feedback, not just static channel priority
 - a weekly Telegraph brief plus a tracked study loop informed by acted-on evidence
 - a cost-aware, explainable AI workflow with feedback capture and scope-first memory retrieval
@@ -30,7 +30,7 @@ A private, production-ready pipeline that runs on a personal VPS and processes T
 Four-phase memory unification is complete. The system now has a coherent, scope-first memory stack built on top of the existing SQLite canonical state:
 
 - **Tier 1** — canonical operational state: `raw_posts`, `posts`, scoring, explicit tags, feedback, triage, rejection memory, artifact records
-- **Tier 2** — derived snapshots: `channel_memory`, `project_context_snapshots` (refreshed from config + GitHub deltas + linked signal counts)
+- **Tier 2** — derived snapshots: `channel_memory`, `project_context_snapshots` (refreshed from config + GitHub deltas + linked signal counts + recent project decisions)
 - **Tier 3** — verbatim evidence memory: `signal_evidence_items` — curated high-value post excerpts with provenance (source channel, Telegram link, selection reason, week label, project scope)
 - **Tier 4** — decision continuity: `decision_journal` — acted-on / ignored / deferred / rejected / completed history unified across signal feedback, insight triage, and study-plan completion
 
@@ -112,6 +112,7 @@ Then the system adds:
 Project context is updated incrementally. The system does not need to reread the whole repo every time:
 - GitHub sync refreshes repo metadata
 - recent commit deltas are folded into `project_context_snapshots`
+- recent project-scoped decisions and linked signals are folded back into `project_context_snapshots` on read
 - weekly recommendations, project insights, and study planning use those snapshots
 
 This is not a temporary hack. It is an intentional product decision:
@@ -273,7 +274,7 @@ System capabilities summary:
 - time-decayed channel scoring blended into source quality and exposed through `channel_memory`
 - preference judge for reader-facing ranking and project-aware rationale, now seeded with scoped evidence from `signal_evidence_items`
 - completion-aware weekly study plan with `/study_done`, now incorporating acted-on evidence from `decision_journal`
-- incremental project context snapshots derived from GitHub sync, recent commits, and linked signal counts
+- incremental project context snapshots derived from GitHub sync, recent commits, linked signal counts, and recent project decisions
 - observability: cost trends, score distribution trends, enriched health-check
 - insight triage layer: deterministic do_now / backlog / reject_or_defer classification with 4-week rejection memory, unique-source filtering, and a stronger preference for current-project improvements
 - **Tier 3 — verbatim evidence memory**: `signal_evidence_items` records curated strong/manual-tag signals with provenance per week and project

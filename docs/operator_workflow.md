@@ -60,7 +60,7 @@ These tags are used to:
 
 The system also maintains:
 - `channel_memory` derived from your tag history, including a dynamic `channel_score`
-- `project_context_snapshots` derived from GitHub sync and recent commit deltas
+- `project_context_snapshots` derived from GitHub sync, recent commit deltas, linked signals, and recent project-scoped decisions
 
 That lets the brief explain more directly in the article and reduces the need to open the original Telegram post.
 
@@ -205,8 +205,9 @@ Current state is built from:
 - GitHub metadata from sync (`github_repo`, `last_commit_at`)
 - recent commit messages folded into `project_context_snapshots`
 - Telegram relevance already linked in the DB
+- recent project-scoped decisions from `decision_journal` (implemented, deferred, rejected)
 
-This lets study planning, recommendations, and project insights reason from recent project changes instead of from keywords alone.
+This lets study planning, recommendations, and project insights reason from recent project changes instead of from keywords alone. In practice, project context is now refreshed from the current database state even when GitHub metadata itself did not change.
 
 ---
 

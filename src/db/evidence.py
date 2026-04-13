@@ -1,4 +1,5 @@
 import json
+import re
 import sqlite3
 from datetime import datetime, timezone
 
@@ -52,6 +53,16 @@ def _parse_project_names_json(raw_value: str | None) -> str:
             if isinstance(name, str) and name.strip():
                 project_names.append(name.strip())
     return json.dumps(project_names)
+
+
+def _project_name_from_insight_title(title: str | None) -> str | None:
+    if not title:
+        return None
+    match = re.match(r"\[(?:Implement|Build)\]\s+(.+?)\s+[—–-]\s+", str(title).strip(), re.IGNORECASE)
+    if not match:
+        return None
+    value = match.group(1).strip()
+    return value or None
 
 
 def record_signal_evidence_for_scored_posts(
@@ -248,7 +259,7 @@ def record_decisions_for_triage(
                 "insight",
                 "insight_triage_id",
                 subject_ref_id,
-                None,
+                _project_name_from_insight_title(title),
                 mapped_status,
                 reason,
                 "pipeline",

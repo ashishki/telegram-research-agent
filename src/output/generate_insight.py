@@ -6,7 +6,7 @@ from pathlib import Path
 
 from config.settings import PROJECT_ROOT
 from llm.client import LLMClient
-from output.context_memory import load_project_context
+from output.context_memory import load_project_context, refresh_all_project_context_snapshots
 from output.report_utils import _extract_markdown_section
 
 
@@ -131,6 +131,7 @@ def generate_insight(db_path: str, lookback_days: int = 90) -> str:
             return ""
 
         sections = [f"# Retroactive Project Insights — {week_label}", f"_Generated at {_utc_now_iso()}_\n"]
+        refresh_all_project_context_snapshots(connection)
         project_context_rows = load_project_context(connection, [str(project["name"]) for project in projects])
         project_context_by_name = {
             str(item["project_name"]): item for item in project_context_rows

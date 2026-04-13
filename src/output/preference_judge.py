@@ -5,7 +5,12 @@ from datetime import datetime, timedelta, timezone
 
 from db.retrieval import fetch_evidence_items
 from llm.client import LLMClient
-from output.context_memory import load_channel_memory, load_project_context, refresh_channel_memory
+from output.context_memory import (
+    load_channel_memory,
+    load_project_context,
+    refresh_all_project_context_snapshots,
+    refresh_channel_memory,
+)
 
 
 LOGGER = logging.getLogger(__name__)
@@ -332,6 +337,7 @@ def judge_recent_posts(db_path: str, projects: list[dict] | None, lookback_days:
         with sqlite3.connect(db_path) as connection:
             connection.row_factory = sqlite3.Row
             refresh_channel_memory(connection)
+            refresh_all_project_context_snapshots(connection)
             examples = _fetch_tagged_examples(connection)
             candidates = _fetch_candidates(connection, lookback_days=lookback_days)
             active_projects = _active_projects(projects)

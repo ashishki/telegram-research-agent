@@ -16,7 +16,7 @@ import yaml
 from config.settings import PROJECT_ROOT, Settings
 from db.retrieval import fetch_decisions
 from llm.client import LLMClient
-from output.context_memory import load_project_context
+from output.context_memory import load_project_context, refresh_all_project_context_snapshots
 from output.report_utils import _extract_markdown_section
 
 try:
@@ -247,6 +247,7 @@ def _fetch_active_projects(connection: sqlite3.Connection) -> list[str]:
 
 
 def _fetch_project_context_snapshots(connection: sqlite3.Connection) -> list[dict[str, str]]:
+    refresh_all_project_context_snapshots(connection)
     snapshots = load_project_context(connection)
     results: list[dict[str, str]] = []
     for item in snapshots[:8]:
