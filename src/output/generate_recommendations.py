@@ -13,7 +13,7 @@ from bot.telegram_delivery import send_text
 from delivery.telegraph import publish_article
 from llm.client import complete
 from output.context_memory import load_project_context
-from output.insight_triage import render_triaged_insights_html, triage_insights
+from output.insight_triage import parse_insights_html, render_triaged_insights_html, triage_insights
 from output.report_utils import _extract_markdown_section
 
 
@@ -22,6 +22,7 @@ PROMPT_PATH = PROJECT_ROOT / "docs" / "prompts" / "insights.md"
 OUTPUT_DIR = PROJECT_ROOT / "data" / "output" / "recommendations"
 PROJECTS_YAML_PATH = Path(__file__).resolve().parents[1] / "config" / "projects.yaml"
 INLINE_URL_RE = re.compile(r"(?<![\"'>])(https?://[^\s<]+)")
+TELEGRAM_URL_RE = re.compile(r"https?://t\.me/[A-Za-z0-9_]+/\d+(?:\?[^\s<]+)?", re.IGNORECASE)
 
 
 def _utc_now() -> datetime:
@@ -99,15 +100,29 @@ def _load_recent_decisions(connection: sqlite3.Connection) -> str:
     return "\n".join(lines)
 
 
-def _load_recent_project_evidence(connection: sqlite3.Connection) -> str:
+def _tokenize_match_text(text: str) -> set[str]:
+    return {
+        token
+        for token in re.findall(r"[^\W_]+", (text or "").lower(), flags=re.UNICODE)
+        if len(token) >= 4
+    }
+
+
+def _extract_project_name_from_header(header: str) -> str:
+    match = re.match(r"\[(?:Implement|Build)\]\s+([^—\-]+)", header.strip(), re.IGNORECASE)
+    return match.group(1).strip().lower() if match else ""
+
+
+def _load_recent_project_evidence(connection: sqlite3.Connection) -> tuple[str, list[dict]]:
     project_names = _load_project_names()
     if not project_names:
-        return "No project evidence available."
+        return "No project evidence available.", []
     now = _utc_now()
     end_year, end_week, _ = now.isocalendar()
     start_year, start_week, _ = (now - timedelta(weeks=2)).isocalendar()
     week_range = [f"{start_year}-W{start_week:02d}", f"{end_year}-W{end_week:02d}"]
     lines: list[str] = []
+    candidates: list[dict] = []
     for name in project_names:
         try:
             items = fetch_evidence_items(connection, project_name=name, week_range=week_range, limit=3)
@@ -119,8 +134,21 @@ def _load_recent_project_evidence(connection: sqlite3.Connection) -> str:
             excerpt = str(item.get("excerpt_text") or "")[:220]
             channel = str(item.get("source_channel") or "")
             week = str(item.get("week_label") or "")
-            lines.append(f"[{name}][{week}][{kind}] {channel}: {excerpt}"[:280])
-    return "\n".join(lines) if lines else "No recent project evidence found."
+            url = str(item.get("message_url") or "").strip()
+            line = f"[{name}][{week}][{kind}] {channel}: {excerpt}"
+            if url:
+                line += f" {url}"
+            lines.append(line[:280])
+            if url:
+                candidates.append(
+                    {
+                        "url": url,
+                        "project_name": name.lower(),
+                        "channel": channel.lower(),
+                        "match_text": f"{name} {channel} {excerpt}",
+                    }
+                )
+    return ("\n".join(lines) if lines else "No recent project evidence found."), candidates
 
 
 def _load_project_context_snapshots(connection: sqlite3.Connection) -> str:
@@ -141,7 +169,7 @@ def _load_project_context_snapshots(connection: sqlite3.Connection) -> str:
     return "\n".join(lines)
 
 
-def _load_digest_summary(connection: sqlite3.Connection, week_label: str) -> tuple[str | None, str]:
+def _load_digest_summary(connection: sqlite3.Connection, week_label: str) -> tuple[str | None, str, list[dict]]:
     row = connection.execute(
         """
         SELECT content_md
@@ -151,7 +179,7 @@ def _load_digest_summary(connection: sqlite3.Connection, week_label: str) -> tup
         (week_label,),
     ).fetchone()
     if row is None:
-        return None, ""
+        return None, "", []
     digest_md = row["content_md"]
 
     week_start_iso, week_end_iso = _week_bounds(week_label)
@@ -186,6 +214,7 @@ def _load_digest_summary(connection: sqlite3.Connection, week_label: str) -> tup
     ).fetchall()
 
     lines = []
+    candidates: list[dict] = []
     if topic_rows:
         lines.append("Топ тем:")
         for row in topic_rows:
@@ -198,8 +227,67 @@ def _load_digest_summary(connection: sqlite3.Connection, week_label: str) -> tup
             url = row["message_url"] or ""
             channel = row["channel_username"] or ""
             lines.append(f"  - [{channel}] {excerpt} {url}".strip())
+            if url:
+                candidates.append(
+                    {
+                        "url": str(url).strip(),
+                        "project_name": "",
+                        "channel": str(channel).lower(),
+                        "match_text": f"{channel} {excerpt}",
+                    }
+                )
 
-    return digest_md, "\n".join(lines)
+    return digest_md, "\n".join(lines), candidates
+
+
+def _best_source_candidate(header: str, body: str, candidates: list[dict], used_urls: set[str]) -> str | None:
+    insight_project = _extract_project_name_from_header(header)
+    insight_tokens = _tokenize_match_text(f"{header} {body}")
+    best_url: str | None = None
+    best_score = 0
+
+    for candidate in candidates:
+        url = str(candidate.get("url") or "").strip()
+        if not url or url in used_urls:
+            continue
+        candidate_tokens = _tokenize_match_text(str(candidate.get("match_text") or ""))
+        overlap = len(insight_tokens & candidate_tokens)
+        score = overlap
+        if insight_project and insight_project == str(candidate.get("project_name") or "").strip():
+            score += 4
+        channel = str(candidate.get("channel") or "").strip()
+        if channel and channel in (body or "").lower():
+            score += 2
+        if score > best_score:
+            best_score = score
+            best_url = url
+    return best_url if best_score > 0 else None
+
+
+def _rewrite_insight_source_urls(content: str, candidates: list[dict]) -> str:
+    if not content or not candidates:
+        return content
+
+    parsed = parse_insights_html(content)
+    if not parsed:
+        return content
+
+    rewritten = content
+    used_urls: set[str] = set()
+    for header, body, source_url, raw_html in parsed:
+        replacement_url = _best_source_candidate(header, body, candidates, used_urls)
+        if replacement_url is None:
+            replacement_url = source_url.strip()
+        if not replacement_url:
+            continue
+        updated_block = raw_html
+        if source_url.strip():
+            updated_block = updated_block.replace(source_url, replacement_url, 1)
+        elif '<a href="' not in updated_block:
+            updated_block = updated_block.rstrip() + f'\n<a href="{replacement_url}">источник</a>'
+        rewritten = rewritten.replace(raw_html, updated_block, 1)
+        used_urls.add(replacement_url)
+    return rewritten
 
 
 def _load_completed_study_history(connection: sqlite3.Connection, limit: int = 6) -> str:
@@ -407,7 +495,7 @@ def run_recommendations(settings: Settings, force_delivery: bool = False) -> dic
         connection.execute("PRAGMA foreign_keys = ON;")
         connection.execute("PRAGMA journal_mode = WAL;")
 
-        digest_md, digest_summary = _load_digest_summary(connection, week_label)
+        digest_md, digest_summary, digest_candidates = _load_digest_summary(connection, week_label)
         if digest_md is None:
             LOGGER.warning("Insights skipped because no digest exists for week=%s", week_label)
             return {"week_label": week_label, "output_path": None, "text": ""}
@@ -416,7 +504,7 @@ def run_recommendations(settings: Settings, force_delivery: bool = False) -> dic
         project_context_snapshots = _load_project_context_snapshots(connection)
         completed_study_history = _load_completed_study_history(connection)
         recent_decisions = _load_recent_decisions(connection)
-        recent_evidence = _load_recent_project_evidence(connection)
+        recent_evidence, evidence_candidates = _load_recent_project_evidence(connection)
         system_prompt, user_template = _load_prompt_sections()
         prompt = (
             user_template.replace("{week_label}", week_label)
@@ -429,6 +517,10 @@ def run_recommendations(settings: Settings, force_delivery: bool = False) -> dic
         )
 
         insights_text = complete(prompt=prompt, system=system_prompt, category="insight")
+        insights_text = _rewrite_insight_source_urls(
+            insights_text,
+            evidence_candidates + digest_candidates,
+        )
 
         # Triage: classify ideas and apply rejection memory before rendering
         connection.execute("BEGIN")
