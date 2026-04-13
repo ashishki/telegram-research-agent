@@ -27,6 +27,10 @@ _CATEGORY_LABELS: dict[str, str] = {
     "reject_or_defer": "⏸ Отложить / отклонить",
 }
 _CATEGORY_ORDER = ["do_now", "backlog", "reject_or_defer"]
+_SECTION_LABELS: dict[str, str] = {
+    "built": "🧱 Собранные идеи",
+    "fresh": "🆕 Отдельные сигналы",
+}
 
 
 @dataclass
@@ -42,6 +46,7 @@ class TriagedInsight:
     main_risk: str
     recommendation: str     # "do_now" | "backlog" | "reject_or_defer"
     reason: str
+    rubric_section: str = "fresh"  # "built" | "fresh"
     suppressed: bool = False
     source_html: str = ""   # original HTML block for rendering
 
@@ -126,12 +131,44 @@ def parse_insights_html(html_text: str) -> list[tuple[str, str, str, str]]:
     return results
 
 
+def _parse_insights_html_with_sections(html_text: str) -> list[tuple[str, str, str, str, str]]:
+    pattern = re.compile(r"<b>(\[(?:Implement|Build)\][^<]*)</b>", re.IGNORECASE)
+    matches = list(pattern.finditer(html_text))
+    section_markers = list(re.finditer(r"<b>([^<]+)</b>", html_text))
+    results: list[tuple[str, str, str, str, str]] = []
+
+    for i, match in enumerate(matches):
+        header = match.group(1).strip()
+        start = match.end()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(html_text)
+        raw_block = html_text[match.start():end].strip()
+        section = html_text[start:end]
+        url_match = re.search(r'<a\s+href="([^"]+)"', section)
+        source_url = url_match.group(1) if url_match else ""
+        body = re.sub(r"<[^>]+>", " ", section)
+        body = re.sub(r"\s+", " ", body).strip()
+        rubric_section = "fresh"
+        for marker in section_markers:
+            if marker.start() >= match.start():
+                break
+            heading = marker.group(1).strip().lower()
+            if heading.startswith("[implement]") or heading.startswith("[build]"):
+                continue
+            if "собранные идеи" in heading or "built ideas" in heading:
+                rubric_section = "built"
+            elif "отдельные сигналы" in heading or "fresh signals" in heading:
+                rubric_section = "fresh"
+        results.append((header, body, source_url, raw_block, rubric_section))
+    return results
+
+
 def classify_insight(
     header: str,
     body: str,
     source_url: str,
     *,
     raw_html: str = "",
+    rubric_section: str = "fresh",
     rejection_fingerprints: set[str] | None = None,
 ) -> TriagedInsight:
     """Classify a single insight. Fully deterministic, no LLM calls."""
@@ -165,6 +202,7 @@ def classify_insight(
             main_risk=main_risk,
             recommendation="reject_or_defer",
             reason="Previously rejected — not yet eligible for revisit",
+            rubric_section=rubric_section,
             suppressed=True,
             source_html=raw_html,
         )
@@ -196,6 +234,7 @@ def classify_insight(
         main_risk=main_risk,
         recommendation=recommendation,
         reason=reason,
+        rubric_section=rubric_section,
         suppressed=False,
         source_html=raw_html,
     )
@@ -262,40 +301,37 @@ def _select_reportable_insights(insights: list[TriagedInsight], max_total: int =
 
     selected: list[TriagedInsight] = []
     selected_sources: set[str] = set()
-    selected_projects: set[str] = set()
-    do_now_count = 0
-    backlog_count = 0
 
-    for insight in ordered:
-        source_key = insight.source_url.strip().lower()
-        project_key = _extract_project_key(insight.title)
-
-        if source_key in selected_sources:
-            continue
-        if insight.recommendation == "do_now":
-            if do_now_count >= 2:
+    def pick(items: list[TriagedInsight], *, max_items: int, distinct_projects: bool) -> list[TriagedInsight]:
+        picked: list[TriagedInsight] = []
+        local_projects: set[str] = set()
+        for insight in items:
+            if len(picked) >= max_items:
+                break
+            source_key = insight.source_url.strip().lower()
+            if source_key in selected_sources:
                 continue
-            if project_key and project_key in selected_projects:
+            if insight.recommendation not in {"do_now", "backlog"}:
                 continue
-        elif insight.recommendation == "backlog":
-            if backlog_count >= 1:
+            project_key = _extract_project_key(insight.title)
+            if distinct_projects and project_key and project_key in local_projects:
                 continue
-        else:
-            continue
-
-        selected.append(insight)
-        selected_sources.add(source_key)
-        if insight.recommendation == "do_now":
-            do_now_count += 1
+            picked.append(insight)
+            selected_sources.add(source_key)
             if project_key:
-                selected_projects.add(project_key)
-        elif insight.recommendation == "backlog":
-            backlog_count += 1
+                local_projects.add(project_key)
+        return picked
 
-        if len(selected) >= max_total:
-            break
+    built_candidates = [item for item in ordered if item.rubric_section == "built"]
+    fresh_candidates = [item for item in ordered if item.rubric_section != "built"]
 
-    return selected
+    selected.extend(pick(built_candidates, max_items=2, distinct_projects=True))
+    if len(selected) < max_total:
+        remaining_slots = max_total - len(selected)
+        fresh_cap = 3 if not selected else 2
+        selected.extend(pick(fresh_candidates, max_items=min(fresh_cap, remaining_slots), distinct_projects=False))
+
+    return selected[:max_total]
 
 
 def load_rejection_fingerprints(connection: sqlite3.Connection) -> set[str]:
@@ -392,15 +428,16 @@ def triage_insights(
     Returns list of TriagedInsight (including suppressed items).
     """
     rejection_fingerprints = load_rejection_fingerprints(connection)
-    parsed = parse_insights_html(html_text)
+    parsed = _parse_insights_html_with_sections(html_text)
 
     insights: list[TriagedInsight] = []
-    for header, body, source_url, raw_html in parsed:
+    for header, body, source_url, raw_html, rubric_section in parsed:
         insight = classify_insight(
             header,
             body,
             source_url,
             raw_html=raw_html,
+            rubric_section=rubric_section,
             rejection_fingerprints=rejection_fingerprints,
         )
         insights.append(insight)
@@ -423,26 +460,24 @@ def render_triaged_insights_html(
     if not insights:
         return raw_html
 
-    by_category: dict[str, list[TriagedInsight]] = {cat: [] for cat in _CATEGORY_ORDER}
-    for insight in insights:
-        cat = insight.recommendation if insight.recommendation in by_category else "backlog"
-        by_category[cat].append(insight)
-
     blocks: list[str] = ["<b>💡 Инсайты недели</b>"]
 
-    for category in _CATEGORY_ORDER:
-        items = by_category[category]
+    by_section: dict[str, list[TriagedInsight]] = {"built": [], "fresh": []}
+    for insight in insights:
+        key = "built" if insight.rubric_section == "built" else "fresh"
+        by_section[key].append(insight)
+
+    for section_key in ("built", "fresh"):
+        items = by_section[section_key]
         if not items:
             continue
-        label = _CATEGORY_LABELS[category]
-        blocks.append(f"<b>{label}</b>")
+        blocks.append(f"<b>{_SECTION_LABELS[section_key]}</b>")
         for item in items:
+            status_label = _CATEGORY_LABELS.get(item.recommendation, item.recommendation)
+            triage_note = f"<i>({status_label} — {item.reason})</i>"
             if item.source_html:
-                triage_note = f"<i>({item.reason})</i>"
                 blocks.append(f"{item.source_html}\n{triage_note}")
             else:
-                blocks.append(
-                    f"<b>{item.title}</b>\n{item.summary}\n<i>({item.reason})</i>"
-                )
+                blocks.append(f"<b>{item.title}</b>\n{item.summary}\n{triage_note}")
 
     return "\n\n".join(blocks)

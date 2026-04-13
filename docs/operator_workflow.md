@@ -29,6 +29,8 @@ Owner receives:
 Expected time to read: 10–15 minutes.
 
 `Implementation Ideas` should be treated as a triaged surface:
+- `Built Ideas` are the stronger synthesized moves: they can combine several Telegram signals, project context, and recurring patterns into one clearer recommendation
+- `Fresh Signals` are separate new ideas worth seeing even if they have not matured into a larger thesis yet
 - `do now` ideas are candidate implementation moves for the current working horizon
 - `backlog` ideas are useful but not urgent
 - `reject/defer` ideas should be remembered and suppressed from repeating unchanged

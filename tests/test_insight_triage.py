@@ -309,6 +309,7 @@ class TestInsightDedupe(unittest.TestCase):
                 main_risk="low",
                 recommendation="do_now",
                 reason="direct improvement",
+                rubric_section="built",
             ),
             TriagedInsight(
                 title="[Implement] Project A — Second idea",
@@ -322,6 +323,7 @@ class TestInsightDedupe(unittest.TestCase):
                 main_risk="low",
                 recommendation="do_now",
                 reason="direct improvement",
+                rubric_section="built",
             ),
             TriagedInsight(
                 title="[Implement] Project B — Third idea",
@@ -335,6 +337,7 @@ class TestInsightDedupe(unittest.TestCase):
                 main_risk="low",
                 recommendation="do_now",
                 reason="direct improvement",
+                rubric_section="built",
             ),
             TriagedInsight(
                 title="[Build] New Tool — Exploration",
@@ -348,6 +351,7 @@ class TestInsightDedupe(unittest.TestCase):
                 main_risk="distraction",
                 recommendation="backlog",
                 reason="new project concept",
+                rubric_section="fresh",
             ),
         ]
 
@@ -413,6 +417,24 @@ class TestTriageInsightsPipeline(unittest.TestCase):
         insights = triage_insights("", self.conn, "2026-W14")
         self.assertEqual(insights, [])
 
+    def test_detects_built_and_fresh_sections_from_html(self):
+        html = (
+            "<b>💡 Инсайты недели</b>\n\n"
+            "<b>🧱 Собранные идеи</b>\n\n"
+            '<b>[Implement] Project A — Built idea</b>\n'
+            "Body one.\n"
+            '<a href="https://t.me/chan/1">источник</a>\n\n'
+            "<b>🆕 Отдельные сигналы</b>\n\n"
+            '<b>[Build] New Tool — Fresh idea</b>\n'
+            "Body two.\n"
+            '<a href="https://t.me/chan/2">источник</a>'
+        )
+
+        insights = triage_insights(html, self.conn, "2026-W14")
+
+        self.assertEqual(insights[0].rubric_section, "built")
+        self.assertEqual(insights[1].rubric_section, "fresh")
+
 
 # ---------------------------------------------------------------------------
 # render_triaged_insights_html
@@ -423,21 +445,21 @@ class TestRenderTriagedInsights(unittest.TestCase):
         results = parse_insights_html(_SAMPLE_HTML)
         insights = [classify_insight(h, b, u, raw_html=r) for h, b, u, r in results]
         rendered = render_triaged_insights_html(_SAMPLE_HTML, insights)
-        self.assertIn("Сделать сейчас", rendered)
+        self.assertIn("Отдельные сигналы", rendered)
 
-    def test_backlog_section_present(self):
+    def test_built_section_present_when_insight_marked_built(self):
         results = parse_insights_html(_SAMPLE_HTML)
-        insights = [classify_insight(h, b, u, raw_html=r) for h, b, u, r in results]
+        insights = [classify_insight(h, b, u, raw_html=r, rubric_section="built" if "[Implement]" in h else "fresh") for h, b, u, r in results]
         rendered = render_triaged_insights_html(_SAMPLE_HTML, insights)
-        self.assertIn("Бэклог", rendered)
+        self.assertIn("Собранные идеи", rendered)
 
-    def test_do_now_before_backlog(self):
+    def test_built_before_fresh(self):
         results = parse_insights_html(_SAMPLE_HTML)
-        insights = [classify_insight(h, b, u, raw_html=r) for h, b, u, r in results]
+        insights = [classify_insight(h, b, u, raw_html=r, rubric_section="built" if "[Implement]" in h else "fresh") for h, b, u, r in results]
         rendered = render_triaged_insights_html(_SAMPLE_HTML, insights)
-        idx_do_now = rendered.index("Сделать сейчас")
-        idx_backlog = rendered.index("Бэклог")
-        self.assertLess(idx_do_now, idx_backlog)
+        idx_built = rendered.index("Собранные идеи")
+        idx_fresh = rendered.index("Отдельные сигналы")
+        self.assertLess(idx_built, idx_fresh)
 
     def test_fallback_to_raw_html_when_no_insights(self):
         raw = "<b>raw content</b>"

@@ -64,7 +64,7 @@ Full case study: `docs/case-study.md` | Demo walkthrough: `docs/demo-walkthrough
 8. **Records decisions** — signal feedback (acted_on / skipped / marked_important), insight triage, and study-plan completion are all written to `decision_journal` as a unified continuity log
 9. **Renders** the review as an HTML document
 10. **Publishes** two Telegraph articles: `Research Brief` and `Implementation Ideas`
-    Implementation Ideas are triaged into `do_now`, `backlog`, and `reject_or_defer` categories before publishing.
+    Implementation Ideas now has two layers: `Built Ideas` for higher-confidence synthesized moves and `Fresh Signals` for separate new ideas worth tracking. Internal triage still classifies items into `do_now`, `backlog`, and `reject_or_defer` before publishing.
 11. **Delivers** to Telegram: short notification (≤300 chars) + article URL, with HTML attachment fallback for the research brief if Telegraph is unavailable
 
 ### What you receive
