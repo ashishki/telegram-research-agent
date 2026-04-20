@@ -267,10 +267,10 @@ The weekly brief must produce useful content even when there are no recent manua
 
 | ID | Task | Status | File |
 |---|---|---|---|
-| A5-1 | Relax preference judge prompt | `[ ]` | `src/output/preference_judge.py` |
-| A5-2 | Soften `_build_auto_watch_lines` gate | `[ ]` | `src/output/signal_report.py` |
-| A5-3 | Fix silent `run_recommendations` failure | `[ ]` | `src/output/generate_digest.py` + `src/output/generate_recommendations.py` |
-| A5-4 | Fix "No comparison baseline" | `[ ]` | `src/output/signal_report.py` |
+| A5-1 | Relax preference judge prompt | `[x]` | `src/output/preference_judge.py` |
+| A5-2 | Soften `_build_auto_watch_lines` gate | `[x]` | `src/output/signal_report.py` |
+| A5-3 | Fix silent `run_recommendations` failure | `[x]` | `src/output/generate_digest.py` + `src/output/generate_recommendations.py` |
+| A5-4 | Fix "No comparison baseline" | `[x]` | `src/output/signal_report.py` |
 
 ---
 

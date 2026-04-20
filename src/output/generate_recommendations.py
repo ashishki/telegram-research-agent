@@ -502,7 +502,11 @@ def run_recommendations(settings: Settings, force_delivery: bool = False) -> dic
             return {"week_label": week_label, "output_path": None, "text": ""}
 
         projects_context = _load_projects_context()
-        project_context_snapshots = _load_project_context_snapshots(connection)
+        try:
+            project_context_snapshots = _load_project_context_snapshots(connection)
+        except Exception:
+            LOGGER.warning("Project context snapshot refresh failed; using empty context", exc_info=True)
+            project_context_snapshots = "No project context snapshots available yet."
         completed_study_history = _load_completed_study_history(connection)
         recent_decisions = _load_recent_decisions(connection)
         recent_evidence, evidence_candidates = _load_recent_project_evidence(connection)

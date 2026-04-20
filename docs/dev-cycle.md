@@ -34,9 +34,9 @@ Current phase order:
 2. Phase 2 — MVP Memory Unification ✓
 3. Phase 3 — Wire Memory Into Weekly Outputs ✓
 4. Phase 4 — Observability And Evaluation ✓
-5. **Phase 5 — Autonomous Signal Discovery** ← active
+5. Phase 5 — Autonomous Signal Discovery ✓
 
-Phase 5 goal: weekly brief must produce useful content with zero manual tags for the current week. The preference judge has all the context it needs (GitHub snapshots, channel memory, decision history, previous tagged examples) — the pipeline must trust its output instead of requiring `include=True` gates and manual-tag-first logic.
+All phases complete. No active phase.
 
 Reference documents:
 

@@ -721,8 +721,8 @@ def run_digest(settings: Settings, force_delivery: bool = False) -> DigestResult
             if insights_text and not has_standalone_delivery and token and chat_id:
                 time.sleep(1)
                 send_text(chat_id=chat_id, text=insights_text, token=token, parse_mode=None)
-        except Exception as exc:
-            LOGGER.warning("Insights generation failed, skipping: %s", exc, exc_info=True)
+        except Exception:
+            LOGGER.warning("Insights generation failed, skipping", exc_info=True)
 
     return DigestResult(
         week_label=week_label,

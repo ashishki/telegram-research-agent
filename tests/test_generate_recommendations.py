@@ -1,6 +1,8 @@
 import sys
 import types
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 
 
 def _install_stub(module_name: str, **attributes: object) -> None:
@@ -21,7 +23,7 @@ _install_stub(
     RateLimitError=Exception,
 )
 
-from output.generate_recommendations import _render_insights_fragment, _rewrite_insight_source_urls  # noqa: E402
+from output.generate_recommendations import _render_insights_fragment, _rewrite_insight_source_urls, run_recommendations  # noqa: E402
 
 
 class TestGenerateRecommendationsHtml(unittest.TestCase):
@@ -69,6 +71,31 @@ class TestGenerateRecommendationsHtml(unittest.TestCase):
         self.assertIn("https://t.me/channelA/100", rewritten)
         self.assertIn("https://t.me/channelB/200", rewritten)
         self.assertNotIn("https://t.me/NeuralShit/7342", rewritten)
+
+
+class TestRunRecommendations(unittest.TestCase):
+    def test_run_recommendations_continues_when_project_context_snapshots_fail(self):
+        settings = SimpleNamespace(db_path=":memory:")
+
+        with patch("output.generate_recommendations._load_digest_summary", return_value=("digest", "summary", [])), \
+             patch("output.generate_recommendations._load_projects_context", return_value="projects"), \
+             patch("output.generate_recommendations._load_project_context_snapshots", side_effect=RuntimeError("boom")), \
+             patch("output.generate_recommendations._load_completed_study_history", return_value="study"), \
+             patch("output.generate_recommendations._load_recent_decisions", return_value="decisions"), \
+             patch("output.generate_recommendations._load_recent_project_evidence", return_value=("evidence", [])), \
+             patch("output.generate_recommendations._load_prompt_sections", return_value=("system", "{project_context_snapshots}")), \
+             patch("output.generate_recommendations.complete", return_value="insights") as complete_mock, \
+             patch("output.generate_recommendations._rewrite_insight_source_urls", return_value="insights"), \
+             patch("output.generate_recommendations.triage_insights", return_value=[]), \
+             patch("output.generate_recommendations.render_triaged_insights_html", return_value="rendered"), \
+             patch("output.generate_recommendations._write_insights_file"), \
+             patch("output.generate_recommendations._write_insights_html_file"), \
+             patch("output.generate_recommendations._store_recommendations"), \
+             patch("output.generate_recommendations._send_recommendations_to_telegram_owner"):
+            result = run_recommendations(settings)
+
+        complete_mock.assert_called_once()
+        self.assertEqual("rendered", result["text"])
 
 
 if __name__ == "__main__":

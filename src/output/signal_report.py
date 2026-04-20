@@ -63,8 +63,9 @@ def _format_source_suffix(message_url: str | None) -> str:
     return f" | Source: {url}" if url else ""
 
 
-def _load_previous_quality_metrics() -> dict | None:
-    db_path = os.environ.get("AGENT_DB_PATH", "").strip()
+def _load_previous_quality_metrics(db_path: str = "") -> dict | None:
+    if not db_path:
+        db_path = os.environ.get("AGENT_DB_PATH", "").strip()
     if not db_path:
         return None
     try:
@@ -84,8 +85,8 @@ def _load_previous_quality_metrics() -> dict | None:
     return dict(row) if row is not None else None
 
 
-def _build_what_changed_lines(bucket_counts: Counter) -> list[str]:
-    previous = _load_previous_quality_metrics()
+def _build_what_changed_lines(bucket_counts: Counter, db_path: str = "") -> list[str]:
+    previous = _load_previous_quality_metrics(db_path=db_path)
     if previous is None:
         return ["No comparison baseline available."]
 
@@ -236,6 +237,9 @@ def _build_legacy_project_queue(posts: list[dict], projects: list[dict] | None) 
 
 
 def _format_legacy_signal_report(posts: list[dict], settings) -> str:
+    db_path = str(getattr(settings, "db_path", "") or "").strip() if settings is not None else ""
+    if not db_path:
+        db_path = os.environ.get("AGENT_DB_PATH", "").strip()
     profile = _load_profile()
     indexed_posts = [{**post, "_original_position": index} for index, post in enumerate(posts)]
     ranked_posts = apply_personalization(indexed_posts, profile) if profile is not None else list(indexed_posts)
@@ -304,7 +308,7 @@ def _format_legacy_signal_report(posts: list[dict], settings) -> str:
             f"- noise: {bucket_counts.get('noise', 0)}",
             "",
             "## What Changed",
-            *_build_what_changed_lines(bucket_counts),
+            *_build_what_changed_lines(bucket_counts, db_path=db_path),
         ]
     )
     return "\n".join(sections).strip() + "\n"
@@ -417,9 +421,12 @@ def _build_auto_watch_lines(
         judged = _judged(post_id, judged_by_post)
         if primary_tag in {"strong", "try_in_project", "interesting", "funny", "low_signal"}:
             continue
-        if judged.get("include") is not True:
+        category = str(judged.get("category") or "")
+        if category not in {"strong", "try_in_project", "interesting"}:
             continue
-        if str(judged.get("category") or "") not in {"strong", "try_in_project", "interesting"}:
+        confidence = float(judged.get("confidence") or 0.0)
+        # Show if judge explicitly approved, OR if it has a strong category with decent confidence
+        if not judged.get("include") and confidence < 0.65:
             continue
         lines.append(
             _render_signal(
@@ -466,7 +473,7 @@ def format_signal_report(posts: list[dict], settings=None, *, reader_mode: bool 
         judged_by_post,
         excluded_post_ids=project_post_ids,
     )
-    what_changed_lines = _build_what_changed_lines(bucket_counts)
+    what_changed_lines = _build_what_changed_lines(bucket_counts, db_path=db_path)
 
     sections: list[str] = []
     for heading, lines in manual_sections:

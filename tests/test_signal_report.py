@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import yaml
 
-from output.signal_report import format_signal_report
+from output.signal_report import _build_auto_watch_lines, format_signal_report
 
 
 class TestSignalReport(unittest.TestCase):
@@ -295,6 +295,114 @@ class TestSignalReport(unittest.TestCase):
             self.assertIn("## Additional Signals", report)
             self.assertEqual(report.count("**Project-only signal**"), 1)
             self.assertEqual(report.count("**Additional signal**"), 1)
+        finally:
+            os.unlink(db_path)
+
+    def test_auto_watch_lines_include_interesting_items_with_false_include_and_high_confidence(self):
+        posts = [
+            {
+                "id": 7,
+                "content": "Useful workflow signal",
+                "message_url": "https://t.me/test/7",
+                "channel_username": "@test",
+            }
+        ]
+        judged_by_post = {
+            7: {
+                "include": False,
+                "category": "interesting",
+                "title": "Interesting signal",
+                "key_takeaway": "Worth tracking.",
+                "why_now": "Useful soon.",
+                "project_application": "",
+                "confidence": 0.7,
+            }
+        }
+
+        lines = _build_auto_watch_lines(posts, tag_details_by_post={}, judged_by_post=judged_by_post)
+
+        self.assertNotEqual(["No additional high-confidence auto-selected signals this week."], lines)
+        self.assertTrue(any("Interesting signal" in line for line in lines))
+
+    def test_auto_watch_lines_skip_interesting_items_with_false_include_and_low_confidence(self):
+        posts = [
+            {
+                "id": 8,
+                "content": "Weak workflow signal",
+                "message_url": "https://t.me/test/8",
+                "channel_username": "@test",
+            }
+        ]
+        judged_by_post = {
+            8: {
+                "include": False,
+                "category": "interesting",
+                "title": "Weak signal",
+                "key_takeaway": "Probably not enough.",
+                "why_now": "Not urgent.",
+                "project_application": "",
+                "confidence": 0.5,
+            }
+        }
+
+        lines = _build_auto_watch_lines(posts, tag_details_by_post={}, judged_by_post=judged_by_post)
+
+        self.assertEqual(["No additional high-confidence auto-selected signals this week."], lines)
+
+    def test_reader_mode_uses_settings_db_path_for_what_changed_baseline(self):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+            db_path = tmp.name
+
+        try:
+            with sqlite3.connect(db_path) as connection:
+                connection.executescript(
+                    """
+                    CREATE TABLE quality_metrics (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        week_label TEXT NOT NULL UNIQUE,
+                        computed_at TEXT NOT NULL,
+                        total_posts INTEGER NOT NULL DEFAULT 0,
+                        strong_count INTEGER NOT NULL DEFAULT 0,
+                        watch_count INTEGER NOT NULL DEFAULT 0,
+                        cultural_count INTEGER NOT NULL DEFAULT 0,
+                        noise_count INTEGER NOT NULL DEFAULT 0,
+                        avg_signal_score REAL,
+                        project_match_count INTEGER NOT NULL DEFAULT 0,
+                        output_word_count INTEGER NOT NULL DEFAULT 0
+                    );
+                    CREATE TABLE user_post_tags (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        post_id INTEGER NOT NULL,
+                        tag TEXT NOT NULL,
+                        note TEXT,
+                        recorded_at TEXT NOT NULL
+                    );
+                    """
+                )
+                connection.execute(
+                    """
+                    INSERT INTO quality_metrics (
+                        week_label, computed_at, strong_count, watch_count, noise_count
+                    ) VALUES (?, ?, ?, ?, ?)
+                    """,
+                    ("2026-W13", "2026-03-24T00:00:00Z", 2, 1, 3),
+                )
+                connection.commit()
+
+            class _Settings:
+                def __init__(self, path: str):
+                    self.db_path = path
+
+            with patch("output.signal_report._load_profile", return_value={}):
+                with patch("output.signal_report._load_projects", return_value=[]):
+                    with patch("output.signal_report.judge_recent_posts", return_value={}):
+                        report = format_signal_report([], settings=_Settings(db_path), reader_mode=True)
+
+            self.assertIn("## What Changed", report)
+            self.assertIn("strong: 0 (was 2, -2)", report)
+            self.assertIn("watch: 0 (was 1, -1)", report)
+            self.assertIn("noise: 0 (was 3, -3)", report)
+            self.assertNotIn("No comparison baseline available.", report)
         finally:
             os.unlink(db_path)
 

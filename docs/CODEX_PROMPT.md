@@ -1,20 +1,19 @@
 # CODEX_PROMPT — Session Handoff
-_v3.1 · 2026-04-20 · telegram-research-agent_
+_v3.2 · 2026-04-20 · telegram-research-agent_
 
 ---
 
 ## Current State
 
-- Phases 1–4 (memory unification roadmap) complete.
-- Active problem: weekly brief produces near-empty output when no manual tags exist for the current week.
-- Root cause confirmed via data analysis (W17 post-mortem):
-  - `strong_count = 0` for three consecutive weeks — scoring never promotes any post to "strong" bucket.
-  - Preference judge runs (6 batches, 24 candidates in W17) but its output is blocked by `include=True` gate in `_build_auto_watch_lines`.
-  - Judge prompt says "Be selective. Prefer fewer items." — makes it too conservative.
-  - `run_recommendations` (implementation brief) silently crashed in W17 — no `insight` LLM call in `llm_usage`, no W17 entry in `recommendations` table. Caught by bare `except Exception` with no traceback.
-  - "No comparison baseline" — `AGENT_DB_PATH` env var absent; `_load_previous_quality_metrics()` can't read DB.
-- `pytest` available via: `python -m pytest`
-- Orchestrator-to-Codex execution path: `codex exec -s workspace-write`
+- Phases 1–5 complete.
+- Phase 5 (Autonomous Signal Discovery) shipped 2026-04-20:
+  - Preference judge prompt relaxed — `include=True` by default for any actionable signal
+  - `_build_auto_watch_lines` gate softened — uses `category + confidence ≥ 0.65` instead of requiring `include=True`
+  - `run_recommendations` silent crash fixed — snapshot refresh failure now logged with traceback; LLM call proceeds with fallback context
+  - "What Changed" baseline fixed — `db_path` threaded from `settings` through to `_load_previous_quality_metrics`
+- All roadmap phases (1–5) are complete. No active phase.
+- `pytest` available via: `python3 -m pytest`
+- Orchestrator-to-Codex execution path: write prompt to file, then `codex exec -s workspace-write < /tmp/prompt.md`
 
 ---
 
@@ -27,32 +26,40 @@ _v3.1 · 2026-04-20 · telegram-research-agent_
 - `signal_evidence_items` and `decision_journal` tables (unified memory)
 - implementation-idea triage and rejection memory
 - scope-first retrieval helpers
+- autonomous signal discovery via preference judge (category + confidence gate)
 
 ---
 
-## Active Architecture Concern
+## Known Open Issues (not yet roadmapped)
 
-Phases 1–4 added the memory plumbing. The system now has project context, channel memory, evidence items, and decision history — but the weekly report pipeline does not fully use this to produce autonomous output.
-
-The preference judge should be the primary signal-discovery mechanism. Instead, manual tagging is still de facto required for a non-empty brief.
+- `strong_count = 0` for W15–W17 — scoring engine calibration needed; no post ever reaches "strong" bucket. Tracked as A6, separate from Phase 5.
 
 ---
 
-## Exact Next Execution Step
+## Active Architecture State
 
-Implement **Phase 5 — Autonomous Signal Discovery** from `docs/tasks.md`.
+The weekly pipeline now has:
+- project context snapshots (GitHub-derived)
+- channel memory
+- decision journal
+- evidence items
+- preference judge with generous inclusion policy
 
-Execute in this order:
+The brief should now produce auto-selected signals from `watch`/`cultural` posts without any manual tagging this week.
 
-1. **A5-3** — fix silent `run_recommendations` crash (add try/except around `_load_project_context_snapshots`; improve exception logging in `generate_digest.py`)
-2. **A5-1** — relax judge prompt: replace "Be selective. Prefer fewer items." with an explicit inclusion policy
-3. **A5-2** — soften `_build_auto_watch_lines` gate: use `category + confidence ≥ 0.65` instead of requiring `include=True`
-4. **A5-4** — fix "No comparison baseline": thread `db_path` from `settings` through to `_load_previous_quality_metrics`
+---
 
-Do not start scoring recalibration (strong_count=0 issue) in this phase — that is a separate task.
+## Next Execution Step
+
+No active phase. Await new roadmap item or A6 (scoring recalibration).
+
+If starting A6, scope it as a standalone phase with:
+- root cause analysis of why `signal_score` never reaches 0.75 threshold
+- calibration changes to `src/config/scoring.yaml` or `src/processing/score_posts.py`
+- success criterion: at least 1 post reaches "strong" bucket in a normal week
 
 Reference documents:
 
-- `docs/tasks.md` (Phase 5 section for exact specs)
+- `docs/tasks.md`
 - `docs/IMPLEMENTATION_CONTRACT.md`
 - `docs/architecture.md`
