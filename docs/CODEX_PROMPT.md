@@ -1,14 +1,19 @@
 # CODEX_PROMPT — Session Handoff
-_v3.0 · 2026-04-07 · telegram-research-agent_
+_v3.1 · 2026-04-20 · telegram-research-agent_
 
 ---
 
 ## Current State
 
-- Planning reset complete
-- Active architecture concern: fragmented memory/state surfaces
-- Repository status verified from code, not legacy roadmap prose
-- `pytest` is not available in the current shell environment (`pytest: command not found`)
+- Phases 1–4 (memory unification roadmap) complete.
+- Active problem: weekly brief produces near-empty output when no manual tags exist for the current week.
+- Root cause confirmed via data analysis (W17 post-mortem):
+  - `strong_count = 0` for three consecutive weeks — scoring never promotes any post to "strong" bucket.
+  - Preference judge runs (6 batches, 24 candidates in W17) but its output is blocked by `include=True` gate in `_build_auto_watch_lines`.
+  - Judge prompt says "Be selective. Prefer fewer items." — makes it too conservative.
+  - `run_recommendations` (implementation brief) silently crashed in W17 — no `insight` LLM call in `llm_usage`, no W17 entry in `recommendations` table. Caught by bare `except Exception` with no traceback.
+  - "No comparison baseline" — `AGENT_DB_PATH` env var absent; `_load_previous_quality_metrics()` can't read DB.
+- `pytest` available via: `python -m pytest`
 - Orchestrator-to-Codex execution path: `codex exec -s workspace-write`
 
 ---
@@ -18,40 +23,36 @@ _v3.0 · 2026-04-07 · telegram-research-agent_
 - Telegram ingestion, normalization, scoring, and topic assignment
 - project relevance, personalization, and weekly report generation
 - explicit feedback and tagging
-- derived `channel_memory`
-- derived `project_context_snapshots`
+- derived `channel_memory` and `project_context_snapshots`
+- `signal_evidence_items` and `decision_journal` tables (unified memory)
 - implementation-idea triage and rejection memory
+- scope-first retrieval helpers
 
 ---
 
-## Architectural Verdict
+## Active Architecture Concern
 
-The repo already has persistence, but it lacks one coherent memory contract.
+Phases 1–4 added the memory plumbing. The system now has project context, channel memory, evidence items, and decision history — but the weekly report pipeline does not fully use this to produce autonomous output.
 
-Next work is **memory unification**, specifically:
-
-- a curated verbatim evidence layer for high-value signals
-- a decision journal spanning acted-on / ignored / deferred / rejected outcomes
-- scope-first retrieval helpers shared by weekly generators
-
-Do not build a generic memory framework.
-
-Reference documents:
-
-- `docs/memory_architecture.md`
-- `docs/tasks.md`
-- `docs/architecture.md`
+The preference judge should be the primary signal-discovery mechanism. Instead, manual tagging is still de facto required for a non-empty brief.
 
 ---
 
 ## Exact Next Execution Step
 
-Implement **Phase 1 — Memory Contract And Inventory** from `docs/tasks.md`.
+Implement **Phase 5 — Autonomous Signal Discovery** from `docs/tasks.md`.
 
-Immediate tasks:
+Execute in this order:
 
-1. M3 — finalize schema for `signal_evidence_items`, `decision_journal`, and the evolved project snapshot surface
-2. M4 — write migration mapping from current tables into the new architecture
-3. M5 — define retrieval debug/eval requirements
+1. **A5-3** — fix silent `run_recommendations` crash (add try/except around `_load_project_context_snapshots`; improve exception logging in `generate_digest.py`)
+2. **A5-1** — relax judge prompt: replace "Be selective. Prefer fewer items." with an explicit inclusion policy
+3. **A5-2** — soften `_build_auto_watch_lines` gate: use `category + confidence ≥ 0.65` instead of requiring `include=True`
+4. **A5-4** — fix "No comparison baseline": thread `db_path` from `settings` through to `_load_previous_quality_metrics`
 
-Do not start prompt rewrites or broad output changes before those contracts are explicit.
+Do not start scoring recalibration (strong_count=0 issue) in this phase — that is a separate task.
+
+Reference documents:
+
+- `docs/tasks.md` (Phase 5 section for exact specs)
+- `docs/IMPLEMENTATION_CONTRACT.md`
+- `docs/architecture.md`

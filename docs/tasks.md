@@ -229,12 +229,175 @@ These are explicitly deferred until the MVP memory architecture proves useful:
 
 ---
 
+## Phase 5 — Autonomous Signal Discovery (zero-tag fallback)
+
+**Goal**
+
+The weekly brief must produce useful content even when there are no recent manual tags. The preference judge already has everything it needs (GitHub project context, channel memory, previous rated examples, post content) — but its output is filtered out by an overly strict `include=True` gate and a "prefer fewer" prompt instruction.
+
+**Root cause (confirmed in W17 analysis)**
+
+- `strong_count = 0` for three consecutive weeks (W15–W17): the scoring engine never assigned a "strong" bucket to any post.
+- The preference judge ran 6 batches on 24 candidates and correctly classified posts — but `_build_auto_watch_lines` requires `judged.get("include") is True`, which the judge almost never sets because its prompt says "Be selective. Prefer fewer items."
+- Result: "Additional Signals: No additional high-confidence auto-selected signals this week." — every week, unless the user has manually tagged posts that very week.
+- `run_recommendations` (implementation brief) silently failed for W17 — no `insight` LLM call in `llm_usage` after the preference_judge runs, no W17 entry in `recommendations` table. Failed before the LLM call, caught by a bare `except Exception`. The implementation brief was not delivered.
+- "No comparison baseline" — `AGENT_DB_PATH` env var not available when `_load_previous_quality_metrics()` runs in `signal_report.py`.
+
+**What this phase implements**
+
+1. Relax preference judge prompt: replace "Be selective. Prefer fewer items." with an explicit policy about when to set `include=True`.
+2. Soften the `_build_auto_watch_lines` gate: drop the hard `include=True` requirement; use `category` + `confidence` as the primary filter.
+3. Fix silent `run_recommendations` failure: add minimal error surfacing so the cause is logged clearly; fix the underlying crash point.
+4. Fix "No comparison baseline": pass `db_path` through `format_signal_report` to `_load_previous_quality_metrics`, or read it from `settings` directly.
+
+**What this phase does not implement**
+
+- No changes to the ingestion or scoring layers yet (strong_count=0 is a separate calibration issue, tracked in A6).
+- No UI changes.
+
+**Success criteria**
+
+- Weekly review contains at least 3 auto-selected signals when 10+ watch/cultural posts exist, without any manual tagging.
+- Implementation brief is generated every week alongside the digest.
+- "What Changed" section shows numeric delta vs previous week.
+
+---
+
+### Tasks
+
+| ID | Task | Status | File |
+|---|---|---|---|
+| A5-1 | Relax preference judge prompt | `[ ]` | `src/output/preference_judge.py` |
+| A5-2 | Soften `_build_auto_watch_lines` gate | `[ ]` | `src/output/signal_report.py` |
+| A5-3 | Fix silent `run_recommendations` failure | `[ ]` | `src/output/generate_digest.py` + `src/output/generate_recommendations.py` |
+| A5-4 | Fix "No comparison baseline" | `[ ]` | `src/output/signal_report.py` |
+
+---
+
+#### A5-1: Relax preference judge prompt
+
+**File:** `src/output/preference_judge.py`  
+**Function:** `_judge_batch_once`
+
+**Problem:** The instruction "Be selective. Prefer fewer items." causes the judge to return `include=False` for nearly all posts, even when they are genuinely relevant to the user's active projects.
+
+**Change:** In the prompt string (around line 275), replace:
+
+```
+"Be selective. Prefer fewer items. Ignore generic hype, broad news and shallow benchmarking unless it clearly fits the user's tagged taste.\n"
+```
+
+With:
+
+```
+"Use 'ignore' for category only when the post is clearly generic hype, meme, or pure benchmark announcement with no application to the user's projects. Set include=true whenever the post has a concrete takeaway for any active project, signals a tool or approach the user is building with, or matches a pattern from the tagged examples — even if only moderately relevant. A marginal actionable signal is better than a silent week. Do not suppress posts just because similar topics appeared before; surface the most actionable angle.\n"
+```
+
+Also update the `include` field description in the prompt from `"- include: boolean\n"` to:
+
+```
+"- include: boolean — true if the user would benefit from seeing this in the weekly brief (be generous: default true unless it is pure noise or clearly irrelevant)\n"
+```
+
+**Tests:** `tests/test_generate_digest.py`, `tests/test_personalize.py` — run existing suite, add one test that mocks judge returning `confidence=0.7, category='interesting', include=False` and verifies it still appears in auto_watch output after A5-2.
+
+---
+
+#### A5-2: Soften `_build_auto_watch_lines` gate
+
+**File:** `src/output/signal_report.py`  
+**Function:** `_build_auto_watch_lines` (line ~403)
+
+**Problem:** Current gate:
+```python
+if judged.get("include") is not True:
+    continue
+if str(judged.get("category") or "") not in {"strong", "try_in_project", "interesting"}:
+    continue
+```
+This filters out all posts unless `include=True` AND category is strong/try/interesting. Because the judge rarely sets `include=True`, the section is always empty without manual tags.
+
+**Change:** Replace both conditions with:
+```python
+category = str(judged.get("category") or "")
+if category not in {"strong", "try_in_project", "interesting"}:
+    continue
+confidence = float(judged.get("confidence") or 0.0)
+# Show if judge explicitly approved, OR if it has a strong category with decent confidence
+if not judged.get("include") and confidence < 0.65:
+    continue
+```
+
+**Rationale:** Category is the substantive classification; `include` is a secondary flag. If the judge assigned a meaningful category with ≥0.65 confidence, the post is worth showing. The confidence floor prevents low-certainty noise from leaking in.
+
+**Tests:** Add a unit test in `tests/test_signal_report.py` that verifies a post with `category='interesting', include=False, confidence=0.7` appears in auto_watch output, and a post with `category='interesting', include=False, confidence=0.5` does NOT appear.
+
+---
+
+#### A5-3: Fix silent `run_recommendations` failure
+
+**Files:** `src/output/generate_digest.py`, `src/output/generate_recommendations.py`
+
+**Problem:** In `generate_digest.py` line 724, `run_recommendations` is wrapped in a bare `except Exception` with only a warning log. When it fails before the LLM call (no `insight` entry in `llm_usage` for W17), the failure is invisible. No implementation brief is generated or delivered.
+
+**Confirmed:** W17 `recommendations` table has no entry; `llm_usage` has no `insight` category call after the preference_judge calls at 05:02:28.
+
+**Likely crash point:** `_load_project_context_snapshots` in `generate_recommendations.py` calls `refresh_all_project_context_snapshots(connection)` which writes to the DB. This is called on a fresh connection while the outer generate_digest connection is still open (inside the `with` block). In WAL mode this should be safe, but if `refresh_all_project_context_snapshots` raises (e.g., GitHub API rate limit, network error), the exception propagates uncaught through `_load_project_context_snapshots` to `run_recommendations`, which has no internal guard at that point.
+
+**Change 1 — `generate_recommendations.py`:** Wrap `_load_project_context_snapshots` call inside `run_recommendations` in a try/except:
+
+```python
+try:
+    project_context_snapshots = _load_project_context_snapshots(connection)
+except Exception:
+    LOGGER.warning("Project context snapshot refresh failed; using empty context", exc_info=True)
+    project_context_snapshots = "No project context snapshots available yet."
+```
+
+**Change 2 — `generate_digest.py`:** Improve the exception log at line 724 to include traceback details explicitly:
+
+```python
+except Exception:
+    LOGGER.warning("Insights generation failed, skipping", exc_info=True)
+```
+
+(Change `exc` parameter capture to `exc_info=True` without the positional `%s` so the full traceback is always logged.)
+
+**Tests:** Add a test in `tests/test_generate_recommendations.py` that patches `_load_project_context_snapshots` to raise `RuntimeError` and verifies `run_recommendations` catches it gracefully and still attempts the LLM call with a fallback context string.
+
+---
+
+#### A5-4: Fix "No comparison baseline"
+
+**File:** `src/output/signal_report.py`  
+**Function:** `_load_previous_quality_metrics` (line ~67)
+
+**Problem:** The function reads `AGENT_DB_PATH` from env. If not set, returns `None` → "No comparison baseline available." The `db_path` is available via `settings` object passed to `format_signal_report`, but it is not threaded through to `_load_previous_quality_metrics`.
+
+**Change:** Thread `db_path` through the call stack:
+
+1. `format_signal_report(posts, settings, ...)` already has `settings`.
+2. Derive `db_path` at the top of the reader_mode branch:
+   ```python
+   db_path = str(getattr(settings, "db_path", "") or "").strip() if settings is not None else ""
+   if not db_path:
+       db_path = os.environ.get("AGENT_DB_PATH", "").strip()
+   ```
+3. Pass `db_path` to `_build_what_changed_lines(bucket_counts, db_path=db_path)`.
+4. Update `_build_what_changed_lines` signature and `_load_previous_quality_metrics` call to accept and use `db_path` instead of reading env.
+5. Do the same for `_format_legacy_signal_report` (legacy path) to avoid regression.
+
+**Tests:** Add a test in `tests/test_signal_report.py` that passes a mock settings object with a valid `db_path` and verifies "What Changed" produces numeric comparison lines.
+
+---
+
 ## First Recommended Implementation Phase
 
-Start with **Phase 1 — Memory Contract And Inventory** and execute in this order:
+Execute Phase 5 tasks in this order:
 
-1. M3 — finalize schema design for evidence items, decision journal, and project snapshots
-2. M4 — document migration mapping from current tables
-3. M5 — define debug/eval contract
+1. **A5-3** — fix silent failure first so we can see what actually breaks
+2. **A5-1** — relax judge prompt so it produces more `include=True` signals
+3. **A5-2** — soften the auto_watch gate to use category+confidence
+4. **A5-4** — fix "No comparison baseline"
 
-That is the smallest next step that reduces ambiguity without committing the repo to premature implementation complexity.
+Run the full test suite after each task.

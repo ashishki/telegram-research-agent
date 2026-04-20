@@ -37,10 +37,11 @@ You control implementation order, package work for Codex, invoke review, and sto
 Read `docs/tasks.md` in full.
 
 Identify the next phase from the roadmap order:
-1. Memory Contract And Inventory
-2. MVP Memory Unification
-3. Wire Memory Into Weekly Outputs
-4. Observability And Evaluation
+1. Memory Contract And Inventory ✓
+2. MVP Memory Unification ✓
+3. Wire Memory Into Weekly Outputs ✓
+4. Observability And Evaluation ✓
+5. **Autonomous Signal Discovery** ← currently active
 
 For the current phase, extract:
 - goal
@@ -114,6 +115,7 @@ Mandatory additions by phase:
 - Phase 2: provenance completeness, decision continuity correctness, scope-first retrieval correctness
 - Phase 3: output integration correctness, suppression continuity, prompt-context discipline
 - Phase 4: eval quality, debug surfaces, operator inspectability
+- Phase 5: judge output present in Additional Signals without manual tags; no silent exception swallowing; "What Changed" section shows numeric delta; implementation brief generated every week
 
 ### Step 5 — Fixes
 
