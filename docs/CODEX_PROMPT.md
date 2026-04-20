@@ -30,9 +30,9 @@ _v3.2 · 2026-04-20 · telegram-research-agent_
 
 ---
 
-## Known Open Issues (not yet roadmapped)
+## Known Open Issues
 
-- `strong_count = 0` for W15–W17 — scoring engine calibration needed; no post ever reaches "strong" bucket. Tracked as A6, separate from Phase 5.
+- `strong_count = 0` for W15–W17 — scoring calibration, separate from current phase.
 
 ---
 
@@ -45,21 +45,22 @@ The weekly pipeline now has:
 - evidence items
 - preference judge with generous inclusion policy
 
-The brief should now produce auto-selected signals from `watch`/`cultural` posts without any manual tagging this week.
-
 ---
 
-## Next Execution Step
+## Exact Next Execution Step
 
-No active phase. Await new roadmap item or A6 (scoring recalibration).
+Implement **Phase 6 — Fix SQLite Transaction Conflicts** from `docs/tasks.md`.
 
-If starting A6, scope it as a standalone phase with:
-- root cause analysis of why `signal_score` never reaches 0.75 threshold
-- calibration changes to `src/config/scoring.yaml` or `src/processing/score_posts.py`
-- success criterion: at least 1 post reaches "strong" bucket in a normal week
+Execute in this order:
+
+1. **A6-1** — remove explicit `BEGIN` from `generate_recommendations.py` (lines 531, 539)
+2. **A6-2** — remove explicit `BEGIN` from `generate_study_plan.py` (line 379)
+3. **A6-3** — add `timeout=5` to `sqlite3.connect()` in `llm/client.py:_record_usage`
+
+These are surgical one-line removals. Do not refactor connection management beyond what is specified.
 
 Reference documents:
 
-- `docs/tasks.md`
+- `docs/tasks.md` (Phase 6 section for exact specs)
 - `docs/IMPLEMENTATION_CONTRACT.md`
 - `docs/architecture.md`

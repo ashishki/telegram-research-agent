@@ -41,7 +41,8 @@ Identify the next phase from the roadmap order:
 2. MVP Memory Unification ✓
 3. Wire Memory Into Weekly Outputs ✓
 4. Observability And Evaluation ✓
-5. **Autonomous Signal Discovery** ← currently active
+5. Autonomous Signal Discovery ✓
+6. **Fix SQLite Transaction Conflicts** ← currently active
 
 For the current phase, extract:
 - goal
@@ -116,6 +117,7 @@ Mandatory additions by phase:
 - Phase 3: output integration correctness, suppression continuity, prompt-context discipline
 - Phase 4: eval quality, debug surfaces, operator inspectability
 - Phase 5: judge output present in Additional Signals without manual tags; no silent exception swallowing; "What Changed" section shows numeric delta; implementation brief generated every week
+- Phase 6: `run_recommendations` and `generate_study_plan` complete without transaction errors; `_record_usage` no longer logs `database is locked`
 
 ### Step 5 — Fixes
 

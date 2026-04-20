@@ -391,6 +391,162 @@ except Exception:
 
 ---
 
+## Phase 6 — Fix SQLite Transaction Conflicts
+
+**Goal**
+
+Fix two interrelated SQLite errors that prevent `run_recommendations` and `generate_study_plan` from completing every week.
+
+**Root cause (confirmed in W17 live log, 2026-04-20)**
+
+```
+sqlite3.OperationalError: database is locked           ← llm/client.py _record_usage
+sqlite3.OperationalError: cannot start a transaction within a transaction  ← generate_recommendations.py:531
+sqlite3.OperationalError: cannot start a transaction within a transaction  ← generate_study_plan.py:379
+```
+
+**Sequence that causes the crash:**
+
+1. `run_recommendations` opens its own connection: `with sqlite3.connect(db_path) as connection`.
+2. `_load_project_context_snapshots` → `refresh_all_project_context_snapshots` executes UPSERT statements. Python's `sqlite3` module auto-begins an implicit transaction on the first DML.
+3. The LLM call (`complete(...)`) fires. Inside `_record_usage` in `llm/client.py`, a **third** connection opens and tries to INSERT into `llm_usage`. The second connection's implicit write transaction is still open → `database is locked`.
+4. Back in `run_recommendations`, line 531 does `connection.execute("BEGIN")` explicitly. The second connection already has an implicit transaction → `cannot start a transaction within a transaction`. Crash. Same pattern in `generate_study_plan.py:379`.
+
+**Fix strategy**
+
+Python's `sqlite3` module auto-begins a transaction when isolation_level is non-None (the default). Explicit `connection.execute("BEGIN")` is correct only when `isolation_level=None` (autocommit). Mixing both causes the crash.
+
+The right fix is to commit the implicit transaction before doing additional write batches, not to issue a redundant `BEGIN`. Replace the explicit `BEGIN` → `COMMIT` pairs with just `connection.commit()` calls, relying on Python's auto-transaction.
+
+For `_record_usage`: add `timeout=5` to `sqlite3.connect()` so it waits up to 5 s for any write lock to clear instead of immediately failing.
+
+**What this phase implements**
+
+1. Remove explicit `connection.execute("BEGIN")` from `generate_recommendations.py` (lines 531, 539) — replace with `connection.commit()` where the intent is to flush a batch.
+2. Remove explicit `connection.execute("BEGIN")` from `generate_study_plan.py` (line 379) — same pattern.
+3. Add `timeout=5` to `sqlite3.connect(db_path)` in `llm/client.py:_record_usage`.
+
+**What this phase does not implement**
+
+- No changes to other files that use explicit `BEGIN` (they operate on isolated connections that don't mix implicit and explicit transactions in the same path).
+- No connection pooling or refactoring of the outer connection in `generate_digest.py`.
+
+**Success criteria**
+
+- `run_recommendations` completes and writes a row to the `recommendations` table every week.
+- `generate_study_plan` completes without "cannot start a transaction" error.
+- `_record_usage` no longer logs `database is locked` warnings.
+- Full test suite passes.
+
+---
+
+### Tasks
+
+| ID | Task | Status | File |
+|---|---|---|---|
+| A6-1 | Remove explicit `BEGIN` from `generate_recommendations.py` | `[ ]` | `src/output/generate_recommendations.py` |
+| A6-2 | Remove explicit `BEGIN` from `generate_study_plan.py` | `[ ]` | `src/output/generate_study_plan.py` |
+| A6-3 | Add `timeout=5` to `_record_usage` connection | `[ ]` | `src/llm/client.py` |
+
+---
+
+#### A6-1: Remove explicit BEGIN from generate_recommendations.py
+
+**File:** `src/output/generate_recommendations.py`
+
+**Problem:** Lines 531 and 539 call `connection.execute("BEGIN")` explicitly on a connection that already has an implicit transaction open from prior UPSERT operations. This raises `cannot start a transaction within a transaction`.
+
+**Change:** Remove both `connection.execute("BEGIN")` calls. The `connection.commit()` calls that follow are correct and sufficient — Python auto-begins the next transaction after each commit.
+
+Before (line 530–533):
+```python
+# Triage: classify ideas and apply rejection memory before rendering
+connection.execute("BEGIN")
+triaged = triage_insights(insights_text, connection, week_label)
+connection.commit()
+```
+
+After:
+```python
+# Triage: classify ideas and apply rejection memory before rendering
+triaged = triage_insights(insights_text, connection, week_label)
+connection.commit()
+```
+
+Before (line 539–541):
+```python
+connection.execute("BEGIN")
+_store_recommendations(connection, week_label, delivery_text)
+connection.commit()
+```
+
+After:
+```python
+_store_recommendations(connection, week_label, delivery_text)
+connection.commit()
+```
+
+**Tests:** Add a test in `tests/test_generate_recommendations.py` that runs `run_recommendations` against a real in-memory or temp-file SQLite DB (with all required tables) without patching the connection, and verifies no transaction exception is raised and the recommendations row is stored.
+
+---
+
+#### A6-2: Remove explicit BEGIN from generate_study_plan.py
+
+**File:** `src/output/generate_study_plan.py`
+
+**Problem:** Line 379 calls `connection.execute("BEGIN")` explicitly after `complete()` has triggered `_record_usage` which may have left a write lock contention, and after implicit DML transactions from context refresh. Same pattern as A6-1.
+
+**Change:** Remove `connection.execute("BEGIN")` at line 379. Keep the `connection.commit()` that follows.
+
+Before:
+```python
+connection.execute("BEGIN")
+connection.execute(
+    """
+    INSERT INTO study_plans ...
+    """,
+    ...
+)
+connection.commit()
+```
+
+After:
+```python
+connection.execute(
+    """
+    INSERT INTO study_plans ...
+    """,
+    ...
+)
+connection.commit()
+```
+
+**Tests:** Add a test in `tests/test_generate_digest.py` or a new `tests/test_generate_study_plan.py` that verifies `generate_study_plan` does not raise a transaction error when called after a context-refreshing operation.
+
+---
+
+#### A6-3: Add timeout to _record_usage connection
+
+**File:** `src/llm/client.py`
+
+**Problem:** `sqlite3.connect(db_path)` with no timeout immediately raises `database is locked` if another connection holds a write lock. This makes LLM usage logging unreliable during heavy pipeline runs.
+
+**Change:** Add `timeout=5`:
+
+Before:
+```python
+with sqlite3.connect(db_path) as conn:
+```
+
+After:
+```python
+with sqlite3.connect(db_path, timeout=5) as conn:
+```
+
+**Tests:** Existing test suite is sufficient. Confirm no regressions.
+
+---
+
 ## First Recommended Implementation Phase
 
 Execute Phase 5 tasks in this order:
