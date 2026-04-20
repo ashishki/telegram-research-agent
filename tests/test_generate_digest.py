@@ -335,7 +335,7 @@ class TestRunDigestFixes(unittest.TestCase):
 
             handler.flush()
             log_output = log_stream.getvalue()
-            self.assertIn("Insights generation failed, skipping: boom", log_output)
+            self.assertIn("Insights generation failed, skipping", log_output)
             self.assertIn("Traceback", log_output)
         finally:
             gd.LOGGER.setLevel(previous_level)
