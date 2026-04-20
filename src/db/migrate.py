@@ -135,6 +135,7 @@ def run_migrations() -> Path:
             "ALTER TABLE study_plans ADD COLUMN reminder_sent_at TEXT",
             "ALTER TABLE study_plans ADD COLUMN completed_at TEXT",
             "ALTER TABLE study_plans ADD COLUMN completion_notes TEXT",
+            "ALTER TABLE study_plans ADD COLUMN telegraph_url TEXT",
         ]:
             try:
                 connection.execute(stmt)

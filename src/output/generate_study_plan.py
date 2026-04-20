@@ -21,8 +21,12 @@ from output.report_utils import _extract_markdown_section
 
 try:
     from bot.telegram_delivery import send_text
+    from delivery.telegraph import publish_article
+    from output.render_report import render_report_html
 except ImportError:  # pragma: no cover - direct module execution fallback
     from src.bot.telegram_delivery import send_text
+    from src.delivery.telegraph import publish_article
+    from src.output.render_report import render_report_html
 
 
 LOGGER = logging.getLogger(__name__)
@@ -440,11 +444,6 @@ def send_study_reminder(settings: Settings) -> None:
             return
 
         content_md = str(row["content_md"]) if row is not None and row["content_md"] else generate_study_plan(settings)
-        message = (
-            f"Study plan for {week_label}\n"
-            "Use /study_done when you finish this week's plan.\n\n"
-            f"{content_md}"
-        )
 
         bot_token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
         chat_id = os.environ.get("TELEGRAM_OWNER_CHAT_ID", "").strip()
@@ -452,16 +451,31 @@ def send_study_reminder(settings: Settings) -> None:
             LOGGER.warning("Study reminder skipped because Telegram bot credentials are not configured")
             return
 
-        send_text(chat_id=chat_id, text=message, token=bot_token)
+        telegraph_url: str | None = None
+        notification = f"Study Plan {week_label} is ready.\nOpen the full plan:"
+        try:
+            html_content = render_report_html(content_md)
+            telegraph_url = publish_article(title=f"Study Plan {week_label}", html_content=html_content)
+            send_text(chat_id=chat_id, text=f"{notification}\n{telegraph_url}", token=bot_token, parse_mode=None)
+            LOGGER.info("Study plan published to Telegraph week=%s url=%s", week_label, telegraph_url)
+        except Exception:
+            LOGGER.warning("Failed to publish study plan to Telegraph; falling back to text", exc_info=True)
+            fallback = (
+                f"Study plan for {week_label}\n"
+                "Use /study_done when you finish this week's plan.\n\n"
+                f"{content_md}"
+            )
+            send_text(chat_id=chat_id, text=fallback, token=bot_token)
+
         with sqlite3.connect(settings.db_path) as connection:
             connection.row_factory = sqlite3.Row
             connection.execute(
                 """
                 UPDATE study_plans
-                SET reminder_sent_at = ?
+                SET reminder_sent_at = ?, telegraph_url = ?
                 WHERE week_label = ?
                 """,
-                (_utc_now_iso(), week_label),
+                (_utc_now_iso(), telegraph_url, week_label),
             )
             connection.commit()
         LOGGER.info("Study reminder sent week=%s", week_label)

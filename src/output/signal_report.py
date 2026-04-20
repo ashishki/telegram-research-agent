@@ -85,6 +85,38 @@ def _load_previous_quality_metrics(db_path: str = "") -> dict | None:
     return dict(row) if row is not None else None
 
 
+def _build_source_analytics_lines(posts: list[dict]) -> list[str]:
+    """Top signal sources: channels that contributed strong/watch posts this week."""
+    channel_stats: dict[str, dict] = {}
+    for post in posts:
+        ch = (post.get("channel_username") or "").strip()
+        if not ch:
+            continue
+        if ch not in channel_stats:
+            channel_stats[ch] = {"signal": 0, "total": 0, "score_sum": 0.0}
+        channel_stats[ch]["total"] += 1
+        bucket = post.get("bucket") or "noise"
+        score = float(post.get("signal_score") or 0.0)
+        channel_stats[ch]["score_sum"] += score
+        if bucket in ("strong", "watch"):
+            channel_stats[ch]["signal"] += 1
+
+    ranked = sorted(
+        channel_stats.items(),
+        key=lambda kv: (-kv[1]["signal"], -kv[1]["score_sum"]),
+    )
+    top = [(ch, s) for ch, s in ranked if s["signal"] > 0][:5]
+
+    if not top:
+        return ["No signal sources this week."]
+
+    lines = []
+    for ch, s in top:
+        avg = s["score_sum"] / s["total"] if s["total"] else 0.0
+        lines.append(f"- {ch}: {s['signal']} signal posts, avg score {avg:.2f}")
+    return lines
+
+
 def _build_what_changed_lines(bucket_counts: Counter, db_path: str = "") -> list[str]:
     previous = _load_previous_quality_metrics(db_path=db_path)
     if previous is None:
@@ -474,6 +506,7 @@ def format_signal_report(posts: list[dict], settings=None, *, reader_mode: bool 
         excluded_post_ids=project_post_ids,
     )
     what_changed_lines = _build_what_changed_lines(bucket_counts, db_path=db_path)
+    source_analytics_lines = _build_source_analytics_lines(posts)
 
     sections: list[str] = []
     for heading, lines in manual_sections:
@@ -486,6 +519,9 @@ def format_signal_report(posts: list[dict], settings=None, *, reader_mode: bool 
             "",
             "## Additional Signals",
             *auto_watch_lines,
+            "",
+            "## Source Map",
+            *source_analytics_lines,
             "",
             "## What Changed",
             *what_changed_lines,
