@@ -42,7 +42,7 @@ Identify the next phase from the roadmap order:
 3. Wire Memory Into Weekly Outputs ✓
 4. Observability And Evaluation ✓
 5. Autonomous Signal Discovery ✓
-6. **Fix SQLite Transaction Conflicts** ← currently active
+6. Fix SQLite Transaction Conflicts ✓
 
 For the current phase, extract:
 - goal
