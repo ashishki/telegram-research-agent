@@ -1,6 +1,9 @@
 import sys
 import types
 import unittest
+import sqlite3
+import tempfile
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -96,6 +99,156 @@ class TestRunRecommendations(unittest.TestCase):
 
         complete_mock.assert_called_once()
         self.assertEqual("rendered", result["text"])
+
+    def test_run_recommendations_uses_real_db_without_nested_transaction_error(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "recommendations.sqlite"
+            settings = SimpleNamespace(db_path=str(db_path))
+            week_label = "2026-W17"
+
+            with sqlite3.connect(db_path) as connection:
+                connection.executescript(
+                    """
+                    CREATE TABLE IF NOT EXISTS digests (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        week_label TEXT NOT NULL UNIQUE,
+                        generated_at TEXT NOT NULL,
+                        content_md TEXT NOT NULL
+                    );
+                    CREATE TABLE IF NOT EXISTS recommendations (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        week_label TEXT NOT NULL UNIQUE,
+                        generated_at TEXT NOT NULL,
+                        content_md TEXT NOT NULL
+                    );
+                    CREATE TABLE IF NOT EXISTS llm_usage (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        called_at TEXT,
+                        model TEXT,
+                        task_type TEXT,
+                        input_tokens INTEGER,
+                        output_tokens INTEGER,
+                        est_cost_usd REAL,
+                        category TEXT,
+                        cost_usd REAL,
+                        duration_ms INTEGER
+                    );
+                    CREATE TABLE IF NOT EXISTS study_plans (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        week_label TEXT NOT NULL UNIQUE,
+                        generated_at TEXT NOT NULL,
+                        content_md TEXT NOT NULL,
+                        topics_covered TEXT,
+                        reminder_sent_at TEXT,
+                        completed_at TEXT,
+                        completion_notes TEXT
+                    );
+                    CREATE TABLE IF NOT EXISTS post_topics (
+                        post_id INTEGER,
+                        topic_id INTEGER
+                    );
+                    CREATE TABLE IF NOT EXISTS posts (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        raw_post_id INTEGER,
+                        channel_username TEXT,
+                        content TEXT,
+                        posted_at TEXT
+                    );
+                    CREATE TABLE IF NOT EXISTS raw_posts (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        message_url TEXT,
+                        view_count INTEGER
+                    );
+                    CREATE TABLE IF NOT EXISTS topics (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        label TEXT,
+                        description TEXT
+                    );
+                    CREATE TABLE IF NOT EXISTS project_context_snapshots (
+                        project_id INTEGER PRIMARY KEY,
+                        project_name TEXT NOT NULL,
+                        github_repo TEXT,
+                        source_commit_at TEXT,
+                        summary TEXT NOT NULL DEFAULT '',
+                        open_questions TEXT NOT NULL DEFAULT '',
+                        recent_changes TEXT NOT NULL DEFAULT '',
+                        context_json TEXT NOT NULL DEFAULT '{}',
+                        updated_at TEXT NOT NULL
+                    );
+                    CREATE TABLE IF NOT EXISTS signal_evidence_items (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        post_id INTEGER NOT NULL,
+                        raw_post_id INTEGER NOT NULL,
+                        week_label TEXT NOT NULL,
+                        evidence_kind TEXT NOT NULL,
+                        excerpt_text TEXT NOT NULL,
+                        source_channel TEXT NOT NULL,
+                        message_url TEXT,
+                        posted_at TEXT NOT NULL,
+                        topic_labels_json TEXT NOT NULL DEFAULT '[]',
+                        project_names_json TEXT NOT NULL DEFAULT '[]',
+                        selection_reason TEXT NOT NULL,
+                        last_used_at TEXT,
+                        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    );
+                    CREATE TABLE IF NOT EXISTS decision_journal (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        decision_scope TEXT NOT NULL,
+                        subject_ref_type TEXT NOT NULL,
+                        subject_ref_id TEXT NOT NULL,
+                        project_name TEXT,
+                        status TEXT NOT NULL,
+                        reason TEXT,
+                        evidence_item_ids_json TEXT NOT NULL DEFAULT '[]',
+                        recorded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        recorded_by TEXT NOT NULL DEFAULT 'pipeline'
+                    );
+                    CREATE TABLE IF NOT EXISTS insight_triage_records (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        week_label TEXT NOT NULL,
+                        title TEXT NOT NULL,
+                        idea_type TEXT NOT NULL,
+                        timing TEXT NOT NULL,
+                        implementation_mode TEXT NOT NULL,
+                        confidence TEXT NOT NULL,
+                        evidence_strength TEXT NOT NULL,
+                        main_risk TEXT NOT NULL,
+                        recommendation TEXT NOT NULL,
+                        reason TEXT NOT NULL,
+                        source_url TEXT NOT NULL DEFAULT '',
+                        created_at TEXT NOT NULL
+                    );
+                    CREATE TABLE IF NOT EXISTS insight_rejection_memory (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        title_fingerprint TEXT NOT NULL UNIQUE,
+                        title TEXT NOT NULL,
+                        reason TEXT NOT NULL,
+                        rejected_at TEXT NOT NULL,
+                        suppressed_until TEXT
+                    );
+                    """
+                )
+                connection.execute(
+                    "INSERT INTO digests (week_label, generated_at, content_md) VALUES (?, ?, ?)",
+                    (week_label, "2026-04-20T00:00:00Z", "digest"),
+                )
+                connection.commit()
+
+            with patch("output.generate_recommendations._compute_week_label", return_value=week_label), \
+                 patch("output.generate_recommendations.complete", return_value="<b>[Implement] Project — Idea</b>\nBody\n<a href=\"https://example.com/source\">источник</a>"), \
+                 patch("output.generate_recommendations._load_project_context_snapshots", return_value="snapshot"), \
+                 patch("output.generate_recommendations._send_recommendations_to_telegram_owner"), \
+                 patch("output.generate_recommendations._write_insights_file"), \
+                 patch("output.generate_recommendations._write_insights_html_file"):
+                result = run_recommendations(settings)
+
+            self.assertIn("Project", result["text"])
+            with sqlite3.connect(db_path) as connection:
+                stored = connection.execute(
+                    "SELECT content_md FROM recommendations WHERE week_label = ?",
+                    (week_label,),
+                ).fetchone()
+            self.assertIsNotNone(stored)
 
 
 if __name__ == "__main__":

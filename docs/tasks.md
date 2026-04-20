@@ -444,9 +444,9 @@ For `_record_usage`: add `timeout=5` to `sqlite3.connect()` so it waits up to 5 
 
 | ID | Task | Status | File |
 |---|---|---|---|
-| A6-1 | Remove explicit `BEGIN` from `generate_recommendations.py` | `[ ]` | `src/output/generate_recommendations.py` |
-| A6-2 | Remove explicit `BEGIN` from `generate_study_plan.py` | `[ ]` | `src/output/generate_study_plan.py` |
-| A6-3 | Add `timeout=5` to `_record_usage` connection | `[ ]` | `src/llm/client.py` |
+| A6-1 | Remove explicit `BEGIN` from `generate_recommendations.py` | `[x]` | `src/output/generate_recommendations.py` |
+| A6-2 | Remove explicit `BEGIN` from `generate_study_plan.py` | `[x]` | `src/output/generate_study_plan.py` |
+| A6-3 | Add `timeout=5` to `_record_usage` connection | `[x]` | `src/llm/client.py` |
 
 ---
 

@@ -61,7 +61,7 @@ def _record_usage(task_type: str, model: str, input_tokens: int, output_tokens: 
         from datetime import datetime, timezone
 
         now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-        with sqlite3.connect(db_path) as conn:
+        with sqlite3.connect(db_path, timeout=5) as conn:
             conn.execute(
                 (
                     "INSERT INTO llm_usage "

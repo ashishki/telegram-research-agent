@@ -35,7 +35,7 @@ Current phase order:
 3. Phase 3 — Wire Memory Into Weekly Outputs ✓
 4. Phase 4 — Observability And Evaluation ✓
 5. Phase 5 — Autonomous Signal Discovery ✓
-6. **Phase 6 — Fix SQLite Transaction Conflicts** ← active
+6. Phase 6 — Fix SQLite Transaction Conflicts ✓
 
 Reference documents:
 

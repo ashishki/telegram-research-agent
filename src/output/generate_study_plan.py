@@ -376,7 +376,6 @@ def generate_study_plan(settings: Settings, force: bool = False) -> str:
         )
         topics_covered = json.dumps([topic["label"] for topic in topics], ensure_ascii=True)
 
-        connection.execute("BEGIN")
         connection.execute(
             """
             INSERT INTO study_plans (week_label, generated_at, content_md, topics_covered)

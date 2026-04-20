@@ -528,7 +528,6 @@ def run_recommendations(settings: Settings, force_delivery: bool = False) -> dic
         )
 
         # Triage: classify ideas and apply rejection memory before rendering
-        connection.execute("BEGIN")
         triaged = triage_insights(insights_text, connection, week_label)
         connection.commit()
 
@@ -536,7 +535,6 @@ def run_recommendations(settings: Settings, force_delivery: bool = False) -> dic
 
         output_path = _write_insights_file(week_label, delivery_text)
         html_path = _write_insights_html_file(week_label, delivery_text)
-        connection.execute("BEGIN")
         _store_recommendations(connection, week_label, delivery_text)
         connection.commit()
         try:

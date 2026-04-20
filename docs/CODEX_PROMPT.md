@@ -49,18 +49,12 @@ The weekly pipeline now has:
 
 ## Exact Next Execution Step
 
-Implement **Phase 6 — Fix SQLite Transaction Conflicts** from `docs/tasks.md`.
+No active phase. Phases 1–6 complete.
 
-Execute in this order:
-
-1. **A6-1** — remove explicit `BEGIN` from `generate_recommendations.py` (lines 531, 539)
-2. **A6-2** — remove explicit `BEGIN` from `generate_study_plan.py` (line 379)
-3. **A6-3** — add `timeout=5` to `sqlite3.connect()` in `llm/client.py:_record_usage`
-
-These are surgical one-line removals. Do not refactor connection management beyond what is specified.
+If starting a new phase, read `docs/tasks.md` in full, define scope, dependencies, and success criteria before sending anything to Codex.
 
 Reference documents:
 
-- `docs/tasks.md` (Phase 6 section for exact specs)
+- `docs/tasks.md`
 - `docs/IMPLEMENTATION_CONTRACT.md`
 - `docs/architecture.md`
