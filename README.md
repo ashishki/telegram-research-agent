@@ -240,6 +240,7 @@ export TELEGRAPH_TOKEN=your_token_here
 
 ```bash
 python3 src/main.py health-check      # DB connectivity, config status, last run timestamps, stuck queues
+python3 src/main.py sync-reactions --days 14  # import your Telegram post reactions as tags/feedback
 python3 src/main.py score-stats       # bucket distribution + trend vs previous week
 python3 src/main.py cost-stats        # actual and estimated LLM cost breakdown by model/category/week
 python3 src/main.py report-preview    # legacy operator preview of scored posts (not identical to the reader-facing Telegraph brief)
@@ -271,6 +272,8 @@ System capabilities summary:
 - HTML render + Telegraph publish (fallback: file attachment)
 - project relevance with explicit keyword lists and exclusion suppression
 - manual tagging (`/tag`, `/mark_strong`, `/mark_try`, etc.) plus acted_on/skipped feedback
+- Telegram reaction sync for low-friction feedback on original channel posts (`🔥`/`⭐` strong, `👍` interesting, `✅` acted-on, `👎`/`❌` skipped)
+- Telegram inline feedback cards for `Implementation Ideas` decisions (`сделал` / `позже` / `отказал` / `интересно`)
 - time-decayed channel scoring blended into source quality and exposed through `channel_memory`
 - preference judge for reader-facing ranking and project-aware rationale, now seeded with scoped evidence from `signal_evidence_items`
 - completion-aware weekly study plan with `/study_done`, now incorporating acted-on evidence from `decision_journal`

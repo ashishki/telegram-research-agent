@@ -47,13 +47,20 @@ def _telegram_request(url: str, data: bytes, headers: dict[str, str]) -> dict:
     return decoded
 
 
-def _send_text_internal(chat_id: str, text: str, token: str, parse_mode: str | None = "Markdown") -> None:
+def _send_text_internal(
+    chat_id: str,
+    text: str,
+    token: str,
+    parse_mode: str | None = "Markdown",
+    reply_markup: dict | None = None,
+) -> None:
     if not token:
         LOGGER.warning("Telegram send skipped because TELEGRAM_BOT_TOKEN is not set")
         return
 
     url = f"{BOT_API_BASE}/bot{token}/sendMessage"
-    for chunk in _chunk_text(text):
+    chunks = _chunk_text(text)
+    for index, chunk in enumerate(chunks):
         payload_dict = {
             "chat_id": chat_id,
             "text": chunk,
@@ -61,6 +68,8 @@ def _send_text_internal(chat_id: str, text: str, token: str, parse_mode: str | N
         }
         if parse_mode:
             payload_dict["parse_mode"] = parse_mode
+        if reply_markup and index == len(chunks) - 1:
+            payload_dict["reply_markup"] = json.dumps(reply_markup, ensure_ascii=False)
         payload = parse.urlencode(payload_dict).encode("utf-8")
         _telegram_request(
             url=url,
@@ -69,8 +78,20 @@ def _send_text_internal(chat_id: str, text: str, token: str, parse_mode: str | N
         )
 
 
-def send_text(chat_id: str, text: str, token: str, parse_mode: str | None = "HTML") -> None:
-    _send_text_internal(chat_id=chat_id, text=text, token=token, parse_mode=parse_mode)
+def send_text(
+    chat_id: str,
+    text: str,
+    token: str,
+    parse_mode: str | None = "HTML",
+    reply_markup: dict | None = None,
+) -> None:
+    _send_text_internal(
+        chat_id=chat_id,
+        text=text,
+        token=token,
+        parse_mode=parse_mode,
+        reply_markup=reply_markup,
+    )
 
 
 def send_document(chat_id: str, file_path: str, caption: str, token: str) -> None:

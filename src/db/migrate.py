@@ -43,6 +43,21 @@ def run_migrations() -> Path:
         connection.execute("PRAGMA foreign_keys = ON;")
         connection.execute("PRAGMA journal_mode = WAL;")
         connection.executescript(schema_sql)
+        connection.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS reaction_sync_state (
+                source TEXT NOT NULL,
+                channel_username TEXT NOT NULL,
+                message_id INTEGER NOT NULL,
+                emoji TEXT NOT NULL,
+                action_key TEXT NOT NULL,
+                applied_at TEXT NOT NULL,
+                PRIMARY KEY(source, channel_username, message_id, emoji, action_key)
+            );
+            CREATE INDEX IF NOT EXISTS idx_reaction_sync_state_message
+                ON reaction_sync_state(channel_username, message_id);
+            """
+        )
         for stmt in [
             "ALTER TABLE projects ADD COLUMN github_repo TEXT",
             "ALTER TABLE projects ADD COLUMN last_commit_at TEXT",

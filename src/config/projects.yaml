@@ -18,8 +18,8 @@ projects:
 
   - name: telegram-research-agent
     repo: ashishki/telegram-research-agent
-    description: "Weekly AI/tech digest from Telegram channels. Telethon ingestion, TF-IDF clustering, Claude synthesis, PDF/text delivery."
-    focus: "digest quality, insight generation, clustering accuracy, delivery UX"
+    description: "Personal research intelligence pipeline for Telegram channels. Deterministic scoring, preference-shaped synthesis, project-aware recommendations, reaction feedback, evidence memory, and decision continuity."
+    focus: "digest quality, signal scoring, reaction feedback loop, project-aware insight generation, evidence memory, decision journal, low-signal alerts"
     keywords:
       - digest
       - clustering
@@ -28,20 +28,32 @@ projects:
       - workflow
       - signal
       - scoring
+      - reactions
+      - feedback
+      - evidence
+      - decisions
     exclude_keywords:
       - film
 
   - name: film-school-assistant
     repo: ashishki/film-school-assistant
-    description: "Film school learning assistant bot. Early stage — currently a basic bot, evolving toward a structured learning companion."
-    focus: "learning path design, content structuring, bot UX, AI tutoring patterns"
+    description: "Private Telegram-first creative workflow assistant for directors and film students. Captures text and voice notes, structures notes/ideas/homework/deadlines, maintains project continuity, evidence memory, reflection, recurring practices, and weekly summaries."
+    focus: "creative workflow continuity, project-scoped memory, evidence recall, reflection quality, voice capture, Telegram UX, recurring practices, weekly creative progress"
     keywords:
       - film
-      - learning
-      - tutoring
-      - curriculum
+      - director
+      - creative
+      - continuity
+      - memory
+      - reflection
+      - evidence
+      - voice
+      - practice
+      - notes
+      - ideas
+      - deadlines
       - education
-      - bot
+      - telegram
       - assistant
     exclude_keywords:
       - fastapi

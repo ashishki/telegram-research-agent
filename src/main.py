@@ -45,7 +45,16 @@ def build_parser() -> argparse.ArgumentParser:
     bootstrap_parser.set_defaults(handler=handle_bootstrap)
 
     ingest_parser = subparsers.add_parser("ingest")
+    ingest_parser.add_argument("--skip-reactions", action="store_true", help="Skip Telegram reaction feedback sync")
     ingest_parser.set_defaults(handler=handle_ingest)
+
+    reaction_parser = subparsers.add_parser(
+        "sync-reactions",
+        help="Sync your Telegram post reactions into feedback and manual tags",
+    )
+    reaction_parser.add_argument("--days", type=int, default=14, help="Lookback window in days (default: 14)")
+    reaction_parser.add_argument("--limit", type=int, default=300, help="Maximum posts to inspect (default: 300)")
+    reaction_parser.set_defaults(handler=handle_sync_reactions)
 
     digest_parser = subparsers.add_parser("digest")
     digest_parser.add_argument("--force", action="store_true")
@@ -137,7 +146,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def handle_ingest(_: argparse.Namespace) -> int:
+def handle_ingest(args: argparse.Namespace) -> int:
     settings = load_settings()
 
     try:
@@ -162,6 +171,25 @@ def handle_ingest(_: argparse.Namespace) -> int:
             normalization_summary["skipped"],
             normalization_summary["errors"],
         )
+
+        if not getattr(args, "skip_reactions", False):
+            try:
+                from ingestion.reaction_sync import sync_reactions
+
+                LOGGER.info("Starting step=sync_reactions")
+                reaction_summary = asyncio.run(sync_reactions(settings, days=14, limit=300))
+                LOGGER.info(
+                    "Finished step=sync_reactions posts_checked=%d posts_with_reactions=%d "
+                    "applied_tags=%d applied_feedback=%d skipped_existing=%d errors=%d",
+                    reaction_summary["posts_checked"],
+                    reaction_summary["posts_with_reactions"],
+                    reaction_summary["applied_tags"],
+                    reaction_summary["applied_feedback"],
+                    reaction_summary["skipped_existing"],
+                    reaction_summary["errors"],
+                )
+            except Exception:
+                LOGGER.exception("Reaction sync failed; continuing ingest pipeline")
 
         LOGGER.info("Starting step=cluster")
         clusters = cluster_posts(settings)
@@ -224,6 +252,36 @@ def handle_bootstrap(_: argparse.Namespace) -> int:
         LOGGER.exception("Bootstrap failed")
         return 1
     return 0 if bootstrap_summary["errors"] == 0 and normalization_summary["errors"] == 0 else 1
+
+
+def handle_sync_reactions(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    try:
+        from ingestion.reaction_sync import sync_reactions
+
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+
+        LOGGER.info("Starting step=sync_reactions days=%d limit=%d", args.days, args.limit)
+        summary = asyncio.run(sync_reactions(settings, days=args.days, limit=args.limit))
+        LOGGER.info(
+            "Finished step=sync_reactions posts_checked=%d posts_with_reactions=%d "
+            "matched_reactions=%d applied_tags=%d applied_feedback=%d skipped_unknown=%d "
+            "skipped_existing=%d errors=%d",
+            summary["posts_checked"],
+            summary["posts_with_reactions"],
+            summary["matched_reactions"],
+            summary["applied_tags"],
+            summary["applied_feedback"],
+            summary["skipped_unknown"],
+            summary["skipped_existing"],
+            summary["errors"],
+        )
+    except Exception:
+        LOGGER.exception("Reaction sync failed")
+        return 1
+    return 0 if summary["errors"] == 0 else 1
 
 
 def handle_normalize(_: argparse.Namespace) -> int:

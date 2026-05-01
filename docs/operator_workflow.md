@@ -107,10 +107,33 @@ While reading the weekly brief:
 /study_done [notes]           -> mark this week's plan as completed
 ```
 
+For lower-friction source-post feedback, react to the original Telegram channel post and run:
+
+```bash
+python3 src/main.py sync-reactions --days 14
+```
+
+The weekly `ingest` command also runs this sync unless `--skip-reactions` is passed.
+
+Default reaction mapping:
+- `🔥`, `⭐`, `❤️` -> `strong` + `marked_important`
+- `👍`, `👏` -> `interesting` + `marked_important`
+- `👀`, `🤔` -> `read_later`
+- `⚡`, `🛠️` -> `try_in_project`
+- `✅` -> `try_in_project` + `acted_on`
+- `👎`, `💩`, `❌` -> `low_signal` + `skipped`
+
 The study plan now has a weekly completion loop:
 1. The system sends one reminder per week
 2. You complete the plan and mark it with `/study_done`
 3. Completed study history is fed into future study plans and recommendations
+
+Implementation Ideas are also sent as short Telegram feedback cards after the Telegraph link.
+Use the inline buttons to record the decision without typing commands:
+- `✅ сделал` -> `acted_on`
+- `🕒 позже` -> `deferred`
+- `⛔ отказал` -> `rejected`
+- `🧠 интересно` -> `deferred` with an "interesting" note
 
 ---
 

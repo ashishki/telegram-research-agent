@@ -51,6 +51,7 @@ MAX_STRONG = 3
 MAX_WATCH = 3
 MAX_CULTURAL = 1
 MAX_OUTPUT_WORDS = 600
+LOW_SIGNAL_MIN_ACTIONABLE = 1
 
 
 def _utc_now() -> datetime:
@@ -131,6 +132,31 @@ def _build_review_notification(week_label: str, strong_count: int, watch_count: 
     )[:300]
 
 
+def _build_digest_health_alert(
+    week_label: str,
+    *,
+    post_count: int,
+    strong_count: int,
+    watch_count: int,
+    channel_count: int = 0,
+    topic_count: int = 0,
+) -> str | None:
+    actionable_count = strong_count + watch_count
+    if post_count <= 0:
+        return (
+            f"Research pipeline alert {week_label}\n"
+            "No Telegram posts were available for the last 7 days.\n"
+            "Check ingestion credentials, active channels, and service schedule."
+        )[:300]
+    if actionable_count < LOW_SIGNAL_MIN_ACTIONABLE:
+        return (
+            f"Research pipeline alert {week_label}\n"
+            f"{post_count} posts from {channel_count} channels, but 0 strong/watch signals.\n"
+            f"Topics: {topic_count}. Check scoring thresholds, reaction feedback, and channel quality."
+        )[:300]
+    return None
+
+
 def _load_delivery_state(connection: sqlite3.Connection, week_label: str) -> dict[str, str]:
     row = connection.execute(
         """
@@ -182,6 +208,7 @@ def _send_weekly_review_to_telegram_owner(
     watch_count: int,
     html_path: Path | None,
     force_delivery: bool = False,
+    health_alert: str | None = None,
 ) -> None:
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
     chat_id = os.environ.get("TELEGRAM_OWNER_CHAT_ID", "").strip()
@@ -194,6 +221,8 @@ def _send_weekly_review_to_telegram_owner(
         return
 
     notification = _build_review_notification(week_label, strong_count, watch_count)
+    if health_alert:
+        notification = f"{health_alert}\n\n{notification}"[:700]
 
     # Try Telegraph first
     if html_path is not None:
@@ -585,6 +614,12 @@ def run_digest(settings: Settings, force_delivery: bool = False) -> DigestResult
                 output_word_count=empty_word_count,
             )
             connection.commit()
+            health_alert = _build_digest_health_alert(
+                week_label,
+                post_count=0,
+                strong_count=0,
+                watch_count=0,
+            )
             try:
                 _send_weekly_review_to_telegram_owner(
                     connection=connection,
@@ -594,6 +629,7 @@ def run_digest(settings: Settings, force_delivery: bool = False) -> DigestResult
                     watch_count=0,
                     html_path=html_path,
                     force_delivery=force_delivery,
+                    health_alert=health_alert,
                 )
             except Exception:
                 LOGGER.warning("Failed to send digest to Telegram owner week=%s", week_label, exc_info=True)
@@ -699,6 +735,17 @@ def run_digest(settings: Settings, force_delivery: bool = False) -> DigestResult
             output_word_count, output_path,
         )
 
+        health_alert = _build_digest_health_alert(
+            week_label,
+            post_count=post_count,
+            strong_count=buckets["bucket_counts"]["strong"],
+            watch_count=buckets["bucket_counts"]["watch"],
+            channel_count=channel_count,
+            topic_count=len(topic_counts),
+        )
+        if health_alert:
+            LOGGER.warning("Digest health alert week=%s alert=%s", week_label, health_alert.replace("\n", " | "))
+
         try:
             _send_weekly_review_to_telegram_owner(
                 connection=connection,
@@ -708,6 +755,7 @@ def run_digest(settings: Settings, force_delivery: bool = False) -> DigestResult
                 watch_count=buckets["bucket_counts"]["watch"],
                 html_path=html_path,
                 force_delivery=force_delivery,
+                health_alert=health_alert,
             )
         except Exception:
             LOGGER.warning("Failed to send digest to Telegram owner week=%s", week_label, exc_info=True)

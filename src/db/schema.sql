@@ -85,6 +85,16 @@ CREATE TABLE IF NOT EXISTS post_project_links (
     FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS reaction_sync_state (
+    source TEXT NOT NULL,
+    channel_username TEXT NOT NULL,
+    message_id INTEGER NOT NULL,
+    emoji TEXT NOT NULL,
+    action_key TEXT NOT NULL,
+    applied_at TEXT NOT NULL,
+    PRIMARY KEY(source, channel_username, message_id, emoji, action_key)
+);
+
 CREATE VIRTUAL TABLE IF NOT EXISTS posts_fts USING fts5(
     content,
     content='posts',

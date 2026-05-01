@@ -2,11 +2,13 @@ import logging
 import os
 import re
 import sqlite3
+import html
 from datetime import timezone, date, datetime, timedelta
 from pathlib import Path
 
 import yaml
 
+from bot.callbacks import build_idea_feedback_markup
 from db.retrieval import fetch_decisions, fetch_evidence_items
 from config.settings import PROJECT_ROOT, Settings
 from bot.telegram_delivery import send_text
@@ -23,6 +25,7 @@ OUTPUT_DIR = PROJECT_ROOT / "data" / "output" / "recommendations"
 PROJECTS_YAML_PATH = Path(__file__).resolve().parents[1] / "config" / "projects.yaml"
 INLINE_URL_RE = re.compile(r"(?<![\"'>])(https?://[^\s<]+)")
 TELEGRAM_URL_RE = re.compile(r"https?://t\.me/[A-Za-z0-9_]+/\d+(?:\?[^\s<]+)?", re.IGNORECASE)
+HTML_TAG_RE = re.compile(r"<[^>]+>")
 
 
 def _utc_now() -> datetime:
@@ -455,6 +458,53 @@ def _build_notification(week_label: str) -> str:
     )[:300]
 
 
+def _strip_html(value: str) -> str:
+    return re.sub(r"\s+", " ", HTML_TAG_RE.sub(" ", html.unescape(value or ""))).strip()
+
+
+def _load_feedback_cards(connection: sqlite3.Connection, week_label: str, limit: int = 3) -> list[sqlite3.Row]:
+    return connection.execute(
+        """
+        SELECT id, title, reason, recommendation
+        FROM insight_triage_records
+        WHERE week_label = ?
+          AND recommendation IN ('do_now', 'backlog')
+        ORDER BY
+            CASE recommendation
+                WHEN 'do_now' THEN 0
+                WHEN 'backlog' THEN 1
+                ELSE 9
+            END,
+            id ASC
+        LIMIT ?
+        """,
+        (week_label, limit),
+    ).fetchall()
+
+
+def _build_feedback_card_text(row: sqlite3.Row, week_label: str) -> str:
+    title = _strip_html(str(row["title"] or "Implementation idea"))
+    reason = _strip_html(str(row["reason"] or ""))
+    lines = [
+        f"Идея {week_label} #{row['id']}",
+        title,
+    ]
+    if reason:
+        lines.append(reason)
+    return "\n".join(lines)[:900]
+
+
+def _send_feedback_cards(connection: sqlite3.Connection, week_label: str, token: str, chat_id: str) -> None:
+    for row in _load_feedback_cards(connection, week_label):
+        send_text(
+            chat_id=chat_id,
+            text=_build_feedback_card_text(row, week_label),
+            token=token,
+            parse_mode=None,
+            reply_markup=build_idea_feedback_markup(int(row["id"])),
+        )
+
+
 def _send_recommendations_to_telegram_owner(
     connection: sqlite3.Connection,
     week_label: str,
@@ -476,6 +526,10 @@ def _send_recommendations_to_telegram_owner(
             html_content = html_path.read_text(encoding="utf-8")
             url = publish_article(title=f"Implementation Ideas {week_label}", html_content=html_content)
             send_text(chat_id=chat_id, text=f"{notification}\n{url}", token=token, parse_mode=None)
+            try:
+                _send_feedback_cards(connection, week_label, token, chat_id)
+            except Exception:
+                LOGGER.warning("Failed to send implementation idea feedback cards week=%s", week_label, exc_info=True)
             _mark_delivery_state(connection, week_label, telegraph_url=url, telegram_sent_at=_utc_now_iso())
             connection.commit()
             LOGGER.info("Implementation ideas published to Telegraph week=%s url=%s", week_label, url)
@@ -483,6 +537,10 @@ def _send_recommendations_to_telegram_owner(
         except Exception:
             LOGGER.warning("Failed to publish implementation ideas week=%s", week_label, exc_info=True)
     send_text(chat_id=chat_id, text=notification, token=token, parse_mode=None)
+    try:
+        _send_feedback_cards(connection, week_label, token, chat_id)
+    except Exception:
+        LOGGER.warning("Failed to send implementation idea feedback cards week=%s", week_label, exc_info=True)
     _mark_delivery_state(connection, week_label, telegram_sent_at=_utc_now_iso())
     connection.commit()
 

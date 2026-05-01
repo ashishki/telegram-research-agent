@@ -34,6 +34,7 @@ import output.generate_digest as gd  # noqa: E402  (must come after mock)
 from output.generate_digest import (
     MAX_OUTPUT_WORDS,
     _append_github_section,
+    _build_digest_health_alert,
     _count_words,
 )
 
@@ -83,6 +84,51 @@ class TestWordCountGate(unittest.TestCase):
                     MAX_OUTPUT_WORDS,
                 )
             mock_warning.assert_not_called()
+
+
+class TestDigestHealthAlert(unittest.TestCase):
+    def test_empty_week_alert_points_to_ingestion(self):
+        alert = _build_digest_health_alert(
+            "2026-W18",
+            post_count=0,
+            strong_count=0,
+            watch_count=0,
+        )
+
+        self.assertIsNotNone(alert)
+        self.assertIn("No Telegram posts", alert or "")
+        self.assertIn("Check ingestion", alert or "")
+
+    def test_low_signal_week_alert_points_to_scoring(self):
+        alert = _build_digest_health_alert(
+            "2026-W18",
+            post_count=42,
+            strong_count=0,
+            watch_count=0,
+            channel_count=7,
+            topic_count=3,
+        )
+
+        self.assertIsNotNone(alert)
+        self.assertIn("0 strong/watch", alert or "")
+        self.assertIn("scoring thresholds", alert or "")
+
+    def test_actionable_week_has_no_alert(self):
+        alert = _build_digest_health_alert(
+            "2026-W18",
+            post_count=42,
+            strong_count=1,
+            watch_count=0,
+            channel_count=7,
+            topic_count=3,
+        )
+
+        self.assertIsNone(alert)
+
+
+class TestDigestHelpers(unittest.TestCase):
+    def _make_long_text(self, word_count: int) -> str:
+        return " ".join(["word"] * word_count)
 
     def test_count_words_helper_counts_correctly(self):
         """_count_words splits on whitespace — sanity check."""
