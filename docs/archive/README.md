@@ -2,14 +2,17 @@
 
 This directory stores historical documentation that should not be treated as active execution guidance.
 
-Current active AI-development documents live in:
+Current active documentation is indexed in `docs/README.md`.
 
-- `docs/tasks.md`
-- `docs/memory_architecture.md`
-- `docs/architecture.md`
-- `docs/dev-cycle.md`
-- `docs/IMPLEMENTATION_CONTRACT.md`
-- `docs/CODEX_PROMPT.md`
-- `docs/prompts/workflow_*.md`
+## Contents
 
-Anything under `docs/archive/` is historical context only.
+| Path | Contents |
+|---|---|
+| `baseline/` | Historical representative output snapshots |
+| `legacy_audit/` | Superseded audit prompts and reports |
+| `portfolio/` | Case study and demo walkthrough material |
+| `reviews/` | Older architecture/review notes |
+| `roadmaps/` | Completed or superseded roadmap files |
+| `session-reports/` | Historical session reports |
+
+Anything under `docs/archive/` is reference material only. Do not use it as the current source of truth for implementation or operations.

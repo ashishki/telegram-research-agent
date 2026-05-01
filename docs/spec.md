@@ -599,38 +599,35 @@ Summary:
 See `docs/dev-cycle.md` for full process.
 
 Summary:
-1. **Strategist:** defines phase scope, dependencies, quality gates, and documentation deltas.
-2. **Orchestrator:** selects the current phase, checks readiness, and packages bounded work.
-3. **Codex:** implements only the active phase packet.
+1. **Strategist:** defines work-item scope, dependencies, quality gates, and documentation deltas.
+2. **Orchestrator:** selects the current backlog item, checks readiness, and packages bounded work.
+3. **Codex:** implements only the active packet.
 4. **Reviewer:** checks architecture, quality gates, routing/output contracts, and regression risk.
 5. **Fixes:** address review findings only.
-6. Living docs remain synchronized after each phase.
+6. Living docs remain synchronized after each packet.
 
 This workflow also applies to meta-quality improvements in AI-generated artifacts themselves.
-If the system starts producing technically plausible but operationally weak implementation ideas, that becomes roadmap work only after it is expressed as a bounded phase in `docs/tasks.md`, not as an ad hoc prompt tweak.
+If the system starts producing technically plausible but operationally weak implementation ideas, that becomes backlog work only after it is expressed as a bounded item in `docs/tasks.md`, not as an ad hoc prompt tweak.
 
 ---
 
-## 17. Phase Implementation Plan
+## 17. Active Maintenance Backlog
 
-| Phase | Name | Deliverables |
-|---|---|---|
-| 1 | Baseline Stabilization | aligned docs, baseline metrics, frozen current-state contracts |
-| 2 | Scoring Foundation | reliable signal buckets, scoring evidence, score distribution metrics |
-| 3 | Model Routing | `CHEAP / MID / STRONG` tiers, routing policy, budget-aware execution |
-| 4 | Signal-First Output | Strong signals / Project relevance / Weak signals / Think layer / Light-culture / Ignored |
-| 5 | Project Relevance Upgrade | stronger project matching, clearer relevance rationale and tiering |
-| 6 | Personalization / Taste Model | user profile, preference memory, downranking and re-ranking rules |
-| 7 | Learning Layer Refinement | learning guidance tied to validated signals, projects, and personal context |
-| 8 | Productization / Surface Layer | operator-facing delivery, observability, release-ready surfaces |
+The historical roadmap is archived under `docs/archive/roadmaps/`. Current work is
+tracked as small, reviewable maintenance items in `docs/tasks.md`.
 
-Roadmap v3 extensions may add post-surface control phases when artifact quality itself becomes the bottleneck. One concrete example is an `Insight Triage` phase that separates actionable implementation ideas from backlog or reject/defer noise.
+| Lane | Deliverables |
+|---|---|
+| Feedback | reaction sync, inline decisions, explicit operator feedback history |
+| Quality | digest health checks, signal quality tracking, evaluation fixtures |
+| Cost | token/cost baselines and model routing visibility |
+| Docs | README, active docs, archive hygiene |
 
 ---
 
 ## 18. Codex Task Graph
 
-See `docs/tasks.md` for full graph with dependencies.
+See `docs/tasks.md` for the active backlog and success criteria.
 
 ---
 
@@ -691,7 +688,7 @@ See `docs/tasks.md` for full graph with dependencies.
 
 ## 20. Claude Review Checklist
 
-Per phase, the Claude Reviewer must verify:
+Per bounded packet, the reviewer must verify:
 
 **Architecture adherence:**
 - [ ] No writes to `/srv/openclaw-you/state`
@@ -718,21 +715,21 @@ Per phase, the Claude Reviewer must verify:
 **Routing / cost controls:**
 - [ ] Expensive model usage is justified by routing policy
 - [ ] Tier usage is measurable
-- [ ] Cost impact is observable for the phase
+- [ ] Cost impact is observable when the change touches LLM usage
 
 **Output / product clarity:**
-- [ ] Output structure matches the current phase contract
+- [ ] Output structure matches the current report contract
 - [ ] Ignored/noise handling is explicit where required
 - [ ] Project relevance is kept distinct from general importance
 
 **Personalization guardrails:**
 - [ ] Personalization does not override evidence-based signal quality
 - [ ] Preference rules are explainable
-- [ ] Personalization work is not introduced before the roadmap allows it
+- [ ] Personalization work is introduced only when the backlog item explicitly requires it
 
 **Documentation:**
-- [ ] Living docs updated after phase
-- [ ] New modules have corresponding task entries marked complete
+- [ ] Living docs updated after the packet
+- [ ] New modules have corresponding backlog entries marked complete or linked
 
 ---
 

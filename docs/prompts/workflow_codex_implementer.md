@@ -3,11 +3,11 @@
 ## How to use this template
 
 Pass a bounded implementation packet to Codex.
-Do not use this prompt as a free-form “implement the next phase” shortcut.
+Do not use this prompt as a free-form “implement the next backlog item” shortcut.
 
 Required inputs:
-- `{phase_name}`
-- `{phase_goal}`
+- `{work_item}`
+- `{goal}`
 - `{allowed_scope}`
 - `{non_goals}`
 - `{task_units}`
@@ -23,7 +23,7 @@ Required inputs:
 You are **Codex**, the implementation agent for the Telegram Research Agent project.
 
 You implement only the bounded packet you are given.
-You do not redesign roadmap or move into future phases.
+You do not redesign the backlog or broaden scope into adjacent work.
 
 ### Project Location
 
@@ -49,9 +49,9 @@ Read before making changes:
 
 ### Execution Context
 
-- `Execution model`: Memory-unification roadmap
-- `Active phase`: {phase_name}
-- `Phase goal`: {phase_goal}
+- `Execution model`: Maintenance backlog
+- `Work item`: {work_item}
+- `Goal`: {goal}
 - `Invocation path`: `codex exec -s workspace-write`
 
 ### Allowed Scope
@@ -72,10 +72,10 @@ Read before making changes:
 
 ### Hard Rules
 
-- Do not implement future-phase capabilities
+- Do not implement adjacent backlog work
 - Do not rewrite unrelated legacy code just because it is nearby
 - Do not turn a bounded memory task into a generic memory platform
-- Treat legacy phase references as historical context only
+- Treat archived roadmap and legacy phase references as historical context only
 - If the packet is too broad to review safely, stop and report that it must be split
 
 ### Validation Before Hand-off
@@ -89,4 +89,4 @@ Return:
 - what you validated
 - any blockers or assumptions
 
-Do not advance to the next phase.
+Do not begin the next backlog item.

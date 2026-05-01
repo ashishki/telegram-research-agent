@@ -1,18 +1,19 @@
 # CODEX_PROMPT — Session Handoff
-_v3.2 · 2026-04-20 · telegram-research-agent_
+_v3.3 · 2026-05-01 · telegram-research-agent_
 
 ---
 
 ## Current State
 
-- Phases 1–5 complete.
-- Phase 5 (Autonomous Signal Discovery) shipped 2026-04-20:
-  - Preference judge prompt relaxed — `include=True` by default for any actionable signal
-  - `_build_auto_watch_lines` gate softened — uses `category + confidence ≥ 0.65` instead of requiring `include=True`
-  - `run_recommendations` silent crash fixed — snapshot refresh failure now logged with traceback; LLM call proceeds with fallback context
-  - "What Changed" baseline fixed — `db_path` threaded from `settings` through to `_load_previous_quality_metrics`
-- All roadmap phases (1–5) are complete. No active phase.
-- `pytest` available via: `python3 -m pytest`
+- Memory unification and Roadmap v3 are complete.
+- Recent shipped changes:
+  - Telegram reaction sync imports source-post reactions as tags/feedback.
+  - Implementation Ideas now send inline feedback cards and record decisions in `decision_journal`.
+  - Empty/low-signal digest health alerts are included in delivery notifications.
+  - `src/config/projects.yaml` has current project context for active repos.
+  - README/docs were cleaned; historical material moved under `docs/archive/`.
+- Active work is maintenance/backlog driven from `docs/tasks.md`.
+- In this environment, `pytest` may be unavailable; verified fallback is `PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m unittest ...`.
 - Orchestrator-to-Codex execution path: write prompt to file, then `codex exec -s workspace-write < /tmp/prompt.md`
 
 ---
@@ -32,7 +33,9 @@ _v3.2 · 2026-04-20 · telegram-research-agent_
 
 ## Known Open Issues
 
-- `strong_count = 0` for W15–W17 — scoring calibration, separate from current phase.
+- Live validation still needed for Telegram reaction visibility through Telethon.
+- Live validation still needed for inline callback handling in the deployed bot process.
+- Low-signal weeks now produce alerts, but long-term quality trend reporting is still backlog work.
 
 ---
 
@@ -49,9 +52,9 @@ The weekly pipeline now has:
 
 ## Exact Next Execution Step
 
-No active phase. Phases 1–6 complete.
+No active phase. Use `docs/tasks.md` as the maintenance backlog.
 
-If starting a new phase, read `docs/tasks.md` in full, define scope, dependencies, and success criteria before sending anything to Codex.
+Before implementation, define scope, touched files, acceptance criteria, and verification command.
 
 Reference documents:
 

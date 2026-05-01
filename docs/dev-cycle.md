@@ -1,8 +1,8 @@
 # Telegram Research Agent — Development Cycle
 
-**Version:** 3.0
-**Date:** 2026-04-07
-**Status:** Memory-unification workflow active
+**Version:** 3.1
+**Date:** 2026-05-01
+**Status:** Maintenance workflow active
 
 ---
 
@@ -14,7 +14,7 @@ Development follows a bounded AI-assisted loop:
 Strategist -> Orchestrator -> Codex -> Review -> Fixes
 ```
 
-The active program is the memory-unification roadmap in `docs/tasks.md`, not the older roadmap generations.
+The memory-unification roadmap is complete and archived. The active queue is the lightweight maintenance backlog in `docs/tasks.md`.
 
 The workflow exists to enforce:
 
@@ -28,14 +28,16 @@ The workflow exists to enforce:
 
 ## Active Execution Model
 
-Current phase order:
+Current execution is maintenance-oriented:
 
-1. Phase 1 — Memory Contract And Inventory ✓
-2. Phase 2 — MVP Memory Unification ✓
-3. Phase 3 — Wire Memory Into Weekly Outputs ✓
-4. Phase 4 — Observability And Evaluation ✓
-5. Phase 5 — Autonomous Signal Discovery ✓
-6. Phase 6 — Fix SQLite Transaction Conflicts ✓
+1. Pick one item from `docs/tasks.md`.
+2. Define scope, touched files, acceptance criteria, and verification command.
+3. Implement narrowly.
+4. Run focused tests.
+5. Update docs when behavior or operator workflow changes.
+6. Commit only the relevant files.
+
+Completed roadmap history is archived under `docs/archive/roadmaps/` and `docs/archive/legacy_audit/`.
 
 Reference documents:
 
@@ -60,7 +62,7 @@ Owns:
 
 Must produce:
 
-- exact phase scope
+- exact work-item scope
 - dependencies
 - success criteria
 - stop conditions
@@ -70,7 +72,7 @@ Must produce:
 
 Owns:
 
-- current phase selection from `docs/tasks.md`
+- current work-item selection from `docs/tasks.md`
 - dependency checks
 - bounded implementation packet for Codex
 - bounded review packet for the reviewer
@@ -78,7 +80,7 @@ Owns:
 
 Must not:
 
-- hand Codex a multi-phase packet
+- hand Codex a mixed-scope packet
 - use legacy roadmap phases as the active execution source
 
 Execution path:
@@ -152,19 +154,19 @@ Must not:
 
 - verify docs and code still match
 - verify non-goals were respected
-- verify the packet did not leak into a later phase
+- verify the packet did not leak into adjacent backlog work
 
 ### Before advancing
 
 - review must pass
-- phase success criteria must be evidenced
-- next phase must be startable without reinterpretation
+- work-item success criteria must be evidenced
+- adjacent backlog work must be startable without reinterpretation
 
 ---
 
 ## Mandatory Review Checks
 
-Every phase review must cover:
+Every packet review must cover:
 
 - architecture adherence
 - scope adherence

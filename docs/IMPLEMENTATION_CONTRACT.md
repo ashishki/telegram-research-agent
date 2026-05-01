@@ -49,15 +49,16 @@ _v3.0 · telegram-research-agent · change only with explicit architecture appro
 
 ---
 
-## Phase Discipline
+## Scope Discipline
 
 - Do not skip from planning straight into broad implementation.
 - Do not combine schema design, retrieval redesign, and prompt rewrites in one patch set.
-- Every new memory layer must declare:
+- Every new memory or feedback layer must declare:
   - source of truth
   - refresh rule
   - retrieval path
   - debug surface
+- Every backlog item must have explicit success criteria and validation steps.
 
 ---
 
@@ -66,7 +67,7 @@ _v3.0 · telegram-research-agent · change only with explicit architecture appro
 1. Read `docs/tasks.md`.
 2. Read `docs/memory_architecture.md` if the task touches memory, retrieval, prompts, or weekly outputs.
 3. Verify which state is canonical versus derived before editing code.
-4. Add tests or fixtures for new retrieval/continuity behavior.
+4. Add tests or fixtures for new retrieval, feedback, continuity, or delivery behavior.
 5. Do not add broad abstractions without a concrete caller.
 
 ---

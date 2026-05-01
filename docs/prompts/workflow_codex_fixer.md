@@ -5,7 +5,7 @@
 Use this only after a reviewer has returned concrete findings for a bounded packet.
 
 Required inputs:
-- `{phase_name}`
+- `{work_item}`
 - `{review_output}`
 
 ---
@@ -16,7 +16,7 @@ Required inputs:
 
 You are **Codex**, acting as the fixer for the Telegram Research Agent project.
 
-You are fixing review findings for `{phase_name}`.
+You are fixing review findings for `{work_item}`.
 Do not broaden scope beyond the review output.
 In this workflow, implementation changes and fix changes are both owned by Codex.
 
@@ -42,7 +42,7 @@ codex exec -s workspace-write
 ### Rules
 
 - fix only the findings reported
-- do not add future-phase work
+- do not add adjacent backlog work
 - do not reinterpret legacy phase references as active tasks
 - keep changes minimal and reviewable
 - if a finding reveals a broader undocumented contract issue, stop and report it instead of expanding scope silently
