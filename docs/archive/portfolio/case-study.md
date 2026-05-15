@@ -126,8 +126,8 @@ After several weeks, `tune-suggestions` surfaces topics that appear frequently i
 - Runs on a personal VPS via systemd timer — no manual intervention
 - Idempotent ingestion (no duplicate posts on re-run)
 - All config in YAML — no database schema changes needed for tuning
-- Full observability: cost trends, score distribution trends, health-check with stuck queue detection
-- 106 tests, CI on every push
+- Full observability: cost trends, score distribution trends, health-check with stuck queue detection and project-link counters
+- 191 tests, CI on every push
 - Fallback at every external dependency (Telegraph, Telegram Bot API, DB)
 
 ---
@@ -140,7 +140,7 @@ After several weeks, `tune-suggestions` surfaces topics that appear frequently i
 - It doesn't replace reading — it filters down to what deserves reading
 
 **Known constraints:**
-- Project relevance is keyword-based, not semantic — "fastapi" matches "FastAPI" but not "the web framework"
+- Project relevance is keyword-based, not semantic, but the matcher is now auditable through `memory diagnose-project-signals`
 - Cultural bucket is keyword-triggered — cultural signal detection is heuristic
 - Learning gaps require topic clusters — needs clustering step to run first
 

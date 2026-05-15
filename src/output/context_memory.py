@@ -31,6 +31,27 @@ def _load_curated_project_configs() -> list[dict]:
     return [project for project in projects if isinstance(project, dict)]
 
 
+def _curated_project_aliases() -> set[str]:
+    aliases: set[str] = set()
+    for project in _load_curated_project_configs():
+        for value in (project.get("name"), project.get("repo")):
+            alias = str(value or "").strip().lower()
+            if alias:
+                aliases.add(alias)
+    return aliases
+
+
+def _project_is_curated(project_name: str, github_repo: str) -> bool:
+    aliases = _curated_project_aliases()
+    if not aliases:
+        return True
+    return any(
+        value.strip().lower() in aliases
+        for value in (str(project_name or ""), str(github_repo or ""))
+        if value.strip()
+    )
+
+
 def _find_project_config(project_name: str, github_repo: str) -> dict:
     normalized_name = (project_name or "").strip().lower()
     normalized_repo = (github_repo or "").strip().lower()
@@ -411,10 +432,15 @@ def refresh_all_project_context_snapshots(connection: sqlite3.Connection) -> Non
     if not rows:
         return
     for row in rows:
+        if not _project_is_curated(str(row["name"] or ""), str(row["github_repo"] or "")):
+            continue
         config = _find_project_config(str(row["name"] or ""), str(row["github_repo"] or ""))
         raw_keywords = row["keywords"]
         keywords: list[str] = []
-        if raw_keywords:
+        config_keywords = config.get("keywords")
+        if isinstance(config_keywords, list) and config_keywords:
+            keywords = [str(item).strip() for item in config_keywords if str(item).strip()]
+        elif raw_keywords:
             try:
                 parsed = json.loads(raw_keywords)
             except (TypeError, ValueError):
@@ -423,8 +449,6 @@ def refresh_all_project_context_snapshots(connection: sqlite3.Connection) -> Non
                 keywords = [str(item).strip() for item in parsed if str(item).strip()]
             elif isinstance(parsed, str):
                 keywords = [part.strip() for part in parsed.split(",") if part.strip()]
-        if not keywords:
-            keywords = [str(item).strip() for item in config.get("keywords", []) if str(item).strip()]
         refresh_project_context_snapshot(
             connection=connection,
             project_id=int(row["id"]),
@@ -458,6 +482,11 @@ def load_project_context(connection: sqlite3.Connection, project_names: list[str
         return []
     snapshots: list[dict] = []
     for row in rows:
+        if project_names is None and not _project_is_curated(
+            str(row["project_name"] or ""),
+            str(row["github_repo"] or ""),
+        ):
+            continue
         try:
             context = json.loads(row["context_json"] or "{}")
         except json.JSONDecodeError:

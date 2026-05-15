@@ -92,6 +92,60 @@ class TestProjectRelevance(unittest.TestCase):
 
         self.assertIn("workflow", results[0]["rationale"].lower())
 
+    def test_multiword_explicit_keyword_matches_by_component_tokens(self):
+        projects = [
+            {
+                "name": "gdev-agent",
+                "description": "",
+                "focus": "",
+                "keywords": ["service layer patterns", "cost control", "async FastAPI"],
+            }
+        ]
+
+        results = score_project_relevance("FastAPI async cost controls for service code", projects)
+
+        self.assertGreaterEqual(results[0]["score"], 0.6)
+        self.assertIn("fastapi", results[0]["rationale"].lower())
+
+    def test_short_language_keyword_does_not_match_inside_other_words(self):
+        projects = [
+            {
+                "name": "low-level-tool",
+                "description": "",
+                "focus": "",
+                "keywords": ["C"],
+            }
+        ]
+
+        results = score_project_relevance("Robotics competitions and model comparisons", projects)
+
+        self.assertEqual(results[0]["score"], 0.0)
+
+    def test_large_keyword_lists_use_capped_denominator(self):
+        projects = [
+            {
+                "name": "telegram-research-agent",
+                "description": "",
+                "focus": "",
+                "keywords": [
+                    "telegram digest",
+                    "research brief",
+                    "implementation ideas",
+                    "project insights",
+                    "context snapshots",
+                    "evidence",
+                    "memory",
+                    "topic detection",
+                    "diagnostics",
+                    "pipeline",
+                ],
+            }
+        ]
+
+        results = score_project_relevance("Add diagnostics for project signal pipeline", projects)
+
+        self.assertGreaterEqual(results[0]["score"], 0.5)
+
 
 if __name__ == "__main__":
     unittest.main()

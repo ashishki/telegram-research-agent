@@ -246,6 +246,50 @@ class TestRecordSignalEvidenceForManualTag(unittest.TestCase):
         ).fetchone()[0]
         self.assertEqual(count, 0)
 
+    def test_blank_manual_tag_content_is_skipped(self):
+        from db.evidence import record_signal_evidence_for_manual_tag
+
+        self.conn.execute("UPDATE posts SET content = '' WHERE id = 1")
+        self.conn.commit()
+
+        record_signal_evidence_for_manual_tag(self.conn, post_id=1, tag="strong")
+
+        count = self.conn.execute(
+            "SELECT COUNT(*) FROM signal_evidence_items"
+        ).fetchone()[0]
+        self.assertEqual(count, 0)
+
+
+class TestRecordSignalEvidenceForScoredPosts(unittest.TestCase):
+    def setUp(self):
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.db_path = str(Path(self.tmpdir.name) / "test.db")
+        self.conn = _run_migrations_for_test(self.db_path)
+        self.conn.execute(
+            "INSERT INTO raw_posts (id, channel_username, channel_id, message_id, posted_at, raw_json, ingested_at)"
+            " VALUES (1, 'testchan', 1, 100, '2026-04-07T10:00:00Z', '{}', '2026-04-07T10:00:00Z')"
+        )
+        self.conn.execute(
+            "INSERT INTO posts (id, raw_post_id, channel_username, content, posted_at, normalized_at, bucket)"
+            " VALUES (1, 1, 'testchan', '', '2026-04-07T10:00:00Z', '2026-04-07T10:00:00Z', 'watch')"
+        )
+        self.conn.commit()
+
+    def tearDown(self):
+        self.conn.close()
+        del os.environ["AGENT_DB_PATH"]
+        self.tmpdir.cleanup()
+
+    def test_blank_scored_post_content_is_skipped(self):
+        from db.evidence import record_signal_evidence_for_scored_posts
+
+        record_signal_evidence_for_scored_posts(self.conn, [1])
+
+        count = self.conn.execute(
+            "SELECT COUNT(*) FROM signal_evidence_items"
+        ).fetchone()[0]
+        self.assertEqual(count, 0)
+
 
 if __name__ == "__main__":
     unittest.main()

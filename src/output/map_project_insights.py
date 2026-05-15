@@ -7,6 +7,7 @@ from typing import Any
 
 from config.settings import PROJECT_ROOT, Settings
 from llm.client import LLMError, LLMSchemaError, complete_json
+from output.context_memory import _find_project_config, _project_is_curated
 from output.report_utils import _extract_markdown_section
 
 
@@ -58,6 +59,17 @@ def _split_keywords(keywords: str | None) -> list[str]:
         pass
     values = [part.strip() for part in keywords.split(",")]
     return [value for value in values if value]
+
+
+def _project_keywords_for_mapping(project: sqlite3.Row) -> list[str]:
+    config = _find_project_config(
+        str(project["name"] or ""),
+        str(project["github_repo"] or "") if "github_repo" in project.keys() else "",
+    )
+    config_keywords = config.get("keywords")
+    if isinstance(config_keywords, list) and config_keywords:
+        return [str(item).strip() for item in config_keywords if str(item).strip()]
+    return _split_keywords(project["keywords"])
 
 
 def _build_fts_query(keywords: list[str]) -> str:
@@ -245,7 +257,7 @@ def run_project_mapping(settings: Settings) -> dict:
 
         projects = connection.execute(
             """
-            SELECT id, name, description, keywords
+            SELECT id, name, description, keywords, github_repo
             FROM projects
             WHERE active = 1
             ORDER BY name ASC
@@ -258,8 +270,15 @@ def run_project_mapping(settings: Settings) -> dict:
             system_prompt, user_template = _load_prompt_sections()
 
             for project in projects:
+                if not _project_is_curated(str(project["name"] or ""), str(project["github_repo"] or "")):
+                    LOGGER.info(
+                        "Skipping project_id=%d name=%r because it is not in projects.yaml",
+                        project["id"],
+                        project["name"],
+                    )
+                    continue
                 result["projects_processed"] += 1
-                keywords = _split_keywords(project["keywords"])
+                keywords = _project_keywords_for_mapping(project)
                 if not keywords:
                     LOGGER.info(
                         "Skipping project_id=%d name=%r because it has no keywords",

@@ -536,12 +536,13 @@ These surfaces must exist before Phase 3 output integration ships.
 
 | CLI command | What it shows |
 |---|---|
-| `memory inspect evidence --project X --week LABEL` | Evidence items for that project and week, including `source_channel`, `message_url`, and `selection_reason` |
-| `memory inspect evidence --kind strong_signal` | Evidence items of that kind sorted by `posted_at` descending |
-| `memory inspect decisions --project X` | `decision_journal` rows for the project, newest first, with `status` and `reason` |
-| `memory inspect decisions --scope insight --status rejected` | Rejected insight decisions |
-| `memory inspect stale-snapshots` | `project_context_snapshots` rows where `snapshot_week_label` is older than two weeks |
-| `memory inspect suppression --title '...'` | `insight_rejection_memory` fingerprint lookup plus matching `decision_journal` rows explaining why the idea was suppressed |
+| `memory inspect-evidence --project X --week LABEL` | Evidence items for that project and week, including `source_channel`, `message_url`, and `selection_reason` |
+| `memory inspect-evidence --kind strong_signal` | Evidence items of that kind sorted by `posted_at` descending |
+| `memory inspect-decisions --project X` | `decision_journal` rows for the project, newest first, with `status` and `reason` |
+| `memory inspect-decisions --scope insight --status rejected` | Rejected insight decisions |
+| `memory inspect-snapshots --stale-only` | Curated `project_context_snapshots` rows where `snapshot_week_label` is older than two weeks |
+| `memory inspect-suppression --title '...'` | `insight_rejection_memory` fingerprint lookup plus matching `decision_journal` rows explaining why the idea was suppressed |
+| `memory diagnose-project-signals --week LABEL` | Per-project explanation of digest topics that linked, stayed candidates, or were dropped |
 
 ### Provenance completeness eval gate
 

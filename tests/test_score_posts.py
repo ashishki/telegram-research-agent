@@ -304,6 +304,87 @@ class TestScorePostsPersistence(unittest.TestCase):
         self.assertIsNotNone(row[0])
         self.assertGreaterEqual(row[0], 0.0)
 
+    def test_score_posts_stores_project_matches_json(self):
+        with sqlite3.connect(self.db_path) as connection:
+            connection.execute(
+                """
+                UPDATE posts
+                SET content = ?
+                WHERE id = 1
+                """,
+                ("Telegram digest clustering quality delivery workflow signal scoring",),
+            )
+            connection.commit()
+
+        score_posts(self.settings, since_days=7)
+
+        with sqlite3.connect(self.db_path) as connection:
+            row = connection.execute(
+                "SELECT project_matches FROM posts WHERE id = 1"
+            ).fetchone()
+
+        matches = json.loads(row[0])
+        self.assertTrue(any(match["name"] == "telegram-research-agent" for match in matches))
+
+    def test_score_posts_creates_high_confidence_project_links(self):
+        now_iso = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        with sqlite3.connect(self.db_path) as connection:
+            connection.execute(
+                """
+                INSERT INTO projects (
+                    name, description, keywords, active, github_repo, last_commit_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "ashishki/telegram-research-agent",
+                    "Weekly digest from Telegram channels",
+                    json.dumps(["digest", "clustering", "quality", "delivery", "workflow", "signal", "scoring"]),
+                    1,
+                    "ashishki/telegram-research-agent",
+                    now_iso,
+                ),
+            )
+            connection.execute(
+                """
+                UPDATE posts
+                SET content = ?, word_count = ?, has_code = ?, url_count = ?
+                WHERE id = 1
+                """,
+                ("Telegram digest clustering quality delivery workflow signal scoring", 90, 1, 2),
+            )
+            connection.execute(
+                """
+                INSERT INTO user_post_tags (post_id, tag, note, recorded_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (1, "strong", "", now_iso),
+            )
+            connection.commit()
+
+        score_posts(self.settings, since_days=7)
+
+        with sqlite3.connect(self.db_path) as connection:
+            row = connection.execute(
+                """
+                SELECT COUNT(*)
+                FROM post_project_links ppl
+                JOIN projects p ON p.id = ppl.project_id
+                WHERE ppl.post_id = 1
+                  AND p.name = 'ashishki/telegram-research-agent'
+                  AND ppl.tier = 'deterministic'
+                """
+            ).fetchone()
+            evidence_row = connection.execute(
+                """
+                SELECT project_names_json
+                FROM signal_evidence_items
+                WHERE post_id = 1 AND evidence_kind = 'strong_signal'
+                """
+            ).fetchone()
+
+        self.assertEqual(row[0], 1)
+        self.assertIn("telegram-research-agent", json.loads(evidence_row[0]))
+
     def test_recent_channel_feedback_outweighs_old_feedback(self):
         now_iso = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
         old_iso = datetime(2025, 1, 1, tzinfo=timezone.utc).isoformat().replace("+00:00", "Z")

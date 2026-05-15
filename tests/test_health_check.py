@@ -89,6 +89,9 @@ class TestHealthCheckCli(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertIn("posts:", output)
         self.assertIn("llm_usage:", output)
+        self.assertIn("active_projects:", output)
+        self.assertIn("project_matches_present:", output)
+        self.assertIn("post_project_links:", output)
 
     def test_health_check_without_db_path_prints_not_configured(self):
         stdout = io.StringIO()

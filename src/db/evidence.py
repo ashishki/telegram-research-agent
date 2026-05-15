@@ -87,9 +87,12 @@ def record_signal_evidence_for_scored_posts(
     week_label = _current_week_label()
     created_at = _now_iso()
     for row in rows:
+        excerpt_text = _truncate(row[3], 500)
+        if not excerpt_text.strip():
+            continue
         connection.execute(
             """
-            INSERT OR IGNORE INTO signal_evidence_items (
+            INSERT INTO signal_evidence_items (
                 post_id,
                 raw_post_id,
                 week_label,
@@ -104,13 +107,17 @@ def record_signal_evidence_for_scored_posts(
                 created_at
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(post_id, week_label, evidence_kind) DO UPDATE SET
+                topic_labels_json = excluded.topic_labels_json,
+                project_names_json = excluded.project_names_json,
+                selection_reason = excluded.selection_reason
             """,
             (
                 row[0],
                 row[1],
                 week_label,
                 "strong_signal",
-                _truncate(row[3], 500),
+                excerpt_text,
                 row[2],
                 row[7],
                 row[4],
@@ -141,6 +148,9 @@ def record_signal_evidence_for_manual_tag(
     ).fetchone()
     if row is None:
         return
+    excerpt_text = _truncate(row[3], 500)
+    if not excerpt_text.strip():
+        return
 
     connection.execute(
         """
@@ -165,7 +175,7 @@ def record_signal_evidence_for_manual_tag(
             row[1],
             _current_week_label(),
             "manual_tag",
-            _truncate(row[3], 500),
+            excerpt_text,
             row[2],
             row[5],
             row[4],

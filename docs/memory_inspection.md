@@ -100,7 +100,7 @@ python -m src.main memory inspect-decisions --scope study
 Show `project_context_snapshots` with week labels and signal counts.
 
 ```
-python -m src.main memory inspect-snapshots [--stale-only]
+python -m src.main memory inspect-snapshots [--stale-only] [--include-non-curated]
 ```
 
 **Flags**
@@ -108,6 +108,7 @@ python -m src.main memory inspect-snapshots [--stale-only]
 | Flag | Description |
 |---|---|
 | `--stale-only` | Show only snapshots older than 2 weeks (not refreshed recently) |
+| `--include-non-curated` | Include active DB projects not listed in `projects.yaml` |
 
 **Output fields per row**
 
@@ -162,6 +163,29 @@ python -m src.main memory inspect-suppression --title "[Build] Lightweight cost 
 
 ---
 
+### diagnose-project-signals
+
+Show why digest topics did or did not become linked Telegram signals for active projects.
+
+```
+python -m src.main memory diagnose-project-signals [--week LABEL] [--limit N] [--json]
+```
+
+**Flags**
+
+| Flag | Default | Description |
+|---|---|---|
+| `--week` | current ISO week | Digest week to inspect, e.g. `2026-W20` |
+| `--limit` | 10 | Maximum digest topics to consider |
+| `--json` | false | Print the raw diagnostic payload |
+
+Use this when `project_context_snapshots.linked_signal_count` is zero across projects. It separates
+keyword vocabulary problems from pipeline problems: no keyword overlap, excluded keywords, matching
+posts without links, or already-linked topics. The command follows the curated project registry in
+`src/config/projects.yaml`, so stale GitHub-synced rows do not dominate the output.
+
+---
+
 ## Weekly Troubleshooting Checklist
 
 Use this sequence to debug a weekly run where the output seems wrong.
@@ -192,6 +216,15 @@ python -m src.main memory inspect-snapshots --stale-only
 
 Expected: no rows, or rows for projects not updated recently. If stale snapshots appear,
 run the project mapping step to refresh them.
+
+If snapshots are fresh but all `signals=0`, run:
+
+```bash
+python -m src.main memory diagnose-project-signals --week 2026-W14
+```
+
+Expected: each project shows whether digest topics were dropped by vocabulary mismatch or remained
+`candidate_unlinked` because matching posts were found but `post_project_links` was not populated.
 
 **4. Acted-on signals not contributing to study plan**
 

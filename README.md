@@ -48,8 +48,10 @@ It is not a public bot, SaaS product, or generic summarizer.
   - derived channel/project snapshots
   - verbatim evidence
   - decision journal
+- Project signal diagnostics for explaining linked, candidate, and dropped digest topics.
 - Telegraph delivery with HTML/file fallback.
 - Cost, score, health, triage, and memory inspection commands.
+- Health-check counters for project matches, links, scoped evidence, and zero-signal snapshots.
 - Empty/low-signal weekly alerts so pipeline failures do not look like normal empty digests.
 
 ## Main Commands
@@ -66,7 +68,9 @@ python3 src/main.py insight-triage-stats
 
 python3 src/main.py memory inspect-evidence --project gdev-agent --limit 10
 python3 src/main.py memory inspect-decisions --scope insight --limit 10
+python3 src/main.py memory inspect-snapshots --stale-only
 python3 src/main.py memory inspect-suppression --title "TITLE"
+python3 src/main.py memory diagnose-project-signals --week 2026-W20
 ```
 
 ## Configuration
@@ -88,6 +92,8 @@ Environment:
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_OWNER_CHAT_ID` | Telegram delivery and command bot |
 | `LLM_API_KEY` | LLM provider key |
 | `TELEGRAPH_TOKEN` | Stable Telegraph publishing account |
+
+`projects.yaml` is the curated active-project registry for scoped outputs. Older GitHub-synced DB rows may remain active in SQLite; project diagnostics and snapshots prefer the curated entries.
 
 ## Documentation
 

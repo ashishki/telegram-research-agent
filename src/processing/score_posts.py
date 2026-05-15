@@ -26,8 +26,10 @@ from output.project_relevance import score_project_relevance
 
 try:
     from db.evidence import record_signal_evidence_for_scored_posts
+    from output.context_memory import refresh_all_project_context_snapshots
 except ModuleNotFoundError:
     from src.db.evidence import record_signal_evidence_for_scored_posts
+    from src.output.context_memory import refresh_all_project_context_snapshots
 
 
 LOGGER = logging.getLogger(__name__)
@@ -74,6 +76,52 @@ def _load_projects() -> list[dict]:
     data = _load_yaml(PROJECTS_PATH)
     projects = data.get("projects", [])
     return [project for project in projects if isinstance(project, dict)]
+
+
+def _load_project_id_by_config_name(conn: sqlite3.Connection, projects: list[dict]) -> dict[str, int]:
+    """Map curated project config names to rows in the projects table."""
+    if not projects:
+        return {}
+
+    rows = conn.execute(
+        """
+        SELECT id, name, github_repo
+        FROM projects
+        WHERE active = 1
+        """
+    ).fetchall()
+    alias_to_id: dict[str, int] = {}
+    for row in rows:
+        project_id = int(row["id"])
+        for value in (row["name"], row["github_repo"]):
+            alias = str(value or "").strip().lower()
+            if alias:
+                alias_to_id[alias] = project_id
+
+    result: dict[str, int] = {}
+    for project in projects:
+        config_name = str(project.get("name") or "").strip()
+        if not config_name:
+            continue
+        for value in (config_name, project.get("repo")):
+            alias = str(value or "").strip().lower()
+            if alias in alias_to_id:
+                result[config_name] = alias_to_id[alias]
+                break
+    return result
+
+
+def _serialize_project_matches(project_matches: list[dict]) -> str:
+    relevant = [
+        {
+            "name": str(match.get("name") or ""),
+            "score": round(float(match.get("score") or 0.0), 4),
+            "rationale": str(match.get("rationale") or ""),
+        }
+        for match in project_matches
+        if float(match.get("score") or 0.0) > 0.0
+    ]
+    return json.dumps(relevant, ensure_ascii=True)
 
 
 # ---------------------------------------------------------------------------
@@ -495,6 +543,7 @@ def score_posts(
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON;")
         conn.execute("PRAGMA journal_mode = WAL;")
+        project_id_by_name = _load_project_id_by_config_name(conn, projects)
 
         posts = _fetch_posts_window(conn, since_days)
         if not posts:
@@ -508,7 +557,8 @@ def score_posts(
         coherence_score = _fetch_latest_silhouette_score(conn)
 
         explicit_tags_by_post, channel_biases, channel_scores = _fetch_user_preference_signals(conn)
-        scored_rows: list[tuple[float, str, float, str, str, str, float, float, str | None, str, int]] = []
+        scored_rows: list[tuple[float, str, float, str, str, str, str, float, float, str | None, str, int]] = []
+        project_link_rows: list[tuple[int, int, float, str, str, str]] = []
 
         for post in posts:
             try:
@@ -602,6 +652,26 @@ def score_posts(
                     (float(match.get("score") or 0.0) for match in project_matches),
                     default=0.0,
                 )
+                project_matches_json = _serialize_project_matches(project_matches)
+                if bucket in {"strong", "watch"}:
+                    for match in project_matches:
+                        relevance_score = float(match.get("score") or 0.0)
+                        if relevance_score < 0.30:
+                            continue
+                        project_name = str(match.get("name") or "")
+                        project_id = project_id_by_name.get(project_name)
+                        if project_id is None:
+                            continue
+                        project_link_rows.append(
+                            (
+                                post_id,
+                                project_id,
+                                round(relevance_score, 4),
+                                "auto-linked by deterministic project relevance",
+                                "deterministic",
+                                str(match.get("rationale") or ""),
+                            )
+                        )
                 score_breakdown = json.dumps(
                     {
                         "recency": d_recency,
@@ -616,6 +686,7 @@ def score_posts(
                         signal_score,
                         bucket,
                         project_relevance_score,
+                        project_matches_json,
                         routed_model,
                         score_run_id,
                         scored_at,
@@ -637,19 +708,39 @@ def score_posts(
         conn.execute("BEGIN")
         conn.executemany(
             (
-                "UPDATE posts SET signal_score = ?, bucket = ?, project_relevance_score = ?, "
+                "UPDATE posts SET signal_score = ?, bucket = ?, project_relevance_score = ?, project_matches = ?, "
                 "routed_model = ?, score_run_id = ?, scored_at = ?, user_preference_score = ?, "
                 "user_adjusted_score = ?, user_override_tag = ?, score_breakdown = ? WHERE id = ?"
             ),
             scored_rows,
         )
+        if project_link_rows:
+            conn.executemany(
+                """
+                INSERT OR IGNORE INTO post_project_links (
+                    post_id,
+                    project_id,
+                    relevance_score,
+                    note,
+                    tier,
+                    rationale
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                project_link_rows,
+            )
         conn.commit()
-        strong_watch_post_ids = [row[10] for row in scored_rows if row[1] in {"strong", "watch"}]
+        strong_watch_post_ids = [row[11] for row in scored_rows if row[1] in {"strong", "watch"}]
         try:
             record_signal_evidence_for_scored_posts(conn, strong_watch_post_ids)
             conn.commit()
         except Exception:
             LOGGER.warning("Signal evidence population failed after scoring", exc_info=True)
+        try:
+            refresh_all_project_context_snapshots(conn)
+            conn.commit()
+        except Exception:
+            LOGGER.warning("Project context snapshot refresh failed after scoring", exc_info=True)
 
     # Apply per-bucket caps: re-cap at max items by downgrading extras to noise
     # (cap enforcement is done at digest-generation time, not here — we store raw scores)

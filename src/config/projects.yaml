@@ -4,15 +4,24 @@ projects:
     description: "Multi-tenant AI triage service. FastAPI, PostgreSQL/pgvector, Redis, Claude API. Webhook ingestion, LLM classification, approval workflow."
     focus: "service layer patterns, eval pipeline, cost control, multi-tenant RLS, async FastAPI"
     keywords:
-      - fastapi
-      - redis
-      - triage
-      - service
-      - cost
-      - control
-      - async
-      - webhook
+      - ai agents
+      - agent runtime
+      - approval workflow
+      - benchmark
       - classification
+      - cost control
+      - eval
+      - evaluation
+      - fastapi
+      - llm routing
+      - multi-tenant
+      - pgvector
+      - postgres
+      - service
+      - async
+      - triage
+      - webhook
+      - redis
     exclude_keywords:
       - film
 
@@ -21,6 +30,15 @@ projects:
     description: "Personal research intelligence pipeline for Telegram channels. Deterministic scoring, preference-shaped synthesis, project-aware recommendations, reaction feedback, evidence memory, and decision continuity."
     focus: "digest quality, signal scoring, reaction feedback loop, project-aware insight generation, evidence memory, decision journal, low-signal alerts"
     keywords:
+      - telegram digest
+      - research brief
+      - implementation ideas
+      - project insights
+      - context snapshots
+      - evidence
+      - memory
+      - topic detection
+      - topic matching
       - digest
       - clustering
       - quality
@@ -30,8 +48,10 @@ projects:
       - scoring
       - reactions
       - feedback
-      - evidence
       - decisions
+      - recommendations
+      - diagnostics
+      - pipeline
     exclude_keywords:
       - film
 
@@ -52,9 +72,16 @@ projects:
       - notes
       - ideas
       - deadlines
+      - learning
+      - study plan
+      - course
+      - students
+      - tutoring
+      - curriculum
       - education
       - telegram
       - assistant
+      - content
     exclude_keywords:
       - fastapi
       - postgresql
@@ -64,6 +91,13 @@ projects:
     description: "Reusable AI-assisted development workflow. Phase-based orchestration, review cycles, implementation contracts."
     focus: "workflow automation, agent orchestration, quality gates, developer tooling"
     keywords:
+      - ai agents
+      - coding agents
+      - claude code
+      - codex
+      - implementation workflow
+      - review cycle
+      - quality gates
       - workflow
       - orchestration
       - automation

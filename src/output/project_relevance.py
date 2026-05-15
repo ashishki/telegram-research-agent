@@ -46,17 +46,46 @@ def _get_project_keywords(project: dict) -> list[str]:
     return list(_tokenize(f"{description} {focus}"))
 
 
+def _keyword_matches_content(keyword: str, content_lower: str, post_tokens: set[str]) -> tuple[bool, list[str]]:
+    keyword_lower = keyword.strip().lower()
+    if not keyword_lower:
+        return False, []
+
+    if len(keyword_lower) < 3 and keyword_lower.isalnum():
+        boundary_pattern = rf"(?<![a-z0-9]){re.escape(keyword_lower)}(?![a-z0-9])"
+        if re.search(boundary_pattern, content_lower):
+            return True, [keyword_lower]
+    elif keyword_lower in content_lower:
+        return True, [keyword_lower]
+
+    keyword_tokens = _tokenize(keyword_lower)
+    matched_tokens = sorted(keyword_tokens & post_tokens)
+    return bool(matched_tokens), matched_tokens
+
+
+def _score_keyword_overlap(matched_count: int, keyword_count: int) -> float:
+    denominator = max(1, min(keyword_count, 4))
+    return min(matched_count / denominator, 1.0)
+
+
 def score_project_relevance(post_content: str, projects: list[dict]) -> list[dict]:
+    content_lower = (post_content or "").lower()
     post_tokens = _tokenize(post_content or "")
     results: list[dict] = []
 
     for project in projects:
         name = str(project.get("name") or "")
         project_keywords = _get_project_keywords(project)
-        project_token_set = set(project_keywords)
+        matched_keyword_labels: list[str] = []
+        matched_terms: set[str] = set()
+        for keyword in project_keywords:
+            matched, terms = _keyword_matches_content(keyword, content_lower, post_tokens)
+            if matched:
+                matched_keyword_labels.append(keyword)
+                matched_terms.update(terms)
 
-        overlap_keywords = sorted(post_tokens & project_token_set)
-        score = min(len(overlap_keywords) / max(len(project_token_set), 1), 1.0)
+        score = _score_keyword_overlap(len(matched_keyword_labels), len(project_keywords))
+        overlap_keywords = sorted(matched_terms or set(matched_keyword_labels))
 
         if overlap_keywords:
             rationale = f"Matches: {', '.join(overlap_keywords[:3])}"

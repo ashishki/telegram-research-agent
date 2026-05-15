@@ -135,11 +135,21 @@ def build_parser() -> argparse.ArgumentParser:
 
     is_parser = memory_sub.add_parser("inspect-snapshots")
     is_parser.add_argument("--stale-only", action="store_true")
+    is_parser.add_argument("--include-non-curated", action="store_true")
     is_parser.set_defaults(handler=handle_memory_inspect_snapshots)
 
     isupp_parser = memory_sub.add_parser("inspect-suppression")
     isupp_parser.add_argument("--title", required=True)
     isupp_parser.set_defaults(handler=handle_memory_inspect_suppression)
+
+    diag_parser = memory_sub.add_parser(
+        "diagnose-project-signals",
+        help="Explain why digest topics did or did not link to active projects",
+    )
+    diag_parser.add_argument("--week", default=None)
+    diag_parser.add_argument("--limit", type=int, default=10)
+    diag_parser.add_argument("--json", action="store_true")
+    diag_parser.set_defaults(handler=handle_memory_diagnose_project_signals)
 
     memory_parser.set_defaults(handler=lambda args: memory_parser.print_help() or 0)
 
@@ -578,6 +588,8 @@ def _config_status_lines() -> list[str]:
 
 
 def handle_health_check(_: argparse.Namespace) -> int:
+    from output.context_memory import _project_is_curated
+
     db_path_raw = os.environ.get("AGENT_DB_PATH", "").strip()
     lines: list[str] = []
 
@@ -616,17 +628,86 @@ def handle_health_check(_: argparse.Namespace) -> int:
                         "SELECT COUNT(*) FROM posts WHERE scored_at IS NULL"
                     ).fetchone()[0]
                 )
+                project_rows = connection.execute(
+                    """
+                    SELECT name, github_repo
+                    FROM projects
+                    WHERE active = 1
+                    """
+                ).fetchall()
+                active_projects_count = len(project_rows)
+                curated_active_projects_count = sum(
+                    1
+                    for row in project_rows
+                    if _project_is_curated(str(row["name"] or ""), str(row["github_repo"] or ""))
+                )
+                non_curated_active_projects_count = active_projects_count - curated_active_projects_count
+                project_relevance_count = int(
+                    connection.execute(
+                        "SELECT COUNT(*) FROM posts WHERE COALESCE(project_relevance_score, 0) > 0"
+                    ).fetchone()[0]
+                )
+                project_matches_present_count = int(
+                    connection.execute(
+                        """
+                        SELECT COUNT(*)
+                        FROM posts
+                        WHERE project_matches IS NOT NULL
+                          AND project_matches NOT IN ('[]', 'null', '')
+                        """
+                    ).fetchone()[0]
+                )
+                post_project_links_count = int(
+                    connection.execute("SELECT COUNT(*) FROM post_project_links").fetchone()[0]
+                )
+                project_scoped_evidence_count = int(
+                    connection.execute(
+                        """
+                        SELECT COUNT(*)
+                        FROM signal_evidence_items
+                        WHERE project_names_json NOT IN ('[]', 'null', '')
+                        """
+                    ).fetchone()[0]
+                )
+                zero_signal_snapshot_rows = connection.execute(
+                    """
+                    SELECT project_name, github_repo
+                    FROM project_context_snapshots
+                    WHERE COALESCE(linked_signal_count, 0) = 0
+                    """
+                ).fetchall()
+                zero_signal_snapshots_count = sum(
+                    1
+                    for row in zero_signal_snapshot_rows
+                    if _project_is_curated(str(row["project_name"] or ""), str(row["github_repo"] or ""))
+                )
         except Exception as exc:
             lines.append(f"db_error: {exc}")
         else:
             lines.append(f"posts: {posts_count}")
             lines.append(f"scored_posts: {scored_posts_count}")
+            lines.append(f"active_projects: {active_projects_count}")
+            lines.append(f"curated_active_projects: {curated_active_projects_count}")
+            lines.append(f"non_curated_active_projects: {non_curated_active_projects_count}")
+            lines.append(f"project_relevance_posts: {project_relevance_count}")
+            lines.append(f"project_matches_present: {project_matches_present_count}")
+            lines.append(f"post_project_links: {post_project_links_count}")
+            lines.append(f"project_scoped_evidence: {project_scoped_evidence_count}")
+            lines.append(f"zero_signal_snapshots: {zero_signal_snapshots_count}")
             lines.append(f"llm_usage: {llm_usage_count}")
             lines.append(f"last_ingestion: {last_ingestion}")
             lines.append(f"last_scored: {last_scored}")
             lines.append(f"last_digest: {last_digest}")
             if unscored_count > 0:
                 lines.append(f"WARNING: {unscored_count} posts pending scoring (stuck queue?)")
+            if project_relevance_count > 0 and project_matches_present_count == 0:
+                lines.append("WARNING: project relevance exists but project_matches are empty; rerun scoring")
+            if project_matches_present_count > 0 and post_project_links_count == 0:
+                lines.append(
+                    "WARNING: project_matches exist but no high-confidence project links; run diagnose-project-signals"
+                )
+            if non_curated_active_projects_count > 0:
+                lines.append("WARNING: non-curated active projects exist; scoped outputs use projects.yaml")
     else:
         lines.append("db_status: missing")
 
@@ -987,6 +1068,7 @@ def handle_memory_inspect_decisions(args: argparse.Namespace) -> int:
 
 def handle_memory_inspect_snapshots(args: argparse.Namespace) -> int:
     from db.retrieval import fetch_stale_snapshots
+    from output.context_memory import _project_is_curated
 
     settings = load_settings()
 
@@ -1011,6 +1093,15 @@ def handle_memory_inspect_snapshots(args: argparse.Namespace) -> int:
                         ORDER BY project_name ASC
                         """
                     ).fetchall()
+                ]
+            if not args.include_non_curated:
+                rows = [
+                    row
+                    for row in rows
+                    if _project_is_curated(
+                        str(row.get("project_name") or ""),
+                        str(row.get("github_repo") or ""),
+                    )
                 ]
     except Exception as exc:
         sys.stdout.write(f"Error inspecting project snapshots: {exc}\n")
@@ -1066,6 +1157,35 @@ def handle_memory_inspect_suppression(args: argparse.Namespace) -> int:
         lines.append("No rejection memory entry found for this title.")
 
     sys.stdout.write("\n".join(lines) + "\n")
+    return 0
+
+
+def handle_memory_diagnose_project_signals(args: argparse.Namespace) -> int:
+    import json
+    from output.project_signal_diagnostics import (
+        diagnose_project_signal_matching,
+        format_project_signal_diagnostics,
+    )
+
+    settings = load_settings()
+
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+        report = diagnose_project_signal_matching(
+            settings,
+            week_label=args.week,
+            topic_limit=max(1, int(args.limit or 10)),
+        )
+    except Exception as exc:
+        sys.stdout.write(f"Error diagnosing project signal matching: {exc}\n")
+        return 1
+
+    if args.json:
+        sys.stdout.write(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
+    else:
+        sys.stdout.write(format_project_signal_diagnostics(report))
     return 0
 
 

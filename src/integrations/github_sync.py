@@ -175,7 +175,11 @@ def sync_github_projects(db_path: str) -> list[dict]:
             if rate_limited:
                 break
 
-            keywords_list = [kw.strip() for kw in focus.split(",") if kw.strip()]
+            explicit_keywords = project.get("keywords")
+            if isinstance(explicit_keywords, list) and explicit_keywords:
+                keywords_list = [str(kw).strip() for kw in explicit_keywords if str(kw).strip()]
+            else:
+                keywords_list = [kw.strip() for kw in focus.split(",") if kw.strip()]
 
             # Use description from yaml if GitHub description is empty
             github_description = str(repo_meta.get("description") or "")

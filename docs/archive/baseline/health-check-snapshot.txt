@@ -7,6 +7,14 @@
 db_path: /home/gdev/telegram-research-agent/data/agent.db
 posts: 0
 scored_posts: 0
+active_projects: 4
+curated_active_projects: 4
+non_curated_active_projects: 0
+project_relevance_posts: 0
+project_matches_present: 0
+post_project_links: 0
+project_scoped_evidence: 0
+zero_signal_snapshots: 0
 llm_usage: 0
 last_ingestion: never
 last_scored: never
@@ -19,6 +27,14 @@ scoring.yaml: present
 # db_path: /home/gdev/telegram-research-agent/data/agent.db
 # posts: 312
 # scored_posts: 312
+# active_projects: 4
+# curated_active_projects: 4
+# non_curated_active_projects: 0
+# project_relevance_posts: 12
+# project_matches_present: 12
+# post_project_links: 3
+# project_scoped_evidence: 3
+# zero_signal_snapshots: 1
 # llm_usage: 47
 # last_ingestion: 2026-03-31T06:00:12Z
 # last_scored: 2026-03-31T06:02:44Z

@@ -274,7 +274,7 @@ Normalized, processed view of `raw_posts`.
 | normalized_at | DATETIME | |
 | signal_score | REAL | Composite score 0.0–1.0; written by score_posts.py |
 | bucket | TEXT | `strong`, `watch`, `cultural`, or `noise` |
-| project_matches | TEXT | JSON list of matching project names |
+| project_matches | TEXT | JSON list of matching projects with score and rationale |
 | interpretation | TEXT | Free-text scoring rationale |
 | score_breakdown | TEXT | JSON with per-dimension scores: recency, engagement, topic_relevance, source_quality, novelty |
 | score_run_id | TEXT | UUID of the scoring run that set this score |
@@ -337,7 +337,7 @@ Normalized, processed view of `raw_posts`.
 | id | INTEGER PK | |
 | name | TEXT | project identifier |
 | description | TEXT | free text |
-| keywords | TEXT | comma-separated |
+| keywords | TEXT | JSON or comma-separated project keywords; curated config from `projects.yaml` takes precedence |
 | active | BOOLEAN | |
 
 ---
@@ -349,9 +349,9 @@ Normalized, processed view of `raw_posts`.
 | post_id | INTEGER FK | |
 | project_id | INTEGER FK | |
 | relevance_score | REAL | |
-| note | TEXT | LLM-generated rationale |
-| tier | TEXT | Inference tier from three-tier project insight mapping (Phase 19) |
-| rationale | TEXT | LLM-generated relevance rationale (Phase 19) |
+| note | TEXT | Link note, e.g. deterministic scorer or LLM mapping |
+| tier | TEXT | `deterministic` or LLM inference tier |
+| rationale | TEXT | Relevance rationale |
 
 ---
 
@@ -519,19 +519,30 @@ generate_recommendations.py
 map_project_insights.py
 │
 ├── Load active projects from projects table
+├── Keep only curated projects from `src/config/projects.yaml`
 ├── For each project:
-│   ├── Retrieve project keywords
+│   ├── Retrieve explicit config keywords first, then DB keywords
 │   ├── Query posts from last 7 days matching keywords (SQLite FTS5)
 │   ├── Score matches by keyword overlap + view_count
-│   └── Insert top 10 matches into post_project_links
+│   └── Submit strongest candidates to LLM
 │
-├── For linked posts: submit to LLM for relevance rationale
-│   └── Prompt: "Given project X, explain how this post is relevant"
+├── Insert LLM-confirmed relevant posts into post_project_links
+│   └── score_posts.py also auto-links strong/watch deterministic matches >= 0.30
 │
 └── Write structured project insights report to `data/output/project_insights/YYYY-WXX.md`
 ```
 
-**Keyword match is deterministic (FTS5). LLM only writes the rationale sentence.**
+**Keyword matching is deterministic and auditable.** Multi-word keywords match by exact phrase or component tokens, short language keywords such as `C` require token boundaries, and broad alias lists use a capped denominator so adding useful aliases does not dilute relevance to zero.
+
+Operator diagnostics:
+
+```bash
+python3 src/main.py memory diagnose-project-signals --week 2026-W20
+python3 src/main.py health-check
+```
+
+`health-check` reports project-link counters: `project_matches_present`, `post_project_links`,
+`project_scoped_evidence`, `zero_signal_snapshots`, and non-curated active DB rows.
 
 ---
 

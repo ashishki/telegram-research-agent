@@ -70,6 +70,7 @@ That lets the brief explain more directly in the article and reduces the need to
 
 ```bash
 # Verify system health — DB, config, last run timestamps, unscored post count
+# Also prints project-link counters and non-curated active project rows.
 python3 src/main.py health-check
 
 # Inspect score distribution from last run (+ trend vs previous week)
@@ -94,6 +95,9 @@ python3 src/main.py tune-suggestions
 
 # Inspect insight triage summary — counts by category, recent records, rejection memory
 python3 src/main.py insight-triage-stats
+
+# Debug why digest topics did not become project-linked Telegram signals
+python3 src/main.py memory diagnose-project-signals --week 2026-W20
 ```
 
 ### Inline Feedback (from Telegram)
@@ -225,6 +229,7 @@ Project context is not just a static `projects.yaml` description anymore.
 
 Current state is built from:
 - `projects.yaml` baseline description and focus
+- `projects.yaml` as the curated active-project registry for scoped outputs
 - GitHub metadata from sync (`github_repo`, `last_commit_at`)
 - recent commit messages folded into `project_context_snapshots`
 - Telegram relevance already linked in the DB

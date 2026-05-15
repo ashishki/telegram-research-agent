@@ -270,6 +270,9 @@ python3 src/main.py health-check
 # db_path: /home/gdev/.../agent.db
 # posts: 312
 # scored_posts: 312
+# project_matches_present: 12
+# post_project_links: 3
+# zero_signal_snapshots: 1
 # last_ingestion: 2026-03-31T06:00:12Z
 # last_digest: 2026-W13
 # profile.yaml: present
