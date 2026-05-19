@@ -29,6 +29,28 @@ class TestRenderReport(unittest.TestCase):
         html = render_report_html("This is **bold** text.\n")
         self.assertIn("<b>bold</b>", html)
 
+    def test_render_signal_item_groups_indented_details(self):
+        html = render_report_html(
+            "## Project Insights\n"
+            "**telegram-research-agent**\n"
+            "- **Anthropic macro signal**\n"
+            "  Key takeaway: Compute matters.\n"
+            "  Why now: Official source.\n"
+            "  Source: @data_secrets | https://t.me/data_secrets/9220\n"
+        )
+
+        self.assertIn("<h3>telegram-research-agent</h3>", html)
+        self.assertIn("<article class=\"signal-item\">", html)
+        self.assertIn("<h4><b>Anthropic macro signal</b></h4>", html)
+        self.assertIn("<b>Takeaway:</b> Compute matters.", html)
+        self.assertIn("<b>Why now:</b> Official source.", html)
+
+    def test_render_markdown_links(self):
+        html = render_report_html("- [repo](https://github.com/example/repo) — active\n")
+
+        self.assertIn('<a href="https://github.com/example/repo">repo</a>', html)
+        self.assertNotIn("](<a href", html)
+
     def test_render_plain_paragraph(self):
         html = render_report_html("Plain paragraph line\n")
         self.assertIn("<p>Plain paragraph line</p>", html)

@@ -472,6 +472,27 @@ class TestRenderTriagedInsights(unittest.TestCase):
         rendered = render_triaged_insights_html(_SAMPLE_HTML, insights)
         self.assertIn("<i>(", rendered)
 
+    def test_section_heading_not_duplicated_inside_previous_item(self):
+        conn = _make_triage_db()
+        try:
+            html = (
+                "<b>💡 Инсайты недели</b>\n\n"
+                "<b>🧱 Собранные идеи</b>\n\n"
+                '<b>[Implement] Project A — Built idea</b>\n'
+                "Body one.\n"
+                '<a href="https://t.me/chan/1">источник</a>\n\n'
+                "<b>🆕 Отдельные сигналы</b>\n\n"
+                '<b>[Build] New Tool — Fresh idea</b>\n'
+                "Body two.\n"
+                '<a href="https://t.me/chan/2">источник</a>'
+            )
+            insights = triage_insights(html, conn, "2026-W18")
+            rendered = render_triaged_insights_html(html, insights)
+
+            self.assertEqual(rendered.count("🆕 Отдельные сигналы"), 1)
+        finally:
+            conn.close()
+
 
 if __name__ == "__main__":
     unittest.main()

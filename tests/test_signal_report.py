@@ -406,6 +406,58 @@ class TestSignalReport(unittest.TestCase):
         finally:
             os.unlink(db_path)
 
+    def test_reader_mode_surfaces_macro_context_with_primary_source(self):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+            db_path = tmp.name
+
+        try:
+            with sqlite3.connect(db_path) as connection:
+                connection.executescript(
+                    """
+                    CREATE TABLE user_post_tags (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        post_id INTEGER NOT NULL,
+                        tag TEXT NOT NULL,
+                        note TEXT,
+                        recorded_at TEXT NOT NULL
+                    );
+                    """
+                )
+                connection.commit()
+
+            class _Settings:
+                def __init__(self, path: str):
+                    self.db_path = path
+
+            posts = [
+                {
+                    "id": 42,
+                    "content": (
+                        "Anthropic 2028 AI leadership forecast: compute, chips and infrastructure now matter. "
+                        "https://www.anthropic.com/research/2028-ai-leadership"
+                    ),
+                    "signal_score": 0.74,
+                    "bucket": "watch",
+                    "routed_model": "m1",
+                    "score_breakdown": "{}",
+                    "message_url": "https://t.me/data_secrets/9220",
+                    "channel_username": "@data_secrets",
+                }
+            ]
+
+            with patch("output.signal_report._load_profile", return_value={}):
+                with patch("output.signal_report._load_projects", return_value=[]):
+                    with patch("output.signal_report.judge_recent_posts", return_value={}):
+                        report = format_signal_report(posts, settings=_Settings(db_path), reader_mode=True)
+
+            self.assertIn("## Macro Context", report)
+            self.assertIn(
+                "Primary source: primary | https://www.anthropic.com/research/2028-ai-leadership",
+                report,
+            )
+        finally:
+            os.unlink(db_path)
+
 
 if __name__ == "__main__":
     unittest.main()

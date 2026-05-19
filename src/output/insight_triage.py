@@ -140,7 +140,19 @@ def _parse_insights_html_with_sections(html_text: str) -> list[tuple[str, str, s
     for i, match in enumerate(matches):
         header = match.group(1).strip()
         start = match.end()
-        end = matches[i + 1].start() if i + 1 < len(matches) else len(html_text)
+        next_idea_start = matches[i + 1].start() if i + 1 < len(matches) else len(html_text)
+        next_section_start = next_idea_start
+        for marker in section_markers:
+            if marker.start() <= match.start():
+                continue
+            if marker.start() >= next_idea_start:
+                break
+            heading = marker.group(1).strip().lower()
+            if heading.startswith("[implement]") or heading.startswith("[build]"):
+                continue
+            next_section_start = marker.start()
+            break
+        end = min(next_idea_start, next_section_start)
         raw_block = html_text[match.start():end].strip()
         section = html_text[start:end]
         url_match = re.search(r'<a\s+href="([^"]+)"', section)

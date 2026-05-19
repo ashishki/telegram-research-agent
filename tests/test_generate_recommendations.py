@@ -26,7 +26,13 @@ _install_stub(
     RateLimitError=Exception,
 )
 
-from output.generate_recommendations import _render_insights_fragment, _rewrite_insight_source_urls, run_recommendations  # noqa: E402
+from output.generate_recommendations import (  # noqa: E402
+    _html_to_copyable_text,
+    _normalize_insights_delivery_text,
+    _render_insights_fragment,
+    _rewrite_insight_source_urls,
+    run_recommendations,
+)
 
 
 class TestGenerateRecommendationsHtml(unittest.TestCase):
@@ -41,8 +47,34 @@ class TestGenerateRecommendationsHtml(unittest.TestCase):
         html = _render_insights_fragment(content)
 
         self.assertIn("<h2><b>💡 Инсайты недели</b></h2>", html)
-        self.assertIn("<p><b>[Implement] Project</b></p>", html)
+        self.assertIn("<h4><b>[Implement] Project</b></h4>", html)
         self.assertIn("<p>Полезный абзац с объяснением. <a href=\"https://example.com/source\">https://example.com/source</a></p>", html)
+
+    def test_html_to_copyable_text_preserves_anchor_url(self):
+        text = _html_to_copyable_text('<b>[Implement] Project</b>\n<a href="https://example.com/source">источник</a>')
+
+        self.assertIn("[Implement] Project", text)
+        self.assertIn("источник: https://example.com/source", text)
+
+    def test_normalize_insights_delivery_text_removes_stale_duplicate_section_heading(self):
+        content = (
+            "<b>🧱 Собранные идеи</b>\n\n"
+            "<b>[Implement] Project A</b>\n"
+            "Body.\n"
+            "<b>🆕 Отдельные сигналы</b>\n"
+            "<i>(✅ Сделать сейчас — Direct improvement to existing project with cited evidence)</i>\n\n"
+            "<b>🆕 Отдельные сигналы</b>\n\n"
+            "<b>[Implement] Project B</b>\n"
+            "Body."
+        )
+
+        normalized = _normalize_insights_delivery_text(content)
+        html = _render_insights_fragment(content)
+        copy_text = _html_to_copyable_text(content)
+
+        self.assertEqual(normalized.count("🆕 Отдельные сигналы"), 1)
+        self.assertEqual(html.count("🆕 Отдельные сигналы"), 1)
+        self.assertEqual(copy_text.count("🆕 Отдельные сигналы"), 1)
 
     def test_rewrite_insight_source_urls_rebinds_to_best_matching_candidates(self):
         content = (

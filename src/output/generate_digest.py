@@ -108,6 +108,26 @@ def _write_digest_file(week_label: str, content_md: str) -> Path:
     return output_path
 
 
+def _write_copyable_digest_file(week_label: str, content_md: str) -> Path:
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    output_path = OUTPUT_DIR / f"{week_label}_copy.txt"
+    output_path.write_text(content_md, encoding="utf-8")
+    return output_path
+
+
+def _send_copyable_digest_document(chat_id: str, week_label: str, content_md: str, token: str) -> None:
+    try:
+        copy_path = _write_copyable_digest_file(week_label, content_md)
+        send_document(
+            chat_id=chat_id,
+            file_path=str(copy_path),
+            caption=f"Copyable Research Brief {week_label}",
+            token=token,
+        )
+    except Exception:
+        LOGGER.warning("Failed to send copyable research brief week=%s", week_label, exc_info=True)
+
+
 def _write_digest_json_file(week_label: str, report: ResearchReport) -> Path:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     output_path = OUTPUT_DIR / f"{week_label}.json"
@@ -230,6 +250,7 @@ def _send_weekly_review_to_telegram_owner(
             html_content = html_path.read_text(encoding="utf-8")
             url = publish_article(title=f"Research Brief {week_label}", html_content=html_content)
             send_text(chat_id=chat_id, text=f"{notification}\n{url}", token=token, parse_mode=None)
+            _send_copyable_digest_document(chat_id, week_label, content_md, token)
             _mark_delivery_state(connection, week_label, telegraph_url=url, telegram_sent_at=_utc_now_iso())
             connection.commit()
             LOGGER.info("Weekly review published to Telegraph week=%s url=%s", week_label, url)
@@ -242,6 +263,7 @@ def _send_weekly_review_to_telegram_owner(
             )
 
     send_text(chat_id=chat_id, text=notification, token=token, parse_mode=None)
+    _send_copyable_digest_document(chat_id, week_label, content_md, token)
     _mark_delivery_state(connection, week_label, telegram_sent_at=_utc_now_iso())
     connection.commit()
 

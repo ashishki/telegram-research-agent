@@ -1,9 +1,11 @@
 import json
 import logging
 import os
+import re
 import sqlite3
 from collections import Counter
 from pathlib import Path
+from urllib.parse import urlparse
 
 import yaml
 
@@ -23,6 +25,37 @@ TAG_PRIORITY = {
     "funny": 3,
     "read_later": 4,
     "low_signal": 9,
+}
+URL_RE = re.compile(r"https?://[^\s<>)]+", re.IGNORECASE)
+PRIMARY_SOURCE_DOMAINS = {
+    "anthropic.com",
+    "openai.com",
+    "ai.google",
+    "deepmind.google",
+    "microsoft.com",
+    "nvidia.com",
+    "github.com",
+    "arxiv.org",
+}
+MACRO_SIGNAL_KEYWORDS = {
+    "compute",
+    "chips",
+    "chip",
+    "export controls",
+    "infrastructure",
+    "ai leadership",
+    "frontier ai",
+    "dual-use",
+    "2028",
+    "китай",
+    "сша",
+    "чип",
+    "чипы",
+    "инфраструктур",
+    "экспортн",
+    "прогноз",
+    "лидерств",
+    "двойного назначения",
 }
 VISIBLE_TAGS = ("strong", "try_in_project", "interesting", "funny", "read_later")
 MANUAL_HEADING_BY_TAG = {
@@ -61,6 +94,49 @@ def _truncate_words(text: str | None, limit: int) -> str:
 def _format_source_suffix(message_url: str | None) -> str:
     url = (message_url or "").strip()
     return f" | Source: {url}" if url else ""
+
+
+def _domain_from_url(url: str) -> str:
+    try:
+        host = urlparse(url).netloc.lower()
+    except ValueError:
+        return ""
+    if host.startswith("www."):
+        host = host[4:]
+    return host
+
+
+def _extract_external_urls(text: str | None) -> list[str]:
+    urls: list[str] = []
+    for match in URL_RE.finditer(text or ""):
+        url = match.group(0).rstrip(".,;:")
+        domain = _domain_from_url(url)
+        if not domain or domain == "t.me":
+            continue
+        urls.append(url)
+    return urls
+
+
+def _source_tier(url: str) -> str:
+    domain = _domain_from_url(url)
+    if not domain:
+        return ""
+    for primary in PRIMARY_SOURCE_DOMAINS:
+        if domain == primary or domain.endswith(f".{primary}"):
+            return "primary"
+    return "external"
+
+
+def _primary_source_url(post: dict) -> str:
+    for url in _extract_external_urls(post.get("content")):
+        if _source_tier(url) == "primary":
+            return url
+    return ""
+
+
+def _is_macro_signal(post: dict) -> bool:
+    text = (post.get("content") or "").lower()
+    return any(keyword in text for keyword in MACRO_SIGNAL_KEYWORDS)
 
 
 def _load_previous_quality_metrics(db_path: str = "") -> dict | None:
@@ -204,6 +280,37 @@ def _render_signal(
         else:
             lines.append(f"  Source: {source}")
     return "\n".join(lines)
+
+
+def _build_macro_context_lines(
+    posts: list[dict],
+    judged_by_post: dict[int, dict],
+    limit: int = 3,
+) -> list[str]:
+    lines: list[str] = []
+    seen: set[int] = set()
+    for post in posts:
+        post_id = int(post.get("id") or 0)
+        if post_id in seen:
+            continue
+        primary_url = _primary_source_url(post)
+        if not _is_macro_signal(post):
+            continue
+        judged = _judged(post_id, judged_by_post)
+        rendered = _render_signal(
+            post,
+            title=str(judged.get("title") or ""),
+            key_takeaway=str(judged.get("key_takeaway") or ""),
+            why_now=str(judged.get("why_now") or ""),
+            project_application=str(judged.get("project_application") or ""),
+        )
+        if primary_url:
+            rendered += f"\n  Primary source: {_source_tier(primary_url)} | {primary_url}"
+        lines.append(rendered)
+        seen.add(post_id)
+        if len(lines) >= limit:
+            break
+    return lines
 
 
 def _sort_posts_for_brief(posts: list[dict], tag_details_by_post: dict[int, list[dict[str, str]]]) -> list[dict]:
@@ -505,6 +612,7 @@ def format_signal_report(posts: list[dict], settings=None, *, reader_mode: bool 
         judged_by_post,
         excluded_post_ids=project_post_ids,
     )
+    macro_context_lines = _build_macro_context_lines(visible_posts, judged_by_post)
     what_changed_lines = _build_what_changed_lines(bucket_counts, db_path=db_path)
     source_analytics_lines = _build_source_analytics_lines(posts)
 
@@ -512,20 +620,21 @@ def format_signal_report(posts: list[dict], settings=None, *, reader_mode: bool 
     for heading, lines in manual_sections:
         sections.extend([f"## {heading}", *lines, ""])
 
-    sections.extend(
-        [
-            "## Project Insights",
-            *project_lines,
-            "",
-            "## Additional Signals",
-            *auto_watch_lines,
-            "",
-            "## Source Map",
-            *source_analytics_lines,
-            "",
-            "## What Changed",
-            *what_changed_lines,
-        ]
-    )
+    if macro_context_lines:
+        sections.extend(["## Macro Context", *macro_context_lines, ""])
+
+    sections.extend([
+        "## Project Insights",
+        *project_lines,
+        "",
+        "## Additional Signals",
+        *auto_watch_lines,
+        "",
+        "## Source Map",
+        *source_analytics_lines,
+        "",
+        "## What Changed",
+        *what_changed_lines,
+    ])
 
     return "\n".join(line for line in sections if line is not None).strip() + "\n"

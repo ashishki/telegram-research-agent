@@ -11,7 +11,7 @@ import yaml
 from bot.callbacks import build_idea_feedback_markup
 from db.retrieval import fetch_decisions, fetch_evidence_items
 from config.settings import PROJECT_ROOT, Settings
-from bot.telegram_delivery import send_text
+from bot.telegram_delivery import send_document, send_text
 from delivery.telegraph import publish_article
 from llm.client import complete
 from output.context_memory import load_project_context, refresh_all_project_context_snapshots
@@ -26,6 +26,13 @@ PROJECTS_YAML_PATH = Path(__file__).resolve().parents[1] / "config" / "projects.
 INLINE_URL_RE = re.compile(r"(?<![\"'>])(https?://[^\s<]+)")
 TELEGRAM_URL_RE = re.compile(r"https?://t\.me/[A-Za-z0-9_]+/\d+(?:\?[^\s<]+)?", re.IGNORECASE)
 HTML_TAG_RE = re.compile(r"<[^>]+>")
+HTML_ANCHOR_RE = re.compile(r'<a\s+href="([^"]+)"[^>]*>(.*?)</a>', re.IGNORECASE | re.DOTALL)
+INSIGHT_SECTION_HEADINGS = {
+    "🧱 собранные идеи",
+    "🆕 отдельные сигналы",
+    "built ideas",
+    "fresh signals",
+}
 
 
 def _utc_now() -> datetime:
@@ -319,8 +326,89 @@ def _load_completed_study_history(connection: sqlite3.Connection, limit: int = 6
 def _write_insights_file(week_label: str, content: str) -> Path:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     output_path = OUTPUT_DIR / f"{week_label}_insights.md"
-    output_path.write_text(content, encoding="utf-8")
+    output_path.write_text(_normalize_insights_delivery_text(content), encoding="utf-8")
     return output_path
+
+
+def _section_heading_key(line: str) -> str:
+    text = _strip_html(line).lower()
+    for heading in INSIGHT_SECTION_HEADINGS:
+        if heading in text:
+            return heading
+    return ""
+
+
+def _is_triage_note_line(line: str) -> bool:
+    text = _strip_html(line)
+    if not text.startswith("("):
+        return False
+    return any(
+        marker in text
+        for marker in (
+            "Сделать сейчас",
+            "Бэклог",
+            "Отложить",
+            "Direct improvement",
+            "New project concept",
+            "Previously rejected",
+        )
+    )
+
+
+def _normalize_insights_delivery_text(content: str) -> str:
+    lines = (content or "").replace("\r\n", "\n").split("\n")
+    normalized: list[str] = []
+    for index, line in enumerate(lines):
+        heading_key = _section_heading_key(line.strip())
+        if heading_key:
+            lookahead = index + 1
+            while lookahead < len(lines):
+                candidate = lines[lookahead].strip()
+                if not candidate or _is_triage_note_line(candidate):
+                    lookahead += 1
+                    continue
+                break
+            if lookahead < len(lines) and _section_heading_key(lines[lookahead].strip()) == heading_key:
+                continue
+        normalized.append(line)
+    return "\n".join(normalized).strip()
+
+
+def _html_to_copyable_text(content: str) -> str:
+    def replace_anchor(match: re.Match) -> str:
+        url = html.unescape(match.group(1).strip())
+        label = _strip_html(match.group(2)).strip()
+        if label and label != url:
+            return f"{label}: {url}"
+        return url
+
+    content = _normalize_insights_delivery_text(content)
+    text = HTML_ANCHOR_RE.sub(replace_anchor, content or "")
+    text = HTML_TAG_RE.sub("", text)
+    text = html.unescape(text)
+    text = re.sub(r"[ \t]+\n", "\n", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip() + "\n" if text.strip() else ""
+
+
+def _write_copyable_insights_file(week_label: str, content_html: str) -> Path:
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    output_path = OUTPUT_DIR / f"{week_label}_insights_copy.txt"
+    output_path.write_text(_html_to_copyable_text(content_html), encoding="utf-8")
+    return output_path
+
+
+def _send_copyable_insights_document(chat_id: str, week_label: str, content_html: str, token: str) -> None:
+    try:
+        copy_path = _write_copyable_insights_file(week_label, content_html)
+        send_document(
+            chat_id=chat_id,
+            file_path=str(copy_path),
+            caption=f"Copyable Implementation Ideas {week_label}",
+            token=token,
+        )
+    except Exception:
+        LOGGER.warning("Failed to send copyable implementation ideas week=%s", week_label, exc_info=True)
 
 
 def _write_insights_html_file(week_label: str, content_html: str) -> Path:
@@ -335,9 +423,11 @@ def _write_insights_html_file(week_label: str, content_html: str) -> Path:
             "line-height: 1.68; color: #18212b; background: #f7f2e8; max-width: 860px; "
             "margin: 0 auto; padding: 20px;\">"
             "<style>"
-            "body{font-size:17px;}"
-            "section.idea{background:#fffdf8;border:1px solid #eadfcb;border-radius:16px;padding:18px 18px 8px 18px;margin:0 0 14px 0;}"
+            "body{font-size:17px;-webkit-user-select:text;user-select:text;}"
+            "section.idea{background:#fffdf8;border:1px solid #eadfcb;border-radius:10px;padding:18px;margin:0 0 14px 0;}"
             "h2{font-size:22px;line-height:1.25;margin:0 0 12px 0;color:#102a43;}"
+            "h3{font-size:18px;line-height:1.3;margin:18px 0 10px 0;color:#102a43;}"
+            "h4{font-size:17px;line-height:1.35;margin:14px 0 8px 0;color:#102a43;}"
             "p{margin:0 0 12px 0;}"
             "a{color:#0b6bcb;text-decoration:none;}"
             "b{color:#0f1720;}"
@@ -349,6 +439,7 @@ def _write_insights_html_file(week_label: str, content_html: str) -> Path:
 
 
 def _render_insights_fragment(content: str) -> str:
+    content = _normalize_insights_delivery_text(content)
     lines = [line.strip() for line in content.replace("\r\n", "\n").split("\n")]
     blocks: list[str] = []
     paragraph_parts: list[str] = []
@@ -379,7 +470,15 @@ def _render_insights_fragment(content: str) -> str:
         if not normalized:
             continue
         if normalized.startswith("<b>") and normalized.endswith("</b>"):
-            tag = "h2" if index == 0 else "p"
+            stripped = _strip_html(normalized)
+            if index == 0:
+                tag = "h2"
+            elif stripped.startswith(("[Implement]", "[Build]")):
+                tag = "h4"
+            elif "Собранные идеи" in stripped or "Отдельные сигналы" in stripped or "Built Ideas" in stripped or "Fresh Signals" in stripped:
+                tag = "h3"
+            else:
+                tag = "p"
             rendered_blocks.append(f"<{tag}>{normalized}</{tag}>")
             continue
         if normalized.startswith("<a ") and normalized.endswith("</a>"):
@@ -526,6 +625,7 @@ def _send_recommendations_to_telegram_owner(
             html_content = html_path.read_text(encoding="utf-8")
             url = publish_article(title=f"Implementation Ideas {week_label}", html_content=html_content)
             send_text(chat_id=chat_id, text=f"{notification}\n{url}", token=token, parse_mode=None)
+            _send_copyable_insights_document(chat_id, week_label, content_md, token)
             try:
                 _send_feedback_cards(connection, week_label, token, chat_id)
             except Exception:
@@ -537,6 +637,7 @@ def _send_recommendations_to_telegram_owner(
         except Exception:
             LOGGER.warning("Failed to publish implementation ideas week=%s", week_label, exc_info=True)
     send_text(chat_id=chat_id, text=notification, token=token, parse_mode=None)
+    _send_copyable_insights_document(chat_id, week_label, content_md, token)
     try:
         _send_feedback_cards(connection, week_label, token, chat_id)
     except Exception:
@@ -589,7 +690,7 @@ def run_recommendations(settings: Settings, force_delivery: bool = False) -> dic
         triaged = triage_insights(insights_text, connection, week_label)
         connection.commit()
 
-        delivery_text = render_triaged_insights_html(insights_text, triaged)
+        delivery_text = _normalize_insights_delivery_text(render_triaged_insights_html(insights_text, triaged))
 
         output_path = _write_insights_file(week_label, delivery_text)
         html_path = _write_insights_html_file(week_label, delivery_text)
