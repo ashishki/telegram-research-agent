@@ -2,12 +2,14 @@ import json
 import logging
 import os
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
+from delivery.telegraph import publish_article
 from bot.telegram_delivery import send_document, send_text
 from config.settings import PROJECT_ROOT, Settings
 from output.opportunity_seed_export import export_opportunity_seeds
+from output.render_report import render_report_html
 
 
 LOGGER = logging.getLogger(__name__)
@@ -26,6 +28,9 @@ class MvpWeeklyPipelineResult:
     selected_title: str | None
     recommendation: str | None
     score: int | None
+    telegraph_url: str | None = None
+    source_counts: dict[str, object] | None = None
+    source_errors: dict[str, str] | None = None
 
 
 def run_mvp_weekly_pipeline(
@@ -58,9 +63,12 @@ def run_mvp_weekly_pipeline(
         selected_title=_optional_str(radar_payload.get("selected_title")),
         recommendation=_optional_str(radar_payload.get("recommendation")),
         score=_optional_int(radar_payload.get("score")),
+        source_counts=_optional_dict(radar_payload.get("source_counts")),
+        source_errors=_optional_str_dict(radar_payload.get("source_errors")),
     )
     if deliver:
-        _deliver_result(result)
+        telegraph_url = _deliver_result(result)
+        result = replace(result, telegraph_url=telegraph_url)
     return result
 
 
@@ -133,21 +141,25 @@ def _radar_python_command(radar_repo: Path) -> list[str]:
     raise FileNotFoundError(f"Demand-to-MVP Radar local venv not found: {repo_venv_python}")
 
 
-def _deliver_result(result: MvpWeeklyPipelineResult) -> None:
+def _deliver_result(result: MvpWeeklyPipelineResult) -> str | None:
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
     chat_id = os.environ.get("TELEGRAM_OWNER_CHAT_ID", "").strip()
     if not token or not chat_id:
         LOGGER.info("MVP weekly delivery skipped because Telegram owner credentials are missing")
-        return
+        return None
 
     title = result.selected_title or "No candidate selected"
     score_suffix = f", score {result.score}/100" if result.score is not None else ""
+    telegraph_url = _publish_mvp_telegraph(result)
     notification = (
         f"MVP of the Week {result.week_label} is ready.\n"
         f"{title}\n"
         f"Recommendation: {result.recommendation or result.radar_status}{score_suffix}.\n"
-        f"Seeds exported: {result.seed_count}."
+        f"Seeds exported: {result.seed_count}.\n"
+        f"{source_mix_summary(result)}"
     )
+    if telegraph_url:
+        notification = f"{notification}\n{telegraph_url}"
     send_text(chat_id=chat_id, text=notification, token=token, parse_mode=None)
     if result.report_path:
         send_document(
@@ -156,6 +168,24 @@ def _deliver_result(result: MvpWeeklyPipelineResult) -> None:
             caption=f"MVP of the Week {result.week_label}",
             token=token,
         )
+    return telegraph_url
+
+
+def _publish_mvp_telegraph(result: MvpWeeklyPipelineResult) -> str | None:
+    if not result.report_path:
+        return None
+    report_path = Path(result.report_path)
+    if not report_path.exists():
+        LOGGER.warning("MVP weekly Telegraph publish skipped; report missing: %s", report_path)
+        return None
+    try:
+        markdown = report_path.read_text(encoding="utf-8")
+        html = render_report_html(markdown)
+        title = f"MVP of the Week {result.week_label}"
+        return publish_article(title=title, html_content=html)
+    except Exception:
+        LOGGER.warning("MVP weekly Telegraph publish failed", exc_info=True)
+        return None
 
 
 def _optional_str(value: object) -> str | None:
@@ -172,3 +202,46 @@ def _optional_int(value: object) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+def _optional_dict(value: object) -> dict[str, object] | None:
+    return value if isinstance(value, dict) else None
+
+
+def _optional_str_dict(value: object) -> dict[str, str] | None:
+    if not isinstance(value, dict):
+        return None
+    return {str(key): str(item) for key, item in value.items()}
+
+
+def source_mix_summary(result: MvpWeeklyPipelineResult) -> str:
+    counts = result.source_counts or {}
+    telegram_count = _optional_int(counts.get("telegram_seed_evidence_count"))
+    if telegram_count is None:
+        telegram_count = _optional_int(counts.get("telegram_research_agent"))
+    external_count = _optional_int(counts.get("external_evidence_count"))
+    external_types = counts.get("external_source_types") or ()
+    if isinstance(external_types, str):
+        external_text = external_types
+    elif isinstance(external_types, (list, tuple)):
+        external_text = ", ".join(str(item) for item in external_types)
+    else:
+        external_text = ""
+    skipped = counts.get("skipped_sources") or ()
+    if isinstance(skipped, str):
+        skipped_text = skipped
+    elif isinstance(skipped, (list, tuple)):
+        skipped_text = ", ".join(str(item) for item in skipped)
+    else:
+        skipped_text = ""
+    parts = [
+        f"telegram={telegram_count if telegram_count is not None else 'unknown'}",
+        f"external={external_count if external_count is not None else 'unknown'}",
+        f"external_types={external_text or 'none'}",
+    ]
+    if skipped_text:
+        parts.append(f"skipped={skipped_text}")
+    source_errors = result.source_errors or {}
+    if source_errors:
+        parts.append("source_errors=" + ", ".join(sorted(source_errors)))
+    return "Source mix: " + "; ".join(parts) + "."

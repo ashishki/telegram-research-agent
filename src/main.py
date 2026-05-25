@@ -448,6 +448,7 @@ def handle_mvp_weekly(args: argparse.Namespace) -> int:
             f"{summary.report_path or ''}\n"
             f"status={summary.radar_status} seeds={summary.seed_count} "
             f"title={summary.selected_title or ''}\n"
+            f"telegraph={summary.telegraph_url or ''}\n"
         )
     except Exception:
         LOGGER.exception("MVP weekly pipeline failed")

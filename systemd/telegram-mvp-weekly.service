@@ -9,6 +9,7 @@ User=oc_you
 Group=oc_you
 WorkingDirectory=/srv/openclaw-you/workspace/telegram-research-agent
 EnvironmentFile=/srv/openclaw-you/.env
+EnvironmentFile=-/etc/demand-mvp-radar.env
 Environment=PYTHONPATH=/srv/openclaw-you/workspace/telegram-research-agent
 Environment=RADAR_REPO_PATH=/srv/openclaw-you/workspace/Demand-to-MVP-Radar
 Environment=RADAR_PYTHON=/srv/openclaw-you/workspace/Demand-to-MVP-Radar/.venv/bin/python

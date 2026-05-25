@@ -69,6 +69,13 @@ def render_report_html(report_text: str) -> str:
             index += 1
             continue
 
+        if line.startswith("# "):
+            close_section()
+            heading = html.escape(line[2:].strip())
+            body_parts.append(f"<h1>{heading}</h1>")
+            index += 1
+            continue
+
         if line.startswith("## "):
             close_section()
             heading = html.escape(line[3:].strip())

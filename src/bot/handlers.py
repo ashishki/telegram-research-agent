@@ -14,7 +14,7 @@ from output.generate_digest import _compute_week_label, run_digest
 from output.generate_answer import generate_answer
 from output.generate_insight import generate_insight
 from output.generate_study_plan import generate_study_plan, mark_study_complete
-from output.mvp_weekly_pipeline import run_mvp_weekly_pipeline
+from output.mvp_weekly_pipeline import run_mvp_weekly_pipeline, source_mix_summary
 
 
 LOGGER = logging.getLogger(__name__)
@@ -500,6 +500,9 @@ def handle_run_mvp_weekly(chat_id: str, args: str, settings: Settings) -> None:
         f"status={summary.radar_status}",
         f"seeds={summary.seed_count}",
     ]
+    if summary.telegraph_url:
+        lines.append(summary.telegraph_url)
+    lines.append(source_mix_summary(summary))
     if summary.selected_title:
         lines.append(f"title={summary.selected_title}")
     send_report_preview(
