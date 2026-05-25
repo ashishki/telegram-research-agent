@@ -27,7 +27,8 @@ The systemd timer triggers the full pipeline:
 Owner receives:
 - Telegram message: short `Research Brief` notification + Telegraph link
 - Telegram message: short `Implementation Ideas` notification + Telegraph link
-- Telegram document: `MVP of the Week` with one focused experiment candidate and evidence
+- Telegram message: short `MVP of the Week` notification + Telegraph link + source-mix summary
+- Telegram document: copyable `MVP of the Week` Markdown fallback with one candidate, evidence, missing evidence, risks, and next experiment
 
 Expected time to read: 10–15 minutes.
 
@@ -108,6 +109,11 @@ python3 src/main.py insight-triage-stats
 # Debug why digest topics did not become project-linked Telegram signals
 python3 src/main.py memory diagnose-project-signals --week 2026-W20
 ```
+
+`mvp-weekly` is not Telegram-only idea generation. It exports Telegram seeds to
+Demand-to-MVP Radar, then Radar collects the configured external demand bundle
+before synthesis. The delivered notification includes a `Source mix` line so a
+weak external run is visible immediately.
 
 ### Inline Feedback (from Telegram)
 
@@ -258,9 +264,14 @@ This lets study planning, recommendations, and project insights reason from rece
 - [ ] Ensure the service user can write to `data/output/reviews`, `data/output/recommendations`, and `data/output/study_plans`
 - [ ] Ensure `Demand-to-MVP-Radar` is present beside this repo, has a local `.venv`, and is writable at `data/` and `reports/`
 - [ ] Ensure `Demand-to-MVP-Radar/config/mvp_weekly_sources.json` reflects the source surfaces Radar should collect before the weekly MVP synthesis
+- [ ] Create `/etc/demand-mvp-radar.env` from `Demand-to-MVP-Radar/config/live_sources.env.example` when external source credentials are available
+- [ ] Add at least `SERPAPI_API_KEY`, `YOUTUBE_API_KEY`, `PRODUCT_HUNT_TOKEN`, and Reddit credentials for the full broad-source weekly run; `GITHUB_TOKEN` and `STACK_EXCHANGE_KEY` improve quota but are optional
 - [ ] Set `DMR_LLM_PROVIDER=anthropic` and `DMR_LLM_MODEL_MVP_WEEKLY=claude-opus-4-7` for the weekly MVP report if LLM synthesis should run
+- [ ] Confirm `systemd/telegram-mvp-weekly.service` loads both `/srv/openclaw-you/.env` and optional `/etc/demand-mvp-radar.env`
 - [ ] Run `python3 src/main.py health-check` — verify DB and config presence
 - [ ] Run bootstrap ingestion for initial data
 - [ ] Run `python3 src/main.py score-stats` — verify scoring produces expected distribution
 - [ ] Run first digest — review output quality before enabling the timer
 - [ ] Run `python3 src/main.py mvp-weekly --no-deliver` — verify Radar artifact quality before enabling `telegram-mvp-weekly.timer`
+
+For the complete MVP Radar bridge contract, see `docs/mvp_weekly_radar.md`.

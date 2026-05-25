@@ -54,7 +54,7 @@ It is not a public bot, SaaS product, or generic summarizer.
 - Cost, score, health, triage, and memory inspection commands.
 - Health-check counters for project matches, links, scoped evidence, and zero-signal snapshots.
 - Empty/low-signal weekly alerts so pipeline failures do not look like normal empty digests.
-- Weekly MVP Radar bridge: Telegram exports opportunity seeds, Radar collects configured demand sources, Opus-class synthesis writes a separate MVP-of-week report, and the bot can deliver it back to Telegram.
+- Weekly MVP Radar bridge: Telegram exports opportunity seeds, Radar collects configured demand sources, Opus-class synthesis writes a separate MVP-of-week report, and the bot delivers it as a Telegraph article plus a copyable Markdown document.
 
 ## Main Commands
 
@@ -94,6 +94,11 @@ Environment:
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_OWNER_CHAT_ID` | Telegram delivery and command bot |
 | `LLM_API_KEY` | LLM provider key |
 | `TELEGRAPH_TOKEN` | Stable Telegraph publishing account |
+| `RADAR_REPO_PATH` / `RADAR_PYTHON` | Demand-to-MVP Radar repo and local venv Python |
+| `DMR_MVP_SOURCE_CONFIG` | Radar weekly live-source config |
+| `DMR_LLM_PROVIDER` / `DMR_LLM_MODEL_MVP_WEEKLY` | Radar MVP synthesis provider/model |
+
+Radar live-source credentials are loaded separately by `systemd/telegram-mvp-weekly.service` from `/etc/demand-mvp-radar.env` when present. That file may contain `SERPAPI_API_KEY`, `GITHUB_TOKEN`, `YOUTUBE_API_KEY`, `PRODUCT_HUNT_TOKEN`, `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USER_AGENT`, and `STACK_EXCHANGE_KEY`.
 
 `projects.yaml` is the curated active-project registry for scoped outputs. Older GitHub-synced DB rows may remain active in SQLite; project diagnostics and snapshots prefer the curated entries.
 
@@ -106,6 +111,7 @@ Start here:
 - [docs/architecture.md](docs/architecture.md) — current system shape
 - [docs/spec.md](docs/spec.md) — implementation-facing system specification
 - [docs/report_format.md](docs/report_format.md) — weekly artifact contract
+- [docs/mvp_weekly_radar.md](docs/mvp_weekly_radar.md) — MVP of the Week Radar bridge and credentials
 - [docs/memory_architecture.md](docs/memory_architecture.md) — memory model
 - [docs/memory_inspection.md](docs/memory_inspection.md) — memory debugging commands
 

@@ -27,7 +27,9 @@ A well-structured, readable long-form document.
 Delivered as:
 - a `Research Brief` Telegraph article
 - an `Implementation Ideas` Telegraph article
+- an `MVP of the Week` Telegraph article generated from the Radar Markdown report
 - fallback HTML attachment for `Research Brief` if Telegraph is unavailable
+- copyable Markdown document fallback for `MVP of the Week`
 Readable inside Telegram without opening an external app.
 Scannable — section headers, bullet points, source links inline per signal.
 
@@ -130,6 +132,33 @@ The report is informed by:
 - Source links must be real `t.me` deep links, not channel root links
 
 ---
+
+## MVP of the Week Artifact
+
+`MVP of the Week` is a separate Radar artifact, not a section inside the
+Telegram research brief.
+
+Delivery requirements:
+
+- Telegram notification stays short.
+- Notification includes the Telegraph URL when publishing succeeds.
+- Notification includes a source-mix summary from Radar output.
+- Markdown document is sent as a fallback/copyable artifact even when Telegraph succeeds.
+- Telegraph failures must not block the Markdown fallback.
+
+Content requirements are owned by Demand-to-MVP Radar:
+
+- Source Mix;
+- Operator Fit;
+- One-Function MVP;
+- Evidence;
+- Missing Evidence;
+- Risks;
+- This Week Experiment;
+- Anti-Complexity Guardrail.
+
+Telegram-only evidence is not enough for a confident experiment. Radar must
+show whether external sources supported the selected idea.
 
 ## Anti-Patterns to Avoid
 

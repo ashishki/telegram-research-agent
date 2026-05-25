@@ -10,6 +10,7 @@ This directory keeps active operator and implementation guidance at the top leve
 | `spec.md` | Implementation-facing system specification |
 | `operator_workflow.md` | Weekly operations, feedback, tuning, and troubleshooting |
 | `report_format.md` | Reader-facing weekly artifact contract |
+| `mvp_weekly_radar.md` | Demand-to-MVP Radar bridge, source-mix contract, and live-source credentials |
 | `memory_architecture.md` | Implemented four-tier memory design |
 | `memory_inspection.md` | CLI guide for inspecting evidence, decisions, snapshots, and suppression |
 | `ops-security.md` | VPS, Telegram credential, and service security guidance |

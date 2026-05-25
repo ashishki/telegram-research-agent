@@ -72,6 +72,18 @@ TELEGRAM_SESSION_PATH=/srv/openclaw-you/secrets/telegram.session
 
 This file is sourced by systemd via `EnvironmentFile=` directive and by `scripts/setup.sh` for the initial auth flow.
 
+The weekly MVP Radar service also loads an optional source-specific env file:
+
+```env
+/etc/demand-mvp-radar.env
+```
+
+Allowed values there are Radar live-source credentials such as
+`SERPAPI_API_KEY`, `GITHUB_TOKEN`, `YOUTUBE_API_KEY`, `PRODUCT_HUNT_TOKEN`,
+`REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USER_AGENT`, and
+`STACK_EXCHANGE_KEY`. Missing values must be reported as source-scoped
+`source_errors`, not hidden as successful collection.
+
 Application code loads these via `os.environ`, never via hardcoded values.
 
 ### .gitignore Requirements

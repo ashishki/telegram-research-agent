@@ -97,7 +97,7 @@ Legacy phases (Phase 1–20 in the original numbering) are preserved as implemen
 
 **Rationale:** The OpenClaw gateway at `ws://127.0.0.1:18789` implements a custom TypeScript WebSocket protocol (RequestFrame, EventFrame, session management) designed for the OpenClaw plugin ecosystem — not for external Python clients. No Python SDK exists for this protocol. Implementing a conformant client would be fragile and undocumented. The Anthropic API key is already present in the environment and is the authoritative credential. Direct SDK usage is simpler, tested, and well-documented.
 
-**Credential source:** `/srv/openclaw-you/.env` loaded via `EnvironmentFile=` in systemd. Key: `LLM_API_KEY`.
+**Credential source:** `/srv/openclaw-you/.env` loaded via `EnvironmentFile=` in systemd. Key: `LLM_API_KEY`. The `telegram-mvp-weekly` service also loads optional Radar live-source credentials from `/etc/demand-mvp-radar.env`.
 
 **Current routing:** `topic_detection` and `project_insights` use Haiku. `digest`, `recommendations`, `study_plan`, `insight`, and `bot_ask` use Sonnet. `mvp_weekly` is reserved for the separate Radar MVP artifact and defaults to Opus 4.7 when called through that boundary. Environment overrides such as `LLM_MODEL_DIGEST` and `LLM_MODEL_MVP_WEEKLY` remain supported.
 
@@ -125,7 +125,7 @@ The insight triage layer (`do_now` / `backlog` / `reject_or_defer`) is intention
 **Output artifacts are:**
 - `Research Brief` Markdown/HTML written to `data/output/digests` and `data/output/reviews`
 - `Implementation Ideas` Markdown/HTML written to `data/output/recommendations`
-- `MVP of the Week` Markdown written by `Demand-to-MVP-Radar` under its `reports/mvp_of_week` directory and delivered back through the Telegram bot
+- `MVP of the Week` Markdown/JSON written by `Demand-to-MVP-Radar` under its `reports/mvp_of_week` directory, published as Telegraph when available, and delivered back through the Telegram bot with Markdown document fallback
 - study plans and project-insight artifacts under `data/output/*`
 - Telegraph URLs persisted in SQLite for delivered reports
 
