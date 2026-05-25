@@ -11,9 +11,13 @@ WorkingDirectory=/srv/openclaw-you/workspace/telegram-research-agent
 EnvironmentFile=/srv/openclaw-you/.env
 Environment=PYTHONPATH=/srv/openclaw-you/workspace/telegram-research-agent
 Environment=RADAR_REPO_PATH=/srv/openclaw-you/workspace/Demand-to-MVP-Radar
+Environment=RADAR_PYTHON=/srv/openclaw-you/workspace/Demand-to-MVP-Radar/.venv/bin/python
 Environment=DMR_DATA_DIR=/srv/openclaw-you/workspace/Demand-to-MVP-Radar/data
 Environment=DMR_REPORT_DIR=/srv/openclaw-you/workspace/Demand-to-MVP-Radar/reports
-Environment=UV_CACHE_DIR=/srv/openclaw-you/workspace/Demand-to-MVP-Radar/data/uv-cache
+Environment=DMR_MVP_SOURCE_CONFIG=/srv/openclaw-you/workspace/Demand-to-MVP-Radar/config/mvp_weekly_sources.json
+Environment=DMR_LLM_PROVIDER=anthropic
+Environment=DMR_LLM_MODEL_MVP_WEEKLY=claude-opus-4-7
+Environment=DMR_LLM_FALLBACK_MODEL_MVP_WEEKLY=claude-opus-4-1-20250805
 ExecStart=/srv/openclaw-you/venv/bin/python3 src/main.py mvp-weekly
 Restart=no
 StandardOutput=journal

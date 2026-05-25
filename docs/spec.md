@@ -99,7 +99,7 @@ Legacy phases (Phase 1–20 in the original numbering) are preserved as implemen
 
 **Credential source:** `/srv/openclaw-you/.env` loaded via `EnvironmentFile=` in systemd. Key: `LLM_API_KEY`.
 
-**Current routing:** `topic_detection` and `project_insights` use Haiku. `digest`, `recommendations`, `study_plan`, `insight`, and `bot_ask` use Sonnet. Environment overrides such as `LLM_MODEL_DIGEST` remain supported.
+**Current routing:** `topic_detection` and `project_insights` use Haiku. `digest`, `recommendations`, `study_plan`, `insight`, and `bot_ask` use Sonnet. `mvp_weekly` is reserved for the separate Radar MVP artifact and defaults to Opus 4.7 when called through that boundary. Environment overrides such as `LLM_MODEL_DIGEST` and `LLM_MODEL_MVP_WEEKLY` remain supported.
 
 **Future option:** A gateway migration remains possible later if OpenClaw exposes a stable Python-facing interface, but it is not the current transport.
 
@@ -112,6 +112,7 @@ Legacy phases (Phase 1–20 in the original numbering) are preserved as implemen
 - Study recommendation generation
 - Project insight mapping
 - Experiment idea generation
+- Weekly MVP opportunity synthesis through Demand-to-MVP Radar, after Telegram evidence has been exported as seeds and Radar has collected its configured sources
 
 The insight triage layer (`do_now` / `backlog` / `reject_or_defer`) is intentionally deterministic. It classifies LLM-generated ideas using heuristic rules with no additional LLM call.
 
@@ -124,6 +125,7 @@ The insight triage layer (`do_now` / `backlog` / `reject_or_defer`) is intention
 **Output artifacts are:**
 - `Research Brief` Markdown/HTML written to `data/output/digests` and `data/output/reviews`
 - `Implementation Ideas` Markdown/HTML written to `data/output/recommendations`
+- `MVP of the Week` Markdown written by `Demand-to-MVP-Radar` under its `reports/mvp_of_week` directory and delivered back through the Telegram bot
 - study plans and project-insight artifacts under `data/output/*`
 - Telegraph URLs persisted in SQLite for delivered reports
 

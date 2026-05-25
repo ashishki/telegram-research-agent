@@ -24,6 +24,7 @@ It is not a public bot, SaaS product, or generic summarizer.
    - `Research Brief`
    - `Implementation Ideas`
    - `Study Plan`
+   - `MVP of the Week` from Demand-to-MVP Radar
 7. **Record decisions** in `decision_journal` so acted-on, deferred, rejected, and completed items shape future output.
 
 ## Current Capabilities
@@ -53,6 +54,7 @@ It is not a public bot, SaaS product, or generic summarizer.
 - Cost, score, health, triage, and memory inspection commands.
 - Health-check counters for project matches, links, scoped evidence, and zero-signal snapshots.
 - Empty/low-signal weekly alerts so pipeline failures do not look like normal empty digests.
+- Weekly MVP Radar bridge: Telegram exports opportunity seeds, Radar collects configured demand sources, Opus-class synthesis writes a separate MVP-of-week report, and the bot can deliver it back to Telegram.
 
 ## Main Commands
 

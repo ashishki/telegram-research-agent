@@ -24,6 +24,7 @@ CATEGORY_MODEL_MAP: dict[str, str] = {
     "insight":           "claude-sonnet-4-6",
     "bot_ask":           "claude-sonnet-4-6",
     "preference_judge":  "claude-sonnet-4-6",
+    "mvp_weekly":        "claude-opus-4-7",
     # Fast + cheap — called many times per run
     "project_insights":  "claude-haiku-4-5",
     "topic_detection":   "claude-haiku-4-5",

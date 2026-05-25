@@ -256,7 +256,9 @@ This lets study planning, recommendations, and project insights reason from rece
 - [ ] Fill `src/config/profile.yaml` — your boost/downrank topics
 - [ ] Fill `src/config/projects.yaml` — your active projects with focus keywords
 - [ ] Ensure the service user can write to `data/output/reviews`, `data/output/recommendations`, and `data/output/study_plans`
-- [ ] Ensure `Demand-to-MVP-Radar` is present beside this repo and writable at `data/` and `reports/`
+- [ ] Ensure `Demand-to-MVP-Radar` is present beside this repo, has a local `.venv`, and is writable at `data/` and `reports/`
+- [ ] Ensure `Demand-to-MVP-Radar/config/mvp_weekly_sources.json` reflects the source surfaces Radar should collect before the weekly MVP synthesis
+- [ ] Set `DMR_LLM_PROVIDER=anthropic` and `DMR_LLM_MODEL_MVP_WEEKLY=claude-opus-4-7` for the weekly MVP report if LLM synthesis should run
 - [ ] Run `python3 src/main.py health-check` — verify DB and config presence
 - [ ] Run bootstrap ingestion for initial data
 - [ ] Run `python3 src/main.py score-stats` — verify scoring produces expected distribution

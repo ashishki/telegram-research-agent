@@ -1,34 +1,161 @@
 projects:
-  - name: gdev-agent
-    repo: ashishki/gdev-agent
-    description: "Multi-tenant AI triage service. FastAPI, PostgreSQL/pgvector, Redis, Claude API. Webhook ingestion, LLM classification, approval workflow."
-    focus: "service layer patterns, eval pipeline, cost control, multi-tenant RLS, async FastAPI"
+  - name: entropy_protocol
+    repo: ashishki/entropy_protocol
+    description: "Private product portfolio for governed trading research and trader discipline workflows. Active wedges: Trader Risk Audit for deterministic post-trade rule-violation reports and Signal Analytics Sandbox for public-channel retrospective reports."
+    focus: "artifact-first validation, deterministic risk audit, trader rule violations, public signal analytics, report correctness, safety boundaries, no live capital"
     keywords:
-      - ai agents
-      - agent runtime
-      - approval workflow
-      - benchmark
-      - classification
-      - cost control
-      - eval
-      - evaluation
-      - fastapi
-      - llm routing
-      - multi-tenant
-      - pgvector
-      - postgres
-      - service
-      - async
-      - triage
+      - entropy protocol
+      - trader risk audit
+      - trade upload
+      - risk rules
+      - rule violation
+      - pnl attribution
+      - audit report
+      - artifact validation
+      - signal analytics
+      - public channel retrospective
+      - claim ledger
+      - market outcomes
+      - evidence packet
+      - governance
+      - research firewall
+      - no live capital
+      - trading research
+      - report correctness
+    exclude_keywords:
+      - live trading bot
+      - order execution
+      - investment advice
+
+  - name: ai-rollout-training-os
+    repo: ashishki/AI-Rollout-Training-OS
+    description: "System for measurable AI rollout in working teams: role-specific missions, policy/SOP-grounded feedback, guardrail checks, manager approval, and adoption evidence."
+    focus: "AI adoption pilots, role missions, policy-grounded RAG feedback, guardrails, manager-approved workflow changes, training rollout metrics"
+    keywords:
+      - ai rollout
+      - training
+      - adoption
+      - role missions
+      - policy
+      - sop
+      - guardrails
+      - manager approval
+      - workflow change
+      - training owner
+      - learner
+      - feedback
+      - rubric
+      - cohort
+      - adoption metrics
+      - evidence
+      - RAG
+    exclude_keywords:
+      - trading
+      - film
+
+  - name: demand-to-mvp-radar
+    repo: ashishki/Demand-to-MVP-Radar
+    description: "Local demand-intelligence workflow that turns source-backed market signals into ranked one-function MVP briefs with evidence, scoring, source freshness, and decision memory."
+    focus: "MVP opportunity research, demand source map, search intent, competitor traction, repeated questions, manual workarounds, weekly MVP-of-week artifact"
+    keywords:
+      - demand radar
+      - mvp
+      - opportunity
+      - search intent
+      - competitor traction
+      - repeated questions
+      - manual workaround
+      - store demand
+      - source map
+      - evidence
+      - scoring
+      - decision memory
+      - weekly mvp
+      - product idea
+      - public data
+      - validation
+      - build reject revisit
+    exclude_keywords:
+      - implementation refactor only
+
+  - name: lead-response-sla-agent
+    repo: ashishki/Lead-Response-SLA-Agent
+    description: "AI-assisted first-response and lead qualification workflow for service businesses, with SLA measurement, safe knowledge-grounded replies, CRM writes, and human handoff."
+    focus: "lead response latency, first reply SLA, qualification, CRM handoff, RAG no-answer behavior, safe customer-facing automation"
+    keywords:
+      - lead response
+      - sla
+      - first response
+      - qualified lead
+      - service business
+      - crm
       - webhook
-      - redis
+      - qualification
+      - booking
+      - human handoff
+      - approved knowledge
+      - no answer
+      - RAG
+      - audit trail
+      - latency
+      - operator trust
+    exclude_keywords:
+      - game support
+      - trading
+
+  - name: workflow-to-agent-studio
+    repo: ashishki/-Workflow-to-Agent-Studio
+    description: "Local-first AI automation discovery tool that turns raw workflow descriptions, SOPs, transcripts, forms, and integration notes into evidence-linked automation blueprints."
+    focus: "workflow discovery, automation blueprint, process mapping, integration risks, human approval boundaries, eval cases, implementation tasks"
+    keywords:
+      - workflow to agent
+      - automation discovery
+      - workflow blueprint
+      - SOP
+      - transcript
+      - process map
+      - integration
+      - human approval
+      - eval cases
+      - observability
+      - risk
+      - blueprint
+      - discovery
+      - consultant
+      - solution architect
+      - AI automation
     exclude_keywords:
       - film
+      - trading
+
+  - name: dream-motif-interpreter
+    repo: ashishki/Dream_Motif_Interpreter
+    description: "Private dream-analysis system with Google Docs ingestion, pgvector retrieval, Telegram interface, voice input, motif induction, cultural-parallel research, and bounded speculative outputs."
+    focus: "RAG architecture reference, source intake, motif induction, grounded interpretation, Telegram voice UX, evidence-backed speculative research"
+    keywords:
+      - dream motif
+      - dream archive
+      - Google Docs
+      - pgvector
+      - retrieval
+      - RAG
+      - motif induction
+      - motif grounding
+      - cultural parallels
+      - voice input
+      - Telegram assistant
+      - annotation versioning
+      - source intake
+      - research retriever
+      - evidence
+    exclude_keywords:
+      - trading
+      - sales lead
 
   - name: telegram-research-agent
     repo: ashishki/telegram-research-agent
-    description: "Personal research intelligence pipeline for Telegram channels. Deterministic scoring, preference-shaped synthesis, project-aware recommendations, reaction feedback, evidence memory, and decision continuity."
-    focus: "digest quality, signal scoring, reaction feedback loop, project-aware insight generation, evidence memory, decision journal, low-signal alerts"
+    description: "Personal research intelligence pipeline for Telegram channels. Deterministic scoring, preference-shaped synthesis, project-aware recommendations, reaction feedback, evidence memory, decision continuity, and weekly MVP Radar delivery."
+    focus: "digest quality, signal scoring, reaction feedback loop, project-aware insight generation, evidence memory, decision journal, MVP-of-week bridge"
     keywords:
       - telegram digest
       - research brief
@@ -51,13 +178,71 @@ projects:
       - decisions
       - recommendations
       - diagnostics
+      - mvp weekly
+      - radar
       - pipeline
     exclude_keywords:
       - film
 
+  - name: gdev-agent
+    repo: ashishki/gdev-agent
+    description: "Multi-tenant AI support triage platform for game-studio player support. Webhook ingestion, input guard, Claude tool_use classification, approval workflow, RLS, budgets, evals, and observability."
+    focus: "support triage, service layer patterns, eval pipeline, cost control, multi-tenant RLS, async FastAPI, human approval workflow"
+    keywords:
+      - game support
+      - player support
+      - support triage
+      - ai agents
+      - agent runtime
+      - approval workflow
+      - benchmark
+      - classification
+      - cost control
+      - eval
+      - evaluation
+      - fastapi
+      - llm routing
+      - multi-tenant
+      - RLS
+      - postgres
+      - service
+      - async
+      - webhook
+      - redis
+      - observability
+    exclude_keywords:
+      - film
+
+  - name: ai-workflow-playbook
+    repo: ashishki/AI_workflow_playbook
+    description: "Reusable AI-assisted development operating model with phase gates, implementation contracts, role separation, review cycles, cognition memory, and quality controls."
+    focus: "workflow automation, agent orchestration, quality gates, developer tooling, cognition memory, governance artifacts"
+    keywords:
+      - ai agents
+      - coding agents
+      - claude code
+      - codex
+      - implementation workflow
+      - review cycle
+      - quality gates
+      - workflow
+      - orchestration
+      - automation
+      - agent
+      - quality
+      - developer
+      - tooling
+      - cognition
+      - memory
+      - governance
+      - artifact
+    exclude_keywords:
+      - film
+      - postgresql
+
   - name: film-school-assistant
     repo: ashishki/film-school-assistant
-    description: "Private Telegram-first creative workflow assistant for directors and film students. Captures text and voice notes, structures notes/ideas/homework/deadlines, maintains project continuity, evidence memory, reflection, recurring practices, and weekly summaries."
+    description: "Telegram-first private creative workflow assistant for film school and director work. Captures text and voice notes, structures homework/deadlines/ideas, maintains project continuity, memory, reflection, and weekly summaries."
     focus: "creative workflow continuity, project-scoped memory, evidence recall, reflection quality, voice capture, Telegram UX, recurring practices, weekly creative progress"
     keywords:
       - film
@@ -86,25 +271,29 @@ projects:
       - fastapi
       - postgresql
 
-  - name: ai-workflow-playbook
-    repo: ashishki/AI_workflow_playbook
-    description: "Reusable AI-assisted development workflow. Phase-based orchestration, review cycles, implementation contracts."
-    focus: "workflow automation, agent orchestration, quality gates, developer tooling"
+  - name: ai-adoption-diff-tool
+    repo: ashishki/AI_Adoption_Diff_Tool
+    description: "Deterministic CLI for measuring codebase changes before and after AI coding tool adoption through git-history metrics, reports, and confidence caveats."
+    focus: "AI adoption measurement, git metrics, before-after analysis, churn, revert frequency, test-to-code ratio, confidence reporting"
     keywords:
-      - ai agents
-      - coding agents
-      - claude code
-      - codex
-      - implementation workflow
-      - review cycle
-      - quality gates
-      - workflow
-      - orchestration
-      - automation
-      - agent
-      - quality
-      - developer
-      - tooling
+      - AI adoption
+      - diff tool
+      - git history
+      - metrics
+      - churn
+      - revert
+      - fix frequency
+      - test ratio
+      - boilerplate
+      - hot files
+      - directory concentration
+      - confidence score
+      - ROI
+      - productivity
+      - coding assistant
+      - Cursor
+      - Copilot
+      - Claude Code
     exclude_keywords:
+      - trading
       - film
-      - postgresql

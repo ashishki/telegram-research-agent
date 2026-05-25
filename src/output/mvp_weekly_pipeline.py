@@ -2,10 +2,8 @@ import json
 import logging
 import os
 import subprocess
-import sys
 from dataclasses import dataclass
 from pathlib import Path
-from shutil import which
 
 from bot.telegram_delivery import send_document, send_text
 from config.settings import PROJECT_ROOT, Settings
@@ -14,7 +12,7 @@ from output.opportunity_seed_export import export_opportunity_seeds
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_RADAR_REPO = PROJECT_ROOT.parent / "Demand-to-MVP-Radar"
-DEFAULT_RADAR_PYTHON = Path("/srv/openclaw-you/venv/bin/python3")
+DEFAULT_MVP_MODEL = "claude-opus-4-7"
 
 
 @dataclass(frozen=True)
@@ -82,9 +80,21 @@ def _run_radar(*, seed_path: Path, run_id: str) -> dict[str, object]:
         if env.get("PYTHONPATH")
         else str(radar_repo)
     )
-    env.setdefault("UV_CACHE_DIR", str(data_dir / "uv-cache"))
+    env.setdefault("DMR_LLM_PROVIDER", "anthropic")
+    env.setdefault("DMR_LLM_API_KEY", env.get("LLM_API_KEY", ""))
+    env.setdefault(
+        "DMR_LLM_MODEL_MVP_WEEKLY",
+        env.get("LLM_MODEL_MVP_WEEKLY") or env.get("STRONG_MODEL") or DEFAULT_MVP_MODEL,
+    )
+    env.setdefault("DMR_LLM_FALLBACK_MODEL_MVP_WEEKLY", "claude-opus-4-1-20250805")
+    source_config = Path(
+        os.environ.get(
+            "DMR_MVP_SOURCE_CONFIG",
+            str(radar_repo / "config" / "mvp_weekly_sources.json"),
+        )
+    ).resolve()
     command = [
-        *_radar_python_command(),
+        *_radar_python_command(radar_repo),
         "-m",
         "demand_mvp_radar.cli",
         "mvp-of-week",
@@ -97,6 +107,8 @@ def _run_radar(*, seed_path: Path, run_id: str) -> dict[str, object]:
         "--report-dir",
         str(report_dir),
     ]
+    if source_config.exists():
+        command.extend(["--source-config", str(source_config)])
     completed = subprocess.run(
         command,
         cwd=str(radar_repo),
@@ -111,23 +123,14 @@ def _run_radar(*, seed_path: Path, run_id: str) -> dict[str, object]:
     return json.loads(stdout)
 
 
-def _radar_python_command() -> list[str]:
+def _radar_python_command(radar_repo: Path) -> list[str]:
     python_bin = os.environ.get("RADAR_PYTHON", "").strip()
     if python_bin:
         return [python_bin]
-    uv_bin = os.environ.get("RADAR_UV_BIN", "").strip() or which("uv")
-    if uv_bin:
-        return [
-            uv_bin,
-            "run",
-            "--no-project",
-            "--python",
-            os.environ.get("RADAR_PYTHON_VERSION", "3.12"),
-            "--with",
-            "pydantic>=2,<3",
-            "python",
-        ]
-    return [str(DEFAULT_RADAR_PYTHON if DEFAULT_RADAR_PYTHON.exists() else Path(sys.executable))]
+    repo_venv_python = radar_repo / ".venv" / "bin" / "python"
+    if repo_venv_python.exists():
+        return [str(repo_venv_python)]
+    raise FileNotFoundError(f"Demand-to-MVP Radar local venv not found: {repo_venv_python}")
 
 
 def _deliver_result(result: MvpWeeklyPipelineResult) -> None:
