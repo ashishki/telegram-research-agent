@@ -22,6 +22,8 @@ from output.map_project_insights import run_project_mapping
 from output.signal_report import format_signal_report
 from output.generate_study_plan import OUTPUT_DIR as STUDY_PLAN_OUTPUT_DIR
 from output.generate_study_plan import generate_study_plan, send_study_reminder
+from output.mvp_weekly_pipeline import run_mvp_weekly_pipeline
+from output.opportunity_seed_export import export_opportunity_seeds
 from processing.cleanup import run_cleanup
 from processing.cluster import cluster_posts
 from processing.detect_topics import run_topic_detection
@@ -72,6 +74,27 @@ def build_parser() -> argparse.ArgumentParser:
     insight_parser.add_argument("--since-bootstrap", action="store_true")
     insight_parser.add_argument("--weeks", type=int, default=4)
     insight_parser.set_defaults(handler=handle_insight)
+
+    seed_parser = subparsers.add_parser(
+        "export-opportunity-seeds",
+        help="Export recent Telegram demand signals for Demand-to-MVP Radar",
+    )
+    seed_parser.add_argument("--days", type=int, default=7)
+    seed_parser.add_argument("--limit", type=int, default=80)
+    seed_parser.add_argument("--out", default=None)
+    seed_parser.add_argument("--include-channel", action="append", default=[])
+    seed_parser.set_defaults(handler=handle_export_opportunity_seeds)
+
+    mvp_weekly_parser = subparsers.add_parser(
+        "mvp-weekly",
+        help="Generate and optionally deliver the weekly MVP artifact through Demand-to-MVP Radar",
+    )
+    mvp_weekly_parser.add_argument("--days", type=int, default=7)
+    mvp_weekly_parser.add_argument("--limit", type=int, default=80)
+    mvp_weekly_parser.add_argument("--include-channel", action="append", default=[])
+    mvp_weekly_parser.add_argument("--run-id", default=None)
+    mvp_weekly_parser.add_argument("--no-deliver", action="store_true")
+    mvp_weekly_parser.set_defaults(handler=handle_mvp_weekly)
 
     normalize_parser = subparsers.add_parser("normalize")
     normalize_parser.set_defaults(handler=handle_normalize)
@@ -365,6 +388,70 @@ def handle_digest(args: argparse.Namespace) -> int:
     except Exception:
         LOGGER.exception("Cleanup failed but digest succeeded")
 
+    return 0
+
+
+def handle_export_opportunity_seeds(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+        output_path = Path(args.out) if args.out else None
+        summary = export_opportunity_seeds(
+            settings,
+            days=max(1, args.days),
+            limit=max(1, args.limit),
+            output_path=output_path,
+            include_channels=tuple(args.include_channel or ()),
+        )
+        LOGGER.info(
+            "Finished step=export_opportunity_seeds week=%s seeds=%d scanned=%d output=%s",
+            summary.week_label,
+            summary.seed_count,
+            summary.scanned_count,
+            summary.output_path,
+        )
+        sys.stdout.write(
+            f"{summary.output_path}\n"
+            f"seeds={summary.seed_count} scanned={summary.scanned_count} week={summary.week_label}\n"
+        )
+    except Exception:
+        LOGGER.exception("Opportunity seed export failed")
+        return 1
+    return 0
+
+
+def handle_mvp_weekly(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+        LOGGER.info("Starting step=mvp_weekly")
+        summary = run_mvp_weekly_pipeline(
+            settings,
+            days=max(1, args.days),
+            limit=max(1, args.limit),
+            include_channels=tuple(args.include_channel or ()),
+            run_id=args.run_id,
+            deliver=not args.no_deliver,
+        )
+        LOGGER.info(
+            "Finished step=mvp_weekly week=%s seeds=%d status=%s report=%s",
+            summary.week_label,
+            summary.seed_count,
+            summary.radar_status,
+            summary.report_path or "",
+        )
+        sys.stdout.write(
+            f"{summary.report_path or ''}\n"
+            f"status={summary.radar_status} seeds={summary.seed_count} "
+            f"title={summary.selected_title or ''}\n"
+        )
+    except Exception:
+        LOGGER.exception("MVP weekly pipeline failed")
+        return 1
     return 0
 
 

@@ -30,6 +30,7 @@ _install_stub("jinja2")
 
 from config.settings import Settings  # noqa: E402
 from output.report_schema import DigestResult  # noqa: E402
+from output.mvp_weekly_pipeline import MvpWeeklyPipelineResult  # noqa: E402
 import bot.handlers as handlers  # noqa: E402
 
 
@@ -89,6 +90,40 @@ class TestHandlers(unittest.TestCase):
             summary_lines=["/tmp/digest.md", "/tmp/digest.json"],
             week_label="2026-W14",
             token="bot-token",
+        )
+
+    def test_handle_run_mvp_weekly_sends_preview(self):
+        settings = Settings(
+            db_path=":memory:",
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+        summary = MvpWeeklyPipelineResult(
+            week_label="2026-W22",
+            seed_path="/tmp/seeds.json",
+            seed_count=4,
+            radar_status="selected",
+            report_path="/tmp/mvp.md",
+            json_path="/tmp/mvp.json",
+            selected_title="Telegram Channel SEO Site Generator",
+            recommendation="focused_experiment",
+            score=78,
+        )
+
+        with patch.object(handlers, "run_mvp_weekly_pipeline", return_value=summary) as mock_run:
+            with patch.object(handlers, "send_report_preview") as mock_preview:
+                with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                    handlers.handle_run_mvp_weekly(chat_id="42", args="", settings=settings)
+
+        mock_run.assert_called_once_with(settings, deliver=True)
+        mock_preview.assert_called_once()
+        self.assertEqual(mock_preview.call_args.kwargs["title"], "MVP of the Week generated")
+        self.assertTrue(
+            any(
+                "Telegram Channel SEO Site Generator" in line
+                for line in mock_preview.call_args.kwargs["summary_lines"]
+            )
         )
 
 

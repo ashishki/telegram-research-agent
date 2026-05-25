@@ -14,6 +14,7 @@ from output.generate_digest import _compute_week_label, run_digest
 from output.generate_answer import generate_answer
 from output.generate_insight import generate_insight
 from output.generate_study_plan import generate_study_plan, mark_study_complete
+from output.mvp_weekly_pipeline import run_mvp_weekly_pipeline
 
 
 LOGGER = logging.getLogger(__name__)
@@ -30,6 +31,7 @@ COMMAND_DOCS: dict[str, tuple[str, str]] = {
     "/study_done [notes]": ("handle_study_done", "Mark this week's study plan as completed"),
     "/costs": ("handle_costs", "Show LLM usage and cost statistics"),
     "/run_digest [force]": ("handle_run_digest", "Generate a fresh weekly brief; use force to resend delivery for the same week"),
+    "/run_mvp_weekly": ("handle_run_mvp_weekly", "Generate the weekly MVP artifact"),
     "/status": ("handle_status", "Show database and pipeline status"),
     "/mark_useful <post_id|link>": ("handle_mark_useful", "Record acted_on feedback"),
     "/mark_skipped <post_id|link>": ("handle_mark_skipped", "Record skipped feedback"),
@@ -490,6 +492,25 @@ def handle_run_digest(chat_id: str, args: str, settings: Settings) -> None:
     )
 
 
+def handle_run_mvp_weekly(chat_id: str, args: str, settings: Settings) -> None:
+    del args
+    summary = run_mvp_weekly_pipeline(settings, deliver=True)
+    lines = [
+        summary.report_path or "No report path returned",
+        f"status={summary.radar_status}",
+        f"seeds={summary.seed_count}",
+    ]
+    if summary.selected_title:
+        lines.append(f"title={summary.selected_title}")
+    send_report_preview(
+        chat_id=chat_id,
+        title="MVP of the Week generated",
+        summary_lines=lines,
+        week_label=summary.week_label,
+        token=_get_bot_token(),
+    )
+
+
 def handle_status(chat_id: str, args: str, settings: Settings) -> None:
     del args
     with _with_db(settings) as connection:
@@ -654,6 +675,7 @@ HANDLERS: dict[str, Callable[[str, str, Settings], None]] = {
     "/study_done": handle_study_done,
     "/costs": handle_costs,
     "/run_digest": handle_run_digest,
+    "/run_mvp_weekly": handle_run_mvp_weekly,
     "/status": handle_status,
     "/mark_useful": handle_mark_useful,
     "/mark_skipped": handle_mark_skipped,

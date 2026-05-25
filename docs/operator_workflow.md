@@ -14,6 +14,7 @@ The system runs automatically via systemd timers. The owner's weekly interaction
 Schedule:
 - ingestion: Monday 07:00 `Asia/Tbilisi`
 - weekly delivery: Monday 09:00 `Asia/Tbilisi`
+- MVP of the Week delivery: Monday 09:20 `Asia/Tbilisi`
 
 The systemd timer triggers the full pipeline:
 1. Incremental ingestion (new posts since last run)
@@ -21,10 +22,12 @@ The systemd timer triggers the full pipeline:
 3. Scoring (`score_posts`)
 4. Digest generation and reader-facing signal report formatting
 5. Delivery: Telegram notifications + full artifacts
+6. Opportunity seed export to Demand-to-MVP Radar and `MVP of the Week` delivery
 
 Owner receives:
 - Telegram message: short `Research Brief` notification + Telegraph link
 - Telegram message: short `Implementation Ideas` notification + Telegraph link
+- Telegram document: `MVP of the Week` with one focused experiment candidate and evidence
 
 Expected time to read: 10–15 minutes.
 
@@ -78,6 +81,12 @@ python3 src/main.py score-stats
 
 # Check LLM cost from last run (+ 4-week weekly trend)
 python3 src/main.py cost-stats
+
+# Dry-run the weekly MVP artifact without Telegram delivery
+python3 src/main.py mvp-weekly --no-deliver
+
+# Export only the Radar input contract
+python3 src/main.py export-opportunity-seeds --days 7 --limit 80
 
 # Preview scored posts without re-running the full pipeline
 # Note: this is a legacy operator preview, not an exact copy of the delivered Telegraph brief
@@ -247,7 +256,9 @@ This lets study planning, recommendations, and project insights reason from rece
 - [ ] Fill `src/config/profile.yaml` — your boost/downrank topics
 - [ ] Fill `src/config/projects.yaml` — your active projects with focus keywords
 - [ ] Ensure the service user can write to `data/output/reviews`, `data/output/recommendations`, and `data/output/study_plans`
+- [ ] Ensure `Demand-to-MVP-Radar` is present beside this repo and writable at `data/` and `reports/`
 - [ ] Run `python3 src/main.py health-check` — verify DB and config presence
 - [ ] Run bootstrap ingestion for initial data
 - [ ] Run `python3 src/main.py score-stats` — verify scoring produces expected distribution
 - [ ] Run first digest — review output quality before enabling the timer
+- [ ] Run `python3 src/main.py mvp-weekly --no-deliver` — verify Radar artifact quality before enabling `telegram-mvp-weekly.timer`

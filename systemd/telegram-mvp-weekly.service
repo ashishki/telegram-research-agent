@@ -1,0 +1,31 @@
+# Validated: systemd-analyze verify (run manually before deploying)
+[Unit]
+Description=Telegram Research Agent — MVP of the Week
+After=network.target
+
+[Service]
+Type=simple
+User=oc_you
+Group=oc_you
+WorkingDirectory=/srv/openclaw-you/workspace/telegram-research-agent
+EnvironmentFile=/srv/openclaw-you/.env
+Environment=PYTHONPATH=/srv/openclaw-you/workspace/telegram-research-agent
+Environment=RADAR_REPO_PATH=/srv/openclaw-you/workspace/Demand-to-MVP-Radar
+Environment=DMR_DATA_DIR=/srv/openclaw-you/workspace/Demand-to-MVP-Radar/data
+Environment=DMR_REPORT_DIR=/srv/openclaw-you/workspace/Demand-to-MVP-Radar/reports
+Environment=UV_CACHE_DIR=/srv/openclaw-you/workspace/Demand-to-MVP-Radar/data/uv-cache
+ExecStart=/srv/openclaw-you/venv/bin/python3 src/main.py mvp-weekly
+Restart=no
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=telegram-mvp-weekly
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/openclaw-you/workspace/telegram-research-agent/data
+ReadWritePaths=/srv/openclaw-you/workspace/Demand-to-MVP-Radar/data
+ReadWritePaths=/srv/openclaw-you/workspace/Demand-to-MVP-Radar/reports
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,11 @@
+[Unit]
+Description=Telegram Research Agent — MVP of the Week Timer
+Requires=telegram-mvp-weekly.service
+
+[Timer]
+OnCalendar=Mon *-*-* 09:20:00 Asia/Tbilisi
+Persistent=true
+Unit=telegram-mvp-weekly.service
+
+[Install]
+WantedBy=timers.target
