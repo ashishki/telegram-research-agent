@@ -117,7 +117,16 @@ def _radar_python_command() -> list[str]:
         return [python_bin]
     uv_bin = os.environ.get("RADAR_UV_BIN", "").strip() or which("uv")
     if uv_bin:
-        return [uv_bin, "run", "--with", "pydantic>=2,<3", "python"]
+        return [
+            uv_bin,
+            "run",
+            "--no-project",
+            "--python",
+            os.environ.get("RADAR_PYTHON_VERSION", "3.12"),
+            "--with",
+            "pydantic>=2,<3",
+            "python",
+        ]
     return [str(DEFAULT_RADAR_PYTHON if DEFAULT_RADAR_PYTHON.exists() else Path(sys.executable))]
 
 
