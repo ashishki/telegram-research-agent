@@ -23,6 +23,14 @@ Repo-local map that translates the project's existing runtime memory architectur
 - Runtime research memory is product data; it is not a cross-project engineering memory source unless summarized in reviewed docs.
 - Obsidian and generated indexes are optional navigation layers.
 
+## Shared VPS Cognition Vault
+
+- Vault path: `/srv/codex-entropy/repos/product-3/engineering-cognition-vault`.
+- Live checkout on this VPS: `/srv/openclaw-you/workspace/telegram-research-agent`.
+- Repo-local docs remain the source of truth for architecture, prompts, runbooks, tasks, evals, findings, and decisions.
+- The vault is a downstream/navigation layer for cross-project discovery and context packets; do not hand-write canonical findings, evals, or decisions there.
+- Operational policy: `docs/VPS_COGNITION_VAULT.md`.
+
 ## Project Identity
 
 | Field | Value |
@@ -118,4 +126,3 @@ Do not write canonical decisions, eval results, or findings directly into the va
 |----------|------|--------|
 | Cognition index | `generated/cognition/index.json` | Optional generated artifact; exclude raw Telegram exports |
 | Context packets | `docs/context-packets/` | Commit only major review/regression packets |
-

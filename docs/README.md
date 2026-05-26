@@ -17,6 +17,8 @@ This directory keeps active operator and implementation guidance at the top leve
 | `dev-cycle.md` | AI-assisted development workflow for this repo |
 | `tasks.md` | Current lightweight backlog |
 | `IMPLEMENTATION_CONTRACT.md` | Engineering rules for future changes |
+| `COGNITION_MANIFEST.md` | Repo-local cognition map and source-of-truth rules |
+| `VPS_COGNITION_VAULT.md` | Shared VPS vault location and sync policy |
 | `CODEX_PROMPT.md` | Current session handoff / repo state summary |
 
 ## Prompt Docs

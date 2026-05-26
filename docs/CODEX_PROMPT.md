@@ -13,6 +13,7 @@ _v3.3 · 2026-05-01 · telegram-research-agent_
   - `src/config/projects.yaml` has current project context for active repos.
   - README/docs were cleaned; historical material moved under `docs/archive/`.
 - Active work is maintenance/backlog driven from `docs/tasks.md`.
+- VPS cognition vault: `/srv/codex-entropy/repos/product-3/engineering-cognition-vault`; use it as a downstream navigation layer, not as the source of truth.
 - In this environment, `pytest` may be unavailable; verified fallback is `PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m unittest ...`.
 - Orchestrator-to-Codex execution path: write prompt to file, then `codex exec -s workspace-write < /tmp/prompt.md`
 
@@ -59,5 +60,7 @@ Before implementation, define scope, touched files, acceptance criteria, and ver
 Reference documents:
 
 - `docs/tasks.md`
+- `docs/COGNITION_MANIFEST.md`
+- `docs/VPS_COGNITION_VAULT.md`
 - `docs/IMPLEMENTATION_CONTRACT.md`
 - `docs/architecture.md`
