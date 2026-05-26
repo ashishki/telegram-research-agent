@@ -56,6 +56,47 @@ Repo-local map that translates the project's existing runtime memory architectur
 | Digest/report quality | `docs/report_format.md` | output tests, prompt docs, evidence tests |
 | Reviewer packet | task ACs and contract | architecture/memory docs, relevant tests |
 
+## Local/VPS Agent Context Workflow
+
+Agents do not automatically discover the cognition vault. The operator or orchestrator must pass a repo-local manifest, vault project map, or generated context packet path into the agent task.
+
+Expected sibling layout on any machine that runs agents:
+
+```text
+ai-stack/
+|-- projects/<repo>/
+`-- engineering-cognition-vault/
+```
+
+Local project work:
+
+```bash
+cd ai-stack/engineering-cognition-vault
+./scripts/sync_from_projects.sh --no-pull --commit --push
+```
+
+VPS project work:
+
+1. Commit and push code, docs, evals, ADRs, findings, or postmortems in this repo.
+2. Refresh the vault on the machine that owns vault sync:
+
+```bash
+cd ai-stack/engineering-cognition-vault
+git pull --ff-only
+./scripts/sync_from_projects.sh --commit --push
+```
+
+If an agent runs on the VPS, clone the vault next to `projects/` and pass packet paths explicitly:
+
+```text
+../engineering-cognition-vault/10-projects/<project>.md
+../engineering-cognition-vault/90-context-packets/<role>-<project>-<scope>.md
+```
+
+Do not write canonical decisions, eval results, or findings directly into the vault. Write them into this repo first, then regenerate the vault.
+
+---
+
 ## Known Gaps
 
 | Gap | Impact | Migration step |
