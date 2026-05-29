@@ -2,6 +2,8 @@
 
 Personal research intelligence for Telegram channels: ingest posts, filter noise, preserve evidence, and produce weekly project-aware decisions instead of a generic digest.
 
+Status: active observation. Current roadmap: strengthen evidence discipline, usefulness logging, and evolve toward Telegram Channel Intelligence. See `docs/PROJECT_PLAN.md`.
+
 ## What It Is
 
 This is a private, single-user pipeline that runs on a VPS and processes curated Telegram channels. It is designed for one operator who follows too many technical channels and wants a weekly brief that answers:

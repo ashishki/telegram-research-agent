@@ -1,7 +1,7 @@
 # Current Backlog
 
 **Status:** Active lightweight backlog
-**Last updated:** 2026-05-01
+**Last updated:** 2026-05-29
 
 The historical memory-unification roadmap is complete and archived at
 `docs/archive/roadmaps/tasks-v5-memory-unification.md`.
@@ -26,6 +26,10 @@ Implemented:
 | ID | Priority | Task | Notes |
 |---|---:|---|---|
 | DOC-1 | P1 | Keep README and docs map aligned with runtime behavior | Update after delivery/feedback changes |
+| STRAT-1 | P0 | Add operator usefulness log for weekly briefs | Track useful/not useful sections, decisions influenced, weak evidence, and channels gaining/losing trust |
+| EVID-1 | P0 | Strengthen evidence discipline in weekly reports | Every recommendation should cite source posts or state insufficient evidence |
+| INTEL-1 | P1 | Design Telegram Channel Intelligence layer | Narratives, repeated claims, source trust, entity/topic graph, and project relevance |
+| ENT-1 | P1 | Add research brief receipt concept | Evidence window, source set, model/config, generated report, and verification status |
 | OPS-1 | P1 | Validate reaction sync against live Telegram channels | Confirm current user reactions are visible through Telethon in production |
 | OPS-2 | P1 | Validate inline button callbacks in deployed bot polling | Requires bot process to run with callback updates enabled |
 | QUAL-1 | P2 | Add weekly quality trend from digest health alerts | Track empty/low-signal weeks over time |
@@ -38,3 +42,4 @@ Implemented:
 - More granular artifact-level feedback for the Research Brief itself.
 - Monthly operator report summarizing reactions, button decisions, cost, and low-signal alerts.
 - Better surfaced reasons when a source is repeatedly down-ranked.
+- Productized Telegram Channel Intelligence can split later if weekly operator use proves repeated value.
