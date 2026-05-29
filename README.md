@@ -2,7 +2,7 @@
 
 Personal research intelligence for Telegram channels: ingest posts, filter noise, preserve evidence, and produce weekly project-aware decisions instead of a generic digest.
 
-Status: active observation. Current roadmap: strengthen evidence discipline, usefulness logging, and evolve toward Telegram Channel Intelligence. See `docs/PROJECT_PLAN.md`.
+Status: active observation. Evidence discipline, decision feedback, Research Brief usefulness capture, and low-signal health alerts are implemented. Current work is tracked in `docs/tasks.md`.
 
 Reference integration: `docs/entropy_core_gensyn_integration.md`.
 
@@ -48,6 +48,8 @@ It is not a public bot, SaaS product, or generic summarizer.
   - `🕒 позже`
   - `⛔ отказал`
   - `🧠 интересно`
+- Source-disciplined `Implementation Ideas`: actionable `[Implement]` and `[Build]` ideas require concrete Telegram message links and otherwise render an insufficient-evidence note.
+- Operator-authored Research Brief usefulness capture into `weekly_usefulness_logs`.
 - Scope-first memory:
   - canonical operational state
   - derived channel/project snapshots
@@ -71,6 +73,7 @@ python3 src/main.py health-check
 python3 src/main.py score-stats
 python3 src/main.py cost-stats
 python3 src/main.py insight-triage-stats
+python3 src/main.py log-usefulness --week 2026-W22 --useful-section "Project Relevance" --decision "Prioritized callback validation"
 
 python3 src/main.py memory inspect-evidence --project gdev-agent --limit 10
 python3 src/main.py memory inspect-decisions --scope insight --limit 10
@@ -116,6 +119,8 @@ Start here:
 - [docs/spec.md](docs/spec.md) — implementation-facing system specification
 - [docs/report_format.md](docs/report_format.md) — weekly artifact contract
 - [docs/mvp_weekly_radar.md](docs/mvp_weekly_radar.md) — MVP of the Week Radar bridge and credentials
+- [docs/research_brief_receipt.md](docs/research_brief_receipt.md) — Research Brief receipt audit contract with implemented SQLite schema/storage helpers; generation, delivery updates, verification, and CLI inspection remain planned
+- [docs/telegram_channel_intelligence.md](docs/telegram_channel_intelligence.md) — planned Channel Intelligence design
 - [docs/memory_architecture.md](docs/memory_architecture.md) — memory model
 - [docs/memory_inspection.md](docs/memory_inspection.md) — memory debugging commands
 
@@ -123,4 +128,4 @@ Historical material lives under [docs/archive/](docs/archive/README.md).
 
 ## Development State
 
-The main product architecture is implemented. Current work is maintenance and quality improvement: better feedback capture, stronger project context, digest health checks, and keeping documentation aligned with runtime behavior.
+The main product architecture is implemented, and Channel Intelligence design is captured. Current work is maintenance and quality improvement: follow-up Channel Intelligence implementation tasks, research-brief receipts, production validation, quality trends, and operator-experience refinements.

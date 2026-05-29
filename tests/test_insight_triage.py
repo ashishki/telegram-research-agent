@@ -58,6 +58,18 @@ def _make_triage_db() -> sqlite3.Connection:
             rejected_at TEXT NOT NULL,
             suppressed_until TEXT
         );
+        CREATE TABLE decision_journal (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            decision_scope TEXT NOT NULL,
+            subject_ref_type TEXT NOT NULL,
+            subject_ref_id TEXT NOT NULL,
+            project_name TEXT,
+            status TEXT NOT NULL,
+            reason TEXT,
+            evidence_item_ids_json TEXT NOT NULL DEFAULT '[]',
+            recorded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            recorded_by TEXT NOT NULL DEFAULT 'pipeline'
+        );
         """
     )
     return conn
@@ -364,6 +376,43 @@ class TestInsightDedupe(unittest.TestCase):
             "[Build] New Tool — Exploration",
         ])
 
+    def test_selection_ignores_non_telegram_source_url(self):
+        insights = [
+            TriagedInsight(
+                title="[Implement] Project A — Generic source",
+                summary="Generic source should not count as evidence.",
+                source_url="https://example.com/source",
+                idea_type="implement",
+                timing="now",
+                implementation_mode="extend",
+                confidence="high",
+                evidence_strength="strong",
+                main_risk="low",
+                recommendation="do_now",
+                reason="direct improvement",
+                rubric_section="built",
+            ),
+            TriagedInsight(
+                title="[Implement] Project B — Telegram source",
+                summary="Telegram message source should count.",
+                source_url="https://t.me/chan/2",
+                idea_type="implement",
+                timing="now",
+                implementation_mode="extend",
+                confidence="high",
+                evidence_strength="strong",
+                main_risk="low",
+                recommendation="do_now",
+                reason="direct improvement",
+                rubric_section="built",
+            ),
+        ]
+
+        selected = _select_reportable_insights(insights)
+
+        self.assertEqual(len(selected), 1)
+        self.assertEqual(selected[0].title, "[Implement] Project B — Telegram source")
+
     def test_triage_pipeline_stores_only_one_record_for_duplicate_source(self):
         conn = _make_triage_db()
         try:
@@ -465,6 +514,72 @@ class TestRenderTriagedInsights(unittest.TestCase):
         raw = "<b>raw content</b>"
         rendered = render_triaged_insights_html(raw, [])
         self.assertEqual(rendered, raw)
+
+    def test_source_backed_ideas_preserve_source_links(self):
+        results = parse_insights_html(_SAMPLE_HTML)
+        insights = [classify_insight(h, b, u, raw_html=r) for h, b, u, r in results]
+
+        rendered = render_triaged_insights_html(_SAMPLE_HTML, insights)
+
+        self.assertIn("[Implement] MyProject", rendered)
+        self.assertIn('href="https://t.me/chan/1"', rendered)
+        self.assertIn("Сделать сейчас", rendered)
+
+    def test_unsupported_parsed_ideas_render_insufficient_evidence_note(self):
+        raw = (
+            "<b>💡 Инсайты недели</b>\n\n"
+            "<b>[Implement] Project A — Unsupported idea</b>\n"
+            "Ship this based on a vague trend, but no source link is present."
+        )
+
+        rendered = render_triaged_insights_html(raw, [])
+
+        self.assertIn("Недостаточно доказательств", rendered)
+        self.assertIn("No source-backed implementation ideas this week", rendered)
+        self.assertNotIn("[Implement] Project A", rendered)
+
+    def test_non_telegram_source_url_renders_insufficient_evidence_note(self):
+        raw = (
+            "<b>💡 Инсайты недели</b>\n\n"
+            "<b>[Implement] Project A — Unsupported idea</b>\n"
+            "Ship this based on a generic link.\n"
+            '<a href="https://example.com/source">источник</a>'
+        )
+        results = parse_insights_html(raw)
+        insights = [
+            classify_insight(header, body, url, raw_html=raw_html)
+            for header, body, url, raw_html in results
+        ]
+
+        rendered = render_triaged_insights_html(raw, insights)
+
+        self.assertIn("Недостаточно доказательств", rendered)
+        self.assertIn("No source-backed implementation ideas this week", rendered)
+        self.assertNotIn("[Implement] Project A", rendered)
+        self.assertNotIn("https://example.com/source", rendered)
+
+    def test_mixed_output_notes_unsupported_dropped_ideas(self):
+        raw = (
+            "<b>💡 Инсайты недели</b>\n\n"
+            '<b>[Implement] Project A — Backed idea</b>\n'
+            "Use the cited signal.\n"
+            '<a href="https://t.me/chan/1">источник</a>\n\n'
+            "<b>[Build] Unsupported idea</b>\n"
+            "No source link here."
+        )
+        results = parse_insights_html(raw)
+        supported = [
+            classify_insight(header, body, url, raw_html=raw_html)
+            for header, body, url, raw_html in results
+            if url
+        ]
+
+        rendered = render_triaged_insights_html(raw, supported)
+
+        self.assertIn("[Implement] Project A", rendered)
+        self.assertIn('href="https://t.me/chan/1"', rendered)
+        self.assertIn("omitted because no concrete source post URL", rendered)
+        self.assertNotIn("<b>[Build] Unsupported idea</b>\nNo source link here.", rendered)
 
     def test_reason_annotation_present(self):
         results = parse_insights_html(_SAMPLE_HTML)

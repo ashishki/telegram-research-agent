@@ -9,7 +9,12 @@ _v3.3 · 2026-05-01 · telegram-research-agent_
 - Recent shipped changes:
   - Telegram reaction sync imports source-post reactions as tags/feedback.
   - Implementation Ideas now send inline feedback cards and record decisions in `decision_journal`.
+  - Implementation Ideas require concrete Telegram source-post links or render an insufficient-evidence note.
+  - Weekly Research Brief usefulness can be recorded through `log-usefulness` into `weekly_usefulness_logs`.
   - Empty/low-signal digest health alerts are included in delivery notifications.
+  - README and active docs are aligned with the current delivery/feedback behavior.
+  - Telegram Channel Intelligence design is captured in `docs/telegram_channel_intelligence.md`; narratives, repeated claims, source trust signals, entity/topic links, and project relevance are planned but not implemented.
+  - Research Brief receipt schema and storage helpers are implemented via `research_brief_receipts`; receipt creation during generation, delivery updates, verification, and CLI inspection are still planned.
   - `src/config/projects.yaml` has current project context for active repos.
   - README/docs were cleaned; historical material moved under `docs/archive/`.
 - Active work is maintenance/backlog driven from `docs/tasks.md`.
@@ -24,9 +29,11 @@ _v3.3 · 2026-05-01 · telegram-research-agent_
 - Telegram ingestion, normalization, scoring, and topic assignment
 - project relevance, personalization, and weekly report generation
 - explicit feedback and tagging
+- operator-authored weekly usefulness logs
 - derived `channel_memory` and `project_context_snapshots`
 - `signal_evidence_items` and `decision_journal` tables (unified memory)
 - implementation-idea triage and rejection memory
+- implementation-idea evidence guard for missing/non-Telegram source-post URLs
 - scope-first retrieval helpers
 - autonomous signal discovery via preference judge (category + confidence gate)
 

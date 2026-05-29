@@ -136,6 +136,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     triage_stats_parser.set_defaults(handler=handle_insight_triage_stats)
 
+    usefulness_parser = subparsers.add_parser(
+        "log-usefulness",
+        help="Record operator usefulness feedback for a weekly Research Brief",
+    )
+    usefulness_parser.add_argument("--week", required=True, help="ISO week label for the brief, e.g. 2026-W22")
+    usefulness_parser.add_argument("--useful-section", action="append", default=[])
+    usefulness_parser.add_argument("--not-useful-section", action="append", default=[])
+    usefulness_parser.add_argument("--decision", action="append", default=[])
+    usefulness_parser.add_argument("--weak-evidence", action="append", default=[])
+    usefulness_parser.add_argument("--trust-up", action="append", default=[])
+    usefulness_parser.add_argument("--trust-down", action="append", default=[])
+    usefulness_parser.add_argument("--notes", default=None)
+    usefulness_parser.set_defaults(handler=handle_log_usefulness)
+
     memory_parser = subparsers.add_parser(
         "memory",
         help="Inspect memory surfaces (evidence, decisions, snapshots)",
@@ -1061,6 +1075,54 @@ def handle_insight_triage_stats(_: argparse.Namespace) -> int:
     else:
         lines.append("Rejection memory: empty")
 
+    sys.stdout.write("\n".join(lines) + "\n")
+    return 0
+
+
+def handle_log_usefulness(args: argparse.Namespace) -> int:
+    from db.usefulness import record_weekly_usefulness_log
+
+    settings = load_settings()
+
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+
+        with sqlite3.connect(settings.db_path) as connection:
+            connection.execute("PRAGMA foreign_keys = ON;")
+            connection.execute("PRAGMA journal_mode = WAL;")
+            log = record_weekly_usefulness_log(
+                connection,
+                week_label=args.week,
+                useful_sections=args.useful_section,
+                not_useful_sections=args.not_useful_section,
+                decisions_influenced=args.decision,
+                weak_evidence_notes=args.weak_evidence,
+                channels_gaining_trust=args.trust_up,
+                channels_losing_trust=args.trust_down,
+                notes=args.notes,
+            )
+    except Exception as exc:
+        LOGGER.exception("Usefulness log recording failed")
+        sys.stdout.write(f"Failed to record usefulness log: {exc}\n")
+        return 1
+
+    lines = [
+        f"Recorded weekly usefulness log id={log['id']} week={log['week_label']}",
+        f"recorded_at={log['recorded_at']}",
+        (
+            "counts: "
+            f"useful_sections={len(log['useful_sections'])} "
+            f"not_useful_sections={len(log['not_useful_sections'])} "
+            f"decisions={len(log['decisions_influenced'])} "
+            f"weak_evidence={len(log['weak_evidence_notes'])} "
+            f"trust_up={len(log['channels_gaining_trust'])} "
+            f"trust_down={len(log['channels_losing_trust'])}"
+        ),
+    ]
+    if log.get("notes"):
+        lines.append(f"notes={log['notes']}")
     sys.stdout.write("\n".join(lines) + "\n")
     return 0
 

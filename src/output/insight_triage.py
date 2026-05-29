@@ -11,6 +11,7 @@ import sqlite3
 import unicodedata
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlparse
 
 try:
     from db.evidence import record_decisions_for_triage
@@ -31,6 +32,7 @@ _SECTION_LABELS: dict[str, str] = {
     "built": "🧱 Собранные идеи",
     "fresh": "🆕 Отдельные сигналы",
 }
+_INSUFFICIENT_EVIDENCE_HEADING = "<b>⚠️ Недостаточно доказательств</b>"
 
 
 @dataclass
@@ -73,6 +75,16 @@ def _detect_idea_type(header: str) -> str:
     if "[build]" in lower:
         return "build"
     return "unknown"
+
+
+def _is_telegram_message_deep_link(source_url: str) -> bool:
+    parsed = urlparse(source_url.strip())
+    if parsed.scheme != "https" or parsed.netloc.lower() != "t.me":
+        return False
+    path_parts = [part for part in parsed.path.split("/") if part]
+    if len(path_parts) != 2:
+        return False
+    return bool(path_parts[0]) and bool(re.fullmatch(r"\d+", path_parts[1]))
 
 
 def _detect_implementation_mode(title: str, body: str) -> str:
@@ -297,7 +309,7 @@ def _select_reportable_insights(insights: list[TriagedInsight], max_total: int =
     reportable = [
         item
         for item in insights
-        if item.source_url.strip() and item.idea_type in {"implement", "build"}
+        if _is_telegram_message_deep_link(item.source_url) and item.idea_type in {"implement", "build"}
     ]
     if not reportable:
         return []
@@ -467,15 +479,40 @@ def render_triaged_insights_html(
 ) -> str:
     """
     Render insights HTML with triage labels, grouping do_now → backlog → reject_or_defer.
-    Falls back to raw_html if no ideas were parsed.
+    Falls back to raw_html only if no idea headers were parsed.
     """
-    if not insights:
+    parsed_ideas = parse_insights_html(raw_html)
+    unsupported_source_count = sum(
+        1
+        for _, _, source_url, _ in parsed_ideas
+        if not _is_telegram_message_deep_link(source_url)
+    )
+    source_backed_insights = [
+        item
+        for item in insights
+        if item.idea_type in {"implement", "build"} and _is_telegram_message_deep_link(item.source_url)
+    ]
+
+    if not source_backed_insights:
+        if parsed_ideas:
+            if unsupported_source_count:
+                return (
+                    "<b>💡 Инсайты недели</b>\n\n"
+                    f"{_INSUFFICIENT_EVIDENCE_HEADING}\n"
+                    "Идеи без конкретной ссылки на исходный пост не доставлены как actionable-рекомендации. "
+                    "No source-backed implementation ideas this week."
+                )
+            return (
+                "<b>💡 Инсайты недели</b>\n\n"
+                f"{_INSUFFICIENT_EVIDENCE_HEADING}\n"
+                "Нет implementation ideas, прошедших deterministic triage this week."
+            )
         return raw_html
 
     blocks: list[str] = ["<b>💡 Инсайты недели</b>"]
 
     by_section: dict[str, list[TriagedInsight]] = {"built": [], "fresh": []}
-    for insight in insights:
+    for insight in source_backed_insights:
         key = "built" if insight.rubric_section == "built" else "fresh"
         by_section[key].append(insight)
 
@@ -491,5 +528,11 @@ def render_triaged_insights_html(
                 blocks.append(f"{item.source_html}\n{triage_note}")
             else:
                 blocks.append(f"<b>{item.title}</b>\n{item.summary}\n{triage_note}")
+
+    if unsupported_source_count:
+        blocks.append(
+            f"{_INSUFFICIENT_EVIDENCE_HEADING}\n"
+            f"{unsupported_source_count} parsed idea block(s) omitted because no concrete source post URL was available."
+        )
 
     return "\n\n".join(blocks)

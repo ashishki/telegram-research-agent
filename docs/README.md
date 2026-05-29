@@ -7,19 +7,21 @@ This directory keeps active operator and implementation guidance at the top leve
 | File | Role |
 |---|---|
 | `architecture.md` | Current system architecture and memory surfaces |
-| `spec.md` | Implementation-facing system specification |
-| `operator_workflow.md` | Weekly operations, feedback, tuning, and troubleshooting |
-| `report_format.md` | Reader-facing weekly artifact contract |
+| `spec.md` | Implementation-facing system specification and maintenance lanes |
+| `operator_workflow.md` | Weekly workflow, operator feedback, `log-usefulness`, tuning, and troubleshooting |
+| `report_format.md` | Weekly artifact contracts, boundaries, and Telegram source-link requirements |
 | `mvp_weekly_radar.md` | Demand-to-MVP Radar bridge, source-mix contract, and live-source credentials |
+| `research_brief_receipt.md` | Research Brief receipt audit contract with implemented SQLite schema/storage helpers for evidence window, source set, model/config, artifacts, delivery, and verification status; generation, delivery updates, verification, and CLI inspection remain planned |
+| `telegram_channel_intelligence.md` | Planned Channel Intelligence design for narratives, repeated claims, source trust signals, entity/topic links, and project relevance |
 | `memory_architecture.md` | Implemented four-tier memory design |
-| `memory_inspection.md` | CLI guide for inspecting evidence, decisions, snapshots, and suppression |
+| `memory_inspection.md` | Memory/debug inspection CLI for evidence, decisions, snapshots, suppression, and project signals |
 | `ops-security.md` | VPS, Telegram credential, and service security guidance |
 | `dev-cycle.md` | AI-assisted development workflow for this repo |
-| `tasks.md` | Current lightweight backlog |
+| `tasks.md` | Current backlog and implemented-state checklist |
 | `IMPLEMENTATION_CONTRACT.md` | Engineering rules for future changes |
 | `COGNITION_MANIFEST.md` | Repo-local cognition map and source-of-truth rules |
 | `VPS_COGNITION_VAULT.md` | Shared VPS vault location and sync policy |
-| `CODEX_PROMPT.md` | Current session handoff / repo state summary |
+| `CODEX_PROMPT.md` | Current session handoff and active repo state summary |
 
 ## Prompt Docs
 

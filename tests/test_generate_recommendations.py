@@ -41,20 +41,20 @@ class TestGenerateRecommendationsHtml(unittest.TestCase):
             "<b>💡 Инсайты недели</b>\n\n"
             "<b>[Implement] Project</b>\n"
             "Полезный абзац с объяснением.\n"
-            "https://example.com/source"
+            "https://t.me/source_chan/123"
         )
 
         html = _render_insights_fragment(content)
 
         self.assertIn("<h2><b>💡 Инсайты недели</b></h2>", html)
         self.assertIn("<h4><b>[Implement] Project</b></h4>", html)
-        self.assertIn("<p>Полезный абзац с объяснением. <a href=\"https://example.com/source\">https://example.com/source</a></p>", html)
+        self.assertIn("<p>Полезный абзац с объяснением. <a href=\"https://t.me/source_chan/123\">https://t.me/source_chan/123</a></p>", html)
 
     def test_html_to_copyable_text_preserves_anchor_url(self):
-        text = _html_to_copyable_text('<b>[Implement] Project</b>\n<a href="https://example.com/source">источник</a>')
+        text = _html_to_copyable_text('<b>[Implement] Project</b>\n<a href="https://t.me/source_chan/123">источник</a>')
 
         self.assertIn("[Implement] Project", text)
-        self.assertIn("источник: https://example.com/source", text)
+        self.assertIn("источник: https://t.me/source_chan/123", text)
 
     def test_normalize_insights_delivery_text_removes_stale_duplicate_section_heading(self):
         content = (
@@ -131,6 +131,36 @@ class TestRunRecommendations(unittest.TestCase):
 
         complete_mock.assert_called_once()
         self.assertEqual("rendered", result["text"])
+
+    def test_run_recommendations_stores_insufficient_evidence_note_for_unsupported_ideas(self):
+        settings = SimpleNamespace(db_path=":memory:")
+        unsupported_html = (
+            "<b>💡 Инсайты недели</b>\n\n"
+            "<b>[Implement] Project — Unsupported idea</b>\n"
+            "Ship this with a generic source link.\n"
+            '<a href="https://example.com/source">источник</a>'
+        )
+
+        with patch("output.generate_recommendations._load_digest_summary", return_value=("digest", "summary", [])), \
+             patch("output.generate_recommendations._load_projects_context", return_value="projects"), \
+             patch("output.generate_recommendations._load_project_context_snapshots", return_value="snapshot"), \
+             patch("output.generate_recommendations._load_completed_study_history", return_value="study"), \
+             patch("output.generate_recommendations._load_recent_decisions", return_value="decisions"), \
+             patch("output.generate_recommendations._load_recent_project_evidence", return_value=("evidence", [])), \
+             patch("output.generate_recommendations._load_prompt_sections", return_value=("system", "{recent_evidence}")), \
+             patch("output.generate_recommendations.complete", return_value=unsupported_html), \
+             patch("output.generate_recommendations.triage_insights", return_value=[]), \
+             patch("output.generate_recommendations._write_insights_file"), \
+             patch("output.generate_recommendations._write_insights_html_file"), \
+             patch("output.generate_recommendations._store_recommendations") as store_mock, \
+             patch("output.generate_recommendations._send_recommendations_to_telegram_owner"):
+            result = run_recommendations(settings)
+
+        self.assertIn("Недостаточно доказательств", result["text"])
+        self.assertIn("No source-backed implementation ideas this week", result["text"])
+        self.assertNotIn("[Implement] Project", result["text"])
+        stored_text = store_mock.call_args.args[2]
+        self.assertEqual(result["text"], stored_text)
 
     def test_run_recommendations_uses_real_db_without_nested_transaction_error(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -267,7 +297,7 @@ class TestRunRecommendations(unittest.TestCase):
                 connection.commit()
 
             with patch("output.generate_recommendations._compute_week_label", return_value=week_label), \
-                 patch("output.generate_recommendations.complete", return_value="<b>[Implement] Project — Idea</b>\nBody\n<a href=\"https://example.com/source\">источник</a>"), \
+                 patch("output.generate_recommendations.complete", return_value="<b>[Implement] Project — Idea</b>\nBody\n<a href=\"https://t.me/source_chan/123\">источник</a>"), \
                  patch("output.generate_recommendations._load_project_context_snapshots", return_value="snapshot"), \
                  patch("output.generate_recommendations._send_recommendations_to_telegram_owner"), \
                  patch("output.generate_recommendations._write_insights_file"), \

@@ -17,6 +17,10 @@ not a runtime dependency.
 
 Default level: receipt-compatible.
 
+Entropy Core is optional vocabulary only for this repository. Local receipt
+generation, storage, delivery, verification, and inspection must not require an
+Entropy Core runtime.
+
 Planned local artifacts:
 
 - `research_brief_receipt`
@@ -45,6 +49,10 @@ entropy_core:
   use_level: receipt_compatible
   runtime_dependency: false
 ```
+
+The detailed local contract for `research_brief_receipt` lives in
+`docs/research_brief_receipt.md` and keeps the same vocabulary for evidence
+window, source set, artifact refs, verifier method, and verification status.
 
 ## Required Context-Refs
 

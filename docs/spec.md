@@ -631,8 +631,9 @@ tracked as small, reviewable maintenance items in `docs/tasks.md`.
 
 | Lane | Deliverables |
 |---|---|
-| Feedback | reaction sync, inline decisions, explicit operator feedback history |
-| Quality | digest health checks, signal quality tracking, evaluation fixtures |
+| Feedback | reaction sync, inline decisions in `decision_journal`, and operator-authored weekly usefulness history |
+| Quality | implemented low-signal digest alerts, signal quality tracking, quality trend work |
+| Evidence | source-disciplined implementation ideas and research-brief receipt work |
 | Cost | token/cost baselines and model routing visibility |
 | Docs | README, active docs, archive hygiene |
 
@@ -651,8 +652,12 @@ See `docs/tasks.md` for the active backlog and success criteria.
 ├── docs/
 │   ├── spec.md              ← this file
 │   ├── architecture.md
+│   ├── report_format.md
+│   ├── operator_workflow.md
 │   ├── tasks.md
 │   ├── dev-cycle.md
+│   ├── memory_architecture.md
+│   ├── memory_inspection.md
 │   └── ops-security.md
 ├── docs/prompts/
 │   ├── rubric_discovery.md

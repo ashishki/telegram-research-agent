@@ -35,9 +35,14 @@ Scannable — section headers, bullet points, source links inline per signal.
 
 ---
 
-## Artifact Structure
+## Research Brief Artifact
 
 `Research Brief` sections stay in this order when populated. Reader-facing sections may be omitted if empty. Noise and operator-only metrics do not belong in the main brief.
+
+Audit metadata for delivered Research Briefs is specified separately in
+`docs/research_brief_receipt.md`. Its SQLite schema/storage helpers are
+implemented; generation, delivery updates, verification, and CLI inspection
+remain planned. A Research Brief receipt is not reader-facing content.
 
 ---
 
@@ -130,6 +135,35 @@ The report is informed by:
 - Telegram message hard limit: 4096 chars — notification should stay short
 - Telegraph article limit: ~65 KB — full review must fit
 - Source links must be real `t.me` deep links, not channel root links
+
+---
+
+## Implementation Ideas Artifact
+
+`Implementation Ideas` is a separate Telegraph article for project-aware actions,
+not a replacement for the Research Brief and not the same artifact as MVP Radar.
+It is delivered with short Telegram feedback cards so the operator can record
+acted-on, deferred, rejected, or interesting decisions into `decision_journal`.
+
+Evidence contract:
+
+- Actionable `[Implement]` and `[Build]` ideas must cite a concrete Telegram
+  source-post link in the form `https://t.me/<channel>/<message_id>`.
+- Channel root links, missing links, non-Telegram URLs, or vague source labels do
+  not satisfy the evidence contract for actionable implementation ideas.
+- Unsupported parsed ideas must not be presented as recommendations. They render
+  under the insufficient-evidence note (`Недостаточно доказательств`) or are
+  omitted with a count of unsupported blocks.
+- Low-signal weeks should produce fewer or no implementation ideas. The correct
+  fallback is an insufficient-evidence/no source-backed ideas note, not filler.
+
+Boundary:
+
+- `Research Brief` explains what mattered and why.
+- `Implementation Ideas` turns source-backed weekly signals into small project
+  actions or backlog/reject decisions.
+- `MVP of the Week` is owned by Demand-to-MVP Radar and requires broader demand
+  evidence beyond Telegram-only seeds.
 
 ---
 

@@ -22,6 +22,7 @@ Telegram ingestion
   -> explicit feedback + manual tags
   -> evidence recording (signal_evidence_items)
   -> weekly outputs (brief / ideas / study)
+  -> operator usefulness log (weekly_usefulness_logs)
   -> decision journal (decision_journal)
 
 Cross-cutting:
@@ -36,6 +37,7 @@ What the system provides:
 
 - canonical post storage and scoring
 - explicit preference capture
+- operator-authored weekly brief usefulness capture
 - dynamic per-channel preference with time decay blended into source scoring
 - project-aware outputs
 - rejection memory for weak implementation ideas
@@ -61,6 +63,7 @@ Stored in SQLite and treated as source of truth:
 - topic/project links
 - explicit feedback and tags
 - weekly artifact records
+- weekly usefulness logs
 - triage and rejection records
 
 ### 2. Derived snapshots
@@ -89,6 +92,43 @@ Implemented as `decision_journal`:
 - insight triage writes via `record_decisions_for_triage`
 - study-plan completion writes via `record_study_completion_decision`
 - unified continuity across all decision types; used by recommendations and study-plan generators to suppress repeated ideas
+
+### 5. Weekly usefulness logs
+
+Implemented as `weekly_usefulness_logs`:
+
+- source of truth: operator-authored canonical SQLite state
+- refresh rule: append-only by default; no derived refresh mutates it
+- retrieval path: `db.usefulness.fetch_weekly_usefulness_logs`, scoped by `week_label`
+- debug surface: `python3 src/main.py log-usefulness ...` prints the inserted row id and category counts, and the table is directly inspectable in SQLite
+- current use: records useful sections, not useful sections, decisions influenced, weak evidence notes, channels gaining trust, channels losing trust, optional notes, and timestamp
+
+This table is not yet used to auto-rank channels or rewrite future reports.
+
+## Planned Design: Telegram Channel Intelligence
+
+`docs/telegram_channel_intelligence.md` defines a planned, not implemented,
+Channel Intelligence layer for narratives, repeated claims, source trust
+signals, entity/topic links, and project relevance. The design keeps SQLite as
+the source of truth, treats narratives/claims/source observations as derived and
+refreshable state, and requires project/topic/time/source-scoped retrieval with
+visible evidence rows before any report prose can use the layer.
+
+This planned layer must not become a second generic memory engine. It extends
+the existing evidence-first architecture by adding bounded derived tables and
+inspection surfaces around Telegram channel behavior.
+
+## Research Brief Receipts
+
+`docs/research_brief_receipt.md` defines the Research Brief receipt contract.
+The canonical SQLite table and storage helpers now exist for receipt rows that
+store evidence window, source set, model/config fingerprints, generated
+artifact refs, delivery refs, health flags, and verification status.
+
+Runtime receipt creation is not yet integrated with weekly generation or
+delivery. Generation-time snapshots should not be silently recomputed once
+recorded; delivery and verification fields may be updated only as future
+lifecycle steps complete.
 
 ---
 

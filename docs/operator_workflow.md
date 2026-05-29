@@ -115,6 +115,28 @@ Demand-to-MVP Radar, then Radar collects the configured external demand bundle
 before synthesis. The delivered notification includes a `Source mix` line so a
 weak external run is visible immediately.
 
+### Weekly Brief Usefulness Log
+
+After reading the Research Brief, record what was actually useful:
+
+```bash
+python3 src/main.py log-usefulness \
+  --week 2026-W22 \
+  --useful-section "Project Relevance" \
+  --not-useful-section "Study Plan" \
+  --decision "Prioritized callback validation" \
+  --weak-evidence "Recommendation lacked source links" \
+  --trust-up "@source_a" \
+  --trust-down "@source_b" \
+  --notes "Brief was useful but evidence citations need work"
+```
+
+All list fields can be repeated. The command writes append-only operator-authored
+state to `weekly_usefulness_logs` in the configured `AGENT_DB_PATH` database and
+prints the inserted row id plus per-field counts. It does not mutate
+`profile.yaml`, `channels.yaml`, project config, channel scores, or future brief
+generation logic yet.
+
 ### Inline Feedback (from Telegram)
 
 While reading the weekly brief:
@@ -226,10 +248,11 @@ The system captures lightweight feedback and explicit tags without automatic pro
 
 **How it works:**
 1. You read the weekly `Research Brief` and `Implementation Ideas` (Telegraph articles, or HTML file for the research brief fallback)
-2. Tag or mark signals directly from Telegram
-3. The next scoring run updates explicit overrides, channel/source bias, and a time-decayed `channel_score`
-4. The weekly preference judge uses those examples to reshape the final brief
-5. `tune-suggestions` can still surface profile topic candidates, but manual tags are now the primary signal
+2. Record brief-level usefulness with `log-usefulness` when the artifact affected decisions or exposed weak evidence
+3. Tag or mark signals directly from Telegram
+4. The next scoring run updates explicit overrides, channel/source bias, and a time-decayed `channel_score`
+5. The weekly preference judge uses signal-level examples to reshape the final brief
+6. `tune-suggestions` can still surface profile topic candidates, but manual tags are now the primary signal
 
 **Design constraint:** `profile.yaml` is never auto-modified. The feedback loop surfaces suggestions only. You control your taste profile explicitly.
 

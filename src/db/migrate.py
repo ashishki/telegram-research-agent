@@ -233,6 +233,96 @@ def run_migrations() -> Path:
         )
         connection.executescript(
             """
+            CREATE TABLE IF NOT EXISTS weekly_usefulness_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                week_label TEXT NOT NULL CHECK(length(trim(week_label)) > 0),
+                useful_sections_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(useful_sections_json)),
+                not_useful_sections_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(not_useful_sections_json)),
+                decisions_influenced_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(decisions_influenced_json)),
+                weak_evidence_notes_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(weak_evidence_notes_json)),
+                channels_gaining_trust_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(channels_gaining_trust_json)),
+                channels_losing_trust_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(channels_losing_trust_json)),
+                notes TEXT,
+                recorded_at TEXT NOT NULL,
+                recorded_by TEXT NOT NULL DEFAULT 'operator'
+            );
+            CREATE INDEX IF NOT EXISTS idx_weekly_usefulness_logs_week_label
+                ON weekly_usefulness_logs(week_label);
+            CREATE INDEX IF NOT EXISTS idx_weekly_usefulness_logs_recorded_at
+                ON weekly_usefulness_logs(recorded_at);
+            """
+        )
+        connection.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS research_brief_receipts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                receipt_id TEXT NOT NULL UNIQUE,
+                type TEXT NOT NULL DEFAULT 'research_brief_receipt'
+                    CHECK(type = 'research_brief_receipt'),
+                week_label TEXT NOT NULL CHECK(length(trim(week_label)) > 0),
+                generated_at TEXT NOT NULL,
+                source_project TEXT NOT NULL DEFAULT 'telegram-research-agent',
+                source_version TEXT,
+                window_start TEXT,
+                window_end TEXT,
+                included_channels_json TEXT NOT NULL DEFAULT '[]'
+                    CHECK(json_valid(included_channels_json)),
+                post_counts_json TEXT NOT NULL DEFAULT '{}'
+                    CHECK(json_valid(post_counts_json)),
+                source_set_json TEXT NOT NULL DEFAULT '{}'
+                    CHECK(json_valid(source_set_json)),
+                project_scopes_json TEXT NOT NULL DEFAULT '[]'
+                    CHECK(json_valid(project_scopes_json)),
+                topic_scopes_json TEXT NOT NULL DEFAULT '[]'
+                    CHECK(json_valid(topic_scopes_json)),
+                llm_provider TEXT,
+                llm_model TEXT,
+                llm_category TEXT,
+                prompt_template_path TEXT,
+                prompt_template_version TEXT,
+                config_fingerprints_json TEXT NOT NULL DEFAULT '{}'
+                    CHECK(json_valid(config_fingerprints_json)),
+                generation_params_fingerprint TEXT,
+                digest_id INTEGER,
+                markdown_path TEXT,
+                json_path TEXT,
+                html_path TEXT,
+                telegraph_url TEXT,
+                telegram_delivery_timestamp TEXT,
+                telegram_message_id INTEGER,
+                fallback_delivery TEXT,
+                fallback_delivery_used INTEGER NOT NULL DEFAULT 0
+                    CHECK(fallback_delivery_used IN (0, 1)),
+                verification_status TEXT NOT NULL DEFAULT 'pending'
+                    CHECK(verification_status IN (
+                        'pending',
+                        'verified',
+                        'needs_review',
+                        'failed',
+                        'waived'
+                    )),
+                verifier_method TEXT,
+                verifier_notes TEXT,
+                checked_at TEXT,
+                checked_by TEXT,
+                health_flags_json TEXT NOT NULL DEFAULT '[]'
+                    CHECK(json_valid(health_flags_json)),
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY(digest_id) REFERENCES digests(id) ON DELETE SET NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_research_brief_receipts_week_label
+                ON research_brief_receipts(week_label);
+            CREATE INDEX IF NOT EXISTS idx_research_brief_receipts_digest_id
+                ON research_brief_receipts(digest_id);
+            CREATE INDEX IF NOT EXISTS idx_research_brief_receipts_verification_status
+                ON research_brief_receipts(verification_status);
+            CREATE INDEX IF NOT EXISTS idx_research_brief_receipts_generated_at
+                ON research_brief_receipts(generated_at);
+            """
+        )
+        connection.executescript(
+            """
             CREATE TABLE IF NOT EXISTS user_post_tags (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 post_id INTEGER NOT NULL,
