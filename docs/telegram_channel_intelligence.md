@@ -30,6 +30,8 @@ The product value is not "summarize Telegram." It is:
   - evidence files
   - verification status
 
+Reference integration details live in `docs/entropy_core_gensyn_integration.md`.
+
 ## Non-Goals
 
 - No generic public bot.

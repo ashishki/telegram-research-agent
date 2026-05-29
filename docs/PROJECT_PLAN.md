@@ -42,6 +42,8 @@ backed analysis of narratives, sources, claims, and project-relevant signals.
 - Add optional `research_brief_receipt`.
 - Add evidence window per report.
 - Add reviewer/referee pass for high-impact claims.
+- Follow `docs/entropy_core_gensyn_integration.md`; Entropy Core is optional
+  receipt vocabulary, not a runtime dependency.
 
 ### P2 - Product Split
 
