@@ -28,6 +28,8 @@ backed analysis of narratives, sources, claims, and project-relevant signals.
 - Require source links/citations for brief claims.
 - Add broken-source checks.
 - Separate summaries from recommendations.
+- Use `src/proof_receipts.py` to expose Core-compatible Research Brief receipt
+  views for delivered weekly briefs.
 
 ### P1 - Channel Intelligence Layer
 
@@ -39,7 +41,9 @@ backed analysis of narratives, sources, claims, and project-relevant signals.
 
 ### P1 - Entropy Integration
 
-- Add optional `research_brief_receipt`.
+- Keep implemented `research_brief_receipt` storage and verification as the
+  local source of truth.
+- Add CLI inspection for the Core-compatible receipt view.
 - Add evidence window per report.
 - Add reviewer/referee pass for high-impact claims.
 - Follow `docs/entropy_core_gensyn_integration.md`; Entropy Core is optional
@@ -58,6 +62,7 @@ backed analysis of narratives, sources, claims, and project-relevant signals.
 - Do not let AI invent source trust; trust signals must come from observed
   behavior.
 - Use deterministic citation checks.
+- Reject Core-compatible receipt generation when no source evidence refs exist.
 
 ## Stop Conditions
 

@@ -1,7 +1,7 @@
 # Entropy Core And Gensyn Integration
 
-Status: planned reference integration
-Last updated: 2026-05-29
+Status: implemented local Core-compatible receipt adapter; Core runtime not adopted
+Last updated: 2026-05-31
 
 ## Purpose
 
@@ -20,15 +20,16 @@ vendored component, adapted code, pattern-only reuse, or rejection.
 
 ## Entropy Core Use
 
-Default level: receipt-compatible now; evidence-lookup compatible next.
+Default level: evidence-lookup compatible for Research Brief receipts.
 
 Entropy Core is optional vocabulary only for this repository. Local receipt
 generation, storage, delivery, verification, and inspection must not require an
 Entropy Core runtime.
 
-Planned local artifacts:
+Local artifacts:
 
-- `research_brief_receipt`
+- `research_brief_receipt` implemented in SQLite/local verification
+- Core-compatible adapter implemented in `src/proof_receipts.py`
 - `source_claim_receipt`
 - `channel_intelligence_referee_verdict`
 - `operator_usefulness_verdict`
@@ -65,10 +66,21 @@ The Telegram Research Agent already has product-local receipts and verification
 checks. Entropy Core should be used as a downstream proof contract, not as
 runtime storage or generation logic.
 
-Implementation path:
+Implemented now:
 
-1. Add a stable Core-compatible schema id to `research_brief_receipt`.
-2. Ensure receipt evidence refs point to canonical digest/evidence/source rows.
+- `build_core_research_brief_receipt(...)` converts a local
+  `research_brief_receipts` row into a Core-compatible receipt with schema id,
+  artifact ref/hash, evidence refs, verifier status, and deterministic receipt
+  hash.
+- The adapter rejects Research Brief receipts without source evidence refs.
+- `tests/test_core_research_brief_receipt.py` covers verified, pending, and
+  missing-evidence paths.
+
+Next implementation tasks:
+
+1. Add an `inspect-core-receipt` CLI command for a delivered brief.
+2. Persist the Core-compatible receipt hash in operator audit notes or a small
+   receipt index without changing the canonical SQLite row contract.
 3. Add Core-style evidence lookup checks for delivered briefs and future
    channel intelligence receipts.
 4. Use schema compatibility checks before changing receipt fields.
