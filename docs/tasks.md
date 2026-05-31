@@ -33,13 +33,13 @@ Implemented:
 - Telegram Channel Intelligence design, schema migrations, deterministic repeated-claim extraction, canonical source-observation refresh, active-project intelligence links, narrative candidate refresh, inspection CLI, and optional Markdown report surface captured in `docs/telegram_channel_intelligence.md`
 - Research Brief receipt SQLite schema, storage helpers, generation-time creation, delivery ref updates, deterministic verification checks, CLI inspection, operator review, and optional operator-only audit notes via `research_brief_receipts`
 - Core-compatible Research Brief receipt adapter, weekly audit-note hash wiring,
-  and `memory inspect-core-receipt` for delivered briefs
+  `memory inspect-core-receipt` for delivered briefs, and deterministic Core
+  evidence lookup checks via `--verify-evidence`
 
 ## Active Maintenance Queue
 
 | ID | Priority | Task | Notes |
 |---|---:|---|---|
-| ENT-CORE-1 | P0 | Add Core evidence lookup checks for delivered Research Brief receipts | Verify `signal_evidence_item:<id>` refs resolve locally and Telegram source links have valid post URL shape; no Core runtime dependency |
 | ENT-CORE-2 | P0 | Add Core receipt schema compatibility checks | Pin required Core-compatible fields/types and deterministic hash behavior before future receipt-field changes |
 | ENT-CORE-3 | P0 | Preserve product-local receipt boundaries | Keep usefulness, delivery, Telegram source parsing, operator review, and digest generation local; Core remains derived proof vocabulary |
 | TRUST-1 | P1 | Surface source down-rank explanations | Show observed reasons for noisy/down-ranked sources from local reactions, scores, source links, claim outcomes, and project relevance |

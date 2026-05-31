@@ -1,6 +1,6 @@
 # Entropy Core And Gensyn Integration
 
-Status: implemented local Core-compatible receipt adapter; Core runtime not adopted
+Status: implemented local Core-compatible receipt adapter and evidence lookup checks; Core runtime not adopted
 Last updated: 2026-05-31
 
 ## Purpose
@@ -77,15 +77,16 @@ Implemented now:
   receipt hash when the stored local receipt has source evidence refs.
 - `memory inspect-core-receipt` prints the Core-compatible receipt view for a
   delivered brief.
+- `memory inspect-core-receipt --verify-evidence` verifies
+  `signal_evidence_item:<id>` refs against local SQLite rows and checks
+  Telegram source-link shape without an Entropy Core runtime.
 - `tests/test_core_research_brief_receipt.py` covers verified, pending, and
-  missing-evidence paths.
+  evidence lookup paths.
 
 Next implementation tasks:
 
-1. Add Core-style evidence lookup checks for delivered briefs and future
-   channel intelligence receipts.
-2. Use schema compatibility checks before changing receipt fields.
-3. Keep usefulness, delivery behavior, Telegram source parsing, and operator
+1. Use schema compatibility checks before changing receipt fields.
+2. Keep usefulness, delivery behavior, Telegram source parsing, and operator
    review product-local.
 
 These tasks are tracked as `ENT-CORE-1` through `ENT-CORE-3` in

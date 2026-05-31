@@ -223,6 +223,11 @@ def build_parser() -> argparse.ArgumentParser:
     core_receipt_parser.add_argument("--telegraph-url", default=None)
     core_receipt_parser.add_argument("--status", default=None)
     core_receipt_parser.add_argument("--limit", type=int, default=1)
+    core_receipt_parser.add_argument(
+        "--verify-evidence",
+        action="store_true",
+        help="Include deterministic local lookup checks for Core evidence refs",
+    )
     core_receipt_parser.set_defaults(handler=handle_memory_inspect_core_receipt)
 
     receipt_review_parser = memory_sub.add_parser(
@@ -1547,7 +1552,11 @@ def handle_memory_inspect_receipts(args: argparse.Namespace) -> int:
 
 def handle_memory_inspect_core_receipt(args: argparse.Namespace) -> int:
     from db.research_brief_receipts import fetch_research_brief_receipts
-    from proof_receipts import build_core_research_brief_receipt, core_receipt_sha256
+    from proof_receipts import (
+        build_core_research_brief_receipt,
+        core_receipt_sha256,
+        verify_core_research_brief_evidence_refs,
+    )
 
     settings = load_settings()
 
@@ -1587,6 +1596,11 @@ def handle_memory_inspect_core_receipt(args: argparse.Namespace) -> int:
             )
             return 1
         core_receipt["receipt_sha256"] = core_receipt_sha256(core_receipt)
+        if args.verify_evidence:
+            core_receipt["evidence_verification"] = verify_core_research_brief_evidence_refs(
+                connection,
+                core_receipt,
+            )
         core_receipts.append(core_receipt)
 
     payload: dict | list[dict]

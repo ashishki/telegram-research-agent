@@ -43,6 +43,8 @@ Implemented:
 - `memory inspect-receipts` for local receipt inspection.
 - `memory inspect-core-receipt` for Core-compatible receipt JSON.
 - `src/proof_receipts.py` adapter and deterministic Core-compatible hash.
+- Deterministic Core evidence lookup checks through
+  `memory inspect-core-receipt --verify-evidence`.
 - Weekly audit notes include the Core-compatible hash when source evidence refs
   exist.
 - Channel Intelligence groundwork: schema migrations, repeated-claim
@@ -54,6 +56,11 @@ Implemented:
 Goal: make Core-compatible receipts checkable, not just printable.
 
 ### ENT-CORE-1 - Core Evidence Lookup Checks
+
+Status: implemented.
+
+Implemented via `verify_core_research_brief_evidence_refs(...)` and
+`memory inspect-core-receipt --verify-evidence`.
 
 Implement a deterministic checker for the Core-compatible `evidence_refs`
 returned by `build_core_research_brief_receipt(...)`.
@@ -253,4 +260,3 @@ Acceptance criteria:
 - Update docs only when command surface, architecture boundaries, or task state
   changes.
 - Do not reimplement existing receipt builders, storage helpers, or receipt CLI.
-

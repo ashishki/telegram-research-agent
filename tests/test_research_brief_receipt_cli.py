@@ -89,6 +89,83 @@ class TestResearchBriefReceiptCli(unittest.TestCase):
                 )
         return db_path
 
+    def _make_core_evidence_receipt_db(
+        self,
+        *,
+        source_links: list[str] | None = None,
+        receipt_evidence_ids: list[int] | None = None,
+        stored_evidence_ids: list[int] | None = None,
+    ) -> str:
+        tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+        tmp.close()
+        db_path = tmp.name
+        with patch.dict(os.environ, {"AGENT_DB_PATH": db_path}, clear=False):
+            run_migrations()
+            with sqlite3.connect(db_path) as connection:
+                digest_id = connection.execute(
+                    """
+                    INSERT INTO digests (
+                        week_label,
+                        generated_at,
+                        content_md,
+                        post_count
+                    )
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    ("2026-W22", "2026-05-29T09:00:00Z", "# Brief", 2),
+                ).lastrowid
+                for evidence_id in stored_evidence_ids or []:
+                    connection.execute(
+                        """
+                        INSERT INTO signal_evidence_items (
+                            id,
+                            post_id,
+                            raw_post_id,
+                            week_label,
+                            evidence_kind,
+                            excerpt_text,
+                            source_channel,
+                            message_url,
+                            posted_at,
+                            topic_labels_json,
+                            project_names_json,
+                            selection_reason,
+                            created_at
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            evidence_id,
+                            evidence_id,
+                            evidence_id,
+                            "2026-W22",
+                            "strong_signal",
+                            "source excerpt",
+                            "source_a",
+                            "https://t.me/source_a/123",
+                            "2026-05-29T08:00:00Z",
+                            "[]",
+                            "[]",
+                            "test evidence",
+                            "2026-05-29T09:00:00Z",
+                        ),
+                    )
+                connection.commit()
+                record_research_brief_receipt(
+                    connection,
+                    receipt_id="rbr_core_evidence_2026_w22",
+                    week_label="2026-W22",
+                    generated_at="2026-05-29T10:00:00Z",
+                    source_set={
+                        "telegram_source_links": source_links or ["https://t.me/source_a/123"],
+                        "source_evidence_item_ids": receipt_evidence_ids or [101],
+                    },
+                    digest_id=digest_id,
+                    markdown_path="/tmp/brief.md",
+                    telegraph_url="https://telegra.ph/brief",
+                )
+        return db_path
+
     def test_memory_inspect_receipts_prints_debug_surface(self):
         db_path = self._make_receipt_db()
         stdout = io.StringIO()
@@ -156,6 +233,38 @@ class TestResearchBriefReceiptCli(unittest.TestCase):
             [ref["ref_type"] for ref in payload["evidence_refs"]],
             ["telegram_source_link"],
         )
+
+    def test_memory_inspect_core_receipt_can_verify_evidence_refs(self):
+        db_path = self._make_core_evidence_receipt_db(stored_evidence_ids=[101])
+        stdout = io.StringIO()
+        try:
+            with patch.dict(os.environ, {"AGENT_DB_PATH": db_path}, clear=False):
+                with patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "main.py",
+                        "memory",
+                        "inspect-core-receipt",
+                        "--week",
+                        "2026-W22",
+                        "--verify-evidence",
+                    ],
+                ):
+                    with redirect_stdout(stdout):
+                        exit_code = main.main()
+        finally:
+            os.unlink(db_path)
+
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(payload["receipt_id"], "rbr_core_evidence_2026_w22")
+        self.assertEqual(payload["evidence_verification"]["status"], "passed")
+        self.assertEqual(
+            payload["evidence_verification"]["resolved_signal_evidence_item_ids"],
+            [101],
+        )
+        self.assertEqual(payload["evidence_verification"]["failures"], [])
 
     def test_memory_review_receipt_updates_operator_status(self):
         db_path = self._make_receipt_db()

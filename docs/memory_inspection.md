@@ -234,6 +234,23 @@ python -m src.main memory inspect-receipts --status needs_review
 
 ---
 
+### inspect-core-receipt
+
+Print the Core-compatible Research Brief receipt JSON. Add
+`--verify-evidence` to include deterministic local lookup checks for the
+derived Core `evidence_refs`.
+
+```
+python -m src.main memory inspect-core-receipt [--week LABEL] [--receipt-id ID] [--digest-id ID] [--artifact-path PATH] [--telegraph-url URL] [--status STATUS] [--limit N] [--verify-evidence]
+```
+
+With `--verify-evidence`, the JSON includes `evidence_verification.status`
+(`passed`, `failed`, or `needs_review`), resolved `signal_evidence_item` IDs,
+checked Telegram source links, failures, and review notes. The check uses only
+local SQLite rows and Telegram post URL shape.
+
+---
+
 ### review-receipt
 
 Record an operator review status for a Research Brief receipt. This updates
