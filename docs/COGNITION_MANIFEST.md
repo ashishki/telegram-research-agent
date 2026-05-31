@@ -22,6 +22,7 @@ Repo-local map that translates the project's existing runtime memory architectur
 - Code, tests, runtime docs, and database schema are authoritative.
 - Runtime research memory is product data; it is not a cross-project engineering memory source unless summarized in reviewed docs.
 - Obsidian and generated indexes are optional navigation layers.
+- The cognition vault is for navigation, context packets, and cross-project recall only; this repo remains authoritative.
 
 ## Shared VPS Cognition Vault
 
@@ -109,6 +110,10 @@ If an agent runs on the VPS, clone the vault next to `projects/` and pass packet
 ```
 
 Do not write canonical decisions, eval results, or findings directly into the vault. Write them into this repo first, then regenerate the vault.
+
+Use the vault when starting an agent cold, preparing a reviewer packet, comparing
+projects, or checking cross-project dependencies. Do not use it to close tasks,
+change project status, replace ADRs/evals/findings, or drive runtime behavior.
 
 ---
 
