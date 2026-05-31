@@ -543,6 +543,8 @@ These surfaces must exist before Phase 3 output integration ships.
 | `memory inspect-snapshots --stale-only` | Curated `project_context_snapshots` rows where `snapshot_week_label` is older than two weeks |
 | `memory inspect-suppression --title '...'` | `insight_rejection_memory` fingerprint lookup plus matching `decision_journal` rows explaining why the idea was suppressed |
 | `memory diagnose-project-signals --week LABEL` | Per-project explanation of digest topics that linked, stayed candidates, or were dropped |
+| `memory inspect-receipts --week LABEL` | Research Brief receipt audit metadata: source of truth, refresh rule, retrieval path, debug surface, artifacts, delivery refs, verification, and health flags |
+| `memory review-receipt --receipt-id ID --status verified` | Operator review status update for a Research Brief receipt with optional notes |
 
 ### Provenance completeness eval gate
 

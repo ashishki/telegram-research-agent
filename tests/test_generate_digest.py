@@ -37,6 +37,7 @@ from output.generate_digest import (
     _build_digest_health_alert,
     _count_words,
 )
+from db.research_brief_receipts import fetch_research_brief_receipts
 
 
 class TestWordCountGate(unittest.TestCase):
@@ -124,6 +125,20 @@ class TestDigestHealthAlert(unittest.TestCase):
         )
 
         self.assertIsNone(alert)
+
+    def test_receipt_audit_note_only_renders_actionable_receipt_state(self):
+        self.assertIsNone(gd._build_receipt_audit_note({"verification_status": "pending", "health_flags": []}))
+
+        note = gd._build_receipt_audit_note(
+            {
+                "verification_status": "needs_review",
+                "health_flags": ["low_signal_alert"],
+                "fallback_delivery_used": True,
+                "fallback_delivery": "html_attachment",
+            }
+        )
+
+        self.assertEqual(note, "Receipt: needs_review | flags=low_signal_alert | fallback=html_attachment")
 
 
 class TestDigestHelpers(unittest.TestCase):
@@ -263,7 +278,7 @@ class TestRunDigestFixes(unittest.TestCase):
             telegram_session_path="",
         )
 
-    def _build_digest_db(self, db_path: str) -> None:
+    def _build_digest_db(self, db_path: str, *, include_posts: bool = True) -> None:
         with sqlite3.connect(db_path) as connection:
             connection.executescript(
                 """
@@ -293,12 +308,15 @@ class TestRunDigestFixes(unittest.TestCase):
                     topic_id INTEGER
                 );
                 CREATE TABLE digests (
-                    week_label TEXT PRIMARY KEY,
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    week_label TEXT NOT NULL UNIQUE,
                     generated_at TEXT,
                     content_md TEXT,
                     content_json TEXT,
                     pdf_path TEXT,
-                    post_count INTEGER
+                    post_count INTEGER,
+                    telegraph_url TEXT,
+                    telegram_sent_at TEXT
                 );
                 CREATE TABLE quality_metrics (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -313,8 +331,73 @@ class TestRunDigestFixes(unittest.TestCase):
                     project_match_count INTEGER NOT NULL DEFAULT 0,
                     output_word_count INTEGER NOT NULL DEFAULT 0
                 );
+                CREATE TABLE research_brief_receipts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    receipt_id TEXT NOT NULL UNIQUE,
+                    type TEXT NOT NULL DEFAULT 'research_brief_receipt'
+                        CHECK(type = 'research_brief_receipt'),
+                    week_label TEXT NOT NULL CHECK(length(trim(week_label)) > 0),
+                    generated_at TEXT NOT NULL,
+                    source_project TEXT NOT NULL DEFAULT 'telegram-research-agent',
+                    source_version TEXT,
+                    window_start TEXT,
+                    window_end TEXT,
+                    included_channels_json TEXT NOT NULL DEFAULT '[]'
+                        CHECK(json_valid(included_channels_json)),
+                    post_counts_json TEXT NOT NULL DEFAULT '{}'
+                        CHECK(json_valid(post_counts_json)),
+                    source_set_json TEXT NOT NULL DEFAULT '{}'
+                        CHECK(json_valid(source_set_json)),
+                    project_scopes_json TEXT NOT NULL DEFAULT '[]'
+                        CHECK(json_valid(project_scopes_json)),
+                    topic_scopes_json TEXT NOT NULL DEFAULT '[]'
+                        CHECK(json_valid(topic_scopes_json)),
+                    llm_provider TEXT,
+                    llm_model TEXT,
+                    llm_category TEXT,
+                    prompt_template_path TEXT,
+                    prompt_template_version TEXT,
+                    config_fingerprints_json TEXT NOT NULL DEFAULT '{}'
+                        CHECK(json_valid(config_fingerprints_json)),
+                    generation_params_fingerprint TEXT,
+                    digest_id INTEGER,
+                    markdown_path TEXT,
+                    json_path TEXT,
+                    html_path TEXT,
+                    telegraph_url TEXT,
+                    telegram_delivery_timestamp TEXT,
+                    telegram_message_id INTEGER,
+                    fallback_delivery TEXT,
+                    fallback_delivery_used INTEGER NOT NULL DEFAULT 0
+                        CHECK(fallback_delivery_used IN (0, 1)),
+                    verification_status TEXT NOT NULL DEFAULT 'pending'
+                        CHECK(verification_status IN (
+                            'pending',
+                            'verified',
+                            'needs_review',
+                            'failed',
+                            'waived'
+                        )),
+                    verifier_method TEXT,
+                    verifier_notes TEXT,
+                    checked_at TEXT,
+                    checked_by TEXT,
+                    health_flags_json TEXT NOT NULL DEFAULT '[]'
+                        CHECK(json_valid(health_flags_json)),
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    FOREIGN KEY(digest_id) REFERENCES digests(id) ON DELETE SET NULL
+                );
+                CREATE TABLE signal_evidence_items (
+                    id INTEGER PRIMARY KEY,
+                    post_id INTEGER,
+                    week_label TEXT
+                );
                 """
             )
+            if not include_posts:
+                connection.commit()
+                return
             connection.executemany(
                 "INSERT INTO raw_posts (id, view_count, message_url) VALUES (?, ?, ?)",
                 [
@@ -343,6 +426,10 @@ class TestRunDigestFixes(unittest.TestCase):
             connection.executemany(
                 "INSERT INTO post_topics (post_id, topic_id) VALUES (?, ?)",
                 [(1, 1), (2, 2), (3, 3), (4, 4)],
+            )
+            connection.executemany(
+                "INSERT INTO signal_evidence_items (id, post_id, week_label) VALUES (?, ?, ?)",
+                [(1, 1, "2026-W14"), (2, 2, "2026-W14")],
             )
             connection.commit()
 
@@ -419,6 +506,200 @@ class TestRunDigestFixes(unittest.TestCase):
             self.assertGreater(row["output_word_count"], 3)
         finally:
             os.unlink(db_path)
+
+    def test_run_digest_creates_research_brief_receipt(self):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+            db_path = tmp.name
+
+        try:
+            self._build_digest_db(db_path)
+            with patch.dict(os.environ, {"GIT_COMMIT": "abc123"}, clear=False):
+                with patch("output.generate_recommendations.run_recommendations", return_value={"text": ""}):
+                    self._run_digest(db_path)
+
+            with sqlite3.connect(db_path) as connection:
+                connection.row_factory = sqlite3.Row
+                receipts = fetch_research_brief_receipts(connection, week_label="2026-W14", limit=5)
+
+            self.assertEqual(len(receipts), 1)
+            receipt = receipts[0]
+            self.assertEqual(receipt["week_label"], "2026-W14")
+            self.assertEqual(receipt["verification_status"], "pending")
+            self.assertEqual(receipt["source_version"], "abc123")
+            self.assertEqual(receipt["window_start"], "2026-03-23T12:00:00Z")
+            self.assertEqual(receipt["window_end"], "2026-03-30T12:00:00Z")
+            self.assertEqual(receipt["included_channels"], ["chan1", "chan2", "chan3", "chan4"])
+            self.assertEqual(receipt["post_counts"]["total_posts"], 4)
+            self.assertEqual(receipt["post_counts"]["strong_count"], 1)
+            self.assertEqual(receipt["post_counts"]["watch_count"], 1)
+            self.assertEqual(receipt["source_set"]["source_evidence_item_ids"], [1, 2])
+            self.assertEqual(receipt["source_set"]["source_post_ids"], [1, 2, 3, 4])
+            self.assertIn("https://t.me/c/1", receipt["source_set"]["telegram_source_links"])
+            self.assertEqual(receipt["project_scopes"], ["proj-a"])
+            self.assertEqual(receipt["topic_scopes"], ["Agents", "Culture", "Infra", "Noise"])
+            self.assertEqual(receipt["llm_provider"], "anthropic")
+            self.assertEqual(receipt["llm_category"], "digest")
+            self.assertEqual(receipt["prompt_template_path"], "docs/prompts/digest_generation.md")
+            self.assertIn("scoring_config", receipt["config_fingerprints"])
+            self.assertEqual(receipt["markdown_path"], "/tmp/2026-W14.md")
+            self.assertEqual(receipt["json_path"], "/tmp/2026-W14.json")
+            self.assertEqual(receipt["html_path"], "/tmp/2026-W14.html")
+            self.assertEqual(receipt["health_flags"], [])
+        finally:
+            os.unlink(db_path)
+
+    def test_empty_week_creates_research_brief_receipt_with_health_flag(self):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+            db_path = tmp.name
+
+        try:
+            self._build_digest_db(db_path, include_posts=False)
+            settings = self._make_settings(db_path)
+            fixed_now = datetime(2026, 3, 30, 12, 0, tzinfo=timezone.utc)
+
+            with patch.object(gd, "_utc_now", return_value=fixed_now):
+                with patch.object(gd, "_compute_week_label", return_value="2026-W14"):
+                    with patch.object(gd, "score_posts", return_value={"strong": 0, "watch": 0, "cultural": 0, "noise": 0, "avg_signal_score": 0.0}):
+                        with patch.object(gd, "_append_github_section", side_effect=lambda content, settings: content):
+                            with patch.object(gd, "_write_digest_file", return_value=gd.Path("/tmp/2026-W14.md")):
+                                with patch.object(gd, "write_report_html", return_value=gd.Path("/tmp/2026-W14.html")):
+                                    with patch.object(gd, "_send_weekly_review_to_telegram_owner"):
+                                        gd.run_digest(settings)
+
+            with sqlite3.connect(db_path) as connection:
+                connection.row_factory = sqlite3.Row
+                receipts = fetch_research_brief_receipts(connection, week_label="2026-W14", limit=5)
+
+            self.assertEqual(len(receipts), 1)
+            receipt = receipts[0]
+            self.assertEqual(receipt["post_counts"]["total_posts"], 0)
+            self.assertEqual(receipt["included_channels"], [])
+            self.assertEqual(receipt["source_set"]["source_post_ids"], [])
+            self.assertEqual(receipt["markdown_path"], "/tmp/2026-W14.md")
+            self.assertIsNone(receipt["json_path"])
+            self.assertEqual(receipt["html_path"], "/tmp/2026-W14.html")
+            self.assertEqual(receipt["health_flags"], ["empty_week_alert"])
+        finally:
+            os.unlink(db_path)
+
+    def test_weekly_review_delivery_updates_receipt_with_telegraph_refs(self):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+            db_path = tmp.name
+        with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as html_tmp:
+            html_tmp.write(b"<h1>Brief</h1>")
+            html_path = gd.Path(html_tmp.name)
+
+        try:
+            self._build_digest_db(db_path)
+            with patch("output.generate_recommendations.run_recommendations", return_value={"text": ""}):
+                self._run_digest(db_path)
+
+            with sqlite3.connect(db_path) as connection:
+                connection.row_factory = sqlite3.Row
+                digest_id = connection.execute(
+                    "SELECT id FROM digests WHERE week_label = ?",
+                    ("2026-W14",),
+                ).fetchone()["id"]
+
+                with patch.dict(
+                    os.environ,
+                    {
+                        "TELEGRAM_BOT_TOKEN": "token",
+                        "TELEGRAM_OWNER_CHAT_ID": "chat",
+                    },
+                    clear=False,
+                ):
+                    with patch.object(gd, "publish_article", return_value="https://telegra.ph/brief"):
+                        with patch.object(gd, "send_text", return_value=777) as send_mock:
+                            with patch.object(gd, "_send_copyable_digest_document"):
+                                with patch.object(gd, "_utc_now_iso", return_value="2026-03-30T12:05:00Z"):
+                                    gd._send_weekly_review_to_telegram_owner(
+                                        connection=connection,
+                                        content_md="brief",
+                                        week_label="2026-W14",
+                                        strong_count=1,
+                                        watch_count=1,
+                                        html_path=html_path,
+                                        digest_id=digest_id,
+                                        receipt_audit_note="Receipt: needs_review | flags=low_signal_alert",
+                                    )
+
+                receipt = fetch_research_brief_receipts(connection, digest_id=digest_id, limit=1)[0]
+                digest_row = connection.execute(
+                    "SELECT telegraph_url, telegram_sent_at FROM digests WHERE id = ?",
+                    (digest_id,),
+                ).fetchone()
+
+            self.assertEqual(receipt["telegraph_url"], "https://telegra.ph/brief")
+            self.assertEqual(receipt["telegram_delivery_timestamp"], "2026-03-30T12:05:00Z")
+            self.assertEqual(receipt["telegram_message_id"], 777)
+            self.assertFalse(receipt["fallback_delivery_used"])
+            self.assertEqual(digest_row["telegraph_url"], "https://telegra.ph/brief")
+            self.assertEqual(digest_row["telegram_sent_at"], "2026-03-30T12:05:00Z")
+            self.assertIn("Receipt: needs_review", send_mock.call_args.kwargs["text"])
+        finally:
+            os.unlink(db_path)
+            os.unlink(html_path)
+
+    def test_weekly_review_delivery_updates_receipt_with_fallback_refs(self):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+            db_path = tmp.name
+        with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as html_tmp:
+            html_tmp.write(b"<h1>Brief</h1>")
+            html_path = gd.Path(html_tmp.name)
+
+        try:
+            self._build_digest_db(db_path)
+            with patch("output.generate_recommendations.run_recommendations", return_value={"text": ""}):
+                self._run_digest(db_path)
+
+            with sqlite3.connect(db_path) as connection:
+                connection.row_factory = sqlite3.Row
+                digest_id = connection.execute(
+                    "SELECT id FROM digests WHERE week_label = ?",
+                    ("2026-W14",),
+                ).fetchone()["id"]
+
+                with patch.dict(
+                    os.environ,
+                    {
+                        "TELEGRAM_BOT_TOKEN": "token",
+                        "TELEGRAM_OWNER_CHAT_ID": "chat",
+                    },
+                    clear=False,
+                ):
+                    with patch.object(gd, "publish_article", side_effect=RuntimeError("telegraph down")):
+                        with patch.object(gd, "send_text", return_value=888):
+                            with patch.object(gd, "send_document", return_value=889):
+                                with patch.object(gd, "_send_copyable_digest_document"):
+                                    with patch.object(gd, "_utc_now_iso", return_value="2026-03-30T12:06:00Z"):
+                                        gd._send_weekly_review_to_telegram_owner(
+                                            connection=connection,
+                                            content_md="brief",
+                                            week_label="2026-W14",
+                                            strong_count=1,
+                                            watch_count=1,
+                                            html_path=html_path,
+                                            digest_id=digest_id,
+                                        )
+
+                receipt = fetch_research_brief_receipts(connection, digest_id=digest_id, limit=1)[0]
+                digest_row = connection.execute(
+                    "SELECT telegraph_url, telegram_sent_at FROM digests WHERE id = ?",
+                    (digest_id,),
+                ).fetchone()
+
+            self.assertIsNone(receipt["telegraph_url"])
+            self.assertEqual(receipt["telegram_delivery_timestamp"], "2026-03-30T12:06:00Z")
+            self.assertEqual(receipt["telegram_message_id"], 888)
+            self.assertEqual(receipt["fallback_delivery"], "html_attachment")
+            self.assertTrue(receipt["fallback_delivery_used"])
+            self.assertEqual(receipt["health_flags"], ["fallback_delivery"])
+            self.assertIsNone(digest_row["telegraph_url"])
+            self.assertEqual(digest_row["telegram_sent_at"], "2026-03-30T12:06:00Z")
+        finally:
+            os.unlink(db_path)
+            os.unlink(html_path)
 
     def test_run_digest_sleeps_between_digest_and_insights_send(self):
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:

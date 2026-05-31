@@ -27,6 +27,8 @@ _install_stub(
 )
 
 from output.generate_recommendations import (  # noqa: E402
+    MAX_FEEDBACK_CARD_TEXT_CHARS,
+    _build_feedback_card_text,
     _html_to_copyable_text,
     _normalize_insights_delivery_text,
     _render_insights_fragment,
@@ -36,6 +38,41 @@ from output.generate_recommendations import (  # noqa: E402
 
 
 class TestGenerateRecommendationsHtml(unittest.TestCase):
+    def test_feedback_card_text_is_compact_without_losing_decision_context(self):
+        with sqlite3.connect(":memory:") as connection:
+            connection.row_factory = sqlite3.Row
+            connection.execute(
+                """
+                CREATE TABLE insight_triage_records (
+                    id INTEGER,
+                    title TEXT,
+                    reason TEXT,
+                    recommendation TEXT
+                )
+                """
+            )
+            connection.execute(
+                """
+                INSERT INTO insight_triage_records (id, title, reason, recommendation)
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    7,
+                    "<b>[Implement] telegram-research-agent - Add a very long implementation card title that should not dominate Telegram</b>",
+                    "This reason is intentionally verbose. " * 20,
+                    "do_now",
+                ),
+            )
+            row = connection.execute("SELECT * FROM insight_triage_records").fetchone()
+
+        text = _build_feedback_card_text(row, "2026-W22")
+
+        self.assertLessEqual(len(text), MAX_FEEDBACK_CARD_TEXT_CHARS)
+        self.assertIn("Implementation idea #7 | 2026-W22", text)
+        self.assertIn("Do now:", text)
+        self.assertIn("Why:", text)
+        self.assertIn("Choose:", text)
+
     def test_render_insights_fragment_wraps_paragraphs_and_links(self):
         content = (
             "<b>💡 Инсайты недели</b>\n\n"

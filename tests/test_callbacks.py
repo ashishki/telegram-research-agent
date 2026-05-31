@@ -1,9 +1,36 @@
 import os
 import sqlite3
+import sys
 import tempfile
+import types
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+
+def _install_stub(module_name: str, **attributes: object) -> None:
+    module = sys.modules.get(module_name)
+    if module is None:
+        module = types.ModuleType(module_name)
+        sys.modules[module_name] = module
+    for name, value in attributes.items():
+        setattr(module, name, value)
+
+
+_install_stub(
+    "anthropic",
+    APIConnectionError=Exception,
+    APIStatusError=Exception,
+    APITimeoutError=Exception,
+    Anthropic=object,
+    RateLimitError=Exception,
+)
+_install_stub("telethon", TelegramClient=object)
+_install_stub("telethon.errors", FloodWaitError=Exception)
+_install_stub("weasyprint")
+_install_stub("jinja2")
+
+from bot import bot as bot_runtime
 from bot.callbacks import build_idea_feedback_markup, record_idea_callback
 from config.settings import Settings
 
@@ -86,6 +113,43 @@ class TestIdeaCallbacks(unittest.TestCase):
         self.assertEqual(row["project_name"], "telegram-research-agent")
         self.assertEqual(row["status"], "rejected")
         self.assertEqual(row["recorded_by"], "telegram_button")
+
+    def test_run_bot_dispatches_authorized_callback_update(self):
+        settings = self._settings_with_idea()
+        update = {
+            "update_id": 100,
+            "callback_query": {
+                "id": "callback-1",
+                "from": {"id": 12345},
+                "message": {"chat": {"id": 12345}},
+                "data": "idea:7:done",
+            },
+        }
+
+        def stop_after_first_poll(state):
+            state.stop_requested = True
+
+        with patch.dict(
+            os.environ,
+            {"TELEGRAM_BOT_TOKEN": "token", "TELEGRAM_OWNER_CHAT_ID": "12345"},
+            clear=False,
+        ), patch.object(bot_runtime, "_install_signal_handlers", side_effect=stop_after_first_poll), patch.object(
+            bot_runtime,
+            "_telegram_get_updates",
+            return_value=[update],
+        ) as get_updates_mock, patch.object(
+            bot_runtime,
+            "record_idea_callback",
+            return_value="Записал: acted_on",
+        ) as record_mock, patch.object(
+            bot_runtime,
+            "_telegram_answer_callback",
+        ) as answer_mock:
+            bot_runtime.run_bot(settings)
+
+        get_updates_mock.assert_called_once_with(token="token", offset=None)
+        record_mock.assert_called_once_with(settings, "idea:7:done")
+        answer_mock.assert_called_once_with("token", "callback-1", "Записал: acted_on")
 
 
 if __name__ == "__main__":

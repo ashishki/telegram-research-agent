@@ -1,6 +1,6 @@
 # Telegram Channel Intelligence
 
-Status: planned design, not implemented
+Status: design, schema migrations, deterministic repeated-claim extraction, source-observation refresh, active-project intelligence links, narrative candidate refresh, inspection CLI, and optional Markdown report surface implemented
 
 ## Product Purpose
 
@@ -160,18 +160,26 @@ derived cache.
 
 ## Proposed Data Model
 
-This section is design only. Do not create migrations from it without a separate
-implementation task.
+INTEL-2 implements the design-reviewed SQLite schema. INTEL-3 implements
+deterministic repeated-claim extraction over scoped evidence rows. INTEL-4
+implements source-observation refresh from canonical counters only. INTEL-5
+implements lightweight entity/topic/project links scoped to active curated
+projects. INTEL-6 implements narrative candidate refresh and narrative-claim
+links with over-aggregation rejection gates. INTEL-7 implements inspection CLI
+for claims, narratives, source observations, and intelligence links. INTEL-8
+implements an optional Markdown report renderer that prints citations,
+weak-evidence labels, and input row IDs without changing the default weekly
+digest.
 
 | Candidate | Purpose | Source of Truth | Refresh Rule | Retrieval Path | Debug Surface |
 |---|---|---|---|---|---|
-| `channel_narratives` | Stores bounded narrative candidates with stable IDs, title, summary, status, first/last seen week, confidence counters, and optional project scope. | Derived from `signal_evidence_items`, `posts`, `post_topics`, `post_project_links`, `decision_journal`, and operator feedback. | Recompute or upsert per week and project/topic scope; keep previous IDs when evidence overlap is strong; mark stale when not seen for N weeks. | Query by project, topic, week range, source channel, status, and linked claim IDs. | CLI/report row view showing title, scope, supporting post count, channels, first/last seen, linked claims, and evidence links. |
+| `channel_narratives` | Stores bounded narrative candidates with stable IDs, title, summary, status, first/last seen week, confidence counters, and optional project scope. | Derived from repeated claims with explicit supporting evidence rows, active project scope, and topic labels. | Implemented by `output.channel_intelligence.refresh_narrative_candidates`; upserts per week/project/topic scope and rejects over-aggregated groups instead of surfacing them as active narratives. | Query by project, topic, week range, source channel, status, and linked claim IDs. | CLI/report row view showing title, scope, supporting post count, channels, first/last seen, linked claims, and evidence links. |
 | `channel_repeated_claims` | Stores normalized concrete claims, claim type, first/last seen, occurrence count, channel count, project/topic scope, and evidence strength. | Derived from claim occurrences found in cited posts/evidence; canonical text is refreshable normalization, not fact truth. | Upsert from claim extraction over scoped evidence; merge only when normalized text and entity/topic overlap pass deterministic similarity gates. | Query by project, topic/entity, time window, minimum occurrence count, minimum channel count, and source inclusion/exclusion. | CLI/report view showing normalized claim, all occurrences, source posts, channels, week labels, and whether minimum repetition gates passed. |
 | `claim_occurrences` | Stores every observed occurrence of a repeated claim in a post or evidence item. | `raw_posts`/`posts` text plus `signal_evidence_items` excerpts and source metadata. | Append or replace for a refresh window; preserve one row per claim/post/evidence item with extraction version. | Join from claim to posts/evidence by claim ID, project, week, source, and occurrence text. | Inspect command that prints occurrence text, Telegram URL, source channel, posted date, extraction reason, and linked project/topic. |
-| `source_observations` | Stores observed source behavior counters by channel/week/window. | Canonical post counts, scoring buckets, evidence selection, feedback, decision outcomes, and usefulness logs. | Rebuild per channel and week from canonical rows; never directly edited by model output. | Query by channel, week range, project/topic, metric name, and direction of change. | Source diagnostics showing useful/acted-on/cited/skipped/rejected counts, low-signal rate, repeated-claim participation, and raw counter inputs. |
-| `intelligence_entity_links` | Links entities/topics to posts, claims, narratives, projects, and channels. | Existing topic assignments plus deterministic/entity-extraction pass over evidence rows and high-signal posts. | Refresh for scoped windows; delete/replace links produced by the same extractor version for that scope. | Query by entity/topic plus project/time/source; use as a join table, not as a standalone memory pool. | Inspector listing entity label, entity type, linked object type/id, source row, extractor version, and confidence/reason. |
-| `project_intelligence_links` | Records why a claim or narrative is relevant to an active project. | `src/config/projects.yaml`, `post_project_links`, project relevance scores, scoped evidence, and operator decisions. | Rebuild after project config or evidence refresh; preserve only links to active curated projects unless explicitly debugging historical state. | Query by project first, then narrative/claim/topic/time/source. | Project diagnostics showing linked narratives/claims, matching focus terms, evidence rows, and dropped candidates. |
-| `narrative_claim_links` | Many-to-many link between narratives and repeated claims. | Derived overlap between narratives, claims, shared evidence, entities, topics, and projects. | Rebuild for changed narratives/claims; require at least one shared cited evidence row or strong entity/topic overlap. | Join from narrative to concrete claims and from claim to broader storyline. | Inspector showing link reason, shared evidence count, shared entities/topics, and confidence counters. |
+| `source_observations` | Stores observed source behavior counters by channel/week/window. | Canonical post counts, scoring buckets, evidence selection, feedback, decision outcomes, usefulness logs, and repeated-claim occurrences. | Implemented by `output.channel_intelligence.refresh_source_observations`; rebuilds per channel/week/project/topic scope from canonical rows and never accepts model-authored trust labels. | Query by channel, week range, project/topic, metric name, and direction of change. | Source diagnostics showing useful/acted-on/cited/skipped/rejected counts, low-signal rate, repeated-claim participation, and raw counter inputs in `counters_json`. |
+| `intelligence_entity_links` | Links entities/topics to posts, claims, narratives, projects, and channels. | Existing topic and project labels on scoped evidence plus repeated-claim topic/project scope. | Implemented by `output.channel_intelligence.refresh_intelligence_links`; refreshes rows by extractor version and scope, and keeps links lightweight. | Query by entity/topic plus project/time/source; use as a join table, not as a standalone memory pool. | Inspector listing entity label, entity type, linked object type/id, source row, extractor version, and confidence/reason. |
+| `project_intelligence_links` | Records why a claim, source observation, or entity link is relevant to an active project. | `src/config/projects.yaml`, `projects.active`, scoped evidence, repeated claims, and source observations. | Implemented by `refresh_intelligence_links`; preserves only links to active curated projects unless historical debug behavior is explicitly added later. | Query by project first, then narrative/claim/topic/time/source. | Project diagnostics showing linked claims/source observations/entity rows, matching reasons, evidence row IDs, and dropped candidates. |
+| `narrative_claim_links` | Many-to-many link between narratives and repeated claims. | Derived overlap between active narrative candidates and repeated claims in the same active project/topic scope. | Implemented by `refresh_narrative_candidates`; links are rebuilt for the narrative and require supporting evidence row IDs. Rejected narratives do not receive claim links. | Join from narrative to concrete claims and from claim to broader storyline. | Inspector showing link reason, shared evidence count, shared entities/topics, and confidence counters. |
 | `channel_intelligence_weekly_rollups` | Materialized weekly rollup for report generation and fast inspection. | Derived only from the candidate tables above plus canonical evidence and feedback. | Rebuild for a week label after ingestion/scoring/evidence refresh; disposable cache. | Query by week, project, topic, source, and report section. | Report/debug output showing exact input row IDs used for each rollup item. |
 
 Naming should stay close to this table unless an implementation task finds an
@@ -264,13 +272,22 @@ MVP Radar may use:
 - Telegram repeated claims and narratives as seed context only
 - explicit source links and weak-evidence flags when exported
 
-A possible separate Channel Intelligence report may show:
+The optional separate Channel Intelligence report may show:
 
 - narrative leaderboard by project and week
 - repeated-claim table with occurrences and citations
 - source observation table with counters, not reputation prose
 - entity/topic graph slices for active projects
 - "watch next week" items with explicit missing evidence
+
+Implemented surface:
+
+```bash
+python3 src/main.py channel-intelligence-report --week 2026-W22 --project telegram-research-agent
+```
+
+This renders Markdown from existing derived rows only. It does not refresh data,
+deliver Telegram messages, or alter the default Research Brief.
 
 ## Observability And Quality Gates
 
@@ -350,38 +367,35 @@ Minimum test contracts:
 
 Future implementation should be split into bounded tasks:
 
-1. `INTEL-2`: add design-reviewed SQLite migrations for claim, narrative, link,
-   source observation, and rollup tables. Validation gate: migration tests plus
-   direct SQLite inspection; no report behavior changes.
-2. `INTEL-3`: implement repeated-claim extraction over scoped evidence rows.
-   Validation gate: fixture proves cross-channel, same-channel, and weak
-   single-occurrence claims are classified separately.
-3. `INTEL-4`: implement source observation refresh from canonical counters.
-   Validation gate: counters are reproducible from posts, evidence, feedback,
-   decisions, and usefulness logs; no model-authored trust labels.
-4. `INTEL-5`: implement lightweight entity/topic/project link refresh.
-   Validation gate: project-scoped retrieval returns only active-project rows
-   unless historical debug mode is explicit.
-5. `INTEL-6`: implement narrative candidate refresh and narrative-claim links.
-   Validation gate: over-aggregation fixtures fail closed and every surfaced
-   narrative has supporting row IDs.
-6. `INTEL-7`: add CLI inspection commands for claims, narratives, source
-   observations, and project intelligence links. Validation gate: commands print
-   source of truth, refresh rule, retrieval path, and debug surface details.
-7. `INTEL-8`: add optional Channel Intelligence report section/report after the
-   inspection layer is proven. Validation gate: report items include citations,
-   weak-evidence labels, and input row IDs.
+1. `INTEL-2`: implemented. Design-reviewed SQLite migrations exist for claim,
+   narrative, link, source observation, and rollup tables. Migration tests and
+   direct SQLite insertion cover the schema; no report behavior changes.
+2. `INTEL-3`: implemented. Deterministic repeated-claim extraction over scoped
+   evidence rows classifies cross-channel, same-channel, and weak
+   single-occurrence claims separately.
+3. `INTEL-4`: implemented. Source observation refresh derives reproducible
+   counters from posts, evidence, feedback, tags, decisions, usefulness logs,
+   and repeated-claim occurrences; it writes raw input IDs to `counters_json`
+   and no model-authored trust labels.
+4. `INTEL-5`: implemented. Lightweight entity/topic/project link refresh
+   derives links from scoped evidence, repeated claims, and source observations;
+   project intelligence rows are limited to active curated projects.
+5. `INTEL-6`: implemented. Narrative candidates are derived from repeated
+   claims in the same active project/topic scope, active rows include
+   supporting evidence IDs and narrative-claim links, and over-aggregated
+   groups are stored as `rejected` without links.
+6. `INTEL-7`: implemented. `memory inspect-channel-intelligence` prints source
+   of truth, refresh rule, retrieval path, debug surface, scoped claims,
+   narratives, source observations, entity links, and project links.
+7. `INTEL-8`: implemented. `channel-intelligence-report` renders optional
+   Markdown from derived rows and includes citations, weak-evidence labels, and
+   input row IDs.
 
 Dependencies:
 
-- `INTEL-2` depends on this design only.
-- `INTEL-3` depends on `INTEL-2` and existing `signal_evidence_items`.
-- `INTEL-4` depends on existing feedback, evidence, decision, and usefulness log
-  rows.
-- `INTEL-5` depends on active project config and existing project links.
-- `INTEL-6` depends on `INTEL-3` and `INTEL-5`.
-- `INTEL-7` depends on the first implemented tables.
-- `INTEL-8` depends on `INTEL-7` and passing quality gates.
+All initial Channel Intelligence implementation tasks are complete. Future work
+should come from observed operator usage rather than expanding the layer by
+default.
 
 Keep separate unless explicitly needed:
 

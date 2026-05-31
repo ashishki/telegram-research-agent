@@ -6,7 +6,8 @@ import tempfile
 import types
 import unittest
 from contextlib import redirect_stdout
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from unittest.mock import patch
 
 
@@ -31,6 +32,12 @@ _install_stub("telethon", TelegramClient=object)
 _install_stub("telethon.errors", FloodWaitError=Exception)
 _install_stub("weasyprint")
 _install_stub("jinja2")
+_install_stub("numpy", asarray=lambda value: value)
+_install_stub("sklearn")
+_install_stub("sklearn.cluster", KMeans=object)
+_install_stub("sklearn.feature_extraction")
+_install_stub("sklearn.feature_extraction.text", ENGLISH_STOP_WORDS=set(), TfidfVectorizer=object)
+_install_stub("sklearn.metrics", silhouette_score=lambda *_args, **_kwargs: 0.0)
 
 from db.migrate import run_migrations  # noqa: E402
 import main  # noqa: E402
@@ -104,6 +111,24 @@ class TestHealthCheckCli(unittest.TestCase):
         output = stdout.getvalue()
         self.assertEqual(exit_code, 0)
         self.assertIn("DB_PATH not configured", output)
+
+    def test_config_status_lines_warn_when_projects_yaml_is_stale(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            config_dir = root / "src" / "config"
+            config_dir.mkdir(parents=True)
+            for name in ("profile.yaml", "projects.yaml", "scoring.yaml"):
+                (config_dir / name).write_text("{}", encoding="utf-8")
+            stale_timestamp = (datetime.now(timezone.utc) - timedelta(days=45)).timestamp()
+            os.utime(config_dir / "projects.yaml", (stale_timestamp, stale_timestamp))
+
+            with patch.object(main, "PROJECT_ROOT", root):
+                lines = main._config_status_lines()
+
+        rendered = "\n".join(lines)
+        self.assertIn("projects_yaml_review:", rendered)
+        self.assertIn("age_days=", rendered)
+        self.assertIn("WARNING: projects.yaml has not changed in over 31 days", rendered)
 
 
 if __name__ == "__main__":

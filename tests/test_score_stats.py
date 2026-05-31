@@ -31,8 +31,15 @@ _install_stub("telethon", TelegramClient=object)
 _install_stub("telethon.errors", FloodWaitError=Exception)
 _install_stub("weasyprint")
 _install_stub("jinja2")
+_install_stub("numpy", asarray=lambda value: value)
+_install_stub("sklearn")
+_install_stub("sklearn.cluster", KMeans=object)
+_install_stub("sklearn.feature_extraction")
+_install_stub("sklearn.feature_extraction.text", ENGLISH_STOP_WORDS=set(), TfidfVectorizer=object)
+_install_stub("sklearn.metrics", silhouette_score=lambda *_args, **_kwargs: 0.0)
 
 from db.migrate import run_migrations  # noqa: E402
+from db.research_brief_receipts import record_research_brief_receipt  # noqa: E402
 import main  # noqa: E402
 
 
@@ -124,6 +131,43 @@ class TestScoreStatsCli(unittest.TestCase):
         self.assertIn("watch: count=0 avg_signal_score=0.0000", output)
         self.assertIn("noise: count=1 avg_signal_score=0.1000", output)
         self.assertIn("top_topics: agents (1), llm (1), memes (1)", output)
+
+    def test_score_stats_reports_digest_health_trend_from_receipts(self):
+        db_path = self._make_db()
+        stdout = io.StringIO()
+
+        try:
+            with sqlite3.connect(db_path) as connection:
+                record_research_brief_receipt(
+                    connection,
+                    receipt_id="rbr_health_2026_w22",
+                    week_label="2026-W22",
+                    generated_at="2026-05-29T10:00:00Z",
+                    post_counts={"total_posts": 0, "strong_count": 0, "watch_count": 0},
+                    health_flags=["empty_week_alert"],
+                )
+                record_research_brief_receipt(
+                    connection,
+                    receipt_id="rbr_health_2026_w21",
+                    week_label="2026-W21",
+                    generated_at="2026-05-22T10:00:00Z",
+                    post_counts={"total_posts": 5, "strong_count": 0, "watch_count": 0},
+                    health_flags=["low_signal_alert"],
+                )
+
+            with patch.dict(os.environ, {"AGENT_DB_PATH": db_path}, clear=False):
+                with patch.object(sys, "argv", ["main.py", "score-stats"]):
+                    with redirect_stdout(stdout):
+                        exit_code = main.main()
+        finally:
+            os.unlink(db_path)
+
+        output = stdout.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("digest_health_trend (latest receipt per week):", output)
+        self.assertIn("2026-W22: flags=empty_week_alert total_posts=0", output)
+        self.assertIn("2026-W21: flags=low_signal_alert total_posts=5", output)
+        self.assertIn("digest_health_alerts_last_2: empty=1 low_signal=1", output)
 
 
 if __name__ == "__main__":

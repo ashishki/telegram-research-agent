@@ -515,6 +515,259 @@ def run_migrations() -> Path:
             except sqlite3.OperationalError as exc:
                 if "duplicate column name" not in str(exc).lower():
                     raise
+        connection.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS channel_repeated_claims (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                claim_key TEXT NOT NULL UNIQUE,
+                normalized_claim TEXT NOT NULL CHECK(length(trim(normalized_claim)) > 0),
+                claim_type TEXT NOT NULL DEFAULT 'general',
+                status TEXT NOT NULL DEFAULT 'candidate'
+                    CHECK(status IN ('candidate', 'repeated', 'weak', 'rejected')),
+                evidence_strength TEXT NOT NULL DEFAULT 'weak'
+                    CHECK(evidence_strength IN ('weak', 'moderate', 'strong')),
+                first_seen_week TEXT,
+                last_seen_week TEXT,
+                occurrence_count INTEGER NOT NULL DEFAULT 0,
+                channel_count INTEGER NOT NULL DEFAULT 0,
+                project_name TEXT,
+                topic_label TEXT,
+                entity_labels_json TEXT NOT NULL DEFAULT '[]'
+                    CHECK(json_valid(entity_labels_json)),
+                evidence_item_ids_json TEXT NOT NULL DEFAULT '[]'
+                    CHECK(json_valid(evidence_item_ids_json)),
+                refresh_scope_json TEXT NOT NULL DEFAULT '{}'
+                    CHECK(json_valid(refresh_scope_json)),
+                extraction_version TEXT NOT NULL DEFAULT 'unversioned',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_channel_repeated_claims_project
+                ON channel_repeated_claims(project_name);
+            CREATE INDEX IF NOT EXISTS idx_channel_repeated_claims_topic
+                ON channel_repeated_claims(topic_label);
+            CREATE INDEX IF NOT EXISTS idx_channel_repeated_claims_status
+                ON channel_repeated_claims(status);
+            CREATE INDEX IF NOT EXISTS idx_channel_repeated_claims_last_seen
+                ON channel_repeated_claims(last_seen_week);
+
+            CREATE TABLE IF NOT EXISTS channel_narratives (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                narrative_key TEXT NOT NULL UNIQUE,
+                title TEXT NOT NULL CHECK(length(trim(title)) > 0),
+                summary TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'candidate'
+                    CHECK(status IN ('candidate', 'active', 'stale', 'rejected')),
+                project_name TEXT,
+                topic_label TEXT,
+                first_seen_week TEXT,
+                last_seen_week TEXT,
+                supporting_post_count INTEGER NOT NULL DEFAULT 0,
+                supporting_channel_count INTEGER NOT NULL DEFAULT 0,
+                linked_claim_count INTEGER NOT NULL DEFAULT 0,
+                evidence_item_ids_json TEXT NOT NULL DEFAULT '[]'
+                    CHECK(json_valid(evidence_item_ids_json)),
+                source_channels_json TEXT NOT NULL DEFAULT '[]'
+                    CHECK(json_valid(source_channels_json)),
+                refresh_scope_json TEXT NOT NULL DEFAULT '{}'
+                    CHECK(json_valid(refresh_scope_json)),
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_channel_narratives_project
+                ON channel_narratives(project_name);
+            CREATE INDEX IF NOT EXISTS idx_channel_narratives_topic
+                ON channel_narratives(topic_label);
+            CREATE INDEX IF NOT EXISTS idx_channel_narratives_status
+                ON channel_narratives(status);
+            CREATE INDEX IF NOT EXISTS idx_channel_narratives_last_seen
+                ON channel_narratives(last_seen_week);
+
+            CREATE TABLE IF NOT EXISTS claim_occurrences (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                claim_id INTEGER NOT NULL,
+                post_id INTEGER,
+                signal_evidence_item_id INTEGER,
+                week_label TEXT NOT NULL,
+                source_channel TEXT NOT NULL CHECK(length(trim(source_channel)) > 0),
+                message_url TEXT,
+                posted_at TEXT,
+                occurrence_text TEXT NOT NULL CHECK(length(trim(occurrence_text)) > 0),
+                extraction_reason TEXT NOT NULL DEFAULT '',
+                project_name TEXT,
+                topic_label TEXT,
+                extraction_version TEXT NOT NULL DEFAULT 'unversioned',
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(claim_id) REFERENCES channel_repeated_claims(id) ON DELETE CASCADE,
+                FOREIGN KEY(post_id) REFERENCES posts(id) ON DELETE SET NULL,
+                FOREIGN KEY(signal_evidence_item_id) REFERENCES signal_evidence_items(id) ON DELETE SET NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_claim_occurrences_claim_id
+                ON claim_occurrences(claim_id);
+            CREATE INDEX IF NOT EXISTS idx_claim_occurrences_week_label
+                ON claim_occurrences(week_label);
+            CREATE INDEX IF NOT EXISTS idx_claim_occurrences_source_channel
+                ON claim_occurrences(source_channel);
+            CREATE INDEX IF NOT EXISTS idx_claim_occurrences_project
+                ON claim_occurrences(project_name);
+
+            CREATE TABLE IF NOT EXISTS source_observations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                channel_username TEXT NOT NULL CHECK(length(trim(channel_username)) > 0),
+                week_label TEXT NOT NULL,
+                scope_key TEXT NOT NULL DEFAULT 'global',
+                window_start TEXT,
+                window_end TEXT,
+                project_name TEXT,
+                topic_label TEXT,
+                post_count INTEGER NOT NULL DEFAULT 0,
+                scored_count INTEGER NOT NULL DEFAULT 0,
+                evidence_count INTEGER NOT NULL DEFAULT 0,
+                cited_count INTEGER NOT NULL DEFAULT 0,
+                acted_on_count INTEGER NOT NULL DEFAULT 0,
+                skipped_count INTEGER NOT NULL DEFAULT 0,
+                rejected_count INTEGER NOT NULL DEFAULT 0,
+                low_signal_count INTEGER NOT NULL DEFAULT 0,
+                repeated_claim_count INTEGER NOT NULL DEFAULT 0,
+                useful_count INTEGER NOT NULL DEFAULT 0,
+                counters_json TEXT NOT NULL DEFAULT '{}'
+                    CHECK(json_valid(counters_json)),
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE(channel_username, week_label, scope_key)
+            );
+            CREATE INDEX IF NOT EXISTS idx_source_observations_channel
+                ON source_observations(channel_username);
+            CREATE INDEX IF NOT EXISTS idx_source_observations_week_label
+                ON source_observations(week_label);
+            CREATE INDEX IF NOT EXISTS idx_source_observations_project
+                ON source_observations(project_name);
+            CREATE INDEX IF NOT EXISTS idx_source_observations_topic
+                ON source_observations(topic_label);
+
+            CREATE TABLE IF NOT EXISTS intelligence_entity_links (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                entity_label TEXT NOT NULL CHECK(length(trim(entity_label)) > 0),
+                entity_type TEXT NOT NULL DEFAULT 'unknown',
+                linked_object_type TEXT NOT NULL
+                    CHECK(linked_object_type IN (
+                        'post',
+                        'evidence',
+                        'claim',
+                        'narrative',
+                        'project',
+                        'channel',
+                        'topic'
+                    )),
+                linked_object_id TEXT NOT NULL,
+                project_name TEXT,
+                topic_label TEXT,
+                source_table TEXT,
+                source_row_id INTEGER,
+                confidence REAL NOT NULL DEFAULT 0.0,
+                reason TEXT NOT NULL DEFAULT '',
+                extractor_version TEXT NOT NULL DEFAULT 'unversioned',
+                week_label TEXT,
+                created_at TEXT NOT NULL,
+                UNIQUE(entity_label, entity_type, linked_object_type, linked_object_id, extractor_version)
+            );
+            CREATE INDEX IF NOT EXISTS idx_intelligence_entity_links_entity
+                ON intelligence_entity_links(entity_label, entity_type);
+            CREATE INDEX IF NOT EXISTS idx_intelligence_entity_links_object
+                ON intelligence_entity_links(linked_object_type, linked_object_id);
+            CREATE INDEX IF NOT EXISTS idx_intelligence_entity_links_project
+                ON intelligence_entity_links(project_name);
+            CREATE INDEX IF NOT EXISTS idx_intelligence_entity_links_week
+                ON intelligence_entity_links(week_label);
+
+            CREATE TABLE IF NOT EXISTS project_intelligence_links (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_name TEXT NOT NULL CHECK(length(trim(project_name)) > 0),
+                linked_object_type TEXT NOT NULL
+                    CHECK(linked_object_type IN (
+                        'claim',
+                        'narrative',
+                        'entity',
+                        'source_observation',
+                        'rollup'
+                    )),
+                linked_object_id TEXT NOT NULL,
+                week_label TEXT,
+                relevance_score REAL NOT NULL DEFAULT 0.0,
+                match_reason TEXT NOT NULL DEFAULT '',
+                evidence_item_ids_json TEXT NOT NULL DEFAULT '[]'
+                    CHECK(json_valid(evidence_item_ids_json)),
+                active_project INTEGER NOT NULL DEFAULT 1
+                    CHECK(active_project IN (0, 1)),
+                refresh_scope_json TEXT NOT NULL DEFAULT '{}'
+                    CHECK(json_valid(refresh_scope_json)),
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE(project_name, linked_object_type, linked_object_id, week_label)
+            );
+            CREATE INDEX IF NOT EXISTS idx_project_intelligence_links_project
+                ON project_intelligence_links(project_name);
+            CREATE INDEX IF NOT EXISTS idx_project_intelligence_links_object
+                ON project_intelligence_links(linked_object_type, linked_object_id);
+            CREATE INDEX IF NOT EXISTS idx_project_intelligence_links_week
+                ON project_intelligence_links(week_label);
+
+            CREATE TABLE IF NOT EXISTS narrative_claim_links (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                narrative_id INTEGER NOT NULL,
+                claim_id INTEGER NOT NULL,
+                link_reason TEXT NOT NULL DEFAULT '',
+                shared_evidence_count INTEGER NOT NULL DEFAULT 0,
+                shared_entities_json TEXT NOT NULL DEFAULT '[]'
+                    CHECK(json_valid(shared_entities_json)),
+                confidence REAL NOT NULL DEFAULT 0.0,
+                created_at TEXT NOT NULL,
+                UNIQUE(narrative_id, claim_id),
+                FOREIGN KEY(narrative_id) REFERENCES channel_narratives(id) ON DELETE CASCADE,
+                FOREIGN KEY(claim_id) REFERENCES channel_repeated_claims(id) ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS idx_narrative_claim_links_narrative
+                ON narrative_claim_links(narrative_id);
+            CREATE INDEX IF NOT EXISTS idx_narrative_claim_links_claim
+                ON narrative_claim_links(claim_id);
+
+            CREATE TABLE IF NOT EXISTS channel_intelligence_weekly_rollups (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                week_label TEXT NOT NULL,
+                scope_key TEXT NOT NULL DEFAULT 'global',
+                project_name TEXT,
+                topic_label TEXT,
+                source_channel TEXT,
+                section_name TEXT NOT NULL DEFAULT 'default',
+                item_type TEXT NOT NULL
+                    CHECK(item_type IN (
+                        'narrative',
+                        'claim',
+                        'source_observation',
+                        'entity_link',
+                        'project_link'
+                    )),
+                item_id TEXT NOT NULL,
+                input_row_ids_json TEXT NOT NULL DEFAULT '{}'
+                    CHECK(json_valid(input_row_ids_json)),
+                summary_json TEXT NOT NULL DEFAULT '{}'
+                    CHECK(json_valid(summary_json)),
+                weak_evidence INTEGER NOT NULL DEFAULT 0
+                    CHECK(weak_evidence IN (0, 1)),
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE(week_label, scope_key, section_name, item_type, item_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_channel_intelligence_rollups_week
+                ON channel_intelligence_weekly_rollups(week_label);
+            CREATE INDEX IF NOT EXISTS idx_channel_intelligence_rollups_project
+                ON channel_intelligence_weekly_rollups(project_name);
+            CREATE INDEX IF NOT EXISTS idx_channel_intelligence_rollups_topic
+                ON channel_intelligence_weekly_rollups(topic_label);
+            CREATE INDEX IF NOT EXISTS idx_channel_intelligence_rollups_source
+                ON channel_intelligence_weekly_rollups(source_channel);
+            """
+        )
         connection.commit()
 
     LOGGER.info("Database migrations complete")

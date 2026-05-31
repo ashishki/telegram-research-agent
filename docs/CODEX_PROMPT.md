@@ -9,12 +9,13 @@ _v3.3 · 2026-05-01 · telegram-research-agent_
 - Recent shipped changes:
   - Telegram reaction sync imports source-post reactions as tags/feedback.
   - Implementation Ideas now send inline feedback cards and record decisions in `decision_journal`.
+  - Bot polling callback dispatch has an integration-style unit test around `bot.run_bot`.
   - Implementation Ideas require concrete Telegram source-post links or render an insufficient-evidence note.
   - Weekly Research Brief usefulness can be recorded through `log-usefulness` into `weekly_usefulness_logs`.
-  - Empty/low-signal digest health alerts are included in delivery notifications.
+  - Empty/low-signal digest health alerts are included in delivery notifications and trended in `score-stats` from Research Brief receipts.
   - README and active docs are aligned with the current delivery/feedback behavior.
-  - Telegram Channel Intelligence design is captured in `docs/telegram_channel_intelligence.md`; narratives, repeated claims, source trust signals, entity/topic links, and project relevance are planned but not implemented.
-  - Research Brief receipt schema and storage helpers are implemented via `research_brief_receipts`; receipt creation during generation, delivery updates, verification, and CLI inspection are still planned.
+  - Telegram Channel Intelligence design, schema migrations, deterministic repeated-claim extraction, canonical source-observation refresh, active-project intelligence links, narrative candidate refresh, inspection CLI, and optional Markdown report surface are captured in `docs/telegram_channel_intelligence.md`.
+  - Research Brief receipt schema, storage helpers, generation-time receipt creation, delivery ref updates, deterministic verification checks, CLI inspection, operator review, and optional operator-only audit notes are implemented via `research_brief_receipts`.
   - `src/config/projects.yaml` has current project context for active repos.
   - README/docs were cleaned; historical material moved under `docs/archive/`.
 - Active work is maintenance/backlog driven from `docs/tasks.md`.
@@ -43,7 +44,7 @@ _v3.3 · 2026-05-01 · telegram-research-agent_
 
 - Live validation still needed for Telegram reaction visibility through Telethon.
 - Live validation still needed for inline callback handling in the deployed bot process.
-- Low-signal weeks now produce alerts, but long-term quality trend reporting is still backlog work.
+- Low-signal weeks now produce alerts and `score-stats` reports recent empty/low-signal receipt trends.
 
 ---
 

@@ -1,13 +1,17 @@
 import json
+import re
 import sqlite3
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 
 SOURCE_PROJECT = "telegram-research-agent"
 RECEIPT_TYPE = "research_brief_receipt"
 VERIFICATION_STATUSES = {"pending", "verified", "needs_review", "failed", "waived"}
+OPERATOR_REVIEW_STATUSES = {"verified", "needs_review", "failed", "waived"}
+TELEGRAM_POST_URL_RE = re.compile(r"^https://t\.me/[A-Za-z0-9_]+/\d+$")
 
 LIST_JSON_FIELDS = {
     "included_channels": "included_channels_json",
@@ -46,6 +50,58 @@ def _require_verification_status(verification_status: str) -> str:
         allowed = ", ".join(sorted(VERIFICATION_STATUSES))
         raise ValueError(f"unsupported verification_status: {verification_status!r}; expected one of {allowed}")
     return verification_status
+
+
+def _merge_health_flags(existing: list[Any], new_flags: list[Any] | tuple[Any, ...] | None) -> list[Any]:
+    merged: list[Any] = []
+    for flag in [*existing, *(list(new_flags) if new_flags is not None else [])]:
+        if flag not in merged:
+            merged.append(flag)
+    return merged
+
+
+def _table_exists(connection: sqlite3.Connection, table_name: str) -> bool:
+    row = connection.execute(
+        """
+        SELECT 1
+        FROM sqlite_master
+        WHERE type = 'table' AND name = ?
+        LIMIT 1
+        """,
+        (table_name,),
+    ).fetchone()
+    return row is not None
+
+
+def _count_existing_ids(connection: sqlite3.Connection, table_name: str, ids: list[int]) -> int:
+    if not ids or not _table_exists(connection, table_name):
+        return 0
+    placeholders = ",".join("?" for _ in ids)
+    row = connection.execute(
+        f"SELECT COUNT(*) FROM {table_name} WHERE id IN ({placeholders})",
+        ids,
+    ).fetchone()
+    return int(row[0] if row else 0)
+
+
+def _is_existing_path(value: Any) -> bool:
+    text = str(value or "").strip()
+    if not text:
+        return False
+    return Path(text).exists()
+
+
+def _coerce_int_list(values: Any) -> tuple[list[int], int]:
+    if not isinstance(values, list):
+        return [], 0
+    coerced: list[int] = []
+    invalid_count = 0
+    for value in values:
+        try:
+            coerced.append(int(value))
+        except (TypeError, ValueError):
+            invalid_count += 1
+    return coerced, invalid_count
 
 
 def _json_list(values: list[Any] | tuple[Any, ...] | None) -> str:
@@ -236,6 +292,8 @@ def fetch_research_brief_receipts(
     week_label: str | None = None,
     digest_id: int | None = None,
     verification_status: str | None = None,
+    artifact_path: str | None = None,
+    telegraph_url: str | None = None,
     limit: int = 10,
 ) -> list[dict]:
     clauses = []
@@ -254,6 +312,12 @@ def fetch_research_brief_receipts(
     if verification_status is not None:
         clauses.append("verification_status = ?")
         params.append(_require_verification_status(verification_status))
+    if artifact_path:
+        clauses.append("(markdown_path = ? OR json_path = ? OR html_path = ?)")
+        params.extend([artifact_path, artifact_path, artifact_path])
+    if telegraph_url:
+        clauses.append("telegraph_url = ?")
+        params.append(telegraph_url)
 
     where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     cursor = connection.execute(
@@ -267,3 +331,257 @@ def fetch_research_brief_receipts(
         (*params, clean_limit),
     )
     return _cursor_rows_to_receipts(cursor)
+
+
+def update_research_brief_receipt_delivery_refs(
+    connection: sqlite3.Connection,
+    *,
+    receipt_id: str | None = None,
+    week_label: str | None = None,
+    digest_id: int | None = None,
+    telegraph_url: str | None = None,
+    telegram_delivery_timestamp: str | None = None,
+    telegram_message_id: int | None = None,
+    fallback_delivery: str | None = None,
+    fallback_delivery_used: bool | None = None,
+    health_flags: list[Any] | tuple[Any, ...] | None = None,
+) -> dict | None:
+    if not any([receipt_id, week_label, digest_id is not None]):
+        raise ValueError("receipt_id, week_label, or digest_id is required")
+
+    rows = fetch_research_brief_receipts(
+        connection,
+        receipt_id=receipt_id,
+        week_label=week_label,
+        digest_id=digest_id,
+        limit=1,
+    )
+    if not rows:
+        return None
+
+    receipt = rows[0]
+    fields: list[str] = ["updated_at = ?"]
+    params: list[Any] = [_now_iso()]
+
+    if telegraph_url is not None:
+        fields.append("telegraph_url = ?")
+        params.append(_clean_text(telegraph_url))
+    if telegram_delivery_timestamp is not None:
+        fields.append("telegram_delivery_timestamp = ?")
+        params.append(_clean_text(telegram_delivery_timestamp))
+    if telegram_message_id is not None:
+        fields.append("telegram_message_id = ?")
+        params.append(telegram_message_id)
+    if fallback_delivery is not None:
+        fields.append("fallback_delivery = ?")
+        params.append(_clean_text(fallback_delivery))
+    if fallback_delivery_used is not None:
+        fields.append("fallback_delivery_used = ?")
+        params.append(1 if fallback_delivery_used else 0)
+    if health_flags is not None:
+        fields.append("health_flags_json = ?")
+        params.append(_json_list(_merge_health_flags(receipt["health_flags"], health_flags)))
+
+    params.append(receipt["id"])
+    connection.execute(
+        f"""
+        UPDATE research_brief_receipts
+        SET {', '.join(fields)}
+        WHERE id = ?
+        """,
+        params,
+    )
+    connection.commit()
+
+    updated = fetch_research_brief_receipts(connection, receipt_id=receipt["receipt_id"], limit=1)
+    return updated[0] if updated else None
+
+
+def verify_research_brief_receipt(
+    connection: sqlite3.Connection,
+    *,
+    receipt_id: str | None = None,
+    week_label: str | None = None,
+    digest_id: int | None = None,
+) -> dict | None:
+    if not any([receipt_id, week_label, digest_id is not None]):
+        raise ValueError("receipt_id, week_label, or digest_id is required")
+
+    rows = fetch_research_brief_receipts(
+        connection,
+        receipt_id=receipt_id,
+        week_label=week_label,
+        digest_id=digest_id,
+        limit=1,
+    )
+    if not rows:
+        return None
+
+    receipt = rows[0]
+    failures: list[str] = []
+    review: list[str] = []
+
+    if receipt.get("type") != RECEIPT_TYPE:
+        failures.append("receipt type is not research_brief_receipt")
+    if not receipt.get("week_label"):
+        failures.append("week_label is missing")
+    if not receipt.get("window_start") or not receipt.get("window_end"):
+        failures.append("evidence window is incomplete")
+    if receipt.get("digest_id") is None:
+        failures.append("digest_id is missing")
+    elif _count_existing_ids(connection, "digests", [int(receipt["digest_id"])]) != 1:
+        failures.append("digest_id does not resolve")
+
+    source_set = receipt.get("source_set") or {}
+    source_links = [
+        str(url).strip()
+        for url in source_set.get("telegram_source_links", [])
+        if str(url).strip()
+    ]
+    invalid_links = [url for url in source_links if not TELEGRAM_POST_URL_RE.match(url)]
+    if invalid_links:
+        failures.append(f"invalid Telegram source links: {len(invalid_links)}")
+    if source_set.get("source_post_ids") and not source_links:
+        review.append("source_post_ids are present but telegram_source_links are missing")
+
+    evidence_ids, invalid_evidence_id_count = _coerce_int_list(source_set.get("source_evidence_item_ids", []))
+    if invalid_evidence_id_count:
+        failures.append("one or more source_evidence_item_ids are invalid")
+    if evidence_ids:
+        existing_evidence_count = _count_existing_ids(connection, "signal_evidence_items", evidence_ids)
+        if existing_evidence_count != len(set(evidence_ids)):
+            failures.append("one or more source_evidence_item_ids do not resolve")
+
+    markdown_path = receipt.get("markdown_path")
+    json_path = receipt.get("json_path")
+    html_path = receipt.get("html_path")
+    if not _is_existing_path(markdown_path):
+        failures.append("markdown artifact is missing")
+    total_posts = int((receipt.get("post_counts") or {}).get("total_posts") or 0)
+    if total_posts > 0 and not _is_existing_path(json_path):
+        failures.append("json artifact is missing")
+    if not receipt.get("telegraph_url") and not receipt.get("fallback_delivery_used"):
+        review.append("delivery route is missing telegraph_url or fallback_delivery")
+    if receipt.get("fallback_delivery_used") and not receipt.get("fallback_delivery"):
+        failures.append("fallback delivery is flagged but fallback_delivery is missing")
+    if receipt.get("fallback_delivery_used") and not _is_existing_path(html_path) and receipt.get("fallback_delivery") != "text":
+        failures.append("fallback artifact is missing")
+
+    config_fingerprints = receipt.get("config_fingerprints") or {}
+    for key in ("scoring_config", "profile_config", "projects_config", "channels_config", "prompt_template"):
+        value = config_fingerprints.get(key)
+        if not isinstance(value, dict) or not (value.get("sha256") or value.get("status") == "missing"):
+            review.append(f"{key} fingerprint is missing")
+
+    llm_model = receipt.get("llm_model")
+    llm_usage_ids = source_set.get("llm_usage_ids") or config_fingerprints.get("llm_usage_ids") or []
+    if llm_model and not llm_usage_ids:
+        review.append("llm_usage_ids are missing for model-generated brief")
+    if llm_usage_ids:
+        usage_ids, invalid_usage_id_count = _coerce_int_list(llm_usage_ids)
+        if invalid_usage_id_count:
+            failures.append("one or more llm_usage_ids are invalid")
+        existing_usage_count = _count_existing_ids(connection, "llm_usage", usage_ids)
+        if existing_usage_count != len(set(usage_ids)):
+            failures.append("one or more llm_usage_ids do not resolve")
+
+    health_flags = receipt.get("health_flags") or []
+    strong_count = int((receipt.get("post_counts") or {}).get("strong_count") or 0)
+    watch_count = int((receipt.get("post_counts") or {}).get("watch_count") or 0)
+    if total_posts <= 0 and "empty_week_alert" not in health_flags:
+        review.append("empty week is missing empty_week_alert")
+    if total_posts > 0 and strong_count + watch_count <= 0 and "low_signal_alert" not in health_flags:
+        review.append("low-signal week is missing low_signal_alert")
+    if source_set.get("broad_fallback_used") and not source_set.get("broad_fallback_reason"):
+        review.append("broad fallback usage lacks broad_fallback_reason")
+
+    if failures:
+        status = "failed"
+        notes = failures + review
+    elif review:
+        status = "needs_review"
+        notes = review
+    else:
+        status = "verified"
+        notes = ["deterministic checks passed"]
+
+    connection.execute(
+        """
+        UPDATE research_brief_receipts
+        SET verification_status = ?,
+            verifier_method = ?,
+            verifier_notes = ?,
+            checked_at = ?,
+            checked_by = ?,
+            updated_at = ?
+        WHERE id = ?
+        """,
+        (
+            status,
+            "deterministic_checks",
+            "; ".join(notes),
+            _now_iso(),
+            "system",
+            _now_iso(),
+            receipt["id"],
+        ),
+    )
+    connection.commit()
+
+    updated = fetch_research_brief_receipts(connection, receipt_id=receipt["receipt_id"], limit=1)
+    return updated[0] if updated else None
+
+
+def review_research_brief_receipt(
+    connection: sqlite3.Connection,
+    *,
+    verification_status: str,
+    verifier_notes: str | None = None,
+    checked_by: str = "operator",
+    receipt_id: str | None = None,
+    week_label: str | None = None,
+    digest_id: int | None = None,
+) -> dict | None:
+    if verification_status not in OPERATOR_REVIEW_STATUSES:
+        allowed = ", ".join(sorted(OPERATOR_REVIEW_STATUSES))
+        raise ValueError(f"unsupported operator verification_status: {verification_status!r}; expected one of {allowed}")
+    if not any([receipt_id, week_label, digest_id is not None]):
+        raise ValueError("receipt_id, week_label, or digest_id is required")
+
+    rows = fetch_research_brief_receipts(
+        connection,
+        receipt_id=receipt_id,
+        week_label=week_label,
+        digest_id=digest_id,
+        limit=1,
+    )
+    if not rows:
+        return None
+
+    receipt = rows[0]
+    timestamp = _now_iso()
+    connection.execute(
+        """
+        UPDATE research_brief_receipts
+        SET verification_status = ?,
+            verifier_method = ?,
+            verifier_notes = ?,
+            checked_at = ?,
+            checked_by = ?,
+            updated_at = ?
+        WHERE id = ?
+        """,
+        (
+            verification_status,
+            "operator_review",
+            _clean_text(verifier_notes),
+            timestamp,
+            _clean_text(checked_by) or "operator",
+            timestamp,
+            receipt["id"],
+        ),
+    )
+    connection.commit()
+
+    updated = fetch_research_brief_receipts(connection, receipt_id=receipt["receipt_id"], limit=1)
+    return updated[0] if updated else None

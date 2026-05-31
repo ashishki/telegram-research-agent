@@ -107,12 +107,20 @@ This table is not yet used to auto-rank channels or rewrite future reports.
 
 ## Planned Design: Telegram Channel Intelligence
 
-`docs/telegram_channel_intelligence.md` defines a planned, not implemented,
-Channel Intelligence layer for narratives, repeated claims, source trust
-signals, entity/topic links, and project relevance. The design keeps SQLite as
-the source of truth, treats narratives/claims/source observations as derived and
-refreshable state, and requires project/topic/time/source-scoped retrieval with
-visible evidence rows before any report prose can use the layer.
+`docs/telegram_channel_intelligence.md` defines the Channel Intelligence layer
+for narratives, repeated claims, source trust signals, entity/topic links, and
+project relevance. The design-reviewed SQLite schema and deterministic
+repeated-claim extraction over scoped evidence now exist, source observations
+can be refreshed from canonical post/evidence/feedback/decision counters
+without model-authored source labels, and lightweight intelligence links are
+limited to active curated projects. Narrative candidates are derived from
+repeated claims with explicit evidence IDs and reject over-aggregated groups
+instead of surfacing them as active storylines. Inspection CLI and optional
+Markdown report rendering exist for operator review. The design keeps SQLite as
+the source of truth, treats
+narratives/claims/source observations as derived and refreshable state, and
+requires project/topic/time/source-scoped retrieval with visible evidence rows
+before any report prose can use the layer.
 
 This planned layer must not become a second generic memory engine. It extends
 the existing evidence-first architecture by adding bounded derived tables and
@@ -121,14 +129,15 @@ inspection surfaces around Telegram channel behavior.
 ## Research Brief Receipts
 
 `docs/research_brief_receipt.md` defines the Research Brief receipt contract.
-The canonical SQLite table and storage helpers now exist for receipt rows that
-store evidence window, source set, model/config fingerprints, generated
-artifact refs, delivery refs, health flags, and verification status.
+The canonical SQLite table, storage helpers, and generation-time creation now
+exist for receipt rows that store evidence window, source set, model/config
+fingerprints, generated artifact refs, delivery refs, health flags, and
+verification status.
 
-Runtime receipt creation is not yet integrated with weekly generation or
-delivery. Generation-time snapshots should not be silently recomputed once
-recorded; delivery and verification fields may be updated only as future
-lifecycle steps complete.
+Deterministic verification can mark receipts `verified`, `needs_review`, or
+`failed` with verifier notes. Generation-time snapshots should not be silently
+recomputed once recorded; delivery and verification fields may be updated only
+as lifecycle steps complete.
 
 ---
 

@@ -48,6 +48,7 @@ It is not a public bot, SaaS product, or generic summarizer.
   - `🕒 позже`
   - `⛔ отказал`
   - `🧠 интересно`
+- Implementation Ideas cards are compact enough to decide from Telegram without opening Telegraph for every item.
 - Source-disciplined `Implementation Ideas`: actionable `[Implement]` and `[Build]` ideas require concrete Telegram message links and otherwise render an insufficient-evidence note.
 - Operator-authored Research Brief usefulness capture into `weekly_usefulness_logs`.
 - Scope-first memory:
@@ -60,6 +61,8 @@ It is not a public bot, SaaS product, or generic summarizer.
 - Cost, score, health, triage, and memory inspection commands.
 - Health-check counters for project matches, links, scoped evidence, and zero-signal snapshots.
 - Empty/low-signal weekly alerts so pipeline failures do not look like normal empty digests.
+- `score-stats` includes recent Research Brief receipt health trends for empty and low-signal weeks.
+- `health-check` warns when `src/config/projects.yaml` needs monthly review.
 - Weekly MVP Radar bridge: Telegram exports opportunity seeds, Radar collects configured demand sources, Opus-class synthesis writes a separate MVP-of-week report, and the bot delivers it as a Telegraph article plus a copyable Markdown document.
 
 ## Main Commands
@@ -79,7 +82,11 @@ python3 src/main.py memory inspect-evidence --project gdev-agent --limit 10
 python3 src/main.py memory inspect-decisions --scope insight --limit 10
 python3 src/main.py memory inspect-snapshots --stale-only
 python3 src/main.py memory inspect-suppression --title "TITLE"
+python3 src/main.py memory inspect-receipts --week 2026-W22
+python3 src/main.py memory review-receipt --receipt-id rbr_... --status waived --notes "Accepted after manual read"
 python3 src/main.py memory diagnose-project-signals --week 2026-W20
+python3 src/main.py memory inspect-channel-intelligence --week 2026-W22 --project telegram-research-agent
+python3 src/main.py channel-intelligence-report --week 2026-W22 --project telegram-research-agent
 ```
 
 ## Configuration
@@ -119,8 +126,8 @@ Start here:
 - [docs/spec.md](docs/spec.md) — implementation-facing system specification
 - [docs/report_format.md](docs/report_format.md) — weekly artifact contract
 - [docs/mvp_weekly_radar.md](docs/mvp_weekly_radar.md) — MVP of the Week Radar bridge and credentials
-- [docs/research_brief_receipt.md](docs/research_brief_receipt.md) — Research Brief receipt audit contract with implemented SQLite schema/storage helpers; generation, delivery updates, verification, and CLI inspection remain planned
-- [docs/telegram_channel_intelligence.md](docs/telegram_channel_intelligence.md) — planned Channel Intelligence design
+- [docs/research_brief_receipt.md](docs/research_brief_receipt.md) — Research Brief receipt audit contract with implemented SQLite schema/storage helpers, generation-time receipt creation, delivery ref updates, deterministic verification checks, CLI inspection, operator review, and optional operator-only audit notes
+- [docs/telegram_channel_intelligence.md](docs/telegram_channel_intelligence.md) — Channel Intelligence design, implemented schema migrations, deterministic repeated-claim extraction, source-observation refresh, active-project links, narrative candidates, inspection CLI, and optional Markdown report surface
 - [docs/memory_architecture.md](docs/memory_architecture.md) — memory model
 - [docs/memory_inspection.md](docs/memory_inspection.md) — memory debugging commands
 
@@ -128,4 +135,4 @@ Historical material lives under [docs/archive/](docs/archive/README.md).
 
 ## Development State
 
-The main product architecture is implemented, and Channel Intelligence design is captured. Current work is maintenance and quality improvement: follow-up Channel Intelligence implementation tasks, research-brief receipts, production validation, quality trends, and operator-experience refinements.
+The main product architecture is implemented, Research Brief receipts are auditable, and Channel Intelligence schema plus claim/source/link/narrative refresh, inspection, and optional reporting groundwork is in place. Current work is maintenance and quality improvement: production validation, quality trends, and operator-experience refinements.

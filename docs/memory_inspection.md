@@ -2,10 +2,12 @@
 
 ## Overview
 
-The `memory` CLI subcommand group provides scope-first inspection of the four unified memory
-surfaces: signal evidence items, decision journal, project snapshots, and insight suppression.
-Use these commands to debug weekly outputs, investigate why an idea was suppressed, or check
-whether evidence is being populated correctly.
+The `memory` CLI subcommand group provides scope-first inspection of unified
+memory and audit surfaces: signal evidence items, decision journal, project
+snapshots, insight suppression, Research Brief receipts, and Channel
+Intelligence derived rows. Use these commands to debug weekly outputs,
+investigate why an idea was suppressed, or check whether evidence, receipt audit
+metadata, and intelligence refresh rows are being populated correctly.
 
 All commands require `AGENT_DB_PATH` to point to the agent database. Migrations are run
 automatically on each invocation.
@@ -183,6 +185,125 @@ Use this when `project_context_snapshots.linked_signal_count` is zero across pro
 keyword vocabulary problems from pipeline problems: no keyword overlap, excluded keywords, matching
 posts without links, or already-linked topics. The command follows the curated project registry in
 `src/config/projects.yaml`, so stale GitHub-synced rows do not dominate the output.
+
+---
+
+### inspect-receipts
+
+Inspect Research Brief receipt audit metadata by week, receipt ID, digest ID,
+artifact path, Telegraph URL, or verification status.
+
+```
+python -m src.main memory inspect-receipts [--week LABEL] [--receipt-id ID] [--digest-id ID] [--artifact-path PATH] [--telegraph-url URL] [--status STATUS] [--limit N]
+```
+
+**Flags**
+
+| Flag | Default | Description |
+|---|---|---|
+| `--week` | all weeks | Filter by exact ISO week label |
+| `--receipt-id` | all receipts | Filter by stable receipt ID |
+| `--digest-id` | all digests | Filter by linked `digests.id` |
+| `--artifact-path` | all artifacts | Match Markdown, JSON, or HTML artifact path |
+| `--telegraph-url` | all URLs | Filter by delivered Telegraph URL |
+| `--status` | all statuses | Filter by `pending`, `verified`, `needs_review`, `failed`, or `waived` |
+| `--limit` | 10 | Maximum receipts to return |
+
+**Output fields per receipt**
+
+```
+Receipt <receipt_id>
+  source_of_truth: research_brief_receipts row id=<id> plus linked digests/signal_evidence_items/llm_usage/artifacts
+  refresh_rule: created once after generation; delivery and verification fields update as lifecycle steps complete
+  retrieval_path: receipt_id, week_label, digest_id, artifact path, or Telegraph URL
+  debug_surface: identity, evidence window, source set, model/config fingerprints, artifacts, delivery refs, verification, health flags
+```
+
+**Common use cases**
+
+```bash
+# Inspect the receipt for a weekly brief
+python -m src.main memory inspect-receipts --week 2026-W22
+
+# Find the audit record behind a delivered Telegraph article
+python -m src.main memory inspect-receipts --telegraph-url https://telegra.ph/brief
+
+# List receipts needing deterministic or operator follow-up
+python -m src.main memory inspect-receipts --status needs_review
+```
+
+---
+
+### review-receipt
+
+Record an operator review status for a Research Brief receipt. This updates
+verification fields only; it does not change reader-facing reports.
+
+```
+python -m src.main memory review-receipt (--receipt-id ID | --week LABEL | --digest-id ID) --status STATUS [--notes TEXT] [--checked-by NAME]
+```
+
+**Flags**
+
+| Flag | Default | Description |
+|---|---|---|
+| `--receipt-id` | optional | Review a specific receipt ID |
+| `--week` | optional | Review the latest receipt for a week |
+| `--digest-id` | optional | Review the receipt linked to a digest row |
+| `--status` | required | One of `verified`, `waived`, `needs_review`, or `failed` |
+| `--notes` | none | Operator note explaining the review decision |
+| `--checked-by` | `operator` | Local actor label to store in `checked_by` |
+
+**Common use cases**
+
+```bash
+# Accept a receipt after manual review
+python -m src.main memory review-receipt --receipt-id rbr_... --status verified --notes "Source links checked"
+
+# Waive a known issue for the week
+python -m src.main memory review-receipt --week 2026-W22 --status waived --notes "Telegraph outage; HTML fallback delivered"
+```
+
+---
+
+### inspect-channel-intelligence
+
+Inspect derived Channel Intelligence rows: repeated claims, narratives, source
+observations, entity links, and project links.
+
+```
+python -m src.main memory inspect-channel-intelligence [--kind KIND] [--week LABEL] [--project NAME] [--topic LABEL] [--channel NAME] [--status STATUS] [--limit N]
+```
+
+**Flags**
+
+| Flag | Default | Description |
+|---|---|---|
+| `--kind` | `all` | One of `all`, `claims`, `narratives`, `sources`, `entity-links`, `project-links` |
+| `--week` | all weeks | Filter by ISO week label |
+| `--project` | all projects | Filter by active project scope |
+| `--topic` | all topics | Filter by topic label |
+| `--channel` | all channels | Filter claims by occurrence source and source observations by channel |
+| `--status` | all statuses | Filter claim or narrative status |
+| `--limit` | 10 | Maximum rows per section |
+
+The command prints source-of-truth, refresh-rule, retrieval-path, and
+debug-surface metadata before scoped row details. Row details include claim and
+narrative evidence IDs, source observation counters, entity link provenance,
+project link match reasons, `refresh_scope_json`, and `counters_json`.
+
+**Common use cases**
+
+```bash
+# Inspect all Channel Intelligence rows for a project/week
+python -m src.main memory inspect-channel-intelligence --week 2026-W22 --project telegram-research-agent
+
+# Inspect source counters for a specific channel
+python -m src.main memory inspect-channel-intelligence --kind sources --channel source_a
+
+# Inspect rejected narrative candidates
+python -m src.main memory inspect-channel-intelligence --kind narratives --status rejected
+```
 
 ---
 

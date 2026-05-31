@@ -169,7 +169,7 @@ The study plan now has a weekly completion loop:
 2. You complete the plan and mark it with `/study_done`
 3. Completed study history is fed into future study plans and recommendations
 
-Implementation Ideas are also sent as short Telegram feedback cards after the Telegraph link.
+Implementation Ideas are also sent as compact Telegram feedback cards after the Telegraph link.
 Use the inline buttons to record the decision without typing commands:
 - `✅ сделал` -> `acted_on`
 - `🕒 позже` -> `deferred`
@@ -182,7 +182,7 @@ Use the inline buttons to record the decision without typing commands:
 
 Once a month, review:
 
-1. **Scoring distribution trends** — is strong bucket growing? Check `quality_metrics` table or `score-stats`.
+1. **Scoring distribution trends** — is strong bucket growing? Check `quality_metrics` table or `score-stats`; `score-stats` also shows recent empty/low-signal Research Brief receipt alerts.
    - If strong > 15% of total: raise `strong.min_score` in `scoring.yaml` (currently 0.75)
    - If strong is consistently 0–1 items: lower threshold or expand boost topics
 
@@ -194,7 +194,7 @@ Once a month, review:
    - Stale interests produce phantom relevance
    - Remove topics you no longer care about
 
-4. **Projects.yaml** — add new active projects, archive completed ones
+4. **Projects.yaml** — add new active projects, archive completed ones; `health-check` warns when `projects.yaml` has not changed in over 31 days
    - Dead projects generate false positives in Project Relevance section
 
 5. **Implementation Ideas quality** — review whether weekly ideas are operationally useful or drifting into speculative abstractions

@@ -5,9 +5,14 @@ import sqlite3
 import time
 from dataclasses import asdict
 from datetime import timezone, date, datetime, timedelta
+from hashlib import sha256
 from pathlib import Path
 
 from config.settings import PROJECT_ROOT, Settings
+from db.research_brief_receipts import (
+    record_research_brief_receipt,
+    update_research_brief_receipt_delivery_refs,
+)
 from llm.client import complete
 from llm.router import route
 from output import generate_recommendations as recommendations_module
@@ -52,6 +57,13 @@ MAX_WATCH = 3
 MAX_CULTURAL = 1
 MAX_OUTPUT_WORDS = 600
 LOW_SIGNAL_MIN_ACTIONABLE = 1
+CONFIG_FINGERPRINT_PATHS = {
+    "scoring_config": PROJECT_ROOT / "src" / "config" / "scoring.yaml",
+    "profile_config": PROJECT_ROOT / "src" / "config" / "profile.yaml",
+    "projects_config": PROJECT_ROOT / "src" / "config" / "projects.yaml",
+    "channels_config": PROJECT_ROOT / "src" / "config" / "channels.yaml",
+    "prompt_template": PROMPT_PATH,
+}
 
 
 def _utc_now() -> datetime:
@@ -152,6 +164,23 @@ def _build_review_notification(week_label: str, strong_count: int, watch_count: 
     )[:300]
 
 
+def _build_receipt_audit_note(receipt: dict | None) -> str | None:
+    if not receipt:
+        return None
+    status = str(receipt.get("verification_status") or "pending")
+    flags = [str(flag) for flag in receipt.get("health_flags", []) if str(flag).strip()]
+    fallback_used = bool(receipt.get("fallback_delivery_used"))
+    if status == "pending" and not flags and not fallback_used:
+        return None
+
+    parts = [f"Receipt: {status}"]
+    if flags:
+        parts.append(f"flags={', '.join(flags[:4])}")
+    if fallback_used:
+        parts.append(f"fallback={receipt.get('fallback_delivery') or 'yes'}")
+    return " | ".join(parts)[:220]
+
+
 def _build_digest_health_alert(
     week_label: str,
     *,
@@ -175,6 +204,54 @@ def _build_digest_health_alert(
             f"Topics: {topic_count}. Check scoring thresholds, reaction feedback, and channel quality."
         )[:300]
     return None
+
+
+def _path_fingerprint(path: Path) -> dict[str, str]:
+    try:
+        content = path.read_bytes()
+    except OSError:
+        return {"path": str(path.relative_to(PROJECT_ROOT)), "status": "missing"}
+    return {
+        "path": str(path.relative_to(PROJECT_ROOT)),
+        "sha256": sha256(content).hexdigest(),
+    }
+
+
+def _build_config_fingerprints() -> dict[str, dict[str, str]]:
+    return {
+        name: _path_fingerprint(path)
+        for name, path in CONFIG_FINGERPRINT_PATHS.items()
+    }
+
+
+def _source_version() -> str | None:
+    for env_name in ("GIT_COMMIT", "SOURCE_VERSION", "RENDER_GIT_COMMIT"):
+        value = os.environ.get(env_name, "").strip()
+        if value:
+            return value
+    return None
+
+
+def _parse_json_list_text(value: str | None) -> list:
+    if not value:
+        return []
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        return []
+    return parsed if isinstance(parsed, list) else []
+
+
+def _generation_params_fingerprint() -> str:
+    params = {
+        "max_strong": MAX_STRONG,
+        "max_watch": MAX_WATCH,
+        "max_cultural": MAX_CULTURAL,
+        "max_output_words": MAX_OUTPUT_WORDS,
+        "low_signal_min_actionable": LOW_SIGNAL_MIN_ACTIONABLE,
+    }
+    encoded = json.dumps(params, sort_keys=True).encode("utf-8")
+    return sha256(encoded).hexdigest()
 
 
 def _load_delivery_state(connection: sqlite3.Connection, week_label: str) -> dict[str, str]:
@@ -220,6 +297,36 @@ def _mark_delivery_state(
     )
 
 
+def _mark_receipt_delivery_state(
+    connection: sqlite3.Connection,
+    *,
+    week_label: str,
+    digest_id: int | None = None,
+    telegraph_url: str | None = None,
+    telegram_delivery_timestamp: str | None = None,
+    telegram_message_id: int | None = None,
+    fallback_delivery: str | None = None,
+    fallback_delivery_used: bool | None = None,
+    health_flags: list[str] | None = None,
+) -> None:
+    try:
+        updated = update_research_brief_receipt_delivery_refs(
+            connection,
+            week_label=week_label if digest_id is None else None,
+            digest_id=digest_id,
+            telegraph_url=telegraph_url,
+            telegram_delivery_timestamp=telegram_delivery_timestamp,
+            telegram_message_id=telegram_message_id,
+            fallback_delivery=fallback_delivery,
+            fallback_delivery_used=fallback_delivery_used,
+            health_flags=health_flags,
+        )
+        if updated is None:
+            LOGGER.info("Research brief receipt delivery update skipped week=%s; no receipt found", week_label)
+    except Exception:
+        LOGGER.warning("Failed to update research brief receipt delivery refs week=%s", week_label, exc_info=True)
+
+
 def _send_weekly_review_to_telegram_owner(
     connection: sqlite3.Connection,
     content_md: str,
@@ -227,8 +334,10 @@ def _send_weekly_review_to_telegram_owner(
     strong_count: int,
     watch_count: int,
     html_path: Path | None,
+    digest_id: int | None = None,
     force_delivery: bool = False,
     health_alert: str | None = None,
+    receipt_audit_note: str | None = None,
 ) -> None:
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
     chat_id = os.environ.get("TELEGRAM_OWNER_CHAT_ID", "").strip()
@@ -237,21 +346,40 @@ def _send_weekly_review_to_telegram_owner(
 
     delivery_state = _load_delivery_state(connection, week_label)
     if delivery_state["telegram_sent_at"] and not force_delivery:
+        _mark_receipt_delivery_state(
+            connection,
+            week_label=week_label,
+            digest_id=digest_id,
+            telegraph_url=delivery_state["telegraph_url"] or None,
+            telegram_delivery_timestamp=delivery_state["telegram_sent_at"] or None,
+        )
         LOGGER.info("Weekly review delivery skipped week=%s because it was already sent", week_label)
         return
 
     notification = _build_review_notification(week_label, strong_count, watch_count)
     if health_alert:
         notification = f"{health_alert}\n\n{notification}"[:700]
+    if receipt_audit_note:
+        notification = f"{notification}\n{receipt_audit_note}"[:900]
 
     # Try Telegraph first
     if html_path is not None:
         try:
             html_content = html_path.read_text(encoding="utf-8")
             url = publish_article(title=f"Research Brief {week_label}", html_content=html_content)
-            send_text(chat_id=chat_id, text=f"{notification}\n{url}", token=token, parse_mode=None)
+            message_id = send_text(chat_id=chat_id, text=f"{notification}\n{url}", token=token, parse_mode=None)
             _send_copyable_digest_document(chat_id, week_label, content_md, token)
-            _mark_delivery_state(connection, week_label, telegraph_url=url, telegram_sent_at=_utc_now_iso())
+            sent_at = _utc_now_iso()
+            _mark_delivery_state(connection, week_label, telegraph_url=url, telegram_sent_at=sent_at)
+            _mark_receipt_delivery_state(
+                connection,
+                week_label=week_label,
+                digest_id=digest_id,
+                telegraph_url=url,
+                telegram_delivery_timestamp=sent_at,
+                telegram_message_id=message_id,
+                fallback_delivery_used=False,
+            )
             connection.commit()
             LOGGER.info("Weekly review published to Telegraph week=%s url=%s", week_label, url)
             return
@@ -262,9 +390,24 @@ def _send_weekly_review_to_telegram_owner(
                 exc_info=True,
             )
 
-    send_text(chat_id=chat_id, text=notification, token=token, parse_mode=None)
+    message_id = send_text(chat_id=chat_id, text=notification, token=token, parse_mode=None)
     _send_copyable_digest_document(chat_id, week_label, content_md, token)
-    _mark_delivery_state(connection, week_label, telegram_sent_at=_utc_now_iso())
+    sent_at = _utc_now_iso()
+    _mark_delivery_state(connection, week_label, telegram_sent_at=sent_at)
+    fallback_route = "html_attachment" if html_path is not None else "text"
+    fallback_flags = ["fallback_delivery"]
+    if html_path is None:
+        fallback_flags.append("artifact_missing")
+    _mark_receipt_delivery_state(
+        connection,
+        week_label=week_label,
+        digest_id=digest_id,
+        telegram_delivery_timestamp=sent_at,
+        telegram_message_id=message_id,
+        fallback_delivery=fallback_route,
+        fallback_delivery_used=True,
+        health_flags=fallback_flags,
+    )
     connection.commit()
 
     if html_path is None:
@@ -281,6 +424,14 @@ def _send_weekly_review_to_telegram_owner(
     except Exception:
         LOGGER.warning("Failed to send HTML review week=%s; falling back to text send", week_label, exc_info=True)
         send_text(chat_id=chat_id, text=content_md, token=token, parse_mode=None)
+        _mark_receipt_delivery_state(
+            connection,
+            week_label=week_label,
+            digest_id=digest_id,
+            fallback_delivery="text_after_html_failure",
+            fallback_delivery_used=True,
+            health_flags=["fallback_delivery"],
+        )
 
 
 def _append_github_section(content_md: str, settings: Settings) -> str:
@@ -383,6 +534,7 @@ def _fetch_scored_posts(connection: sqlite3.Connection, cutoff_iso: str) -> dict
         project_matches = (row["project_matches"] or "").strip()
         if project_matches and project_matches not in {"[]", "null"}:
             project_match_count += 1
+        project_match_list = _parse_json_list_text(project_matches)
         entry = {
             "id": post_id,
             "channel_username": row["channel_username"],
@@ -395,6 +547,7 @@ def _fetch_scored_posts(connection: sqlite3.Connection, cutoff_iso: str) -> dict
             "bucket": bucket,
             "routed_model": row["routed_model"] or "",
             "score_breakdown": row["score_breakdown"] or "",
+            "project_matches": project_match_list,
             "posted_at": row["posted_at"],
         }
         buckets[bucket].append(entry)
@@ -416,6 +569,7 @@ def _fetch_scored_posts(connection: sqlite3.Connection, cutoff_iso: str) -> dict
         **buckets,
         "all_post_count": len(seen),
         "channel_count": len({row["channel_username"] for row in seen.values()}),
+        "included_channels": sorted({str(row["channel_username"]) for row in seen.values() if row["channel_username"]}),
         "topic_counts": topic_counts,
         "topic_by_post": topic_by_post,
         "bucket_counts": bucket_counts,
@@ -458,6 +612,174 @@ def _build_scored_posts_for_prompt(buckets: dict) -> list[dict]:
                 "signal_score": p["signal_score"],
             })
     return posts
+
+
+def _iter_receipt_source_posts(buckets: dict) -> list[dict]:
+    full_buckets = buckets.get("full_buckets", {})
+    posts: list[dict] = []
+    seen_ids: set[int] = set()
+    for bucket_name in ("strong", "watch", "cultural", "noise"):
+        for post in full_buckets.get(bucket_name, buckets.get(bucket_name, [])):
+            post_id = int(post.get("id") or 0)
+            if post_id <= 0 or post_id in seen_ids:
+                continue
+            seen_ids.add(post_id)
+            posts.append(post)
+    return posts
+
+
+def _fetch_receipt_evidence_item_ids(
+    connection: sqlite3.Connection,
+    *,
+    week_label: str,
+    post_ids: list[int],
+) -> list[int]:
+    if not post_ids:
+        return []
+    placeholders = ",".join("?" for _ in post_ids)
+    try:
+        rows = connection.execute(
+            f"""
+            SELECT id
+            FROM signal_evidence_items
+            WHERE week_label = ?
+              AND post_id IN ({placeholders})
+            ORDER BY id
+            """,
+            (week_label, *post_ids),
+        ).fetchall()
+    except sqlite3.OperationalError:
+        return []
+    return [int(row["id"] if isinstance(row, sqlite3.Row) else row[0]) for row in rows]
+
+
+def _build_receipt_source_set(
+    connection: sqlite3.Connection,
+    *,
+    week_label: str,
+    source_posts: list[dict],
+) -> dict:
+    post_ids = [int(post.get("id") or 0) for post in source_posts if int(post.get("id") or 0) > 0]
+    source_links = sorted({
+        str(post.get("message_url") or "").strip()
+        for post in source_posts
+        if str(post.get("message_url") or "").strip()
+    })
+    channels = sorted({
+        str(post.get("channel_username") or "").strip()
+        for post in source_posts
+        if str(post.get("channel_username") or "").strip()
+    })
+    return {
+        "channels": channels,
+        "telegram_source_links": source_links,
+        "source_evidence_item_ids": _fetch_receipt_evidence_item_ids(
+            connection,
+            week_label=week_label,
+            post_ids=post_ids,
+        ),
+        "source_post_ids": sorted(set(post_ids)),
+        "broad_fallback_used": False,
+    }
+
+
+def _build_receipt_health_flags(
+    *,
+    post_count: int,
+    strong_count: int,
+    watch_count: int,
+    markdown_path: Path | None,
+    json_path: Path | None,
+    html_path: Path | None,
+) -> list[str]:
+    flags: list[str] = []
+    if post_count <= 0:
+        flags.append("empty_week_alert")
+    elif strong_count + watch_count < LOW_SIGNAL_MIN_ACTIONABLE:
+        flags.append("low_signal_alert")
+
+    expected_paths = [markdown_path, html_path]
+    if post_count > 0:
+        expected_paths.append(json_path)
+    if any(path is None for path in expected_paths):
+        flags.append("artifact_missing")
+    return flags
+
+
+def _create_research_brief_receipt(
+    connection: sqlite3.Connection,
+    *,
+    week_label: str,
+    generated_at: str,
+    window_start: str,
+    window_end: str,
+    buckets: dict,
+    digest_id: int,
+    markdown_path: Path,
+    json_path: Path | None,
+    html_path: Path | None,
+    llm_provider: str | None,
+    llm_model: str | None,
+    llm_category: str | None,
+) -> dict:
+    source_posts = _iter_receipt_source_posts(buckets)
+    project_scopes = sorted({
+        str(project)
+        for post in source_posts
+        for project in post.get("project_matches", [])
+        if str(project).strip()
+    })
+    topic_scopes = sorted(str(topic) for topic in buckets.get("topic_counts", {}) if str(topic).strip())
+    bucket_counts = buckets.get("bucket_counts", {})
+    strong_count = int(bucket_counts.get("strong") or 0)
+    watch_count = int(bucket_counts.get("watch") or 0)
+    post_count = int(buckets.get("all_post_count") or 0)
+    config_fingerprints = _build_config_fingerprints()
+
+    return record_research_brief_receipt(
+        connection,
+        week_label=week_label,
+        generated_at=generated_at,
+        source_version=_source_version(),
+        window_start=window_start,
+        window_end=window_end,
+        included_channels=buckets.get("included_channels", []),
+        post_counts={
+            "total_posts": post_count,
+            "post_count_scored": post_count,
+            "strong_count": strong_count,
+            "watch_count": watch_count,
+            "cultural_count": int(bucket_counts.get("cultural") or 0),
+            "noise_count": int(bucket_counts.get("noise") or 0),
+        },
+        source_set=_build_receipt_source_set(
+            connection,
+            week_label=week_label,
+            source_posts=source_posts,
+        ),
+        project_scopes=project_scopes,
+        topic_scopes=topic_scopes,
+        llm_provider=llm_provider,
+        llm_model=llm_model,
+        llm_category=llm_category,
+        prompt_template_path=str(PROMPT_PATH.relative_to(PROJECT_ROOT)),
+        prompt_template_version=config_fingerprints["prompt_template"].get("sha256"),
+        config_fingerprints=config_fingerprints,
+        generation_params_fingerprint=_generation_params_fingerprint(),
+        digest_id=digest_id,
+        markdown_path=str(markdown_path),
+        json_path=str(json_path) if json_path is not None else None,
+        html_path=str(html_path) if html_path is not None else None,
+        verification_status="pending",
+        health_flags=_build_receipt_health_flags(
+            post_count=post_count,
+            strong_count=strong_count,
+            watch_count=watch_count,
+            markdown_path=markdown_path,
+            json_path=json_path,
+            html_path=html_path,
+        ),
+    )
 
 
 def _build_research_report(
@@ -514,7 +836,7 @@ def _store_digest(
     content_json: str,
     pdf_path: str | None,
     post_count: int,
-) -> None:
+) -> int:
     connection.execute(
         """
         INSERT INTO digests (week_label, generated_at, content_md, content_json, pdf_path, post_count)
@@ -528,6 +850,13 @@ def _store_digest(
         """,
         (week_label, _utc_now_iso(), content_md, content_json, pdf_path, post_count),
     )
+    row = connection.execute(
+        "SELECT id FROM digests WHERE week_label = ?",
+        (week_label,),
+    ).fetchone()
+    if row is None:
+        raise RuntimeError("digest insert could not be read back")
+    return int(row["id"] if isinstance(row, sqlite3.Row) else row[0])
 
 
 def _store_quality_metrics(
@@ -622,7 +951,7 @@ def run_digest(settings: Settings, force_delivery: bool = False) -> DigestResult
             except OSError:
                 LOGGER.warning("Failed to write HTML review week=%s", week_label, exc_info=True)
             connection.execute("BEGIN")
-            _store_digest(connection, week_label, empty_digest, "", None, 0)
+            digest_id = _store_digest(connection, week_label, empty_digest, "", None, 0)
             _store_quality_metrics(
                 connection,
                 week_label=week_label,
@@ -636,6 +965,26 @@ def run_digest(settings: Settings, force_delivery: bool = False) -> DigestResult
                 output_word_count=empty_word_count,
             )
             connection.commit()
+            receipt_audit_note = None
+            try:
+                receipt = _create_research_brief_receipt(
+                    connection,
+                    week_label=week_label,
+                    generated_at=_utc_now_iso(),
+                    window_start=cutoff_iso,
+                    window_end=_utc_now_iso(),
+                    buckets=buckets,
+                    digest_id=digest_id,
+                    markdown_path=output_path,
+                    json_path=None,
+                    html_path=html_path,
+                    llm_provider=None,
+                    llm_model=None,
+                    llm_category=None,
+                )
+                receipt_audit_note = _build_receipt_audit_note(receipt)
+            except Exception:
+                LOGGER.warning("Failed to create research brief receipt week=%s", week_label, exc_info=True)
             health_alert = _build_digest_health_alert(
                 week_label,
                 post_count=0,
@@ -650,8 +999,10 @@ def run_digest(settings: Settings, force_delivery: bool = False) -> DigestResult
                     strong_count=0,
                     watch_count=0,
                     html_path=html_path,
+                    digest_id=digest_id,
                     force_delivery=force_delivery,
                     health_alert=health_alert,
+                    receipt_audit_note=receipt_audit_note,
                 )
             except Exception:
                 LOGGER.warning("Failed to send digest to Telegram owner week=%s", week_label, exc_info=True)
@@ -681,11 +1032,12 @@ def run_digest(settings: Settings, force_delivery: bool = False) -> DigestResult
             .replace("{noise_summary}", noise_summary)
         )
 
+        digest_model = route("synthesis")
         llm_brief = complete(
             prompt=prompt,
             system=system_prompt,
             category="digest",
-            model=route("synthesis"),
+            model=digest_model,
         )
 
         full_buckets = buckets.get("full_buckets", {})
@@ -735,7 +1087,7 @@ def run_digest(settings: Settings, force_delivery: bool = False) -> DigestResult
             LOGGER.warning("Failed to write HTML review week=%s", week_label, exc_info=True)
 
         connection.execute("BEGIN")
-        _store_digest(connection, week_label, content_md, content_json, None, post_count)
+        digest_id = _store_digest(connection, week_label, content_md, content_json, None, post_count)
         _store_quality_metrics(
             connection,
             week_label=week_label,
@@ -749,6 +1101,32 @@ def run_digest(settings: Settings, force_delivery: bool = False) -> DigestResult
             output_word_count=output_word_count,
         )
         connection.commit()
+        receipt_audit_note = None
+        try:
+            receipt = _create_research_brief_receipt(
+                connection,
+                week_label=week_label,
+                generated_at=generated_at,
+                window_start=cutoff_iso,
+                window_end=generated_at,
+                buckets=buckets,
+                digest_id=digest_id,
+                markdown_path=output_path,
+                json_path=json_path,
+                html_path=html_path,
+                llm_provider=settings.model_provider,
+                llm_model=digest_model,
+                llm_category="digest",
+            )
+            LOGGER.info(
+                "Research brief receipt created week=%s receipt_id=%s digest_id=%d",
+                week_label,
+                receipt.get("receipt_id", ""),
+                digest_id,
+            )
+            receipt_audit_note = _build_receipt_audit_note(receipt)
+        except Exception:
+            LOGGER.warning("Failed to create research brief receipt week=%s", week_label, exc_info=True)
 
         LOGGER.info(
             "Digest generation complete week=%s posts=%d strong=%d watch=%d words=%d output=%s",
@@ -776,8 +1154,10 @@ def run_digest(settings: Settings, force_delivery: bool = False) -> DigestResult
                 strong_count=buckets["bucket_counts"]["strong"],
                 watch_count=buckets["bucket_counts"]["watch"],
                 html_path=html_path,
+                digest_id=digest_id,
                 force_delivery=force_delivery,
                 health_alert=health_alert,
+                receipt_audit_note=receipt_audit_note,
             )
         except Exception:
             LOGGER.warning("Failed to send digest to Telegram owner week=%s", week_label, exc_info=True)

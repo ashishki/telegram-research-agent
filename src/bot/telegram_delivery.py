@@ -53,13 +53,14 @@ def _send_text_internal(
     token: str,
     parse_mode: str | None = "Markdown",
     reply_markup: dict | None = None,
-) -> None:
+) -> int | None:
     if not token:
         LOGGER.warning("Telegram send skipped because TELEGRAM_BOT_TOKEN is not set")
-        return
+        return None
 
     url = f"{BOT_API_BASE}/bot{token}/sendMessage"
     chunks = _chunk_text(text)
+    last_message_id: int | None = None
     for index, chunk in enumerate(chunks):
         payload_dict = {
             "chat_id": chat_id,
@@ -71,11 +72,15 @@ def _send_text_internal(
         if reply_markup and index == len(chunks) - 1:
             payload_dict["reply_markup"] = json.dumps(reply_markup, ensure_ascii=False)
         payload = parse.urlencode(payload_dict).encode("utf-8")
-        _telegram_request(
+        response = _telegram_request(
             url=url,
             data=payload,
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
+        result = response.get("result") if isinstance(response, dict) else None
+        if isinstance(result, dict) and result.get("message_id") is not None:
+            last_message_id = int(result["message_id"])
+    return last_message_id
 
 
 def send_text(
@@ -84,25 +89,25 @@ def send_text(
     token: str,
     parse_mode: str | None = "HTML",
     reply_markup: dict | None = None,
-) -> None:
-    _send_text_internal(
+) -> int | None:
+    return _send_text_internal(
         chat_id=chat_id,
         text=text,
         token=token,
         parse_mode=parse_mode,
         reply_markup=reply_markup,
-    )
+)
 
 
-def send_document(chat_id: str, file_path: str, caption: str, token: str) -> None:
+def send_document(chat_id: str, file_path: str, caption: str, token: str) -> int | None:
     if not token:
         LOGGER.warning("Telegram file send skipped because TELEGRAM_BOT_TOKEN is not set")
-        return
+        return None
 
     path = Path(file_path)
     if not path.exists():
         LOGGER.warning("Telegram file send skipped because file does not exist path=%s", path)
-        return
+        return None
 
     boundary = f"----codex-{uuid.uuid4().hex}"
     body = bytearray()
@@ -128,11 +133,15 @@ def send_document(chat_id: str, file_path: str, caption: str, token: str) -> Non
     body.extend(b"\r\n")
     body.extend(f"--{boundary}--\r\n".encode("utf-8"))
 
-    _telegram_request(
+    response = _telegram_request(
         url=f"{BOT_API_BASE}/bot{token}/sendDocument",
         data=bytes(body),
         headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
     )
+    result = response.get("result") if isinstance(response, dict) else None
+    if isinstance(result, dict) and result.get("message_id") is not None:
+        return int(result["message_id"])
+    return None
 
 
 # T21: not used in delivery path

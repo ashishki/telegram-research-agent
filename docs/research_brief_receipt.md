@@ -1,12 +1,13 @@
 # Research Brief Receipt
 
-Status: storage implemented; generation, delivery updates, verification, and CLI inspection planned
+Status: storage, generation-time receipt creation, delivery ref updates, deterministic verification checks, CLI inspection, operator review, and optional operator-only audit notes implemented
 
 ## Purpose And Boundaries
 
 `research_brief_receipt` is audit metadata for each delivered weekly Research
-Brief. The canonical SQLite table and storage helpers exist, but the weekly
-generation and delivery pipeline does not create or update receipts yet. The
+Brief. The canonical SQLite table, storage helpers, generation-time receipt
+creation, delivery ref updates, deterministic verification checks, CLI
+inspection, operator review, and optional operator-only audit notes exist. The
 receipt answers a narrow operator question: "What exact inputs, configuration,
 generated artifacts, delivery state, and verification status produced this
 brief?"
@@ -208,16 +209,20 @@ linked digest, not copied into receipt state except as an explicit note.
 | Source of truth | `research_brief_receipts` SQLite row plus linked canonical rows in `digests`, `signal_evidence_items`, `llm_usage`, `quality_metrics`, and delivered artifacts. |
 | Refresh rule | Create once after brief generation; update only delivery refs, verification status, verifier notes, and health flags that become known after delivery/checks. Do not silently recompute generation-time snapshots. If a brief is regenerated, create a new receipt or explicit revision. |
 | Retrieval path | Fetch by `receipt_id`, `week_label`, `digest_id`, or artifact URL/path; join to digest, evidence rows, source posts, usage rows, and quality metrics only when inspection asks for details. |
-| Debug surface | Future CLI commands should print receipt identity, evidence window, source set, model/config fingerprints, artifact refs, delivery refs, verification status, health flags, and linked row IDs. Debug output must show missing source links, weak evidence, fallback delivery, and broad fallback usage prominently. |
+| Debug surface | `memory inspect-receipts` prints receipt identity, evidence window, source set, model/config fingerprints, artifact refs, delivery refs, verification status, health flags, and linked row IDs. Debug output shows missing source links, weak evidence, fallback delivery, and broad fallback usage prominently. |
 
 This is the explicit source of truth, refresh rule, retrieval path, and debug
 surface contract for future receipt implementation.
 
 ## Storage Model
 
-ENT-2 implements the primary SQLite storage surface and helper API. Runtime
-creation, delivery updates, verification checks, and CLI inspection remain
-future tasks.
+ENT-2 implements the primary SQLite storage surface and helper API. ENT-3
+creates pending receipts after Research Brief generation. ENT-4 updates
+delivery refs after Telegraph/Telegram delivery. ENT-5 adds deterministic
+verification checks and status transitions. ENT-6 adds CLI inspection.
+ENT-7 adds operator review status updates.
+ENT-8 adds concise operator-only audit notes to Telegram notifications when
+receipt status or flags are useful.
 
 Primary table: `research_brief_receipts`.
 
@@ -289,7 +294,7 @@ coverage, or delivery problems.
 
 ### Deterministic Checks
 
-Before implementation is accepted, deterministic checks should exist for:
+Implemented deterministic checks validate:
 
 - receipt type is `research_brief_receipt`
 - `week_label`, evidence window, and `digest_id` are present
@@ -304,9 +309,9 @@ Before implementation is accepted, deterministic checks should exist for:
 - broad fallback usage is visible and not mixed silently into project-scoped
   output
 
-Missing required audit state should fail safe: set `verification_status` to
-`failed` or `needs_review`, surface the failing fields in CLI/debug output, and
-avoid presenting the brief as verified.
+Missing required audit state fails safe by setting `verification_status` to
+`failed` or `needs_review`, recording `deterministic_checks` as the verifier
+method, and storing actionable notes in `verifier_notes`.
 
 ### Optional Future Referee Pass
 
@@ -322,7 +327,7 @@ operator review.
 
 ## Inspection And Outputs
 
-Future CLI/debug questions:
+CLI/debug questions:
 
 - Which Research Brief receipt exists for `2026-W22`?
 - What evidence window and channels did that brief use?
@@ -337,8 +342,9 @@ Future CLI/debug questions:
   artifacts?
 
 Operator reports should show receipt metadata only when useful. A delivered
-Research Brief should not include the full receipt. Acceptable report surfaces
-are a short audit footer or debug-only report note such as:
+Research Brief should not include the full receipt. The Telegram operator
+notification may include a short audit note when receipt status, health flags,
+or fallback state need attention, such as:
 
 - `Receipt: pending`
 - `Audit flags: low signal, fallback delivery`
@@ -361,22 +367,23 @@ Future work remains split into bounded tasks:
 1. `ENT-2`: implemented. `research_brief_receipts` schema and storage helpers
    exist with indexes for `week_label`, `digest_id`, `verification_status`,
    and `generated_at`. No report behavior changes.
-2. `ENT-3`: write receipt creation after Research Brief generation. Snapshot
-   evidence window, source set, model/config fingerprints, digest ID, artifact
-   paths, and initial health flags.
-3. `ENT-4`: update receipt delivery refs after Telegraph/Telegram delivery.
-   Record Telegraph URL, Telegram timestamp/message ID, fallback delivery, and
-   missing artifact flags.
-4. `ENT-5`: add deterministic verification checks and status transitions.
-   Failed checks must set `failed` or `needs_review` and print actionable debug
-   details.
-5. `ENT-6`: add CLI/debug inspection for receipts by week, receipt ID, digest
-   ID, artifact path, or Telegraph URL. Output must include source of truth,
-   refresh rule, retrieval path, and debug surface metadata.
-6. `ENT-7`: add optional operator review workflow for marking receipts
-   `verified`, `waived`, `needs_review`, or `failed` with notes.
-7. `ENT-8`: add an optional concise audit note in operator-only reports after
-   CLI inspection and verification behavior are stable.
+2. `ENT-3`: implemented. Research Brief generation creates a pending receipt
+   with evidence window, source set, model/config fingerprints, digest ID,
+   artifact paths, and initial health flags.
+3. `ENT-4`: implemented. Telegraph/Telegram delivery updates receipt delivery
+   refs with Telegraph URL when available, Telegram timestamp/message ID,
+   fallback delivery fields, and delivery-related health flags.
+4. `ENT-5`: implemented. Deterministic verification checks update
+   `verification_status` to `verified`, `needs_review`, or `failed` and store
+   actionable `verifier_notes`.
+5. `ENT-6`: implemented. `memory inspect-receipts` inspects receipts by week,
+   receipt ID, digest ID, artifact path, Telegraph URL, or status and prints
+   source of truth, refresh rule, retrieval path, and debug surface metadata.
+6. `ENT-7`: implemented. `memory review-receipt` lets the operator mark
+   receipts `verified`, `waived`, `needs_review`, or `failed` with notes.
+7. `ENT-8`: implemented. Telegram operator notifications include a concise
+   receipt status/flags/fallback note only when the receipt has actionable audit
+   state.
 
 Keep separate unless explicitly connected by a future task:
 

@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import json
 import logging
 import os
 import signal
@@ -96,6 +97,16 @@ def build_parser() -> argparse.ArgumentParser:
     mvp_weekly_parser.add_argument("--no-deliver", action="store_true")
     mvp_weekly_parser.set_defaults(handler=handle_mvp_weekly)
 
+    channel_intel_report_parser = subparsers.add_parser(
+        "channel-intelligence-report",
+        help="Render an optional Markdown report from derived Channel Intelligence rows",
+    )
+    channel_intel_report_parser.add_argument("--week", required=True)
+    channel_intel_report_parser.add_argument("--project", default=None)
+    channel_intel_report_parser.add_argument("--topic", default=None)
+    channel_intel_report_parser.add_argument("--limit", type=int, default=5)
+    channel_intel_report_parser.set_defaults(handler=handle_channel_intelligence_report)
+
     normalize_parser = subparsers.add_parser("normalize")
     normalize_parser.set_defaults(handler=handle_normalize)
 
@@ -187,6 +198,52 @@ def build_parser() -> argparse.ArgumentParser:
     diag_parser.add_argument("--limit", type=int, default=10)
     diag_parser.add_argument("--json", action="store_true")
     diag_parser.set_defaults(handler=handle_memory_diagnose_project_signals)
+
+    receipt_parser = memory_sub.add_parser(
+        "inspect-receipts",
+        help="Inspect Research Brief receipt audit metadata",
+    )
+    receipt_parser.add_argument("--receipt-id", default=None)
+    receipt_parser.add_argument("--week", default=None)
+    receipt_parser.add_argument("--digest-id", type=int, default=None)
+    receipt_parser.add_argument("--artifact-path", default=None)
+    receipt_parser.add_argument("--telegraph-url", default=None)
+    receipt_parser.add_argument("--status", default=None)
+    receipt_parser.add_argument("--limit", type=int, default=10)
+    receipt_parser.set_defaults(handler=handle_memory_inspect_receipts)
+
+    receipt_review_parser = memory_sub.add_parser(
+        "review-receipt",
+        help="Record operator review status for a Research Brief receipt",
+    )
+    receipt_review_parser.add_argument("--receipt-id", default=None)
+    receipt_review_parser.add_argument("--week", default=None)
+    receipt_review_parser.add_argument("--digest-id", type=int, default=None)
+    receipt_review_parser.add_argument(
+        "--status",
+        required=True,
+        choices=["verified", "waived", "needs_review", "failed"],
+    )
+    receipt_review_parser.add_argument("--notes", default=None)
+    receipt_review_parser.add_argument("--checked-by", default="operator")
+    receipt_review_parser.set_defaults(handler=handle_memory_review_receipt)
+
+    intel_parser = memory_sub.add_parser(
+        "inspect-channel-intelligence",
+        help="Inspect Channel Intelligence claims, narratives, source observations, and links",
+    )
+    intel_parser.add_argument(
+        "--kind",
+        choices=["all", "claims", "narratives", "sources", "entity-links", "project-links"],
+        default="all",
+    )
+    intel_parser.add_argument("--week", default=None)
+    intel_parser.add_argument("--project", default=None)
+    intel_parser.add_argument("--topic", default=None)
+    intel_parser.add_argument("--channel", default=None)
+    intel_parser.add_argument("--status", default=None)
+    intel_parser.add_argument("--limit", type=int, default=10)
+    intel_parser.set_defaults(handler=handle_memory_inspect_channel_intelligence)
 
     memory_parser.set_defaults(handler=lambda args: memory_parser.print_help() or 0)
 
@@ -549,6 +606,14 @@ def handle_score_stats(_: argparse.Namespace) -> int:
                 LIMIT 2
                 """
             ).fetchall()
+            receipt_health_rows = connection.execute(
+                """
+                SELECT week_label, generated_at, post_counts_json, health_flags_json
+                FROM research_brief_receipts
+                ORDER BY week_label DESC, generated_at DESC, id DESC
+                LIMIT 16
+                """
+            ).fetchall()
     except Exception:
         LOGGER.exception("Score stats failed")
         return 1
@@ -573,6 +638,38 @@ def handle_score_stats(_: argparse.Namespace) -> int:
             lines.append(f"  {col}: {cur} ({delta:+d})")
     elif len(qm_rows) == 1:
         lines.append(f"trend: only one run recorded ({qm_rows[0]['week_label']}), no comparison yet")
+
+    latest_receipt_by_week: dict[str, sqlite3.Row] = {}
+    for row in receipt_health_rows:
+        week = str(row["week_label"] or "")
+        if week and week not in latest_receipt_by_week:
+            latest_receipt_by_week[week] = row
+    if latest_receipt_by_week:
+        lines.append("digest_health_trend (latest receipt per week):")
+        empty_alerts = 0
+        low_signal_alerts = 0
+        for week, row in list(latest_receipt_by_week.items())[:8]:
+            try:
+                flags = json.loads(row["health_flags_json"] or "[]")
+            except json.JSONDecodeError:
+                flags = []
+            try:
+                post_counts = json.loads(row["post_counts_json"] or "{}")
+            except json.JSONDecodeError:
+                post_counts = {}
+            if "empty_week_alert" in flags:
+                empty_alerts += 1
+            if "low_signal_alert" in flags:
+                low_signal_alerts += 1
+            lines.append(
+                f"  {week}: flags={','.join(flags) if flags else 'none'} "
+                f"total_posts={int(post_counts.get('total_posts') or 0)} "
+                f"strong={int(post_counts.get('strong_count') or 0)} "
+                f"watch={int(post_counts.get('watch_count') or 0)}"
+            )
+        lines.append(f"digest_health_alerts_last_{min(8, len(latest_receipt_by_week))}: empty={empty_alerts} low_signal={low_signal_alerts}")
+    else:
+        lines.append("digest_health_trend: no Research Brief receipts recorded")
 
     sys.stdout.write("\n".join(lines) + "\n")
     return 0
@@ -686,7 +783,17 @@ def _config_status_lines() -> list[str]:
         PROJECT_ROOT / "src" / "config" / "projects.yaml",
         PROJECT_ROOT / "src" / "config" / "scoring.yaml",
     )
-    return [f"{path.name}: {'present' if path.exists() else 'missing'}" for path in config_paths]
+    lines = [f"{path.name}: {'present' if path.exists() else 'missing'}" for path in config_paths]
+    projects_path = PROJECT_ROOT / "src" / "config" / "projects.yaml"
+    if projects_path.exists():
+        modified_at = datetime.fromtimestamp(projects_path.stat().st_mtime, tz=timezone.utc)
+        age_days = max(0, (datetime.now(timezone.utc) - modified_at).days)
+        lines.append(f"projects_yaml_review: last_modified={modified_at.date().isoformat()} age_days={age_days}")
+        if age_days > 31:
+            lines.append("WARNING: projects.yaml has not changed in over 31 days; review active project config")
+    else:
+        lines.append("projects_yaml_review: missing")
+    return lines
 
 
 def handle_health_check(_: argparse.Namespace) -> int:
@@ -1336,6 +1443,495 @@ def handle_memory_diagnose_project_signals(args: argparse.Namespace) -> int:
         sys.stdout.write(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
     else:
         sys.stdout.write(format_project_signal_diagnostics(report))
+    return 0
+
+
+def _format_receipt_list(values: object, *, limit: int = 6) -> str:
+    if not isinstance(values, list) or not values:
+        return "none"
+    rendered = [str(value) for value in values[:limit]]
+    if len(values) > limit:
+        rendered.append(f"+{len(values) - limit} more")
+    return ", ".join(rendered)
+
+
+def _format_receipt_dict(values: object, *, limit: int = 6) -> str:
+    if not isinstance(values, dict) or not values:
+        return "none"
+    parts = []
+    for index, (key, value) in enumerate(values.items()):
+        if index >= limit:
+            parts.append(f"+{len(values) - limit} more")
+            break
+        parts.append(f"{key}={value}")
+    return ", ".join(parts)
+
+
+def _format_research_brief_receipt(receipt: dict) -> str:
+    source_set = receipt.get("source_set") or {}
+    post_counts = receipt.get("post_counts") or {}
+    config_fingerprints = receipt.get("config_fingerprints") or {}
+
+    lines = [
+        f"Receipt {receipt.get('receipt_id') or 'n/a'}",
+        f"  source_of_truth: research_brief_receipts row id={receipt.get('id') or 'n/a'} plus linked digests/signal_evidence_items/llm_usage/artifacts",
+        "  refresh_rule: created once after generation; delivery and verification fields update as lifecycle steps complete",
+        "  retrieval_path: receipt_id, week_label, digest_id, artifact path, or Telegraph URL",
+        "  debug_surface: identity, evidence window, source set, model/config fingerprints, artifacts, delivery refs, verification, health flags",
+        f"  identity: week={receipt.get('week_label') or 'n/a'} digest_id={receipt.get('digest_id') or 'n/a'} generated_at={receipt.get('generated_at') or 'n/a'} source_version={receipt.get('source_version') or 'n/a'}",
+        f"  evidence_window: start={receipt.get('window_start') or 'n/a'} end={receipt.get('window_end') or 'n/a'} channels={_format_receipt_list(receipt.get('included_channels'))}",
+        f"  post_counts: {_format_receipt_dict(post_counts)}",
+        f"  source_links: {_format_receipt_list(source_set.get('telegram_source_links'))}",
+        f"  source_evidence_item_ids: {_format_receipt_list(source_set.get('source_evidence_item_ids'))}",
+        f"  source_post_ids: {_format_receipt_list(source_set.get('source_post_ids'))}",
+        f"  scopes: projects={_format_receipt_list(receipt.get('project_scopes'))} topics={_format_receipt_list(receipt.get('topic_scopes'))}",
+        f"  broad_fallback: used={bool(source_set.get('broad_fallback_used'))} reason={source_set.get('broad_fallback_reason') or 'n/a'}",
+        f"  model: provider={receipt.get('llm_provider') or 'n/a'} model={receipt.get('llm_model') or 'n/a'} category={receipt.get('llm_category') or 'n/a'} prompt={receipt.get('prompt_template_path') or 'n/a'}",
+        f"  config_fingerprints: {_format_receipt_list(list(config_fingerprints.keys()))}",
+        f"  artifacts: markdown={receipt.get('markdown_path') or 'n/a'} json={receipt.get('json_path') or 'n/a'} html={receipt.get('html_path') or 'n/a'}",
+        f"  delivery: telegraph={receipt.get('telegraph_url') or 'n/a'} telegram_at={receipt.get('telegram_delivery_timestamp') or 'n/a'} message_id={receipt.get('telegram_message_id') or 'n/a'} fallback_used={bool(receipt.get('fallback_delivery_used'))} fallback={receipt.get('fallback_delivery') or 'n/a'}",
+        f"  verification: status={receipt.get('verification_status') or 'n/a'} method={receipt.get('verifier_method') or 'n/a'} checked_at={receipt.get('checked_at') or 'n/a'} checked_by={receipt.get('checked_by') or 'n/a'}",
+        f"  verifier_notes: {receipt.get('verifier_notes') or 'n/a'}",
+        f"  health_flags: {_format_receipt_list(receipt.get('health_flags'))}",
+    ]
+    return "\n".join(lines)
+
+
+def handle_memory_inspect_receipts(args: argparse.Namespace) -> int:
+    from db.research_brief_receipts import fetch_research_brief_receipts
+
+    settings = load_settings()
+
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+
+        with sqlite3.connect(settings.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON;")
+            receipts = fetch_research_brief_receipts(
+                connection,
+                receipt_id=args.receipt_id,
+                week_label=args.week,
+                digest_id=args.digest_id,
+                verification_status=args.status,
+                artifact_path=args.artifact_path,
+                telegraph_url=args.telegraph_url,
+                limit=args.limit,
+            )
+    except Exception as exc:
+        sys.stdout.write(f"Error inspecting Research Brief receipts: {exc}\n")
+        return 1
+
+    if not receipts:
+        sys.stdout.write("No Research Brief receipts found for the given scope.\n")
+        return 0
+
+    sys.stdout.write(("\n\n".join(_format_research_brief_receipt(receipt) for receipt in receipts)).rstrip() + "\n")
+    return 0
+
+
+def handle_memory_review_receipt(args: argparse.Namespace) -> int:
+    from db.research_brief_receipts import review_research_brief_receipt
+
+    if not any([args.receipt_id, args.week, args.digest_id is not None]):
+        sys.stdout.write("receipt-id, week, or digest-id is required.\n")
+        return 1
+
+    settings = load_settings()
+
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+
+        with sqlite3.connect(settings.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON;")
+            receipt = review_research_brief_receipt(
+                connection,
+                receipt_id=args.receipt_id,
+                week_label=args.week,
+                digest_id=args.digest_id,
+                verification_status=args.status,
+                verifier_notes=args.notes,
+                checked_by=args.checked_by,
+            )
+    except Exception as exc:
+        sys.stdout.write(f"Error reviewing Research Brief receipt: {exc}\n")
+        return 1
+
+    if receipt is None:
+        sys.stdout.write("No Research Brief receipt found for the given scope.\n")
+        return 1
+
+    lines = [
+        f"Reviewed Research Brief receipt {receipt.get('receipt_id')}",
+        f"status={receipt.get('verification_status')}",
+        f"method={receipt.get('verifier_method')}",
+        f"checked_by={receipt.get('checked_by')}",
+    ]
+    if receipt.get("verifier_notes"):
+        lines.append(f"notes={receipt.get('verifier_notes')}")
+    sys.stdout.write("\n".join(lines) + "\n")
+    return 0
+
+
+def _json_list_preview(value: object, *, limit: int = 6) -> str:
+    try:
+        parsed = json.loads(value or "[]") if isinstance(value, str) else value
+    except json.JSONDecodeError:
+        parsed = []
+    if not isinstance(parsed, list) or not parsed:
+        return "none"
+    items = [str(item) for item in parsed[:limit]]
+    if len(parsed) > limit:
+        items.append(f"+{len(parsed) - limit} more")
+    return ", ".join(items)
+
+
+def _json_dict_preview(value: object, *, limit: int = 6) -> str:
+    try:
+        parsed = json.loads(value or "{}") if isinstance(value, str) else value
+    except json.JSONDecodeError:
+        parsed = {}
+    if not isinstance(parsed, dict) or not parsed:
+        return "none"
+    parts = []
+    for index, (key, item) in enumerate(parsed.items()):
+        if index >= limit:
+            parts.append(f"+{len(parsed) - limit} more")
+            break
+        parts.append(f"{key}={item}")
+    return ", ".join(parts)
+
+
+def _append_channel_intelligence_claims(
+    connection: sqlite3.Connection,
+    lines: list[str],
+    args: argparse.Namespace,
+) -> None:
+    clauses = []
+    params: list[object] = []
+    if args.week:
+        clauses.append("(first_seen_week <= ? AND last_seen_week >= ?)")
+        params.extend([args.week, args.week])
+    if args.project:
+        clauses.append("project_name = ?")
+        params.append(args.project)
+    if args.topic:
+        clauses.append("topic_label = ?")
+        params.append(args.topic)
+    if args.status:
+        clauses.append("status = ?")
+        params.append(args.status)
+    if args.channel:
+        clauses.append(
+            """
+            id IN (
+                SELECT claim_id
+                FROM claim_occurrences
+                WHERE source_channel = ?
+            )
+            """
+        )
+        params.append(args.channel)
+    where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    rows = connection.execute(
+        f"""
+        SELECT *
+        FROM channel_repeated_claims
+        {where_sql}
+        ORDER BY last_seen_week DESC, id DESC
+        LIMIT ?
+        """,
+        (*params, max(1, int(args.limit or 10))),
+    ).fetchall()
+    lines.append(f"claims ({len(rows)}):")
+    if not rows:
+        lines.append("  none")
+        return
+    for row in rows:
+        lines.append(
+            f"  claim id={row['id']} status={row['status']} type={row['claim_type']} "
+            f"strength={row['evidence_strength']} project={row['project_name'] or 'n/a'} topic={row['topic_label'] or 'n/a'}"
+        )
+        lines.append(
+            f"    weeks={row['first_seen_week'] or 'n/a'}..{row['last_seen_week'] or 'n/a'} "
+            f"occurrences={row['occurrence_count']} channels={row['channel_count']}"
+        )
+        lines.append(f"    normalized_claim: {row['normalized_claim']}")
+        lines.append(f"    evidence_item_ids: {_json_list_preview(row['evidence_item_ids_json'])}")
+        lines.append(f"    refresh_scope: {_json_dict_preview(row['refresh_scope_json'])}")
+
+
+def _append_channel_intelligence_narratives(
+    connection: sqlite3.Connection,
+    lines: list[str],
+    args: argparse.Namespace,
+) -> None:
+    clauses = []
+    params: list[object] = []
+    if args.week:
+        clauses.append("(first_seen_week <= ? AND last_seen_week >= ?)")
+        params.extend([args.week, args.week])
+    if args.project:
+        clauses.append("project_name = ?")
+        params.append(args.project)
+    if args.topic:
+        clauses.append("topic_label = ?")
+        params.append(args.topic)
+    if args.status:
+        clauses.append("status = ?")
+        params.append(args.status)
+    where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    rows = connection.execute(
+        f"""
+        SELECT *
+        FROM channel_narratives
+        {where_sql}
+        ORDER BY last_seen_week DESC, id DESC
+        LIMIT ?
+        """,
+        (*params, max(1, int(args.limit or 10))),
+    ).fetchall()
+    lines.append(f"narratives ({len(rows)}):")
+    if not rows:
+        lines.append("  none")
+        return
+    for row in rows:
+        claim_links = connection.execute(
+            """
+            SELECT claim_id, shared_evidence_count, confidence
+            FROM narrative_claim_links
+            WHERE narrative_id = ?
+            ORDER BY claim_id ASC
+            LIMIT ?
+            """,
+            (row["id"], max(1, int(args.limit or 10))),
+        ).fetchall()
+        lines.append(
+            f"  narrative id={row['id']} status={row['status']} project={row['project_name'] or 'n/a'} "
+            f"topic={row['topic_label'] or 'n/a'}"
+        )
+        lines.append(f"    title: {row['title']}")
+        lines.append(
+            f"    support: evidence={row['supporting_post_count']} channels={row['supporting_channel_count']} "
+            f"linked_claims={row['linked_claim_count']}"
+        )
+        lines.append(f"    evidence_item_ids: {_json_list_preview(row['evidence_item_ids_json'])}")
+        lines.append(f"    source_channels: {_json_list_preview(row['source_channels_json'])}")
+        lines.append(f"    refresh_scope: {_json_dict_preview(row['refresh_scope_json'])}")
+        if claim_links:
+            rendered_links = [
+                f"claim={link['claim_id']} shared_evidence={link['shared_evidence_count']} confidence={float(link['confidence'] or 0.0):.2f}"
+                for link in claim_links
+            ]
+            lines.append(f"    claim_links: {'; '.join(rendered_links)}")
+        else:
+            lines.append("    claim_links: none")
+
+
+def _append_channel_intelligence_sources(
+    connection: sqlite3.Connection,
+    lines: list[str],
+    args: argparse.Namespace,
+) -> None:
+    clauses = []
+    params: list[object] = []
+    if args.week:
+        clauses.append("week_label = ?")
+        params.append(args.week)
+    if args.project:
+        clauses.append("project_name = ?")
+        params.append(args.project)
+    if args.topic:
+        clauses.append("topic_label = ?")
+        params.append(args.topic)
+    if args.channel:
+        clauses.append("channel_username = ?")
+        params.append(args.channel)
+    where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    rows = connection.execute(
+        f"""
+        SELECT *
+        FROM source_observations
+        {where_sql}
+        ORDER BY week_label DESC, channel_username ASC
+        LIMIT ?
+        """,
+        (*params, max(1, int(args.limit or 10))),
+    ).fetchall()
+    lines.append(f"source_observations ({len(rows)}):")
+    if not rows:
+        lines.append("  none")
+        return
+    for row in rows:
+        lines.append(
+            f"  source id={row['id']} channel={row['channel_username']} week={row['week_label']} "
+            f"scope={row['scope_key']}"
+        )
+        lines.append(
+            "    counters: "
+            f"posts={row['post_count']} scored={row['scored_count']} evidence={row['evidence_count']} "
+            f"cited={row['cited_count']} acted_on={row['acted_on_count']} skipped={row['skipped_count']} "
+            f"rejected={row['rejected_count']} low_signal={row['low_signal_count']} "
+            f"repeated_claims={row['repeated_claim_count']} useful={row['useful_count']}"
+        )
+        lines.append(f"    raw_inputs: {_json_dict_preview(row['counters_json'])}")
+
+
+def _append_channel_intelligence_entity_links(
+    connection: sqlite3.Connection,
+    lines: list[str],
+    args: argparse.Namespace,
+) -> None:
+    clauses = []
+    params: list[object] = []
+    if args.week:
+        clauses.append("week_label = ?")
+        params.append(args.week)
+    if args.project:
+        clauses.append("project_name = ?")
+        params.append(args.project)
+    if args.topic:
+        clauses.append("topic_label = ?")
+        params.append(args.topic)
+    where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    rows = connection.execute(
+        f"""
+        SELECT *
+        FROM intelligence_entity_links
+        {where_sql}
+        ORDER BY week_label DESC, entity_label ASC, id DESC
+        LIMIT ?
+        """,
+        (*params, max(1, int(args.limit or 10))),
+    ).fetchall()
+    lines.append(f"entity_links ({len(rows)}):")
+    if not rows:
+        lines.append("  none")
+        return
+    for row in rows:
+        lines.append(
+            f"  entity_link id={row['id']} label={row['entity_label']} type={row['entity_type']} "
+            f"object={row['linked_object_type']}:{row['linked_object_id']} project={row['project_name'] or 'n/a'}"
+        )
+        lines.append(
+            f"    source={row['source_table'] or 'n/a'}:{row['source_row_id'] or 'n/a'} "
+            f"confidence={float(row['confidence'] or 0.0):.2f} extractor={row['extractor_version']}"
+        )
+        lines.append(f"    reason: {row['reason'] or 'n/a'}")
+
+
+def _append_channel_intelligence_project_links(
+    connection: sqlite3.Connection,
+    lines: list[str],
+    args: argparse.Namespace,
+) -> None:
+    clauses = []
+    params: list[object] = []
+    if args.week:
+        clauses.append("week_label = ?")
+        params.append(args.week)
+    if args.project:
+        clauses.append("project_name = ?")
+        params.append(args.project)
+    where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    rows = connection.execute(
+        f"""
+        SELECT *
+        FROM project_intelligence_links
+        {where_sql}
+        ORDER BY week_label DESC, project_name ASC, linked_object_type ASC, id DESC
+        LIMIT ?
+        """,
+        (*params, max(1, int(args.limit or 10))),
+    ).fetchall()
+    lines.append(f"project_links ({len(rows)}):")
+    if not rows:
+        lines.append("  none")
+        return
+    for row in rows:
+        lines.append(
+            f"  project_link id={row['id']} project={row['project_name']} "
+            f"object={row['linked_object_type']}:{row['linked_object_id']} week={row['week_label'] or 'n/a'}"
+        )
+        lines.append(
+            f"    score={float(row['relevance_score'] or 0.0):.2f} active_project={row['active_project']} "
+            f"evidence_item_ids={_json_list_preview(row['evidence_item_ids_json'])}"
+        )
+        lines.append(f"    reason: {row['match_reason'] or 'n/a'}")
+        lines.append(f"    refresh_scope: {_json_dict_preview(row['refresh_scope_json'])}")
+
+
+def handle_memory_inspect_channel_intelligence(args: argparse.Namespace) -> int:
+    settings = load_settings()
+
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+
+        with sqlite3.connect(settings.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON;")
+            lines = [
+                "Channel Intelligence inspection",
+                "source_of_truth: channel_repeated_claims, claim_occurrences, channel_narratives, narrative_claim_links, source_observations, intelligence_entity_links, project_intelligence_links",
+                "refresh_rule: derived rows rebuilt by output.channel_intelligence refresh helpers; canonical inputs remain posts/evidence/feedback/decisions/usefulness logs",
+                "retrieval_path: week, project, topic, channel, status, and linked row IDs",
+                "debug_surface: claims, occurrences, narratives, source counters, entity links, project links, refresh_scope_json, counters_json",
+                (
+                    "scope: "
+                    f"kind={args.kind} week={args.week or 'any'} project={args.project or 'any'} "
+                    f"topic={args.topic or 'any'} channel={args.channel or 'any'} status={args.status or 'any'}"
+                ),
+            ]
+            if args.kind in {"all", "claims"}:
+                _append_channel_intelligence_claims(connection, lines, args)
+            if args.kind in {"all", "narratives"}:
+                _append_channel_intelligence_narratives(connection, lines, args)
+            if args.kind in {"all", "sources"}:
+                _append_channel_intelligence_sources(connection, lines, args)
+            if args.kind in {"all", "entity-links"}:
+                _append_channel_intelligence_entity_links(connection, lines, args)
+            if args.kind in {"all", "project-links"}:
+                _append_channel_intelligence_project_links(connection, lines, args)
+    except Exception as exc:
+        sys.stdout.write(f"Error inspecting Channel Intelligence: {exc}\n")
+        return 1
+
+    sys.stdout.write("\n".join(lines).rstrip() + "\n")
+    return 0
+
+
+def handle_channel_intelligence_report(args: argparse.Namespace) -> int:
+    from output.channel_intelligence_report import render_channel_intelligence_report
+
+    settings = load_settings()
+
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+
+        with sqlite3.connect(settings.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON;")
+            report = render_channel_intelligence_report(
+                connection,
+                week_label=args.week,
+                project_name=args.project,
+                topic_label=args.topic,
+                limit=args.limit,
+            )
+    except Exception as exc:
+        sys.stdout.write(f"Error rendering Channel Intelligence report: {exc}\n")
+        return 1
+
+    sys.stdout.write(report)
     return 0
 
 

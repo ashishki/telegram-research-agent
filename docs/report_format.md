@@ -41,8 +41,10 @@ Scannable — section headers, bullet points, source links inline per signal.
 
 Audit metadata for delivered Research Briefs is specified separately in
 `docs/research_brief_receipt.md`. Its SQLite schema/storage helpers are
-implemented; generation, delivery updates, verification, and CLI inspection
-remain planned. A Research Brief receipt is not reader-facing content.
+implemented, generation creates pending receipts, and delivery updates receipt
+refs; deterministic verification checks are implemented, while CLI inspection
+is available through `memory inspect-receipts` and operator review through
+`memory review-receipt`. A Research Brief receipt is not reader-facing content.
 
 ---
 

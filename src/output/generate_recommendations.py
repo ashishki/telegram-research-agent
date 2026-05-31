@@ -581,16 +581,34 @@ def _load_feedback_cards(connection: sqlite3.Connection, week_label: str, limit:
     ).fetchall()
 
 
+MAX_FEEDBACK_CARD_TEXT_CHARS = 420
+MAX_FEEDBACK_CARD_REASON_CHARS = 180
+
+
+def _truncate_card_text(value: str, limit: int) -> str:
+    clean = _strip_html(value)
+    if len(clean) <= limit:
+        return clean
+    trimmed = clean[: max(0, limit - 1)].rstrip()
+    split_at = trimmed.rfind(" ")
+    if split_at >= 60:
+        trimmed = trimmed[:split_at].rstrip()
+    return f"{trimmed}..."
+
+
 def _build_feedback_card_text(row: sqlite3.Row, week_label: str) -> str:
     title = _strip_html(str(row["title"] or "Implementation idea"))
     reason = _strip_html(str(row["reason"] or ""))
+    recommendation = str(row["recommendation"] or "")
+    label = "Do now" if recommendation == "do_now" else "Backlog" if recommendation == "backlog" else "Idea"
     lines = [
-        f"Идея {week_label} #{row['id']}",
-        title,
+        f"Implementation idea #{row['id']} | {week_label}",
+        f"{label}: {_truncate_card_text(title, 140)}",
     ]
     if reason:
-        lines.append(reason)
-    return "\n".join(lines)[:900]
+        lines.append(f"Why: {_truncate_card_text(reason, MAX_FEEDBACK_CARD_REASON_CHARS)}")
+    lines.append("Choose:")
+    return _truncate_card_text("\n".join(lines), MAX_FEEDBACK_CARD_TEXT_CHARS)
 
 
 def _send_feedback_cards(connection: sqlite3.Connection, week_label: str, token: str, chat_id: str) -> None:

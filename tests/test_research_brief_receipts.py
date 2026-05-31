@@ -9,6 +9,9 @@ from db.migrate import run_migrations
 from db.research_brief_receipts import (
     fetch_research_brief_receipts,
     record_research_brief_receipt,
+    review_research_brief_receipt,
+    update_research_brief_receipt_delivery_refs,
+    verify_research_brief_receipt,
 )
 
 
@@ -162,6 +165,19 @@ class TestResearchBriefReceipts(unittest.TestCase):
                     connection,
                     verification_status="pending",
                 )
+                by_artifact = fetch_research_brief_receipts(
+                    connection,
+                    artifact_path="data/output/digests/2026-W22.html",
+                )
+                update_research_brief_receipt_delivery_refs(
+                    connection,
+                    receipt_id="rbr_test_2026_w22",
+                    telegraph_url="https://telegra.ph/brief",
+                )
+                by_telegraph = fetch_research_brief_receipts(
+                    connection,
+                    telegraph_url="https://telegra.ph/brief",
+                )
         finally:
             os.unlink(db_path)
 
@@ -196,6 +212,8 @@ class TestResearchBriefReceipts(unittest.TestCase):
         self.assertEqual([row["receipt_id"] for row in by_week], ["rbr_test_2026_w22"])
         self.assertEqual([row["receipt_id"] for row in by_digest], ["rbr_test_2026_w22"])
         self.assertIn("rbr_test_2026_w22", [row["receipt_id"] for row in by_status])
+        self.assertEqual([row["receipt_id"] for row in by_artifact], ["rbr_test_2026_w22"])
+        self.assertEqual([row["receipt_id"] for row in by_telegraph], ["rbr_test_2026_w22"])
 
     def test_record_rejects_empty_week_label(self):
         db_path = self._make_db()
@@ -210,6 +228,274 @@ class TestResearchBriefReceipts(unittest.TestCase):
             os.unlink(db_path)
 
         self.assertEqual(count, 0)
+
+    def test_update_delivery_refs_merges_health_flags(self):
+        db_path = self._make_db()
+        try:
+            with sqlite3.connect(db_path) as connection:
+                connection.execute("PRAGMA foreign_keys = ON;")
+                digest_id = connection.execute(
+                    """
+                    INSERT INTO digests (
+                        week_label,
+                        generated_at,
+                        content_md,
+                        post_count
+                    )
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    ("2026-W22", "2026-05-29T09:00:00Z", "# Brief", 3),
+                ).lastrowid
+                connection.commit()
+
+                record_research_brief_receipt(
+                    connection,
+                    receipt_id="rbr_delivery_2026_w22",
+                    week_label="2026-W22",
+                    generated_at="2026-05-29T10:00:00Z",
+                    digest_id=digest_id,
+                    health_flags=["low_signal_alert"],
+                )
+                updated = update_research_brief_receipt_delivery_refs(
+                    connection,
+                    digest_id=digest_id,
+                    telegraph_url="https://telegra.ph/research-brief",
+                    telegram_delivery_timestamp="2026-05-29T10:05:00Z",
+                    telegram_message_id=12345,
+                    fallback_delivery="html_attachment",
+                    fallback_delivery_used=True,
+                    health_flags=["fallback_delivery", "low_signal_alert"],
+                )
+        finally:
+            os.unlink(db_path)
+
+        self.assertIsNotNone(updated)
+        assert updated is not None
+        self.assertEqual(updated["telegraph_url"], "https://telegra.ph/research-brief")
+        self.assertEqual(updated["telegram_delivery_timestamp"], "2026-05-29T10:05:00Z")
+        self.assertEqual(updated["telegram_message_id"], 12345)
+        self.assertEqual(updated["fallback_delivery"], "html_attachment")
+        self.assertTrue(updated["fallback_delivery_used"])
+        self.assertEqual(updated["health_flags"], ["low_signal_alert", "fallback_delivery"])
+
+    def test_verify_receipt_marks_verified_when_deterministic_checks_pass(self):
+        db_path = self._make_db()
+        artifact_paths: list[str] = []
+        try:
+            for suffix in (".md", ".json", ".html"):
+                tmp = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
+                tmp.write(b"artifact")
+                tmp.close()
+                artifact_paths.append(tmp.name)
+
+            with sqlite3.connect(db_path) as connection:
+                connection.execute("PRAGMA foreign_keys = ON;")
+                digest_id = connection.execute(
+                    """
+                    INSERT INTO digests (
+                        week_label,
+                        generated_at,
+                        content_md,
+                        post_count
+                    )
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    ("2026-W22", "2026-05-29T09:00:00Z", "# Brief", 2),
+                ).lastrowid
+                connection.commit()
+
+                record_research_brief_receipt(
+                    connection,
+                    receipt_id="rbr_verified_2026_w22",
+                    week_label="2026-W22",
+                    generated_at="2026-05-29T10:00:00Z",
+                    window_start="2026-05-22T00:00:00Z",
+                    window_end="2026-05-29T00:00:00Z",
+                    post_counts={"total_posts": 2, "strong_count": 1, "watch_count": 1},
+                    source_set={
+                        "telegram_source_links": ["https://t.me/source_a/123"],
+                        "source_post_ids": [1],
+                        "broad_fallback_used": False,
+                    },
+                    config_fingerprints={
+                        "scoring_config": {"sha256": "a"},
+                        "profile_config": {"sha256": "b"},
+                        "projects_config": {"sha256": "c"},
+                        "channels_config": {"sha256": "d"},
+                        "prompt_template": {"sha256": "e"},
+                    },
+                    digest_id=digest_id,
+                    markdown_path=artifact_paths[0],
+                    json_path=artifact_paths[1],
+                    html_path=artifact_paths[2],
+                    telegraph_url="https://telegra.ph/brief",
+                )
+                verified = verify_research_brief_receipt(connection, receipt_id="rbr_verified_2026_w22")
+        finally:
+            os.unlink(db_path)
+            for path in artifact_paths:
+                os.unlink(path)
+
+        self.assertIsNotNone(verified)
+        assert verified is not None
+        self.assertEqual(verified["verification_status"], "verified")
+        self.assertEqual(verified["verifier_method"], "deterministic_checks")
+        self.assertEqual(verified["checked_by"], "system")
+        self.assertIn("deterministic checks passed", verified["verifier_notes"])
+
+    def test_verify_receipt_marks_failed_for_broken_evidence_and_artifacts(self):
+        db_path = self._make_db()
+        try:
+            with sqlite3.connect(db_path) as connection:
+                connection.execute("PRAGMA foreign_keys = ON;")
+                digest_id = connection.execute(
+                    """
+                    INSERT INTO digests (
+                        week_label,
+                        generated_at,
+                        content_md,
+                        post_count
+                    )
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    ("2026-W22", "2026-05-29T09:00:00Z", "# Brief", 2),
+                ).lastrowid
+                connection.commit()
+
+                record_research_brief_receipt(
+                    connection,
+                    receipt_id="rbr_failed_2026_w22",
+                    week_label="2026-W22",
+                    generated_at="2026-05-29T10:00:00Z",
+                    window_start="2026-05-22T00:00:00Z",
+                    window_end="2026-05-29T00:00:00Z",
+                    post_counts={"total_posts": 2, "strong_count": 1, "watch_count": 0},
+                    source_set={
+                        "telegram_source_links": ["https://example.com/not-telegram"],
+                        "source_evidence_item_ids": [999],
+                        "source_post_ids": [1],
+                    },
+                    config_fingerprints={
+                        "scoring_config": {"sha256": "a"},
+                        "profile_config": {"sha256": "b"},
+                        "projects_config": {"sha256": "c"},
+                        "channels_config": {"sha256": "d"},
+                        "prompt_template": {"sha256": "e"},
+                    },
+                    digest_id=digest_id,
+                    markdown_path="/tmp/missing-research-brief.md",
+                    json_path="/tmp/missing-research-brief.json",
+                    html_path="/tmp/missing-research-brief.html",
+                    fallback_delivery="html_attachment",
+                    fallback_delivery_used=True,
+                )
+                failed = verify_research_brief_receipt(connection, receipt_id="rbr_failed_2026_w22")
+        finally:
+            os.unlink(db_path)
+
+        self.assertIsNotNone(failed)
+        assert failed is not None
+        self.assertEqual(failed["verification_status"], "failed")
+        self.assertIn("invalid Telegram source links", failed["verifier_notes"])
+        self.assertIn("source_evidence_item_ids do not resolve", failed["verifier_notes"])
+        self.assertIn("markdown artifact is missing", failed["verifier_notes"])
+
+    def test_verify_receipt_marks_needs_review_for_missing_model_usage(self):
+        db_path = self._make_db()
+        artifact_paths: list[str] = []
+        try:
+            for suffix in (".md", ".json", ".html"):
+                tmp = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
+                tmp.write(b"artifact")
+                tmp.close()
+                artifact_paths.append(tmp.name)
+
+            with sqlite3.connect(db_path) as connection:
+                connection.execute("PRAGMA foreign_keys = ON;")
+                digest_id = connection.execute(
+                    """
+                    INSERT INTO digests (
+                        week_label,
+                        generated_at,
+                        content_md,
+                        post_count
+                    )
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    ("2026-W22", "2026-05-29T09:00:00Z", "# Brief", 2),
+                ).lastrowid
+                connection.commit()
+
+                record_research_brief_receipt(
+                    connection,
+                    receipt_id="rbr_review_2026_w22",
+                    week_label="2026-W22",
+                    generated_at="2026-05-29T10:00:00Z",
+                    window_start="2026-05-22T00:00:00Z",
+                    window_end="2026-05-29T00:00:00Z",
+                    post_counts={"total_posts": 2, "strong_count": 0, "watch_count": 0},
+                    source_set={
+                        "telegram_source_links": ["https://t.me/source_a/123"],
+                        "source_post_ids": [1],
+                    },
+                    config_fingerprints={
+                        "scoring_config": {"sha256": "a"},
+                        "profile_config": {"sha256": "b"},
+                        "projects_config": {"sha256": "c"},
+                        "channels_config": {"sha256": "d"},
+                        "prompt_template": {"sha256": "e"},
+                    },
+                    llm_model="claude-test",
+                    digest_id=digest_id,
+                    markdown_path=artifact_paths[0],
+                    json_path=artifact_paths[1],
+                    html_path=artifact_paths[2],
+                    telegraph_url="https://telegra.ph/brief",
+                )
+                reviewed = verify_research_brief_receipt(connection, receipt_id="rbr_review_2026_w22")
+        finally:
+            os.unlink(db_path)
+            for path in artifact_paths:
+                os.unlink(path)
+
+        self.assertIsNotNone(reviewed)
+        assert reviewed is not None
+        self.assertEqual(reviewed["verification_status"], "needs_review")
+        self.assertIn("llm_usage_ids are missing", reviewed["verifier_notes"])
+        self.assertIn("low-signal week is missing low_signal_alert", reviewed["verifier_notes"])
+
+    def test_operator_review_updates_status_and_notes(self):
+        db_path = self._make_db()
+        try:
+            with sqlite3.connect(db_path) as connection:
+                record_research_brief_receipt(
+                    connection,
+                    receipt_id="rbr_operator_review_2026_w22",
+                    week_label="2026-W22",
+                    generated_at="2026-05-29T10:00:00Z",
+                )
+                reviewed = review_research_brief_receipt(
+                    connection,
+                    receipt_id="rbr_operator_review_2026_w22",
+                    verification_status="waived",
+                    verifier_notes="Accepted missing source link for known outage",
+                    checked_by="ashish",
+                )
+                with self.assertRaises(ValueError):
+                    review_research_brief_receipt(
+                        connection,
+                        receipt_id="rbr_operator_review_2026_w22",
+                        verification_status="pending",
+                    )
+        finally:
+            os.unlink(db_path)
+
+        self.assertIsNotNone(reviewed)
+        assert reviewed is not None
+        self.assertEqual(reviewed["verification_status"], "waived")
+        self.assertEqual(reviewed["verifier_method"], "operator_review")
+        self.assertEqual(reviewed["verifier_notes"], "Accepted missing source link for known outage")
+        self.assertEqual(reviewed["checked_by"], "ashish")
 
     def test_record_rejects_unsupported_verification_status(self):
         db_path = self._make_db()
