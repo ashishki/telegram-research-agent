@@ -9,6 +9,21 @@ from proof_receipts import (
 
 
 class TestCoreResearchBriefReceipt(unittest.TestCase):
+    REQUIRED_CORE_FIELDS = {
+        "type": str,
+        "schema_version": str,
+        "product_id": str,
+        "receipt_id": str,
+        "week_label": str,
+        "artifact_ref": str,
+        "artifact_sha256": str,
+        "generated_at": str,
+        "evidence_refs": list,
+        "verifier_status": str,
+        "verifier_notes": list,
+        "entropy_core_level": str,
+    }
+
     def _make_evidence_connection(self, evidence_ids: list[int] | None = None) -> sqlite3.Connection:
         connection = sqlite3.connect(":memory:")
         connection.execute("CREATE TABLE signal_evidence_items (id INTEGER PRIMARY KEY)")
@@ -46,6 +61,77 @@ class TestCoreResearchBriefReceipt(unittest.TestCase):
             {"signal_evidence_item", "telegram_source_link"},
         )
         self.assertEqual(len(core_receipt_sha256(receipt)), 64)
+
+    def test_core_research_brief_receipt_schema_contract_is_pinned(self):
+        receipt = build_core_research_brief_receipt(
+            {
+                "receipt_id": "rbr_schema",
+                "week_label": "2026-W22",
+                "generated_at": "2026-05-31T09:00:00Z",
+                "verification_status": "verified",
+                "markdown_path": "data/output/digests/2026-W22.md",
+                "source_set": {
+                    "source_evidence_item_ids": [101],
+                    "telegram_source_links": ["https://t.me/source_a/1"],
+                },
+            }
+        )
+
+        self.assertEqual(set(receipt), set(self.REQUIRED_CORE_FIELDS))
+        for field, expected_type in self.REQUIRED_CORE_FIELDS.items():
+            self.assertIsInstance(receipt[field], expected_type, field)
+        self.assertEqual(receipt["schema_version"], "entropy_core.product_receipt.v1")
+        self.assertEqual(receipt["verifier_status"], "passed")
+        self.assertRegex(receipt["artifact_sha256"], r"^[0-9a-f]{64}$")
+        self.assertEqual(len(receipt["evidence_refs"]), 2)
+        for evidence_ref in receipt["evidence_refs"]:
+            self.assertEqual(
+                set(evidence_ref),
+                {"ref_id", "ref_type", "supports", "checksum_sha256"},
+            )
+            self.assertIsInstance(evidence_ref["ref_id"], str)
+            self.assertIsInstance(evidence_ref["ref_type"], str)
+            self.assertIsInstance(evidence_ref["supports"], str)
+            self.assertRegex(evidence_ref["checksum_sha256"], r"^[0-9a-f]{64}$")
+
+    def test_core_receipt_hash_is_deterministic_for_equivalent_payloads(self):
+        payload_a = {
+            "type": "research_brief_receipt",
+            "schema_version": "entropy_core.product_receipt.v1",
+            "product_id": "telegram-research-agent",
+            "receipt_id": "rbr_hash",
+            "week_label": "2026-W22",
+            "artifact_ref": "data/output/digests/2026-W22.md",
+            "artifact_sha256": "0" * 64,
+            "generated_at": "2026-05-31T09:00:00Z",
+            "evidence_refs": [
+                {
+                    "ref_id": "signal_evidence_item:101",
+                    "ref_type": "signal_evidence_item",
+                    "supports": "2026-W22",
+                    "checksum_sha256": "1" * 64,
+                }
+            ],
+            "verifier_status": "passed",
+            "verifier_notes": [],
+            "entropy_core_level": "evidence_lookup_compatible",
+        }
+        payload_b = {
+            "week_label": "2026-W22",
+            "receipt_id": "rbr_hash",
+            "product_id": "telegram-research-agent",
+            "schema_version": "entropy_core.product_receipt.v1",
+            "type": "research_brief_receipt",
+            "artifact_ref": "data/output/digests/2026-W22.md",
+            "generated_at": "2026-05-31T09:00:00Z",
+            "artifact_sha256": "0" * 64,
+            "evidence_refs": payload_a["evidence_refs"],
+            "entropy_core_level": "evidence_lookup_compatible",
+            "verifier_notes": [],
+            "verifier_status": "passed",
+        }
+
+        self.assertEqual(core_receipt_sha256(payload_a), core_receipt_sha256(payload_b))
 
     def test_core_research_brief_receipt_requires_evidence_refs(self):
         with self.assertRaisesRegex(ValueError, "source evidence refs"):

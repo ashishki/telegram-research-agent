@@ -106,6 +106,18 @@ python3 src/main.py tune-suggestions
 # Inspect insight triage summary — counts by category, recent records, rejection memory
 python3 src/main.py insight-triage-stats
 
+# Monthly operator report — feedback, inline decisions, costs, receipt health
+python3 src/main.py operator-report --month 2026-05
+
+# Source down-rank reasons from observed local behavior
+python3 src/main.py memory explain-source-downrank --days 30 --limit 10
+
+# Product split gate for Telegram Channel Intelligence
+python3 src/main.py product-split-gate
+
+# Production validation evidence for Telegram reactions and inline callbacks
+python3 src/main.py ops-validate all --days 14
+
 # Debug why digest topics did not become project-linked Telegram signals
 python3 src/main.py memory diagnose-project-signals --week 2026-W20
 ```
@@ -136,6 +148,32 @@ state to `weekly_usefulness_logs` in the configured `AGENT_DB_PATH` database and
 prints the inserted row id plus per-field counts. It does not mutate
 `profile.yaml`, `channels.yaml`, project config, channel scores, or future brief
 generation logic yet.
+
+### Artifact Feedback
+
+Record feedback for a specific artifact section, item, or evidence group when a
+whole-week usefulness log is too broad:
+
+```bash
+python3 src/main.py log-artifact-feedback \
+  --week 2026-W22 \
+  --artifact-type research_brief \
+  --artifact-path data/output/digests/2026-W22.md \
+  --section "Evidence" \
+  --item-ref "claim-7" \
+  --feedback weak \
+  --evidence-id 101 \
+  --notes "Source was too thin"
+```
+
+Inspect stored artifact feedback:
+
+```bash
+python3 src/main.py memory inspect-artifact-feedback --week 2026-W22
+```
+
+This remains operator-authored local state. It does not become model-authored
+source trust by itself.
 
 ### Inline Feedback (from Telegram)
 

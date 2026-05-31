@@ -81,13 +81,9 @@ Implemented now:
   `signal_evidence_item:<id>` refs against local SQLite rows and checks
   Telegram source-link shape without an Entropy Core runtime.
 - `tests/test_core_research_brief_receipt.py` covers verified, pending, and
-  evidence lookup paths.
-
-Next implementation tasks:
-
-1. Use schema compatibility checks before changing receipt fields.
-2. Keep usefulness, delivery behavior, Telegram source parsing, and operator
-   review product-local.
+  evidence lookup, schema compatibility, and deterministic hash paths.
+- `tests/test_core_boundaries.py` keeps usefulness, delivery behavior,
+  Telegram source parsing, and operator review product-local.
 
 These tasks are tracked as `ENT-CORE-1` through `ENT-CORE-3` in
 `docs/tasks.md` and detailed in `docs/next_development_roadmap.md`.

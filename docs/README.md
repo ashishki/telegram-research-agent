@@ -10,13 +10,13 @@ This directory keeps active operator and implementation guidance at the top leve
 | `spec.md` | Implementation-facing system specification and maintenance lanes |
 | `PROJECT_PLAN.md` | Strategic project plan and near-term roadmap categories |
 | `next_development_roadmap.md` | Active next-step roadmap with AI-ready tasks, phases, acceptance criteria, and verification guidance |
-| `operator_workflow.md` | Weekly workflow, operator feedback, `log-usefulness`, tuning, and troubleshooting |
+| `operator_workflow.md` | Weekly workflow, operator feedback, artifact feedback, monthly report, OPS validation, tuning, and troubleshooting |
 | `report_format.md` | Weekly artifact contracts, boundaries, and Telegram source-link requirements |
 | `mvp_weekly_radar.md` | Demand-to-MVP Radar bridge, source-mix contract, and live-source credentials |
 | `research_brief_receipt.md` | Research Brief receipt audit contract with implemented SQLite schema/storage helpers, generation-time receipt creation, delivery ref updates, deterministic verification checks, CLI inspection, operator review, and optional operator-only audit notes for evidence window, source set, model/config, artifacts, delivery, and verification status |
 | `telegram_channel_intelligence.md` | Channel Intelligence design, schema migrations, deterministic repeated-claim extraction, source-observation refresh, active-project intelligence links, narrative candidate refresh, inspection CLI, and optional Markdown report surface for narratives, repeated claims, source observations, entity/topic links, project relevance joins, and weekly rollups |
 | `memory_architecture.md` | Implemented four-tier memory design |
-| `memory_inspection.md` | Memory/debug inspection CLI for evidence, decisions, snapshots, suppression, and project signals |
+| `memory_inspection.md` | Memory/debug inspection CLI for evidence, decisions, snapshots, suppression, artifact feedback, source down-rank reasons, receipts, and project signals |
 | `ops-security.md` | VPS, Telegram credential, and service security guidance |
 | `dev-cycle.md` | AI-assisted development workflow for this repo |
 | `tasks.md` | Current backlog and implemented-state checklist |

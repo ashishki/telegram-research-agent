@@ -35,19 +35,22 @@ Implemented:
 - Core-compatible Research Brief receipt adapter, weekly audit-note hash wiring,
   `memory inspect-core-receipt` for delivered briefs, and deterministic Core
   evidence lookup checks via `--verify-evidence`
+- Core receipt schema compatibility tests and product-local boundary guards
+- artifact-level operator feedback via `log-artifact-feedback` and
+  `memory inspect-artifact-feedback`
+- monthly operator report via `operator-report`
+- source down-rank explanations via `memory explain-source-downrank`
+- product split gate via `product-split-gate`
+- production validation surfaces for reaction sync and inline callbacks via
+  `ops-validate`
 
 ## Active Maintenance Queue
 
-| ID | Priority | Task | Notes |
-|---|---:|---|---|
-| ENT-CORE-2 | P0 | Add Core receipt schema compatibility checks | Pin required Core-compatible fields/types and deterministic hash behavior before future receipt-field changes |
-| ENT-CORE-3 | P0 | Preserve product-local receipt boundaries | Keep usefulness, delivery, Telegram source parsing, operator review, and digest generation local; Core remains derived proof vocabulary |
-| TRUST-1 | P1 | Surface source down-rank explanations | Show observed reasons for noisy/down-ranked sources from local reactions, scores, source links, claim outcomes, and project relevance |
-| RPT-1 | P1 | Add monthly operator report | Summarize reactions, inline decisions, usefulness, costs, empty/low-signal receipts, and fallback delivery |
-| OPS-1 | P1 | Validate reaction sync against live Telegram channels | Confirm current user reactions are visible through Telethon in production |
-| OPS-2 | P1 | Validate inline button callbacks in deployed bot polling | Requires bot process to run with callback updates enabled |
-| FBK-1 | P2 | Add artifact-level feedback | Let operator mark specific sections/items/artifacts beyond weekly usefulness logs |
-| PROD-1 | P2 | Define product split decision gate | Decide whether Telegram Channel Intelligence deserves a separate product workspace only after repeated operator value |
+No local implementation tasks remain in this queue.
+
+Production validation is now inspectable with `ops-validate`. If no live
+Telegram reaction or callback event has occurred in the selected window, the
+command reports `needs_live_event` rather than storing unverified success.
 
 ## Parking Lot
 

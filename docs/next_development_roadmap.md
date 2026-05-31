@@ -45,6 +45,9 @@ Implemented:
 - `src/proof_receipts.py` adapter and deterministic Core-compatible hash.
 - Deterministic Core evidence lookup checks through
   `memory inspect-core-receipt --verify-evidence`.
+- Core receipt schema compatibility tests and product-local boundary guards.
+- Artifact-level feedback, monthly operator reporting, source down-rank
+  explanations, product split gate, and OPS validation command surfaces.
 - Weekly audit notes include the Core-compatible hash when source evidence refs
   exist.
 - Channel Intelligence groundwork: schema migrations, repeated-claim
@@ -96,6 +99,12 @@ PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m uni
 
 ### ENT-CORE-2 - Core Receipt Schema Compatibility Checks
 
+Status: implemented.
+
+Implemented in `tests/test_core_research_brief_receipt.py` by pinning required
+fields, field types, evidence-ref structure, schema version, and deterministic
+hash behavior.
+
 Add a small schema compatibility test for the Core-compatible receipt payload.
 
 Expected behavior:
@@ -120,6 +129,11 @@ PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 tests/
 
 ### ENT-CORE-3 - Product-Local Boundary Guard
 
+Status: implemented.
+
+Implemented in `tests/test_core_boundaries.py`; Core remains derived proof
+vocabulary and receipt storage/delivery/review/usefulness stay product-local.
+
 Keep Entropy/Core as proof vocabulary only.
 
 Rules for future AI agents:
@@ -142,6 +156,11 @@ Goal: improve the feedback loop from weekly reports to system tuning.
 
 ### FBK-1 - Artifact-Level Feedback
 
+Status: implemented.
+
+Implemented via `artifact_feedback_logs`, `log-artifact-feedback`, and
+`memory inspect-artifact-feedback`.
+
 Add feedback that targets specific brief sections or artifacts, beyond the
 weekly usefulness log.
 
@@ -160,6 +179,10 @@ Acceptance criteria:
 - Feedback does not become model-authored source trust by itself.
 
 ### RPT-1 - Monthly Operator Report
+
+Status: implemented.
+
+Implemented via `operator-report --month YYYY-MM`.
 
 Add a monthly report summarizing system quality and usage.
 
@@ -185,6 +208,10 @@ Goal: make source ranking and down-ranking inspectable.
 
 ### TRUST-1 - Source Down-Rank Explanations
 
+Status: implemented.
+
+Implemented via `memory explain-source-downrank`.
+
 Surface why a channel/source is repeatedly down-ranked.
 
 Possible observed reasons:
@@ -207,6 +234,13 @@ Goal: prove the deployed Telegram loops work with live Telegram behavior.
 
 ### OPS-1 - Validate Reaction Sync Against Live Telegram Channels
 
+Status: implemented validation surface; live success depends on an observed
+Telegram reaction event.
+
+Implemented via `ops-validate reaction-sync`. The command reports `passed` when
+local `reaction_sync_state` contains recent Telegram reaction evidence and
+`needs_live_event` when no recent live event is present.
+
 Confirm current user reactions are visible through Telethon in production.
 
 Acceptance criteria:
@@ -216,6 +250,13 @@ Acceptance criteria:
 - Failure modes are documented if Telegram visibility is limited.
 
 ### OPS-2 - Validate Inline Button Callbacks In Deployed Bot Polling
+
+Status: implemented validation surface; live success depends on an observed
+Telegram callback event.
+
+Implemented via `ops-validate callbacks`. The command checks that callback
+updates are enabled in bot polling and reports `passed` when recent
+`telegram_button` decisions exist.
 
 Confirm inline callback dispatch works in the deployed bot process.
 
@@ -230,6 +271,11 @@ Acceptance criteria:
 Goal: decide whether Telegram Channel Intelligence deserves a productized split.
 
 ### PROD-1 - Product Split Decision Gate
+
+Status: implemented.
+
+Implemented via `product-split-gate`, which returns `go` only when the local
+evidence threshold is met; otherwise it returns `no_go`.
 
 Do not split into a product workspace until the private tool shows repeated
 operator value.

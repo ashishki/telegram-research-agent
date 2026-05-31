@@ -123,6 +123,32 @@ def build_parser() -> argparse.ArgumentParser:
     cost_stats_parser = subparsers.add_parser("cost-stats", help="Print aggregate LLM cost statistics")
     cost_stats_parser.set_defaults(handler=handle_cost_stats)
 
+    operator_report_parser = subparsers.add_parser(
+        "operator-report",
+        help="Render a monthly operator report from local feedback, costs, and receipt health",
+    )
+    operator_report_parser.add_argument("--month", default=None, help="Month in YYYY-MM format (default: current UTC month)")
+    operator_report_parser.set_defaults(handler=handle_operator_report)
+
+    product_split_parser = subparsers.add_parser(
+        "product-split-gate",
+        help="Evaluate whether Telegram Channel Intelligence is ready for a product split",
+    )
+    product_split_parser.set_defaults(handler=handle_product_split_gate)
+
+    ops_parser = subparsers.add_parser(
+        "ops-validate",
+        help="Validate production Telegram reaction and callback evidence from local state",
+    )
+    ops_parser.add_argument(
+        "kind",
+        nargs="?",
+        choices=["all", "reaction-sync", "callbacks"],
+        default="all",
+    )
+    ops_parser.add_argument("--days", type=int, default=14)
+    ops_parser.set_defaults(handler=handle_ops_validate)
+
     health_check_parser = subparsers.add_parser("health-check", help="Print DB and config health information")
     health_check_parser.set_defaults(handler=handle_health_check)
 
@@ -161,6 +187,29 @@ def build_parser() -> argparse.ArgumentParser:
     usefulness_parser.add_argument("--notes", default=None)
     usefulness_parser.set_defaults(handler=handle_log_usefulness)
 
+    artifact_feedback_parser = subparsers.add_parser(
+        "log-artifact-feedback",
+        help="Record operator feedback for a specific report artifact section or item",
+    )
+    artifact_feedback_parser.add_argument("--week", required=True, help="ISO week label, e.g. 2026-W22")
+    artifact_feedback_parser.add_argument(
+        "--feedback",
+        required=True,
+        choices=["useful", "weak", "noisy", "decision-impacting", "decision_impacting"],
+    )
+    artifact_feedback_parser.add_argument(
+        "--artifact-type",
+        default="research_brief",
+        choices=["research_brief", "implementation_ideas", "study_plan", "channel_intelligence", "other"],
+    )
+    artifact_feedback_parser.add_argument("--artifact-path", default=None)
+    artifact_feedback_parser.add_argument("--digest-id", type=int, default=None)
+    artifact_feedback_parser.add_argument("--section", default=None)
+    artifact_feedback_parser.add_argument("--item-ref", default=None)
+    artifact_feedback_parser.add_argument("--evidence-id", action="append", default=[])
+    artifact_feedback_parser.add_argument("--notes", default=None)
+    artifact_feedback_parser.set_defaults(handler=handle_log_artifact_feedback)
+
     memory_parser = subparsers.add_parser(
         "memory",
         help="Inspect memory surfaces (evidence, decisions, snapshots)",
@@ -189,6 +238,27 @@ def build_parser() -> argparse.ArgumentParser:
     isupp_parser = memory_sub.add_parser("inspect-suppression")
     isupp_parser.add_argument("--title", required=True)
     isupp_parser.set_defaults(handler=handle_memory_inspect_suppression)
+
+    af_parser = memory_sub.add_parser(
+        "inspect-artifact-feedback",
+        help="Inspect artifact-level operator feedback",
+    )
+    af_parser.add_argument("--week", default=None)
+    af_parser.add_argument("--artifact-type", default=None)
+    af_parser.add_argument("--artifact-path", default=None)
+    af_parser.add_argument("--digest-id", type=int, default=None)
+    af_parser.add_argument("--feedback", default=None)
+    af_parser.add_argument("--limit", type=int, default=20)
+    af_parser.set_defaults(handler=handle_memory_inspect_artifact_feedback)
+
+    downrank_parser = memory_sub.add_parser(
+        "explain-source-downrank",
+        help="Explain source down-rank signals from observed local behavior",
+    )
+    downrank_parser.add_argument("--channel", default=None)
+    downrank_parser.add_argument("--days", type=int, default=30)
+    downrank_parser.add_argument("--limit", type=int, default=10)
+    downrank_parser.set_defaults(handler=handle_memory_explain_source_downrank)
 
     diag_parser = memory_sub.add_parser(
         "diagnose-project-signals",
@@ -795,6 +865,72 @@ def handle_cost_stats(_: argparse.Namespace) -> int:
     return 0
 
 
+def handle_operator_report(args: argparse.Namespace) -> int:
+    from output.operator_report import build_monthly_operator_report
+
+    settings = load_settings()
+
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+
+        with sqlite3.connect(settings.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON;")
+            report = build_monthly_operator_report(connection, month=args.month)
+    except Exception as exc:
+        sys.stdout.write(f"Error rendering operator report: {exc}\n")
+        return 1
+
+    sys.stdout.write(report)
+    return 0
+
+
+def handle_product_split_gate(_: argparse.Namespace) -> int:
+    from output.product_split import evaluate_product_split_gate, format_product_split_gate
+
+    settings = load_settings()
+
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+
+        with sqlite3.connect(settings.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON;")
+            evaluation = evaluate_product_split_gate(connection)
+    except Exception as exc:
+        sys.stdout.write(f"Error evaluating product split gate: {exc}\n")
+        return 1
+
+    sys.stdout.write(format_product_split_gate(evaluation))
+    return 0
+
+
+def handle_ops_validate(args: argparse.Namespace) -> int:
+    from output.ops_validation import format_ops_validation, validate_ops
+
+    settings = load_settings()
+
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+
+        with sqlite3.connect(settings.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON;")
+            results = validate_ops(connection, kind=args.kind, days=args.days)
+    except Exception as exc:
+        sys.stdout.write(f"Error validating ops paths: {exc}\n")
+        return 1
+
+    sys.stdout.write(format_ops_validation(results))
+    return 0
+
+
 def _config_status_lines() -> list[str]:
     config_paths = (
         PROJECT_ROOT / "src" / "config" / "profile.yaml",
@@ -1252,6 +1388,53 @@ def handle_log_usefulness(args: argparse.Namespace) -> int:
     return 0
 
 
+def handle_log_artifact_feedback(args: argparse.Namespace) -> int:
+    from db.artifact_feedback import record_artifact_feedback
+
+    settings = load_settings()
+
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+
+        with sqlite3.connect(settings.db_path) as connection:
+            connection.execute("PRAGMA foreign_keys = ON;")
+            connection.execute("PRAGMA journal_mode = WAL;")
+            feedback = record_artifact_feedback(
+                connection,
+                week_label=args.week,
+                artifact_type=args.artifact_type,
+                artifact_path=args.artifact_path,
+                digest_id=args.digest_id,
+                section=args.section,
+                item_ref=args.item_ref,
+                feedback=args.feedback,
+                source_evidence_item_ids=args.evidence_id,
+                notes=args.notes,
+            )
+    except Exception as exc:
+        LOGGER.exception("Artifact feedback recording failed")
+        sys.stdout.write(f"Failed to record artifact feedback: {exc}\n")
+        return 1
+
+    lines = [
+        f"Recorded artifact feedback id={feedback['id']} week={feedback['week_label']}",
+        f"artifact_type={feedback['artifact_type']} feedback={feedback['feedback']}",
+        f"target=section:{feedback.get('section') or 'n/a'} item_ref:{feedback.get('item_ref') or 'n/a'}",
+        f"evidence_ids={_format_receipt_list(feedback.get('source_evidence_item_ids'))}",
+        f"recorded_at={feedback['recorded_at']}",
+    ]
+    if feedback.get("artifact_path"):
+        lines.append(f"artifact_path={feedback['artifact_path']}")
+    if feedback.get("digest_id") is not None:
+        lines.append(f"digest_id={feedback['digest_id']}")
+    if feedback.get("notes"):
+        lines.append(f"notes={feedback['notes']}")
+    sys.stdout.write("\n".join(lines) + "\n")
+    return 0
+
+
 def handle_memory_inspect_evidence(args: argparse.Namespace) -> int:
     from db.retrieval import fetch_evidence_items
 
@@ -1296,6 +1479,80 @@ def handle_memory_inspect_evidence(args: argparse.Namespace) -> int:
         lines.append("")
 
     sys.stdout.write("\n".join(lines).rstrip() + "\n")
+    return 0
+
+
+def _format_artifact_feedback(feedback: dict) -> str:
+    lines = [
+        f"ArtifactFeedback {feedback.get('id')}",
+        f"  week={feedback.get('week_label') or 'n/a'} type={feedback.get('artifact_type') or 'n/a'} feedback={feedback.get('feedback') or 'n/a'}",
+        f"  artifact_path={feedback.get('artifact_path') or 'n/a'} digest_id={feedback.get('digest_id') or 'n/a'}",
+        f"  target: section={feedback.get('section') or 'n/a'} item_ref={feedback.get('item_ref') or 'n/a'}",
+        f"  source_evidence_item_ids={_format_receipt_list(feedback.get('source_evidence_item_ids'))}",
+        f"  recorded_at={feedback.get('recorded_at') or 'n/a'} recorded_by={feedback.get('recorded_by') or 'n/a'}",
+        f"  notes={feedback.get('notes') or 'n/a'}",
+    ]
+    return "\n".join(lines)
+
+
+def handle_memory_inspect_artifact_feedback(args: argparse.Namespace) -> int:
+    from db.artifact_feedback import fetch_artifact_feedback
+
+    settings = load_settings()
+
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+
+        with sqlite3.connect(settings.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON;")
+            rows = fetch_artifact_feedback(
+                connection,
+                week_label=args.week,
+                artifact_type=args.artifact_type,
+                artifact_path=args.artifact_path,
+                digest_id=args.digest_id,
+                feedback=args.feedback,
+                limit=args.limit,
+            )
+    except Exception as exc:
+        sys.stdout.write(f"Error inspecting artifact feedback: {exc}\n")
+        return 1
+
+    if not rows:
+        sys.stdout.write("No artifact feedback found for the given scope.\n")
+        return 0
+
+    sys.stdout.write(("\n\n".join(_format_artifact_feedback(row) for row in rows)).rstrip() + "\n")
+    return 0
+
+
+def handle_memory_explain_source_downrank(args: argparse.Namespace) -> int:
+    from output.source_trust import explain_source_downrank, format_source_downrank_explanations
+
+    settings = load_settings()
+
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+
+        with sqlite3.connect(settings.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON;")
+            explanations = explain_source_downrank(
+                connection,
+                channel=args.channel,
+                days=args.days,
+                limit=args.limit,
+            )
+    except Exception as exc:
+        sys.stdout.write(f"Error explaining source down-rank signals: {exc}\n")
+        return 1
+
+    sys.stdout.write(format_source_downrank_explanations(explanations))
     return 0
 
 

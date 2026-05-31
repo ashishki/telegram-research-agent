@@ -251,6 +251,34 @@ local SQLite rows and Telegram post URL shape.
 
 ---
 
+### inspect-artifact-feedback
+
+Inspect operator feedback that targets a specific artifact section, item, or
+evidence group.
+
+```
+python -m src.main memory inspect-artifact-feedback [--week LABEL] [--artifact-type TYPE] [--artifact-path PATH] [--digest-id ID] [--feedback VALUE] [--limit N]
+```
+
+Feedback values are `useful`, `weak`, `noisy`, or `decision_impacting`.
+
+---
+
+### explain-source-downrank
+
+Explain why a source/channel is being down-ranked from observed local behavior:
+noise buckets, missing source links, low-signal tags, skipped feedback, source
+observations, and low project relevance.
+
+```
+python -m src.main memory explain-source-downrank [--channel USERNAME] [--days N] [--limit N]
+```
+
+The output is deterministic and does not store model-generated source trust as
+fact.
+
+---
+
 ### review-receipt
 
 Record an operator review status for a Research Brief receipt. This updates

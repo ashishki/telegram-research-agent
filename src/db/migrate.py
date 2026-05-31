@@ -254,6 +254,44 @@ def run_migrations() -> Path:
         )
         connection.executescript(
             """
+            CREATE TABLE IF NOT EXISTS artifact_feedback_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                week_label TEXT NOT NULL CHECK(length(trim(week_label)) > 0),
+                artifact_type TEXT NOT NULL DEFAULT 'research_brief'
+                    CHECK(artifact_type IN (
+                        'research_brief',
+                        'implementation_ideas',
+                        'study_plan',
+                        'channel_intelligence',
+                        'other'
+                    )),
+                artifact_path TEXT,
+                digest_id INTEGER,
+                section TEXT,
+                item_ref TEXT,
+                feedback TEXT NOT NULL
+                    CHECK(feedback IN ('useful', 'weak', 'noisy', 'decision_impacting')),
+                source_evidence_item_ids_json TEXT NOT NULL DEFAULT '[]'
+                    CHECK(json_valid(source_evidence_item_ids_json)),
+                notes TEXT,
+                recorded_at TEXT NOT NULL,
+                recorded_by TEXT NOT NULL DEFAULT 'operator',
+                FOREIGN KEY(digest_id) REFERENCES digests(id) ON DELETE SET NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_artifact_feedback_week_label
+                ON artifact_feedback_logs(week_label);
+            CREATE INDEX IF NOT EXISTS idx_artifact_feedback_artifact_type
+                ON artifact_feedback_logs(artifact_type);
+            CREATE INDEX IF NOT EXISTS idx_artifact_feedback_feedback
+                ON artifact_feedback_logs(feedback);
+            CREATE INDEX IF NOT EXISTS idx_artifact_feedback_digest_id
+                ON artifact_feedback_logs(digest_id);
+            CREATE INDEX IF NOT EXISTS idx_artifact_feedback_recorded_at
+                ON artifact_feedback_logs(recorded_at);
+            """
+        )
+        connection.executescript(
+            """
             CREATE TABLE IF NOT EXISTS research_brief_receipts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 receipt_id TEXT NOT NULL UNIQUE,

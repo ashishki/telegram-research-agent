@@ -52,17 +52,18 @@ development queue.
 - Keep implemented `research_brief_receipt` storage and verification as the
   local source of truth.
 - Use implemented CLI inspection for the Core-compatible receipt view.
-- Add evidence window per report.
-- Add evidence lookup checks for Core-compatible receipt refs.
-- Add reviewer/referee pass for high-impact claims.
+- Evidence lookup checks for Core-compatible receipt refs are implemented.
+- Schema compatibility and product-local boundary guards are implemented.
+- Add reviewer/referee pass for high-impact claims after source trust
+  explanations have accumulated enough observed evidence.
 - Follow `docs/entropy_core_gensyn_integration.md`; Entropy Core is optional
   receipt vocabulary, not a runtime dependency.
 
 ### P1 - Operator Feedback And Reporting
 
-- Add artifact-level feedback beyond weekly usefulness logs.
-- Add monthly operator report summarizing reactions, button decisions, costs,
-  low-signal weeks, and fallback delivery.
+- Artifact-level feedback beyond weekly usefulness logs is implemented.
+- Monthly operator report summarizing reactions, button decisions, costs,
+  low-signal weeks, and fallback delivery is implemented.
 - Keep all feedback product-local and based on observed behavior.
 
 ### P2 - Product Split
