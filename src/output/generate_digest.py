@@ -18,6 +18,7 @@ from llm.router import route
 from output import generate_recommendations as recommendations_module
 from output.render_report import write_report_html
 from output.signal_report import format_signal_report
+from proof_receipts import build_core_research_brief_receipt, core_receipt_sha256
 from output.report_schema import (
     DigestResult,
     EvidenceItem,
@@ -170,15 +171,37 @@ def _build_receipt_audit_note(receipt: dict | None) -> str | None:
     status = str(receipt.get("verification_status") or "pending")
     flags = [str(flag) for flag in receipt.get("health_flags", []) if str(flag).strip()]
     fallback_used = bool(receipt.get("fallback_delivery_used"))
-    if status == "pending" and not flags and not fallback_used:
+    core_hash = _build_core_receipt_hash(receipt)
+    if status == "pending" and not flags and not fallback_used and not core_hash:
         return None
 
     parts = [f"Receipt: {status}"]
+    if core_hash:
+        parts.append(f"core_sha256={core_hash}")
     if flags:
         parts.append(f"flags={', '.join(flags[:4])}")
     if fallback_used:
         parts.append(f"fallback={receipt.get('fallback_delivery') or 'yes'}")
     return " | ".join(parts)[:220]
+
+
+def _build_core_receipt_hash(receipt: dict) -> str | None:
+    try:
+        return core_receipt_sha256(build_core_research_brief_receipt(receipt))
+    except ValueError as exc:
+        LOGGER.info(
+            "Core-compatible receipt unavailable receipt_id=%s reason=%s",
+            receipt.get("receipt_id") or "n/a",
+            exc,
+        )
+        return None
+    except Exception:
+        LOGGER.warning(
+            "Failed to build Core-compatible receipt hash receipt_id=%s",
+            receipt.get("receipt_id") or "n/a",
+            exc_info=True,
+        )
+        return None
 
 
 def _build_digest_health_alert(

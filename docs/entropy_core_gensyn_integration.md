@@ -73,18 +73,19 @@ Implemented now:
   artifact ref/hash, evidence refs, verifier status, and deterministic receipt
   hash.
 - The adapter rejects Research Brief receipts without source evidence refs.
+- Weekly Research Brief delivery audit notes include the Core-compatible
+  receipt hash when the stored local receipt has source evidence refs.
+- `memory inspect-core-receipt` prints the Core-compatible receipt view for a
+  delivered brief.
 - `tests/test_core_research_brief_receipt.py` covers verified, pending, and
   missing-evidence paths.
 
 Next implementation tasks:
 
-1. Add an `inspect-core-receipt` CLI command for a delivered brief.
-2. Persist the Core-compatible receipt hash in operator audit notes or a small
-   receipt index without changing the canonical SQLite row contract.
-3. Add Core-style evidence lookup checks for delivered briefs and future
+1. Add Core-style evidence lookup checks for delivered briefs and future
    channel intelligence receipts.
-4. Use schema compatibility checks before changing receipt fields.
-5. Keep usefulness, delivery behavior, Telegram source parsing, and operator
+2. Use schema compatibility checks before changing receipt fields.
+3. Keep usefulness, delivery behavior, Telegram source parsing, and operator
    review product-local.
 
 Core value here: prove what inputs and evidence produced a brief, and make

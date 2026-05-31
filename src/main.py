@@ -212,6 +212,19 @@ def build_parser() -> argparse.ArgumentParser:
     receipt_parser.add_argument("--limit", type=int, default=10)
     receipt_parser.set_defaults(handler=handle_memory_inspect_receipts)
 
+    core_receipt_parser = memory_sub.add_parser(
+        "inspect-core-receipt",
+        help="Print the Core-compatible Research Brief receipt view",
+    )
+    core_receipt_parser.add_argument("--receipt-id", default=None)
+    core_receipt_parser.add_argument("--week", default=None)
+    core_receipt_parser.add_argument("--digest-id", type=int, default=None)
+    core_receipt_parser.add_argument("--artifact-path", default=None)
+    core_receipt_parser.add_argument("--telegraph-url", default=None)
+    core_receipt_parser.add_argument("--status", default=None)
+    core_receipt_parser.add_argument("--limit", type=int, default=1)
+    core_receipt_parser.set_defaults(handler=handle_memory_inspect_core_receipt)
+
     receipt_review_parser = memory_sub.add_parser(
         "review-receipt",
         help="Record operator review status for a Research Brief receipt",
@@ -1529,6 +1542,56 @@ def handle_memory_inspect_receipts(args: argparse.Namespace) -> int:
         return 0
 
     sys.stdout.write(("\n\n".join(_format_research_brief_receipt(receipt) for receipt in receipts)).rstrip() + "\n")
+    return 0
+
+
+def handle_memory_inspect_core_receipt(args: argparse.Namespace) -> int:
+    from db.research_brief_receipts import fetch_research_brief_receipts
+    from proof_receipts import build_core_research_brief_receipt, core_receipt_sha256
+
+    settings = load_settings()
+
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+
+        with sqlite3.connect(settings.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON;")
+            receipts = fetch_research_brief_receipts(
+                connection,
+                receipt_id=args.receipt_id,
+                week_label=args.week,
+                digest_id=args.digest_id,
+                verification_status=args.status,
+                artifact_path=args.artifact_path,
+                telegraph_url=args.telegraph_url,
+                limit=args.limit,
+            )
+    except Exception as exc:
+        sys.stdout.write(f"Error inspecting Core-compatible Research Brief receipt: {exc}\n")
+        return 1
+
+    if not receipts:
+        sys.stdout.write("No Research Brief receipts found for the given scope.\n")
+        return 0
+
+    core_receipts = []
+    for receipt in receipts:
+        try:
+            core_receipt = build_core_research_brief_receipt(receipt)
+        except Exception as exc:
+            sys.stdout.write(
+                f"Error building Core-compatible receipt {receipt.get('receipt_id') or 'n/a'}: {exc}\n"
+            )
+            return 1
+        core_receipt["receipt_sha256"] = core_receipt_sha256(core_receipt)
+        core_receipts.append(core_receipt)
+
+    payload: dict | list[dict]
+    payload = core_receipts[0] if len(core_receipts) == 1 else core_receipts
+    sys.stdout.write(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
     return 0
 
 

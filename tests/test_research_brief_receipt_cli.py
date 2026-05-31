@@ -1,4 +1,5 @@
 import io
+import json
 import os
 import sqlite3
 import sys
@@ -119,6 +120,42 @@ class TestResearchBriefReceiptCli(unittest.TestCase):
         self.assertIn("debug_surface: identity, evidence window, source set", output)
         self.assertIn("delivery: telegraph=https://telegra.ph/brief", output)
         self.assertIn("verification: status=pending", output)
+
+    def test_memory_inspect_core_receipt_prints_core_compatible_json(self):
+        db_path = self._make_receipt_db()
+        stdout = io.StringIO()
+        try:
+            with patch.dict(os.environ, {"AGENT_DB_PATH": db_path}, clear=False):
+                with patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "main.py",
+                        "memory",
+                        "inspect-core-receipt",
+                        "--week",
+                        "2026-W22",
+                    ],
+                ):
+                    with redirect_stdout(stdout):
+                        exit_code = main.main()
+        finally:
+            os.unlink(db_path)
+
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(payload["type"], "research_brief_receipt")
+        self.assertEqual(payload["schema_version"], "entropy_core.product_receipt.v1")
+        self.assertEqual(payload["product_id"], "telegram-research-agent")
+        self.assertEqual(payload["receipt_id"], "rbr_cli_2026_w22")
+        self.assertEqual(payload["week_label"], "2026-W22")
+        self.assertEqual(payload["verifier_status"], "needs_review")
+        self.assertEqual(payload["entropy_core_level"], "evidence_lookup_compatible")
+        self.assertEqual(len(payload["receipt_sha256"]), 64)
+        self.assertEqual(
+            [ref["ref_type"] for ref in payload["evidence_refs"]],
+            ["telegram_source_link"],
+        )
 
     def test_memory_review_receipt_updates_operator_status(self):
         db_path = self._make_receipt_db()

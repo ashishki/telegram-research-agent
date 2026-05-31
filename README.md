@@ -83,6 +83,7 @@ python3 src/main.py memory inspect-decisions --scope insight --limit 10
 python3 src/main.py memory inspect-snapshots --stale-only
 python3 src/main.py memory inspect-suppression --title "TITLE"
 python3 src/main.py memory inspect-receipts --week 2026-W22
+python3 src/main.py memory inspect-core-receipt --week 2026-W22
 python3 src/main.py memory review-receipt --receipt-id rbr_... --status waived --notes "Accepted after manual read"
 python3 src/main.py memory diagnose-project-signals --week 2026-W20
 python3 src/main.py memory inspect-channel-intelligence --week 2026-W22 --project telegram-research-agent

@@ -140,6 +140,26 @@ class TestDigestHealthAlert(unittest.TestCase):
 
         self.assertEqual(note, "Receipt: needs_review | flags=low_signal_alert | fallback=html_attachment")
 
+    def test_receipt_audit_note_includes_core_hash_when_receipt_is_buildable(self):
+        note = gd._build_receipt_audit_note(
+            {
+                "receipt_id": "rbr_2026_w14",
+                "week_label": "2026-W14",
+                "generated_at": "2026-03-30T12:00:00Z",
+                "verification_status": "pending",
+                "markdown_path": "/tmp/2026-W14.md",
+                "source_set": {
+                    "telegram_source_links": ["https://t.me/source_a/123"],
+                },
+                "health_flags": [],
+            }
+        )
+
+        self.assertIsNotNone(note)
+        assert note is not None
+        self.assertIn("Receipt: pending", note)
+        self.assertRegex(note, r"core_sha256=[0-9a-f]{64}")
+
 
 class TestDigestHelpers(unittest.TestCase):
     def _make_long_text(self, word_count: int) -> str:
@@ -545,6 +565,36 @@ class TestRunDigestFixes(unittest.TestCase):
             self.assertEqual(receipt["json_path"], "/tmp/2026-W14.json")
             self.assertEqual(receipt["html_path"], "/tmp/2026-W14.html")
             self.assertEqual(receipt["health_flags"], [])
+        finally:
+            os.unlink(db_path)
+
+    def test_run_digest_passes_core_receipt_hash_audit_note_to_delivery(self):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+            db_path = tmp.name
+
+        try:
+            self._build_digest_db(db_path)
+            settings = self._make_settings(db_path)
+            fixed_now = datetime(2026, 3, 30, 12, 0, tzinfo=timezone.utc)
+
+            with patch.object(gd, "_utc_now", return_value=fixed_now):
+                with patch.object(gd, "_compute_week_label", return_value="2026-W14"):
+                    with patch.object(gd, "score_posts", return_value={"strong": 1, "watch": 1, "cultural": 1, "noise": 1, "avg_signal_score": 0.475}):
+                        with patch.object(gd, "_load_prompt_sections", return_value=("system", "week={week_label}")):
+                            with patch.object(gd, "complete", return_value="digest output words"):
+                                with patch.object(gd, "_append_github_section", side_effect=lambda content, settings: content):
+                                    with patch.object(gd, "_write_digest_file", return_value=gd.Path("/tmp/2026-W14.md")):
+                                        with patch.object(gd, "_write_digest_json_file", return_value=gd.Path("/tmp/2026-W14.json")):
+                                            with patch.object(gd, "write_report_html", return_value=gd.Path("/tmp/2026-W14.html")):
+                                                with patch.object(gd, "_send_weekly_review_to_telegram_owner") as send_mock:
+                                                    with patch("output.generate_recommendations.run_recommendations", return_value={"text": ""}):
+                                                        gd.run_digest(settings)
+
+            send_mock.assert_called_once()
+            receipt_audit_note = send_mock.call_args.kwargs["receipt_audit_note"]
+            self.assertIsNotNone(receipt_audit_note)
+            self.assertIn("Receipt: pending", receipt_audit_note)
+            self.assertRegex(receipt_audit_note, r"core_sha256=[0-9a-f]{64}")
         finally:
             os.unlink(db_path)
 
