@@ -20,7 +20,7 @@ vendored component, adapted code, pattern-only reuse, or rejection.
 
 ## Entropy Core Use
 
-Default level: receipt-compatible.
+Default level: receipt-compatible now; evidence-lookup compatible next.
 
 Entropy Core is optional vocabulary only for this repository. Local receipt
 generation, storage, delivery, verification, and inspection must not require an
@@ -58,6 +58,26 @@ entropy_core:
 The detailed local contract for `research_brief_receipt` lives in
 `docs/research_brief_receipt.md` and keeps the same vocabulary for evidence
 window, source set, artifact refs, verifier method, and verification status.
+
+## Proof Layer Implementation
+
+The Telegram Research Agent already has product-local receipts and verification
+checks. Entropy Core should be used as a downstream proof contract, not as
+runtime storage or generation logic.
+
+Implementation path:
+
+1. Add a stable Core-compatible schema id to `research_brief_receipt`.
+2. Ensure receipt evidence refs point to canonical digest/evidence/source rows.
+3. Add Core-style evidence lookup checks for delivered briefs and future
+   channel intelligence receipts.
+4. Use schema compatibility checks before changing receipt fields.
+5. Keep usefulness, delivery behavior, Telegram source parsing, and operator
+   review product-local.
+
+Core value here: prove what inputs and evidence produced a brief, and make
+stale or missing receipt evidence visible before the operator trusts a weekly
+summary.
 
 ## Required Context-Refs
 
