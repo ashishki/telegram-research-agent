@@ -88,6 +88,9 @@ Next implementation tasks:
 3. Keep usefulness, delivery behavior, Telegram source parsing, and operator
    review product-local.
 
+These tasks are tracked as `ENT-CORE-1` through `ENT-CORE-3` in
+`docs/tasks.md` and detailed in `docs/next_development_roadmap.md`.
+
 Core value here: prove what inputs and evidence produced a brief, and make
 stale or missing receipt evidence visible before the operator trusts a weekly
 summary.

@@ -122,6 +122,8 @@ Radar live-source credentials are loaded separately by `systemd/telegram-mvp-wee
 Start here:
 
 - [docs/README.md](docs/README.md) — documentation map
+- [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) — strategic project plan
+- [docs/next_development_roadmap.md](docs/next_development_roadmap.md) — next development roadmap and AI-ready tasks
 - [docs/operator_workflow.md](docs/operator_workflow.md) — weekly operating workflow
 - [docs/architecture.md](docs/architecture.md) — current system shape
 - [docs/spec.md](docs/spec.md) — implementation-facing system specification

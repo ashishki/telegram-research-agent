@@ -14,6 +14,10 @@ backed analysis of narratives, sources, claims, and project-relevant signals.
 
 ## Near-Term Roadmap
 
+Execution details for the next development cycle live in
+`docs/next_development_roadmap.md`. `docs/tasks.md` is the active AI
+development queue.
+
 ### P0 - Operator Usefulness Log
 
 - Track weekly:
@@ -30,6 +34,9 @@ backed analysis of narratives, sources, claims, and project-relevant signals.
 - Separate summaries from recommendations.
 - Use `src/proof_receipts.py` to expose Core-compatible Research Brief receipt
   views for delivered weekly briefs.
+- Add deterministic Core-style evidence lookup checks for delivered Research
+  Brief receipts.
+- Pin Core-compatible receipt schema fields before changing receipt contracts.
 
 ### P1 - Channel Intelligence Layer
 
@@ -38,16 +45,25 @@ backed analysis of narratives, sources, claims, and project-relevant signals.
 - Track source trust signals.
 - Add topic/entity graph.
 - Connect project relevance to current portfolio tasks.
+- Surface source down-rank explanations from observed local behavior.
 
 ### P1 - Entropy Integration
 
 - Keep implemented `research_brief_receipt` storage and verification as the
   local source of truth.
-- Add CLI inspection for the Core-compatible receipt view.
+- Use implemented CLI inspection for the Core-compatible receipt view.
 - Add evidence window per report.
+- Add evidence lookup checks for Core-compatible receipt refs.
 - Add reviewer/referee pass for high-impact claims.
 - Follow `docs/entropy_core_gensyn_integration.md`; Entropy Core is optional
   receipt vocabulary, not a runtime dependency.
+
+### P1 - Operator Feedback And Reporting
+
+- Add artifact-level feedback beyond weekly usefulness logs.
+- Add monthly operator report summarizing reactions, button decisions, costs,
+  low-signal weeks, and fallback delivery.
+- Keep all feedback product-local and based on observed behavior.
 
 ### P2 - Product Split
 

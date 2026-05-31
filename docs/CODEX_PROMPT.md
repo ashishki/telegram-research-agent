@@ -18,6 +18,10 @@ _v3.3 · 2026-05-01 · telegram-research-agent_
   - Research Brief receipt schema, storage helpers, generation-time receipt creation, delivery ref updates, deterministic verification checks, CLI inspection, operator review, and optional operator-only audit notes are implemented via `research_brief_receipts`.
   - `src/config/projects.yaml` has current project context for active repos.
   - README/docs were cleaned; historical material moved under `docs/archive/`.
+  - `docs/next_development_roadmap.md` now captures the next AI-development
+    roadmap for Core receipt evidence checks, schema compatibility, source
+    trust transparency, operator reporting, production validation, and product
+    split readiness.
 - Active work is maintenance/backlog driven from `docs/tasks.md`.
 - VPS cognition vault: `/srv/codex-entropy/repos/product-3/engineering-cognition-vault`; use it as a downstream navigation layer, not as the source of truth.
 - In this environment, `pytest` may be unavailable; verified fallback is `PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m unittest ...`.
@@ -61,13 +65,16 @@ The weekly pipeline now has:
 
 ## Exact Next Execution Step
 
-No active phase. Use `docs/tasks.md` as the maintenance backlog.
+No active phase. Use `docs/tasks.md` as the maintenance backlog and
+`docs/next_development_roadmap.md` for detailed task scope, acceptance
+criteria, and verification guidance.
 
 Before implementation, define scope, touched files, acceptance criteria, and verification command.
 
 Reference documents:
 
 - `docs/tasks.md`
+- `docs/next_development_roadmap.md`
 - `docs/COGNITION_MANIFEST.md`
 - `docs/VPS_COGNITION_VAULT.md`
 - `docs/IMPLEMENTATION_CONTRACT.md`
