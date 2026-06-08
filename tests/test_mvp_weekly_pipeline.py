@@ -44,6 +44,10 @@ class TestMvpWeeklyPipeline(unittest.TestCase):
             self.assertEqual(telegraph_url, "https://telegra.ph/mvp-weekly")
             mock_publish.assert_called_once()
             self.assertIn("https://telegra.ph/mvp-weekly", mock_text.call_args.kwargs["text"])
+            self.assertEqual(
+                mock_text.call_args.kwargs["reply_markup"]["inline_keyboard"][0][0]["callback_data"],
+                "art:2026-W22:mvp:u",
+            )
             mock_document.assert_called_once_with(
                 chat_id="42",
                 file_path=str(report_path),

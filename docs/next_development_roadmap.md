@@ -58,6 +58,8 @@ Implemented:
 - Core receipt schema compatibility tests and product-local boundary guards.
 - Artifact-level feedback, monthly operator reporting, source down-rank
   explanations, product split gate, and OPS validation command surfaces.
+- Artifact-level Telegram feedback buttons on Research Brief, Implementation
+  Ideas, MVP weekly, and Study Plan notifications.
 - Weekly audit notes include the Core-compatible hash when source evidence refs
   exist.
 - Channel Intelligence groundwork: schema migrations, repeated-claim
@@ -355,11 +357,12 @@ The Research Brief and Telegram notification must start with a compact summary:
 
 ### RQ-3 - Artifact Feedback Buttons
 
-Status: open.
+Status: implemented.
 
-Add low-friction inline feedback buttons for Research Brief, Implementation
-Ideas, MVP of the Week, and optionally Study Plan. Buttons should write to
-`artifact_feedback_logs` and feed monthly/operator reporting.
+Implemented as low-friction inline feedback buttons for Research Brief,
+Implementation Ideas, MVP weekly, and Study Plan notifications. Buttons write
+to `artifact_feedback_logs` and feed monthly/operator reporting; existing
+per-idea Implementation Ideas decision buttons are preserved.
 
 ### RQ-4 - Reader-Facing Evidence And Source Mix Summary
 

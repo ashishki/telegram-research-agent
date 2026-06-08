@@ -200,7 +200,7 @@ def build_parser() -> argparse.ArgumentParser:
     artifact_feedback_parser.add_argument(
         "--artifact-type",
         default="research_brief",
-        choices=["research_brief", "implementation_ideas", "study_plan", "channel_intelligence", "other"],
+        choices=["research_brief", "implementation_ideas", "mvp_weekly", "study_plan", "channel_intelligence", "other"],
     )
     artifact_feedback_parser.add_argument("--artifact-path", default=None)
     artifact_feedback_parser.add_argument("--digest-id", type=int, default=None)

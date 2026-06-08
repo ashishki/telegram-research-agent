@@ -741,6 +741,10 @@ class TestRunDigestFixes(unittest.TestCase):
             self.assertEqual(digest_row["telegraph_url"], "https://telegra.ph/brief")
             self.assertEqual(digest_row["telegram_sent_at"], "2026-03-30T12:05:00Z")
             self.assertIn("Receipt: needs_review", send_mock.call_args.kwargs["text"])
+            self.assertEqual(
+                send_mock.call_args.kwargs["reply_markup"]["inline_keyboard"][0][0]["callback_data"],
+                "art:2026-W14:rb:u",
+            )
         finally:
             os.unlink(db_path)
             os.unlink(html_path)

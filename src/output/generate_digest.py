@@ -38,8 +38,10 @@ from output.report_utils import _extract_markdown_section
 from processing.score_posts import score_posts
 
 try:
+    from bot.callbacks import build_artifact_feedback_markup
     from bot.telegram_delivery import send_document, send_text
 except ImportError:  # pragma: no cover
+    from src.bot.callbacks import build_artifact_feedback_markup
     from src.bot.telegram_delivery import send_document, send_text
 
 try:
@@ -480,13 +482,20 @@ def _send_weekly_review_to_telegram_owner(
         notification = f"{report_quality_warning}\n\n{notification}"[:900]
     if receipt_audit_note:
         notification = f"{notification}\n{receipt_audit_note}"[:900]
+    feedback_markup = build_artifact_feedback_markup(week_label, "research_brief")
 
     # Try Telegraph first
     if html_path is not None:
         try:
             html_content = html_path.read_text(encoding="utf-8")
             url = publish_article(title=f"Research Brief {week_label}", html_content=html_content)
-            message_id = send_text(chat_id=chat_id, text=f"{notification}\n{url}", token=token, parse_mode=None)
+            message_id = send_text(
+                chat_id=chat_id,
+                text=f"{notification}\n{url}",
+                token=token,
+                parse_mode=None,
+                reply_markup=feedback_markup,
+            )
             _send_copyable_digest_document(chat_id, week_label, content_md, token)
             sent_at = _utc_now_iso()
             _mark_delivery_state(connection, week_label, telegraph_url=url, telegram_sent_at=sent_at)
@@ -509,7 +518,13 @@ def _send_weekly_review_to_telegram_owner(
                 exc_info=True,
             )
 
-    message_id = send_text(chat_id=chat_id, text=notification, token=token, parse_mode=None)
+    message_id = send_text(
+        chat_id=chat_id,
+        text=notification,
+        token=token,
+        parse_mode=None,
+        reply_markup=feedback_markup,
+    )
     _send_copyable_digest_document(chat_id, week_label, content_md, token)
     sent_at = _utc_now_iso()
     _mark_delivery_state(connection, week_label, telegram_sent_at=sent_at)

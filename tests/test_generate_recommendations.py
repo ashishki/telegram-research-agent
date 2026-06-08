@@ -33,6 +33,7 @@ from output.generate_recommendations import (  # noqa: E402
     _normalize_insights_delivery_text,
     _render_insights_fragment,
     _rewrite_insight_source_urls,
+    _send_recommendations_to_telegram_owner,
     run_recommendations,
 )
 
@@ -72,6 +73,65 @@ class TestGenerateRecommendationsHtml(unittest.TestCase):
         self.assertIn("Do now:", text)
         self.assertIn("Why:", text)
         self.assertIn("Choose:", text)
+
+    def test_recommendations_notification_includes_artifact_feedback_markup(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            html_path = Path(tmpdir) / "ideas.html"
+            html_path.write_text("<html><body>ideas</body></html>", encoding="utf-8")
+            with sqlite3.connect(":memory:") as connection:
+                connection.row_factory = sqlite3.Row
+                connection.execute(
+                    """
+                    CREATE TABLE recommendations (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        week_label TEXT NOT NULL UNIQUE,
+                        generated_at TEXT,
+                        content_md TEXT,
+                        telegraph_url TEXT,
+                        telegram_sent_at TEXT
+                    )
+                    """
+                )
+                connection.execute(
+                    "INSERT INTO recommendations (week_label, generated_at, content_md) VALUES (?, ?, ?)",
+                    ("2026-W22", "2026-05-26T00:00:00Z", "ideas"),
+                )
+                connection.execute(
+                    """
+                    CREATE TABLE insight_triage_records (
+                        id INTEGER,
+                        week_label TEXT,
+                        title TEXT,
+                        reason TEXT,
+                        recommendation TEXT
+                    )
+                    """
+                )
+                connection.commit()
+
+                with patch.dict(
+                    "os.environ",
+                    {"TELEGRAM_BOT_TOKEN": "token", "TELEGRAM_OWNER_CHAT_ID": "42"},
+                ), patch(
+                    "output.generate_recommendations.publish_article",
+                    return_value="https://telegra.ph/ideas",
+                ), patch(
+                    "output.generate_recommendations.send_text",
+                ) as mock_text, patch(
+                    "output.generate_recommendations._send_copyable_insights_document",
+                ):
+                    _send_recommendations_to_telegram_owner(
+                        connection,
+                        week_label="2026-W22",
+                        content_md="ideas",
+                        html_path=html_path,
+                        force_delivery=True,
+                    )
+
+        self.assertEqual(
+            mock_text.call_args.kwargs["reply_markup"]["inline_keyboard"][0][0]["callback_data"],
+            "art:2026-W22:ii:u",
+        )
 
     def test_render_insights_fragment_wraps_paragraphs_and_links(self):
         content = (

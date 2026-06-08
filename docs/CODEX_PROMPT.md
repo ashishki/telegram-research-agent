@@ -31,6 +31,9 @@ _v3.4 · 2026-06-08 · telegram-research-agent_
   - Reader-facing Research Brief now starts with a deterministic Decision Brief,
     Actions This Week, and early What Changed summary; Telegram notification
     includes a compact post -> strong/watch/noise -> actions funnel.
+  - Artifact-level Telegram feedback buttons now attach to Research Brief,
+    Implementation Ideas, MVP weekly, and Study Plan delivery notifications and
+    record rows in `artifact_feedback_logs`.
   - 2026-W24 artifact review showed that internal signal quality improved but
     reader-facing report quality is weak: no first-screen decision brief,
     buried trend summary, visible internal `Matches: ...` traces, contradictions
@@ -65,11 +68,11 @@ _v3.4 · 2026-06-08 · telegram-research-agent_
 - Low-signal weeks now produce alerts and `score-stats` reports recent empty/low-signal receipt trends.
 - June operator feedback is sparse: recent monthly report showed zero reaction
   sync actions, zero weekly usefulness logs, and zero artifact feedback rows.
-  Add low-friction artifact feedback buttons before expecting the system to
-  learn the operator's taste.
-- Weekly reports still need low-friction artifact feedback buttons and a fuller
-  reader-facing evidence/source-mix summary. Deterministic quality gates now
-  log/report the current failure examples from `docs/report_quality_roadmap.md`.
+  Low-friction artifact feedback buttons are now shipped; live operator use is
+  still needed before the system can learn taste from artifact-level feedback.
+- Weekly reports still need a fuller reader-facing evidence/source-mix summary.
+  Deterministic quality gates now log/report the current failure examples from
+  `docs/report_quality_roadmap.md`.
 - Demand-to-MVP Radar must not deliver a report that says a candidate is both
   `focused_experiment` and downgraded by source mix gates.
 
@@ -88,7 +91,8 @@ The weekly pipeline now has:
 
 ## Exact Next Execution Step
 
-Start with `RQ-3 - Artifact Feedback Buttons` from `docs/tasks.md`.
+Start with `RQ-4 - Reader-Facing Evidence And Source Mix Summary` from
+`docs/tasks.md`.
 Use `docs/report_quality_roadmap.md` for detailed task scope, acceptance
 criteria, touched-file guidance, and verification commands.
 

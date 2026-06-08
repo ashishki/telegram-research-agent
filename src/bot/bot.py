@@ -7,7 +7,7 @@ from urllib import parse, request
 
 from config.settings import Settings
 
-from .callbacks import record_idea_callback
+from .callbacks import record_callback
 from .handlers import dispatch_command
 
 
@@ -138,7 +138,7 @@ def run_bot(settings: Settings) -> None:
                     continue
                 data = str(callback_query.get("data") or "")
                 try:
-                    answer = record_idea_callback(settings, data)
+                    answer = record_callback(settings, data)
                 except Exception:
                     LOGGER.warning("Callback handling failed data=%s", data, exc_info=True)
                     answer = "Не смог записать решение"

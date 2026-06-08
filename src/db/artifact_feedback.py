@@ -7,6 +7,7 @@ from typing import Iterable
 ARTIFACT_TYPES = {
     "research_brief",
     "implementation_ideas",
+    "mvp_weekly",
     "study_plan",
     "channel_intelligence",
     "other",

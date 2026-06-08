@@ -26,7 +26,7 @@ _install_stub(
     RateLimitError=Exception,
 )
 
-from output.generate_study_plan import generate_study_plan  # noqa: E402
+from output.generate_study_plan import generate_study_plan, send_study_reminder  # noqa: E402
 
 
 class TestGenerateStudyPlan(unittest.TestCase):
@@ -148,6 +148,51 @@ class TestGenerateStudyPlan(unittest.TestCase):
                     (week_label,),
                 ).fetchone()
             self.assertIsNotNone(stored)
+
+    def test_send_study_reminder_includes_artifact_feedback_markup(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "study_plan.sqlite"
+            settings = SimpleNamespace(db_path=str(db_path))
+            week_label = "2026-W17"
+
+            with sqlite3.connect(db_path) as connection:
+                connection.execute(
+                    """
+                    CREATE TABLE study_plans (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        week_label TEXT NOT NULL UNIQUE,
+                        generated_at TEXT NOT NULL,
+                        content_md TEXT NOT NULL,
+                        topics_covered TEXT,
+                        reminder_sent_at TEXT,
+                        completed_at TEXT,
+                        completion_notes TEXT,
+                        telegraph_url TEXT
+                    )
+                    """
+                )
+                connection.execute(
+                    """
+                    INSERT INTO study_plans (week_label, generated_at, content_md, topics_covered)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (week_label, "2026-04-20T00:00:00Z", "# Study Plan\n\nRead.", "[]"),
+                )
+                connection.commit()
+
+            with patch("output.generate_study_plan._compute_week_label", return_value=week_label), \
+                 patch.dict(
+                     "os.environ",
+                     {"TELEGRAM_BOT_TOKEN": "token", "TELEGRAM_OWNER_CHAT_ID": "42"},
+                 ), \
+                 patch("output.generate_study_plan.publish_article", return_value="https://telegra.ph/study"), \
+                 patch("output.generate_study_plan.send_text") as mock_text:
+                send_study_reminder(settings)
+
+            self.assertEqual(
+                mock_text.call_args.kwargs["reply_markup"]["inline_keyboard"][0][0]["callback_data"],
+                "art:2026-W17:sp:u",
+            )
 
 
 if __name__ == "__main__":

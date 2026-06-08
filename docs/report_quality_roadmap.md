@@ -266,8 +266,16 @@ PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m uni
 
 ### RQ-3 - Artifact Feedback Buttons
 
+Status: implemented.
+
 Goal: make it easy for the operator to teach the system what was useful or
 confusing without typing CLI commands.
+
+Implemented through compact artifact callback payloads in `src/bot/callbacks.py`,
+delivery markup on Research Brief, Implementation Ideas, MVP weekly, and Study
+Plan notifications, `mvp_weekly` support in `artifact_feedback_logs`, and
+focused callback/delivery tests. Existing per-idea Implementation Ideas buttons
+continue to write to `decision_journal`.
 
 Extend Telegram inline callbacks beyond Implementation Ideas.
 
@@ -633,17 +641,21 @@ cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
 
 ## Remaining Suggested Execution Order
 
-1. RQ-3 - artifact feedback buttons.
+1. RQ-4 - reader-facing evidence/source-mix summary.
 2. RADAR-2 - single final gate.
 3. RADAR-1 - candidate dossier output.
 4. RADAR-3 - source mix truth surface.
-5. COST-1 - internal cost guardrail sentinel.
-6. RQ-5 - weekly artifact consistency contract.
-7. MEM-1 - weekly editorial memory.
+5. RADAR-4 - Radar report-quality tests.
+6. COST-1 - internal cost guardrail sentinel.
+7. RQ-5 - weekly artifact consistency contract.
+8. MEM-1 - weekly editorial memory.
 
 Reasoning:
 
-- Feedback buttons create the missing taste signal.
+- Feedback buttons now create the missing taste signal once the operator uses
+  live Telegram buttons.
+- Reader-facing evidence/source mix is the remaining Telegram Research Agent P0
+  before Radar handoff work.
 - Radar contradiction fixes are prerequisite for trusting MVP output.
 - Cost sentinel should be dogfooded internally before any product split.
 

@@ -31,7 +31,12 @@ _install_stub("weasyprint")
 _install_stub("jinja2")
 
 from bot import bot as bot_runtime
-from bot.callbacks import build_idea_feedback_markup, record_idea_callback
+from bot.callbacks import (
+    build_artifact_feedback_markup,
+    build_idea_feedback_markup,
+    record_artifact_callback,
+    record_idea_callback,
+)
 from config.settings import Settings
 
 
@@ -91,6 +96,18 @@ class TestIdeaCallbacks(unittest.TestCase):
         self.assertIn("idea:7:reject", callbacks)
         self.assertTrue(all(len(value) <= 64 for value in callbacks))
 
+    def test_artifact_feedback_markup_uses_compact_callback_payloads(self):
+        markup = build_artifact_feedback_markup("2026-W18", "research_brief")
+        callbacks = [
+            button["callback_data"]
+            for row in markup["inline_keyboard"]
+            for button in row
+        ]
+
+        self.assertIn("art:2026-W18:rb:u", callbacks)
+        self.assertIn("art:2026-W18:rb:d", callbacks)
+        self.assertTrue(all(len(value) <= 64 for value in callbacks))
+
     def test_record_idea_callback_writes_user_decision(self):
         settings = self._settings_with_idea()
         answer = record_idea_callback(settings, "idea:7:reject")
@@ -113,6 +130,46 @@ class TestIdeaCallbacks(unittest.TestCase):
         self.assertEqual(row["project_name"], "telegram-research-agent")
         self.assertEqual(row["status"], "rejected")
         self.assertEqual(row["recorded_by"], "telegram_button")
+
+    def test_record_artifact_callback_writes_artifact_feedback(self):
+        settings = self._settings_with_idea()
+        answer = record_artifact_callback(settings, "art:2026-W18:rb:a")
+
+        with sqlite3.connect(self.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            row = connection.execute(
+                """
+                SELECT week_label, artifact_type, feedback, recorded_by
+                FROM artifact_feedback_logs
+                ORDER BY id DESC
+                LIMIT 1
+                """
+            ).fetchone()
+
+        self.assertEqual(answer, "Записал: decision_impacting")
+        self.assertEqual(row["week_label"], "2026-W18")
+        self.assertEqual(row["artifact_type"], "research_brief")
+        self.assertEqual(row["feedback"], "decision_impacting")
+        self.assertEqual(row["recorded_by"], "telegram_button")
+
+    def test_record_artifact_defer_button_records_note(self):
+        settings = self._settings_with_idea()
+        record_artifact_callback(settings, "art:2026-W18:ii:d")
+
+        with sqlite3.connect(self.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            row = connection.execute(
+                """
+                SELECT artifact_type, feedback, notes
+                FROM artifact_feedback_logs
+                ORDER BY id DESC
+                LIMIT 1
+                """
+            ).fetchone()
+
+        self.assertEqual(row["artifact_type"], "implementation_ideas")
+        self.assertEqual(row["feedback"], "weak")
+        self.assertEqual(row["notes"], "deferred_from_button")
 
     def test_run_bot_dispatches_authorized_callback_update(self):
         settings = self._settings_with_idea()
@@ -139,7 +196,7 @@ class TestIdeaCallbacks(unittest.TestCase):
             return_value=[update],
         ) as get_updates_mock, patch.object(
             bot_runtime,
-            "record_idea_callback",
+            "record_callback",
             return_value="Записал: acted_on",
         ) as record_mock, patch.object(
             bot_runtime,

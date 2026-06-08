@@ -8,7 +8,7 @@ from pathlib import Path
 
 import yaml
 
-from bot.callbacks import build_idea_feedback_markup
+from bot.callbacks import build_artifact_feedback_markup, build_idea_feedback_markup
 from db.retrieval import fetch_decisions, fetch_evidence_items
 from config.settings import PROJECT_ROOT, Settings
 from bot.telegram_delivery import send_document, send_text
@@ -642,7 +642,13 @@ def _send_recommendations_to_telegram_owner(
         try:
             html_content = html_path.read_text(encoding="utf-8")
             url = publish_article(title=f"Implementation Ideas {week_label}", html_content=html_content)
-            send_text(chat_id=chat_id, text=f"{notification}\n{url}", token=token, parse_mode=None)
+            send_text(
+                chat_id=chat_id,
+                text=f"{notification}\n{url}",
+                token=token,
+                parse_mode=None,
+                reply_markup=build_artifact_feedback_markup(week_label, "implementation_ideas"),
+            )
             _send_copyable_insights_document(chat_id, week_label, content_md, token)
             try:
                 _send_feedback_cards(connection, week_label, token, chat_id)
@@ -654,7 +660,13 @@ def _send_recommendations_to_telegram_owner(
             return
         except Exception:
             LOGGER.warning("Failed to publish implementation ideas week=%s", week_label, exc_info=True)
-    send_text(chat_id=chat_id, text=notification, token=token, parse_mode=None)
+    send_text(
+        chat_id=chat_id,
+        text=notification,
+        token=token,
+        parse_mode=None,
+        reply_markup=build_artifact_feedback_markup(week_label, "implementation_ideas"),
+    )
     _send_copyable_insights_document(chat_id, week_label, content_md, token)
     try:
         _send_feedback_cards(connection, week_label, token, chat_id)

@@ -118,6 +118,25 @@ class TestArtifactFeedback(unittest.TestCase):
         self.assertEqual(json.loads(stored[0]), [101, 102])
         self.assertEqual([row["id"] for row in fetched], [feedback["id"]])
 
+    def test_mvp_weekly_artifact_type_is_supported(self):
+        db_path = self._make_db()
+        try:
+            with sqlite3.connect(db_path) as connection:
+                feedback = record_artifact_feedback(
+                    connection,
+                    week_label="2026-W22",
+                    artifact_type="mvp_weekly",
+                    feedback="useful",
+                    recorded_at="2026-05-31T10:00:00Z",
+                    recorded_by="telegram_button",
+                )
+        finally:
+            os.unlink(db_path)
+
+        self.assertEqual(feedback["artifact_type"], "mvp_weekly")
+        self.assertEqual(feedback["feedback"], "useful")
+        self.assertEqual(feedback["recorded_by"], "telegram_button")
+
     def test_log_and_inspect_artifact_feedback_cli(self):
         db_path = self._make_db()
         record_stdout = io.StringIO()

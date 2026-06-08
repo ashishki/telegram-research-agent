@@ -32,6 +32,91 @@ def get_db_path() -> Path:
     return path.resolve()
 
 
+def _ensure_artifact_feedback_mvp_type(connection: sqlite3.Connection) -> None:
+    row = connection.execute(
+        """
+        SELECT sql
+        FROM sqlite_master
+        WHERE type = 'table' AND name = 'artifact_feedback_logs'
+        LIMIT 1
+        """
+    ).fetchone()
+    table_sql = str(row[0] if row else "")
+    if not table_sql or "mvp_weekly" in table_sql:
+        return
+
+    LOGGER.info("Rebuilding artifact_feedback_logs to allow mvp_weekly artifact type")
+    connection.executescript(
+        """
+        ALTER TABLE artifact_feedback_logs RENAME TO artifact_feedback_logs_old;
+        CREATE TABLE artifact_feedback_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            week_label TEXT NOT NULL CHECK(length(trim(week_label)) > 0),
+            artifact_type TEXT NOT NULL DEFAULT 'research_brief'
+                CHECK(artifact_type IN (
+                    'research_brief',
+                    'implementation_ideas',
+                    'mvp_weekly',
+                    'study_plan',
+                    'channel_intelligence',
+                    'other'
+                )),
+            artifact_path TEXT,
+            digest_id INTEGER,
+            section TEXT,
+            item_ref TEXT,
+            feedback TEXT NOT NULL
+                CHECK(feedback IN ('useful', 'weak', 'noisy', 'decision_impacting')),
+            source_evidence_item_ids_json TEXT NOT NULL DEFAULT '[]'
+                CHECK(json_valid(source_evidence_item_ids_json)),
+            notes TEXT,
+            recorded_at TEXT NOT NULL,
+            recorded_by TEXT NOT NULL DEFAULT 'operator',
+            FOREIGN KEY(digest_id) REFERENCES digests(id) ON DELETE SET NULL
+        );
+        INSERT INTO artifact_feedback_logs (
+            id,
+            week_label,
+            artifact_type,
+            artifact_path,
+            digest_id,
+            section,
+            item_ref,
+            feedback,
+            source_evidence_item_ids_json,
+            notes,
+            recorded_at,
+            recorded_by
+        )
+        SELECT
+            id,
+            week_label,
+            artifact_type,
+            artifact_path,
+            digest_id,
+            section,
+            item_ref,
+            feedback,
+            source_evidence_item_ids_json,
+            notes,
+            recorded_at,
+            recorded_by
+        FROM artifact_feedback_logs_old;
+        DROP TABLE artifact_feedback_logs_old;
+        CREATE INDEX IF NOT EXISTS idx_artifact_feedback_week_label
+            ON artifact_feedback_logs(week_label);
+        CREATE INDEX IF NOT EXISTS idx_artifact_feedback_artifact_type
+            ON artifact_feedback_logs(artifact_type);
+        CREATE INDEX IF NOT EXISTS idx_artifact_feedback_feedback
+            ON artifact_feedback_logs(feedback);
+        CREATE INDEX IF NOT EXISTS idx_artifact_feedback_digest_id
+            ON artifact_feedback_logs(digest_id);
+        CREATE INDEX IF NOT EXISTS idx_artifact_feedback_recorded_at
+            ON artifact_feedback_logs(recorded_at);
+        """
+    )
+
+
 def run_migrations() -> Path:
     db_path = get_db_path()
     db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -261,6 +346,7 @@ def run_migrations() -> Path:
                     CHECK(artifact_type IN (
                         'research_brief',
                         'implementation_ideas',
+                        'mvp_weekly',
                         'study_plan',
                         'channel_intelligence',
                         'other'
@@ -290,6 +376,7 @@ def run_migrations() -> Path:
                 ON artifact_feedback_logs(recorded_at);
             """
         )
+        _ensure_artifact_feedback_mvp_type(connection)
         connection.executescript(
             """
             CREATE TABLE IF NOT EXISTS research_brief_receipts (

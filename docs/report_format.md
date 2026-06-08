@@ -21,7 +21,7 @@ Two-tier delivery:
 **Tier 1 — Telegram notification**
 Sent to the owner's Telegram immediately after the pipeline completes.
 Contains: short status text, signal funnel, top action count, confidence/source
-mix hint, and direct link to the full artifact.
+mix hint, artifact-level feedback buttons, and direct link to the full artifact.
 Format: plain text or minimal HTML.
 
 **Tier 2 — Full review artifacts**
@@ -182,6 +182,8 @@ The report is informed by:
 not a replacement for the Research Brief and not the same artifact as MVP Radar.
 It is delivered with short Telegram feedback cards so the operator can record
 acted-on, deferred, rejected, or interesting decisions into `decision_journal`.
+The artifact notification also includes artifact-level feedback buttons that
+write useful/weak/noisy/decision-impacting feedback to `artifact_feedback_logs`.
 
 Evidence contract:
 

@@ -6,6 +6,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 
 from delivery.telegraph import publish_article
+from bot.callbacks import build_artifact_feedback_markup
 from bot.telegram_delivery import send_document, send_text
 from config.settings import PROJECT_ROOT, Settings
 from output.opportunity_seed_export import export_opportunity_seeds
@@ -160,7 +161,13 @@ def _deliver_result(result: MvpWeeklyPipelineResult) -> str | None:
     )
     if telegraph_url:
         notification = f"{notification}\n{telegraph_url}"
-    send_text(chat_id=chat_id, text=notification, token=token, parse_mode=None)
+    send_text(
+        chat_id=chat_id,
+        text=notification,
+        token=token,
+        parse_mode=None,
+        reply_markup=build_artifact_feedback_markup(result.week_label, "mvp_weekly"),
+    )
     if result.report_path:
         send_document(
             chat_id=chat_id,

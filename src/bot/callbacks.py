@@ -3,16 +3,33 @@ import sqlite3
 from datetime import datetime, timezone
 
 from config.settings import Settings
+from db.artifact_feedback import record_artifact_feedback
 
 
 LOGGER = logging.getLogger(__name__)
 
 IDEA_CALLBACK_PREFIX = "idea"
+ARTIFACT_CALLBACK_PREFIX = "art"
 _IDEA_ACTIONS: dict[str, tuple[str, str]] = {
     "done": ("acted_on", "Marked done from Telegram button"),
     "later": ("deferred", "Deferred from Telegram button"),
     "reject": ("rejected", "Rejected from Telegram button"),
     "interesting": ("deferred", "Marked interesting from Telegram button"),
+}
+_ARTIFACT_TYPE_CODES = {
+    "rb": "research_brief",
+    "ii": "implementation_ideas",
+    "mvp": "mvp_weekly",
+    "sp": "study_plan",
+    "ci": "channel_intelligence",
+}
+_ARTIFACT_TYPE_TO_CODE = {value: key for key, value in _ARTIFACT_TYPE_CODES.items()}
+_ARTIFACT_ACTIONS: dict[str, tuple[str, str | None]] = {
+    "u": ("useful", None),
+    "w": ("weak", None),
+    "n": ("noisy", None),
+    "a": ("decision_impacting", None),
+    "d": ("weak", "deferred_from_button"),
 }
 
 
@@ -30,6 +47,33 @@ def build_idea_feedback_markup(triage_id: int) -> dict:
             [
                 {"text": "⛔ отказал", "callback_data": f"{IDEA_CALLBACK_PREFIX}:{triage_id}:reject"},
                 {"text": "🧠 интересно", "callback_data": f"{IDEA_CALLBACK_PREFIX}:{triage_id}:interesting"},
+            ],
+        ]
+    }
+
+
+def build_artifact_feedback_markup(week_label: str, artifact_type: str) -> dict:
+    clean_week = str(week_label).strip()
+    type_code = _ARTIFACT_TYPE_TO_CODE.get(str(artifact_type).strip())
+    if not clean_week or not type_code:
+        raise ValueError("Unsupported artifact feedback target")
+
+    def _button(text: str, action_code: str) -> dict:
+        return {
+            "text": text,
+            "callback_data": f"{ARTIFACT_CALLBACK_PREFIX}:{clean_week}:{type_code}:{action_code}",
+        }
+
+    return {
+        "inline_keyboard": [
+            [
+                _button("Useful", "u"),
+                _button("Unclear", "w"),
+                _button("Noise", "n"),
+            ],
+            [
+                _button("Apply", "a"),
+                _button("Defer", "d"),
             ],
         ]
     }
@@ -105,3 +149,40 @@ def record_idea_callback(settings: Settings, callback_data: str) -> str:
         connection.commit()
 
     return f"Записал: {status}"
+
+
+def record_artifact_callback(settings: Settings, callback_data: str) -> str:
+    parts = callback_data.split(":")
+    if len(parts) != 4 or parts[0] != ARTIFACT_CALLBACK_PREFIX:
+        raise ValueError("Unsupported callback")
+
+    week_label = parts[1].strip()
+    artifact_type = _ARTIFACT_TYPE_CODES.get(parts[2])
+    feedback_note = _ARTIFACT_ACTIONS.get(parts[3])
+    if not week_label:
+        raise ValueError("Invalid artifact week")
+    if artifact_type is None:
+        raise ValueError("Unsupported artifact type")
+    if feedback_note is None:
+        raise ValueError("Unsupported artifact feedback")
+    feedback, note = feedback_note
+
+    with sqlite3.connect(settings.db_path) as connection:
+        record_artifact_feedback(
+            connection,
+            week_label=week_label,
+            artifact_type=artifact_type,
+            feedback=feedback,
+            notes=note,
+            recorded_by="telegram_button",
+        )
+
+    return f"Записал: {feedback}"
+
+
+def record_callback(settings: Settings, callback_data: str) -> str:
+    if callback_data.startswith(f"{IDEA_CALLBACK_PREFIX}:"):
+        return record_idea_callback(settings, callback_data)
+    if callback_data.startswith(f"{ARTIFACT_CALLBACK_PREFIX}:"):
+        return record_artifact_callback(settings, callback_data)
+    raise ValueError("Unsupported callback")

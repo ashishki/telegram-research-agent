@@ -21,10 +21,12 @@ from output.report_quality import format_finding_for_log, load_weekly_quality_fa
 from output.report_utils import _extract_markdown_section
 
 try:
+    from bot.callbacks import build_artifact_feedback_markup
     from bot.telegram_delivery import send_text
     from delivery.telegraph import publish_article
     from output.render_report import render_report_html
 except ImportError:  # pragma: no cover - direct module execution fallback
+    from src.bot.callbacks import build_artifact_feedback_markup
     from src.bot.telegram_delivery import send_text
     from src.delivery.telegraph import publish_article
     from src.output.render_report import render_report_html
@@ -476,7 +478,13 @@ def send_study_reminder(settings: Settings) -> None:
         try:
             html_content = render_report_html(content_md)
             telegraph_url = publish_article(title=f"Study Plan {week_label}", html_content=html_content)
-            send_text(chat_id=chat_id, text=f"{notification}\n{telegraph_url}", token=bot_token, parse_mode=None)
+            send_text(
+                chat_id=chat_id,
+                text=f"{notification}\n{telegraph_url}",
+                token=bot_token,
+                parse_mode=None,
+                reply_markup=build_artifact_feedback_markup(week_label, "study_plan"),
+            )
             LOGGER.info("Study plan published to Telegraph week=%s url=%s", week_label, telegraph_url)
         except Exception:
             LOGGER.warning("Failed to publish study plan to Telegraph; falling back to text", exc_info=True)
@@ -485,7 +493,12 @@ def send_study_reminder(settings: Settings) -> None:
                 "Use /study_done when you finish this week's plan.\n\n"
                 f"{content_md}"
             )
-            send_text(chat_id=chat_id, text=fallback, token=bot_token)
+            send_text(
+                chat_id=chat_id,
+                text=fallback,
+                token=bot_token,
+                reply_markup=build_artifact_feedback_markup(week_label, "study_plan"),
+            )
 
         with sqlite3.connect(settings.db_path) as connection:
             connection.row_factory = sqlite3.Row
