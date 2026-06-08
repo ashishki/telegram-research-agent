@@ -17,6 +17,7 @@ from config.settings import PROJECT_ROOT, Settings
 from db.retrieval import fetch_decisions
 from llm.client import LLMClient
 from output.context_memory import load_project_context, refresh_all_project_context_snapshots
+from output.report_quality import format_finding_for_log, load_weekly_quality_facts, validate_artifact
 from output.report_utils import _extract_markdown_section
 
 try:
@@ -323,6 +324,23 @@ def _write_study_plan_file(week_label: str, content_md: str) -> Path:
     return output_path
 
 
+def _log_study_plan_quality_findings(
+    connection: sqlite3.Connection,
+    *,
+    week_label: str,
+    content_md: str,
+) -> None:
+    try:
+        facts = load_weekly_quality_facts(connection, week_label)
+        findings = validate_artifact("study_plan", content_md, facts=facts)
+    except Exception:
+        LOGGER.warning("Study plan report-quality validation failed week=%s", week_label, exc_info=True)
+        return
+    for finding in findings:
+        log_method = LOGGER.error if finding.severity == "critical" else LOGGER.warning
+        log_method("Report quality finding week=%s %s", week_label, format_finding_for_log(finding))
+
+
 def generate_study_plan(settings: Settings, force: bool = False) -> str:
     week_label = _compute_week_label()
     output_path = OUTPUT_DIR / f"{week_label}.md"
@@ -342,6 +360,7 @@ def generate_study_plan(settings: Settings, force: bool = False) -> str:
         ).fetchone()
         if existing_row is not None and not force:
             content_md = str(existing_row["content_md"])
+            _log_study_plan_quality_findings(connection, week_label=week_label, content_md=content_md)
             if not output_path.exists():
                 _write_study_plan_file(week_label, content_md)
             return content_md
@@ -378,6 +397,7 @@ def generate_study_plan(settings: Settings, force: bool = False) -> str:
             max_tokens=3000,
             category="study_plan",
         )
+        _log_study_plan_quality_findings(connection, week_label=week_label, content_md=content_md)
         topics_covered = json.dumps([topic["label"] for topic in topics], ensure_ascii=True)
 
         connection.execute(

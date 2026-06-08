@@ -324,7 +324,7 @@ Detailed tasks: `docs/report_quality_roadmap.md`.
 
 ### RQ-2 - Report Quality Gates Before Delivery
 
-Status: open.
+Status: implemented.
 
 Add deterministic report-quality validation before weekly artifacts are treated
 as clean.

@@ -199,8 +199,14 @@ PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m uni
 
 ### RQ-2 - Report Quality Gates Before Delivery
 
+Status: implemented.
+
 Goal: prevent confusing or contradictory artifacts from being delivered as if
 they were clean reports.
+
+Implemented via `src/output/report_quality.py`, non-blocking digest delivery
+warnings for critical findings, Study Plan and Project Insights quality
+logging, and a monthly `operator-report` Report Quality section.
 
 Add deterministic report-quality validation for generated weekly artifacts.
 
@@ -618,21 +624,19 @@ cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
 .venv/bin/python -m pytest tests/test_mvp_of_week.py tests/test_source_trust.py
 ```
 
-## Suggested Execution Order
+## Remaining Suggested Execution Order
 
-1. RQ-2 - report quality gates.
-2. RQ-1 - decision brief header.
-3. RQ-3 - artifact feedback buttons.
-4. RADAR-2 - single final gate.
-5. RADAR-1 - candidate dossier output.
-6. RADAR-3 - source mix truth surface.
-7. COST-1 - internal cost guardrail sentinel.
-8. RQ-5 - weekly artifact consistency contract.
-9. MEM-1 - weekly editorial memory.
+1. RQ-1 - decision brief header.
+2. RQ-3 - artifact feedback buttons.
+3. RADAR-2 - single final gate.
+4. RADAR-1 - candidate dossier output.
+5. RADAR-3 - source mix truth surface.
+6. COST-1 - internal cost guardrail sentinel.
+7. RQ-5 - weekly artifact consistency contract.
+8. MEM-1 - weekly editorial memory.
 
 Reasoning:
 
-- Quality gates catch the current failure mode fastest.
 - Decision brief improves next Monday's reader experience immediately.
 - Feedback buttons create the missing taste signal.
 - Radar contradiction fixes are prerequisite for trusting MVP output.

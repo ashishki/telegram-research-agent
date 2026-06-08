@@ -22,6 +22,12 @@ _v3.4 · 2026-06-08 · telegram-research-agent_
     artifact-level feedback, monthly operator report, source down-rank
     explanations, OPS validation surfaces, and the product split gate are
     implemented.
+  - Deterministic report-quality gates now catch user-visible internal
+    `Matches: ...` traces, missing/buried summary structure, Study Plan/digest
+    contradictions, Project Insights contradictions, evidence/source-confidence
+    issues, and overlong unsummarized artifacts. Critical findings are logged
+    and included in Research Brief delivery notifications without blocking
+    delivery; `operator-report` surfaces monthly report-quality findings.
   - 2026-W24 artifact review showed that internal signal quality improved but
     reader-facing report quality is weak: no first-screen decision brief,
     buried trend summary, visible internal `Matches: ...` traces, contradictions
@@ -58,8 +64,9 @@ _v3.4 · 2026-06-08 · telegram-research-agent_
   sync actions, zero weekly usefulness logs, and zero artifact feedback rows.
   Add low-friction artifact feedback buttons before expecting the system to
   learn the operator's taste.
-- Weekly reports need deterministic quality gates before delivery. Current
-  failure examples are recorded in `docs/report_quality_roadmap.md`.
+- Weekly reports still need a first-screen decision brief and reader-facing
+  evidence/source-mix summary. Deterministic quality gates now log/report the
+  current failure examples from `docs/report_quality_roadmap.md`.
 - Demand-to-MVP Radar must not deliver a report that says a candidate is both
   `focused_experiment` and downgraded by source mix gates.
 
@@ -78,7 +85,7 @@ The weekly pipeline now has:
 
 ## Exact Next Execution Step
 
-Start with `RQ-2 - Report Quality Gates Before Delivery` from `docs/tasks.md`.
+Start with `RQ-1 - Weekly Decision Brief Header` from `docs/tasks.md`.
 Use `docs/report_quality_roadmap.md` for detailed task scope, acceptance
 criteria, touched-file guidance, and verification commands.
 

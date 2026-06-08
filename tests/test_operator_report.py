@@ -7,6 +7,7 @@ import tempfile
 import types
 import unittest
 from contextlib import redirect_stdout
+from pathlib import Path
 from unittest.mock import patch
 
 
@@ -187,6 +188,55 @@ class TestOperatorReport(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertIn("# Operator Report 2026-05", stdout.getvalue())
         self.assertIn("LLM usage: calls=1", stdout.getvalue())
+
+    def test_monthly_operator_report_includes_report_quality_findings(self):
+        db_path = self._make_db()
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                output_root = Path(tmpdir)
+                (output_root / "digests").mkdir()
+                (output_root / "study_plans").mkdir()
+                (output_root / "project_insights").mkdir()
+                (output_root / "digests" / "2026-W19.md").write_text(
+                    "## Decision Brief\n- Evaluated: 10 posts.\n\n"
+                    "## Project Insights\n**project**\n- Source-backed insight\n\n"
+                    "## What Changed\n- watch: 2\n",
+                    encoding="utf-8",
+                )
+                (output_root / "study_plans" / "2026-W19.md").write_text(
+                    "No Telegram signals this week.",
+                    encoding="utf-8",
+                )
+                (output_root / "project_insights" / "2026-W19.md").write_text(
+                    "## Project Insights - 2026-W19\n\nNo project insights were identified this week.\n",
+                    encoding="utf-8",
+                )
+
+                with sqlite3.connect(db_path) as connection:
+                    connection.row_factory = sqlite3.Row
+                    connection.execute(
+                        """
+                        INSERT INTO quality_metrics (
+                            week_label, computed_at, total_posts, strong_count, watch_count,
+                            cultural_count, noise_count, project_match_count, output_word_count
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        ("2026-W19", "2026-05-14T10:00:00Z", 10, 0, 2, 0, 8, 1, 80),
+                    )
+                    connection.commit()
+                    report = build_monthly_operator_report(
+                        connection,
+                        month="2026-05",
+                        report_output_root=output_root,
+                    )
+        finally:
+            os.unlink(db_path)
+
+        self.assertIn("## Report Quality", report)
+        self.assertIn("critical=2", report)
+        self.assertIn("Study Plan says no Telegram signals", report)
+        self.assertIn("Project Insights artifact says no insights", report)
 
 
 if __name__ == "__main__":

@@ -46,6 +46,9 @@ Implemented:
 - product split gate via `product-split-gate`
 - production validation surfaces for reaction sync and inline callbacks via
   `ops-validate`
+- deterministic report-quality gates for weekly artifacts via
+  `output.report_quality`, digest delivery warnings, Study Plan/Project
+  Insights logging, and `operator-report`
 
 ## Active Maintenance Queue
 
@@ -54,7 +57,6 @@ The active queue is now reader-facing report quality and Radar handoff.
 
 | ID | Priority | Task | Notes |
 |---|---:|---|---|
-| RQ-2 | P0 | Add report quality gates before delivery | Catch `Matches: ...` as user-visible takeaway, missing decision brief, buried change summary, Study Plan/digest contradictions, Project Insights contradictions, and overlong reports |
 | RQ-1 | P0 | Add Weekly Decision Brief header | First screen must say what was evaluated, what changed, what decision/action follows, and confidence/evidence status |
 | RQ-3 | P0 | Add artifact feedback buttons | Add Research Brief / Implementation Ideas / MVP feedback buttons that write to `artifact_feedback_logs` |
 | RQ-4 | P0 | Add reader-facing evidence/source-mix summary | Translate receipt/evidence lookup status into concise operator-facing confidence text |

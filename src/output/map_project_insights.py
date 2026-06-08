@@ -8,12 +8,14 @@ from typing import Any
 from config.settings import PROJECT_ROOT, Settings
 from llm.client import LLMError, LLMSchemaError, complete_json
 from output.context_memory import _find_project_config, _project_is_curated
+from output.report_quality import format_finding_for_log, load_weekly_quality_facts, validate_weekly_artifacts
 from output.report_utils import _extract_markdown_section
 
 
 LOGGER = logging.getLogger(__name__)
 PROMPT_PATH = PROJECT_ROOT / "docs" / "prompts" / "project_insights.md"
 PROJECT_INSIGHTS_OUTPUT_DIR = PROJECT_ROOT / "data" / "output" / "project_insights"
+DIGEST_OUTPUT_DIR = PROJECT_ROOT / "data" / "output" / "digests"
 TEXT_EXCERPT_LENGTH = 200
 FTS_MATCH_LIMIT = 20
 LLM_POST_LIMIT = 10
@@ -244,6 +246,39 @@ def _write_project_insights_file(week_label: str, content_md: str) -> Path:
     return output_path
 
 
+def _read_digest_artifact(week_label: str) -> str | None:
+    path = DIGEST_OUTPUT_DIR / f"{week_label}.md"
+    try:
+        return path.read_text(encoding="utf-8") if path.exists() else None
+    except OSError:
+        LOGGER.warning("Failed to read digest for project-insights quality validation path=%s", path, exc_info=True)
+        return None
+
+
+def _log_project_insights_quality_findings(
+    settings: Settings,
+    *,
+    week_label: str,
+    content_md: str,
+) -> None:
+    try:
+        with sqlite3.connect(settings.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            facts = load_weekly_quality_facts(connection, week_label)
+        findings = validate_weekly_artifacts(
+            week_label=week_label,
+            digest_md=_read_digest_artifact(week_label),
+            project_insights_md=content_md,
+            facts=facts,
+        )
+    except Exception:
+        LOGGER.warning("Project insights report-quality validation failed week=%s", week_label, exc_info=True)
+        return
+    for finding in findings:
+        log_method = LOGGER.error if finding.severity == "critical" else LOGGER.warning
+        log_method("Report quality finding week=%s %s", week_label, format_finding_for_log(finding))
+
+
 def run_project_mapping(settings: Settings) -> dict:
     result = {"projects_processed": 0, "links_created": 0, "output_path": None}
     week_label = _compute_week_label()
@@ -366,6 +401,7 @@ def run_project_mapping(settings: Settings) -> dict:
 
     content_md = _render_project_insights_report(week_label, project_notes)
     output_path = _write_project_insights_file(week_label, content_md)
+    _log_project_insights_quality_findings(settings, week_label=week_label, content_md=content_md)
     LOGGER.info("Project insights report written week=%s output=%s", week_label, output_path)
     result["output_path"] = str(output_path)
     return result

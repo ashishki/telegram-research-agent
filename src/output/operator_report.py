@@ -2,7 +2,10 @@ import json
 import re
 import sqlite3
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
+
+from output.report_quality import WeeklyReportFacts, validate_weekly_artifact_paths
 
 
 MONTH_RE = re.compile(r"^\d{4}-\d{2}$")
@@ -202,7 +205,79 @@ def _artifact_feedback_summary(connection: sqlite3.Connection, month: str) -> li
     return lines
 
 
-def build_monthly_operator_report(connection: sqlite3.Connection, *, month: str | None = None) -> str:
+def _report_quality_summary(
+    connection: sqlite3.Connection,
+    month: str,
+    *,
+    report_output_root: Path | str | None = None,
+) -> list[str]:
+    if not _table_exists(connection, "quality_metrics"):
+        return ["- Report quality: quality_metrics table missing"]
+    rows = connection.execute(
+        """
+        SELECT week_label, total_posts, strong_count, watch_count, cultural_count,
+               noise_count, project_match_count, output_word_count
+        FROM quality_metrics
+        WHERE substr(computed_at, 1, 7) = ?
+        ORDER BY week_label ASC
+        """,
+        (month,),
+    ).fetchall()
+    if not rows:
+        return ["- Report quality: no quality metric weeks"]
+
+    findings = []
+    for row in rows:
+        if isinstance(row, sqlite3.Row):
+            facts = WeeklyReportFacts(
+                week_label=str(row["week_label"] or ""),
+                post_count=int(row["total_posts"] or 0),
+                strong_count=int(row["strong_count"] or 0),
+                watch_count=int(row["watch_count"] or 0),
+                cultural_count=int(row["cultural_count"] or 0),
+                noise_count=int(row["noise_count"] or 0),
+                project_match_count=int(row["project_match_count"] or 0),
+                output_word_count=int(row["output_word_count"] or 0),
+            )
+        else:
+            facts = WeeklyReportFacts(
+                week_label=str(row[0] or ""),
+                post_count=int(row[1] or 0),
+                strong_count=int(row[2] or 0),
+                watch_count=int(row[3] or 0),
+                cultural_count=int(row[4] or 0),
+                noise_count=int(row[5] or 0),
+                project_match_count=int(row[6] or 0),
+                output_word_count=int(row[7] or 0),
+            )
+        findings.extend(
+            validate_weekly_artifact_paths(
+                facts.week_label or "",
+                facts=facts,
+                output_root=report_output_root,
+            )
+        )
+
+    critical_count = sum(1 for finding in findings if finding.severity == "critical")
+    warning_count = sum(1 for finding in findings if finding.severity == "warning")
+    lines = [
+        f"- Report quality: {len(findings)} findings across {len(rows)} week(s)",
+        f"  - critical={critical_count} warning={warning_count}",
+    ]
+    for finding in findings[:6]:
+        hint = f" ({finding.line_hint})" if finding.line_hint else ""
+        lines.append(f"  - {finding.severity} {finding.artifact_type}: {finding.message}{hint}")
+    if len(findings) > 6:
+        lines.append(f"  - +{len(findings) - 6} more")
+    return lines
+
+
+def build_monthly_operator_report(
+    connection: sqlite3.Connection,
+    *,
+    month: str | None = None,
+    report_output_root: Path | str | None = None,
+) -> str:
     clean_month = _validate_month(month)
     lines = [
         f"# Operator Report {clean_month}",
@@ -218,5 +293,8 @@ def build_monthly_operator_report(connection: sqlite3.Connection, *, month: str 
         "",
         "## Delivery And Receipt Health",
         *_receipt_summary(connection, clean_month),
+        "",
+        "## Report Quality",
+        *_report_quality_summary(connection, clean_month, report_output_root=report_output_root),
     ]
     return "\n".join(lines).rstrip() + "\n"

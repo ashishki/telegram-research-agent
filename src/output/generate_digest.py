@@ -17,6 +17,12 @@ from llm.client import complete
 from llm.router import route
 from output import generate_recommendations as recommendations_module
 from output.render_report import write_report_html
+from output.report_quality import (
+    ReportQualityFinding,
+    format_findings_for_notification,
+    format_finding_for_log,
+    validate_weekly_artifacts,
+)
 from output.signal_report import format_signal_report
 from proof_receipts import build_core_research_brief_receipt, core_receipt_sha256
 from output.report_schema import (
@@ -52,6 +58,8 @@ except Exception:  # pragma: no cover
 LOGGER = logging.getLogger(__name__)
 PROMPT_PATH = PROJECT_ROOT / "docs" / "prompts" / "digest_generation.md"
 OUTPUT_DIR = PROJECT_ROOT / "data" / "output" / "digests"
+STUDY_PLAN_OUTPUT_DIR = PROJECT_ROOT / "data" / "output" / "study_plans"
+PROJECT_INSIGHTS_OUTPUT_DIR = PROJECT_ROOT / "data" / "output" / "project_insights"
 TEXT_EXCERPT_LENGTH = 250
 MAX_STRONG = 3
 MAX_WATCH = 3
@@ -229,6 +237,53 @@ def _build_digest_health_alert(
     return None
 
 
+def _read_optional_artifact(path: Path) -> str | None:
+    try:
+        return path.read_text(encoding="utf-8") if path.exists() else None
+    except OSError:
+        LOGGER.warning("Failed to read artifact for report-quality validation path=%s", path, exc_info=True)
+        return None
+
+
+def _validate_weekly_report_quality(
+    *,
+    week_label: str,
+    content_md: str,
+    post_count: int,
+    strong_count: int,
+    watch_count: int,
+    cultural_count: int,
+    noise_count: int,
+    project_match_count: int = 0,
+    output_word_count: int = 0,
+) -> list[ReportQualityFinding]:
+    try:
+        findings = validate_weekly_artifacts(
+            week_label=week_label,
+            digest_md=content_md,
+            study_plan_md=_read_optional_artifact(STUDY_PLAN_OUTPUT_DIR / f"{week_label}.md"),
+            project_insights_md=_read_optional_artifact(PROJECT_INSIGHTS_OUTPUT_DIR / f"{week_label}.md"),
+            facts={
+                "week_label": week_label,
+                "post_count": post_count,
+                "strong_count": strong_count,
+                "watch_count": watch_count,
+                "cultural_count": cultural_count,
+                "noise_count": noise_count,
+                "project_match_count": project_match_count,
+                "output_word_count": output_word_count,
+            },
+        )
+    except Exception:
+        LOGGER.warning("Report-quality validation failed week=%s", week_label, exc_info=True)
+        return []
+
+    for finding in findings:
+        log_method = LOGGER.error if finding.severity == "critical" else LOGGER.warning
+        log_method("Report quality finding week=%s %s", week_label, format_finding_for_log(finding))
+    return findings
+
+
 def _path_fingerprint(path: Path) -> dict[str, str]:
     try:
         content = path.read_bytes()
@@ -361,6 +416,7 @@ def _send_weekly_review_to_telegram_owner(
     force_delivery: bool = False,
     health_alert: str | None = None,
     receipt_audit_note: str | None = None,
+    report_quality_warning: str | None = None,
 ) -> None:
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
     chat_id = os.environ.get("TELEGRAM_OWNER_CHAT_ID", "").strip()
@@ -382,6 +438,8 @@ def _send_weekly_review_to_telegram_owner(
     notification = _build_review_notification(week_label, strong_count, watch_count)
     if health_alert:
         notification = f"{health_alert}\n\n{notification}"[:700]
+    if report_quality_warning:
+        notification = f"{report_quality_warning}\n\n{notification}"[:900]
     if receipt_audit_note:
         notification = f"{notification}\n{receipt_audit_note}"[:900]
 
@@ -1014,6 +1072,18 @@ def run_digest(settings: Settings, force_delivery: bool = False) -> DigestResult
                 strong_count=0,
                 watch_count=0,
             )
+            report_quality_findings = _validate_weekly_report_quality(
+                week_label=week_label,
+                content_md=empty_digest,
+                post_count=0,
+                strong_count=0,
+                watch_count=0,
+                cultural_count=0,
+                noise_count=0,
+                project_match_count=0,
+                output_word_count=empty_word_count,
+            )
+            report_quality_warning = format_findings_for_notification(report_quality_findings)
             try:
                 _send_weekly_review_to_telegram_owner(
                     connection=connection,
@@ -1026,6 +1096,7 @@ def run_digest(settings: Settings, force_delivery: bool = False) -> DigestResult
                     force_delivery=force_delivery,
                     health_alert=health_alert,
                     receipt_audit_note=receipt_audit_note,
+                    report_quality_warning=report_quality_warning,
                 )
             except Exception:
                 LOGGER.warning("Failed to send digest to Telegram owner week=%s", week_label, exc_info=True)
@@ -1169,6 +1240,19 @@ def run_digest(settings: Settings, force_delivery: bool = False) -> DigestResult
         if health_alert:
             LOGGER.warning("Digest health alert week=%s alert=%s", week_label, health_alert.replace("\n", " | "))
 
+        report_quality_findings = _validate_weekly_report_quality(
+            week_label=week_label,
+            content_md=content_md,
+            post_count=post_count,
+            strong_count=buckets["bucket_counts"]["strong"],
+            watch_count=buckets["bucket_counts"]["watch"],
+            cultural_count=buckets["bucket_counts"]["cultural"],
+            noise_count=buckets["bucket_counts"]["noise"],
+            project_match_count=buckets["project_match_count"],
+            output_word_count=output_word_count,
+        )
+        report_quality_warning = format_findings_for_notification(report_quality_findings)
+
         try:
             _send_weekly_review_to_telegram_owner(
                 connection=connection,
@@ -1181,6 +1265,7 @@ def run_digest(settings: Settings, force_delivery: bool = False) -> DigestResult
                 force_delivery=force_delivery,
                 health_alert=health_alert,
                 receipt_audit_note=receipt_audit_note,
+                report_quality_warning=report_quality_warning,
             )
         except Exception:
             LOGGER.warning("Failed to send digest to Telegram owner week=%s", week_label, exc_info=True)

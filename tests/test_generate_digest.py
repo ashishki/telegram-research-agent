@@ -37,6 +37,7 @@ from output.generate_digest import (
     _build_digest_health_alert,
     _count_words,
 )
+from output.report_quality import ReportQualityFinding
 from db.research_brief_receipts import fetch_research_brief_receipts
 
 
@@ -595,6 +596,43 @@ class TestRunDigestFixes(unittest.TestCase):
             self.assertIsNotNone(receipt_audit_note)
             self.assertIn("Receipt: pending", receipt_audit_note)
             self.assertRegex(receipt_audit_note, r"core_sha256=[0-9a-f]{64}")
+        finally:
+            os.unlink(db_path)
+
+    def test_run_digest_passes_report_quality_warning_to_delivery(self):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+            db_path = tmp.name
+
+        try:
+            self._build_digest_db(db_path)
+            settings = self._make_settings(db_path)
+            fixed_now = datetime(2026, 3, 30, 12, 0, tzinfo=timezone.utc)
+            critical_finding = ReportQualityFinding(
+                severity="critical",
+                artifact_type="study_plan",
+                message="Study Plan says no Telegram signals while digest facts show signals",
+                line_hint="line 3: No Telegram signals this week.",
+            )
+
+            with patch.object(gd, "_utc_now", return_value=fixed_now):
+                with patch.object(gd, "_compute_week_label", return_value="2026-W14"):
+                    with patch.object(gd, "score_posts", return_value={"strong": 1, "watch": 1, "cultural": 1, "noise": 1, "avg_signal_score": 0.475}):
+                        with patch.object(gd, "_load_prompt_sections", return_value=("system", "week={week_label}")):
+                            with patch.object(gd, "complete", return_value="digest output words"):
+                                with patch.object(gd, "_append_github_section", side_effect=lambda content, settings: content):
+                                    with patch.object(gd, "_write_digest_file", return_value=gd.Path("/tmp/2026-W14.md")):
+                                        with patch.object(gd, "_write_digest_json_file", return_value=gd.Path("/tmp/2026-W14.json")):
+                                            with patch.object(gd, "write_report_html", return_value=gd.Path("/tmp/2026-W14.html")):
+                                                with patch.object(gd, "validate_weekly_artifacts", return_value=[critical_finding]):
+                                                    with patch.object(gd, "_send_weekly_review_to_telegram_owner") as send_mock:
+                                                        with patch("output.generate_recommendations.run_recommendations", return_value={"text": ""}):
+                                                            gd.run_digest(settings)
+
+            send_mock.assert_called_once()
+            warning = send_mock.call_args.kwargs["report_quality_warning"]
+            self.assertIsNotNone(warning)
+            self.assertIn("Report quality warning", warning)
+            self.assertIn("Study Plan says no Telegram signals", warning)
         finally:
             os.unlink(db_path)
 
