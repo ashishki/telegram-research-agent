@@ -16,7 +16,33 @@ backed analysis of narratives, sources, claims, and project-relevant signals.
 
 Execution details for the next development cycle live in
 `docs/next_development_roadmap.md`. `docs/tasks.md` is the active AI
-development queue.
+development queue. Reader-facing report quality and Radar handoff details live
+in `docs/report_quality_roadmap.md`.
+
+### P0 - Reader-Facing Report Quality
+
+- Add a first-screen Decision Brief to the weekly Research Brief.
+- Show what was evaluated, what changed, what action follows, and why the
+  operator should believe it.
+- Add deterministic report-quality gates before delivery:
+  - no internal `Matches: ...` traces as user takeaways;
+  - no Study Plan / digest contradiction;
+  - no Project Insights / digest contradiction;
+  - no missing or buried trend summary.
+- Turn proof receipts and evidence lookup into a concise reader-facing
+  confidence/source-mix summary.
+- Keep the report as a private operator decision surface, not a generic news
+  digest.
+
+### P0 - Demand-to-MVP Radar Honesty
+
+- Radar work happens in `/srv/openclaw-you/workspace/Demand-to-MVP-Radar`.
+- Change Radar weekly output from overconfident "MVP of the Week" framing to a
+  Candidate Dossier when source evidence only supports investigation.
+- Enforce one canonical final gate: Markdown and JSON must not disagree.
+- Show selected-candidate source mix, missing credentials, missing evidence,
+  next experiment, and kill criteria.
+- Do not treat Telegram-only seeds as build-ready product validation.
 
 ### P0 - Operator Usefulness Log
 
@@ -64,7 +90,18 @@ development queue.
 - Artifact-level feedback beyond weekly usefulness logs is implemented.
 - Monthly operator report summarizing reactions, button decisions, costs,
   low-signal weeks, and fallback delivery is implemented.
+- Add low-friction Telegram artifact feedback buttons for Research Brief,
+  Implementation Ideas, MVP of the Week, and optionally Study Plan.
 - Keep all feedback product-local and based on observed behavior.
+
+### P1 - Internal Cost Guardrails
+
+- Dogfood the `LLM Cost & Guardrail Budget Sentinel` idea inside this private
+  agent before considering any separate product.
+- Use existing `llm_usage` rows for weekly budget, category cost, and spike
+  warnings.
+- Surface warnings in `cost-stats`, `operator-report`, and optionally weekly
+  delivery notifications.
 
 ### P2 - Product Split
 

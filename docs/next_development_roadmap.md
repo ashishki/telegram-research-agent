@@ -1,17 +1,20 @@
 # Next Development Roadmap
 
 Status: active next-step roadmap
-Last updated: 2026-05-31
+Last updated: 2026-06-08
 
 ## Purpose
 
-This roadmap turns the remaining Entropy/Core receipt, operator feedback, source
-trust, and product-readiness ideas into AI-development tasks.
+This roadmap turns the remaining report-quality, operator-feedback, Radar
+handoff, and internal guardrail ideas into AI-development tasks.
 
 The product should stay a private operator research system until weekly briefs
-repeatedly influence real decisions. The next work should improve auditability,
-feedback quality, and operational confidence without adding a generic UI or a
-runtime dependency on Entropy Core.
+repeatedly influence real decisions. The next work should improve reader
+usefulness, report consistency, feedback quality, and Radar honesty without
+adding a generic UI or a runtime dependency on Entropy Core.
+
+Detailed report-quality task scope lives in
+`docs/report_quality_roadmap.md`.
 
 ## Scope
 
@@ -24,6 +27,11 @@ In scope:
 - Clearer source down-ranking explanations.
 - Production validation of Telegram reaction and callback paths.
 - Product-split readiness criteria for Telegram Channel Intelligence.
+- Reader-facing Research Brief decision summary.
+- Deterministic report-quality gates before delivery.
+- Artifact-level Telegram feedback buttons.
+- Internal LLM cost/guardrail dogfooding.
+- Demand-to-MVP Radar candidate dossier and source-gate consistency.
 
 Out of scope:
 
@@ -31,6 +39,8 @@ Out of scope:
 - Public/customer UI.
 - Generic Telegram summarization.
 - AI-invented source trust or unexplained ranking changes.
+- Public report dashboard before private weekly reports are consistently useful.
+- Radar build-ready recommendations that are not supported by source mix gates.
 
 ## Current Baseline
 
@@ -53,6 +63,17 @@ Implemented:
 - Channel Intelligence groundwork: schema migrations, repeated-claim
   extraction, source observations, active-project links, narrative candidates,
   inspection CLI, and optional Markdown report.
+- 2026-W24 review showed improved internal signal quality but weak
+  reader-facing packaging: no decision brief, buried trend summary, visible
+  internal matching traces, contradictions between Study Plan/Project Insights
+  and digest facts, and a Radar report that both recommended
+  `focused_experiment` and later downgraded the same candidate.
+
+Active next task details:
+
+- `docs/tasks.md` lists the active queue.
+- `docs/report_quality_roadmap.md` contains the implementation handoff,
+  acceptance criteria, touched-file guidance, and Radar repo paths.
 
 ## Phase 1 - Receipt Evidence Confidence
 
@@ -294,10 +315,139 @@ Acceptance criteria:
 - If the decision is "go", create a separate product plan instead of mixing
   public product UI into this private assistant.
 
+## Phase 6 - Reader-Facing Report Quality
+
+Goal: turn working evidence infrastructure into useful operator-facing
+artifacts.
+
+Detailed tasks: `docs/report_quality_roadmap.md`.
+
+### RQ-2 - Report Quality Gates Before Delivery
+
+Status: open.
+
+Add deterministic report-quality validation before weekly artifacts are treated
+as clean.
+
+Must catch:
+
+- `Matches: ...` internal traces in user-facing takeaways.
+- missing Decision Brief section.
+- buried or missing change summary.
+- Study Plan claiming no Telegram signals when digest/evidence rows show
+  signals.
+- Project Insights claiming no insights while the digest contains project
+  insights.
+- overlong reports without a short decision layer.
+
+### RQ-1 - Weekly Decision Brief Header
+
+Status: open.
+
+The Research Brief and Telegram notification must start with a compact summary:
+
+- evaluated window and post count;
+- signal funnel;
+- change versus previous week;
+- top actions;
+- evidence/confidence status;
+- source mix summary.
+
+### RQ-3 - Artifact Feedback Buttons
+
+Status: open.
+
+Add low-friction inline feedback buttons for Research Brief, Implementation
+Ideas, MVP of the Week, and optionally Study Plan. Buttons should write to
+`artifact_feedback_logs` and feed monthly/operator reporting.
+
+### RQ-4 - Reader-Facing Evidence And Source Mix Summary
+
+Status: open.
+
+Expose proof-receipt/evidence lookup status in plain language inside the weekly
+Research Brief and Telegram notification.
+
+### RQ-5 - Weekly Artifact Consistency Contract
+
+Status: open.
+
+Ensure weekly artifacts agree on the same run facts: post count, signal counts,
+project insight state, receipt status, and MVP recommendation.
+
+## Phase 7 - Radar Candidate Honesty
+
+Goal: make Demand-to-MVP Radar output an honest candidate dossier instead of an
+overconfident "MVP of the Week" story.
+
+Radar repo path:
+
+```text
+/srv/openclaw-you/workspace/Demand-to-MVP-Radar
+```
+
+Detailed tasks: `docs/report_quality_roadmap.md`.
+
+### RADAR-2 - Single Final Gate And Contradiction Guard
+
+Status: open.
+
+Deterministic gates in Radar must override LLM report text. Markdown and JSON
+must agree on one final recommendation/status.
+
+Primary Radar file:
+
+```text
+/srv/openclaw-you/workspace/Demand-to-MVP-Radar/demand_mvp_radar/mvp_weekly.py
+```
+
+### RADAR-1 - Candidate Dossier Output
+
+Status: open.
+
+Change weekly Radar output to a Candidate Dossier with a canonical status:
+`build`, `focused_experiment`, `investigate`, or `reject`.
+
+### RADAR-3 - Source Mix Truth Surface
+
+Status: open.
+
+Show selected-candidate source mix, missing credentials, Reddit/GitHub
+limitations, and whether external evidence truly corroborates the Telegram
+seed.
+
+### RADAR-4 - Radar Report Quality Test Suite
+
+Status: open.
+
+Add tests for candidate dossier contract, no contradictory gates, source mix
+card, missing evidence, kill criteria, and existing-project context.
+
+## Phase 8 - Internal Cost Guardrails
+
+Goal: dogfood the `LLM Cost & Guardrail Budget Sentinel` idea inside the
+private system before treating it as a separate product.
+
+### COST-1 - Internal LLM Cost And Guardrail Sentinel
+
+Status: open.
+
+Use existing `llm_usage` rows to expose budget thresholds, cost spikes,
+highest-cost categories, and suggested downgrade/defer actions in `cost-stats`
+and `operator-report`.
+
+### MEM-1 - Weekly Editorial Memory
+
+Status: open.
+
+Persist weekly report-quality learnings from feedback and quality findings so
+future report generation can improve from local state rather than chat history.
+
 ## AI-Development Rules For This Roadmap
 
 - Read `docs/CODEX_PROMPT.md`, `docs/PROJECT_PLAN.md`,
-  `docs/tasks.md`, and this roadmap before implementation.
+  `docs/tasks.md`, `docs/report_quality_roadmap.md`, and this roadmap before
+  implementation.
 - Start from the highest-priority open task in `docs/tasks.md`.
 - Define touched files, acceptance criteria, and verification command before
   code edits.

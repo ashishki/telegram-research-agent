@@ -1,7 +1,7 @@
 # Weekly Review Artifact — Format Specification
 
-**Version:** 3.0
-**Status:** Implemented — preference-shaped weekly brief
+**Version:** 3.1
+**Status:** Implemented baseline; report-quality improvements pending
 
 ---
 
@@ -19,7 +19,8 @@ Two-tier delivery:
 
 **Tier 1 — Telegram notification**
 Sent to the owner's Telegram immediately after the pipeline completes.
-Contains: short status text and direct link to the full artifact.
+Contains: short status text, signal funnel, top action count, confidence/source
+mix hint, and direct link to the full artifact.
 Format: plain text or minimal HTML.
 
 **Tier 2 — Full review artifacts**
@@ -27,9 +28,10 @@ A well-structured, readable long-form document.
 Delivered as:
 - a `Research Brief` Telegraph article
 - an `Implementation Ideas` Telegraph article
-- an `MVP of the Week` Telegraph article generated from the Radar Markdown report
+- a Radar Candidate Dossier or `MVP of the Week` Telegraph article generated
+  from the Radar Markdown report
 - fallback HTML attachment for `Research Brief` if Telegraph is unavailable
-- copyable Markdown document fallback for `MVP of the Week`
+- copyable Markdown document fallback for the Radar artifact
 Readable inside Telegram without opening an external app.
 Scannable — section headers, bullet points, source links inline per signal.
 
@@ -37,18 +39,49 @@ Scannable — section headers, bullet points, source links inline per signal.
 
 ## Research Brief Artifact
 
-`Research Brief` sections stay in this order when populated. Reader-facing sections may be omitted if empty. Noise and operator-only metrics do not belong in the main brief.
+`Research Brief` sections stay in this order when populated. Reader-facing
+sections may be omitted if empty. Noise and operator-only metrics do not belong
+in the main brief.
 
 Audit metadata for delivered Research Briefs is specified separately in
 `docs/research_brief_receipt.md`. Its SQLite schema/storage helpers are
 implemented, generation creates pending receipts, and delivery updates receipt
 refs; deterministic verification checks are implemented, while CLI inspection
 is available through `memory inspect-receipts` and operator review through
-`memory review-receipt`. A Research Brief receipt is not reader-facing content.
+`memory review-receipt`. A raw Research Brief receipt is not reader-facing
+content. A concise reader-facing evidence/confidence summary derived from
+receipts is expected.
 
 ---
 
-### 1. What Matters This Week
+### 1. Decision Brief
+
+The first screen must explain the result before listing details.
+
+Required fields:
+
+- evaluated week/window;
+- post count and signal funnel;
+- watch/strong/noise change versus previous week;
+- 1-3 recommended actions;
+- evidence/confidence status;
+- source-mix weakness if relevant;
+- skip/apply guidance when the week is weak.
+
+Format:
+
+```text
+## Decision Brief
+- Evaluated: 179 Telegram posts from the last 7 days.
+- Signal change: watch 16 -> 56, noise 157 -> 116, avg score 0.33 -> 0.41.
+- Decision: apply report-quality gates now; investigate Radar candidate; defer
+  product split.
+- Evidence: local receipt lookup passed; confidence medium.
+```
+
+---
+
+### 2. What Matters This Week
 
 Up to 5 highest-confidence signals.
 For each:
@@ -68,13 +101,13 @@ Source: https://t.me/channel/message_id
 
 ---
 
-### 2. Things To Try
+### 3. Things To Try
 
 Concrete ideas to test in active projects.
 
 ---
 
-### 3. Project Insights
+### 4. Project Insights
 
 One sub-section per active project with at least one relevant signal.
 Skip projects with no matches above relevance threshold (0.3).
@@ -90,27 +123,28 @@ Project relevance may come from deterministic matching or the preference judge. 
 
 ---
 
-### 4. Keep In View
+### 5. Keep In View
 
 Signals worth tracking but not acting on yet.
 
 ---
 
-### 5. Funny / Cultural
+### 6. Funny / Cultural
 
 Optional. Only include if the user explicitly tagged cultural/funny items or the preference judge found clear context value.
 
 ---
 
-### 6. Additional Signals
+### 7. Additional Signals
 
 Auto-selected, high-confidence signals that were not manually tagged yet.
 
 ---
 
-### 7. What Changed Since Last Week
+### 8. What Changed Since Last Week
 
-Delta from the previous week's review. Automatic, no LLM required.
+Delta from the previous week's review. Automatic, no LLM required. The compact
+version must also appear in `Decision Brief`.
 Shows:
 - Bucket shifts
 - notable deltas in signal volume
@@ -132,6 +166,7 @@ The report is informed by:
 - preference-shaped `user_adjusted_score`
 - `preference_judge.py` for reader-facing titles, why text, and project angle
 - `channel_memory` and `project_context_snapshots` so important context can be pulled into the brief instead of outsourced to the source link
+- report-quality gates from `docs/report_quality_roadmap.md` before delivery
 
 **Constraints:**
 - Telegram message hard limit: 4096 chars — notification should stay short
@@ -169,10 +204,11 @@ Boundary:
 
 ---
 
-## MVP of the Week Artifact
+## MVP / Candidate Dossier Artifact
 
-`MVP of the Week` is a separate Radar artifact, not a section inside the
-Telegram research brief.
+The Radar artifact is separate from the Telegram research brief. It should be
+rendered as a Candidate Dossier unless evidence gates clearly support a
+build-ready MVP framing.
 
 Delivery requirements:
 
@@ -184,17 +220,20 @@ Delivery requirements:
 
 Content requirements are owned by Demand-to-MVP Radar:
 
+- canonical status: `build`, `focused_experiment`, `investigate`, or `reject`;
+- Decision;
+- Confidence;
 - Source Mix;
 - Operator Fit;
-- One-Function MVP;
 - Evidence;
 - Missing Evidence;
-- Risks;
-- This Week Experiment;
+- Next Experiment;
+- Kill Criteria;
 - Anti-Complexity Guardrail.
 
 Telegram-only evidence is not enough for a confident experiment. Radar must
-show whether external sources supported the selected idea.
+show whether external sources supported the selected idea. Markdown and JSON
+must agree on the same final status.
 
 ## Anti-Patterns to Avoid
 
@@ -204,3 +243,8 @@ show whether external sources supported the selected idea.
 - Showing operator-only fields like `post_id`, raw scores, or manual notes in the reader-facing brief
 - Writing prose summaries per-item instead of evidence-forward bullets
 - Assuming `report-preview` is identical to the delivered Telegraph brief
+- Exposing internal matching traces such as `Matches: claude, git` as a
+  reader-facing takeaway
+- Letting Study Plan, Project Insights, Research Brief, and Radar disagree on
+  the same week's signal facts
+- Reporting a Radar candidate as both gate-passed and downgraded

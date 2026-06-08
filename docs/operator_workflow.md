@@ -32,6 +32,25 @@ Owner receives:
 
 Expected time to read: 10–15 minutes.
 
+### Reader-Facing Quality Contract
+
+The weekly package should behave like a decision brief, not a raw digest.
+
+The first screen should answer:
+
+- what was evaluated;
+- what changed versus the previous week;
+- what should be applied, investigated, deferred, or rejected;
+- why the evidence is believable;
+- where the source mix is weak.
+
+If the report instead starts with a long topic list, exposes internal matching
+traces such as `Matches: claude, git`, or contradicts another artifact, treat it
+as a report-quality bug and record artifact feedback.
+
+Active AI-development tasks for this quality layer live in
+`docs/report_quality_roadmap.md`.
+
 `Implementation Ideas` should be treated as a triaged surface:
 - `Built Ideas` are the stronger synthesized moves: they can combine several Telegram signals, project context, and recurring patterns into one clearer recommendation
 - `Fresh Signals` are separate new ideas worth seeing even if they have not matured into a larger thesis yet
@@ -127,6 +146,10 @@ Demand-to-MVP Radar, then Radar collects the configured external demand bundle
 before synthesis. The delivered notification includes a `Source mix` line so a
 weak external run is visible immediately.
 
+Radar output should be read as a candidate dossier unless the source gate is
+clearly passed. A Telegram seed plus weak external evidence is an
+`investigate` result, not a build-ready product decision.
+
 ### Weekly Brief Usefulness Log
 
 After reading the Research Brief, record what was actually useful:
@@ -174,6 +197,17 @@ python3 src/main.py memory inspect-artifact-feedback --week 2026-W22
 
 This remains operator-authored local state. It does not become model-authored
 source trust by itself.
+
+When artifact feedback buttons are implemented, prefer using them directly from
+Telegram for low-friction feedback. Until then, use `log-artifact-feedback` for
+specific failures such as:
+
+- unclear first screen;
+- useful decision;
+- noisy source;
+- weak evidence;
+- Radar source gate contradiction;
+- Study Plan contradicting the Research Brief.
 
 ### Inline Feedback (from Telegram)
 

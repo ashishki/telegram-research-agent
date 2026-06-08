@@ -124,6 +124,7 @@ Start here:
 - [docs/README.md](docs/README.md) — documentation map
 - [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) — strategic project plan
 - [docs/next_development_roadmap.md](docs/next_development_roadmap.md) — next development roadmap and AI-ready tasks
+- [docs/report_quality_roadmap.md](docs/report_quality_roadmap.md) — report-quality, artifact feedback, internal cost guardrail, and Demand-to-MVP Radar handoff tasks
 - [docs/operator_workflow.md](docs/operator_workflow.md) — weekly operating workflow
 - [docs/architecture.md](docs/architecture.md) — current system shape
 - [docs/spec.md](docs/spec.md) — implementation-facing system specification
@@ -138,4 +139,4 @@ Historical material lives under [docs/archive/](docs/archive/README.md).
 
 ## Development State
 
-The main product architecture is implemented, Research Brief receipts are auditable, and Channel Intelligence schema plus claim/source/link/narrative refresh, inspection, and optional reporting groundwork is in place. Current work is maintenance and quality improvement: production validation, quality trends, and operator-experience refinements.
+The main product architecture is implemented, Research Brief receipts are auditable, and Channel Intelligence schema plus claim/source/link/narrative refresh, inspection, and optional reporting groundwork is in place. Current work is reader-facing report quality: Decision Brief first screen, deterministic report-quality gates, artifact feedback buttons, internal cost guardrails, and honest Demand-to-MVP Radar candidate dossiers.

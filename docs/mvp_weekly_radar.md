@@ -1,7 +1,7 @@
 # MVP Weekly Radar Bridge
 
 Status: Active production bridge
-Date: 2026-05-25
+Date: 2026-06-08
 
 ## Purpose
 
@@ -14,8 +14,11 @@ The split is intentional:
 - Telegram Research Agent finds and scores relevant Telegram signals.
 - Demand-to-MVP Radar collects broader demand sources and checks whether the
   same pain exists outside Telegram.
-- The Telegram bot delivers the final `MVP of the Week` artifact back to the
-  operator as a Telegraph article plus a copyable Markdown document.
+- The Telegram bot delivers the final Radar artifact back to the operator as a
+  Telegraph article plus a copyable Markdown document.
+
+The next Radar iteration should treat this artifact as a Candidate Dossier
+unless the source gates clearly support a build-ready recommendation.
 
 ## Runtime Flow
 
@@ -125,7 +128,7 @@ The owner should receive a message shaped like:
 ```text
 MVP of the Week 2026-W22 is ready.
 <selected title>
-Recommendation: revisit_with_evidence_gap, score 64/100.
+Recommendation: investigate, score 64/100.
 Seeds exported: 80.
 Source mix: telegram=80; external=119; external_types=github_public, rss, stack_exchange; source_errors=serp_search_intent_live, youtube_creator_tutorial_demand_live.
 https://telegra.ph/...
@@ -133,3 +136,67 @@ https://telegra.ph/...
 
 The source-mix line is a truth surface: it shows whether the idea was validated
 beyond Telegram or still needs credentials/external evidence.
+
+## Candidate Dossier Contract
+
+Radar should not present every selected candidate as a build-ready MVP. The
+reader-facing artifact should use one canonical final status:
+
+- `build` - evidence is strong enough to build now.
+- `focused_experiment` - evidence supports a narrow 7-day experiment.
+- `investigate` - candidate is interesting but missing evidence remains.
+- `reject` - source mix, operator fit, or risk makes it not worth pursuing.
+
+The Markdown and JSON must agree on the same status. A report must not say the
+Decision Gate passed and later say the candidate was downgraded.
+
+Expected dossier shape:
+
+```text
+# Candidate Dossier: <title>
+
+Status: investigate
+Decision: Run one validation experiment before building.
+Confidence: low
+
+## Why This Candidate
+## Source Mix
+## Evidence
+## Missing Evidence
+## Next Experiment
+## Kill Criteria
+## Operator Fit
+## Anti-Complexity Guardrail
+```
+
+## Cross-Repo AI Handoff
+
+Radar implementation work happens in:
+
+```text
+/srv/openclaw-you/workspace/Demand-to-MVP-Radar
+```
+
+Primary files for the next Radar tasks:
+
+- `demand_mvp_radar/mvp_weekly.py`
+  - `run_mvp_of_week`
+  - `_synthesize_or_render`
+  - `_apply_synthesis_gates`
+  - `_append_gate_notes`
+  - `_append_report_quality_sections`
+  - `_render_report`
+- `tests/test_mvp_of_week.py`
+- `config/mvp_weekly_sources.json`
+- `reports/mvp_of_week/` for generated local outputs only; do not commit private
+  generated reports unless a task explicitly asks for sanitized fixtures.
+
+Run Radar tests from the Radar repo:
+
+```bash
+cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
+.venv/bin/python -m pytest tests/test_mvp_of_week.py
+```
+
+Detailed Telegram-side and Radar-side tasks live in
+`docs/report_quality_roadmap.md` as `RADAR-1` through `RADAR-4`.

@@ -10,6 +10,7 @@ This directory keeps active operator and implementation guidance at the top leve
 | `spec.md` | Implementation-facing system specification and maintenance lanes |
 | `PROJECT_PLAN.md` | Strategic project plan and near-term roadmap categories |
 | `next_development_roadmap.md` | Active next-step roadmap with AI-ready tasks, phases, acceptance criteria, and verification guidance |
+| `report_quality_roadmap.md` | Active AI-development roadmap for reader-facing report quality, artifact feedback buttons, internal cost guardrails, and Demand-to-MVP Radar candidate dossier handoff |
 | `operator_workflow.md` | Weekly workflow, operator feedback, artifact feedback, monthly report, OPS validation, tuning, and troubleshooting |
 | `report_format.md` | Weekly artifact contracts, boundaries, and Telegram source-link requirements |
 | `mvp_weekly_radar.md` | Demand-to-MVP Radar bridge, source-mix contract, and live-source credentials |
