@@ -421,11 +421,14 @@ Research Agent notifications can display that canonical status.
 
 ### RADAR-3 - Source Mix Truth Surface
 
-Status: open.
+Status: implemented.
 
-Show selected-candidate source mix, missing credentials, Reddit/GitHub
-limitations, and whether external evidence truly corroborates the Telegram
-seed.
+Implemented in the Radar repo and Telegram delivery bridge. Radar JSON exposes
+machine-readable `selected_source_mix` / selected `source_mix`; Markdown renders
+a compact Source Mix card near the top; missing credentials remain visible;
+Reddit API usage is distinguished from SERP-indexed Reddit pages; GitHub
+evidence is labeled as primary or repeated variants; Telegram notifications
+include the source-mix readiness label.
 
 ### RADAR-4 - Radar Report Quality Test Suite
 

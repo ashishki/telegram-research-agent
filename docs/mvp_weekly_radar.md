@@ -131,12 +131,13 @@ MVP of the Week 2026-W22 is ready.
 Status: investigate, score 64/100.
 Recommendation: revisit_with_evidence_gap.
 Seeds exported: 80.
-Source mix: telegram=80; external=119; external_types=github_public, rss, stack_exchange; source_errors=serp_search_intent_live, youtube_creator_tutorial_demand_live.
+Source mix: readiness=credential_limited; telegram=80; external=119; external_types=github_public, rss, stack_exchange; reddit=missing_credentials; missing_credentials=reddit_demand_live; source_errors=serp_search_intent_live, youtube_creator_tutorial_demand_live.
 https://telegra.ph/...
 ```
 
 The source-mix line is a truth surface: it shows whether the idea was validated
-beyond Telegram or still needs credentials/external evidence.
+beyond Telegram or still needs credentials/external evidence. `readiness` is
+`telegram_only`, `externally_corroborated`, or `credential_limited`.
 
 ## Candidate Dossier Contract
 

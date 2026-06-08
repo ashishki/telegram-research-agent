@@ -25,6 +25,11 @@ class TestMvpWeeklyPipeline(unittest.TestCase):
                 dossier_status="investigate",
                 recommendation="revisit_with_evidence_gap",
                 score=62,
+                selected_source_mix={
+                    "readiness": "credential_limited",
+                    "reddit_api_status": "missing_credentials",
+                    "missing_credentials": ["reddit_demand_live"],
+                },
             )
 
             with patch.dict(
@@ -47,6 +52,9 @@ class TestMvpWeeklyPipeline(unittest.TestCase):
             notification = mock_text.call_args.kwargs["text"]
             self.assertIn("Status: investigate, score 62/100.", notification)
             self.assertIn("Recommendation: revisit_with_evidence_gap.", notification)
+            self.assertIn("readiness=credential_limited", notification)
+            self.assertIn("reddit=missing_credentials", notification)
+            self.assertIn("missing_credentials=reddit_demand_live", notification)
             self.assertIn("https://telegra.ph/mvp-weekly", notification)
             self.assertEqual(
                 mock_text.call_args.kwargs["reply_markup"]["inline_keyboard"][0][0]["callback_data"],

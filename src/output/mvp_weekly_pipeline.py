@@ -30,6 +30,7 @@ class MvpWeeklyPipelineResult:
     dossier_status: str | None
     recommendation: str | None
     score: int | None
+    selected_source_mix: dict[str, object] | None = None
     telegraph_url: str | None = None
     source_counts: dict[str, object] | None = None
     source_errors: dict[str, str] | None = None
@@ -66,6 +67,7 @@ def run_mvp_weekly_pipeline(
         dossier_status=_optional_str(radar_payload.get("dossier_status")),
         recommendation=_optional_str(radar_payload.get("recommendation")),
         score=_optional_int(radar_payload.get("score")),
+        selected_source_mix=_optional_dict(radar_payload.get("selected_source_mix")),
         source_counts=_optional_dict(radar_payload.get("source_counts")),
         source_errors=_optional_str_dict(radar_payload.get("source_errors")),
     )
@@ -228,6 +230,8 @@ def _optional_str_dict(value: object) -> dict[str, str] | None:
 
 def source_mix_summary(result: MvpWeeklyPipelineResult) -> str:
     counts = result.source_counts or {}
+    selected_mix = result.selected_source_mix or {}
+    readiness = _optional_str(selected_mix.get("readiness"))
     telegram_count = _optional_int(counts.get("telegram_seed_evidence_count"))
     if telegram_count is None:
         telegram_count = _optional_int(counts.get("telegram_research_agent"))
@@ -247,10 +251,23 @@ def source_mix_summary(result: MvpWeeklyPipelineResult) -> str:
     else:
         skipped_text = ""
     parts = [
+        f"readiness={readiness or 'unknown'}",
         f"telegram={telegram_count if telegram_count is not None else 'unknown'}",
         f"external={external_count if external_count is not None else 'unknown'}",
         f"external_types={external_text or 'none'}",
     ]
+    reddit_status = _optional_str(selected_mix.get("reddit_api_status"))
+    if reddit_status:
+        parts.append(f"reddit={reddit_status}")
+    missing_credentials = selected_mix.get("missing_credentials") or ()
+    if isinstance(missing_credentials, str):
+        missing_text = missing_credentials
+    elif isinstance(missing_credentials, (list, tuple)):
+        missing_text = ", ".join(str(item) for item in missing_credentials)
+    else:
+        missing_text = ""
+    if missing_text:
+        parts.append(f"missing_credentials={missing_text}")
     if skipped_text:
         parts.append(f"skipped={skipped_text}")
     source_errors = result.source_errors or {}

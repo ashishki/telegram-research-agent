@@ -62,6 +62,9 @@ Implemented:
   `build/focused_experiment/investigate/reject` status, decision, confidence,
   next action, missing evidence, next experiment, kill criteria, and Telegram
   notification status display
+- Demand-to-MVP Radar source-mix truth surface: selected-candidate source mix
+  in Markdown/JSON, missing credentials, Reddit API vs SERP-indexed Reddit, and
+  GitHub primary/repeated-variant labeling surfaced to Telegram notification
 
 ## Active Maintenance Queue
 
@@ -70,7 +73,6 @@ The active queue is now reader-facing report quality and Radar handoff.
 
 | ID | Priority | Task | Notes |
 |---|---:|---|---|
-| RADAR-3 | P1 | Add Radar source-mix truth surface | Show selected-candidate source mix, missing credentials, and whether Reddit/GitHub evidence is actually primary |
 | RADAR-4 | P1 | Add Radar report-quality tests | Lock candidate dossier, source mix, missing evidence, kill criteria, and no-contradiction contract |
 | COST-1 | P1 | Dogfood internal LLM cost guardrail sentinel | Budget/spike warnings from existing `llm_usage`, surfaced in `cost-stats` and monthly operator report |
 | RQ-5 | P1 | Add weekly artifact consistency contract | Ensure Research Brief, Implementation Ideas, Study Plan, Project Insights, and MVP status agree for the same week |

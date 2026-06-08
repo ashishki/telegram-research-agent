@@ -602,7 +602,17 @@ Acceptance criteria:
 
 ### RADAR-3 - Source Mix Truth Surface
 
+Status: implemented.
+
 Goal: make Radar's source mix understandable and operational.
+
+Implemented in `/srv/openclaw-you/workspace/Demand-to-MVP-Radar` and the
+Telegram Research Agent bridge: Radar JSON exposes machine-readable
+`selected_source_mix` / selected `source_mix`; Markdown includes a compact
+Source Mix card near the top; missing credentials remain visible; Reddit API
+usage is distinguished from SERP-indexed Reddit pages; GitHub evidence is
+labeled as primary or repeated variants; Telegram notifications include the
+readiness label.
 
 Required reader-facing fields:
 
@@ -663,11 +673,10 @@ cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
 
 ## Remaining Suggested Execution Order
 
-1. RADAR-3 - source mix truth surface.
-2. RADAR-4 - Radar report-quality tests.
-3. COST-1 - internal cost guardrail sentinel.
-4. RQ-5 - weekly artifact consistency contract.
-5. MEM-1 - weekly editorial memory.
+1. RADAR-4 - Radar report-quality tests.
+2. COST-1 - internal cost guardrail sentinel.
+3. RQ-5 - weekly artifact consistency contract.
+4. MEM-1 - weekly editorial memory.
 
 Reasoning:
 
@@ -675,8 +684,9 @@ Reasoning:
   live Telegram buttons.
 - Reader-facing evidence/source mix is implemented; Radar contradiction fixes
   are implemented.
-- Candidate dossier output is implemented; next risk is whether readers can see
-  the selected candidate's true source mix and credential limits at a glance.
+- Candidate dossier output and source-mix truth surface are implemented; next
+  risk is regression, so lock the new Radar artifact contract with focused
+  report-quality tests.
 - Cost sentinel should be dogfooded internally before any product split.
 
 ## Stop Conditions
