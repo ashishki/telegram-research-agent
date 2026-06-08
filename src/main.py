@@ -597,15 +597,17 @@ def handle_mvp_weekly(args: argparse.Namespace) -> int:
             deliver=not args.no_deliver,
         )
         LOGGER.info(
-            "Finished step=mvp_weekly week=%s seeds=%d status=%s report=%s",
+            "Finished step=mvp_weekly week=%s seeds=%d status=%s dossier_status=%s report=%s",
             summary.week_label,
             summary.seed_count,
             summary.radar_status,
+            summary.dossier_status or "",
             summary.report_path or "",
         )
         sys.stdout.write(
             f"{summary.report_path or ''}\n"
             f"status={summary.radar_status} seeds={summary.seed_count} "
+            f"dossier_status={summary.dossier_status or ''} "
             f"title={summary.selected_title or ''}\n"
             f"telegraph={summary.telegraph_url or ''}\n"
         )

@@ -22,6 +22,7 @@ class TestMvpWeeklyPipeline(unittest.TestCase):
                 report_path=str(report_path),
                 json_path="/tmp/mvp.json",
                 selected_title="Operator Fit Tool",
+                dossier_status="investigate",
                 recommendation="revisit_with_evidence_gap",
                 score=62,
             )
@@ -43,7 +44,10 @@ class TestMvpWeeklyPipeline(unittest.TestCase):
 
             self.assertEqual(telegraph_url, "https://telegra.ph/mvp-weekly")
             mock_publish.assert_called_once()
-            self.assertIn("https://telegra.ph/mvp-weekly", mock_text.call_args.kwargs["text"])
+            notification = mock_text.call_args.kwargs["text"]
+            self.assertIn("Status: investigate, score 62/100.", notification)
+            self.assertIn("Recommendation: revisit_with_evidence_gap.", notification)
+            self.assertIn("https://telegra.ph/mvp-weekly", notification)
             self.assertEqual(
                 mock_text.call_args.kwargs["reply_markup"]["inline_keyboard"][0][0]["callback_data"],
                 "art:2026-W22:mvp:u",

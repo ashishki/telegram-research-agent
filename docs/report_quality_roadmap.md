@@ -496,8 +496,16 @@ These tasks must be implemented in:
 
 ### RADAR-1 - Candidate Dossier Output
 
+Status: implemented.
+
 Goal: Radar should produce an honest candidate dossier, not a confident "MVP of
 the Week" story when the source mix only supports investigation.
+
+Implemented in `/srv/openclaw-you/workspace/Demand-to-MVP-Radar` and the
+Telegram Research Agent bridge: Radar Markdown starts with canonical status,
+decision, confidence, and next action; JSON result/selected objects expose the
+same `dossier_status`; existing-project context is rendered as apply-to-existing
+project; Telegram delivery can display the canonical status.
 
 Change the weekly report shape to:
 
@@ -655,12 +663,11 @@ cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
 
 ## Remaining Suggested Execution Order
 
-1. RADAR-1 - candidate dossier output.
-2. RADAR-3 - source mix truth surface.
-3. RADAR-4 - Radar report-quality tests.
-4. COST-1 - internal cost guardrail sentinel.
-5. RQ-5 - weekly artifact consistency contract.
-6. MEM-1 - weekly editorial memory.
+1. RADAR-3 - source mix truth surface.
+2. RADAR-4 - Radar report-quality tests.
+3. COST-1 - internal cost guardrail sentinel.
+4. RQ-5 - weekly artifact consistency contract.
+5. MEM-1 - weekly editorial memory.
 
 Reasoning:
 
@@ -668,8 +675,8 @@ Reasoning:
   live Telegram buttons.
 - Reader-facing evidence/source mix is implemented; Radar contradiction fixes
   are implemented.
-- Candidate dossier output is next because Radar now has one canonical final
-  gate but still presents the artifact as "MVP of the Week".
+- Candidate dossier output is implemented; next risk is whether readers can see
+  the selected candidate's true source mix and credential limits at a glance.
 - Cost sentinel should be dogfooded internally before any product split.
 
 ## Stop Conditions

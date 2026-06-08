@@ -411,10 +411,13 @@ Primary Radar file:
 
 ### RADAR-1 - Candidate Dossier Output
 
-Status: open.
+Status: implemented.
 
-Change weekly Radar output to a Candidate Dossier with a canonical status:
-`build`, `focused_experiment`, `investigate`, or `reject`.
+Implemented in the Radar repo and Telegram delivery bridge. Weekly Radar output
+now renders a Candidate Dossier with canonical `dossier_status`, decision,
+confidence, next action, missing evidence, next experiment, kill criteria, and
+existing-project copy that cannot be framed as a new standalone MVP. Telegram
+Research Agent notifications can display that canonical status.
 
 ### RADAR-3 - Source Mix Truth Surface
 

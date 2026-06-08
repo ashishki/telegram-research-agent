@@ -27,6 +27,7 @@ class MvpWeeklyPipelineResult:
     report_path: str | None
     json_path: str | None
     selected_title: str | None
+    dossier_status: str | None
     recommendation: str | None
     score: int | None
     telegraph_url: str | None = None
@@ -62,6 +63,7 @@ def run_mvp_weekly_pipeline(
         report_path=_optional_str(radar_payload.get("report_path")),
         json_path=_optional_str(radar_payload.get("json_path")),
         selected_title=_optional_str(radar_payload.get("selected_title")),
+        dossier_status=_optional_str(radar_payload.get("dossier_status")),
         recommendation=_optional_str(radar_payload.get("recommendation")),
         score=_optional_int(radar_payload.get("score")),
         source_counts=_optional_dict(radar_payload.get("source_counts")),
@@ -151,11 +153,14 @@ def _deliver_result(result: MvpWeeklyPipelineResult) -> str | None:
 
     title = result.selected_title or "No candidate selected"
     score_suffix = f", score {result.score}/100" if result.score is not None else ""
+    status = result.dossier_status or result.recommendation or result.radar_status
+    recommendation = result.recommendation or result.radar_status
     telegraph_url = _publish_mvp_telegraph(result)
     notification = (
         f"MVP of the Week {result.week_label} is ready.\n"
         f"{title}\n"
-        f"Recommendation: {result.recommendation or result.radar_status}{score_suffix}.\n"
+        f"Status: {status}{score_suffix}.\n"
+        f"Recommendation: {recommendation}.\n"
         f"Seeds exported: {result.seed_count}.\n"
         f"{source_mix_summary(result)}"
     )

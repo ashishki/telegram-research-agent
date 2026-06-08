@@ -234,6 +234,7 @@ Delivery requirements:
 
 - Telegram notification stays short.
 - Notification includes the Telegraph URL when publishing succeeds.
+- Notification includes the canonical Radar status when available.
 - Notification includes a source-mix summary from Radar output.
 - Markdown document is sent as a fallback/copyable artifact even when Telegraph succeeds.
 - Telegraph failures must not block the Markdown fallback.

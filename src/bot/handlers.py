@@ -498,6 +498,7 @@ def handle_run_mvp_weekly(chat_id: str, args: str, settings: Settings) -> None:
     lines = [
         summary.report_path or "No report path returned",
         f"status={summary.radar_status}",
+        f"dossier_status={summary.dossier_status or 'unknown'}",
         f"seeds={summary.seed_count}",
     ]
     if summary.telegraph_url:

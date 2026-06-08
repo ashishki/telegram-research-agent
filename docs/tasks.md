@@ -58,6 +58,10 @@ Implemented:
   receipt evidence lookup, source links, fallback state, and top channels
 - Demand-to-MVP Radar final gate contradiction guard: runtime LLM Markdown
   cannot override deterministic source-mix gates, and Radar Markdown/JSON agree
+- Demand-to-MVP Radar Candidate Dossier output: canonical
+  `build/focused_experiment/investigate/reject` status, decision, confidence,
+  next action, missing evidence, next experiment, kill criteria, and Telegram
+  notification status display
 
 ## Active Maintenance Queue
 
@@ -66,7 +70,6 @@ The active queue is now reader-facing report quality and Radar handoff.
 
 | ID | Priority | Task | Notes |
 |---|---:|---|---|
-| RADAR-1 | P0 | Change Radar output to Candidate Dossier | Radar should render `build/focused_experiment/investigate/reject` status, missing evidence, next experiment, and kill criteria |
 | RADAR-3 | P1 | Add Radar source-mix truth surface | Show selected-candidate source mix, missing credentials, and whether Reddit/GitHub evidence is actually primary |
 | RADAR-4 | P1 | Add Radar report-quality tests | Lock candidate dossier, source mix, missing evidence, kill criteria, and no-contradiction contract |
 | COST-1 | P1 | Dogfood internal LLM cost guardrail sentinel | Budget/spike warnings from existing `llm_usage`, surfaced in `cost-stats` and monthly operator report |

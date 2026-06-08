@@ -128,7 +128,8 @@ The owner should receive a message shaped like:
 ```text
 MVP of the Week 2026-W22 is ready.
 <selected title>
-Recommendation: investigate, score 64/100.
+Status: investigate, score 64/100.
+Recommendation: revisit_with_evidence_gap.
 Seeds exported: 80.
 Source mix: telegram=80; external=119; external_types=github_public, rss, stack_exchange; source_errors=serp_search_intent_live, youtube_creator_tutorial_demand_live.
 https://telegra.ph/...
