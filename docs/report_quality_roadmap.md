@@ -551,7 +551,14 @@ cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
 
 ### RADAR-2 - Single Final Gate And Contradiction Guard
 
+Status: implemented.
+
 Goal: prevent reports that say both "gate passed" and "downgraded".
+
+Implemented in `/srv/openclaw-you/workspace/Demand-to-MVP-Radar` via canonical
+LLM synthesis Markdown rewriting: deterministic gates replace contradictory
+Decision Gate and Build-Worthy sections, the top recommendation block uses the
+gated result, and JSON `result`/`selected` agree with the rendered report.
 
 Current failure:
 
@@ -648,21 +655,21 @@ cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
 
 ## Remaining Suggested Execution Order
 
-1. RADAR-2 - single final gate.
-2. RADAR-1 - candidate dossier output.
-3. RADAR-3 - source mix truth surface.
-4. RADAR-4 - Radar report-quality tests.
-5. COST-1 - internal cost guardrail sentinel.
-6. RQ-5 - weekly artifact consistency contract.
-7. MEM-1 - weekly editorial memory.
+1. RADAR-1 - candidate dossier output.
+2. RADAR-3 - source mix truth surface.
+3. RADAR-4 - Radar report-quality tests.
+4. COST-1 - internal cost guardrail sentinel.
+5. RQ-5 - weekly artifact consistency contract.
+6. MEM-1 - weekly editorial memory.
 
 Reasoning:
 
 - Feedback buttons now create the missing taste signal once the operator uses
   live Telegram buttons.
 - Reader-facing evidence/source mix is implemented; Radar contradiction fixes
-  are now the highest-priority handoff work.
-- Radar contradiction fixes are prerequisite for trusting MVP output.
+  are implemented.
+- Candidate dossier output is next because Radar now has one canonical final
+  gate but still presents the artifact as "MVP of the Week".
 - Cost sentinel should be dogfooded internally before any product split.
 
 ## Stop Conditions

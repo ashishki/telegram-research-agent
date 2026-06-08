@@ -56,6 +56,8 @@ Implemented:
   recorded in `artifact_feedback_logs`
 - reader-facing Research Brief evidence/source-mix summary derived from local
   receipt evidence lookup, source links, fallback state, and top channels
+- Demand-to-MVP Radar final gate contradiction guard: runtime LLM Markdown
+  cannot override deterministic source-mix gates, and Radar Markdown/JSON agree
 
 ## Active Maintenance Queue
 
@@ -64,7 +66,6 @@ The active queue is now reader-facing report quality and Radar handoff.
 
 | ID | Priority | Task | Notes |
 |---|---:|---|---|
-| RADAR-2 | P0 | Fix Radar final gate contradictions | In `/srv/openclaw-you/workspace/Demand-to-MVP-Radar`, deterministic gates must override LLM text and Markdown/JSON must agree |
 | RADAR-1 | P0 | Change Radar output to Candidate Dossier | Radar should render `build/focused_experiment/investigate/reject` status, missing evidence, next experiment, and kill criteria |
 | RADAR-3 | P1 | Add Radar source-mix truth surface | Show selected-candidate source mix, missing credentials, and whether Reddit/GitHub evidence is actually primary |
 | RADAR-4 | P1 | Add Radar report-quality tests | Lock candidate dossier, source mix, missing evidence, kill criteria, and no-contradiction contract |

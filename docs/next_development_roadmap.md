@@ -62,6 +62,8 @@ Implemented:
   Ideas, MVP weekly, and Study Plan notifications.
 - Reader-facing Research Brief evidence/source-mix summary derived from local
   receipt evidence lookup, source-link counts, fallback state, and top channels.
+- Demand-to-MVP Radar final-gate contradiction guard for `mvp-of-week`
+  Markdown/JSON agreement.
 - Weekly audit notes include the Core-compatible hash when source evidence refs
   exist.
 - Channel Intelligence groundwork: schema migrations, repeated-claim
@@ -395,10 +397,11 @@ Detailed tasks: `docs/report_quality_roadmap.md`.
 
 ### RADAR-2 - Single Final Gate And Contradiction Guard
 
-Status: open.
+Status: implemented.
 
-Deterministic gates in Radar must override LLM report text. Markdown and JSON
-must agree on one final recommendation/status.
+Implemented in the Radar repo: deterministic gates override LLM report text,
+rewrite contradictory Decision Gate / Build-Worthy sections, and keep Markdown
+and JSON on one final recommendation.
 
 Primary Radar file:
 

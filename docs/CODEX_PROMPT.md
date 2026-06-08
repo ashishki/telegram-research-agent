@@ -38,6 +38,9 @@ _v3.4 · 2026-06-08 · telegram-research-agent_
     section and Telegram evidence line from local receipt evidence lookup,
     source-link counts, top channels, fallback state, and deterministic
     confidence wording.
+  - Demand-to-MVP Radar now rewrites contradictory LLM `mvp-of-week` Decision
+    Gate and Build-Worthy sections to deterministic gated truth; Markdown and
+    JSON agree on the final recommendation.
   - 2026-W24 artifact review showed that internal signal quality improved but
     reader-facing report quality is weak: no first-screen decision brief,
     buried trend summary, visible internal `Matches: ...` traces, contradictions
@@ -77,8 +80,8 @@ _v3.4 · 2026-06-08 · telegram-research-agent_
 - Weekly reports now have a reader-facing evidence/source-mix summary.
   Deterministic quality gates still log/report the current failure examples
   from `docs/report_quality_roadmap.md`.
-- Demand-to-MVP Radar must not deliver a report that says a candidate is both
-  `focused_experiment` and downgraded by source mix gates.
+- Demand-to-MVP Radar final-gate contradictions are fixed for `mvp-of-week`;
+  remaining Radar work is candidate dossier shape and source-mix truth surface.
 
 ---
 
@@ -95,7 +98,8 @@ The weekly pipeline now has:
 
 ## Exact Next Execution Step
 
-Start with `RADAR-2 - Fix Radar final gate contradictions` from `docs/tasks.md`.
+Start with `RADAR-1 - Change Radar output to Candidate Dossier` from
+`docs/tasks.md`.
 Use `docs/report_quality_roadmap.md` for detailed task scope, acceptance
 criteria, touched-file guidance, and verification commands.
 
