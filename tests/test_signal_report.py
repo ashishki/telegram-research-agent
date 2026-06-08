@@ -1,10 +1,31 @@
 import os
 import sqlite3
+import sys
 import tempfile
+import types
 import unittest
 from unittest.mock import patch
 
 import yaml
+
+
+def _install_stub(module_name: str, **attributes: object) -> None:
+    module = sys.modules.get(module_name)
+    if module is None:
+        module = types.ModuleType(module_name)
+        sys.modules[module_name] = module
+    for name, value in attributes.items():
+        setattr(module, name, value)
+
+
+_install_stub(
+    "anthropic",
+    APIConnectionError=Exception,
+    APIStatusError=Exception,
+    APITimeoutError=Exception,
+    Anthropic=object,
+    RateLimitError=Exception,
+)
 
 from output.signal_report import _build_auto_watch_lines, format_signal_report
 
@@ -295,6 +316,142 @@ class TestSignalReport(unittest.TestCase):
             self.assertIn("## Additional Signals", report)
             self.assertEqual(report.count("**Project-only signal**"), 1)
             self.assertEqual(report.count("**Additional signal**"), 1)
+        finally:
+            os.unlink(db_path)
+
+    def test_reader_mode_starts_with_decision_brief_and_early_change_summary(self):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+            db_path = tmp.name
+
+        try:
+            with sqlite3.connect(db_path) as connection:
+                connection.executescript(
+                    """
+                    CREATE TABLE user_post_tags (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        post_id INTEGER NOT NULL,
+                        tag TEXT NOT NULL,
+                        note TEXT,
+                        recorded_at TEXT NOT NULL
+                    );
+                    CREATE TABLE quality_metrics (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        week_label TEXT NOT NULL UNIQUE,
+                        computed_at TEXT NOT NULL,
+                        total_posts INTEGER NOT NULL DEFAULT 0,
+                        strong_count INTEGER NOT NULL DEFAULT 0,
+                        watch_count INTEGER NOT NULL DEFAULT 0,
+                        cultural_count INTEGER NOT NULL DEFAULT 0,
+                        noise_count INTEGER NOT NULL DEFAULT 0,
+                        avg_signal_score REAL,
+                        project_match_count INTEGER NOT NULL DEFAULT 0,
+                        output_word_count INTEGER NOT NULL DEFAULT 0
+                    );
+                    """
+                )
+                connection.execute(
+                    """
+                    INSERT INTO quality_metrics (
+                        week_label, computed_at, total_posts, strong_count, watch_count, noise_count, avg_signal_score
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    ("2026-W13", "2026-03-24T00:00:00Z", 10, 1, 1, 8, 0.25),
+                )
+                connection.commit()
+
+            class _Settings:
+                def __init__(self, path: str):
+                    self.db_path = path
+
+            posts = [
+                {
+                    "id": 1,
+                    "content": "Strong agent workflow signal",
+                    "signal_score": 0.9,
+                    "bucket": "strong",
+                    "message_url": "https://t.me/test/1",
+                    "channel_username": "@test",
+                },
+                {
+                    "id": 2,
+                    "content": "Watch project quality gate signal",
+                    "signal_score": 0.7,
+                    "bucket": "watch",
+                    "message_url": "https://t.me/test/2",
+                    "channel_username": "@test",
+                },
+                {"id": 3, "content": "noise", "signal_score": 0.1, "bucket": "noise"},
+            ]
+            judged = {
+                1: {
+                    "include": True,
+                    "category": "strong",
+                    "title": "Strong workflow signal",
+                    "key_takeaway": "Use this now.",
+                    "why_now": "It affects current work.",
+                    "confidence": 0.9,
+                },
+                2: {
+                    "include": True,
+                    "category": "interesting",
+                    "title": "Project quality signal",
+                    "key_takeaway": "Relevant to project quality.",
+                    "why_now": "Report gates are active.",
+                    "project_name": "telegram-research-agent",
+                    "project_application": "Add a decision brief.",
+                    "confidence": 0.8,
+                },
+            }
+
+            with patch("output.signal_report._load_profile", return_value={}):
+                with patch("output.signal_report._load_projects", return_value=[{"name": "telegram-research-agent"}]):
+                    with patch("output.signal_report.judge_recent_posts", return_value=judged):
+                        report = format_signal_report(posts, settings=_Settings(db_path), reader_mode=True)
+
+            self.assertTrue(report.startswith("## Decision Brief"))
+            self.assertIn("## Actions This Week", report)
+            self.assertLess(report.index("## What Changed"), report.index("## Project Insights"))
+            self.assertIn("Funnel: 3 posts -> 1 strong / 1 watch", report)
+            self.assertIn("Source mix: Telegram-only scan", report)
+        finally:
+            os.unlink(db_path)
+
+    def test_reader_mode_low_signal_week_has_skip_guidance(self):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+            db_path = tmp.name
+
+        try:
+            with sqlite3.connect(db_path) as connection:
+                connection.execute(
+                    """
+                    CREATE TABLE user_post_tags (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        post_id INTEGER NOT NULL,
+                        tag TEXT NOT NULL,
+                        note TEXT,
+                        recorded_at TEXT NOT NULL
+                    )
+                    """
+                )
+                connection.commit()
+
+            class _Settings:
+                def __init__(self, path: str):
+                    self.db_path = path
+
+            posts = [
+                {"id": 1, "content": "noise one", "signal_score": 0.1, "bucket": "noise"},
+                {"id": 2, "content": "noise two", "signal_score": 0.2, "bucket": "noise"},
+            ]
+
+            with patch("output.signal_report._load_profile", return_value={}):
+                with patch("output.signal_report._load_projects", return_value=[]):
+                    with patch("output.signal_report.judge_recent_posts", return_value={}):
+                        report = format_signal_report(posts, settings=_Settings(db_path), reader_mode=True)
+
+            self.assertTrue(report.startswith("## Decision Brief"))
+            self.assertIn("Skip if you only need project decisions", report)
+            self.assertIn("confidence low", report)
         finally:
             os.unlink(db_path)
 

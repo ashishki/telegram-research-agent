@@ -149,7 +149,7 @@ def _load_previous_quality_metrics(db_path: str = "") -> dict | None:
             connection.row_factory = sqlite3.Row
             row = connection.execute(
                 """
-                SELECT strong_count, watch_count, noise_count
+                SELECT total_posts, strong_count, watch_count, noise_count, avg_signal_score
                 FROM quality_metrics
                 ORDER BY computed_at DESC, id DESC
                 LIMIT 1
@@ -205,6 +205,113 @@ def _build_what_changed_lines(bucket_counts: Counter, db_path: str = "") -> list
         delta = current - prior
         lines.append(f"- {bucket_name}: {current} (was {prior}, {delta:+d})")
     return lines
+
+
+def _summarize_signal_change(bucket_counts: Counter, db_path: str = "") -> str:
+    previous = _load_previous_quality_metrics(db_path=db_path)
+    if previous is None:
+        return "No comparison baseline available."
+    parts: list[str] = []
+    for bucket_name in ("watch", "noise"):
+        current = int(bucket_counts.get(bucket_name, 0))
+        prior = int(previous.get(f"{bucket_name}_count") or 0)
+        parts.append(f"{bucket_name} {prior} -> {current}")
+    return ", ".join(parts) + "."
+
+
+def _build_action_lines(
+    *,
+    bucket_counts: Counter,
+    manual_sections: list[tuple[str, list[str]]],
+    project_lines: list[str],
+    auto_watch_lines: list[str],
+) -> list[str]:
+    actions: list[str] = []
+    if manual_sections:
+        first_heading, first_lines = manual_sections[0]
+        if first_lines:
+            actions.append(f"Review {first_heading.lower()} and decide whether to apply the first item.")
+    if project_lines and project_lines != ["No project-specific signals this week."]:
+        actions.append("Use Project Insights to update the active repo/backlog that has the clearest source-backed signal.")
+    if auto_watch_lines and auto_watch_lines != ["No additional high-confidence auto-selected signals this week."]:
+        actions.append("Keep the additional high-confidence signals in view before turning them into work.")
+    if not actions:
+        actionable = int(bucket_counts.get("strong", 0)) + int(bucket_counts.get("watch", 0))
+        if actionable <= 0:
+            actions.append("Skip deep reading this week unless you are debugging ingestion or scoring quality.")
+        else:
+            actions.append("Scan the watch signals, but defer new work until evidence becomes more specific.")
+    return [f"{index}. {action}" for index, action in enumerate(actions[:3], start=1)]
+
+
+def _build_source_mix_summary(posts: list[dict]) -> str:
+    signal_posts = [
+        post
+        for post in posts
+        if str(post.get("bucket") or "noise") in {"strong", "watch"}
+    ]
+    if not signal_posts:
+        return "Telegram-only scan; no strong/watch source concentration."
+    channel_counts = Counter(
+        str(post.get("channel_username") or "").strip()
+        for post in signal_posts
+        if str(post.get("channel_username") or "").strip()
+    )
+    top_channels = ", ".join(f"{channel} ({count})" for channel, count in channel_counts.most_common(3))
+    linked_count = sum(1 for post in signal_posts if str(post.get("message_url") or "").strip())
+    if not top_channels:
+        return f"Telegram-only scan; {linked_count} linked source posts."
+    return f"Telegram-only scan; top signal sources: {top_channels}; linked posts: {linked_count}."
+
+
+def _build_evidence_confidence_line(posts: list[dict], bucket_counts: Counter) -> str:
+    strong_count = int(bucket_counts.get("strong", 0))
+    watch_count = int(bucket_counts.get("watch", 0))
+    actionable_count = strong_count + watch_count
+    linked_count = sum(
+        1
+        for post in posts
+        if str(post.get("bucket") or "noise") in {"strong", "watch"}
+        and str(post.get("message_url") or "").strip()
+    )
+    if actionable_count <= 0:
+        return "Evidence: no strong/watch signals; confidence low."
+    if strong_count > 0 and linked_count >= actionable_count:
+        return f"Evidence: {linked_count} linked Telegram source posts; confidence medium."
+    return f"Evidence: {linked_count} linked Telegram source posts for {actionable_count} strong/watch signals; confidence low-to-medium."
+
+
+def _build_decision_brief_lines(
+    *,
+    posts: list[dict],
+    bucket_counts: Counter,
+    actions: list[str],
+    db_path: str = "",
+) -> list[str]:
+    post_count = len(posts)
+    strong_count = int(bucket_counts.get("strong", 0))
+    watch_count = int(bucket_counts.get("watch", 0))
+    cultural_count = int(bucket_counts.get("cultural", 0))
+    noise_count = int(bucket_counts.get("noise", 0))
+    actionable_count = strong_count + watch_count
+    guidance = (
+        "Read this if you are choosing project work this week."
+        if actionable_count > 0
+        else "Skip if you only need project decisions; read only to debug signal quality."
+    )
+    decision = actions[0].split(". ", maxsplit=1)[1] if actions else "No immediate action recommended."
+    return [
+        f"- Evaluated: {post_count} Telegram posts from the last 7 days.",
+        (
+            f"- Funnel: {post_count} posts -> {strong_count} strong / {watch_count} watch / "
+            f"{cultural_count} cultural / {noise_count} noise -> {len(actions)} actions."
+        ),
+        f"- Signal change: {_summarize_signal_change(bucket_counts, db_path=db_path)}",
+        f"- Decision: {decision}",
+        f"- {_build_evidence_confidence_line(posts, bucket_counts)}",
+        f"- Source mix: {_build_source_mix_summary(posts)}",
+        f"- {guidance}",
+    ]
 
 
 def _load_user_tag_details(post_ids: list[int], settings) -> dict[int, list[dict[str, str]]]:
@@ -326,20 +433,6 @@ def _sort_posts_for_brief(posts: list[dict], tag_details_by_post: dict[int, list
 
 def _judged(post_id: int, judged_by_post: dict[int, dict]) -> dict:
     return judged_by_post.get(post_id, {})
-
-
-def _table_exists(db_path: str, table_name: str) -> bool:
-    if not db_path:
-        return False
-    try:
-        with sqlite3.connect(db_path) as connection:
-            row = connection.execute(
-                "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
-                (table_name,),
-            ).fetchone()
-    except sqlite3.Error:
-        return False
-    return row is not None
 
 
 def _format_legacy_entry(post: dict) -> str:
@@ -586,8 +679,6 @@ def format_signal_report(posts: list[dict], settings=None, *, reader_mode: bool 
         return _format_legacy_signal_report(posts, settings)
 
     db_path = str(getattr(settings, "db_path", "") or "").strip() if settings is not None else ""
-    if not _table_exists(db_path, "user_post_tags"):
-        return _format_legacy_signal_report(posts, settings)
 
     indexed_posts = [{**post, "_original_position": index} for index, post in enumerate(posts)]
     profile = _load_profile()
@@ -615,8 +706,30 @@ def format_signal_report(posts: list[dict], settings=None, *, reader_mode: bool 
     macro_context_lines = _build_macro_context_lines(visible_posts, judged_by_post)
     what_changed_lines = _build_what_changed_lines(bucket_counts, db_path=db_path)
     source_analytics_lines = _build_source_analytics_lines(posts)
+    action_lines = _build_action_lines(
+        bucket_counts=bucket_counts,
+        manual_sections=manual_sections,
+        project_lines=project_lines,
+        auto_watch_lines=auto_watch_lines,
+    )
+    decision_brief_lines = _build_decision_brief_lines(
+        posts=posts,
+        bucket_counts=bucket_counts,
+        actions=action_lines,
+        db_path=db_path,
+    )
 
-    sections: list[str] = []
+    sections: list[str] = [
+        "## Decision Brief",
+        *decision_brief_lines,
+        "",
+        "## Actions This Week",
+        *action_lines,
+        "",
+        "## What Changed",
+        *what_changed_lines,
+        "",
+    ]
     for heading, lines in manual_sections:
         sections.extend([f"## {heading}", *lines, ""])
 
@@ -632,9 +745,6 @@ def format_signal_report(posts: list[dict], settings=None, *, reader_mode: bool 
         "",
         "## Source Map",
         *source_analytics_lines,
-        "",
-        "## What Changed",
-        *what_changed_lines,
     ])
 
     return "\n".join(line for line in sections if line is not None).strip() + "\n"

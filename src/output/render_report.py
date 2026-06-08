@@ -21,15 +21,15 @@ DETAIL_LABELS = {
 def render_report_html(report_text: str) -> str:
     lines = report_text.splitlines()
     body_parts: list[str] = []
-    in_list = False
+    open_list_tag: str | None = None
     current_section_open = False
     section_started = False
 
     def close_list() -> None:
-        nonlocal in_list
-        if in_list:
-            body_parts.append("</ul>")
-            in_list = False
+        nonlocal open_list_tag
+        if open_list_tag:
+            body_parts.append(f"</{open_list_tag}>")
+            open_list_tag = None
 
     def close_section() -> None:
         nonlocal current_section_open
@@ -53,11 +53,14 @@ def render_report_html(report_text: str) -> str:
                 body_parts.append(f"<p>{_format_inline_markup(detail.strip())}</p>")
         body_parts.append("</article>")
 
-    def render_list_item(text: str) -> None:
-        nonlocal in_list
-        if not in_list:
-            body_parts.append("<ul>")
-            in_list = True
+    def render_list_item(text: str, *, ordered: bool = False) -> None:
+        nonlocal open_list_tag
+        target_tag = "ol" if ordered else "ul"
+        if open_list_tag and open_list_tag != target_tag:
+            close_list()
+        if not open_list_tag:
+            body_parts.append(f"<{target_tag}>")
+            open_list_tag = target_tag
         body_parts.append(f"<li>{_format_inline_markup(text.strip())}</li>")
 
     index = 0
@@ -111,6 +114,12 @@ def render_report_html(report_text: str) -> str:
                 index = lookahead
                 continue
             render_list_item(item_text)
+            index += 1
+            continue
+
+        ordered_match = re.match(r"^\d+\.\s+(.+)$", line.strip())
+        if ordered_match:
+            render_list_item(ordered_match.group(1), ordered=True)
             index += 1
             continue
 

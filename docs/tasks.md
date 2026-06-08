@@ -49,6 +49,8 @@ Implemented:
 - deterministic report-quality gates for weekly artifacts via
   `output.report_quality`, digest delivery warnings, Study Plan/Project
   Insights logging, and `operator-report`
+- reader-facing Research Brief Decision Brief and Actions header, with early
+  What Changed summary and compact Telegram notification funnel/action count
 
 ## Active Maintenance Queue
 
@@ -57,7 +59,6 @@ The active queue is now reader-facing report quality and Radar handoff.
 
 | ID | Priority | Task | Notes |
 |---|---:|---|---|
-| RQ-1 | P0 | Add Weekly Decision Brief header | First screen must say what was evaluated, what changed, what decision/action follows, and confidence/evidence status |
 | RQ-3 | P0 | Add artifact feedback buttons | Add Research Brief / Implementation Ideas / MVP feedback buttons that write to `artifact_feedback_logs` |
 | RQ-4 | P0 | Add reader-facing evidence/source-mix summary | Translate receipt/evidence lookup status into concise operator-facing confidence text |
 | RADAR-2 | P0 | Fix Radar final gate contradictions | In `/srv/openclaw-you/workspace/Demand-to-MVP-Radar`, deterministic gates must override LLM text and Markdown/JSON must agree |

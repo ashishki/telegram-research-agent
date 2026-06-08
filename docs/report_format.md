@@ -1,7 +1,8 @@
 # Weekly Review Artifact — Format Specification
 
 **Version:** 3.1
-**Status:** Implemented baseline; report-quality improvements pending
+**Status:** Implemented baseline; Decision Brief and quality gates implemented;
+additional report-quality improvements pending
 
 ---
 

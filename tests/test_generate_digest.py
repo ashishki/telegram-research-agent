@@ -35,7 +35,9 @@ from output.generate_digest import (
     MAX_OUTPUT_WORDS,
     _append_github_section,
     _build_digest_health_alert,
+    _build_review_notification,
     _count_words,
+    _extract_actions_this_week_count,
 )
 from output.report_quality import ReportQualityFinding
 from db.research_brief_receipts import fetch_research_brief_receipts
@@ -126,6 +128,20 @@ class TestDigestHealthAlert(unittest.TestCase):
         )
 
         self.assertIsNone(alert)
+
+    def test_review_notification_includes_funnel_and_action_count(self):
+        content = "## Actions This Week\n1. Apply report gates.\n2. Defer weak source.\n"
+
+        notification = _build_review_notification(
+            "2026-W24",
+            strong_count=1,
+            watch_count=56,
+            post_count=179,
+            noise_count=116,
+            action_count=_extract_actions_this_week_count(content),
+        )
+
+        self.assertIn("Funnel: 179 posts -> 1 strong / 56 watch / 116 noise -> 2 actions.", notification)
 
     def test_receipt_audit_note_only_renders_actionable_receipt_state(self):
         self.assertIsNone(gd._build_receipt_audit_note({"verification_status": "pending", "health_flags": []}))
@@ -836,7 +852,7 @@ class TestRunDigestFixes(unittest.TestCase):
         finally:
             os.unlink(db_path)
 
-    def test_run_digest_prepends_signal_report_section(self):
+    def test_run_digest_prepends_decision_brief_section(self):
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
             db_path = tmp.name
 
@@ -859,7 +875,8 @@ class TestRunDigestFixes(unittest.TestCase):
                                                             gd.run_digest(settings)
 
             written_content = write_mock.call_args.args[1]
-            self.assertIn("## Strong Signals", written_content)
+            self.assertTrue(written_content.startswith("## Decision Brief"))
+            self.assertIn("## Actions This Week", written_content)
         finally:
             os.unlink(db_path)
 

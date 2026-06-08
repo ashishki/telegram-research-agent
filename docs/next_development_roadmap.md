@@ -342,7 +342,7 @@ Must catch:
 
 ### RQ-1 - Weekly Decision Brief Header
 
-Status: open.
+Status: implemented.
 
 The Research Brief and Telegram notification must start with a compact summary:
 

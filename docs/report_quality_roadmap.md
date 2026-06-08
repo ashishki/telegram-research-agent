@@ -139,7 +139,14 @@ cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
 
 ### RQ-1 - Weekly Decision Brief Header
 
+Status: implemented.
+
 Goal: make the Research Brief useful in the first screen.
+
+Implemented in `src/output/signal_report.py`, `src/output/generate_digest.py`,
+and `src/output/render_report.py`: reader-mode Research Brief starts with
+Decision Brief, Actions This Week, and early What Changed; Telegram
+notification includes a compact funnel and action count.
 
 Add a compact decision brief at the top of the delivered Research Brief and in
 the Telegram notification.
@@ -626,18 +633,16 @@ cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
 
 ## Remaining Suggested Execution Order
 
-1. RQ-1 - decision brief header.
-2. RQ-3 - artifact feedback buttons.
-3. RADAR-2 - single final gate.
-4. RADAR-1 - candidate dossier output.
-5. RADAR-3 - source mix truth surface.
-6. COST-1 - internal cost guardrail sentinel.
-7. RQ-5 - weekly artifact consistency contract.
-8. MEM-1 - weekly editorial memory.
+1. RQ-3 - artifact feedback buttons.
+2. RADAR-2 - single final gate.
+3. RADAR-1 - candidate dossier output.
+4. RADAR-3 - source mix truth surface.
+5. COST-1 - internal cost guardrail sentinel.
+6. RQ-5 - weekly artifact consistency contract.
+7. MEM-1 - weekly editorial memory.
 
 Reasoning:
 
-- Decision brief improves next Monday's reader experience immediately.
 - Feedback buttons create the missing taste signal.
 - Radar contradiction fixes are prerequisite for trusting MVP output.
 - Cost sentinel should be dogfooded internally before any product split.

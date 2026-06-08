@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 import sqlite3
 import time
 from dataclasses import asdict
@@ -165,10 +166,38 @@ def _send_digest_to_telegram_owner(content_md: str, week_label: str) -> None:
     LOGGER.info("Digest sent to Telegram owner week=%s", week_label)
 
 
-def _build_review_notification(week_label: str, strong_count: int, watch_count: int) -> str:
+def _extract_actions_this_week_count(content_md: str | None) -> int:
+    in_actions = False
+    count = 0
+    for raw_line in str(content_md or "").splitlines():
+        line = raw_line.strip()
+        if line.startswith("## "):
+            in_actions = line == "## Actions This Week"
+            continue
+        if in_actions and re.match(r"^\d+\.\s+", line):
+            count += 1
+    return count
+
+
+def _build_review_notification(
+    week_label: str,
+    strong_count: int,
+    watch_count: int,
+    *,
+    post_count: int | None = None,
+    noise_count: int | None = None,
+    action_count: int | None = None,
+) -> str:
+    if post_count is not None and action_count is not None:
+        funnel = f"{post_count} posts -> {strong_count} strong / {watch_count} watch"
+        if noise_count is not None:
+            funnel = f"{funnel} / {noise_count} noise"
+        funnel = f"{funnel} -> {action_count} actions"
+    else:
+        funnel = f"{strong_count} strong signals, {watch_count} watch"
     return (
         f"Research Brief {week_label} is ready.\n"
-        f"{strong_count} strong signals, {watch_count} watch.\n"
+        f"Funnel: {funnel}.\n"
         "Open the full brief:"
     )[:300]
 
@@ -413,6 +442,8 @@ def _send_weekly_review_to_telegram_owner(
     watch_count: int,
     html_path: Path | None,
     digest_id: int | None = None,
+    post_count: int | None = None,
+    noise_count: int | None = None,
     force_delivery: bool = False,
     health_alert: str | None = None,
     receipt_audit_note: str | None = None,
@@ -435,7 +466,14 @@ def _send_weekly_review_to_telegram_owner(
         LOGGER.info("Weekly review delivery skipped week=%s because it was already sent", week_label)
         return
 
-    notification = _build_review_notification(week_label, strong_count, watch_count)
+    notification = _build_review_notification(
+        week_label,
+        strong_count,
+        watch_count,
+        post_count=post_count,
+        noise_count=noise_count,
+        action_count=_extract_actions_this_week_count(content_md),
+    )
     if health_alert:
         notification = f"{health_alert}\n\n{notification}"[:700]
     if report_quality_warning:
@@ -1093,6 +1131,8 @@ def run_digest(settings: Settings, force_delivery: bool = False) -> DigestResult
                     watch_count=0,
                     html_path=html_path,
                     digest_id=digest_id,
+                    post_count=0,
+                    noise_count=0,
                     force_delivery=force_delivery,
                     health_alert=health_alert,
                     receipt_audit_note=receipt_audit_note,
@@ -1262,6 +1302,8 @@ def run_digest(settings: Settings, force_delivery: bool = False) -> DigestResult
                 watch_count=buckets["bucket_counts"]["watch"],
                 html_path=html_path,
                 digest_id=digest_id,
+                post_count=post_count,
+                noise_count=buckets["bucket_counts"]["noise"],
                 force_delivery=force_delivery,
                 health_alert=health_alert,
                 receipt_audit_note=receipt_audit_note,

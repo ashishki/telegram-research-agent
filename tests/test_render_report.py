@@ -25,6 +25,14 @@ class TestRenderReport(unittest.TestCase):
         self.assertIn("<li>beta</li>", html)
         self.assertEqual(html.count("<ul>"), 1)
 
+    def test_render_numbered_actions_grouped_in_ol(self):
+        html = render_report_html("## Actions This Week\n1. Apply gates\n2. Defer weak signal\n")
+
+        self.assertIn("<ol>", html)
+        self.assertIn("</ol>", html)
+        self.assertIn("<li>Apply gates</li>", html)
+        self.assertIn("<li>Defer weak signal</li>", html)
+
     def test_render_bold_formatting(self):
         html = render_report_html("This is **bold** text.\n")
         self.assertIn("<b>bold</b>", html)
