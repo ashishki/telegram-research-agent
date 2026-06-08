@@ -60,6 +60,8 @@ Implemented:
   explanations, product split gate, and OPS validation command surfaces.
 - Artifact-level Telegram feedback buttons on Research Brief, Implementation
   Ideas, MVP weekly, and Study Plan notifications.
+- Reader-facing Research Brief evidence/source-mix summary derived from local
+  receipt evidence lookup, source-link counts, fallback state, and top channels.
 - Weekly audit notes include the Core-compatible hash when source evidence refs
   exist.
 - Channel Intelligence groundwork: schema migrations, repeated-claim
@@ -366,10 +368,10 @@ per-idea Implementation Ideas decision buttons are preserved.
 
 ### RQ-4 - Reader-Facing Evidence And Source Mix Summary
 
-Status: open.
+Status: implemented.
 
-Expose proof-receipt/evidence lookup status in plain language inside the weekly
-Research Brief and Telegram notification.
+Implemented as a deterministic `Evidence & Source Mix` Research Brief section
+and Telegram notification line from local receipt/evidence lookup facts.
 
 ### RQ-5 - Weekly Artifact Consistency Contract
 

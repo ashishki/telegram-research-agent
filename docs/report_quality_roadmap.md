@@ -330,8 +330,15 @@ PYTHONPATH=src /srv/openclaw-you/venv/bin/python3 src/main.py ops-validate callb
 
 ### RQ-4 - Reader-Facing Evidence And Source Mix Summary
 
+Status: implemented.
+
 Goal: turn proof receipts and source counts into a reader-facing confidence
 surface.
+
+Implemented through `summarize_research_brief_evidence(...)`, Research Brief
+`Evidence & Source Mix` insertion after receipt creation, Telegram notification
+evidence lines, fallback delivery status updates for fallback Markdown, and
+focused receipt/digest tests.
 
 The system already has evidence lookup checks, but the operator only sees a
 technical audit note or nothing at all. Add a compact evidence section to the
@@ -641,21 +648,20 @@ cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
 
 ## Remaining Suggested Execution Order
 
-1. RQ-4 - reader-facing evidence/source-mix summary.
-2. RADAR-2 - single final gate.
-3. RADAR-1 - candidate dossier output.
-4. RADAR-3 - source mix truth surface.
-5. RADAR-4 - Radar report-quality tests.
-6. COST-1 - internal cost guardrail sentinel.
-7. RQ-5 - weekly artifact consistency contract.
-8. MEM-1 - weekly editorial memory.
+1. RADAR-2 - single final gate.
+2. RADAR-1 - candidate dossier output.
+3. RADAR-3 - source mix truth surface.
+4. RADAR-4 - Radar report-quality tests.
+5. COST-1 - internal cost guardrail sentinel.
+6. RQ-5 - weekly artifact consistency contract.
+7. MEM-1 - weekly editorial memory.
 
 Reasoning:
 
 - Feedback buttons now create the missing taste signal once the operator uses
   live Telegram buttons.
-- Reader-facing evidence/source mix is the remaining Telegram Research Agent P0
-  before Radar handoff work.
+- Reader-facing evidence/source mix is implemented; Radar contradiction fixes
+  are now the highest-priority handoff work.
 - Radar contradiction fixes are prerequisite for trusting MVP output.
 - Cost sentinel should be dogfooded internally before any product split.
 

@@ -139,9 +139,11 @@ class TestDigestHealthAlert(unittest.TestCase):
             post_count=179,
             noise_count=116,
             action_count=_extract_actions_this_week_count(content),
+            evidence_summary_note="Evidence: 12 local rows, 8 Telegram links, lookup passed, confidence medium.",
         )
 
         self.assertIn("Funnel: 179 posts -> 1 strong / 56 watch / 116 noise -> 2 actions.", notification)
+        self.assertIn("Evidence: 12 local rows, 8 Telegram links, lookup passed", notification)
 
     def test_receipt_audit_note_only_renders_actionable_receipt_state(self):
         self.assertIsNone(gd._build_receipt_audit_note({"verification_status": "pending", "health_flags": []}))
@@ -438,10 +440,10 @@ class TestRunDigestFixes(unittest.TestCase):
             connection.executemany(
                 "INSERT INTO raw_posts (id, view_count, message_url) VALUES (?, ?, ?)",
                 [
-                    (1, 100, "https://t.me/c/1"),
-                    (2, 90, "https://t.me/c/2"),
-                    (3, 80, "https://t.me/c/3"),
-                    (4, 70, "https://t.me/c/4"),
+                    (1, 100, "https://t.me/c/100/1"),
+                    (2, 90, "https://t.me/c/100/2"),
+                    (3, 80, "https://t.me/c/100/3"),
+                    (4, 70, "https://t.me/c/100/4"),
                 ],
             )
             connection.executemany(
@@ -557,6 +559,10 @@ class TestRunDigestFixes(unittest.TestCase):
             with sqlite3.connect(db_path) as connection:
                 connection.row_factory = sqlite3.Row
                 receipts = fetch_research_brief_receipts(connection, week_label="2026-W14", limit=5)
+                digest_row = connection.execute(
+                    "SELECT content_md FROM digests WHERE week_label = ?",
+                    ("2026-W14",),
+                ).fetchone()
 
             self.assertEqual(len(receipts), 1)
             receipt = receipts[0]
@@ -571,7 +577,7 @@ class TestRunDigestFixes(unittest.TestCase):
             self.assertEqual(receipt["post_counts"]["watch_count"], 1)
             self.assertEqual(receipt["source_set"]["source_evidence_item_ids"], [1, 2])
             self.assertEqual(receipt["source_set"]["source_post_ids"], [1, 2, 3, 4])
-            self.assertIn("https://t.me/c/1", receipt["source_set"]["telegram_source_links"])
+            self.assertIn("https://t.me/c/100/1", receipt["source_set"]["telegram_source_links"])
             self.assertEqual(receipt["project_scopes"], ["proj-a"])
             self.assertEqual(receipt["topic_scopes"], ["Agents", "Culture", "Infra", "Noise"])
             self.assertEqual(receipt["llm_provider"], "anthropic")
@@ -582,6 +588,10 @@ class TestRunDigestFixes(unittest.TestCase):
             self.assertEqual(receipt["json_path"], "/tmp/2026-W14.json")
             self.assertEqual(receipt["html_path"], "/tmp/2026-W14.html")
             self.assertEqual(receipt["health_flags"], [])
+            self.assertIsNotNone(digest_row)
+            self.assertIn("## Evidence & Source Mix", digest_row["content_md"])
+            self.assertIn("2 local evidence rows", digest_row["content_md"])
+            self.assertIn("receipt lookup passed", digest_row["content_md"])
         finally:
             os.unlink(db_path)
 
@@ -612,6 +622,11 @@ class TestRunDigestFixes(unittest.TestCase):
             self.assertIsNotNone(receipt_audit_note)
             self.assertIn("Receipt: pending", receipt_audit_note)
             self.assertRegex(receipt_audit_note, r"core_sha256=[0-9a-f]{64}")
+            evidence_summary_note = send_mock.call_args.kwargs["evidence_summary_note"]
+            self.assertEqual(
+                evidence_summary_note,
+                "Evidence: 2 local rows, 4 Telegram links, lookup passed, confidence medium.",
+            )
         finally:
             os.unlink(db_path)
 
@@ -767,6 +782,19 @@ class TestRunDigestFixes(unittest.TestCase):
                     "SELECT id FROM digests WHERE week_label = ?",
                     ("2026-W14",),
                 ).fetchone()["id"]
+                evidence_summary = {
+                    "status": "passed",
+                    "local_evidence_row_count": 2,
+                    "telegram_source_link_count": 4,
+                    "top_channels": [{"channel": "chan1", "count": 1}],
+                    "fallback_delivery_used": False,
+                    "fallback_delivery": "not_used",
+                    "confidence_level": "medium",
+                    "confidence_sentence": "medium - local evidence rows and Telegram source links resolved.",
+                    "failures": [],
+                    "review_notes": [],
+                }
+                evidence_summary_note = gd._format_receipt_evidence_notification(evidence_summary)
 
                 with patch.dict(
                     os.environ,
@@ -777,23 +805,26 @@ class TestRunDigestFixes(unittest.TestCase):
                     clear=False,
                 ):
                     with patch.object(gd, "publish_article", side_effect=RuntimeError("telegraph down")):
-                        with patch.object(gd, "send_text", return_value=888):
+                        with patch.object(gd, "send_text", return_value=888) as send_mock:
                             with patch.object(gd, "send_document", return_value=889):
                                 with patch.object(gd, "_send_copyable_digest_document"):
-                                    with patch.object(gd, "_utc_now_iso", return_value="2026-03-30T12:06:00Z"):
-                                        gd._send_weekly_review_to_telegram_owner(
-                                            connection=connection,
-                                            content_md="brief",
-                                            week_label="2026-W14",
-                                            strong_count=1,
-                                            watch_count=1,
-                                            html_path=html_path,
-                                            digest_id=digest_id,
-                                        )
+                                    with patch.object(gd, "_write_digest_file", return_value=gd.Path("/tmp/2026-W14.md")):
+                                        with patch.object(gd, "_utc_now_iso", return_value="2026-03-30T12:06:00Z"):
+                                            gd._send_weekly_review_to_telegram_owner(
+                                                connection=connection,
+                                                content_md="brief",
+                                                week_label="2026-W14",
+                                                strong_count=1,
+                                                watch_count=1,
+                                                html_path=html_path,
+                                                digest_id=digest_id,
+                                                evidence_summary_note=evidence_summary_note,
+                                                evidence_summary=evidence_summary,
+                                            )
 
                 receipt = fetch_research_brief_receipts(connection, digest_id=digest_id, limit=1)[0]
                 digest_row = connection.execute(
-                    "SELECT telegraph_url, telegram_sent_at FROM digests WHERE id = ?",
+                    "SELECT telegraph_url, telegram_sent_at, content_md FROM digests WHERE id = ?",
                     (digest_id,),
                 ).fetchone()
 
@@ -805,6 +836,8 @@ class TestRunDigestFixes(unittest.TestCase):
             self.assertEqual(receipt["health_flags"], ["fallback_delivery"])
             self.assertIsNone(digest_row["telegraph_url"])
             self.assertEqual(digest_row["telegram_sent_at"], "2026-03-30T12:06:00Z")
+            self.assertIn("fallback=html_attachment", send_mock.call_args.kwargs["text"])
+            self.assertIn("fallback used: html_attachment", digest_row["content_md"])
         finally:
             os.unlink(db_path)
             os.unlink(html_path)

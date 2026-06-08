@@ -25,7 +25,11 @@ from output.report_quality import (
     validate_weekly_artifacts,
 )
 from output.signal_report import format_signal_report
-from proof_receipts import build_core_research_brief_receipt, core_receipt_sha256
+from proof_receipts import (
+    build_core_research_brief_receipt,
+    core_receipt_sha256,
+    summarize_research_brief_evidence,
+)
 from output.report_schema import (
     DigestResult,
     EvidenceItem,
@@ -189,6 +193,7 @@ def _build_review_notification(
     post_count: int | None = None,
     noise_count: int | None = None,
     action_count: int | None = None,
+    evidence_summary_note: str | None = None,
 ) -> str:
     if post_count is not None and action_count is not None:
         funnel = f"{post_count} posts -> {strong_count} strong / {watch_count} watch"
@@ -197,11 +202,14 @@ def _build_review_notification(
         funnel = f"{funnel} -> {action_count} actions"
     else:
         funnel = f"{strong_count} strong signals, {watch_count} watch"
-    return (
-        f"Research Brief {week_label} is ready.\n"
-        f"Funnel: {funnel}.\n"
-        "Open the full brief:"
-    )[:300]
+    lines = [
+        f"Research Brief {week_label} is ready.",
+        f"Funnel: {funnel}.",
+    ]
+    if evidence_summary_note:
+        lines.append(evidence_summary_note)
+    lines.append("Open the full brief:")
+    return "\n".join(lines)[:520]
 
 
 def _build_receipt_audit_note(receipt: dict | None) -> str | None:
@@ -222,6 +230,104 @@ def _build_receipt_audit_note(receipt: dict | None) -> str | None:
     if fallback_used:
         parts.append(f"fallback={receipt.get('fallback_delivery') or 'yes'}")
     return " | ".join(parts)[:220]
+
+
+def _format_receipt_top_channels(summary: dict) -> str:
+    channels = summary.get("top_channels") or []
+    if not channels:
+        return "no channel concentration"
+    parts = []
+    for item in channels[:3]:
+        channel = str(item.get("channel") or "").strip()
+        count = int(item.get("count") or 0)
+        if channel:
+            parts.append(f"{channel} ({count})")
+    return "top channels: " + ", ".join(parts) if parts else "no channel concentration"
+
+
+def _format_receipt_delivery_status(summary: dict) -> str:
+    if summary.get("fallback_delivery_used"):
+        return f"fallback used: {summary.get('fallback_delivery') or 'yes'}"
+    return "fallback not used"
+
+
+def _format_receipt_evidence_section(summary: dict | None) -> str | None:
+    if not summary:
+        return None
+    status = str(summary.get("status") or "needs_review")
+    local_rows = int(summary.get("local_evidence_row_count") or 0)
+    source_links = int(summary.get("telegram_source_link_count") or 0)
+    confidence = str(summary.get("confidence_sentence") or "needs review")
+    lines = [
+        "## Evidence & Source Mix",
+        (
+            f"- Evidence: {local_rows} local evidence rows, {source_links} linked Telegram "
+            f"sources; receipt lookup {status}."
+        ),
+        f"- Source mix: Telegram-first; {_format_receipt_top_channels(summary)}.",
+        f"- Delivery: {_format_receipt_delivery_status(summary)}.",
+        f"- Confidence: {confidence}",
+    ]
+    failures = [str(item) for item in summary.get("failures", []) if str(item).strip()]
+    review_notes = [str(item) for item in summary.get("review_notes", []) if str(item).strip()]
+    if failures:
+        lines.append(f"- Review: {failures[0]}")
+    elif review_notes:
+        lines.append(f"- Review: {review_notes[0]}")
+    return "\n".join(lines)
+
+
+def _format_receipt_evidence_notification(summary: dict | None) -> str | None:
+    if not summary:
+        return None
+    status = str(summary.get("status") or "needs_review")
+    confidence = str(summary.get("confidence_level") or "needs_review")
+    local_rows = int(summary.get("local_evidence_row_count") or 0)
+    source_links = int(summary.get("telegram_source_link_count") or 0)
+    delivery = ""
+    if summary.get("fallback_delivery_used"):
+        delivery = f"; fallback={summary.get('fallback_delivery') or 'yes'}"
+    return (
+        f"Evidence: {local_rows} local rows, {source_links} Telegram links, "
+        f"lookup {status}, confidence {confidence}{delivery}."
+    )[:240]
+
+
+def _upsert_evidence_summary_section(content_md: str, summary: dict | None) -> str:
+    section = _format_receipt_evidence_section(summary)
+    if not section:
+        return content_md
+
+    heading = "## Evidence & Source Mix"
+    lines = content_md.rstrip().splitlines()
+    section_lines = section.splitlines()
+
+    start = next((index for index, line in enumerate(lines) if line.strip() == heading), None)
+    if start is not None:
+        end = next(
+            (index for index in range(start + 1, len(lines)) if lines[index].startswith("## ")),
+            len(lines),
+        )
+        updated = [*lines[:start], *section_lines, "", *lines[end:]]
+        return "\n".join(updated).strip() + "\n"
+
+    insert_at = len(lines)
+    what_changed = next((index for index, line in enumerate(lines) if line.strip() == "## What Changed"), None)
+    if what_changed is not None:
+        insert_at = next(
+            (index for index in range(what_changed + 1, len(lines)) if lines[index].startswith("## ")),
+            len(lines),
+        )
+    else:
+        decision_brief = next((index for index, line in enumerate(lines) if line.strip() == "## Decision Brief"), None)
+        if decision_brief is not None:
+            insert_at = next(
+                (index for index in range(decision_brief + 1, len(lines)) if lines[index].startswith("## ")),
+                len(lines),
+            )
+
+    updated = [*lines[:insert_at], "", *section_lines, "", *lines[insert_at:]]
+    return "\n".join(updated).strip() + "\n"
 
 
 def _build_core_receipt_hash(receipt: dict) -> str | None:
@@ -449,6 +555,8 @@ def _send_weekly_review_to_telegram_owner(
     force_delivery: bool = False,
     health_alert: str | None = None,
     receipt_audit_note: str | None = None,
+    evidence_summary_note: str | None = None,
+    evidence_summary: dict | None = None,
     report_quality_warning: str | None = None,
 ) -> None:
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
@@ -475,6 +583,7 @@ def _send_weekly_review_to_telegram_owner(
         post_count=post_count,
         noise_count=noise_count,
         action_count=_extract_actions_this_week_count(content_md),
+        evidence_summary_note=evidence_summary_note,
     )
     if health_alert:
         notification = f"{health_alert}\n\n{notification}"[:700]
@@ -518,6 +627,28 @@ def _send_weekly_review_to_telegram_owner(
                 exc_info=True,
             )
 
+    fallback_route = "html_attachment" if html_path is not None else "text"
+    if evidence_summary:
+        fallback_summary = {
+            **evidence_summary,
+            "fallback_delivery_used": True,
+            "fallback_delivery": fallback_route,
+        }
+        fallback_summary_note = _format_receipt_evidence_notification(fallback_summary)
+        if evidence_summary_note and fallback_summary_note:
+            notification = notification.replace(evidence_summary_note, fallback_summary_note)
+        elif fallback_summary_note:
+            notification = f"{notification}\n{fallback_summary_note}"[:900]
+        content_md = _upsert_evidence_summary_section(content_md, fallback_summary)
+        try:
+            _write_digest_file(week_label, content_md)
+            connection.execute(
+                "UPDATE digests SET content_md = ? WHERE week_label = ?",
+                (content_md, week_label),
+            )
+        except Exception:
+            LOGGER.warning("Failed to update fallback evidence summary week=%s", week_label, exc_info=True)
+
     message_id = send_text(
         chat_id=chat_id,
         text=notification,
@@ -528,7 +659,6 @@ def _send_weekly_review_to_telegram_owner(
     _send_copyable_digest_document(chat_id, week_label, content_md, token)
     sent_at = _utc_now_iso()
     _mark_delivery_state(connection, week_label, telegram_sent_at=sent_at)
-    fallback_route = "html_attachment" if html_path is not None else "text"
     fallback_flags = ["fallback_delivery"]
     if html_path is None:
         fallback_flags.append("artifact_missing")
@@ -1100,6 +1230,8 @@ def run_digest(settings: Settings, force_delivery: bool = False) -> DigestResult
             )
             connection.commit()
             receipt_audit_note = None
+            evidence_summary = None
+            evidence_summary_note = None
             try:
                 receipt = _create_research_brief_receipt(
                     connection,
@@ -1116,6 +1248,24 @@ def run_digest(settings: Settings, force_delivery: bool = False) -> DigestResult
                     llm_model=None,
                     llm_category=None,
                 )
+                evidence_summary = summarize_research_brief_evidence(connection, receipt)
+                evidence_summary_note = _format_receipt_evidence_notification(evidence_summary)
+                empty_digest = _upsert_evidence_summary_section(empty_digest, evidence_summary)
+                empty_word_count = _count_words(empty_digest)
+                output_path = _write_digest_file(week_label, empty_digest)
+                try:
+                    html_path = write_report_html(week_label, empty_digest)
+                except OSError:
+                    LOGGER.warning("Failed to rewrite HTML review week=%s", week_label, exc_info=True)
+                connection.execute(
+                    "UPDATE digests SET content_md = ? WHERE id = ?",
+                    (empty_digest, digest_id),
+                )
+                connection.execute(
+                    "UPDATE quality_metrics SET output_word_count = ? WHERE week_label = ?",
+                    (empty_word_count, week_label),
+                )
+                connection.commit()
                 receipt_audit_note = _build_receipt_audit_note(receipt)
             except Exception:
                 LOGGER.warning("Failed to create research brief receipt week=%s", week_label, exc_info=True)
@@ -1151,6 +1301,8 @@ def run_digest(settings: Settings, force_delivery: bool = False) -> DigestResult
                     force_delivery=force_delivery,
                     health_alert=health_alert,
                     receipt_audit_note=receipt_audit_note,
+                    evidence_summary_note=evidence_summary_note,
+                    evidence_summary=evidence_summary,
                     report_quality_warning=report_quality_warning,
                 )
             except Exception:
@@ -1251,6 +1403,8 @@ def run_digest(settings: Settings, force_delivery: bool = False) -> DigestResult
         )
         connection.commit()
         receipt_audit_note = None
+        evidence_summary = None
+        evidence_summary_note = None
         try:
             receipt = _create_research_brief_receipt(
                 connection,
@@ -1273,6 +1427,36 @@ def run_digest(settings: Settings, force_delivery: bool = False) -> DigestResult
                 receipt.get("receipt_id", ""),
                 digest_id,
             )
+            evidence_summary = summarize_research_brief_evidence(connection, receipt)
+            evidence_summary_note = _format_receipt_evidence_notification(evidence_summary)
+            content_md = _upsert_evidence_summary_section(content_md, evidence_summary)
+            output_word_count = _count_words(content_md)
+            report = _build_research_report(
+                week_label=week_label,
+                date_range=date_range,
+                generated_at=generated_at,
+                post_count=post_count,
+                channel_count=channel_count,
+                content_md=content_md,
+                top_topics=top_topics,
+                scored_posts_flat=scored_posts_flat,
+            )
+            content_json = json.dumps(asdict(report), ensure_ascii=False)
+            json_path = _write_digest_json_file(week_label, report)
+            output_path = _write_digest_file(week_label, content_md)
+            try:
+                html_path = write_report_html(week_label, content_md)
+            except OSError:
+                LOGGER.warning("Failed to rewrite HTML review week=%s", week_label, exc_info=True)
+            connection.execute(
+                "UPDATE digests SET content_md = ?, content_json = ? WHERE id = ?",
+                (content_md, content_json, digest_id),
+            )
+            connection.execute(
+                "UPDATE quality_metrics SET output_word_count = ? WHERE week_label = ?",
+                (output_word_count, week_label),
+            )
+            connection.commit()
             receipt_audit_note = _build_receipt_audit_note(receipt)
         except Exception:
             LOGGER.warning("Failed to create research brief receipt week=%s", week_label, exc_info=True)
@@ -1322,6 +1506,8 @@ def run_digest(settings: Settings, force_delivery: bool = False) -> DigestResult
                 force_delivery=force_delivery,
                 health_alert=health_alert,
                 receipt_audit_note=receipt_audit_note,
+                evidence_summary_note=evidence_summary_note,
+                evidence_summary=evidence_summary,
                 report_quality_warning=report_quality_warning,
             )
         except Exception:

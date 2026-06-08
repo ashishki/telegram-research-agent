@@ -2,6 +2,7 @@ import hashlib
 import json
 import re
 import sqlite3
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -124,6 +125,72 @@ def verify_core_research_brief_evidence_refs(
     )
 
 
+def summarize_research_brief_evidence(
+    connection: sqlite3.Connection,
+    receipt: dict[str, Any],
+) -> dict[str, Any]:
+    """Build a reader-facing evidence/source-mix summary from a local receipt."""
+    source_set = receipt.get("source_set") if isinstance(receipt.get("source_set"), dict) else {}
+    evidence_ids = _coerce_int_values(source_set.get("source_evidence_item_ids"))
+    telegram_link_values = source_set.get("telegram_source_links")
+    if not isinstance(telegram_link_values, list):
+        telegram_link_values = []
+    telegram_links = [
+        str(url).strip()
+        for url in telegram_link_values
+        if str(url).strip()
+    ]
+    post_counts = receipt.get("post_counts") if isinstance(receipt.get("post_counts"), dict) else {}
+    failures: list[str] = []
+    review_notes: list[str] = []
+
+    try:
+        core_receipt = build_core_research_brief_receipt(receipt)
+        lookup = verify_core_research_brief_evidence_refs(connection, core_receipt)
+        lookup_status = str(lookup.get("status") or "needs_review")
+        resolved_evidence_ids = list(lookup.get("resolved_signal_evidence_item_ids") or [])
+        checked_telegram_links = list(lookup.get("checked_telegram_source_links") or [])
+        failures = [str(item) for item in lookup.get("failures", [])]
+        review_notes = [str(item) for item in lookup.get("review_notes", [])]
+    except ValueError as exc:
+        lookup_status = "failed"
+        resolved_evidence_ids = []
+        checked_telegram_links = []
+        failures = [str(exc)]
+    except Exception as exc:  # pragma: no cover - defensive receipt summarization
+        lookup_status = "needs_review"
+        resolved_evidence_ids = []
+        checked_telegram_links = []
+        review_notes = [f"evidence lookup unavailable: {exc}"]
+
+    top_channels = _top_receipt_channels(connection, source_set)
+    confidence_level, confidence_sentence = _evidence_confidence(
+        lookup_status=lookup_status,
+        post_counts=post_counts,
+        local_evidence_row_count=len(resolved_evidence_ids),
+        telegram_source_link_count=len(checked_telegram_links) or len(telegram_links),
+    )
+    fallback_used = bool(receipt.get("fallback_delivery_used"))
+    fallback_delivery = str(receipt.get("fallback_delivery") or "").strip()
+    return {
+        "status": lookup_status,
+        "receipt_id": str(receipt.get("receipt_id") or ""),
+        "week_label": str(receipt.get("week_label") or ""),
+        "local_evidence_row_count": len(resolved_evidence_ids),
+        "declared_evidence_ref_count": len(evidence_ids),
+        "telegram_source_link_count": len(checked_telegram_links) or len(telegram_links),
+        "declared_telegram_source_link_count": len(telegram_links),
+        "top_channels": top_channels,
+        "fallback_delivery_used": fallback_used,
+        "fallback_delivery": fallback_delivery if fallback_used else "not_used",
+        "confidence_level": confidence_level,
+        "confidence_sentence": confidence_sentence,
+        "failures": failures,
+        "review_notes": review_notes,
+        "runtime_dependency": False,
+    }
+
+
 def _evidence_refs(receipt: dict[str, Any]) -> list[dict[str, str]]:
     source_set = receipt.get("source_set") or {}
     refs: list[dict[str, str]] = []
@@ -226,6 +293,81 @@ def _resolve_signal_evidence_item_ids(
         unique_ids,
     ).fetchall()
     return {int(row[0]) for row in rows}
+
+
+def _coerce_int_values(values: Any) -> list[int]:
+    if not isinstance(values, list):
+        return []
+    result: list[int] = []
+    for value in values:
+        try:
+            result.append(int(value))
+        except (TypeError, ValueError):
+            continue
+    return result
+
+
+def _top_receipt_channels(connection: sqlite3.Connection, source_set: dict[str, Any]) -> list[dict[str, Any]]:
+    post_ids = _coerce_int_values(source_set.get("source_post_ids"))
+    if post_ids and _table_exists(connection, "posts"):
+        placeholders = ",".join("?" for _ in post_ids)
+        try:
+            rows = connection.execute(
+                f"""
+                SELECT COALESCE(channel_username, '') AS channel_username, COUNT(*) AS count
+                FROM posts
+                WHERE id IN ({placeholders})
+                GROUP BY COALESCE(channel_username, '')
+                ORDER BY count DESC, channel_username ASC
+                LIMIT 3
+                """,
+                post_ids,
+            ).fetchall()
+        except sqlite3.Error:
+            rows = []
+        channels = [
+            {
+                "channel": str(row["channel_username"] if isinstance(row, sqlite3.Row) else row[0]).strip(),
+                "count": int(row["count"] if isinstance(row, sqlite3.Row) else row[1]),
+            }
+            for row in rows
+            if str(row["channel_username"] if isinstance(row, sqlite3.Row) else row[0]).strip()
+        ]
+        if channels:
+            return channels
+
+    channel_values = source_set.get("channels")
+    if not isinstance(channel_values, list):
+        channel_values = []
+    fallback_channels = [str(channel).strip() for channel in channel_values if str(channel).strip()]
+    counts = Counter(fallback_channels)
+    return [
+        {"channel": channel, "count": count}
+        for channel, count in counts.most_common(3)
+    ]
+
+
+def _evidence_confidence(
+    *,
+    lookup_status: str,
+    post_counts: dict[str, Any],
+    local_evidence_row_count: int,
+    telegram_source_link_count: int,
+) -> tuple[str, str]:
+    strong_count = int(post_counts.get("strong_count") or 0)
+    watch_count = int(post_counts.get("watch_count") or 0)
+    actionable_count = strong_count + watch_count
+    if lookup_status == "failed":
+        return "low", "low - receipt evidence lookup failed; review source links before acting."
+    if actionable_count <= 0:
+        return "low", "low - no strong/watch signals were available this week."
+    if lookup_status == "needs_review":
+        return "medium-low", "medium-low - source refs exist but receipt lookup needs review."
+    if local_evidence_row_count <= 0:
+        return "medium-low", "medium-low - Telegram links resolved, but no local evidence rows were available."
+    if telegram_source_link_count < actionable_count:
+        return "medium", "medium - local evidence resolved, but not every signal has a Telegram source link."
+    return "medium", "medium - local evidence rows and Telegram source links resolved."
 
 
 def _table_exists(connection: sqlite3.Connection, table_name: str) -> bool:

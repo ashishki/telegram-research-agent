@@ -4,6 +4,7 @@ import unittest
 from proof_receipts import (
     build_core_research_brief_receipt,
     core_receipt_sha256,
+    summarize_research_brief_evidence,
     verify_core_research_brief_evidence_refs,
 )
 
@@ -218,6 +219,61 @@ class TestCoreResearchBriefReceipt(unittest.TestCase):
             "malformed Telegram source link: https://example.com/not-telegram",
             result["failures"],
         )
+
+    def test_research_brief_evidence_summary_counts_verified_refs_and_channels(self):
+        connection = self._make_evidence_connection([101])
+        connection.execute(
+            "CREATE TABLE posts (id INTEGER PRIMARY KEY, channel_username TEXT)"
+        )
+        connection.executemany(
+            "INSERT INTO posts (id, channel_username) VALUES (?, ?)",
+            [(1, "source_a"), (2, "source_a"), (3, "source_b")],
+        )
+        connection.commit()
+
+        summary = summarize_research_brief_evidence(
+            connection,
+            {
+                "receipt_id": "rbr_summary",
+                "week_label": "2026-W22",
+                "markdown_path": "data/output/digests/2026-W22.md",
+                "verification_status": "verified",
+                "post_counts": {"strong_count": 1, "watch_count": 0},
+                "source_set": {
+                    "source_evidence_item_ids": [101],
+                    "telegram_source_links": ["https://t.me/source_a/123"],
+                    "source_post_ids": [1, 2, 3],
+                },
+            },
+        )
+
+        self.assertEqual(summary["status"], "passed")
+        self.assertEqual(summary["local_evidence_row_count"], 1)
+        self.assertEqual(summary["telegram_source_link_count"], 1)
+        self.assertEqual(summary["top_channels"][0], {"channel": "source_a", "count": 2})
+        self.assertEqual(summary["confidence_level"], "medium")
+        self.assertFalse(summary["runtime_dependency"])
+
+    def test_research_brief_evidence_summary_marks_missing_refs_failed(self):
+        connection = self._make_evidence_connection([])
+
+        summary = summarize_research_brief_evidence(
+            connection,
+            {
+                "receipt_id": "rbr_empty",
+                "week_label": "2026-W22",
+                "markdown_path": "data/output/digests/2026-W22.md",
+                "verification_status": "pending",
+                "post_counts": {"strong_count": 0, "watch_count": 0},
+                "source_set": {},
+            },
+        )
+
+        self.assertEqual(summary["status"], "failed")
+        self.assertEqual(summary["local_evidence_row_count"], 0)
+        self.assertEqual(summary["telegram_source_link_count"], 0)
+        self.assertEqual(summary["confidence_level"], "low")
+        self.assertIn("source evidence refs", summary["failures"][0])
 
 
 if __name__ == "__main__":

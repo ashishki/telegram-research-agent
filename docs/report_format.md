@@ -1,8 +1,9 @@
 # Weekly Review Artifact — Format Specification
 
-**Version:** 3.1
-**Status:** Implemented baseline; Decision Brief and quality gates implemented;
-additional report-quality improvements pending
+**Version:** 3.2
+**Status:** Implemented baseline; Decision Brief, quality gates, artifact
+feedback buttons, and evidence/source-mix summary implemented; additional
+report-quality improvements pending
 
 ---
 
@@ -51,7 +52,7 @@ refs; deterministic verification checks are implemented, while CLI inspection
 is available through `memory inspect-receipts` and operator review through
 `memory review-receipt`. A raw Research Brief receipt is not reader-facing
 content. A concise reader-facing evidence/confidence summary derived from
-receipts is expected.
+receipts is implemented in the delivered brief and Telegram notification.
 
 ---
 
@@ -152,6 +153,22 @@ Shows:
 - any meaningful change worth scanning quickly
 
 If no prior week in DB: "No comparison baseline available."
+
+---
+
+### 9. Evidence & Source Mix
+
+Deterministic, reader-facing summary derived from the local Research Brief
+receipt and Core-compatible evidence lookup.
+
+Required fields:
+
+- local evidence row count;
+- linked Telegram source count;
+- receipt lookup status: `passed`, `needs_review`, or `failed`;
+- top source channels;
+- delivery fallback state;
+- one confidence sentence.
 
 ---
 

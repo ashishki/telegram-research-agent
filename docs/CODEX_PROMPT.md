@@ -34,6 +34,10 @@ _v3.4 · 2026-06-08 · telegram-research-agent_
   - Artifact-level Telegram feedback buttons now attach to Research Brief,
     Implementation Ideas, MVP weekly, and Study Plan delivery notifications and
     record rows in `artifact_feedback_logs`.
+  - Research Brief delivery now adds a reader-facing `Evidence & Source Mix`
+    section and Telegram evidence line from local receipt evidence lookup,
+    source-link counts, top channels, fallback state, and deterministic
+    confidence wording.
   - 2026-W24 artifact review showed that internal signal quality improved but
     reader-facing report quality is weak: no first-screen decision brief,
     buried trend summary, visible internal `Matches: ...` traces, contradictions
@@ -70,9 +74,9 @@ _v3.4 · 2026-06-08 · telegram-research-agent_
   sync actions, zero weekly usefulness logs, and zero artifact feedback rows.
   Low-friction artifact feedback buttons are now shipped; live operator use is
   still needed before the system can learn taste from artifact-level feedback.
-- Weekly reports still need a fuller reader-facing evidence/source-mix summary.
-  Deterministic quality gates now log/report the current failure examples from
-  `docs/report_quality_roadmap.md`.
+- Weekly reports now have a reader-facing evidence/source-mix summary.
+  Deterministic quality gates still log/report the current failure examples
+  from `docs/report_quality_roadmap.md`.
 - Demand-to-MVP Radar must not deliver a report that says a candidate is both
   `focused_experiment` and downgraded by source mix gates.
 
@@ -91,8 +95,7 @@ The weekly pipeline now has:
 
 ## Exact Next Execution Step
 
-Start with `RQ-4 - Reader-Facing Evidence And Source Mix Summary` from
-`docs/tasks.md`.
+Start with `RADAR-2 - Fix Radar final gate contradictions` from `docs/tasks.md`.
 Use `docs/report_quality_roadmap.md` for detailed task scope, acceptance
 criteria, touched-file guidance, and verification commands.
 
