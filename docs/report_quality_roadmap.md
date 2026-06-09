@@ -647,7 +647,16 @@ Acceptance criteria:
 
 ### RADAR-4 - Radar Report Quality Test Suite
 
+Status: implemented.
+
 Goal: lock the new Radar artifact contract with tests.
+
+Implemented in `/srv/openclaw-you/workspace/Demand-to-MVP-Radar`: focused
+report-quality tests lock the Candidate Dossier top block, required sections,
+source-mix card, missing evidence, kill criteria, existing-project context, and
+no contradictory build-ready claims when source gates fail. LLM Markdown is
+sanitized after canonicalization if failed gates leave build-ready claims in
+extra sections.
 
 Add tests for:
 
@@ -673,10 +682,9 @@ cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
 
 ## Remaining Suggested Execution Order
 
-1. RADAR-4 - Radar report-quality tests.
-2. COST-1 - internal cost guardrail sentinel.
-3. RQ-5 - weekly artifact consistency contract.
-4. MEM-1 - weekly editorial memory.
+1. COST-1 - internal cost guardrail sentinel.
+2. RQ-5 - weekly artifact consistency contract.
+3. MEM-1 - weekly editorial memory.
 
 Reasoning:
 
@@ -684,9 +692,9 @@ Reasoning:
   live Telegram buttons.
 - Reader-facing evidence/source mix is implemented; Radar contradiction fixes
   are implemented.
-- Candidate dossier output and source-mix truth surface are implemented; next
-  risk is regression, so lock the new Radar artifact contract with focused
-  report-quality tests.
+- Radar handoff work is implemented and locked with focused tests. Next highest
+  leverage task is dogfooding the internal cost/guardrail sentinel before any
+  product split work.
 - Cost sentinel should be dogfooded internally before any product split.
 
 ## Stop Conditions

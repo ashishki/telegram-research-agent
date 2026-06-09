@@ -65,6 +65,9 @@ Implemented:
 - Demand-to-MVP Radar source-mix truth surface: selected-candidate source mix
   in Markdown/JSON, missing credentials, Reddit API vs SERP-indexed Reddit, and
   GitHub primary/repeated-variant labeling surfaced to Telegram notification
+- Demand-to-MVP Radar report-quality tests: Candidate Dossier top block,
+  required sections, source-mix card, missing evidence, kill criteria,
+  existing-project context, and no contradictory build-ready claims
 
 ## Active Maintenance Queue
 
@@ -73,7 +76,6 @@ The active queue is now reader-facing report quality and Radar handoff.
 
 | ID | Priority | Task | Notes |
 |---|---:|---|---|
-| RADAR-4 | P1 | Add Radar report-quality tests | Lock candidate dossier, source mix, missing evidence, kill criteria, and no-contradiction contract |
 | COST-1 | P1 | Dogfood internal LLM cost guardrail sentinel | Budget/spike warnings from existing `llm_usage`, surfaced in `cost-stats` and monthly operator report |
 | RQ-5 | P1 | Add weekly artifact consistency contract | Ensure Research Brief, Implementation Ideas, Study Plan, Project Insights, and MVP status agree for the same week |
 | MEM-1 | P2 | Add weekly editorial memory | Persist useful/confusing report notes from feedback and quality findings for future report generation |

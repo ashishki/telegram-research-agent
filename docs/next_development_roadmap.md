@@ -432,10 +432,12 @@ include the source-mix readiness label.
 
 ### RADAR-4 - Radar Report Quality Test Suite
 
-Status: open.
+Status: implemented.
 
-Add tests for candidate dossier contract, no contradictory gates, source mix
-card, missing evidence, kill criteria, and existing-project context.
+Implemented in the Radar repo. Focused report-quality tests now lock the
+Candidate Dossier top block, required sections, source-mix card, missing
+evidence, kill criteria, existing-project context, and no contradictory
+build-ready claims when source gates fail.
 
 ## Phase 8 - Internal Cost Guardrails
 
