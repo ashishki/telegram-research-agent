@@ -1,5 +1,5 @@
 # CODEX_PROMPT — Session Handoff
-_v3.4 · 2026-06-08 · telegram-research-agent_
+_v3.5 · 2026-06-09 · telegram-research-agent_
 
 ---
 
@@ -53,12 +53,18 @@ _v3.4 · 2026-06-08 · telegram-research-agent_
     Candidate Dossier top block, required sections, source-mix card, missing
     evidence, kill criteria, existing-project context, and no contradictory
     build-ready claims when gates fail.
+  - Weekly editorial memory now builds operator/system-authored
+    keep/change/demote/test-next-week notes from artifact feedback, usefulness
+    logs, report-quality findings, receipt health, and source down-rank
+    explanations via `memory inspect-editorial-memory`; monthly
+    `operator-report` summarizes weeks with editorial memory signals.
   - 2026-W24 artifact review showed that internal signal quality improved but
     reader-facing report quality is weak: no first-screen decision brief,
     buried trend summary, visible internal `Matches: ...` traces, contradictions
     between digest/study/project-insights outputs, and Radar gate contradiction.
-- Active implementation tasks are now report quality and Radar handoff in
-  `docs/tasks.md` and `docs/report_quality_roadmap.md`.
+- The current report-quality, Radar handoff, cost, artifact consistency, and
+  editorial memory task queue is implemented. Add the next roadmap item before
+  starting new implementation work.
 - VPS cognition vault: `/srv/codex-entropy/repos/product-3/engineering-cognition-vault`; use it as a downstream navigation layer, not as the source of truth.
 - In this environment, `pytest` may be unavailable; verified fallback is `PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m unittest ...`.
 - Orchestrator-to-Codex execution path: write prompt to file, then `codex exec -s workspace-write < /tmp/prompt.md`
@@ -102,6 +108,9 @@ _v3.4 · 2026-06-08 · telegram-research-agent_
   Brief signal counts, Project Insights vs Research Brief project section, MVP
   delivery build-readiness contradictions, and monthly operator-report
   consistency warnings.
+- Weekly editorial memory is now persisted as local operator/system-authored
+  Markdown sidecars under `data/output/editorial_memory/` when inspected
+  explicitly, and is summarized by monthly `operator-report`.
 
 ---
 
@@ -118,12 +127,9 @@ The weekly pipeline now has:
 
 ## Exact Next Execution Step
 
-Start with `MEM-1 - Add weekly editorial memory` from
-`docs/tasks.md`.
-Use `docs/report_quality_roadmap.md` for detailed task scope, acceptance
-criteria, touched-file guidance, and verification commands.
-
-Before implementation, define scope, touched files, acceptance criteria, and verification command.
+No active implementation task remains in `docs/tasks.md` as of 2026-06-09.
+Before starting new implementation work, add or select the next roadmap item and
+define scope, touched files, acceptance criteria, and verification command.
 
 Reference documents:
 

@@ -457,10 +457,12 @@ surface the warnings without making new LLM calls.
 
 ### MEM-1 - Weekly Editorial Memory
 
-Status: open.
+Status: implemented.
 
-Persist weekly report-quality learnings from feedback and quality findings so
-future report generation can improve from local state rather than chat history.
+Implemented. `memory inspect-editorial-memory --week YYYY-WNN` writes a local
+Markdown sidecar from operator/system-authored telemetry only, grouping what to
+keep, change, demote, and test next week. Monthly `operator-report` summarizes
+weeks with editorial memory signals.
 
 ## AI-Development Rules For This Roadmap
 

@@ -1,7 +1,7 @@
 # Current Backlog
 
 **Status:** Active lightweight backlog
-**Last updated:** 2026-06-08
+**Last updated:** 2026-06-09
 
 The historical memory-unification roadmap is complete and archived at
 `docs/archive/roadmaps/tasks-v5-memory-unification.md`.
@@ -73,15 +73,20 @@ Implemented:
 - weekly artifact consistency contract: Study Plan/Project Insights checks
   against Research Brief facts, MVP delivery build-readiness guard, and
   operator-report consistency warnings
+- weekly editorial memory via `memory inspect-editorial-memory`: local
+  operator/system-authored keep/change/demote/test-next-week notes from
+  artifact feedback, usefulness logs, report-quality findings, receipt health,
+  and source down-rank explanations
 
 ## Active Maintenance Queue
 
-The previous receipt/source-trust/operator-reporting backlog is implemented.
-The active queue is now reader-facing report quality and Radar handoff.
+The previous receipt/source-trust/operator-reporting backlog, reader-facing
+report quality, Radar handoff, cost guardrails, artifact consistency, and
+editorial memory queue are implemented.
 
 | ID | Priority | Task | Notes |
 |---|---:|---|---|
-| MEM-1 | P2 | Add weekly editorial memory | Persist useful/confusing report notes from feedback and quality findings for future report generation |
+| - | - | No active implementation task | Pick the next task only after a new roadmap item is added |
 
 Implementation details, acceptance criteria, touched-file guidance, and Radar
 paths are in `docs/report_quality_roadmap.md`.

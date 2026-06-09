@@ -1,7 +1,7 @@
 # Report Quality And Radar Handoff Roadmap
 
-Status: active AI-development roadmap
-Last updated: 2026-06-08
+Status: implemented AI-development roadmap
+Last updated: 2026-06-09
 
 ## Purpose
 
@@ -481,8 +481,15 @@ PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m uni
 
 ### MEM-1 - Weekly Editorial Memory
 
+Status: implemented.
+
 Goal: preserve what was confusing or useful so future weekly reports can improve
 without relying on chat history.
+
+Implemented in `src/output/editorial_memory.py`, `src/main.py`, and
+`src/output/operator_report.py`: `memory inspect-editorial-memory --week
+YYYY-WNN` writes `data/output/editorial_memory/YYYY-WNN.md`, and monthly
+`operator-report` summarizes weeks with editorial memory signals.
 
 Create a small local weekly editorial memory from:
 
@@ -700,7 +707,8 @@ cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
 
 ## Remaining Suggested Execution Order
 
-1. MEM-1 - weekly editorial memory.
+No active report-quality/Radar/cost/editorial-memory task remains in this
+roadmap.
 
 Reasoning:
 
@@ -708,9 +716,9 @@ Reasoning:
   live Telegram buttons.
 - Reader-facing evidence/source mix is implemented; Radar contradiction fixes
   are implemented.
-- Radar handoff work, internal cost guardrails, and weekly artifact consistency
-  validation are implemented and locked with focused tests. Next risk is losing
-  useful/confusing report-quality learnings between weeks.
+- Radar handoff work, internal cost guardrails, weekly artifact consistency
+  validation, and weekly editorial memory are implemented and locked with
+  focused tests.
 
 ## Stop Conditions
 

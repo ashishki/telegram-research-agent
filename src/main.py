@@ -251,6 +251,14 @@ def build_parser() -> argparse.ArgumentParser:
     af_parser.add_argument("--limit", type=int, default=20)
     af_parser.set_defaults(handler=handle_memory_inspect_artifact_feedback)
 
+    editorial_parser = memory_sub.add_parser(
+        "inspect-editorial-memory",
+        help="Build and inspect weekly editorial memory",
+    )
+    editorial_parser.add_argument("--week", required=True)
+    editorial_parser.add_argument("--output-root", default=None)
+    editorial_parser.set_defaults(handler=handle_memory_inspect_editorial_memory)
+
     downrank_parser = memory_sub.add_parser(
         "explain-source-downrank",
         help="Explain source down-rank signals from observed local behavior",
@@ -1539,6 +1547,35 @@ def handle_memory_inspect_artifact_feedback(args: argparse.Namespace) -> int:
         return 0
 
     sys.stdout.write(("\n\n".join(_format_artifact_feedback(row) for row in rows)).rstrip() + "\n")
+    return 0
+
+
+def handle_memory_inspect_editorial_memory(args: argparse.Namespace) -> int:
+    from output.editorial_memory import build_weekly_editorial_memory
+
+    settings = load_settings()
+
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+
+        with sqlite3.connect(settings.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON;")
+            memory = build_weekly_editorial_memory(
+                connection,
+                week_label=args.week,
+                output_root=args.output_root,
+                write_sidecar=True,
+            )
+    except Exception as exc:
+        sys.stdout.write(f"Error inspecting editorial memory: {exc}\n")
+        return 1
+
+    if memory.sidecar_path is not None:
+        sys.stdout.write(f"sidecar={memory.sidecar_path}\n")
+    sys.stdout.write(memory.markdown)
     return 0
 
 

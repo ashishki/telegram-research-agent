@@ -125,11 +125,14 @@ python3 src/main.py tune-suggestions
 # Inspect insight triage summary — counts by category, recent records, rejection memory
 python3 src/main.py insight-triage-stats
 
-# Monthly operator report — feedback, inline decisions, costs, receipt health
+# Monthly operator report — feedback, inline decisions, costs, receipt health, editorial memory
 python3 src/main.py operator-report --month 2026-05
 
 # Source down-rank reasons from observed local behavior
 python3 src/main.py memory explain-source-downrank --days 30 --limit 10
+
+# Build a local weekly editorial memory sidecar from operator/system telemetry
+python3 src/main.py memory inspect-editorial-memory --week 2026-W22
 
 # Product split gate for Telegram Channel Intelligence
 python3 src/main.py product-split-gate
@@ -198,9 +201,21 @@ python3 src/main.py memory inspect-artifact-feedback --week 2026-W22
 This remains operator-authored local state. It does not become model-authored
 source trust by itself.
 
-When artifact feedback buttons are implemented, prefer using them directly from
-Telegram for low-friction feedback. Until then, use `log-artifact-feedback` for
-specific failures such as:
+Build the weekly editorial memory sidecar after logging feedback or reviewing
+quality findings:
+
+```bash
+python3 src/main.py memory inspect-editorial-memory --week 2026-W22
+```
+
+The command writes `data/output/editorial_memory/2026-W22.md` with
+operator/system-authored keep/change/demote/test-next-week notes from artifact
+feedback, weekly usefulness logs, report-quality findings, receipt warnings,
+and source down-rank explanations. Future report-generation prompts should read
+this only when explicitly wired to do so.
+
+Prefer using Telegram artifact feedback buttons for low-friction feedback. Use
+`log-artifact-feedback` for specific failures that need more context, such as:
 
 - unclear first screen;
 - useful decision;

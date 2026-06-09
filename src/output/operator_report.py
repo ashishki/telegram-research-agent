@@ -282,6 +282,8 @@ def build_monthly_operator_report(
     month: str | None = None,
     report_output_root: Path | str | None = None,
 ) -> str:
+    from output.editorial_memory import build_monthly_editorial_memory_summary
+
     clean_month = _validate_month(month)
     lines = [
         f"# Operator Report {clean_month}",
@@ -300,5 +302,12 @@ def build_monthly_operator_report(
         "",
         "## Report Quality",
         *_report_quality_summary(connection, clean_month, report_output_root=report_output_root),
+        "",
+        "## Editorial Memory",
+        *build_monthly_editorial_memory_summary(
+            connection,
+            month=clean_month,
+            output_root=report_output_root,
+        ),
     ]
     return "\n".join(lines).rstrip() + "\n"
