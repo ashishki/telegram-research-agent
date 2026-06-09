@@ -94,7 +94,10 @@ _v3.4 · 2026-06-08 · telegram-research-agent_
   from `docs/report_quality_roadmap.md`.
 - Demand-to-MVP Radar final-gate contradictions, Candidate Dossier shape,
   source-mix truth surface, and report-quality contract tests are fixed for
-  `mvp-of-week`; remaining active work starts with COST-1.
+  `mvp-of-week`.
+- Internal LLM cost guardrails now evaluate existing `llm_usage` rows without
+  new model calls. `cost-stats` and monthly `operator-report` show weekly
+  budget status, highest-cost category, spike warnings, and suggested actions.
 
 ---
 
@@ -111,7 +114,7 @@ The weekly pipeline now has:
 
 ## Exact Next Execution Step
 
-Start with `COST-1 - Dogfood internal LLM cost guardrail sentinel` from
+Start with `RQ-5 - Add weekly artifact consistency contract` from
 `docs/tasks.md`.
 Use `docs/report_quality_roadmap.md` for detailed task scope, acceptance
 criteria, touched-file guidance, and verification commands.

@@ -238,6 +238,61 @@ class TestOperatorReport(unittest.TestCase):
         self.assertIn("Study Plan says no Telegram signals", report)
         self.assertIn("Project Insights artifact says no insights", report)
 
+    def test_monthly_operator_report_includes_cost_guardrail_warnings(self):
+        db_path = self._make_db()
+        try:
+            with sqlite3.connect(db_path) as connection:
+                connection.row_factory = sqlite3.Row
+                self._seed_report_rows(connection)
+                connection.executemany(
+                    """
+                    INSERT INTO llm_usage (
+                        model, input_tokens, output_tokens, est_cost_usd,
+                        cost_usd, called_at, category, duration_ms
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    [
+                        (
+                            "claude-test",
+                            50,
+                            20,
+                            0.01,
+                            0.02,
+                            "2026-05-06T10:00:00Z",
+                            "topic_detection",
+                            500,
+                        ),
+                        (
+                            "claude-test",
+                            300,
+                            120,
+                            0.10,
+                            0.12,
+                            "2026-05-20T10:00:00Z",
+                            "preference_judge",
+                            1500,
+                        ),
+                    ],
+                )
+                connection.commit()
+                with patch.dict(
+                    os.environ,
+                    {
+                        "LLM_WEEKLY_COST_BUDGET_USD": "0.05",
+                        "LLM_WEEKLY_COST_SPIKE_RATIO": "2.0",
+                    },
+                ):
+                    report = build_monthly_operator_report(connection, month="2026-05")
+        finally:
+            os.unlink(db_path)
+
+        self.assertIn("LLM cost guardrail: status=warning", report)
+        self.assertIn("weekly budget exceeded", report)
+        self.assertIn("weekly cost spike", report)
+        self.assertIn("highest_cost_category=preference_judge", report)
+        self.assertIn("suggested_action: reduce candidate count before synthesis", report)
+
 
 if __name__ == "__main__":
     unittest.main()

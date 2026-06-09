@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from output.cost_guardrails import evaluate_llm_cost_guardrails, format_cost_guardrail_lines
 from output.report_quality import WeeklyReportFacts, validate_weekly_artifact_paths
 
 
@@ -151,6 +152,9 @@ def _cost_summary(connection: sqlite3.Connection, month: str) -> list[str]:
     return [
         f"- LLM usage: calls={calls} input_tokens={input_tokens} output_tokens={output_tokens}",
         f"  - cost_usd=${cost_usd:.6f} est_cost_usd=${est_cost_usd:.6f}",
+        *format_cost_guardrail_lines(
+            evaluate_llm_cost_guardrails(connection, month=month)
+        ),
     ]
 
 

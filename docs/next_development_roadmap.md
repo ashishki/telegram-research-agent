@@ -446,11 +446,12 @@ private system before treating it as a separate product.
 
 ### COST-1 - Internal LLM Cost And Guardrail Sentinel
 
-Status: open.
+Status: implemented.
 
-Use existing `llm_usage` rows to expose budget thresholds, cost spikes,
-highest-cost categories, and suggested downgrade/defer actions in `cost-stats`
-and `operator-report`.
+Implemented. Existing `llm_usage` rows are evaluated deterministically for
+weekly budget thresholds, week-over-week spikes, highest-cost categories, and
+suggested downgrade/defer actions. `cost-stats` and monthly `operator-report`
+surface the warnings without making new LLM calls.
 
 ### MEM-1 - Weekly Editorial Memory
 

@@ -766,6 +766,11 @@ def handle_score_stats(_: argparse.Namespace) -> int:
 
 
 def handle_cost_stats(_: argparse.Namespace) -> int:
+    from output.cost_guardrails import (
+        evaluate_llm_cost_guardrails,
+        format_cost_guardrail_lines,
+    )
+
     settings = load_settings()
 
     try:
@@ -827,6 +832,7 @@ def handle_cost_stats(_: argparse.Namespace) -> int:
                 LIMIT 20
                 """
             ).fetchall()
+            guardrail_report = evaluate_llm_cost_guardrails(connection)
     except Exception:
         LOGGER.exception("Cost stats failed")
         return 1
@@ -862,6 +868,11 @@ def handle_cost_stats(_: argparse.Namespace) -> int:
                 f"  {row['week']}  {row['category']}  calls={int(row['call_count'] or 0)}  "
                 f"cost=${float(row['week_cost'] or 0.0):.6f}"
             )
+    lines.append("guardrails:")
+    lines.extend(
+        "  " + line[2:] if line.startswith("- ") else "  " + line
+        for line in format_cost_guardrail_lines(guardrail_report)
+    )
 
     sys.stdout.write("\n".join(lines) + "\n")
     return 0

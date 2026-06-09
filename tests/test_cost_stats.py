@@ -37,6 +37,12 @@ _install_stub("telethon", TelegramClient=object)
 _install_stub("telethon.errors", FloodWaitError=Exception)
 _install_stub("weasyprint")
 _install_stub("jinja2")
+_install_stub("numpy", asarray=lambda value: value)
+_install_stub("sklearn")
+_install_stub("sklearn.cluster", KMeans=object)
+_install_stub("sklearn.feature_extraction")
+_install_stub("sklearn.feature_extraction.text", ENGLISH_STOP_WORDS=set(), TfidfVectorizer=object)
+_install_stub("sklearn.metrics", silhouette_score=lambda *_args, **_kwargs: 0.0)
 
 from config.settings import Settings  # noqa: E402
 from db.migrate import run_migrations  # noqa: E402
@@ -89,6 +95,38 @@ class TestCostStats(unittest.TestCase):
             self.assertIn("distinct_days=2", rendered)
             self.assertIn("claude-haiku-4-5 call_count=1 total_cost_usd=0.10000000", rendered)
             self.assertIn("claude-sonnet-4-6 call_count=1 total_cost_usd=0.20000000", rendered)
+            self.assertIn("guardrails:", rendered)
+            self.assertIn("LLM cost guardrail: status=warning", rendered)
+            self.assertIn("highest_cost_category=digest", rendered)
+            self.assertIn("suggested_action: reduce candidate count", rendered)
+        finally:
+            os.unlink(db_path)
+
+    def test_cost_stats_handles_missing_usage_rows(self):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+            db_path = tmp.name
+
+        settings = Settings(
+            db_path=db_path,
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+
+        try:
+            with patch.dict(os.environ, {"AGENT_DB_PATH": db_path}):
+                run_migrations()
+
+            output = io.StringIO()
+            with patch.object(main_module, "load_settings", return_value=settings):
+                with redirect_stdout(output):
+                    exit_code = main_module.handle_cost_stats(argparse.Namespace())
+
+            rendered = output.getvalue()
+            self.assertEqual(exit_code, 0)
+            self.assertIn("total_cost_usd=0.00000000", rendered)
+            self.assertIn("LLM cost guardrail: status=no_usage", rendered)
+            self.assertIn("warning: no llm_usage rows in selected period", rendered)
         finally:
             os.unlink(db_path)
 

@@ -424,8 +424,17 @@ Acceptance criteria:
 
 ### COST-1 - Internal LLM Cost And Guardrail Sentinel
 
+Status: implemented.
+
 Goal: dogfood the `LLM Cost & Guardrail Budget Sentinel` idea inside this
 private system before considering it as a separate product.
+
+Implemented via `src/output/cost_guardrails.py`: existing `llm_usage` rows are
+evaluated deterministically for weekly budget thresholds, week-over-week
+spikes, highest-cost categories, and suggested downgrade/defer actions.
+`cost-stats` and monthly `operator-report` surface the warnings without making
+new LLM calls. Configure with `LLM_WEEKLY_COST_BUDGET_USD` and
+`LLM_WEEKLY_COST_SPIKE_RATIO`.
 
 Add internal cost guardrails around existing `llm_usage` rows.
 
@@ -682,9 +691,8 @@ cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
 
 ## Remaining Suggested Execution Order
 
-1. COST-1 - internal cost guardrail sentinel.
-2. RQ-5 - weekly artifact consistency contract.
-3. MEM-1 - weekly editorial memory.
+1. RQ-5 - weekly artifact consistency contract.
+2. MEM-1 - weekly editorial memory.
 
 Reasoning:
 
@@ -692,10 +700,9 @@ Reasoning:
   live Telegram buttons.
 - Reader-facing evidence/source mix is implemented; Radar contradiction fixes
   are implemented.
-- Radar handoff work is implemented and locked with focused tests. Next highest
-  leverage task is dogfooding the internal cost/guardrail sentinel before any
-  product split work.
-- Cost sentinel should be dogfooded internally before any product split.
+- Radar handoff work and internal cost guardrails are implemented and locked
+  with focused tests. Next risk is cross-artifact contradiction, so add the
+  weekly artifact consistency contract.
 
 ## Stop Conditions
 

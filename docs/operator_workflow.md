@@ -259,7 +259,8 @@ Once a month, review:
    - If strong is consistently 0–1 items: lower threshold or expand boost topics
 
 2. **Cost per run** — check `cost-stats`.
-   - The output now shows actual `cost_usd`, estimated cost, weekly trend, and weekly category breakdown
+   - The output now shows actual `cost_usd`, estimated cost, weekly trend, weekly category breakdown, and guardrail status
+   - Configure guardrails with `LLM_WEEKLY_COST_BUDGET_USD` and `LLM_WEEKLY_COST_SPIKE_RATIO`
    - `preference_judge` is expected to be one of the higher-cost categories because it writes the reader-facing brief
 
 3. **Profile.yaml freshness** — are boost topics still reflecting current focus?
