@@ -38,6 +38,19 @@ MISSING_EVIDENCE_RE = re.compile(
 )
 HIGH_CONFIDENCE_RE = re.compile(r"\bconfidence\s*:\s*(?:high|strong|medium)\b", re.IGNORECASE)
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
+BUILD_READY_NOTIFICATION_RE = re.compile(
+    r"\b(?:status|recommendation)\s*:\s*(?:build|focused_experiment)\b"
+    r"|\b(?:build\s+now|ready\s+to\s+build\s+now)\b",
+    re.IGNORECASE,
+)
+BUILD_READY_MVP_STATUSES = {"build", "focused_experiment"}
+NON_BUILD_READY_MVP_RECOMMENDATIONS = {
+    "revisit_with_evidence_gap",
+    "needs_more_evidence",
+    "needs_more_specific_scope",
+    "existing_project_context",
+    "reject",
+}
 
 
 @dataclass(frozen=True)
@@ -150,6 +163,9 @@ def validate_weekly_artifacts(
     digest_md: str | None = None,
     study_plan_md: str | None = None,
     project_insights_md: str | None = None,
+    mvp_status: str | None = None,
+    mvp_recommendation: str | None = None,
+    mvp_notification_text: str | None = None,
     facts: WeeklyReportFacts | Mapping[str, Any] | None = None,
 ) -> list[ReportQualityFinding]:
     weekly_facts = coerce_weekly_facts(facts)
@@ -158,6 +174,13 @@ def validate_weekly_artifacts(
     findings.extend(validate_artifact("research_brief", digest_md, facts=weekly_facts))
     findings.extend(validate_artifact("study_plan", study_plan_md, facts=weekly_facts))
     findings.extend(validate_artifact("project_insights", project_insights_md, facts=weekly_facts))
+    findings.extend(
+        validate_mvp_delivery_consistency(
+            status=mvp_status,
+            recommendation=mvp_recommendation,
+            notification_text=mvp_notification_text,
+        )
+    )
 
     if project_insights_report_is_empty(project_insights_md) and digest_has_project_insights(digest_md):
         findings.append(
@@ -172,6 +195,49 @@ def validate_weekly_artifacts(
             )
         )
 
+    return findings
+
+
+def validate_mvp_delivery_consistency(
+    *,
+    status: str | None,
+    recommendation: str | None,
+    notification_text: str | None = None,
+) -> list[ReportQualityFinding]:
+    normalized_status = str(status or "").strip().lower()
+    normalized_recommendation = str(recommendation or "").strip().lower()
+    findings: list[ReportQualityFinding] = []
+    if (
+        normalized_recommendation in NON_BUILD_READY_MVP_RECOMMENDATIONS
+        and normalized_status in BUILD_READY_MVP_STATUSES
+    ):
+        findings.append(
+            ReportQualityFinding(
+                severity=SEVERITY_CRITICAL,
+                artifact_type="mvp_weekly",
+                message=(
+                    "MVP delivery status claims build-readiness while Radar "
+                    "recommendation requires revisit or more evidence"
+                ),
+                line_hint=f"status={status} recommendation={recommendation}",
+            )
+        )
+    notification = str(notification_text or "")
+    if (
+        normalized_recommendation in NON_BUILD_READY_MVP_RECOMMENDATIONS
+        and BUILD_READY_NOTIFICATION_RE.search(notification)
+    ):
+        findings.append(
+            ReportQualityFinding(
+                severity=SEVERITY_CRITICAL,
+                artifact_type="mvp_weekly",
+                message=(
+                    "MVP notification claims build-readiness while Radar "
+                    "recommendation requires revisit or more evidence"
+                ),
+                line_hint=_first_matching_line(notification, BUILD_READY_NOTIFICATION_RE),
+            )
+        )
     return findings
 
 

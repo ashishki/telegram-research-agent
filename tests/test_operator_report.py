@@ -234,6 +234,7 @@ class TestOperatorReport(unittest.TestCase):
             os.unlink(db_path)
 
         self.assertIn("## Report Quality", report)
+        self.assertIn("Report quality / artifact consistency", report)
         self.assertIn("critical=2", report)
         self.assertIn("Study Plan says no Telegram signals", report)
         self.assertIn("Project Insights artifact says no insights", report)

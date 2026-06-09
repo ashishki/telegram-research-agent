@@ -67,6 +67,39 @@ class TestMvpWeeklyPipeline(unittest.TestCase):
                 token="bot-token",
             )
 
+    def test_deliver_result_does_not_claim_build_when_recommendation_revisits(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_path = Path(tmp_dir) / "mvp.md"
+            report_path.write_text("# Candidate Dossier\n", encoding="utf-8")
+            result = MvpWeeklyPipelineResult(
+                week_label="2026-W24",
+                seed_path="/tmp/seeds.json",
+                seed_count=3,
+                radar_status="selected",
+                report_path=str(report_path),
+                json_path="/tmp/mvp.json",
+                selected_title="Operator Fit Tool",
+                dossier_status="build",
+                recommendation="revisit_with_evidence_gap",
+                score=80,
+            )
+
+            with patch.dict(
+                "os.environ",
+                {
+                    "TELEGRAM_BOT_TOKEN": "bot-token",
+                    "TELEGRAM_OWNER_CHAT_ID": "42",
+                },
+            ):
+                with patch("output.mvp_weekly_pipeline.publish_article", return_value=None):
+                    with patch("output.mvp_weekly_pipeline.send_text") as mock_text:
+                        with patch("output.mvp_weekly_pipeline.send_document"):
+                            _deliver_result(result)
+
+            notification = mock_text.call_args.kwargs["text"]
+            self.assertIn("Status: investigate, score 80/100.", notification)
+            self.assertNotIn("Status: build", notification)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -377,10 +377,12 @@ and Telegram notification line from local receipt/evidence lookup facts.
 
 ### RQ-5 - Weekly Artifact Consistency Contract
 
-Status: open.
+Status: implemented.
 
-Ensure weekly artifacts agree on the same run facts: post count, signal counts,
-project insight state, receipt status, and MVP recommendation.
+Implemented. The deterministic report-quality contract catches Study Plan vs
+Research Brief signal contradictions, Project Insights vs Research Brief
+project-section contradictions, MVP delivery build-readiness contradictions,
+and surfaces consistency warnings in monthly `operator-report`.
 
 ## Phase 7 - Radar Candidate Honesty
 

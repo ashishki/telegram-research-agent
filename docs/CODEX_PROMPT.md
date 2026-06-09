@@ -98,6 +98,10 @@ _v3.4 · 2026-06-08 · telegram-research-agent_
 - Internal LLM cost guardrails now evaluate existing `llm_usage` rows without
   new model calls. `cost-stats` and monthly `operator-report` show weekly
   budget status, highest-cost category, spike warnings, and suggested actions.
+- Weekly artifact consistency validation now covers Study Plan vs Research
+  Brief signal counts, Project Insights vs Research Brief project section, MVP
+  delivery build-readiness contradictions, and monthly operator-report
+  consistency warnings.
 
 ---
 
@@ -114,7 +118,7 @@ The weekly pipeline now has:
 
 ## Exact Next Execution Step
 
-Start with `RQ-5 - Add weekly artifact consistency contract` from
+Start with `MEM-1 - Add weekly editorial memory` from
 `docs/tasks.md`.
 Use `docs/report_quality_roadmap.md` for detailed task scope, acceptance
 criteria, touched-file guidance, and verification commands.

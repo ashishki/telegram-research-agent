@@ -70,6 +70,9 @@ Implemented:
   existing-project context, and no contradictory build-ready claims
 - internal LLM cost guardrail sentinel via deterministic `llm_usage` summaries:
   budget/spike warnings in `cost-stats` and monthly `operator-report`
+- weekly artifact consistency contract: Study Plan/Project Insights checks
+  against Research Brief facts, MVP delivery build-readiness guard, and
+  operator-report consistency warnings
 
 ## Active Maintenance Queue
 
@@ -78,7 +81,6 @@ The active queue is now reader-facing report quality and Radar handoff.
 
 | ID | Priority | Task | Notes |
 |---|---:|---|---|
-| RQ-5 | P1 | Add weekly artifact consistency contract | Ensure Research Brief, Implementation Ideas, Study Plan, Project Insights, and MVP status agree for the same week |
 | MEM-1 | P2 | Add weekly editorial memory | Persist useful/confusing report notes from feedback and quality findings for future report generation |
 
 Implementation details, acceptance criteria, touched-file guidance, and Radar

@@ -387,8 +387,17 @@ PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m uni
 
 ### RQ-5 - Weekly Artifact Consistency Contract
 
+Status: implemented.
+
 Goal: make Research Brief, Implementation Ideas, Study Plan, Project Insights,
 and MVP delivery agree about the same week.
+
+Implemented in `src/output/report_quality.py`, `src/output/mvp_weekly_pipeline.py`,
+and `src/output/operator_report.py`: deterministic validation catches Study
+Plan vs Research Brief signal contradictions, Project Insights vs Research
+Brief project-section contradictions, MVP delivery build-readiness
+contradictions, and monthly `operator-report` lists artifact-consistency
+warnings.
 
 Build a small contract that shares or validates the weekly run facts:
 
@@ -691,8 +700,7 @@ cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
 
 ## Remaining Suggested Execution Order
 
-1. RQ-5 - weekly artifact consistency contract.
-2. MEM-1 - weekly editorial memory.
+1. MEM-1 - weekly editorial memory.
 
 Reasoning:
 
@@ -700,9 +708,9 @@ Reasoning:
   live Telegram buttons.
 - Reader-facing evidence/source mix is implemented; Radar contradiction fixes
   are implemented.
-- Radar handoff work and internal cost guardrails are implemented and locked
-  with focused tests. Next risk is cross-artifact contradiction, so add the
-  weekly artifact consistency contract.
+- Radar handoff work, internal cost guardrails, and weekly artifact consistency
+  validation are implemented and locked with focused tests. Next risk is losing
+  useful/confusing report-quality learnings between weeks.
 
 ## Stop Conditions
 

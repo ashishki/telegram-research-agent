@@ -11,6 +11,7 @@ from output.report_quality import (
     format_findings_for_notification,
     load_weekly_quality_facts,
     validate_artifact,
+    validate_mvp_delivery_consistency,
     validate_weekly_artifact_paths,
     validate_weekly_artifacts,
 )
@@ -91,6 +92,34 @@ class TestReportQualityValidation(unittest.TestCase):
         self.assertTrue(digest_has_project_insights(digest))
         self.assertTrue(any(finding.artifact_type == "project_insights" for finding in findings))
         self.assertTrue(any(finding.severity == SEVERITY_CRITICAL for finding in findings))
+
+    def test_mvp_delivery_build_claim_with_revisit_recommendation_returns_critical(self):
+        findings = validate_mvp_delivery_consistency(
+            status="build",
+            recommendation="revisit_with_evidence_gap",
+            notification_text=(
+                "MVP of the Week 2026-W24 is ready.\n"
+                "Status: build, score 80/100.\n"
+                "Recommendation: revisit_with_evidence_gap."
+            ),
+        )
+
+        self.assertTrue(any(finding.artifact_type == "mvp_weekly" for finding in findings))
+        self.assertGreaterEqual(
+            sum(1 for finding in findings if finding.severity == SEVERITY_CRITICAL),
+            1,
+        )
+
+    def test_weekly_artifacts_validate_mvp_delivery_consistency(self):
+        findings = validate_weekly_artifacts(
+            week_label="2026-W24",
+            mvp_status="focused_experiment",
+            mvp_recommendation="needs_more_evidence",
+            mvp_notification_text="Status: focused_experiment.",
+            facts=WeeklyReportFacts(week_label="2026-W24"),
+        )
+
+        self.assertTrue(any(finding.artifact_type == "mvp_weekly" for finding in findings))
 
     def test_overlong_report_without_summary_returns_warning(self):
         content = "## Macro Context\n" + " ".join(["word"] * 61)

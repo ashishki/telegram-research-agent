@@ -265,7 +265,7 @@ def _report_quality_summary(
     critical_count = sum(1 for finding in findings if finding.severity == "critical")
     warning_count = sum(1 for finding in findings if finding.severity == "warning")
     lines = [
-        f"- Report quality: {len(findings)} findings across {len(rows)} week(s)",
+        f"- Report quality / artifact consistency: {len(findings)} findings across {len(rows)} week(s)",
         f"  - critical={critical_count} warning={warning_count}",
     ]
     for finding in findings[:6]:

@@ -16,6 +16,14 @@ from output.render_report import render_report_html
 LOGGER = logging.getLogger(__name__)
 DEFAULT_RADAR_REPO = PROJECT_ROOT.parent / "Demand-to-MVP-Radar"
 DEFAULT_MVP_MODEL = "claude-opus-4-7"
+BUILD_READY_STATUSES = {"build", "focused_experiment"}
+NON_BUILD_READY_RECOMMENDATIONS = {
+    "revisit_with_evidence_gap",
+    "needs_more_evidence",
+    "needs_more_specific_scope",
+    "existing_project_context",
+    "reject",
+}
 
 
 @dataclass(frozen=True)
@@ -155,7 +163,7 @@ def _deliver_result(result: MvpWeeklyPipelineResult) -> str | None:
 
     title = result.selected_title or "No candidate selected"
     score_suffix = f", score {result.score}/100" if result.score is not None else ""
-    status = result.dossier_status or result.recommendation or result.radar_status
+    status = _notification_status(result)
     recommendation = result.recommendation or result.radar_status
     telegraph_url = _publish_mvp_telegraph(result)
     notification = (
@@ -183,6 +191,18 @@ def _deliver_result(result: MvpWeeklyPipelineResult) -> str | None:
             token=token,
         )
     return telegraph_url
+
+
+def _notification_status(result: MvpWeeklyPipelineResult) -> str:
+    status = result.dossier_status or result.recommendation or result.radar_status
+    recommendation = (result.recommendation or "").strip().lower()
+    normalized_status = status.strip().lower()
+    if (
+        recommendation in NON_BUILD_READY_RECOMMENDATIONS
+        and normalized_status in BUILD_READY_STATUSES
+    ):
+        return "reject" if recommendation == "reject" else "investigate"
+    return status
 
 
 def _publish_mvp_telegraph(result: MvpWeeklyPipelineResult) -> str | None:
