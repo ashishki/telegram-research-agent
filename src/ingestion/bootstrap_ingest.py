@@ -11,6 +11,7 @@ from telethon.errors import FloodWaitError
 from config.settings import PROJECT_ROOT, Settings
 from ingestion.telegram_client import make_client
 from llm.vision import analyze_photo
+from output.source_events import append_source_events, telegram_source_event_from_row
 
 
 LOGGER = logging.getLogger(__name__)
@@ -123,6 +124,7 @@ async def _ingest_channel(client, connection: sqlite3.Connection, channel: dict,
             cursor = connection.cursor()
             cursor.execute("BEGIN")
             ingested_at = _to_utc_iso(datetime.now(timezone.utc))
+            source_events = []
 
             # Telethon treats offset_date as a lower bound when iterating in reverse order.
             async for message in client.iter_messages(entity, offset_date=cutoff_date, reverse=True):
@@ -145,8 +147,18 @@ async def _ingest_channel(client, connection: sqlite3.Connection, channel: dict,
                     channel_skipped += 1
                     continue
                 channel_inserted += 1
+                source_events.append(telegram_source_event_from_row(row))
 
             connection.commit()
+            try:
+                append_source_events(source_events)
+            except Exception:
+                LOGGER.warning(
+                    "Source event append failed channel=%s events=%d",
+                    channel_username,
+                    len(source_events),
+                    exc_info=True,
+                )
             LOGGER.info(
                 "Bootstrap channel=%s inserted=%d skipped=%d",
                 channel_username,

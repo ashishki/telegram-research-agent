@@ -12,6 +12,9 @@ Detailed next-roadmap context lives in
 Reader-facing report quality and Demand-to-MVP Radar handoff details live in
 `docs/report_quality_roadmap.md`.
 
+Pathway live source intelligence and Radar incremental-indexing work lives in
+`docs/pathway_live_source_intelligence.md`.
+
 ## Current State
 
 Implemented:
@@ -82,11 +85,15 @@ Implemented:
 
 The previous receipt/source-trust/operator-reporting backlog, reader-facing
 report quality, Radar handoff, cost guardrails, artifact consistency, and
-editorial memory queue are implemented.
+editorial memory queue are implemented. The active queue is now Pathway-ready
+live source intelligence and Radar context integration.
 
 | ID | Priority | Task | Notes |
 |---|---:|---|---|
-| - | - | No active implementation task | Pick the next task only after a new roadmap item is added |
+| PTH-TRA-1 | P1 | Agent source event log | Emit append-only Pathway-ready Telegram source events from ingestion |
+| PTH-TRA-2 | P1 | Live source intelligence snapshot | Build bounded deterministic snapshot from source events |
+| PTH-RADAR-1 | P1 | Radar live intelligence context | Radar reads snapshot as context only, not source-mix gate evidence |
+| PTH-TRA-3 | P2 | Agent-to-Radar bridge | Pass latest/generated live intelligence snapshot to Radar mvp-weekly |
 
 Implementation details, acceptance criteria, touched-file guidance, and Radar
 paths are in `docs/report_quality_roadmap.md`.

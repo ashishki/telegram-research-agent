@@ -86,6 +86,20 @@ def build_parser() -> argparse.ArgumentParser:
     seed_parser.add_argument("--include-channel", action="append", default=[])
     seed_parser.set_defaults(handler=handle_export_opportunity_seeds)
 
+    live_index_parser = subparsers.add_parser(
+        "live-source-index",
+        help="Build a bounded live source intelligence snapshot from source events",
+    )
+    live_index_parser.add_argument("--days", type=int, default=14)
+    live_index_parser.add_argument("--event-root", default=None)
+    live_index_parser.add_argument("--out", default=None)
+    live_index_parser.add_argument(
+        "--backfill-from-db",
+        action="store_true",
+        help="Backfill source events from recent raw_posts before building the snapshot",
+    )
+    live_index_parser.set_defaults(handler=handle_live_source_index)
+
     mvp_weekly_parser = subparsers.add_parser(
         "mvp-weekly",
         help="Generate and optionally deliver the weekly MVP artifact through Demand-to-MVP Radar",
@@ -585,6 +599,41 @@ def handle_export_opportunity_seeds(args: argparse.Namespace) -> int:
         )
     except Exception:
         LOGGER.exception("Opportunity seed export failed")
+        return 1
+    return 0
+
+
+def handle_live_source_index(args: argparse.Namespace) -> int:
+    from output.live_source_intelligence import build_live_source_intelligence_snapshot
+    from output.source_events import backfill_recent_source_events
+
+    settings = load_settings()
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+        backfilled = 0
+        if args.backfill_from_db:
+            with sqlite3.connect(settings.db_path) as connection:
+                connection.row_factory = sqlite3.Row
+                backfilled = backfill_recent_source_events(
+                    connection,
+                    days=max(1, args.days),
+                    event_root=args.event_root,
+                )
+        summary = build_live_source_intelligence_snapshot(
+            days=max(1, args.days),
+            event_root=args.event_root,
+            output_path=args.out,
+        )
+        sys.stdout.write(
+            f"{summary.output_path}\n"
+            f"events={summary.event_count} repeated_claims={summary.repeated_claim_count} "
+            f"week={summary.week_label} pathway_available={str(summary.pathway_available).lower()} "
+            f"backfilled={backfilled}\n"
+        )
+    except Exception:
+        LOGGER.exception("Live source index build failed")
         return 1
     return 0
 
