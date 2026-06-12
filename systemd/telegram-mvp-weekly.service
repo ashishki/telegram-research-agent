@@ -19,7 +19,7 @@ Environment=DMR_MVP_SOURCE_CONFIG=/srv/openclaw-you/workspace/Demand-to-MVP-Rada
 Environment=DMR_LLM_PROVIDER=anthropic
 Environment=DMR_LLM_MODEL_MVP_WEEKLY=claude-opus-4-7
 Environment=DMR_LLM_FALLBACK_MODEL_MVP_WEEKLY=claude-opus-4-1-20250805
-ExecStart=/srv/openclaw-you/venv/bin/python3 src/main.py mvp-weekly
+ExecStart=/srv/openclaw-you/venv/bin/python3 src/main.py mvp-weekly --with-live-source-index --backfill-live-source-events
 Restart=no
 StandardOutput=journal
 StandardError=journal
