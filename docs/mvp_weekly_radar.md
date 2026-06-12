@@ -115,10 +115,29 @@ Manual delivery run:
 python3 src/main.py mvp-weekly
 ```
 
+Manual run with live source intelligence context:
+
+```bash
+python3 src/main.py mvp-weekly --with-live-source-index
+```
+
+First run after deploying the event stream can backfill recent source events
+from SQLite before building the live intelligence snapshot:
+
+```bash
+python3 src/main.py mvp-weekly --with-live-source-index --backfill-live-source-events
+```
+
 Export only Telegram seeds:
 
 ```bash
 python3 src/main.py export-opportunity-seeds --days 7 --limit 80
+```
+
+Build only the live source intelligence snapshot:
+
+```bash
+python3 src/main.py live-source-index --days 14 --backfill-from-db
 ```
 
 ## Expected Operator Output
@@ -138,6 +157,10 @@ https://telegra.ph/...
 The source-mix line is a truth surface: it shows whether the idea was validated
 beyond Telegram or still needs credentials/external evidence. `readiness` is
 `telegram_only`, `externally_corroborated`, or `credential_limited`.
+
+The optional live intelligence line is context only. It may summarize recent
+source-event activity and repeated-claim candidates, but it does not satisfy
+Radar's external evidence gates.
 
 ## Candidate Dossier Contract
 

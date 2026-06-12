@@ -109,6 +109,10 @@ def build_parser() -> argparse.ArgumentParser:
     mvp_weekly_parser.add_argument("--include-channel", action="append", default=[])
     mvp_weekly_parser.add_argument("--run-id", default=None)
     mvp_weekly_parser.add_argument("--no-deliver", action="store_true")
+    mvp_weekly_parser.add_argument("--with-live-source-index", action="store_true")
+    mvp_weekly_parser.add_argument("--live-intelligence-path", default=None)
+    mvp_weekly_parser.add_argument("--live-index-days", type=int, default=None)
+    mvp_weekly_parser.add_argument("--backfill-live-source-events", action="store_true")
     mvp_weekly_parser.set_defaults(handler=handle_mvp_weekly)
 
     channel_intel_report_parser = subparsers.add_parser(
@@ -652,6 +656,10 @@ def handle_mvp_weekly(args: argparse.Namespace) -> int:
             include_channels=tuple(args.include_channel or ()),
             run_id=args.run_id,
             deliver=not args.no_deliver,
+            with_live_source_index=args.with_live_source_index,
+            live_intelligence_path=args.live_intelligence_path,
+            live_index_days=args.live_index_days,
+            backfill_live_source_events=args.backfill_live_source_events,
         )
         LOGGER.info(
             "Finished step=mvp_weekly week=%s seeds=%d status=%s dossier_status=%s report=%s",
@@ -666,6 +674,7 @@ def handle_mvp_weekly(args: argparse.Namespace) -> int:
             f"status={summary.radar_status} seeds={summary.seed_count} "
             f"dossier_status={summary.dossier_status or ''} "
             f"title={summary.selected_title or ''}\n"
+            f"live_intelligence={summary.live_intelligence_path or ''}\n"
             f"telegraph={summary.telegraph_url or ''}\n"
         )
     except Exception:

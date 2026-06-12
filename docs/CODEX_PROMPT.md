@@ -58,13 +58,18 @@ _v3.5 · 2026-06-09 · telegram-research-agent_
     logs, report-quality findings, receipt health, and source down-rank
     explanations via `memory inspect-editorial-memory`; monthly
     `operator-report` summarizes weeks with editorial memory signals.
+  - Pathway-ready live source intelligence is implemented as an optional sidecar
+    contract: Telegram ingestion writes append-only source events, `live-source-index`
+    builds deterministic snapshots, and `mvp-weekly --with-live-source-index`
+    passes context-only live intelligence to Demand-to-MVP Radar.
   - 2026-W24 artifact review showed that internal signal quality improved but
     reader-facing report quality is weak: no first-screen decision brief,
     buried trend summary, visible internal `Matches: ...` traces, contradictions
     between digest/study/project-insights outputs, and Radar gate contradiction.
-- The current report-quality, Radar handoff, cost, artifact consistency, and
-  editorial memory task queue is implemented. Add the next roadmap item before
-  starting new implementation work.
+- The current report-quality, Radar handoff, cost, artifact consistency,
+  editorial memory, and initial Pathway live-source-intelligence task queue is
+  implemented. Add the next roadmap item before starting new implementation
+  work.
 - VPS cognition vault: `/srv/codex-entropy/repos/product-3/engineering-cognition-vault`; use it as a downstream navigation layer, not as the source of truth.
 - In this environment, `pytest` may be unavailable; verified fallback is `PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m unittest ...`.
 - Orchestrator-to-Codex execution path: write prompt to file, then `codex exec -s workspace-write < /tmp/prompt.md`
@@ -111,6 +116,10 @@ _v3.5 · 2026-06-09 · telegram-research-agent_
 - Weekly editorial memory is now persisted as local operator/system-authored
   Markdown sidecars under `data/output/editorial_memory/` when inspected
   explicitly, and is summarized by monthly `operator-report`.
+- Pathway itself is not a required runtime dependency yet. The shipped boundary
+  is a Pathway-ready JSONL event stream plus deterministic fallback snapshot;
+  Radar treats the snapshot as context only, not decision-grade external
+  evidence.
 
 ---
 

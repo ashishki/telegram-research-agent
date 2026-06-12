@@ -42,6 +42,7 @@ class MvpWeeklyPipelineResult:
     telegraph_url: str | None = None
     source_counts: dict[str, object] | None = None
     source_errors: dict[str, str] | None = None
+    live_intelligence_path: str | None = None
 
 
 def run_mvp_weekly_pipeline(
@@ -52,6 +53,10 @@ def run_mvp_weekly_pipeline(
     include_channels: tuple[str, ...] = (),
     run_id: str | None = None,
     deliver: bool = True,
+    with_live_source_index: bool = False,
+    live_intelligence_path: Path | str | None = None,
+    live_index_days: int | None = None,
+    backfill_live_source_events: bool = False,
 ) -> MvpWeeklyPipelineResult:
     seed_export = export_opportunity_seeds(
         settings,
@@ -60,9 +65,17 @@ def run_mvp_weekly_pipeline(
         include_channels=include_channels,
     )
     effective_run_id = run_id or f"mvp-weekly-{seed_export.week_label}"
+    live_path = _prepare_live_intelligence_path(
+        settings,
+        explicit_path=live_intelligence_path,
+        enabled=with_live_source_index,
+        days=live_index_days or days,
+        backfill=backfill_live_source_events,
+    )
     radar_payload = _run_radar(
         seed_path=Path(seed_export.output_path),
         run_id=effective_run_id,
+        live_intelligence_path=live_path,
     )
     result = MvpWeeklyPipelineResult(
         week_label=seed_export.week_label,
@@ -78,6 +91,7 @@ def run_mvp_weekly_pipeline(
         selected_source_mix=_optional_dict(radar_payload.get("selected_source_mix")),
         source_counts=_optional_dict(radar_payload.get("source_counts")),
         source_errors=_optional_str_dict(radar_payload.get("source_errors")),
+        live_intelligence_path=str(live_path) if live_path is not None else None,
     )
     if deliver:
         telegraph_url = _deliver_result(result)
@@ -85,7 +99,40 @@ def run_mvp_weekly_pipeline(
     return result
 
 
-def _run_radar(*, seed_path: Path, run_id: str) -> dict[str, object]:
+def _prepare_live_intelligence_path(
+    settings: Settings,
+    *,
+    explicit_path: Path | str | None,
+    enabled: bool,
+    days: int,
+    backfill: bool,
+) -> Path | None:
+    if explicit_path is not None:
+        path = Path(explicit_path)
+        if not path.exists():
+            raise FileNotFoundError(f"Live intelligence snapshot not found: {path}")
+        return path
+    if not enabled:
+        return None
+    from output.live_source_intelligence import build_live_source_intelligence_snapshot
+    from output.source_events import backfill_recent_source_events
+
+    if backfill:
+        import sqlite3
+
+        with sqlite3.connect(settings.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            backfill_recent_source_events(connection, days=max(1, int(days or 7)))
+    result = build_live_source_intelligence_snapshot(days=max(1, int(days or 7)))
+    return result.output_path
+
+
+def _run_radar(
+    *,
+    seed_path: Path,
+    run_id: str,
+    live_intelligence_path: Path | None = None,
+) -> dict[str, object]:
     radar_repo = Path(os.environ.get("RADAR_REPO_PATH", str(DEFAULT_RADAR_REPO))).resolve()
     if not radar_repo.exists():
         raise FileNotFoundError(f"Demand-to-MVP-Radar repository not found: {radar_repo}")
@@ -130,6 +177,8 @@ def _run_radar(*, seed_path: Path, run_id: str) -> dict[str, object]:
     ]
     if source_config.exists():
         command.extend(["--source-config", str(source_config)])
+    if live_intelligence_path is not None and live_intelligence_path.exists():
+        command.extend(["--live-intelligence", str(live_intelligence_path)])
     completed = subprocess.run(
         command,
         cwd=str(radar_repo),
@@ -172,7 +221,8 @@ def _deliver_result(result: MvpWeeklyPipelineResult) -> str | None:
         f"Status: {status}{score_suffix}.\n"
         f"Recommendation: {recommendation}.\n"
         f"Seeds exported: {result.seed_count}.\n"
-        f"{source_mix_summary(result)}"
+        f"{source_mix_summary(result)}\n"
+        f"{live_intelligence_summary(result)}"
     )
     if telegraph_url:
         notification = f"{notification}\n{telegraph_url}"
@@ -294,3 +344,23 @@ def source_mix_summary(result: MvpWeeklyPipelineResult) -> str:
     if source_errors:
         parts.append("source_errors=" + ", ".join(sorted(source_errors)))
     return "Source mix: " + "; ".join(parts) + "."
+
+
+def live_intelligence_summary(result: MvpWeeklyPipelineResult) -> str:
+    live = (result.source_counts or {}).get("live_intelligence")
+    if not isinstance(live, dict):
+        return "Live intelligence: not supplied."
+    events = _optional_int(live.get("events_scanned"))
+    repeated = _optional_int(live.get("repeated_claim_count"))
+    pathway = live.get("pathway")
+    pathway_status = ""
+    if isinstance(pathway, dict):
+        pathway_status = str(pathway.get("status") or "")
+    parts = [
+        f"events={events if events is not None else 0}",
+        f"repeated_claims={repeated if repeated is not None else 0}",
+        "context_only=true",
+    ]
+    if pathway_status:
+        parts.append(f"pathway={pathway_status}")
+    return "Live intelligence: " + "; ".join(parts) + "."

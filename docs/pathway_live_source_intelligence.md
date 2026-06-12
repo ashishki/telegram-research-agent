@@ -65,10 +65,14 @@ Acceptance:
 
 ### PTH-RADAR-1 - Radar Live Intelligence Context
 
-Status: pending.
+Status: implemented.
 
 Goal: let Demand-to-MVP Radar read the live intelligence snapshot as context
 without treating it as decision-grade external evidence.
+
+Implemented in Demand-to-MVP Radar commit `cfa5c21`: Radar accepts
+`--live-intelligence PATH`, renders a `Live Source Intelligence` section, and
+keeps source-mix gates unchanged.
 
 Acceptance:
 
@@ -80,10 +84,13 @@ Acceptance:
 
 ### PTH-TRA-3 - Agent-to-Radar Bridge
 
-Status: pending.
+Status: implemented.
 
 Goal: pass the latest generated live intelligence snapshot to Radar during
 `mvp-weekly` when available or explicitly generated.
+
+Implemented via `mvp-weekly --with-live-source-index`, optional
+`--live-intelligence-path`, and `--backfill-live-source-events`.
 
 Acceptance:
 
@@ -101,3 +108,9 @@ After each phase:
 - Confirm source-mix gates still prevent Telegram-only or live-context-only
   candidates from becoming build-ready.
 - Commit and push before moving to the next project.
+
+## Current State
+
+All initial Pathway live source intelligence tasks are implemented. Future work
+should only add an actual long-running Pathway sidecar after the JSONL event
+contract proves useful in weekly operation.

@@ -80,20 +80,20 @@ Implemented:
   operator/system-authored keep/change/demote/test-next-week notes from
   artifact feedback, usefulness logs, report-quality findings, receipt health,
   and source down-rank explanations
+- Pathway-ready live source intelligence: append-only source events from
+  Telegram ingestion, deterministic live-source snapshots, Radar context-only
+  consumption, and optional `mvp-weekly --with-live-source-index` bridge
 
 ## Active Maintenance Queue
 
 The previous receipt/source-trust/operator-reporting backlog, reader-facing
 report quality, Radar handoff, cost guardrails, artifact consistency, and
-editorial memory queue are implemented. The active queue is now Pathway-ready
-live source intelligence and Radar context integration.
+editorial memory queue are implemented. The initial Pathway-ready live source
+intelligence and Radar context integration queue is implemented.
 
 | ID | Priority | Task | Notes |
 |---|---:|---|---|
-| PTH-TRA-1 | P1 | Agent source event log | Emit append-only Pathway-ready Telegram source events from ingestion |
-| PTH-TRA-2 | P1 | Live source intelligence snapshot | Build bounded deterministic snapshot from source events |
-| PTH-RADAR-1 | P1 | Radar live intelligence context | Radar reads snapshot as context only, not source-mix gate evidence |
-| PTH-TRA-3 | P2 | Agent-to-Radar bridge | Pass latest/generated live intelligence snapshot to Radar mvp-weekly |
+| - | - | No active implementation task | Add the next roadmap item before starting new implementation work |
 
 Implementation details, acceptance criteria, touched-file guidance, and Radar
 paths are in `docs/report_quality_roadmap.md`.

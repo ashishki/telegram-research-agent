@@ -1,9 +1,10 @@
 import tempfile
+import types
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from output.mvp_weekly_pipeline import MvpWeeklyPipelineResult, _deliver_result
+from output.mvp_weekly_pipeline import MvpWeeklyPipelineResult, _deliver_result, _run_radar
 
 
 class TestMvpWeeklyPipeline(unittest.TestCase):
@@ -30,6 +31,13 @@ class TestMvpWeeklyPipeline(unittest.TestCase):
                     "reddit_api_status": "missing_credentials",
                     "missing_credentials": ["reddit_demand_live"],
                 },
+                source_counts={
+                    "live_intelligence": {
+                        "events_scanned": 12,
+                        "repeated_claim_count": 2,
+                        "pathway": {"status": "not_installed"},
+                    }
+                },
             )
 
             with patch.dict(
@@ -55,6 +63,8 @@ class TestMvpWeeklyPipeline(unittest.TestCase):
             self.assertIn("readiness=credential_limited", notification)
             self.assertIn("reddit=missing_credentials", notification)
             self.assertIn("missing_credentials=reddit_demand_live", notification)
+            self.assertIn("Live intelligence: events=12", notification)
+            self.assertIn("context_only=true", notification)
             self.assertIn("https://telegra.ph/mvp-weekly", notification)
             self.assertEqual(
                 mock_text.call_args.kwargs["reply_markup"]["inline_keyboard"][0][0]["callback_data"],
@@ -99,6 +109,41 @@ class TestMvpWeeklyPipeline(unittest.TestCase):
             notification = mock_text.call_args.kwargs["text"]
             self.assertIn("Status: investigate, score 80/100.", notification)
             self.assertNotIn("Status: build", notification)
+
+    def test_run_radar_passes_live_intelligence_path(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            radar_repo = root / "radar"
+            radar_repo.mkdir()
+            live_path = root / "live.json"
+            live_path.write_text("{}", encoding="utf-8")
+            seed_path = root / "seeds.json"
+            seed_path.write_text("[]", encoding="utf-8")
+
+            with patch.dict(
+                "os.environ",
+                {
+                    "RADAR_REPO_PATH": str(radar_repo),
+                    "RADAR_PYTHON": "/usr/bin/python3",
+                    "DMR_DATA_DIR": str(root / "data"),
+                    "DMR_REPORT_DIR": str(root / "reports"),
+                },
+                clear=False,
+            ):
+                with patch("output.mvp_weekly_pipeline.subprocess.run") as mock_run:
+                    mock_run.return_value = types.SimpleNamespace(
+                        stdout='{"status":"selected"}'
+                    )
+                    payload = _run_radar(
+                        seed_path=seed_path,
+                        run_id="mvp-weekly-live",
+                        live_intelligence_path=live_path,
+                    )
+
+        command = mock_run.call_args.args[0]
+        self.assertEqual(payload["status"], "selected")
+        self.assertIn("--live-intelligence", command)
+        self.assertIn(str(live_path), command)
 
 
 if __name__ == "__main__":
