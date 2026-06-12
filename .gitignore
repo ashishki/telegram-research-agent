@@ -1,6 +1,8 @@
 data/agent.db
 data/agent.db-wal
 data/agent.db-shm
+data/events/
+data/output/live_source_intelligence/
 *.session
 .env
 __pycache__/
