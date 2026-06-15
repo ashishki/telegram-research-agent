@@ -17,6 +17,7 @@ from llm.client import complete
 from output.context_memory import load_project_context, refresh_all_project_context_snapshots
 from output.insight_triage import parse_insights_html, render_triaged_insights_html, triage_insights
 from output.report_utils import _extract_markdown_section
+from output.weekly_messages import build_implementation_message, write_weekly_message
 
 
 LOGGER = logging.getLogger(__name__)
@@ -637,14 +638,16 @@ def _send_recommendations_to_telegram_owner(
     if delivery_state["telegram_sent_at"] and not force_delivery:
         LOGGER.info("Implementation ideas delivery skipped week=%s because it was already sent", week_label)
         return
-    notification = _build_notification(week_label)
+    operator_message = build_implementation_message(week_label=week_label, insights_html=content_md)
+    write_weekly_message(week_label, "implementation", operator_message)
+    notification = operator_message
     if html_path is not None:
         try:
             html_content = html_path.read_text(encoding="utf-8")
             url = publish_article(title=f"Implementation Ideas {week_label}", html_content=html_content)
             send_text(
                 chat_id=chat_id,
-                text=f"{notification}\n{url}",
+                text=f"{notification}\n\nПолный audit-отчет: {url}"[:4096],
                 token=token,
                 parse_mode=None,
                 reply_markup=build_artifact_feedback_markup(week_label, "implementation_ideas"),
@@ -662,7 +665,7 @@ def _send_recommendations_to_telegram_owner(
             LOGGER.warning("Failed to publish implementation ideas week=%s", week_label, exc_info=True)
     send_text(
         chat_id=chat_id,
-        text=notification,
+        text=notification[:4096],
         token=token,
         parse_mode=None,
         reply_markup=build_artifact_feedback_markup(week_label, "implementation_ideas"),
@@ -721,6 +724,11 @@ def run_recommendations(settings: Settings, force_delivery: bool = False) -> dic
         connection.commit()
 
         delivery_text = _normalize_insights_delivery_text(render_triaged_insights_html(insights_text, triaged))
+        implementation_message = build_implementation_message(
+            week_label=week_label,
+            insights_html=delivery_text,
+        )
+        write_weekly_message(week_label, "implementation", implementation_message)
 
         output_path = _write_insights_file(week_label, delivery_text)
         html_path = _write_insights_html_file(week_label, delivery_text)

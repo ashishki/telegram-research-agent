@@ -58,13 +58,10 @@ class TestMvpWeeklyPipeline(unittest.TestCase):
             self.assertEqual(telegraph_url, "https://telegra.ph/mvp-weekly")
             mock_publish.assert_called_once()
             notification = mock_text.call_args.kwargs["text"]
-            self.assertIn("Status: investigate, score 62/100.", notification)
-            self.assertIn("Recommendation: revisit_with_evidence_gap.", notification)
-            self.assertIn("readiness=credential_limited", notification)
-            self.assertIn("reddit=missing_credentials", notification)
-            self.assertIn("missing_credentials=reddit_demand_live", notification)
-            self.assertIn("Live intelligence: events=12", notification)
-            self.assertIn("context_only=true", notification)
+            self.assertIn("MVP 2026-W22: Operator Fit Tool", notification)
+            self.assertIn("Решение: MVP не выбран как build-ready.", notification)
+            self.assertIn("Почему: выбранный кандидат имеет 0 Telegram seed evidence", notification)
+            self.assertIn("Live intelligence: 2 повторяющихся claim-кандидатов.", notification)
             self.assertIn("https://telegra.ph/mvp-weekly", notification)
             self.assertEqual(
                 mock_text.call_args.kwargs["reply_markup"]["inline_keyboard"][0][0]["callback_data"],
@@ -107,8 +104,8 @@ class TestMvpWeeklyPipeline(unittest.TestCase):
                             _deliver_result(result)
 
             notification = mock_text.call_args.kwargs["text"]
-            self.assertIn("Status: investigate, score 80/100.", notification)
-            self.assertNotIn("Status: build", notification)
+            self.assertIn("Решение: MVP не выбран как build-ready.", notification)
+            self.assertNotIn("Решение: можно рассматривать", notification)
 
     def test_run_radar_passes_live_intelligence_path(self):
         with tempfile.TemporaryDirectory() as tmp_dir:

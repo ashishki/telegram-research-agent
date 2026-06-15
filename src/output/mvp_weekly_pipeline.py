@@ -11,6 +11,7 @@ from bot.telegram_delivery import send_document, send_text
 from config.settings import PROJECT_ROOT, Settings
 from output.opportunity_seed_export import export_opportunity_seeds
 from output.render_report import render_report_html
+from output.weekly_messages import build_mvp_message, write_weekly_message
 
 
 LOGGER = logging.getLogger(__name__)
@@ -93,6 +94,7 @@ def run_mvp_weekly_pipeline(
         source_errors=_optional_str_dict(radar_payload.get("source_errors")),
         live_intelligence_path=str(live_path) if live_path is not None else None,
     )
+    _write_mvp_operator_message(result)
     if deliver:
         telegraph_url = _deliver_result(result)
         result = replace(result, telegraph_url=telegraph_url)
@@ -210,25 +212,13 @@ def _deliver_result(result: MvpWeeklyPipelineResult) -> str | None:
         LOGGER.info("MVP weekly delivery skipped because Telegram owner credentials are missing")
         return None
 
-    title = result.selected_title or "No candidate selected"
-    score_suffix = f", score {result.score}/100" if result.score is not None else ""
-    status = _notification_status(result)
-    recommendation = result.recommendation or result.radar_status
     telegraph_url = _publish_mvp_telegraph(result)
-    notification = (
-        f"MVP of the Week {result.week_label} is ready.\n"
-        f"{title}\n"
-        f"Status: {status}{score_suffix}.\n"
-        f"Recommendation: {recommendation}.\n"
-        f"Seeds exported: {result.seed_count}.\n"
-        f"{source_mix_summary(result)}\n"
-        f"{live_intelligence_summary(result)}"
-    )
+    notification = _write_mvp_operator_message(result)
     if telegraph_url:
-        notification = f"{notification}\n{telegraph_url}"
+        notification = f"{notification}\n\nПолный audit-отчет: {telegraph_url}"
     send_text(
         chat_id=chat_id,
-        text=notification,
+        text=notification[:4096],
         token=token,
         parse_mode=None,
         reply_markup=build_artifact_feedback_markup(result.week_label, "mvp_weekly"),
@@ -241,6 +231,21 @@ def _deliver_result(result: MvpWeeklyPipelineResult) -> str | None:
             token=token,
         )
     return telegraph_url
+
+
+def _write_mvp_operator_message(result: MvpWeeklyPipelineResult) -> str:
+    live = (result.source_counts or {}).get("live_intelligence")
+    notification = build_mvp_message(
+        week_label=result.week_label,
+        title=result.selected_title or "No candidate selected",
+        status=_notification_status(result),
+        recommendation=result.recommendation or result.radar_status,
+        score=result.score,
+        source_mix=result.selected_source_mix or {},
+        live_intelligence=live if isinstance(live, dict) else {},
+    )
+    write_weekly_message(result.week_label, "mvp", notification)
+    return notification
 
 
 def _notification_status(result: MvpWeeklyPipelineResult) -> str:

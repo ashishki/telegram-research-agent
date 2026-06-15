@@ -25,6 +25,7 @@ from output.report_quality import (
     validate_weekly_artifacts,
 )
 from output.signal_report import format_signal_report
+from output.weekly_messages import build_brief_message, write_weekly_message
 from proof_receipts import (
     build_core_research_brief_receipt,
     core_receipt_sha256,
@@ -558,6 +559,7 @@ def _send_weekly_review_to_telegram_owner(
     evidence_summary_note: str | None = None,
     evidence_summary: dict | None = None,
     report_quality_warning: str | None = None,
+    operator_message: str | None = None,
 ) -> None:
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
     chat_id = os.environ.get("TELEGRAM_OWNER_CHAT_ID", "").strip()
@@ -576,7 +578,7 @@ def _send_weekly_review_to_telegram_owner(
         LOGGER.info("Weekly review delivery skipped week=%s because it was already sent", week_label)
         return
 
-    notification = _build_review_notification(
+    notification = operator_message or _build_review_notification(
         week_label,
         strong_count,
         watch_count,
@@ -585,11 +587,11 @@ def _send_weekly_review_to_telegram_owner(
         action_count=_extract_actions_this_week_count(content_md),
         evidence_summary_note=evidence_summary_note,
     )
-    if health_alert:
+    if health_alert and not operator_message:
         notification = f"{health_alert}\n\n{notification}"[:700]
-    if report_quality_warning:
+    if report_quality_warning and not operator_message:
         notification = f"{report_quality_warning}\n\n{notification}"[:900]
-    if receipt_audit_note:
+    if receipt_audit_note and not operator_message:
         notification = f"{notification}\n{receipt_audit_note}"[:900]
     feedback_markup = build_artifact_feedback_markup(week_label, "research_brief")
 
@@ -598,9 +600,10 @@ def _send_weekly_review_to_telegram_owner(
         try:
             html_content = html_path.read_text(encoding="utf-8")
             url = publish_article(title=f"Research Brief {week_label}", html_content=html_content)
+            delivery_text = f"{notification}\n\nПолный audit-отчет: {url}" if operator_message else f"{notification}\n{url}"
             message_id = send_text(
                 chat_id=chat_id,
-                text=f"{notification}\n{url}",
+                text=delivery_text[:4096],
                 token=token,
                 parse_mode=None,
                 reply_markup=feedback_markup,
@@ -651,7 +654,7 @@ def _send_weekly_review_to_telegram_owner(
 
     message_id = send_text(
         chat_id=chat_id,
-        text=notification,
+        text=notification[:4096],
         token=token,
         parse_mode=None,
         reply_markup=feedback_markup,
@@ -1287,6 +1290,13 @@ def run_digest(settings: Settings, force_delivery: bool = False) -> DigestResult
                 output_word_count=empty_word_count,
             )
             report_quality_warning = format_findings_for_notification(report_quality_findings)
+            operator_message = build_brief_message(
+                week_label=week_label,
+                posts=[],
+                bucket_counts=buckets.get("bucket_counts", {}),
+                top_topics=[],
+            )
+            write_weekly_message(week_label, "brief", operator_message)
             try:
                 _send_weekly_review_to_telegram_owner(
                     connection=connection,
@@ -1304,6 +1314,7 @@ def run_digest(settings: Settings, force_delivery: bool = False) -> DigestResult
                     evidence_summary_note=evidence_summary_note,
                     evidence_summary=evidence_summary,
                     report_quality_warning=report_quality_warning,
+                    operator_message=operator_message,
                 )
             except Exception:
                 LOGGER.warning("Failed to send digest to Telegram owner week=%s", week_label, exc_info=True)
@@ -1365,6 +1376,13 @@ def run_digest(settings: Settings, force_delivery: bool = False) -> DigestResult
 
         content_md = _append_github_section(content_md, settings)
         output_word_count = _count_words(content_md)
+        operator_message = build_brief_message(
+            week_label=week_label,
+            posts=signal_posts,
+            bucket_counts=buckets.get("bucket_counts", {}),
+            top_topics=top_topics,
+        )
+        write_weekly_message(week_label, "brief", operator_message)
 
         # Step 5: Persist
         generated_at = _utc_now_iso()
@@ -1509,6 +1527,7 @@ def run_digest(settings: Settings, force_delivery: bool = False) -> DigestResult
                 evidence_summary_note=evidence_summary_note,
                 evidence_summary=evidence_summary,
                 report_quality_warning=report_quality_warning,
+                operator_message=operator_message,
             )
         except Exception:
             LOGGER.warning("Failed to send digest to Telegram owner week=%s", week_label, exc_info=True)
