@@ -638,10 +638,11 @@ def _send_weekly_review_to_telegram_owner(
             "fallback_delivery": fallback_route,
         }
         fallback_summary_note = _format_receipt_evidence_notification(fallback_summary)
-        if evidence_summary_note and fallback_summary_note:
-            notification = notification.replace(evidence_summary_note, fallback_summary_note)
-        elif fallback_summary_note:
-            notification = f"{notification}\n{fallback_summary_note}"[:900]
+        if not operator_message:
+            if evidence_summary_note and fallback_summary_note:
+                notification = notification.replace(evidence_summary_note, fallback_summary_note)
+            elif fallback_summary_note:
+                notification = f"{notification}\n{fallback_summary_note}"[:900]
         content_md = _upsert_evidence_summary_section(content_md, fallback_summary)
         try:
             _write_digest_file(week_label, content_md)
