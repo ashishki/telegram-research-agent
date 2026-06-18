@@ -204,6 +204,29 @@ class TestGenerateRecommendationsHtml(unittest.TestCase):
         self.assertIn("https://t.me/channelB/200", rewritten)
         self.assertNotIn("https://t.me/NeuralShit/7342", rewritten)
 
+    def test_rewrite_insight_source_urls_keeps_one_source_anchor_per_idea(self):
+        content = (
+            "<b>💡 Инсайты недели</b>\n\n"
+            "<b>[Implement] project — Eval layer</b>\n"
+            "Body mentions eval quality.\n"
+            "<a href=\"https://t.me/source_a/123\">источник</a>\n"
+            "<a href=\"https://t.me/source_b/1\">источник (extra benchmark)</a>"
+        )
+        candidates = [
+            {
+                "url": "https://t.me/source_a/123",
+                "project_name": "project",
+                "channel": "@source_a",
+                "match_text": "project eval quality",
+            }
+        ]
+
+        rewritten = _rewrite_insight_source_urls(content, candidates)
+
+        self.assertIn("https://t.me/source_a/123", rewritten)
+        self.assertNotIn("https://t.me/source_b/1", rewritten)
+        self.assertEqual(rewritten.count("источник"), 1)
+
 
 class TestRunRecommendations(unittest.TestCase):
     def test_run_recommendations_continues_when_project_context_snapshots_fail(self):

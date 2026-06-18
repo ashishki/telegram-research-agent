@@ -487,9 +487,29 @@ def _rewrite_insight_source_urls(content: str, candidates: list[dict]) -> str:
             updated_block = updated_block.replace(source_url, replacement_url, 1)
         elif '<a href="' not in updated_block:
             updated_block = updated_block.rstrip() + f'\n<a href="{replacement_url}">источник</a>'
+        updated_block = _keep_single_source_anchor(updated_block)
         rewritten = rewritten.replace(raw_html, updated_block, 1)
         used_urls.add(replacement_url)
     return rewritten
+
+
+def _keep_single_source_anchor(block: str) -> str:
+    lines: list[str] = []
+    source_anchor_seen = False
+    for line in block.splitlines():
+        anchor_match = HTML_ANCHOR_RE.search(line)
+        if not anchor_match:
+            lines.append(line)
+            continue
+        label = _strip_html(anchor_match.group(2)).strip().lower()
+        if "источник" not in label and "source" not in label:
+            lines.append(line)
+            continue
+        if source_anchor_seen:
+            continue
+        source_anchor_seen = True
+        lines.append(line)
+    return "\n".join(lines)
 
 
 def _load_completed_study_history(connection: sqlite3.Connection, limit: int = 6) -> str:
