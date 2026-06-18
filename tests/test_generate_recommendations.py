@@ -41,12 +41,17 @@ from output.project_memory_pack import build_project_memory_pack  # noqa: E402
 
 
 class TestGenerateRecommendationsHtml(unittest.TestCase):
-    def test_build_project_memory_pack_reads_local_state_tasks_and_git_history(self):
+    def test_build_project_memory_pack_reads_vault_tasks_and_git_history(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             workspace = Path(tmpdir) / "workspace"
             workspace.mkdir()
             repo_path = workspace / "sample-repo"
             repo_path.mkdir()
+            vault_path = workspace / "engineering-cognition-vault"
+            (vault_path / "10-projects").mkdir(parents=True)
+            (vault_path / "_generated" / "summaries").mkdir(parents=True)
+            (vault_path / "40-findings").mkdir()
+            (vault_path / "50-patterns").mkdir()
             projects_yaml = Path(tmpdir) / "projects.yaml"
             projects_yaml.write_text(
                 """
@@ -58,14 +63,42 @@ projects:
                 encoding="utf-8",
             )
             (repo_path / "docs").mkdir()
-            (repo_path / "docs" / "project_state.md").write_text(
+            (vault_path / "10-projects" / "sample-project.md").write_text(
                 """
-# Project State
-Now: tightening report quality.
-Do not suggest: landing page redesign.
+## Active Capability Profiles
+Report quality and project-aware recommendations.
+
+## Open Findings
+- Needs source freshness diagnostics.
+
+## Context Packet Scopes
+- implementation recommendation quality
 """,
                 encoding="utf-8",
             )
+            (vault_path / "_generated" / "summaries" / "sample-project.catalog.md").write_text(
+                """
+## Canonical Artifacts
+
+| Path | Kind | Title |
+|------|------|-------|
+| `docs/tasks.md` | task_graph | Current Backlog |
+""",
+                encoding="utf-8",
+            )
+            (vault_path / "40-findings" / "open-findings-map.md").write_text(
+                "| Project | Gap |\n|---|---|\n| [[sample-project]] | Needs decision log |\n",
+                encoding="utf-8",
+            )
+            (vault_path / "50-patterns" / "deterministic-before-llm.md").write_text(
+                "# Deterministic Before LLM\n",
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "init"], cwd=vault_path, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=vault_path, check=True)
+            subprocess.run(["git", "config", "user.name", "Test User"], cwd=vault_path, check=True)
+            subprocess.run(["git", "add", "."], cwd=vault_path, check=True)
+            subprocess.run(["git", "commit", "-m", "Seed vault"], cwd=vault_path, check=True, capture_output=True)
             (repo_path / "docs" / "tasks.md").write_text(
                 """
 - [ ] Add source freshness gate
@@ -80,10 +113,17 @@ Do not suggest: landing page redesign.
             subprocess.run(["git", "add", "."], cwd=repo_path, check=True)
             subprocess.run(["git", "commit", "-m", "Ship weekly formatter"], cwd=repo_path, check=True, capture_output=True)
 
-            pack = build_project_memory_pack(projects_yaml_path=projects_yaml, workspace_root=workspace)
+            pack = build_project_memory_pack(
+                projects_yaml_path=projects_yaml,
+                workspace_root=workspace,
+                vault_root=vault_path,
+            )
 
         self.assertIn("sample-project", pack)
-        self.assertIn("Now: tightening report quality", pack)
+        self.assertIn("Vault freshness: no upstream; pull skipped", pack)
+        self.assertIn("Report quality and project-aware recommendations", pack)
+        self.assertIn("Needs source freshness diagnostics", pack)
+        self.assertIn("Current Backlog", pack)
         self.assertIn("Add source freshness gate", pack)
         self.assertIn("Ship weekly message formatter", pack)
         self.assertIn("Ship weekly formatter", pack)

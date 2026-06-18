@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import subprocess
 from pathlib import Path
 from typing import Mapping
@@ -14,26 +15,39 @@ LOGGER = logging.getLogger(__name__)
 PROJECTS_YAML_PATH = PROJECT_ROOT / "src" / "config" / "projects.yaml"
 WORKSPACE_ROOT = PROJECT_ROOT.parent
 MAX_PROJECT_CHARS = 1400
-MAX_MANUAL_STATE_CHARS = 700
+DEFAULT_VAULT_PATHS = (
+    WORKSPACE_ROOT / "engineering-cognition-vault",
+    Path("/srv/codex-entropy/repos/product-3/engineering-cognition-vault"),
+)
 
 
 def build_project_memory_pack(
     *,
     projects_yaml_path: Path = PROJECTS_YAML_PATH,
     workspace_root: Path = WORKSPACE_ROOT,
+    vault_root: Path | None = None,
 ) -> str:
     projects = _load_project_configs(projects_yaml_path)
     if not projects:
         return "Project Memory Pack: no curated projects configured."
 
+    resolved_vault = vault_root or _resolve_vault_root(workspace_root)
+    vault_status = _refresh_vault(resolved_vault)
     blocks = [
         "Project Memory Pack",
         "Use this as current-work context. Do not suggest already shipped, closed, or explicitly blocked work.",
+        f"Engineering Cognition Vault: {resolved_vault if resolved_vault else 'not found'}",
+        f"Vault freshness: {vault_status}",
         "",
     ]
+    if resolved_vault:
+        global_vault_context = _global_vault_context(resolved_vault)
+        if global_vault_context:
+            blocks.append(global_vault_context)
+            blocks.append("")
     missing_local: list[str] = []
     for project in projects:
-        block = _build_project_block(project, workspace_root=workspace_root)
+        block = _build_project_block(project, workspace_root=workspace_root, vault_root=resolved_vault)
         if "Local workspace: missing" in block:
             missing_local.append(str(project.get("name") or project.get("repo") or "unknown"))
         blocks.append(block)
@@ -52,7 +66,7 @@ def _load_project_configs(projects_yaml_path: Path) -> list[dict]:
     return [project for project in data.get("projects", []) if isinstance(project, dict)]
 
 
-def _build_project_block(project: Mapping[str, object], *, workspace_root: Path) -> str:
+def _build_project_block(project: Mapping[str, object], *, workspace_root: Path, vault_root: Path | None) -> str:
     name = str(project.get("name") or "").strip()
     repo = str(project.get("repo") or "").strip()
     focus = _compact(str(project.get("focus") or ""), 220)
@@ -62,18 +76,15 @@ def _build_project_block(project: Mapping[str, object], *, workspace_root: Path)
         f"Repo: {repo or 'not configured'}",
         f"Focus: {focus or 'not specified'}",
     ]
+    vault_lines = _vault_project_lines(vault_root, _project_slug(project))
+    if vault_lines:
+        lines.append("Vault cognition:")
+        lines.extend(f"- {line}" for line in vault_lines)
     if local_path is None:
         lines.append("Local workspace: missing")
         return _limit_block(lines)
 
     lines.append(f"Local workspace: {local_path}")
-    manual_state = _read_manual_project_state(local_path)
-    if manual_state:
-        lines.append("Manual state:")
-        lines.extend(f"- {line}" for line in _compact_lines(manual_state, limit=5, char_limit=MAX_MANUAL_STATE_CHARS))
-    else:
-        lines.append("Manual state: not recorded.")
-
     commits = _git_lines(local_path, ["log", "--since=28 days ago", "--pretty=format:%cs %h %s", "-n", "8"])
     if commits:
         lines.append("Recently shipped / changed:")
@@ -116,18 +127,86 @@ def _resolve_local_repo_path(project: Mapping[str, object], workspace_root: Path
     return None
 
 
-def _read_manual_project_state(repo_path: Path) -> str:
-    for relative in ("docs/project_state.md", "PROJECT_STATE.md", ".codex/project_state.md"):
-        path = repo_path / relative
-        if path.is_file():
-            return path.read_text(encoding="utf-8", errors="ignore")
-    return ""
+def _project_slug(project: Mapping[str, object]) -> str:
+    name = str(project.get("name") or "").strip()
+    repo = str(project.get("repo") or "").strip().split("/")[-1]
+    slug = name or repo
+    return slug.lstrip("-").replace("_", "-").lower()
+
+
+def _resolve_vault_root(workspace_root: Path) -> Path | None:
+    env_path = os.environ.get("COGNITION_VAULT_PATH", "").strip()
+    candidates = [Path(env_path)] if env_path else []
+    candidates.extend(DEFAULT_VAULT_PATHS)
+    candidates.append(workspace_root / "engineering-cognition-vault")
+    for candidate in candidates:
+        if candidate and (candidate / ".git").is_dir():
+            return candidate
+    return None
+
+
+def _refresh_vault(vault_root: Path | None) -> str:
+    if vault_root is None:
+        return "missing; vault context unavailable"
+    status = _git_lines(vault_root, ["status", "--porcelain"])
+    if status:
+        return "dirty; pull skipped to avoid overwriting local vault work"
+    upstream = _git_lines(vault_root, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])
+    if not upstream:
+        return "no upstream; pull skipped"
+    pull = _run_git(vault_root, ["pull", "--ff-only"])
+    if pull.returncode != 0:
+        return _compact(f"pull failed: {pull.stderr or pull.stdout}", 220)
+    head = _git_lines(vault_root, ["rev-parse", "--short", "HEAD"])
+    return f"pulled latest; head={head[0] if head else 'unknown'}"
+
+
+def _global_vault_context(vault_root: Path) -> str:
+    lines = ["## Vault portfolio context"]
+    findings = _matching_lines(vault_root / "40-findings" / "open-findings-map.md", "[[", limit=8)
+    if findings:
+        lines.append("Open cross-project findings:")
+        lines.extend(f"- {line}" for line in findings)
+    patterns = _pattern_titles(vault_root / "50-patterns", limit=8)
+    if patterns:
+        lines.append("Reusable patterns / anti-patterns:")
+        lines.extend(f"- {line}" for line in patterns)
+    return _limit_block(lines) if len(lines) > 1 else ""
+
+
+def _vault_project_lines(vault_root: Path | None, slug: str) -> list[str]:
+    if vault_root is None or not slug:
+        return []
+    project_map = vault_root / "10-projects" / f"{slug}.md"
+    catalog = vault_root / "_generated" / "summaries" / f"{slug}.catalog.md"
+    lines: list[str] = []
+    if project_map.is_file():
+        for heading in ("Active Capability Profiles", "Open Findings", "Context Packet Scopes", "Eval Memory"):
+            section_lines = _markdown_section_lines(project_map, heading, limit=4)
+            if section_lines:
+                lines.append(f"{heading}: {'; '.join(section_lines)}")
+    else:
+        lines.append("project map missing in vault")
+    if catalog.is_file():
+        canonical = _markdown_table_rows(catalog, "Canonical Artifacts", limit=4)
+        if canonical:
+            lines.append(f"Catalog canonical artifacts: {'; '.join(canonical)}")
+    else:
+        lines.append("generated catalog missing in vault")
+    return [_compact(line, 260) for line in lines if line]
 
 
 def _git_lines(repo_path: Path, args: list[str]) -> list[str]:
+    result = _run_git(repo_path, args)
+    if result.returncode != 0:
+        return []
+    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+
+def _run_git(repo_path: Path, args: list[str]) -> subprocess.CompletedProcess[str]:
     try:
-        result = subprocess.run(
-            ["git", "-C", str(repo_path), *args],
+        return subprocess.run(
+            ["git", "-c", f"safe.directory={repo_path}", "-C", str(repo_path), *args],
             check=False,
             capture_output=True,
             text=True,
@@ -135,10 +214,7 @@ def _git_lines(repo_path: Path, args: list[str]) -> list[str]:
         )
     except Exception:
         LOGGER.warning("Failed to read git context for %s", repo_path, exc_info=True)
-        return []
-    if result.returncode != 0:
-        return []
-    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+        return subprocess.CompletedProcess(args=args, returncode=1, stdout="", stderr="")
 
 
 def _task_lines(tasks_path: Path) -> tuple[list[str], list[str]]:
@@ -183,6 +259,70 @@ def _compact_lines(value: str, *, limit: int, char_limit: int) -> list[str]:
         if len(lines) >= limit:
             break
     return lines
+
+
+def _matching_lines(path: Path, pattern: str, *, limit: int) -> list[str]:
+    if not path.is_file():
+        return []
+    lines: list[str] = []
+    for raw_line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+        line = raw_line.strip()
+        if pattern not in line or line.startswith("| Project |") or line.startswith("|---"):
+            continue
+        lines.append(_compact(line.strip("| "), 220))
+        if len(lines) >= limit:
+            break
+    return lines
+
+
+def _pattern_titles(pattern_dir: Path, *, limit: int) -> list[str]:
+    if not pattern_dir.is_dir():
+        return []
+    titles: list[str] = []
+    for path in sorted(pattern_dir.glob("*.md")):
+        title = ""
+        for raw_line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+            line = raw_line.strip()
+            if line.startswith("# "):
+                title = line[2:].strip()
+                break
+        titles.append(title or path.stem.replace("-", " "))
+        if len(titles) >= limit:
+            break
+    return titles
+
+
+def _markdown_section_lines(path: Path, heading: str, *, limit: int) -> list[str]:
+    lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+    in_section = False
+    section_lines: list[str] = []
+    for raw_line in lines:
+        line = raw_line.strip()
+        if line.startswith("## "):
+            in_section = line[3:].strip().lower() == heading.lower()
+            continue
+        if not in_section:
+            continue
+        if not line or line.startswith("|---") or line.startswith("| Project |"):
+            continue
+        if line.startswith("#"):
+            break
+        section_lines.append(_compact(line.strip("-| "), 180))
+        if len(section_lines) >= limit:
+            break
+    return section_lines
+
+
+def _markdown_table_rows(path: Path, heading: str, *, limit: int) -> list[str]:
+    rows = _markdown_section_lines(path, heading, limit=limit + 3)
+    cleaned: list[str] = []
+    for row in rows:
+        if row.startswith("Path | Kind") or row.startswith("------"):
+            continue
+        cleaned.append(row)
+        if len(cleaned) >= limit:
+            break
+    return cleaned
 
 
 def _compact(value: str, limit: int) -> str:
