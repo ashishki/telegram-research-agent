@@ -5,6 +5,7 @@ import sqlite3
 import html
 from datetime import timezone, date, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -17,13 +18,23 @@ from llm.client import complete
 from output.context_memory import load_project_context, refresh_all_project_context_snapshots
 from output.insight_triage import parse_insights_html, render_triaged_insights_html, triage_insights
 from output.report_utils import _extract_markdown_section
-from output.weekly_messages import build_implementation_message, write_weekly_message
+from output.weekly_messages import (
+    build_implementation_message,
+    build_project_freshness_blocked_message,
+    write_weekly_message,
+)
+
+try:
+    from integrations.github_sync import sync_github_projects
+except Exception:  # pragma: no cover - import must not block offline recommendation tests
+    sync_github_projects = None  # type: ignore[assignment]
 
 
 LOGGER = logging.getLogger(__name__)
 PROMPT_PATH = PROJECT_ROOT / "docs" / "prompts" / "insights.md"
 OUTPUT_DIR = PROJECT_ROOT / "data" / "output" / "recommendations"
 PROJECTS_YAML_PATH = Path(__file__).resolve().parents[1] / "config" / "projects.yaml"
+PROJECT_CONTEXT_MAX_SYNC_AGE_DAYS = 2
 INLINE_URL_RE = re.compile(r"(?<![\"'>])(https?://[^\s<]+)")
 TELEGRAM_URL_RE = re.compile(r"https?://t\.me/[A-Za-z0-9_]+/\d+(?:\?[^\s<]+)?", re.IGNORECASE)
 HTML_TAG_RE = re.compile(r"<[^>]+>")
@@ -87,6 +98,185 @@ def _load_projects_context() -> str:
 def _load_project_names() -> list[str]:
     data = yaml.safe_load(PROJECTS_YAML_PATH.read_text(encoding="utf-8"))
     return [str(p.get("name", "")).strip() for p in data.get("projects", []) if p.get("name")]
+
+
+def _load_project_repos() -> list[str]:
+    data = yaml.safe_load(PROJECTS_YAML_PATH.read_text(encoding="utf-8"))
+    repos: list[str] = []
+    for project in data.get("projects", []):
+        repo = str(project.get("repo") or "").strip()
+        if repo:
+            repos.append(repo)
+    return repos
+
+
+def _parse_iso_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    normalized = value.strip()
+    if not normalized:
+        return None
+    if normalized.endswith("Z"):
+        normalized = f"{normalized[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _maybe_sync_project_context(db_path: str) -> dict[str, Any]:
+    if not os.environ.get("GITHUB_TOKEN"):
+        return {
+            "attempted": False,
+            "repos_synced": 0,
+            "error": "",
+            "reason": "GITHUB_TOKEN is not set",
+        }
+    if sync_github_projects is None:
+        return {
+            "attempted": False,
+            "repos_synced": 0,
+            "error": "",
+            "reason": "GitHub sync integration is unavailable",
+        }
+    try:
+        synced = sync_github_projects(db_path)
+        return {
+            "attempted": True,
+            "repos_synced": len(synced),
+            "error": "",
+            "reason": "",
+        }
+    except Exception as exc:
+        LOGGER.warning("Fresh project context sync failed", exc_info=True)
+        return {
+            "attempted": True,
+            "repos_synced": 0,
+            "error": str(exc),
+            "reason": "GitHub sync raised an exception",
+        }
+
+
+def _load_project_freshness_rows(connection: sqlite3.Connection, repos: list[str]) -> list[dict[str, str]]:
+    if not repos:
+        return []
+    placeholders = ",".join("?" for _ in repos)
+    rows = connection.execute(
+        f"""
+        SELECT
+            projects.name,
+            projects.github_repo,
+            projects.github_synced_at,
+            projects.last_commit_at,
+            project_context_snapshots.source_commit_at,
+            project_context_snapshots.updated_at AS snapshot_updated_at,
+            project_context_snapshots.recent_changes
+        FROM projects
+        LEFT JOIN project_context_snapshots
+          ON project_context_snapshots.project_id = projects.id
+        WHERE projects.github_repo IN ({placeholders})
+           OR projects.name IN ({placeholders})
+        """,
+        repos + repos,
+    ).fetchall()
+    return [
+        {
+            "name": str(row["name"] or ""),
+            "github_repo": str(row["github_repo"] or ""),
+            "github_synced_at": str(row["github_synced_at"] or ""),
+            "last_commit_at": str(row["last_commit_at"] or ""),
+            "source_commit_at": str(row["source_commit_at"] or ""),
+            "snapshot_updated_at": str(row["snapshot_updated_at"] or ""),
+            "recent_changes": str(row["recent_changes"] or ""),
+        }
+        for row in rows
+    ]
+
+
+def _build_project_freshness_report(
+    connection: sqlite3.Connection,
+    *,
+    sync_result: dict[str, Any],
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    current = now or _utc_now()
+    repos = _load_project_repos()
+    try:
+        rows = _load_project_freshness_rows(connection, repos)
+    except sqlite3.Error:
+        LOGGER.warning("Failed to load project freshness rows", exc_info=True)
+        return {
+            "gate_passed": True,
+            "sync_attempted": bool(sync_result.get("attempted")),
+            "repos_synced": int(sync_result.get("repos_synced") or 0),
+            "latest_github_synced_at": "",
+            "blocking_reasons": [],
+            "stale_projects": [],
+            "prompt_context": "Project freshness unavailable; do not infer repo recency.",
+        }
+
+    rows_by_repo = {
+        (row.get("github_repo") or row.get("name") or "").strip(): row
+        for row in rows
+        if (row.get("github_repo") or row.get("name") or "").strip()
+    }
+    missing_repos = [repo for repo in repos if repo not in rows_by_repo]
+    stale_projects: list[str] = []
+    latest_sync_at: datetime | None = None
+    latest_sync_raw = ""
+    blocking_reasons: list[str] = []
+
+    for repo in repos:
+        row = rows_by_repo.get(repo)
+        if row is None:
+            stale_projects.append(repo)
+            continue
+        synced_at_raw = row.get("github_synced_at") or ""
+        synced_at = _parse_iso_datetime(synced_at_raw)
+        if synced_at and (latest_sync_at is None or synced_at > latest_sync_at):
+            latest_sync_at = synced_at
+            latest_sync_raw = synced_at_raw
+        if synced_at is None:
+            stale_projects.append(repo)
+            continue
+        if current - synced_at > timedelta(days=PROJECT_CONTEXT_MAX_SYNC_AGE_DAYS):
+            stale_projects.append(repo)
+
+    if sync_result.get("attempted") and int(sync_result.get("repos_synced") or 0) == 0:
+        blocking_reasons.append("GitHub sync был запущен, но не обновил ни одного репозитория")
+    if sync_result.get("error"):
+        blocking_reasons.append(f"GitHub sync error: {sync_result['error']}")
+    if missing_repos:
+        blocking_reasons.append(f"нет project rows для {len(missing_repos)} curated repos")
+    if stale_projects:
+        blocking_reasons.append(
+            f"{len(stale_projects)} curated repos имеют github_synced_at старше {PROJECT_CONTEXT_MAX_SYNC_AGE_DAYS} дней или пустой sync"
+        )
+
+    gate_passed = not blocking_reasons
+    recent_change_count = sum(1 for row in rows if row.get("recent_changes"))
+    prompt_context = "\n".join(
+        [
+            f"Project freshness gate: {'passed' if gate_passed else 'blocked'}",
+            f"sync_attempted={bool(sync_result.get('attempted'))}",
+            f"repos_synced={int(sync_result.get('repos_synced') or 0)}",
+            f"latest_github_synced_at={latest_sync_raw or 'n/a'}",
+            f"rows_with_recent_changes={recent_change_count}/{len(rows)}",
+            f"blocking_reasons={'; '.join(blocking_reasons) if blocking_reasons else 'none'}",
+        ]
+    )
+    return {
+        "gate_passed": gate_passed,
+        "sync_attempted": bool(sync_result.get("attempted")),
+        "repos_synced": int(sync_result.get("repos_synced") or 0),
+        "latest_github_synced_at": latest_sync_raw,
+        "blocking_reasons": blocking_reasons,
+        "stale_projects": stale_projects,
+        "prompt_context": prompt_context,
+    }
 
 
 def _load_recent_decisions(connection: sqlite3.Connection) -> str:
@@ -629,6 +819,7 @@ def _send_recommendations_to_telegram_owner(
     content_md: str,
     html_path: Path | None,
     force_delivery: bool = False,
+    operator_message: str | None = None,
 ) -> None:
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
     chat_id = os.environ.get("TELEGRAM_OWNER_CHAT_ID", "").strip()
@@ -638,9 +829,8 @@ def _send_recommendations_to_telegram_owner(
     if delivery_state["telegram_sent_at"] and not force_delivery:
         LOGGER.info("Implementation ideas delivery skipped week=%s because it was already sent", week_label)
         return
-    operator_message = build_implementation_message(week_label=week_label, insights_html=content_md)
-    write_weekly_message(week_label, "implementation", operator_message)
-    notification = operator_message
+    notification = operator_message or build_implementation_message(week_label=week_label, insights_html=content_md)
+    write_weekly_message(week_label, "implementation", notification)
     if html_path is not None:
         try:
             html_content = html_path.read_text(encoding="utf-8")
@@ -693,12 +883,48 @@ def run_recommendations(settings: Settings, force_delivery: bool = False) -> dic
             LOGGER.warning("Insights skipped because no digest exists for week=%s", week_label)
             return {"week_label": week_label, "output_path": None, "text": ""}
 
+        sync_result = _maybe_sync_project_context(db_path)
         projects_context = _load_projects_context()
         try:
             project_context_snapshots = _load_project_context_snapshots(connection)
         except Exception:
             LOGGER.warning("Project context snapshot refresh failed; using empty context", exc_info=True)
             project_context_snapshots = "No project context snapshots available yet."
+        freshness_report = _build_project_freshness_report(connection, sync_result=sync_result)
+        if not freshness_report["gate_passed"]:
+            delivery_text = build_project_freshness_blocked_message(
+                week_label=week_label,
+                freshness_report=freshness_report,
+            )
+            write_weekly_message(week_label, "implementation", delivery_text)
+            output_path = _write_insights_file(week_label, delivery_text)
+            html_path = _write_insights_html_file(week_label, delivery_text)
+            _store_recommendations(connection, week_label, delivery_text)
+            connection.commit()
+            try:
+                _send_recommendations_to_telegram_owner(
+                    connection=connection,
+                    week_label=week_label,
+                    content_md=delivery_text,
+                    html_path=html_path,
+                    force_delivery=force_delivery,
+                    operator_message=delivery_text,
+                )
+            except Exception:
+                LOGGER.warning("Failed to send project freshness blocked message week=%s", week_label, exc_info=True)
+            LOGGER.warning(
+                "Insights generation blocked by stale project context week=%s reasons=%s",
+                week_label,
+                freshness_report["blocking_reasons"],
+            )
+            return {
+                "week_label": week_label,
+                "output_path": str(output_path),
+                "text": delivery_text,
+                "html_path": str(html_path),
+                "project_freshness": freshness_report,
+            }
+        project_context_snapshots = f"{freshness_report['prompt_context']}\n\n{project_context_snapshots}"
         completed_study_history = _load_completed_study_history(connection)
         recent_decisions = _load_recent_decisions(connection)
         recent_evidence, evidence_candidates = _load_recent_project_evidence(connection)

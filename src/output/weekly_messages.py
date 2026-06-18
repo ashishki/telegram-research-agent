@@ -112,6 +112,49 @@ def build_implementation_message(*, week_label: str, insights_html: str) -> str:
     return _limit_message("\n".join(lines).strip(), 3200)
 
 
+def build_project_freshness_blocked_message(*, week_label: str, freshness_report: Mapping[str, object]) -> str:
+    reasons = [str(item).strip() for item in freshness_report.get("blocking_reasons", []) if str(item).strip()]
+    stale_projects = [
+        str(item).strip()
+        for item in freshness_report.get("stale_projects", [])
+        if str(item).strip()
+    ][:5]
+    sync_attempted = bool(freshness_report.get("sync_attempted"))
+    repos_synced = _safe_int(freshness_report.get("repos_synced"))
+    latest_sync = str(freshness_report.get("latest_github_synced_at") or "").strip()
+
+    lines = [
+        f"Что улучшить в проектах — {week_label}",
+        "",
+        "Implementation-рекомендации заблокированы: контекст проектов устарел.",
+        "",
+        "Почему это важно: без свежего GitHub-состояния бот может предлагать изменения по старым snapshots, а не по реальному состоянию репозиториев.",
+        "",
+        "Что видно сейчас:",
+    ]
+    if sync_attempted:
+        lines.append(f"- свежая попытка GitHub sync обработала {repos_synced} репозиториев;")
+    else:
+        lines.append("- свежая попытка GitHub sync не выполнялась;")
+    if latest_sync:
+        lines.append(f"- последний сохраненный github_synced_at: {latest_sync};")
+    for reason in reasons[:4]:
+        lines.append(f"- {reason};")
+    if stale_projects:
+        lines.append(f"- stale projects: {', '.join(stale_projects)}.")
+
+    lines.extend(
+        [
+            "",
+            "Что сделать дальше:",
+            "1. Починить GitHub sync/token и добиться ненулевого repos_synced.",
+            "2. Обновить project_context_snapshots из свежего repo-state.",
+            "3. Перегенерировать weekly implementation после прохождения freshness gate.",
+        ]
+    )
+    return _limit_message("\n".join(lines).strip(), 3200)
+
+
 def build_mvp_message(
     *,
     week_label: str,

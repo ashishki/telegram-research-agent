@@ -259,6 +259,113 @@ class TestRunRecommendations(unittest.TestCase):
         stored_text = store_mock.call_args.args[2]
         self.assertEqual(result["text"], stored_text)
 
+    def test_run_recommendations_blocks_llm_when_project_context_is_stale(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "recommendations.sqlite"
+            settings = SimpleNamespace(db_path=str(db_path))
+            week_label = "2026-W25"
+
+            with sqlite3.connect(db_path) as connection:
+                connection.executescript(
+                    """
+                    CREATE TABLE digests (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        week_label TEXT NOT NULL UNIQUE,
+                        generated_at TEXT NOT NULL,
+                        content_md TEXT NOT NULL
+                    );
+                    CREATE TABLE recommendations (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        week_label TEXT NOT NULL UNIQUE,
+                        generated_at TEXT NOT NULL,
+                        content_md TEXT NOT NULL
+                    );
+                    CREATE TABLE projects (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT NOT NULL UNIQUE,
+                        description TEXT,
+                        keywords TEXT,
+                        github_repo TEXT,
+                        last_commit_at TEXT,
+                        github_synced_at TEXT,
+                        active INTEGER DEFAULT 1
+                    );
+                    CREATE TABLE project_context_snapshots (
+                        project_id INTEGER PRIMARY KEY,
+                        project_name TEXT NOT NULL,
+                        github_repo TEXT,
+                        source_commit_at TEXT,
+                        summary TEXT NOT NULL DEFAULT '',
+                        open_questions TEXT NOT NULL DEFAULT '',
+                        recent_changes TEXT NOT NULL DEFAULT '',
+                        context_json TEXT NOT NULL DEFAULT '{}',
+                        updated_at TEXT NOT NULL
+                    );
+                    """
+                )
+                connection.execute(
+                    "INSERT INTO digests (week_label, generated_at, content_md) VALUES (?, ?, ?)",
+                    (week_label, "2026-06-15T00:00:00Z", "digest"),
+                )
+                connection.execute(
+                    """
+                    INSERT INTO projects (id, name, github_repo, last_commit_at, github_synced_at, active)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        1,
+                        "owner/repo",
+                        "owner/repo",
+                        "2026-05-29T00:00:00Z",
+                        "2026-06-08T00:00:00Z",
+                        1,
+                    ),
+                )
+                connection.execute(
+                    """
+                    INSERT INTO project_context_snapshots (
+                        project_id, project_name, github_repo, source_commit_at, summary, recent_changes, updated_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        1,
+                        "owner/repo",
+                        "owner/repo",
+                        "2026-05-29T00:00:00Z",
+                        "Old summary",
+                        "",
+                        "2026-06-18T00:00:00Z",
+                    ),
+                )
+                connection.commit()
+
+            with patch("output.generate_recommendations._compute_week_label", return_value=week_label), \
+                 patch("output.generate_recommendations._load_digest_summary", return_value=("digest", "summary", [])), \
+                 patch("output.generate_recommendations._load_project_repos", return_value=["owner/repo"]), \
+                 patch(
+                     "output.generate_recommendations._maybe_sync_project_context",
+                     return_value={"attempted": True, "repos_synced": 0, "error": "", "reason": ""},
+                 ), \
+                 patch("output.generate_recommendations._load_projects_context", return_value="projects"), \
+                 patch("output.generate_recommendations._load_project_context_snapshots", return_value="snapshot"), \
+                 patch("output.generate_recommendations.complete") as complete_mock, \
+                 patch("output.generate_recommendations._write_insights_file", return_value=Path(tmpdir) / "out.md"), \
+                 patch("output.generate_recommendations._write_insights_html_file", return_value=Path(tmpdir) / "out.html"), \
+                 patch("output.generate_recommendations._send_recommendations_to_telegram_owner"):
+                result = run_recommendations(settings)
+
+            complete_mock.assert_not_called()
+            self.assertIn("контекст проектов устарел", result["text"])
+            self.assertFalse(result["project_freshness"]["gate_passed"])
+            with sqlite3.connect(db_path) as connection:
+                stored = connection.execute(
+                    "SELECT content_md FROM recommendations WHERE week_label = ?",
+                    (week_label,),
+                ).fetchone()
+            self.assertIsNotNone(stored)
+            self.assertIn("Implementation-рекомендации заблокированы", stored[0])
+
     def test_run_recommendations_uses_real_db_without_nested_transaction_error(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "recommendations.sqlite"
