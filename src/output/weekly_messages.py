@@ -133,6 +133,7 @@ def build_mvp_message(
     live_intelligence = live_intelligence or {}
     selected_external = _safe_int(source_mix.get("selected_external_evidence_count"))
     selected_telegram = _safe_int(source_mix.get("selected_telegram_seed_evidence_count"))
+    decision_grade_external = bool(source_mix.get("decision_grade_external"))
     repeated_live = _safe_int(live_intelligence.get("repeated_claim_count"))
 
     lines = [f"MVP {week_label}: {title_text}", ""]
@@ -151,7 +152,8 @@ def build_mvp_message(
     lines.append(
         (
             "Почему: выбранный кандидат имеет "
-            f"{selected_telegram} Telegram seed evidence и {selected_external} decision-grade external evidence."
+            f"{selected_telegram} Telegram seed evidence и {selected_external} external evidence item(s); "
+            f"decision-grade gate: {'passed' if decision_grade_external else 'not passed'}."
         )
     )
     if repeated_live:
