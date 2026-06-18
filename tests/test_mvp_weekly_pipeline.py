@@ -58,10 +58,10 @@ class TestMvpWeeklyPipeline(unittest.TestCase):
             self.assertEqual(telegraph_url, "https://telegra.ph/mvp-weekly")
             mock_publish.assert_called_once()
             notification = mock_text.call_args.kwargs["text"]
-            self.assertIn("MVP 2026-W22: Operator Fit Tool", notification)
-            self.assertIn("Решение: MVP не выбран как build-ready.", notification)
-            self.assertIn("Почему: выбранный кандидат имеет 0 Telegram seed evidence", notification)
-            self.assertIn("Live intelligence: 2 повторяющихся claim-кандидатов.", notification)
+            self.assertIn("MVP-кандидат 2026-W22: Operator Fit Tool", notification)
+            self.assertIn("Решение: пока не строим.", notification)
+            self.assertIn("0 Telegram-сигналов", notification)
+            self.assertIn("Live intelligence: найдено 2 повторяющихся тезисов.", notification)
             self.assertIn("https://telegra.ph/mvp-weekly", notification)
             self.assertEqual(
                 mock_text.call_args.kwargs["reply_markup"]["inline_keyboard"][0][0]["callback_data"],
@@ -104,7 +104,7 @@ class TestMvpWeeklyPipeline(unittest.TestCase):
                             _deliver_result(result)
 
             notification = mock_text.call_args.kwargs["text"]
-            self.assertIn("Решение: MVP не выбран как build-ready.", notification)
+            self.assertIn("Решение: пока не строим.", notification)
             self.assertNotIn("Решение: можно рассматривать", notification)
 
     def test_run_radar_passes_live_intelligence_path(self):

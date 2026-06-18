@@ -27,8 +27,8 @@ class TestWeeklyMessages(unittest.TestCase):
         )
 
         self.assertIn("Бриф недели 2026-W25", message)
-        self.assertIn("Почему важно:", message)
         self.assertIn("Источник: @Redmadnews", message)
+        self.assertNotIn("bucket", message)
         self.assertNotIn("Matches:", message)
         self.assertLess(len(message), 3200)
 
@@ -45,7 +45,7 @@ class TestWeeklyMessages(unittest.TestCase):
 
         message = build_implementation_message(week_label="2026-W25", insights_html=html)
 
-        self.assertIn("Implementation 2026-W25", message)
+        self.assertIn("Что улучшить в проектах — 2026-W25", message)
         self.assertIn("gdev-agent — Добавить eval для guardrail", message)
         self.assertIn("это не новые продукты", message)
         self.assertNotIn("New Product", message)
@@ -64,9 +64,9 @@ class TestWeeklyMessages(unittest.TestCase):
             live_intelligence={"repeated_claim_count": 0},
         )
 
-        self.assertIn("MVP 2026-W25: LLM Guardrail Watchdog", message)
-        self.assertIn("MVP не выбран как build-ready", message)
-        self.assertIn("2 независимых внешних источника", message)
+        self.assertIn("MVP-кандидат 2026-W25: LLM Guardrail Watchdog", message)
+        self.assertIn("Решение: пока не строим.", message)
+        self.assertIn("Два независимых внешних источника", message)
 
 
 if __name__ == "__main__":

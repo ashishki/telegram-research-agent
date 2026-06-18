@@ -54,8 +54,8 @@ def build_brief_message(
         f"Бриф недели {week_label}: {theme}",
         "",
         (
-            f"Просмотрено {total} Telegram-постов. Полезных сигналов: "
-            f"{strong} strong и {watch} watch; шум: {noise}."
+            f"Просмотрено {total} постов. В работу можно брать только конкретные сигналы: "
+            f"{strong} сильных и {watch} на наблюдение; шум: {noise}."
         ),
         "",
     ]
@@ -74,9 +74,6 @@ def build_brief_message(
         lines.append(f"{index}. {title}")
         if body:
             lines.append(body)
-        why = _why_it_matters(post)
-        if why:
-            lines.append(f"Почему важно: {why}")
         source = _source_line(post)
         if source:
             lines.append(source)
@@ -92,7 +89,7 @@ def build_brief_message(
 def build_implementation_message(*, week_label: str, insights_html: str) -> str:
     ideas = _parse_insight_ideas(insights_html)
     implement_ideas = [idea for idea in ideas if idea["kind"].lower() == "implement"][:3]
-    lines = [f"Implementation {week_label}", ""]
+    lines = [f"Что улучшить в проектах — {week_label}", ""]
     if not implement_ideas:
         lines.extend(
             [
@@ -105,8 +102,8 @@ def build_implementation_message(*, week_label: str, insights_html: str) -> str:
     for index, idea in enumerate(implement_ideas, start=1):
         lines.append(f"{index}. {idea['project']} — {idea['title']}")
         if idea["body"]:
-            lines.append(f"Что сделать: {_truncate(idea['body'], 360)}")
-        lines.append("Критерий готовности: один узкий PR или один backlog item с проверяемым результатом.")
+            lines.append(f"Суть: {_compact_sentences(idea['body'], 260)}")
+        lines.append("Действие: оформить один узкий PR или backlog item с проверяемым результатом.")
         if idea["source"]:
             lines.append(f"Источник: {idea['source']}")
         lines.append("")
@@ -127,7 +124,7 @@ def build_mvp_message(
 ) -> str:
     normalized_recommendation = str(recommendation or "").strip().lower()
     normalized_status = str(status or "").strip().lower()
-    title_text = title or "кандидат не выбран"
+    title_text = _human_mvp_title(title or "кандидат не выбран")
     score_text = f", score {score}/100" if score is not None else ""
     source_mix = source_mix or {}
     live_intelligence = live_intelligence or {}
@@ -136,7 +133,7 @@ def build_mvp_message(
     decision_grade_external = bool(source_mix.get("decision_grade_external"))
     repeated_live = _safe_int(live_intelligence.get("repeated_claim_count"))
 
-    lines = [f"MVP {week_label}: {title_text}", ""]
+    lines = [f"MVP-кандидат {week_label}: {title_text}", ""]
     if normalized_recommendation == "existing_project_context":
         lines.append("Решение: это не standalone MVP, а контекст для существующего проекта.")
     elif normalized_recommendation in {
@@ -145,21 +142,20 @@ def build_mvp_message(
         "needs_more_specific_scope",
         "reject",
     } or normalized_status in {"investigate", "reject"}:
-        lines.append("Решение: MVP не выбран как build-ready.")
+        lines.append("Решение: пока не строим.")
     else:
         lines.append(f"Решение: можно рассматривать узкий эксперимент{score_text}.")
 
+    gate_text = "пройден" if decision_grade_external else "не пройден"
     lines.append(
-        (
-            "Почему: выбранный кандидат имеет "
-            f"{selected_telegram} Telegram seed evidence и {selected_external} external evidence item(s); "
-            f"decision-grade gate: {'passed' if decision_grade_external else 'not passed'}."
-        )
+        "Почему: у кандидата "
+        f"{selected_telegram} Telegram-сигналов и {selected_external} внешних подтверждений; "
+        f"decision-grade gate {gate_text}."
     )
     if repeated_live:
-        lines.append(f"Live intelligence: {repeated_live} повторяющихся claim-кандидатов.")
+        lines.append(f"Live intelligence: найдено {repeated_live} повторяющихся тезисов.")
     else:
-        lines.append("Live intelligence: повторяющихся claim-кандидатов пока нет; Pathway-sidecar рано.")
+        lines.append("Live intelligence: повторяющихся тезисов пока нет; Pathway-sidecar рано.")
 
     if normalized_recommendation in {
         "revisit_with_evidence_gap",
@@ -170,10 +166,10 @@ def build_mvp_message(
         lines.extend(
             [
                 "",
-                "Что проверить до сборки:",
-                "1. Найти 2 независимых внешних источника той же боли.",
-                "2. Найти повторяемый search/query/workaround pattern.",
-                "3. Получить хотя бы один сигнал willingness-to-pay или срочности.",
+                "Что нужно до сборки:",
+                "1. Два независимых внешних источника той же боли.",
+                "2. Повторяемый поисковый запрос, workaround или публичная жалоба.",
+                "3. Хотя бы один сигнал срочности или готовности платить.",
             ]
         )
     else:
@@ -239,6 +235,50 @@ def _why_it_matters(post: Mapping[str, object]) -> str:
     if topic and topic.lower() != "unlabeled":
         return f"это усиливает тему `{topic}` и попало в bucket `{bucket or 'watch'}`."
     return f"сигнал попал в bucket `{bucket or 'watch'}` и заслуживает проверки, а не немедленной сборки."
+
+
+def _compact_sentences(value: str, limit: int) -> str:
+    sentences = [
+        sentence.strip()
+        for sentence in re.split(r"(?<=[.!?])\s+", _clean_text(value))
+        if sentence.strip()
+    ]
+    selected: list[str] = []
+    total = 0
+    for sentence in sentences:
+        projected = total + len(sentence) + (1 if selected else 0)
+        if selected and projected > limit:
+            break
+        if not selected and len(sentence) > limit:
+            return _truncate_at_word(sentence, limit)
+        selected.append(sentence)
+        total = projected
+    return " ".join(selected) if selected else _truncate_at_word(value, limit)
+
+
+def _truncate_at_word(value: str, limit: int) -> str:
+    value = _clean_text(value)
+    if len(value) <= limit:
+        return value
+    trimmed = value[:limit].rstrip()
+    split_at = trimmed.rfind(" ")
+    if split_at >= max(24, limit // 2):
+        trimmed = trimmed[:split_at].rstrip()
+    return trimmed.rstrip(".,;:")
+
+
+def _human_mvp_title(value: str) -> str:
+    title = _clean_text(value)
+    normalized = title.lower()
+    replacements = {
+        "ai approval agent - workflow automation": "агент согласований для workflow-автоматизации",
+        "workflow automation": "workflow-автоматизация",
+    }
+    if normalized in replacements:
+        return replacements[normalized]
+    title = title.replace("AI ", "AI-")
+    title = title.replace(" - Workflow Automation", " для workflow-автоматизации")
+    return title
 
 
 def _source_line(post: Mapping[str, object]) -> str:

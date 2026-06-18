@@ -1178,6 +1178,108 @@ def _render_empty_digest(week_label: str, date_range: str) -> str:
     )
 
 
+def _build_editorial_brief_message(
+    *,
+    week_label: str,
+    posts: list[dict],
+    bucket_counts: dict,
+    top_topics: list[dict],
+    model: str | None,
+) -> str:
+    fallback = build_brief_message(
+        week_label=week_label,
+        posts=posts,
+        bucket_counts=bucket_counts,
+        top_topics=top_topics,
+    )
+    if not posts:
+        return fallback
+
+    ranked_posts = sorted(
+        posts,
+        key=lambda post: (
+            -float(post.get("signal_score") or 0.0),
+            -int(post.get("view_count") or 0),
+        ),
+    )[:8]
+    compact_posts = [
+        {
+            "channel": post.get("channel_username"),
+            "url": post.get("message_url"),
+            "topic": post.get("topic_label"),
+            "score": post.get("signal_score"),
+            "text": _make_editorial_excerpt(post.get("content"), limit=900),
+        }
+        for post in ranked_posts
+    ]
+    system = (
+        "Ты редактор короткого Telegram weekly-поста для основателя, который строит AI-инструменты. "
+        "Пиши как человек: ясный тезис недели, 2-3 сюжета, почему это важно, что делать дальше. "
+        "Не копируй длинные фрагменты постов. Не используй служебные слова bucket, strong, watch, label, score. "
+        "Не обрывай предложения многоточиями. Не пиши markdown-таблицы. Русский язык."
+    )
+    prompt = "\n".join(
+        [
+            f"Неделя: {week_label}",
+            f"Счетчики: {json.dumps(bucket_counts, ensure_ascii=False, sort_keys=True)}",
+            f"Темы: {json.dumps(top_topics, ensure_ascii=False)}",
+            "Посты:",
+            json.dumps(compact_posts, ensure_ascii=False, indent=2),
+            "",
+            "Верни только готовый Telegram-текст в таком формате:",
+            "Бриф недели: [человеческий заголовок-тезис]",
+            "",
+            "[2-3 предложения: что за неделя и главный вывод]",
+            "",
+            "1. [Сюжет]",
+            "[2-3 предложения: что произошло и почему это важно для нас]",
+            "Источник: [channel] | [url]",
+            "",
+            "2. ...",
+            "",
+            "Что делать дальше: [одна конкретная строка]",
+            "",
+            "Ограничение: 1800 символов. Никаких обрезанных предложений.",
+        ]
+    )
+    try:
+        message = complete(prompt=prompt, system=system, category="digest", model=model).strip()
+    except Exception:
+        LOGGER.warning("Editorial weekly brief synthesis failed; using deterministic fallback", exc_info=True)
+        return fallback
+    if not _editorial_brief_is_usable(message):
+        LOGGER.warning("Editorial weekly brief synthesis failed validation; using deterministic fallback")
+        return fallback
+    return message[:2200].strip()
+
+
+def _make_editorial_excerpt(value: str | None, *, limit: int) -> str:
+    compact = " ".join((value or "").split())
+    if len(compact) <= limit:
+        return compact
+    trimmed = compact[:limit].rstrip()
+    split_at = trimmed.rfind(". ")
+    if split_at >= 160:
+        return trimmed[: split_at + 1]
+    split_at = trimmed.rfind(" ")
+    if split_at >= 160:
+        return trimmed[:split_at].rstrip()
+    return trimmed
+
+
+def _editorial_brief_is_usable(message: str) -> bool:
+    text = message.strip()
+    if len(text) < 200:
+        return False
+    forbidden = ("bucket", "strong", "watch", "label", "score")
+    lowered = text.lower()
+    if any(token in lowered for token in forbidden):
+        return False
+    if "…" in text or "..." in text:
+        return False
+    return "Источник:" in text
+
+
 def run_digest(settings: Settings, force_delivery: bool = False) -> DigestResult:
     week_label = _compute_week_label()
     date_range = _format_date_range(week_label)
@@ -1377,11 +1479,12 @@ def run_digest(settings: Settings, force_delivery: bool = False) -> DigestResult
 
         content_md = _append_github_section(content_md, settings)
         output_word_count = _count_words(content_md)
-        operator_message = build_brief_message(
+        operator_message = _build_editorial_brief_message(
             week_label=week_label,
             posts=signal_posts,
             bucket_counts=buckets.get("bucket_counts", {}),
             top_topics=top_topics,
+            model=digest_model,
         )
         write_weekly_message(week_label, "brief", operator_message)
 
