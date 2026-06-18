@@ -2,6 +2,7 @@ import sys
 import types
 import unittest
 import sqlite3
+import subprocess
 import tempfile
 from pathlib import Path
 from types import SimpleNamespace
@@ -36,9 +37,57 @@ from output.generate_recommendations import (  # noqa: E402
     _send_recommendations_to_telegram_owner,
     run_recommendations,
 )
+from output.project_memory_pack import build_project_memory_pack  # noqa: E402
 
 
 class TestGenerateRecommendationsHtml(unittest.TestCase):
+    def test_build_project_memory_pack_reads_local_state_tasks_and_git_history(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workspace = Path(tmpdir) / "workspace"
+            workspace.mkdir()
+            repo_path = workspace / "sample-repo"
+            repo_path.mkdir()
+            projects_yaml = Path(tmpdir) / "projects.yaml"
+            projects_yaml.write_text(
+                """
+projects:
+  - name: sample-project
+    repo: owner/sample-repo
+    focus: current focus area
+""",
+                encoding="utf-8",
+            )
+            (repo_path / "docs").mkdir()
+            (repo_path / "docs" / "project_state.md").write_text(
+                """
+# Project State
+Now: tightening report quality.
+Do not suggest: landing page redesign.
+""",
+                encoding="utf-8",
+            )
+            (repo_path / "docs" / "tasks.md").write_text(
+                """
+- [ ] Add source freshness gate
+- [x] Ship weekly message formatter
+""",
+                encoding="utf-8",
+            )
+            (repo_path / "README.md").write_text("Sample repo\n", encoding="utf-8")
+            subprocess.run(["git", "init"], cwd=repo_path, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo_path, check=True)
+            subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo_path, check=True)
+            subprocess.run(["git", "add", "."], cwd=repo_path, check=True)
+            subprocess.run(["git", "commit", "-m", "Ship weekly formatter"], cwd=repo_path, check=True, capture_output=True)
+
+            pack = build_project_memory_pack(projects_yaml_path=projects_yaml, workspace_root=workspace)
+
+        self.assertIn("sample-project", pack)
+        self.assertIn("Now: tightening report quality", pack)
+        self.assertIn("Add source freshness gate", pack)
+        self.assertIn("Ship weekly message formatter", pack)
+        self.assertIn("Ship weekly formatter", pack)
+
     def test_feedback_card_text_is_compact_without_losing_decision_context(self):
         with sqlite3.connect(":memory:") as connection:
             connection.row_factory = sqlite3.Row
@@ -234,6 +283,7 @@ class TestRunRecommendations(unittest.TestCase):
 
         with patch("output.generate_recommendations._load_digest_summary", return_value=("digest", "summary", [])), \
              patch("output.generate_recommendations._load_projects_context", return_value="projects"), \
+             patch("output.generate_recommendations.build_project_memory_pack", return_value="memory-pack"), \
              patch("output.generate_recommendations._load_project_context_snapshots", side_effect=RuntimeError("boom")), \
              patch("output.generate_recommendations._load_completed_study_history", return_value="study"), \
              patch("output.generate_recommendations._load_recent_decisions", return_value="decisions"), \
@@ -252,6 +302,29 @@ class TestRunRecommendations(unittest.TestCase):
         complete_mock.assert_called_once()
         self.assertEqual("rendered", result["text"])
 
+    def test_run_recommendations_passes_project_memory_pack_to_prompt(self):
+        settings = SimpleNamespace(db_path=":memory:")
+
+        with patch("output.generate_recommendations._load_digest_summary", return_value=("digest", "summary", [])), \
+             patch("output.generate_recommendations._load_projects_context", return_value="projects"), \
+             patch("output.generate_recommendations.build_project_memory_pack", return_value="CURRENT PROJECT INTENT"), \
+             patch("output.generate_recommendations._load_project_context_snapshots", return_value="snapshot"), \
+             patch("output.generate_recommendations._load_completed_study_history", return_value="study"), \
+             patch("output.generate_recommendations._load_recent_decisions", return_value="decisions"), \
+             patch("output.generate_recommendations._load_recent_project_evidence", return_value=("evidence", [])), \
+             patch("output.generate_recommendations._load_prompt_sections", return_value=("system", "{project_memory_pack}")), \
+             patch("output.generate_recommendations.complete", return_value="insights") as complete_mock, \
+             patch("output.generate_recommendations._rewrite_insight_source_urls", return_value="insights"), \
+             patch("output.generate_recommendations.triage_insights", return_value=[]), \
+             patch("output.generate_recommendations.render_triaged_insights_html", return_value="rendered"), \
+             patch("output.generate_recommendations._write_insights_file"), \
+             patch("output.generate_recommendations._write_insights_html_file"), \
+             patch("output.generate_recommendations._store_recommendations"), \
+             patch("output.generate_recommendations._send_recommendations_to_telegram_owner"):
+            run_recommendations(settings)
+
+        self.assertEqual("CURRENT PROJECT INTENT", complete_mock.call_args.kwargs["prompt"])
+
     def test_run_recommendations_stores_insufficient_evidence_note_for_unsupported_ideas(self):
         settings = SimpleNamespace(db_path=":memory:")
         unsupported_html = (
@@ -263,6 +336,7 @@ class TestRunRecommendations(unittest.TestCase):
 
         with patch("output.generate_recommendations._load_digest_summary", return_value=("digest", "summary", [])), \
              patch("output.generate_recommendations._load_projects_context", return_value="projects"), \
+             patch("output.generate_recommendations.build_project_memory_pack", return_value="memory-pack"), \
              patch("output.generate_recommendations._load_project_context_snapshots", return_value="snapshot"), \
              patch("output.generate_recommendations._load_completed_study_history", return_value="study"), \
              patch("output.generate_recommendations._load_recent_decisions", return_value="decisions"), \

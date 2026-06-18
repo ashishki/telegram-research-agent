@@ -17,6 +17,7 @@ from delivery.telegraph import publish_article
 from llm.client import complete
 from output.context_memory import load_project_context, refresh_all_project_context_snapshots
 from output.insight_triage import parse_insights_html, render_triaged_insights_html, triage_insights
+from output.project_memory_pack import build_project_memory_pack
 from output.report_utils import _extract_markdown_section
 from output.weekly_messages import (
     build_implementation_message,
@@ -906,6 +907,11 @@ def run_recommendations(settings: Settings, force_delivery: bool = False) -> dic
         sync_result = _maybe_sync_project_context(db_path)
         projects_context = _load_projects_context()
         try:
+            project_memory_pack = build_project_memory_pack()
+        except Exception:
+            LOGGER.warning("Project memory pack build failed; continuing without local project intent", exc_info=True)
+            project_memory_pack = "Project Memory Pack unavailable."
+        try:
             project_context_snapshots = _load_project_context_snapshots(connection)
         except Exception:
             LOGGER.warning("Project context snapshot refresh failed; using empty context", exc_info=True)
@@ -953,6 +959,7 @@ def run_recommendations(settings: Settings, force_delivery: bool = False) -> dic
             user_template.replace("{week_label}", week_label)
             .replace("{digest_summary}", digest_summary)
             .replace("{projects_context}", projects_context)
+            .replace("{project_memory_pack}", project_memory_pack)
             .replace("{project_context_snapshots}", project_context_snapshots)
             .replace("{completed_study_history}", completed_study_history)
             .replace("{recent_decisions}", recent_decisions)
