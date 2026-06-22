@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import Mapping
 
@@ -140,8 +141,11 @@ def _resolve_vault_root(workspace_root: Path) -> Path | None:
     candidates.extend(DEFAULT_VAULT_PATHS)
     candidates.append(workspace_root / "engineering-cognition-vault")
     for candidate in candidates:
-        if candidate and (candidate / ".git").is_dir():
-            return candidate
+        try:
+            if candidate and (candidate / ".git").is_dir():
+                return candidate
+        except OSError:
+            LOGGER.warning("Skipping inaccessible cognition vault candidate path=%s", candidate)
     return None
 
 
@@ -204,6 +208,11 @@ def _git_lines(repo_path: Path, args: list[str]) -> list[str]:
 
 
 def _run_git(repo_path: Path, args: list[str]) -> subprocess.CompletedProcess[str]:
+    askpass_path = _write_github_askpass()
+    env = os.environ.copy()
+    env["GIT_TERMINAL_PROMPT"] = "0"
+    if askpass_path:
+        env["GIT_ASKPASS"] = str(askpass_path)
     try:
         return subprocess.run(
             ["git", "-c", f"safe.directory={repo_path}", "-C", str(repo_path), *args],
@@ -211,10 +220,34 @@ def _run_git(repo_path: Path, args: list[str]) -> subprocess.CompletedProcess[st
             capture_output=True,
             text=True,
             timeout=8,
+            env=env,
         )
     except Exception:
         LOGGER.warning("Failed to read git context for %s", repo_path, exc_info=True)
         return subprocess.CompletedProcess(args=args, returncode=1, stdout="", stderr="")
+    finally:
+        if askpass_path is not None:
+            try:
+                askpass_path.unlink()
+            except OSError:
+                pass
+
+
+def _write_github_askpass() -> Path | None:
+    if not os.environ.get("GITHUB_TOKEN"):
+        return None
+    handle = tempfile.NamedTemporaryFile("w", delete=False, encoding="utf-8")
+    path = Path(handle.name)
+    with handle:
+        handle.write(
+            "#!/bin/sh\n"
+            "case \"$1\" in\n"
+            "  *Username*) printf '%s\\n' x-access-token ;;\n"
+            "  *) printf '%s\\n' \"$GITHUB_TOKEN\" ;;\n"
+            "esac\n"
+        )
+    path.chmod(0o700)
+    return path
 
 
 def _task_lines(tasks_path: Path) -> tuple[list[str], list[str]]:
