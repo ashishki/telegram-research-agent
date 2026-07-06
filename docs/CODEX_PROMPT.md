@@ -10,7 +10,8 @@ _v3.6 · 2026-07-06 · telegram-research-agent_
   Intelligence Desk. The main weekly artifact should be a human-readable HTML
   intelligence report built from Telegram knowledge atoms and temporal idea
   threads. MVP Radar and project recommendations remain downstream consumers,
-  not the center of the product.
+  not the center of the product. Obsidian is a generated human-facing knowledge
+  vault projection, not the runtime source of truth.
 - Operational incident on 2026-07-06: `telegram-digest.timer` had been inactive
   since 2026-06-22, so weekly Research Brief/Implementation Ideas stopped
   running while ingest and MVP weekly continued. The timer was manually
@@ -81,7 +82,12 @@ _v3.6 · 2026-07-06 · telegram-research-agent_
   editorial memory, and initial Pathway live-source-intelligence task queue is
   implemented. Add the next roadmap item before starting new implementation
   work.
-- VPS cognition vault: `/srv/codex-entropy/repos/product-3/engineering-cognition-vault`; use it as a downstream navigation layer, not as the source of truth.
+- VPS cognition vault:
+  `/srv/codex-entropy/repos/product-3/engineering-cognition-vault`; use it as
+  a downstream navigation layer, not as the source of truth. For AI source
+  intelligence, prefer a dedicated `ai-intelligence-vault` or a clearly scoped
+  generated namespace such as `_generated/ai-intelligence/`. Do not create one
+  note per Telegram post.
 - In this environment, `pytest` may be unavailable; verified fallback is `PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m unittest ...`.
 - Orchestrator-to-Codex execution path: write prompt to file, then `codex exec -s workspace-write < /tmp/prompt.md`
 
@@ -161,7 +167,8 @@ Do not start by prompt-tuning the old Research Brief. The strategic direction is
 
 ```text
 all Telegram posts -> knowledge atoms -> temporal idea threads ->
-weekly AI intelligence HTML report -> personal read/try/build loop
+weekly AI intelligence HTML report -> generated Obsidian vault ->
+personal read/try/build loop
 ```
 
 Reference documents:

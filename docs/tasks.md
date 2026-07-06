@@ -100,8 +100,9 @@ implemented.
 
 The active queue is now the AI Knowledge Intelligence Desk roadmap. The goal is
 to build a durable knowledge base from Telegram posts, extract cheap structured
-knowledge atoms, group them into temporal idea threads, and generate a
-human-readable weekly HTML AI intelligence report. MVP Radar and project
+knowledge atoms, group them into temporal idea threads, generate a
+human-readable weekly HTML AI intelligence report, and project the curated
+knowledge layer into Obsidian for long-lived browsing. MVP Radar and project
 recommendations become downstream consumers.
 
 | ID | Priority | Task | Notes |
@@ -112,6 +113,7 @@ recommendations become downstream consumers.
 | KIR-011 | P1 | Implement cheap batched knowledge extraction CLI | Add `knowledge-extract --weeks N --model cheap`, idempotent/resumable batch processing, JSON validation, and inspection command. |
 | KIR-020 | P2 | Build Idea Thread grouping and momentum layer | Group atoms into evolving ideas, connect sources, compute 7/30/90 day momentum, and mark active/stale/superseded/hype-only statuses. |
 | KIR-030 | P3 | Generate standalone weekly AI Intelligence HTML report | Create the new primary report with Executive Brief, What Changed, Idea Evolution, Tools/Models/Practices, Contradictions, Read Queue, Try This Week, Source Map, and Appendix. |
+| KIR-035 | P3 | Generate Obsidian knowledge vault projection | Add `obsidian-export` that writes deterministic Markdown notes for weekly intelligence, idea threads, tools/models, practices, channels, read queue, and experiments into a dedicated vault or scoped generated namespace. Raw Telegram posts remain in the database; generated notes must have frontmatter, backlinks, source references, stable slugs, and must not overwrite hand-authored notes. |
 | KIR-040 | P4 | Add report feedback and personal learning loop | Capture read/useful/tried/missed/noise feedback and feed it into operator relevance and weekly read/try/build recommendations. |
 | KIR-050 | P5 | Rewire MVP Radar and project recommendations as downstream consumers | Feed MVP/project artifacts from knowledge threads instead of raw weekly scoring and keyword-only project matching. |
 

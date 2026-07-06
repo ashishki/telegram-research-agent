@@ -32,6 +32,7 @@ all Telegram posts
   -> temporal idea graph
   -> frontier-model weekly analysis
   -> human-readable HTML report
+  -> generated Obsidian knowledge vault
   -> personal read/try/build loop
 ```
 
@@ -49,9 +50,12 @@ Telegram channels over time and explains:
 - which posts are worth reading;
 - what the operator should try to develop AI systems engineering skill;
 - how current signals compare with the last 30/90 days of channel history.
+- how the evolving knowledge base can be browsed as a generated Obsidian vault.
 
 The main weekly artifact is a designed HTML report. Telegram should deliver a
-short notification with a link, not be the primary reading surface.
+short notification with a link, not be the primary reading surface. Obsidian can
+be a long-lived navigation surface for threads, weekly notes, tools, practices,
+and learning actions, but not the runtime source of truth.
 
 ## Non-Goals
 
@@ -61,6 +65,9 @@ short notification with a link, not be the primary reading surface.
 - Do not feed thousands of raw posts directly to an expensive frontier model.
 - Do not delete old knowledge just because it is stale; mark it as stale,
   superseded, resolved, or hype-only.
+- Do not make Obsidian or any Markdown vault the primary database.
+- Do not create one permanent note per Telegram post. Keep raw posts in the
+  archive and project curated, grouped knowledge into the vault.
 
 ## Target Architecture
 
@@ -208,7 +215,78 @@ Design requirements:
 - works as a standalone HTML file;
 - Telegram notification contains only a short summary and link.
 
-### 7. Personal Learning Loop
+### 7. Obsidian Knowledge Vault Projection
+
+Obsidian is useful as a human-facing cockpit for the knowledge system, not as
+the ingestion store or runtime coordination layer.
+
+The database remains authoritative for raw posts, knowledge atoms, idea threads,
+feedback, and generation state. The vault is an idempotently generated
+projection that makes the knowledge base easy to browse, review, and connect
+with existing engineering cognition notes.
+
+Recommended default:
+
+- create a separate generated vault, for example `ai-intelligence-vault`, when
+  the goal is high-volume AI-source intelligence;
+- if reusing `engineering-cognition-vault`, write into a clearly scoped
+  generated namespace such as `_generated/ai-intelligence/` or
+  `80-ai-intelligence/`;
+- only promote mature, project-relevant insights back into the hand-authored
+  cognition vault areas.
+
+Do not store every Telegram post as a note. The right granularity is:
+
+- weekly intelligence notes;
+- idea-thread notes;
+- tool/model notes;
+- engineering-practice notes;
+- channel/source profile notes;
+- read queue notes;
+- try/build experiment notes.
+
+Suggested folder layout for a dedicated projection vault:
+
+```text
+ai-intelligence-vault/
+  00-dashboard/
+  10-weekly/
+  20-idea-threads/
+  30-tools-models/
+  40-practices/
+  50-channels/
+  60-read-queue/
+  70-experiments/
+  90-generated/
+```
+
+Every generated note should have stable frontmatter so future runs can update
+it safely:
+
+```yaml
+---
+type: idea_thread
+status: active
+first_seen: 2026-06-01
+last_seen: 2026-07-06
+momentum_7d: 0.72
+channels: [ai_newz, neuraldeep]
+entities: [Claude Code, Codex, MCP]
+source_count: 18
+generated_from: telegram-research-agent
+---
+```
+
+The vault exporter must be deterministic:
+
+- stable slugs for idea threads, tools, practices, channels, and weeks;
+- generated file markers to avoid overwriting hand-authored notes;
+- source links back to Telegram posts and report sections;
+- no raw post dump unless explicitly requested for debugging;
+- validation that generated Markdown has frontmatter, backlinks, and source
+  references.
+
+### 8. Personal Learning Loop
 
 The report must actively develop the operator as an AI systems engineer.
 
@@ -399,6 +477,34 @@ Acceptance:
 - report includes personal learning actions;
 - Telegram notification links to the full report.
 
+### Phase 3.5: Obsidian Projection Layer
+
+Purpose: generate a navigable Obsidian vault from the same knowledge layer as
+the HTML report.
+
+Required work:
+
+- add an `obsidian-export` command that reads idea threads, knowledge atoms,
+  weekly reports, learning actions, and channel profiles;
+- generate Markdown into a configured vault path;
+- use stable slugs and generated-file markers;
+- create weekly, idea-thread, tool/model, practice, channel, read-queue, and
+  experiment notes;
+- optionally link mature project-relevant notes into
+  `engineering-cognition-vault`;
+- validate frontmatter, backlinks, source references, and no accidental raw
+  post dump.
+
+Acceptance:
+
+- exporter can regenerate the same week without duplicating notes;
+- raw Telegram posts remain in the database, not as one-note-per-post vault
+  clutter;
+- generated notes link back to source posts and HTML report sections;
+- hand-authored vault notes are not overwritten;
+- Obsidian output works with a local dedicated vault or a scoped generated
+  namespace inside `engineering-cognition-vault`.
+
 ### Phase 4: Feedback and Evaluation Loop
 
 Purpose: make the system learn from the operator.
@@ -454,8 +560,8 @@ docs/ai_knowledge_intelligence_roadmap.md.
 Start with the first open task in docs/tasks.md. The strategic direction is to
 turn the project into an AI Knowledge Intelligence Desk: all Telegram posts ->
 knowledge atoms -> temporal idea threads -> weekly HTML intelligence report ->
-personal read/try/build loop. MVP Radar and project recommendations are
-downstream consumers, not the main product.
+generated Obsidian vault -> personal read/try/build loop. MVP Radar and project
+recommendations are downstream consumers, not the main product.
 
 Implement end-to-end, add focused tests, update docs only if needed, run
 verification, commit and push. Do not add runtime artifacts from data/output.
