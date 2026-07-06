@@ -112,6 +112,12 @@ Implemented:
   Idea Evolution / Tools-Models-Practices / Contradictions / Read Queue / Try
   This Week / Source Map / Appendix sections, JSON sidecar, local notification
   text, and quality gates that block internal matching traces
+- generated Obsidian knowledge vault projection via `obsidian-export`:
+  deterministic Markdown notes for weekly intelligence, idea threads,
+  tools/models, practices, channels, read queue, and experiments; frontmatter,
+  generated-file markers, source references, HTML report section links,
+  namespace support, idempotent regeneration, and hand-authored note overwrite
+  protection
 - Telegram digest timer was restored on 2026-07-06 after being inactive since
   2026-06-22; 2026-W28 Research Brief and Implementation Ideas were regenerated
   manually. This exposed the next product direction: convert the project from a
@@ -133,7 +139,6 @@ recommendations become downstream consumers.
 
 | ID | Priority | Task | Notes |
 |---|---:|---|---|
-| KIR-035 | P3 | Generate Obsidian knowledge vault projection | Add `obsidian-export` that writes deterministic Markdown notes for weekly intelligence, idea threads, tools/models, practices, channels, read queue, and experiments into a dedicated vault or scoped generated namespace. Raw Telegram posts remain in the database; generated notes must have frontmatter, backlinks, source references, stable slugs, and must not overwrite hand-authored notes. |
 | KIR-040 | P4 | Add report feedback and personal learning loop | Capture read/useful/tried/missed/noise feedback and feed it into operator relevance and weekly read/try/build recommendations. |
 | KIR-050 | P5 | Rewire MVP Radar and project recommendations as downstream consumers | Feed MVP/project artifacts from knowledge threads instead of raw weekly scoring and keyword-only project matching. |
 

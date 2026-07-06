@@ -99,6 +99,11 @@ _v3.6 · 2026-07-06 · telegram-research-agent_
     Intelligence report from compressed Idea Thread / Knowledge Atom context,
     writes a JSON sidecar, includes source map, appendix, read/try actions,
     and blocks internal `Matches:` traces before writing invalid output.
+  - `obsidian-export` projects the same AI Intelligence layer into generated
+    Obsidian Markdown notes for weekly intelligence, idea threads,
+    tools/models, practices, channels, read queue, and experiments with stable
+    slugs, frontmatter, generated markers, source references, HTML report
+    section links, scoped namespace support, and hand-authored note protection.
   - 2026-W24 artifact review showed that internal signal quality improved but
     reader-facing report quality is weak: no first-screen decision brief,
     buried trend summary, visible internal `Matches: ...` traces, contradictions
@@ -185,7 +190,7 @@ Start with the first open KIR task in `docs/tasks.md`.
 Current first task:
 
 ```text
-KIR-035 — Generate Obsidian knowledge vault projection
+KIR-040 — Add report feedback and personal learning loop
 ```
 
 Do not start by prompt-tuning the old Research Brief. The strategic direction is:

@@ -132,6 +132,18 @@ def build_parser() -> argparse.ArgumentParser:
     ai_report_parser.add_argument("--refresh-weeks", type=int, default=12, help="Idea Thread refresh lookback window")
     ai_report_parser.set_defaults(handler=handle_ai_intelligence_report)
 
+    obsidian_parser = subparsers.add_parser(
+        "obsidian-export",
+        help="Export the AI Intelligence knowledge layer into generated Obsidian Markdown notes",
+    )
+    obsidian_parser.add_argument("--week", default=None, help="ISO week label, e.g. 2026-W28 (default: current UTC week)")
+    obsidian_parser.add_argument("--vault-path", default=None, help="Dedicated vault path (default: data/output/ai_intelligence_vault)")
+    obsidian_parser.add_argument("--namespace", default=None, help="Optional scoped namespace inside the vault")
+    obsidian_parser.add_argument("--report-root", default=None, help="Directory containing AI Intelligence HTML reports")
+    obsidian_parser.add_argument("--threads-limit", type=int, default=100)
+    obsidian_parser.add_argument("--atoms-limit", type=int, default=20)
+    obsidian_parser.set_defaults(handler=handle_obsidian_export)
+
     mvp_weekly_parser = subparsers.add_parser(
         "mvp-weekly",
         help="Generate and optionally deliver the weekly MVP artifact through Demand-to-MVP Radar",
@@ -1484,6 +1496,56 @@ def handle_ai_intelligence_report(args: argparse.Namespace) -> int:
         f"source_atoms={summary.source_atom_count} source_channels={summary.source_channel_count} "
         f"actions={summary.action_count} quality_findings={summary.quality_finding_count}\n"
         f"notification={summary.notification_text}\n"
+    )
+    return 0
+
+
+def handle_obsidian_export(args: argparse.Namespace) -> int:
+    from output.obsidian_export import ObsidianExportError, export_obsidian_vault
+
+    settings = load_settings()
+
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+
+        LOGGER.info(
+            "Starting step=obsidian_export week=%s vault=%s namespace=%s",
+            args.week or "current",
+            args.vault_path or "default",
+            args.namespace or "",
+        )
+        summary = export_obsidian_vault(
+            settings,
+            week_label=args.week,
+            vault_path=args.vault_path,
+            namespace=args.namespace,
+            report_root=args.report_root,
+            threads_limit=max(1, args.threads_limit),
+            atoms_limit=max(1, args.atoms_limit),
+        )
+        LOGGER.info(
+            "Finished step=obsidian_export week=%s files=%d vault=%s",
+            summary.week_label,
+            summary.files_written,
+            summary.vault_root,
+        )
+    except ObsidianExportError as exc:
+        LOGGER.exception("Obsidian export failed validation")
+        sys.stdout.write(f"Obsidian export failed: {exc}\n")
+        return 1
+    except Exception as exc:
+        LOGGER.exception("Obsidian export failed")
+        sys.stdout.write(f"Obsidian export failed: {exc}\n")
+        return 1
+
+    sys.stdout.write(
+        f"{summary.vault_root}\n"
+        f"week={summary.week_label} files={summary.files_written} "
+        f"threads={summary.thread_count} source_atoms={summary.source_atom_count} "
+        f"terms={summary.term_note_count} channels={summary.channel_note_count} "
+        f"read_queue={summary.read_queue_note_count} experiments={summary.experiment_note_count}\n"
     )
     return 0
 
