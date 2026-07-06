@@ -17,6 +17,7 @@ from ingestion.incremental_ingest import run_incremental
 from bot.bot import run_bot
 from llm.client import set_usage_db_path
 from output.generate_digest import run_digest
+from output.delivery_health import build_weekly_delivery_health, format_weekly_delivery_health
 from output.generate_insight import OUTPUT_DIR as INSIGHT_OUTPUT_DIR
 from output.generate_insight import generate_insight
 from output.map_project_insights import run_project_mapping
@@ -1032,8 +1033,9 @@ def _config_status_lines() -> list[str]:
 def handle_health_check(_: argparse.Namespace) -> int:
     from output.context_memory import _project_is_curated
 
-    db_path_raw = os.environ.get("AGENT_DB_PATH", "").strip()
+    db_path_raw = os.environ.get("AGENT_DB_PATH", "").strip() or os.environ.get("DB_PATH", "").strip()
     lines: list[str] = []
+    exit_code = 0
 
     if not db_path_raw:
         lines.append("DB_PATH not configured")
@@ -1123,6 +1125,10 @@ def handle_health_check(_: argparse.Namespace) -> int:
                     for row in zero_signal_snapshot_rows
                     if _project_is_curated(str(row["project_name"] or ""), str(row["github_repo"] or ""))
                 )
+                weekly_delivery_health = build_weekly_delivery_health(
+                    connection=connection,
+                    project_root=PROJECT_ROOT,
+                )
         except Exception as exc:
             lines.append(f"db_error: {exc}")
         else:
@@ -1140,6 +1146,9 @@ def handle_health_check(_: argparse.Namespace) -> int:
             lines.append(f"last_ingestion: {last_ingestion}")
             lines.append(f"last_scored: {last_scored}")
             lines.append(f"last_digest: {last_digest}")
+            lines.extend(format_weekly_delivery_health(weekly_delivery_health, relative_to=PROJECT_ROOT))
+            if weekly_delivery_health.failure_reasons:
+                exit_code = 1
             if unscored_count > 0:
                 lines.append(f"WARNING: {unscored_count} posts pending scoring (stuck queue?)")
             if project_relevance_count > 0 and project_matches_present_count == 0:
@@ -1155,7 +1164,7 @@ def handle_health_check(_: argparse.Namespace) -> int:
 
     lines.extend(_config_status_lines())
     sys.stdout.write("\n".join(lines) + "\n")
-    return 0
+    return exit_code
 
 
 def handle_report_preview(_: argparse.Namespace) -> int:

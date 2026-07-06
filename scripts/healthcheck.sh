@@ -16,6 +16,7 @@ fi
 DB_PATH="${AGENT_DB_PATH:-$DEFAULT_DB_PATH}"
 SESSION_PATH="${TELEGRAM_SESSION_PATH:-$DEFAULT_SESSION_PATH}"
 export DB_PATH
+export AGENT_DB_PATH="$DB_PATH"
 export INGESTION_STALE_DAYS
 
 if [[ ! -f "$DB_PATH" ]]; then
@@ -100,6 +101,15 @@ if parsed < datetime.now(timezone.utc) - timedelta(days=int(os.environ["INGESTIO
 
 if [[ -n "$last_ingested_at" ]]; then
   echo "$last_ingested_at" >&2
+fi
+
+health_check_output="$("$PYTHON" "$PROJECT_ROOT/src/main.py" health-check 2>&1)" || {
+  echo "$health_check_output" >&2
+  exit 1
+}
+
+if [[ -n "$health_check_output" ]]; then
+  echo "$health_check_output"
 fi
 
 echo "Healthcheck OK"

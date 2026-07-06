@@ -86,9 +86,11 @@ class TestHealthCheckCli(unittest.TestCase):
                 connection.commit()
 
             with patch.dict(os.environ, {"AGENT_DB_PATH": db_path}, clear=False):
-                with patch.object(sys, "argv", ["main.py", "health-check"]):
-                    with redirect_stdout(stdout):
-                        exit_code = main.main()
+                with patch.object(main, "build_weekly_delivery_health", return_value=types.SimpleNamespace(failure_reasons=())):
+                    with patch.object(main, "format_weekly_delivery_health", return_value=["weekly_delivery: test healthy"]):
+                        with patch.object(sys, "argv", ["main.py", "health-check"]):
+                            with redirect_stdout(stdout):
+                                exit_code = main.main()
         finally:
             os.unlink(db_path)
 
@@ -99,6 +101,7 @@ class TestHealthCheckCli(unittest.TestCase):
         self.assertIn("active_projects:", output)
         self.assertIn("project_matches_present:", output)
         self.assertIn("post_project_links:", output)
+        self.assertIn("weekly_delivery: test healthy", output)
 
     def test_health_check_without_db_path_prints_not_configured(self):
         stdout = io.StringIO()
@@ -129,6 +132,56 @@ class TestHealthCheckCli(unittest.TestCase):
         self.assertIn("projects_yaml_review:", rendered)
         self.assertIn("age_days=", rendered)
         self.assertIn("WARNING: projects.yaml has not changed in over 31 days", rendered)
+
+    def test_health_check_accepts_db_path_fallback(self):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+            db_path = tmp.name
+
+        stdout = io.StringIO()
+        try:
+            with patch.dict(os.environ, {"AGENT_DB_PATH": db_path}, clear=False):
+                run_migrations()
+
+            with patch.dict(os.environ, {"DB_PATH": db_path}, clear=True):
+                with patch.object(main, "build_weekly_delivery_health", return_value=types.SimpleNamespace(failure_reasons=())):
+                    with patch.object(main, "format_weekly_delivery_health", return_value=["weekly_delivery: test healthy"]):
+                        with patch.object(sys, "argv", ["main.py", "health-check"]):
+                            with redirect_stdout(stdout):
+                                exit_code = main.main()
+        finally:
+            os.unlink(db_path)
+
+        output = stdout.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn(f"db_path: {db_path}", output)
+        self.assertNotIn("DB_PATH not configured", output)
+
+    def test_health_check_returns_failure_for_weekly_delivery_failure(self):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+            db_path = tmp.name
+
+        stdout = io.StringIO()
+        try:
+            with patch.dict(os.environ, {"AGENT_DB_PATH": db_path}, clear=False):
+                run_migrations()
+
+            delivery_health = types.SimpleNamespace(failure_reasons=("current_week_digest_missing",))
+            with patch.dict(os.environ, {"AGENT_DB_PATH": db_path}, clear=False):
+                with patch.object(main, "build_weekly_delivery_health", return_value=delivery_health):
+                    with patch.object(
+                        main,
+                        "format_weekly_delivery_health",
+                        return_value=["weekly_delivery_failures: current_week_digest_missing"],
+                    ):
+                        with patch.object(sys, "argv", ["main.py", "health-check"]):
+                            with redirect_stdout(stdout):
+                                exit_code = main.main()
+        finally:
+            os.unlink(db_path)
+
+        output = stdout.getvalue()
+        self.assertEqual(exit_code, 1)
+        self.assertIn("weekly_delivery_failures: current_week_digest_missing", output)
 
 
 if __name__ == "__main__":

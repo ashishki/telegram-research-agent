@@ -15,9 +15,10 @@ _v3.6 · 2026-07-06 · telegram-research-agent_
 - Operational incident on 2026-07-06: `telegram-digest.timer` had been inactive
   since 2026-06-22, so weekly Research Brief/Implementation Ideas stopped
   running while ingest and MVP weekly continued. The timer was manually
-  restarted and 2026-W28 artifacts were regenerated, but the system needs
-  health checks for inactive timers, missing current-week reports, root-owned
-  output files, and SQLite usage-log contention.
+  restarted and 2026-W28 artifacts were regenerated. Weekly delivery health
+  checks now cover inactive timers, missing current-week reports after the
+  scheduled window, and root-owned output files; SQLite usage-log contention
+  remains the next P0 item.
 - Recent shipped changes:
   - Telegram reaction sync imports source-post reactions as tags/feedback.
   - Implementation Ideas now send inline feedback cards and record decisions in `decision_journal`.
@@ -74,6 +75,10 @@ _v3.6 · 2026-07-06 · telegram-research-agent_
     contract: Telegram ingestion writes append-only source events, `live-source-index`
     builds deterministic snapshots, and `mvp-weekly --with-live-source-index`
     passes context-only live intelligence to Demand-to-MVP Radar.
+  - `health-check` now reports weekly delivery status for
+    `telegram-digest.timer`, current-week digest presence after the scheduled
+    Monday window, and root-owned `data/output` files; `scripts/healthcheck.sh`
+    invokes this Python health surface.
   - 2026-W24 artifact review showed that internal signal quality improved but
     reader-facing report quality is weak: no first-screen decision brief,
     buried trend summary, visible internal `Matches: ...` traces, contradictions
@@ -160,7 +165,7 @@ Start with the first open KIR task in `docs/tasks.md`.
 Current first task:
 
 ```text
-KIR-001 — Stabilize weekly report delivery health
+KIR-002 — Make LLM usage recording non-blocking under SQLite contention
 ```
 
 Do not start by prompt-tuning the old Research Brief. The strategic direction is:

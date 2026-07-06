@@ -86,6 +86,10 @@ Implemented:
 - Pathway-ready live source intelligence: append-only source events from
   Telegram ingestion, deterministic live-source snapshots, Radar context-only
   consumption, and optional `mvp-weekly --with-live-source-index` bridge
+- weekly delivery health checks in `health-check`: inactive
+  `telegram-digest.timer`, missing current-week digest after the scheduled
+  Monday window, root-owned `data/output` files, and deployed
+  `scripts/healthcheck.sh` wiring through the Python health surface
 - Telegram digest timer was restored on 2026-07-06 after being inactive since
   2026-06-22; 2026-W28 Research Brief and Implementation Ideas were regenerated
   manually. This exposed the next product direction: convert the project from a
@@ -107,7 +111,6 @@ recommendations become downstream consumers.
 
 | ID | Priority | Task | Notes |
 |---|---:|---|---|
-| KIR-001 | P0 | Stabilize weekly report delivery health | Add health checks for inactive `telegram-digest.timer`, missing current-week digest after the scheduled window, and root-owned `data/output` files. See Phase 0 in `docs/ai_knowledge_intelligence_roadmap.md`. |
 | KIR-002 | P0 | Make LLM usage recording non-blocking under SQLite contention | Current logs show repeated `sqlite3.OperationalError: database is locked` from usage recording during ingest/digest. Usage logging must never slow or destabilize report generation. |
 | KIR-010 | P1 | Add Knowledge Atom schema and migrations | Add extraction batch and `knowledge_atoms` storage with source post IDs/URLs, atom type, entities, confidence, novelty, utility, and staleness fields. |
 | KIR-011 | P1 | Implement cheap batched knowledge extraction CLI | Add `knowledge-extract --weeks N --model cheap`, idempotent/resumable batch processing, JSON validation, and inspection command. |
