@@ -87,6 +87,10 @@ _v3.6 · 2026-07-06 · telegram-research-agent_
     and `knowledge_atoms` migrations plus `db.knowledge_atoms` helpers for
     batch tracking, stable atom keys, source citations, confidence/novelty/
     utility/relevance scores, and staleness status.
+  - `knowledge-extract --weeks N --model cheap` performs bounded batched
+    Knowledge Atom extraction from normalized posts with JSON validation,
+    idempotent completed-batch skips, failed-batch recording, source URL
+    derivation, and `memory inspect-knowledge-atoms`.
   - 2026-W24 artifact review showed that internal signal quality improved but
     reader-facing report quality is weak: no first-screen decision brief,
     buried trend summary, visible internal `Matches: ...` traces, contradictions
@@ -173,7 +177,7 @@ Start with the first open KIR task in `docs/tasks.md`.
 Current first task:
 
 ```text
-KIR-011 — Implement cheap batched knowledge extraction CLI
+KIR-020 — Build Idea Thread grouping and momentum layer
 ```
 
 Do not start by prompt-tuning the old Research Brief. The strategic direction is:

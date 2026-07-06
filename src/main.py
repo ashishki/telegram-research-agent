@@ -101,6 +101,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     live_index_parser.set_defaults(handler=handle_live_source_index)
 
+    knowledge_extract_parser = subparsers.add_parser(
+        "knowledge-extract",
+        help="Extract structured Knowledge Atoms from recent Telegram posts",
+    )
+    knowledge_extract_parser.add_argument("--weeks", type=int, default=1)
+    knowledge_extract_parser.add_argument("--model", default="cheap")
+    knowledge_extract_parser.add_argument("--batch-size", type=int, default=12)
+    knowledge_extract_parser.add_argument("--limit", type=int, default=0, help="Optional per-week post limit")
+    knowledge_extract_parser.add_argument("--force", action="store_true", help="Rerun completed extraction batches")
+    knowledge_extract_parser.set_defaults(handler=handle_knowledge_extract)
+
     mvp_weekly_parser = subparsers.add_parser(
         "mvp-weekly",
         help="Generate and optionally deliver the weekly MVP artifact through Demand-to-MVP Radar",
@@ -269,6 +280,17 @@ def build_parser() -> argparse.ArgumentParser:
     af_parser.add_argument("--feedback", default=None)
     af_parser.add_argument("--limit", type=int, default=20)
     af_parser.set_defaults(handler=handle_memory_inspect_artifact_feedback)
+
+    atoms_parser = memory_sub.add_parser(
+        "inspect-knowledge-atoms",
+        help="Inspect extracted Knowledge Atom batches and atoms",
+    )
+    atoms_parser.add_argument("--week", default=None)
+    atoms_parser.add_argument("--atom-type", default=None)
+    atoms_parser.add_argument("--staleness", default=None)
+    atoms_parser.add_argument("--batch-status", default=None)
+    atoms_parser.add_argument("--limit", type=int, default=20)
+    atoms_parser.set_defaults(handler=handle_memory_inspect_knowledge_atoms)
 
     editorial_parser = memory_sub.add_parser(
         "inspect-editorial-memory",
@@ -1304,6 +1326,46 @@ def handle_insight(args: argparse.Namespace) -> int:
     return 0
 
 
+def handle_knowledge_extract(args: argparse.Namespace) -> int:
+    from output.knowledge_extraction import format_knowledge_extraction_summary, run_knowledge_extraction
+
+    settings = load_settings()
+
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+
+        LOGGER.info(
+            "Starting step=knowledge_extract weeks=%d model=%s batch_size=%d",
+            args.weeks,
+            args.model,
+            args.batch_size,
+        )
+        summary = run_knowledge_extraction(
+            settings,
+            weeks=args.weeks,
+            model=args.model,
+            batch_size=args.batch_size,
+            limit=args.limit if args.limit and args.limit > 0 else None,
+            force=bool(args.force),
+        )
+        LOGGER.info(
+            "Finished step=knowledge_extract posts=%d batches=%d atoms=%d errors=%d",
+            summary.posts_seen,
+            summary.batches_total,
+            summary.atoms_recorded,
+            len(summary.errors),
+        )
+    except Exception as exc:
+        LOGGER.exception("Knowledge extraction failed")
+        sys.stdout.write(f"Knowledge extraction failed: {exc}\n")
+        return 1
+
+    sys.stdout.write(format_knowledge_extraction_summary(summary))
+    return 0 if not summary.errors else 1
+
+
 def handle_tune_suggestions(_: argparse.Namespace) -> int:
     import json
     import yaml
@@ -1614,6 +1676,90 @@ def handle_memory_inspect_artifact_feedback(args: argparse.Namespace) -> int:
         return 0
 
     sys.stdout.write(("\n\n".join(_format_artifact_feedback(row) for row in rows)).rstrip() + "\n")
+    return 0
+
+
+def _format_knowledge_atom(atom: dict) -> str:
+    source_urls = atom.get("source_urls") or []
+    entities = atom.get("entities") or []
+    lines = [
+        f"KnowledgeAtom {atom.get('id')}",
+        (
+            f"  week={atom.get('week_label') or 'n/a'} type={atom.get('atom_type') or 'n/a'} "
+            f"staleness={atom.get('staleness_status') or 'n/a'} confidence={atom.get('confidence') or 0:.2f} "
+            f"novelty={atom.get('novelty_score') or 0:.2f} utility={atom.get('practical_utility_score') or 0:.2f}"
+        ),
+        f"  claim={atom.get('claim') or 'n/a'}",
+        f"  evidence={atom.get('evidence_quote') or 'n/a'}",
+        f"  sources={', '.join(source_urls[:3]) if source_urls else 'n/a'}",
+        f"  entities={', '.join(entities[:8]) if entities else 'n/a'}",
+        f"  atom_key={atom.get('atom_key') or 'n/a'} batch_id={atom.get('extraction_batch_id') or 'n/a'}",
+    ]
+    if atom.get("why_it_matters"):
+        lines.append(f"  why_it_matters={atom['why_it_matters']}")
+    return "\n".join(lines)
+
+
+def handle_memory_inspect_knowledge_atoms(args: argparse.Namespace) -> int:
+    from db.knowledge_atoms import fetch_knowledge_atoms, fetch_knowledge_extraction_batches
+
+    settings = load_settings()
+
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+
+        with sqlite3.connect(settings.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON;")
+            batches = fetch_knowledge_extraction_batches(
+                connection,
+                week_label=args.week,
+                status=args.batch_status,
+                limit=args.limit,
+            )
+            atoms = fetch_knowledge_atoms(
+                connection,
+                week_label=args.week,
+                atom_type=args.atom_type,
+                staleness_status=args.staleness,
+                limit=args.limit,
+            )
+    except Exception as exc:
+        sys.stdout.write(f"Error inspecting Knowledge Atoms: {exc}\n")
+        return 1
+
+    lines = [
+        "Knowledge Atom inspection",
+        "source_of_truth: knowledge_extraction_batches, knowledge_atoms, posts/raw_posts source citations",
+        "refresh_rule: derived rows are created by knowledge-extract; raw Telegram posts remain authoritative",
+        "retrieval_path: week, atom_type, staleness_status, batch status, source post IDs and URLs",
+        (
+            "scope: "
+            f"week={args.week or 'any'} atom_type={args.atom_type or 'any'} "
+            f"staleness={args.staleness or 'any'} batch_status={args.batch_status or 'any'}"
+        ),
+        f"batches ({len(batches)}):",
+    ]
+    if batches:
+        for batch in batches:
+            lines.append(
+                f"  - id={batch['id']} week={batch['week_label']} channel={batch.get('channel_username') or 'all'} "
+                f"status={batch['status']} posts={batch['post_count']} model={batch['model']} "
+                f"started={batch['started_at']} completed={batch.get('completed_at') or 'n/a'}"
+            )
+            if batch.get("error"):
+                lines.append(f"    error={batch['error']}")
+    else:
+        lines.append("  none")
+    lines.append(f"atoms ({len(atoms)}):")
+    if atoms:
+        lines.extend(_format_knowledge_atom(atom) for atom in atoms)
+    else:
+        lines.append("  none")
+
+    sys.stdout.write("\n".join(lines).rstrip() + "\n")
     return 0
 
 
