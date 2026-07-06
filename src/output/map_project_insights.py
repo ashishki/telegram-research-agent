@@ -8,6 +8,7 @@ from typing import Any
 from config.settings import PROJECT_ROOT, Settings
 from llm.client import LLMError, LLMSchemaError, complete_json
 from output.context_memory import _find_project_config, _project_is_curated
+from output.downstream_knowledge import PROJECT_KNOWLEDGE_ATOM_TYPES, load_downstream_knowledge_threads
 from output.report_quality import format_finding_for_log, load_weekly_quality_facts, validate_weekly_artifacts
 from output.report_utils import _extract_markdown_section
 
@@ -111,6 +112,35 @@ def _score_post(row: sqlite3.Row, keywords: list[str]) -> dict[str, Any]:
         "topic_label": "",
         "final_score": final_score,
     }
+
+
+def _project_knowledge_notes(
+    connection: sqlite3.Connection,
+    *,
+    project: sqlite3.Row,
+    keywords: list[str],
+    min_last_seen_at: str,
+) -> list[str]:
+    threads = load_downstream_knowledge_threads(
+        connection,
+        atom_types=PROJECT_KNOWLEDGE_ATOM_TYPES,
+        keywords=keywords,
+        min_last_seen_at=min_last_seen_at,
+        limit=3,
+    )
+    notes = []
+    for thread in threads:
+        atoms = thread.get("atoms") or []
+        first_atom = atoms[0] if atoms else {}
+        claim = str(first_atom.get("claim") or (thread.get("current_claims") or [""])[0])
+        source_urls = thread.get("source_urls") or []
+        source_text = ", ".join(source_urls[:2]) if source_urls else "no source URL"
+        atom_ids = ", ".join(str(atom_id) for atom_id in (thread.get("source_atom_ids") or [])[:5])
+        notes.append(
+            f"Knowledge Thread `{thread.get('slug')}` informs {project['name']}: "
+            f"{claim} Source atoms: {atom_ids or 'none'}. Sources: {source_text}"
+        )
+    return notes
 
 
 def _search_project_posts(
@@ -280,7 +310,7 @@ def _log_project_insights_quality_findings(
 
 
 def run_project_mapping(settings: Settings) -> dict:
-    result = {"projects_processed": 0, "links_created": 0, "output_path": None}
+    result = {"projects_processed": 0, "links_created": 0, "knowledge_thread_links": 0, "output_path": None}
     week_label = _compute_week_label()
     week_start_iso = _start_of_current_iso_week().isoformat().replace("+00:00", "Z")
     project_notes: dict[str, list[str]] = {}
@@ -321,6 +351,16 @@ def run_project_mapping(settings: Settings) -> dict:
                         project["name"],
                     )
                     continue
+
+                knowledge_notes = _project_knowledge_notes(
+                    connection,
+                    project=project,
+                    keywords=keywords,
+                    min_last_seen_at=week_start_iso,
+                )
+                if knowledge_notes:
+                    project_notes.setdefault(project["name"], []).extend(knowledge_notes)
+                    result["knowledge_thread_links"] += len(knowledge_notes)
 
                 matched_rows = _search_project_posts(connection, keywords, week_start_iso)
                 if not matched_rows:
@@ -387,7 +427,9 @@ def run_project_mapping(settings: Settings) -> dict:
                     continue
 
                 if relevant_entries:
-                    project_notes[project["name"]] = [entry["rationale"] for entry in relevant_entries if entry["rationale"]]
+                    project_notes.setdefault(project["name"], []).extend(
+                        entry["rationale"] for entry in relevant_entries if entry["rationale"]
+                    )
 
                 result["links_created"] += inserted_count
                 LOGGER.info(

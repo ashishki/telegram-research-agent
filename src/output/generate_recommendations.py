@@ -16,6 +16,7 @@ from bot.telegram_delivery import send_document, send_text
 from delivery.telegraph import publish_article
 from llm.client import complete
 from output.context_memory import load_project_context, refresh_all_project_context_snapshots
+from output.downstream_knowledge import IMPLEMENTATION_KNOWLEDGE_ATOM_TYPES, evaluate_knowledge_freshness
 from output.insight_triage import parse_insights_html, render_triaged_insights_html, triage_insights
 from output.project_memory_pack import build_project_memory_pack
 from output.report_utils import _extract_markdown_section
@@ -278,6 +279,25 @@ def _build_project_freshness_report(
         "stale_projects": stale_projects,
         "prompt_context": prompt_context,
     }
+
+
+def _build_knowledge_freshness_blocked_message(week_label: str, freshness_report: dict[str, Any]) -> str:
+    reasons = freshness_report.get("blocking_reasons") or ["knowledge context is stale"]
+    lines = [
+        f"Implementation-рекомендации заблокированы — контекст Knowledge Threads устарел ({week_label}).",
+        "",
+        "Почему:",
+    ]
+    lines.extend(f"- {reason}" for reason in reasons)
+    latest = freshness_report.get("latest_last_seen_at") or "n/a"
+    lines.extend(
+        [
+            "",
+            f"latest_knowledge_thread_last_seen_at={latest}",
+            "Действие: запусти `knowledge-extract` и `idea-threads`, затем повтори recommendations.",
+        ]
+    )
+    return "\n".join(lines).rstrip() + "\n"
 
 
 def _load_recent_decisions(connection: sqlite3.Connection) -> str:
@@ -950,10 +970,49 @@ def run_recommendations(settings: Settings, force_delivery: bool = False) -> dic
                 "html_path": str(html_path),
                 "project_freshness": freshness_report,
             }
+        knowledge_freshness = evaluate_knowledge_freshness(
+            connection,
+            week_label=week_label,
+            atom_types=IMPLEMENTATION_KNOWLEDGE_ATOM_TYPES,
+        )
+        if not knowledge_freshness["gate_passed"]:
+            delivery_text = _build_knowledge_freshness_blocked_message(
+                week_label=week_label,
+                freshness_report=knowledge_freshness,
+            )
+            write_weekly_message(week_label, "implementation", delivery_text)
+            output_path = _write_insights_file(week_label, delivery_text)
+            html_path = _write_insights_html_file(week_label, delivery_text)
+            _store_recommendations(connection, week_label, delivery_text)
+            connection.commit()
+            try:
+                _send_recommendations_to_telegram_owner(
+                    connection=connection,
+                    week_label=week_label,
+                    content_md=delivery_text,
+                    html_path=html_path,
+                    force_delivery=force_delivery,
+                    operator_message=delivery_text,
+                )
+            except Exception:
+                LOGGER.warning("Failed to send knowledge freshness blocked message week=%s", week_label, exc_info=True)
+            LOGGER.warning(
+                "Insights generation blocked by stale Knowledge Thread context week=%s reasons=%s",
+                week_label,
+                knowledge_freshness["blocking_reasons"],
+            )
+            return {
+                "week_label": week_label,
+                "output_path": str(output_path),
+                "text": delivery_text,
+                "html_path": str(html_path),
+                "knowledge_freshness": knowledge_freshness,
+            }
         project_context_snapshots = f"{freshness_report['prompt_context']}\n\n{project_context_snapshots}"
         completed_study_history = _load_completed_study_history(connection)
         recent_decisions = _load_recent_decisions(connection)
         recent_evidence, evidence_candidates = _load_recent_project_evidence(connection)
+        knowledge_thread_context = str(knowledge_freshness.get("prompt_context") or "")
         system_prompt, user_template = _load_prompt_sections()
         prompt = (
             user_template.replace("{week_label}", week_label)
@@ -961,6 +1020,7 @@ def run_recommendations(settings: Settings, force_delivery: bool = False) -> dic
             .replace("{projects_context}", projects_context)
             .replace("{project_memory_pack}", project_memory_pack)
             .replace("{project_context_snapshots}", project_context_snapshots)
+            .replace("{knowledge_thread_context}", knowledge_thread_context)
             .replace("{completed_study_history}", completed_study_history)
             .replace("{recent_decisions}", recent_decisions)
             .replace("{recent_evidence}", recent_evidence)

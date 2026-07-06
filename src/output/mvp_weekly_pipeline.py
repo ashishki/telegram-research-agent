@@ -44,6 +44,8 @@ class MvpWeeklyPipelineResult:
     source_counts: dict[str, object] | None = None
     source_errors: dict[str, str] | None = None
     live_intelligence_path: str | None = None
+    knowledge_thread_count: int = 0
+    knowledge_threads: list[dict] | None = None
 
 
 def run_mvp_weekly_pipeline(
@@ -93,6 +95,8 @@ def run_mvp_weekly_pipeline(
         source_counts=_optional_dict(radar_payload.get("source_counts")),
         source_errors=_optional_str_dict(radar_payload.get("source_errors")),
         live_intelligence_path=str(live_path) if live_path is not None else None,
+        knowledge_thread_count=seed_export.knowledge_thread_count,
+        knowledge_threads=seed_export.knowledge_threads or [],
     )
     _write_mvp_operator_message(result)
     if deliver:
@@ -244,6 +248,12 @@ def _write_mvp_operator_message(result: MvpWeeklyPipelineResult) -> str:
         source_mix=result.selected_source_mix or {},
         live_intelligence=live if isinstance(live, dict) else {},
     )
+    if result.knowledge_thread_count:
+        labels = ", ".join(
+            str(item.get("title") or item.get("slug") or "untitled")
+            for item in (result.knowledge_threads or [])[:3]
+        )
+        notification = f"{notification}\nKnowledge Threads в seed-контексте: {labels}"
     write_weekly_message(result.week_label, "mvp", notification)
     return notification
 

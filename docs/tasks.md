@@ -125,6 +125,12 @@ Implemented:
   downranking for thread/atom recommendations, and a quality-gated weekly loop
   with five read targets, two try targets, one experiment, one skill gap, and
   one reflection question
+- downstream MVP Radar and project consumers now read the curated knowledge
+  layer: opportunity seed export emits Knowledge Thread-backed Radar seeds with
+  source atom provenance, MVP weekly surfaces knowledge-thread counts,
+  Implementation Ideas blocks on stale Knowledge Thread context and prompts
+  from engineering/workflow threads, and Project Insights can render
+  project-relevant Knowledge Thread notes without raw keyword-only matches
 - Telegram digest timer was restored on 2026-07-06 after being inactive since
   2026-06-22; 2026-W28 Research Brief and Implementation Ideas were regenerated
   manually. This exposed the next product direction: convert the project from a
@@ -144,9 +150,8 @@ human-readable weekly HTML AI intelligence report, and project the curated
 knowledge layer into Obsidian for long-lived browsing. MVP Radar and project
 recommendations become downstream consumers.
 
-| ID | Priority | Task | Notes |
-|---|---:|---|---|
-| KIR-050 | P5 | Rewire MVP Radar and project recommendations as downstream consumers | Feed MVP/project artifacts from knowledge threads instead of raw weekly scoring and keyword-only project matching. |
+No open KIR tasks remain in this lightweight queue after KIR-050. Add the next
+roadmap item here before starting a new implementation loop.
 
 Implementation details and acceptance criteria for the active queue are in
 `docs/ai_knowledge_intelligence_roadmap.md`. Historical report-quality and Radar

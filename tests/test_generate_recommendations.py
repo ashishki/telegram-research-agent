@@ -4,6 +4,7 @@ import unittest
 import sqlite3
 import subprocess
 import tempfile
+import os
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -37,6 +38,7 @@ from output.generate_recommendations import (  # noqa: E402
     _send_recommendations_to_telegram_owner,
     run_recommendations,
 )
+from db.migrate import run_migrations  # noqa: E402
 from output.project_memory_pack import build_project_memory_pack  # noqa: E402
 
 
@@ -502,6 +504,48 @@ class TestRunRecommendations(unittest.TestCase):
                 ).fetchone()
             self.assertIsNotNone(stored)
             self.assertIn("Implementation-рекомендации заблокированы", stored[0])
+
+    def test_run_recommendations_blocks_llm_when_knowledge_context_is_stale(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "recommendations.sqlite"
+            settings = SimpleNamespace(db_path=str(db_path))
+            week_label = "2026-W28"
+            with patch.dict(os.environ, {"AGENT_DB_PATH": str(db_path)}, clear=False):
+                run_migrations()
+
+            with patch("output.generate_recommendations._compute_week_label", return_value=week_label), \
+                 patch("output.generate_recommendations._load_digest_summary", return_value=("digest", "summary", [])), \
+                 patch(
+                     "output.generate_recommendations._maybe_sync_project_context",
+                     return_value={"attempted": False, "repos_synced": 0, "error": "", "reason": ""},
+                 ), \
+                 patch("output.generate_recommendations._load_projects_context", return_value="projects"), \
+                 patch("output.generate_recommendations.build_project_memory_pack", return_value="memory-pack"), \
+                 patch("output.generate_recommendations._load_project_context_snapshots", return_value="snapshot"), \
+                 patch(
+                     "output.generate_recommendations._build_project_freshness_report",
+                     return_value={
+                         "gate_passed": True,
+                         "prompt_context": "Project freshness gate: passed",
+                         "blocking_reasons": [],
+                     },
+                 ), \
+                 patch("output.generate_recommendations.complete") as complete_mock, \
+                 patch("output.generate_recommendations._write_insights_file", return_value=Path(tmpdir) / "out.md"), \
+                 patch("output.generate_recommendations._write_insights_html_file", return_value=Path(tmpdir) / "out.html"), \
+                 patch("output.generate_recommendations._send_recommendations_to_telegram_owner"):
+                result = run_recommendations(settings)
+
+            complete_mock.assert_not_called()
+            self.assertIn("Knowledge Threads устарел", result["text"])
+            self.assertFalse(result["knowledge_freshness"]["gate_passed"])
+            with sqlite3.connect(db_path) as connection:
+                stored = connection.execute(
+                    "SELECT content_md FROM recommendations WHERE week_label = ?",
+                    (week_label,),
+                ).fetchone()
+            self.assertIsNotNone(stored)
+            self.assertIn("Knowledge Threads устарел", stored[0])
 
     def test_run_recommendations_uses_real_db_without_nested_transaction_error(self):
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -110,6 +110,13 @@ _v3.6 · 2026-07-06 · telegram-research-agent_
     as personalization context, missed-post eval examples, thread/atom
     downranking, and a quality-gated personal learning loop with read/try/
     experiment/skill-gap/reflection slots.
+  - MVP Radar, Implementation Ideas, and Project Insights now consume the
+    curated knowledge layer: Radar seeds can come from market/workflow
+    Knowledge Threads with source atom provenance, MVP weekly reports the
+    knowledge-thread seed context, Implementation Ideas gates stale
+    engineering/workflow threads before calling the LLM, and Project Insights
+    can use project-relevant Knowledge Threads instead of raw keyword-only
+    matches.
   - 2026-W24 artifact review showed that internal signal quality improved but
     reader-facing report quality is weak: no first-screen decision brief,
     buried trend summary, visible internal `Matches: ...` traces, contradictions
@@ -196,7 +203,7 @@ Start with the first open KIR task in `docs/tasks.md`.
 Current first task:
 
 ```text
-KIR-050 — Rewire MVP Radar and project recommendations as downstream consumers
+No open KIR task in docs/tasks.md.
 ```
 
 Do not start by prompt-tuning the old Research Brief. The strategic direction is:

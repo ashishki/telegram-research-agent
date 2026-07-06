@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from config.settings import PROJECT_ROOT, Settings
+from output.downstream_knowledge import MVP_KNOWLEDGE_ATOM_TYPES, load_downstream_knowledge_threads
 
 
 OUTPUT_DIR = PROJECT_ROOT / "data" / "output" / "opportunity_seeds"
@@ -165,6 +166,8 @@ class OpportunitySeedExportResult:
     output_path: str
     seed_count: int
     scanned_count: int
+    knowledge_thread_count: int = 0
+    knowledge_threads: list[dict] | None = None
 
 
 def export_opportunity_seeds(
@@ -184,10 +187,18 @@ def export_opportunity_seeds(
 
     with sqlite3.connect(settings.db_path) as connection:
         connection.row_factory = sqlite3.Row
+        knowledge_threads = load_downstream_knowledge_threads(
+            connection,
+            atom_types=MVP_KNOWLEDGE_ATOM_TYPES,
+            min_last_seen_at=cutoff,
+            limit=max(1, min(limit, 20)),
+        )
         rows = _fetch_recent_posts(connection, cutoff, scan_limit=max(limit * 8, 300))
 
-    seeds = []
+    seeds = [_seed_from_knowledge_thread(thread) for thread in knowledge_threads]
     for row in rows:
+        if len(seeds) >= limit:
+            break
         surfaces = classify_demand_surfaces(str(row["content"] or ""))
         manual_tags = _split_csv(row["manual_tags"])
         bucket = str(row["bucket"] or "")
@@ -211,6 +222,15 @@ def export_opportunity_seeds(
         output_path=str(target_path),
         seed_count=len(seeds),
         scanned_count=len(rows),
+        knowledge_thread_count=len(knowledge_threads),
+        knowledge_threads=[
+            {
+                "slug": thread.get("slug"),
+                "title": thread.get("title"),
+                "source_atom_ids": thread.get("source_atom_ids") or [],
+            }
+            for thread in knowledge_threads
+        ],
     )
 
 
@@ -335,6 +355,67 @@ def _seed_from_row(
         "anti_complexity_note": infer_anti_complexity_note(mvp_shape),
         "private": False,
     }
+
+
+def _seed_from_knowledge_thread(thread: dict) -> dict[str, object]:
+    atoms = thread.get("atoms") or []
+    first_atom = atoms[0] if atoms else {}
+    claim = str(first_atom.get("claim") or (thread.get("current_claims") or [""])[0])
+    summary = str(first_atom.get("summary") or thread.get("summary") or claim)
+    atom_types = list(thread.get("atom_types") or [])
+    surfaces = _demand_surfaces_from_atom_types(atom_types)
+    source_urls = list(thread.get("source_urls") or [])
+    source_url = source_urls[0] if source_urls else ""
+    text = " ".join(part for part in (thread.get("title"), summary, claim) if part)
+    mvp_shape = infer_mvp_shape(text, surfaces)
+    return {
+        "upstream_id": f"knowledge-thread:{thread.get('slug')}",
+        "captured_at": str(thread.get("last_seen_at") or ""),
+        "title": mvp_shape,
+        "text": text,
+        "snippet": _truncate(text, 260),
+        "source_url": source_url,
+        "source_urls": source_urls,
+        "channel_username": ",".join(thread.get("source_channels") or []),
+        "post_id": "",
+        "bucket": "knowledge_thread",
+        "signal_score": None,
+        "user_adjusted_score": None,
+        "manual_tags": [],
+        "project_names": [],
+        "demand_surfaces": surfaces,
+        "demand_signal_type": surfaces[0] if surfaces else "knowledge_thread",
+        "evidence_strength": "knowledge_thread",
+        "pain_statement": infer_pain_statement(claim or summary),
+        "mvp_shape": mvp_shape,
+        "target_user": infer_target_user(text),
+        "verification_needed": infer_verification_needed(surfaces),
+        "anti_complexity_note": infer_anti_complexity_note(mvp_shape),
+        "private": False,
+        "source_kind": "knowledge_thread",
+        "knowledge_thread_slug": thread.get("slug"),
+        "knowledge_thread_title": thread.get("title"),
+        "knowledge_thread_status": thread.get("status"),
+        "knowledge_atom_types": atom_types,
+        "source_atom_ids": thread.get("source_atom_ids") or [],
+    }
+
+
+def _demand_surfaces_from_atom_types(atom_types: list[str]) -> list[str]:
+    surfaces = []
+    if "market_signal" in atom_types:
+        surfaces.append("market_signal")
+    if "workflow_pattern" in atom_types:
+        surfaces.extend(["manual_workaround", "workflow_automation"])
+    if "case_study" in atom_types:
+        surfaces.append("competitor_traction")
+    if "opinion_shift" in atom_types:
+        surfaces.append("repeated_questions")
+    unique = []
+    for surface in surfaces:
+        if surface not in unique:
+            unique.append(surface)
+    return unique or ["knowledge_thread"]
 
 
 def infer_mvp_shape(text: str, surfaces: list[str]) -> str:

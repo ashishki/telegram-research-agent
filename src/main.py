@@ -718,15 +718,17 @@ def handle_export_opportunity_seeds(args: argparse.Namespace) -> int:
             include_channels=tuple(args.include_channel or ()),
         )
         LOGGER.info(
-            "Finished step=export_opportunity_seeds week=%s seeds=%d scanned=%d output=%s",
+            "Finished step=export_opportunity_seeds week=%s seeds=%d scanned=%d knowledge_threads=%d output=%s",
             summary.week_label,
             summary.seed_count,
             summary.scanned_count,
+            summary.knowledge_thread_count,
             summary.output_path,
         )
         sys.stdout.write(
             f"{summary.output_path}\n"
-            f"seeds={summary.seed_count} scanned={summary.scanned_count} week={summary.week_label}\n"
+            f"seeds={summary.seed_count} scanned={summary.scanned_count} "
+            f"knowledge_threads={summary.knowledge_thread_count} week={summary.week_label}\n"
         )
     except Exception:
         LOGGER.exception("Opportunity seed export failed")
@@ -799,6 +801,7 @@ def handle_mvp_weekly(args: argparse.Namespace) -> int:
         sys.stdout.write(
             f"{summary.report_path or ''}\n"
             f"status={summary.radar_status} seeds={summary.seed_count} "
+            f"knowledge_threads={summary.knowledge_thread_count} "
             f"dossier_status={summary.dossier_status or ''} "
             f"title={summary.selected_title or ''}\n"
             f"live_intelligence={summary.live_intelligence_path or ''}\n"
