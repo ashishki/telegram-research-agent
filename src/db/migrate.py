@@ -327,6 +327,67 @@ def run_migrations() -> Path:
         )
         connection.executescript(
             """
+            CREATE TABLE IF NOT EXISTS idea_threads (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL CHECK(length(trim(title)) > 0),
+                slug TEXT NOT NULL UNIQUE CHECK(length(trim(slug)) > 0),
+                summary TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'active'
+                    CHECK(status IN (
+                        'active',
+                        'stale',
+                        'superseded',
+                        'resolved',
+                        'hype_only',
+                        'production_pattern'
+                    )),
+                first_seen_at TEXT NOT NULL,
+                last_seen_at TEXT NOT NULL,
+                momentum_7d REAL NOT NULL DEFAULT 0.0 CHECK(momentum_7d >= 0.0 AND momentum_7d <= 1.0),
+                momentum_30d REAL NOT NULL DEFAULT 0.0 CHECK(momentum_30d >= 0.0 AND momentum_30d <= 1.0),
+                momentum_90d REAL NOT NULL DEFAULT 0.0 CHECK(momentum_90d >= 0.0 AND momentum_90d <= 1.0),
+                atom_count INTEGER NOT NULL DEFAULT 0 CHECK(atom_count >= 0),
+                source_channel_count INTEGER NOT NULL DEFAULT 0 CHECK(source_channel_count >= 0),
+                source_channels_json TEXT NOT NULL DEFAULT '[]'
+                    CHECK(json_valid(source_channels_json) AND json_type(source_channels_json) = 'array'),
+                key_entities_json TEXT NOT NULL DEFAULT '[]'
+                    CHECK(json_valid(key_entities_json) AND json_type(key_entities_json) = 'array'),
+                current_claims_json TEXT NOT NULL DEFAULT '[]'
+                    CHECK(json_valid(current_claims_json) AND json_type(current_claims_json) = 'array'),
+                superseded_claims_json TEXT NOT NULL DEFAULT '[]'
+                    CHECK(json_valid(superseded_claims_json) AND json_type(superseded_claims_json) = 'array'),
+                contradictions_json TEXT NOT NULL DEFAULT '[]'
+                    CHECK(json_valid(contradictions_json) AND json_type(contradictions_json) = 'array'),
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_idea_threads_slug
+                ON idea_threads(slug);
+            CREATE INDEX IF NOT EXISTS idx_idea_threads_status
+                ON idea_threads(status);
+            CREATE INDEX IF NOT EXISTS idx_idea_threads_last_seen
+                ON idea_threads(last_seen_at);
+            CREATE INDEX IF NOT EXISTS idx_idea_threads_momentum_30d
+                ON idea_threads(momentum_30d);
+
+            CREATE TABLE IF NOT EXISTS idea_thread_atoms (
+                thread_id INTEGER NOT NULL,
+                atom_id INTEGER NOT NULL,
+                relation TEXT NOT NULL DEFAULT 'supports'
+                    CHECK(relation IN ('supports', 'contradicts', 'supersedes', 'related')),
+                created_at TEXT NOT NULL,
+                PRIMARY KEY(thread_id, atom_id),
+                FOREIGN KEY(thread_id) REFERENCES idea_threads(id) ON DELETE CASCADE,
+                FOREIGN KEY(atom_id) REFERENCES knowledge_atoms(id) ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS idx_idea_thread_atoms_atom
+                ON idea_thread_atoms(atom_id);
+            CREATE INDEX IF NOT EXISTS idx_idea_thread_atoms_relation
+                ON idea_thread_atoms(relation);
+            """
+        )
+        connection.executescript(
+            """
             CREATE TABLE IF NOT EXISTS study_plans (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 week_label TEXT NOT NULL UNIQUE,

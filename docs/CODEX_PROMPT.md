@@ -91,6 +91,10 @@ _v3.6 · 2026-07-06 · telegram-research-agent_
     Knowledge Atom extraction from normalized posts with JSON validation,
     idempotent completed-batch skips, failed-batch recording, source URL
     derivation, and `memory inspect-knowledge-atoms`.
+  - `idea-threads` refreshes deterministic temporal Idea Threads from
+    Knowledge Atoms with 7/30/90 day momentum, source-channel counts,
+    active/stale/superseded/hype-only status handling, source-atom relations,
+    and `memory inspect-idea-threads` timeline inspection.
   - 2026-W24 artifact review showed that internal signal quality improved but
     reader-facing report quality is weak: no first-screen decision brief,
     buried trend summary, visible internal `Matches: ...` traces, contradictions
@@ -177,7 +181,7 @@ Start with the first open KIR task in `docs/tasks.md`.
 Current first task:
 
 ```text
-KIR-020 — Build Idea Thread grouping and momentum layer
+KIR-030 — Generate standalone weekly AI Intelligence HTML report
 ```
 
 Do not start by prompt-tuning the old Research Brief. The strategic direction is:

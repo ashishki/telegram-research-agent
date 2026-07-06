@@ -101,6 +101,11 @@ Implemented:
   post batches, cheap-model routing, JSON-only validation, idempotent completed
   batch skips, failed-batch recording, source URL derivation, and
   `memory inspect-knowledge-atoms`
+- Idea Thread grouping and momentum layer: `idea_threads` and
+  `idea_thread_atoms` migrations, deterministic Knowledge Atom grouping,
+  7/30/90 day momentum scores, active/stale/superseded/hype-only status
+  handling, source-channel visibility, and `memory inspect-idea-threads`
+  timeline inspection
 - Telegram digest timer was restored on 2026-07-06 after being inactive since
   2026-06-22; 2026-W28 Research Brief and Implementation Ideas were regenerated
   manually. This exposed the next product direction: convert the project from a
@@ -122,7 +127,6 @@ recommendations become downstream consumers.
 
 | ID | Priority | Task | Notes |
 |---|---:|---|---|
-| KIR-020 | P2 | Build Idea Thread grouping and momentum layer | Group atoms into evolving ideas, connect sources, compute 7/30/90 day momentum, and mark active/stale/superseded/hype-only statuses. |
 | KIR-030 | P3 | Generate standalone weekly AI Intelligence HTML report | Create the new primary report with Executive Brief, What Changed, Idea Evolution, Tools/Models/Practices, Contradictions, Read Queue, Try This Week, Source Map, and Appendix. |
 | KIR-035 | P3 | Generate Obsidian knowledge vault projection | Add `obsidian-export` that writes deterministic Markdown notes for weekly intelligence, idea threads, tools/models, practices, channels, read queue, and experiments into a dedicated vault or scoped generated namespace. Raw Telegram posts remain in the database; generated notes must have frontmatter, backlinks, source references, stable slugs, and must not overwrite hand-authored notes. |
 | KIR-040 | P4 | Add report feedback and personal learning loop | Capture read/useful/tried/missed/noise feedback and feed it into operator relevance and weekly read/try/build recommendations. |

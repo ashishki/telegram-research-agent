@@ -112,6 +112,14 @@ def build_parser() -> argparse.ArgumentParser:
     knowledge_extract_parser.add_argument("--force", action="store_true", help="Rerun completed extraction batches")
     knowledge_extract_parser.set_defaults(handler=handle_knowledge_extract)
 
+    idea_threads_parser = subparsers.add_parser(
+        "idea-threads",
+        help="Refresh temporal Idea Threads from persisted Knowledge Atoms",
+    )
+    idea_threads_parser.add_argument("--weeks", type=int, default=12)
+    idea_threads_parser.add_argument("--limit", type=int, default=0, help="Optional atom limit for bounded refreshes")
+    idea_threads_parser.set_defaults(handler=handle_idea_threads)
+
     mvp_weekly_parser = subparsers.add_parser(
         "mvp-weekly",
         help="Generate and optionally deliver the weekly MVP artifact through Demand-to-MVP Radar",
@@ -291,6 +299,16 @@ def build_parser() -> argparse.ArgumentParser:
     atoms_parser.add_argument("--batch-status", default=None)
     atoms_parser.add_argument("--limit", type=int, default=20)
     atoms_parser.set_defaults(handler=handle_memory_inspect_knowledge_atoms)
+
+    threads_parser = memory_sub.add_parser(
+        "inspect-idea-threads",
+        help="Inspect Idea Threads and their source Knowledge Atom timeline",
+    )
+    threads_parser.add_argument("--slug", default=None)
+    threads_parser.add_argument("--status", default=None)
+    threads_parser.add_argument("--limit", type=int, default=10)
+    threads_parser.add_argument("--atoms-limit", type=int, default=8)
+    threads_parser.set_defaults(handler=handle_memory_inspect_idea_threads)
 
     editorial_parser = memory_sub.add_parser(
         "inspect-editorial-memory",
@@ -1366,6 +1384,37 @@ def handle_knowledge_extract(args: argparse.Namespace) -> int:
     return 0 if not summary.errors else 1
 
 
+def handle_idea_threads(args: argparse.Namespace) -> int:
+    from output.idea_threads import format_idea_thread_summary, refresh_idea_threads
+
+    settings = load_settings()
+
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+
+        LOGGER.info("Starting step=idea_threads weeks=%d limit=%d", args.weeks, args.limit)
+        summary = refresh_idea_threads(
+            settings,
+            weeks=max(1, args.weeks),
+            limit=args.limit if args.limit and args.limit > 0 else None,
+        )
+        LOGGER.info(
+            "Finished step=idea_threads atoms=%d threads=%d links=%d",
+            summary.atoms_seen,
+            summary.threads_refreshed,
+            summary.links_refreshed,
+        )
+    except Exception as exc:
+        LOGGER.exception("Idea Thread refresh failed")
+        sys.stdout.write(f"Idea Thread refresh failed: {exc}\n")
+        return 1
+
+    sys.stdout.write(format_idea_thread_summary(summary))
+    return 0
+
+
 def handle_tune_suggestions(_: argparse.Namespace) -> int:
     import json
     import yaml
@@ -1756,6 +1805,95 @@ def handle_memory_inspect_knowledge_atoms(args: argparse.Namespace) -> int:
     lines.append(f"atoms ({len(atoms)}):")
     if atoms:
         lines.extend(_format_knowledge_atom(atom) for atom in atoms)
+    else:
+        lines.append("  none")
+
+    sys.stdout.write("\n".join(lines).rstrip() + "\n")
+    return 0
+
+
+def _format_idea_thread(thread: dict, atoms: list[dict]) -> str:
+    source_channels = thread.get("source_channels") or []
+    key_entities = thread.get("key_entities") or []
+    current_claims = thread.get("current_claims") or []
+    superseded_claims = thread.get("superseded_claims") or []
+    contradictions = thread.get("contradictions") or []
+    lines = [
+        f"IdeaThread {thread.get('id')} {thread.get('slug')}",
+        (
+            f"  status={thread.get('status') or 'n/a'} atom_count={thread.get('atom_count') or 0} "
+            f"channels={thread.get('source_channel_count') or 0} "
+            f"momentum_7d={thread.get('momentum_7d') or 0:.2f} "
+            f"momentum_30d={thread.get('momentum_30d') or 0:.2f} "
+            f"momentum_90d={thread.get('momentum_90d') or 0:.2f}"
+        ),
+        f"  title={thread.get('title') or 'n/a'}",
+        f"  first_seen={thread.get('first_seen_at') or 'n/a'} last_seen={thread.get('last_seen_at') or 'n/a'}",
+        f"  source_channels={', '.join(source_channels[:8]) if source_channels else 'n/a'}",
+        f"  key_entities={', '.join(key_entities[:8]) if key_entities else 'n/a'}",
+        f"  current_claims={'; '.join(current_claims[:3]) if current_claims else 'n/a'}",
+    ]
+    if superseded_claims:
+        lines.append(f"  superseded_claims={'; '.join(superseded_claims[:3])}")
+    if contradictions:
+        lines.append(f"  contradictions={'; '.join(contradictions[:3])}")
+    lines.append(f"  timeline_atoms ({len(atoms)}):")
+    if atoms:
+        for atom in atoms:
+            source_urls = atom.get("source_urls") or []
+            lines.append(
+                f"    - atom={atom.get('id')} relation={atom.get('relation') or 'n/a'} "
+                f"type={atom.get('atom_type') or 'n/a'} staleness={atom.get('staleness_status') or 'n/a'} "
+                f"last_seen={atom.get('last_seen_at') or 'n/a'}"
+            )
+            lines.append(f"      claim={atom.get('claim') or 'n/a'}")
+            lines.append(f"      sources={', '.join(source_urls[:3]) if source_urls else 'n/a'}")
+    else:
+        lines.append("    none")
+    return "\n".join(lines)
+
+
+def handle_memory_inspect_idea_threads(args: argparse.Namespace) -> int:
+    from db.idea_threads import fetch_idea_thread_atoms, fetch_idea_threads
+
+    settings = load_settings()
+
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+
+        with sqlite3.connect(settings.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON;")
+            threads = fetch_idea_threads(
+                connection,
+                slug=args.slug,
+                status=args.status,
+                limit=args.limit,
+            )
+            thread_atoms = {
+                thread["id"]: fetch_idea_thread_atoms(
+                    connection,
+                    thread_id=thread["id"],
+                    limit=args.atoms_limit,
+                )
+                for thread in threads
+            }
+    except Exception as exc:
+        sys.stdout.write(f"Error inspecting Idea Threads: {exc}\n")
+        return 1
+
+    lines = [
+        "Idea Thread inspection",
+        "source_of_truth: idea_threads, idea_thread_atoms, knowledge_atoms",
+        "refresh_rule: derived rows are refreshed by idea-threads; stale status preserves source evidence",
+        "retrieval_path: slug, status, momentum, source Knowledge Atom timeline",
+        f"scope: slug={args.slug or 'any'} status={args.status or 'any'}",
+        f"threads ({len(threads)}):",
+    ]
+    if threads:
+        lines.extend(_format_idea_thread(thread, thread_atoms.get(thread["id"], [])) for thread in threads)
     else:
         lines.append("  none")
 
