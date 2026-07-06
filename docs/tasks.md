@@ -118,6 +118,13 @@ Implemented:
   generated-file markers, source references, HTML report section links,
   namespace support, idempotent regeneration, and hand-authored note overwrite
   protection
+- AI Intelligence report feedback and personal learning loop:
+  `ai_report_feedback_events` persistence, `log-ai-report-feedback`,
+  `memory inspect-ai-report-feedback`, prior-feedback personalization context
+  in the next HTML report, missed-post eval example extraction, feedback-aware
+  downranking for thread/atom recommendations, and a quality-gated weekly loop
+  with five read targets, two try targets, one experiment, one skill gap, and
+  one reflection question
 - Telegram digest timer was restored on 2026-07-06 after being inactive since
   2026-06-22; 2026-W28 Research Brief and Implementation Ideas were regenerated
   manually. This exposed the next product direction: convert the project from a
@@ -139,7 +146,6 @@ recommendations become downstream consumers.
 
 | ID | Priority | Task | Notes |
 |---|---:|---|---|
-| KIR-040 | P4 | Add report feedback and personal learning loop | Capture read/useful/tried/missed/noise feedback and feed it into operator relevance and weekly read/try/build recommendations. |
 | KIR-050 | P5 | Rewire MVP Radar and project recommendations as downstream consumers | Feed MVP/project artifacts from knowledge threads instead of raw weekly scoring and keyword-only project matching. |
 
 Implementation details and acceptance criteria for the active queue are in

@@ -197,6 +197,40 @@ CREATE TABLE IF NOT EXISTS idea_thread_atoms (
     FOREIGN KEY(atom_id) REFERENCES knowledge_atoms(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS ai_report_feedback_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    week_label TEXT NOT NULL CHECK(length(trim(week_label)) > 0),
+    report_path TEXT,
+    feedback_type TEXT NOT NULL
+        CHECK(feedback_type IN (
+            'read',
+            'useful',
+            'tried',
+            'applied_to_project',
+            'too_shallow',
+            'missed_important_post',
+            'wrong_priority',
+            'not_interested',
+            'noise'
+        )),
+    target_type TEXT NOT NULL DEFAULT 'report'
+        CHECK(target_type IN (
+            'report',
+            'report_section',
+            'idea_thread',
+            'knowledge_atom',
+            'source_channel',
+            'read_queue',
+            'experiment',
+            'action'
+        )),
+    target_ref TEXT,
+    source_url TEXT,
+    notes TEXT,
+    created_at TEXT NOT NULL,
+    recorded_by TEXT NOT NULL DEFAULT 'operator'
+);
+
 CREATE TABLE IF NOT EXISTS projects (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,

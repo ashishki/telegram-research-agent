@@ -272,6 +272,56 @@ def build_parser() -> argparse.ArgumentParser:
     artifact_feedback_parser.add_argument("--notes", default=None)
     artifact_feedback_parser.set_defaults(handler=handle_log_artifact_feedback)
 
+    ai_feedback_parser = subparsers.add_parser(
+        "log-ai-report-feedback",
+        help="Record read/try/missed/noise feedback for the AI Intelligence report",
+    )
+    ai_feedback_parser.add_argument("--week", required=True, help="ISO week label, e.g. 2026-W28")
+    ai_feedback_parser.add_argument(
+        "--feedback",
+        required=True,
+        choices=[
+            "read",
+            "useful",
+            "tried",
+            "applied-to-project",
+            "applied_to_project",
+            "too-shallow",
+            "too_shallow",
+            "missed-important-post",
+            "missed_important_post",
+            "wrong-priority",
+            "wrong_priority",
+            "not-interested",
+            "not_interested",
+            "noise",
+        ],
+    )
+    ai_feedback_parser.add_argument(
+        "--target-type",
+        default="report",
+        choices=[
+            "report",
+            "report-section",
+            "report_section",
+            "idea-thread",
+            "idea_thread",
+            "knowledge-atom",
+            "knowledge_atom",
+            "source-channel",
+            "source_channel",
+            "read-queue",
+            "read_queue",
+            "experiment",
+            "action",
+        ],
+    )
+    ai_feedback_parser.add_argument("--target-ref", default=None)
+    ai_feedback_parser.add_argument("--report-path", default=None)
+    ai_feedback_parser.add_argument("--source-url", default=None)
+    ai_feedback_parser.add_argument("--notes", default=None)
+    ai_feedback_parser.set_defaults(handler=handle_log_ai_report_feedback)
+
     memory_parser = subparsers.add_parser(
         "memory",
         help="Inspect memory surfaces (evidence, decisions, snapshots)",
@@ -312,6 +362,18 @@ def build_parser() -> argparse.ArgumentParser:
     af_parser.add_argument("--feedback", default=None)
     af_parser.add_argument("--limit", type=int, default=20)
     af_parser.set_defaults(handler=handle_memory_inspect_artifact_feedback)
+
+    aif_parser = memory_sub.add_parser(
+        "inspect-ai-report-feedback",
+        help="Inspect AI Intelligence report feedback and missed-post eval examples",
+    )
+    aif_parser.add_argument("--week", default=None)
+    aif_parser.add_argument("--feedback", default=None)
+    aif_parser.add_argument("--target-type", default=None)
+    aif_parser.add_argument("--target-ref", default=None)
+    aif_parser.add_argument("--limit", type=int, default=20)
+    aif_parser.add_argument("--eval-examples", action="store_true")
+    aif_parser.set_defaults(handler=handle_memory_inspect_ai_report_feedback)
 
     atoms_parser = memory_sub.add_parser(
         "inspect-knowledge-atoms",
@@ -1769,6 +1831,49 @@ def handle_log_artifact_feedback(args: argparse.Namespace) -> int:
     return 0
 
 
+def handle_log_ai_report_feedback(args: argparse.Namespace) -> int:
+    from db.ai_report_feedback import record_ai_report_feedback
+
+    settings = load_settings()
+
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+
+        with sqlite3.connect(settings.db_path) as connection:
+            connection.execute("PRAGMA foreign_keys = ON;")
+            connection.execute("PRAGMA journal_mode = WAL;")
+            feedback = record_ai_report_feedback(
+                connection,
+                week_label=args.week,
+                feedback_type=args.feedback,
+                target_type=args.target_type,
+                target_ref=args.target_ref,
+                report_path=args.report_path,
+                source_url=args.source_url,
+                notes=args.notes,
+            )
+    except Exception as exc:
+        LOGGER.exception("AI report feedback recording failed")
+        sys.stdout.write(f"Failed to record AI report feedback: {exc}\n")
+        return 1
+
+    lines = [
+        f"Recorded AI report feedback id={feedback['id']} week={feedback['week_label']}",
+        f"feedback={feedback['feedback_type']} target={feedback['target_type']}:{feedback.get('target_ref') or 'report'}",
+        f"recorded_at={feedback['created_at']}",
+    ]
+    if feedback.get("source_url"):
+        lines.append(f"source_url={feedback['source_url']}")
+    if feedback.get("report_path"):
+        lines.append(f"report_path={feedback['report_path']}")
+    if feedback.get("notes"):
+        lines.append(f"notes={feedback['notes']}")
+    sys.stdout.write("\n".join(lines) + "\n")
+    return 0
+
+
 def handle_memory_inspect_evidence(args: argparse.Namespace) -> int:
     from db.retrieval import fetch_evidence_items
 
@@ -1860,6 +1965,91 @@ def handle_memory_inspect_artifact_feedback(args: argparse.Namespace) -> int:
         return 0
 
     sys.stdout.write(("\n\n".join(_format_artifact_feedback(row) for row in rows)).rstrip() + "\n")
+    return 0
+
+
+def _format_ai_report_feedback(row: dict) -> str:
+    lines = [
+        f"AIReportFeedback {row.get('id')}",
+        (
+            f"  week={row.get('week_label') or 'n/a'} feedback={row.get('feedback_type') or 'n/a'} "
+            f"target={row.get('target_type') or 'n/a'}:{row.get('target_ref') or 'report'}"
+        ),
+        f"  report_path={row.get('report_path') or 'n/a'}",
+        f"  source_url={row.get('source_url') or 'n/a'}",
+        f"  recorded_at={row.get('created_at') or 'n/a'} recorded_by={row.get('recorded_by') or 'n/a'}",
+        f"  notes={row.get('notes') or 'n/a'}",
+    ]
+    return "\n".join(lines)
+
+
+def handle_memory_inspect_ai_report_feedback(args: argparse.Namespace) -> int:
+    from db.ai_report_feedback import (
+        fetch_ai_report_feedback,
+        fetch_missed_post_eval_examples,
+        format_ai_report_feedback_summary,
+        summarize_ai_report_feedback,
+    )
+
+    settings = load_settings()
+
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+
+        with sqlite3.connect(settings.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON;")
+            rows = fetch_ai_report_feedback(
+                connection,
+                week_label=args.week,
+                feedback_type=args.feedback,
+                target_type=args.target_type,
+                target_ref=args.target_ref,
+                limit=args.limit,
+            )
+            summary = summarize_ai_report_feedback(
+                connection,
+                week_label=args.week,
+                limit=max(args.limit, 100),
+            )
+            eval_examples = (
+                fetch_missed_post_eval_examples(connection, week_label=args.week, limit=args.limit)
+                if args.eval_examples
+                else []
+            )
+    except Exception as exc:
+        sys.stdout.write(f"Error inspecting AI report feedback: {exc}\n")
+        return 1
+
+    lines = [
+        "AI Report Feedback inspection",
+        "source_of_truth: ai_report_feedback_events",
+        "retrieval_path: week, feedback_type, target_type, target_ref, missed-post eval examples",
+        (
+            f"scope: week={args.week or 'any'} feedback={args.feedback or 'any'} "
+            f"target_type={args.target_type or 'any'} target_ref={args.target_ref or 'any'}"
+        ),
+        f"summary: {format_ai_report_feedback_summary(summary)}",
+        f"events ({len(rows)}):",
+    ]
+    if rows:
+        lines.extend(_format_ai_report_feedback(row) for row in rows)
+    else:
+        lines.append("  none")
+    if args.eval_examples:
+        lines.append(f"missed_post_eval_examples ({len(eval_examples)}):")
+        if eval_examples:
+            for example in eval_examples:
+                lines.append(
+                    f"  - week={example.get('week_label')} source_url={example.get('source_url') or 'n/a'} "
+                    f"target_ref={example.get('target_ref') or 'n/a'} notes={example.get('notes') or 'n/a'}"
+                )
+        else:
+            lines.append("  none")
+
+    sys.stdout.write("\n".join(lines).rstrip() + "\n")
     return 0
 
 

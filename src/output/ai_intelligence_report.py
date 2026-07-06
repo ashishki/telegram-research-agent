@@ -9,6 +9,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from config.settings import PROJECT_ROOT, Settings
+from db.ai_report_feedback import summarize_ai_report_feedback
 from output.report_quality import (
     MATCHES_TRACE_RE,
     ReportQualityFinding,
@@ -29,6 +30,8 @@ REQUIRED_SECTIONS = (
     ("appendix", "Appendix: grouped source posts"),
 )
 READ_QUEUE_TYPES = {"tutorial_resource", "case_study", "research_claim", "benchmark_claim"}
+PERSONAL_READ_TARGET_COUNT = 5
+PERSONAL_TRY_TARGET_COUNT = 2
 
 
 @dataclass(frozen=True)
@@ -233,6 +236,18 @@ def load_ai_intelligence_context(
         "threads": threads,
         "source_channels": _source_channel_counts(threads),
         "compressed_context": _compressed_context(threads),
+        "feedback_context": (
+            summarize_ai_report_feedback(connection, before_week_label=week_label)
+            if _table_exists(connection, "ai_report_feedback_events")
+            else {
+                "event_count": 0,
+                "counts_by_feedback": {},
+                "downranked_thread_slugs": [],
+                "downranked_atom_refs": [],
+                "missed_post_eval_examples": [],
+                "recent_events": [],
+            }
+        ),
     }
 
 
@@ -311,25 +326,152 @@ def _changed_threads(threads: list[dict]) -> list[dict]:
     return [thread for thread in threads if thread.get("changed_this_week")]
 
 
-def _read_queue_atoms(threads: list[dict]) -> list[dict]:
-    candidates = [
-        atom
-        for atom in _all_atoms(threads)
-        if atom.get("atom_type") in READ_QUEUE_TYPES
-    ]
-    candidates.sort(
-        key=lambda atom: (
+def _read_queue_atoms(threads: list[dict], feedback_context: dict | None = None) -> list[dict]:
+    feedback = feedback_context or {}
+    downranked_threads = set(feedback.get("downranked_thread_slugs") or [])
+    downranked_atoms = {str(value) for value in feedback.get("downranked_atom_refs") or []}
+    atoms = []
+    seen = set()
+    for thread in threads:
+        if thread.get("slug") in downranked_threads:
+            continue
+        for atom in thread.get("atoms") or []:
+            atom_id = str(atom.get("id") or "")
+            if atom_id in downranked_atoms or atom_id in seen:
+                continue
+            seen.add(atom_id)
+            atoms.append(atom)
+    preferred = [atom for atom in atoms if atom.get("atom_type") in READ_QUEUE_TYPES]
+    fallback = [atom for atom in atoms if atom.get("atom_type") not in READ_QUEUE_TYPES]
+
+    def score_key(atom: dict) -> tuple[float, float, float, str]:
+        return (
             float(atom.get("practical_utility_score") or 0.0),
             float(atom.get("novelty_score") or 0.0),
             float(atom.get("confidence") or 0.0),
             str(atom.get("last_seen_at") or ""),
-        ),
-        reverse=True,
-    )
-    return candidates[:6]
+        )
+
+    preferred.sort(key=score_key, reverse=True)
+    fallback.sort(key=score_key, reverse=True)
+    candidates = preferred + fallback
+    return candidates[:PERSONAL_READ_TARGET_COUNT]
 
 
-def _learning_actions(threads: list[dict]) -> list[dict]:
+def _primary_source_url(atom: dict) -> str:
+    urls = atom.get("source_urls") or []
+    return str(urls[0]) if urls else ""
+
+
+def _personal_learning_loop(
+    threads: list[dict],
+    actions: list[dict],
+    feedback_context: dict | None = None,
+) -> dict:
+    feedback = feedback_context or {}
+    read_atoms = _read_queue_atoms(threads, feedback)
+    read_items = [
+        {
+            "atom_id": atom.get("id"),
+            "claim": atom.get("claim") or "Untitled source",
+            "summary": atom.get("summary") or atom.get("why_it_matters") or "",
+            "source_url": _primary_source_url(atom),
+        }
+        for atom in read_atoms[:PERSONAL_READ_TARGET_COUNT]
+    ]
+    while len(read_items) < PERSONAL_READ_TARGET_COUNT:
+        slot = len(read_items) + 1
+        read_items.append(
+            {
+                "atom_id": None,
+                "claim": f"Open read slot {slot}",
+                "summary": "Backfill this slot by running Knowledge Atom extraction for the current week.",
+                "source_url": "",
+            }
+        )
+
+    term_candidates: list[dict] = []
+    for label, field in (("Tool", "tools"), ("Workflow", "practices")):
+        for term, count in _term_counts(threads, field):
+            term_candidates.append({"kind": label, "name": term, "count": count})
+    seen_terms = set()
+    try_items = []
+    for item in term_candidates:
+        key = str(item["name"]).lower()
+        if key in seen_terms:
+            continue
+        seen_terms.add(key)
+        try_items.append(
+            {
+                "title": f"{item['kind']}: {item['name']}",
+                "body": f"Try it against one current workflow and note whether it changes speed, quality, or review effort.",
+                "source_count": item["count"],
+            }
+        )
+        if len(try_items) >= PERSONAL_TRY_TARGET_COUNT:
+            break
+    fallback_try = [
+        {
+            "title": "Workflow: source-grounded eval checklist",
+            "body": "Apply the strongest thread claim to a tiny eval checklist before trusting agent output.",
+            "source_count": 0,
+        },
+        {
+            "title": "Workflow: weekly read/try note",
+            "body": "Turn one read item into a short implementation note with source links and a next action.",
+            "source_count": 0,
+        },
+    ]
+    for item in fallback_try:
+        if len(try_items) >= PERSONAL_TRY_TARGET_COUNT:
+            break
+        try_items.append(item)
+
+    first_action = actions[0] if actions else {}
+    missed_examples = feedback.get("missed_post_eval_examples") or []
+    if missed_examples:
+        experiment_title = "Convert one missed post into an eval example"
+        experiment_body = "Use missed-post feedback to add a concrete example to next week's report evaluation checklist."
+    else:
+        action_title = str(first_action.get("title") or "Backfill the knowledge layer")
+        experiment_title = f"30-minute experiment: {action_title.replace('Verify and apply: ', '')}"
+        experiment_body = str(first_action.get("body") or "Run extraction and refresh Idea Threads before the next report.")
+
+    counts = feedback.get("counts_by_feedback") or {}
+    if int(counts.get("too_shallow") or 0) > 0:
+        skill_gap = "Source verification depth: improve evidence checks before adopting a claim."
+    elif int(counts.get("wrong_priority") or 0) > 0:
+        skill_gap = "Priority calibration: connect each trial to an active engineering workflow."
+    elif read_atoms:
+        skill_gap = "Synthesis discipline: turn read items into source-backed engineering notes."
+    else:
+        skill_gap = "Knowledge coverage: extract enough atoms to fill the weekly read queue."
+
+    if int(feedback.get("event_count") or 0) > 0:
+        reflection = "Which feedback signal changed this week's priorities, and should it become a standing scoring rule?"
+    else:
+        reflection = "Which read or try item produced a reusable AI systems engineering pattern?"
+
+    return {
+        "read_items": read_items,
+        "try_items": try_items[:PERSONAL_TRY_TARGET_COUNT],
+        "small_experiment": {"title": experiment_title, "body": experiment_body},
+        "skill_gap": skill_gap,
+        "reflection_question": reflection,
+    }
+
+
+def _learning_actions(threads: list[dict], feedback_context: dict | None = None) -> list[dict]:
+    feedback = feedback_context or {}
+    downranked = set(feedback.get("downranked_thread_slugs") or [])
+    counts = feedback.get("counts_by_feedback") or {}
+    missed_examples = feedback.get("missed_post_eval_examples") or []
+    depth_note = ""
+    if int(counts.get("too_shallow") or 0) > 0:
+        depth_note = " Recent feedback asked for deeper evidence, so verify source quality before applying it."
+    priority_note = ""
+    if int(counts.get("wrong_priority") or 0) > 0:
+        priority_note = " Recent feedback flagged priority drift, so tie the trial to an active workflow."
     actions = []
     ranked = sorted(
         threads,
@@ -341,6 +483,8 @@ def _learning_actions(threads: list[dict]) -> list[dict]:
         reverse=True,
     )
     for thread in ranked:
+        if thread.get("slug") in downranked:
+            continue
         if thread.get("status") in {"hype_only", "resolved"}:
             continue
         title = thread.get("title") or thread.get("slug") or "Untitled thread"
@@ -351,6 +495,7 @@ def _learning_actions(threads: list[dict]) -> list[dict]:
                 "body": (
                     "Pick one source-backed claim from this thread, verify the cited posts, "
                     "and turn it into a 30-minute read/try note."
+                    f"{depth_note}{priority_note}"
                 ),
                 "claim": claims[0] if claims else "",
                 "source_count": len({url for atom in thread.get("atoms") or [] for url in atom.get("source_urls") or []}),
@@ -358,6 +503,20 @@ def _learning_actions(threads: list[dict]) -> list[dict]:
         )
         if len(actions) >= 4:
             break
+    if missed_examples and len(actions) < 4:
+        example = missed_examples[0]
+        source_url = example.get("source_url") or "the missed source"
+        actions.append(
+            {
+                "title": "Convert missed-post feedback into an eval example",
+                "body": (
+                    f"Review {source_url}, decide which report section missed it, "
+                    "and add the pattern to next week's evaluation checklist."
+                ),
+                "claim": example.get("notes") or "",
+                "source_count": 1 if example.get("source_url") else 0,
+            }
+        )
     if not actions:
         actions.append(
             {
@@ -425,6 +584,27 @@ def _source_links(atom: dict, *, limit: int = 3) -> str:
     return " ".join(links)
 
 
+def _render_feedback_context(context: dict) -> str:
+    feedback = context.get("feedback_context") or {}
+    if int(feedback.get("event_count") or 0) <= 0:
+        return ""
+    counts = feedback.get("counts_by_feedback") or {}
+    count_text = ", ".join(f"{name.replace('_', ' ')}={count}" for name, count in sorted(counts.items())) or "none"
+    missed = feedback.get("missed_post_eval_examples") or []
+    missed_text = ""
+    if missed:
+        missed_text = f"<li>Missed-post eval examples available: {_escape(len(missed))}</li>"
+    return (
+        '<div class="feedback-context">'
+        "<h3>Personalization Context</h3>"
+        "<ul>"
+        f"<li>Prior report feedback: {_escape(count_text)}</li>"
+        f"{missed_text}"
+        "</ul>"
+        "</div>"
+    )
+
+
 def _render_executive_brief(context: dict, actions: list[dict]) -> str:
     threads = context["threads"]
     atoms = _all_atoms(threads)
@@ -448,7 +628,7 @@ def _render_executive_brief(context: dict, actions: list[dict]) -> str:
             "<p>No Idea Threads are available yet. Generate Knowledge Atoms, refresh Idea Threads, "
             "then rerun this report.</p>"
         )
-    return '<div class="metrics">' + "".join(cards) + "</div>" + lead
+    return '<div class="metrics">' + "".join(cards) + "</div>" + lead + _render_feedback_context(context)
 
 
 def _render_what_changed(context: dict) -> str:
@@ -543,7 +723,7 @@ def _render_contradictions(context: dict) -> str:
 
 
 def _render_read_queue(context: dict) -> str:
-    atoms = _read_queue_atoms(context["threads"])
+    atoms = _read_queue_atoms(context["threads"], context.get("feedback_context") or {})
     if not atoms:
         return "<p>No tutorial, case-study, benchmark, or research-claim atoms are available yet.</p>"
     items = []
@@ -558,7 +738,62 @@ def _render_read_queue(context: dict) -> str:
     return "".join(items)
 
 
-def _render_try_this_week(actions: list[dict]) -> str:
+def _render_personal_learning_loop(context: dict, actions: list[dict]) -> str:
+    loop = _personal_learning_loop(
+        context["threads"],
+        actions,
+        context.get("feedback_context") or {},
+    )
+    read_items = []
+    for index, item in enumerate(loop["read_items"], start=1):
+        source_link = (
+            _link(item.get("source_url") or "", f"Read {index}")
+            if item.get("source_url")
+            else '<span class="muted">source pending</span>'
+        )
+        read_items.append(
+            '<li class="learning-read-item">'
+            f'<b>{_escape(index)}. {_escape(item.get("claim") or "Untitled source")}</b>'
+            f'<p>{_escape(item.get("summary") or "")}</p>'
+            f'<p class="sources">{source_link}</p>'
+            '</li>'
+        )
+    try_items = []
+    for item in loop["try_items"]:
+        try_items.append(
+            '<li class="learning-try-item">'
+            f'<b>{_escape(item.get("title") or "Try item")}</b>'
+            f'<p>{_escape(item.get("body") or "")}</p>'
+            f'<p class="muted">Source mentions: {_escape(item.get("source_count", 0))}</p>'
+            '</li>'
+        )
+    experiment = loop["small_experiment"]
+    return (
+        '<div class="learning-loop">'
+        "<h3>Personal Learning Loop</h3>"
+        '<div class="learning-grid">'
+        '<div><h4>Five Posts To Read</h4>'
+        f'<ol class="learning-read-list">{"".join(read_items)}</ol></div>'
+        '<div><h4>Two Tools Or Workflows To Try</h4>'
+        f'<ol class="learning-try-list">{"".join(try_items)}</ol></div>'
+        "</div>"
+        '<div class="learning-followups">'
+        '<article class="learning-experiment">'
+        f'<h4>Small Experiment</h4><p><b>{_escape(experiment.get("title") or "")}</b></p>'
+        f'<p>{_escape(experiment.get("body") or "")}</p>'
+        '</article>'
+        '<article class="learning-skill-gap">'
+        f'<h4>Skill Gap</h4><p>{_escape(loop["skill_gap"])}</p>'
+        '</article>'
+        '<article class="learning-reflection">'
+        f'<h4>Reflection Question</h4><p>{_escape(loop["reflection_question"])}</p>'
+        '</article>'
+        '</div>'
+        '</div>'
+    )
+
+
+def _render_try_this_week(context: dict, actions: list[dict]) -> str:
     cards = []
     for action in actions:
         claim = f'<p class="muted">Anchor claim: {_escape(action["claim"])}</p>' if action.get("claim") else ""
@@ -570,7 +805,7 @@ def _render_try_this_week(actions: list[dict]) -> str:
             f'<p class="muted">Source links in action context: {_escape(action.get("source_count", 0))}</p>'
             '</article>'
         )
-    return "".join(cards)
+    return _render_personal_learning_loop(context, actions) + "".join(cards)
 
 
 def _render_source_map(context: dict) -> str:
@@ -615,7 +850,7 @@ def _render_appendix(context: dict) -> str:
 
 def render_ai_intelligence_html(context: dict, *, generated_at: str | None = None) -> tuple[str, list[dict]]:
     week_label = context["week_label"]
-    actions = _learning_actions(context["threads"])
+    actions = _learning_actions(context["threads"], context.get("feedback_context") or {})
     generated = generated_at or _utc_now_iso()
     section_bodies = {
         "executive-brief": _render_executive_brief(context, actions),
@@ -624,7 +859,7 @@ def render_ai_intelligence_html(context: dict, *, generated_at: str | None = Non
         "tools-models-practices": _render_terms(context),
         "contradictions": _render_contradictions(context),
         "read-queue": _render_read_queue(context),
-        "try-this-week": _render_try_this_week(actions),
+        "try-this-week": _render_try_this_week(context, actions),
         "source-map": _render_source_map(context),
         "appendix": _render_appendix(context),
     }
@@ -650,6 +885,7 @@ header {{ max-width:1120px; margin:0 auto; padding:34px 24px 18px; }}
 h1 {{ font-size:34px; line-height:1.16; margin:0 0 10px; letter-spacing:0; }}
 h2 {{ font-size:22px; line-height:1.24; margin:0 0 16px; letter-spacing:0; }}
 h3 {{ font-size:17px; line-height:1.3; margin:0 0 8px; letter-spacing:0; }}
+h4 {{ font-size:14px; line-height:1.3; margin:0 0 8px; letter-spacing:0; text-transform:uppercase; color:var(--muted); }}
 p {{ margin:0 0 12px; }}
 nav {{ display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; }}
 nav a {{ border:1px solid var(--line); background:#fff; border-radius:6px; padding:7px 10px; color:#24313d; font-size:13px; }}
@@ -672,6 +908,12 @@ section {{ background:var(--panel); border:1px solid var(--line); border-radius:
 .sources a {{ display:inline-block; margin-right:8px; }}
 .term-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px; }}
 .term-column {{ border:1px solid var(--line); border-radius:8px; padding:12px; background:#fbfcfd; }}
+.learning-loop {{ border:1px solid #cbd5e1; border-radius:8px; padding:14px; margin:0 0 12px; background:#f8fafc; }}
+.learning-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px; }}
+.learning-read-list, .learning-try-list {{ padding-left:22px; margin:0 0 10px; }}
+.learning-read-item, .learning-try-item {{ margin:0 0 12px; }}
+.learning-followups {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:10px; margin-top:12px; }}
+.learning-experiment, .learning-skill-gap, .learning-reflection {{ border:1px solid var(--line); border-radius:8px; padding:12px; background:#fff; }}
 table {{ width:100%; border-collapse:collapse; }}
 th, td {{ border-bottom:1px solid var(--line); text-align:left; padding:9px 8px; }}
 details {{ border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin:0 0 10px; background:#fbfcfd; }}
@@ -727,6 +969,47 @@ def validate_ai_intelligence_html(html_text: str) -> list[ReportQualityFinding]:
                 line_hint="try-this-week",
             )
         )
+    if 'class="learning-loop"' not in html_text:
+        findings.append(
+            ReportQualityFinding(
+                severity=SEVERITY_CRITICAL,
+                artifact_type="ai_intelligence_report",
+                message="Personal learning loop is missing from Try This Week",
+                line_hint="try-this-week",
+            )
+        )
+    if html_text.count('class="learning-read-item"') < PERSONAL_READ_TARGET_COUNT:
+        findings.append(
+            ReportQualityFinding(
+                severity=SEVERITY_CRITICAL,
+                artifact_type="ai_intelligence_report",
+                message="Personal learning loop must include five read targets",
+                line_hint="try-this-week",
+            )
+        )
+    if html_text.count('class="learning-try-item"') < PERSONAL_TRY_TARGET_COUNT:
+        findings.append(
+            ReportQualityFinding(
+                severity=SEVERITY_CRITICAL,
+                artifact_type="ai_intelligence_report",
+                message="Personal learning loop must include two try targets",
+                line_hint="try-this-week",
+            )
+        )
+    for marker, message in (
+        ('class="learning-experiment"', "Personal learning loop must include a small experiment"),
+        ('class="learning-skill-gap"', "Personal learning loop must include a skill gap"),
+        ('class="learning-reflection"', "Personal learning loop must include a reflection question"),
+    ):
+        if marker not in html_text:
+            findings.append(
+                ReportQualityFinding(
+                    severity=SEVERITY_CRITICAL,
+                    artifact_type="ai_intelligence_report",
+                    message=message,
+                    line_hint="try-this-week",
+                )
+            )
     return findings
 
 
@@ -777,6 +1060,11 @@ def generate_ai_intelligence_report(
             atoms_limit=atoms_limit,
         )
     html_text, actions = render_ai_intelligence_html(context, generated_at=generated_at)
+    personal_learning_loop = _personal_learning_loop(
+        context["threads"],
+        actions,
+        context.get("feedback_context") or {},
+    )
     findings = validate_ai_intelligence_html(html_text)
     critical = [finding for finding in findings if finding.severity == SEVERITY_CRITICAL]
     if critical:
@@ -793,6 +1081,8 @@ def generate_ai_intelligence_report(
         "action_count": len(actions),
         "sections": [title for _section_id, title in REQUIRED_SECTIONS],
         "compressed_context": context.get("compressed_context") or [],
+        "feedback_context": context.get("feedback_context") or {},
+        "personal_learning_loop": personal_learning_loop,
         "quality_findings": [finding.as_dict() for finding in findings],
         "actions": actions,
     }

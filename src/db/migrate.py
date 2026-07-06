@@ -388,6 +388,51 @@ def run_migrations() -> Path:
         )
         connection.executescript(
             """
+            CREATE TABLE IF NOT EXISTS ai_report_feedback_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                week_label TEXT NOT NULL CHECK(length(trim(week_label)) > 0),
+                report_path TEXT,
+                feedback_type TEXT NOT NULL
+                    CHECK(feedback_type IN (
+                        'read',
+                        'useful',
+                        'tried',
+                        'applied_to_project',
+                        'too_shallow',
+                        'missed_important_post',
+                        'wrong_priority',
+                        'not_interested',
+                        'noise'
+                    )),
+                target_type TEXT NOT NULL DEFAULT 'report'
+                    CHECK(target_type IN (
+                        'report',
+                        'report_section',
+                        'idea_thread',
+                        'knowledge_atom',
+                        'source_channel',
+                        'read_queue',
+                        'experiment',
+                        'action'
+                    )),
+                target_ref TEXT,
+                source_url TEXT,
+                notes TEXT,
+                created_at TEXT NOT NULL,
+                recorded_by TEXT NOT NULL DEFAULT 'operator'
+            );
+            CREATE INDEX IF NOT EXISTS idx_ai_report_feedback_week
+                ON ai_report_feedback_events(week_label);
+            CREATE INDEX IF NOT EXISTS idx_ai_report_feedback_type
+                ON ai_report_feedback_events(feedback_type);
+            CREATE INDEX IF NOT EXISTS idx_ai_report_feedback_target
+                ON ai_report_feedback_events(target_type, target_ref);
+            CREATE INDEX IF NOT EXISTS idx_ai_report_feedback_created
+                ON ai_report_feedback_events(created_at);
+            """
+        )
+        connection.executescript(
+            """
             CREATE TABLE IF NOT EXISTS study_plans (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 week_label TEXT NOT NULL UNIQUE,
