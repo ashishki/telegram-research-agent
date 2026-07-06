@@ -106,6 +106,12 @@ Implemented:
   7/30/90 day momentum scores, active/stale/superseded/hype-only status
   handling, source-channel visibility, and `memory inspect-idea-threads`
   timeline inspection
+- standalone weekly AI Intelligence HTML report via
+  `ai-intelligence-report`: deterministic report assembly from compressed Idea
+  Thread and Knowledge Atom context, required Executive Brief / What Changed /
+  Idea Evolution / Tools-Models-Practices / Contradictions / Read Queue / Try
+  This Week / Source Map / Appendix sections, JSON sidecar, local notification
+  text, and quality gates that block internal matching traces
 - Telegram digest timer was restored on 2026-07-06 after being inactive since
   2026-06-22; 2026-W28 Research Brief and Implementation Ideas were regenerated
   manually. This exposed the next product direction: convert the project from a
@@ -127,7 +133,6 @@ recommendations become downstream consumers.
 
 | ID | Priority | Task | Notes |
 |---|---:|---|---|
-| KIR-030 | P3 | Generate standalone weekly AI Intelligence HTML report | Create the new primary report with Executive Brief, What Changed, Idea Evolution, Tools/Models/Practices, Contradictions, Read Queue, Try This Week, Source Map, and Appendix. |
 | KIR-035 | P3 | Generate Obsidian knowledge vault projection | Add `obsidian-export` that writes deterministic Markdown notes for weekly intelligence, idea threads, tools/models, practices, channels, read queue, and experiments into a dedicated vault or scoped generated namespace. Raw Telegram posts remain in the database; generated notes must have frontmatter, backlinks, source references, stable slugs, and must not overwrite hand-authored notes. |
 | KIR-040 | P4 | Add report feedback and personal learning loop | Capture read/useful/tried/missed/noise feedback and feed it into operator relevance and weekly read/try/build recommendations. |
 | KIR-050 | P5 | Rewire MVP Radar and project recommendations as downstream consumers | Feed MVP/project artifacts from knowledge threads instead of raw weekly scoring and keyword-only project matching. |

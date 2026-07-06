@@ -120,6 +120,18 @@ def build_parser() -> argparse.ArgumentParser:
     idea_threads_parser.add_argument("--limit", type=int, default=0, help="Optional atom limit for bounded refreshes")
     idea_threads_parser.set_defaults(handler=handle_idea_threads)
 
+    ai_report_parser = subparsers.add_parser(
+        "ai-intelligence-report",
+        help="Generate the standalone weekly AI Intelligence HTML report",
+    )
+    ai_report_parser.add_argument("--week", default=None, help="ISO week label, e.g. 2026-W28 (default: current UTC week)")
+    ai_report_parser.add_argument("--threads-limit", type=int, default=8)
+    ai_report_parser.add_argument("--atoms-limit", type=int, default=8)
+    ai_report_parser.add_argument("--output-root", default=None)
+    ai_report_parser.add_argument("--skip-refresh", action="store_true", help="Do not refresh Idea Threads before rendering")
+    ai_report_parser.add_argument("--refresh-weeks", type=int, default=12, help="Idea Thread refresh lookback window")
+    ai_report_parser.set_defaults(handler=handle_ai_intelligence_report)
+
     mvp_weekly_parser = subparsers.add_parser(
         "mvp-weekly",
         help="Generate and optionally deliver the weekly MVP artifact through Demand-to-MVP Radar",
@@ -1412,6 +1424,67 @@ def handle_idea_threads(args: argparse.Namespace) -> int:
         return 1
 
     sys.stdout.write(format_idea_thread_summary(summary))
+    return 0
+
+
+def handle_ai_intelligence_report(args: argparse.Namespace) -> int:
+    from output.ai_intelligence_report import (
+        AiIntelligenceReportQualityError,
+        generate_ai_intelligence_report,
+    )
+    from output.idea_threads import refresh_idea_threads
+
+    settings = load_settings()
+
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+
+        if not args.skip_refresh:
+            LOGGER.info("Starting step=idea_threads refresh_weeks=%d", args.refresh_weeks)
+            refresh_idea_threads(settings, weeks=max(1, args.refresh_weeks))
+            LOGGER.info("Finished step=idea_threads")
+
+        LOGGER.info(
+            "Starting step=ai_intelligence_report week=%s threads_limit=%d atoms_limit=%d",
+            args.week or "current",
+            args.threads_limit,
+            args.atoms_limit,
+        )
+        summary = generate_ai_intelligence_report(
+            settings,
+            week_label=args.week,
+            threads_limit=max(1, args.threads_limit),
+            atoms_limit=max(1, args.atoms_limit),
+            output_root=args.output_root,
+        )
+        LOGGER.info(
+            "Finished step=ai_intelligence_report week=%s threads=%d atoms=%d output=%s",
+            summary.week_label,
+            summary.thread_count,
+            summary.source_atom_count,
+            summary.html_path,
+        )
+    except AiIntelligenceReportQualityError as exc:
+        LOGGER.exception("AI Intelligence report failed quality gates")
+        lines = ["AI Intelligence report failed quality gates:"]
+        lines.extend(f"- {finding.message}" for finding in exc.findings)
+        sys.stdout.write("\n".join(lines) + "\n")
+        return 1
+    except Exception as exc:
+        LOGGER.exception("AI Intelligence report generation failed")
+        sys.stdout.write(f"AI Intelligence report generation failed: {exc}\n")
+        return 1
+
+    sys.stdout.write(
+        f"{summary.html_path}\n"
+        f"json={summary.json_path}\n"
+        f"week={summary.week_label} threads={summary.thread_count} "
+        f"source_atoms={summary.source_atom_count} source_channels={summary.source_channel_count} "
+        f"actions={summary.action_count} quality_findings={summary.quality_finding_count}\n"
+        f"notification={summary.notification_text}\n"
+    )
     return 0
 
 
