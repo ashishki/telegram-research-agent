@@ -4,6 +4,7 @@ import mimetypes
 import os
 import sqlite3
 import time
+from contextlib import closing
 from typing import Any
 
 from anthropic import APIConnectionError, APIStatusError, APITimeoutError, Anthropic, RateLimitError
@@ -13,6 +14,8 @@ from llm.router import estimate_cost_usd
 LOGGER = logging.getLogger(__name__)
 DEFAULT_MODEL_PROVIDER = "claude-haiku-4-5"
 MAX_RETRIES = 3
+USAGE_RECORDING_SQLITE_TIMEOUT_SECONDS = 0.05
+USAGE_RECORDING_SQLITE_BUSY_TIMEOUT_MS = 50
 
 # Model routing by task category.
 # Override any entry via env var: LLM_MODEL_DIGEST, LLM_MODEL_BOT_ASK, etc.
@@ -52,17 +55,29 @@ def _resolve_usage_db_path() -> str:
     return _usage_db_path or os.environ.get("AGENT_DB_PATH", "").strip()
 
 
-def _record_usage(task_type: str, model: str, input_tokens: int, output_tokens: int, duration_ms: int) -> None:
+def _is_sqlite_lock_error(exc: sqlite3.OperationalError) -> bool:
+    message = str(exc).lower()
+    return "database is locked" in message or "database table is locked" in message
+
+
+def _record_usage(task_type: str, model: str, input_tokens: int, output_tokens: int, duration_ms: int) -> bool:
     db_path = _resolve_usage_db_path()
     if not db_path:
-        return
+        return False
 
     cost = estimate_cost_usd(model=model, input_tokens=input_tokens, output_tokens=output_tokens)
     try:
         from datetime import datetime, timezone
 
         now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-        with sqlite3.connect(db_path, timeout=5) as conn:
+        with closing(
+            sqlite3.connect(
+                db_path,
+                timeout=USAGE_RECORDING_SQLITE_TIMEOUT_SECONDS,
+                isolation_level=None,
+            )
+        ) as conn:
+            conn.execute(f"PRAGMA busy_timeout = {USAGE_RECORDING_SQLITE_BUSY_TIMEOUT_MS}")
             conn.execute(
                 (
                     "INSERT INTO llm_usage "
@@ -83,8 +98,16 @@ def _record_usage(task_type: str, model: str, input_tokens: int, output_tokens: 
                     duration_ms,
                 ),
             )
+        return True
+    except sqlite3.OperationalError as exc:
+        if _is_sqlite_lock_error(exc):
+            LOGGER.debug("Skipped LLM usage recording because SQLite is locked")
+            return False
+        LOGGER.warning("Failed to record LLM usage", exc_info=True)
+        return False
     except Exception:
         LOGGER.warning("Failed to record LLM usage", exc_info=True)
+        return False
 
 
 def _get_client() -> Anthropic:

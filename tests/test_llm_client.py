@@ -2,6 +2,7 @@ import os
 import sqlite3
 import sys
 import tempfile
+import time
 import types
 import unittest
 from types import SimpleNamespace
@@ -103,6 +104,31 @@ class TestLLMClient(unittest.TestCase):
         self.assertEqual(row[1], "test")
         self.assertEqual(row[2], 123)
         self.assertEqual(row[3], 45)
+
+    def test_complete_skips_usage_recording_when_database_is_locked(self):
+        response = SimpleNamespace(
+            content=[SimpleNamespace(type="text", text="hello world")],
+            usage=SimpleNamespace(input_tokens=123, output_tokens=45),
+        )
+        mock_client = SimpleNamespace(messages=SimpleNamespace(create=lambda **_: response))
+        locker = sqlite3.connect(self.db_path, timeout=5, isolation_level=None)
+        locker.execute("BEGIN IMMEDIATE")
+
+        try:
+            with patch.dict(os.environ, {"AGENT_DB_PATH": self.db_path}, clear=False):
+                with patch.object(client, "_get_client", return_value=mock_client):
+                    started_at = time.monotonic()
+                    result = client.complete(prompt="hi", category="test", model="claude-haiku-4-5")
+                    elapsed = time.monotonic() - started_at
+        finally:
+            locker.rollback()
+            locker.close()
+
+        self.assertEqual(result, "hello world")
+        self.assertLess(elapsed, 0.5)
+        with sqlite3.connect(self.db_path) as connection:
+            count = connection.execute("SELECT COUNT(*) FROM llm_usage").fetchone()[0]
+        self.assertEqual(count, 0)
 
     def test_complete_vision_returns_text(self):
         response = SimpleNamespace(

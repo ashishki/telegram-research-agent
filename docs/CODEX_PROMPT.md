@@ -17,8 +17,9 @@ _v3.6 · 2026-07-06 · telegram-research-agent_
   running while ingest and MVP weekly continued. The timer was manually
   restarted and 2026-W28 artifacts were regenerated. Weekly delivery health
   checks now cover inactive timers, missing current-week reports after the
-  scheduled window, and root-owned output files; SQLite usage-log contention
-  remains the next P0 item.
+  scheduled window, and root-owned output files. SQLite usage logging is now a
+  best-effort, short-timeout autocommit insert that quietly skips under lock
+  contention so report generation is not delayed.
 - Recent shipped changes:
   - Telegram reaction sync imports source-post reactions as tags/feedback.
   - Implementation Ideas now send inline feedback cards and record decisions in `decision_journal`.
@@ -79,6 +80,9 @@ _v3.6 · 2026-07-06 · telegram-research-agent_
     `telegram-digest.timer`, current-week digest presence after the scheduled
     Monday window, and root-owned `data/output` files; `scripts/healthcheck.sh`
     invokes this Python health surface.
+  - `llm_usage` recording no longer waits behind SQLite write contention:
+    usage writes use a 50 ms busy timeout, autocommit, explicit connection
+    closing, and quiet lock skips.
   - 2026-W24 artifact review showed that internal signal quality improved but
     reader-facing report quality is weak: no first-screen decision brief,
     buried trend summary, visible internal `Matches: ...` traces, contradictions
@@ -165,7 +169,7 @@ Start with the first open KIR task in `docs/tasks.md`.
 Current first task:
 
 ```text
-KIR-002 — Make LLM usage recording non-blocking under SQLite contention
+KIR-010 — Add Knowledge Atom schema and migrations
 ```
 
 Do not start by prompt-tuning the old Research Brief. The strategic direction is:
