@@ -93,6 +93,10 @@ Implemented:
 - non-blocking best-effort `llm_usage` recording: short SQLite busy timeout,
   autocommit insert, closed usage connection, and quiet skip under database
   lock contention so report generation is not delayed by cost logging
+- Knowledge Atom schema and storage helpers: `knowledge_extraction_batches`
+  and `knowledge_atoms` migrations with source citation JSON, atom type,
+  confidence/novelty/utility/relevance scores, staleness status, stable keys,
+  and focused round-trip tests
 - Telegram digest timer was restored on 2026-07-06 after being inactive since
   2026-06-22; 2026-W28 Research Brief and Implementation Ideas were regenerated
   manually. This exposed the next product direction: convert the project from a
@@ -114,7 +118,6 @@ recommendations become downstream consumers.
 
 | ID | Priority | Task | Notes |
 |---|---:|---|---|
-| KIR-010 | P1 | Add Knowledge Atom schema and migrations | Add extraction batch and `knowledge_atoms` storage with source post IDs/URLs, atom type, entities, confidence, novelty, utility, and staleness fields. |
 | KIR-011 | P1 | Implement cheap batched knowledge extraction CLI | Add `knowledge-extract --weeks N --model cheap`, idempotent/resumable batch processing, JSON validation, and inspection command. |
 | KIR-020 | P2 | Build Idea Thread grouping and momentum layer | Group atoms into evolving ideas, connect sources, compute 7/30/90 day momentum, and mark active/stale/superseded/hype-only statuses. |
 | KIR-030 | P3 | Generate standalone weekly AI Intelligence HTML report | Create the new primary report with Executive Brief, What Changed, Idea Evolution, Tools/Models/Practices, Contradictions, Read Queue, Try This Week, Source Map, and Appendix. |

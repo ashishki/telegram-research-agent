@@ -83,6 +83,10 @@ _v3.6 · 2026-07-06 · telegram-research-agent_
   - `llm_usage` recording no longer waits behind SQLite write contention:
     usage writes use a 50 ms busy timeout, autocommit, explicit connection
     closing, and quiet lock skips.
+  - Knowledge Atom persistence is in place: `knowledge_extraction_batches`
+    and `knowledge_atoms` migrations plus `db.knowledge_atoms` helpers for
+    batch tracking, stable atom keys, source citations, confidence/novelty/
+    utility/relevance scores, and staleness status.
   - 2026-W24 artifact review showed that internal signal quality improved but
     reader-facing report quality is weak: no first-screen decision brief,
     buried trend summary, visible internal `Matches: ...` traces, contradictions
@@ -169,7 +173,7 @@ Start with the first open KIR task in `docs/tasks.md`.
 Current first task:
 
 ```text
-KIR-010 — Add Knowledge Atom schema and migrations
+KIR-011 — Implement cheap batched knowledge extraction CLI
 ```
 
 Do not start by prompt-tuning the old Research Brief. The strategic direction is:
