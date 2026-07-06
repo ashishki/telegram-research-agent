@@ -1,11 +1,22 @@
 # CODEX_PROMPT — Session Handoff
-_v3.5 · 2026-06-09 · telegram-research-agent_
+_v3.6 · 2026-07-06 · telegram-research-agent_
 
 ---
 
 ## Current State
 
 - Memory unification and Roadmap v3 are complete.
+- Active strategic pivot: the project should become an AI Knowledge
+  Intelligence Desk. The main weekly artifact should be a human-readable HTML
+  intelligence report built from Telegram knowledge atoms and temporal idea
+  threads. MVP Radar and project recommendations remain downstream consumers,
+  not the center of the product.
+- Operational incident on 2026-07-06: `telegram-digest.timer` had been inactive
+  since 2026-06-22, so weekly Research Brief/Implementation Ideas stopped
+  running while ingest and MVP weekly continued. The timer was manually
+  restarted and 2026-W28 artifacts were regenerated, but the system needs
+  health checks for inactive timers, missing current-week reports, root-owned
+  output files, and SQLite usage-log contention.
 - Recent shipped changes:
   - Telegram reaction sync imports source-post reactions as tags/feedback.
   - Implementation Ideas now send inline feedback cards and record decisions in `decision_journal`.
@@ -120,6 +131,8 @@ _v3.5 · 2026-06-09 · telegram-research-agent_
   is a Pathway-ready JSONL event stream plus deterministic fallback snapshot;
   Radar treats the snapshot as context only, not decision-grade external
   evidence.
+- The next roadmap is `docs/ai_knowledge_intelligence_roadmap.md`. Start with
+  KIR tasks in `docs/tasks.md`.
 
 ---
 
@@ -136,15 +149,27 @@ The weekly pipeline now has:
 
 ## Exact Next Execution Step
 
-No active implementation task remains in `docs/tasks.md` as of 2026-06-09.
-Before starting new implementation work, add or select the next roadmap item and
-define scope, touched files, acceptance criteria, and verification command.
+Start with the first open KIR task in `docs/tasks.md`.
+
+Current first task:
+
+```text
+KIR-001 — Stabilize weekly report delivery health
+```
+
+Do not start by prompt-tuning the old Research Brief. The strategic direction is:
+
+```text
+all Telegram posts -> knowledge atoms -> temporal idea threads ->
+weekly AI intelligence HTML report -> personal read/try/build loop
+```
 
 Reference documents:
 
 - `docs/tasks.md`
 - `docs/next_development_roadmap.md`
 - `docs/report_quality_roadmap.md`
+- `docs/ai_knowledge_intelligence_roadmap.md`
 - `docs/mvp_weekly_radar.md`
 - `docs/COGNITION_MANIFEST.md`
 - `docs/VPS_COGNITION_VAULT.md`

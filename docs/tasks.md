@@ -1,7 +1,7 @@
 # Current Backlog
 
 **Status:** Active lightweight backlog
-**Last updated:** 2026-06-09
+**Last updated:** 2026-07-06
 
 The historical memory-unification roadmap is complete and archived at
 `docs/archive/roadmaps/tasks-v5-memory-unification.md`.
@@ -14,6 +14,9 @@ Reader-facing report quality and Demand-to-MVP Radar handoff details live in
 
 Pathway live source intelligence and Radar incremental-indexing work lives in
 `docs/pathway_live_source_intelligence.md`.
+
+AI Knowledge Intelligence Desk strategy, architecture, phases, and implementation
+details live in `docs/ai_knowledge_intelligence_roadmap.md`.
 
 ## Current State
 
@@ -83,20 +86,38 @@ Implemented:
 - Pathway-ready live source intelligence: append-only source events from
   Telegram ingestion, deterministic live-source snapshots, Radar context-only
   consumption, and optional `mvp-weekly --with-live-source-index` bridge
+- Telegram digest timer was restored on 2026-07-06 after being inactive since
+  2026-06-22; 2026-W28 Research Brief and Implementation Ideas were regenerated
+  manually. This exposed the next product direction: convert the project from a
+  project/MVP-centered weekly digest into an AI Knowledge Intelligence Desk.
 
 ## Active Maintenance Queue
 
 The previous receipt/source-trust/operator-reporting backlog, reader-facing
-report quality, Radar handoff, cost guardrails, artifact consistency, and
-editorial memory queue are implemented. The initial Pathway-ready live source
-intelligence and Radar context integration queue is implemented.
+report quality, Radar handoff, cost guardrails, artifact consistency, editorial
+memory queue, and initial Pathway-ready live source intelligence work are
+implemented.
+
+The active queue is now the AI Knowledge Intelligence Desk roadmap. The goal is
+to build a durable knowledge base from Telegram posts, extract cheap structured
+knowledge atoms, group them into temporal idea threads, and generate a
+human-readable weekly HTML AI intelligence report. MVP Radar and project
+recommendations become downstream consumers.
 
 | ID | Priority | Task | Notes |
 |---|---:|---|---|
-| - | - | No active implementation task | Add the next roadmap item before starting new implementation work |
+| KIR-001 | P0 | Stabilize weekly report delivery health | Add health checks for inactive `telegram-digest.timer`, missing current-week digest after the scheduled window, and root-owned `data/output` files. See Phase 0 in `docs/ai_knowledge_intelligence_roadmap.md`. |
+| KIR-002 | P0 | Make LLM usage recording non-blocking under SQLite contention | Current logs show repeated `sqlite3.OperationalError: database is locked` from usage recording during ingest/digest. Usage logging must never slow or destabilize report generation. |
+| KIR-010 | P1 | Add Knowledge Atom schema and migrations | Add extraction batch and `knowledge_atoms` storage with source post IDs/URLs, atom type, entities, confidence, novelty, utility, and staleness fields. |
+| KIR-011 | P1 | Implement cheap batched knowledge extraction CLI | Add `knowledge-extract --weeks N --model cheap`, idempotent/resumable batch processing, JSON validation, and inspection command. |
+| KIR-020 | P2 | Build Idea Thread grouping and momentum layer | Group atoms into evolving ideas, connect sources, compute 7/30/90 day momentum, and mark active/stale/superseded/hype-only statuses. |
+| KIR-030 | P3 | Generate standalone weekly AI Intelligence HTML report | Create the new primary report with Executive Brief, What Changed, Idea Evolution, Tools/Models/Practices, Contradictions, Read Queue, Try This Week, Source Map, and Appendix. |
+| KIR-040 | P4 | Add report feedback and personal learning loop | Capture read/useful/tried/missed/noise feedback and feed it into operator relevance and weekly read/try/build recommendations. |
+| KIR-050 | P5 | Rewire MVP Radar and project recommendations as downstream consumers | Feed MVP/project artifacts from knowledge threads instead of raw weekly scoring and keyword-only project matching. |
 
-Implementation details, acceptance criteria, touched-file guidance, and Radar
-paths are in `docs/report_quality_roadmap.md`.
+Implementation details and acceptance criteria for the active queue are in
+`docs/ai_knowledge_intelligence_roadmap.md`. Historical report-quality and Radar
+paths remain in `docs/report_quality_roadmap.md`.
 
 Production validation remains inspectable with `ops-validate`. If no live
 Telegram reaction or callback event has occurred in the selected window, the
@@ -109,3 +130,5 @@ command reports `needs_live_event` rather than storing unverified success.
   inspectable.
 - Productized Telegram Channel Intelligence repo or workspace after repeated
   operator value is demonstrated.
+- Pathway as an incremental indexing backend after the deterministic
+  knowledge-atom and idea-thread contracts are proven locally.
