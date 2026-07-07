@@ -54,6 +54,45 @@ that means the evidence was not specific enough after broad terms like `AI`,
 `workflow`, and `evidence` were filtered out. Treat this as honest uncertainty,
 not as a pipeline failure.
 
+### Weekly Intelligence Workbook Routine
+
+The new target artifact is the Weekly AI Intelligence Workbook: a concise
+first-screen decision brief plus deeper study, evidence, implementation, MVP
+Radar, and feedback sections. Treat Telegram as delivery/feedback, not as the
+main reading surface.
+
+Monday:
+
+- open the workbook HTML;
+- read Decision Brief first;
+- scan Strong Signals;
+- inspect Project Implementation and MVP Radar sections;
+- choose the week's read/try/build targets.
+
+During the week:
+
+- read 3-5 selected source items;
+- run 1-2 try items;
+- complete one experiment, project PR, or backlog item when the evidence
+  supports it;
+- react to original Telegram posts that caught your interest; any visible
+  personal reaction should mean "interesting", not a specific emoji taxonomy.
+
+End of week:
+
+- send voice feedback to the bot after reading or trying items;
+- confirm the parsed feedback before it affects memory;
+- review Strategy Reviewer suggestions;
+- decide which Codex-ready tasks to run next;
+- approve code/config/prompt/profile changes manually, never implicitly through
+  voice feedback.
+
+Suggested voice feedback prompt:
+
+```text
+Что было полезно? Что было мимо? Что попробовал? Что применил к проекту? Что нужно изменить в следующем отчете?
+```
+
 ### Reader-Facing Quality Contract
 
 The weekly package should behave like a decision brief, not a raw digest.

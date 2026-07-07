@@ -2,6 +2,7 @@
 
 Status: active roadmap
 Created: 2026-07-06
+Last updated: 2026-07-07
 
 ## Why This Exists
 
@@ -336,6 +337,633 @@ Feedback to capture:
 - wrong priority;
 - not interested.
 
+## KIR Quality And User-Value Roadmap After 2026-W28 Audit
+
+Status: active quality/eval roadmap
+Source: committed repository state plus the versioned 2026-W28 visual artifact.
+The live DB/VPS pipeline was not evaluated for this audit.
+
+### Short Diagnosis
+
+The project is no longer just a digest bot. The repository already contains an
+end-to-end knowledge-intelligence pipeline:
+
+```text
+Telegram posts
+  -> durable archive
+  -> Knowledge Atoms
+  -> Idea Threads
+  -> frontier synthesis
+  -> HTML/JSON reports
+  -> Archify audit map
+  -> Obsidian projection
+  -> feedback/read/try/build loop
+  -> downstream MVP Radar and project consumers
+```
+
+The W28 artifact proves that the plumbing works: it contains 12 idea threads,
+14 rendered source atoms, 4 source channels, 4 actions, a JSON sidecar,
+Decision Brief, Trust Check, Do Now, Study Next, What Changed, Project
+Implications, Knowledge Flow, Trend Board, and Sources.
+
+The current bottleneck is not ingestion, HTML rendering, Archify, or Obsidian.
+The bottleneck is synthesis quality, personalization, and the eval loop. The old
+scoring produced `0 strong` while the operator manually found useful posts,
+which means system scoring does not yet match the real user task.
+
+KIR-050 finished the infrastructure loop, but it did not finish the user-value
+work. The next queue is a quality/eval/user-value roadmap, not another feature
+roadmap.
+
+### Product Quality Target
+
+A weekly report is good only if the operator can quickly understand:
+
+- what changed this week;
+- what changed compared with previous weeks;
+- which 3-5 claims matter;
+- which claims are weak, single-source, vendor-adjacent, or speculative;
+- what to read;
+- what to try;
+- what to ignore or defer;
+- how the signals relate to active projects/profile;
+- which minimum feedback will make the next report better.
+
+HTML remains the weekly decision artifact. Archify remains an audit/navigation
+surface. Obsidian remains a generated projection/cockpit. SQLite/local evidence
+remains the source of truth.
+
+Final HTML language contract:
+
+- operator-facing weekly HTML report copy must be Russian;
+- section headings, cards, action labels, caveats, empty states, and feedback
+  prompts must be Russian;
+- internal JSON keys, CLI names, schema fields, code identifiers, and source
+  titles may remain English;
+- source quotes should keep their original language unless a separate
+  translation field is added.
+
+### P0 - Report Quality Contract
+
+Introduce a strict report contract. A report is not good merely because all
+sections exist; it must pass user-value gates.
+
+Required first-screen blocks:
+
+- `Operator Verdict`: apply, study, watch, ignore/defer, verify first;
+- `Top Claims Evidence`: source count, source type, independent confirmation,
+  quote verification, confidence, contradiction/caveat, expiry, and next
+  verification step;
+- `What Changed`: previous state -> new evidence -> updated interpretation ->
+  confidence movement;
+- `Operational Actions`: effort, scope, success criterion, kill condition, and
+  feedback target;
+- `Project Fit Diagnostic`: confirmed leads, project watch, learning-only
+  implications, rejected broad overlaps, and missing evidence.
+
+A report quality gate must fail when:
+
+- top claims do not cite atom IDs;
+- evidence quotes are missing or not verified against source text;
+- source URL is missing for a high-impact claim;
+- a single-source claim is written as an established trend;
+- `What Changed` is only a count of changed threads;
+- actions lack success criteria or feedback targets;
+- zero project leads are shown without diagnostic explanation;
+- no-feedback weeks do not warn that personalization confidence is low;
+- the final user-facing HTML report is not Russian.
+
+### P1 - Atom/Thread/Frontier Handoff Improvements
+
+Knowledge Atom extraction already has bounded batches, JSON validation, source
+IDs/URLs, confidence/novelty/utility/relevance scores, and idempotent batch
+skips. The next improvement is claim quality, not extraction volume.
+
+Add or derive these atom/report fields:
+
+- `evidence_role`: primary announcement, commentary, user anecdote, benchmark
+  claim, rumor, tutorial, case study;
+- `source_independence_key`;
+- `verification_status`;
+- `quote_verified`;
+- `claim_scope`;
+- `time_horizon`;
+- `expiry_hint`;
+- `operator_relevance_reason`;
+- `project_relevance_reason`.
+
+Acceptance rule: a top claim cannot enter Decision Brief without source URL and
+verified quote unless it is explicitly marked weak/single-source/speculative.
+
+Idea Threads already group Knowledge Atoms and compute 7/30/90 momentum. The
+next improvement is temporal interpretation.
+
+Add per-thread fields or equivalent derived structure:
+
+- `previous_week_state`;
+- `this_week_delta`;
+- `delta_reason`;
+- `confidence_change`;
+- `new_evidence_atom_ids`;
+- `state`: emerging, accelerating, contested, validated, stale, superseded,
+  hype-only, production-pattern;
+- `why_this_is_one_thread`;
+- `merge_split_audit_status`.
+
+Frontier output should be structured as decision data, not prose that HTML has
+to reinterpret:
+
+```json
+{
+  "decisions": [
+    {
+      "title": "...",
+      "status": "apply | study | watch | ignore | verify_first",
+      "evidence_atom_ids": [1, 2],
+      "confidence": "low | medium | high",
+      "why_for_me": "...",
+      "next_action": "...",
+      "success_metric": "..."
+    }
+  ],
+  "claim_cards": [
+    {
+      "claim": "...",
+      "evidence_tier": "primary | secondary | anecdote | speculative",
+      "source_count": 2,
+      "independent_sources": 1,
+      "caveat": "...",
+      "verification_action": "..."
+    }
+  ],
+  "thread_deltas": [
+    {
+      "thread_id": 10,
+      "previous_state": "...",
+      "new_state": "...",
+      "delta_reason": "..."
+    }
+  ]
+}
+```
+
+Project implications remain conservative. Do not loosen matching with broad
+terms such as `AI`, `workflow`, `evidence`, and `tool`. Replace binary
+"project links or zero" with three tiers:
+
+- confirmed project lead: specific project overlap plus evidence;
+- project watch: plausible but weak, not an action;
+- learning-only implication: useful for the operator but not attached to a
+  project.
+
+### P2 - Longitudinal Intelligence
+
+Start this only after 3-4 stable weekly runs with the P0/P1 gates:
+
+- referee pass for only the 3-5 high-impact Decision Brief claims;
+- thread merge/split audit CLI;
+- monthly `changed beliefs` report;
+- cautious scoped retrieval/embeddings over evidence items only, not over all
+  raw posts.
+
+The monthly report should show what became stronger, what was contradicted,
+what was accepted, what was rejected, what remains uncertain, what was tried,
+what was applied to a project, and what was ignored.
+
+### End-To-End Development Stages
+
+#### Stage 0 - Contract And Fixtures
+
+Status: implemented by KIR-Q-001.
+
+Goal: remove the false `done` state and define report quality as a testable
+contract.
+
+Work:
+
+- update `docs/tasks.md` with KIR-Q open tasks;
+- add the report contract to this roadmap;
+- define JSON schema shape for decisions, claim cards, thread deltas, feedback
+  targets, project diagnostic, and final HTML language metadata;
+- use W28 artifact as the first regression fixture.
+
+Acceptance:
+
+- docs no longer say no KIR work remains;
+- fixture can be checked without live DB/VPS run;
+- tests can fail a structurally complete but low-value report;
+- tests can fail a final HTML report whose user-facing copy is not Russian.
+
+Implementation note:
+
+- The code-facing contract lives in `src/output/ai_report_contract.py` as
+  `weekly-ai-intelligence-v1`. It validates `decision_cards`, `claim_cards`,
+  `thread_deltas`, `action_cards`, `project_diagnostic`, `feedback_targets`,
+  and Russian final-HTML markers.
+- `ai-visual-report` writes the contract fields into the JSON sidecar and uses
+  them to render the operator-facing final HTML in Russian.
+- The committed 2026-W28 artifact under
+  `docs/artifacts/ai-decision-intelligence-2026-W28/` is now an offline
+  regression fixture: tests can evaluate it without the live DB/VPS pipeline
+  and currently flag it as pre-contract output.
+
+#### Stage 1 - Claim Evidence Cards
+
+Status: implemented by KIR-Q-002.
+
+Goal: make claims auditable before they influence operator decisions.
+
+Work:
+
+- add evidence tier, evidence role, quote verification, source independence,
+  claim scope, expiry, and caveat metadata;
+- verify evidence quotes deterministically against source post text;
+- render top claims in Russian HTML evidence cards;
+- enforce single-source wording rules.
+
+Acceptance:
+
+- top claim without source URL or verified quote is blocked or labeled weak;
+- W28-style high-impact claims show caveat and verification action;
+- report gates catch missing atom provenance.
+
+Implementation note:
+
+- Weekly AI visual reports now attach local source-post text to Knowledge Atom
+  context and verify claim-card `evidence_quote` values deterministically
+  against `posts.content`.
+- Claim cards include evidence tier, evidence role, source independence key(s),
+  verification status, `quote_verified`, claim scope, time horizon, expiry hint,
+  caveat, next verification action, and decision eligibility.
+- Gates prevent missing atom IDs/URLs and prevent `apply`/`study` decisions
+  from relying on unverified quote evidence unless the claim is explicitly weak
+  and decision-ineligible.
+
+#### Stage 2 - Temporal Delta Layer
+
+Status: implemented by KIR-Q-003.
+
+Goal: turn `What Changed` into a real temporal-intelligence surface.
+
+Work:
+
+- compute previous state, new evidence, delta reason, and confidence movement
+  for top threads;
+- render previous -> new -> interpretation;
+- mark insufficient history explicitly;
+- add thread merge/split audit hooks.
+
+Acceptance:
+
+- at least five top threads have clear delta or insufficient-history label;
+- momentum bars are explained, not treated as quantitative truth;
+- report no longer substitutes thread counts for interpretation.
+
+Implementation note:
+
+- Weekly report metadata now derives top `thread_deltas` by splitting each
+  Idea Thread into previous atoms and this-week evidence.
+- Russian HTML renders previous state -> new evidence -> updated interpretation
+  with confidence movement, delta reason, source atom IDs, continuity rationale,
+  and merge/split audit status.
+- Gates require delta details for the available thread count and make
+  `insufficient_history` explicit when no previous atoms exist.
+
+#### Stage 3 - Project Fit Diagnostic
+
+Status: implemented by KIR-Q-004.
+
+Goal: make zero project leads useful without creating fake project matching.
+
+Work:
+
+- keep broad-term suppression;
+- add confirmed lead / project watch / learning-only tiers;
+- render checked projects, rejected overlaps, close-but-not-enough signals, and
+  missing evidence/config additions.
+
+Acceptance:
+
+- 0 project leads explains what was checked and why nothing passed;
+- learning-only implications stay visible;
+- broad keyword overlap cannot become a confident project decision.
+
+Implementation note:
+
+- Project diagnostics now split confirmed leads, project watch, and
+  learning-only implications, while broad overlaps are surfaced only as
+  rejected close-but-not-enough signals.
+- The Russian HTML report explains checked projects, rejected broad terms,
+  missing evidence, and config additions needed to turn a learning signal into
+  a project lead.
+- Gates require the diagnostic shape and prevent zero-lead reports from being
+  empty or falsely confident.
+
+#### Stage 4 - Operational Action Cards
+
+Status: implemented by KIR-Q-005.
+
+Goal: make actions measurable and suitable for feedback in the next weekly run.
+
+Work:
+
+- render effort: 15/30/60 min or equivalent;
+- render scope: skill, project, infra, reading, experiment;
+- render success criterion, kill condition, feedback target, and follow-up
+  date/hint;
+- connect actions to stable target refs.
+
+Acceptance:
+
+- each action says what to do, how to know it worked, when to stop, and how to
+  leave feedback;
+- action outcomes can be recorded as useful, tried, applied_to_project,
+  wrong_priority, too_shallow, or not_interested.
+
+Implementation note:
+
+- Weekly `action_cards` now include stable target refs, action kind, effort,
+  scope, success criterion, kill condition, follow-up hint, feedback options,
+  outcome policy, and feedback target linkage.
+- The report contract guarantees at least two try actions and one experiment
+  action even when frontier output is sparse.
+- Russian HTML renders these fields so actions are measurable and do not count
+  as useful until outcome feedback is recorded.
+
+#### Stage 5 - Obsidian Projection Pruning
+
+Status: implemented in KIR-Q-006.
+
+Goal: keep Obsidian as a cockpit, not a database mirror.
+
+Work:
+
+- generate fewer term/channel notes;
+- create experiment notes with hypothesis, method, result, decision, and
+  optional project link;
+- connect weekly note to top threads, five read items, two try items, one
+  experiment, and project watches only when threshold passes;
+- preserve generated markers and hand-authored overwrite protection.
+
+Acceptance:
+
+- no note explosion and no one-note-per-post output;
+- generated notes have frontmatter, backlinks, source refs, and report links;
+- mature insights are manually promotable into the hand-authored cognition
+  vault.
+
+Implementation:
+
+- the exporter builds a bounded projection context from the weekly report
+  contract, project diagnostics, and action cards;
+- term/channel notes require repeated, promoted, decision-relevant, or
+  active-high-signal evidence and are capped per folder;
+- weekly notes link to top threads, capped read queue, two try actions, one
+  experiment note, and project watches only when thresholds pass;
+- experiment notes now carry hypothesis, method, result, decision, optional
+  project link, source refs, generated markers, and manual-promotion guidance.
+
+#### Stage 6 - Minimum Weekly Feedback And Eval Loop
+
+Status: implemented in KIR-Q-007.
+
+Goal: make personalization measurable.
+
+Work:
+
+- add weekly feedback completion indicator;
+- require or request minimum weekly feedback: two read items, one action, one
+  missed important post or explicit no-missed, and one trust correction when
+  relevant;
+- convert missed posts and wrong-priority labels into eval examples;
+- feed previous feedback into frontier context.
+
+Acceptance:
+
+- next report can explicitly say what previous feedback changed;
+- at least 3-5 feedback events are recordable for one report;
+- no-feedback weeks show low personalization confidence.
+
+Implementation:
+
+- AI report feedback events support the minimum loop: two read events, one
+  action/experiment outcome, missed-post or no-missed marker, and trust
+  correction;
+- summaries derive completion state, promoted/downranked targets, missed-post
+  eval examples, priority-calibration eval examples, and frontier prompt
+  guidance from the same feedback table;
+- the weekly report contract and visual report expose feedback usage and
+  low-personalization confidence instead of treating feedback as theoretical;
+- frontier synthesis is instructed to downrank wrong-priority/not-interested
+  patterns and promote useful/tried/read/applied patterns.
+
+#### Stage 7 - Regeneration And Manual Eval
+
+Goal: prove the roadmap on W28 and the standard run path.
+
+Run:
+
+```bash
+python3 src/main.py knowledge-extract --weeks 12 --model cheap
+python3 src/main.py idea-threads --weeks 12
+python3 src/main.py frontier-analysis --week 2026-W28 --lookback-weeks 12 --model strong
+python3 src/main.py ai-visual-report --week 2026-W28 --skip-refresh
+python3 src/main.py obsidian-export --week 2026-W28
+```
+
+Acceptance:
+
+- HTML passes structural gates plus claim/action/evidence/language gates;
+- at least three feedback events are recorded;
+- W28 before/after visibly improves first-screen clarity, evidence discipline,
+  project diagnostic value, and action usefulness;
+- final W28 HTML user-facing copy is Russian;
+- Obsidian output remains scoped and disposable.
+
+#### Stage 8 - Referee, Audit, Monthly Intelligence
+
+Goal: add higher-cost intelligence checks after the weekly loop is stable.
+
+Work:
+
+- referee pass for only top high-impact claims;
+- thread merge/split audit CLI;
+- monthly changed-beliefs report;
+- scoped retrieval over evidence items if deterministic context is
+  insufficient.
+
+Acceptance:
+
+- top claims get second-pass scrutiny without expensive review of every atom;
+- monthly report shows accepted/rejected/uncertain/tried/applied/ignored
+  changes;
+- embeddings are not introduced as a global raw-post memory.
+
+### 7-Day Implementation Plan
+
+Day 1:
+
+- finish Stage 0;
+- update docs/tasks;
+- add report contract and schema notes;
+- prepare W28 fixture.
+
+Acceptance: false `done` is removed; W28 can be evaluated as fixture.
+
+Day 2:
+
+- implement claim evidence cards;
+- add quote verification;
+- render top five claim cards in Russian HTML.
+
+Acceptance: unsupported high-impact claims are blocked or labeled weak.
+
+Day 3:
+
+- implement temporal thread deltas;
+- replace count-based `What Changed` with previous/new/interpretation.
+
+Acceptance: at least five top threads have delta or insufficient-history label.
+
+Day 4:
+
+- implement Project Fit Diagnostic;
+- add confirmed/watch/learning-only tiers.
+
+Acceptance: 0 project leads still produces useful diagnostic output.
+
+Day 5:
+
+- implement operational action cards;
+- expose success criteria and feedback targets in Russian HTML.
+
+Acceptance: every action has effort, success, kill condition, and feedback ref.
+
+Day 6:
+
+- prune Obsidian projection;
+- add experiment note template and tighter weekly note links.
+
+Acceptance: no note explosion; generated projection remains auditable.
+
+Day 7:
+
+- regenerate W28;
+- run quality gates;
+- record manual feedback events;
+- compare artifact before/after.
+
+Acceptance: structural, user-value, and Russian HTML gates pass; W28 diff
+improves clarity.
+
+### 30-Day Plan
+
+Week 1:
+
+- report contract;
+- claim evidence cards;
+- quote verification;
+- operational action rendering.
+
+Result: W28/W29 report has verdict, evidence cards, Russian user-facing HTML,
+and action success criteria.
+
+Week 2:
+
+- temporal delta layer;
+- project diagnostic;
+- useful zero-lead state.
+
+Result: `What Changed` becomes temporal intelligence and 0 project leads becomes
+actionable diagnostic.
+
+Week 3:
+
+- feedback completion indicator;
+- missed-post eval examples;
+- wrong-priority and too-shallow examples in next frontier prompt.
+
+Result: next report explicitly uses operator feedback.
+
+Week 4:
+
+- monthly changed-beliefs report;
+- first thread merge/split audit;
+- scoped referee pass for top claims.
+
+Result: system reports what changed in beliefs/actions, not just what changed
+in Telegram.
+
+### Metrics
+
+Track these per week:
+
+- decision usefulness rate: useful + tried + applied_to_project / shown
+  actions;
+- read queue completion;
+- try completion;
+- experiment completion;
+- evidence coverage for top claims;
+- independent-source coverage for high-impact claims;
+- temporal delta coverage for top threads;
+- personal relevance precision: useful / not_interested;
+- missed important post count;
+- project implication precision, including accepted zero-lead diagnostic weeks;
+- Russian HTML coverage for user-facing final report labels, sections, cards,
+  caveats, and empty states.
+
+After four weekly runs the system is better only if:
+
+- there are at least 12-20 feedback events for the month;
+- at least 50% of action cards have an outcome;
+- top claims have evidence tier and caveat;
+- missed important posts decline or become eval examples;
+- at least two experiments were actually completed;
+- the operator can name at least two decisions changed by the report.
+
+### Guardrails And Non-Goals
+
+Do not do now:
+
+- public SaaS or multi-user UI;
+- broad keyword project matching;
+- one note per Telegram post;
+- generic global vector memory over all raw posts;
+- Archify as the main screen;
+- HTML animation polish ahead of evidence/action metrics;
+- feeding thousands of raw posts into the frontier model;
+- auto-editing `profile.yaml` without explicit operator approval.
+
+Guardrails:
+
+- coverage badge: thin, adequate, strong;
+- evidence tier: primary, secondary, anecdote, speculative;
+- quote verification must match source text;
+- single-source wording rule for strong trend language;
+- weekly sample of top threads for merge/split quality;
+- conservative project lead threshold;
+- no-feedback warning for low personalization confidence;
+- artifact receipt should expose scheduled, on-demand, partial, or regenerated
+  run state;
+- Obsidian generated namespace only, with manual promotion of mature notes;
+- action is not counted useful until feedback records read/tried/applied.
+
+### Key Risks
+
+The system can sound confident while being wrong when:
+
+- high-impact claims come from weak Telegram atoms;
+- single-source anecdotes are turned into trends;
+- deterministic thread grouping creates false continuity;
+- frontier synthesis converts a few weak signals into a macro narrative;
+- polished HTML/Obsidian/Archify surfaces hide a thin evidence base.
+
+Examples to handle carefully in W28-style reports: GigaChat parity/speed,
+J-space, Nvidia revenue-share, Stanford agentic-skill demand, Fable pricing, and
+commoditization forecasts. These can be useful intelligence candidates, but
+they need evidence tier, caveat, and verification action before they influence
+decisions.
+
 ## Data Model Proposal
 
 Add migrations for these tables or equivalent structures.
@@ -568,28 +1196,77 @@ Acceptance:
 - project insights no longer say "no insights" when the report contains
   project-relevant thread sections.
 
+### Phase 6: Weekly Intelligence Workbook And Feedback Loop
+
+Purpose: turn the weekly AI Intelligence report into a study/work artifact that
+drives the operator's weekly read/try/build loop and makes feedback actionable.
+
+Detailed task planning lives in `docs/ai_intelligence_workbook_roadmap.md`.
+
+Required work:
+
+- promote the visual report into a Weekly AI Intelligence Workbook with a
+  concise Decision Brief, Strong Signals, Deep Explanation cards, Project
+  Implementation, MVP Radar, Read/Try/Build, Feedback, and Appendix sections;
+- add Deep Explanation sections for the strongest 3-5 signals;
+- generate deterministic local concept diagrams, preferably Archify-style
+  dataflow/concept diagrams;
+- treat any visible operator reaction as positive implicit interest after
+  Telethon personal-reaction visibility is validated;
+- add voice feedback intake with transcription, structured LLM parse, bot
+  confirmation, and confirmed-only memory writes;
+- add a Strategy Reviewer that proposes memory/config/code improvements without
+  applying them;
+- generate Codex-ready task suggestions with title, files likely touched,
+  acceptance criteria, and verification commands;
+- refine Obsidian projection for workbook/read/try/build, feedback summaries,
+  and Strategy Reviewer notes without one-note-per-post output.
+
+Acceptance:
+
+- first screen remains concise and decision-oriented;
+- strongest signals explain what changed, why it matters, caveats, evidence
+  strength, source links, and what to study/try;
+- concept diagrams are deterministic and explanatory, not evidence;
+- no reaction is treated as unknown, not negative;
+- voice feedback does not affect memory until the operator confirms the parsed
+  summary;
+- the system never edits code, prompts, thresholds, `profile.yaml`, or
+  `projects.yaml` without explicit human approval;
+- Radar remains conservative: Telegram-seeded build/focused_experiment requires
+  fresh KIR thread evidence, source atoms, source URLs, external
+  corroboration, operator fit, and no blocking risk/profile mismatch.
+
 ## First Tasks for Next AI Development Session
 
-Start from `docs/tasks.md`. The first open task is operational because the
-project recently failed silently when the digest timer became inactive.
+Start from `docs/tasks.md`. The active queue is now
+`KIR-Q: AI Intelligence Quality / Workbook / Feedback / Radar Contract`.
 
-After Phase 0 is complete, proceed to the Knowledge Atom schema and extraction
-pipeline. Do not start with prompt tuning or HTML polish; those are downstream
-from the knowledge layer.
+The first implementation task after the docs-first planning pass is KIR-Q1:
+preserve Knowledge Thread provenance on Demand-to-MVP Radar import. KIR-Q2 then
+adds the KIR-backed Radar gate. Do not start by expanding workbook HTML before
+the cross-repo provenance contract is preserved; otherwise Radar cannot explain
+whether a Telegram-seeded candidate has fresh KIR evidence.
 
 ## Suggested New Session Prompt
 
 ```text
 Work in /srv/openclaw-you/workspace/telegram-research-agent on master.
 Read docs/CODEX_PROMPT.md, docs/tasks.md, and
-docs/ai_knowledge_intelligence_roadmap.md.
+docs/ai_intelligence_workbook_roadmap.md. Also inspect the Demand-to-MVP-Radar
+bridge at /srv/openclaw-you/workspace/Demand-to-MVP-Radar.
 
-Start with the first open task in docs/tasks.md. The strategic direction is to
-turn the project into an AI Knowledge Intelligence Desk: all Telegram posts ->
-knowledge atoms -> temporal idea threads -> weekly HTML intelligence report ->
-generated Obsidian vault -> personal read/try/build loop. MVP Radar and project
-recommendations are downstream consumers, not the main product.
+Implement KIR-Q1 only: preserve Knowledge Thread provenance in Radar import.
+Do not implement the KIR-backed gate yet except for any minimal test fixture
+setup needed to prove metadata is available.
 
-Implement end-to-end, add focused tests, update docs only if needed, run
-verification, commit and push. Do not add runtime artifacts from data/output.
+Acceptance: imported EvidenceRecord.provider_metadata preserves source_kind,
+source_urls, knowledge_thread_slug, knowledge_thread_title,
+knowledge_thread_status, knowledge_atom_types, and source_atom_ids for
+knowledge_thread seeds; existing Telegram seed imports still pass; selected
+JSON/report code can access the fields for KIR-Q2.
+
+Run:
+cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
+.venv/bin/python -m pytest tests/test_mvp_of_week.py tests/test_mvp_report_quality.py
 ```

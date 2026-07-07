@@ -65,6 +65,61 @@ Radar's active weekly source bundle includes:
 Confident recommendations are gated in Radar. Telegram-only candidates cannot
 become `focused_experiment`.
 
+## KIR-backed Radar Contract
+
+Radar is a conservative opportunity scout. It may receive Knowledge
+Thread-backed seeds from Telegram Research Agent, but it must still answer only
+whether a real MVP opportunity is validated beyond Telegram.
+
+Telegram Research Agent currently exports Knowledge Thread-backed opportunity
+seeds with fields such as:
+
+- `source_kind`
+- `source_urls`
+- `knowledge_thread_slug`
+- `knowledge_thread_title`
+- `knowledge_thread_status`
+- `knowledge_atom_types`
+- `source_atom_ids`
+
+Demand-to-MVP Radar import must preserve those fields in imported
+`EvidenceRecord.provider_metadata`. The next Radar contract should derive and
+expose KIR-aware source mix fields:
+
+- `kir_source_kind`
+- `kir_thread_slug`
+- `kir_thread_status`
+- `kir_source_atom_count`
+- `kir_has_fresh_thread`
+- `kir_gate_status`
+
+In Telegram-seeded weekly mode, `build` or `focused_experiment` should require:
+
+- fresh Knowledge Thread evidence;
+- non-empty `source_atom_ids`;
+- source URLs;
+- decision-grade external evidence;
+- operator fit;
+- no blocking risk or profile mismatch.
+
+Clarifications:
+
+- Telegram-only remains `investigate` or `reject`.
+- Live source intelligence is context-only and does not satisfy external
+  evidence gates.
+- Existing-project context is `investigate/apply-to-existing`, not a new
+  standalone MVP.
+- External-first standalone Radar runs should remain possible. Apply the KIR
+  gate only when imported seeds are from Telegram Research Agent in
+  `knowledge_thread` mode, or make the gate configurable.
+
+First implementation task:
+
+- KIR-Q1 preserves KIR provenance in
+  `/srv/openclaw-you/workspace/Demand-to-MVP-Radar/demand_mvp_radar/sources/telegram_research_agent.py`.
+- KIR-Q2 adds the KIR-backed gate and report/JSON explanation in
+  `/srv/openclaw-you/workspace/Demand-to-MVP-Radar/demand_mvp_radar/mvp_weekly.py`.
+
 ## Credentials
 
 Primary Telegram Research Agent secrets remain in:
@@ -204,8 +259,14 @@ Radar implementation work happens in:
 
 Primary files for the next Radar tasks:
 
+- `demand_mvp_radar/sources/telegram_research_agent.py`
+  - `TelegramResearchAgentBridge.metadata_fields`
+  - `_provider_metadata`
 - `demand_mvp_radar/mvp_weekly.py`
   - `run_mvp_of_week`
+  - `_rank_candidates`
+  - `_selected_source_mix`
+  - `_decision_gate_summary`
   - `_synthesize_or_render`
   - `_apply_synthesis_gates`
   - `_append_gate_notes`
@@ -220,8 +281,10 @@ Run Radar tests from the Radar repo:
 
 ```bash
 cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
-.venv/bin/python -m pytest tests/test_mvp_of_week.py
+.venv/bin/python -m pytest tests/test_mvp_of_week.py tests/test_mvp_report_quality.py
 ```
 
-Detailed Telegram-side and Radar-side tasks live in
-`docs/report_quality_roadmap.md` as `RADAR-1` through `RADAR-4`.
+The implemented historical Radar tasks live in `docs/report_quality_roadmap.md`
+as `RADAR-1` through `RADAR-4`. The active KIR-backed Radar work lives in
+`docs/tasks.md` as KIR-Q1 and KIR-Q2, with product context in
+`docs/ai_intelligence_workbook_roadmap.md`.
