@@ -29,8 +29,30 @@ Owner receives:
 - Telegram message: short `Implementation Ideas` notification + Telegraph link
 - Telegram message: short `MVP of the Week` notification + Telegraph link + source-mix summary
 - Telegram document: copyable `MVP of the Week` Markdown fallback with one candidate, evidence, missing evidence, risks, and next experiment
+- When run on demand, Telegram document: `AI Decision Intelligence` HTML report with a first-screen decision brief, actions, conservative project implications, trend board, source links, and an embedded Archify knowledge-flow diagram
 
 Expected time to read: 10–15 minutes.
+
+### AI Knowledge Intelligence Run
+
+The current AI Knowledge layer is an on-demand pipeline over the raw Telegram
+archive. Use it when you want the richer 12-week view: what ideas changed,
+which actions matter now, how current signals connect to the long-running
+knowledge base, and what should be browsed later in Obsidian.
+
+```bash
+python3 src/main.py knowledge-extract --weeks 12 --model cheap
+python3 src/main.py idea-threads --weeks 12
+python3 src/main.py frontier-analysis --week 2026-W28 --lookback-weeks 12 --model strong
+python3 src/main.py ai-visual-report --week 2026-W28 --skip-refresh --threads-limit 12 --atoms-limit 8
+python3 src/main.py obsidian-export --week 2026-W28
+```
+
+Add `--deliver` to `ai-visual-report` to send the HTML file to the configured
+Telegram owner chat/channel. The report is allowed to show zero project leads:
+that means the evidence was not specific enough after broad terms like `AI`,
+`workflow`, and `evidence` were filtered out. Treat this as honest uncertainty,
+not as a pipeline failure.
 
 ### Reader-Facing Quality Contract
 
@@ -142,6 +164,16 @@ python3 src/main.py ops-validate all --days 14
 
 # Debug why digest topics did not become project-linked Telegram signals
 python3 src/main.py memory diagnose-project-signals --week 2026-W20
+
+# Refresh the AI Knowledge Intelligence layer over 12 weeks
+python3 src/main.py knowledge-extract --weeks 12 --model cheap
+python3 src/main.py idea-threads --weeks 12
+python3 src/main.py frontier-analysis --week 2026-W28 --lookback-weeks 12 --model strong
+
+# Generate the stakeholder-facing HTML report and optional Obsidian projection
+python3 src/main.py ai-visual-report --week 2026-W28 --skip-refresh
+python3 src/main.py ai-visual-report --week 2026-W28 --skip-refresh --deliver
+python3 src/main.py obsidian-export --week 2026-W28
 ```
 
 `mvp-weekly` is not Telegram-only idea generation. It exports Telegram seeds to
@@ -367,8 +399,9 @@ This lets study planning, recommendations, and project insights reason from rece
 
 ## Initial Setup Checklist
 
-- [ ] Set `AGENT_DB_PATH`, `ANTHROPIC_API_KEY` in environment
+- [ ] Set `AGENT_DB_PATH`, `LLM_API_KEY` in environment
 - [ ] Set `TELEGRAPH_TOKEN` if you want a stable Telegraph account instead of anonymous per-publish accounts
+- [ ] Set `ARCHIFY_ROOT` if you want `ai-visual-report` to use an installed Archify renderer instead of the deterministic fallback diagram
 - [ ] Fill `src/config/channels.yaml` — your curated channel list with priorities
 - [ ] Fill `src/config/profile.yaml` — your boost/downrank topics
 - [ ] Fill `src/config/projects.yaml` — your active projects with focus keywords

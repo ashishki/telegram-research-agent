@@ -1,7 +1,7 @@
 # Current Backlog
 
 **Status:** Active lightweight backlog
-**Last updated:** 2026-07-06
+**Last updated:** 2026-07-07
 
 The historical memory-unification roadmap is complete and archived at
 `docs/archive/roadmaps/tasks-v5-memory-unification.md`.
@@ -113,10 +113,13 @@ Implemented:
   This Week / Source Map / Appendix sections, JSON sidecar, local notification
   text, and quality gates that block internal matching traces
 - Archify-backed weekly visual artifact via `ai-visual-report`: generates a
-  one-off interactive stakeholder HTML report with embedded Archify data-flow
-  visualization, week delta metrics, project-fit matrix, trend board,
+  one-off interactive `AI Decision Intelligence` HTML report with a first-screen
+  Decision Brief, top actions, week delta metrics, conservative Project
+  Implication leads, trend board, embedded Archify data-flow visualization,
   frontier-model study/action sections, JSON sidecar, quality gates, and
-  optional Telegram document delivery through `--deliver`
+  optional Telegram document delivery through `--deliver`. Broad keyword-only
+  project overlaps are suppressed, so zero project leads is an honest outcome
+  when the evidence is not specific enough.
 - generated Obsidian knowledge vault projection via `obsidian-export`:
   deterministic Markdown notes for weekly intelligence, idea threads,
   tools/models, practices, channels, read queue, and experiments; frontmatter,

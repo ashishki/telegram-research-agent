@@ -34,14 +34,61 @@ DEFAULT_ARCHIFY_CANDIDATES = (
     Path.home() / ".codex" / "skills" / "archify",
 )
 VISUAL_REQUIRED_SECTIONS = (
-    ("frontier-brief", "Frontier Brief"),
-    ("knowledge-flow", "Knowledge Flow"),
-    ("week-delta", "This Week"),
-    ("project-fit", "Project Fit"),
-    ("trend-board", "Trend Board"),
+    ("decision-brief", "Decision Brief"),
+    ("what-changed", "What Changed"),
     ("actions", "Study And Do"),
+    ("project-implications", "Project Implications"),
+    ("knowledge-flow", "Knowledge Flow"),
+    ("trend-board", "Trend Board"),
     ("sources", "Sources"),
 )
+GENERIC_PROJECT_TERMS = {
+    "agent",
+    "agents",
+    "ai",
+    "automation",
+    "channel",
+    "data",
+    "developer",
+    "evidence",
+    "implementation",
+    "memory",
+    "project",
+    "public",
+    "research",
+    "risk",
+    "signal",
+    "signals",
+    "source",
+    "support",
+    "tool",
+    "workflow",
+    "discovery",
+    "service",
+    "training",
+    "voice",
+}
+STRONG_SINGLE_PROJECT_TERMS = {
+    "anthropic",
+    "claude",
+    "codex",
+    "fastapi",
+    "github",
+    "openai",
+    "pathway",
+    "postgres",
+    "postgresql",
+    "rag",
+    "redis",
+    "sqlite",
+    "telethon",
+}
+GENERIC_PROJECT_PHRASES = {
+    "ai agents",
+    "ai automation",
+    "agent orchestration",
+    "workflow automation",
+}
 
 
 @dataclass(frozen=True)
@@ -79,7 +126,7 @@ def _utc_now_iso() -> str:
 
 
 def _escape(value: object) -> str:
-    return html.escape(str(value or ""), quote=True)
+    return html.escape("" if value is None else str(value), quote=True)
 
 
 def _safe_id(value: object) -> str:
@@ -128,6 +175,29 @@ def _project_keywords(project: dict) -> list[str]:
     return sorted(_tokenize(fallback))
 
 
+def _keyword_hit(keyword: str, text_lower: str, tokens: set[str]) -> bool:
+    clean = " ".join(str(keyword or "").lower().split())
+    if not clean:
+        return False
+    if " " in clean:
+        return clean not in GENERIC_PROJECT_PHRASES and clean in text_lower
+    if clean in GENERIC_PROJECT_TERMS:
+        return False
+    return clean in STRONG_SINGLE_PROJECT_TERMS and clean in tokens
+
+
+def _thread_source_urls(thread: dict, *, limit: int = 4) -> list[str]:
+    urls: list[str] = []
+    for atom in thread.get("atoms") or []:
+        for url in atom.get("source_urls") or []:
+            clean = str(url or "").strip()
+            if clean and clean not in urls:
+                urls.append(clean)
+            if len(urls) >= limit:
+                return urls
+    return urls
+
+
 def _thread_text(thread: dict) -> str:
     parts = [
         thread.get("title") or "",
@@ -161,17 +231,19 @@ def _project_links(context: dict, projects: list[dict]) -> list[dict]:
             keywords = _project_keywords(project)
             hits: list[str] = []
             for keyword in keywords:
-                keyword_lower = keyword.lower()
-                keyword_tokens = _tokenize(keyword_lower)
-                if keyword_lower and keyword_lower in text_lower:
-                    hits.append(keyword_lower)
-                elif keyword_tokens and keyword_tokens & tokens:
+                keyword_lower = " ".join(str(keyword or "").lower().split())
+                if _keyword_hit(keyword_lower, text_lower, tokens):
                     hits.append(keyword_lower)
                 if len(hits) >= 4:
                     break
             if not hits:
                 continue
-            score = min(1.0, len(hits) / max(1, min(len(keywords), 4)))
+            score = min(1.0, len(hits) / 3)
+            confidence = "review"
+            if len(hits) >= 3 and float(thread.get("momentum_30d") or 0.0) >= 0.08:
+                confidence = "medium"
+            if len(hits) >= 4 and int(thread.get("source_channel_count") or 0) >= 2:
+                confidence = "higher"
             links.append(
                 {
                     "project": str(project.get("name") or project.get("repo") or "unknown-project"),
@@ -179,23 +251,34 @@ def _project_links(context: dict, projects: list[dict]) -> list[dict]:
                     "thread_slug": thread.get("slug"),
                     "thread_title": thread.get("title"),
                     "score": round(score, 2),
+                    "confidence": confidence,
                     "shared_terms": hits[:4],
-                    "why": (
-                        "Relevant to this project because the thread touches "
-                        + ", ".join(hits[:3])
-                        + "."
+                    "why": _compact(
+                        f"{thread.get('title') or 'This thread'} may matter because it overlaps "
+                        f"{', '.join(hits[:3])}. Treat this as a lead to inspect, not an automatic project decision.",
+                        260,
                     ),
+                    "next_step": (
+                        "Open the linked source atom(s), then decide whether this changes the next project experiment."
+                    ),
+                    "evidence_urls": _thread_source_urls(thread),
                 }
             )
     links.sort(
         key=lambda item: (
+            item.get("confidence") == "higher",
+            item.get("confidence") == "medium",
             float(item.get("score") or 0.0),
-            str(item.get("project") or ""),
             str(item.get("thread_title") or ""),
         ),
         reverse=True,
     )
-    return links[:16]
+    best_by_project: dict[str, dict] = {}
+    for link in links:
+        project = str(link.get("project") or "")
+        if project not in best_by_project:
+            best_by_project[project] = link
+    return list(best_by_project.values())[:6]
 
 
 def _all_atoms(threads: list[dict]) -> list[dict]:
@@ -309,7 +392,7 @@ def _build_archify_ir(context: dict, *, project_count: int, action_count: int) -
                 "id": "profile",
                 "type": "security",
                 "label": "Profile + Projects",
-                "sublabel": f"{project_count} project links",
+                "sublabel": f"{project_count} project leads",
                 "stage": 0,
                 "row": 3,
                 "tag": "personal fit",
@@ -458,7 +541,7 @@ def _build_archify_ir(context: dict, *, project_count: int, action_count: int) -
                 "title": "Why This Matters",
                 "items": [
                     "The report explains how the week changes the existing knowledge base.",
-                    "Project-fit links turn general AI news into portfolio-specific decisions.",
+                    "Project leads turn general AI news into portfolio-specific checks.",
                     "The visual artifact can be sent as a standalone Telegram document.",
                 ],
             },
@@ -571,21 +654,90 @@ def _analysis_text(item: object, *keys: str) -> str:
     return str(item or "").strip()
 
 
-def _render_frontier_brief(context: dict) -> str:
+def _sentences(value: object, *, limit: int = 3) -> list[str]:
+    text = " ".join(str(value or "").split())
+    if not text:
+        return []
+    parts = re.split(r"(?<=[.!?])\s+", text)
+    return [part.strip() for part in parts if part.strip()][:limit]
+
+
+def _render_item_cards(items: list, *, title_keys: tuple[str, ...], body_keys: tuple[str, ...], limit: int = 4) -> str:
+    cards = []
+    for item in items[:limit]:
+        title = _analysis_text(item, *title_keys)
+        body = _analysis_text(item, *body_keys)
+        cards.append(
+            "<article>"
+            f"<h3>{_escape(title or 'Untitled')}</h3>"
+            f"<p>{_escape(body)}</p>"
+            "</article>"
+        )
+    return "".join(cards)
+
+
+def _render_decision_brief(context: dict) -> str:
     analysis = context.get("frontier_analysis") or {}
     if not analysis:
         return (
             "<p>No saved frontier-model synthesis exists for this week yet.</p>"
             '<p class="muted">Run <code>frontier-analysis --lookback-weeks 12</code>, then regenerate this visual report.</p>'
         )
+    brief_lines = "".join(f"<li>{_escape(sentence)}</li>" for sentence in _sentences(analysis.get("executive_brief"), limit=3))
+    actions = _analysis_items(analysis, "actions")
+    study_now = _analysis_items(analysis, "study_now")
+    caveats = _analysis_items(analysis, "caveats")
+    do_now = _render_item_cards(
+        actions,
+        title_keys=("title", "action"),
+        body_keys=("next_step", "success_criterion", "why"),
+        limit=2,
+    )
+    study = _render_item_cards(
+        study_now,
+        title_keys=("topic", "title"),
+        body_keys=("reason", "why_it_matters"),
+        limit=2,
+    )
+    caveat_items = "".join(
+        f"<li>{_escape(_analysis_text(item, 'caveat', 'summary'))}</li>"
+        for item in caveats[:3]
+    )
+    if not do_now:
+        do_now = '<p class="muted">No top-model action queue has been saved yet.</p>'
+    if not study:
+        study = '<p class="muted">No top-model study queue has been saved yet.</p>'
+    if not caveat_items:
+        caveat_items = "<li>No explicit caveats were saved for this week.</li>"
+    return (
+        '<div class="decision-layout">'
+        '<article class="decision-main">'
+        "<h3>Main Read</h3>"
+        f'<ol class="decision-list">{brief_lines}</ol>'
+        "</article>"
+        '<article class="decision-watchout">'
+        "<h3>Trust Check</h3>"
+        f"<ul>{caveat_items}</ul>"
+        "</article>"
+        "</div>"
+        '<div class="split action-first">'
+        f'<div><h3>Do Now</h3><div class="card-grid">{do_now}</div></div>'
+        f'<div><h3>Study Next</h3><div class="card-grid">{study}</div></div>'
+        "</div>"
+    )
+
+
+def _render_what_changed(context: dict) -> str:
+    analysis = context.get("frontier_analysis") or {}
+    if not analysis:
+        return _render_week_delta(context)
     what_changed = _analysis_items(analysis, "what_changed")
     narratives = _analysis_items(analysis, "trend_narratives")
-    changed_html = "".join(
-        "<article>"
-        f"<h3>{_escape(_analysis_text(item, 'title', 'change', 'topic'))}</h3>"
-        f"<p>{_escape(_analysis_text(item, 'summary', 'why_it_matters', 'reason'))}</p>"
-        "</article>"
-        for item in what_changed[:4]
+    changed_html = _render_item_cards(
+        what_changed,
+        title_keys=("title", "change", "topic"),
+        body_keys=("summary", "why_it_matters", "reason"),
+        limit=4,
     )
     narrative_html = "".join(
         "<li>"
@@ -595,14 +747,16 @@ def _render_frontier_brief(context: dict) -> str:
         for item in narratives[:4]
     )
     return (
-        f'<p class="lead">{_escape(analysis.get("executive_brief") or "")}</p>'
+        _render_week_delta(context)
+        +
+        "<h3>Top-Model Interpretation</h3>"
         '<div class="card-grid frontier-cards">'
         f"{changed_html}"
         "</div>"
         '<ol class="narrative-list">'
         f"{narrative_html}"
         "</ol>"
-        f'<p class="muted">Model: {_escape(analysis.get("model") or "")} | '
+        f'<p class="muted">Synthesis model: {_escape(analysis.get("model") or "")} | '
         f'{_escape(analysis.get("threads_analyzed") or 0)} threads | '
         f'{_escape(analysis.get("atoms_analyzed") or 0)} atoms</p>'
     )
@@ -652,34 +806,37 @@ def _render_week_delta(context: dict) -> str:
     )
 
 
-def _render_project_fit(project_links: list[dict]) -> str:
+def _render_project_implications(project_links: list[dict]) -> str:
     if not project_links:
         return (
-            "<p>No project-fit links were strong enough in this report context.</p>"
-            '<p class="muted">Update <code>src/config/projects.yaml</code> or extract more Knowledge Atoms to improve this section.</p>'
+            "<p>No project implications were strong enough to show confidently in this report context.</p>"
+            '<p class="muted">This is intentional: broad overlaps such as AI, workflow, evidence, and tool are suppressed so the report does not show noisy project guesses. '
+            'Update <code>src/config/projects.yaml</code> with more specific project phrases or extract more Knowledge Atoms to improve this section.</p>'
         )
-    filters = []
-    projects = sorted({str(link.get("project") or "unknown") for link in project_links})
-    for project in projects[:10]:
-        filters.append(f'<button type="button" data-project-filter="{_escape(project)}">{_escape(project)}</button>')
     rows = []
     for link in project_links:
         terms = ", ".join(link.get("shared_terms") or [])
+        source_links = " ".join(
+            _source_link(url, f"S{index}")
+            for index, url in enumerate(link.get("evidence_urls") or [], start=1)
+        )
+        confidence = str(link.get("confidence") or "review").replace("_", " ")
         rows.append(
-            '<article class="project-link" data-project="' + _escape(link.get("project") or "") + '">'
+            '<article class="project-implication">'
+            '<div class="project-head">'
             f'<h3>{_escape(link.get("project") or "")}</h3>'
+            f'<span class="status-pill">{_escape(confidence)}</span>'
+            "</div>"
             f'<p><b>{_escape(link.get("thread_title") or "")}</b></p>'
             f'<p>{_escape(link.get("why") or "")}</p>'
-            f'{_bar(float(link.get("score") or 0.0), label="project fit")}'
-            f'<p class="muted">Shared context: {_escape(terms)}</p>'
+            f'<p><b>Next check:</b> {_escape(link.get("next_step") or "")}</p>'
+            f'<p class="muted">Shared terms: {_escape(terms or "none")} | Evidence: {source_links or "source pending"}</p>'
             "</article>"
         )
     return (
-        '<div class="filter-row">'
-        '<button type="button" data-project-filter="all" class="active">All</button>'
-        + "".join(filters)
-        + "</div>"
-        '<div class="card-grid project-grid">'
+        '<p class="section-note">These are conservative leads from project config overlap. '
+        "They should guide what to inspect next, not automatically rewrite project priorities.</p>"
+        '<div class="card-grid project-grid compact-grid">'
         + "".join(rows)
         + "</div>"
     )
@@ -806,19 +963,31 @@ def _render_html(
     diagram_srcdoc = _escape(diagram_html)
     profile = _load_profile()
     boost_topics = ", ".join(str(item) for item in (profile.get("boost_topics") or [])[:8])
+    hero_actions = _analysis_items(context.get("frontier_analysis") or {}, "actions")
+    hero_action_items = "".join(
+        f"<li>{_escape(_analysis_text(item, 'title', 'action'))}</li>"
+        for item in hero_actions[:2]
+    )
+    hero_actions_html = (
+        f'<div class="hero-actions"><b>Do now</b><ol>{hero_action_items}</ol></div>'
+        if hero_action_items
+        else ""
+    )
     sections = {
-        "frontier-brief": _render_frontier_brief(context),
+        "decision-brief": _render_decision_brief(context),
+        "what-changed": _render_what_changed(context),
+        "actions": _render_actions(context),
+        "project-implications": _render_project_implications(project_links),
         "knowledge-flow": (
+            '<p class="section-note">This diagram explains how the report was built. '
+            "Read the decision sections first; use this map when auditing the pipeline.</p>"
             '<div class="diagram-shell">'
             f'<iframe title="Archify knowledge flow" srcdoc="{diagram_srcdoc}"></iframe>'
             "</div>"
             f'<p class="muted">Diagram renderer: {_escape(archify_status)} | '
             f'Standalone diagram: {_source_link(str(diagram_html_path), diagram_html_path.name)}</p>'
         ),
-        "week-delta": _render_week_delta(context),
-        "project-fit": _render_project_fit(project_links),
         "trend-board": _render_trend_board(context),
-        "actions": _render_actions(context),
         "sources": _render_sources(context),
     }
     section_html = "\n".join(
@@ -830,16 +999,16 @@ def _render_html(
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AI Visual Intelligence { _escape(week_label) }</title>
+<title>AI Decision Intelligence { _escape(week_label) }</title>
 <style>
-:root {{ color-scheme: light; --ink:#172026; --muted:#62717f; --bg:#eef3f1; --panel:#fff; --line:#d6dfdc; --green:#0f766e; --blue:#2563eb; --rose:#be123c; --amber:#b45309; }}
+:root {{ color-scheme: light; --ink:#172026; --muted:#62717f; --bg:#eef3f1; --panel:#fff; --line:#d6dfdc; --green:#0f766e; --blue:#2563eb; --rose:#be123c; --amber:#b45309; --soft:#f8fafc; }}
 * {{ box-sizing:border-box; }}
 body {{ margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:var(--bg); color:var(--ink); line-height:1.55; }}
 a {{ color:#0b63ce; text-decoration:none; }}
 a:hover {{ text-decoration:underline; }}
 header {{ position:relative; overflow:hidden; background:#10231f; color:#f8fafc; padding:30px 24px 24px; }}
 header::after {{ content:""; position:absolute; inset:auto 0 0 0; height:5px; background:linear-gradient(90deg,#14b8a6,#2563eb,#f59e0b,#e11d48); }}
-.hero {{ max-width:1180px; margin:0 auto; display:grid; grid-template-columns:minmax(0,1.3fr) minmax(260px,.7fr); gap:22px; align-items:end; }}
+.hero {{ max-width:1180px; margin:0 auto; display:grid; grid-template-columns:minmax(0,1.25fr) minmax(260px,.75fr); gap:22px; align-items:end; }}
 .kicker {{ color:#99f6e4; font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; margin:0 0 7px; }}
 h1 {{ font-size:38px; line-height:1.08; margin:0 0 10px; letter-spacing:0; }}
 h2 {{ font-size:23px; line-height:1.2; margin:0 0 14px; letter-spacing:0; }}
@@ -852,17 +1021,30 @@ p {{ margin:0 0 11px; }}
 .hero-metrics div {{ padding:12px; background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.18); }}
 .hero-metrics b {{ display:block; font-size:27px; line-height:1; }}
 .hero-metrics span {{ color:#cbd5e1; font-size:12px; }}
+.hero-actions {{ margin-top:12px; border:1px solid rgba(153,246,228,.36); border-radius:8px; padding:10px 12px; background:rgba(15,118,110,.18); max-width:760px; }}
+.hero-actions b {{ display:block; color:#99f6e4; font-size:13px; margin-bottom:4px; text-transform:uppercase; }}
+.hero-actions ol {{ margin:0; padding-left:20px; color:#f8fafc; display:grid; gap:2px; }}
 nav {{ max-width:1180px; margin:18px auto 0; display:flex; flex-wrap:wrap; gap:8px; }}
 nav a {{ color:#eff6ff; border:1px solid rgba(255,255,255,.22); border-radius:6px; padding:7px 10px; background:rgba(255,255,255,.08); font-size:13px; }}
-main {{ max-width:1180px; margin:0 auto; padding:18px 24px 46px; }}
+main {{ max-width:1180px; margin:0 auto; padding:14px 24px 46px; }}
 section {{ background:var(--panel); padding:20px; margin:0 0 14px; }}
 article {{ background:#fbfdfc; padding:13px; margin:0; }}
 .card-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(235px,1fr)); gap:10px; }}
+.compact-grid {{ grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); }}
 .frontier-cards article:first-child {{ border-color:#99f6e4; background:#f0fdfa; }}
 .narrative-list, .source-list {{ padding-left:22px; margin:14px 0 0; }}
 .narrative-list li, .source-list li {{ margin:0 0 9px; }}
 .narrative-list span, .source-list span {{ display:block; color:var(--muted); font-size:13px; }}
-.diagram-shell {{ width:100%; height:min(78vh,820px); min-height:560px; border:1px solid var(--line); border-radius:8px; overflow:hidden; background:#0f172a; }}
+.decision-layout {{ display:grid; grid-template-columns:minmax(0,1.2fr) minmax(260px,.8fr); gap:12px; margin-bottom:14px; }}
+.decision-main {{ background:#f0fdfa; border-color:#99f6e4; }}
+.decision-watchout {{ background:#fff7ed; border-color:#fed7aa; }}
+.decision-list {{ margin:0; padding-left:22px; display:grid; gap:8px; font-size:17px; }}
+.action-first article {{ background:#f8fafc; }}
+.section-note {{ color:#425466; margin-top:-2px; max-width:860px; }}
+.project-head {{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }}
+.status-pill {{ display:inline-block; border:1px solid #cbd5e1; border-radius:999px; padding:2px 8px; color:#334155; background:#f8fafc; font-size:12px; font-weight:700; white-space:nowrap; }}
+.project-implication {{ background:#fbfdfc; }}
+.diagram-shell {{ width:100%; height:min(70vh,720px); min-height:520px; border:1px solid var(--line); border-radius:8px; overflow:hidden; background:#0f172a; }}
 .diagram-shell iframe {{ width:100%; height:100%; border:0; display:block; }}
 .metrics-row {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; margin:0 0 16px; }}
 .metrics-row div {{ border:1px solid var(--line); border-radius:8px; background:#f8fafc; padding:13px; }}
@@ -873,17 +1055,13 @@ article {{ background:#fbfdfc; padding:13px; margin:0; }}
 .bar span {{ display:block; height:100%; background:linear-gradient(90deg,#0f766e,#2563eb,#f59e0b); }}
 .distribution, .term-list {{ list-style:none; padding:0; margin:0; display:grid; gap:10px; }}
 .distribution li, .term-list li {{ border:1px solid var(--line); border-radius:8px; padding:10px; background:#fbfdfc; }}
-.filter-row {{ display:flex; flex-wrap:wrap; gap:8px; margin:0 0 12px; }}
-button {{ border:1px solid var(--line); border-radius:6px; background:#fff; color:#172026; padding:7px 10px; cursor:pointer; }}
-button.active {{ background:#0f766e; border-color:#0f766e; color:#fff; }}
-.project-link[data-hidden="true"] {{ display:none; }}
 .trend-card {{ display:grid; gap:6px; }}
 .trend-bars label {{ display:block; font-size:12px; color:var(--muted); }}
 table {{ width:100%; border-collapse:collapse; }}
 th, td {{ border-bottom:1px solid var(--line); text-align:left; padding:9px 8px; }}
 code {{ background:#eef2f6; border:1px solid #d7dee7; border-radius:4px; padding:1px 4px; }}
 .profile-note {{ color:#cbd5e1; font-size:13px; margin-top:10px; }}
-@media (max-width:860px) {{ .hero, .split {{ grid-template-columns:1fr; }} h1 {{ font-size:30px; }} main {{ padding-left:14px; padding-right:14px; }} header {{ padding-left:14px; padding-right:14px; }} .diagram-shell {{ min-height:460px; }} }}
+@media (max-width:860px) {{ .hero, .split, .decision-layout {{ grid-template-columns:1fr; }} h1 {{ font-size:27px; }} main {{ padding-left:14px; padding-right:14px; }} header {{ padding-left:14px; padding-right:14px; }} section {{ padding:14px; }} .profile-note {{ display:none; }} .hero-metrics {{ grid-template-columns:repeat(4,minmax(0,1fr)); }} .hero-metrics div {{ padding:8px; }} .hero-metrics b {{ font-size:20px; }} .hero-metrics span {{ font-size:11px; }} .hero-actions {{ font-size:13px; }} .diagram-shell {{ height:430px; min-height:430px; }} .decision-list {{ font-size:15px; }} .compact-grid {{ grid-template-columns:1fr; }} }}
 </style>
 </head>
 <body>
@@ -891,37 +1069,24 @@ code {{ background:#eef2f6; border:1px solid #d7dee7; border-radius:4px; padding
 <div class="hero">
 <div>
 <p class="kicker">AI Knowledge Intelligence</p>
-<h1>AI Visual Intelligence - {_escape(week_label)}</h1>
-<p>Interactive weekly artifact: what changed, why it matters, how it fits the knowledge base, and what to study or do next.</p>
+<h1>AI Decision Intelligence - {_escape(week_label)}</h1>
+<p>Briefing-first weekly artifact: what changed, what to do, what to study, and which project leads deserve inspection.</p>
 <p class="profile-note">Profile anchors: {_escape(boost_topics or "profile topics unavailable")}</p>
+{hero_actions_html}
 </div>
 <div class="hero-metrics">
 <div><b>{_escape(len(threads))}</b><span>idea threads</span></div>
 <div><b>{_escape(len(atoms))}</b><span>source atoms</span></div>
 <div><b>{_escape(len(_source_counts(threads)))}</b><span>source channels</span></div>
-<div><b>{_escape(len(project_links))}</b><span>project links</span></div>
+<div><b>{_escape(len(project_links))}</b><span>project leads</span></div>
 </div>
 </div>
 <nav>{nav}</nav>
 </header>
 <main>
-<p class="muted">Generated {_escape(generated_at)}. Archify renders the knowledge-flow visualization; deterministic report code renders the surrounding decision surface.</p>
+<p class="muted">Generated {_escape(generated_at)}. Frontier synthesis drives the briefing; deterministic code renders metrics, sources, and the Archify pipeline map.</p>
 {section_html}
 </main>
-<script>
-const buttons = document.querySelectorAll('[data-project-filter]');
-const links = document.querySelectorAll('.project-link');
-buttons.forEach((button) => {{
-  button.addEventListener('click', () => {{
-    const filter = button.getAttribute('data-project-filter');
-    buttons.forEach((item) => item.classList.toggle('active', item === button));
-    links.forEach((item) => {{
-      const visible = filter === 'all' || item.getAttribute('data-project') === filter;
-      item.dataset.hidden = visible ? 'false' : 'true';
-    }});
-  }});
-}});
-</script>
 </body>
 </html>
 """
@@ -959,13 +1124,22 @@ def validate_ai_visual_html(html_text: str) -> list[ReportQualityFinding]:
                 line_hint="knowledge-flow",
             )
         )
-    if "Project Fit" not in html_text:
+    if "Decision Brief" not in html_text:
         findings.append(
             ReportQualityFinding(
                 severity=SEVERITY_CRITICAL,
                 artifact_type="ai_visual_report",
-                message="Project fit surface is missing",
-                line_hint="project-fit",
+                message="Decision brief surface is missing",
+                line_hint="decision-brief",
+            )
+        )
+    if "Project Implications" not in html_text:
+        findings.append(
+            ReportQualityFinding(
+                severity=SEVERITY_CRITICAL,
+                artifact_type="ai_visual_report",
+                message="Project implications surface is missing",
+                line_hint="project-implications",
             )
         )
     return findings
@@ -973,9 +1147,9 @@ def validate_ai_visual_html(html_text: str) -> list[ReportQualityFinding]:
 
 def build_ai_visual_notification(summary: AiVisualReportSummary) -> str:
     return (
-        f"AI Visual Intelligence {summary.week_label} is ready.\n"
+        f"AI Decision Intelligence {summary.week_label} is ready.\n"
         f"Threads: {summary.thread_count} | Atoms: {summary.source_atom_count} | "
-        f"Projects: {summary.project_link_count} | Archify: {summary.archify_status}\n"
+        f"Project leads: {summary.project_link_count} | Archify: {summary.archify_status}\n"
         f"HTML: {summary.html_path}"
     )
 
@@ -1117,7 +1291,7 @@ def deliver_ai_visual_report(
     message_id = send_document(
         chat_id=clean_chat_id,
         file_path=summary.html_path,
-        caption=f"AI Visual Intelligence {summary.week_label}",
+        caption=f"AI Decision Intelligence {summary.week_label}",
         token=clean_token,
     )
     return AiVisualReportSummary(

@@ -1,5 +1,5 @@
 # CODEX_PROMPT — Session Handoff
-_v3.6 · 2026-07-06 · telegram-research-agent_
+_v3.7 · 2026-07-07 · telegram-research-agent_
 
 ---
 
@@ -99,11 +99,14 @@ _v3.6 · 2026-07-06 · telegram-research-agent_
     Intelligence report from compressed Idea Thread / Knowledge Atom context,
     writes a JSON sidecar, includes source map, appendix, read/try actions,
     and blocks internal `Matches:` traces before writing invalid output.
-  - `ai-visual-report` generates the stakeholder-facing interactive HTML
-    artifact. It writes a JSON sidecar, renders the knowledge-flow diagram
-    through Archify when `ARCHIFY_ROOT` or a local skill install is available,
-    falls back to a deterministic diagram when it is not, and can send the HTML
-    file to a Telegram chat/channel with `--deliver --chat-id ...`.
+  - `ai-visual-report` generates the stakeholder-facing interactive
+    `AI Decision Intelligence` HTML artifact. It writes a JSON sidecar, starts
+    with a Decision Brief, puts top actions on the first screen, shows
+    conservative Project Implication leads only when evidence is specific enough,
+    renders the knowledge-flow diagram through Archify when `ARCHIFY_ROOT` or a
+    local skill install is available, falls back to a deterministic diagram when
+    it is not, and can send the HTML file to a Telegram chat/channel with
+    `--deliver --chat-id ...`.
   - `obsidian-export` projects the same AI Intelligence layer into generated
     Obsidian Markdown notes for weekly intelligence, idea threads,
     tools/models, practices, channels, read queue, and experiments with stable

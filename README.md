@@ -1,8 +1,8 @@
 # Telegram Research Agent
 
-Personal research intelligence for Telegram channels: ingest posts, filter noise, preserve evidence, and produce weekly project-aware decisions instead of a generic digest.
+Personal research intelligence for Telegram channels: ingest posts, preserve evidence, extract AI knowledge atoms, track evolving idea threads, and produce weekly decision reports instead of a generic digest.
 
-Status: active observation. Evidence discipline, decision feedback, Research Brief usefulness capture, and low-signal health alerts are implemented. Current work is tracked in `docs/tasks.md`.
+Status: active AI Knowledge Intelligence Desk. The legacy Research Brief / Implementation Ideas loop still works, but the newer knowledge-atom, idea-thread, frontier-analysis, visual HTML, and generated Obsidian layers are implemented and are the primary direction. Current work is tracked in `docs/tasks.md`.
 
 Reference integration: `docs/entropy_core_gensyn_integration.md`.
 
@@ -24,12 +24,16 @@ It is not a public bot, SaaS product, or generic summarizer.
 3. **Score deterministically** before any LLM call using personal interest, source quality, technical depth, novelty, and actionability.
 4. **Apply preference feedback** from commands, Telegram reactions, and implementation-idea buttons.
 5. **Record evidence** in `signal_evidence_items` with source channel, Telegram link, week, project scope, and selection reason.
-6. **Generate weekly artifacts**:
-   - `Research Brief`
-   - `Implementation Ideas`
-   - `Study Plan`
+6. **Extract Knowledge Atoms** from recent posts with cheap bounded LLM batches.
+7. **Refresh Idea Threads** with 7/30/90 day momentum, source counts, and stale/superseded status.
+8. **Run Frontier Analysis** over compressed thread/atom context for the current week.
+9. **Generate weekly artifacts**:
+   - `AI Decision Intelligence` visual HTML report
+   - standalone `AI Intelligence` HTML report and JSON sidecar
+   - generated Obsidian vault projection
+   - legacy `Research Brief`, `Implementation Ideas`, `Study Plan`
    - `MVP of the Week` from Demand-to-MVP Radar
-7. **Record decisions** in `decision_journal` so acted-on, deferred, rejected, and completed items shape future output.
+10. **Record decisions and feedback** so acted-on, deferred, rejected, read, tried, and missed signals shape future output.
 
 ## Current Capabilities
 
@@ -64,6 +68,12 @@ It is not a public bot, SaaS product, or generic summarizer.
 - `score-stats` includes recent Research Brief receipt health trends for empty and low-signal weeks.
 - `health-check` warns when `src/config/projects.yaml` needs monthly review.
 - Weekly MVP Radar bridge: Telegram exports opportunity seeds, Radar collects configured demand sources, Opus-class synthesis writes a separate MVP-of-week report, and the bot delivers it as a Telegraph article plus a copyable Markdown document.
+- Knowledge Atom extraction via `knowledge-extract`: bounded, resumable JSON extraction from raw Telegram posts with source citations.
+- Temporal Idea Threads via `idea-threads`: deterministic grouping of atoms into evolving AI ideas with momentum and status.
+- Frontier-model synthesis via `frontier-analysis`: top-model weekly interpretation over compressed 12-week context.
+- Stakeholder-facing `AI Decision Intelligence` HTML via `ai-visual-report`: decision brief first, actions in the hero, conservative project implications, trend board, source links, JSON sidecar, and an embedded Archify knowledge-flow diagram when available.
+- Generated Obsidian projection via `obsidian-export`: weekly, thread, tool/model, practice, channel, read-queue, and experiment notes with generated-file markers and source links.
+- Honest project implications: the visual report suppresses broad keyword overlaps like `AI`, `workflow`, and `evidence`; a zero project-lead count means the current atom/thread evidence was too weak for a user-facing project claim.
 
 ## Main Commands
 
@@ -88,6 +98,17 @@ python3 src/main.py memory review-receipt --receipt-id rbr_... --status waived -
 python3 src/main.py memory diagnose-project-signals --week 2026-W20
 python3 src/main.py memory inspect-channel-intelligence --week 2026-W22 --project telegram-research-agent
 python3 src/main.py channel-intelligence-report --week 2026-W22 --project telegram-research-agent
+
+# AI Knowledge Intelligence loop over the last 12 weeks
+python3 src/main.py knowledge-extract --weeks 12 --model cheap
+python3 src/main.py idea-threads --weeks 12
+python3 src/main.py frontier-analysis --week 2026-W28 --lookback-weeks 12 --model strong
+python3 src/main.py ai-intelligence-report --week 2026-W28 --skip-refresh
+python3 src/main.py ai-visual-report --week 2026-W28 --skip-refresh --threads-limit 12 --atoms-limit 8
+python3 src/main.py obsidian-export --week 2026-W28
+
+# Send the visual HTML to Telegram as a document when bot credentials are configured
+python3 src/main.py ai-visual-report --week 2026-W28 --skip-refresh --deliver
 ```
 
 ## Configuration
@@ -112,6 +133,7 @@ Environment:
 | `RADAR_REPO_PATH` / `RADAR_PYTHON` | Demand-to-MVP Radar repo and local venv Python |
 | `DMR_MVP_SOURCE_CONFIG` | Radar weekly live-source config |
 | `DMR_LLM_PROVIDER` / `DMR_LLM_MODEL_MVP_WEEKLY` | Radar MVP synthesis provider/model |
+| `ARCHIFY_ROOT` | Optional path to an installed Archify skill directory for `ai-visual-report`; otherwise a deterministic fallback diagram is embedded |
 
 Radar live-source credentials are loaded separately by `systemd/telegram-mvp-weekly.service` from `/etc/demand-mvp-radar.env` when present. That file may contain `SERPAPI_API_KEY`, `GITHUB_TOKEN`, `YOUTUBE_API_KEY`, `PRODUCT_HUNT_TOKEN`, `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USER_AGENT`, and `STACK_EXCHANGE_KEY`.
 
@@ -125,6 +147,7 @@ Start here:
 - [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) — strategic project plan
 - [docs/next_development_roadmap.md](docs/next_development_roadmap.md) — next development roadmap and AI-ready tasks
 - [docs/report_quality_roadmap.md](docs/report_quality_roadmap.md) — report-quality, artifact feedback, internal cost guardrail, and Demand-to-MVP Radar handoff tasks
+- [docs/ai_knowledge_intelligence_roadmap.md](docs/ai_knowledge_intelligence_roadmap.md) — AI Knowledge Intelligence Desk architecture, phases, visual report, and Obsidian projection
 - [docs/operator_workflow.md](docs/operator_workflow.md) — weekly operating workflow
 - [docs/architecture.md](docs/architecture.md) — current system shape
 - [docs/spec.md](docs/spec.md) — implementation-facing system specification
@@ -139,4 +162,6 @@ Historical material lives under [docs/archive/](docs/archive/README.md).
 
 ## Development State
 
-The main product architecture is implemented, Research Brief receipts are auditable, and Channel Intelligence schema plus claim/source/link/narrative refresh, inspection, and optional reporting groundwork is in place. Current work is reader-facing report quality: Decision Brief first screen, deterministic report-quality gates, artifact feedback buttons, internal cost guardrails, and honest Demand-to-MVP Radar candidate dossiers.
+The AI Knowledge Intelligence path is implemented end-to-end for local operation: raw posts can be atomized, atoms can be grouped into temporal threads, a frontier analysis can be persisted, the user-facing HTML report can be generated and delivered, and Obsidian notes can be regenerated from the same knowledge layer.
+
+The honest limitation is quality of interpretation, not missing plumbing: project implications are conservative keyword/evidence leads, not full project-priority decisions; empty project leads are allowed when evidence is too broad. The legacy Research Brief, Implementation Ideas, Study Plan, receipts, Radar bridge, and operator health surfaces still exist and remain useful downstream.

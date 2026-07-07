@@ -44,7 +44,7 @@ from config.settings import Settings  # noqa: E402
 from db.frontier_analysis import upsert_frontier_analysis  # noqa: E402
 from db.knowledge_atoms import record_knowledge_atom  # noqa: E402
 from db.migrate import run_migrations  # noqa: E402
-from output.ai_visual_report import generate_ai_visual_report  # noqa: E402
+from output.ai_visual_report import _escape, _project_links, generate_ai_visual_report  # noqa: E402
 from output.idea_threads import refresh_idea_threads  # noqa: E402
 import main  # noqa: E402
 
@@ -198,16 +198,60 @@ process.exit(2);
         self.assertEqual(summary.archify_status, "rendered")
         self.assertTrue(diagram_html_exists)
         self.assertTrue(diagram_ir_exists)
-        self.assertIn("AI Visual Intelligence - 2026-W28", html_text)
+        self.assertIn("AI Decision Intelligence - 2026-W28", html_text)
+        self.assertIn("Decision Brief", html_text)
+        self.assertIn("Do Now", html_text)
         self.assertIn("Knowledge Flow", html_text)
         self.assertIn("Archify", html_text)
         self.assertIn("<iframe", html_text)
-        self.assertIn("Project Fit", html_text)
+        self.assertIn("Project Implications", html_text)
         self.assertIn("Coding-agent eval design", html_text)
         self.assertNotIn("Matches:", html_text)
         self.assertEqual(metadata["archify"]["status"], "rendered")
         self.assertEqual(metadata["diagram_ir"]["diagram_type"], "dataflow")
         self.assertTrue(metadata["project_links"])
+        self.assertIn("Project Implications", metadata["sections"])
+        self.assertIn("AI Decision Intelligence", summary.notification_text)
+        self.assertIn("Project leads", summary.notification_text)
+
+    def test_project_implications_ignore_generic_keyword_overlap(self):
+        context = {
+            "threads": [
+                {
+                    "slug": "generic-ai-workflow",
+                    "title": "AI workflow evidence is discussed across posts",
+                    "summary": "The thread mentions workflow, evidence, tools, and automation in broad terms.",
+                    "current_claims": ["Teams are still comparing AI workflow tool options."],
+                    "superseded_claims": [],
+                    "contradictions": [],
+                    "momentum_30d": 0.4,
+                    "source_channel_count": 3,
+                    "atoms": [
+                        {
+                            "claim": "Generic AI workflow discussion",
+                            "summary": "No project-specific phrase appears.",
+                            "why_it_matters": "Useful background, but not a project lead.",
+                            "entities": ["AI"],
+                            "tools": ["tool"],
+                            "models": [],
+                            "practices": ["workflow", "evidence"],
+                            "source_urls": ["https://t.me/example/1"],
+                        }
+                    ],
+                }
+            ]
+        }
+        projects = [
+            {
+                "name": "workflow-to-agent-studio",
+                "keywords": ["AI automation", "workflow", "evidence", "tool"],
+            }
+        ]
+
+        self.assertEqual(_project_links(context, projects), [])
+
+    def test_zero_metrics_are_rendered_as_zero(self):
+        self.assertEqual(_escape(0), "0")
 
     def test_visual_report_falls_back_when_archify_is_missing(self):
         db_path = self._make_db()
