@@ -112,6 +112,11 @@ Implemented:
   Idea Evolution / Tools-Models-Practices / Contradictions / Read Queue / Try
   This Week / Source Map / Appendix sections, JSON sidecar, local notification
   text, and quality gates that block internal matching traces
+- Archify-backed weekly visual artifact via `ai-visual-report`: generates a
+  one-off interactive stakeholder HTML report with embedded Archify data-flow
+  visualization, week delta metrics, project-fit matrix, trend board,
+  frontier-model study/action sections, JSON sidecar, quality gates, and
+  optional Telegram document delivery through `--deliver`
 - generated Obsidian knowledge vault projection via `obsidian-export`:
   deterministic Markdown notes for weekly intelligence, idea threads,
   tools/models, practices, channels, read queue, and experiments; frontmatter,

@@ -99,6 +99,11 @@ _v3.6 · 2026-07-06 · telegram-research-agent_
     Intelligence report from compressed Idea Thread / Knowledge Atom context,
     writes a JSON sidecar, includes source map, appendix, read/try actions,
     and blocks internal `Matches:` traces before writing invalid output.
+  - `ai-visual-report` generates the stakeholder-facing interactive HTML
+    artifact. It writes a JSON sidecar, renders the knowledge-flow diagram
+    through Archify when `ARCHIFY_ROOT` or a local skill install is available,
+    falls back to a deterministic diagram when it is not, and can send the HTML
+    file to a Telegram chat/channel with `--deliver --chat-id ...`.
   - `obsidian-export` projects the same AI Intelligence layer into generated
     Obsidian Markdown notes for weekly intelligence, idea threads,
     tools/models, practices, channels, read queue, and experiments with stable
