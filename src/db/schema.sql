@@ -197,6 +197,31 @@ CREATE TABLE IF NOT EXISTS idea_thread_atoms (
     FOREIGN KEY(atom_id) REFERENCES knowledge_atoms(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS frontier_analyses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    week_label TEXT NOT NULL UNIQUE CHECK(length(trim(week_label)) > 0),
+    generated_at TEXT NOT NULL,
+    model TEXT NOT NULL CHECK(length(trim(model)) > 0),
+    prompt_version TEXT NOT NULL CHECK(length(trim(prompt_version)) > 0),
+    lookback_weeks INTEGER NOT NULL DEFAULT 12 CHECK(lookback_weeks >= 1),
+    threads_analyzed INTEGER NOT NULL DEFAULT 0 CHECK(threads_analyzed >= 0),
+    atoms_analyzed INTEGER NOT NULL DEFAULT 0 CHECK(atoms_analyzed >= 0),
+    executive_brief TEXT NOT NULL DEFAULT '',
+    what_changed_json TEXT NOT NULL DEFAULT '[]'
+        CHECK(json_valid(what_changed_json) AND json_type(what_changed_json) = 'array'),
+    trend_narratives_json TEXT NOT NULL DEFAULT '[]'
+        CHECK(json_valid(trend_narratives_json) AND json_type(trend_narratives_json) = 'array'),
+    study_now_json TEXT NOT NULL DEFAULT '[]'
+        CHECK(json_valid(study_now_json) AND json_type(study_now_json) = 'array'),
+    actions_json TEXT NOT NULL DEFAULT '[]'
+        CHECK(json_valid(actions_json) AND json_type(actions_json) = 'array'),
+    caveats_json TEXT NOT NULL DEFAULT '[]'
+        CHECK(json_valid(caveats_json) AND json_type(caveats_json) = 'array'),
+    analysis_json TEXT NOT NULL CHECK(json_valid(analysis_json)),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS ai_report_feedback_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     week_label TEXT NOT NULL CHECK(length(trim(week_label)) > 0),

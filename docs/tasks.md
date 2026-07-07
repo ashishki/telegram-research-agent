@@ -125,6 +125,10 @@ Implemented:
   downranking for thread/atom recommendations, and a quality-gated weekly loop
   with five read targets, two try targets, one experiment, one skill gap, and
   one reflection question
+- frontier-model analysis layer via `frontier-analysis`: top-model synthesis
+  over compressed Idea Threads and Knowledge Atoms, persisted in
+  `frontier_analyses`, rendered as the reader-facing Frontier Analysis section
+  in HTML reports, and projected into generated Obsidian weekly notes
 - downstream MVP Radar and project consumers now read the curated knowledge
   layer: opportunity seed export emits Knowledge Thread-backed Radar seeds with
   source atom provenance, MVP weekly surfaces knowledge-thread counts,

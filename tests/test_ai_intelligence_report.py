@@ -41,6 +41,7 @@ _install_stub("sklearn.feature_extraction.text", ENGLISH_STOP_WORDS=set(), Tfidf
 _install_stub("sklearn.metrics", silhouette_score=lambda *_args, **_kwargs: 0.0)
 
 from config.settings import Settings  # noqa: E402
+from db.frontier_analysis import upsert_frontier_analysis  # noqa: E402
 from db.knowledge_atoms import record_knowledge_atom  # noqa: E402
 from db.migrate import run_migrations  # noqa: E402
 from output.ai_intelligence_report import (  # noqa: E402
@@ -143,6 +144,45 @@ class TestAiIntelligenceReport(unittest.TestCase):
                     weeks=12,
                     now=datetime(2026, 7, 8, tzinfo=timezone.utc),
                 )
+                with sqlite3.connect(db_path) as connection:
+                    upsert_frontier_analysis(
+                        connection,
+                        week_label="2026-W28",
+                        generated_at="2026-07-08T00:00:00Z",
+                        model="claude-opus-4-6",
+                        prompt_version="frontier-analysis-v1",
+                        lookback_weeks=12,
+                        threads_analyzed=1,
+                        atoms_analyzed=3,
+                        executive_brief="Top-model synthesis says eval-gated agent workflows are becoming practical.",
+                        what_changed=[
+                            {
+                                "title": "Eval gates moved into practice",
+                                "summary": "The thread now combines implementation and risk signals.",
+                                "why_it_matters": "It changes what to verify before using agent output.",
+                            }
+                        ],
+                        trend_narratives=[
+                            {
+                                "title": "Eval-gated agent workflows",
+                                "narrative": "The idea moved from isolated demos toward release discipline.",
+                            }
+                        ],
+                        study_now=[
+                            {
+                                "topic": "Coding-agent eval design",
+                                "reason": "It is the bridge from useful demos to repeatable engineering.",
+                            }
+                        ],
+                        actions=[
+                            {
+                                "title": "Build one tiny eval gate",
+                                "next_step": "Catch a bad agent edit before merge.",
+                            }
+                        ],
+                        caveats=["Evidence is still bounded to the current thread set."],
+                        analysis={},
+                    )
                 summary = generate_ai_intelligence_report(
                     settings,
                     week_label="2026-W28",
@@ -164,6 +204,9 @@ class TestAiIntelligenceReport(unittest.TestCase):
             self.assertIn(title, html_text)
         self.assertIn("<!doctype html>", html_text)
         self.assertIn("AI Intelligence Report - 2026-W28", html_text)
+        self.assertIn("Frontier Analysis", html_text)
+        self.assertIn("Top-model synthesis says eval-gated agent workflows are becoming practical.", html_text)
+        self.assertIn("Coding-agent eval design", html_text)
         self.assertIn("https://t.me/ai_lab/101", html_text)
         self.assertIn("Source Map", html_text)
         self.assertIn("Appendix: grouped source posts", html_text)
@@ -176,6 +219,7 @@ class TestAiIntelligenceReport(unittest.TestCase):
         self.assertIn("Reflection Question", html_text)
         self.assertNotIn("Matches:", html_text)
         self.assertEqual(metadata["thread_count"], 1)
+        self.assertEqual(metadata["frontier_analysis"]["model"], "claude-opus-4-6")
         self.assertTrue(metadata["compressed_context"])
         self.assertTrue(metadata["actions"])
         self.assertEqual(len(metadata["personal_learning_loop"]["read_items"]), 5)

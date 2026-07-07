@@ -128,6 +128,18 @@ def build_parser() -> argparse.ArgumentParser:
     idea_threads_parser.add_argument("--limit", type=int, default=0, help="Optional atom limit for bounded refreshes")
     idea_threads_parser.set_defaults(handler=handle_idea_threads)
 
+    frontier_parser = subparsers.add_parser(
+        "frontier-analysis",
+        help="Run top-model synthesis over Idea Threads and Knowledge Atoms",
+    )
+    frontier_parser.add_argument("--week", default=None, help="ISO week label, e.g. 2026-W28 (default: current UTC week)")
+    frontier_parser.add_argument("--lookback-weeks", type=int, default=12)
+    frontier_parser.add_argument("--model", default="strong", help="strong, mid, or explicit model id")
+    frontier_parser.add_argument("--threads-limit", type=int, default=24)
+    frontier_parser.add_argument("--atoms-limit", type=int, default=8)
+    frontier_parser.add_argument("--force", action="store_true", help="Regenerate even when analysis already exists")
+    frontier_parser.set_defaults(handler=handle_frontier_analysis)
+
     ai_report_parser = subparsers.add_parser(
         "ai-intelligence-report",
         help="Generate the standalone weekly AI Intelligence HTML report",
@@ -1509,6 +1521,48 @@ def handle_idea_threads(args: argparse.Namespace) -> int:
         return 1
 
     sys.stdout.write(format_idea_thread_summary(summary))
+    return 0
+
+
+def handle_frontier_analysis(args: argparse.Namespace) -> int:
+    from output.frontier_analysis import format_frontier_analysis_summary, run_frontier_analysis
+
+    settings = load_settings()
+
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+
+        LOGGER.info(
+            "Starting step=frontier_analysis week=%s lookback_weeks=%d model=%s",
+            args.week or "current",
+            args.lookback_weeks,
+            args.model,
+        )
+        summary = run_frontier_analysis(
+            settings,
+            week_label=args.week,
+            lookback_weeks=max(1, args.lookback_weeks),
+            model=args.model,
+            threads_limit=max(1, args.threads_limit),
+            atoms_limit=max(1, args.atoms_limit),
+            force=bool(args.force),
+        )
+        LOGGER.info(
+            "Finished step=frontier_analysis week=%s threads=%d atoms=%d actions=%d skipped=%s",
+            summary.week_label,
+            summary.threads_analyzed,
+            summary.atoms_analyzed,
+            summary.action_count,
+            summary.skipped_existing,
+        )
+    except Exception as exc:
+        LOGGER.exception("Frontier analysis failed")
+        sys.stdout.write(f"Frontier analysis failed: {exc}\n")
+        return 1
+
+    sys.stdout.write(format_frontier_analysis_summary(summary))
     return 0
 
 

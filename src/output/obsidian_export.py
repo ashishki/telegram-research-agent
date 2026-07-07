@@ -187,7 +187,48 @@ def _dashboard_note(week_label: str, threads: list[dict], report_path: Path) -> 
     )
 
 
-def _weekly_note(week_label: str, threads: list[dict], report_path: Path) -> tuple[Path, str]:
+def _analysis_line(item: object, *keys: str) -> str:
+    if isinstance(item, dict):
+        for key in keys:
+            value = str(item.get(key) or "").strip()
+            if value:
+                return value
+        values = [str(value).strip() for value in item.values() if str(value).strip()]
+        return " - ".join(values[:2])
+    return str(item or "").strip()
+
+
+def _frontier_analysis_markdown(frontier_analysis: dict | None) -> str:
+    if not frontier_analysis:
+        return "\n".join(
+            [
+                "## Frontier Analysis",
+                "- Pending: run `frontier-analysis --lookback-weeks 12` and regenerate the report.",
+            ]
+        )
+    study = [
+        f"- **{_analysis_line(item, 'topic', 'title')}**: {_analysis_line(item, 'reason', 'why_it_matters')}"
+        for item in (frontier_analysis.get("study_now") or [])[:5]
+    ]
+    actions = [
+        f"- **{_analysis_line(item, 'title', 'action')}**: {_analysis_line(item, 'next_step', 'success_criterion')}"
+        for item in (frontier_analysis.get("actions") or [])[:5]
+    ]
+    return "\n".join(
+        [
+            "## Frontier Analysis",
+            frontier_analysis.get("executive_brief") or "No executive brief saved.",
+            "",
+            "### Study Now",
+            *(study or ["- No study recommendations saved."]),
+            "",
+            "### Do Next",
+            *(actions or ["- No actions saved."]),
+        ]
+    )
+
+
+def _weekly_note(week_label: str, threads: list[dict], report_path: Path, frontier_analysis: dict | None = None) -> tuple[Path, str]:
     thread_links = []
     for thread in threads:
         thread_path = f"20-idea-threads/{thread['slug']}"
@@ -203,6 +244,8 @@ def _weekly_note(week_label: str, threads: list[dict], report_path: Path) -> tup
             f"Backlinks: {_wiki('00-dashboard/index', 'Dashboard')}",
             "",
             f"HTML report: {report_path}",
+            "",
+            _frontier_analysis_markdown(frontier_analysis),
             "",
             "## Idea Threads",
             *thread_links,
@@ -501,7 +544,7 @@ def export_obsidian_vault(
     threads = context.get("threads") or []
     notes: list[tuple[Path, str]] = [
         _dashboard_note(clean_week, threads, report_path),
-        _weekly_note(clean_week, threads, report_path),
+        _weekly_note(clean_week, threads, report_path, context.get("frontier_analysis")),
     ]
     notes.extend(_thread_note(clean_week, thread, report_path) for thread in threads)
     notes.extend(

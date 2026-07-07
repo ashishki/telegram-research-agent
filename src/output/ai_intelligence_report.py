@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 
 from config.settings import PROJECT_ROOT, Settings
 from db.ai_report_feedback import summarize_ai_report_feedback
+from db.frontier_analysis import fetch_frontier_analysis
 from output.report_quality import (
     MATCHES_TRACE_RE,
     ReportQualityFinding,
@@ -20,6 +21,7 @@ from output.report_quality import (
 OUTPUT_DIR = PROJECT_ROOT / "data" / "output" / "ai_intelligence"
 REQUIRED_SECTIONS = (
     ("executive-brief", "Executive Brief"),
+    ("frontier-analysis", "Frontier Analysis"),
     ("what-changed", "What Changed This Week"),
     ("idea-evolution", "Idea Evolution Timelines"),
     ("tools-models-practices", "Tools, Models, and Practices"),
@@ -235,6 +237,11 @@ def load_ai_intelligence_context(
         "week_end": week_end_sql,
         "threads": threads,
         "source_channels": _source_channel_counts(threads),
+        "frontier_analysis": (
+            fetch_frontier_analysis(connection, week_label=week_label)
+            if _table_exists(connection, "frontier_analyses")
+            else None
+        ),
         "compressed_context": _compressed_context(threads),
         "feedback_context": (
             summarize_ai_report_feedback(connection, before_week_label=week_label)
@@ -631,6 +638,84 @@ def _render_executive_brief(context: dict, actions: list[dict]) -> str:
     return '<div class="metrics">' + "".join(cards) + "</div>" + lead + _render_feedback_context(context)
 
 
+def _analysis_text(item: object, *keys: str) -> str:
+    if isinstance(item, dict):
+        for key in keys:
+            value = str(item.get(key) or "").strip()
+            if value:
+                return value
+        values = [str(value).strip() for value in item.values() if str(value).strip()]
+        return " ".join(values[:2])
+    return str(item or "").strip()
+
+
+def _render_analysis_cards(items: list, *, title_keys: tuple[str, ...], body_keys: tuple[str, ...], empty: str) -> str:
+    if not items:
+        return f'<p class="muted">{_escape(empty)}</p>'
+    cards = []
+    for item in items[:6]:
+        title = _analysis_text(item, *title_keys) or "Untitled"
+        body = _analysis_text(item, *body_keys)
+        cards.append(
+            '<article class="analysis-card">'
+            f'<h4>{_escape(title)}</h4>'
+            f'<p>{_escape(body)}</p>'
+            '</article>'
+        )
+    return "".join(cards)
+
+
+def _render_frontier_analysis(context: dict) -> str:
+    analysis = context.get("frontier_analysis")
+    if not analysis:
+        return (
+            '<div class="frontier-pending">'
+            "<p>No top-model synthesis has been saved for this week yet.</p>"
+            '<p class="muted">Run <code>frontier-analysis --lookback-weeks 12</code> after refreshing Idea Threads, '
+            "then regenerate this report.</p>"
+            "</div>"
+        )
+    return (
+        '<div class="frontier-analysis">'
+        f'<p class="frontier-brief">{_escape(analysis.get("executive_brief") or "")}</p>'
+        '<div class="analysis-grid">'
+        '<div><h3>What Changed</h3>'
+        + _render_analysis_cards(
+            analysis.get("what_changed") or [],
+            title_keys=("title", "change", "topic"),
+            body_keys=("summary", "why_it_matters", "reason"),
+            empty="No changes synthesized.",
+        )
+        + '</div><div><h3>Study Now</h3>'
+        + _render_analysis_cards(
+            analysis.get("study_now") or [],
+            title_keys=("topic", "title"),
+            body_keys=("reason", "why_it_matters"),
+            empty="No study recommendations synthesized.",
+        )
+        + '</div><div><h3>Do Next</h3>'
+        + _render_analysis_cards(
+            analysis.get("actions") or [],
+            title_keys=("title", "action"),
+            body_keys=("next_step", "success_criterion", "why"),
+            empty="No actions synthesized.",
+        )
+        + '</div></div>'
+        '<h3>Trend Narratives</h3>'
+        + _render_analysis_cards(
+            analysis.get("trend_narratives") or [],
+            title_keys=("title", "thread_slug"),
+            body_keys=("narrative", "summary"),
+            empty="No trend narratives synthesized.",
+        )
+        + '<h3>Caveats</h3>'
+        + _claim_list([_analysis_text(item, "caveat", "summary") for item in analysis.get("caveats") or []], empty="No caveats synthesized.")
+        + f'<p class="muted">Top-model synthesis: {_escape(analysis.get("model") or "")} · '
+        f'{_escape(analysis.get("threads_analyzed") or 0)} threads · {_escape(analysis.get("atoms_analyzed") or 0)} atoms</p>'
+        "</div>"
+    )
+
+
 def _render_what_changed(context: dict) -> str:
     changed = _changed_threads(context["threads"])
     if not changed:
@@ -854,6 +939,7 @@ def render_ai_intelligence_html(context: dict, *, generated_at: str | None = Non
     generated = generated_at or _utc_now_iso()
     section_bodies = {
         "executive-brief": _render_executive_brief(context, actions),
+        "frontier-analysis": _render_frontier_analysis(context),
         "what-changed": _render_what_changed(context),
         "idea-evolution": _render_idea_evolution(context),
         "tools-models-practices": _render_terms(context),
@@ -898,6 +984,10 @@ section {{ background:var(--panel); border:1px solid var(--line); border-radius:
 .metric-detail, .muted {{ color:var(--muted); font-size:13px; }}
 .thread-card, .action-card {{ border:1px solid var(--line); border-radius:8px; padding:14px; margin:0 0 12px; background:#fbfcfd; }}
 .thread-card.compact {{ padding:12px; }}
+.frontier-brief {{ font-size:17px; color:#24313d; max-width:860px; }}
+.analysis-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:12px; margin:14px 0; }}
+.analysis-card {{ border:1px solid var(--line); border-radius:8px; padding:12px; margin:0 0 10px; background:#fbfcfd; }}
+code {{ background:#eef2f6; border:1px solid #d7dee7; border-radius:4px; padding:1px 4px; }}
 .tag {{ display:inline-block; border:1px solid #bbd4c1; background:#edf7ef; color:#14532d; border-radius:999px; padding:2px 8px; font-size:12px; font-weight:700; }}
 .momentum {{ height:8px; border-radius:999px; background:#e5e7eb; overflow:hidden; margin:6px 0 4px; }}
 .momentum span {{ display:block; height:100%; background:linear-gradient(90deg, #16a34a, #d97706); }}
@@ -1081,6 +1171,7 @@ def generate_ai_intelligence_report(
         "action_count": len(actions),
         "sections": [title for _section_id, title in REQUIRED_SECTIONS],
         "compressed_context": context.get("compressed_context") or [],
+        "frontier_analysis": context.get("frontier_analysis"),
         "feedback_context": context.get("feedback_context") or {},
         "personal_learning_loop": personal_learning_loop,
         "quality_findings": [finding.as_dict() for finding in findings],

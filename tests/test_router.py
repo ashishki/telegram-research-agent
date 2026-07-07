@@ -30,6 +30,9 @@ class TestRouter(unittest.TestCase):
 
         self.assertTrue(any("Unknown model=unknown-model-xyz, using default rates" in message for message in logs.output))
 
+    def test_estimate_cost_usd_opus_48_uses_strong_rates(self):
+        self.assertEqual(estimate_cost_usd("claude-opus-4-8", 1_000_000, 1_000_000), 90.0)
+
 
 if __name__ == "__main__":
     unittest.main()
