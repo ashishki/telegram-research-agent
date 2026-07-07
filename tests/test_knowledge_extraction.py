@@ -40,6 +40,7 @@ _install_stub("sklearn.metrics", silhouette_score=lambda *_args, **_kwargs: 0.0)
 
 from db.knowledge_atoms import record_knowledge_atom, record_knowledge_extraction_batch  # noqa: E402
 from db.migrate import run_migrations  # noqa: E402
+from llm.client import LLMError  # noqa: E402
 import main  # noqa: E402
 
 
@@ -234,6 +235,76 @@ class TestKnowledgeExtractionCli(unittest.TestCase):
         self.assertIn("invalid JSON", batch_row[1])
         self.assertEqual(atom_count, 0)
         self.assertIn("errors=1", stdout.getvalue())
+
+    def test_knowledge_extract_retries_invalid_json_once(self):
+        db_path = self._make_db()
+        stdout = io.StringIO()
+        try:
+            with patch.dict(os.environ, {"AGENT_DB_PATH": db_path}, clear=False):
+                with patch(
+                    "output.knowledge_extraction.complete",
+                    side_effect=["{not-json", self._atom_payload()],
+                ) as complete:
+                    with patch.object(
+                        sys,
+                        "argv",
+                        ["main.py", "knowledge-extract", "--weeks", "1", "--model", "cheap", "--batch-size", "2"],
+                    ):
+                        with redirect_stdout(stdout):
+                            exit_code = main.main()
+            with sqlite3.connect(db_path) as connection:
+                batch_row = connection.execute(
+                    "SELECT status, error FROM knowledge_extraction_batches"
+                ).fetchone()
+                atom_count = connection.execute("SELECT COUNT(*) FROM knowledge_atoms").fetchone()[0]
+        finally:
+            os.unlink(db_path)
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(complete.call_count, 2)
+        self.assertEqual(batch_row[0], "completed")
+        self.assertIsNone(batch_row[1])
+        self.assertEqual(atom_count, 1)
+        self.assertIn("errors=0", stdout.getvalue())
+
+    def test_knowledge_extract_aborts_on_low_credit_error(self):
+        db_path = self._make_db()
+        stdout = io.StringIO()
+        quota_error = LLMError("Anthropic completion failed")
+        quota_error.__cause__ = RuntimeError("Your credit balance is too low to access the Anthropic API.")
+        try:
+            with sqlite3.connect(db_path) as connection:
+                self._insert_post(
+                    connection,
+                    post_id=2,
+                    raw_post_id=2,
+                    channel_username="@ai_lab",
+                    message_id=102,
+                    content="A second post should not be processed after provider credit exhaustion.",
+                )
+                connection.commit()
+            with patch.dict(os.environ, {"AGENT_DB_PATH": db_path}, clear=False):
+                with patch("output.knowledge_extraction.complete", side_effect=quota_error) as complete:
+                    with patch.object(
+                        sys,
+                        "argv",
+                        ["main.py", "knowledge-extract", "--weeks", "1", "--model", "cheap", "--batch-size", "1"],
+                    ):
+                        with redirect_stdout(stdout):
+                            exit_code = main.main()
+            with sqlite3.connect(db_path) as connection:
+                batch_rows = connection.execute(
+                    "SELECT status, error FROM knowledge_extraction_batches ORDER BY id"
+                ).fetchall()
+        finally:
+            os.unlink(db_path)
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(complete.call_count, 1)
+        self.assertEqual(len(batch_rows), 1)
+        self.assertEqual(batch_rows[0][0], "failed")
+        self.assertIn("Anthropic completion failed", batch_rows[0][1])
+        self.assertIn("batches_total=1", stdout.getvalue())
 
     def test_memory_inspect_knowledge_atoms_prints_batches_and_atoms(self):
         db_path = self._make_db()

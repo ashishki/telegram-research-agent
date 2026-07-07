@@ -36,6 +36,13 @@ from processing.score_posts import score_posts
 LOGGER = logging.getLogger(__name__)
 
 
+def _positive_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("must be >= 1")
+    return parsed
+
+
 def _handle_sigterm(_: int, __) -> None:
     LOGGER.info("SIGTERM received, shutting down")
     sys.exit(0)
@@ -46,6 +53,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     bootstrap_parser = subparsers.add_parser("bootstrap")
+    bootstrap_parser.add_argument("--days", type=_positive_int, default=90, help="Lookback window in days (default: 90)")
     bootstrap_parser.set_defaults(handler=handle_bootstrap)
 
     ingest_parser = subparsers.add_parser("ingest")
@@ -569,15 +577,15 @@ def handle_ingest(args: argparse.Namespace) -> int:
     return 0
 
 
-def handle_bootstrap(_: argparse.Namespace) -> int:
+def handle_bootstrap(args: argparse.Namespace) -> int:
     settings = load_settings()
     try:
         LOGGER.info("Starting step=run_migrations")
         run_migrations()
         LOGGER.info("Finished step=run_migrations")
 
-        LOGGER.info("Starting step=bootstrap_ingest")
-        bootstrap_summary = asyncio.run(run_bootstrap(settings))
+        LOGGER.info("Starting step=bootstrap_ingest days=%d", args.days)
+        bootstrap_summary = asyncio.run(run_bootstrap(settings, days=args.days))
         LOGGER.info(
             "Finished step=bootstrap_ingest inserted=%d skipped=%d errors=%d",
             bootstrap_summary["inserted"],

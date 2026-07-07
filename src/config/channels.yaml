@@ -54,6 +54,11 @@ channels:
     language: "ru"
     priority: medium
     active: true
+  - username: "@leadgenvalley"
+    label: "Leadgen Valley"
+    language: "ru"
+    priority: medium
+    active: true
   - username: "@Redmadnews"
     label: "Redmad News"
     language: "ru"

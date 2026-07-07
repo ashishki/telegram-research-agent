@@ -23,6 +23,9 @@ LOGGER = logging.getLogger(__name__)
 PROMPT_VERSION = "knowledge-atoms-v1"
 DEFAULT_BATCH_SIZE = 12
 MAX_POST_TEXT_CHARS = 1400
+MAX_ATOMS_PER_BATCH = 6
+KNOWLEDGE_EXTRACTION_MAX_TOKENS = 4096
+KNOWLEDGE_EXTRACTION_ATTEMPTS = 2
 
 
 class KnowledgeExtractionError(Exception):
@@ -208,9 +211,15 @@ def _post_payload(post: SourcePost) -> dict:
     }
 
 
-def _build_prompt(week_label: str, posts: list[SourcePost]) -> str:
+def _build_prompt(week_label: str, posts: list[SourcePost], *, retry_error: str | None = None) -> str:
     atom_types = ", ".join(sorted(ATOM_TYPES))
     payload = [_post_payload(post) for post in posts]
+    retry_instruction = ""
+    if retry_error:
+        retry_instruction = (
+            "\nPrevious output failed validation. Return a smaller valid JSON object now. "
+            f"Validation error: {retry_error}\n"
+        )
     return (
         "Extract compact AI knowledge atoms from these Telegram posts.\n"
         "Return JSON only, with this shape:\n"
@@ -222,7 +231,11 @@ def _build_prompt(week_label: str, posts: list[SourcePost]) -> str:
         "\"frontier_relevance_score\":0.0,\"operator_relevance_score\":0.0,"
         "\"staleness_status\":\"active\",\"why_it_matters\":\"why this matters\"}]}\n"
         f"Allowed atom_type values: {atom_types}.\n"
+        f"Return at most {MAX_ATOMS_PER_BATCH} atoms total. Use fewer atoms when evidence is weak.\n"
+        "Keep every string concise: claim, summary, evidence_quote, and why_it_matters must each stay under 180 characters.\n"
+        "Do not use markdown, comments, trailing commas, or extra keys. The response must be one complete JSON object.\n"
         "Only cite post_id values from the provided posts. Prefer no atom over weak or generic claims.\n"
+        f"{retry_instruction}"
         f"Week: {week_label}\n"
         f"Posts JSON:\n{json.dumps(payload, ensure_ascii=False, indent=2)}"
     )
@@ -342,15 +355,43 @@ def _extract_atoms_from_batch(
     posts: list[SourcePost],
     model: str,
 ) -> list[dict]:
-    prompt = _build_prompt(week_label, posts)
-    raw = complete(
-        prompt=prompt,
-        system="You extract source-grounded structured JSON. Return JSON only.",
-        max_tokens=2048,
-        category="knowledge_extraction",
-        model=model,
-    )
-    return _validate_atoms_payload(_parse_json_object(raw), posts)
+    last_error: KnowledgeExtractionValidationError | None = None
+    for attempt in range(1, KNOWLEDGE_EXTRACTION_ATTEMPTS + 1):
+        prompt = _build_prompt(week_label, posts, retry_error=str(last_error) if last_error else None)
+        raw = complete(
+            prompt=prompt,
+            system="You extract source-grounded structured JSON. Return JSON only.",
+            max_tokens=KNOWLEDGE_EXTRACTION_MAX_TOKENS,
+            category="knowledge_extraction",
+            model=model,
+        )
+        try:
+            return _validate_atoms_payload(_parse_json_object(raw), posts)
+        except KnowledgeExtractionValidationError as exc:
+            last_error = exc
+            if attempt < KNOWLEDGE_EXTRACTION_ATTEMPTS:
+                LOGGER.warning(
+                    "Knowledge extraction validation retry week=%s posts=%d attempt=%d/%d error=%s",
+                    week_label,
+                    len(posts),
+                    attempt,
+                    KNOWLEDGE_EXTRACTION_ATTEMPTS,
+                    exc,
+                )
+                continue
+            raise
+
+    raise last_error or KnowledgeExtractionValidationError("knowledge extraction validation failed")
+
+
+def _is_low_credit_error(exc: Exception) -> bool:
+    current: BaseException | None = exc
+    while current is not None:
+        message = str(current).lower()
+        if "credit balance is too low" in message or "purchase credits" in message:
+            return True
+        current = current.__cause__
+    return False
 
 
 def run_knowledge_extraction(
@@ -436,6 +477,19 @@ def run_knowledge_extraction(
                             error=str(exc),
                         )
                         errors.append(error)
+                        if _is_low_credit_error(exc):
+                            LOGGER.error("Stopping knowledge extraction after non-retryable provider credit error")
+                            return ExtractionSummary(
+                                week_labels=week_labels,
+                                model=resolved_model,
+                                prompt_version=PROMPT_VERSION,
+                                posts_seen=posts_seen,
+                                batches_total=batches_total,
+                                batches_completed=batches_completed,
+                                batches_skipped=batches_skipped,
+                                atoms_recorded=atoms_recorded,
+                                errors=tuple(errors),
+                            )
 
     return ExtractionSummary(
         week_labels=week_labels,

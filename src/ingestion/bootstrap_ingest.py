@@ -17,6 +17,7 @@ from output.source_events import append_source_events, telegram_source_event_fro
 LOGGER = logging.getLogger(__name__)
 CHANNELS_PATH = PROJECT_ROOT / "src" / "config" / "channels.yaml"
 MAX_FLOOD_WAIT_SECONDS = 600
+DEFAULT_BOOTSTRAP_DAYS = 90
 
 
 def _load_active_channels() -> list[dict]:
@@ -113,6 +114,19 @@ def _insert_message(cursor: sqlite3.Cursor, row: dict) -> None:
     )
 
 
+def _message_exists(cursor: sqlite3.Cursor, channel_id: int, message_id: int) -> bool:
+    row = cursor.execute(
+        """
+        SELECT 1
+        FROM raw_posts
+        WHERE channel_id = ? AND message_id = ?
+        LIMIT 1
+        """,
+        (channel_id, message_id),
+    ).fetchone()
+    return row is not None
+
+
 async def _ingest_channel(client, connection: sqlite3.Connection, channel: dict, cutoff_date: datetime) -> dict:
     channel_username = channel["username"]
 
@@ -134,6 +148,10 @@ async def _ingest_channel(client, connection: sqlite3.Connection, channel: dict,
                     continue
 
                 row = _extract_message_row(message, channel_username, ingested_at)
+                if _message_exists(cursor, int(row["channel_id"]), int(row["message_id"])):
+                    channel_skipped += 1
+                    continue
+
                 if row["media_type"] == "photo" and len((row["text"] or "").strip()) < 20:
                     try:
                         photo_bytes = await client.download_media(message, bytes)
@@ -184,9 +202,15 @@ async def _ingest_channel(client, connection: sqlite3.Connection, channel: dict,
             return {"inserted": 0, "skipped": 0, "errors": 1}
 
 
-async def run_bootstrap(settings: Settings) -> dict:
+def _cutoff_date_for_days(days: int) -> datetime:
+    if days < 1:
+        raise ValueError("bootstrap days must be >= 1")
+    return datetime.now(timezone.utc) - timedelta(days=days)
+
+
+async def run_bootstrap(settings: Settings, *, days: int = DEFAULT_BOOTSTRAP_DAYS) -> dict:
     channels = _load_active_channels()
-    cutoff_date = datetime.now(timezone.utc) - timedelta(days=90)
+    cutoff_date = _cutoff_date_for_days(days)
     totals = {"inserted": 0, "skipped": 0, "errors": 0}
 
     db_path = Path(settings.db_path)
