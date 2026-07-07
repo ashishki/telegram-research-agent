@@ -1,0 +1,464 @@
+{
+  "week_label": "2026-W28",
+  "generated_at": "2026-07-07T10:40:05Z",
+  "thread_count": 12,
+  "source_atom_count": 14,
+  "source_channel_count": 4,
+  "project_link_count": 0,
+  "action_count": 4,
+  "sections": [
+    "Decision Brief",
+    "What Changed",
+    "Study And Do",
+    "Project Implications",
+    "Knowledge Flow",
+    "Trend Board",
+    "Sources"
+  ],
+  "archify": {
+    "status": "rendered",
+    "detail": "/root/.agents/skills/archify",
+    "root": "/root/.agents/skills/archify",
+    "diagram_html_path": "2026-W28.knowledge-flow.archify.html",
+    "diagram_ir_path": "2026-W28.knowledge-flow.archify.json"
+  },
+  "frontier_analysis": {
+    "id": 1,
+    "week_label": "2026-W28",
+    "generated_at": "2026-07-07T09:35:39Z",
+    "model": "claude-opus-4-8",
+    "prompt_version": "frontier-analysis-v1",
+    "lookback_weeks": 12,
+    "threads_analyzed": 24,
+    "atoms_analyzed": 26,
+    "executive_brief": "This week's signal concentrates on open-source model efficiency, LLM interpretability breakthroughs, and shifting AI infrastructure economics. GigaChat 3.5 Ultra dominates with a 432B MIT-licensed hybrid MLA+GatedDeltaNet architecture matching DeepSeek V3.2 at ~1.5x smaller size, plus practical inference gains (dual MTP-heads, 2.2x generation speed). Anthropic's discovery of J-space—a localized reasoning workspace in Claude—marks a potential interpretability milestone with safety implications. Meanwhile, Nvidia's revenue-share pivot and Stanford's 10,854% surge in agentic-systems job demand both point to structural repositioning of who builds and profits from AI. Fable pricing shocks and a macro thesis on post-2027 commoditization sharpen where operators should concentrate effort.",
+    "what_changed": [
+      {
+        "title": "Open-source frontier efficiency leaps with GigaChat 3.5 Ultra",
+        "summary": "A 432B MIT-licensed hybrid MLA+GatedDeltaNet model reportedly matches DeepSeek V3.2 at ~1.5x smaller size, with FP8 training, online RL, 40% size reduction vs prior gen, and dual MTP-heads for 2.2x faster generation.",
+        "why_it_matters": "Reproducible, permissively licensed architecture and inference techniques are directly transferable to production deployments seeking throughput and cost gains without proprietary lock-in."
+      },
+      {
+        "title": "Interpretability signal: J-space in Claude",
+        "summary": "Anthropic research identifies a compact neural workspace acting as working memory for complex reasoning, analogous to global workspace theory, with claims it tracks context, bugs, and deception attempts.",
+        "why_it_matters": "If robust, this enables predicting and auditing internal reasoning steps—foundational for safety tooling and debugging agentic systems."
+      },
+      {
+        "title": "Nvidia shifts toward revenue-sharing with startups",
+        "summary": "Nvidia offers infrastructure credits in exchange for revenue share, targeting datacenter builders to reduce dependence on Google, Amazon, and Microsoft.",
+        "why_it_matters": "Changes AI infrastructure access economics; smaller builders may gain compute leverage, altering cost structures and competitive positioning."
+      },
+      {
+        "title": "Agentic-systems skills become the dominant engineering demand",
+        "summary": "Stanford AI Index 2026 reports a 10,854% YoY surge in agentic-systems job mentions, signaling a shift from code-writing to system architecture and context management.",
+        "why_it_matters": "Career and hiring signals now favor autonomous-system design skills over raw coding tenure—reprioritize skill development accordingly."
+      }
+    ],
+    "trend_narratives": [
+      {
+        "thread_slug": "gateddeltanet-gigachat-3-5-ultra-mla",
+        "title": "Efficient open-source hybrid architectures go mainstream",
+        "narrative": "Across multiple atoms this week, GigaChat 3.5 Ultra converges the signals: a large hybrid MLA+GatedDeltaNet model, FP8 training, online RL, expanded context, and dual MTP-head inference speedups—all under MIT license. The narrative is that frontier-competitive performance is increasingly achievable at reduced scale with reproducible methods, pressuring proprietary moats.",
+        "status": "active"
+      },
+      {
+        "thread_slug": "anthropic-claude-interpretability",
+        "title": "Localized reasoning workspaces emerge in LLMs",
+        "narrative": "Two converging atoms describe J-space as a compact activation layer encoding reasoning and semantic awareness that emerged without explicit design. This moves interpretability from feature-level probing toward identifying functional reasoning substrates, with direct safety and debugging applications.",
+        "status": "active"
+      },
+      {
+        "thread_slug": "ai-market-content-software",
+        "title": "From buildout to commoditization",
+        "narrative": "A macro thesis frames AI's arc: buildout (2023-24), rollout (2025-26), then deflationary commoditization of tokenizable products post-2027, with durable value migrating to non-commoditizable domains like science and biology. Paired with Nvidia's revenue-share pivot and agentic-skill demand, it clarifies where to place multi-year bets.",
+        "status": "active"
+      },
+      {
+        "thread_slug": "agentic-systems-ai-agents-llmops",
+        "title": "Agentic engineering as the new core skill",
+        "narrative": "Labor-market data shows explosive demand for agentic-systems design, reflecting a move from writing code to architecting autonomous, context-managed systems. This reinforces the practical thread on iterative staged prompting and multi-agent tooling like T3MP3ST.",
+        "status": "active"
+      }
+    ],
+    "study_now": [
+      {
+        "topic": "MLA + GatedDeltaNet hybrid architecture and dual MTP-heads inference",
+        "reason": "Reproducible, MIT-licensed efficiency and throughput techniques applicable to production serving now",
+        "priority": "high"
+      },
+      {
+        "topic": "J-space interpretability findings and global-workspace analogy",
+        "reason": "Potential foundation for auditing and safety tooling in agentic deployments; still early enough to shape practice",
+        "priority": "high"
+      },
+      {
+        "topic": "Agentic-systems architecture and context management patterns",
+        "reason": "Sharpest labor-demand signal of the week; skills gap is widening fast",
+        "priority": "high"
+      },
+      {
+        "topic": "Multi-agent red-team automation (T3MP3ST-style)",
+        "reason": "90% success on 104 security tasks suggests autonomous security testing is becoming viable and worth piloting",
+        "priority": "medium"
+      },
+      {
+        "topic": "Buyer-persona pain-intensity mapping for GTM",
+        "reason": "167x LTV variance by persona is a concrete lever for revenue efficiency",
+        "priority": "medium"
+      }
+    ],
+    "actions": [
+      {
+        "title": "Prototype FP8 + MTP-head serving on an open hybrid model",
+        "next_step": "Deploy GigaChat 3.5 Ultra (or comparable open model) in a test harness and benchmark generation speed and throughput-under-load against your current stack",
+        "success_criterion": "Measured ≥1.5x generation speedup or ≥20% throughput gain reproduced in your environment"
+      },
+      {
+        "title": "Audit exposure to opaque per-call AI pricing",
+        "next_step": "Review all third-party AI API integrations (e.g., Fable-style services) for system-prompt cost amplification and free-to-paid tier transitions",
+        "success_criterion": "Cost-per-interaction documented and no service can produce a >5x unexpected charge without alerting"
+      },
+      {
+        "title": "Re-scope hiring and skill development toward agentic systems",
+        "next_step": "Update role rubrics to weight demonstrated code-review/testing/mentoring and agent-architecture experience over tenure",
+        "success_criterion": "Revised rubric adopted and next hiring loop evaluates candidates on agentic design tasks"
+      },
+      {
+        "title": "Adopt staged iterative prompting as default agent workflow",
+        "next_step": "Convert one end-to-end build task from single-shot to incremental staged prompting and compare defect rate",
+        "success_criterion": "Fewer debug cycles and higher first-pass quality on the staged version"
+      }
+    ],
+    "caveats": [
+      "J-space claims carry moderate confidence (0.75-0.88) and lean on a global-workspace analogy; treat 'conscious-like awareness' framing as speculative pending replication.",
+      "GigaChat performance parity with DeepSeek V3.2 is vendor-adjacent benchmark reporting; validate independently before production reliance.",
+      "Fable pricing atoms rest on individual user reports and may not generalize to all usage patterns.",
+      "The post-2027 commoditization thesis is a directional market forecast (confidence 0.75), not an established outcome.",
+      "Most threads have single-atom, low sustained momentum, so several signals may be transient rather than durable trends."
+    ],
+    "analysis": {
+      "actions": [
+        {
+          "next_step": "Deploy GigaChat 3.5 Ultra (or comparable open model) in a test harness and benchmark generation speed and throughput-under-load against your current stack",
+          "success_criterion": "Measured ≥1.5x generation speedup or ≥20% throughput gain reproduced in your environment",
+          "title": "Prototype FP8 + MTP-head serving on an open hybrid model"
+        },
+        {
+          "next_step": "Review all third-party AI API integrations (e.g., Fable-style services) for system-prompt cost amplification and free-to-paid tier transitions",
+          "success_criterion": "Cost-per-interaction documented and no service can produce a >5x unexpected charge without alerting",
+          "title": "Audit exposure to opaque per-call AI pricing"
+        },
+        {
+          "next_step": "Update role rubrics to weight demonstrated code-review/testing/mentoring and agent-architecture experience over tenure",
+          "success_criterion": "Revised rubric adopted and next hiring loop evaluates candidates on agentic design tasks",
+          "title": "Re-scope hiring and skill development toward agentic systems"
+        },
+        {
+          "next_step": "Convert one end-to-end build task from single-shot to incremental staged prompting and compare defect rate",
+          "success_criterion": "Fewer debug cycles and higher first-pass quality on the staged version",
+          "title": "Adopt staged iterative prompting as default agent workflow"
+        }
+      ],
+      "caveats": [
+        "J-space claims carry moderate confidence (0.75-0.88) and lean on a global-workspace analogy; treat 'conscious-like awareness' framing as speculative pending replication.",
+        "GigaChat performance parity with DeepSeek V3.2 is vendor-adjacent benchmark reporting; validate independently before production reliance.",
+        "Fable pricing atoms rest on individual user reports and may not generalize to all usage patterns.",
+        "The post-2027 commoditization thesis is a directional market forecast (confidence 0.75), not an established outcome.",
+        "Most threads have single-atom, low sustained momentum, so several signals may be transient rather than durable trends."
+      ],
+      "executive_brief": "This week's signal concentrates on open-source model efficiency, LLM interpretability breakthroughs, and shifting AI infrastructure economics. GigaChat 3.5 Ultra dominates with a 432B MIT-licensed hybrid MLA+GatedDeltaNet architecture matching DeepSeek V3.2 at ~1.5x smaller size, plus practical inference gains (dual MTP-heads, 2.2x generation speed). Anthropic's discovery of J-space—a localized reasoning workspace in Claude—marks a potential interpretability milestone with safety implications. Meanwhile, Nvidia's revenue-share pivot and Stanford's 10,854% surge in agentic-systems job demand both point to structural repositioning of who builds and profits from AI. Fable pricing shocks and a macro thesis on post-2027 commoditization sharpen where operators should concentrate effort.",
+      "source_context": {
+        "atoms_analyzed": 26,
+        "lookback_weeks": 12,
+        "threads_analyzed": 24,
+        "week_label": "2026-W28"
+      },
+      "study_now": [
+        {
+          "priority": "high",
+          "reason": "Reproducible, MIT-licensed efficiency and throughput techniques applicable to production serving now",
+          "topic": "MLA + GatedDeltaNet hybrid architecture and dual MTP-heads inference"
+        },
+        {
+          "priority": "high",
+          "reason": "Potential foundation for auditing and safety tooling in agentic deployments; still early enough to shape practice",
+          "topic": "J-space interpretability findings and global-workspace analogy"
+        },
+        {
+          "priority": "high",
+          "reason": "Sharpest labor-demand signal of the week; skills gap is widening fast",
+          "topic": "Agentic-systems architecture and context management patterns"
+        },
+        {
+          "priority": "medium",
+          "reason": "90% success on 104 security tasks suggests autonomous security testing is becoming viable and worth piloting",
+          "topic": "Multi-agent red-team automation (T3MP3ST-style)"
+        },
+        {
+          "priority": "medium",
+          "reason": "167x LTV variance by persona is a concrete lever for revenue efficiency",
+          "topic": "Buyer-persona pain-intensity mapping for GTM"
+        }
+      ],
+      "trend_narratives": [
+        {
+          "narrative": "Across multiple atoms this week, GigaChat 3.5 Ultra converges the signals: a large hybrid MLA+GatedDeltaNet model, FP8 training, online RL, expanded context, and dual MTP-head inference speedups—all under MIT license. The narrative is that frontier-competitive performance is increasingly achievable at reduced scale with reproducible methods, pressuring proprietary moats.",
+          "status": "active",
+          "thread_slug": "gateddeltanet-gigachat-3-5-ultra-mla",
+          "title": "Efficient open-source hybrid architectures go mainstream"
+        },
+        {
+          "narrative": "Two converging atoms describe J-space as a compact activation layer encoding reasoning and semantic awareness that emerged without explicit design. This moves interpretability from feature-level probing toward identifying functional reasoning substrates, with direct safety and debugging applications.",
+          "status": "active",
+          "thread_slug": "anthropic-claude-interpretability",
+          "title": "Localized reasoning workspaces emerge in LLMs"
+        },
+        {
+          "narrative": "A macro thesis frames AI's arc: buildout (2023-24), rollout (2025-26), then deflationary commoditization of tokenizable products post-2027, with durable value migrating to non-commoditizable domains like science and biology. Paired with Nvidia's revenue-share pivot and agentic-skill demand, it clarifies where to place multi-year bets.",
+          "status": "active",
+          "thread_slug": "ai-market-content-software",
+          "title": "From buildout to commoditization"
+        },
+        {
+          "narrative": "Labor-market data shows explosive demand for agentic-systems design, reflecting a move from writing code to architecting autonomous, context-managed systems. This reinforces the practical thread on iterative staged prompting and multi-agent tooling like T3MP3ST.",
+          "status": "active",
+          "thread_slug": "agentic-systems-ai-agents-llmops",
+          "title": "Agentic engineering as the new core skill"
+        }
+      ],
+      "what_changed": [
+        {
+          "summary": "A 432B MIT-licensed hybrid MLA+GatedDeltaNet model reportedly matches DeepSeek V3.2 at ~1.5x smaller size, with FP8 training, online RL, 40% size reduction vs prior gen, and dual MTP-heads for 2.2x faster generation.",
+          "title": "Open-source frontier efficiency leaps with GigaChat 3.5 Ultra",
+          "why_it_matters": "Reproducible, permissively licensed architecture and inference techniques are directly transferable to production deployments seeking throughput and cost gains without proprietary lock-in."
+        },
+        {
+          "summary": "Anthropic research identifies a compact neural workspace acting as working memory for complex reasoning, analogous to global workspace theory, with claims it tracks context, bugs, and deception attempts.",
+          "title": "Interpretability signal: J-space in Claude",
+          "why_it_matters": "If robust, this enables predicting and auditing internal reasoning steps—foundational for safety tooling and debugging agentic systems."
+        },
+        {
+          "summary": "Nvidia offers infrastructure credits in exchange for revenue share, targeting datacenter builders to reduce dependence on Google, Amazon, and Microsoft.",
+          "title": "Nvidia shifts toward revenue-sharing with startups",
+          "why_it_matters": "Changes AI infrastructure access economics; smaller builders may gain compute leverage, altering cost structures and competitive positioning."
+        },
+        {
+          "summary": "Stanford AI Index 2026 reports a 10,854% YoY surge in agentic-systems job mentions, signaling a shift from code-writing to system architecture and context management.",
+          "title": "Agentic-systems skills become the dominant engineering demand",
+          "why_it_matters": "Career and hiring signals now favor autonomous-system design skills over raw coding tenure—reprioritize skill development accordingly."
+        }
+      ]
+    },
+    "created_at": "2026-07-07T09:34:15Z",
+    "updated_at": "2026-07-07T09:35:39Z"
+  },
+  "project_links": [],
+  "diagram_ir": {
+    "schema_version": 1,
+    "diagram_type": "dataflow",
+    "meta": {
+      "title": "AI Knowledge Flow 2026-W28",
+      "subtitle": "Telegram sources to atoms, threads, frontier synthesis, project actions, and memory",
+      "output": "2026-W28.knowledge-flow.html",
+      "animation": "trace",
+      "viewBox": [
+        1080,
+        760
+      ]
+    },
+    "stages": [
+      {
+        "label": "Sources"
+      },
+      {
+        "label": "Atomize"
+      },
+      {
+        "label": "Thread"
+      },
+      {
+        "label": "Synthesize"
+      },
+      {
+        "label": "Act"
+      }
+    ],
+    "nodes": [
+      {
+        "id": "sources",
+        "type": "external",
+        "label": "Telegram Sources",
+        "sublabel": "4 channels",
+        "stage": 0,
+        "row": 0,
+        "tag": "12w input"
+      },
+      {
+        "id": "profile",
+        "type": "security",
+        "label": "Profile + Projects",
+        "sublabel": "0 project leads",
+        "stage": 0,
+        "row": 3,
+        "tag": "personal fit"
+      },
+      {
+        "id": "atoms",
+        "type": "database",
+        "label": "Knowledge Atoms",
+        "sublabel": "14 cited atoms",
+        "stage": 1,
+        "row": 1,
+        "tag": "claims"
+      },
+      {
+        "id": "threads",
+        "type": "messagebus",
+        "label": "Idea Threads",
+        "sublabel": "12 timelines",
+        "stage": 2,
+        "row": 1,
+        "tag": "momentum"
+      },
+      {
+        "id": "frontier",
+        "type": "backend",
+        "label": "Frontier Analysis",
+        "sublabel": "claude-opus-4-8",
+        "stage": 3,
+        "row": 0,
+        "tag": "why now"
+      },
+      {
+        "id": "report",
+        "type": "frontend",
+        "label": "Visual HTML",
+        "sublabel": "interactive artifact",
+        "stage": 4,
+        "row": 0,
+        "tag": "sendable"
+      },
+      {
+        "id": "obsidian",
+        "type": "database",
+        "label": "Obsidian Vault",
+        "sublabel": "long memory",
+        "stage": 4,
+        "row": 4,
+        "tag": "browse"
+      },
+      {
+        "id": "actions",
+        "type": "cloud",
+        "label": "Study + Do",
+        "sublabel": "4 next moves",
+        "stage": 4,
+        "row": 2,
+        "tag": "operator"
+      }
+    ],
+    "flows": [
+      {
+        "from": "sources",
+        "to": "atoms",
+        "label": "posts to claims",
+        "classification": "source-grounded",
+        "variant": "emphasis"
+      },
+      {
+        "from": "profile",
+        "to": "atoms",
+        "label": "personal scoring",
+        "classification": "profile filter",
+        "variant": "security"
+      },
+      {
+        "from": "atoms",
+        "to": "threads",
+        "label": "claim timelines",
+        "classification": "temporal grouping",
+        "variant": "emphasis"
+      },
+      {
+        "from": "threads",
+        "to": "frontier",
+        "label": "compressed context",
+        "classification": "top-model input",
+        "variant": "emphasis"
+      },
+      {
+        "from": "profile",
+        "to": "frontier",
+        "label": "portfolio context",
+        "classification": "project fit",
+        "variant": "dashed"
+      },
+      {
+        "from": "frontier",
+        "to": "report",
+        "label": "what changed",
+        "classification": "human synthesis",
+        "variant": "emphasis"
+      },
+      {
+        "from": "threads",
+        "to": "report",
+        "label": "metrics + links",
+        "classification": "deterministic",
+        "variant": "default"
+      },
+      {
+        "from": "threads",
+        "to": "obsidian",
+        "label": "generated notes",
+        "classification": "memory projection",
+        "variant": "dashed"
+      },
+      {
+        "from": "report",
+        "to": "actions",
+        "label": "study queue",
+        "classification": "this week",
+        "variant": "emphasis",
+        "labelAt": [
+          960,
+          320
+        ]
+      },
+      {
+        "from": "obsidian",
+        "to": "actions",
+        "label": "reference back",
+        "classification": "longitudinal memory",
+        "variant": "default",
+        "labelAt": [
+          1000,
+          526
+        ]
+      }
+    ],
+    "cards": [
+      {
+        "dot": "emerald",
+        "title": "What Archify Shows",
+        "items": [
+          "The main path is source posts -> atoms -> threads -> frontier synthesis -> action.",
+          "Profile and project context affect scoring and interpretation, not reader-facing gossip.",
+          "Obsidian remains the memory projection while HTML is the weekly decision artifact."
+        ]
+      },
+      {
+        "dot": "violet",
+        "title": "Why This Matters",
+        "items": [
+          "The report explains how the week changes the existing knowledge base.",
+          "Project leads turn general AI news into portfolio-specific checks.",
+          "The visual artifact can be sent as a standalone Telegram document."
+        ]
+      }
+    ]
+  },
+  "quality_findings": [],
+  "html_path": "2026-W28.visual.html",
+  "json_path": "2026-W28.visual.json"
+}

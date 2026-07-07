@@ -1,0 +1,1341 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Decision Intelligence 2026-W28</title>
+<style>
+:root { color-scheme: light; --ink:#172026; --muted:#62717f; --bg:#eef3f1; --panel:#fff; --line:#d6dfdc; --green:#0f766e; --blue:#2563eb; --rose:#be123c; --amber:#b45309; --soft:#f8fafc; }
+* { box-sizing:border-box; }
+body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:var(--bg); color:var(--ink); line-height:1.55; }
+a { color:#0b63ce; text-decoration:none; }
+a:hover { text-decoration:underline; }
+header { position:relative; overflow:hidden; background:#10231f; color:#f8fafc; padding:30px 24px 24px; }
+header::after { content:""; position:absolute; inset:auto 0 0 0; height:5px; background:linear-gradient(90deg,#14b8a6,#2563eb,#f59e0b,#e11d48); }
+.hero { max-width:1180px; margin:0 auto; display:grid; grid-template-columns:minmax(0,1.25fr) minmax(260px,.75fr); gap:22px; align-items:end; }
+.kicker { color:#99f6e4; font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; margin:0 0 7px; }
+h1 { font-size:38px; line-height:1.08; margin:0 0 10px; letter-spacing:0; }
+h2 { font-size:23px; line-height:1.2; margin:0 0 14px; letter-spacing:0; }
+h3 { font-size:16px; line-height:1.26; margin:0 0 7px; letter-spacing:0; }
+p { margin:0 0 11px; }
+.lead { font-size:18px; max-width:900px; color:#26333d; }
+.muted { color:var(--muted); font-size:13px; }
+.hero-metrics { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.hero-metrics div, section, article { border:1px solid var(--line); border-radius:8px; }
+.hero-metrics div { padding:12px; background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.18); }
+.hero-metrics b { display:block; font-size:27px; line-height:1; }
+.hero-metrics span { color:#cbd5e1; font-size:12px; }
+.hero-actions { margin-top:12px; border:1px solid rgba(153,246,228,.36); border-radius:8px; padding:10px 12px; background:rgba(15,118,110,.18); max-width:760px; }
+.hero-actions b { display:block; color:#99f6e4; font-size:13px; margin-bottom:4px; text-transform:uppercase; }
+.hero-actions ol { margin:0; padding-left:20px; color:#f8fafc; display:grid; gap:2px; }
+nav { max-width:1180px; margin:18px auto 0; display:flex; flex-wrap:wrap; gap:8px; }
+nav a { color:#eff6ff; border:1px solid rgba(255,255,255,.22); border-radius:6px; padding:7px 10px; background:rgba(255,255,255,.08); font-size:13px; }
+main { max-width:1180px; margin:0 auto; padding:14px 24px 46px; }
+section { background:var(--panel); padding:20px; margin:0 0 14px; }
+article { background:#fbfdfc; padding:13px; margin:0; }
+.card-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(235px,1fr)); gap:10px; }
+.compact-grid { grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); }
+.frontier-cards article:first-child { border-color:#99f6e4; background:#f0fdfa; }
+.narrative-list, .source-list { padding-left:22px; margin:14px 0 0; }
+.narrative-list li, .source-list li { margin:0 0 9px; }
+.narrative-list span, .source-list span { display:block; color:var(--muted); font-size:13px; }
+.decision-layout { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(260px,.8fr); gap:12px; margin-bottom:14px; }
+.decision-main { background:#f0fdfa; border-color:#99f6e4; }
+.decision-watchout { background:#fff7ed; border-color:#fed7aa; }
+.decision-list { margin:0; padding-left:22px; display:grid; gap:8px; font-size:17px; }
+.action-first article { background:#f8fafc; }
+.section-note { color:#425466; margin-top:-2px; max-width:860px; }
+.project-head { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+.status-pill { display:inline-block; border:1px solid #cbd5e1; border-radius:999px; padding:2px 8px; color:#334155; background:#f8fafc; font-size:12px; font-weight:700; white-space:nowrap; }
+.project-implication { background:#fbfdfc; }
+.diagram-shell { width:100%; height:min(70vh,720px); min-height:520px; border:1px solid var(--line); border-radius:8px; overflow:hidden; background:#0f172a; }
+.diagram-shell iframe { width:100%; height:100%; border:0; display:block; }
+.metrics-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; margin:0 0 16px; }
+.metrics-row div { border:1px solid var(--line); border-radius:8px; background:#f8fafc; padding:13px; }
+.metrics-row b { display:block; font-size:26px; line-height:1; color:var(--green); }
+.metrics-row span { color:var(--muted); font-size:13px; }
+.split { display:grid; grid-template-columns:minmax(0,1fr) minmax(280px,.72fr); gap:14px; align-items:start; }
+.bar { height:8px; border-radius:999px; background:#e5e7eb; overflow:hidden; margin:8px 0 5px; }
+.bar span { display:block; height:100%; background:linear-gradient(90deg,#0f766e,#2563eb,#f59e0b); }
+.distribution, .term-list { list-style:none; padding:0; margin:0; display:grid; gap:10px; }
+.distribution li, .term-list li { border:1px solid var(--line); border-radius:8px; padding:10px; background:#fbfdfc; }
+.trend-card { display:grid; gap:6px; }
+.trend-bars label { display:block; font-size:12px; color:var(--muted); }
+table { width:100%; border-collapse:collapse; }
+th, td { border-bottom:1px solid var(--line); text-align:left; padding:9px 8px; }
+code { background:#eef2f6; border:1px solid #d7dee7; border-radius:4px; padding:1px 4px; }
+.profile-note { color:#cbd5e1; font-size:13px; margin-top:10px; }
+@media (max-width:860px) { .hero, .split, .decision-layout { grid-template-columns:1fr; } h1 { font-size:27px; } main { padding-left:14px; padding-right:14px; } header { padding-left:14px; padding-right:14px; } section { padding:14px; } .profile-note { display:none; } .hero-metrics { grid-template-columns:repeat(4,minmax(0,1fr)); } .hero-metrics div { padding:8px; } .hero-metrics b { font-size:20px; } .hero-metrics span { font-size:11px; } .hero-actions { font-size:13px; } .diagram-shell { height:430px; min-height:430px; } .decision-list { font-size:15px; } .compact-grid { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<header>
+<div class="hero">
+<div>
+<p class="kicker">AI Knowledge Intelligence</p>
+<h1>AI Decision Intelligence - 2026-W28</h1>
+<p>Briefing-first weekly artifact: what changed, what to do, what to study, and which project leads deserve inspection.</p>
+<p class="profile-note">Profile anchors: AI agents, agent orchestration, LLM orchestration, evaluation, evals, AI infrastructure, LLM internals, developer tooling</p>
+<div class="hero-actions"><b>Do now</b><ol><li>Prototype FP8 + MTP-head serving on an open hybrid model</li><li>Audit exposure to opaque per-call AI pricing</li></ol></div>
+</div>
+<div class="hero-metrics">
+<div><b>12</b><span>idea threads</span></div>
+<div><b>14</b><span>source atoms</span></div>
+<div><b>4</b><span>source channels</span></div>
+<div><b>0</b><span>project leads</span></div>
+</div>
+</div>
+<nav><a href="#decision-brief">Decision Brief</a><a href="#what-changed">What Changed</a><a href="#actions">Study And Do</a><a href="#project-implications">Project Implications</a><a href="#knowledge-flow">Knowledge Flow</a><a href="#trend-board">Trend Board</a><a href="#sources">Sources</a></nav>
+</header>
+<main>
+<p class="muted">Generated 2026-07-07T10:40:05Z. Frontier synthesis drives the briefing; deterministic code renders metrics, sources, and the Archify pipeline map.</p>
+<section id="decision-brief"><h2>Decision Brief</h2><div class="decision-layout"><article class="decision-main"><h3>Main Read</h3><ol class="decision-list"><li>This week&#x27;s signal concentrates on open-source model efficiency, LLM interpretability breakthroughs, and shifting AI infrastructure economics.</li><li>GigaChat 3.5 Ultra dominates with a 432B MIT-licensed hybrid MLA+GatedDeltaNet architecture matching DeepSeek V3.2 at ~1.5x smaller size, plus practical inference gains (dual MTP-heads, 2.2x generation speed).</li><li>Anthropic&#x27;s discovery of J-space—a localized reasoning workspace in Claude—marks a potential interpretability milestone with safety implications.</li></ol></article><article class="decision-watchout"><h3>Trust Check</h3><ul><li>J-space claims carry moderate confidence (0.75-0.88) and lean on a global-workspace analogy; treat &#x27;conscious-like awareness&#x27; framing as speculative pending replication.</li><li>GigaChat performance parity with DeepSeek V3.2 is vendor-adjacent benchmark reporting; validate independently before production reliance.</li><li>Fable pricing atoms rest on individual user reports and may not generalize to all usage patterns.</li></ul></article></div><div class="split action-first"><div><h3>Do Now</h3><div class="card-grid"><article><h3>Prototype FP8 + MTP-head serving on an open hybrid model</h3><p>Deploy GigaChat 3.5 Ultra (or comparable open model) in a test harness and benchmark generation speed and throughput-under-load against your current stack</p></article><article><h3>Audit exposure to opaque per-call AI pricing</h3><p>Review all third-party AI API integrations (e.g., Fable-style services) for system-prompt cost amplification and free-to-paid tier transitions</p></article></div></div><div><h3>Study Next</h3><div class="card-grid"><article><h3>MLA + GatedDeltaNet hybrid architecture and dual MTP-heads inference</h3><p>Reproducible, MIT-licensed efficiency and throughput techniques applicable to production serving now</p></article><article><h3>J-space interpretability findings and global-workspace analogy</h3><p>Potential foundation for auditing and safety tooling in agentic deployments; still early enough to shape practice</p></article></div></div></div></section>
+<section id="what-changed"><h2>What Changed</h2><div class="metrics-row"><div><b>12</b><span>changed threads</span></div><div><b>13</b><span>atoms this week</span></div><div><b>4</b><span>source channels</span></div></div><div class="split"><div><h3>New Or Updated Threads</h3><div class="card-grid"><article><h3>Fable</h3><p>Fable API pricing concern: user reported $20 charge for single &#x27;Hello&#x27; message indicating aggressive system prompt execution costs</p><div class="bar" title="30d momentum"><span style="width:17%"></span></div></article><article><h3>Vibecraft / Yandex</h3><p>Yandex launched Vibecraft, a no-code web/app builder using text prompts for non-developers</p><div class="bar" title="30d momentum"><span style="width:17%"></span></div></article><article><h3>Atlas / Boston Dynamics / Hyundai Motor Group</h3><p>Boston Dynamics Atlas humanoid robot deployed at World Cup 2026 with mass production planned</p><div class="bar" title="30d momentum"><span style="width:8%"></span></div></article><article><h3>GigaChat 3.5 Ultra / DeepSeek V3.2 / DeepSeek V4</h3><p>GigaChat 3.5 Ultra released as 432B open-source model with hybrid MLA+GatedDeltaNet architecture</p><div class="bar" title="30d momentum"><span style="width:8%"></span></div></article><article><h3>Jacobian Lens / Claude / Anthropic</h3><p>Anthropic discovers J-space: localized neural workspace encoding model&#x27;s reasoning process in Claude</p><div class="bar" title="30d momentum"><span style="width:8%"></span></div></article><article><h3>Nvidia / hyperscalers / revenue-sharing</h3><p>Nvidia shifts to revenue-sharing model with startups to reduce hyperscaler chip dependency</p><div class="bar" title="30d momentum"><span style="width:8%"></span></div></article></div></div><div><h3>Atom Mix</h3><ul class="distribution"><li><b>tool release</b><div class="bar" title="3"><span style="width:23%"></span></div><span>3 atoms</span></li><li><b>pricing or limit change</b><div class="bar" title="2"><span style="width:15%"></span></div><span>2 atoms</span></li><li><b>case study</b><div class="bar" title="2"><span style="width:15%"></span></div><span>2 atoms</span></li><li><b>model update</b><div class="bar" title="2"><span style="width:15%"></span></div><span>2 atoms</span></li><li><b>research claim</b><div class="bar" title="2"><span style="width:15%"></span></div><span>2 atoms</span></li><li><b>market signal</b><div class="bar" title="1"><span style="width:8%"></span></div><span>1 atoms</span></li><li><b>benchmark claim</b><div class="bar" title="1"><span style="width:8%"></span></div><span>1 atoms</span></li></ul></div></div><h3>Top-Model Interpretation</h3><div class="card-grid frontier-cards"><article><h3>Open-source frontier efficiency leaps with GigaChat 3.5 Ultra</h3><p>A 432B MIT-licensed hybrid MLA+GatedDeltaNet model reportedly matches DeepSeek V3.2 at ~1.5x smaller size, with FP8 training, online RL, 40% size reduction vs prior gen, and dual MTP-heads for 2.2x faster generation.</p></article><article><h3>Interpretability signal: J-space in Claude</h3><p>Anthropic research identifies a compact neural workspace acting as working memory for complex reasoning, analogous to global workspace theory, with claims it tracks context, bugs, and deception attempts.</p></article><article><h3>Nvidia shifts toward revenue-sharing with startups</h3><p>Nvidia offers infrastructure credits in exchange for revenue share, targeting datacenter builders to reduce dependence on Google, Amazon, and Microsoft.</p></article><article><h3>Agentic-systems skills become the dominant engineering demand</h3><p>Stanford AI Index 2026 reports a 10,854% YoY surge in agentic-systems job mentions, signaling a shift from code-writing to system architecture and context management.</p></article></div><ol class="narrative-list"><li><b>Efficient open-source hybrid architectures go mainstream</b><span>Across multiple atoms this week, GigaChat 3.5 Ultra converges the signals: a large hybrid MLA+GatedDeltaNet model, FP8 training, online RL, expanded context, and dual MTP-head inference speedups—all under MIT license. The narrative is that frontier-competitive performance is increasingly achievable at reduced scale with reproducible methods, pressuring proprietary moats.</span></li><li><b>Localized reasoning workspaces emerge in LLMs</b><span>Two converging atoms describe J-space as a compact activation layer encoding reasoning and semantic awareness that emerged without explicit design. This moves interpretability from feature-level probing toward identifying functional reasoning substrates, with direct safety and debugging applications.</span></li><li><b>From buildout to commoditization</b><span>A macro thesis frames AI&#x27;s arc: buildout (2023-24), rollout (2025-26), then deflationary commoditization of tokenizable products post-2027, with durable value migrating to non-commoditizable domains like science and biology. Paired with Nvidia&#x27;s revenue-share pivot and agentic-skill demand, it clarifies where to place multi-year bets.</span></li><li><b>Agentic engineering as the new core skill</b><span>Labor-market data shows explosive demand for agentic-systems design, reflecting a move from writing code to architecting autonomous, context-managed systems. This reinforces the practical thread on iterative staged prompting and multi-agent tooling like T3MP3ST.</span></li></ol><p class="muted">Synthesis model: claude-opus-4-8 | 24 threads | 26 atoms</p></section>
+<section id="actions"><h2>Study And Do</h2><div class="split"><div><h3>Study Now</h3><div class="card-grid"><article><h3>MLA + GatedDeltaNet hybrid architecture and dual MTP-heads inference</h3><p>Reproducible, MIT-licensed efficiency and throughput techniques applicable to production serving now</p><p class="muted">Priority: high</p></article><article><h3>J-space interpretability findings and global-workspace analogy</h3><p>Potential foundation for auditing and safety tooling in agentic deployments; still early enough to shape practice</p><p class="muted">Priority: high</p></article><article><h3>Agentic-systems architecture and context management patterns</h3><p>Sharpest labor-demand signal of the week; skills gap is widening fast</p><p class="muted">Priority: high</p></article><article><h3>Multi-agent red-team automation (T3MP3ST-style)</h3><p>90% success on 104 security tasks suggests autonomous security testing is becoming viable and worth piloting</p><p class="muted">Priority: medium</p></article><article><h3>Buyer-persona pain-intensity mapping for GTM</h3><p>167x LTV variance by persona is a concrete lever for revenue efficiency</p><p class="muted">Priority: medium</p></article></div></div><div><h3>Do Next</h3><div class="card-grid"><article><h3>Prototype FP8 + MTP-head serving on an open hybrid model</h3><p>Deploy GigaChat 3.5 Ultra (or comparable open model) in a test harness and benchmark generation speed and throughput-under-load against your current stack</p></article><article><h3>Audit exposure to opaque per-call AI pricing</h3><p>Review all third-party AI API integrations (e.g., Fable-style services) for system-prompt cost amplification and free-to-paid tier transitions</p></article><article><h3>Re-scope hiring and skill development toward agentic systems</h3><p>Update role rubrics to weight demonstrated code-review/testing/mentoring and agent-architecture experience over tenure</p></article><article><h3>Adopt staged iterative prompting as default agent workflow</h3><p>Convert one end-to-end build task from single-shot to incremental staged prompting and compare defect rate</p></article></div></div></div></section>
+<section id="project-implications"><h2>Project Implications</h2><p>No project implications were strong enough to show confidently in this report context.</p><p class="muted">This is intentional: broad overlaps such as AI, workflow, evidence, and tool are suppressed so the report does not show noisy project guesses. Update <code>src/config/projects.yaml</code> with more specific project phrases or extract more Knowledge Atoms to improve this section.</p></section>
+<section id="knowledge-flow"><h2>Knowledge Flow</h2><p class="section-note">This diagram explains how the report was built. Read the decision sections first; use this map when auditing the pipeline.</p><div class="diagram-shell"><iframe title="Archify knowledge flow" srcdoc="&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot; data-theme=&quot;dark&quot;&gt;
+&lt;head&gt;
+  &lt;meta charset=&quot;UTF-8&quot;&gt;
+  &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;
+  &lt;meta name=&quot;generator&quot; content=&quot;archify 2.10.0&quot;&gt;
+  &lt;title&gt;AI Knowledge Flow 2026-W28 Diagram&lt;/title&gt;
+  &lt;script&gt;
+    // Resolve the theme before first paint so light-preference users don&#x27;t
+    // see a dark flash. The toolbar script below re-applies with UI state.
+    (function () {
+      try {
+        var theme = null;
+        try {
+          var param = new URLSearchParams(window.location.search).get(&#x27;theme&#x27;);
+          if (param === &#x27;light&#x27; || param === &#x27;dark&#x27;) theme = param;
+        } catch (_) {}
+        if (!theme) {
+          try { theme = localStorage.getItem(&#x27;archify-theme&#x27;); } catch (_) {}
+        }
+        if (theme !== &#x27;light&#x27; &amp;&amp; theme !== &#x27;dark&#x27;) {
+          theme = window.matchMedia(&#x27;(prefers-color-scheme: light)&#x27;).matches ? &#x27;light&#x27; : &#x27;dark&#x27;;
+        }
+        document.documentElement.setAttribute(&#x27;data-theme&#x27;, theme);
+      } catch (_) {}
+    })();
+  &lt;/script&gt;
+  &lt;!-- Async font load: a blackholed network must not block first paint.
+       The body font stack falls back to system monospace until it lands. --&gt;
+  &lt;link rel=&quot;preconnect&quot; href=&quot;https://fonts.gstatic.com&quot; crossorigin&gt;
+  &lt;link href=&quot;https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&amp;display=swap&quot;
+        rel=&quot;stylesheet&quot; media=&quot;print&quot; onload=&quot;this.media=&#x27;all&#x27;&quot;&gt;
+  &lt;noscript&gt;
+    &lt;link href=&quot;https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&amp;display=swap&quot; rel=&quot;stylesheet&quot;&gt;
+  &lt;/noscript&gt;
+  &lt;style&gt;
+    /* ==========================================================
+       THEME VARIABLES — switch by toggling [data-theme] on &lt;html&gt;
+       ========================================================== */
+    :root,
+    [data-theme=&quot;dark&quot;] {
+      --bg: #020617;
+      --grid: #1e293b;
+      --text: #ffffff;
+      --text-muted: #94a3b8;
+      --text-dim: #475569;
+      /* UI chrome (menu hints, footer) needs more contrast than SVG .t-dim accents */
+      --text-faint: #7d8da1;
+
+      --panel: rgba(15, 23, 42, 0.5);
+      --panel-border: #1e293b;
+      --lane-fill: rgba(15, 23, 42, 0.22);
+      --lane-stroke: #334155;
+
+      --arrow: #64748b;
+      --arrow-emphasis: #34d399;
+
+      /* Opaque mask color used behind semi-transparent component fills
+         so the arrows drawn underneath are properly hidden. */
+      --mask: #0f172a;
+
+      --frontend-fill:    rgba(8, 51, 68, 0.4);
+      --frontend-stroke:  #22d3ee;
+      --backend-fill:     rgba(6, 78, 59, 0.4);
+      --backend-stroke:   #34d399;
+      --database-fill:    rgba(76, 29, 149, 0.4);
+      --database-stroke:  #a78bfa;
+      --cloud-fill:       rgba(120, 53, 15, 0.3);
+      --cloud-stroke:     #fbbf24;
+      --security-fill:    rgba(136, 19, 55, 0.4);
+      --security-stroke:  #fb7185;
+      --messagebus-fill:  rgba(251, 146, 60, 0.3);
+      --messagebus-stroke:#fb923c;
+      --external-fill:    rgba(30, 41, 59, 0.5);
+      --external-stroke:  #94a3b8;
+
+      --toolbar-bg:       rgba(15, 23, 42, 0.8);
+      --toolbar-border:   #334155;
+      --toolbar-text:     #e2e8f0;
+      --toolbar-hover:    rgba(15, 23, 42, 0.95);
+      --toolbar-menu-bg:  #0f172a;
+    }
+
+    [data-theme=&quot;light&quot;] {
+      --bg: #f8fafc;
+      --grid: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --text-dim: #94a3b8;
+      --text-faint: #64748b;
+
+      --panel: #ffffff;
+      --panel-border: #e2e8f0;
+      --lane-fill: rgba(248, 250, 252, 0.65);
+      --lane-stroke: #cbd5e1;
+
+      --arrow: #94a3b8;
+      --arrow-emphasis: #059669;
+
+      --mask: #ffffff;
+
+      --frontend-fill:    rgba(34, 211, 238, 0.15);
+      --frontend-stroke:  #0891b2;
+      --backend-fill:     rgba(52, 211, 153, 0.18);
+      --backend-stroke:   #059669;
+      --database-fill:    rgba(167, 139, 250, 0.2);
+      --database-stroke:  #7c3aed;
+      --cloud-fill:       rgba(251, 191, 36, 0.18);
+      --cloud-stroke:     #d97706;
+      --security-fill:    rgba(251, 113, 133, 0.15);
+      --security-stroke:  #e11d48;
+      --messagebus-fill:  rgba(251, 146, 60, 0.15);
+      --messagebus-stroke:#ea580c;
+      --external-fill:    rgba(148, 163, 184, 0.18);
+      --external-stroke:  #64748b;
+
+      --toolbar-bg:       rgba(255, 255, 255, 0.92);
+      --toolbar-border:   #cbd5e1;
+      --toolbar-text:     #334155;
+      --toolbar-hover:    #ffffff;
+      --toolbar-menu-bg:  #ffffff;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: &#x27;JetBrains Mono&#x27;, ui-monospace, SFMono-Regular, Menlo, Consolas, &#x27;DejaVu Sans Mono&#x27;, &#x27;Liberation Mono&#x27;, &#x27;Noto Sans Mono CJK SC&#x27;, &#x27;PingFang SC&#x27;, &#x27;Hiragino Sans GB&#x27;, &#x27;Microsoft YaHei&#x27;, monospace;
+      background: var(--bg);
+      min-height: 100vh;
+      padding: 2rem;
+      color: var(--text);
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    .container { max-width: 1200px; margin: 0 auto; }
+
+    .header { margin-bottom: 2rem; }
+
+    .header-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .pulse-dot {
+      width: 12px;
+      height: 12px;
+      background: var(--frontend-stroke);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 0.875rem;
+      margin-left: 1.75rem;
+    }
+
+    .diagram-container {
+      background: var(--panel);
+      border-radius: 1rem;
+      border: 1px solid var(--panel-border);
+      padding: 1.5rem;
+      overflow-x: auto;
+    }
+
+    svg {
+      width: 100%;
+      min-width: min(900px, 100%);
+      display: block;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+
+    .card {
+      background: var(--panel);
+      border-radius: 0.75rem;
+      border: 1px solid var(--panel-border);
+      padding: 1.25rem;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .card-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .card-dot.cyan     { background: var(--frontend-stroke); }
+    .card-dot.emerald  { background: var(--backend-stroke); }
+    .card-dot.violet   { background: var(--database-stroke); }
+    .card-dot.amber    { background: var(--cloud-stroke); }
+    .card-dot.rose     { background: var(--security-stroke); }
+    .card-dot.orange   { background: var(--messagebus-stroke); }
+    .card-dot.slate    { background: var(--external-stroke); }
+
+    .card h3 { font-size: 0.875rem; font-weight: 600; color: var(--text); }
+
+    .card ul {
+      list-style: none;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+    }
+
+    .card li { margin-bottom: 0.375rem; }
+
+    .footer {
+      text-align: center;
+      margin-top: 1.5rem;
+      color: var(--text-faint);
+      font-size: 0.75rem;
+    }
+
+    /* ==========================================================
+       Print stylesheet — hide interactive controls, force light,
+       drop the grid so the diagram doesn&#x27;t waste ink, use landscape
+       so wide diagrams fit, pack summary cards into 2 columns to
+       avoid an orphan card on a trailing page.
+       ========================================================== */
+    @page { size: landscape; margin: 1.5cm; }
+
+    @media print {
+      /* Force the FULL light palette — including component fills/strokes and
+         lane/arrow colors — so printing from dark theme doesn&#x27;t put neon
+         strokes and translucent dark fills on white paper. */
+      :root, [data-theme=&quot;dark&quot;], [data-theme=&quot;light&quot;] {
+        --bg: #ffffff;
+        --grid: transparent;
+        --panel: #ffffff;
+        --panel-border: #e2e8f0;
+        --text: #0f172a;
+        --text-muted: #475569;
+        --text-dim: #94a3b8;
+        --text-faint: #64748b;
+        --mask: #ffffff;
+        --lane-fill: rgba(248, 250, 252, 0.65);
+        --lane-stroke: #cbd5e1;
+        --arrow: #94a3b8;
+        --arrow-emphasis: #059669;
+        --frontend-fill:    rgba(34, 211, 238, 0.15);
+        --frontend-stroke:  #0891b2;
+        --backend-fill:     rgba(52, 211, 153, 0.18);
+        --backend-stroke:   #059669;
+        --database-fill:    rgba(167, 139, 250, 0.2);
+        --database-stroke:  #7c3aed;
+        --cloud-fill:       rgba(251, 191, 36, 0.18);
+        --cloud-stroke:     #d97706;
+        --security-fill:    rgba(251, 113, 133, 0.15);
+        --security-stroke:  #e11d48;
+        --messagebus-fill:  rgba(251, 146, 60, 0.15);
+        --messagebus-stroke:#ea580c;
+        --external-fill:    rgba(148, 163, 184, 0.18);
+        --external-stroke:  #64748b;
+      }
+      body { background: #ffffff !important; padding: 0; }
+      .container { max-width: none; }
+      .toolbar, .archify-toast, .no-print { display: none !important; }
+      .diagram-container, .card { box-shadow: none; border-color: #e2e8f0; }
+      .cards { grid-template-columns: 1fr 1fr; }
+      /* Ensure elements break sensibly across pages */
+      .card { break-inside: avoid; page-break-inside: avoid; }
+      .diagram-container { break-inside: avoid; page-break-inside: avoid; }
+      h1, .subtitle { color: #0f172a; }
+    }
+
+    /* ==========================================================
+       TOOLBAR (theme toggle + export menu)
+       ========================================================== */
+    .toolbar {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      display: flex;
+      gap: 0.5rem;
+      z-index: 100;
+    }
+    .toolbar button {
+      background: var(--toolbar-bg);
+      color: var(--toolbar-text);
+      border: 1px solid var(--toolbar-border);
+      padding: 0.5rem 0.875rem;
+      border-radius: 0.5rem;
+      font-family: inherit;
+      font-size: 0.75rem;
+      font-weight: 500;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      transition: background 0.15s, border-color 0.15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+    }
+    .toolbar button:hover {
+      background: var(--toolbar-hover);
+      border-color: var(--arrow);
+    }
+    .toolbar button:focus-visible {
+      outline: 2px solid var(--frontend-stroke);
+      outline-offset: 2px;
+    }
+    .toolbar .export-wrap { position: relative; }
+    .toolbar .export-menu {
+      position: absolute;
+      top: calc(100% + 0.375rem);
+      right: 0;
+      background: var(--toolbar-menu-bg);
+      border: 1px solid var(--toolbar-border);
+      border-radius: 0.5rem;
+      padding: 0.375rem;
+      min-width: 160px;
+      display: none;
+      flex-direction: column;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+    }
+    .toolbar .export-menu.open { display: flex; }
+    .toolbar .export-menu button {
+      background: transparent;
+      border: 0;
+      justify-content: space-between;
+      width: 100%;
+      text-align: left;
+      padding: 0.5rem 0.75rem;
+    }
+    .toolbar .export-menu button:hover {
+      background: var(--toolbar-hover);
+    }
+    .toolbar .export-menu .hint {
+      color: var(--text-faint);
+      font-size: 0.625rem;
+    }
+    .toolbar .export-menu hr {
+      border: 0;
+      border-top: 1px solid var(--toolbar-border);
+      margin: 0.25rem 0.375rem;
+      opacity: 0.5;
+    }
+
+    /* Toast — brief feedback for actions like &quot;copied&quot; */
+    .archify-toast {
+      position: fixed;
+      top: 1rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(-8px);
+      background: var(--toolbar-menu-bg);
+      color: var(--text);
+      border: 1px solid var(--toolbar-border);
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      font-family: inherit;
+      font-size: 0.75rem;
+      opacity: 0;
+      transition: opacity 0.2s, transform 0.2s;
+      z-index: 200;
+      pointer-events: none;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+    }
+    .archify-toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    @media (max-width: 720px) {
+      body { padding: 1rem; }
+      .toolbar {
+        position: static;
+        justify-content: flex-end;
+        margin-bottom: 1rem;
+      }
+      .header { margin-bottom: 1.25rem; }
+      .header-row {
+        gap: 0.75rem;
+        align-items: flex-start;
+      }
+      h1 {
+        font-size: 1.25rem;
+        line-height: 1.25;
+      }
+      .subtitle {
+        margin-left: 0;
+        font-size: 0.8125rem;
+        line-height: 1.55;
+      }
+      .diagram-container {
+        padding: 0.75rem;
+        border-radius: 0.75rem;
+      }
+      .cards {
+        grid-template-columns: 1fr;
+        margin-top: 1rem;
+      }
+    }
+
+    /* ==========================================================
+       SVG SEMANTIC CLASSES — use these instead of inline fill/stroke
+       ========================================================== */
+    .c-grid       { stroke: var(--grid); fill: none; }
+    .c-mask       { fill: var(--mask); stroke: none; }
+
+    .c-frontend   { fill: var(--frontend-fill);   stroke: var(--frontend-stroke); }
+    .c-backend    { fill: var(--backend-fill);    stroke: var(--backend-stroke); }
+    .c-database   { fill: var(--database-fill);   stroke: var(--database-stroke); }
+    .c-cloud      { fill: var(--cloud-fill);      stroke: var(--cloud-stroke); }
+    .c-security   { fill: var(--security-fill);   stroke: var(--security-stroke); }
+    .c-messagebus { fill: var(--messagebus-fill); stroke: var(--messagebus-stroke); }
+    .c-external   { fill: var(--external-fill);   stroke: var(--external-stroke); }
+
+    /* Text helpers */
+    .t-primary { fill: var(--text); }
+    .t-muted   { fill: var(--text-muted); }
+    .t-dim     { fill: var(--text-dim); }
+    .t-frontend   { fill: var(--frontend-stroke); }
+    .t-backend    { fill: var(--backend-stroke); }
+    .t-database   { fill: var(--database-stroke); }
+    .t-cloud      { fill: var(--cloud-stroke); }
+    .t-security   { fill: var(--security-stroke); }
+    .t-messagebus { fill: var(--messagebus-stroke); }
+    .t-external   { fill: var(--external-stroke); }
+
+    /* Arrows */
+    .a-default   { stroke: var(--arrow); fill: none; }
+    .a-emphasis  { stroke: var(--arrow-emphasis); fill: none; }
+    .a-security  { stroke: var(--security-stroke); fill: none; stroke-dasharray: 5,5; }
+    .a-dashed    { stroke: var(--database-stroke); fill: none; stroke-dasharray: 4,4; }
+
+    /* Arrowhead markers reference these */
+    .m-default   { fill: var(--arrow); }
+    .m-emphasis  { fill: var(--arrow-emphasis); }
+    .m-security  { fill: var(--security-stroke); }
+    .m-dashed    { fill: var(--database-stroke); }
+
+    /* Dashed boundary variants */
+    .c-security-group { fill: transparent; stroke: var(--security-stroke); stroke-dasharray: 4,4; }
+    .c-region         { fill: rgba(251, 191, 36, 0.05); stroke: var(--cloud-stroke); stroke-dasharray: 8,4; }
+    .c-lane           { fill: var(--lane-fill); stroke: var(--lane-stroke); stroke-dasharray: 6,6; }
+
+    /* Optional trace animation, enabled only by meta.animation = &quot;trace&quot;.
+       Static diagrams do not carry data-animation and render exactly as before. */
+    svg[data-animation=&quot;trace&quot;] [data-animate=&quot;edge&quot;] {
+      stroke-dasharray: 10 8;
+      stroke-dashoffset: 54;
+      animation: archify-edge-flow 2.4s linear infinite;
+      animation-delay: calc(var(--step, 0) * 160ms);
+    }
+    svg[data-animation=&quot;trace&quot;] [data-animate=&quot;node&quot;] {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: archify-node-pulse 3.6s ease-in-out infinite;
+      animation-delay: calc(var(--step, 0) * 160ms);
+    }
+    @keyframes archify-edge-flow {
+      to { stroke-dashoffset: 0; }
+    }
+    @keyframes archify-node-pulse {
+      0%, 72%, 100% { filter: none; stroke-width: 1.5; }
+      18%, 36% {
+        filter: drop-shadow(0 0 8px var(--arrow-emphasis));
+        stroke-width: 2.4;
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      svg[data-animation=&quot;trace&quot;] [data-animate] {
+        animation: none !important;
+        stroke-dashoffset: 0;
+      }
+    }
+  &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;!-- Toolbar: theme toggle + export menu (present on every generated diagram)
+       Keyboard: T toggles theme, E opens export menu (when no input focused) --&gt;
+  &lt;div class=&quot;toolbar&quot; role=&quot;toolbar&quot; aria-label=&quot;Diagram actions&quot;&gt;
+    &lt;button id=&quot;btn-theme&quot; type=&quot;button&quot;
+            title=&quot;Toggle theme (T)&quot;
+            aria-label=&quot;Toggle color theme&quot;
+            aria-pressed=&quot;false&quot;&gt;
+      &lt;span id=&quot;theme-icon&quot; aria-hidden=&quot;true&quot;&gt;&amp;#9790;&lt;/span&gt;
+      &lt;span id=&quot;theme-label&quot;&gt;Dark&lt;/span&gt;
+    &lt;/button&gt;
+    &lt;div class=&quot;export-wrap&quot;&gt;
+      &lt;button id=&quot;btn-export&quot; type=&quot;button&quot;
+              title=&quot;Export diagram (E)&quot;
+              aria-label=&quot;Export diagram&quot;
+              aria-haspopup=&quot;menu&quot;
+              aria-expanded=&quot;false&quot;
+              aria-controls=&quot;export-menu&quot;&gt;
+        Export &lt;span aria-hidden=&quot;true&quot;&gt;&amp;#9662;&lt;/span&gt;
+      &lt;/button&gt;
+      &lt;div class=&quot;export-menu&quot; id=&quot;export-menu&quot; role=&quot;menu&quot; aria-label=&quot;Export&quot;&gt;
+        &lt;button data-action=&quot;copy&quot;  type=&quot;button&quot; role=&quot;menuitem&quot; tabindex=&quot;-1&quot;&gt;Copy to clipboard &lt;span class=&quot;hint&quot;&gt;PNG&lt;/span&gt;&lt;/button&gt;
+        &lt;hr role=&quot;separator&quot;&gt;
+        &lt;button data-format=&quot;png&quot;   type=&quot;button&quot; role=&quot;menuitem&quot; tabindex=&quot;-1&quot;&gt;Download PNG&lt;/button&gt;
+        &lt;button data-format=&quot;jpeg&quot;  type=&quot;button&quot; role=&quot;menuitem&quot; tabindex=&quot;-1&quot;&gt;Download JPEG&lt;/button&gt;
+        &lt;button data-format=&quot;webp&quot;  type=&quot;button&quot; role=&quot;menuitem&quot; tabindex=&quot;-1&quot;&gt;Download WebP&lt;/button&gt;
+        &lt;hr role=&quot;separator&quot;&gt;
+        &lt;button data-format=&quot;svg&quot;   type=&quot;button&quot; role=&quot;menuitem&quot; tabindex=&quot;-1&quot;&gt;Download SVG &lt;span class=&quot;hint&quot;&gt;vector&lt;/span&gt;&lt;/button&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+
+  &lt;div class=&quot;container&quot;&gt;
+    &lt;!-- Header --&gt;
+    &lt;div class=&quot;header&quot;&gt;
+      &lt;div class=&quot;header-row&quot;&gt;
+        &lt;div class=&quot;pulse-dot&quot;&gt;&lt;/div&gt;
+        &lt;h1&gt;AI Knowledge Flow 2026-W28&lt;/h1&gt;
+      &lt;/div&gt;
+      &lt;p class=&quot;subtitle&quot;&gt;Telegram sources to atoms, threads, frontier synthesis, project actions, and memory&lt;/p&gt;
+    &lt;/div&gt;
+
+    &lt;!-- Main Diagram --&gt;
+    &lt;div class=&quot;diagram-container&quot;&gt;
+      &lt;svg viewBox=&quot;0 0 1080 760&quot; role=&quot;img&quot; aria-label=&quot;AI Knowledge Flow 2026-W28 — Telegram sources to atoms, threads, frontier synthesis, project actions, and memory (data-flow diagram)&quot; data-animation=&quot;trace&quot;&gt;
+        &lt;!-- Definitions --&gt;
+        &lt;defs&gt;
+          &lt;marker id=&quot;arrowhead&quot; markerWidth=&quot;10&quot; markerHeight=&quot;7&quot; refX=&quot;9&quot; refY=&quot;3.5&quot; orient=&quot;auto&quot;&gt;
+            &lt;polygon points=&quot;0 0, 10 3.5, 0 7&quot; class=&quot;m-default&quot; /&gt;
+          &lt;/marker&gt;
+          &lt;marker id=&quot;arrowhead-emphasis&quot; markerWidth=&quot;10&quot; markerHeight=&quot;7&quot; refX=&quot;9&quot; refY=&quot;3.5&quot; orient=&quot;auto&quot;&gt;
+            &lt;polygon points=&quot;0 0, 10 3.5, 0 7&quot; class=&quot;m-emphasis&quot; /&gt;
+          &lt;/marker&gt;
+          &lt;marker id=&quot;arrowhead-security&quot; markerWidth=&quot;10&quot; markerHeight=&quot;7&quot; refX=&quot;9&quot; refY=&quot;3.5&quot; orient=&quot;auto&quot;&gt;
+            &lt;polygon points=&quot;0 0, 10 3.5, 0 7&quot; class=&quot;m-security&quot; /&gt;
+          &lt;/marker&gt;
+          &lt;marker id=&quot;arrowhead-dashed&quot; markerWidth=&quot;10&quot; markerHeight=&quot;7&quot; refX=&quot;9&quot; refY=&quot;3.5&quot; orient=&quot;auto&quot;&gt;
+            &lt;polygon points=&quot;0 0, 10 3.5, 0 7&quot; class=&quot;m-dashed&quot; /&gt;
+          &lt;/marker&gt;
+          &lt;pattern id=&quot;grid&quot; width=&quot;40&quot; height=&quot;40&quot; patternUnits=&quot;userSpaceOnUse&quot;&gt;
+            &lt;path d=&quot;M 40 0 L 0 0 0 40&quot; class=&quot;c-grid&quot; stroke-width=&quot;0.5&quot;/&gt;
+          &lt;/pattern&gt;
+        &lt;/defs&gt;
+
+        &lt;!-- Background Grid --&gt;
+        &lt;rect width=&quot;100%&quot; height=&quot;100%&quot; fill=&quot;url(#grid)&quot; /&gt;
+
+        &lt;!-- Data Stages --&gt;
+        &lt;rect x=&quot;16&quot; y=&quot;46&quot; width=&quot;168&quot; height=&quot;640&quot; rx=&quot;10&quot; class=&quot;c-lane&quot; stroke-width=&quot;1&quot;/&gt;
+        &lt;text x=&quot;100&quot; y=&quot;68&quot; class=&quot;t-dim&quot; font-size=&quot;9&quot; font-weight=&quot;600&quot; text-anchor=&quot;middle&quot;&gt;01 / Sources&lt;/text&gt;
+
+        &lt;rect x=&quot;231&quot; y=&quot;46&quot; width=&quot;168&quot; height=&quot;640&quot; rx=&quot;10&quot; class=&quot;c-lane&quot; stroke-width=&quot;1&quot;/&gt;
+        &lt;text x=&quot;315&quot; y=&quot;68&quot; class=&quot;t-dim&quot; font-size=&quot;9&quot; font-weight=&quot;600&quot; text-anchor=&quot;middle&quot;&gt;02 / Atomize&lt;/text&gt;
+
+        &lt;rect x=&quot;446&quot; y=&quot;46&quot; width=&quot;168&quot; height=&quot;640&quot; rx=&quot;10&quot; class=&quot;c-lane&quot; stroke-width=&quot;1&quot;/&gt;
+        &lt;text x=&quot;530&quot; y=&quot;68&quot; class=&quot;t-dim&quot; font-size=&quot;9&quot; font-weight=&quot;600&quot; text-anchor=&quot;middle&quot;&gt;03 / Thread&lt;/text&gt;
+
+        &lt;rect x=&quot;661&quot; y=&quot;46&quot; width=&quot;168&quot; height=&quot;640&quot; rx=&quot;10&quot; class=&quot;c-lane&quot; stroke-width=&quot;1&quot;/&gt;
+        &lt;text x=&quot;745&quot; y=&quot;68&quot; class=&quot;t-dim&quot; font-size=&quot;9&quot; font-weight=&quot;600&quot; text-anchor=&quot;middle&quot;&gt;04 / Synthesize&lt;/text&gt;
+
+        &lt;rect x=&quot;876&quot; y=&quot;46&quot; width=&quot;168&quot; height=&quot;640&quot; rx=&quot;10&quot; class=&quot;c-lane&quot; stroke-width=&quot;1&quot;/&gt;
+        &lt;text x=&quot;960&quot; y=&quot;68&quot; class=&quot;t-dim&quot; font-size=&quot;9&quot; font-weight=&quot;600&quot; text-anchor=&quot;middle&quot;&gt;05 / Act&lt;/text&gt;
+
+        &lt;!-- Flow paths --&gt;
+        &lt;path d=&quot;M 156 157 L 207.5 157 L 207.5 271 L 259 271&quot; class=&quot;a-emphasis&quot; data-animate=&quot;edge&quot; style=&quot;--step:0&quot; stroke-width=&quot;1.8&quot; marker-end=&quot;url(#arrowhead-emphasis)&quot;/&gt;
+        &lt;path d=&quot;M 156 499 L 207.5 499 L 207.5 271 L 259 271&quot; class=&quot;a-security&quot; data-animate=&quot;edge&quot; style=&quot;--step:1&quot; stroke-width=&quot;1.4&quot; marker-end=&quot;url(#arrowhead-security)&quot;/&gt;
+        &lt;path d=&quot;M 371 271 L 474 271&quot; class=&quot;a-emphasis&quot; data-animate=&quot;edge&quot; style=&quot;--step:2&quot; stroke-width=&quot;1.8&quot; marker-end=&quot;url(#arrowhead-emphasis)&quot;/&gt;
+        &lt;path d=&quot;M 586 271 L 637.5 271 L 637.5 157 L 689 157&quot; class=&quot;a-emphasis&quot; data-animate=&quot;edge&quot; style=&quot;--step:3&quot; stroke-width=&quot;1.8&quot; marker-end=&quot;url(#arrowhead-emphasis)&quot;/&gt;
+        &lt;path d=&quot;M 156 499 L 422.5 499 L 422.5 157 L 689 157&quot; class=&quot;a-dashed&quot; data-animate=&quot;edge&quot; style=&quot;--step:4&quot; stroke-width=&quot;1.4&quot; marker-end=&quot;url(#arrowhead-dashed)&quot;/&gt;
+        &lt;path d=&quot;M 801 157 L 904 157&quot; class=&quot;a-emphasis&quot; data-animate=&quot;edge&quot; style=&quot;--step:5&quot; stroke-width=&quot;1.8&quot; marker-end=&quot;url(#arrowhead-emphasis)&quot;/&gt;
+        &lt;path d=&quot;M 586 271 L 745 271 L 745 157 L 904 157&quot; class=&quot;a-default&quot; data-animate=&quot;edge&quot; style=&quot;--step:6&quot; stroke-width=&quot;1.4&quot; marker-end=&quot;url(#arrowhead)&quot;/&gt;
+        &lt;path d=&quot;M 586 271 L 745 271 L 745 613 L 904 613&quot; class=&quot;a-dashed&quot; data-animate=&quot;edge&quot; style=&quot;--step:7&quot; stroke-width=&quot;1.4&quot; marker-end=&quot;url(#arrowhead-dashed)&quot;/&gt;
+        &lt;path d=&quot;M 960 186 L 960 186 L 960 356 L 960 356&quot; class=&quot;a-emphasis&quot; data-animate=&quot;edge&quot; style=&quot;--step:8&quot; stroke-width=&quot;1.8&quot; marker-end=&quot;url(#arrowhead-emphasis)&quot;/&gt;
+        &lt;path d=&quot;M 960 584 L 960 584 L 960 414 L 960 414&quot; class=&quot;a-default&quot; data-animate=&quot;edge&quot; style=&quot;--step:9&quot; stroke-width=&quot;1.4&quot; marker-end=&quot;url(#arrowhead)&quot;/&gt;
+
+        &lt;!-- Nodes --&gt;
+        &lt;rect x=&quot;44&quot; y=&quot;128&quot; width=&quot;112&quot; height=&quot;58&quot; rx=&quot;6&quot; class=&quot;c-mask&quot;/&gt;
+        &lt;rect x=&quot;44&quot; y=&quot;128&quot; width=&quot;112&quot; height=&quot;58&quot; rx=&quot;6&quot; class=&quot;c-external&quot; data-animate=&quot;node&quot; style=&quot;--step:0&quot; stroke-width=&quot;1.5&quot;/&gt;
+        &lt;text x=&quot;100&quot; y=&quot;149&quot; class=&quot;t-primary&quot; font-size=&quot;10&quot; font-weight=&quot;600&quot; text-anchor=&quot;middle&quot;&gt;Telegram Sources&lt;/text&gt;
+        &lt;text x=&quot;100&quot; y=&quot;165&quot; class=&quot;t-muted&quot; font-size=&quot;7&quot; text-anchor=&quot;middle&quot;&gt;4 channels&lt;/text&gt;
+        &lt;text x=&quot;100&quot; y=&quot;175&quot; class=&quot;t-external&quot; font-size=&quot;7&quot; text-anchor=&quot;middle&quot;&gt;12w input&lt;/text&gt;
+
+        &lt;rect x=&quot;44&quot; y=&quot;470&quot; width=&quot;112&quot; height=&quot;58&quot; rx=&quot;6&quot; class=&quot;c-mask&quot;/&gt;
+        &lt;rect x=&quot;44&quot; y=&quot;470&quot; width=&quot;112&quot; height=&quot;58&quot; rx=&quot;6&quot; class=&quot;c-security&quot; data-animate=&quot;node&quot; style=&quot;--step:1&quot; stroke-width=&quot;1.5&quot;/&gt;
+        &lt;text x=&quot;100&quot; y=&quot;491&quot; class=&quot;t-primary&quot; font-size=&quot;10&quot; font-weight=&quot;600&quot; text-anchor=&quot;middle&quot;&gt;Profile + Projects&lt;/text&gt;
+        &lt;text x=&quot;100&quot; y=&quot;507&quot; class=&quot;t-muted&quot; font-size=&quot;7&quot; text-anchor=&quot;middle&quot;&gt;0 project leads&lt;/text&gt;
+        &lt;text x=&quot;100&quot; y=&quot;517&quot; class=&quot;t-security&quot; font-size=&quot;7&quot; text-anchor=&quot;middle&quot;&gt;personal fit&lt;/text&gt;
+
+        &lt;rect x=&quot;259&quot; y=&quot;242&quot; width=&quot;112&quot; height=&quot;58&quot; rx=&quot;6&quot; class=&quot;c-mask&quot;/&gt;
+        &lt;rect x=&quot;259&quot; y=&quot;242&quot; width=&quot;112&quot; height=&quot;58&quot; rx=&quot;6&quot; class=&quot;c-database&quot; data-animate=&quot;node&quot; style=&quot;--step:1&quot; stroke-width=&quot;1.5&quot;/&gt;
+        &lt;text x=&quot;315&quot; y=&quot;263&quot; class=&quot;t-primary&quot; font-size=&quot;10&quot; font-weight=&quot;600&quot; text-anchor=&quot;middle&quot;&gt;Knowledge Atoms&lt;/text&gt;
+        &lt;text x=&quot;315&quot; y=&quot;279&quot; class=&quot;t-muted&quot; font-size=&quot;7&quot; text-anchor=&quot;middle&quot;&gt;14 cited atoms&lt;/text&gt;
+        &lt;text x=&quot;315&quot; y=&quot;289&quot; class=&quot;t-database&quot; font-size=&quot;7&quot; text-anchor=&quot;middle&quot;&gt;claims&lt;/text&gt;
+
+        &lt;rect x=&quot;474&quot; y=&quot;242&quot; width=&quot;112&quot; height=&quot;58&quot; rx=&quot;6&quot; class=&quot;c-mask&quot;/&gt;
+        &lt;rect x=&quot;474&quot; y=&quot;242&quot; width=&quot;112&quot; height=&quot;58&quot; rx=&quot;6&quot; class=&quot;c-messagebus&quot; data-animate=&quot;node&quot; style=&quot;--step:3&quot; stroke-width=&quot;1.5&quot;/&gt;
+        &lt;text x=&quot;530&quot; y=&quot;263&quot; class=&quot;t-primary&quot; font-size=&quot;10&quot; font-weight=&quot;600&quot; text-anchor=&quot;middle&quot;&gt;Idea Threads&lt;/text&gt;
+        &lt;text x=&quot;530&quot; y=&quot;279&quot; class=&quot;t-muted&quot; font-size=&quot;7&quot; text-anchor=&quot;middle&quot;&gt;12 timelines&lt;/text&gt;
+        &lt;text x=&quot;530&quot; y=&quot;289&quot; class=&quot;t-messagebus&quot; font-size=&quot;7&quot; text-anchor=&quot;middle&quot;&gt;momentum&lt;/text&gt;
+
+        &lt;rect x=&quot;689&quot; y=&quot;128&quot; width=&quot;112&quot; height=&quot;58&quot; rx=&quot;6&quot; class=&quot;c-mask&quot;/&gt;
+        &lt;rect x=&quot;689&quot; y=&quot;128&quot; width=&quot;112&quot; height=&quot;58&quot; rx=&quot;6&quot; class=&quot;c-backend&quot; data-animate=&quot;node&quot; style=&quot;--step:4&quot; stroke-width=&quot;1.5&quot;/&gt;
+        &lt;text x=&quot;745&quot; y=&quot;149&quot; class=&quot;t-primary&quot; font-size=&quot;10&quot; font-weight=&quot;600&quot; text-anchor=&quot;middle&quot;&gt;Frontier Analysis&lt;/text&gt;
+        &lt;text x=&quot;745&quot; y=&quot;165&quot; class=&quot;t-muted&quot; font-size=&quot;7&quot; text-anchor=&quot;middle&quot;&gt;claude-opus-4-8&lt;/text&gt;
+        &lt;text x=&quot;745&quot; y=&quot;175&quot; class=&quot;t-backend&quot; font-size=&quot;7&quot; text-anchor=&quot;middle&quot;&gt;why now&lt;/text&gt;
+
+        &lt;rect x=&quot;904&quot; y=&quot;128&quot; width=&quot;112&quot; height=&quot;58&quot; rx=&quot;6&quot; class=&quot;c-mask&quot;/&gt;
+        &lt;rect x=&quot;904&quot; y=&quot;128&quot; width=&quot;112&quot; height=&quot;58&quot; rx=&quot;6&quot; class=&quot;c-frontend&quot; data-animate=&quot;node&quot; style=&quot;--step:6&quot; stroke-width=&quot;1.5&quot;/&gt;
+        &lt;text x=&quot;960&quot; y=&quot;149&quot; class=&quot;t-primary&quot; font-size=&quot;10&quot; font-weight=&quot;600&quot; text-anchor=&quot;middle&quot;&gt;Visual HTML&lt;/text&gt;
+        &lt;text x=&quot;960&quot; y=&quot;165&quot; class=&quot;t-muted&quot; font-size=&quot;7&quot; text-anchor=&quot;middle&quot;&gt;interactive artifact&lt;/text&gt;
+        &lt;text x=&quot;960&quot; y=&quot;175&quot; class=&quot;t-frontend&quot; font-size=&quot;7&quot; text-anchor=&quot;middle&quot;&gt;sendable&lt;/text&gt;
+
+        &lt;rect x=&quot;904&quot; y=&quot;584&quot; width=&quot;112&quot; height=&quot;58&quot; rx=&quot;6&quot; class=&quot;c-mask&quot;/&gt;
+        &lt;rect x=&quot;904&quot; y=&quot;584&quot; width=&quot;112&quot; height=&quot;58&quot; rx=&quot;6&quot; class=&quot;c-database&quot; data-animate=&quot;node&quot; style=&quot;--step:8&quot; stroke-width=&quot;1.5&quot;/&gt;
+        &lt;text x=&quot;960&quot; y=&quot;605&quot; class=&quot;t-primary&quot; font-size=&quot;10&quot; font-weight=&quot;600&quot; text-anchor=&quot;middle&quot;&gt;Obsidian Vault&lt;/text&gt;
+        &lt;text x=&quot;960&quot; y=&quot;621&quot; class=&quot;t-muted&quot; font-size=&quot;7&quot; text-anchor=&quot;middle&quot;&gt;long memory&lt;/text&gt;
+        &lt;text x=&quot;960&quot; y=&quot;631&quot; class=&quot;t-database&quot; font-size=&quot;7&quot; text-anchor=&quot;middle&quot;&gt;browse&lt;/text&gt;
+
+        &lt;rect x=&quot;904&quot; y=&quot;356&quot; width=&quot;112&quot; height=&quot;58&quot; rx=&quot;6&quot; class=&quot;c-mask&quot;/&gt;
+        &lt;rect x=&quot;904&quot; y=&quot;356&quot; width=&quot;112&quot; height=&quot;58&quot; rx=&quot;6&quot; class=&quot;c-cloud&quot; data-animate=&quot;node&quot; style=&quot;--step:9&quot; stroke-width=&quot;1.5&quot;/&gt;
+        &lt;text x=&quot;960&quot; y=&quot;377&quot; class=&quot;t-primary&quot; font-size=&quot;10&quot; font-weight=&quot;600&quot; text-anchor=&quot;middle&quot;&gt;Study + Do&lt;/text&gt;
+        &lt;text x=&quot;960&quot; y=&quot;393&quot; class=&quot;t-muted&quot; font-size=&quot;7&quot; text-anchor=&quot;middle&quot;&gt;4 next moves&lt;/text&gt;
+        &lt;text x=&quot;960&quot; y=&quot;403&quot; class=&quot;t-cloud&quot; font-size=&quot;7&quot; text-anchor=&quot;middle&quot;&gt;operator&lt;/text&gt;
+
+        &lt;!-- Flow labels --&gt;
+        &lt;rect x=&quot;164.75&quot; y=&quot;193&quot; width=&quot;85.5&quot; height=&quot;27&quot; rx=&quot;4&quot; class=&quot;c-mask&quot;/&gt;
+        &lt;text x=&quot;207.5&quot; y=&quot;204&quot; class=&quot;t-backend&quot; font-size=&quot;8&quot; text-anchor=&quot;middle&quot;&gt;posts to claims&lt;/text&gt;
+        &lt;text x=&quot;207.5&quot; y=&quot;215&quot; class=&quot;t-dim&quot; font-size=&quot;7&quot; text-anchor=&quot;middle&quot;&gt;source-grounded&lt;/text&gt;
+        &lt;rect x=&quot;162.3&quot; y=&quot;364&quot; width=&quot;90.4&quot; height=&quot;27&quot; rx=&quot;4&quot; class=&quot;c-mask&quot;/&gt;
+        &lt;text x=&quot;207.5&quot; y=&quot;375&quot; class=&quot;t-security&quot; font-size=&quot;8&quot; text-anchor=&quot;middle&quot;&gt;personal scoring&lt;/text&gt;
+        &lt;text x=&quot;207.5&quot; y=&quot;386&quot; class=&quot;t-dim&quot; font-size=&quot;7&quot; text-anchor=&quot;middle&quot;&gt;profile filter&lt;/text&gt;
+        &lt;rect x=&quot;374.85&quot; y=&quot;250&quot; width=&quot;95.30000000000001&quot; height=&quot;27&quot; rx=&quot;4&quot; class=&quot;c-mask&quot;/&gt;
+        &lt;text x=&quot;422.5&quot; y=&quot;261&quot; class=&quot;t-backend&quot; font-size=&quot;8&quot; text-anchor=&quot;middle&quot;&gt;claim timelines&lt;/text&gt;
+        &lt;text x=&quot;422.5&quot; y=&quot;272&quot; class=&quot;t-dim&quot; font-size=&quot;7&quot; text-anchor=&quot;middle&quot;&gt;temporal grouping&lt;/text&gt;
+        &lt;rect x=&quot;587.4&quot; y=&quot;193&quot; width=&quot;100.2&quot; height=&quot;27&quot; rx=&quot;4&quot; class=&quot;c-mask&quot;/&gt;
+        &lt;text x=&quot;637.5&quot; y=&quot;204&quot; class=&quot;t-backend&quot; font-size=&quot;8&quot; text-anchor=&quot;middle&quot;&gt;compressed context&lt;/text&gt;
+        &lt;text x=&quot;637.5&quot; y=&quot;215&quot; class=&quot;t-dim&quot; font-size=&quot;7&quot; text-anchor=&quot;middle&quot;&gt;top-model input&lt;/text&gt;
+        &lt;rect x=&quot;374.85&quot; y=&quot;307&quot; width=&quot;95.30000000000001&quot; height=&quot;27&quot; rx=&quot;4&quot; class=&quot;c-mask&quot;/&gt;
+        &lt;text x=&quot;422.5&quot; y=&quot;318&quot; class=&quot;t-messagebus&quot; font-size=&quot;8&quot; text-anchor=&quot;middle&quot;&gt;portfolio context&lt;/text&gt;
+        &lt;text x=&quot;422.5&quot; y=&quot;329&quot; class=&quot;t-dim&quot; font-size=&quot;7&quot; text-anchor=&quot;middle&quot;&gt;project fit&lt;/text&gt;
+        &lt;rect x=&quot;809.75&quot; y=&quot;136&quot; width=&quot;85.5&quot; height=&quot;27&quot; rx=&quot;4&quot; class=&quot;c-mask&quot;/&gt;
+        &lt;text x=&quot;852.5&quot; y=&quot;147&quot; class=&quot;t-backend&quot; font-size=&quot;8&quot; text-anchor=&quot;middle&quot;&gt;what changed&lt;/text&gt;
+        &lt;text x=&quot;852.5&quot; y=&quot;158&quot; class=&quot;t-dim&quot; font-size=&quot;7&quot; text-anchor=&quot;middle&quot;&gt;human synthesis&lt;/text&gt;
+        &lt;rect x=&quot;702.25&quot; y=&quot;193&quot; width=&quot;85.5&quot; height=&quot;27&quot; rx=&quot;4&quot; class=&quot;c-mask&quot;/&gt;
+        &lt;text x=&quot;745&quot; y=&quot;204&quot; class=&quot;t-muted&quot; font-size=&quot;8&quot; text-anchor=&quot;middle&quot;&gt;metrics + links&lt;/text&gt;
+        &lt;text x=&quot;745&quot; y=&quot;215&quot; class=&quot;t-dim&quot; font-size=&quot;7&quot; text-anchor=&quot;middle&quot;&gt;deterministic&lt;/text&gt;
+        &lt;rect x=&quot;697.35&quot; y=&quot;421&quot; width=&quot;95.30000000000001&quot; height=&quot;27&quot; rx=&quot;4&quot; class=&quot;c-mask&quot;/&gt;
+        &lt;text x=&quot;745&quot; y=&quot;432&quot; class=&quot;t-messagebus&quot; font-size=&quot;8&quot; text-anchor=&quot;middle&quot;&gt;generated notes&lt;/text&gt;
+        &lt;text x=&quot;745&quot; y=&quot;443&quot; class=&quot;t-dim&quot; font-size=&quot;7&quot; text-anchor=&quot;middle&quot;&gt;memory projection&lt;/text&gt;
+        &lt;rect x=&quot;927.05&quot; y=&quot;309&quot; width=&quot;65.9&quot; height=&quot;27&quot; rx=&quot;4&quot; class=&quot;c-mask&quot;/&gt;
+        &lt;text x=&quot;960&quot; y=&quot;320&quot; class=&quot;t-backend&quot; font-size=&quot;8&quot; text-anchor=&quot;middle&quot;&gt;study queue&lt;/text&gt;
+        &lt;text x=&quot;960&quot; y=&quot;331&quot; class=&quot;t-dim&quot; font-size=&quot;7&quot; text-anchor=&quot;middle&quot;&gt;this week&lt;/text&gt;
+        &lt;rect x=&quot;947.45&quot; y=&quot;515&quot; width=&quot;105.10000000000001&quot; height=&quot;27&quot; rx=&quot;4&quot; class=&quot;c-mask&quot;/&gt;
+        &lt;text x=&quot;1000&quot; y=&quot;526&quot; class=&quot;t-muted&quot; font-size=&quot;8&quot; text-anchor=&quot;middle&quot;&gt;reference back&lt;/text&gt;
+        &lt;text x=&quot;1000&quot; y=&quot;537&quot; class=&quot;t-dim&quot; font-size=&quot;7&quot; text-anchor=&quot;middle&quot;&gt;longitudinal memory&lt;/text&gt;
+
+        &lt;!-- Legend --&gt;
+        &lt;text x=&quot;214&quot; y=&quot;704&quot; class=&quot;t-primary&quot; font-size=&quot;10&quot; font-weight=&quot;600&quot;&gt;Legend&lt;/text&gt;
+        &lt;path d=&quot;M 214 724 L 248 724&quot; class=&quot;a-emphasis&quot; stroke-width=&quot;1.8&quot; marker-end=&quot;url(#arrowhead-emphasis)&quot;/&gt;
+        &lt;text x=&quot;257&quot; y=&quot;727&quot; class=&quot;t-muted&quot; font-size=&quot;8&quot;&gt;primary data&lt;/text&gt;
+        &lt;path d=&quot;M 340 724 L 374 724&quot; class=&quot;a-security&quot; stroke-width=&quot;1.4&quot; marker-end=&quot;url(#arrowhead-security)&quot;/&gt;
+        &lt;text x=&quot;383&quot; y=&quot;727&quot; class=&quot;t-muted&quot; font-size=&quot;8&quot;&gt;policy / PII&lt;/text&gt;
+        &lt;path d=&quot;M 480 724 L 514 724&quot; class=&quot;a-dashed&quot; stroke-width=&quot;1.4&quot; marker-end=&quot;url(#arrowhead-dashed)&quot;/&gt;
+        &lt;text x=&quot;523&quot; y=&quot;727&quot; class=&quot;t-muted&quot; font-size=&quot;8&quot;&gt;async batch&lt;/text&gt;
+        &lt;rect x=&quot;625&quot; y=&quot;716&quot; width=&quot;14&quot; height=&quot;9&quot; rx=&quot;2&quot; class=&quot;c-database&quot; stroke-width=&quot;1&quot;/&gt;
+        &lt;text x=&quot;646&quot; y=&quot;724&quot; class=&quot;t-muted&quot; font-size=&quot;8&quot;&gt;data store&lt;/text&gt;
+      &lt;/svg&gt;
+    &lt;/div&gt;
+
+    &lt;!-- Info Cards --&gt;
+    &lt;div class=&quot;cards&quot;&gt;
+      &lt;div class=&quot;card&quot;&gt;
+        &lt;div class=&quot;card-header&quot;&gt;
+          &lt;div class=&quot;card-dot emerald&quot;&gt;&lt;/div&gt;
+          &lt;h3&gt;What Archify Shows&lt;/h3&gt;
+        &lt;/div&gt;
+        &lt;ul&gt;
+          &lt;li&gt;&amp;bull; The main path is source posts -&amp;gt; atoms -&amp;gt; threads -&amp;gt; frontier synthesis -&amp;gt; action.&lt;/li&gt;
+          &lt;li&gt;&amp;bull; Profile and project context affect scoring and interpretation, not reader-facing gossip.&lt;/li&gt;
+          &lt;li&gt;&amp;bull; Obsidian remains the memory projection while HTML is the weekly decision artifact.&lt;/li&gt;
+        &lt;/ul&gt;
+      &lt;/div&gt;
+
+      &lt;div class=&quot;card&quot;&gt;
+        &lt;div class=&quot;card-header&quot;&gt;
+          &lt;div class=&quot;card-dot violet&quot;&gt;&lt;/div&gt;
+          &lt;h3&gt;Why This Matters&lt;/h3&gt;
+        &lt;/div&gt;
+        &lt;ul&gt;
+          &lt;li&gt;&amp;bull; The report explains how the week changes the existing knowledge base.&lt;/li&gt;
+          &lt;li&gt;&amp;bull; Project leads turn general AI news into portfolio-specific checks.&lt;/li&gt;
+          &lt;li&gt;&amp;bull; The visual artifact can be sent as a standalone Telegram document.&lt;/li&gt;
+        &lt;/ul&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+
+    &lt;!-- Footer --&gt;
+    &lt;p class=&quot;footer&quot;&gt;
+      Data-flow diagram &amp;bull; Built with Archify&lt;span class=&quot;no-print&quot;&gt; &amp;bull; Press &lt;kbd&gt;T&lt;/kbd&gt; for theme and &lt;kbd&gt;E&lt;/kbd&gt; for export&lt;/span&gt;
+    &lt;/p&gt;
+  &lt;/div&gt;
+
+  &lt;script&gt;
+    /* ============================================================
+       Theme toggle — persists to localStorage, respects system pref
+       ============================================================ */
+    var Archify = {};
+
+    Archify.theme = (function () {
+      var STORAGE_KEY = &#x27;archify-theme&#x27;;
+      var html = document.documentElement;
+      var btn = document.getElementById(&#x27;btn-theme&#x27;);
+      var icon = document.getElementById(&#x27;theme-icon&#x27;);
+      var label = document.getElementById(&#x27;theme-label&#x27;);
+
+      // localStorage can throw (blocked cookies, sandboxed iframes); the whole
+      // script element dies on an uncaught error, so guard every access.
+      function readStored() {
+        try { return localStorage.getItem(STORAGE_KEY); } catch (_) { return null; }
+      }
+      function writeStored(value) {
+        try { localStorage.setItem(STORAGE_KEY, value); } catch (_) {}
+      }
+      function urlOverride() {
+        // URL param wins (useful for deterministic screenshots / share links)
+        try {
+          var param = new URLSearchParams(window.location.search).get(&#x27;theme&#x27;);
+          if (param === &#x27;light&#x27; || param === &#x27;dark&#x27;) return param;
+        } catch (_) {}
+        return null;
+      }
+
+      function resolveInitial() {
+        var fromUrl = urlOverride();
+        if (fromUrl) return fromUrl;
+        var saved = readStored();
+        if (saved === &#x27;light&#x27; || saved === &#x27;dark&#x27;) return saved;
+        return window.matchMedia(&#x27;(prefers-color-scheme: light)&#x27;).matches ? &#x27;light&#x27; : &#x27;dark&#x27;;
+      }
+
+      function apply(theme) {
+        html.setAttribute(&#x27;data-theme&#x27;, theme);
+        icon.textContent = theme === &#x27;dark&#x27; ? &#x27;\u263E&#x27; : &#x27;\u263C&#x27;;
+        label.textContent = theme === &#x27;dark&#x27; ? &#x27;Dark&#x27; : &#x27;Light&#x27;;
+        btn.setAttribute(&#x27;aria-pressed&#x27;, theme === &#x27;light&#x27; ? &#x27;true&#x27; : &#x27;false&#x27;);
+      }
+
+      function toggle() {
+        var next = html.getAttribute(&#x27;data-theme&#x27;) === &#x27;dark&#x27; ? &#x27;light&#x27; : &#x27;dark&#x27;;
+        apply(next);
+        writeStored(next);
+      }
+
+      apply(resolveInitial());
+      btn.addEventListener(&#x27;click&#x27;, toggle);
+
+      // Follow live OS theme changes while the user has no explicit preference.
+      try {
+        var media = window.matchMedia(&#x27;(prefers-color-scheme: light)&#x27;);
+        var onChange = function (e) {
+          var saved = readStored();
+          if (urlOverride() || saved === &#x27;light&#x27; || saved === &#x27;dark&#x27;) return;
+          apply(e.matches ? &#x27;light&#x27; : &#x27;dark&#x27;);
+        };
+        if (media.addEventListener) media.addEventListener(&#x27;change&#x27;, onChange);
+        else if (media.addListener) media.addListener(onChange);
+      } catch (_) {}
+
+      return { toggle: toggle };
+    })();
+
+    /* ============================================================
+       Export — PNG / JPEG / WebP / SVG (download) and Copy PNG (clipboard)
+
+       Raster exports are always rendered at 4x source resolution for
+       maximum sharpness. The trick: we set the serialized SVG&#x27;s
+       `width`/`height` to viewBox * 4 so the browser rasterizes the
+       vectors at that resolution natively. drawImage then draws at
+       the image&#x27;s natural size (no upscaling = no blur).
+
+       JPEG/WebP paint the current theme&#x27;s background explicitly since
+       those formats have no alpha channel.
+       ============================================================ */
+    (function () {
+      var RASTER_SCALE = 4;
+
+      function diagramFilename() {
+        var title = (document.title || &#x27;diagram&#x27;)
+          .replace(/\s+Architecture(\s+Diagram)?$/i, &#x27;&#x27;)
+          .replace(/\s+Diagram$/i, &#x27;&#x27;)
+          .trim();
+        return title.replace(/[^a-z0-9_\-]+/gi, &#x27;-&#x27;)
+                    .toLowerCase()
+                    .replace(/^-+|-+$/g, &#x27;&#x27;) || &#x27;diagram&#x27;;
+      }
+
+      function currentBg() {
+        return getComputedStyle(document.body).backgroundColor || &#x27;#ffffff&#x27;;
+      }
+
+      /**
+       * Serialize the main SVG into a standalone document.
+       *
+       * Two modes:
+       * - Default (opts.autoTheme=false) — locks the serialized SVG to the
+       *   viewer&#x27;s current theme. Used by the raster pipeline
+       *   (PNG/JPEG/WebP/clipboard) because canvas rasterization needs
+       *   deterministic colors; a raster cannot react to
+       *   prefers-color-scheme after encoding.
+       * - autoTheme=true — emits BOTH dark and light variable sets plus a
+       *   `@media (prefers-color-scheme)` rule so the resulting SVG
+       *   self-themes when embedded in GitHub READMEs or other hosts that
+       *   expose a color scheme. Used for &quot;Download SVG&quot;.
+       */
+      function serializeSvg(scale, opts) {
+        // scale: integer multiplier for intrinsic SVG pixel dimensions used by
+        // the raster path. Defaults to 1 (natural size) for SVG download.
+        scale = scale || 1;
+        opts = opts || {};
+        var autoTheme = opts.autoTheme === true;
+
+        var svg = document.querySelector(&#x27;.diagram-container svg&#x27;);
+        var clone = svg.cloneNode(true);
+
+        var vb = svg.viewBox.baseVal;
+        // Scale width/height so the browser rasterizes the vectors at target
+        // resolution directly. viewBox stays unchanged so coordinates don&#x27;t
+        // shift. This is the key to sharp rasters — do NOT scale later via
+        // canvas upscaling.
+        clone.setAttribute(&#x27;width&#x27;, vb.width * scale);
+        clone.setAttribute(&#x27;height&#x27;, vb.height * scale);
+        clone.setAttribute(&#x27;xmlns&#x27;, &#x27;http://www.w3.org/2000/svg&#x27;);
+
+        // Only the SVG-relevant rules: semantic classes, markers, and the
+        // theme variable blocks. Toolbar/cards/print CSS can never apply
+        // inside a standalone SVG and would only bloat the export.
+        var hostStyle = (function () {
+          var out = [];
+          Array.prototype.forEach.call(document.styleSheets, function (sheet) {
+            var rules;
+            try { rules = sheet.cssRules; } catch (_) { return; } // cross-origin
+            if (!rules) return;
+            Array.prototype.forEach.call(rules, function (rule) {
+              if (rule.type !== 1) return; // plain style rules only
+              var sel = rule.selectorText || &#x27;&#x27;;
+              if (/(^|,)\s*(svg|:root|\[data-theme|\.c-|\.t-|\.a-|\.m-)/.test(sel)) {
+                out.push(rule.cssText);
+              }
+            });
+          });
+          return out.join(&#x27;\n&#x27;);
+        })();
+
+        // Derive the variable list from the stylesheet so newly added theme
+        // variables can never be missed by the export pipeline again
+        // (--lane-fill/--lane-stroke once were).
+        var varNames = (function () {
+          var seen = {};
+          var names = [];
+          (hostStyle.match(/--[a-zA-Z0-9-]+(?=\s*:)/g) || []).forEach(function (n) {
+            if (!seen[n]) { seen[n] = true; names.push(n); }
+          });
+          return names;
+        })();
+
+        // Resolve the full variable set for a given data-theme via an
+        // off-DOM probe, independent of what the viewer is currently set to.
+        function resolveVars(themeAttr) {
+          var probe = document.createElement(&#x27;div&#x27;);
+          probe.setAttribute(&#x27;data-theme&#x27;, themeAttr);
+          probe.style.cssText = &#x27;position:absolute;width:0;height:0;visibility:hidden;&#x27;;
+          document.body.appendChild(probe);
+          try {
+            var c = getComputedStyle(probe);
+            return varNames.map(function (n) {
+              return n + &#x27;: &#x27; + c.getPropertyValue(n).trim() + &#x27;;&#x27;;
+            }).join(&#x27; &#x27;);
+          } finally {
+            document.body.removeChild(probe);
+          }
+        }
+
+        // Prepend a local()-only @font-face block for each weight so that the
+        // sandboxed image-rendering context used during PNG/JPEG/WebP export
+        // can find JetBrains Mono if the user has it installed locally, and
+        // falls through cleanly to the monospace stack otherwise. The usual
+        // Google-Fonts &lt;link&gt; in the host document is unreachable from the
+        // serialized SVG, so url()-sourced faces would just hang.
+        var fontFallback = [400, 500, 600, 700].map(function (w) {
+          return &quot;@font-face { font-family: &#x27;JetBrains Mono&#x27;; font-weight: &quot; + w +
+                 &quot;; src: local(&#x27;JetBrains Mono&#x27;), local(&#x27;JetBrainsMono-Regular&#x27;); }&quot;;
+        }).join(&#x27;\n&#x27;);
+
+        var style = document.createElementNS(&#x27;http://www.w3.org/2000/svg&#x27;, &#x27;style&#x27;);
+        var bgRect = document.createElementNS(&#x27;http://www.w3.org/2000/svg&#x27;, &#x27;rect&#x27;);
+        bgRect.setAttribute(&#x27;width&#x27;, &#x27;100%&#x27;);
+        bgRect.setAttribute(&#x27;height&#x27;, &#x27;100%&#x27;);
+
+        if (autoTheme) {
+          // Dual-theme SVG. Dark is the default (so hosts without
+          // prefers-color-scheme still render), light swaps in via media
+          // query, and svg[data-theme=&quot;...&quot;] still lets downstream
+          // consumers force a specific theme.
+          var darkVars = resolveVars(&#x27;dark&#x27;);
+          var lightVars = resolveVars(&#x27;light&#x27;);
+
+          style.textContent =
+            fontFallback + &quot;\n&quot; +
+            &quot;svg { font-family: &#x27;JetBrains Mono&#x27;, ui-monospace, SFMono-Regular, Menlo, Consolas, &#x27;DejaVu Sans Mono&#x27;, &#x27;Liberation Mono&#x27;, &#x27;Noto Sans Mono CJK SC&#x27;, &#x27;PingFang SC&#x27;, &#x27;Hiragino Sans GB&#x27;, &#x27;Microsoft YaHei&#x27;, monospace; }\n&quot; +
+            hostStyle + &quot;\n&quot; +
+            &quot;:root, svg { &quot; + darkVars + &quot; }\n&quot; +
+            &quot;@media (prefers-color-scheme: light) { :root, svg { &quot; + lightVars + &quot; } }\n&quot; +
+            &quot;svg[data-theme=\&quot;light\&quot;] { &quot; + lightVars + &quot; }\n&quot; +
+            &quot;svg[data-theme=\&quot;dark\&quot;] { &quot; + darkVars + &quot; }\n&quot; +
+            &quot;rect.c-bg-rect { fill: var(--bg); }\n&quot;;
+
+          // Don&#x27;t lock the serialized SVG to the viewer&#x27;s current theme.
+          clone.removeAttribute(&#x27;data-theme&#x27;);
+          // Background follows the CSS variable, not a fixed color, so it
+          // swaps with the media query.
+          bgRect.setAttribute(&#x27;class&#x27;, &#x27;c-bg-rect&#x27;);
+        } else {
+          // Raster path: lock to the viewer&#x27;s current theme.
+          var theme = document.documentElement.getAttribute(&#x27;data-theme&#x27;) || &#x27;dark&#x27;;
+          var themeHost = document.querySelector(&#x27;[data-theme=&quot;&#x27; + theme + &#x27;&quot;]&#x27;) || document.documentElement;
+          var computed = getComputedStyle(themeHost);
+          var vars = varNames.map(function (n) {
+            return n + &#x27;: &#x27; + computed.getPropertyValue(n).trim() + &#x27;;&#x27;;
+          }).join(&#x27; &#x27;);
+
+          // IMPORTANT: inject the resolved variables AFTER hostStyle,
+          // otherwise hostStyle&#x27;s &quot;:root, [data-theme=\&quot;dark\&quot;] { ... }&quot; rule
+          // overrides our chosen theme via later-in-cascade equal-specificity.
+          // Keep this order.
+          style.textContent =
+            fontFallback + &quot;\n&quot; +
+            &quot;svg { font-family: &#x27;JetBrains Mono&#x27;, ui-monospace, SFMono-Regular, Menlo, Consolas, &#x27;DejaVu Sans Mono&#x27;, &#x27;Liberation Mono&#x27;, &#x27;Noto Sans Mono CJK SC&#x27;, &#x27;PingFang SC&#x27;, &#x27;Hiragino Sans GB&#x27;, &#x27;Microsoft YaHei&#x27;, monospace; }\n&quot; +
+            hostStyle + &quot;\n&quot; +
+            &quot;:root, svg { &quot; + vars + &quot; }\n&quot;;
+
+          bgRect.setAttribute(&#x27;fill&#x27;, computed.getPropertyValue(&#x27;--bg&#x27;).trim() || &#x27;#ffffff&#x27;);
+        }
+
+        clone.insertBefore(style, clone.firstChild);
+        clone.insertBefore(bgRect, style.nextSibling);
+
+        return {
+          svgString: new XMLSerializer().serializeToString(clone),
+          width: vb.width * scale,
+          height: vb.height * scale
+        };
+      }
+
+      function download(blob, filename) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement(&#x27;a&#x27;);
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      }
+
+      // Conservative upper bound on total canvas pixels. Older Safari on iOS
+      // silently produces a blank canvas above ~16 Mpx; Chrome / Firefox /
+      // desktop Safari are far higher but start failing on memory-constrained
+      // devices. We pick the largest integer scale in {4,3,2,1} whose target
+      // pixel count fits under this cap.
+      var MAX_CANVAS_PIXELS = 16 * 1024 * 1024;
+
+      function pickSafeScale(vbW, vbH) {
+        for (var s = RASTER_SCALE; s &gt;= 1; s--) {
+          if (vbW * s * vbH * s &lt;= MAX_CANVAS_PIXELS) return s;
+        }
+        return 1;
+      }
+
+      function rasterize(format) {
+        // Serialize at a safe scale (RASTER_SCALE=4 by default, reduced if the
+        // resulting canvas would exceed MAX_CANVAS_PIXELS). The SVG itself is
+        // rasterized at target resolution natively; drawImage draws at natural
+        // size — no upsampling blur.
+        var svg = document.querySelector(&#x27;.diagram-container svg&#x27;);
+        var vb = svg.viewBox.baseVal;
+        var scale = pickSafeScale(vb.width, vb.height);
+        var data = serializeSvg(scale);
+        var svgBlob = new Blob([data.svgString], { type: &#x27;image/svg+xml;charset=utf-8&#x27; });
+        var svgUrl = URL.createObjectURL(svgBlob);
+
+        return new Promise(function (resolve, reject) {
+          var img = new Image();
+          img.onload = function () {
+            var canvas = document.createElement(&#x27;canvas&#x27;);
+            canvas.width = data.width;
+            canvas.height = data.height;
+            var ctx = canvas.getContext(&#x27;2d&#x27;);
+            if (format === &#x27;jpeg&#x27;) {
+              ctx.fillStyle = currentBg();
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+            // Draw at natural size — SVG was already rasterized at target res.
+            ctx.drawImage(img, 0, 0);
+            URL.revokeObjectURL(svgUrl);
+            var mime = format === &#x27;jpeg&#x27; ? &#x27;image/jpeg&#x27; :
+                       format === &#x27;webp&#x27; ? &#x27;image/webp&#x27; : &#x27;image/png&#x27;;
+            var quality = format === &#x27;png&#x27; ? undefined : 0.95;
+            canvas.toBlob(function (blob) {
+              if (!blob) reject(new Error(&#x27;toBlob returned null for &#x27; + format));
+              else resolve(blob);
+            }, mime, quality);
+          };
+          img.onerror = function (e) {
+            URL.revokeObjectURL(svgUrl);
+            reject(e);
+          };
+          img.src = svgUrl;
+        });
+      }
+
+      var menu = document.getElementById(&#x27;export-menu&#x27;);
+      var btn = document.getElementById(&#x27;btn-export&#x27;);
+      var items = function () {
+        return Array.prototype.slice.call(menu.querySelectorAll(&#x27;button[role=&quot;menuitem&quot;]&#x27;));
+      };
+
+      // ---- Clipboard support ----------------------------------------------
+      function canCopyImage() {
+        return typeof ClipboardItem !== &#x27;undefined&#x27; &amp;&amp;
+               navigator.clipboard &amp;&amp;
+               typeof navigator.clipboard.write === &#x27;function&#x27;;
+      }
+
+      // ---- Raster format detection ----------------------------------------
+      // canvas.toBlob(&#x27;image/webp&#x27;) silently returns a PNG on browsers without
+      // WebP encoding (older Safari), so detect explicitly.
+      function supports(format) {
+        if (format === &#x27;svg&#x27; || format === &#x27;png&#x27;) return true;
+        var mime = format === &#x27;jpeg&#x27; ? &#x27;image/jpeg&#x27; : &#x27;image/webp&#x27;;
+        try {
+          var c = document.createElement(&#x27;canvas&#x27;);
+          c.width = c.height = 2;
+          return c.toDataURL(mime).indexOf(&#x27;data:&#x27; + mime) === 0;
+        } catch (_) { return false; }
+      }
+
+      // Gray out unsupported items.
+      items().forEach(function (it) {
+        if (it.dataset.format &amp;&amp; !supports(it.dataset.format)) {
+          it.disabled = true;
+          it.title = &#x27;Not supported by this browser&#x27;;
+          it.style.opacity = &#x27;0.5&#x27;;
+        }
+        if (it.dataset.action === &#x27;copy&#x27; &amp;&amp; !canCopyImage()) {
+          it.disabled = true;
+          it.title = &#x27;Clipboard image write not supported by this browser&#x27;;
+          it.style.opacity = &#x27;0.5&#x27;;
+        }
+      });
+
+      // ---- Toast ----------------------------------------------------------
+      // A live region only announces CHANGES to an existing node, so the toast
+      // element is created once up front and updated in place.
+      var toastEl = document.createElement(&#x27;div&#x27;);
+      toastEl.className = &#x27;archify-toast&#x27;;
+      toastEl.setAttribute(&#x27;role&#x27;, &#x27;status&#x27;);
+      document.body.appendChild(toastEl);
+      var toastTimer = null;
+
+      function toast(msg) {
+        toastEl.textContent = &#x27;&#x27;;
+        requestAnimationFrame(function () {
+          toastEl.textContent = msg;
+          toastEl.classList.add(&#x27;show&#x27;);
+        });
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () { toastEl.classList.remove(&#x27;show&#x27;); }, 1500);
+      }
+
+      function open(focusLast) {
+        menu.classList.add(&#x27;open&#x27;);
+        btn.setAttribute(&#x27;aria-expanded&#x27;, &#x27;true&#x27;);
+        var available = items().filter(function (i) { return !i.disabled; });
+        var target = focusLast ? available[available.length - 1] : available[0];
+        if (target) target.focus();
+      }
+      function close(focusTrigger) {
+        menu.classList.remove(&#x27;open&#x27;);
+        btn.setAttribute(&#x27;aria-expanded&#x27;, &#x27;false&#x27;);
+        if (focusTrigger) btn.focus();
+      }
+      function isOpen() { return menu.classList.contains(&#x27;open&#x27;); }
+
+      btn.addEventListener(&#x27;click&#x27;, function (e) {
+        e.stopPropagation();
+        if (isOpen()) close(false);
+        else open();
+      });
+      // APG menu-button pattern: ArrowDown/ArrowUp on the trigger opens the menu.
+      btn.addEventListener(&#x27;keydown&#x27;, function (e) {
+        if (e.key === &#x27;ArrowDown&#x27; || e.key === &#x27;ArrowUp&#x27;) {
+          e.preventDefault();
+          if (!isOpen()) open(e.key === &#x27;ArrowUp&#x27;);
+        }
+      });
+      document.addEventListener(&#x27;click&#x27;, function (e) {
+        if (!menu.contains(e.target) &amp;&amp; e.target !== btn) close(false);
+      });
+
+      // Keyboard navigation inside the menu.
+      //   Menu items: Up/Down, Home/End.
+      //   Esc closes + returns focus to trigger; Tab closes.
+      menu.addEventListener(&#x27;keydown&#x27;, function (e) {
+        if (e.key === &#x27;Escape&#x27;) { e.preventDefault(); close(true); return; }
+        if (e.key === &#x27;Tab&#x27;)    { close(false); return; }
+
+        var available = items().filter(function (i) { return !i.disabled; });
+        var current = available.indexOf(document.activeElement);
+        switch (e.key) {
+          case &#x27;ArrowDown&#x27;:
+            e.preventDefault();
+            if (available.length) available[(current + 1 + available.length) % available.length].focus();
+            break;
+          case &#x27;ArrowUp&#x27;:
+            e.preventDefault();
+            if (available.length) available[(current - 1 + available.length) % available.length].focus();
+            break;
+          case &#x27;Home&#x27;:
+            e.preventDefault();
+            if (available[0]) available[0].focus();
+            break;
+          case &#x27;End&#x27;:
+            e.preventDefault();
+            if (available.length) available[available.length - 1].focus();
+            break;
+        }
+      });
+
+      function runExport(format) {
+        var base = diagramFilename();
+        close(true);
+        return (format === &#x27;svg&#x27;
+          ? Promise.resolve(serializeSvg(1, { autoTheme: true })).then(function (d) {
+              download(new Blob([d.svgString], { type: &#x27;image/svg+xml;charset=utf-8&#x27; }), base + &#x27;.svg&#x27;);
+            })
+          : rasterize(format).then(function (blob) {
+              download(blob, base + &#x27;.&#x27; + format);
+            })
+        ).catch(function (err) {
+          console.error(err);
+          alert(&#x27;Export failed: &#x27; + (err &amp;&amp; err.message ? err.message : format));
+        });
+      }
+
+      function runCopy() {
+        close(true);
+        if (!canCopyImage()) {
+          alert(&#x27;Clipboard image write not supported in this browser.&#x27;);
+          return;
+        }
+        // WebKit requires ClipboardItem to be constructed synchronously inside
+        // the user gesture — pass the pending Promise&lt;Blob&gt; as the item value.
+        // Browsers that reject promise values throw synchronously; fall back
+        // to awaiting the blob first (works in Chromium/Firefox).
+        var blobPromise = rasterize(&#x27;png&#x27;);
+        var writePromise;
+        try {
+          writePromise = navigator.clipboard.write([new ClipboardItem({ &#x27;image/png&#x27;: blobPromise })]);
+        } catch (_) {
+          writePromise = blobPromise.then(function (blob) {
+            return navigator.clipboard.write([new ClipboardItem({ &#x27;image/png&#x27;: blob })]);
+          });
+        }
+        return writePromise.then(function () {
+          toast(&#x27;Copied PNG to clipboard&#x27;);
+        }).catch(function (err) {
+          console.error(err);
+          alert(&#x27;Copy failed: &#x27; + (err &amp;&amp; err.message ? err.message : &#x27;unknown&#x27;));
+        });
+      }
+
+      menu.addEventListener(&#x27;click&#x27;, function (e) {
+        var copyBtn = e.target.closest(&#x27;button[data-action=&quot;copy&quot;]&#x27;);
+        if (copyBtn &amp;&amp; !copyBtn.disabled) { runCopy(); return; }
+
+        var formatBtn = e.target.closest(&#x27;button[data-format]&#x27;);
+        if (formatBtn &amp;&amp; !formatBtn.disabled) { runExport(formatBtn.dataset.format); }
+      });
+
+      Archify.exportMenu = { open: open, close: close, isOpen: isOpen, run: runExport };
+
+      // Auto-open on page load for demo/screenshot purposes: ?openExport=1
+      // Wait for fonts (so the menu doesn&#x27;t flash before typography lands)
+      // and paint before opening. Fallback timeout for browsers without the
+      // Font Loading API.
+      try {
+        if (new URLSearchParams(window.location.search).get(&#x27;openExport&#x27;) === &#x27;1&#x27;) {
+          var openWhenReady = function () {
+            requestAnimationFrame(function () { requestAnimationFrame(open); });
+          };
+          if (document.fonts &amp;&amp; document.fonts.ready) {
+            document.fonts.ready.then(openWhenReady);
+          } else {
+            setTimeout(openWhenReady, 200);
+          }
+        }
+      } catch (_) {}
+    })();
+
+    /* ============================================================
+       Global keyboard shortcuts
+         T -&gt; toggle theme
+         E -&gt; open export menu
+       Ignored when focus is inside an input/textarea/contenteditable.
+       ============================================================ */
+    document.addEventListener(&#x27;keydown&#x27;, function (e) {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      var t = e.target;
+      if (t &amp;&amp; (t.tagName === &#x27;INPUT&#x27; || t.tagName === &#x27;TEXTAREA&#x27; || t.isContentEditable)) return;
+      if (e.key === &#x27;t&#x27; || e.key === &#x27;T&#x27;) {
+        e.preventDefault();
+        Archify.theme.toggle();
+      } else if (e.key === &#x27;e&#x27; || e.key === &#x27;E&#x27;) {
+        e.preventDefault();
+        if (!Archify.exportMenu.isOpen()) Archify.exportMenu.open();
+      }
+    });
+  &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+"></iframe></div><p class="muted">Diagram renderer: rendered | Standalone diagram: <a href="2026-W28.knowledge-flow.archify.html">2026-W28.knowledge-flow.archify.html</a></p></section>
+<section id="trend-board"><h2>Trend Board</h2><div class="split"><div class="card-grid"><article class="trend-card"><h3>Fable</h3><p>2 atoms across 2 source channel(s). Latest: Fable API pricing concern: user reported $20 charge for single &#x27;Hello&#x27; message indicating aggressive system prompt execution costs</p><div class="trend-bars"><label>7d <div class="bar" title="7d momentum"><span style="width:40%"></span></div></label><label>30d <div class="bar" title="30d momentum"><span style="width:17%"></span></div></label><label>90d <div class="bar" title="90d momentum"><span style="width:8%"></span></div></label></div><p class="muted">2 atoms | 2 channels | active</p></article><article class="trend-card"><h3>Vibecraft / Yandex</h3><p>2 atoms across 2 source channel(s). Latest: Yandex launched Vibecraft, a no-code web/app builder using text prompts for non-developers</p><div class="trend-bars"><label>7d <div class="bar" title="7d momentum"><span style="width:40%"></span></div></label><label>30d <div class="bar" title="30d momentum"><span style="width:17%"></span></div></label><label>90d <div class="bar" title="90d momentum"><span style="width:8%"></span></div></label></div><p class="muted">2 atoms | 2 channels | active</p></article><article class="trend-card"><h3>Atlas / Boston Dynamics / Hyundai Motor Group</h3><p>1 atoms across 1 source channel(s). Latest: Boston Dynamics Atlas humanoid robot deployed at World Cup 2026 with mass production planned</p><div class="trend-bars"><label>7d <div class="bar" title="7d momentum"><span style="width:20%"></span></div></label><label>30d <div class="bar" title="30d momentum"><span style="width:8%"></span></div></label><label>90d <div class="bar" title="90d momentum"><span style="width:4%"></span></div></label></div><p class="muted">1 atoms | 1 channels | active</p></article><article class="trend-card"><h3>GigaChat 3.5 Ultra / DeepSeek V3.2 / DeepSeek V4</h3><p>1 atoms across 1 source channel(s). Latest: GigaChat 3.5 Ultra released as 432B open-source model with hybrid MLA+GatedDeltaNet architecture</p><div class="trend-bars"><label>7d <div class="bar" title="7d momentum"><span style="width:20%"></span></div></label><label>30d <div class="bar" title="30d momentum"><span style="width:8%"></span></div></label><label>90d <div class="bar" title="90d momentum"><span style="width:4%"></span></div></label></div><p class="muted">1 atoms | 1 channels | active</p></article><article class="trend-card"><h3>Jacobian Lens / Claude / Anthropic</h3><p>1 atoms across 1 source channel(s). Latest: Anthropic discovers J-space: localized neural workspace encoding model&#x27;s reasoning process in Claude</p><div class="trend-bars"><label>7d <div class="bar" title="7d momentum"><span style="width:20%"></span></div></label><label>30d <div class="bar" title="30d momentum"><span style="width:8%"></span></div></label><label>90d <div class="bar" title="90d momentum"><span style="width:4%"></span></div></label></div><p class="muted">1 atoms | 1 channels | active</p></article><article class="trend-card"><h3>Nvidia / hyperscalers / revenue-sharing</h3><p>1 atoms across 1 source channel(s). Latest: Nvidia shifts to revenue-sharing model with startups to reduce hyperscaler chip dependency</p><div class="trend-bars"><label>7d <div class="bar" title="7d momentum"><span style="width:20%"></span></div></label><label>30d <div class="bar" title="30d momentum"><span style="width:8%"></span></div></label><label>90d <div class="bar" title="90d momentum"><span style="width:4%"></span></div></label></div><p class="muted">1 atoms | 1 channels | active</p></article><article class="trend-card"><h3>Stanford / AI Agents / LLMOps</h3><p>1 atoms across 1 source channel(s). Latest: Stanford AI Index 2026 reports agentic systems job demand surged 10,854% year-over-year</p><div class="trend-bars"><label>7d <div class="bar" title="7d momentum"><span style="width:20%"></span></div></label><label>30d <div class="bar" title="30d momentum"><span style="width:8%"></span></div></label><label>90d <div class="bar" title="90d momentum"><span style="width:4%"></span></div></label></div><p class="muted">1 atoms | 1 channels | active</p></article><article class="trend-card"><h3>AhaKey / Aha Labs</h3><p>1 atoms across 1 source channel(s). Latest: AhaKey programmable keyboard with 4-button design and voice dictation support for developers</p><div class="trend-bars"><label>7d <div class="bar" title="7d momentum"><span style="width:20%"></span></div></label><label>30d <div class="bar" title="30d momentum"><span style="width:8%"></span></div></label><label>90d <div class="bar" title="90d momentum"><span style="width:4%"></span></div></label></div><p class="muted">1 atoms | 1 channels | active</p></article><article class="trend-card"><h3>Claude / Anthropic / J-space</h3><p>1 atoms across 1 source channel(s). Latest: Claude exhibits J-space: internal neural activation layer with autonomous emergence of semantic understanding without explicit design</p><div class="trend-bars"><label>7d <div class="bar" title="7d momentum"><span style="width:20%"></span></div></label><label>30d <div class="bar" title="30d momentum"><span style="width:8%"></span></div></label><label>90d <div class="bar" title="90d momentum"><span style="width:4%"></span></div></label></div><p class="muted">1 atoms | 1 channels | active</p></article><article class="trend-card"><h3>Fable 5 / Claude Opus 4.8 / Command &amp; Conquer</h3><p>1 atoms across 1 source channel(s). Latest: Command &amp; Conquer game successfully ported to macOS, iPhone, iPad using Fable 5 with native ARM64 compilation</p><div class="trend-bars"><label>7d <div class="bar" title="7d momentum"><span style="width:20%"></span></div></label><label>30d <div class="bar" title="30d momentum"><span style="width:8%"></span></div></label><label>90d <div class="bar" title="90d momentum"><span style="width:4%"></span></div></label></div><p class="muted">1 atoms | 1 channels | active</p></article></div><div><article><h3>Tools</h3><ul class="term-list"><li><span>Fable</span><div class="bar" title="2"><span style="width:100%"></span></div></li><li><span>Vibecraft</span><div class="bar" title="2"><span style="width:100%"></span></div></li><li><span>Jacobian Lens</span><div class="bar" title="1"><span style="width:50%"></span></div></li><li><span>AhaKey</span><div class="bar" title="1"><span style="width:50%"></span></div></li><li><span>Fable 5</span><div class="bar" title="1"><span style="width:50%"></span></div></li><li><span>T3MP3ST</span><div class="bar" title="1"><span style="width:50%"></span></div></li></ul></article><article><h3>Models</h3><ul class="term-list"><li><span>GigaChat 3.5 Ultra</span><div class="bar" title="2"><span style="width:100%"></span></div></li><li><span>Claude</span><div class="bar" title="2"><span style="width:100%"></span></div></li><li><span>Atlas</span><div class="bar" title="1"><span style="width:50%"></span></div></li><li><span>DeepSeek V3.2</span><div class="bar" title="1"><span style="width:50%"></span></div></li><li><span>DeepSeek V4</span><div class="bar" title="1"><span style="width:50%"></span></div></li><li><span>Claude Opus 4.8</span><div class="bar" title="1"><span style="width:50%"></span></div></li></ul></article><article><h3>Practices</h3><ul class="term-list"><li><span>MLA</span><div class="bar" title="2"><span style="width:100%"></span></div></li><li><span>GatedDeltaNet</span><div class="bar" title="2"><span style="width:100%"></span></div></li><li><span>online RL</span><div class="bar" title="2"><span style="width:100%"></span></div></li><li><span>FP8 training</span><div class="bar" title="1"><span style="width:50%"></span></div></li><li><span>interpretability</span><div class="bar" title="1"><span style="width:50%"></span></div></li><li><span>mechanistic analysis</span><div class="bar" title="1"><span style="width:50%"></span></div></li><li><span>revenue-sharing</span><div class="bar" title="1"><span style="width:50%"></span></div></li><li><span>AI Agents</span><div class="bar" title="1"><span style="width:50%"></span></div></li></ul></article></div></div></section>
+<section id="sources"><h2>Sources</h2><div class="split"><div><h3>Source Channels</h3><table><thead><tr><th>Channel</th><th>Atoms</th></tr></thead><tbody><tr><td><a href="https://t.me/codecamp">@codecamp</a></td><td>7</td></tr><tr><td><a href="https://t.me/data_secrets">@data_secrets</a></td><td>5</td></tr><tr><td><a href="https://t.me/cryptoEssay">@cryptoEssay</a></td><td>1</td></tr><tr><td><a href="https://t.me/NeuralShit">@NeuralShit</a></td><td>1</td></tr></tbody></table></div><div><h3>Evidence Links</h3><ol class="source-list"><li><b>GigaChat 3.5 Ultra: open-source 432B hybrid MLA+GatedDeltaNet model with 40% improved efficiency and online RL training</b><span><a href="https://t.me/codecamp/10933">S1</a></span></li><li><b>Stanford AI Index 2026 reports agentic systems job demand surged 10,854% year-over-year</b><span><a href="https://t.me/data_secrets/9493">S1</a></span></li><li><b>Fable moves from free-tier subscription to $50/month paid access for token allocation</b><span><a href="https://t.me/cryptoEssay/3069">S1</a></span></li><li><b>Yandex launched Vibecraft, a no-code web/app builder using text prompts for non-developers</b><span><a href="https://t.me/NeuralShit/7525">S1</a></span></li><li><b>Yandex launched Vibecraft, an AI service for no-code website and app prototyping</b><span><a href="https://t.me/codecamp/10865">S1</a></span></li><li><b>GigaChat 3.5 Ultra released as 432B open-source model with hybrid MLA+GatedDeltaNet architecture</b><span><a href="https://t.me/data_secrets/9496">S1</a></span></li><li><b>Command &amp; Conquer game successfully ported to macOS, iPhone, iPad using Fable 5 with native ARM64 compilation</b><span><a href="https://t.me/codecamp/10932">S1</a></span></li><li><b>T3MP3ST: open-source multi-agent red team system for automated vulnerability discovery achieving 90% success on 104 security tasks</b><span><a href="https://t.me/codecamp/10938">S1</a></span></li><li><b>Fable API pricing concern: user reported $20 charge for single &#x27;Hello&#x27; message indicating aggressive system prompt execution costs</b><span><a href="https://t.me/codecamp/10934">S1</a></span></li><li><b>AhaKey programmable keyboard with 4-button design and voice dictation support for developers</b><span><a href="https://t.me/codecamp/10930">S1</a></span></li><li><b>Anthropic discovers J-space: localized neural workspace encoding model&#x27;s reasoning process in Claude</b><span><a href="https://t.me/data_secrets/9497">S1</a></span></li><li><b>Nvidia shifts to revenue-sharing model with startups to reduce hyperscaler chip dependency</b><span><a href="https://t.me/data_secrets/9490">S1</a></span></li></ol></div></div></section>
+</main>
+</body>
+</html>

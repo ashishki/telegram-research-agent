@@ -26,10 +26,15 @@ This directory keeps active operator and implementation guidance at the top leve
 | `COGNITION_MANIFEST.md` | Repo-local cognition map and source-of-truth rules |
 | `VPS_COGNITION_VAULT.md` | Shared VPS vault location and sync policy |
 | `CODEX_PROMPT.md` | Current session handoff and active repo state summary |
+| `artifacts/README.md` | Versioned generated artifacts selected for review and model-assisted critique |
 
 ## Prompt Docs
 
 `docs/prompts/` contains active LLM prompts used by the runtime pipeline and the development workflow. These are not archive material.
+
+Notable review prompts:
+
+- `docs/prompts/top_model_user_value_audit_ru.md` — Russian prompt for a frontier-model audit of user value, project direction, report UX, data pipeline, Obsidian projection, and next development priorities.
 
 ## Audit Docs
 

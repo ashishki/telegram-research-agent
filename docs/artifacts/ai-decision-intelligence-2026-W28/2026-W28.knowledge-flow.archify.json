@@ -1,0 +1,205 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "AI Knowledge Flow 2026-W28",
+    "subtitle": "Telegram sources to atoms, threads, frontier synthesis, project actions, and memory",
+    "output": "2026-W28.knowledge-flow.html",
+    "animation": "trace",
+    "viewBox": [
+      1080,
+      760
+    ]
+  },
+  "stages": [
+    {
+      "label": "Sources"
+    },
+    {
+      "label": "Atomize"
+    },
+    {
+      "label": "Thread"
+    },
+    {
+      "label": "Synthesize"
+    },
+    {
+      "label": "Act"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "sources",
+      "type": "external",
+      "label": "Telegram Sources",
+      "sublabel": "4 channels",
+      "stage": 0,
+      "row": 0,
+      "tag": "12w input"
+    },
+    {
+      "id": "profile",
+      "type": "security",
+      "label": "Profile + Projects",
+      "sublabel": "0 project leads",
+      "stage": 0,
+      "row": 3,
+      "tag": "personal fit"
+    },
+    {
+      "id": "atoms",
+      "type": "database",
+      "label": "Knowledge Atoms",
+      "sublabel": "14 cited atoms",
+      "stage": 1,
+      "row": 1,
+      "tag": "claims"
+    },
+    {
+      "id": "threads",
+      "type": "messagebus",
+      "label": "Idea Threads",
+      "sublabel": "12 timelines",
+      "stage": 2,
+      "row": 1,
+      "tag": "momentum"
+    },
+    {
+      "id": "frontier",
+      "type": "backend",
+      "label": "Frontier Analysis",
+      "sublabel": "claude-opus-4-8",
+      "stage": 3,
+      "row": 0,
+      "tag": "why now"
+    },
+    {
+      "id": "report",
+      "type": "frontend",
+      "label": "Visual HTML",
+      "sublabel": "interactive artifact",
+      "stage": 4,
+      "row": 0,
+      "tag": "sendable"
+    },
+    {
+      "id": "obsidian",
+      "type": "database",
+      "label": "Obsidian Vault",
+      "sublabel": "long memory",
+      "stage": 4,
+      "row": 4,
+      "tag": "browse"
+    },
+    {
+      "id": "actions",
+      "type": "cloud",
+      "label": "Study + Do",
+      "sublabel": "4 next moves",
+      "stage": 4,
+      "row": 2,
+      "tag": "operator"
+    }
+  ],
+  "flows": [
+    {
+      "from": "sources",
+      "to": "atoms",
+      "label": "posts to claims",
+      "classification": "source-grounded",
+      "variant": "emphasis"
+    },
+    {
+      "from": "profile",
+      "to": "atoms",
+      "label": "personal scoring",
+      "classification": "profile filter",
+      "variant": "security"
+    },
+    {
+      "from": "atoms",
+      "to": "threads",
+      "label": "claim timelines",
+      "classification": "temporal grouping",
+      "variant": "emphasis"
+    },
+    {
+      "from": "threads",
+      "to": "frontier",
+      "label": "compressed context",
+      "classification": "top-model input",
+      "variant": "emphasis"
+    },
+    {
+      "from": "profile",
+      "to": "frontier",
+      "label": "portfolio context",
+      "classification": "project fit",
+      "variant": "dashed"
+    },
+    {
+      "from": "frontier",
+      "to": "report",
+      "label": "what changed",
+      "classification": "human synthesis",
+      "variant": "emphasis"
+    },
+    {
+      "from": "threads",
+      "to": "report",
+      "label": "metrics + links",
+      "classification": "deterministic",
+      "variant": "default"
+    },
+    {
+      "from": "threads",
+      "to": "obsidian",
+      "label": "generated notes",
+      "classification": "memory projection",
+      "variant": "dashed"
+    },
+    {
+      "from": "report",
+      "to": "actions",
+      "label": "study queue",
+      "classification": "this week",
+      "variant": "emphasis",
+      "labelAt": [
+        960,
+        320
+      ]
+    },
+    {
+      "from": "obsidian",
+      "to": "actions",
+      "label": "reference back",
+      "classification": "longitudinal memory",
+      "variant": "default",
+      "labelAt": [
+        1000,
+        526
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "What Archify Shows",
+      "items": [
+        "The main path is source posts -> atoms -> threads -> frontier synthesis -> action.",
+        "Profile and project context affect scoring and interpretation, not reader-facing gossip.",
+        "Obsidian remains the memory projection while HTML is the weekly decision artifact."
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Why This Matters",
+      "items": [
+        "The report explains how the week changes the existing knowledge base.",
+        "Project leads turn general AI news into portfolio-specific checks.",
+        "The visual artifact can be sent as a standalone Telegram document."
+      ]
+    }
+  ]
+}
