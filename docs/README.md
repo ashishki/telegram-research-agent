@@ -32,10 +32,6 @@ This directory keeps active operator and implementation guidance at the top leve
 
 `docs/prompts/` contains active LLM prompts used by the runtime pipeline and the development workflow. These are not archive material.
 
-Notable review prompts:
-
-- `docs/prompts/top_model_user_value_audit_ru.md` — Russian prompt for a frontier-model audit of user value, project direction, report UX, data pipeline, Obsidian projection, and next development priorities.
-
 ## Audit Docs
 
 `docs/audit/AUDIT_INDEX.md` is the active audit index. Historical audits are under `docs/archive/legacy_audit/` and `docs/archive/reviews/`.
