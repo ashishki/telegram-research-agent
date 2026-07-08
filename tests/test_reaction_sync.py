@@ -51,7 +51,7 @@ class TestReactionSync(unittest.TestCase):
         ).fetchone()
         self.assertIsNotNone(row)
 
-    def test_apply_reaction_feedback_records_tag_feedback_and_state(self):
+    def test_apply_reaction_feedback_records_operator_interest_and_raw_emoji(self):
         from ingestion.reaction_sync import apply_reaction_feedback
 
         connection, post_id = self._connection_with_post()
@@ -69,11 +69,14 @@ class TestReactionSync(unittest.TestCase):
 
         tag = connection.execute("SELECT tag FROM user_post_tags WHERE post_id = ?", (post_id,)).fetchone()
         feedback = connection.execute("SELECT feedback FROM signal_feedback WHERE post_id = ?", (post_id,)).fetchone()
-        state = connection.execute("SELECT action_key FROM reaction_sync_state WHERE message_id = 77").fetchone()
+        state = connection.execute(
+            "SELECT emoji, action_key FROM reaction_sync_state WHERE message_id = 77"
+        ).fetchone()
 
-        self.assertEqual(tag["tag"], "strong")
-        self.assertEqual(feedback["feedback"], "marked_important")
-        self.assertEqual(state["action_key"], "tag:strong|feedback:marked_important")
+        self.assertEqual(tag["tag"], "interesting")
+        self.assertEqual(feedback["feedback"], "operator_marked_interesting")
+        self.assertEqual(state["emoji"], "🔥")
+        self.assertEqual(state["action_key"], "tag:interesting|feedback:operator_marked_interesting")
 
     def test_apply_reaction_feedback_is_idempotent(self):
         from ingestion.reaction_sync import apply_reaction_feedback
@@ -100,7 +103,44 @@ class TestReactionSync(unittest.TestCase):
         self.assertEqual(tag_count, 1)
         self.assertEqual(feedback_count, 1)
 
-    def test_unknown_reaction_is_ignored(self):
+    def test_old_reaction_state_prevents_reapplying_same_raw_emoji(self):
+        from ingestion.reaction_sync import apply_reaction_feedback
+
+        connection, post_id = self._connection_with_post()
+        connection.execute(
+            """
+            INSERT INTO reaction_sync_state (
+                source, channel_username, message_id, emoji, action_key, applied_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "telegram_reaction",
+                "@source",
+                77,
+                "🔥",
+                "tag:strong|feedback:marked_important",
+                "2026-07-07T12:00:00Z",
+            ),
+        )
+        connection.commit()
+
+        summary = apply_reaction_feedback(
+            connection,
+            post_id=post_id,
+            channel_username="@source",
+            message_id=77,
+            emojis={"🔥"},
+        )
+
+        self.assertEqual(summary["skipped_existing"], 1)
+        feedback_count = connection.execute(
+            "SELECT COUNT(*) FROM signal_feedback WHERE post_id = ?",
+            (post_id,),
+        ).fetchone()[0]
+        self.assertEqual(feedback_count, 0)
+
+    def test_any_visible_personal_reaction_counts_as_operator_interest(self):
         from ingestion.reaction_sync import apply_reaction_feedback
 
         connection, post_id = self._connection_with_post()
@@ -112,9 +152,50 @@ class TestReactionSync(unittest.TestCase):
             emojis={"🐢"},
         )
 
-        self.assertEqual(summary["skipped_unknown"], 1)
-        self.assertIsNone(connection.execute("SELECT 1 FROM user_post_tags WHERE post_id = ?", (post_id,)).fetchone())
-        self.assertIsNone(connection.execute("SELECT 1 FROM signal_feedback WHERE post_id = ?", (post_id,)).fetchone())
+        self.assertEqual(summary["matched_reactions"], 1)
+        self.assertEqual(summary["skipped_unknown"], 0)
+        tag = connection.execute("SELECT tag FROM user_post_tags WHERE post_id = ?", (post_id,)).fetchone()
+        feedback = connection.execute("SELECT feedback FROM signal_feedback WHERE post_id = ?", (post_id,)).fetchone()
+        state = connection.execute("SELECT emoji FROM reaction_sync_state WHERE message_id = 77").fetchone()
+        self.assertEqual(tag["tag"], "interesting")
+        self.assertEqual(feedback["feedback"], "operator_marked_interesting")
+        self.assertEqual(state["emoji"], "🐢")
+
+    def test_aggregate_only_reaction_counts_are_not_personal_feedback(self):
+        from ingestion.reaction_sync import _extract_self_reactions_from_message
+
+        message = _Object(
+            reactions=_Object(
+                results=[
+                    _Object(reaction=_Object(emoticon="🔥"), count=42),
+                ],
+                recent_reactions=[],
+            )
+        )
+
+        self.assertEqual(_extract_self_reactions_from_message(message, self_user_id=123), set())
+
+    def test_recent_self_reaction_is_personal_feedback(self):
+        from ingestion.reaction_sync import _extract_self_reactions_from_message
+
+        message = _Object(
+            reactions=_Object(
+                recent_reactions=[
+                    _Object(
+                        peer_id=_Object(user_id=123),
+                        reaction=_Object(emoticon="🔥"),
+                    ),
+                ],
+            )
+        )
+
+        self.assertEqual(_extract_self_reactions_from_message(message, self_user_id=123), {"🔥"})
+
+
+class _Object:
+    def __init__(self, **values):
+        for key, value in values.items():
+            setattr(self, key, value)
 
 
 if __name__ == "__main__":

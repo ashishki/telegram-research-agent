@@ -43,6 +43,20 @@ class TestSignalFeedbackMigration(unittest.TestCase):
         self.assertEqual(row["feedback"], "acted_on")
         self.assertTrue(row["recorded_at"])
 
+    def test_record_feedback_accepts_operator_marked_interesting(self):
+        from db.migrate import record_feedback
+
+        conn = self._run_migrations()
+        conn.row_factory = sqlite3.Row
+        record_feedback(conn, post_id=43, feedback="operator_marked_interesting")
+
+        row = conn.execute(
+            "SELECT post_id, feedback, recorded_at FROM signal_feedback WHERE post_id = 43"
+        ).fetchone()
+        self.assertIsNotNone(row)
+        self.assertEqual(row["feedback"], "operator_marked_interesting")
+        self.assertTrue(row["recorded_at"])
+
     def test_record_feedback_rejects_invalid_value(self):
         from db.migrate import record_feedback
 

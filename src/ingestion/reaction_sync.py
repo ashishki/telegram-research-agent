@@ -10,6 +10,8 @@ from db.migrate import record_feedback, record_post_tag
 
 LOGGER = logging.getLogger(__name__)
 REACTION_SOURCE = "telegram_reaction"
+OPERATOR_INTEREST_TAG = "interesting"
+OPERATOR_INTEREST_FEEDBACK = "operator_marked_interesting"
 
 
 @dataclass(frozen=True)
@@ -18,23 +20,10 @@ class ReactionRule:
     feedback: str | None = None
 
 
-REACTION_RULES: dict[str, ReactionRule] = {
-    "🔥": ReactionRule(tag="strong", feedback="marked_important"),
-    "⭐": ReactionRule(tag="strong", feedback="marked_important"),
-    "❤": ReactionRule(tag="strong", feedback="marked_important"),
-    "❤️": ReactionRule(tag="strong", feedback="marked_important"),
-    "👍": ReactionRule(tag="interesting", feedback="marked_important"),
-    "👏": ReactionRule(tag="interesting", feedback="marked_important"),
-    "👀": ReactionRule(tag="read_later"),
-    "🤔": ReactionRule(tag="read_later"),
-    "⚡": ReactionRule(tag="try_in_project"),
-    "🛠": ReactionRule(tag="try_in_project"),
-    "🛠️": ReactionRule(tag="try_in_project"),
-    "✅": ReactionRule(tag="try_in_project", feedback="acted_on"),
-    "👎": ReactionRule(tag="low_signal", feedback="skipped"),
-    "💩": ReactionRule(tag="low_signal", feedback="skipped"),
-    "❌": ReactionRule(tag="low_signal", feedback="skipped"),
-}
+OPERATOR_INTEREST_RULE = ReactionRule(
+    tag=OPERATOR_INTEREST_TAG,
+    feedback=OPERATOR_INTEREST_FEEDBACK,
+)
 
 
 def _utc_now() -> str:
@@ -140,7 +129,6 @@ def _state_exists(
     channel_username: str,
     message_id: int,
     emoji: str,
-    action_key: str,
 ) -> bool:
     row = connection.execute(
         """
@@ -150,10 +138,9 @@ def _state_exists(
           AND lower(channel_username) = lower(?)
           AND message_id = ?
           AND emoji = ?
-          AND action_key = ?
         LIMIT 1
         """,
-        (REACTION_SOURCE, channel_username, message_id, emoji, action_key),
+        (REACTION_SOURCE, channel_username, message_id, emoji),
     ).fetchone()
     return row is not None
 
@@ -195,25 +182,29 @@ def apply_reaction_feedback(
 
     for raw_emoji in sorted(emojis):
         emoji = _normalize_reaction_emoji(raw_emoji)
-        rule = REACTION_RULES.get(emoji or "")
-        if emoji is None or rule is None:
+        if emoji is None:
             summary["skipped_unknown"] += 1
             continue
 
+        rule = OPERATOR_INTEREST_RULE
         action_key = _action_key(rule)
         if _state_exists(
             connection,
             channel_username=channel_username,
             message_id=message_id,
             emoji=emoji,
-            action_key=action_key,
         ):
             summary["skipped_existing"] += 1
             continue
 
         summary["matched_reactions"] += 1
         if rule.tag:
-            record_post_tag(connection, post_id, rule.tag, note=f"telegram reaction {emoji}")
+            record_post_tag(
+                connection,
+                post_id,
+                rule.tag,
+                note=f"operator telegram reaction {emoji}",
+            )
             summary["applied_tags"] += 1
         if rule.feedback:
             record_feedback(connection, post_id, rule.feedback)

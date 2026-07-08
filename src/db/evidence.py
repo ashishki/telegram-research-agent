@@ -9,6 +9,7 @@ _FEEDBACK_STATUS_MAP = {
     "acted_on": "acted_on",
     "skipped": "ignored",
     "marked_important": "acted_on",
+    "operator_marked_interesting": "deferred",
 }
 _TRIAGE_STATUS_MAP = {
     "do_now": "acted_on",

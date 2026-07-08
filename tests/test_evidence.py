@@ -62,6 +62,18 @@ class TestRecordDecisionForFeedback(unittest.TestCase):
         self.assertIsNotNone(row)
         self.assertEqual(row["status"], "acted_on")
 
+    def test_operator_marked_interesting_writes_deferred_status(self):
+        from db.evidence import record_decision_for_feedback
+        record_decision_for_feedback(
+            self.conn,
+            post_id=15,
+            feedback="operator_marked_interesting",
+        )
+
+        row = self._get_decision("15")
+        self.assertIsNotNone(row)
+        self.assertEqual(row["status"], "deferred")
+
     def test_unknown_feedback_writes_no_row(self):
         from db.evidence import record_decision_for_feedback
         record_decision_for_feedback(self.conn, post_id=13, feedback="totally_unknown")

@@ -536,7 +536,7 @@ def _apply_feedback_inputs(
             observation["acted_post_ids"].add(post_id)
         elif feedback == "skipped":
             observation["skipped_post_ids"].add(post_id)
-        elif feedback == "marked_important":
+        elif feedback in {"marked_important", "operator_marked_interesting"}:
             observation["usefulness_log_ids"].add(f"feedback:{row.get('id')}")
         _touch_window(observation, row.get("recorded_at"))
 
