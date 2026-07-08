@@ -18,6 +18,7 @@ from output.intelligence_retrieval_items import (
     load_mvp_radar_status,
     search_retrieval_items,
 )
+from output.strategy_reviewer import build_strategy_review
 
 
 TOKEN_RE = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_-]{1,}")
@@ -261,6 +262,35 @@ class PersonalIntelligenceFacade:
             "counts": dict(summary.get("counts_by_feedback") or {}),
             **grouped,
             "message": "Feedback summary loaded." if count else "No feedback events are available.",
+        }
+
+    def get_strategy_reviewer_notes(self, week_label: str | None = None) -> dict:
+        clean_week = str(week_label or "").strip() or None
+        with self._readonly_connection() as connection:
+            if connection is None or not _table_exists(connection, "ai_report_feedback_events"):
+                return _empty_strategy_review(clean_week, "missing", "AI report feedback table is missing.")
+            try:
+                review = build_strategy_review(connection, week_label=clean_week)
+            except sqlite3.Error:
+                return _empty_strategy_review(clean_week, "missing", "Strategy Reviewer notes could not be loaded.")
+        suggestions = review.get("suggestions") if isinstance(review.get("suggestions"), Mapping) else {}
+        return {
+            "status": "ok",
+            "week_label": clean_week,
+            "generated_at": _clean_text(review.get("generated_at")) or None,
+            "suggestions": {
+                "keep": _string_values(suggestions.get("keep")),
+                "change": _string_values(suggestions.get("change")),
+                "demote": _string_values(suggestions.get("demote")),
+                "test_next_week": _string_values(suggestions.get("test_next_week")),
+            },
+            "memory_only_updates": _string_values(review.get("memory_only_updates")),
+            "approval_required": [dict(item) for item in review.get("approval_required") or [] if isinstance(item, Mapping)],
+            "codex_tasks": [_codex_task(item) for item in review.get("codex_tasks") or [] if isinstance(item, Mapping)],
+            "risks": _string_values(review.get("risks")),
+            "mutation_policy": dict(review.get("mutation_policy") or {}),
+            "feedback_summary": dict(review.get("feedback_summary") or {}),
+            "message": "Strategy Reviewer notes loaded.",
         }
 
     def list_marked_posts(self, week_label: str | None = None, limit: int = 20) -> dict:
@@ -734,6 +764,40 @@ def _empty_feedback_summary(week_label: str | None, status: str, message: str) -
         "applied_to_project": [],
         "tried": [],
         "message": message,
+    }
+
+
+def _empty_strategy_review(week_label: str | None, status: str, message: str) -> dict:
+    return {
+        "status": status,
+        "week_label": week_label,
+        "generated_at": None,
+        "suggestions": {"keep": [], "change": [], "demote": [], "test_next_week": []},
+        "memory_only_updates": [],
+        "approval_required": [],
+        "codex_tasks": [],
+        "risks": [],
+        "mutation_policy": {
+            "source_code": "do_not_modify",
+            "prompts": "do_not_modify",
+            "thresholds": "do_not_modify",
+            "profile": "do_not_modify",
+            "projects": "do_not_modify",
+        },
+        "feedback_summary": {},
+        "message": message,
+    }
+
+
+def _codex_task(task: Mapping[str, Any]) -> dict:
+    return {
+        "title": task.get("title"),
+        "rationale": task.get("rationale"),
+        "files": _string_values(task.get("files")),
+        "acceptance_criteria": _string_values(task.get("acceptance_criteria")),
+        "verification_commands": _string_values(task.get("verification_commands")),
+        "requires_approval": bool(task.get("requires_approval", True)),
+        "mutation_policy": _clean_text(task.get("mutation_policy")) or "suggestion_only_no_auto_edit",
     }
 
 

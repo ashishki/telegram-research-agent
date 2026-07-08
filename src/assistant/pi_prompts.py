@@ -25,5 +25,5 @@ PI_TOOL_DESCRIPTIONS = {
     "get_mvp_radar_status": "Return MVP Radar candidate status without running Radar.",
     "get_feedback_summary": "Return AI workbook feedback summary.",
     "list_marked_posts": "Return operator-marked posts; no reaction is unknown, not negative.",
-    "get_strategy_reviewer_notes": "Return Strategy Reviewer advisory notes from curated retrieval items.",
+    "get_strategy_reviewer_notes": "Return structured Strategy Reviewer advisory notes and Codex task suggestions.",
 }

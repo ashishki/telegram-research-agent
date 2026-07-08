@@ -168,9 +168,11 @@ class TestPITools(unittest.TestCase):
                 facade=self._facade(root),
             )
 
-        self.assertIn(result["status"], {"empty", "missing"})
+        self.assertEqual(result["status"], "missing")
         self.assertEqual(result["evidence_status"], "insufficient")
-        self.assertEqual(result["result"]["items"], [])
+        self.assertEqual(result["result"]["suggestions"]["keep"], [])
+        self.assertEqual(result["result"]["codex_tasks"], [])
+        self.assertEqual(result["result"]["mutation_policy"]["source_code"], "do_not_modify")
 
     def test_unknown_and_invalid_tool_calls_return_dto_errors(self):
         unknown = call_pi_tool("edit_code", {"path": "x"})

@@ -420,29 +420,60 @@ def handle_mvp(chat_id: str, args: str, settings: Settings) -> None:
 
 
 def handle_strategy(chat_id: str, args: str, settings: Settings) -> None:
-    week_label, query = _parse_optional_week_label_args(args)
+    week_label, _query = _parse_optional_week_label_args(args)
     tool = _pi_tool(
         settings,
         "get_strategy_reviewer_notes",
-        {"week_label": week_label, "query": query or None, "limit": 3},
+        {"week_label": week_label},
     )
-    items = [item for item in tool["result"].get("items") or [] if isinstance(item, dict)]
-    if not items:
+    result = tool["result"]
+    if tool["status"] != "ok":
         send_message(
             _get_bot_token(),
             chat_id,
-            f"No Strategy Reviewer notes are available for {week_label or 'latest week'}.",
+            f"No Strategy Reviewer notes are available for {week_label or 'latest week'}.\n{result.get('message')}",
             parse_mode=None,
         )
         return
-    lines = [f"Hermes strategy {week_label or 'latest'}", "Advisory only; no changes were applied."]
-    for item in items:
-        lines.append("")
-        lines.append(item.get("title") or "Strategy Reviewer note")
-        text = item.get("summary") or item.get("text") or ""
-        if text:
-            lines.append(_format_post_snippet(text, limit=320))
-        lines.append(_format_source_refs(item.get("source_refs") or [], item.get("atom_ids") or []))
+    lines = [
+        f"Hermes strategy {result.get('week_label') or week_label or 'latest'}",
+        "Advisory only; no changes were applied.",
+    ]
+    suggestions = result.get("suggestions") or {}
+    for title, key in (
+        ("Keep", "keep"),
+        ("Change", "change"),
+        ("Demote", "demote"),
+        ("Test next week", "test_next_week"),
+    ):
+        lines.extend(_format_optional_list(title, suggestions.get(key) or [], limit=4))
+    lines.extend(_format_optional_list("Memory-only updates", result.get("memory_only_updates") or [], limit=4))
+    approvals = [item for item in result.get("approval_required") or [] if isinstance(item, dict)]
+    if approvals:
+        lines.append("Approval required")
+        for item in approvals[:4]:
+            reason = item.get("reason") or item.get("change_type") or "manual approval required"
+            lines.append(f"- {_format_post_snippet(reason, limit=180)}")
+    tasks = [item for item in result.get("codex_tasks") or [] if isinstance(item, dict)]
+    if tasks:
+        lines.append("Codex tasks")
+        for task in tasks[:3]:
+            lines.append(f"- {task.get('title') or 'Codex task'}")
+            if task.get("rationale"):
+                lines.append(f"  why: {_format_post_snippet(task['rationale'], limit=160)}")
+            if task.get("files"):
+                lines.append(f"  files: {', '.join(task['files'][:4])}")
+            if task.get("acceptance_criteria"):
+                lines.append(f"  acceptance: {_format_post_snippet(task['acceptance_criteria'][0], limit=160)}")
+            if task.get("verification_commands"):
+                lines.append(f"  verify: {task['verification_commands'][0]}")
+    lines.extend(_format_optional_list("Risks", result.get("risks") or [], limit=4))
+    mutation_policy = result.get("mutation_policy") or {}
+    if mutation_policy:
+        lines.append(
+            "Mutation policy: "
+            + ", ".join(f"{key}={value}" for key, value in sorted(mutation_policy.items()))
+        )
     send_message(_get_bot_token(), chat_id, "\n".join(lines), parse_mode=None)
 
 

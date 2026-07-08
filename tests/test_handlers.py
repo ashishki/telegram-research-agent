@@ -249,6 +249,73 @@ class TestHandlers(unittest.TestCase):
         self.assertIn("MVP Radar status is missing", message)
         self.assertIn("MVP Radar result is missing", message)
 
+    def test_handle_strategy_formats_structured_reviewer_summary(self):
+        settings = Settings(
+            db_path=":memory:",
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+        pi_result = {
+            "status": "ok",
+            "tool_name": "get_strategy_reviewer_notes",
+            "read_only": True,
+            "evidence_status": "insufficient",
+            "evidence": {},
+            "result": {
+                "status": "ok",
+                "week_label": "2026-W28",
+                "suggestions": {
+                    "keep": ["Keep useful project actions."],
+                    "change": ["Increase source-depth checks."],
+                    "demote": ["Demote wrong-priority topics."],
+                    "test_next_week": ["Turn missed posts into eval examples."],
+                },
+                "memory_only_updates": ["Confirmed feedback is stored."],
+                "approval_required": [
+                    {"change_type": "config", "reason": "Trust thresholds require approval."}
+                ],
+                "codex_tasks": [
+                    {
+                        "title": "Add source-depth regression",
+                        "rationale": "Operator feedback marked analysis too shallow.",
+                        "files": ["src/output/ai_visual_report.py", "tests/test_ai_visual_report.py"],
+                        "acceptance_criteria": ["No claim is upgraded without source URLs."],
+                        "verification_commands": ["python3 -m unittest tests.test_ai_visual_report"],
+                    }
+                ],
+                "risks": ["Do not apply code/config changes automatically."],
+                "mutation_policy": {"source_code": "do_not_modify", "profile": "do_not_modify"},
+                "message": "Strategy Reviewer notes loaded.",
+            },
+            "message": "Strategy Reviewer notes loaded.",
+        }
+
+        with patch.object(handlers, "_pi_tool", return_value=pi_result) as mock_pi_tool:
+            with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                with patch.object(handlers, "send_message") as mock_send_message:
+                    handlers.handle_strategy(chat_id="42", args="2026-W28", settings=settings)
+
+        mock_pi_tool.assert_called_once_with(settings, "get_strategy_reviewer_notes", {"week_label": "2026-W28"})
+        message = mock_send_message.call_args.args[2]
+        for expected in [
+            "Keep",
+            "Change",
+            "Demote",
+            "Test next week",
+            "Memory-only updates",
+            "Approval required",
+            "Codex tasks",
+            "Add source-depth regression",
+            "files: src/output/ai_visual_report.py",
+            "acceptance: No claim is upgraded without source URLs.",
+            "verify: python3 -m unittest tests.test_ai_visual_report",
+            "Risks",
+            "Mutation policy",
+            "source_code=do_not_modify",
+        ]:
+            self.assertIn(expected, message)
+
     def test_handle_codex_only_prepares_prompt(self):
         settings = Settings(
             db_path=":memory:",

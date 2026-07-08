@@ -156,11 +156,9 @@ def build_pi_tool_catalog() -> dict[str, PITool]:
             input_schema=_schema(
                 {
                     "week_label": {"type": ["string", "null"]},
-                    "query": {"type": ["string", "null"]},
-                    "limit": {"type": ["integer", "null"], "minimum": 1, "maximum": 20},
                 }
             ),
-            handler=_handle_strategy_reviewer_notes,
+            handler=lambda facade, args: facade.get_strategy_reviewer_notes(_optional_string(args.get("week_label"))),
         ),
     }
     validate_pi_tool_catalog(catalog)
@@ -221,24 +219,6 @@ def _handle_workbook_sections(facade: PersonalIntelligenceFacade, args: Mapping[
             "message": "Week label is unavailable.",
         }
     return facade.get_workbook_sections(week_label)
-
-
-def _handle_strategy_reviewer_notes(facade: PersonalIntelligenceFacade, args: Mapping[str, Any]) -> dict:
-    filters = {"item_type": "strategy_reviewer_note"}
-    week_label = _optional_string(args.get("week_label"))
-    if week_label:
-        filters["week_label"] = week_label
-    result = facade.search_intelligence_items(
-        _optional_string(args.get("query")) or "strategy reviewer",
-        filters=filters,
-        limit=_limit(args.get("limit"), default=5, maximum=20),
-    )
-    return {
-        "status": result.get("status", "empty"),
-        "week_label": week_label,
-        "items": list(result.get("items") or []),
-        "message": result.get("message") or "No Strategy Reviewer notes are available.",
-    }
 
 
 def _tool_response(tool_name: str, result: Mapping[str, Any]) -> dict:

@@ -53,11 +53,15 @@ def build_strategy_review(
     approval_required: list[dict[str, str]] = []
     memory_only: list[str] = []
     tasks: list[dict[str, Any]] = []
+    risks: list[str] = [
+        "Strategy Reviewer is advisory; Hermes must not apply code/config/profile/project changes automatically."
+    ]
 
     if not has_feedback:
         keep.append("Keep the feedback prompt visible; personalization confidence stays low until confirmed feedback exists.")
         change.append("Ask for at least one read/try/missed/trust feedback item after the workbook.")
         test_next_week.append("Run the workbook with explicit feedback targets and inspect completion.")
+        risks.append("Personalization confidence is low until confirmed feedback exists.")
     else:
         memory_only.append("Confirmed feedback is already stored in ai_report_feedback_events; no profile/config edit is required.")
         if counts.get("useful") or counts.get("tried") or counts.get("applied_to_project") or counts.get("read"):
@@ -70,6 +74,7 @@ def build_strategy_review(
                     "reason": "Depth behavior requires an approved renderer/prompt/eval change, not an automatic memory write.",
                 }
             )
+            risks.append("Source-depth changes can weaken evidence gates if they are applied without a regression test.")
             tasks.append(
                 _task(
                     title="Add workbook source-depth regression for too_shallow feedback",
@@ -111,6 +116,7 @@ def build_strategy_review(
                     "reason": "Trust threshold/profile changes require explicit operator approval.",
                 }
             )
+            risks.append("Trust calibration changes require explicit approval because they affect future ranking behavior.")
 
     if not tasks:
         tasks.append(
@@ -142,6 +148,7 @@ def build_strategy_review(
         "memory_only_updates": memory_only,
         "approval_required": approval_required,
         "codex_tasks": tasks,
+        "risks": risks,
         "mutation_policy": {
             "source_code": "do_not_modify",
             "prompts": "do_not_modify",
@@ -157,4 +164,3 @@ def write_strategy_review(review: dict[str, Any], output_path: str | Path) -> Pa
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(review, ensure_ascii=False, indent=2), encoding="utf-8")
     return path
-

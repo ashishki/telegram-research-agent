@@ -86,7 +86,12 @@ class TestStrategyReviewer(unittest.TestCase):
         self.assertTrue(review["memory_only_updates"])
         self.assertTrue(review["approval_required"])
         self.assertTrue(review["codex_tasks"])
+        self.assertTrue(review["risks"])
         self.assertTrue(all(task["requires_approval"] for task in review["codex_tasks"]))
+        self.assertTrue(all(task["rationale"] for task in review["codex_tasks"]))
+        self.assertTrue(all(task["files"] for task in review["codex_tasks"]))
+        self.assertTrue(all(task["acceptance_criteria"] for task in review["codex_tasks"]))
+        self.assertTrue(all(task["verification_commands"] for task in review["codex_tasks"]))
         self.assertEqual(review["mutation_policy"]["source_code"], "do_not_modify")
         self.assertEqual(review["mutation_policy"]["profile"], "do_not_modify")
 
@@ -128,4 +133,3 @@ class TestStrategyReviewer(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
