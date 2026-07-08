@@ -5,7 +5,10 @@ import sqlite3
 from dataclasses import dataclass
 from typing import Any
 
+from assistant.feedback_prompts import FEEDBACK_STRATEGIST_SYSTEM_PROMPT, build_feedback_strategist_prompt
 from db.ai_report_feedback import (
+    FEEDBACK_TYPES,
+    TARGET_TYPES,
     confirm_ai_report_feedback_intake,
     discard_ai_report_feedback_intake,
     fetch_ai_report_feedback_intake,
@@ -13,12 +16,14 @@ from db.ai_report_feedback import (
     record_ai_report_feedback_intake,
     update_ai_report_feedback_intake_summary,
 )
+from llm.client import LLMClient
 
 
 URL_RE = re.compile(r"https?://[^\s<>)]+", re.IGNORECASE)
 TARGET_RE = re.compile(r"\b(?:target|ref|item|section)=([A-Za-z0-9_.:@/-]+)", re.IGNORECASE)
 WEEK_RE = re.compile(r"^\d{4}-W\d{2}$")
 CHANNEL_RE = re.compile(r"@[A-Za-z0-9_]+")
+FEEDBACK_STRATEGIST_CATEGORY = "feedback_intake_strategist"
 
 
 @dataclass(frozen=True)
@@ -133,12 +138,14 @@ def _suggestion_type(text: str) -> str | None:
     return None
 
 
-def parse_feedback_text(
+def _heuristic_parse_feedback_text(
     text: str,
     *,
     input_kind: str = "text",
     transcript_text: str | None = None,
+    week_label: str | None = None,
 ) -> dict[str, Any]:
+    del week_label
     raw_text = _compact(text)
     if not raw_text:
         raise ValueError("feedback text is required")
@@ -213,7 +220,206 @@ def parse_feedback_text(
             ("feedback_type", "target_type", "target_ref", "source_url", "notes"),
         ),
         "suggestions": _dedupe_dicts(suggestions, ("suggestion_type", "target_ref", "text")),
+        "memory_events_proposed": _dedupe_dicts(
+            proposals,
+            ("feedback_type", "target_type", "target_ref", "source_url", "notes"),
+        ),
+        "report_changes_suggested": [
+            suggestion for suggestion in suggestions if suggestion.get("suggestion_type") != "codex_task"
+        ],
+        "codex_tasks_suggested": [
+            suggestion for suggestion in suggestions if suggestion.get("suggestion_type") == "codex_task"
+        ],
+        "clarifying_questions": [],
+        "risk_notes": [],
+        "confirmation_summary": "",
+        "strategy_source": "heuristic",
     }
+
+
+def parse_feedback_text(
+    text: str,
+    *,
+    input_kind: str = "text",
+    transcript_text: str | None = None,
+    week_label: str | None = None,
+    llm_client: type[LLMClient] = LLMClient,
+) -> dict[str, Any]:
+    raw_text = _compact(text)
+    if not raw_text:
+        raise ValueError("feedback text is required")
+
+    try:
+        return _parse_feedback_with_strategist(
+            raw_text,
+            input_kind=input_kind,
+            transcript_text=transcript_text,
+            week_label=week_label,
+            llm_client=llm_client,
+        )
+    except Exception:
+        return _heuristic_parse_feedback_text(
+            raw_text,
+            input_kind=input_kind,
+            transcript_text=transcript_text,
+            week_label=week_label,
+        )
+
+
+def _parse_feedback_with_strategist(
+    text: str,
+    *,
+    input_kind: str,
+    transcript_text: str | None,
+    week_label: str | None,
+    llm_client: type[LLMClient],
+) -> dict[str, Any]:
+    response = llm_client.complete_json(
+        prompt=build_feedback_strategist_prompt(week_label=week_label, input_kind=input_kind, text=text),
+        system=FEEDBACK_STRATEGIST_SYSTEM_PROMPT,
+        category=FEEDBACK_STRATEGIST_CATEGORY,
+    )
+    if not isinstance(response, dict):
+        raise ValueError("feedback strategist response must be a JSON object")
+
+    memory_events = _normalize_memory_events(response.get("memory_events_proposed"))
+    report_changes = _normalize_text_suggestions(
+        response.get("report_changes_suggested"),
+        suggestion_type="report_change",
+    )
+    codex_tasks = _normalize_codex_tasks(response.get("codex_tasks_suggested"))
+    questions = _normalize_text_suggestions(
+        response.get("clarifying_questions"),
+        suggestion_type="clarifying_question",
+    )
+    risks = _normalize_text_suggestions(response.get("risk_notes"), suggestion_type="risk_note")
+    suggestions = _dedupe_dicts(
+        [*report_changes, *codex_tasks, *questions, *risks],
+        ("suggestion_type", "target_ref", "text"),
+    )
+
+    return {
+        "input_kind": input_kind,
+        "raw_text": text,
+        "transcript_text": _compact(transcript_text) or None,
+        "proposals": memory_events,
+        "suggestions": suggestions,
+        "memory_events_proposed": memory_events,
+        "report_changes_suggested": report_changes,
+        "codex_tasks_suggested": codex_tasks,
+        "clarifying_questions": questions,
+        "risk_notes": risks,
+        "confirmation_summary": _compact(str(response.get("confirmation_summary") or ""))[:700],
+        "strategy_source": "feedback_intake_strategist",
+    }
+
+
+def _normalize_memory_events(value: object) -> list[dict[str, Any]]:
+    events: list[dict[str, Any]] = []
+    for item in _as_list(value):
+        if not isinstance(item, dict):
+            continue
+        feedback_type = _normalize_allowed(item.get("feedback_type"), FEEDBACK_TYPES)
+        target_type = _normalize_allowed(item.get("target_type") or "report", TARGET_TYPES)
+        if not feedback_type or not target_type:
+            continue
+        notes = _compact(str(item.get("notes") or ""))[:500] or None
+        events.append(
+            {
+                "feedback_type": feedback_type,
+                "target_type": target_type,
+                "target_ref": _compact(str(item.get("target_ref") or ""))[:120] or None,
+                "source_url": _clean_url(item.get("source_url")),
+                "notes": notes,
+            }
+        )
+    return _dedupe_dicts(events, ("feedback_type", "target_type", "target_ref", "source_url", "notes"))
+
+
+def _normalize_text_suggestions(value: object, *, suggestion_type: str) -> list[dict[str, Any]]:
+    suggestions: list[dict[str, Any]] = []
+    for item in _as_list(value):
+        target_ref: str | None = None
+        if isinstance(item, dict):
+            text = _compact(str(item.get("text") or item.get("question") or item.get("note") or ""))
+            target_ref = _compact(str(item.get("target_ref") or ""))[:120] or None
+        else:
+            text = _compact(str(item or ""))
+        if not text:
+            continue
+        suggestions.append(
+            {
+                "suggestion_type": suggestion_type,
+                "target_ref": target_ref,
+                "text": text[:500],
+                "manual_only": True,
+                "action": "review_manually",
+            }
+        )
+    return suggestions
+
+
+def _normalize_codex_tasks(value: object) -> list[dict[str, Any]]:
+    tasks: list[dict[str, Any]] = []
+    for item in _as_list(value):
+        if isinstance(item, dict):
+            title = _compact(str(item.get("title") or "Codex task draft"))
+            why = _compact(str(item.get("why") or item.get("rationale") or ""))
+            text = f"{title}: {why}" if why else title
+            task = {
+                "suggestion_type": "codex_task",
+                "target_ref": _compact(str(item.get("target_ref") or ""))[:120] or None,
+                "text": text[:500],
+                "manual_only": True,
+                "action": "review_manually",
+                "title": title[:160],
+                "why": why[:500] or None,
+                "likely_files": _compact_string_list(item.get("likely_files") or item.get("files")),
+                "acceptance": _compact_string_list(item.get("acceptance") or item.get("acceptance_criteria")),
+                "verification": _compact_string_list(item.get("verification") or item.get("verification_commands")),
+            }
+        else:
+            text = _compact(str(item or ""))
+            if not text:
+                continue
+            task = {
+                "suggestion_type": "codex_task",
+                "target_ref": None,
+                "text": text[:500],
+                "manual_only": True,
+                "action": "review_manually",
+            }
+        tasks.append(task)
+    return tasks
+
+
+def _as_list(value: object) -> list:
+    if isinstance(value, list):
+        return value
+    if value in (None, ""):
+        return []
+    return [value]
+
+
+def _compact_string_list(value: object, *, limit: int = 6) -> list[str]:
+    result: list[str] = []
+    for item in _as_list(value):
+        clean = _compact(str(item or ""))
+        if clean:
+            result.append(clean[:200])
+    return result[:limit]
+
+
+def _normalize_allowed(value: object, allowed: set[str]) -> str | None:
+    clean = _compact(str(value or "")).replace("-", "_").lower()
+    return clean if clean in allowed else None
+
+
+def _clean_url(value: object) -> str | None:
+    clean = _compact(str(value or "")).rstrip(".,;")
+    if not clean or not URL_RE.match(clean):
+        return None
+    return clean[:500]
 
 
 def format_feedback_confirmation(intake: dict[str, Any]) -> str:
@@ -238,6 +444,10 @@ def format_feedback_confirmation(intake: dict[str, Any]) -> str:
         for suggestion in suggestions:
             lines.append(f"- {suggestion.get('suggestion_type')}: {suggestion.get('text')}")
 
+    strategist_summary = _compact(str(intake.get("strategist_summary") or ""))
+    if strategist_summary:
+        lines.extend(["", f"Strategist summary: {strategist_summary[:700]}"])
+
     lines.extend(
         [
             "",
@@ -256,8 +466,15 @@ def create_feedback_intake(
     input_kind: str = "text",
     report_path: str | None = None,
     recorded_by: str = "operator",
+    llm_client: type[LLMClient] = LLMClient,
 ) -> dict[str, Any]:
-    parsed = parse_feedback_text(text, input_kind=input_kind, transcript_text=text if input_kind == "voice_transcript" else None)
+    parsed = parse_feedback_text(
+        text,
+        input_kind=input_kind,
+        transcript_text=text if input_kind == "voice_transcript" else None,
+        week_label=week_label,
+        llm_client=llm_client,
+    )
     draft = record_ai_report_feedback_intake(
         connection,
         week_label=week_label,
@@ -270,7 +487,12 @@ def create_feedback_intake(
         report_path=report_path,
         recorded_by=recorded_by,
     )
-    summary = format_feedback_confirmation(draft)
+    summary = format_feedback_confirmation(
+        {
+            **draft,
+            "strategist_summary": parsed.get("confirmation_summary"),
+        }
+    )
     return update_ai_report_feedback_intake_summary(
         connection,
         intake_id=int(draft["id"]),

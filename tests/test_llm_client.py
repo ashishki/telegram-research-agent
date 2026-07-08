@@ -148,6 +148,17 @@ class TestLLMClient(unittest.TestCase):
 
         self.assertEqual(result, "diagram with service boundaries")
 
+    def test_feedback_intake_strategist_model_route_and_override(self):
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(client._get_model("feedback_intake_strategist"), "claude-opus-4-8")
+
+        with patch.dict(
+            os.environ,
+            {"LLM_MODEL_FEEDBACK_INTAKE_STRATEGIST": "claude-opus-test"},
+            clear=True,
+        ):
+            self.assertEqual(client._get_model("feedback_intake_strategist"), "claude-opus-test")
+
 
 if __name__ == "__main__":
     unittest.main()

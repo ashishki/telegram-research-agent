@@ -10,13 +10,13 @@ facade/tool catalog, Hermes concierge commands, action-status projection, and
 dogfood review layers are the primary direction. Current work is tracked in
 `docs/tasks.md`.
 
-Current next work: Opus-class feedback strategy, a bounded market/business
-channel pack for MVP Radar, a split between Knowledge Atlas and Weekly
-Intelligence Brief HTML surfaces, and a curated-only semantic RAG
-decision/prototype. Hermes Telegram UX cleanup is implemented: plain messages
-do not show MarkdownV2 escape artifacts, and reminders are scheduled/displayed
-in `Asia/Tbilisi`. Raw Telegram firehose RAG and full-year archive processing
-remain deferred.
+Current next work: a bounded market/business channel pack for MVP Radar, a
+split between Knowledge Atlas and Weekly Intelligence Brief HTML surfaces, and
+a curated-only semantic RAG decision/prototype. Hermes Telegram UX cleanup is
+implemented: plain messages do not show MarkdownV2 escape artifacts, reminders
+are scheduled/displayed in `Asia/Tbilisi`, and feedback drafts use an
+Opus-class strategist while remaining confirmation-gated. Raw Telegram firehose
+RAG and full-year archive processing remain deferred.
 
 Reference integration: `docs/entropy_core_gensyn_integration.md`.
 
@@ -60,7 +60,7 @@ It is not a public bot, SaaS product, or generic summarizer.
   - `🕒 позже`
   - `⛔ отказал`
   - `🧠 интересно`
-- AI workbook feedback intake through `/feedback`, `/feedback_voice`, `/feedback_confirm`, and `/feedback_discard`; parsed feedback is stored only after confirmation.
+- AI workbook feedback intake through `/feedback`, `/feedback_voice`, `/feedback_confirm`, and `/feedback_discard`; text and voice transcripts are interpreted by an Opus-class feedback strategist with deterministic fallback, and parsed feedback is stored only after confirmation.
 - Implementation Ideas cards are compact enough to decide from Telegram without opening Telegraph for every item.
 - Source-disciplined `Implementation Ideas`: actionable `[Implement]` and `[Build]` ideas require concrete Telegram message links and otherwise render an insufficient-evidence note.
 - Operator-authored Research Brief usefulness capture into `weekly_usefulness_logs`.
@@ -201,6 +201,7 @@ Environment:
 | `TELEGRAM_SESSION_PATH` | Stored user session file |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_OWNER_CHAT_ID` | Telegram delivery and command bot |
 | `LLM_API_KEY` | LLM provider key |
+| `LLM_MODEL_FEEDBACK_INTAKE_STRATEGIST` | Optional override for Opus-class feedback interpretation; defaults to `claude-opus-4-8` |
 | `OPENAI_API_KEY` | Optional OpenAI audio transcription key for Telegram voice input |
 | `VOICE_TRANSCRIPTION_MODEL` | Optional transcription model override; defaults to `whisper-1` |
 | `TELEGRAM_VOICE_MEDIA_DIR` | Optional temporary directory for downloaded Telegram voice files |

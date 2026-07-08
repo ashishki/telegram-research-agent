@@ -60,6 +60,58 @@ from output.idea_threads import refresh_idea_threads  # noqa: E402
 import main  # noqa: E402
 
 
+class _StrategistLLM:
+    calls: list[dict] = []
+
+    @staticmethod
+    def complete_json(prompt, system="", category="unknown", model=None):
+        _StrategistLLM.calls.append(
+            {
+                "prompt": prompt,
+                "system": system,
+                "category": category,
+                "model": model,
+            }
+        )
+        return {
+            "memory_events_proposed": [
+                {
+                    "feedback_type": "too_shallow",
+                    "target_type": "report_section",
+                    "target_ref": "eval-gates",
+                    "notes": "Needed deeper source checks.",
+                },
+                {
+                    "feedback_type": "applied_to_project",
+                    "target_type": "experiment",
+                    "target_ref": "radar-eval",
+                    "notes": "Applied the recommendation in Radar.",
+                },
+            ],
+            "report_changes_suggested": [
+                {"text": "Make evidence depth more explicit.", "target_ref": "claim-cards"}
+            ],
+            "codex_tasks_suggested": [
+                {
+                    "title": "Add source-depth regression",
+                    "why": "Operator marked eval-gates too shallow.",
+                    "likely_files": ["src/output/ai_visual_report.py"],
+                    "acceptance": ["Shallow claims are flagged."],
+                    "verification": ["python3 -m unittest tests.test_ai_visual_report"],
+                }
+            ],
+            "clarifying_questions": ["Which eval-gates source was missing?"],
+            "risk_notes": ["Manual approval required for report changes."],
+            "confirmation_summary": "Two memory events proposed; suggestions stay manual-only.",
+        }
+
+
+class _BrokenStrategistLLM:
+    @staticmethod
+    def complete_json(prompt, system="", category="unknown", model=None):
+        raise RuntimeError("offline")
+
+
 class TestAiReportFeedback(unittest.TestCase):
     def _make_db(self) -> str:
         tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
@@ -199,6 +251,42 @@ class TestAiReportFeedback(unittest.TestCase):
         )
         self.assertTrue(all(suggestion["manual_only"] for suggestion in parsed["suggestions"]))
 
+    def test_feedback_strategist_path_uses_opus_category_and_separates_outputs(self):
+        _StrategistLLM.calls = []
+        parsed = parse_feedback_text(
+            "Too shallow target=eval-gates, but I applied target=radar-eval to project.",
+            input_kind="voice_transcript",
+            transcript_text="Too shallow target=eval-gates.",
+            week_label="2026-W28",
+            llm_client=_StrategistLLM,
+        )
+
+        self.assertEqual(_StrategistLLM.calls[0]["category"], "feedback_intake_strategist")
+        self.assertIn("private feedback strategist", _StrategistLLM.calls[0]["system"])
+        self.assertIn("Input kind: voice_transcript", _StrategistLLM.calls[0]["prompt"])
+        self.assertEqual(parsed["strategy_source"], "feedback_intake_strategist")
+        self.assertEqual(
+            {event["feedback_type"] for event in parsed["memory_events_proposed"]},
+            {"too_shallow", "applied_to_project"},
+        )
+        self.assertEqual(parsed["proposals"], parsed["memory_events_proposed"])
+        self.assertEqual(parsed["report_changes_suggested"][0]["suggestion_type"], "report_change")
+        self.assertEqual(parsed["codex_tasks_suggested"][0]["suggestion_type"], "codex_task")
+        self.assertEqual(parsed["clarifying_questions"][0]["suggestion_type"], "clarifying_question")
+        self.assertEqual(parsed["risk_notes"][0]["suggestion_type"], "risk_note")
+        self.assertIn("Two memory events", parsed["confirmation_summary"])
+
+    def test_feedback_strategist_falls_back_to_deterministic_parser(self):
+        parsed = parse_feedback_text(
+            "Useful target=claim-cards. Config: adjust lookback manually.",
+            week_label="2026-W28",
+            llm_client=_BrokenStrategistLLM,
+        )
+
+        self.assertEqual(parsed["strategy_source"], "heuristic")
+        self.assertEqual([proposal["feedback_type"] for proposal in parsed["proposals"]], ["useful"])
+        self.assertEqual([suggestion["suggestion_type"] for suggestion in parsed["suggestions"]], ["config"])
+
     def test_feedback_intake_writes_memory_only_after_confirmation(self):
         db_path = self._make_db()
         try:
@@ -238,6 +326,32 @@ class TestAiReportFeedback(unittest.TestCase):
         self.assertEqual({event["feedback_type"] for event in confirmed_events}, {"useful", "missed_important_post"})
         self.assertEqual(confirmed_intake["status"], "confirmed")
         self.assertEqual({suggestion["suggestion_type"] for suggestion in result["suggestions"]}, {"config"})
+
+    def test_feedback_intake_stores_strategist_draft_without_memory_write(self):
+        db_path = self._make_db()
+        try:
+            with sqlite3.connect(db_path) as connection:
+                connection.row_factory = sqlite3.Row
+                intake = create_feedback_intake(
+                    connection,
+                    week_label="2026-W28",
+                    text="Too shallow target=eval-gates. Applied target=radar-eval to project.",
+                    input_kind="voice_transcript",
+                    llm_client=_StrategistLLM,
+                )
+                events_before_confirm = fetch_ai_report_feedback(connection, week_label="2026-W28", limit=10)
+                intakes = fetch_ai_report_feedback_intake(connection, intake_id=int(intake["id"]), limit=1)
+        finally:
+            os.unlink(db_path)
+
+        self.assertEqual(events_before_confirm, [])
+        self.assertEqual(intakes[0]["status"], "pending")
+        self.assertEqual(
+            {proposal["feedback_type"] for proposal in intakes[0]["proposals"]},
+            {"too_shallow", "applied_to_project"},
+        )
+        self.assertIn("Strategist summary: Two memory events proposed", intake["confirmation_summary"])
+        self.assertIn("No memory has been written yet.", intake["confirmation_summary"])
 
     def test_record_fetch_summary_and_missed_eval_examples(self):
         db_path = self._make_db()

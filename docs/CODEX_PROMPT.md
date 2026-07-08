@@ -33,15 +33,16 @@ _v3.8 · 2026-07-08 · telegram-research-agent_
   one daily check-in with `сделал` / `не сделал` buttons. Strategy Reviewer
   remains advisory. Four-week dogfood validates real convenience/usefulness
   before adding complex features.
-- HPI-11 is implemented: Telegram plain-text messages no longer show
-  MarkdownV2 backslash artifacts when `parse_mode=None`, `/help` starts with
-  normal private-assistant guidance, and reminders parse/display/run in
-  `Asia/Tbilisi`. Operator-requested next queue is HPI-12..HPI-14 plus
-  HPI-9-lite: make feedback interpretation an Opus-class strategist, add a
-  bounded market/business channel pack for MVP Radar, split HTML into
-  Knowledge Atlas and Weekly Intelligence Brief, and decide/prototype curated
-  semantic RAG using Dream Motif Interpreter as a reference. Do not run a
-  full-year archive pass yet.
+- HPI-11 and HPI-12 are implemented. Telegram plain-text messages no longer
+  show MarkdownV2 backslash artifacts when `parse_mode=None`, `/help` starts
+  with normal private-assistant guidance, reminders parse/display/run in
+  `Asia/Tbilisi`, and feedback drafts use the Opus-class
+  `feedback_intake_strategist` path with deterministic fallback while memory
+  writes remain confirmation-gated. Operator-requested next queue is HPI-13,
+  HPI-14, then HPI-9-lite: add a bounded market/business channel pack for MVP
+  Radar, split HTML into Knowledge Atlas and Weekly Intelligence Brief, and
+  decide/prototype curated semantic RAG using Dream Motif Interpreter as a
+  reference. Do not run a full-year archive pass yet.
 - Operational incident on 2026-07-06: `telegram-digest.timer` had been inactive
   since 2026-06-22, so weekly Research Brief/Implementation Ideas stopped
   running while ingest and MVP weekly continued. The timer was manually
@@ -257,27 +258,27 @@ transcription with chat/feedback/reminder intent routing, daily operator
 reminders with done/not-done callbacks, Strategy Reviewer Telegram delivery,
 action status projection, and compact dogfood review artifact helpers.
 
-The exact next task is HPI-12, because HPI-11 has fixed the visible Telegram
-MarkdownV2 escaping bug and Tbilisi-local reminder behavior:
+The exact next task is HPI-13, because HPI-12 has added the Opus-class
+feedback strategist while preserving confirmation-gated memory writes:
 
 ```text
-HPI-12 - Opus Feedback Strategist
+HPI-13 - Market Business Channel Pack For MVP Radar
 ```
 
-Implement HPI-12 first:
+Implement HPI-13 first:
 
-- route text and voice feedback interpretation through an Opus-class strategist
-  category;
-- keep feedback memory writes confirmation-gated;
-- separate proposed memory events, report/workbook suggestions, Codex task
-  drafts, clarifying questions, risk notes, and confirmation summary;
-- do not mutate code/config/profile/projects from feedback;
-- preserve "no reaction is unknown, not negative".
+- inspect whether `its_capitan`, `exitsexist`, `leadgenvalley`,
+  `cryptoEssay`, and `huntermikevolkov` already exist in `channels.yaml` and
+  local DB;
+- add missing channels under a distinct market/business group;
+- do only bounded backfill/lookback, not a full-year archive pass;
+- build a deterministic cited market pain pack;
+- feed the pack to MVP Radar as context, not unconditional build evidence;
+- add a Radar gate audit for empty/rejected weeks.
 
-After HPI-12, recommended order is HPI-13 Market Business Channel Pack for MVP
-Radar, HPI-14 split HTML surfaces, then HPI-9-lite curated semantic RAG
-decision/prototype. Dream Motif Interpreter has the retrieval reference code at
-`/srv/openclaw-you/workspace/Dream_Motif_Interpreter`.
+After HPI-13, recommended order is HPI-14 split HTML surfaces, then HPI-9-lite
+curated semantic RAG decision/prototype. Dream Motif Interpreter has the
+retrieval reference code at `/srv/openclaw-you/workspace/Dream_Motif_Interpreter`.
 
 Do not implement raw Telegram firehose RAG. Do not run the annual/full archive
 pass yet. Do not implement assistant mutation tools. Do not let Telegram

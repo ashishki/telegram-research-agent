@@ -611,24 +611,23 @@ Stop and ask the operator if a task:
 
 ## Next Operational Task
 
-Implement HPI-11 first: Hermes Telegram UX and Tbilisi timezone cleanup.
+Implement HPI-13 first: Market Business Channel Pack for MVP Radar.
 
 Scope:
 
-- fix Telegram MarkdownV2 escaping so plain messages do not show `\.` or
-  `1\.`;
-- use `Asia/Tbilisi` for user-facing reminder parsing, formatting, and timer
-  scheduling;
-- keep slash commands as fallback/manual controls, not the main visible UX;
-- preserve the read-only Hermes/PI boundary and all existing explicit commands;
-- update tests/docs and restart the bot/timer if runtime units change.
+- inspect whether `its_capitan`, `exitsexist`, `leadgenvalley`,
+  `cryptoEssay`, and `huntermikevolkov` already exist in channel config and
+  local DB;
+- add missing channels under a distinct market/business group;
+- do bounded lookback/backfill only, not a full-year archive pass;
+- extract a deterministic cited market pain pack for MVP Radar context;
+- keep Telegram-only market evidence as context, not build-ready proof.
 
 Recommended follow-up order:
 
-1. HPI-12 - Opus Feedback Strategist.
-2. HPI-13 - Market Business Channel Pack for MVP Radar.
-3. HPI-14 - Split HTML into Knowledge Atlas and Weekly Intelligence Brief.
-4. HPI-9-lite - Curated Semantic RAG decision/prototype using Dream Motif
+1. HPI-13 - Market Business Channel Pack for MVP Radar.
+2. HPI-14 - Split HTML into Knowledge Atlas and Weekly Intelligence Brief.
+3. HPI-9-lite - Curated Semantic RAG decision/prototype using Dream Motif
    retrieval patterns as reference.
 
 Do not run the full-year archive pass yet. Do not implement raw Telegram RAG,

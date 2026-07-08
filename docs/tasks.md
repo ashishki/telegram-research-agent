@@ -774,7 +774,7 @@ Stop conditions:
 
 ### HPI-12 - Opus Feedback Strategist
 
-Status: next P0 after HPI-11.
+Status: implemented by HPI-12.
 
 Goal: upgrade feedback handling from "parse and store" to "understand, propose,
 and confirm". Feedback should be interpreted by an Opus-class model with a
@@ -794,6 +794,34 @@ Files likely:
 - `tests/test_pi_intent.py`
 - `README.md`
 - `docs/operator_workflow.md`
+
+Implemented files:
+
+- `src/assistant/feedback_prompts.py`
+- `src/output/ai_report_feedback_intake.py`
+- `src/llm/client.py`
+- `tests/test_ai_report_feedback.py`
+- `tests/test_llm_client.py`
+- `README.md`
+- `docs/operator_workflow.md`
+- `docs/tasks.md`
+- `docs/CODEX_PROMPT.md`
+
+Implementation result:
+
+- Text and voice feedback drafts first try the `feedback_intake_strategist`
+  LLM category with default model `claude-opus-4-8` and env override
+  `LLM_MODEL_FEEDBACK_INTAKE_STRATEGIST`.
+- The strategist prompt returns separated proposed memory events,
+  report/workbook suggestions, Codex task drafts, clarifying questions, risk
+  notes, and confirmation summary.
+- Proposed memory events are normalized into the existing
+  `ai_report_feedback_intakes.proposals_json`; report changes, Codex task
+  drafts, questions, and risk notes are stored as manual-only suggestions.
+- If the strategist call fails or returns invalid output, intake falls back to
+  deterministic parsing.
+- Feedback events are still written only by `/feedback_confirm` /
+  `apply_confirmed_feedback_intake`.
 
 Model routing:
 
@@ -846,7 +874,7 @@ Stop conditions:
 
 ### HPI-13 - Market Business Channel Pack For MVP Radar
 
-Status: planned P1.
+Status: next P1 after HPI-12.
 
 Goal: create a separate market/business intelligence input for MVP Radar from
 operators who understand AI market pain, distribution, and business models.

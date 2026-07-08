@@ -108,6 +108,12 @@ manually:
 
 The confirmation rule is unchanged: the bot only drafts feedback first; memory
 changes happen after `/feedback_confirm <id>`.
+Feedback interpretation uses the `feedback_intake_strategist` LLM category
+(`claude-opus-4-8` by default, override with
+`LLM_MODEL_FEEDBACK_INTAKE_STRATEGIST`) to separate proposed memory events,
+report changes, Codex task drafts, clarifying questions, and risk notes. If the
+model is unavailable, Hermes falls back to deterministic parsing and still
+requires confirmation.
 
 Daily reminders are local operator prompts in `Asia/Tbilisi`, not a 30-minute
 notification loop. Create one with text or voice, or explicitly:
@@ -224,8 +230,6 @@ does not use vector search, and does not expose raw SQLite sessions.
 
 Next implementation queue before deeper dogfood:
 
-- upgrade feedback interpretation to an Opus-class strategist while preserving
-  confirmation-gated memory writes;
 - add a bounded market/business channel pack for MVP Radar from
   `its_capitan`, `exitsexist`, `leadgenvalley`, `cryptoEssay`, and
   `huntermikevolkov`;
@@ -238,6 +242,9 @@ Next implementation queue before deeper dogfood:
 Implemented HPI-11 cleanup: plain Telegram messages are sent without MarkdownV2
 backslash artifacts when `parse_mode=None`; `/help` now starts with "just write
 or send voice"; reminders parse, display, and run in `Asia/Tbilisi`.
+Implemented HPI-12 feedback strategist: text and voice feedback drafts use an
+Opus-class interpretation path with deterministic fallback; memory writes
+remain gated by `/feedback_confirm`.
 
 Reaction readiness requires a live operator event. Put any personal reaction on
 a recent original channel post, then run:
