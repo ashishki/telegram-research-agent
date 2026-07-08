@@ -213,6 +213,18 @@ class TestPersonalIntelligenceFacade(unittest.TestCase):
         self.assertEqual(result["counts"]["unknown"], 1)
         self.assertEqual(result["counts"]["not_interested"], 0)
 
+    def test_search_intelligence_items_reports_curated_fts_decision(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_workbook(root)
+            facade = PersonalIntelligenceFacade(settings=self._settings(root), output_root=root)
+            result = facade.search_intelligence_items("радар рынка", limit=5)
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["retrieval_decision"]["mode"], "curated_deterministic_plus_sqlite_fts")
+        self.assertEqual(result["retrieval_decision"]["raw_telegram_status"], "disabled")
+        self.assertTrue(any(item["item_type"] == "mvp_dossier" for item in result["items"]))
+
 
 if __name__ == "__main__":
     unittest.main()

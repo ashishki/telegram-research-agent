@@ -17,8 +17,8 @@ from output.intelligence_retrieval_items import (
     find_latest_week_label,
     load_latest_workbook_json,
     load_mvp_radar_status,
-    search_retrieval_items,
 )
+from assistant.semantic_retrieval import retrieval_decision_note, search_curated_semantic_items
 from output.strategy_reviewer import build_strategy_review
 
 
@@ -373,13 +373,14 @@ class PersonalIntelligenceFacade:
             mvp_output_root=self._mvp_output_root,
             radar_output_root=self._radar_output_root,
         )
-        results = search_retrieval_items(items, query, filters=clean_filters, limit=limit)
+        results = search_curated_semantic_items(items, query, filters=clean_filters, limit=limit)
         return {
             "status": "ok" if results else "empty",
             "query": str(query or ""),
             "filters": clean_filters,
+            "retrieval_decision": retrieval_decision_note(),
             "items": results,
-            "message": "Curated intelligence items matched deterministic search." if results else "No curated intelligence items matched.",
+            "message": "Curated intelligence items matched deterministic+FTS search." if results else "No curated intelligence items matched.",
         }
 
     def _current_week_label(self) -> str:
