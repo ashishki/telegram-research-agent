@@ -110,15 +110,18 @@ changes happen after `/feedback_confirm <id>`.
 ### Hermes / PI Assistant Dogfood Routine
 
 Hermes is the Telegram-facing concierge for the workbook workflow. It is a
-router and reminder, not a source of truth. The Weekly AI Intelligence Workbook
-remains the main reading artifact, and PI Assistant should answer only from
-curated intelligence objects when source-grounded claims are needed.
+bounded LLM chat and command router, not a source of truth. The Weekly AI
+Intelligence Workbook remains the main reading artifact, and PI Assistant
+answers source-grounded questions by calling read-only tools over curated
+intelligence objects.
 
-Planned Hermes commands:
+Hermes commands and chat:
 
 - `/weekly` - current workbook status and three main conclusions;
 - `/actions` - one to three actions for the week;
 - `/explain` - explain a selected signal or ask what to explain;
+- plain text, `/chat`, `/hermes`, or `/ask` - bounded LLM chat that can choose
+  read-only PI tools from context;
 - `/projects` - project actions and watch items;
 - `/mvp` - MVP Radar candidate status, source mix, missing evidence, and why
   build/focused_experiment is or is not allowed;
@@ -136,7 +139,8 @@ Dogfood Monday flow:
 
 During-week flow:
 
-1. Use `/explain` for unclear workbook signals.
+1. Ask plain-language questions directly in the bot, or use `/explain` for
+   narrower workbook signals.
 2. Use `/projects` when choosing project work.
 3. Use `/mvp` before treating any candidate as a build opportunity.
 4. React to original Telegram posts that were interesting for any reason.
@@ -192,8 +196,8 @@ Expected interpretation:
 - `ops-validate` may return `needs_live_event` until a real Telegram reaction
   or inline callback is observed in production.
 
-Hermes readiness does not mean PI Assistant chat is live. The deployed scope is
-Telegram command concierge only: `/weekly`, `/actions`, `/explain`,
+Hermes readiness means the command concierge and bounded LLM chat are live:
+plain text, `/chat`, `/hermes`, `/ask`, `/weekly`, `/actions`, `/explain`,
 `/projects`, `/mvp`, `/strategy`, and `/codex`. `/codex` prepares prompt text
 for manual approval and never executes Codex.
 

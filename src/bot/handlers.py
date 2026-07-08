@@ -7,13 +7,13 @@ from pathlib import Path
 from typing import Callable
 from urllib import error
 
+from assistant.pi_chat import answer_pi_chat
 from assistant.pi_facade import PersonalIntelligenceFacade
 from assistant.pi_tools import call_pi_tool
 from bot.telegram_delivery import _send_text_internal, send_document, send_report_preview, send_text
 from config.settings import PROJECT_ROOT, Settings
 from db.migrate import record_feedback, record_post_tag
 from output.generate_digest import _compute_week_label, run_digest
-from output.generate_answer import generate_answer
 from output.generate_insight import generate_insight
 from output.generate_study_plan import generate_study_plan, mark_study_complete
 from output.ai_report_feedback_intake import (
@@ -37,11 +37,13 @@ COMMAND_DOCS: dict[str, tuple[str, str]] = {
     "/mvp [week]": ("handle_mvp", "Show MVP Radar status and missing evidence"),
     "/strategy [week]": ("handle_strategy", "Show Strategy Reviewer advisory notes"),
     "/codex [focus]": ("handle_codex", "Prepare a Codex prompt draft; never executes Codex"),
+    "/chat <message>": ("handle_chat", "Ask Hermes; LLM may call bounded read-only PI tools"),
+    "/hermes <message>": ("handle_chat", "Ask Hermes; alias for /chat"),
     "/digest": ("handle_digest", "Show the current weekly brief"),
     "/topics": ("handle_topics", "List the strongest tracked topics"),
     "/insight": ("handle_insight", "Show retrospective project insights"),
     "/project <name>": ("handle_project", "Find an active project by partial name"),
-    "/ask <question>": ("handle_ask", "Answer a question from the last 7 days of Telegram data"),
+    "/ask <question>": ("handle_ask", "Ask Hermes through bounded curated PI tools"),
     "/study [refresh]": ("handle_study", "Show the weekly study plan or rebuild it"),
     "/study_done [notes]": ("handle_study_done", "Mark this week's study plan as completed"),
     "/costs": ("handle_costs", "Show LLM usage and cost statistics"),
@@ -244,7 +246,7 @@ def handle_start(chat_id: str, args: str, settings: Settings) -> None:
         "Как сейчас работать:",
         "1. Основной артефакт недели - красивый HTML Workbook. Markdown/TXT - fallback и служебные экспорты.",
         "2. Начни с /weekly, потом /actions, /mvp и /strategy.",
-        "3. Вопрос по отчету: /explain <что объяснить>. Ответ идет по curated workbook/atoms/threads, не по raw Telegram RAG.",
+        "3. Можно просто написать вопрос обычным сообщением. Hermes сам выберет read-only PI tools и ответит по curated workbook/atoms/threads, не по raw Telegram RAG.",
         "4. После чтения отправь feedback текстом или голосом. Я подготовлю draft, но память изменится только после /feedback_confirm <id>.",
         "5. Ставь любую реакцию на оригинальные Telegram-посты. Любая видимая реакция = интересно; отсутствие реакции не считается негативом.",
         "",
@@ -255,6 +257,7 @@ def handle_start(chat_id: str, args: str, settings: Settings) -> None:
         "/projects - проектные действия",
         "/mvp - MVP Radar статус и недостающие evidence",
         "/strategy - Strategy Reviewer",
+        "/chat <message> - полноценный Hermes chat с read-only tool calls",
         "/feedback <text> - текстовый feedback draft",
         "/feedback_voice <text> - transcript fallback, если голос не распознался",
         "/feedback_confirm <id> - подтвердить запись feedback",
@@ -678,43 +681,17 @@ def handle_project(chat_id: str, args: str, settings: Settings) -> None:
 
 
 def handle_ask(chat_id: str, args: str, settings: Settings) -> None:
+    handle_chat(chat_id, args, settings)
+
+
+def handle_chat(chat_id: str, args: str, settings: Settings) -> None:
     question = args.strip()
     if not question:
-        send_message(_get_bot_token(), chat_id, "Usage: /ask <question>", parse_mode=None)
+        send_message(_get_bot_token(), chat_id, "Напиши вопрос после /chat или просто отправь обычное сообщение.", parse_mode=None)
         return
-
-    cutoff_iso = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat().replace("+00:00", "Z")
-    fts_query = _build_fts_query(question)
-
-    with _with_db(settings) as connection:
-        excerpts: list[str] = []
-        if fts_query:
-            rows = connection.execute(
-                """
-                SELECT posts.posted_at, posts.channel_username, posts.content
-                FROM posts_fts
-                INNER JOIN posts ON posts.id = posts_fts.rowid
-                WHERE posts_fts MATCH ? AND posts.posted_at >= ?
-                ORDER BY posts.posted_at DESC, posts.id DESC
-                LIMIT 10
-                """,
-                (fts_query, cutoff_iso),
-            ).fetchall()
-            excerpts = [
-                f"- {row['posted_at']} @{row['channel_username']}: {_format_post_snippet(row['content'], limit=220)}"
-                for row in rows
-            ]
-        topics_summary = _load_topics_summary(connection)
-
-    response_text = generate_answer(
-        question=question,
-        context={
-            "topics_summary": topics_summary,
-            "excerpts": excerpts,
-        },
-        settings=settings,
-    )
-    send_message(_get_bot_token(), chat_id, response_text, parse_mode=None)
+    send_message(_get_bot_token(), chat_id, "Hermes смотрит curated intelligence и вызывает read-only tools.", parse_mode=None)
+    result = answer_pi_chat(question, settings=settings)
+    send_message(_get_bot_token(), chat_id, result["answer"], parse_mode=None)
 
 
 def handle_costs(chat_id: str, args: str, settings: Settings) -> None:
@@ -1095,6 +1072,8 @@ HANDLERS: dict[str, Callable[[str, str, Settings], None]] = {
     "/mvp": handle_mvp,
     "/strategy": handle_strategy,
     "/codex": handle_codex,
+    "/chat": handle_chat,
+    "/hermes": handle_chat,
     "/digest": handle_digest,
     "/topics": handle_topics,
     "/insight": handle_insight,

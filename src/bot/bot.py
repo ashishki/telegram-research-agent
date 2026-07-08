@@ -183,6 +183,10 @@ def run_bot(settings: Settings) -> None:
                 LOGGER.info("Dispatching bot command chat_id=%s text=%s", chat_id, text.splitlines()[0][:200])
                 dispatch_command(chat_id=chat_id, text=text, settings=settings)
                 continue
+            if text:
+                LOGGER.info("Dispatching Hermes chat message chat_id=%s text=%s", chat_id, text.splitlines()[0][:200])
+                dispatch_command(chat_id=chat_id, text=f"/chat {text}", settings=settings)
+                continue
 
             voice_feedback_text = _extract_voice_feedback_text(message)
             if voice_feedback_text:

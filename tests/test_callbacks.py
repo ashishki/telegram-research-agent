@@ -243,6 +243,40 @@ class TestIdeaCallbacks(unittest.TestCase):
             settings=settings,
         )
 
+    def test_run_bot_dispatches_plain_text_to_hermes_chat(self):
+        settings = self._settings_with_idea()
+        update = {
+            "update_id": 104,
+            "message": {
+                "chat": {"id": 12345},
+                "from": {"id": 12345},
+                "text": "Что мне делать с weekly workbook?",
+            },
+        }
+
+        def stop_after_first_poll(state):
+            state.stop_requested = True
+
+        with patch.dict(
+            os.environ,
+            {"TELEGRAM_BOT_TOKEN": "token", "TELEGRAM_OWNER_CHAT_ID": "12345"},
+            clear=False,
+        ), patch.object(bot_runtime, "_install_signal_handlers", side_effect=stop_after_first_poll), patch.object(
+            bot_runtime,
+            "_telegram_get_updates",
+            return_value=[update],
+        ), patch.object(
+            bot_runtime,
+            "dispatch_command",
+        ) as dispatch_mock:
+            bot_runtime.run_bot(settings)
+
+        dispatch_mock.assert_called_once_with(
+            chat_id="12345",
+            text="/chat Что мне делать с weekly workbook?",
+            settings=settings,
+        )
+
     def test_run_bot_voice_without_transcript_runs_transcription(self):
         settings = self._settings_with_idea()
         update = {

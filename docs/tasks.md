@@ -161,6 +161,10 @@ Implemented:
   `/feedback_voice` confirmation draft, and deleted locally after processing.
   Missing transcription config returns a text fallback instead of pretending
   voice feedback worked.
+- Hermes bounded LLM chat is available through plain Telegram text plus
+  `/chat`, `/hermes`, and `/ask`; the model can plan calls only to the
+  read-only PI tool catalog and cannot run Codex, mutate config/code/profile,
+  or query raw Telegram firehose RAG by default.
 
 ## Active Maintenance Queue
 
@@ -345,8 +349,8 @@ Stop conditions:
 
 - HPI-3 added the PI Assistant bounded read-only tool catalog around
   `PersonalIntelligenceFacade`.
-- HPI-4 added read-only Hermes Telegram concierge commands on top of the tool
-  catalog.
+- HPI-4 added read-only Hermes Telegram concierge commands and bounded LLM chat
+  on top of the tool catalog.
 - HPI-5 is covered by the existing confirmation-gated `/feedback` and
   `/feedback_voice` flow: no memory writes happen until `/feedback_confirm`.
 - HPI-6 delivers structured Strategy Reviewer notes through `/strategy` without
@@ -354,8 +358,8 @@ Stop conditions:
 - HPI-7 added a read-only action-status projection; missing feedback stays
   `unknown`.
 - HPI-8 added compact dogfood review artifact helpers.
-- PI/Hermes chat UI, raw RAG, vector retrieval, mutation tools, autonomous
-  Codex execution, and config/profile/project edits are still not implemented.
+- Raw RAG, vector retrieval, mutation tools, autonomous Codex execution, and
+  config/profile/project edits are still not implemented.
 
 ### HPI-3 - PI Assistant Bounded Tool Catalog
 

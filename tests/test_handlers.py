@@ -130,8 +130,46 @@ class TestHandlers(unittest.TestCase):
         )
 
     def test_hpi_hermes_commands_are_registered(self):
-        for command in ["/weekly", "/actions", "/explain", "/projects", "/mvp", "/strategy", "/codex"]:
+        for command in ["/weekly", "/actions", "/explain", "/projects", "/mvp", "/strategy", "/codex", "/chat", "/hermes"]:
             self.assertIn(command, handlers.HANDLERS)
+
+    def test_handle_chat_uses_bounded_pi_chat(self):
+        settings = Settings(
+            db_path=":memory:",
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+        pi_chat_result = {
+            "status": "ok",
+            "answer": "Hermes answer from curated PI tools.",
+            "tool_calls": [{"name": "search_intelligence_items", "arguments": {"query": "eval"}}],
+            "tool_results": [],
+            "evidence": {"source_refs": ["https://t.me/source/1"]},
+            "message": "ok",
+        }
+
+        with patch.object(handlers, "answer_pi_chat", return_value=pi_chat_result) as mock_chat:
+            with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                with patch.object(handlers, "send_message") as mock_send_message:
+                    handlers.handle_chat(chat_id="42", args="что с eval gates?", settings=settings)
+
+        mock_chat.assert_called_once_with("что с eval gates?", settings=settings)
+        self.assertEqual(mock_send_message.call_count, 2)
+        self.assertIn("read-only tools", mock_send_message.call_args_list[0].args[2])
+        self.assertEqual(mock_send_message.call_args_list[1].args[2], "Hermes answer from curated PI tools.")
+
+    def test_handle_ask_delegates_to_pi_chat_not_raw_telegram_answer(self):
+        settings = Settings(
+            db_path=":memory:",
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+        with patch.object(handlers, "handle_chat") as mock_handle_chat:
+            handlers.handle_ask(chat_id="42", args="что важно?", settings=settings)
+
+        mock_handle_chat.assert_called_once_with("42", "что важно?", settings)
 
     def test_handle_weekly_formats_read_only_pi_summary(self):
         settings = Settings(

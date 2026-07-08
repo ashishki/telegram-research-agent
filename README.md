@@ -140,11 +140,13 @@ bash scripts/healthcheck.sh
 PYTHONPATH=src python3 src/main.py ops-validate
 ```
 
-Current Hermes scope is deliberately narrow. It works as a Telegram command
-concierge through `/weekly`, `/actions`, `/explain`, `/projects`, `/mvp`,
-`/strategy`, and `/codex`; `/codex` prepares prompt text only. It is not a full
-LLM chat agent, does not run Codex, does not mutate config/code/profile/project
-files, and does not replace the workbook as the primary reading surface.
+Current Hermes scope is deliberately bounded. It supports both short Telegram
+commands and a normal chat path: send plain text, `/chat <message>`,
+`/hermes <message>`, or `/ask <message>`. The LLM may plan calls only to the
+read-only PI tool catalog, then answer from curated workbook/atom/thread/action
+evidence. `/codex` prepares prompt text only. Hermes does not run Codex, does
+not mutate config/code/profile/project files, and does not replace the workbook
+as the primary reading surface.
 
 Voice feedback is supported when `OPENAI_API_KEY` is configured. The bot
 downloads the Telegram `.ogg` voice file to temporary storage, sends it to the

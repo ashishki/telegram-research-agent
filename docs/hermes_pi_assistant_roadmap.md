@@ -541,7 +541,10 @@ HPI-1 through HPI-8 are implemented as a safe dogfood foundation:
 
 The VPS production baseline is configured for dogfood:
 
-- Hermes runs through `telegram-bot.service` as a Telegram command concierge.
+- Hermes runs through `telegram-bot.service` as a Telegram command concierge
+  and bounded LLM chat. Plain text, `/chat`, `/hermes`, and `/ask` route to a
+  PI tool loop where the model may call only read-only curated-intelligence
+  tools.
 - Weekly ingestion, digest delivery, MVP Radar delivery, cleanup, and study
   reminders run through systemd timers.
 - `scripts/healthcheck.sh` is the primary readiness check for DB/config/output
@@ -550,14 +553,13 @@ The VPS production baseline is configured for dogfood:
   evidence; `needs_live_event` means a real Telegram reaction or inline
   callback still needs to be observed.
 
-This does not change HPI scope:
+This does not change HPI safety scope:
 
-- no PI Assistant LLM chat loop is deployed;
 - no raw Telegram firehose RAG is enabled;
 - no vector retrieval is enabled;
 - no mutation tools or autonomous Codex execution are enabled.
 
-Dogfood week 1 should validate the existing command concierge, workbook
+Dogfood week 1 should validate the bounded chat, command concierge, workbook
 reading loop, reaction sync, feedback confirmation, Strategy Reviewer summary,
 and dogfood metric artifact before any HPI-9 work.
 

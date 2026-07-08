@@ -22,12 +22,14 @@ _v3.8 · 2026-07-08 · telegram-research-agent_
   feedback, feedback-driven ranking, workbook HTML, deep explanations,
   diagrams, project implementation, MVP Radar section, Strategy Reviewer,
   claim-card hardening, and bounded Obsidian projection.
-- HPI-0 is documented, and HPI-1/HPI-2-lite are implemented as the current
-  read-only foundation. Hermes is a
-  Telegram-facing concierge/router, not source of truth. PI Assistant is a
-  bounded Q&A layer over curated intelligence retrieval items, not raw Telegram
-  RAG. Strategy Reviewer remains advisory. Four-week dogfood validates real
-  convenience/usefulness before adding complex features.
+- HPI-0 is documented, and HPI-1..HPI-8 plus the first Hermes usability slice
+  are implemented. Hermes is a Telegram-facing bounded chat/concierge/router,
+  not source of truth. Plain text, `/chat`, `/hermes`, and `/ask` route through
+  a read-only PI tool loop over curated intelligence retrieval items, not raw
+  Telegram RAG. Voice feedback uses OpenAI audio transcription when
+  `OPENAI_API_KEY` is configured, then routes through confirmation-gated
+  `/feedback_voice`. Strategy Reviewer remains advisory. Four-week dogfood
+  validates real convenience/usefulness before adding complex features.
 - Operational incident on 2026-07-06: `telegram-digest.timer` had been inactive
   since 2026-06-22, so weekly Research Brief/Implementation Ideas stopped
   running while ingest and MVP weekly continued. The timer was manually
@@ -235,12 +237,13 @@ Radar Contract` are implemented. HPI is now the active post-KIR roadmap:
 HPI: Hermes / Personal Intelligence Assistant / Dogfood
 ```
 
-HPI-0 documents the roadmap and dogfood plan. HPI-1 through HPI-8 have added
-the read-only facade, deterministic curated retrieval projection, bounded PI
-tool catalog, Hermes Telegram concierge commands, confirmation-gated feedback,
-Strategy Reviewer Telegram delivery, action status projection, and compact
-dogfood review artifact helpers. The exact next task is operational dogfood,
-not another feature:
+HPI-0 documents the roadmap and dogfood plan. HPI-1 through HPI-8 plus the
+first usability slice have added the read-only facade, deterministic curated
+retrieval projection, bounded PI tool catalog, Hermes Telegram concierge
+commands and bounded chat, confirmation-gated feedback, managed voice
+transcription, Strategy Reviewer Telegram delivery, action status projection,
+and compact dogfood review artifact helpers. The exact next task is operational
+dogfood, not another feature:
 
 ```text
 HPI Dogfood Week 1 - Run, Measure, Review
@@ -249,7 +252,7 @@ HPI Dogfood Week 1 - Run, Measure, Review
 Do not implement new assistant capabilities by default. Run the dogfood loop:
 
 - generate or locate the weekly AI Intelligence Workbook;
-- use Hermes `/weekly`, `/actions`, `/mvp`, and `/strategy`;
+- use Hermes plain chat plus `/weekly`, `/actions`, `/mvp`, and `/strategy`;
 - complete at least one real read/try/project/MVP reject-defer action;
 - send voice/text feedback and confirm only correct memory writes;
 - record HPI-8 dogfood metrics in a private weekly review artifact;
