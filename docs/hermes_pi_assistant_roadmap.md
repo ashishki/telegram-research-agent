@@ -542,11 +542,16 @@ HPI-1 through HPI-8 are implemented as a safe dogfood foundation:
 The VPS production baseline is configured for dogfood:
 
 - Hermes runs through `telegram-bot.service` as a Telegram command concierge
-  and bounded LLM chat. Plain text, `/chat`, `/hermes`, and `/ask` route to a
-  PI tool loop where the model may call only read-only curated-intelligence
-  tools.
-- Weekly ingestion, digest delivery, MVP Radar delivery, cleanup, and study
-  reminders run through systemd timers.
+  and bounded LLM chat. Plain text, `/chat`, `/hermes`, and `/ask` route through
+  intent classification and then to a PI tool loop where the model may call
+  only read-only curated-intelligence tools.
+- Voice input uses OpenAI audio transcription when configured, then routes
+  through the same chat/feedback/reminder classifier. A transcript classified
+  as feedback still requires `/feedback_confirm` before memory writes.
+- Operator reminders run as a once-daily Telegram check-in with explicit
+  `сделал` / `не сделал` buttons.
+- Weekly ingestion, digest delivery, MVP Radar delivery, cleanup, study
+  reminders, and operator reminder check-ins run through systemd timers.
 - `scripts/healthcheck.sh` is the primary readiness check for DB/config/output
   ownership and weekly delivery state.
 - `ops-validate` distinguishes infrastructure readiness from live feedback

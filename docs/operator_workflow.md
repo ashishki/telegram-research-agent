@@ -80,7 +80,7 @@ During the week:
 
 End of week:
 
-- send voice feedback to the bot after reading or trying items;
+- send text or voice feedback to the bot after reading or trying items;
 - confirm the parsed feedback before it affects memory;
 - review Strategy Reviewer suggestions;
 - decide which Codex-ready tasks to run next;
@@ -93,12 +93,14 @@ Suggested voice feedback prompt:
 Что было полезно? Что было мимо? Что попробовал? Что применил к проекту? Что нужно изменить в следующем отчете?
 ```
 
-Voice feedback requires `OPENAI_API_KEY` on the bot host. When configured, the
+Voice input requires `OPENAI_API_KEY` on the bot host. When configured, the
 bot downloads the Telegram voice `.ogg` file to temporary storage, transcribes
 it with the OpenAI audio transcription endpoint (`VOICE_TRANSCRIPTION_MODEL`,
-default `whisper-1`), routes the transcript through `/feedback_voice`, and
-deletes the local audio file. If transcription is not configured or fails, send
-the same text manually:
+default `whisper-1`), routes the transcript through Hermes intent
+classification, and deletes the local audio file. The transcript may become a
+chat question, a feedback draft, or a reminder. Feedback drafts still require
+confirmation. If transcription is not configured or fails, send the same text
+manually:
 
 ```text
 /feedback_voice Что было полезно... Что было мимо... Что применил...
@@ -106,6 +108,18 @@ the same text manually:
 
 The confirmation rule is unchanged: the bot only drafts feedback first; memory
 changes happen after `/feedback_confirm <id>`.
+
+Daily reminders are local operator prompts, not a 30-minute notification loop.
+Create one with text or voice, or explicitly:
+
+```text
+/remind завтра 18:00 дать feedback по Workbook
+/reminders
+```
+
+`telegram-reminders.timer` sends one daily check-in with `сделал` /
+`не сделал` buttons. Button clicks record the reminder outcome in SQLite; they
+do not change report scoring or code/config.
 
 ### Hermes / PI Assistant Dogfood Routine
 
@@ -122,6 +136,7 @@ Hermes commands and chat:
 - `/explain` - explain a selected signal or ask what to explain;
 - plain text, `/chat`, `/hermes`, or `/ask` - bounded LLM chat that can choose
   read-only PI tools from context;
+- `/remind` / `/reminders` - local daily reminder check-in workflow;
 - `/projects` - project actions and watch items;
 - `/mvp` - MVP Radar candidate status, source mix, missing evidence, and why
   build/focused_experiment is or is not allowed;
@@ -181,7 +196,7 @@ decisions changed, value score, and friction score.
 Before starting dogfood on the VPS, verify the running baseline:
 
 ```bash
-systemctl is-active telegram-bot.service telegram-ingest.timer telegram-digest.timer telegram-mvp-weekly.timer telegram-cleanup.timer
+systemctl is-active telegram-bot.service telegram-ingest.timer telegram-digest.timer telegram-mvp-weekly.timer telegram-cleanup.timer telegram-reminders.timer
 systemctl list-timers 'telegram-*' --all --no-pager
 bash scripts/healthcheck.sh
 PYTHONPATH=src python3 src/main.py score-stats
@@ -196,10 +211,11 @@ Expected interpretation:
 - `ops-validate` may return `needs_live_event` until a real Telegram reaction
   or inline callback is observed in production.
 
-Hermes readiness means the command concierge and bounded LLM chat are live:
+Hermes readiness means the command concierge, bounded LLM chat, voice router,
+and daily reminder check-in are live:
 plain text, `/chat`, `/hermes`, `/ask`, `/weekly`, `/actions`, `/explain`,
-`/projects`, `/mvp`, `/strategy`, and `/codex`. `/codex` prepares prompt text
-for manual approval and never executes Codex.
+`/projects`, `/mvp`, `/strategy`, `/remind`, `/reminders`, and `/codex`.
+`/codex` prepares prompt text for manual approval and never executes Codex.
 
 RAG readiness is intentionally limited. The assistant layer reads deterministic
 curated retrieval items from workbook/claim/atom/thread/action/MVP/feedback

@@ -155,9 +155,8 @@ class TestHandlers(unittest.TestCase):
                     handlers.handle_chat(chat_id="42", args="что с eval gates?", settings=settings)
 
         mock_chat.assert_called_once_with("что с eval gates?", settings=settings)
-        self.assertEqual(mock_send_message.call_count, 2)
-        self.assertIn("read-only tools", mock_send_message.call_args_list[0].args[2])
-        self.assertEqual(mock_send_message.call_args_list[1].args[2], "Hermes answer from curated PI tools.")
+        self.assertEqual(mock_send_message.call_count, 1)
+        self.assertEqual(mock_send_message.call_args_list[0].args[2], "Hermes answer from curated PI tools.")
 
     def test_handle_ask_delegates_to_pi_chat_not_raw_telegram_answer(self):
         settings = Settings(
@@ -170,6 +169,64 @@ class TestHandlers(unittest.TestCase):
             handlers.handle_ask(chat_id="42", args="что важно?", settings=settings)
 
         mock_handle_chat.assert_called_once_with("42", "что важно?", settings)
+
+    def test_handle_operator_message_routes_chat_intent(self):
+        settings = Settings(
+            db_path=":memory:",
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+
+        with patch.object(
+            handlers,
+            "classify_operator_message",
+            return_value={"intent": "chat", "confidence": 0.8, "reason": "question"},
+        ) as classify_mock, patch.object(handlers, "handle_chat") as chat_mock:
+            handlers.handle_operator_message(chat_id="42", args="что делать с workbook?", settings=settings)
+
+        classify_mock.assert_called_once_with("что делать с workbook?", input_kind="text")
+        chat_mock.assert_called_once_with("42", "что делать с workbook?", settings)
+
+    def test_handle_operator_message_routes_voice_feedback_intent(self):
+        settings = Settings(
+            db_path=":memory:",
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+
+        with patch.object(
+            handlers,
+            "classify_operator_message",
+            return_value={"intent": "feedback", "confidence": 0.9, "reason": "operator feedback"},
+        ) as classify_mock, patch.object(handlers, "_handle_feedback_intake") as feedback_mock:
+            handlers.handle_voice_message(chat_id="42", args="полезно, но слишком shallow", settings=settings)
+
+        classify_mock.assert_called_once_with("полезно, но слишком shallow", input_kind="voice_transcript")
+        feedback_mock.assert_called_once_with(
+            "42",
+            "полезно, но слишком shallow",
+            settings,
+            input_kind="voice_transcript",
+        )
+
+    def test_handle_operator_message_routes_reminder_intent(self):
+        settings = Settings(
+            db_path=":memory:",
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+
+        with patch.object(
+            handlers,
+            "classify_operator_message",
+            return_value={"intent": "reminder", "confidence": 0.9, "reason": "reminder"},
+        ), patch.object(handlers, "handle_remind") as remind_mock:
+            handlers.handle_operator_message(chat_id="42", args="напомни завтра дать feedback", settings=settings)
+
+        remind_mock.assert_called_once_with("42", "напомни завтра дать feedback", settings)
 
     def test_handle_weekly_formats_read_only_pi_summary(self):
         settings = Settings(
@@ -414,6 +471,77 @@ class TestHandlers(unittest.TestCase):
         self.assertIn("Codex prompt draft", message)
         self.assertIn("HPI-4 test prompt", message)
         self.assertIn("No Codex command has been executed.", message)
+
+    def test_handle_remind_creates_pending_reminder(self):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+            db_path = tmp.name
+
+        try:
+            with patch.dict(os.environ, {"AGENT_DB_PATH": db_path}, clear=False):
+                run_migrations()
+            settings = Settings(
+                db_path=db_path,
+                llm_api_key="",
+                model_provider="anthropic",
+                telegram_session_path="",
+            )
+
+            with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                with patch.object(handlers, "send_message") as mock_send_message:
+                    handlers.handle_remind(
+                        chat_id="42",
+                        args="завтра 18:00 дать feedback по Workbook",
+                        settings=settings,
+                    )
+
+            message = mock_send_message.call_args.args[2]
+            self.assertIn("Напоминание добавлено #1", message)
+            self.assertIn("сделал / не сделал", message)
+            with sqlite3.connect(db_path) as connection:
+                connection.row_factory = sqlite3.Row
+                row = connection.execute(
+                    "SELECT text, reminder_type, status FROM operator_reminders WHERE id = 1"
+                ).fetchone()
+            self.assertEqual(row["text"], "дать feedback по Workbook")
+            self.assertEqual(row["reminder_type"], "feedback")
+            self.assertEqual(row["status"], "pending")
+        finally:
+            os.unlink(db_path)
+
+    def test_handle_reminders_lists_pending_reminders(self):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+            db_path = tmp.name
+
+        try:
+            with patch.dict(os.environ, {"AGENT_DB_PATH": db_path}, clear=False):
+                run_migrations()
+            settings = Settings(
+                db_path=db_path,
+                llm_api_key="",
+                model_provider="anthropic",
+                telegram_session_path="",
+            )
+            with sqlite3.connect(db_path) as connection:
+                connection.execute(
+                    """
+                    INSERT INTO operator_reminders (
+                        due_at, text, reminder_type, status, created_at, recorded_by
+                    )
+                    VALUES (?, ?, ?, 'pending', ?, ?)
+                    """,
+                    ("2026-07-08T10:00:00Z", "прочитать Workbook", "read_watch", "2026-07-08T00:00:00Z", "test"),
+                )
+                connection.commit()
+
+            with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                with patch.object(handlers, "send_message") as mock_send_message:
+                    handlers.handle_reminders(chat_id="42", args="", settings=settings)
+
+            message = mock_send_message.call_args.args[2]
+            self.assertIn("Активные напоминания", message)
+            self.assertIn("прочитать Workbook", message)
+        finally:
+            os.unlink(db_path)
 
     def test_handle_feedback_drafts_summary_without_memory_write_until_confirmed(self):
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:

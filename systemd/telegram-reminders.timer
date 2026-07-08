@@ -1,0 +1,11 @@
+[Unit]
+Description=Operator reminders - daily check-in
+Requires=telegram-reminders.service
+
+[Timer]
+OnCalendar=*-*-* 18:30:00
+Persistent=true
+Unit=telegram-reminders.service
+
+[Install]
+WantedBy=timers.target

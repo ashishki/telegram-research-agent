@@ -9,6 +9,7 @@ from urllib import error
 
 from assistant.pi_chat import answer_pi_chat
 from assistant.pi_facade import PersonalIntelligenceFacade
+from assistant.pi_intent import classify_operator_message
 from assistant.pi_tools import call_pi_tool
 from bot.telegram_delivery import _send_text_internal, send_document, send_report_preview, send_text
 from config.settings import PROJECT_ROOT, Settings
@@ -22,6 +23,7 @@ from output.ai_report_feedback_intake import (
     discard_feedback_intake,
 )
 from output.mvp_weekly_pipeline import run_mvp_weekly_pipeline, source_mix_summary
+from output.operator_reminders import cancel_reminder, create_reminder, list_pending_reminders, parse_reminder_request
 
 
 LOGGER = logging.getLogger(__name__)
@@ -39,6 +41,9 @@ COMMAND_DOCS: dict[str, tuple[str, str]] = {
     "/codex [focus]": ("handle_codex", "Prepare a Codex prompt draft; never executes Codex"),
     "/chat <message>": ("handle_chat", "Ask Hermes; LLM may call bounded read-only PI tools"),
     "/hermes <message>": ("handle_chat", "Ask Hermes; alias for /chat"),
+    "/remind <when> <task>": ("handle_remind", "Create a daily-check-in reminder"),
+    "/reminders": ("handle_reminders", "List pending reminders"),
+    "/remind_cancel <id>": ("handle_remind_cancel", "Cancel a pending reminder"),
     "/digest": ("handle_digest", "Show the current weekly brief"),
     "/topics": ("handle_topics", "List the strongest tracked topics"),
     "/insight": ("handle_insight", "Show retrospective project insights"),
@@ -205,6 +210,14 @@ def _parse_optional_week_label_args(args: str) -> tuple[str | None, str]:
     return None, stripped
 
 
+def _format_local_due_at(iso_value: str) -> str:
+    try:
+        parsed = datetime.fromisoformat(str(iso_value).replace("Z", "+00:00"))
+    except ValueError:
+        return str(iso_value)
+    return parsed.astimezone().strftime("%Y-%m-%d %H:%M")
+
+
 def _extract_question_terms(question: str) -> list[str]:
     terms = []
     for raw_term in QUESTION_WORD_RE.findall(question.lower()):
@@ -241,29 +254,23 @@ def _load_topics_summary(connection: sqlite3.Connection) -> str:
 def handle_start(chat_id: str, args: str, settings: Settings) -> None:
     del args, settings
     lines = [
-        "Hermes / AI Intelligence",
+        "Hermes",
         "",
-        "Как сейчас работать:",
-        "1. Основной артефакт недели - красивый HTML Workbook. Markdown/TXT - fallback и служебные экспорты.",
-        "2. Начни с /weekly, потом /actions, /mvp и /strategy.",
-        "3. Можно просто написать вопрос обычным сообщением. Hermes сам выберет read-only PI tools и ответит по curated workbook/atoms/threads, не по raw Telegram RAG.",
-        "4. После чтения отправь feedback текстом или голосом. Я подготовлю draft, но память изменится только после /feedback_confirm <id>.",
-        "5. Ставь любую реакцию на оригинальные Telegram-посты. Любая видимая реакция = интересно; отсутствие реакции не считается негативом.",
+        "Основной режим: просто напиши вопрос или отправь голосовое.",
+        "Я сам определю: чат, фидбек или напоминание.",
         "",
-        "Основные команды:",
-        "/weekly - статус и главные выводы Workbook",
-        "/actions - действия на неделю",
-        "/explain <query> - объяснить сигнал или тему",
-        "/projects - проектные действия",
-        "/mvp - MVP Radar статус и недостающие evidence",
-        "/strategy - Strategy Reviewer",
-        "/chat <message> - полноценный Hermes chat с read-only tool calls",
-        "/feedback <text> - текстовый feedback draft",
-        "/feedback_voice <text> - transcript fallback, если голос не распознался",
-        "/feedback_confirm <id> - подтвердить запись feedback",
-        "/codex <focus> - подготовить Codex prompt, не запускать Codex",
+        "Рабочий цикл:",
+        "1. Открой weekly HTML Workbook.",
+        "2. Спроси: /weekly, /actions, /mvp или /strategy.",
+        "3. После чтения дай feedback текстом или голосом.",
+        "4. Подтверди память через /feedback_confirm <id>.",
         "",
-        "Границы: я не LLM-chat общего назначения, не raw RAG по всему Telegram, не запускаю Codex и не меняю код/config/profile/projects.",
+        "Напоминания:",
+        "/remind завтра 18:00 дать feedback по Workbook",
+        "/reminders",
+        "/remind_cancel <id>",
+        "",
+        "Границы: read-only PI tools, curated intelligence, без raw Telegram RAG, без Codex/config/code mutations.",
     ]
     send_message(_get_bot_token(), chat_id, "\n".join(lines), parse_mode=None)
 
@@ -684,14 +691,100 @@ def handle_ask(chat_id: str, args: str, settings: Settings) -> None:
     handle_chat(chat_id, args, settings)
 
 
+def handle_operator_message(chat_id: str, args: str, settings: Settings) -> None:
+    _handle_operator_message(chat_id, args, settings, input_kind="text")
+
+
+def handle_voice_message(chat_id: str, args: str, settings: Settings) -> None:
+    _handle_operator_message(chat_id, args, settings, input_kind="voice_transcript")
+
+
+def _handle_operator_message(chat_id: str, args: str, settings: Settings, *, input_kind: str) -> None:
+    text = args.strip()
+    if not text:
+        send_message(_get_bot_token(), chat_id, "Напиши вопрос, фидбек или напоминание.", parse_mode=None)
+        return
+    intent = classify_operator_message(text, input_kind=input_kind)
+    if intent["intent"] == "reminder":
+        handle_remind(chat_id, text, settings)
+        return
+    if intent["intent"] == "feedback":
+        _handle_feedback_intake(chat_id, text, settings, input_kind=input_kind)
+        return
+    handle_chat(chat_id, text, settings)
+
+
 def handle_chat(chat_id: str, args: str, settings: Settings) -> None:
     question = args.strip()
     if not question:
         send_message(_get_bot_token(), chat_id, "Напиши вопрос после /chat или просто отправь обычное сообщение.", parse_mode=None)
         return
-    send_message(_get_bot_token(), chat_id, "Hermes смотрит curated intelligence и вызывает read-only tools.", parse_mode=None)
     result = answer_pi_chat(question, settings=settings)
     send_message(_get_bot_token(), chat_id, result["answer"], parse_mode=None)
+
+
+def handle_remind(chat_id: str, args: str, settings: Settings) -> None:
+    text = args.strip()
+    if not text:
+        send_message(
+            _get_bot_token(),
+            chat_id,
+            "Usage: /remind завтра 18:00 дать feedback по Workbook",
+            parse_mode=None,
+        )
+        return
+    try:
+        parsed = parse_reminder_request(text)
+        with _with_db(settings) as connection:
+            reminder = create_reminder(
+                connection,
+                due_at=parsed.due_at,
+                text=parsed.text,
+                reminder_type=parsed.reminder_type,
+                source_text=text,
+                recorded_by="telegram_bot",
+            )
+        send_message(
+            _get_bot_token(),
+            chat_id,
+            (
+                f"Напоминание добавлено #{reminder['id']}\n"
+                f"Когда: {_format_local_due_at(parsed.due_at)}\n"
+                f"Что: {reminder['text']}\n\n"
+                "Я покажу его в дневном чек-ине с кнопками сделал / не сделал."
+            ),
+            parse_mode=None,
+        )
+    except Exception as exc:
+        send_message(_get_bot_token(), chat_id, f"Не смог создать напоминание: {exc}", parse_mode=None)
+
+
+def handle_reminders(chat_id: str, args: str, settings: Settings) -> None:
+    del args
+    with _with_db(settings) as connection:
+        rows = list_pending_reminders(connection, limit=10)
+    if not rows:
+        send_message(_get_bot_token(), chat_id, "Активных напоминаний нет.", parse_mode=None)
+        return
+    lines = ["Активные напоминания"]
+    for row in rows:
+        lines.append(
+            f"#{row['id']} · {_format_local_due_at(row['due_at'])} · {row['reminder_type']}: {row['text']}"
+        )
+    send_message(_get_bot_token(), chat_id, "\n".join(lines), parse_mode=None)
+
+
+def handle_remind_cancel(chat_id: str, args: str, settings: Settings) -> None:
+    first = args.strip().split(maxsplit=1)[0] if args.strip() else ""
+    if not first.isdigit():
+        send_message(_get_bot_token(), chat_id, "Usage: /remind_cancel <id>", parse_mode=None)
+        return
+    with _with_db(settings) as connection:
+        reminder = cancel_reminder(connection, reminder_id=int(first))
+    if reminder is None:
+        send_message(_get_bot_token(), chat_id, f"Напоминание не найдено: {first}", parse_mode=None)
+        return
+    send_message(_get_bot_token(), chat_id, f"Напоминание отменено: #{first}", parse_mode=None)
 
 
 def handle_costs(chat_id: str, args: str, settings: Settings) -> None:
@@ -1065,6 +1158,8 @@ def handle_feedback_discard(chat_id: str, args: str, settings: Settings) -> None
 HANDLERS: dict[str, Callable[[str, str, Settings], None]] = {
     "/start": handle_start,
     "/help": handle_start,
+    "/message": handle_operator_message,
+    "/voice": handle_voice_message,
     "/weekly": handle_weekly,
     "/actions": handle_actions,
     "/explain": handle_explain,
@@ -1074,6 +1169,9 @@ HANDLERS: dict[str, Callable[[str, str, Settings], None]] = {
     "/codex": handle_codex,
     "/chat": handle_chat,
     "/hermes": handle_chat,
+    "/remind": handle_remind,
+    "/reminders": handle_reminders,
+    "/remind_cancel": handle_remind_cancel,
     "/digest": handle_digest,
     "/topics": handle_topics,
     "/insight": handle_insight,

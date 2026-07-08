@@ -130,11 +130,13 @@ On the single-user VPS, the operational baseline is:
   processing window.
 - `telegram-study-reminder-tue.timer` and
   `telegram-study-reminder-fri.timer` send study reminders.
+- `telegram-reminders.timer` sends one daily operator reminder check-in with
+  inline `сделал` / `не сделал` buttons.
 
 Quick checks:
 
 ```bash
-systemctl is-active telegram-bot.service telegram-ingest.timer telegram-digest.timer telegram-mvp-weekly.timer telegram-cleanup.timer
+systemctl is-active telegram-bot.service telegram-ingest.timer telegram-digest.timer telegram-mvp-weekly.timer telegram-cleanup.timer telegram-reminders.timer
 systemctl list-timers 'telegram-*' --all --no-pager
 bash scripts/healthcheck.sh
 PYTHONPATH=src python3 src/main.py ops-validate
@@ -142,18 +144,21 @@ PYTHONPATH=src python3 src/main.py ops-validate
 
 Current Hermes scope is deliberately bounded. It supports both short Telegram
 commands and a normal chat path: send plain text, `/chat <message>`,
-`/hermes <message>`, or `/ask <message>`. The LLM may plan calls only to the
-read-only PI tool catalog, then answer from curated workbook/atom/thread/action
-evidence. `/codex` prepares prompt text only. Hermes does not run Codex, does
-not mutate config/code/profile/project files, and does not replace the workbook
-as the primary reading surface.
+`/hermes <message>`, or `/ask <message>`. Plain text and voice transcripts are
+first classified as chat, feedback, or reminder. For chat, the LLM may plan
+calls only to the read-only PI tool catalog, then answer from curated
+workbook/atom/thread/action evidence. `/codex` prepares prompt text only.
+Hermes does not run Codex, does not mutate config/code/profile/project files,
+and does not replace the workbook as the primary reading surface.
 
-Voice feedback is supported when `OPENAI_API_KEY` is configured. The bot
+Voice input is supported when `OPENAI_API_KEY` is configured. The bot
 downloads the Telegram `.ogg` voice file to temporary storage, sends it to the
 OpenAI audio transcription endpoint with `VOICE_TRANSCRIPTION_MODEL`
-defaulting to `whisper-1`, routes the transcript through the existing
-confirmation-gated `/feedback_voice` flow, and deletes the local audio file. If
-`OPENAI_API_KEY` is missing, voice messages return a clear text fallback.
+defaulting to `whisper-1`, routes the transcript through the Hermes intent
+classifier, and deletes the local audio file. If the transcript is feedback,
+it enters the confirmation-gated `/feedback_voice` flow. If it is a reminder,
+it creates a local reminder for the daily check-in. If `OPENAI_API_KEY` is
+missing, voice messages return a clear text fallback.
 
 Current retrieval is deterministic curated retrieval over workbook sidecars,
 claim cards, Knowledge Atoms, Idea Threads, action cards, MVP/Strategy
@@ -188,9 +193,10 @@ Environment:
 | `TELEGRAM_SESSION_PATH` | Stored user session file |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_OWNER_CHAT_ID` | Telegram delivery and command bot |
 | `LLM_API_KEY` | LLM provider key |
-| `OPENAI_API_KEY` | Optional OpenAI audio transcription key for Telegram voice feedback |
+| `OPENAI_API_KEY` | Optional OpenAI audio transcription key for Telegram voice input |
 | `VOICE_TRANSCRIPTION_MODEL` | Optional transcription model override; defaults to `whisper-1` |
 | `TELEGRAM_VOICE_MEDIA_DIR` | Optional temporary directory for downloaded Telegram voice files |
+| `REMINDER_TIMEZONE` | Optional local timezone for daily operator reminders; defaults to `Europe/Berlin` |
 | `TELEGRAPH_TOKEN` | Stable Telegraph publishing account |
 | `RADAR_REPO_PATH` / `RADAR_PYTHON` | Demand-to-MVP Radar repo and local venv Python |
 | `DMR_MVP_SOURCE_CONFIG` | Radar weekly live-source config |

@@ -34,8 +34,10 @@ from bot import bot as bot_runtime
 from bot.callbacks import (
     build_artifact_feedback_markup,
     build_idea_feedback_markup,
+    build_reminder_digest_markup,
     record_artifact_callback,
     record_idea_callback,
+    record_reminder_callback,
 )
 from config.settings import Settings
 
@@ -108,6 +110,18 @@ class TestIdeaCallbacks(unittest.TestCase):
         self.assertIn("art:2026-W18:rb:d", callbacks)
         self.assertTrue(all(len(value) <= 64 for value in callbacks))
 
+    def test_reminder_digest_markup_uses_done_not_done_buttons(self):
+        markup = build_reminder_digest_markup([{"id": 12, "text": "дать feedback"}])
+        callbacks = [
+            button["callback_data"]
+            for row in markup["inline_keyboard"]
+            for button in row
+        ]
+
+        self.assertIn("rem:12:done", callbacks)
+        self.assertIn("rem:12:not", callbacks)
+        self.assertTrue(all(len(value) <= 64 for value in callbacks))
+
     def test_record_idea_callback_writes_user_decision(self):
         settings = self._settings_with_idea()
         answer = record_idea_callback(settings, "idea:7:reject")
@@ -170,6 +184,60 @@ class TestIdeaCallbacks(unittest.TestCase):
         self.assertEqual(row["artifact_type"], "implementation_ideas")
         self.assertEqual(row["feedback"], "weak")
         self.assertEqual(row["notes"], "deferred_from_button")
+
+    def test_record_reminder_callback_marks_done(self):
+        settings = self._settings_with_idea()
+        with sqlite3.connect(self.db_path) as connection:
+            connection.execute(
+                """
+                INSERT INTO operator_reminders (
+                    id, due_at, text, reminder_type, status, created_at, recorded_by
+                )
+                VALUES (?, ?, ?, ?, 'pending', ?, ?)
+                """,
+                (12, "2026-07-08T10:00:00Z", "дать feedback", "feedback", "2026-07-08T00:00:00Z", "test"),
+            )
+            connection.commit()
+
+        answer = record_reminder_callback(settings, "rem:12:done")
+
+        with sqlite3.connect(self.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            row = connection.execute(
+                "SELECT status, completed_at, not_done_at FROM operator_reminders WHERE id = 12"
+            ).fetchone()
+
+        self.assertEqual(answer, "Записал: сделал")
+        self.assertEqual(row["status"], "done")
+        self.assertIsNotNone(row["completed_at"])
+        self.assertIsNone(row["not_done_at"])
+
+    def test_record_reminder_callback_marks_not_done(self):
+        settings = self._settings_with_idea()
+        with sqlite3.connect(self.db_path) as connection:
+            connection.execute(
+                """
+                INSERT INTO operator_reminders (
+                    id, due_at, text, reminder_type, status, created_at, recorded_by
+                )
+                VALUES (?, ?, ?, ?, 'pending', ?, ?)
+                """,
+                (13, "2026-07-08T10:00:00Z", "прочитать источник", "read_watch", "2026-07-08T00:00:00Z", "test"),
+            )
+            connection.commit()
+
+        answer = record_reminder_callback(settings, "rem:13:not")
+
+        with sqlite3.connect(self.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            row = connection.execute(
+                "SELECT status, completed_at, not_done_at FROM operator_reminders WHERE id = 13"
+            ).fetchone()
+
+        self.assertEqual(answer, "Записал: не сделал")
+        self.assertEqual(row["status"], "not_done")
+        self.assertIsNone(row["completed_at"])
+        self.assertIsNotNone(row["not_done_at"])
 
     def test_run_bot_dispatches_authorized_callback_update(self):
         settings = self._settings_with_idea()
@@ -239,7 +307,7 @@ class TestIdeaCallbacks(unittest.TestCase):
 
         dispatch_mock.assert_called_once_with(
             chat_id="12345",
-            text="/feedback_voice Too shallow target=eval-gates.",
+            text="/voice Too shallow target=eval-gates.",
             settings=settings,
         )
 
@@ -273,7 +341,7 @@ class TestIdeaCallbacks(unittest.TestCase):
 
         dispatch_mock.assert_called_once_with(
             chat_id="12345",
-            text="/chat Что мне делать с weekly workbook?",
+            text="/message Что мне делать с weekly workbook?",
             settings=settings,
         )
 
@@ -317,7 +385,7 @@ class TestIdeaCallbacks(unittest.TestCase):
         transcribe_mock.assert_called_once_with(token="token", file_id="voice-1")
         dispatch_mock.assert_called_once_with(
             chat_id="12345",
-            text="/feedback_voice Useful workbook. target=claim-cards.",
+            text="/voice Useful workbook. target=claim-cards.",
             settings=settings,
         )
 
@@ -360,7 +428,7 @@ class TestIdeaCallbacks(unittest.TestCase):
         self.assertEqual(send_message_mock.call_count, 2)
         fallback_message = send_message_mock.call_args_list[-1].args[2]
         self.assertIn("OPENAI_API_KEY", fallback_message)
-        self.assertIn("/feedback_voice <твой фидбек>", fallback_message)
+        self.assertIn("/feedback <фидбек>", fallback_message)
 
 
 if __name__ == "__main__":

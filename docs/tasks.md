@@ -155,16 +155,20 @@ Implemented:
   environment, output ownership, healthcheck, manual scoring recovery after a
   one-time persistent-timer DB lock, and production `ops-validate` evidence
   checks are documented for dogfood readiness.
-- Telegram voice feedback now has a managed transcription path: voice `.ogg`
+- Telegram voice input now has a managed transcription path: voice `.ogg`
   files are downloaded to temporary storage, transcribed through the OpenAI
-  audio endpoint when `OPENAI_API_KEY` is configured, routed into the existing
-  `/feedback_voice` confirmation draft, and deleted locally after processing.
-  Missing transcription config returns a text fallback instead of pretending
-  voice feedback worked.
+  audio endpoint when `OPENAI_API_KEY` is configured, routed through the Hermes
+  intent classifier as chat/feedback/reminder, and deleted locally after
+  processing. Feedback still uses the existing `/feedback_voice` confirmation
+  draft when the transcript is classified as feedback. Missing transcription
+  config returns a text fallback instead of pretending voice input worked.
 - Hermes bounded LLM chat is available through plain Telegram text plus
   `/chat`, `/hermes`, and `/ask`; the model can plan calls only to the
   read-only PI tool catalog and cannot run Codex, mutate config/code/profile,
   or query raw Telegram firehose RAG by default.
+- Operator reminders are stored locally and delivered as a once-daily Telegram
+  check-in with `сделал` / `не сделал` inline buttons; they do not run every 30
+  minutes and do not mutate workbook/report scoring.
 
 ## Active Maintenance Queue
 
@@ -352,12 +356,16 @@ Stop conditions:
 - HPI-4 added read-only Hermes Telegram concierge commands and bounded LLM chat
   on top of the tool catalog.
 - HPI-5 is covered by the existing confirmation-gated `/feedback` and
-  `/feedback_voice` flow: no memory writes happen until `/feedback_confirm`.
+  `/feedback_voice` flow plus the Hermes intent router: no memory writes happen
+  until `/feedback_confirm`.
 - HPI-6 delivers structured Strategy Reviewer notes through `/strategy` without
   applying suggestions.
 - HPI-7 added a read-only action-status projection; missing feedback stays
   `unknown`.
 - HPI-8 added compact dogfood review artifact helpers.
+- The first usability slice routes plain text and voice through chat/feedback/
+  reminder intent classification and adds once-daily reminders with explicit
+  done/not-done callbacks.
 - Raw RAG, vector retrieval, mutation tools, autonomous Codex execution, and
   config/profile/project edits are still not implemented.
 

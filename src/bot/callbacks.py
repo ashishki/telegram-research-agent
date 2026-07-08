@@ -10,11 +10,16 @@ LOGGER = logging.getLogger(__name__)
 
 IDEA_CALLBACK_PREFIX = "idea"
 ARTIFACT_CALLBACK_PREFIX = "art"
+REMINDER_CALLBACK_PREFIX = "rem"
 _IDEA_ACTIONS: dict[str, tuple[str, str]] = {
     "done": ("acted_on", "Marked done from Telegram button"),
     "later": ("deferred", "Deferred from Telegram button"),
     "reject": ("rejected", "Rejected from Telegram button"),
     "interesting": ("deferred", "Marked interesting from Telegram button"),
+}
+_REMINDER_ACTIONS: dict[str, tuple[str, str, str]] = {
+    "done": ("done", "completed_at", "Записал: сделал"),
+    "not": ("not_done", "not_done_at", "Записал: не сделал"),
 }
 _ARTIFACT_TYPE_CODES = {
     "rb": "research_brief",
@@ -77,6 +82,25 @@ def build_artifact_feedback_markup(week_label: str, artifact_type: str) -> dict:
             ],
         ]
     }
+
+
+def build_reminder_digest_markup(reminders: list[dict]) -> dict:
+    rows = []
+    for index, reminder in enumerate(reminders[:10], start=1):
+        reminder_id = int(reminder["id"])
+        rows.append(
+            [
+                {
+                    "text": f"{index} сделал",
+                    "callback_data": f"{REMINDER_CALLBACK_PREFIX}:{reminder_id}:done",
+                },
+                {
+                    "text": f"{index} не сделал",
+                    "callback_data": f"{REMINDER_CALLBACK_PREFIX}:{reminder_id}:not",
+                },
+            ]
+        )
+    return {"inline_keyboard": rows}
 
 
 def _project_name_from_title(title: str | None) -> str | None:
@@ -180,9 +204,56 @@ def record_artifact_callback(settings: Settings, callback_data: str) -> str:
     return f"Записал: {feedback}"
 
 
+def record_reminder_callback(settings: Settings, callback_data: str) -> str:
+    parts = callback_data.split(":")
+    if len(parts) != 3 or parts[0] != REMINDER_CALLBACK_PREFIX:
+        raise ValueError("Unsupported callback")
+
+    try:
+        reminder_id = int(parts[1])
+    except ValueError as exc:
+        raise ValueError("Invalid reminder id") from exc
+
+    status_field_message = _REMINDER_ACTIONS.get(parts[2])
+    if status_field_message is None:
+        raise ValueError("Unsupported reminder action")
+    status, timestamp_field, message = status_field_message
+    now = _now_iso()
+
+    with sqlite3.connect(settings.db_path) as connection:
+        connection.row_factory = sqlite3.Row
+        row = connection.execute(
+            """
+            SELECT id, status
+            FROM operator_reminders
+            WHERE id = ?
+            LIMIT 1
+            """,
+            (reminder_id,),
+        ).fetchone()
+        if row is None:
+            raise ValueError(f"Reminder not found: {reminder_id}")
+        if row["status"] != "pending":
+            return f"Уже записано: {row['status']}"
+
+        connection.execute(
+            f"""
+            UPDATE operator_reminders
+            SET status = ?, {timestamp_field} = ?
+            WHERE id = ? AND status = 'pending'
+            """,
+            (status, now, reminder_id),
+        )
+        connection.commit()
+
+    return message
+
+
 def record_callback(settings: Settings, callback_data: str) -> str:
     if callback_data.startswith(f"{IDEA_CALLBACK_PREFIX}:"):
         return record_idea_callback(settings, callback_data)
     if callback_data.startswith(f"{ARTIFACT_CALLBACK_PREFIX}:"):
         return record_artifact_callback(settings, callback_data)
+    if callback_data.startswith(f"{REMINDER_CALLBACK_PREFIX}:"):
+        return record_reminder_callback(settings, callback_data)
     raise ValueError("Unsupported callback")

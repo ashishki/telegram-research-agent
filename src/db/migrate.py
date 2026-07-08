@@ -265,6 +265,106 @@ def _ensure_signal_feedback_operator_interest(connection: sqlite3.Connection) ->
     )
 
 
+def _ensure_operator_reminders_daily_contract(connection: sqlite3.Connection) -> None:
+    row = connection.execute(
+        """
+        SELECT sql
+        FROM sqlite_master
+        WHERE type = 'table' AND name = 'operator_reminders'
+        LIMIT 1
+        """
+    ).fetchone()
+    table_sql = str(row[0] if row else "")
+    if not table_sql:
+        return
+    if all(token in table_sql for token in ("'done'", "'not_done'", "last_prompted_at")):
+        return
+
+    column_rows = connection.execute("PRAGMA table_info(operator_reminders)").fetchall()
+    columns = {str(column[1]) for column in column_rows}
+
+    LOGGER.info("Rebuilding operator_reminders for daily digest outcome tracking")
+    connection.execute("ALTER TABLE operator_reminders RENAME TO operator_reminders_old")
+    connection.executescript(
+        """
+        CREATE TABLE operator_reminders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            due_at TEXT NOT NULL,
+            text TEXT NOT NULL CHECK(length(trim(text)) > 0),
+            reminder_type TEXT NOT NULL DEFAULT 'general'
+                CHECK(reminder_type IN ('general', 'feedback', 'action', 'read_watch', 'project', 'mvp')),
+            source_text TEXT,
+            status TEXT NOT NULL DEFAULT 'pending'
+                CHECK(status IN ('pending', 'done', 'not_done', 'canceled')),
+            created_at TEXT NOT NULL,
+            last_prompted_at TEXT,
+            completed_at TEXT,
+            not_done_at TEXT,
+            canceled_at TEXT,
+            recorded_by TEXT NOT NULL DEFAULT 'operator'
+        );
+        """
+    )
+
+    def _column(name: str, fallback: str) -> str:
+        return name if name in columns else fallback
+
+    last_prompted_expr = _column("last_prompted_at", _column("sent_at", "NULL"))
+    completed_expr = _column("completed_at", "NULL")
+    not_done_expr = _column("not_done_at", "NULL")
+    canceled_expr = _column("canceled_at", "NULL")
+    source_text_expr = _column("source_text", "NULL")
+    recorded_by_expr = _column("recorded_by", "'operator'")
+
+    connection.execute(
+        f"""
+        INSERT INTO operator_reminders (
+            id,
+            due_at,
+            text,
+            reminder_type,
+            source_text,
+            status,
+            created_at,
+            last_prompted_at,
+            completed_at,
+            not_done_at,
+            canceled_at,
+            recorded_by
+        )
+        SELECT
+            id,
+            due_at,
+            text,
+            reminder_type,
+            {source_text_expr},
+            CASE
+                WHEN status = 'sent' THEN 'pending'
+                WHEN status IN ('pending', 'done', 'not_done', 'canceled') THEN status
+                ELSE 'pending'
+            END,
+            created_at,
+            {last_prompted_expr},
+            {completed_expr},
+            {not_done_expr},
+            {canceled_expr},
+            {recorded_by_expr}
+        FROM operator_reminders_old
+        """
+    )
+    connection.execute("DROP TABLE operator_reminders_old")
+    connection.executescript(
+        """
+        CREATE INDEX IF NOT EXISTS idx_operator_reminders_due
+            ON operator_reminders(status, due_at);
+        CREATE INDEX IF NOT EXISTS idx_operator_reminders_prompted
+            ON operator_reminders(status, last_prompted_at);
+        CREATE INDEX IF NOT EXISTS idx_operator_reminders_created
+            ON operator_reminders(created_at);
+        """
+    )
+
+
 def run_migrations() -> Path:
     db_path = get_db_path()
     db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -653,6 +753,41 @@ def run_migrations() -> Path:
                 reminder_sent_tue INTEGER NOT NULL DEFAULT 0,
                 reminder_sent_fri INTEGER NOT NULL DEFAULT 0
             );
+            """
+        )
+        connection.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS operator_reminders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                due_at TEXT NOT NULL,
+                text TEXT NOT NULL CHECK(length(trim(text)) > 0),
+                reminder_type TEXT NOT NULL DEFAULT 'general'
+                    CHECK(reminder_type IN ('general', 'feedback', 'action', 'read_watch', 'project', 'mvp')),
+                source_text TEXT,
+                status TEXT NOT NULL DEFAULT 'pending'
+                    CHECK(status IN ('pending', 'done', 'not_done', 'canceled')),
+                created_at TEXT NOT NULL,
+                last_prompted_at TEXT,
+                completed_at TEXT,
+                not_done_at TEXT,
+                canceled_at TEXT,
+                recorded_by TEXT NOT NULL DEFAULT 'operator'
+            );
+            CREATE INDEX IF NOT EXISTS idx_operator_reminders_due
+                ON operator_reminders(status, due_at);
+            CREATE INDEX IF NOT EXISTS idx_operator_reminders_created
+                ON operator_reminders(created_at);
+            """
+        )
+        _ensure_operator_reminders_daily_contract(connection)
+        connection.executescript(
+            """
+            CREATE INDEX IF NOT EXISTS idx_operator_reminders_due
+                ON operator_reminders(status, due_at);
+            CREATE INDEX IF NOT EXISTS idx_operator_reminders_prompted
+                ON operator_reminders(status, last_prompted_at);
+            CREATE INDEX IF NOT EXISTS idx_operator_reminders_created
+                ON operator_reminders(created_at);
             """
         )
         for stmt in [

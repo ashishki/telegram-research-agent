@@ -26,6 +26,7 @@ from output.generate_study_plan import OUTPUT_DIR as STUDY_PLAN_OUTPUT_DIR
 from output.generate_study_plan import generate_study_plan, send_study_reminder
 from output.mvp_weekly_pipeline import run_mvp_weekly_pipeline
 from output.opportunity_seed_export import export_opportunity_seeds
+from output.operator_reminders import list_pending_reminders, send_daily_reminder_digest
 from processing.cleanup import run_cleanup
 from processing.cluster import cluster_posts
 from processing.detect_topics import run_topic_detection
@@ -76,6 +77,13 @@ def build_parser() -> argparse.ArgumentParser:
     study_parser.add_argument("--remind", action="store_true")
     study_parser.add_argument("--force", action="store_true")
     study_parser.set_defaults(handler=handle_study)
+
+    reminders_parser = subparsers.add_parser("reminders", help="Send or inspect operator reminders")
+    reminders_parser.add_argument("--send-daily", action="store_true", help="Send the once-daily reminder digest")
+    reminders_parser.add_argument("--force", action="store_true", help="Send even if today's digest already prompted")
+    reminders_parser.add_argument("--list", action="store_true", help="List pending reminders")
+    reminders_parser.add_argument("--limit", type=int, default=20)
+    reminders_parser.set_defaults(handler=handle_reminders)
 
     insight_parser = subparsers.add_parser(
         "insight",
@@ -1460,6 +1468,28 @@ def handle_study(args: argparse.Namespace) -> int:
         LOGGER.exception("Study plan command failed")
         return 1
     return 0
+
+
+def handle_reminders(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+        if args.send_daily:
+            summary = send_daily_reminder_digest(settings, limit=args.limit, force=args.force)
+            sys.stdout.write(json.dumps(summary, ensure_ascii=False) + "\n")
+            return 0
+        if args.list:
+            with sqlite3.connect(settings.db_path) as connection:
+                rows = list_pending_reminders(connection, limit=args.limit)
+            sys.stdout.write(json.dumps(rows, ensure_ascii=False, indent=2) + "\n")
+            return 0
+        sys.stdout.write("Use --send-daily or --list.\n")
+        return 1
+    except Exception:
+        LOGGER.exception("Reminders command failed")
+        return 1
 
 
 def _current_week_label() -> str:

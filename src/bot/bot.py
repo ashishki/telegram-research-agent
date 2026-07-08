@@ -184,19 +184,24 @@ def run_bot(settings: Settings) -> None:
                 dispatch_command(chat_id=chat_id, text=text, settings=settings)
                 continue
             if text:
-                LOGGER.info("Dispatching Hermes chat message chat_id=%s text=%s", chat_id, text.splitlines()[0][:200])
-                dispatch_command(chat_id=chat_id, text=f"/chat {text}", settings=settings)
+                LOGGER.info("Dispatching Hermes operator message chat_id=%s text=%s", chat_id, text.splitlines()[0][:200])
+                dispatch_command(chat_id=chat_id, text=f"/message {text}", settings=settings)
                 continue
 
             voice_feedback_text = _extract_voice_feedback_text(message)
             if voice_feedback_text:
-                LOGGER.info("Dispatching transcribed voice feedback chat_id=%s", chat_id)
-                dispatch_command(chat_id=chat_id, text=f"/feedback_voice {voice_feedback_text}", settings=settings)
+                LOGGER.info("Dispatching transcribed voice operator message chat_id=%s", chat_id)
+                dispatch_command(chat_id=chat_id, text=f"/voice {voice_feedback_text}", settings=settings)
                 continue
 
             if message.get("voice"):
                 file_id = _extract_voice_file_id(message)
-                send_message(token, chat_id, "Принял голосовое. Распознаю и подготовлю feedback draft.", parse_mode=None)
+                send_message(
+                    token,
+                    chat_id,
+                    "Принял голосовое. Распознаю и пойму: вопрос, фидбек или напоминание.",
+                    parse_mode=None,
+                )
                 try:
                     transcript = transcribe_telegram_voice(token=token, file_id=file_id)
                 except VoiceTranscriptionUnavailable:
@@ -206,7 +211,7 @@ def run_bot(settings: Settings) -> None:
                         chat_id,
                         (
                             "Голосовое распознавание пока не настроено: нужен OPENAI_API_KEY. "
-                            "Пока отправь текстом: /feedback_voice <твой фидбек>."
+                            "Пока отправь текстом обычное сообщение, /chat <вопрос> или /feedback <фидбек>."
                         ),
                         parse_mode=None,
                     )
@@ -216,12 +221,12 @@ def run_bot(settings: Settings) -> None:
                     send_message(
                         token,
                         chat_id,
-                        "Не смог распознать голосовое. Отправь фидбек текстом через /feedback_voice <текст>.",
+                        "Не смог распознать голосовое. Отправь текстом обычное сообщение, /chat <вопрос> или /feedback <фидбек>.",
                         parse_mode=None,
                     )
                     continue
                 LOGGER.info("Voice transcription succeeded chat_id=%s chars=%d", chat_id, len(transcript))
-                dispatch_command(chat_id=chat_id, text=f"/feedback_voice {transcript}", settings=settings)
+                dispatch_command(chat_id=chat_id, text=f"/voice {transcript}", settings=settings)
 
         if state.stop_requested:
             break

@@ -25,11 +25,14 @@ _v3.8 · 2026-07-08 · telegram-research-agent_
 - HPI-0 is documented, and HPI-1..HPI-8 plus the first Hermes usability slice
   are implemented. Hermes is a Telegram-facing bounded chat/concierge/router,
   not source of truth. Plain text, `/chat`, `/hermes`, and `/ask` route through
-  a read-only PI tool loop over curated intelligence retrieval items, not raw
-  Telegram RAG. Voice feedback uses OpenAI audio transcription when
-  `OPENAI_API_KEY` is configured, then routes through confirmation-gated
-  `/feedback_voice`. Strategy Reviewer remains advisory. Four-week dogfood
-  validates real convenience/usefulness before adding complex features.
+  intent classification and a read-only PI tool loop over curated intelligence
+  retrieval items, not raw Telegram RAG. Voice input uses OpenAI audio
+  transcription when `OPENAI_API_KEY` is configured, then routes as chat,
+  feedback, or reminder. Feedback still requires confirmation-gated
+  `/feedback_voice` / `/feedback_confirm`. Operator reminders are delivered as
+  one daily check-in with `сделал` / `не сделал` buttons. Strategy Reviewer
+  remains advisory. Four-week dogfood validates real convenience/usefulness
+  before adding complex features.
 - Operational incident on 2026-07-06: `telegram-digest.timer` had been inactive
   since 2026-06-22, so weekly Research Brief/Implementation Ideas stopped
   running while ingest and MVP weekly continued. The timer was manually
@@ -241,9 +244,10 @@ HPI-0 documents the roadmap and dogfood plan. HPI-1 through HPI-8 plus the
 first usability slice have added the read-only facade, deterministic curated
 retrieval projection, bounded PI tool catalog, Hermes Telegram concierge
 commands and bounded chat, confirmation-gated feedback, managed voice
-transcription, Strategy Reviewer Telegram delivery, action status projection,
-and compact dogfood review artifact helpers. The exact next task is operational
-dogfood, not another feature:
+transcription with chat/feedback/reminder intent routing, daily operator
+reminders with done/not-done callbacks, Strategy Reviewer Telegram delivery,
+action status projection, and compact dogfood review artifact helpers. The
+exact next task is operational dogfood, not another feature:
 
 ```text
 HPI Dogfood Week 1 - Run, Measure, Review
