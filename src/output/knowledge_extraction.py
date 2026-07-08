@@ -233,6 +233,7 @@ def _build_prompt(week_label: str, posts: list[SourcePost], *, retry_error: str 
         f"Allowed atom_type values: {atom_types}.\n"
         f"Return at most {MAX_ATOMS_PER_BATCH} atoms total. Use fewer atoms when evidence is weak.\n"
         "Keep every string concise: claim, summary, evidence_quote, and why_it_matters must each stay under 180 characters.\n"
+        "evidence_quote must be copied verbatim from one cited post so deterministic quote verification can match it.\n"
         "Do not use markdown, comments, trailing commas, or extra keys. The response must be one complete JSON object.\n"
         "Only cite post_id values from the provided posts. Prefer no atom over weak or generic claims.\n"
         f"{retry_instruction}"

@@ -66,15 +66,92 @@ class TestAiVisualReport(unittest.TestCase):
             telegram_session_path="",
         )
 
+    def _insert_post(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        post_id: int,
+        channel_username: str,
+        message_id: int,
+        content: str,
+    ) -> None:
+        posted_at = "2026-07-06T08:00:00Z"
+        raw_post_id = post_id + 1000
+        connection.execute(
+            """
+            INSERT INTO raw_posts (
+                id, channel_username, channel_id, message_id, posted_at, text, media_type,
+                media_caption, forward_from, view_count, message_url, raw_json, ingested_at, image_description
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                raw_post_id,
+                channel_username,
+                raw_post_id,
+                message_id,
+                posted_at,
+                content,
+                None,
+                None,
+                None,
+                0,
+                f"https://t.me/{channel_username}/{message_id}",
+                "{}",
+                posted_at,
+                None,
+            ),
+        )
+        connection.execute(
+            """
+            INSERT INTO posts (
+                id, raw_post_id, channel_username, posted_at, content, url_count, has_code,
+                language_detected, word_count, normalized_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                post_id,
+                raw_post_id,
+                channel_username,
+                posted_at,
+                content,
+                0,
+                0,
+                "en",
+                len(content.split()),
+                posted_at,
+            ),
+        )
+
     def _seed(self, db_path: str) -> Settings:
         settings = self._settings(db_path)
         with sqlite3.connect(db_path) as connection:
+            self._insert_post(
+                connection,
+                post_id=101,
+                channel_username="ai_lab",
+                message_id=101,
+                content="Codex headless automation now pairs with eval gates before release for safer agent edits.",
+            )
+            self._insert_post(
+                connection,
+                post_id=202,
+                channel_username="rollout",
+                message_id=202,
+                content="AI rollout teams now ask for measurable adoption evidence before expanding usage.",
+            )
+            self._insert_post(
+                connection,
+                post_id=303,
+                channel_username="research",
+                message_id=303,
+                content="The warning is simple: shallow eval suites hide risk in agent-written changes.",
+            )
             record_knowledge_atom(
                 connection,
                 week_label="2026-W28",
                 atom_type="engineering_practice",
-                claim="Eval gates are becoming the release path for coding agents.",
-                summary="A source describes eval gates before agent-written releases.",
+                claim="Eval-гейты становятся обязательным этапом релиза для coding agents.",
+                summary="Источник описывает eval-гейты перед релизом изменений, написанных агентом.",
                 evidence_quote="eval gates before release",
                 source_post_ids=[101],
                 source_urls=["https://t.me/ai_lab/101"],
@@ -85,7 +162,7 @@ class TestAiVisualReport(unittest.TestCase):
                 confidence=0.84,
                 novelty_score=0.6,
                 practical_utility_score=0.92,
-                why_it_matters="This is actionable for AI engineering release discipline.",
+                why_it_matters="Это применимо к дисциплине релизов в AI engineering.",
                 first_seen_at="2026-07-06T08:00:00Z",
                 last_seen_at="2026-07-06T08:00:00Z",
             )
@@ -93,8 +170,8 @@ class TestAiVisualReport(unittest.TestCase):
                 connection,
                 week_label="2026-W28",
                 atom_type="market_signal",
-                claim="AI rollout teams need measurable adoption evidence.",
-                summary="A source describes adoption metrics for working teams.",
+                claim="Командам внедрения AI нужны измеримые доказательства adoption.",
+                summary="Источник описывает adoption-метрики для рабочих команд.",
                 evidence_quote="measurable adoption evidence",
                 source_post_ids=[202],
                 source_urls=["https://t.me/rollout/202"],
@@ -105,9 +182,29 @@ class TestAiVisualReport(unittest.TestCase):
                 confidence=0.8,
                 novelty_score=0.68,
                 practical_utility_score=0.9,
-                why_it_matters="It maps to AI rollout project workflows.",
+                why_it_matters="Это связано с workflow проектов по внедрению AI.",
                 first_seen_at="2026-07-07T09:00:00Z",
                 last_seen_at="2026-07-07T09:00:00Z",
+            )
+            record_knowledge_atom(
+                connection,
+                week_label="2026-W28",
+                atom_type="risk_warning",
+                claim="Мелкие eval-наборы могут скрывать риск от agent-written изменений.",
+                summary="Источник предупреждает, что поверхностные проверки не ловят часть дефектов.",
+                evidence_quote="shallow eval suites hide risk",
+                source_post_ids=[303],
+                source_urls=["https://t.me/research/303"],
+                entities=["AI agents", "eval gates"],
+                tools=["Codex"],
+                models=["Claude"],
+                practices=["release checks", "risk review"],
+                confidence=0.78,
+                novelty_score=0.62,
+                practical_utility_score=0.88,
+                why_it_matters="Это задает границу доверия к автоматизированным изменениям.",
+                first_seen_at="2026-07-07T11:00:00Z",
+                last_seen_at="2026-07-07T11:00:00Z",
             )
             upsert_frontier_analysis(
                 connection,
@@ -117,36 +214,36 @@ class TestAiVisualReport(unittest.TestCase):
                 prompt_version="frontier-analysis-v1",
                 lookback_weeks=12,
                 threads_analyzed=2,
-                atoms_analyzed=2,
-                executive_brief="Top-model synthesis says eval-gated agents and measurable rollout evidence now belong in the same operating system.",
+                atoms_analyzed=3,
+                executive_brief="Синтез недели: eval-гейты для coding agents и измеримые adoption-метрики теперь нужно читать как одну операционную систему. Главный вывод не в демо, а в проверяемом пути от agent-written изменения до релиза и внедрения.",
                 what_changed=[
                     {
-                        "title": "Agent work moved closer to release discipline",
-                        "summary": "The thread combines practice, CI, and rollout evidence.",
-                        "why_it_matters": "It changes what should be measured before trusting an AI workflow.",
+                        "title": "Agent work сдвинулся ближе к релизной дисциплине",
+                        "summary": "Тема теперь объединяет практику, CI, риск и adoption-доказательства.",
+                        "why_it_matters": "Это меняет то, что нужно измерять перед доверием к AI workflow.",
                     }
                 ],
                 trend_narratives=[
                     {
                         "title": "Eval-gated agent workflows",
-                        "narrative": "The idea moved from isolated coding-agent use toward repeatable operations.",
+                        "narrative": "Идея сдвинулась от одиночного применения coding agents к повторяемым операционным проверкам.",
                     }
                 ],
                 study_now=[
                     {
-                        "topic": "Coding-agent eval design",
-                        "reason": "It bridges useful demos and reliable team workflows.",
+                        "topic": "Дизайн eval для coding agents",
+                        "reason": "Это мост между полезными демо и надежными командными workflow.",
                         "priority": "high",
                     }
                 ],
                 actions=[
                     {
-                        "title": "Build one tiny eval gate",
-                        "next_step": "Catch a bad agent edit before merge.",
-                        "success_criterion": "A failing edit is blocked.",
+                        "title": "Собрать один маленький eval-гейт",
+                        "next_step": "Поймать плохое agent-edit изменение до merge.",
+                        "success_criterion": "Падающее изменение блокируется до merge.",
                     }
                 ],
-                caveats=["Evidence is limited to the exported thread set."],
+                caveats=["Доказательства ограничены экспортированным набором тем и требуют проверки цитат."],
                 analysis={},
             )
         refresh_idea_threads(settings, weeks=12, now=datetime(2026, 7, 8, tzinfo=timezone.utc))
@@ -181,11 +278,50 @@ process.exit(2);
             try:
                 settings = self._seed(db_path)
                 archify_root = self._fake_archify_root(Path(tool_dir))
+                mvp_json_path = Path(output_dir) / "mvp-weekly-2026-W28.json"
+                mvp_json_path.write_text(
+                    json.dumps(
+                        {
+                            "result": {
+                                "selected_title": "LLM Guardrail Watchdog",
+                                "dossier_status": "investigate",
+                                "recommendation": "revisit_with_evidence_gap",
+                                "score": 61,
+                                "selected_source_mix": {
+                                    "readiness": "telegram_only",
+                                    "selected_external_evidence_count": 1,
+                                    "decision_grade_external": False,
+                                    "kir_source_kind": "knowledge_thread",
+                                    "kir_thread_slug": "eval-gates",
+                                    "kir_thread_title": "Eval gates",
+                                    "kir_thread_status": "active",
+                                    "kir_source_atom_count": 3,
+                                    "kir_source_url_count": 4,
+                                    "kir_gate_status": "blocked",
+                                    "kir_gate_reasons": ["missing decision-grade external evidence"],
+                                },
+                                "source_counts": {
+                                    "live_intelligence": {
+                                        "fresh_sources": 2,
+                                    }
+                                },
+                            },
+                            "selected": {
+                                "missing_evidence": ["Need stronger non-Telegram demand evidence."],
+                                "next_validation": "Interview 3 operators before any build.",
+                                "kill_criteria": ["Kill if no operator commits to a follow-up."],
+                            },
+                        },
+                        ensure_ascii=False,
+                    ),
+                    encoding="utf-8",
+                )
                 summary = generate_ai_visual_report(
                     settings,
                     week_label="2026-W28",
                     output_root=output_dir,
                     archify_root=archify_root,
+                    mvp_radar_json_path=mvp_json_path,
                     now=datetime(2026, 7, 8, tzinfo=timezone.utc),
                 )
                 html_text = Path(summary.html_path).read_text(encoding="utf-8")
@@ -198,21 +334,119 @@ process.exit(2);
         self.assertEqual(summary.archify_status, "rendered")
         self.assertTrue(diagram_html_exists)
         self.assertTrue(diagram_ir_exists)
-        self.assertIn("AI Decision Intelligence - 2026-W28", html_text)
-        self.assertIn("Decision Brief", html_text)
-        self.assertIn("Do Now", html_text)
-        self.assertIn("Knowledge Flow", html_text)
+        self.assertIn("AI-интеллект за неделю - 2026-W28", html_text)
+        self.assertIn("Операторский вердикт", html_text)
+        self.assertIn("Сильные сигналы", html_text)
+        self.assertIn("Глубокое объяснение", html_text)
+        self.assertIn("What is this", html_text)
+        self.assertIn("Why now", html_text)
+        self.assertIn("How it works", html_text)
+        self.assertIn("Where is hype", html_text)
+        self.assertIn("What to do", html_text)
+        self.assertIn("What not to do", html_text)
+        self.assertIn("What would change my mind", html_text)
+        self.assertIn("Concept diagram", html_text)
+        self.assertIn("concept-diagram", html_text)
+        self.assertIn("MVP Radar", html_text)
+        self.assertIn("LLM Guardrail Watchdog", html_text)
+        self.assertIn("Do not build", html_text)
+        self.assertIn("KIR evidence", html_text)
+        self.assertIn("External evidence", html_text)
+        self.assertIn("context-only", html_text)
+        self.assertIn("Читать / пробовать / строить", html_text)
+        self.assertIn("Приложение: источники и аудит", html_text)
+        self.assertIn("Доказательства по ключевым утверждениям", html_text)
+        self.assertIn("Срок годности / staleness", html_text)
+        self.assertIn("Wording policy", html_text)
+        self.assertIn("Карта потока знаний", html_text)
+        self.assertIn("Explanatory only", html_text)
         self.assertIn("Archify", html_text)
         self.assertIn("<iframe", html_text)
-        self.assertIn("Project Implications", html_text)
-        self.assertIn("Coding-agent eval design", html_text)
+        self.assertIn("<details", html_text)
+        self.assertIn("Диагностика проектного соответствия", html_text)
+        self.assertIn("Дизайн eval для coding agents", html_text)
         self.assertNotIn("Matches:", html_text)
+        self.assertLess(len(html_text), 250000)
         self.assertEqual(metadata["archify"]["status"], "rendered")
         self.assertEqual(metadata["diagram_ir"]["diagram_type"], "dataflow")
+        self.assertEqual(metadata["diagram_ir"]["meta"]["evidence_role"], "explanatory_only")
+        self.assertEqual(metadata["concept_diagram_ir"]["diagram_type"], "concept")
+        self.assertEqual(metadata["concept_diagram_ir"]["renderer"], "local_svg")
+        self.assertTrue(metadata["concept_diagram_ir"]["deterministic"])
+        self.assertFalse(metadata["concept_diagram_ir"]["external_assets"])
+        self.assertEqual(metadata["concept_diagram_ir"]["meta"]["evidence_role"], "explanatory_only")
         self.assertTrue(metadata["project_links"])
-        self.assertIn("Project Implications", metadata["sections"])
-        self.assertIn("AI Decision Intelligence", summary.notification_text)
-        self.assertIn("Project leads", summary.notification_text)
+        self.assertIn("Проектная реализация", metadata["sections"])
+        workbook_titles = {section["title_en"] for section in metadata["workbook_sections"]}
+        self.assertTrue(
+            {
+                "Decision Brief",
+                "Strong Signals",
+                "Deep Explain",
+                "Project Implementation",
+                "MVP Radar",
+                "Read/Try/Build",
+                "Feedback",
+                "Appendix",
+            }.issubset(workbook_titles)
+        )
+        self.assertTrue(
+            any(
+                section["progressive_disclosure"] and section["explanatory_only"]
+                for section in metadata["workbook_sections"]
+                if section["id"] == "deep-explain"
+            )
+        )
+        self.assertTrue(metadata["workbook_contract"]["explanatory_surfaces_do_not_upgrade_evidence"])
+        self.assertEqual(metadata["mvp_radar"]["status"], "loaded")
+        self.assertEqual(metadata["mvp_radar"]["decision"], "do_not_build")
+        self.assertEqual(metadata["mvp_radar"]["selected_candidate"], "LLM Guardrail Watchdog")
+        self.assertEqual(metadata["mvp_radar"]["kir_evidence"]["thread_slug"], "eval-gates")
+        self.assertFalse(metadata["mvp_radar"]["external_evidence"]["decision_grade_external"])
+        self.assertFalse(metadata["mvp_radar"]["live_source_intelligence"]["used_for_build_decision"])
+        self.assertEqual(metadata["report_contract"]["html_language"], "ru")
+        self.assertGreaterEqual(len(metadata["decision_cards"]), 3)
+        self.assertGreaterEqual(len(metadata["claim_cards"]), 3)
+        self.assertGreaterEqual(len(metadata["deep_explanation_cards"]), 3)
+        for card in metadata["deep_explanation_cards"][:3]:
+            self.assertTrue(card["source_urls"])
+            self.assertTrue(card["caveat"])
+            self.assertTrue(card["evidence_tier"])
+            self.assertTrue(card["quote_verification_status"])
+            self.assertTrue(card["what_would_change_my_mind"])
+            self.assertTrue(card["explanatory_only"])
+        self.assertTrue(all(card["quote_verified"] for card in metadata["claim_cards"][:3]))
+        self.assertTrue(all(card["verification_status"] == "verified" for card in metadata["claim_cards"][:3]))
+        self.assertTrue(all(card["source_independence_key"] for card in metadata["claim_cards"][:3]))
+        self.assertTrue(all(card["staleness_status"] for card in metadata["claim_cards"][:3]))
+        self.assertTrue(all(card["wording_policy"] for card in metadata["claim_cards"][:3]))
+        self.assertTrue(all(card["next_verification_step"] for card in metadata["claim_cards"][:3]))
+        self.assertTrue(metadata["thread_deltas"])
+        self.assertTrue(all(delta["this_week_evidence"] for delta in metadata["thread_deltas"]))
+        self.assertTrue(all(delta["why_this_is_one_thread"] for delta in metadata["thread_deltas"]))
+        self.assertTrue(all(delta["merge_split_audit_status"] for delta in metadata["thread_deltas"]))
+        self.assertIn("confirmed_leads", metadata["project_diagnostic"])
+        self.assertIn("project_watch", metadata["project_diagnostic"])
+        self.assertIn("PR/backlog candidates", html_text)
+        suggestions = metadata["project_diagnostic"]["implementation_suggestions"]
+        self.assertTrue(suggestions)
+        for suggestion in suggestions:
+            self.assertTrue(suggestion["effort"])
+            self.assertTrue(suggestion["acceptance_criteria"])
+            self.assertTrue(suggestion["risk_caveat"])
+            self.assertTrue(suggestion["source_atom_ids"] or suggestion["source_urls"])
+        self.assertIn("learning_only_implications", metadata["project_diagnostic"])
+        self.assertIn("close_but_not_enough_signals", metadata["project_diagnostic"])
+        self.assertIn("missing_config_suggestions", metadata["project_diagnostic"])
+        self.assertGreaterEqual(len(metadata["action_cards"]), 3)
+        self.assertGreaterEqual(sum(1 for card in metadata["action_cards"] if card["action_kind"] == "try"), 2)
+        self.assertGreaterEqual(sum(1 for card in metadata["action_cards"] if card["action_kind"] == "experiment"), 1)
+        self.assertTrue(all(card["target_ref"] for card in metadata["action_cards"]))
+        self.assertTrue(all(card["follow_up_hint"] for card in metadata["action_cards"]))
+        self.assertTrue(all(card["outcome_policy"] for card in metadata["action_cards"]))
+        self.assertTrue(metadata["feedback_targets"])
+        self.assertIn("AI-интеллект", summary.notification_text)
+        self.assertIn("Проектные лиды", summary.notification_text)
 
     def test_project_implications_ignore_generic_keyword_overlap(self):
         context = {
@@ -270,8 +504,8 @@ process.exit(2);
                 os.unlink(db_path)
 
         self.assertEqual(summary.archify_status, "fallback_missing")
-        self.assertIn("Archify fallback diagram", html_text)
-        self.assertIn("Knowledge Flow", html_text)
+        self.assertIn("Резервная диаграмма Archify", html_text)
+        self.assertIn("Карта потока знаний", html_text)
 
     def test_ai_visual_report_cli_can_deliver_document(self):
         db_path = self._make_db()
