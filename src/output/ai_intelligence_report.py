@@ -188,7 +188,79 @@ def _load_thread_atoms(
         """,
         (int(thread_id), max(1, int(limit or 8))),
     ).fetchall()
-    return [_atom_from_row(row) for row in rows]
+    atoms = [_atom_from_row(row) for row in rows]
+    _attach_source_posts(connection, atoms)
+    return atoms
+
+
+def _attach_source_posts(connection: sqlite3.Connection, atoms: list[dict]) -> None:
+    if not atoms or not _table_exists(connection, "posts"):
+        return
+    source_ids: list[int] = []
+    for atom in atoms:
+        for value in atom.get("source_post_ids") or []:
+            try:
+                post_id = int(value)
+            except (TypeError, ValueError):
+                continue
+            if post_id not in source_ids:
+                source_ids.append(post_id)
+    if not source_ids:
+        return
+    placeholders = ",".join("?" for _ in source_ids)
+    has_raw_posts = _table_exists(connection, "raw_posts")
+    if has_raw_posts:
+        rows = connection.execute(
+            f"""
+            SELECT
+                posts.id AS post_id,
+                posts.content,
+                posts.channel_username,
+                posts.posted_at,
+                raw_posts.message_url,
+                raw_posts.text AS raw_text
+            FROM posts
+            LEFT JOIN raw_posts ON raw_posts.id = posts.raw_post_id
+            WHERE posts.id IN ({placeholders})
+            """,
+            source_ids,
+        ).fetchall()
+    else:
+        rows = connection.execute(
+            f"""
+            SELECT
+                posts.id AS post_id,
+                posts.content,
+                posts.channel_username,
+                posts.posted_at,
+                NULL AS message_url,
+                NULL AS raw_text
+            FROM posts
+            WHERE posts.id IN ({placeholders})
+            """,
+            source_ids,
+        ).fetchall()
+    source_posts = {
+        int(row["post_id"]): {
+            "post_id": int(row["post_id"]),
+            "content": str(row["content"] or row["raw_text"] or ""),
+            "channel_username": str(row["channel_username"] or ""),
+            "posted_at": str(row["posted_at"] or ""),
+            "message_url": str(row["message_url"] or ""),
+        }
+        for row in rows
+    }
+    for atom in atoms:
+        linked = []
+        for value in atom.get("source_post_ids") or []:
+            try:
+                post_id = int(value)
+            except (TypeError, ValueError):
+                continue
+            post = source_posts.get(post_id)
+            if post:
+                linked.append(post)
+        atom["source_posts"] = linked
 
 
 def load_ai_intelligence_context(
@@ -237,6 +309,7 @@ def load_ai_intelligence_context(
         "week_end": week_end_sql,
         "threads": threads,
         "source_channels": _source_channel_counts(threads),
+        "marked_posts": _marked_posts_for_week(connection, week_label=week_label),
         "frontier_analysis": (
             fetch_frontier_analysis(connection, week_label=week_label)
             if _table_exists(connection, "frontier_analyses")
@@ -251,7 +324,30 @@ def load_ai_intelligence_context(
                 "counts_by_feedback": {},
                 "downranked_thread_slugs": [],
                 "downranked_atom_refs": [],
+                "downranked_target_refs": [],
+                "promoted_target_refs": [],
                 "missed_post_eval_examples": [],
+                "priority_eval_examples": [],
+                "feedback_eval_examples": [],
+                "feedback_completion": {
+                    "completed": False,
+                    "completed_count": 0,
+                    "required_count": 4,
+                    "missing": ["read_items", "action_outcome", "missed_or_no_missed", "trust_correction"],
+                    "read_event_count": 0,
+                    "action_event_count": 0,
+                    "has_missed_or_no_missed": False,
+                    "trust_correction_count": 0,
+                },
+                "feedback_changes": {
+                    "status": "low_confidence",
+                    "summary": "No prior feedback is available; personalization confidence is low.",
+                    "items": ["No confirmed feedback has changed ranking yet."],
+                    "downranked": [],
+                    "promoted": [],
+                    "eval_example_count": 0,
+                },
+                "frontier_prompt_guidance": ["No prior feedback is available; state low personalization confidence."],
                 "recent_events": [],
             }
         ),
@@ -309,6 +405,53 @@ def _source_channel_counts(threads: list[dict]) -> list[dict]:
     ]
 
 
+def _marked_posts_for_week(
+    connection: sqlite3.Connection,
+    *,
+    week_label: str,
+    limit: int = 8,
+) -> list[dict]:
+    required_tables = ("signal_feedback", "posts", "raw_posts")
+    if not all(_table_exists(connection, table_name) for table_name in required_tables):
+        return []
+    week_start, week_end = _week_bounds(week_label)
+    rows = connection.execute(
+        """
+        SELECT
+            signal_feedback.feedback,
+            signal_feedback.recorded_at,
+            posts.id AS post_id,
+            posts.channel_username,
+            posts.content,
+            raw_posts.message_url
+        FROM signal_feedback
+        JOIN posts ON posts.id = signal_feedback.post_id
+        LEFT JOIN raw_posts ON raw_posts.id = posts.raw_post_id
+        WHERE signal_feedback.feedback IN ('operator_marked_interesting', 'marked_important')
+          AND signal_feedback.recorded_at >= ?
+          AND signal_feedback.recorded_at < ?
+        ORDER BY signal_feedback.recorded_at DESC, signal_feedback.id DESC
+        LIMIT ?
+        """,
+        (
+            _iso_for_sql(week_start),
+            _iso_for_sql(week_end),
+            max(1, int(limit or 8)),
+        ),
+    ).fetchall()
+    return [
+        {
+            "post_id": int(row["post_id"]),
+            "feedback": str(row["feedback"] or ""),
+            "recorded_at": str(row["recorded_at"] or ""),
+            "channel_username": str(row["channel_username"] or ""),
+            "content": str(row["content"] or ""),
+            "source_url": str(row["message_url"] or ""),
+        }
+        for row in rows
+    ]
+
+
 def _all_atoms(threads: list[dict]) -> list[dict]:
     atoms = []
     seen = set()
@@ -333,6 +476,117 @@ def _changed_threads(threads: list[dict]) -> list[dict]:
     return [thread for thread in threads if thread.get("changed_this_week")]
 
 
+GENERIC_FEEDBACK_REFS = {
+    "report",
+    "weekly-report",
+    "claim-cards",
+    "read-queue",
+    "missed-post",
+    "action",
+    "experiment",
+}
+
+
+def _feedback_ref_terms(feedback: dict, *keys: str) -> set[str]:
+    terms: set[str] = set()
+    for key in keys:
+        for raw in feedback.get(key) or []:
+            text = str(raw or "").strip().lower()
+            if not text:
+                continue
+            candidates = {text}
+            if ":" in text:
+                candidates.add(text.split(":", maxsplit=1)[1])
+                candidates.add(text.rsplit(":", maxsplit=1)[-1])
+            for candidate in candidates:
+                clean = candidate.strip()
+                if len(clean) < 3 or clean in GENERIC_FEEDBACK_REFS:
+                    continue
+                terms.add(clean)
+                terms.add(clean.replace("-", " ").replace("_", " "))
+    return {term for term in terms if len(term) >= 3}
+
+
+def _matches_feedback_term(text: str, terms: set[str]) -> bool:
+    haystack = f" {str(text or '').lower()} "
+    normalized = haystack.replace("-", " ").replace("_", " ")
+    return any(term in haystack or term in normalized for term in terms)
+
+
+def _thread_search_text(thread: dict) -> str:
+    parts = [
+        thread.get("slug") or "",
+        thread.get("title") or "",
+        thread.get("summary") or "",
+        " ".join(thread.get("current_claims") or []),
+        " ".join(thread.get("superseded_claims") or []),
+    ]
+    for atom in thread.get("atoms") or []:
+        parts.extend(
+            [
+                atom.get("claim") or "",
+                atom.get("summary") or "",
+                atom.get("why_it_matters") or "",
+                " ".join(atom.get("entities") or []),
+                " ".join(atom.get("tools") or []),
+                " ".join(atom.get("practices") or []),
+            ]
+        )
+    return " ".join(parts)
+
+
+def _thread_feedback_score(thread: dict, feedback: dict) -> int:
+    slug = str(thread.get("slug") or "").strip().lower()
+    promoted_refs = {str(value or "").strip().lower() for value in feedback.get("promoted_target_refs") or []}
+    downranked_refs = {str(value or "").strip().lower() for value in feedback.get("downranked_target_refs") or []}
+    score = 0
+    if slug and f"idea_thread:{slug}" in promoted_refs:
+        score += 2
+    downranked_slugs = {str(value or "").strip().lower() for value in feedback.get("downranked_thread_slugs") or []}
+    if slug and (f"idea_thread:{slug}" in downranked_refs or slug in downranked_slugs):
+        score -= 2
+    text = _thread_search_text(thread)
+    if _matches_feedback_term(text, _feedback_ref_terms(feedback, "promoted_target_refs")):
+        score += 1
+    if _matches_feedback_term(text, _feedback_ref_terms(feedback, "downranked_target_refs", "downranked_thread_slugs")):
+        score -= 1
+    return score
+
+
+def _atom_search_text(atom: dict, thread: dict) -> str:
+    return " ".join(
+        [
+            str(atom.get("id") or ""),
+            atom.get("claim") or "",
+            atom.get("summary") or "",
+            atom.get("why_it_matters") or "",
+            " ".join(atom.get("entities") or []),
+            " ".join(atom.get("tools") or []),
+            " ".join(atom.get("practices") or []),
+            thread.get("slug") or "",
+            thread.get("title") or "",
+        ]
+    )
+
+
+def _atom_feedback_score(atom: dict, thread: dict, feedback: dict) -> int:
+    atom_id = str(atom.get("id") or "").strip()
+    promoted_refs = {str(value or "").strip().lower() for value in feedback.get("promoted_target_refs") or []}
+    downranked_refs = {str(value or "").strip().lower() for value in feedback.get("downranked_target_refs") or []}
+    score = _thread_feedback_score(thread, feedback)
+    if atom_id:
+        if f"knowledge_atom:{atom_id}" in promoted_refs or f"read_queue:atom:{atom_id}" in promoted_refs:
+            score += 2
+        if f"knowledge_atom:{atom_id}" in downranked_refs or f"read_queue:atom:{atom_id}" in downranked_refs:
+            score -= 2
+    text = _atom_search_text(atom, thread)
+    if _matches_feedback_term(text, _feedback_ref_terms(feedback, "promoted_target_refs")):
+        score += 1
+    if _matches_feedback_term(text, _feedback_ref_terms(feedback, "downranked_target_refs", "downranked_atom_refs")):
+        score -= 1
+    return score
+
+
 def _read_queue_atoms(threads: list[dict], feedback_context: dict | None = None) -> list[dict]:
     feedback = feedback_context or {}
     downranked_threads = set(feedback.get("downranked_thread_slugs") or [])
@@ -347,12 +601,15 @@ def _read_queue_atoms(threads: list[dict], feedback_context: dict | None = None)
             if atom_id in downranked_atoms or atom_id in seen:
                 continue
             seen.add(atom_id)
-            atoms.append(atom)
+            scored_atom = dict(atom)
+            scored_atom["_feedback_score"] = _atom_feedback_score(atom, thread, feedback)
+            atoms.append(scored_atom)
     preferred = [atom for atom in atoms if atom.get("atom_type") in READ_QUEUE_TYPES]
     fallback = [atom for atom in atoms if atom.get("atom_type") not in READ_QUEUE_TYPES]
 
-    def score_key(atom: dict) -> tuple[float, float, float, str]:
+    def score_key(atom: dict) -> tuple[float, float, float, float, str]:
         return (
+            float(atom.get("_feedback_score") or 0.0),
             float(atom.get("practical_utility_score") or 0.0),
             float(atom.get("novelty_score") or 0.0),
             float(atom.get("confidence") or 0.0),
@@ -483,6 +740,7 @@ def _learning_actions(threads: list[dict], feedback_context: dict | None = None)
     ranked = sorted(
         threads,
         key=lambda thread: (
+            _thread_feedback_score(thread, feedback),
             thread.get("status") == "production_pattern",
             float(thread.get("momentum_30d") or 0.0),
             int(thread.get("source_channel_count") or 0),
@@ -549,6 +807,13 @@ def _escape(value: object) -> str:
     return html.escape(str(value or ""), quote=True)
 
 
+def _truncate_text(value: str, limit: int) -> str:
+    text = " ".join(str(value or "").split())
+    if len(text) <= limit:
+        return text
+    return text[: max(1, limit - 1)].rstrip() + "…"
+
+
 def _link(url: str, label: str | None = None) -> str:
     clean = str(url or "").strip()
     if not clean:
@@ -593,10 +858,13 @@ def _source_links(atom: dict, *, limit: int = 3) -> str:
 
 def _render_feedback_context(context: dict) -> str:
     feedback = context.get("feedback_context") or {}
-    if int(feedback.get("event_count") or 0) <= 0:
-        return ""
     counts = feedback.get("counts_by_feedback") or {}
     count_text = ", ".join(f"{name.replace('_', ' ')}={count}" for name, count in sorted(counts.items())) or "none"
+    changes = feedback.get("feedback_changes") or {}
+    change_items = changes.get("items") or []
+    if not change_items:
+        change_items = ["No confirmed feedback has changed ranking yet."]
+    change_summary = changes.get("summary") or "No prior feedback is available; personalization confidence is low."
     missed = feedback.get("missed_post_eval_examples") or []
     missed_text = ""
     if missed:
@@ -608,6 +876,32 @@ def _render_feedback_context(context: dict) -> str:
         f"<li>Prior report feedback: {_escape(count_text)}</li>"
         f"{missed_text}"
         "</ul>"
+        "<h4>What Feedback Changed This Week</h4>"
+        f"<p>{_escape(change_summary)}</p>"
+        "<ul>"
+        + "".join(f"<li>{_escape(item)}</li>" for item in change_items[:6])
+        + "</ul>"
+        "</div>"
+    )
+
+
+def _render_marked_posts(context: dict) -> str:
+    marked_posts = context.get("marked_posts") or []
+    if not marked_posts:
+        return ""
+    items = []
+    for post in marked_posts[:8]:
+        label = post.get("source_url") or f"post {post.get('post_id')}"
+        source = _link(str(post.get("source_url") or ""), label) if post.get("source_url") else _escape(label)
+        snippet = _escape(_truncate_text(str(post.get("content") or ""), 180))
+        channel = _escape(post.get("channel_username") or "unknown")
+        items.append(f"<li>{source} <span class=\"muted\">{channel}</span><br>{snippet}</li>")
+    return (
+        '<div class="feedback-context">'
+        "<h3>Posts you marked this week</h3>"
+        "<ul>"
+        + "".join(items)
+        + "</ul>"
         "</div>"
     )
 
@@ -635,7 +929,14 @@ def _render_executive_brief(context: dict, actions: list[dict]) -> str:
             "<p>No Idea Threads are available yet. Generate Knowledge Atoms, refresh Idea Threads, "
             "then rerun this report.</p>"
         )
-    return '<div class="metrics">' + "".join(cards) + "</div>" + lead + _render_feedback_context(context)
+    return (
+        '<div class="metrics">'
+        + "".join(cards)
+        + "</div>"
+        + lead
+        + _render_feedback_context(context)
+        + _render_marked_posts(context)
+    )
 
 
 def _analysis_text(item: object, *keys: str) -> str:
@@ -1173,6 +1474,7 @@ def generate_ai_intelligence_report(
         "compressed_context": context.get("compressed_context") or [],
         "frontier_analysis": context.get("frontier_analysis"),
         "feedback_context": context.get("feedback_context") or {},
+        "marked_posts": context.get("marked_posts") or [],
         "personal_learning_loop": personal_learning_loop,
         "quality_findings": [finding.as_dict() for finding in findings],
         "actions": actions,

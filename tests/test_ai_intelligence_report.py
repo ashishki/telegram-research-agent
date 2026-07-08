@@ -47,6 +47,8 @@ from db.migrate import run_migrations  # noqa: E402
 from output.ai_intelligence_report import (  # noqa: E402
     AiIntelligenceReportQualityError,
     REQUIRED_SECTIONS,
+    _learning_actions,
+    _read_queue_atoms,
     generate_ai_intelligence_report,
     validate_ai_intelligence_html,
 )
@@ -133,9 +135,70 @@ class TestAiIntelligenceReport(unittest.TestCase):
                 last_seen_at="2026-07-07T10:00:00Z",
             )
 
+    def _seed_marked_post(self, db_path: str) -> None:
+        with sqlite3.connect(db_path) as connection:
+            posted_at = "2026-07-07T11:00:00Z"
+            connection.execute(
+                """
+                INSERT INTO raw_posts (
+                    id, channel_username, channel_id, message_id, posted_at, text,
+                    media_type, media_caption, forward_from, view_count, message_url,
+                    raw_json, ingested_at, image_description
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    701,
+                    "@ai_lab",
+                    10,
+                    701,
+                    posted_at,
+                    "Operator-marked source post about eval-gated agent workflows.",
+                    None,
+                    None,
+                    None,
+                    100,
+                    "https://t.me/ai_lab/701",
+                    "{}",
+                    posted_at,
+                    None,
+                ),
+            )
+            connection.execute(
+                """
+                INSERT INTO posts (
+                    id, raw_post_id, channel_username, posted_at, content,
+                    url_count, has_code, language_detected, word_count, normalized_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    701,
+                    701,
+                    "@ai_lab",
+                    posted_at,
+                    "Operator-marked source post about eval-gated agent workflows.",
+                    0,
+                    0,
+                    "en",
+                    8,
+                    posted_at,
+                ),
+            )
+            connection.commit()
+            connection.execute(
+                """
+                INSERT INTO signal_feedback (post_id, feedback, recorded_at)
+                VALUES (?, ?, ?)
+                """,
+                (701, "operator_marked_interesting", "2026-07-07T12:00:00Z"),
+            )
+            connection.commit()
+
     def test_generates_standalone_html_with_required_sections_sources_and_actions(self):
         db_path = self._make_db()
         self._seed_atoms(db_path)
+        self._seed_marked_post(db_path)
         with tempfile.TemporaryDirectory() as output_dir:
             try:
                 settings = self._settings(db_path)
@@ -212,6 +275,11 @@ class TestAiIntelligenceReport(unittest.TestCase):
         self.assertIn("Appendix: grouped source posts", html_text)
         self.assertIn("action-card", html_text)
         self.assertIn("Personal Learning Loop", html_text)
+        self.assertIn("What Feedback Changed This Week", html_text)
+        self.assertIn("personalization confidence is low", html_text)
+        self.assertIn("Posts you marked this week", html_text)
+        self.assertIn("https://t.me/ai_lab/701", html_text)
+        self.assertEqual(metadata["marked_posts"][0]["feedback"], "operator_marked_interesting")
         self.assertEqual(html_text.count('class="learning-read-item"'), 5)
         self.assertEqual(html_text.count('class="learning-try-item"'), 2)
         self.assertIn("Small Experiment", html_text)
@@ -300,6 +368,87 @@ class TestAiIntelligenceReport(unittest.TestCase):
         self.assertIn("notification=AI Intelligence Report 2026-W28 is ready.", output)
         self.assertIn("threads=1", output)
         self.assertIn("source_atoms=3", output)
+
+    def test_feedback_promotes_related_read_queue_atoms(self):
+        threads = [
+            {
+                "slug": "generic-agent-news",
+                "title": "Generic agent news",
+                "atoms": [
+                    {
+                        "id": 1,
+                        "atom_type": "tutorial_resource",
+                        "claim": "A broad agent tutorial.",
+                        "summary": "Broad but high-scoring.",
+                        "practical_utility_score": 0.99,
+                        "novelty_score": 0.9,
+                        "confidence": 0.9,
+                    }
+                ],
+            },
+            {
+                "slug": "eval-gates",
+                "title": "Eval gates",
+                "atoms": [
+                    {
+                        "id": 2,
+                        "atom_type": "tutorial_resource",
+                        "claim": "A specific eval-gate setup.",
+                        "summary": "Lower raw score but promoted by feedback.",
+                        "practical_utility_score": 0.2,
+                        "novelty_score": 0.2,
+                        "confidence": 0.8,
+                    }
+                ],
+            },
+        ]
+
+        atoms = _read_queue_atoms(
+            threads,
+            {
+                "promoted_target_refs": ["knowledge_atom:2"],
+                "downranked_target_refs": [],
+                "downranked_thread_slugs": [],
+                "downranked_atom_refs": [],
+            },
+        )
+
+        self.assertEqual(atoms[0]["id"], 2)
+
+    def test_feedback_downranks_related_learning_actions(self):
+        threads = [
+            {
+                "slug": "agent-frameworks",
+                "title": "Agent Frameworks",
+                "status": "active",
+                "momentum_30d": 0.95,
+                "source_channel_count": 5,
+                "current_claims": ["Framework churn is noisy."],
+                "atoms": [],
+            },
+            {
+                "slug": "eval-gates",
+                "title": "Eval Gates",
+                "status": "active",
+                "momentum_30d": 0.2,
+                "source_channel_count": 1,
+                "current_claims": ["Eval gates are useful."],
+                "atoms": [],
+            },
+        ]
+
+        actions = _learning_actions(
+            threads,
+            {
+                "downranked_target_refs": ["action:agent-frameworks"],
+                "promoted_target_refs": ["experiment:eval-gates"],
+                "downranked_thread_slugs": [],
+                "counts_by_feedback": {"wrong_priority": 1, "useful": 1},
+                "missed_post_eval_examples": [],
+            },
+        )
+
+        self.assertIn("Eval Gates", actions[0]["title"])
 
 
 if __name__ == "__main__":
