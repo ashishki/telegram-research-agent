@@ -20,6 +20,27 @@ Knowledge Atlas plus Weekly Intelligence Brief surfaces, and PI curated search
 uses deterministic ranking plus transient SQLite FTS over curated objects only.
 Raw Telegram firehose RAG and full-year archive processing remain deferred.
 
+## Dogfood Stabilization Note
+
+Dogfood-blocking repo hygiene was stabilized on 2026-07-08 in commit
+`3ac2515`:
+
+- market context lens output is isolated for non-default seed exports, so tests
+  and one-off exports no longer reuse stale `data/output/market_context_lens`
+  state;
+- Telegram bot dispatch logs record command names and text lengths instead of
+  raw operator messages or feedback text;
+- generated `data/output/**` artifacts are ignored by default;
+- feedback docs now distinguish pending feedback drafts from confirmed feedback
+  memory events;
+- the dogfood plan includes a concrete Week 1 command checklist and smoke
+  checks.
+
+Remaining hygiene is intentionally separate: older tracked `data/output`
+reports still need a fixture-vs-private-artifact decision before any
+`git rm --cached` cleanup, and ad-hoc manual review artifacts under
+`docs/artifacts/` should be committed only when explicitly intended.
+
 Reference integration: `docs/entropy_core_gensyn_integration.md`.
 
 ## What It Is

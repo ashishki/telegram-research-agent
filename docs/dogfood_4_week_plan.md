@@ -22,6 +22,39 @@ Main weekly product test:
 If the system only generates attractive reports and does not change decisions
 or actions, it is not successful.
 
+## Readiness Hygiene Status
+
+Completed before starting dogfood:
+
+- isolated the market context lens sidecar for temp/custom seed exports so
+  stale repo-level market context cannot contaminate tests or one-off Radar
+  seed files;
+- kept market context as `context_only` Radar input; it remains ranking and
+  validation context, not build-ready evidence;
+- redacted Telegram bot dispatch logs so raw operator text, prompts, and
+  feedback are not written to normal service logs;
+- ignored generated `data/output/**` files by default to reduce accidental
+  private artifact commits;
+- clarified that `/feedback` and voice feedback create pending drafts first,
+  while confirmed feedback memory events are written only after
+  `/feedback_confirm`;
+- added the Week 1 command checklist below.
+
+Verification already run:
+
+```text
+tests/test_opportunity_seed_export.py tests/test_market_context_lens.py: 7 passed
+focused PI/Hermes/feedback/Radar-adjacent safety suite: 85 passed
+py_compile for changed Python files: passed
+```
+
+Known remaining cleanup:
+
+- historical tracked `data/output` reports still need a separate
+  fixture-vs-private-artifact decision before any index cleanup;
+- ad-hoc manual review artifacts under `docs/artifacts/` should stay untracked
+  unless the operator intentionally promotes them to documentation.
+
 ## Weekly Routine
 
 ### Week 1 Command Checklist
