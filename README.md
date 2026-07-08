@@ -10,14 +10,15 @@ facade/tool catalog, Hermes concierge commands, action-status projection, and
 dogfood review layers are the primary direction. Current work is tracked in
 `docs/tasks.md`.
 
-Current next work: decide/prototype curated-only semantic RAG. Hermes Telegram
-UX cleanup is implemented: plain messages do not show MarkdownV2 escape
-artifacts, reminders are scheduled/displayed in `Asia/Tbilisi`, feedback drafts
-use an Opus-class strategist while remaining confirmation-gated, MVP Radar now
-has a bounded market/business analyst context pack from curated atoms/threads,
-and the reader-facing HTML can be split into Knowledge Atlas plus Weekly
-Intelligence Brief surfaces. Raw Telegram firehose RAG and full-year archive
-processing remain deferred.
+Current next work: dogfood the PI/Hermes workflow before adding broader product
+surface area. Hermes Telegram UX cleanup is implemented: plain messages do not
+show MarkdownV2 escape artifacts, reminders are scheduled/displayed in
+`Asia/Tbilisi`, feedback drafts use an Opus-class strategist while remaining
+confirmation-gated, MVP Radar now has a bounded market/business analyst context
+pack from curated atoms/threads, the reader-facing HTML can be split into
+Knowledge Atlas plus Weekly Intelligence Brief surfaces, and PI curated search
+uses deterministic ranking plus transient SQLite FTS over curated objects only.
+Raw Telegram firehose RAG and full-year archive processing remain deferred.
 
 Reference integration: `docs/entropy_core_gensyn_integration.md`.
 
@@ -172,9 +173,10 @@ it enters the confirmation-gated `/feedback_voice` flow. If it is a reminder,
 it creates a local reminder for the daily check-in. If `OPENAI_API_KEY` is
 missing, voice messages return a clear text fallback.
 
-Current retrieval is deterministic curated retrieval over workbook sidecars,
-claim cards, Knowledge Atoms, Idea Threads, action cards, MVP/Strategy
-Reviewer/feedback projections, and related DTOs. There is no raw Telegram
+Current retrieval is curated retrieval over workbook sidecars, claim cards,
+Knowledge Atoms, Idea Threads, action cards, MVP/Strategy Reviewer/feedback
+projections, and related DTOs. PI search applies filters first, then ranks with
+deterministic scoring plus transient SQLite FTS5. There is no raw Telegram
 firehose RAG, no vector DB, and no assistant access to raw SQLite sessions.
 
 Telethon reaction sync uses the configured user session to inspect original
@@ -248,4 +250,4 @@ Historical material lives under [docs/archive/](docs/archive/README.md).
 
 The AI Knowledge Intelligence path is implemented end-to-end for local operation: raw posts can be atomized, atoms can be grouped into temporal threads, a frontier analysis can be persisted, the user-facing workbook HTML can be generated and delivered, feedback can be confirmed into memory, Strategy Reviewer can produce advisory improvement tasks, bounded Obsidian notes can be regenerated from the same knowledge layer, and Hermes/PI can read curated intelligence through bounded read-only interfaces.
 
-The honest limitation is quality of interpretation and dogfood proof, not missing plumbing: project implications are conservative keyword/evidence leads, not full project-priority decisions; empty project leads are allowed when evidence is too broad. User value is not proven until the four-week dogfood protocol produces real feedback, actions, decisions changed, and friction scores. HPI-9 vector retrieval and HPI-10 post-dogfood product decisions stay deferred until then.
+The honest limitation is quality of interpretation and dogfood proof, not missing plumbing: project implications are conservative keyword/evidence leads, not full project-priority decisions; empty project leads are allowed when evidence is too broad. User value is not proven until the four-week dogfood protocol produces real feedback, actions, decisions changed, and friction scores. Vector retrieval and HPI-10 post-dogfood product decisions stay deferred until dogfood shows concrete misses.

@@ -33,7 +33,7 @@ _v3.8 · 2026-07-08 · telegram-research-agent_
   one daily check-in with `сделал` / `не сделал` buttons. Strategy Reviewer
   remains advisory. Four-week dogfood validates real convenience/usefulness
   before adding complex features.
-- HPI-11, HPI-12, HPI-13, and HPI-14 are implemented. Telegram plain-text messages no longer
+- HPI-11, HPI-12, HPI-13, HPI-14, and HPI-9-lite are implemented. Telegram plain-text messages no longer
   show MarkdownV2 backslash artifacts when `parse_mode=None`, `/help` starts
   with normal private-assistant guidance, reminders parse/display/run in
   `Asia/Tbilisi`, and feedback drafts use the Opus-class
@@ -43,9 +43,10 @@ _v3.8 · 2026-07-08 · telegram-research-agent_
   only, with raw fallback for channels not yet extracted and gate audits for
   empty or weak weeks. `ai-split-report` now emits separate Knowledge Atlas
   and Weekly Intelligence Brief HTML/JSON artifacts from one curated context
-  load. Operator-requested next queue is HPI-9-lite: decide/prototype curated
-  semantic RAG using Dream Motif Interpreter as a reference. Do not run a
-  full-year archive pass yet.
+  load. HPI-9-lite adds a curated-only retrieval decision and prototype:
+  deterministic ranking plus transient SQLite FTS over filtered curated
+  `IntelligenceRetrievalItem` objects. Vector retrieval and raw Telegram RAG
+  remain deferred. Do not run a full-year archive pass yet.
 - Operational incident on 2026-07-06: `telegram-digest.timer` had been inactive
   since 2026-06-22, so weekly Research Brief/Implementation Ideas stopped
   running while ingest and MVP weekly continued. The timer was manually
@@ -261,35 +262,30 @@ transcription with chat/feedback/reminder intent routing, daily operator
 reminders with done/not-done callbacks, Strategy Reviewer Telegram delivery,
 action status projection, and compact dogfood review artifact helpers.
 
-The exact next task is HPI-9-lite, because HPI-14 has split reader-facing HTML
-into a cumulative Knowledge Atlas and a short Weekly Intelligence Brief while
-keeping sidecars readable by Hermes/PI retrieval:
+The exact next task is dogfood measurement over the implemented PI/Hermes
+workflow, because HPI-9-lite has already decided and prototyped curated-only
+retrieval without vector/raw-post RAG:
 
 ```text
-HPI-9-lite - Curated Semantic RAG Decision And Prototype
+Dogfood PI/Hermes Curated Intelligence Workflow
 ```
 
-Implement HPI-9-lite first:
+Do this next:
 
-- inspect Dream Motif Interpreter retrieval patterns under
-  `/srv/openclaw-you/workspace/Dream_Motif_Interpreter`;
-- decide whether PI Assistant needs semantic retrieval beyond deterministic
-  curated retrieval;
-- if yes, prototype semantic retrieval only over curated objects such as
-  workbook cards, Knowledge Atoms, Idea Threads, actions, MVP dossiers,
-  feedback summaries, and Strategy Reviewer notes;
+- run the weekly split report / Hermes / feedback / action-status loop on real
+  operator questions;
+- record concrete retrieval misses, wrong priorities, useful answers, actions
+  completed, and friction;
+- use `docs/curated_semantic_retrieval.md` as the retrieval decision record;
 - do not index raw Telegram firehose posts;
 - keep all assistant tools read-only.
-
-Dream Motif Interpreter has the retrieval reference code at
-`/srv/openclaw-you/workspace/Dream_Motif_Interpreter`.
 
 Do not implement raw Telegram firehose RAG. Do not run the annual/full archive
 pass yet. Do not implement assistant mutation tools. Do not let Telegram
 commands edit code/config/profile/projects or write feedback directly. Hermes
 remains a concierge/router, not source of truth. PI Assistant must use curated
-retrieval unless HPI-9-lite explicitly proves and implements a curated-only
-semantic layer.
+retrieval; vector retrieval requires concrete dogfood misses against the
+current curated deterministic+FTS layer.
 
 Open/future items outside completed Q0..Q13 remain:
 

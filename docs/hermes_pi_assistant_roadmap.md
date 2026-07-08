@@ -611,20 +611,25 @@ Stop and ask the operator if a task:
 
 ## Next Operational Task
 
-Implement HPI-9-lite first: Curated Semantic RAG decision/prototype.
+Dogfood the implemented PI/Hermes curated intelligence workflow before adding
+broader product surface area or vector retrieval.
 
 Scope:
 
-- inspect Dream Motif Interpreter retrieval patterns;
-- decide whether deterministic curated retrieval is enough for PI Assistant;
-- if needed, prototype semantic retrieval over curated objects only;
+- run real weekly questions through Hermes/PI search, split reports, action
+  status, feedback, and MVP Radar;
+- record concrete retrieval misses and wrong-priority examples;
+- decide on vector retrieval only from measured misses against the current
+  curated deterministic+SQLite FTS layer;
 - keep raw Telegram firehose posts out of vector/RAG indexing;
 - keep assistant tools read-only.
 
 Recommended follow-up order:
 
-1. HPI-9-lite - Curated Semantic RAG decision/prototype using Dream Motif
-   retrieval patterns as reference.
+1. Four-week dogfood measurement over the current PI/Hermes workflow.
+2. HPI-10 post-dogfood product decision.
+3. Optional vector retrieval over curated items only if dogfood proves
+   deterministic+FTS misses.
 
 Do not run the full-year archive pass yet. Do not implement raw Telegram RAG,
 multi-profile Hermes, external Hermes memory, or mutation tools before dogfood

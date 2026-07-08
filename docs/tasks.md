@@ -1057,7 +1057,7 @@ Stop conditions:
 
 ### HPI-9-lite - Curated Semantic RAG Decision And Prototype
 
-Status: next P1 after HPI-14; planned design/prototype task; do not implement raw Telegram RAG.
+Status: implemented by HPI-9-lite; do not implement raw Telegram RAG.
 
 Goal: decide whether the PI Assistant needs semantic retrieval, and if yes,
 prototype it over curated knowledge objects only.
@@ -1087,6 +1087,18 @@ Architecture position:
   - confirmed feedback summaries.
 - Raw Telegram posts are not default assistant memory.
 
+Decision:
+
+- Vector RAG is not needed now. It stays deferred until dogfood produces
+  specific curated-search misses.
+- The accepted prototype is deterministic curated ranking plus transient
+  SQLite FTS5 over filtered `IntelligenceRetrievalItem` objects.
+- The decision record lives in `docs/curated_semantic_retrieval.md`.
+- Dream Motif patterns adopted: facade boundary, exact/FTS before vector,
+  filters before ranking, provenance, and insufficient-evidence states.
+- Dream Motif parts deferred: Postgres/pgvector, persisted embeddings, and LLM
+  query expansion.
+
 Files likely:
 
 - `src/output/intelligence_retrieval_items.py`
@@ -1097,6 +1109,21 @@ Files likely:
 - `tests/test_pi_facade.py`
 - `tests/test_pi_chat.py`
 - docs update capturing the retrieval decision
+
+Implemented:
+
+- `src/assistant/semantic_retrieval.py` adds the curated-only prototype:
+  filter-first request-local SQLite FTS5, deterministic rank merge, small
+  deterministic domain query expansion, raw-post item-type denylist, and
+  `retrieval_mode` metadata.
+- `src/assistant/pi_facade.py` routes `search_intelligence_items` through the
+  curated deterministic+FTS prototype and returns `retrieval_decision`.
+- `src/assistant/pi_prompts.py` tells the assistant that curated FTS is allowed
+  but raw Telegram firehose retrieval and vector memory remain disallowed.
+- `tests/test_semantic_retrieval.py` covers MVP Radar expansion, filter-first
+  retrieval, raw item exclusion, and the vector/raw-RAG decision note.
+- `tests/test_pi_facade.py` covers the facade-level retrieval decision and
+  curated FTS search path.
 
 Implementation plan:
 
@@ -1123,7 +1150,7 @@ Acceptance:
 Verification:
 
 ```bash
-PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m unittest tests.test_intelligence_retrieval_items tests.test_pi_facade tests.test_pi_chat
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m unittest tests.test_semantic_retrieval tests.test_intelligence_retrieval_items tests.test_pi_facade tests.test_pi_tools tests.test_pi_chat
 ```
 
 Stop conditions:

@@ -224,16 +224,18 @@ plain text, `/chat`, `/hermes`, `/ask`, `/weekly`, `/actions`, `/explain`,
 `/projects`, `/mvp`, `/strategy`, `/remind`, `/reminders`, and `/codex`.
 `/codex` prepares prompt text for manual approval and never executes Codex.
 
-RAG readiness is intentionally limited. The assistant layer reads deterministic
-curated retrieval items from workbook/claim/atom/thread/action/MVP/feedback
-and Strategy Reviewer projections. It does not run raw Telegram firehose RAG,
-does not use vector search, and does not expose raw SQLite sessions.
+RAG readiness is intentionally limited. The assistant layer reads curated
+retrieval items from workbook/claim/atom/thread/action/MVP/feedback and
+Strategy Reviewer projections. PI search applies filters first, then uses
+deterministic ranking plus request-local SQLite FTS over those curated objects.
+It does not run raw Telegram firehose RAG, does not use vector search, and does
+not expose raw SQLite sessions.
 
 Next implementation queue before deeper dogfood:
 
-- evaluate curated-only semantic RAG using Dream Motif retrieval patterns as
-  reference. Obsidian remains a generated human navigation/audit projection,
-  not runtime assistant memory.
+- dogfood the current Hermes/PI workflow and record concrete retrieval misses
+  before any vector retrieval decision. Obsidian remains a generated human
+  navigation/audit projection, not runtime assistant memory.
 
 Implemented HPI-11 cleanup: plain Telegram messages are sent without MarkdownV2
 backslash artifacts when `parse_mode=None`; `/help` now starts with "just write
@@ -251,6 +253,10 @@ Implemented HPI-14 split reports: `ai-split-report` writes a cumulative
 Knowledge Atlas and a short Weekly Intelligence Brief from one curated context
 load; both have distinct HTML/JSON sidecars and remain visible to read-only
 Hermes/PI retrieval.
+Implemented HPI-9-lite curated retrieval decision: PI search now uses
+deterministic ranking plus transient SQLite FTS over filtered curated
+`IntelligenceRetrievalItem` objects. Vector retrieval and raw Telegram RAG
+remain deferred; see `docs/curated_semantic_retrieval.md`.
 
 Reaction readiness requires a live operator event. Put any personal reaction on
 a recent original channel post, then run:
