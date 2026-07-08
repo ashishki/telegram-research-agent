@@ -2,7 +2,13 @@
 
 Personal research intelligence for Telegram channels: ingest posts, preserve evidence, extract AI knowledge atoms, track evolving idea threads, and produce weekly decision reports instead of a generic digest.
 
-Status: active AI Knowledge Intelligence Desk. The legacy Research Brief / Implementation Ideas loop still works, but the newer knowledge-atom, idea-thread, Weekly AI Intelligence Workbook, feedback, Strategy Reviewer, MVP Radar bridge, and generated Obsidian layers are implemented and are the primary direction. Current work is tracked in `docs/tasks.md`.
+Status: active AI Knowledge Intelligence Desk with a safe HPI dogfood
+foundation. The legacy Research Brief / Implementation Ideas loop still works,
+but the newer knowledge-atom, idea-thread, Weekly AI Intelligence Workbook,
+feedback, Strategy Reviewer, MVP Radar bridge, generated Obsidian, read-only PI
+facade/tool catalog, Hermes concierge commands, action-status projection, and
+dogfood review layers are the primary direction. Current work is tracked in
+`docs/tasks.md`.
 
 Reference integration: `docs/entropy_core_gensyn_integration.md`.
 
@@ -68,6 +74,9 @@ It is not a public bot, SaaS product, or generic summarizer.
 - Frontier-model synthesis via `frontier-analysis`: top-model weekly interpretation over compressed 12-week context.
 - Stakeholder-facing Weekly AI Intelligence Workbook via `ai-visual-report`: Russian decision brief, strong signals, deep explanation cards, claim evidence cards with quote verification/evidence tiers, concept diagrams, project implementation suggestions, MVP Radar section, feedback prompts, JSON sidecar, and embedded Archify/local diagrams when available.
 - Strategy Reviewer via `strategy-reviewer`: advisory-only keep/change/demote/test-next-week suggestions and Codex-ready tasks from confirmed workbook feedback; it does not mutate source code, prompts, thresholds, profile, or projects.
+- HPI read-only foundation: `PersonalIntelligenceFacade`, deterministic curated retrieval items, and bounded PI tools expose workbook, thread, action, MVP, feedback, marked-post, Strategy Reviewer, and action-status DTOs without raw DB sessions, vector search, or mutation methods.
+- Hermes Telegram concierge commands: `/weekly`, `/actions`, `/explain`, `/projects`, `/mvp`, `/strategy`, and `/codex` provide short operator routing; `/codex` prepares prompt text only and never executes Codex.
+- Dogfood review helper: compact private weekly dogfood JSON/Markdown artifacts can track time-to-understand, sections read, completed actions, feedback counts, MVP status, decisions changed, user value, and friction before HPI-9/HPI-10 decisions.
 - Generated Obsidian projection via `obsidian-export`: bounded weekly, thread, tool/model, practice, channel, read-queue, try/build, experiment, project-watch, feedback-summary, and strategy-review notes with generated-file markers and source links.
 - Honest project implications: the visual report suppresses broad keyword overlaps like `AI`, `workflow`, and `evidence`; a zero project-lead count means the current atom/thread evidence was too weak for a user-facing project claim.
 
@@ -146,6 +155,8 @@ Start here:
 - [docs/report_quality_roadmap.md](docs/report_quality_roadmap.md) — report-quality, artifact feedback, internal cost guardrail, and Demand-to-MVP Radar handoff tasks
 - [docs/ai_knowledge_intelligence_roadmap.md](docs/ai_knowledge_intelligence_roadmap.md) — AI Knowledge Intelligence Desk architecture, phases, visual report, and Obsidian projection
 - [docs/ai_intelligence_workbook_roadmap.md](docs/ai_intelligence_workbook_roadmap.md) — completed KIR-Q0..KIR-Q13 workbook, feedback, Radar contract, Strategy Reviewer, and Obsidian projection roadmap
+- [docs/hermes_pi_assistant_roadmap.md](docs/hermes_pi_assistant_roadmap.md) — HPI roadmap for Hermes concierge, PI Assistant bounded tools, dogfood, and deferred vector/post-dogfood gates
+- [docs/dogfood_4_week_plan.md](docs/dogfood_4_week_plan.md) — four-week dogfood metrics, weekly checklist, success criteria, and simplification triggers
 - [docs/operator_workflow.md](docs/operator_workflow.md) — weekly operating workflow
 - [docs/architecture.md](docs/architecture.md) — current system shape
 - [docs/spec.md](docs/spec.md) — implementation-facing system specification
@@ -160,6 +171,6 @@ Historical material lives under [docs/archive/](docs/archive/README.md).
 
 ## Development State
 
-The AI Knowledge Intelligence path is implemented end-to-end for local operation: raw posts can be atomized, atoms can be grouped into temporal threads, a frontier analysis can be persisted, the user-facing workbook HTML can be generated and delivered, feedback can be confirmed into memory, Strategy Reviewer can produce advisory improvement tasks, and bounded Obsidian notes can be regenerated from the same knowledge layer.
+The AI Knowledge Intelligence path is implemented end-to-end for local operation: raw posts can be atomized, atoms can be grouped into temporal threads, a frontier analysis can be persisted, the user-facing workbook HTML can be generated and delivered, feedback can be confirmed into memory, Strategy Reviewer can produce advisory improvement tasks, bounded Obsidian notes can be regenerated from the same knowledge layer, and Hermes/PI can read curated intelligence through bounded read-only interfaces.
 
-The honest limitation is quality of interpretation, not missing plumbing: project implications are conservative keyword/evidence leads, not full project-priority decisions; empty project leads are allowed when evidence is too broad. The legacy Research Brief, Implementation Ideas, Study Plan, receipts, Radar bridge, and operator health surfaces still exist and remain useful downstream.
+The honest limitation is quality of interpretation and dogfood proof, not missing plumbing: project implications are conservative keyword/evidence leads, not full project-priority decisions; empty project leads are allowed when evidence is too broad. User value is not proven until the four-week dogfood protocol produces real feedback, actions, decisions changed, and friction scores. HPI-9 vector retrieval and HPI-10 post-dogfood product decisions stay deferred until then.

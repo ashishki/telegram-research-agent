@@ -93,6 +93,71 @@ Suggested voice feedback prompt:
 Что было полезно? Что было мимо? Что попробовал? Что применил к проекту? Что нужно изменить в следующем отчете?
 ```
 
+### Hermes / PI Assistant Dogfood Routine
+
+Hermes is the Telegram-facing concierge for the workbook workflow. It is a
+router and reminder, not a source of truth. The Weekly AI Intelligence Workbook
+remains the main reading artifact, and PI Assistant should answer only from
+curated intelligence objects when source-grounded claims are needed.
+
+Planned Hermes commands:
+
+- `/weekly` - current workbook status and three main conclusions;
+- `/actions` - one to three actions for the week;
+- `/explain` - explain a selected signal or ask what to explain;
+- `/projects` - project actions and watch items;
+- `/mvp` - MVP Radar candidate status, source mix, missing evidence, and why
+  build/focused_experiment is or is not allowed;
+- `/feedback` - text or voice feedback intake;
+- `/strategy` - Strategy Reviewer suggestions;
+- `/codex` - prepared Codex task suggestions for manual approval.
+
+Dogfood Monday flow:
+
+1. Generate or locate the current workbook.
+2. Ask Hermes for `/weekly`.
+3. Read Decision Brief, two Deep Explanation cards, Project Actions, and MVP
+   Radar.
+4. Pick one read/try/project/MVP validation/reject-defer action.
+
+During-week flow:
+
+1. Use `/explain` for unclear workbook signals.
+2. Use `/projects` when choosing project work.
+3. Use `/mvp` before treating any candidate as a build opportunity.
+4. React to original Telegram posts that were interesting for any reason.
+
+End-week flow:
+
+1. Send voice feedback through `/feedback`.
+2. Review Hermes parsed summary.
+3. Confirm only the memory writes that are correct.
+4. Review `/strategy`.
+5. Optionally run one `/codex` task if it has clear acceptance criteria and
+   verification commands.
+
+Voice feedback confirmation rule:
+
+- Hermes may show what will be written to memory;
+- Hermes may show config/code/Codex suggestions;
+- only confirmed feedback becomes memory;
+- config/code changes require manual approval and a separate Codex task;
+- no reaction still means unknown, not negative.
+
+Codex task selection rule:
+
+- run at most one optional Codex task per week during dogfood;
+- prefer fixes that improve feedback/action usefulness, evidence clarity, or
+  workflow friction;
+- defer visual polish, multi-profile Hermes, vector retrieval, and extra
+  gateways until the four-week review;
+- never run a task that weakens evidence gates, makes Radar build from
+  Telegram-only evidence, or turns Hermes into source of truth.
+
+Track the weekly dogfood metrics from `docs/dogfood_4_week_plan.md`, especially
+time to understand the week, confirmed feedback count, completed real actions,
+decisions changed, value score, and friction score.
+
 ### Reader-Facing Quality Contract
 
 The weekly package should behave like a decision brief, not a raw digest.

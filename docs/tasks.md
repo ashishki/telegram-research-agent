@@ -1,7 +1,7 @@
 # Current Backlog
 
 **Status:** Active lightweight backlog
-**Last updated:** 2026-07-07
+**Last updated:** 2026-07-08
 
 The historical memory-unification roadmap is complete and archived at
 `docs/archive/roadmaps/tasks-v5-memory-unification.md`.
@@ -158,16 +158,505 @@ report quality, Radar handoff, cost guardrails, artifact consistency,
 editorial memory, initial Pathway-ready live source intelligence, and initial
 KIR plumbing are implemented.
 
-The active queue is not closed after KIR-050. KIR plumbing is done, but the
-quality/eval/user-value roadmap is open: the next stage must turn the working
-knowledge-intelligence pipeline into a reliable weekly intelligence desk that
-shows verified claims, temporal deltas, personalization, operational actions,
-and outcome feedback instead of only attractive atoms/threads/HTML.
+The active queue is now HPI: Hermes / Personal Intelligence Assistant /
+Dogfood. KIR plumbing and KIR-Q0..KIR-Q13 are implemented; the next stage must
+make the working knowledge-intelligence pipeline easier to use through a
+Telegram concierge, bounded curated Q&A, confirmation-gated feedback, and a
+four-week dogfood loop.
 
-Implementation details, end-to-end stages, acceptance criteria, metrics, risks
-and non-goals for this queue are in
-`docs/ai_knowledge_intelligence_roadmap.md`. Historical report-quality and
-Radar paths remain in `docs/report_quality_roadmap.md`.
+Implementation details, end-to-end stages, acceptance criteria, metrics, risks,
+and non-goals for the completed KIR queue remain in
+`docs/ai_knowledge_intelligence_roadmap.md` and
+`docs/ai_intelligence_workbook_roadmap.md`. Historical report-quality and Radar
+paths remain in `docs/report_quality_roadmap.md`.
+
+## HPI: Hermes / Personal Intelligence Assistant / Dogfood
+
+Status: active post-KIR planning and implementation queue.
+
+KIR-Q0..KIR-Q13 are implemented. The next phase is HPI: Hermes as a
+Telegram-facing operator concierge, PI Assistant as bounded Q&A over curated
+intelligence objects, Strategy Reviewer as advisory layer, and a four-week
+dogfood protocol that measures real weekly usefulness before adding more
+complexity.
+
+Roadmap details:
+
+- `docs/hermes_pi_assistant_roadmap.md`
+- `docs/dogfood_4_week_plan.md`
+
+### HPI-0 - Document Hermes/PI Assistant Roadmap And Dogfood Plan
+
+Status: implemented by HPI-0.
+
+Goal: document the post-KIR product layer, architecture boundaries, Hermes
+Guide review, Dream Motif Interpreter reference patterns, dogfood protocol, and
+Codex-ready implementation queue.
+
+Files likely:
+
+- `docs/hermes_pi_assistant_roadmap.md`
+- `docs/dogfood_4_week_plan.md`
+- `docs/tasks.md`
+- `docs/operator_workflow.md`
+- `docs/CODEX_PROMPT.md`
+- `docs/ai_intelligence_workbook_roadmap.md`
+- `docs/README.md`
+
+Acceptance:
+
+- HPI roadmap exists and states Hermes/PI/Strategy Reviewer boundaries;
+- Hermes Guide Review includes Adopt / Defer / Reject;
+- Dream Motif Interpreter pattern review is captured;
+- four-week dogfood plan exists with metrics and success/failure criteria;
+- task queue HPI-0..HPI-10 exists;
+- HPI-1 was identified as the next P0 implementation task at HPI-0 handoff;
+- docs do not claim Hermes/PI is implemented.
+
+Verification:
+
+```bash
+git diff --stat
+rg "HPI-0|HPI-1|Hermes|PI Assistant|dogfood|Hermes Guide Review" docs
+```
+
+Stop conditions:
+
+- do not implement Hermes commands or vector retrieval inside HPI-0;
+- do not touch generated private reports.
+
+### HPI-1 - PersonalIntelligenceFacade Read-Only Contract
+
+Status: implemented by HPI-1.
+
+Goal: add a bounded read-only facade that exposes stable DTO-like access to
+current workbook, idea threads, curated intelligence items, project actions,
+MVP Radar status, feedback summary, marked posts, and Strategy Reviewer notes.
+
+Files likely:
+
+- `src/assistant/pi_facade.py`
+- `tests/test_pi_facade.py`
+- maybe `src/assistant/__init__.py`
+
+Implemented files:
+
+- `src/assistant/__init__.py`
+- `src/assistant/pi_facade.py`
+- `tests/test_pi_facade.py`
+
+Implementation notes:
+
+- HPI-1 creates a read-only facade only.
+- The facade exposes stable DTO-like dictionaries/lists for workbook summary,
+  workbook sections, idea threads, project actions, MVP Radar status, feedback
+  summary, marked posts, and curated intelligence search.
+- It does not expose raw SQLite sessions/rows and has no code/config/Codex
+  mutation methods.
+
+Acceptance:
+
+- facade instantiates from Settings or repo-local path conventions;
+- methods return stable dict/list DTO shapes;
+- missing workbook/MVP/feedback/reviewer data returns empty/insufficient
+  results instead of crashing;
+- no mutation methods exist;
+- no sqlite connection, cursor, ORM row, or mutable internal state is exposed;
+- tests cover empty states and basic shape stability.
+
+Verification:
+
+```bash
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m unittest tests.test_pi_facade
+```
+
+Stop conditions:
+
+- stop if the implementation needs assistant write tools;
+- stop if it requires broad raw Telegram RAG;
+- stop if it exposes raw database handles to the assistant layer.
+
+### HPI-2-lite - Curated Intelligence Retrieval Items Projection
+
+Status: implemented as HPI-2-lite.
+
+Goal: build a deterministic projection of curated intelligence objects into
+`intelligence_retrieval_items` so PI Assistant can search workbook sections,
+claim cards, Knowledge Atoms, Idea Threads, thread deltas, action cards,
+project diagnostics, feedback events, MVP dossiers, and Strategy Reviewer notes.
+
+Files likely:
+
+- `src/output/intelligence_retrieval_items.py`
+- `src/db/` migration/helper for the projection table if needed
+- `tests/test_intelligence_retrieval_items.py`
+
+Implemented files:
+
+- `src/output/intelligence_retrieval_items.py`
+- `tests/test_intelligence_retrieval_items.py`
+
+Implementation notes:
+
+- HPI-2-lite creates deterministic curated retrieval only.
+- It builds an in-memory projection from workbook JSON sidecars, claim cards,
+  Knowledge Atoms, Idea Threads, project diagnostics/actions, MVP Radar status,
+  feedback summaries, and Strategy Reviewer advisory notes when those curated
+  sources are available.
+- It is SQLite-first/read-only and skips missing artifacts or tables
+  gracefully.
+- It does not create a vector index, does not perform raw Telegram firehose
+  RAG, and does not introduce mutation tools.
+- A persisted refresh table or FTS-backed projection can be considered later
+  only if the in-memory deterministic projection is insufficient.
+
+Acceptance:
+
+- projection has stable IDs, item type, week, title, text/summary, source refs,
+  atom IDs, thread slug, project name, confidence/evidence fields, status, and
+  timestamps;
+- deterministic in-memory projection build is idempotent for the same inputs;
+- filters run before broad search;
+- no raw Telegram firehose vector index is introduced.
+
+Verification:
+
+```bash
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m unittest tests.test_intelligence_retrieval_items
+```
+
+Stop conditions:
+
+- stop if the task turns raw posts into the default answer memory;
+- stop if scoped deterministic retrieval cannot express insufficient evidence.
+
+### HPI Phase Implementation Notes After HPI-1..HPI-8
+
+- HPI-3 added the PI Assistant bounded read-only tool catalog around
+  `PersonalIntelligenceFacade`.
+- HPI-4 added read-only Hermes Telegram concierge commands on top of the tool
+  catalog.
+- HPI-5 is covered by the existing confirmation-gated `/feedback` and
+  `/feedback_voice` flow: no memory writes happen until `/feedback_confirm`.
+- HPI-6 delivers structured Strategy Reviewer notes through `/strategy` without
+  applying suggestions.
+- HPI-7 added a read-only action-status projection; missing feedback stays
+  `unknown`.
+- HPI-8 added compact dogfood review artifact helpers.
+- PI/Hermes chat UI, raw RAG, vector retrieval, mutation tools, autonomous
+  Codex execution, and config/profile/project edits are still not implemented.
+
+### HPI-3 - PI Assistant Bounded Tool Catalog
+
+Status: implemented by HPI-3.
+
+Goal: define read-only assistant tools around `PersonalIntelligenceFacade` and
+the curated retrieval projection.
+
+Files likely:
+
+- `src/assistant/pi_tools.py`
+- `src/assistant/pi_prompts.py`
+- `tests/test_pi_tools.py`
+
+Acceptance:
+
+- tools cover weekly summary, section lookup, curated search, thread lookup,
+  project actions, MVP status, feedback summary, marked posts, and Strategy
+  Reviewer notes;
+- tool outputs cite source refs or return insufficient evidence;
+- no write tools exist in the default catalog;
+- tool loop has a bounded round count when chat is added later.
+
+Verification:
+
+```bash
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m unittest tests.test_pi_tools
+```
+
+Stop conditions:
+
+- stop if a tool can edit config/code/profile/projects;
+- stop if a tool answers source claims without evidence refs.
+
+Implementation notes:
+
+- `src/assistant/pi_tools.py` defines a read-only `PITool` catalog and
+  `call_pi_tool` wrapper.
+- `src/assistant/pi_prompts.py` defines the bounded assistant contract and
+  `PI_TOOL_LOOP_MAX_CALLS`.
+- Tool responses include `evidence_status` plus collected source refs, atom
+  ids, thread slugs, and artifact paths.
+- Strategy Reviewer access is read through bounded PI/facade DTOs; no mutation
+  or DB session is exposed.
+- No Telegram commands, vector retrieval, raw firehose RAG, code/config
+  editing, or feedback writes were added in HPI-3.
+
+### HPI-4 - Telegram Hermes Concierge Commands
+
+Status: implemented by HPI-4.
+
+Goal: add small Telegram commands for Hermes concierge behavior:
+`/weekly`, `/actions`, `/explain`, `/projects`, `/mvp`, `/feedback`,
+`/strategy`, and `/codex`.
+
+Files likely:
+
+- `src/bot/handlers.py`
+- `src/assistant/pi_facade.py`
+- `src/assistant/pi_tools.py`
+- `tests/test_bot_handlers.py` or focused handler tests
+
+Acceptance:
+
+- commands are short and action-oriented;
+- workbook link/path is surfaced when available;
+- `/mvp` preserves Radar status and missing evidence;
+- `/codex` shows prepared prompt text only, never executes Codex;
+- missing data returns a clear fallback instead of a traceback.
+
+Verification:
+
+```bash
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m unittest tests.test_bot_handlers
+```
+
+Stop conditions:
+
+- stop if Hermes becomes the main reading surface;
+- stop if commands require multi-user/public product assumptions.
+
+Implementation notes:
+
+- `/weekly`, `/actions`, `/explain`, `/projects`, `/mvp`, `/strategy`, and
+  `/codex` are registered in `src/bot/handlers.py`.
+- Commands call read-only PI tools/facade methods and format short concierge
+  messages.
+- `/codex` prepares prompt text only and never executes Codex.
+- Existing `/feedback` remains confirmation-gated and was not expanded into a
+  direct write surface.
+
+### HPI-5 - Voice Feedback Through PI/Hermes Confirmation Loop
+
+Status: implemented by existing feedback intake and HPI-5 review.
+
+Goal: route voice/text feedback through transcript parsing, structured
+proposal, Hermes confirmation, and confirmed memory writes.
+
+Files likely:
+
+- `src/output/ai_report_feedback_intake.py`
+- `src/db/ai_report_feedback.py`
+- `src/bot/handlers.py`
+- `tests/test_ai_report_feedback.py`
+
+Acceptance:
+
+- parsed proposal separates memory writes, suggestions, config changes, code
+  changes, and Codex task suggestions;
+- confirmation message shows what will be written;
+- no confirmed feedback means no memory writes;
+- Strategy Reviewer can consume confirmed feedback.
+
+Verification:
+
+```bash
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m unittest tests.test_ai_report_feedback
+```
+
+Stop conditions:
+
+- stop if free-form voice feedback directly changes config/code;
+- stop if no-reaction is inferred as negative feedback.
+
+Implementation notes:
+
+- `ai_report_feedback_intake` parses text/voice transcripts into proposed
+  memory writes and manual-only suggestions.
+- `/feedback` and `/feedback_voice` draft confirmation summaries.
+- `/feedback_confirm` is the only path that writes confirmed feedback events.
+- Config/code/Codex suggestions remain manual-only.
+
+### HPI-6 - Strategy Reviewer Telegram Delivery
+
+Status: implemented by HPI-6.
+
+Goal: deliver Strategy Reviewer summaries to Telegram through Hermes without
+letting the reviewer mutate code/config.
+
+Files likely:
+
+- `src/output/strategy_reviewer.py`
+- `src/bot/handlers.py`
+- `tests/test_strategy_reviewer.py`
+
+Acceptance:
+
+- Telegram summary includes keep/change/demote/test-next-week, memory-only
+  updates, approval-required suggestions, Codex tasks, and risks;
+- Codex tasks include title, why, likely files, acceptance, and verification;
+- no code/config/profile/project mutation is performed.
+
+Verification:
+
+```bash
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m unittest tests.test_strategy_reviewer
+```
+
+Stop conditions:
+
+- stop if delivery implies automatic application of reviewer suggestions.
+
+Implementation notes:
+
+- `PersonalIntelligenceFacade.get_strategy_reviewer_notes` returns structured
+  read-only Strategy Reviewer DTOs.
+- `/strategy` includes keep/change/demote/test-next-week, memory-only updates,
+  approval-required items, Codex tasks, risks, and mutation policy.
+- Reviewer tasks remain suggestion-only and require approval.
+
+### HPI-7 - Workbook Action Status And Feedback Follow-Up Loop
+
+Status: implemented as read-only HPI-7 status projection.
+
+Goal: let workbook actions carry status and follow-up context so later reports
+can show what happened to read/try/project/MVP actions.
+
+Files likely:
+
+- `src/output/ai_intelligence_report.py`
+- `src/output/ai_visual_report.py`
+- `src/db/ai_report_feedback.py`
+- focused report tests
+
+Acceptance:
+
+- action cards have stable target IDs;
+- statuses include read, tried, applied_to_project, deferred,
+  wrong_priority, not_interested, and unknown;
+- next workbook can state which prior feedback changed recommendations;
+- unknown stays unknown.
+
+Verification:
+
+```bash
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m unittest tests.test_ai_intelligence_report tests.test_ai_visual_report tests.test_ai_report_feedback
+```
+
+Stop conditions:
+
+- stop if the report treats absence of feedback as negative signal.
+
+Implementation notes:
+
+- `src/output/action_status.py` projects workbook action cards to stable action
+  status DTOs from confirmed feedback events.
+- `PersonalIntelligenceFacade.get_action_statuses` exposes the projection.
+- `/actions` shows status and follow-up context.
+- Missing feedback is always `unknown`, not negative.
+- Full next-workbook narrative integration remains a dogfood follow-up if this
+  projection proves useful.
+
+### HPI-8 - Four-Week Dogfood Metrics And Weekly Review Artifact
+
+Status: implemented by HPI-8.
+
+Goal: record dogfood metrics and weekly review notes without turning the system
+into another heavy reporting surface.
+
+Files likely:
+
+- `src/output/dogfood_review.py`
+- `src/db/` migration/helper if persisted in SQLite
+- `tests/test_dogfood_review.py`
+- `docs/dogfood_4_week_plan.md`
+
+Acceptance:
+
+- records time-to-understand, sections read, completed read/try/actions,
+  feedback counts, MVP statuses, decisions changed, value score, and friction
+  score;
+- weekly review artifact is compact and private;
+- post-four-week review can summarize success/failure criteria;
+- generated private artifacts are not committed.
+
+Verification:
+
+```bash
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m unittest tests.test_dogfood_review
+```
+
+Stop conditions:
+
+- stop if metrics collection becomes more cumbersome than voice feedback.
+
+Implementation notes:
+
+- `src/output/dogfood_review.py` normalizes weekly dogfood metrics and writes
+  compact private JSON/Markdown review artifacts to an explicit output path.
+- The helper can summarize four weeks against the dogfood success criteria.
+- No generated dogfood artifacts are committed.
+
+### HPI-9 - Optional Scoped Vector Retrieval Over Curated Items Only
+
+Status: deferred P2; do not implement until deterministic curated search proves
+insufficient during dogfood.
+
+Goal: add vector retrieval only if deterministic curated search proves
+insufficient during dogfood.
+
+Files likely:
+
+- `src/output/intelligence_retrieval_items.py`
+- `src/assistant/pi_facade.py`
+- dedicated retrieval tests
+
+Acceptance:
+
+- vectors are built only over curated intelligence items;
+- raw Telegram posts are not vectorized as default assistant memory;
+- insufficient evidence remains possible;
+- deterministic filters still run before semantic search.
+
+Verification:
+
+```bash
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m unittest tests.test_intelligence_retrieval_items tests.test_pi_facade
+```
+
+Stop conditions:
+
+- stop if vector retrieval weakens provenance or makes raw archive RAG default.
+
+### HPI-10 - Post-Dogfood Product Decision Review
+
+Status: blocked until four dogfood weeks are recorded.
+
+Goal: decide after four weeks whether to continue, simplify, pause, or add the
+next implementation layer.
+
+Files likely:
+
+- `docs/dogfood_4_week_plan.md`
+- optional dogfood review artifact code if HPI-8 is implemented
+- `docs/tasks.md`
+
+Acceptance:
+
+- review covers four workbook runs, feedback sessions, confirmed feedback
+  events, real actions, decisions changed, value score, and friction score;
+- next roadmap is based on observed weekly use;
+- features that added friction are removed or deferred.
+
+Verification:
+
+```bash
+rg "Post-Four-Week Review|decisions_changed_by_system|friction_score" docs
+```
+
+Stop conditions:
+
+- stop if the review is skipped and new complex features are proposed anyway.
 
 ## KIR-Q: AI Intelligence Quality / Workbook / Feedback / Radar Contract
 

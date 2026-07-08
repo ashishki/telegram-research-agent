@@ -12,6 +12,8 @@ This directory keeps active operator and implementation guidance at the top leve
 | `next_development_roadmap.md` | Active next-step roadmap with AI-ready tasks, phases, acceptance criteria, and verification guidance |
 | `ai_knowledge_intelligence_roadmap.md` | AI Knowledge Intelligence Desk roadmap: atoms, idea threads, frontier analysis, workbook HTML, Obsidian projection, KIR quality/user-value history from the 2026-W28 artifact audit, and Russian final-HTML report requirement |
 | `ai_intelligence_workbook_roadmap.md` | Weekly AI Intelligence Workbook roadmap, feedback loop, KIR-backed Radar contract, Strategy Reviewer concept, and completed KIR-Q0..KIR-Q13 task plan |
+| `hermes_pi_assistant_roadmap.md` | Post-KIR HPI roadmap and implementation state for Hermes concierge, PI Assistant bounded curated retrieval/tools, Strategy Reviewer delivery, dogfood metrics, deferred HPI-9 vector gate, risks, and HPI-0..HPI-10 task plan |
+| `dogfood_4_week_plan.md` | Four-week dogfood protocol for measuring real usefulness, feedback, actions, decisions changed, friction, and post-dogfood product decisions |
 | `report_quality_roadmap.md` | Implemented historical roadmap for reader-facing report quality, artifact feedback buttons, internal cost guardrails, and Demand-to-MVP Radar candidate dossier handoff |
 | `operator_workflow.md` | Weekly workbook workflow, operator feedback, voice/text confirmation, artifact feedback, monthly report, OPS validation, tuning, and troubleshooting |
 | `report_format.md` | Weekly artifact contracts, boundaries, and Telegram source-link requirements |

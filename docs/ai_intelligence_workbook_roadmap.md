@@ -88,6 +88,36 @@ ideas, skills, cultural interest, and the read/try/build learning loop. Radar
 may consume Knowledge Thread-backed seeds, but it must keep its external
 evidence gates.
 
+## Post-KIR HPI Layer
+
+After KIR-Q0..KIR-Q13, the next roadmap layer is HPI: Hermes / Personal
+Intelligence Assistant / Dogfood.
+
+The Workbook remains the main weekly artifact. Hermes does not replace it.
+Hermes is the Telegram-facing concierge that helps the operator open the
+workbook, see the short weekly summary, choose one to three actions, route
+questions to PI Assistant, collect feedback, show Strategy Reviewer notes, and
+prepare Codex-ready prompts for manual approval.
+
+PI Assistant is the interactive Q&A layer over curated intelligence memory:
+workbook sections, claim cards, Knowledge Atoms, Idea Threads, project actions,
+feedback events, MVP Radar dossiers, and Strategy Reviewer notes. It must cite
+source refs or say insufficient evidence. It must not run default raw RAG over
+all Telegram posts.
+
+Strategy Reviewer remains advisory. It can suggest memory-only updates,
+approval-required config changes, and Codex tasks, but it must not edit code,
+prompts, `profile.yaml`, `projects.yaml`, or Radar gates.
+
+The four-week dogfood protocol validates usefulness before more complexity is
+added. Success means the operator can name decisions/actions changed by the
+system. Passing tests or generating richer HTML is not enough.
+
+Detailed HPI docs:
+
+- `docs/hermes_pi_assistant_roadmap.md`
+- `docs/dogfood_4_week_plan.md`
+
 ## Workbook Structure
 
 ### 1. Decision Brief

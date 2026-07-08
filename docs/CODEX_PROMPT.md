@@ -1,5 +1,5 @@
 # CODEX_PROMPT — Session Handoff
-_v3.7 · 2026-07-07 · telegram-research-agent_
+_v3.8 · 2026-07-08 · telegram-research-agent_
 
 ---
 
@@ -14,14 +14,20 @@ _v3.7 · 2026-07-07 · telegram-research-agent_
   vault projection, not the runtime source of truth.
 - Current development state after the 2026-W28 artifact audit: KIR plumbing and
   the Weekly AI Intelligence Workbook queue KIR-Q0..KIR-Q13 are implemented.
-  Future work starts from the first genuinely open item in `docs/tasks.md`; the
-  end-to-end roadmap and Russian final-HTML report requirement live in
-  `docs/ai_knowledge_intelligence_roadmap.md`.
+  The next active roadmap is HPI: Hermes / Personal Intelligence Assistant /
+  Dogfood. End-to-end KIR context and the Russian final-HTML report requirement
+  live in `docs/ai_knowledge_intelligence_roadmap.md`.
 - Weekly AI Intelligence Workbook queue KIR-Q0..KIR-Q13 is implemented:
   docs-first planning, Radar KIR provenance/gating, reaction and voice
   feedback, feedback-driven ranking, workbook HTML, deep explanations,
   diagrams, project implementation, MVP Radar section, Strategy Reviewer,
   claim-card hardening, and bounded Obsidian projection.
+- HPI-0 is documented, and HPI-1/HPI-2-lite are implemented as the current
+  read-only foundation. Hermes is a
+  Telegram-facing concierge/router, not source of truth. PI Assistant is a
+  bounded Q&A layer over curated intelligence retrieval items, not raw Telegram
+  RAG. Strategy Reviewer remains advisory. Four-week dogfood validates real
+  convenience/usefulness before adding complex features.
 - Operational incident on 2026-07-06: `telegram-digest.timer` had been inactive
   since 2026-06-22, so weekly Research Brief/Implementation Ideas stopped
   running while ingest and MVP weekly continued. The timer was manually
@@ -143,9 +149,10 @@ _v3.7 · 2026-07-07 · telegram-research-agent_
     buried trend summary, visible internal `Matches: ...` traces, contradictions
     between digest/study/project-insights outputs, and Radar gate contradiction.
 - The current report-quality, Radar handoff, cost, artifact consistency,
-  editorial memory, and initial Pathway live-source-intelligence task queue is
-  implemented. Add the next roadmap item before starting new implementation
-  work.
+  editorial memory, initial Pathway live-source-intelligence task queue,
+  KIR-Q0..KIR-Q13 queue and HPI-1..HPI-8 dogfood foundation are implemented.
+  Do not add random features. Start from the HPI queue in `docs/tasks.md`;
+  the next step is dogfood measurement, not HPI-9 vector retrieval.
 - VPS cognition vault:
   `/srv/codex-entropy/repos/product-3/engineering-cognition-vault`; use it as
   a downstream navigation layer, not as the source of truth. For AI source
@@ -203,8 +210,8 @@ _v3.7 · 2026-07-07 · telegram-research-agent_
   evidence.
 - The implemented workbook roadmap is `docs/ai_intelligence_workbook_roadmap.md`,
   with supporting context in `docs/ai_knowledge_intelligence_roadmap.md`.
-  Further work should start from the first genuinely open task in
-  `docs/tasks.md`, not from already completed KIR-Q0..KIR-Q13 items.
+  Further work should start from HPI in `docs/tasks.md`, not from already
+  completed KIR-Q0..KIR-Q13 items.
 
 ---
 
@@ -222,10 +229,39 @@ The weekly pipeline now has:
 ## Exact Next Execution Step
 
 KIR-Q0..KIR-Q13 under `KIR-Q: AI Intelligence Quality / Workbook / Feedback /
-Radar Contract` are implemented. Start with the first genuinely open task in
-`docs/tasks.md`.
+Radar Contract` are implemented. HPI is now the active post-KIR roadmap:
 
-Current open/future items outside the completed Q0..Q13 queue:
+```text
+HPI: Hermes / Personal Intelligence Assistant / Dogfood
+```
+
+HPI-0 documents the roadmap and dogfood plan. HPI-1 through HPI-8 have added
+the read-only facade, deterministic curated retrieval projection, bounded PI
+tool catalog, Hermes Telegram concierge commands, confirmation-gated feedback,
+Strategy Reviewer Telegram delivery, action status projection, and compact
+dogfood review artifact helpers. The exact next task is operational dogfood,
+not another feature:
+
+```text
+HPI Dogfood Week 1 - Run, Measure, Review
+```
+
+Do not implement new assistant capabilities by default. Run the dogfood loop:
+
+- generate or locate the weekly AI Intelligence Workbook;
+- use Hermes `/weekly`, `/actions`, `/mvp`, and `/strategy`;
+- complete at least one real read/try/project/MVP reject-defer action;
+- send voice/text feedback and confirm only correct memory writes;
+- record HPI-8 dogfood metrics in a private weekly review artifact;
+- inspect whether deterministic curated search is insufficient before
+  considering HPI-9.
+
+Do not implement vector retrieval yet. Do not implement assistant mutation
+tools. Do not let Telegram commands edit code/config/profile/projects or write
+feedback directly. Hermes remains a concierge/router, not source of truth. PI
+Assistant must use curated retrieval, not raw Telegram firehose RAG.
+
+Open/future items outside completed Q0..Q13 remain:
 
 ```text
 KIR-Q-008 - Regeneration And Manual Quality Eval
@@ -249,9 +285,19 @@ The completed P0/P1/P2 implementation direction was:
 KIR-backed Radar contract first, then reaction/voice feedback, then workbook UI
 ```
 
+The new HPI implementation direction is:
+
+```text
+facade first -> curated retrieval projection -> bounded tools -> Telegram
+concierge commands -> confirmation-gated voice feedback -> dogfood metrics
+-> four-week product decision before optional vector retrieval
+```
+
 Reference documents:
 
 - `docs/tasks.md`
+- `docs/hermes_pi_assistant_roadmap.md`
+- `docs/dogfood_4_week_plan.md`
 - `docs/next_development_roadmap.md`
 - `docs/report_quality_roadmap.md`
 - `docs/ai_knowledge_intelligence_roadmap.md`
