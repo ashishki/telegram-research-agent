@@ -29,6 +29,8 @@ _install_stub("weasyprint")
 _install_stub("jinja2")
 
 from config.settings import Settings  # noqa: E402
+from db.ai_report_feedback import fetch_ai_report_feedback, fetch_ai_report_feedback_intake  # noqa: E402
+from db.migrate import run_migrations  # noqa: E402
 from output.report_schema import DigestResult  # noqa: E402
 from output.mvp_weekly_pipeline import MvpWeeklyPipelineResult  # noqa: E402
 import bot.handlers as handlers  # noqa: E402
@@ -107,6 +109,7 @@ class TestHandlers(unittest.TestCase):
             report_path="/tmp/mvp.md",
             json_path="/tmp/mvp.json",
             selected_title="Telegram Channel SEO Site Generator",
+            dossier_status="generated",
             recommendation="focused_experiment",
             score=78,
         )
@@ -125,6 +128,87 @@ class TestHandlers(unittest.TestCase):
                 for line in mock_preview.call_args.kwargs["summary_lines"]
             )
         )
+
+    def test_handle_feedback_drafts_summary_without_memory_write_until_confirmed(self):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+            db_path = tmp.name
+
+        try:
+            with patch.dict(os.environ, {"AGENT_DB_PATH": db_path}, clear=False):
+                run_migrations()
+            settings = Settings(
+                db_path=db_path,
+                llm_api_key="",
+                model_provider="anthropic",
+                telegram_session_path="",
+            )
+
+            with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                with patch.object(handlers, "send_message") as mock_send_message:
+                    handlers.handle_feedback(
+                        chat_id="42",
+                        args="2026-W28 Useful target=claim-cards. Config: adjust lookback manually.",
+                        settings=settings,
+                    )
+
+            draft_message = mock_send_message.call_args.args[2]
+            self.assertIn("AI workbook feedback draft #1", draft_message)
+            self.assertIn("No memory has been written yet.", draft_message)
+
+            with sqlite3.connect(db_path) as connection:
+                connection.row_factory = sqlite3.Row
+                self.assertEqual(fetch_ai_report_feedback(connection, week_label="2026-W28"), [])
+                intakes = fetch_ai_report_feedback_intake(connection, status="pending", limit=10)
+                self.assertEqual(len(intakes), 1)
+                self.assertEqual(intakes[0]["input_kind"], "text")
+
+            with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                with patch.object(handlers, "send_message") as mock_confirm_message:
+                    handlers.handle_feedback_confirm(chat_id="42", args="1", settings=settings)
+
+            confirm_message = mock_confirm_message.call_args.args[2]
+            self.assertIn("Confirmed feedback draft #1", confirm_message)
+            self.assertIn("memory_writes=1", confirm_message)
+
+            with sqlite3.connect(db_path) as connection:
+                connection.row_factory = sqlite3.Row
+                events = fetch_ai_report_feedback(connection, week_label="2026-W28")
+                intakes = fetch_ai_report_feedback_intake(connection, intake_id=1, limit=1)
+            self.assertEqual([event["feedback_type"] for event in events], ["useful"])
+            self.assertEqual(intakes[0]["status"], "confirmed")
+        finally:
+            os.unlink(db_path)
+
+    def test_handle_feedback_voice_accepts_transcript_text(self):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+            db_path = tmp.name
+
+        try:
+            with patch.dict(os.environ, {"AGENT_DB_PATH": db_path}, clear=False):
+                run_migrations()
+            settings = Settings(
+                db_path=db_path,
+                llm_api_key="",
+                model_provider="anthropic",
+                telegram_session_path="",
+            )
+
+            with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                with patch.object(handlers, "send_message") as mock_send_message:
+                    handlers.handle_feedback_voice(
+                        chat_id="42",
+                        args="2026-W28 Too shallow target=eval-gates.",
+                        settings=settings,
+                    )
+
+            self.assertIn("AI workbook feedback draft #1", mock_send_message.call_args.args[2])
+            with sqlite3.connect(db_path) as connection:
+                connection.row_factory = sqlite3.Row
+                intakes = fetch_ai_report_feedback_intake(connection, status="pending", limit=10)
+            self.assertEqual(intakes[0]["input_kind"], "voice_transcript")
+            self.assertEqual(intakes[0]["transcript_text"], "Too shallow target=eval-gates.")
+        finally:
+            os.unlink(db_path)
 
 
 if __name__ == "__main__":

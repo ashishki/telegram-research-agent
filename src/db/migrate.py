@@ -117,6 +117,154 @@ def _ensure_artifact_feedback_mvp_type(connection: sqlite3.Connection) -> None:
     )
 
 
+def _ensure_ai_report_feedback_contract_types(connection: sqlite3.Connection) -> None:
+    row = connection.execute(
+        """
+        SELECT sql
+        FROM sqlite_master
+        WHERE type = 'table' AND name = 'ai_report_feedback_events'
+        LIMIT 1
+        """
+    ).fetchone()
+    table_sql = str(row[0] if row else "")
+    required_tokens = (
+        "no_missed_posts",
+        "trust_too_high",
+        "trust_too_low",
+        "verify_first",
+        "missed_post",
+        "trust_correction",
+    )
+    if not table_sql or all(token in table_sql for token in required_tokens):
+        return
+
+    LOGGER.info("Rebuilding ai_report_feedback_events to allow KIR-Q feedback contract types")
+    connection.executescript(
+        """
+        ALTER TABLE ai_report_feedback_events RENAME TO ai_report_feedback_events_old;
+        CREATE TABLE ai_report_feedback_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            week_label TEXT NOT NULL CHECK(length(trim(week_label)) > 0),
+            report_path TEXT,
+            feedback_type TEXT NOT NULL
+                CHECK(feedback_type IN (
+                    'read',
+                    'useful',
+                    'tried',
+                    'applied_to_project',
+                    'too_shallow',
+                    'missed_important_post',
+                    'no_missed_posts',
+                    'wrong_priority',
+                    'not_interested',
+                    'noise',
+                    'trust_too_high',
+                    'trust_too_low',
+                    'verify_first'
+                )),
+            target_type TEXT NOT NULL DEFAULT 'report'
+                CHECK(target_type IN (
+                    'report',
+                    'report_section',
+                    'idea_thread',
+                    'knowledge_atom',
+                    'source_channel',
+                    'read_queue',
+                    'experiment',
+                    'action',
+                    'missed_post',
+                    'trust_correction'
+                )),
+            target_ref TEXT,
+            source_url TEXT,
+            notes TEXT,
+            created_at TEXT NOT NULL,
+            recorded_by TEXT NOT NULL DEFAULT 'operator'
+        );
+        INSERT INTO ai_report_feedback_events (
+            id,
+            week_label,
+            report_path,
+            feedback_type,
+            target_type,
+            target_ref,
+            source_url,
+            notes,
+            created_at,
+            recorded_by
+        )
+        SELECT
+            id,
+            week_label,
+            report_path,
+            feedback_type,
+            target_type,
+            target_ref,
+            source_url,
+            notes,
+            created_at,
+            recorded_by
+        FROM ai_report_feedback_events_old;
+        DROP TABLE ai_report_feedback_events_old;
+        CREATE INDEX IF NOT EXISTS idx_ai_report_feedback_week
+            ON ai_report_feedback_events(week_label);
+        CREATE INDEX IF NOT EXISTS idx_ai_report_feedback_type
+            ON ai_report_feedback_events(feedback_type);
+        CREATE INDEX IF NOT EXISTS idx_ai_report_feedback_target
+            ON ai_report_feedback_events(target_type, target_ref);
+        CREATE INDEX IF NOT EXISTS idx_ai_report_feedback_created
+            ON ai_report_feedback_events(created_at);
+        """
+    )
+
+
+def _ensure_signal_feedback_operator_interest(connection: sqlite3.Connection) -> None:
+    row = connection.execute(
+        """
+        SELECT sql
+        FROM sqlite_master
+        WHERE type = 'table' AND name = 'signal_feedback'
+        LIMIT 1
+        """
+    ).fetchone()
+    table_sql = str(row[0] if row else "")
+    if not table_sql or "operator_marked_interesting" in table_sql:
+        return
+
+    LOGGER.info("Rebuilding signal_feedback to allow operator_marked_interesting feedback")
+    connection.executescript(
+        """
+        ALTER TABLE signal_feedback RENAME TO signal_feedback_old;
+        CREATE TABLE signal_feedback (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            post_id INTEGER NOT NULL,
+            feedback TEXT NOT NULL CHECK(feedback IN (
+                'acted_on',
+                'skipped',
+                'marked_important',
+                'operator_marked_interesting'
+            )),
+            recorded_at TEXT NOT NULL
+        );
+        INSERT INTO signal_feedback (
+            id,
+            post_id,
+            feedback,
+            recorded_at
+        )
+        SELECT
+            id,
+            post_id,
+            feedback,
+            recorded_at
+        FROM signal_feedback_old;
+        DROP TABLE signal_feedback_old;
+        CREATE INDEX IF NOT EXISTS idx_signal_feedback_post_id ON signal_feedback(post_id);
+        CREATE INDEX IF NOT EXISTS idx_signal_feedback_feedback ON signal_feedback(feedback);
+        """
+    )
+
+
 def run_migrations() -> Path:
     db_path = get_db_path()
     db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -432,9 +580,13 @@ def run_migrations() -> Path:
                         'applied_to_project',
                         'too_shallow',
                         'missed_important_post',
+                        'no_missed_posts',
                         'wrong_priority',
                         'not_interested',
-                        'noise'
+                        'noise',
+                        'trust_too_high',
+                        'trust_too_low',
+                        'verify_first'
                     )),
                 target_type TEXT NOT NULL DEFAULT 'report'
                     CHECK(target_type IN (
@@ -445,7 +597,9 @@ def run_migrations() -> Path:
                         'source_channel',
                         'read_queue',
                         'experiment',
-                        'action'
+                        'action',
+                        'missed_post',
+                        'trust_correction'
                     )),
                 target_ref TEXT,
                 source_url TEXT,
@@ -461,6 +615,31 @@ def run_migrations() -> Path:
                 ON ai_report_feedback_events(target_type, target_ref);
             CREATE INDEX IF NOT EXISTS idx_ai_report_feedback_created
                 ON ai_report_feedback_events(created_at);
+
+            CREATE TABLE IF NOT EXISTS ai_report_feedback_intakes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                week_label TEXT NOT NULL CHECK(length(trim(week_label)) > 0),
+                report_path TEXT,
+                input_kind TEXT NOT NULL CHECK(input_kind IN ('text', 'voice_transcript')),
+                raw_text TEXT NOT NULL CHECK(length(trim(raw_text)) > 0),
+                transcript_text TEXT,
+                proposals_json TEXT NOT NULL DEFAULT '[]'
+                    CHECK(json_valid(proposals_json) AND json_type(proposals_json) = 'array'),
+                suggestions_json TEXT NOT NULL DEFAULT '[]'
+                    CHECK(json_valid(suggestions_json) AND json_type(suggestions_json) = 'array'),
+                confirmation_summary TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'pending'
+                    CHECK(status IN ('pending', 'confirmed', 'discarded')),
+                created_at TEXT NOT NULL,
+                confirmed_at TEXT,
+                recorded_by TEXT NOT NULL DEFAULT 'operator'
+            );
+            CREATE INDEX IF NOT EXISTS idx_ai_report_feedback_intake_week
+                ON ai_report_feedback_intakes(week_label);
+            CREATE INDEX IF NOT EXISTS idx_ai_report_feedback_intake_status
+                ON ai_report_feedback_intakes(status);
+            CREATE INDEX IF NOT EXISTS idx_ai_report_feedback_intake_created
+                ON ai_report_feedback_intakes(created_at);
             """
         )
         connection.executescript(
@@ -554,7 +733,12 @@ def run_migrations() -> Path:
             CREATE TABLE IF NOT EXISTS signal_feedback (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 post_id INTEGER NOT NULL,
-                feedback TEXT NOT NULL CHECK(feedback IN ('acted_on', 'skipped', 'marked_important')),
+                feedback TEXT NOT NULL CHECK(feedback IN (
+                    'acted_on',
+                    'skipped',
+                    'marked_important',
+                    'operator_marked_interesting'
+                )),
                 recorded_at TEXT NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_signal_feedback_post_id ON signal_feedback(post_id);
@@ -622,6 +806,8 @@ def run_migrations() -> Path:
             """
         )
         _ensure_artifact_feedback_mvp_type(connection)
+        _ensure_ai_report_feedback_contract_types(connection)
+        _ensure_signal_feedback_operator_interest(connection)
         connection.executescript(
             """
             CREATE TABLE IF NOT EXISTS research_brief_receipts (

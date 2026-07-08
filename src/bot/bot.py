@@ -8,7 +8,7 @@ from urllib import parse, request
 from config.settings import Settings
 
 from .callbacks import record_callback
-from .handlers import dispatch_command
+from .handlers import dispatch_command, send_message
 
 
 LOGGER = logging.getLogger(__name__)
@@ -101,6 +101,22 @@ def _is_authorized_callback(callback_query: dict[str, Any], owner_chat_id: str) 
     return owner_chat_id in {from_id, chat_id}
 
 
+def _extract_voice_feedback_text(message: dict[str, Any]) -> str:
+    if not message.get("voice"):
+        return ""
+    for value in (
+        message.get("caption"),
+        message.get("transcript"),
+        message.get("voice_transcript"),
+        (message.get("voice") or {}).get("transcript"),
+        (message.get("voice") or {}).get("transcription"),
+    ):
+        text = str(value or "").strip()
+        if text:
+            return text
+    return ""
+
+
 def run_bot(settings: Settings) -> None:
     token, owner_chat_id = _load_bot_env()
     if not token or not owner_chat_id:
@@ -155,13 +171,26 @@ def run_bot(settings: Settings) -> None:
             if not _is_authorized_message(message, owner_chat_id):
                 continue
 
+            chat_id = str((message.get("chat") or {}).get("id", owner_chat_id))
             text = (message.get("text") or "").strip()
-            if not text.startswith("/"):
+            if text.startswith("/"):
+                LOGGER.info("Dispatching bot command chat_id=%s text=%s", chat_id, text.splitlines()[0][:200])
+                dispatch_command(chat_id=chat_id, text=text, settings=settings)
                 continue
 
-            chat_id = str((message.get("chat") or {}).get("id", owner_chat_id))
-            LOGGER.info("Dispatching bot command chat_id=%s text=%s", chat_id, text.splitlines()[0][:200])
-            dispatch_command(chat_id=chat_id, text=text, settings=settings)
+            voice_feedback_text = _extract_voice_feedback_text(message)
+            if voice_feedback_text:
+                LOGGER.info("Dispatching transcribed voice feedback chat_id=%s", chat_id)
+                dispatch_command(chat_id=chat_id, text=f"/feedback_voice {voice_feedback_text}", settings=settings)
+                continue
+
+            if message.get("voice"):
+                send_message(
+                    token,
+                    chat_id,
+                    "Voice feedback needs a transcript. Send it as /feedback_voice <transcript>.",
+                    parse_mode=None,
+                )
 
         if state.stop_requested:
             break

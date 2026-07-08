@@ -41,13 +41,20 @@ _install_stub("sklearn.metrics", silhouette_score=lambda *_args, **_kwargs: 0.0)
 
 from config.settings import Settings  # noqa: E402
 from db.ai_report_feedback import (  # noqa: E402
+    fetch_ai_report_eval_examples,
     fetch_ai_report_feedback,
+    fetch_ai_report_feedback_intake,
     fetch_missed_post_eval_examples,
     record_ai_report_feedback,
     summarize_ai_report_feedback,
 )
 from db.knowledge_atoms import record_knowledge_atom  # noqa: E402
 from db.migrate import run_migrations  # noqa: E402
+from output.ai_report_feedback_intake import (  # noqa: E402
+    apply_confirmed_feedback_intake,
+    create_feedback_intake,
+    parse_feedback_text,
+)
 from output.ai_intelligence_report import generate_ai_intelligence_report  # noqa: E402
 from output.idea_threads import refresh_idea_threads  # noqa: E402
 import main  # noqa: E402
@@ -116,6 +123,17 @@ class TestAiReportFeedback(unittest.TestCase):
                         """
                     ).fetchall()
                 }
+                intake_table = connection.execute(
+                    """
+                    SELECT name
+                    FROM sqlite_master
+                    WHERE type = 'table' AND name = 'ai_report_feedback_intakes'
+                    """
+                ).fetchone()
+                intake_columns = {
+                    row[1]
+                    for row in connection.execute("PRAGMA table_info(ai_report_feedback_intakes)").fetchall()
+                }
         finally:
             os.unlink(db_path)
 
@@ -125,47 +143,161 @@ class TestAiReportFeedback(unittest.TestCase):
         self.assertIn("idx_ai_report_feedback_week", indexes)
         self.assertIn("idx_ai_report_feedback_type", indexes)
         self.assertIn("idx_ai_report_feedback_target", indexes)
+        self.assertIsNotNone(intake_table)
+        for column in [
+            "input_kind",
+            "raw_text",
+            "transcript_text",
+            "proposals_json",
+            "suggestions_json",
+            "status",
+        ]:
+            self.assertIn(column, intake_columns)
+
+    def test_feedback_text_parser_extracts_feedback_and_manual_suggestions(self):
+        parsed = parse_feedback_text(
+            """
+            Useful target=claim-cards: the claim cards were useful.
+            Not interested target=toy-demos in toy demos.
+            Wrong priority target=agent-frameworks.
+            Too shallow target=eval-gates.
+            Tried target=run-eval in a local project.
+            Applied to project target=Demand-to-MVP-Radar.
+            Missed post https://t.me/ai_lab/999 about eval gates.
+            Source trust: @ai_lab trust too low; verify first @hype_channel.
+            Project correction: Radar is Python, not Node.
+            Preference: prefer practical case studies.
+            Config: increase lookback to 21 days.
+            Codex task: add tests for KIR gates.
+            """,
+            input_kind="voice_transcript",
+            transcript_text="operator voice transcript",
+        )
+
+        feedback_types = {proposal["feedback_type"] for proposal in parsed["proposals"]}
+        suggestion_types = {suggestion["suggestion_type"] for suggestion in parsed["suggestions"]}
+
+        self.assertEqual(parsed["input_kind"], "voice_transcript")
+        self.assertEqual(parsed["transcript_text"], "operator voice transcript")
+        self.assertTrue(
+            {
+                "useful",
+                "not_interested",
+                "wrong_priority",
+                "too_shallow",
+                "tried",
+                "applied_to_project",
+                "missed_important_post",
+                "trust_too_low",
+                "verify_first",
+            }.issubset(feedback_types)
+        )
+        self.assertTrue(
+            {"project_correction", "source_trust", "preference", "config", "codex_task"}.issubset(
+                suggestion_types
+            )
+        )
+        self.assertTrue(all(suggestion["manual_only"] for suggestion in parsed["suggestions"]))
+
+    def test_feedback_intake_writes_memory_only_after_confirmation(self):
+        db_path = self._make_db()
+        try:
+            with sqlite3.connect(db_path) as connection:
+                connection.row_factory = sqlite3.Row
+                intake = create_feedback_intake(
+                    connection,
+                    week_label="2026-W28",
+                    text=(
+                        "Useful target=claim-cards. "
+                        "Missed post https://t.me/ai_lab/999. "
+                        "Config: increase lookback manually."
+                    ),
+                    input_kind="text",
+                )
+                pending_events = fetch_ai_report_feedback(connection, week_label="2026-W28", limit=10)
+                pending_intakes = fetch_ai_report_feedback_intake(
+                    connection,
+                    intake_id=int(intake["id"]),
+                    limit=1,
+                )
+
+                result = apply_confirmed_feedback_intake(connection, intake_id=int(intake["id"]))
+                confirmed_events = fetch_ai_report_feedback(connection, week_label="2026-W28", limit=10)
+                confirmed_intake = fetch_ai_report_feedback_intake(
+                    connection,
+                    intake_id=int(intake["id"]),
+                    limit=1,
+                )[0]
+        finally:
+            os.unlink(db_path)
+
+        self.assertIn("No memory has been written yet.", intake["confirmation_summary"])
+        self.assertEqual(pending_events, [])
+        self.assertEqual(pending_intakes[0]["status"], "pending")
+        self.assertEqual(len(result["created_events"]), 2)
+        self.assertEqual({event["feedback_type"] for event in confirmed_events}, {"useful", "missed_important_post"})
+        self.assertEqual(confirmed_intake["status"], "confirmed")
+        self.assertEqual({suggestion["suggestion_type"] for suggestion in result["suggestions"]}, {"config"})
 
     def test_record_fetch_summary_and_missed_eval_examples(self):
         db_path = self._make_db()
         try:
             with sqlite3.connect(db_path) as connection:
                 connection.row_factory = sqlite3.Row
-                for feedback_type in [
+                feedback_types = [
+                    "read",
                     "read",
                     "useful",
                     "tried",
                     "too-shallow",
                     "missed-important-post",
+                    "no-missed-posts",
                     "wrong-priority",
-                ]:
+                    "not-interested",
+                    "trust-too-high",
+                ]
+                for index, feedback_type in enumerate(feedback_types, start=1):
                     target_type = {
                         "too-shallow": "idea-thread",
                         "wrong-priority": "knowledge-atom",
-                    }.get(feedback_type, "report-section")
+                        "not-interested": "idea-thread",
+                        "tried": "action",
+                        "trust-too-high": "trust-correction",
+                        "no-missed-posts": "missed-post",
+                    }.get(feedback_type, "read-queue" if feedback_type == "read" else "report-section")
                     record_ai_report_feedback(
                         connection,
                         week_label="2026-W27",
                         report_path="data/output/ai_intelligence/2026-W27.html",
                         feedback_type=feedback_type,
                         target_type=target_type,
-                        target_ref="42" if feedback_type == "wrong-priority" else "eval-gates",
+                        target_ref="42" if feedback_type == "wrong-priority" else f"eval-gates-{feedback_type}-{index}",
                         source_url="https://t.me/ai_lab/999" if feedback_type == "missed-important-post" else None,
                         notes=f"note for {feedback_type}",
                     )
                 fetched = fetch_ai_report_feedback(connection, week_label="2026-W27", limit=10)
                 summary = summarize_ai_report_feedback(connection, before_week_label="2026-W28")
                 examples = fetch_missed_post_eval_examples(connection, week_label="2026-W27")
+                all_examples = fetch_ai_report_eval_examples(connection, week_label="2026-W27")
         finally:
             os.unlink(db_path)
 
-        self.assertEqual(len(fetched), 6)
-        self.assertEqual(summary["event_count"], 6)
-        self.assertEqual(summary["counts_by_feedback"]["read"], 1)
+        self.assertEqual(len(fetched), 10)
+        self.assertEqual(summary["event_count"], 10)
+        self.assertEqual(summary["counts_by_feedback"]["read"], 2)
         self.assertEqual(summary["counts_by_feedback"]["too_shallow"], 1)
         self.assertEqual(summary["downranked_atom_refs"], ["42"])
+        self.assertIn("action:eval-gates-tried-4", summary["promoted_target_refs"] or [])
         self.assertEqual(len(summary["missed_post_eval_examples"]), 1)
+        self.assertEqual(len(summary["priority_eval_examples"]), 2)
+        self.assertGreaterEqual(len(summary["feedback_eval_examples"]), 3)
+        self.assertTrue(summary["feedback_completion"]["completed"])
+        self.assertEqual(summary["feedback_changes"]["status"], "feedback_used")
+        self.assertIn("Promoted", summary["feedback_changes"]["summary"])
+        self.assertIn("Downranked", summary["feedback_changes"]["summary"])
+        self.assertIn("Downrank similar items", " ".join(summary["frontier_prompt_guidance"]))
         self.assertEqual(examples[0]["source_url"], "https://t.me/ai_lab/999")
+        self.assertEqual({example["example_type"] for example in all_examples}, {"missed_post", "priority_calibration"})
 
     def test_feedback_context_appears_in_next_ai_report(self):
         db_path = self._make_db()
@@ -208,6 +340,7 @@ class TestAiReportFeedback(unittest.TestCase):
             os.unlink(db_path)
 
         self.assertIn("Personalization Context", html_text)
+        self.assertIn("What Feedback Changed This Week", html_text)
         self.assertIn("too shallow=1", html_text)
         self.assertIn("Missed-post eval examples available", html_text)
         self.assertIn("Convert missed-post feedback into an eval example", html_text)
@@ -263,8 +396,60 @@ class TestAiReportFeedback(unittest.TestCase):
         inspect_output = inspect_stdout.getvalue()
         self.assertIn("AI Report Feedback inspection", inspect_output)
         self.assertIn("missed_important_post", inspect_output)
-        self.assertIn("missed_post_eval_examples (1):", inspect_output)
+        self.assertIn("feedback_eval_examples (1):", inspect_output)
         self.assertIn("https://t.me/ai_lab/999", inspect_output)
+
+    def test_log_ai_report_feedback_cli_accepts_no_missed_and_trust_correction(self):
+        db_path = self._make_db()
+        stdout = io.StringIO()
+        try:
+            with patch.dict(os.environ, {"AGENT_DB_PATH": db_path}, clear=False):
+                with patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "main.py",
+                        "log-ai-report-feedback",
+                        "--week",
+                        "2026-W28",
+                        "--feedback",
+                        "no-missed-posts",
+                        "--target-type",
+                        "missed-post",
+                        "--target-ref",
+                        "weekly-report",
+                    ],
+                ):
+                    with redirect_stdout(stdout):
+                        no_missed_exit = main.main()
+                with patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "main.py",
+                        "log-ai-report-feedback",
+                        "--week",
+                        "2026-W28",
+                        "--feedback",
+                        "trust-too-low",
+                        "--target-type",
+                        "trust-correction",
+                        "--target-ref",
+                        "claim-1",
+                    ],
+                ):
+                    with redirect_stdout(stdout):
+                        trust_exit = main.main()
+                with sqlite3.connect(db_path) as connection:
+                    summary = summarize_ai_report_feedback(connection, week_label="2026-W28")
+        finally:
+            os.unlink(db_path)
+
+        self.assertEqual(no_missed_exit, 0)
+        self.assertEqual(trust_exit, 0)
+        self.assertEqual(summary["counts_by_feedback"]["no_missed_posts"], 1)
+        self.assertEqual(summary["counts_by_feedback"]["trust_too_low"], 1)
+        self.assertIn("read_items", summary["feedback_completion"]["missing"])
 
 
 if __name__ == "__main__":

@@ -234,9 +234,13 @@ CREATE TABLE IF NOT EXISTS ai_report_feedback_events (
             'applied_to_project',
             'too_shallow',
             'missed_important_post',
+            'no_missed_posts',
             'wrong_priority',
             'not_interested',
-            'noise'
+            'noise',
+            'trust_too_high',
+            'trust_too_low',
+            'verify_first'
         )),
     target_type TEXT NOT NULL DEFAULT 'report'
         CHECK(target_type IN (
@@ -247,7 +251,9 @@ CREATE TABLE IF NOT EXISTS ai_report_feedback_events (
             'source_channel',
             'read_queue',
             'experiment',
-            'action'
+            'action',
+            'missed_post',
+            'trust_correction'
         )),
     target_ref TEXT,
     source_url TEXT,
@@ -255,6 +261,31 @@ CREATE TABLE IF NOT EXISTS ai_report_feedback_events (
     created_at TEXT NOT NULL,
     recorded_by TEXT NOT NULL DEFAULT 'operator'
 );
+
+CREATE TABLE IF NOT EXISTS ai_report_feedback_intakes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    week_label TEXT NOT NULL CHECK(length(trim(week_label)) > 0),
+    report_path TEXT,
+    input_kind TEXT NOT NULL CHECK(input_kind IN ('text', 'voice_transcript')),
+    raw_text TEXT NOT NULL CHECK(length(trim(raw_text)) > 0),
+    transcript_text TEXT,
+    proposals_json TEXT NOT NULL DEFAULT '[]'
+        CHECK(json_valid(proposals_json) AND json_type(proposals_json) = 'array'),
+    suggestions_json TEXT NOT NULL DEFAULT '[]'
+        CHECK(json_valid(suggestions_json) AND json_type(suggestions_json) = 'array'),
+    confirmation_summary TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'pending'
+        CHECK(status IN ('pending', 'confirmed', 'discarded')),
+    created_at TEXT NOT NULL,
+    confirmed_at TEXT,
+    recorded_by TEXT NOT NULL DEFAULT 'operator'
+);
+CREATE INDEX IF NOT EXISTS idx_ai_report_feedback_intake_week
+    ON ai_report_feedback_intakes(week_label);
+CREATE INDEX IF NOT EXISTS idx_ai_report_feedback_intake_status
+    ON ai_report_feedback_intakes(status);
+CREATE INDEX IF NOT EXISTS idx_ai_report_feedback_intake_created
+    ON ai_report_feedback_intakes(created_at);
 
 CREATE TABLE IF NOT EXISTS projects (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

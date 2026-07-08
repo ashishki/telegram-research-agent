@@ -14,6 +14,11 @@ from output.generate_digest import _compute_week_label, run_digest
 from output.generate_answer import generate_answer
 from output.generate_insight import generate_insight
 from output.generate_study_plan import generate_study_plan, mark_study_complete
+from output.ai_report_feedback_intake import (
+    apply_confirmed_feedback_intake,
+    create_feedback_intake,
+    discard_feedback_intake,
+)
 from output.mvp_weekly_pipeline import run_mvp_weekly_pipeline, source_mix_summary
 
 
@@ -21,6 +26,7 @@ LOGGER = logging.getLogger(__name__)
 QUESTION_WORD_RE = re.compile(r"[^\W_]+", re.UNICODE)
 TELEGRAM_POST_URL_RE = re.compile(r"^https?://t\.me/([A-Za-z0-9_]+)/(\d+)(?:\?.*)?$", re.IGNORECASE)
 MARKDOWN_V2_SPECIAL_CHARS = r"_*[]()~`>#+-=|{}.!"
+WEEK_LABEL_RE = re.compile(r"^\d{4}-W\d{2}$")
 COMMAND_DOCS: dict[str, tuple[str, str]] = {
     "/digest": ("handle_digest", "Show the current weekly brief"),
     "/topics": ("handle_topics", "List the strongest tracked topics"),
@@ -35,6 +41,10 @@ COMMAND_DOCS: dict[str, tuple[str, str]] = {
     "/status": ("handle_status", "Show database and pipeline status"),
     "/mark_useful <post_id|link>": ("handle_mark_useful", "Record acted_on feedback"),
     "/mark_skipped <post_id|link>": ("handle_mark_skipped", "Record skipped feedback"),
+    "/feedback [week] <text>": ("handle_feedback", "Draft AI workbook feedback for confirmation"),
+    "/feedback_voice [week] <transcript>": ("handle_feedback_voice", "Draft transcribed voice feedback for confirmation"),
+    "/feedback_confirm <draft_id>": ("handle_feedback_confirm", "Confirm drafted AI workbook feedback"),
+    "/feedback_discard <draft_id>": ("handle_feedback_discard", "Discard drafted AI workbook feedback"),
     "/tag <post_id|link> <tag>": ("handle_tag", "Save a tag: strong, interesting, try, funny, low, later"),
     "/mark_strong <post_id|link>": ("handle_mark_strong", "Mark a post as strong"),
     "/mark_interesting <post_id|link>": ("handle_mark_interesting", "Mark a post as interesting"),
@@ -139,6 +149,16 @@ def _resolve_post_reference(connection: sqlite3.Connection, raw_ref: str) -> sql
         """,
         (channel_username, message_id),
     ).fetchone()
+
+
+def _parse_week_label_args(args: str) -> tuple[str, str]:
+    stripped = args.strip()
+    if not stripped:
+        return _compute_week_label(), ""
+    first, _, rest = stripped.partition(" ")
+    if WEEK_LABEL_RE.match(first):
+        return first, rest.strip()
+    return _compute_week_label(), stripped
 
 
 def _extract_question_terms(question: str) -> list[str]:
@@ -668,6 +688,85 @@ def handle_mark_later(chat_id: str, args: str, settings: Settings) -> None:
     _handle_post_tag(chat_id, args, settings, "later")
 
 
+def _handle_feedback_intake(chat_id: str, args: str, settings: Settings, *, input_kind: str) -> None:
+    week_label, text = _parse_week_label_args(args)
+    if not text:
+        command = "/feedback_voice" if input_kind == "voice_transcript" else "/feedback"
+        send_message(_get_bot_token(), chat_id, f"Usage: {command} [week] <feedback text>", parse_mode=None)
+        return
+    try:
+        with _with_db(settings) as connection:
+            intake = create_feedback_intake(
+                connection,
+                week_label=week_label,
+                text=text,
+                input_kind=input_kind,
+                recorded_by="telegram_bot",
+            )
+        send_message(_get_bot_token(), chat_id, intake["confirmation_summary"], parse_mode=None)
+    except Exception as exc:
+        send_message(_get_bot_token(), chat_id, f"Failed to draft feedback: {exc}", parse_mode=None)
+
+
+def handle_feedback(chat_id: str, args: str, settings: Settings) -> None:
+    _handle_feedback_intake(chat_id, args, settings, input_kind="text")
+
+
+def handle_feedback_voice(chat_id: str, args: str, settings: Settings) -> None:
+    _handle_feedback_intake(chat_id, args, settings, input_kind="voice_transcript")
+
+
+def _parse_feedback_intake_id(args: str) -> int | None:
+    first = args.strip().split(maxsplit=1)[0] if args.strip() else ""
+    if not first.isdigit() or int(first) <= 0:
+        return None
+    return int(first)
+
+
+def handle_feedback_confirm(chat_id: str, args: str, settings: Settings) -> None:
+    intake_id = _parse_feedback_intake_id(args)
+    if intake_id is None:
+        send_message(_get_bot_token(), chat_id, "Usage: /feedback_confirm <draft_id>", parse_mode=None)
+        return
+    try:
+        with _with_db(settings) as connection:
+            result = apply_confirmed_feedback_intake(
+                connection,
+                intake_id=intake_id,
+                recorded_by="telegram_bot_confirmed",
+            )
+        send_message(
+            _get_bot_token(),
+            chat_id,
+            (
+                f"Confirmed feedback draft #{intake_id}\n"
+                f"memory_writes={len(result['created_events'])}\n"
+                f"manual_suggestions={len(result['suggestions'])}"
+            ),
+            parse_mode=None,
+        )
+    except Exception as exc:
+        send_message(_get_bot_token(), chat_id, f"Failed to confirm feedback: {exc}", parse_mode=None)
+
+
+def handle_feedback_discard(chat_id: str, args: str, settings: Settings) -> None:
+    intake_id = _parse_feedback_intake_id(args)
+    if intake_id is None:
+        send_message(_get_bot_token(), chat_id, "Usage: /feedback_discard <draft_id>", parse_mode=None)
+        return
+    try:
+        with _with_db(settings) as connection:
+            intake = discard_feedback_intake(connection, intake_id=intake_id)
+        send_message(
+            _get_bot_token(),
+            chat_id,
+            f"Discarded feedback draft #{intake['id']}",
+            parse_mode=None,
+        )
+    except Exception as exc:
+        send_message(_get_bot_token(), chat_id, f"Failed to discard feedback: {exc}", parse_mode=None)
+
+
 HANDLERS: dict[str, Callable[[str, str, Settings], None]] = {
     "/start": handle_start,
     "/digest": handle_digest,
@@ -683,6 +782,10 @@ HANDLERS: dict[str, Callable[[str, str, Settings], None]] = {
     "/status": handle_status,
     "/mark_useful": handle_mark_useful,
     "/mark_skipped": handle_mark_skipped,
+    "/feedback": handle_feedback,
+    "/feedback_voice": handle_feedback_voice,
+    "/feedback_confirm": handle_feedback_confirm,
+    "/feedback_discard": handle_feedback_discard,
     "/tag": handle_tag,
     "/mark_strong": handle_mark_strong,
     "/mark_interesting": handle_mark_interesting,

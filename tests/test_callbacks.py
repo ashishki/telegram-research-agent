@@ -208,6 +208,76 @@ class TestIdeaCallbacks(unittest.TestCase):
         record_mock.assert_called_once_with(settings, "idea:7:done")
         answer_mock.assert_called_once_with("token", "callback-1", "Записал: acted_on")
 
+    def test_run_bot_dispatches_transcribed_voice_feedback(self):
+        settings = self._settings_with_idea()
+        update = {
+            "update_id": 101,
+            "message": {
+                "chat": {"id": 12345},
+                "from": {"id": 12345},
+                "voice": {"file_id": "voice-1"},
+                "caption": "Too shallow target=eval-gates.",
+            },
+        }
+
+        def stop_after_first_poll(state):
+            state.stop_requested = True
+
+        with patch.dict(
+            os.environ,
+            {"TELEGRAM_BOT_TOKEN": "token", "TELEGRAM_OWNER_CHAT_ID": "12345"},
+            clear=False,
+        ), patch.object(bot_runtime, "_install_signal_handlers", side_effect=stop_after_first_poll), patch.object(
+            bot_runtime,
+            "_telegram_get_updates",
+            return_value=[update],
+        ), patch.object(
+            bot_runtime,
+            "dispatch_command",
+        ) as dispatch_mock:
+            bot_runtime.run_bot(settings)
+
+        dispatch_mock.assert_called_once_with(
+            chat_id="12345",
+            text="/feedback_voice Too shallow target=eval-gates.",
+            settings=settings,
+        )
+
+    def test_run_bot_voice_without_transcript_asks_for_transcript(self):
+        settings = self._settings_with_idea()
+        update = {
+            "update_id": 102,
+            "message": {
+                "chat": {"id": 12345},
+                "from": {"id": 12345},
+                "voice": {"file_id": "voice-1"},
+            },
+        }
+
+        def stop_after_first_poll(state):
+            state.stop_requested = True
+
+        with patch.dict(
+            os.environ,
+            {"TELEGRAM_BOT_TOKEN": "token", "TELEGRAM_OWNER_CHAT_ID": "12345"},
+            clear=False,
+        ), patch.object(bot_runtime, "_install_signal_handlers", side_effect=stop_after_first_poll), patch.object(
+            bot_runtime,
+            "_telegram_get_updates",
+            return_value=[update],
+        ), patch.object(
+            bot_runtime,
+            "dispatch_command",
+        ) as dispatch_mock, patch.object(
+            bot_runtime,
+            "send_message",
+        ) as send_message_mock:
+            bot_runtime.run_bot(settings)
+
+        dispatch_mock.assert_not_called()
+        send_message_mock.assert_called_once()
+        self.assertIn("/feedback_voice <transcript>", send_message_mock.call_args.args[2])
+
 
 if __name__ == "__main__":
     unittest.main()
