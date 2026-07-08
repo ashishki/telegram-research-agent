@@ -30,6 +30,9 @@ Owner receives:
 - Telegram message: short `MVP of the Week` notification + Telegraph link + source-mix summary
 - Telegram document: copyable `MVP of the Week` Markdown fallback with one candidate, evidence, missing evidence, risks, and next experiment
 - When run on demand, Telegram document: `AI Decision Intelligence` HTML report with a first-screen decision brief, actions, conservative project implications, trend board, source links, and an embedded Archify knowledge-flow diagram
+- When run on demand, local split HTML files: a short `Weekly Intelligence
+  Brief` for decisions/actions/Radar/feedback and a cumulative `Knowledge
+  Atlas` for trends, source contribution, and study backlog
 
 Expected time to read: 10–15 minutes.
 
@@ -55,19 +58,25 @@ that means the evidence was not specific enough after broad terms like `AI`,
 `workflow`, and `evidence` were filtered out. Treat this as honest uncertainty,
 not as a pipeline failure.
 
-### Weekly Intelligence Workbook Routine
+### Weekly Brief / Knowledge Atlas Routine
 
-The new target artifact is the Weekly AI Intelligence Workbook: a concise
-first-screen decision brief plus deeper study, evidence, implementation, MVP
-Radar, and feedback sections. Treat Telegram as delivery/feedback, not as the
-main reading surface.
+The current target reader-facing flow has two surfaces:
+
+- `Weekly Intelligence Brief`: read first; short operational snapshot, actions,
+  MVP Radar status, missing evidence, next validation, and feedback prompts.
+- `Knowledge Atlas`: open when you need trend history, source/channel
+  contribution, Idea Thread movement, or study backlog.
+
+The older Weekly AI Intelligence Workbook still exists for the richer visual
+single-file report and Archify diagram. Treat Telegram as delivery/feedback,
+not as the main reading surface.
 
 Monday:
 
-- open the workbook HTML;
-- read Decision Brief first;
-- scan Strong Signals;
-- inspect Project Implementation and MVP Radar sections;
+- open the Weekly Brief first;
+- check action/read/try prompts and MVP Radar status;
+- open Knowledge Atlas only for source/trend context;
+- optionally inspect the visual workbook for diagrams and deep explanation;
 - choose the week's read/try/build targets.
 
 During the week:
@@ -117,28 +126,30 @@ model is unavailable, Hermes falls back to deterministic parsing and still
 requires confirmation.
 
 Daily reminders are local operator prompts in `Asia/Tbilisi`, not a 30-minute
-notification loop. Create one with text or voice, or explicitly:
+notification loop. The timer is intentionally disabled until the operator
+re-enables reminders. Create one with text or voice, or explicitly:
 
 ```text
 /remind завтра 18:00 дать feedback по Workbook
 /reminders
 ```
 
-`telegram-reminders.timer` sends one daily `Asia/Tbilisi` check-in with `сделал` /
-`не сделал` buttons. Button clicks record the reminder outcome in SQLite; they
-do not change report scoring or code/config.
+When enabled, `telegram-reminders.timer` sends one daily `Asia/Tbilisi`
+check-in with `сделал` / `не сделал` buttons. Button clicks record the reminder
+outcome in SQLite; they do not change report scoring or code/config.
 
 ### Hermes / PI Assistant Dogfood Routine
 
 Hermes is the Telegram-facing concierge for the workbook workflow. It is a
-bounded LLM chat and command router, not a source of truth. The Weekly AI
-Intelligence Workbook remains the main reading artifact, and PI Assistant
-answers source-grounded questions by calling read-only tools over curated
-intelligence objects.
+bounded LLM chat and command router, not a source of truth. The Weekly
+Intelligence Brief is the first reading artifact, Knowledge Atlas carries
+longer-term context, and the visual Workbook remains available for diagrams
+and deeper explanation. PI Assistant answers source-grounded questions by
+calling read-only tools over curated intelligence objects.
 
 Hermes commands and chat:
 
-- `/weekly` - current workbook status and three main conclusions;
+- `/weekly` - current weekly artifact status and three main conclusions;
 - `/actions` - one to three actions for the week;
 - `/explain` - explain a selected signal or ask what to explain;
 - plain text, `/chat`, `/hermes`, or `/ask` - bounded LLM chat that can choose
@@ -153,10 +164,11 @@ Hermes commands and chat:
 
 Dogfood Monday flow:
 
-1. Generate or locate the current workbook.
+1. Generate or locate the current Weekly Brief, Knowledge Atlas, and optional
+   visual Workbook.
 2. Ask Hermes for `/weekly`.
-3. Read Decision Brief, two Deep Explanation cards, Project Actions, and MVP
-   Radar.
+3. Read Weekly Brief actions/Radar first; open Atlas or visual Workbook only
+   when context is needed.
 4. Pick one read/try/project/MVP validation/reject-defer action.
 
 During-week flow:
@@ -390,6 +402,13 @@ python3 src/main.py ai-visual-report --week 2026-W28 --skip-refresh
 python3 src/main.py ai-split-report --week 2026-W28 --skip-refresh
 python3 src/main.py ai-visual-report --week 2026-W28 --skip-refresh --deliver
 python3 src/main.py obsidian-export --week 2026-W28
+```
+
+Open the split outputs first when dogfooding format:
+
+```text
+data/output/weekly_intelligence_briefs/<week>.weekly-brief.html
+data/output/knowledge_atlas/<week>.knowledge-atlas.html
 ```
 
 `mvp-weekly` is not Telegram-only idea generation. It exports Telegram seeds to

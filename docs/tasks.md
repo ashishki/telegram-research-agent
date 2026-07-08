@@ -317,7 +317,8 @@ Implemented files:
 
 Implementation notes:
 
-- HPI-2-lite creates deterministic curated retrieval only.
+- HPI-2-lite creates the curated retrieval projection; HPI-9-lite adds
+  transient SQLite FTS ranking over that projection.
 - It builds an in-memory projection from workbook JSON sidecars, claim cards,
   Knowledge Atoms, Idea Threads, project diagnostics/actions, MVP Radar status,
   feedback summaries, and Strategy Reviewer advisory notes when those curated
@@ -326,8 +327,8 @@ Implementation notes:
   gracefully.
 - It does not create a vector index, does not perform raw Telegram firehose
   RAG, and does not introduce mutation tools.
-- A persisted refresh table or FTS-backed projection can be considered later
-  only if the in-memory deterministic projection is insufficient.
+- A persisted refresh table can be considered later only if the in-memory
+  projection plus request-local FTS becomes too slow or too hard to inspect.
 
 Acceptance:
 
@@ -622,10 +623,10 @@ Implementation notes:
 
 ### HPI-9 - Optional Scoped Vector Retrieval Over Curated Items Only
 
-Status: deferred P2; do not implement until deterministic curated search proves
-insufficient during dogfood.
+Status: deferred P2; do not implement until curated deterministic+FTS search
+proves insufficient during dogfood.
 
-Goal: add vector retrieval only if deterministic curated search proves
+Goal: add vector retrieval only if curated deterministic+FTS search proves
 insufficient during dogfood.
 
 Files likely:
@@ -639,7 +640,7 @@ Acceptance:
 - vectors are built only over curated intelligence items;
 - raw Telegram posts are not vectorized as default assistant memory;
 - insufficient evidence remains possible;
-- deterministic filters still run before semantic search.
+- deterministic filters still run before vector/semantic ranking.
 
 Verification:
 

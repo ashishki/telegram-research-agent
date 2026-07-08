@@ -4,8 +4,8 @@ Status: implemented by HPI-9-lite on 2026-07-08.
 
 ## Decision
 
-PI Assistant should not add broad vector RAG now. The useful next step is a
-curated-only retrieval prototype:
+PI Assistant should not add broad vector RAG now. The implemented HPI-9-lite
+step is a curated-only retrieval prototype:
 
 - keep SQLite tables and workbook/JSON sidecars as source of truth;
 - build `IntelligenceRetrievalItem` objects from curated artifacts exactly as

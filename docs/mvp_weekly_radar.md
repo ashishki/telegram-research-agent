@@ -1,17 +1,19 @@
 # MVP Weekly Radar Bridge
 
-Status: Active production bridge
-Date: 2026-06-08
+Status: Active production bridge with KIR gates and market-context sidecar
+Date: 2026-07-08
 
 ## Purpose
 
 Telegram Research Agent does not choose the weekly MVP by itself. It exports
-high-signal Telegram opportunity seeds, then delegates market validation and
-MVP synthesis to `Demand-to-MVP-Radar`.
+high-signal Telegram opportunity seeds and bounded market/business context,
+then delegates market validation and MVP synthesis to `Demand-to-MVP-Radar`.
 
 The split is intentional:
 
 - Telegram Research Agent finds and scores relevant Telegram signals.
+- Telegram Research Agent may add a cited market/business analyst context pack
+  from curated Knowledge Atoms and Idea Threads.
 - Demand-to-MVP Radar collects broader demand sources and checks whether the
   same pain exists outside Telegram.
 - The Telegram bot delivers the final Radar artifact back to the operator as a
@@ -24,6 +26,11 @@ unless the source gates clearly support a build-ready recommendation.
 
 1. `src/main.py mvp-weekly` exports opportunity seeds from recent Telegram
    evidence into `data/output/opportunity_seeds/`.
+   - Standard seeds represent candidate pain/opportunity signals.
+   - A special `market_analyst_context` seed can carry bounded business/market
+     context without consuming the ordinary seed limit.
+   - A sidecar JSON is written under
+     `data/output/opportunity_seeds/market_context/`.
 2. The pipeline runs Radar with:
    - `RADAR_REPO_PATH`
    - `RADAR_PYTHON`
@@ -41,6 +48,10 @@ unless the source gates clearly support a build-ready recommendation.
    - Telegraph URL;
    - source-mix summary;
    - Markdown document fallback.
+6. `ai-split-report` can read the resulting Radar JSON into the Weekly
+   Intelligence Brief. The Brief summarizes candidate status, missing evidence,
+   and next validation; Knowledge Atlas remains the long-running trend/source
+   map.
 
 ## Source-Mix Contract
 
@@ -64,6 +75,37 @@ Radar's active weekly source bundle includes:
 
 Confident recommendations are gated in Radar. Telegram-only candidates cannot
 become `focused_experiment`.
+
+## Market/Business Analyst Context
+
+HPI-13 added a separate market/business context pack for Radar. The pack is
+designed to answer: "how do business/source channels describe market pain,
+buyer behavior, demand signals, and what seems to work or fail?"
+
+Inputs:
+
+- requested market/business Telegram channels from `src/config/channels.yaml`;
+- curated Knowledge Atoms and Idea Threads from those channels first;
+- raw fallback only for requested channels that have not yet been extracted
+  into atoms/threads;
+- source URLs, atom IDs, thread slugs, and channel counts for auditability.
+
+Outputs:
+
+- `market_context` sidecar JSON beside the opportunity seed export;
+- optional context-only `market_analyst_context` Radar seed;
+- audit fields showing whether the context came from curated atoms/threads or
+  raw fallback.
+
+Boundaries:
+
+- The pack is **context**, not build evidence.
+- It should improve Radar's language, framing, and candidate comparison.
+- It must not satisfy external demand gates by itself.
+- If market commentary is Telegram-only, Radar should stay `investigate`,
+  `existing_project_context`, `needs_more_evidence`, or `reject`.
+- More injection is not the default next step. Prefer one week of operator
+  reactions and confirmed voice/text feedback before expanding context volume.
 
 ## KIR-backed Radar Contract
 
@@ -107,6 +149,9 @@ Clarifications:
 - Telegram-only remains `investigate` or `reject`.
 - Live source intelligence is context-only and does not satisfy external
   evidence gates.
+- Market/business analyst context is also context-only. It may help rank or
+  explain candidates, but it must not make a candidate build-ready without
+  external demand evidence.
 - Existing-project context is `investigate/apply-to-existing`, not a new
   standalone MVP.
 - External-first standalone Radar runs should remain possible. Apply the KIR
@@ -175,6 +220,19 @@ Manual run with live source intelligence context:
 ```bash
 python3 src/main.py mvp-weekly --with-live-source-index
 ```
+
+Manual run for the current market-context path:
+
+```bash
+python3 src/main.py export-opportunity-seeds --days 7 --limit 80
+python3 src/main.py mvp-weekly --no-deliver
+python3 src/main.py ai-split-report --week 2026-W28 --skip-refresh
+```
+
+The first command writes both the ordinary opportunity seed export and the
+market-context sidecar. The second command lets Radar validate candidates. The
+third command surfaces the Radar status in the short Weekly Brief and keeps the
+Knowledge Atlas separate.
 
 First run after deploying the event stream can backfill recent source events
 from SQLite before building the live intelligence snapshot:

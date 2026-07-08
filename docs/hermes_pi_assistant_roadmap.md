@@ -1,6 +1,6 @@
 # Hermes / Personal Intelligence Assistant Roadmap
 
-Status: planning roadmap
+Status: implemented roadmap with active dogfood phase
 Created: 2026-07-08
 Owner: private single-user operator workflow
 
@@ -8,8 +8,9 @@ Owner: private single-user operator workflow
 
 KIR-Q0..KIR-Q13 are marked implemented in this repo. The system now has a
 curated intelligence pipeline: Telegram archive, Knowledge Atoms, Idea Threads,
-frontier analysis, Weekly AI Intelligence Workbook, MVP Radar section,
-feedback, Strategy Reviewer, and generated Obsidian projection.
+frontier analysis, Weekly AI Intelligence Workbook, split Knowledge
+Atlas/Weekly Intelligence Brief HTML surfaces, MVP Radar section, feedback,
+Strategy Reviewer, and generated Obsidian projection.
 
 The next phase is not another report feature. The next phase is convenience and
 usefulness:
@@ -21,6 +22,7 @@ Telegram posts
   -> Idea Threads
   -> Frontier Analysis
   -> Weekly AI Intelligence Workbook
+  -> Knowledge Atlas + Weekly Intelligence Brief
   -> Project Implementation suggestions
   -> MVP Radar conservative validation
   -> generated Obsidian projection
@@ -43,12 +45,14 @@ the system changes decisions and actions without becoming another workload.
 
 ## Current Repo Verification
 
-Docs and code reviewed on 2026-07-08 show KIR-Q0..KIR-Q13 documented as
-implemented. The implementation surfaces exist for KIR provenance, KIR-backed
-Radar gates, simplified reaction feedback, confirmed text/voice feedback
-intake, feedback-aware reports, Weekly AI Intelligence Workbook, Deep
-Explanation Cards, diagrams, Project Implementation, MVP Radar section,
-Strategy Reviewer, quote/claim evidence hardening, and Obsidian projection.
+Docs and code reviewed on 2026-07-08 show KIR-Q0..KIR-Q13 and HPI-0..HPI-9-lite
+documented as implemented. The implementation surfaces exist for KIR
+provenance, KIR-backed Radar gates, market/business Radar context, simplified
+reaction feedback, confirmed text/voice feedback intake, feedback-aware
+reports, Weekly AI Intelligence Workbook, split Knowledge Atlas / Weekly
+Intelligence Brief HTML, Deep Explanation Cards, diagrams, Project
+Implementation, MVP Radar section, Strategy Reviewer, quote/claim evidence
+hardening, curated deterministic+FTS PI search, and Obsidian projection.
 
 Caveats:
 
@@ -102,6 +106,12 @@ Hermes must not:
 
 PI Assistant is a bounded conversational/RAG interface over curated
 intelligence objects.
+
+Current PI search is not broad vector RAG. It builds curated
+`IntelligenceRetrievalItem` objects from workbook/sidecar/atom/thread/action/
+MVP/feedback/Strategy Reviewer sources, applies filters first, then ranks with
+deterministic scoring plus request-local SQLite FTS. The result carries source
+refs, atom IDs, evidence tier, verification status, and `retrieval_mode`.
 
 It answers questions about reports, claims, threads, projects, MVP status, and
 feedback. It must cite source refs, atom IDs, thread slugs, workbook sections,
@@ -175,14 +185,14 @@ Defer:
 - Rich chat curation tools until the feedback confirmation loop is stable.
 - Cross-surface UI such as Mini App style flows.
 
-Adopt later if HPI-9-lite is approved:
+Implemented in HPI-9-lite:
 
 - Reuse the retrieval/tool-loop separation from Dream Motif, but apply it only
   to curated intelligence objects.
 - Prefer deterministic search or SQLite FTS before adding embeddings.
-- If semantic retrieval is needed, keep filters and provenance before ranking:
-  week, item type, project, thread, status, source refs, atom IDs, evidence
-  tier, and insufficient-evidence states.
+- Keep filters and provenance before ranking: week, item type, project, thread,
+  status, source refs, atom IDs, evidence tier, and insufficient-evidence
+  states.
 
 Reject:
 
@@ -275,7 +285,7 @@ evidence/provenance.
 
 P0 command set:
 
-- `/weekly` - show current workbook status and three main conclusions.
+- `/weekly` - show current weekly artifact status and three main conclusions.
 - `/actions` - show one to three actions for the week.
 - `/explain` - explain selected signal or ask what to explain.
 - `/projects` - show project actions and watch items.
@@ -334,7 +344,7 @@ Suggested fields:
 
 P0 retrieval:
 
-- SQLite/FTS or deterministic search over curated items;
+- deterministic search plus transient SQLite FTS over curated items;
 - filter before broad search by week, project, thread, item type, and status;
 - return insufficient evidence when no strong result exists.
 
@@ -498,11 +508,14 @@ Detailed dogfood protocol lives in `docs/dogfood_4_week_plan.md`.
 - HPI-6 - Deliver Strategy Reviewer summaries through Telegram. Implemented.
 - HPI-7 - Add workbook action-status and feedback follow-up loop.
   Implemented as read-only status projection.
+- HPI-9-lite - Curated Semantic RAG decision and prototype. Implemented as
+  deterministic+SQLite FTS over filtered curated items; vector remains
+  deferred.
 
 ### P2
 
 - HPI-9 - Optional scoped vector retrieval over curated items only. Deferred
-  until dogfood proves deterministic search insufficient.
+  until dogfood proves deterministic+FTS search insufficient.
 - HPI-10 - Post-dogfood product decision review. Blocked until four dogfood
   weeks are recorded.
 
@@ -521,17 +534,21 @@ HPI phase acceptance:
 
 ## Implementation Note - 2026-07-08
 
-HPI-1 through HPI-8 are implemented as a safe dogfood foundation:
+HPI-1 through HPI-9-lite are implemented as a safe dogfood foundation:
 
 - `PersonalIntelligenceFacade` exists and returns stable DTO-like dictionaries
   and lists for curated workbook, thread, project, MVP, feedback, marked-post,
   and retrieval reads.
-- `intelligence_retrieval_items` builds a deterministic curated projection from
-  workbook sidecars, claim cards, Knowledge Atoms, Idea Threads, project
-  diagnostics/actions, MVP Radar status, feedback summaries, and Strategy
-  Reviewer advisory notes when those sources are available.
+- `intelligence_retrieval_items` builds a curated projection from workbook
+  sidecars, split report sidecars, claim cards, Knowledge Atoms, Idea Threads,
+  project diagnostics/actions, MVP Radar status, feedback summaries, and
+  Strategy Reviewer advisory notes when those sources are available.
+- `assistant.semantic_retrieval` ranks filtered curated retrieval items with
+  deterministic scoring plus transient SQLite FTS and reports
+  `retrieval_decision`.
 - No mutation tools were added.
-- No raw Telegram firehose RAG or vector search was added.
+- No raw Telegram firehose RAG or vector search was added; curated PI search
+  uses transient SQLite FTS only.
 - `pi_tools` defines a bounded read-only tool catalog with evidence summaries
   and explicit insufficient-evidence states for future PI/Hermes calls.
 - Hermes commands now expose weekly summary, actions, curated explanation,
@@ -543,8 +560,8 @@ HPI-1 through HPI-8 are implemented as a safe dogfood foundation:
 - Dogfood review helpers can write compact private weekly JSON/Markdown
   artifacts and summarize four weeks.
 - The next recommended step is operational: run dogfood week 1, collect metrics,
-  and do not implement HPI-9 unless deterministic curated search fails in real
-  use.
+  and do not implement vector retrieval unless curated deterministic+FTS search
+  fails in real use.
 
 ## Operational Setup Note - 2026-07-08
 
@@ -573,9 +590,10 @@ This does not change HPI safety scope:
 - no vector retrieval is enabled;
 - no mutation tools or autonomous Codex execution are enabled.
 
-Dogfood week 1 should validate the bounded chat, command concierge, workbook
-reading loop, reaction sync, feedback confirmation, Strategy Reviewer summary,
-and dogfood metric artifact before any HPI-9 work.
+Dogfood week 1 should validate the bounded chat, command concierge,
+Knowledge Atlas / Weekly Brief reading loop, reaction sync, feedback
+confirmation, Strategy Reviewer summary, Radar status explanation, and dogfood
+metric artifact before any vector retrieval or broader product work.
 
 ## Risks
 

@@ -254,13 +254,14 @@ Radar Contract` are implemented. HPI is now the active post-KIR roadmap:
 HPI: Hermes / Personal Intelligence Assistant / Dogfood
 ```
 
-HPI-0 documents the roadmap and dogfood plan. HPI-1 through HPI-8 plus the
-first usability slice have added the read-only facade, deterministic curated
-retrieval projection, bounded PI tool catalog, Hermes Telegram concierge
-commands and bounded chat, confirmation-gated feedback, managed voice
-transcription with chat/feedback/reminder intent routing, daily operator
-reminders with done/not-done callbacks, Strategy Reviewer Telegram delivery,
-action status projection, and compact dogfood review artifact helpers.
+HPI-0 documents the roadmap and dogfood plan. HPI-1 through HPI-9-lite plus the
+first usability slice have added the read-only facade, curated retrieval
+projection, transient SQLite FTS ranking, bounded PI tool catalog, Hermes
+Telegram concierge commands and bounded chat, confirmation-gated feedback,
+managed voice transcription with chat/feedback/reminder intent routing,
+operator reminders with done/not-done callbacks when enabled, Strategy Reviewer
+Telegram delivery, action status projection, and compact dogfood review
+artifact helpers.
 
 The exact next task is dogfood measurement over the implemented PI/Hermes
 workflow, because HPI-9-lite has already decided and prototyped curated-only

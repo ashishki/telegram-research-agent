@@ -45,6 +45,7 @@ It is not a public bot, SaaS product, or generic summarizer.
 8. **Run Frontier Analysis** over compressed thread/atom context for the current week.
 9. **Generate weekly artifacts**:
    - `Weekly AI Intelligence Workbook` visual HTML report
+   - split `Knowledge Atlas` and `Weekly Intelligence Brief` HTML/JSON surfaces
    - standalone `AI Intelligence` HTML report and JSON sidecar
    - generated Obsidian vault projection
    - legacy `Research Brief`, `Implementation Ideas`, `Study Plan`
@@ -86,9 +87,9 @@ It is not a public bot, SaaS product, or generic summarizer.
 - Stakeholder-facing Weekly AI Intelligence Workbook via `ai-visual-report`: Russian decision brief, strong signals, deep explanation cards, claim evidence cards with quote verification/evidence tiers, concept diagrams, project implementation suggestions, MVP Radar section, feedback prompts, JSON sidecar, and embedded Archify/local diagrams when available.
 - Split reader-facing HTML via `ai-split-report`: a cumulative Knowledge Atlas for trend/source/study context and a short Weekly Intelligence Brief for decision, action, MVP Radar, and feedback prompts. Both write distinct HTML/JSON sidecars and reuse the same curated context load.
 - Strategy Reviewer via `strategy-reviewer`: advisory-only keep/change/demote/test-next-week suggestions and Codex-ready tasks from confirmed workbook feedback; it does not mutate source code, prompts, thresholds, profile, or projects.
-- HPI read-only foundation: `PersonalIntelligenceFacade`, deterministic curated retrieval items, and bounded PI tools expose workbook, thread, action, MVP, feedback, marked-post, Strategy Reviewer, and action-status DTOs without raw DB sessions, vector search, or mutation methods.
+- HPI read-only foundation: `PersonalIntelligenceFacade`, curated retrieval items, transient SQLite FTS ranking, and bounded PI tools expose workbook, thread, action, MVP, feedback, marked-post, Strategy Reviewer, and action-status DTOs without raw DB sessions, vector search, or mutation methods.
 - Hermes Telegram concierge commands: `/weekly`, `/actions`, `/explain`, `/projects`, `/mvp`, `/strategy`, and `/codex` provide short operator routing; `/codex` prepares prompt text only and never executes Codex.
-- Dogfood review helper: compact private weekly dogfood JSON/Markdown artifacts can track time-to-understand, sections read, completed actions, feedback counts, MVP status, decisions changed, user value, and friction before HPI-9/HPI-10 decisions.
+- Dogfood review helper: compact private weekly dogfood JSON/Markdown artifacts can track time-to-understand, sections read, completed actions, feedback counts, MVP status, decisions changed, user value, and friction before vector retrieval or HPI-10 product decisions.
 - Generated Obsidian projection via `obsidian-export`: bounded weekly, thread, tool/model, practice, channel, read-queue, try/build, experiment, project-watch, feedback-summary, and strategy-review notes with generated-file markers and source links.
 - Honest project implications: the visual report suppresses broad keyword overlaps like `AI`, `workflow`, and `evidence`; a zero project-lead count means the current atom/thread evidence was too weak for a user-facing project claim.
 
@@ -143,8 +144,9 @@ On the single-user VPS, the operational baseline is:
   processing window.
 - `telegram-study-reminder-tue.timer` and
   `telegram-study-reminder-fri.timer` send study reminders.
-- `telegram-reminders.timer` sends one daily `Asia/Tbilisi` operator reminder
-  check-in with inline `сделал` / `не сделал` buttons.
+- `telegram-reminders.timer` can send one daily `Asia/Tbilisi` operator
+  reminder check-in with inline `сделал` / `не сделал` buttons; it is
+  intentionally disabled until the operator re-enables reminders.
 
 Quick checks:
 
@@ -232,13 +234,13 @@ Start here:
 - [docs/report_quality_roadmap.md](docs/report_quality_roadmap.md) — report-quality, artifact feedback, internal cost guardrail, and Demand-to-MVP Radar handoff tasks
 - [docs/ai_knowledge_intelligence_roadmap.md](docs/ai_knowledge_intelligence_roadmap.md) — AI Knowledge Intelligence Desk architecture, phases, visual report, and Obsidian projection
 - [docs/ai_intelligence_workbook_roadmap.md](docs/ai_intelligence_workbook_roadmap.md) — completed KIR-Q0..KIR-Q13 workbook, feedback, Radar contract, Strategy Reviewer, and Obsidian projection roadmap
-- [docs/hermes_pi_assistant_roadmap.md](docs/hermes_pi_assistant_roadmap.md) — HPI roadmap for Hermes concierge, PI Assistant bounded tools, dogfood, and deferred vector/post-dogfood gates
+- [docs/hermes_pi_assistant_roadmap.md](docs/hermes_pi_assistant_roadmap.md) — HPI roadmap for Hermes concierge, PI Assistant bounded tools, curated FTS retrieval, dogfood, and deferred vector/post-dogfood gates
 - [docs/dogfood_4_week_plan.md](docs/dogfood_4_week_plan.md) — four-week dogfood metrics, weekly checklist, success criteria, and simplification triggers
 - [docs/operator_workflow.md](docs/operator_workflow.md) — weekly operating workflow
 - [docs/architecture.md](docs/architecture.md) — current system shape
 - [docs/spec.md](docs/spec.md) — implementation-facing system specification
 - [docs/report_format.md](docs/report_format.md) — weekly artifact contract
-- [docs/mvp_weekly_radar.md](docs/mvp_weekly_radar.md) — MVP of the Week Radar bridge and credentials
+- [docs/mvp_weekly_radar.md](docs/mvp_weekly_radar.md) — MVP Radar bridge, market-context sidecar, evidence gates, and credentials
 - [docs/research_brief_receipt.md](docs/research_brief_receipt.md) — Research Brief receipt audit contract with implemented SQLite schema/storage helpers, generation-time receipt creation, delivery ref updates, deterministic verification checks, CLI inspection, operator review, and optional operator-only audit notes
 - [docs/telegram_channel_intelligence.md](docs/telegram_channel_intelligence.md) — Channel Intelligence design, implemented schema migrations, deterministic repeated-claim extraction, source-observation refresh, active-project links, narrative candidates, inspection CLI, and optional Markdown report surface
 - [docs/memory_architecture.md](docs/memory_architecture.md) — memory model
