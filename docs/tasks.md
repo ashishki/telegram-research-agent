@@ -874,7 +874,7 @@ Stop conditions:
 
 ### HPI-13 - Market Business Channel Pack For MVP Radar
 
-Status: next P1 after HPI-12.
+Status: implemented by HPI-13.
 
 Goal: create a separate market/business intelligence input for MVP Radar from
 operators who understand AI market pain, distribution, and business models.
@@ -902,6 +902,29 @@ Files likely:
 - `tests/test_mvp_weekly_pipeline.py`
 - new tests for market pain pack
 - `docs/operator_workflow.md`
+
+Implemented:
+
+- `src/config/channels.yaml` now marks the requested market/business channels
+  under `market_business_ai` and adds `@huntermikevolkov`.
+- `src/output/market_pain_intelligence.py` builds a bounded, deterministic,
+  cited market analyst context pack from curated Knowledge Atoms and Idea
+  Threads first, with raw-post fallback only for requested channels that have
+  not yet produced curated atoms in the lookback.
+- The pack exposes what seems to work, what does not work, market pains,
+  buying/WTP triggers, customer segments, distribution channels,
+  workflow/business-model opportunities, proof points, source refs, and Radar
+  gate-audit fields.
+- `opportunity_seed_export` writes a market context sidecar and can add a
+  context-only `market_analyst_context` Radar seed without consuming the
+  ordinary opportunity seed limit.
+- `mvp_weekly_pipeline` carries the pack through operator output and explains
+  empty bounded lookbacks instead of silently looking empty.
+- CLI output reports the market pack path and status for opportunity seed
+  export and weekly MVP runs.
+- Regression coverage verifies curated atom/thread context, raw fallback
+  context, context-only seeds beyond the ordinary limit, empty-pack audit
+  behavior, and operator-message explanation for empty market packs.
 
 Implementation notes:
 
@@ -947,7 +970,7 @@ Stop conditions:
 
 ### HPI-14 - Split HTML Into Knowledge Atlas And Weekly Intelligence Brief
 
-Status: planned P1 after HPI-11/HPI-12 and in parallel with HPI-13 if scoped.
+Status: next P1 after HPI-13.
 
 Goal: stop forcing one HTML artifact to be both a global knowledge map and a
 weekly action brief. Produce two distinct reader-facing HTML surfaces.

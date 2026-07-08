@@ -10,13 +10,15 @@ facade/tool catalog, Hermes concierge commands, action-status projection, and
 dogfood review layers are the primary direction. Current work is tracked in
 `docs/tasks.md`.
 
-Current next work: a bounded market/business channel pack for MVP Radar, a
-split between Knowledge Atlas and Weekly Intelligence Brief HTML surfaces, and
-a curated-only semantic RAG decision/prototype. Hermes Telegram UX cleanup is
-implemented: plain messages do not show MarkdownV2 escape artifacts, reminders
-are scheduled/displayed in `Asia/Tbilisi`, and feedback drafts use an
-Opus-class strategist while remaining confirmation-gated. Raw Telegram firehose
-RAG and full-year archive processing remain deferred.
+Current next work: split Knowledge Atlas and Weekly Intelligence Brief HTML
+surfaces, then decide/prototype curated-only semantic RAG. Hermes Telegram UX
+cleanup is implemented: plain messages do not show MarkdownV2 escape artifacts,
+reminders are scheduled/displayed in `Asia/Tbilisi`, feedback drafts use an
+Opus-class strategist while remaining confirmation-gated, and MVP Radar now has
+a bounded market/business analyst context pack from curated atoms/threads with
+raw fallback for channels not yet extracted. It stays advisory rather than
+build-ready proof. Raw Telegram firehose RAG and full-year archive processing
+remain deferred.
 
 Reference integration: `docs/entropy_core_gensyn_integration.md`.
 
@@ -77,6 +79,7 @@ It is not a public bot, SaaS product, or generic summarizer.
 - `score-stats` includes recent Research Brief receipt health trends for empty and low-signal weeks.
 - `health-check` warns when `src/config/projects.yaml` needs monthly review.
 - Weekly MVP Radar bridge: Telegram exports opportunity seeds, Radar collects configured demand sources, Opus-class synthesis writes a separate MVP-of-week report, and the bot delivers it as a Telegraph article plus a copyable Markdown document.
+- Market/business analyst context for MVP Radar: selected market channels produce a bounded, cited, deterministic sidecar from curated Knowledge Atoms and Idea Threads, with raw fallback only for channels not yet extracted; the export adds context-only analyst notes without consuming the ordinary seed limit.
 - Knowledge Atom extraction via `knowledge-extract`: bounded, resumable JSON extraction from raw Telegram posts with source citations.
 - Temporal Idea Threads via `idea-threads`: deterministic grouping of atoms into evolving AI ideas with momentum and status.
 - Frontier-model synthesis via `frontier-analysis`: top-model weekly interpretation over compressed 12-week context.

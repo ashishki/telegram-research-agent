@@ -611,23 +611,21 @@ Stop and ask the operator if a task:
 
 ## Next Operational Task
 
-Implement HPI-13 first: Market Business Channel Pack for MVP Radar.
+Implement HPI-14 first: Split HTML into Knowledge Atlas and Weekly Intelligence
+Brief.
 
 Scope:
 
-- inspect whether `its_capitan`, `exitsexist`, `leadgenvalley`,
-  `cryptoEssay`, and `huntermikevolkov` already exist in channel config and
-  local DB;
-- add missing channels under a distinct market/business group;
-- do bounded lookback/backfill only, not a full-year archive pass;
-- extract a deterministic cited market pain pack for MVP Radar context;
-- keep Telegram-only market evidence as context, not build-ready proof.
+- produce two distinct reader-facing HTML surfaces;
+- keep Knowledge Atlas cumulative/rolling and trend-oriented;
+- keep Weekly Intelligence Brief short, operational, and action-oriented;
+- keep sidecars stable for Hermes/PI retrieval and generated Obsidian;
+- preserve MVP Radar gates and feedback surfaces.
 
 Recommended follow-up order:
 
-1. HPI-13 - Market Business Channel Pack for MVP Radar.
-2. HPI-14 - Split HTML into Knowledge Atlas and Weekly Intelligence Brief.
-3. HPI-9-lite - Curated Semantic RAG decision/prototype using Dream Motif
+1. HPI-14 - Split HTML into Knowledge Atlas and Weekly Intelligence Brief.
+2. HPI-9-lite - Curated Semantic RAG decision/prototype using Dream Motif
    retrieval patterns as reference.
 
 Do not run the full-year archive pass yet. Do not implement raw Telegram RAG,

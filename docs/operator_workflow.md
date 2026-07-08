@@ -230,9 +230,6 @@ does not use vector search, and does not expose raw SQLite sessions.
 
 Next implementation queue before deeper dogfood:
 
-- add a bounded market/business channel pack for MVP Radar from
-  `its_capitan`, `exitsexist`, `leadgenvalley`, `cryptoEssay`, and
-  `huntermikevolkov`;
 - split the HTML surface into a cumulative Knowledge Atlas and a short Weekly
   Intelligence Brief;
 - evaluate curated-only semantic RAG using Dream Motif retrieval patterns as
@@ -245,6 +242,12 @@ or send voice"; reminders parse, display, and run in `Asia/Tbilisi`.
 Implemented HPI-12 feedback strategist: text and voice feedback drafts use an
 Opus-class interpretation path with deterministic fallback; memory writes
 remain gated by `/feedback_confirm`.
+Implemented HPI-13 market pack: MVP Radar gets a bounded, cited
+market/business analyst context sidecar from the requested channels. It uses
+curated Knowledge Atoms and Idea Threads first, raw fallback only for channels
+not yet extracted, adds context-only analyst notes beyond the ordinary seed
+limit, and keeps Telegram-only market commentary as context rather than
+build-ready evidence.
 
 Reaction readiness requires a live operator event. Put any personal reaction on
 a recent original channel post, then run:
