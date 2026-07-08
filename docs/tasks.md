@@ -181,7 +181,7 @@ and a stronger KIR-backed Radar contract. Roadmap details live in
 
 ### KIR-Q0 - Document AI Intelligence Workbook Roadmap
 
-Status: in_progress for this planning session.
+Status: implemented by KIR-Q0.
 
 Goal: convert the product pivot into explicit docs, task IDs, implementation
 order, and acceptance criteria before code work starts.
@@ -215,7 +215,7 @@ rg "KIR-Q0|KIR-Q1|KIR-Q13|Weekly AI Intelligence Workbook|KIR-backed Radar Contr
 
 ### KIR-Q1 - Preserve KIR Provenance In Radar Import
 
-Status: planned P0.
+Status: implemented by KIR-Q1.
 
 Goal: Demand-to-MVP Radar must preserve Knowledge Thread provenance emitted by
 Telegram Research Agent opportunity seeds.
@@ -245,7 +245,7 @@ cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
 
 ### KIR-Q2 - Add KIR-Backed Radar Gate
 
-Status: planned P0.
+Status: implemented by KIR-Q2.
 
 Goal: in Telegram-seeded weekly mode, `build` or `focused_experiment` must
 require fresh KIR Knowledge Thread evidence with source atoms plus
@@ -278,7 +278,7 @@ cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
 
 ### KIR-Q3 - Simplify Reaction Feedback
 
-Status: planned P0.
+Status: implemented by KIR-Q3.
 
 Goal: any visible operator reaction on a Telegram source post means the post
 caught the operator's interest. The operator should not need to remember emoji
@@ -320,7 +320,7 @@ PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m uni
 
 ### KIR-Q4 - Voice Feedback Intake
 
-Status: planned P0.
+Status: implemented by KIR-Q4.
 
 Goal: let the operator send voice/text feedback after reading the workbook,
 parse it into structured proposals, ask for confirmation, and write only
@@ -350,7 +350,7 @@ Acceptance:
 
 ### KIR-Q5 - Feedback Affects Next Workbook
 
-Status: planned P1.
+Status: implemented by KIR-Q5.
 
 Goal: confirmed feedback should visibly affect the next workbook's ranking,
 wording, and "what changed because of feedback" section.
@@ -373,7 +373,7 @@ Acceptance:
 
 ### KIR-Q6 - Weekly Intelligence Workbook HTML
 
-Status: planned P1.
+Status: implemented by KIR-Q6.
 
 Goal: create the primary rich Weekly AI Intelligence Workbook HTML artifact.
 
@@ -398,7 +398,7 @@ Acceptance:
 
 ### KIR-Q7 - Deep Explanation Cards
 
-Status: planned P1.
+Status: implemented by KIR-Q7.
 
 Goal: strongest signals should explain complex AI/engineering topics in plain
 language without uncited strong claims.
@@ -421,7 +421,7 @@ Acceptance:
 
 ### KIR-Q8 - Concept Diagrams With Archify/Local Renderer
 
-Status: planned P1.
+Status: implemented by KIR-Q8.
 
 Goal: add deterministic concept/dataflow diagrams for selected workbook topics
 when they improve understanding.
@@ -441,7 +441,7 @@ Acceptance:
 
 ### KIR-Q9 - Project Implementation Section
 
-Status: planned P1.
+Status: implemented by KIR-Q9.
 
 Goal: translate strong signals into concrete existing-project PR/backlog
 candidates without broad keyword matching.
@@ -463,7 +463,7 @@ Acceptance:
 
 ### KIR-Q10 - MVP Radar Workbook Section
 
-Status: planned P1.
+Status: implemented by KIR-Q10.
 
 Goal: embed the weekly Radar candidate dossier into the workbook as a
 conservative opportunity section.
@@ -484,7 +484,7 @@ Acceptance:
 
 ### KIR-Q11 - Strategy Reviewer Agent
 
-Status: planned P2.
+Status: implemented by KIR-Q11.
 
 Goal: after feedback, produce advisory system-improvement suggestions and
 Codex-ready tasks without modifying code/config.
@@ -506,7 +506,7 @@ Acceptance:
 
 ### KIR-Q12 - Quote Verification / Evidence Tiers / Claim Cards
 
-Status: planned P2.
+Status: implemented by KIR-Q12.
 
 Goal: harden claim discipline across atom extraction and workbook rendering.
 
@@ -527,7 +527,7 @@ Acceptance:
 
 ### KIR-Q13 - Obsidian Workbook Projection
 
-Status: planned P2.
+Status: implemented by KIR-Q13.
 
 Goal: refine generated Obsidian projection for workbook/read/try/build and
 Strategy Reviewer outputs without note explosion.

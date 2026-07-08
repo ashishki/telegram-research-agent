@@ -314,13 +314,12 @@ python3 src/main.py sync-reactions --days 14
 
 The weekly `ingest` command also runs this sync unless `--skip-reactions` is passed.
 
-Default reaction mapping:
-- `🔥`, `⭐`, `❤️` -> `strong` + `marked_important`
-- `👍`, `👏` -> `interesting` + `marked_important`
-- `👀`, `🤔` -> `read_later`
-- `⚡`, `🛠️` -> `try_in_project`
-- `✅` -> `try_in_project` + `acted_on`
-- `👎`, `💩`, `❌` -> `low_signal` + `skipped`
+Reaction feedback rule:
+- any visible personal reaction on a Telegram source post records
+  `operator_marked_interesting`;
+- the raw emoji is kept for audit;
+- no reaction means unknown, not negative;
+- aggregate channel reaction counts are never treated as personal feedback.
 
 The study plan now has a weekly completion loop:
 1. The system sends one reminder per week

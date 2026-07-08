@@ -1242,11 +1242,17 @@ Acceptance:
 Start from `docs/tasks.md`. The active queue is now
 `KIR-Q: AI Intelligence Quality / Workbook / Feedback / Radar Contract`.
 
-The first implementation task after the docs-first planning pass is KIR-Q1:
-preserve Knowledge Thread provenance on Demand-to-MVP Radar import. KIR-Q2 then
-adds the KIR-backed Radar gate. Do not start by expanding workbook HTML before
-the cross-repo provenance contract is preserved; otherwise Radar cannot explain
-whether a Telegram-seeded candidate has fresh KIR evidence.
+KIR-Q0..KIR-Q13 in that queue are implemented. Future sessions should not
+restart from KIR-Q1; they should pick the first genuinely open task in
+`docs/tasks.md`.
+
+Current open/future work outside the completed Q0..Q13 queue:
+
+- KIR-Q-008 standard regeneration/manual quality loop is partially verified,
+  but forced frontier regeneration still needs `LLM_API_KEY` or
+  `ANTHROPIC_API_KEY`.
+- KIR-Q-009 referee/thread-audit/monthly changed-beliefs work is intentionally
+  deferred until after 3-4 stable weekly runs.
 
 ## Suggested New Session Prompt
 
@@ -1256,15 +1262,13 @@ Read docs/CODEX_PROMPT.md, docs/tasks.md, and
 docs/ai_intelligence_workbook_roadmap.md. Also inspect the Demand-to-MVP-Radar
 bridge at /srv/openclaw-you/workspace/Demand-to-MVP-Radar.
 
-Implement KIR-Q1 only: preserve Knowledge Thread provenance in Radar import.
-Do not implement the KIR-backed gate yet except for any minimal test fixture
-setup needed to prove metadata is available.
+Continue from the first genuinely open task in docs/tasks.md. Do not restart
+completed KIR-Q0..KIR-Q13 work unless fixing a discovered regression.
 
-Acceptance: imported EvidenceRecord.provider_metadata preserves source_kind,
-source_urls, knowledge_thread_slug, knowledge_thread_title,
-knowledge_thread_status, knowledge_atom_types, and source_atom_ids for
-knowledge_thread seeds; existing Telegram seed imports still pass; selected
-JSON/report code can access the fields for KIR-Q2.
+If working on KIR-Q-008, verify the standard weekly regeneration/manual quality
+loop and only force frontier regeneration when LLM_API_KEY or ANTHROPIC_API_KEY
+is configured. If working on KIR-Q-009, first confirm 3-4 stable weekly runs are
+available as evidence.
 
 Run:
 cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar

@@ -1,20 +1,27 @@
 # Next Development Roadmap
 
 Status: active next-step roadmap
-Last updated: 2026-06-08
+Last updated: 2026-07-07
 
 ## Purpose
 
-This roadmap turns the remaining report-quality, operator-feedback, Radar
-handoff, and internal guardrail ideas into AI-development tasks.
+This roadmap originally turned the remaining report-quality, operator-feedback,
+Radar handoff, and internal guardrail ideas into AI-development tasks.
+
+As of 2026-07-07, the receipt/source-trust/report-quality/Radar/cost/editorial
+memory work described here is implemented. The active next-step roadmap is now
+the KIR quality/user-value queue in `docs/tasks.md` and the audit-driven
+roadmap section in `docs/ai_knowledge_intelligence_roadmap.md`, including the
+Russian final-HTML report requirement.
 
 The product should stay a private operator research system until weekly briefs
 repeatedly influence real decisions. The next work should improve reader
 usefulness, report consistency, feedback quality, and Radar honesty without
 adding a generic UI or a runtime dependency on Entropy Core.
 
-Detailed report-quality task scope lives in
-`docs/report_quality_roadmap.md`.
+Detailed historical report-quality task scope lives in
+`docs/report_quality_roadmap.md`. Current KIR-Q tasks live in
+`docs/tasks.md`.
 
 ## Scope
 
@@ -77,9 +84,12 @@ Implemented:
 
 Active next task details:
 
-- `docs/tasks.md` lists the active queue.
-- `docs/report_quality_roadmap.md` contains the implementation handoff,
-  acceptance criteria, touched-file guidance, and Radar repo paths.
+- `docs/tasks.md` lists the active KIR-Q queue.
+- `docs/ai_knowledge_intelligence_roadmap.md` contains the quality/user-value
+  roadmap, Russian final-HTML report requirement, end-to-end stages, acceptance
+  criteria, metrics, risks, and W28 regeneration plan.
+- `docs/report_quality_roadmap.md` remains the historical implementation
+  handoff for the already implemented Research Brief/Radar quality work.
 
 ## Phase 1 - Receipt Evidence Confidence
 

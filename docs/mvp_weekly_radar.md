@@ -71,8 +71,8 @@ Radar is a conservative opportunity scout. It may receive Knowledge
 Thread-backed seeds from Telegram Research Agent, but it must still answer only
 whether a real MVP opportunity is validated beyond Telegram.
 
-Telegram Research Agent currently exports Knowledge Thread-backed opportunity
-seeds with fields such as:
+Telegram Research Agent exports Knowledge Thread-backed opportunity seeds with
+fields such as:
 
 - `source_kind`
 - `source_urls`
@@ -82,9 +82,9 @@ seeds with fields such as:
 - `knowledge_atom_types`
 - `source_atom_ids`
 
-Demand-to-MVP Radar import must preserve those fields in imported
-`EvidenceRecord.provider_metadata`. The next Radar contract should derive and
-expose KIR-aware source mix fields:
+Demand-to-MVP Radar import preserves those fields in imported
+`EvidenceRecord.provider_metadata`. Radar derives and exposes KIR-aware source
+mix fields:
 
 - `kir_source_kind`
 - `kir_thread_slug`
@@ -93,7 +93,7 @@ expose KIR-aware source mix fields:
 - `kir_has_fresh_thread`
 - `kir_gate_status`
 
-In Telegram-seeded weekly mode, `build` or `focused_experiment` should require:
+In Telegram-seeded weekly mode, `build` or `focused_experiment` requires:
 
 - fresh Knowledge Thread evidence;
 - non-empty `source_atom_ids`;
@@ -113,7 +113,7 @@ Clarifications:
   gate only when imported seeds are from Telegram Research Agent in
   `knowledge_thread` mode, or make the gate configurable.
 
-First implementation task:
+Implemented cross-repo KIR tasks:
 
 - KIR-Q1 preserves KIR provenance in
   `/srv/openclaw-you/workspace/Demand-to-MVP-Radar/demand_mvp_radar/sources/telegram_research_agent.py`.
@@ -285,6 +285,6 @@ cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
 ```
 
 The implemented historical Radar tasks live in `docs/report_quality_roadmap.md`
-as `RADAR-1` through `RADAR-4`. The active KIR-backed Radar work lives in
+as `RADAR-1` through `RADAR-4`. The implemented KIR-backed Radar work lives in
 `docs/tasks.md` as KIR-Q1 and KIR-Q2, with product context in
 `docs/ai_intelligence_workbook_roadmap.md`.

@@ -1,7 +1,7 @@
 # Telegram Research Agent — Development Cycle
 
-**Version:** 3.1
-**Date:** 2026-05-01
+**Version:** 3.2
+**Date:** 2026-07-07
 **Status:** Maintenance workflow active
 
 ---
@@ -14,7 +14,8 @@ Development follows a bounded AI-assisted loop:
 Strategist -> Orchestrator -> Codex -> Review -> Fixes
 ```
 
-The memory-unification roadmap is complete and archived. The active queue is the lightweight maintenance backlog in `docs/tasks.md`.
+The memory-unification roadmap and initial KIR plumbing roadmap are complete.
+The active queue is the KIR quality/user-value backlog in `docs/tasks.md`.
 
 The workflow exists to enforce:
 

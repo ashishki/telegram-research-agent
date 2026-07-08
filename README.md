@@ -2,7 +2,7 @@
 
 Personal research intelligence for Telegram channels: ingest posts, preserve evidence, extract AI knowledge atoms, track evolving idea threads, and produce weekly decision reports instead of a generic digest.
 
-Status: active AI Knowledge Intelligence Desk. The legacy Research Brief / Implementation Ideas loop still works, but the newer knowledge-atom, idea-thread, frontier-analysis, visual HTML, and generated Obsidian layers are implemented and are the primary direction. Current work is tracked in `docs/tasks.md`.
+Status: active AI Knowledge Intelligence Desk. The legacy Research Brief / Implementation Ideas loop still works, but the newer knowledge-atom, idea-thread, Weekly AI Intelligence Workbook, feedback, Strategy Reviewer, MVP Radar bridge, and generated Obsidian layers are implemented and are the primary direction. Current work is tracked in `docs/tasks.md`.
 
 Reference integration: `docs/entropy_core_gensyn_integration.md`.
 
@@ -28,30 +28,25 @@ It is not a public bot, SaaS product, or generic summarizer.
 7. **Refresh Idea Threads** with 7/30/90 day momentum, source counts, and stale/superseded status.
 8. **Run Frontier Analysis** over compressed thread/atom context for the current week.
 9. **Generate weekly artifacts**:
-   - `AI Decision Intelligence` visual HTML report
+   - `Weekly AI Intelligence Workbook` visual HTML report
    - standalone `AI Intelligence` HTML report and JSON sidecar
    - generated Obsidian vault projection
    - legacy `Research Brief`, `Implementation Ideas`, `Study Plan`
    - `MVP of the Week` from Demand-to-MVP Radar
-10. **Record decisions and feedback** so acted-on, deferred, rejected, read, tried, and missed signals shape future output.
+10. **Record decisions and confirmed feedback** so read, tried, useful, missed, wrong-priority, trust-correction, and project-application signals shape future output.
 
 ## Current Capabilities
 
 - Deterministic scoring pipeline with strong/watch/cultural/noise buckets.
 - Project relevance based on `src/config/projects.yaml`.
 - Manual tags and feedback commands.
-- Telegram reaction sync for original channel posts:
-  - `🔥`, `⭐`, `❤️` -> `strong`
-  - `👍`, `👏` -> `interesting`
-  - `👀`, `🤔` -> `read_later`
-  - `⚡`, `🛠️` -> `try_in_project`
-  - `✅` -> `try_in_project` + `acted_on`
-  - `👎`, `💩`, `❌` -> `low_signal` + `skipped`
+- Telegram reaction sync for original channel posts: any visible personal reaction records an `interesting` tag plus `operator_marked_interesting` feedback; aggregate channel reaction counts are ignored as personal feedback and the raw emoji is preserved only as metadata.
 - Inline Telegram feedback cards for `Implementation Ideas`:
   - `✅ сделал`
   - `🕒 позже`
   - `⛔ отказал`
   - `🧠 интересно`
+- AI workbook feedback intake through `/feedback`, `/feedback_voice`, `/feedback_confirm`, and `/feedback_discard`; parsed feedback is stored only after confirmation.
 - Implementation Ideas cards are compact enough to decide from Telegram without opening Telegraph for every item.
 - Source-disciplined `Implementation Ideas`: actionable `[Implement]` and `[Build]` ideas require concrete Telegram message links and otherwise render an insufficient-evidence note.
 - Operator-authored Research Brief usefulness capture into `weekly_usefulness_logs`.
@@ -71,8 +66,9 @@ It is not a public bot, SaaS product, or generic summarizer.
 - Knowledge Atom extraction via `knowledge-extract`: bounded, resumable JSON extraction from raw Telegram posts with source citations.
 - Temporal Idea Threads via `idea-threads`: deterministic grouping of atoms into evolving AI ideas with momentum and status.
 - Frontier-model synthesis via `frontier-analysis`: top-model weekly interpretation over compressed 12-week context.
-- Stakeholder-facing `AI Decision Intelligence` HTML via `ai-visual-report`: decision brief first, actions in the hero, conservative project implications, trend board, source links, JSON sidecar, and an embedded Archify knowledge-flow diagram when available.
-- Generated Obsidian projection via `obsidian-export`: weekly, thread, tool/model, practice, channel, read-queue, and experiment notes with generated-file markers and source links.
+- Stakeholder-facing Weekly AI Intelligence Workbook via `ai-visual-report`: Russian decision brief, strong signals, deep explanation cards, claim evidence cards with quote verification/evidence tiers, concept diagrams, project implementation suggestions, MVP Radar section, feedback prompts, JSON sidecar, and embedded Archify/local diagrams when available.
+- Strategy Reviewer via `strategy-reviewer`: advisory-only keep/change/demote/test-next-week suggestions and Codex-ready tasks from confirmed workbook feedback; it does not mutate source code, prompts, thresholds, profile, or projects.
+- Generated Obsidian projection via `obsidian-export`: bounded weekly, thread, tool/model, practice, channel, read-queue, try/build, experiment, project-watch, feedback-summary, and strategy-review notes with generated-file markers and source links.
 - Honest project implications: the visual report suppresses broad keyword overlaps like `AI`, `workflow`, and `evidence`; a zero project-lead count means the current atom/thread evidence was too weak for a user-facing project claim.
 
 ## Main Commands
@@ -106,6 +102,7 @@ python3 src/main.py frontier-analysis --week 2026-W28 --lookback-weeks 12 --mode
 python3 src/main.py ai-intelligence-report --week 2026-W28 --skip-refresh
 python3 src/main.py ai-visual-report --week 2026-W28 --skip-refresh --threads-limit 12 --atoms-limit 8
 python3 src/main.py obsidian-export --week 2026-W28
+python3 src/main.py strategy-reviewer --week 2026-W28 --output-path data/output/reviews/2026-W28-strategy-review.json
 
 # Send the visual HTML to Telegram as a document when bot credentials are configured
 python3 src/main.py ai-visual-report --week 2026-W28 --skip-refresh --deliver
@@ -148,6 +145,7 @@ Start here:
 - [docs/next_development_roadmap.md](docs/next_development_roadmap.md) — next development roadmap and AI-ready tasks
 - [docs/report_quality_roadmap.md](docs/report_quality_roadmap.md) — report-quality, artifact feedback, internal cost guardrail, and Demand-to-MVP Radar handoff tasks
 - [docs/ai_knowledge_intelligence_roadmap.md](docs/ai_knowledge_intelligence_roadmap.md) — AI Knowledge Intelligence Desk architecture, phases, visual report, and Obsidian projection
+- [docs/ai_intelligence_workbook_roadmap.md](docs/ai_intelligence_workbook_roadmap.md) — completed KIR-Q0..KIR-Q13 workbook, feedback, Radar contract, Strategy Reviewer, and Obsidian projection roadmap
 - [docs/operator_workflow.md](docs/operator_workflow.md) — weekly operating workflow
 - [docs/architecture.md](docs/architecture.md) — current system shape
 - [docs/spec.md](docs/spec.md) — implementation-facing system specification
@@ -162,6 +160,6 @@ Historical material lives under [docs/archive/](docs/archive/README.md).
 
 ## Development State
 
-The AI Knowledge Intelligence path is implemented end-to-end for local operation: raw posts can be atomized, atoms can be grouped into temporal threads, a frontier analysis can be persisted, the user-facing HTML report can be generated and delivered, and Obsidian notes can be regenerated from the same knowledge layer.
+The AI Knowledge Intelligence path is implemented end-to-end for local operation: raw posts can be atomized, atoms can be grouped into temporal threads, a frontier analysis can be persisted, the user-facing workbook HTML can be generated and delivered, feedback can be confirmed into memory, Strategy Reviewer can produce advisory improvement tasks, and bounded Obsidian notes can be regenerated from the same knowledge layer.
 
 The honest limitation is quality of interpretation, not missing plumbing: project implications are conservative keyword/evidence leads, not full project-priority decisions; empty project leads are allowed when evidence is too broad. The legacy Research Brief, Implementation Ideas, Study Plan, receipts, Radar bridge, and operator health surfaces still exist and remain useful downstream.

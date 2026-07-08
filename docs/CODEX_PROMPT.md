@@ -12,16 +12,16 @@ _v3.7 · 2026-07-07 · telegram-research-agent_
   threads. MVP Radar and project recommendations remain downstream consumers,
   not the center of the product. Obsidian is a generated human-facing knowledge
   vault projection, not the runtime source of truth.
-- Current development pivot after the 2026-W28 artifact audit: KIR plumbing is
-  implemented, but KIR quality/eval/user-value work is open. Start with the
-  KIR-Q queue in `docs/tasks.md`; the end-to-end roadmap and Russian final-HTML
-  report requirement live in `docs/ai_knowledge_intelligence_roadmap.md`.
-- New strategic pivot for the next loop: move from weekly report to Weekly AI
-  Intelligence Workbook. Start with KIR-Q0 docs-first planning in
-  `docs/ai_intelligence_workbook_roadmap.md`, then implement P0 tasks one at a
-  time: KIR-Q1 preserve KIR provenance in Demand-to-MVP Radar import, KIR-Q2
-  add the KIR-backed Radar gate, KIR-Q3 simplify reaction feedback, and KIR-Q4
-  add confirmed voice feedback intake.
+- Current development state after the 2026-W28 artifact audit: KIR plumbing and
+  the Weekly AI Intelligence Workbook queue KIR-Q0..KIR-Q13 are implemented.
+  Future work starts from the first genuinely open item in `docs/tasks.md`; the
+  end-to-end roadmap and Russian final-HTML report requirement live in
+  `docs/ai_knowledge_intelligence_roadmap.md`.
+- Weekly AI Intelligence Workbook queue KIR-Q0..KIR-Q13 is implemented:
+  docs-first planning, Radar KIR provenance/gating, reaction and voice
+  feedback, feedback-driven ranking, workbook HTML, deep explanations,
+  diagrams, project implementation, MVP Radar section, Strategy Reviewer,
+  claim-card hardening, and bounded Obsidian projection.
 - Operational incident on 2026-07-06: `telegram-digest.timer` had been inactive
   since 2026-06-22, so weekly Research Brief/Implementation Ideas stopped
   running while ingest and MVP weekly continued. The timer was manually
@@ -31,7 +31,9 @@ _v3.7 · 2026-07-07 · telegram-research-agent_
   best-effort, short-timeout autocommit insert that quietly skips under lock
   contention so report generation is not delayed.
 - Recent shipped changes:
-  - Telegram reaction sync imports source-post reactions as tags/feedback.
+  - Telegram reaction sync treats any visible personal source-post reaction as
+    `operator_marked_interesting` feedback plus an `interesting` tag; aggregate
+    reaction counts are not personal feedback.
   - Implementation Ideas now send inline feedback cards and record decisions in `decision_journal`.
   - Bot polling callback dispatch has an integration-style unit test around `bot.run_bot`.
   - Implementation Ideas require concrete Telegram source-post links or render an insufficient-evidence note.
@@ -119,9 +121,10 @@ _v3.7 · 2026-07-07 · telegram-research-agent_
     `--deliver --chat-id ...`.
   - `obsidian-export` projects the same AI Intelligence layer into generated
     Obsidian Markdown notes for weekly intelligence, idea threads,
-    tools/models, practices, channels, read queue, and experiments with stable
-    slugs, frontmatter, generated markers, source references, HTML report
-    section links, scoped namespace support, and hand-authored note protection.
+    tools/models, practices, channels, read queue, try/build, experiments,
+    project watch, feedback summary, and Strategy Reviewer with stable slugs,
+    frontmatter, generated markers, source references, HTML report section
+    links, scoped namespace support, and hand-authored note protection.
   - AI Intelligence feedback is persisted via `ai_report_feedback_events`,
     recorded with `log-ai-report-feedback`, inspected with
     `memory inspect-ai-report-feedback`, and fed back into the next HTML report
@@ -198,10 +201,10 @@ _v3.7 · 2026-07-07 · telegram-research-agent_
   is a Pathway-ready JSONL event stream plus deterministic fallback snapshot;
   Radar treats the snapshot as context only, not decision-grade external
   evidence.
-- The next roadmap is `docs/ai_intelligence_workbook_roadmap.md`, with
-  supporting context in `docs/ai_knowledge_intelligence_roadmap.md`. Start with
-  KIR-Q0 docs-first planning if it is not complete; otherwise implement the P0
-  KIR-Q tasks one at a time, beginning with KIR-Q1.
+- The implemented workbook roadmap is `docs/ai_intelligence_workbook_roadmap.md`,
+  with supporting context in `docs/ai_knowledge_intelligence_roadmap.md`.
+  Further work should start from the first genuinely open task in
+  `docs/tasks.md`, not from already completed KIR-Q0..KIR-Q13 items.
 
 ---
 
@@ -218,20 +221,18 @@ The weekly pipeline now has:
 
 ## Exact Next Execution Step
 
-Start with the first open task in
-`docs/tasks.md` under `KIR-Q: AI Intelligence Quality / Workbook / Feedback /
-Radar Contract`.
+KIR-Q0..KIR-Q13 under `KIR-Q: AI Intelligence Quality / Workbook / Feedback /
+Radar Contract` are implemented. Start with the first genuinely open task in
+`docs/tasks.md`.
 
-Current docs-first task:
-
-```text
-KIR-Q0 - Document AI Intelligence Workbook Roadmap
-```
-
-Current first implementation task after KIR-Q0:
+Current open/future items outside the completed Q0..Q13 queue:
 
 ```text
-KIR-Q1 - Preserve KIR Provenance In Radar Import
+KIR-Q-008 - Regeneration And Manual Quality Eval
+  standard loop verified; forced frontier regeneration needs LLM_API_KEY or ANTHROPIC_API_KEY
+
+KIR-Q-009 - Referee, Thread Audit, Monthly Changed Beliefs
+  planned only after 3-4 stable weekly runs
 ```
 
 Do not start by prompt-tuning the old Research Brief. The strategic direction is:
@@ -242,7 +243,7 @@ Weekly AI Intelligence Workbook HTML -> generated Obsidian projection ->
 read / try / build / feedback loop -> Strategy Reviewer -> Codex-ready tasks
 ```
 
-The immediate P0 implementation direction is:
+The completed P0/P1/P2 implementation direction was:
 
 ```text
 KIR-backed Radar contract first, then reaction/voice feedback, then workbook UI
