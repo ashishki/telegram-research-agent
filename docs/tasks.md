@@ -155,6 +155,12 @@ Implemented:
   environment, output ownership, healthcheck, manual scoring recovery after a
   one-time persistent-timer DB lock, and production `ops-validate` evidence
   checks are documented for dogfood readiness.
+- Telegram voice feedback now has a managed transcription path: voice `.ogg`
+  files are downloaded to temporary storage, transcribed through the OpenAI
+  audio endpoint when `OPENAI_API_KEY` is configured, routed into the existing
+  `/feedback_voice` confirmation draft, and deleted locally after processing.
+  Missing transcription config returns a text fallback instead of pretending
+  voice feedback worked.
 
 ## Active Maintenance Queue
 

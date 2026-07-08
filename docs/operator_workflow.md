@@ -93,6 +93,20 @@ Suggested voice feedback prompt:
 Что было полезно? Что было мимо? Что попробовал? Что применил к проекту? Что нужно изменить в следующем отчете?
 ```
 
+Voice feedback requires `OPENAI_API_KEY` on the bot host. When configured, the
+bot downloads the Telegram voice `.ogg` file to temporary storage, transcribes
+it with the OpenAI audio transcription endpoint (`VOICE_TRANSCRIPTION_MODEL`,
+default `whisper-1`), routes the transcript through `/feedback_voice`, and
+deletes the local audio file. If transcription is not configured or fails, send
+the same text manually:
+
+```text
+/feedback_voice Что было полезно... Что было мимо... Что применил...
+```
+
+The confirmation rule is unchanged: the bot only drafts feedback first; memory
+changes happen after `/feedback_confirm <id>`.
+
 ### Hermes / PI Assistant Dogfood Routine
 
 Hermes is the Telegram-facing concierge for the workbook workflow. It is a

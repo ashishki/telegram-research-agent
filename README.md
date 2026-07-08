@@ -146,6 +146,13 @@ concierge through `/weekly`, `/actions`, `/explain`, `/projects`, `/mvp`,
 LLM chat agent, does not run Codex, does not mutate config/code/profile/project
 files, and does not replace the workbook as the primary reading surface.
 
+Voice feedback is supported when `OPENAI_API_KEY` is configured. The bot
+downloads the Telegram `.ogg` voice file to temporary storage, sends it to the
+OpenAI audio transcription endpoint with `VOICE_TRANSCRIPTION_MODEL`
+defaulting to `whisper-1`, routes the transcript through the existing
+confirmation-gated `/feedback_voice` flow, and deletes the local audio file. If
+`OPENAI_API_KEY` is missing, voice messages return a clear text fallback.
+
 Current retrieval is deterministic curated retrieval over workbook sidecars,
 claim cards, Knowledge Atoms, Idea Threads, action cards, MVP/Strategy
 Reviewer/feedback projections, and related DTOs. There is no raw Telegram
@@ -179,6 +186,9 @@ Environment:
 | `TELEGRAM_SESSION_PATH` | Stored user session file |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_OWNER_CHAT_ID` | Telegram delivery and command bot |
 | `LLM_API_KEY` | LLM provider key |
+| `OPENAI_API_KEY` | Optional OpenAI audio transcription key for Telegram voice feedback |
+| `VOICE_TRANSCRIPTION_MODEL` | Optional transcription model override; defaults to `whisper-1` |
+| `TELEGRAM_VOICE_MEDIA_DIR` | Optional temporary directory for downloaded Telegram voice files |
 | `TELEGRAPH_TOKEN` | Stable Telegraph publishing account |
 | `RADAR_REPO_PATH` / `RADAR_PYTHON` | Demand-to-MVP Radar repo and local venv Python |
 | `DMR_MVP_SOURCE_CONFIG` | Radar weekly live-source config |

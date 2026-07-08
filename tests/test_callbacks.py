@@ -243,7 +243,7 @@ class TestIdeaCallbacks(unittest.TestCase):
             settings=settings,
         )
 
-    def test_run_bot_voice_without_transcript_asks_for_transcript(self):
+    def test_run_bot_voice_without_transcript_runs_transcription(self):
         settings = self._settings_with_idea()
         update = {
             "update_id": 102,
@@ -271,12 +271,62 @@ class TestIdeaCallbacks(unittest.TestCase):
         ) as dispatch_mock, patch.object(
             bot_runtime,
             "send_message",
-        ) as send_message_mock:
+        ) as send_message_mock, patch.object(
+            bot_runtime,
+            "transcribe_telegram_voice",
+            return_value="Useful workbook. target=claim-cards.",
+        ) as transcribe_mock:
+            bot_runtime.run_bot(settings)
+
+        send_message_mock.assert_called_once()
+        self.assertIn("Распознаю", send_message_mock.call_args.args[2])
+        transcribe_mock.assert_called_once_with(token="token", file_id="voice-1")
+        dispatch_mock.assert_called_once_with(
+            chat_id="12345",
+            text="/feedback_voice Useful workbook. target=claim-cards.",
+            settings=settings,
+        )
+
+    def test_run_bot_voice_without_openai_key_returns_text_fallback(self):
+        settings = self._settings_with_idea()
+        update = {
+            "update_id": 103,
+            "message": {
+                "chat": {"id": 12345},
+                "from": {"id": 12345},
+                "voice": {"file_id": "voice-1"},
+            },
+        }
+
+        def stop_after_first_poll(state):
+            state.stop_requested = True
+
+        with patch.dict(
+            os.environ,
+            {"TELEGRAM_BOT_TOKEN": "token", "TELEGRAM_OWNER_CHAT_ID": "12345"},
+            clear=False,
+        ), patch.object(bot_runtime, "_install_signal_handlers", side_effect=stop_after_first_poll), patch.object(
+            bot_runtime,
+            "_telegram_get_updates",
+            return_value=[update],
+        ), patch.object(
+            bot_runtime,
+            "dispatch_command",
+        ) as dispatch_mock, patch.object(
+            bot_runtime,
+            "send_message",
+        ) as send_message_mock, patch.object(
+            bot_runtime,
+            "transcribe_telegram_voice",
+            side_effect=bot_runtime.VoiceTranscriptionUnavailable("OPENAI_API_KEY is not set"),
+        ):
             bot_runtime.run_bot(settings)
 
         dispatch_mock.assert_not_called()
-        send_message_mock.assert_called_once()
-        self.assertIn("/feedback_voice <transcript>", send_message_mock.call_args.args[2])
+        self.assertEqual(send_message_mock.call_count, 2)
+        fallback_message = send_message_mock.call_args_list[-1].args[2]
+        self.assertIn("OPENAI_API_KEY", fallback_message)
+        self.assertIn("/feedback_voice <твой фидбек>", fallback_message)
 
 
 if __name__ == "__main__":

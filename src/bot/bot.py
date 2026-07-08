@@ -9,6 +9,7 @@ from config.settings import Settings
 
 from .callbacks import record_callback
 from .handlers import dispatch_command, send_message
+from .voice import VoiceTranscriptionUnavailable, transcribe_telegram_voice
 
 
 LOGGER = logging.getLogger(__name__)
@@ -117,6 +118,11 @@ def _extract_voice_feedback_text(message: dict[str, Any]) -> str:
     return ""
 
 
+def _extract_voice_file_id(message: dict[str, Any]) -> str:
+    voice = message.get("voice") or {}
+    return str(voice.get("file_id") or "").strip()
+
+
 def run_bot(settings: Settings) -> None:
     token, owner_chat_id = _load_bot_env()
     if not token or not owner_chat_id:
@@ -185,12 +191,33 @@ def run_bot(settings: Settings) -> None:
                 continue
 
             if message.get("voice"):
-                send_message(
-                    token,
-                    chat_id,
-                    "Voice feedback needs a transcript. Send it as /feedback_voice <transcript>.",
-                    parse_mode=None,
-                )
+                file_id = _extract_voice_file_id(message)
+                send_message(token, chat_id, "Принял голосовое. Распознаю и подготовлю feedback draft.", parse_mode=None)
+                try:
+                    transcript = transcribe_telegram_voice(token=token, file_id=file_id)
+                except VoiceTranscriptionUnavailable:
+                    LOGGER.warning("Voice transcription is unavailable because OPENAI_API_KEY is not configured")
+                    send_message(
+                        token,
+                        chat_id,
+                        (
+                            "Голосовое распознавание пока не настроено: нужен OPENAI_API_KEY. "
+                            "Пока отправь текстом: /feedback_voice <твой фидбек>."
+                        ),
+                        parse_mode=None,
+                    )
+                    continue
+                except Exception:
+                    LOGGER.warning("Voice transcription failed chat_id=%s", chat_id, exc_info=True)
+                    send_message(
+                        token,
+                        chat_id,
+                        "Не смог распознать голосовое. Отправь фидбек текстом через /feedback_voice <текст>.",
+                        parse_mode=None,
+                    )
+                    continue
+                LOGGER.info("Voice transcription succeeded chat_id=%s chars=%d", chat_id, len(transcript))
+                dispatch_command(chat_id=chat_id, text=f"/feedback_voice {transcript}", settings=settings)
 
         if state.stop_requested:
             break

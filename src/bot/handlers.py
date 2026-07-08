@@ -238,9 +238,30 @@ def _load_topics_summary(connection: sqlite3.Connection) -> str:
 
 def handle_start(chat_id: str, args: str, settings: Settings) -> None:
     del args, settings
-    lines = ["Telegram Research Agent", "", "Available commands:"]
-    for command, (_, description) in COMMAND_DOCS.items():
-        lines.append(f"{command} — {description}")
+    lines = [
+        "Hermes / AI Intelligence",
+        "",
+        "Как сейчас работать:",
+        "1. Основной артефакт недели - красивый HTML Workbook. Markdown/TXT - fallback и служебные экспорты.",
+        "2. Начни с /weekly, потом /actions, /mvp и /strategy.",
+        "3. Вопрос по отчету: /explain <что объяснить>. Ответ идет по curated workbook/atoms/threads, не по raw Telegram RAG.",
+        "4. После чтения отправь feedback текстом или голосом. Я подготовлю draft, но память изменится только после /feedback_confirm <id>.",
+        "5. Ставь любую реакцию на оригинальные Telegram-посты. Любая видимая реакция = интересно; отсутствие реакции не считается негативом.",
+        "",
+        "Основные команды:",
+        "/weekly - статус и главные выводы Workbook",
+        "/actions - действия на неделю",
+        "/explain <query> - объяснить сигнал или тему",
+        "/projects - проектные действия",
+        "/mvp - MVP Radar статус и недостающие evidence",
+        "/strategy - Strategy Reviewer",
+        "/feedback <text> - текстовый feedback draft",
+        "/feedback_voice <text> - transcript fallback, если голос не распознался",
+        "/feedback_confirm <id> - подтвердить запись feedback",
+        "/codex <focus> - подготовить Codex prompt, не запускать Codex",
+        "",
+        "Границы: я не LLM-chat общего назначения, не raw RAG по всему Telegram, не запускаю Codex и не меняю код/config/profile/projects.",
+    ]
     send_message(_get_bot_token(), chat_id, "\n".join(lines), parse_mode=None)
 
 
@@ -1066,6 +1087,7 @@ def handle_feedback_discard(chat_id: str, args: str, settings: Settings) -> None
 
 HANDLERS: dict[str, Callable[[str, str, Settings], None]] = {
     "/start": handle_start,
+    "/help": handle_start,
     "/weekly": handle_weekly,
     "/actions": handle_actions,
     "/explain": handle_explain,
