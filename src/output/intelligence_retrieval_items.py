@@ -1,0 +1,1097 @@
+from __future__ import annotations
+
+import json
+import re
+import sqlite3
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any, Iterable, Mapping
+from urllib.parse import quote
+
+from config.settings import PROJECT_ROOT
+from db.ai_report_feedback import summarize_ai_report_feedback
+from db.idea_threads import fetch_idea_thread_atoms, fetch_idea_threads
+from db.knowledge_atoms import fetch_knowledge_atoms
+from output.strategy_reviewer import build_strategy_review
+
+
+DEFAULT_OUTPUT_ROOT = PROJECT_ROOT / "data" / "output"
+DEFAULT_VISUAL_OUTPUT_DIR = DEFAULT_OUTPUT_ROOT / "ai_visual_intelligence"
+DEFAULT_AI_OUTPUT_DIR = DEFAULT_OUTPUT_ROOT / "ai_intelligence"
+DEFAULT_MVP_OUTPUT_DIR = DEFAULT_OUTPUT_ROOT / "mvp_weekly"
+DEFAULT_RADAR_OUTPUT_DIR = PROJECT_ROOT.parent / "Demand-to-MVP-Radar" / "reports" / "mvp_of_week"
+WEEK_RE = re.compile(r"(?P<week>\d{4}-W\d{2})")
+TOKEN_RE = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_-]{1,}")
+
+
+@dataclass(frozen=True)
+class IntelligenceRetrievalItem:
+    id: str
+    item_type: str
+    week_label: str | None
+    title: str
+    text: str
+    summary: str | None = None
+    source_refs: list[str] | None = None
+    atom_ids: list[int | str] | None = None
+    thread_slug: str | None = None
+    project_name: str | None = None
+    confidence: float | None = None
+    evidence_tier: str | None = None
+    verification_status: str | None = None
+    status: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+def build_retrieval_items(
+    settings: Any,
+    week_label: str | None = None,
+    *,
+    output_root: str | Path | None = None,
+    visual_output_root: str | Path | None = None,
+    ai_output_root: str | Path | None = None,
+    mvp_output_root: str | Path | None = None,
+    radar_output_root: str | Path | None = None,
+) -> list[IntelligenceRetrievalItem]:
+    """Build a read-only projection over curated intelligence objects."""
+    clean_week = str(week_label).strip() if week_label else None
+    workbook = load_latest_workbook_json(
+        settings,
+        clean_week,
+        output_root=output_root,
+        visual_output_root=visual_output_root,
+        ai_output_root=ai_output_root,
+    )
+    if workbook and not clean_week:
+        clean_week = _clean_text(workbook.get("week_label")) or _artifact_week_label(workbook)
+
+    items: list[IntelligenceRetrievalItem] = []
+    if workbook:
+        items.extend(_items_from_workbook(workbook))
+
+    with _optional_readonly_connection(getattr(settings, "db_path", None)) as connection:
+        if connection is not None:
+            items.extend(_knowledge_atom_items(connection, week_label=clean_week))
+            items.extend(_idea_thread_items(connection, week_label=clean_week))
+            items.extend(_feedback_summary_items(connection, week_label=clean_week))
+            items.extend(_strategy_reviewer_items(connection, week_label=clean_week))
+
+    if clean_week and not any(item.item_type == "mvp_dossier" for item in items):
+        mvp = load_mvp_radar_status(
+            clean_week,
+            output_root=output_root,
+            mvp_output_root=mvp_output_root,
+            radar_output_root=radar_output_root,
+        )
+        if mvp:
+            items.append(_mvp_item(mvp, clean_week))
+
+    return _dedupe_items(items)
+
+
+def search_retrieval_items(
+    items: Iterable[IntelligenceRetrievalItem],
+    query: str,
+    filters: dict | None = None,
+    limit: int = 10,
+) -> list[dict]:
+    clean_filters = dict(filters or {})
+    filtered = [item for item in items if _matches_filters(item, clean_filters)]
+    tokens = _query_tokens(query)
+    scored: list[tuple[float, IntelligenceRetrievalItem]] = []
+    for item in filtered:
+        score = _search_score(item, query, tokens)
+        if tokens and score <= 0:
+            continue
+        scored.append((score, item))
+    scored.sort(
+        key=lambda pair: (
+            pair[0],
+            pair[1].updated_at or pair[1].created_at or "",
+            pair[1].week_label or "",
+            pair[1].id,
+        ),
+        reverse=True,
+    )
+    return [_public_item_dict(item, score=score) for score, item in scored[: max(1, int(limit or 10))]]
+
+
+def load_latest_workbook_json(
+    settings: Any | None = None,
+    week_label: str | None = None,
+    *,
+    output_root: str | Path | None = None,
+    visual_output_root: str | Path | None = None,
+    ai_output_root: str | Path | None = None,
+) -> dict | None:
+    del settings
+    paths = _candidate_workbook_paths(
+        week_label=week_label,
+        output_root=output_root,
+        visual_output_root=visual_output_root,
+        ai_output_root=ai_output_root,
+    )
+    for path, artifact_kind in paths:
+        payload = _read_json_dict(path)
+        if payload is None:
+            continue
+        html_path = _html_path_for_workbook(path, payload, artifact_kind)
+        result = dict(payload)
+        result["_artifact_kind"] = artifact_kind
+        result["_artifact_paths"] = {
+            "json": str(path),
+            "html": str(html_path) if html_path else None,
+        }
+        if not result.get("week_label"):
+            week = _week_from_path(path)
+            if week:
+                result["week_label"] = week
+        return result
+    return None
+
+
+def find_latest_week_label(
+    settings: Any | None = None,
+    *,
+    output_root: str | Path | None = None,
+    visual_output_root: str | Path | None = None,
+    ai_output_root: str | Path | None = None,
+) -> str | None:
+    del settings
+    candidates = _candidate_workbook_paths(
+        week_label=None,
+        output_root=output_root,
+        visual_output_root=visual_output_root,
+        ai_output_root=ai_output_root,
+    )
+    for path, _kind in candidates:
+        week = _week_from_path(path)
+        if week:
+            return week
+    return None
+
+
+def load_mvp_radar_status(
+    week_label: str,
+    *,
+    output_root: str | Path | None = None,
+    mvp_output_root: str | Path | None = None,
+    radar_output_root: str | Path | None = None,
+) -> dict | None:
+    clean_week = str(week_label or "").strip()
+    if not clean_week:
+        return None
+    for path in _candidate_mvp_paths(
+        clean_week,
+        output_root=output_root,
+        mvp_output_root=mvp_output_root,
+        radar_output_root=radar_output_root,
+    ):
+        payload = _read_json_dict(path)
+        if payload is not None:
+            return _normalize_mvp_payload(payload, path)
+    return None
+
+
+def _items_from_workbook(workbook: Mapping[str, Any]) -> list[IntelligenceRetrievalItem]:
+    week = _clean_text(workbook.get("week_label")) or _artifact_week_label(workbook)
+    generated_at = _clean_text(workbook.get("generated_at")) or None
+    artifact_refs = _artifact_source_refs(workbook)
+    items: list[IntelligenceRetrievalItem] = []
+    items.extend(_workbook_section_items(workbook, week_label=week, generated_at=generated_at, artifact_refs=artifact_refs))
+    items.extend(_claim_card_items(workbook, week_label=week, generated_at=generated_at))
+    items.extend(_deep_explanation_items(workbook, week_label=week, generated_at=generated_at))
+    items.extend(_action_card_items(workbook, week_label=week, generated_at=generated_at))
+    items.extend(_project_diagnostic_items(workbook, week_label=week, generated_at=generated_at))
+    mvp = workbook.get("mvp_radar") if isinstance(workbook.get("mvp_radar"), Mapping) else None
+    if mvp:
+        items.append(_mvp_item(dict(mvp), week))
+    return items
+
+
+def _workbook_section_items(
+    workbook: Mapping[str, Any],
+    *,
+    week_label: str | None,
+    generated_at: str | None,
+    artifact_refs: list[str],
+) -> list[IntelligenceRetrievalItem]:
+    sections = workbook.get("workbook_sections")
+    if isinstance(sections, list):
+        section_rows = [section for section in sections if isinstance(section, Mapping)]
+    else:
+        raw_sections = _as_list(workbook.get("sections"))
+        section_rows = [
+            {
+                "id": _slug(str(title)),
+                "title": str(title),
+                "title_en": str(title),
+                "kind": _slug(str(title)).replace("-", "_"),
+            }
+            for title in raw_sections
+            if str(title).strip()
+        ]
+    result: list[IntelligenceRetrievalItem] = []
+    for section in section_rows:
+        section_id = _clean_text(section.get("id")) or _slug(section.get("title") or "section")
+        title = _clean_text(section.get("title_en")) or _clean_text(section.get("title")) or section_id
+        section_items = _section_payload(workbook, section_id, _clean_text(section.get("kind")))
+        text = _json_text(section_items) if section_items else _clean_text(section.get("summary"))
+        result.append(
+            IntelligenceRetrievalItem(
+                id=f"workbook_section:{week_label or 'unknown'}:{section_id}",
+                item_type="workbook_section",
+                week_label=week_label,
+                title=title,
+                summary=_section_summary(section_items),
+                text=text or title,
+                source_refs=artifact_refs,
+                atom_ids=_atom_ids_from_objects(section_items),
+                status=_clean_text(section.get("kind")) or None,
+                created_at=generated_at,
+                updated_at=generated_at,
+            )
+        )
+    return result
+
+
+def _claim_card_items(
+    workbook: Mapping[str, Any],
+    *,
+    week_label: str | None,
+    generated_at: str | None,
+) -> list[IntelligenceRetrievalItem]:
+    cards = [card for card in _as_list(workbook.get("claim_cards")) if isinstance(card, Mapping)]
+    result: list[IntelligenceRetrievalItem] = []
+    for index, card in enumerate(cards, start=1):
+        claim = _clean_text(card.get("claim")) or f"Claim card {index}"
+        item_id = _clean_text(card.get("id")) or _slug(claim)
+        atom_ids = _list_values(card.get("evidence_atom_ids"))
+        result.append(
+            IntelligenceRetrievalItem(
+                id=f"claim_card:{week_label or 'unknown'}:{item_id}",
+                item_type="claim_card",
+                week_label=week_label,
+                title=claim,
+                summary=_clean_text(card.get("caveat")) or None,
+                text=_join_text(
+                    claim,
+                    card.get("evidence_quote"),
+                    card.get("caveat"),
+                    card.get("next_verification_step"),
+                    card.get("wording_policy"),
+                ),
+                source_refs=_string_values(card.get("source_urls")),
+                atom_ids=atom_ids,
+                confidence=_float_or_none(card.get("confidence")),
+                evidence_tier=_clean_text(card.get("evidence_tier")) or None,
+                verification_status=_clean_text(card.get("verification_status")) or None,
+                status=_clean_text(card.get("staleness_status")) or None,
+                created_at=generated_at,
+                updated_at=generated_at,
+            )
+        )
+    return result
+
+
+def _deep_explanation_items(
+    workbook: Mapping[str, Any],
+    *,
+    week_label: str | None,
+    generated_at: str | None,
+) -> list[IntelligenceRetrievalItem]:
+    cards = [card for card in _as_list(workbook.get("deep_explanation_cards")) if isinstance(card, Mapping)]
+    result: list[IntelligenceRetrievalItem] = []
+    for index, card in enumerate(cards, start=1):
+        title = _clean_text(card.get("title")) or _clean_text(card.get("claim_card_id")) or f"Deep explanation {index}"
+        item_id = _clean_text(card.get("id")) or _slug(title)
+        result.append(
+            IntelligenceRetrievalItem(
+                id=f"deep_explanation_card:{week_label or 'unknown'}:{item_id}",
+                item_type="deep_explanation_card",
+                week_label=week_label,
+                title=title,
+                summary=_clean_text(card.get("what_is_this")) or None,
+                text=_join_text(
+                    title,
+                    card.get("what_is_this"),
+                    card.get("why_now"),
+                    card.get("how_it_works"),
+                    card.get("where_is_hype"),
+                    card.get("what_to_do"),
+                    card.get("what_not_to_do"),
+                    card.get("what_would_change_my_mind"),
+                    card.get("caveat"),
+                ),
+                source_refs=_string_values(card.get("source_urls")),
+                atom_ids=[],
+                evidence_tier=_clean_text(card.get("evidence_tier")) or None,
+                verification_status=_clean_text(card.get("quote_verification_status")) or None,
+                status="explanatory_only" if card.get("explanatory_only") is True else None,
+                created_at=generated_at,
+                updated_at=generated_at,
+            )
+        )
+    return result
+
+
+def _action_card_items(
+    workbook: Mapping[str, Any],
+    *,
+    week_label: str | None,
+    generated_at: str | None,
+) -> list[IntelligenceRetrievalItem]:
+    cards = [card for card in _as_list(workbook.get("action_cards")) if isinstance(card, Mapping)]
+    result: list[IntelligenceRetrievalItem] = []
+    for index, card in enumerate(cards, start=1):
+        title = _clean_text(card.get("title")) or f"Action {index}"
+        item_id = _clean_text(card.get("id")) or _clean_text(card.get("target_ref")) or _slug(title)
+        result.append(
+            IntelligenceRetrievalItem(
+                id=f"action_card:{week_label or 'unknown'}:{item_id}",
+                item_type="action_card",
+                week_label=week_label,
+                title=title,
+                summary=_clean_text(card.get("next_step")) or None,
+                text=_join_text(
+                    title,
+                    card.get("next_step"),
+                    card.get("success_criterion"),
+                    card.get("kill_condition"),
+                    card.get("follow_up_hint"),
+                    card.get("outcome_policy"),
+                ),
+                source_refs=[],
+                atom_ids=[],
+                project_name=_clean_text(card.get("project")) or None,
+                status=_clean_text(card.get("action_kind")) or _clean_text(card.get("scope")) or None,
+                created_at=generated_at,
+                updated_at=generated_at,
+            )
+        )
+    return result
+
+
+def _project_diagnostic_items(
+    workbook: Mapping[str, Any],
+    *,
+    week_label: str | None,
+    generated_at: str | None,
+) -> list[IntelligenceRetrievalItem]:
+    diagnostic = workbook.get("project_diagnostic") if isinstance(workbook.get("project_diagnostic"), Mapping) else {}
+    suggestions = [item for item in _as_list(diagnostic.get("implementation_suggestions")) if isinstance(item, Mapping)]
+    result: list[IntelligenceRetrievalItem] = []
+    for index, suggestion in enumerate(suggestions, start=1):
+        project = _clean_text(suggestion.get("project")) or None
+        title = _clean_text(suggestion.get("title")) or _clean_text(suggestion.get("next_step")) or f"Project action {index}"
+        item_id = _clean_text(suggestion.get("id")) or _slug(f"{project or 'project'} {title}")
+        result.append(
+            IntelligenceRetrievalItem(
+                id=f"project_diagnostic:{week_label or 'unknown'}:{item_id}",
+                item_type="project_diagnostic",
+                week_label=week_label,
+                title=title,
+                summary=_clean_text(suggestion.get("next_step")) or None,
+                text=_join_text(
+                    title,
+                    suggestion.get("next_step"),
+                    suggestion.get("risk_caveat"),
+                    " ".join(_string_values(suggestion.get("acceptance_criteria"))),
+                    suggestion.get("source_policy"),
+                ),
+                source_refs=_string_values(suggestion.get("source_urls")),
+                atom_ids=_list_values(suggestion.get("source_atom_ids")),
+                thread_slug=_clean_text(suggestion.get("thread_slug")) or None,
+                project_name=project,
+                status=_clean_text(suggestion.get("suggestion_type")) or None,
+                created_at=generated_at,
+                updated_at=generated_at,
+            )
+        )
+    return result
+
+
+def _mvp_item(payload: Mapping[str, Any], week_label: str | None) -> IntelligenceRetrievalItem:
+    candidate = (
+        _clean_text(payload.get("selected_candidate"))
+        or _clean_text(payload.get("selected_title"))
+        or "MVP Radar status"
+    )
+    source_path = _clean_text(payload.get("source_path"))
+    return IntelligenceRetrievalItem(
+        id=f"mvp_dossier:{week_label or 'unknown'}:{_slug(candidate)}",
+        item_type="mvp_dossier",
+        week_label=week_label,
+        title=candidate,
+        summary=_clean_text(payload.get("recommendation")) or _clean_text(payload.get("dossier_status")) or None,
+        text=_join_text(
+            candidate,
+            payload.get("recommendation"),
+            payload.get("dossier_status"),
+            payload.get("decision"),
+            " ".join(_string_values(payload.get("missing_evidence"))),
+            " ".join(_string_values(payload.get("next_validation"))),
+            _json_text(payload.get("source_mix")),
+        ),
+        source_refs=[source_path] if source_path else [],
+        atom_ids=[],
+        status=_clean_text(payload.get("dossier_status")) or _clean_text(payload.get("recommendation")) or None,
+        created_at=None,
+        updated_at=None,
+    )
+
+
+def _knowledge_atom_items(
+    connection: sqlite3.Connection,
+    *,
+    week_label: str | None,
+) -> list[IntelligenceRetrievalItem]:
+    if not _table_exists(connection, "knowledge_atoms"):
+        return []
+    try:
+        atoms = fetch_knowledge_atoms(connection, week_label=week_label, limit=200) if week_label else fetch_knowledge_atoms(connection, limit=200)
+    except sqlite3.Error:
+        return []
+    result: list[IntelligenceRetrievalItem] = []
+    for atom in atoms:
+        result.append(
+            IntelligenceRetrievalItem(
+                id=f"knowledge_atom:{atom.get('id')}",
+                item_type="knowledge_atom",
+                week_label=_clean_text(atom.get("week_label")) or None,
+                title=_clean_text(atom.get("claim")) or f"Knowledge atom {atom.get('id')}",
+                summary=_clean_text(atom.get("summary")) or None,
+                text=_join_text(
+                    atom.get("claim"),
+                    atom.get("summary"),
+                    atom.get("why_it_matters"),
+                    atom.get("evidence_quote"),
+                    " ".join(_string_values(atom.get("entities"))),
+                    " ".join(_string_values(atom.get("tools"))),
+                    " ".join(_string_values(atom.get("models"))),
+                    " ".join(_string_values(atom.get("practices"))),
+                ),
+                source_refs=_string_values(atom.get("source_urls")),
+                atom_ids=[atom.get("id")] if atom.get("id") is not None else [],
+                confidence=_float_or_none(atom.get("confidence")),
+                evidence_tier=_clean_text(atom.get("atom_type")) or None,
+                verification_status=None,
+                status=_clean_text(atom.get("staleness_status")) or None,
+                created_at=_clean_text(atom.get("created_at")) or None,
+                updated_at=_clean_text(atom.get("updated_at")) or _clean_text(atom.get("last_seen_at")) or None,
+            )
+        )
+    return result
+
+
+def _idea_thread_items(
+    connection: sqlite3.Connection,
+    *,
+    week_label: str | None,
+) -> list[IntelligenceRetrievalItem]:
+    if not _table_exists(connection, "idea_threads") or not _table_exists(connection, "idea_thread_atoms"):
+        return []
+    try:
+        threads = fetch_idea_threads(connection, limit=200)
+    except sqlite3.Error:
+        return []
+    result: list[IntelligenceRetrievalItem] = []
+    for thread in threads:
+        if week_label and not _thread_in_week_window(thread, week_label):
+            continue
+        try:
+            atoms = fetch_idea_thread_atoms(connection, thread_id=int(thread["id"]), limit=50)
+        except (KeyError, sqlite3.Error, TypeError, ValueError):
+            atoms = []
+        source_refs = _unique(
+            url
+            for atom in atoms
+            for url in _string_values(atom.get("source_urls"))
+        )
+        atom_ids = [atom.get("id") for atom in atoms if atom.get("id") is not None]
+        result.append(
+            IntelligenceRetrievalItem(
+                id=f"idea_thread:{thread.get('slug')}",
+                item_type="idea_thread",
+                week_label=week_label,
+                title=_clean_text(thread.get("title")) or _clean_text(thread.get("slug")) or "Idea thread",
+                summary=_clean_text(thread.get("summary")) or None,
+                text=_join_text(
+                    thread.get("title"),
+                    thread.get("summary"),
+                    " ".join(_string_values(thread.get("current_claims"))),
+                    " ".join(_string_values(thread.get("superseded_claims"))),
+                    " ".join(_string_values(thread.get("contradictions"))),
+                    " ".join(_clean_text(atom.get("claim")) for atom in atoms),
+                ),
+                source_refs=source_refs,
+                atom_ids=atom_ids,
+                thread_slug=_clean_text(thread.get("slug")) or None,
+                confidence=None,
+                status=_clean_text(thread.get("status")) or None,
+                created_at=_clean_text(thread.get("created_at")) or _clean_text(thread.get("first_seen_at")) or None,
+                updated_at=_clean_text(thread.get("updated_at")) or _clean_text(thread.get("last_seen_at")) or None,
+            )
+        )
+    return result
+
+
+def _feedback_summary_items(
+    connection: sqlite3.Connection,
+    *,
+    week_label: str | None,
+) -> list[IntelligenceRetrievalItem]:
+    if not _table_exists(connection, "ai_report_feedback_events"):
+        return []
+    try:
+        summary = summarize_ai_report_feedback(connection, week_label=week_label, limit=100)
+    except sqlite3.Error:
+        return []
+    if int(summary.get("event_count") or 0) <= 0:
+        return []
+    changes = summary.get("feedback_changes") or {}
+    recent = [event for event in _as_list(summary.get("recent_events")) if isinstance(event, Mapping)]
+    source_refs = _unique(event.get("source_url") for event in recent if event.get("source_url"))
+    return [
+        IntelligenceRetrievalItem(
+            id=f"feedback_summary:{week_label or 'all'}",
+            item_type="feedback_summary",
+            week_label=week_label,
+            title=f"Feedback Summary {week_label or 'all'}",
+            summary=_clean_text(changes.get("summary")) or None,
+            text=_join_text(
+                changes.get("summary"),
+                " ".join(_string_values(changes.get("items"))),
+                _json_text(summary.get("counts_by_feedback")),
+                _json_text(recent),
+            ),
+            source_refs=source_refs,
+            atom_ids=[],
+            status=_clean_text(changes.get("status")) or None,
+        )
+    ]
+
+
+def _strategy_reviewer_items(
+    connection: sqlite3.Connection,
+    *,
+    week_label: str | None,
+) -> list[IntelligenceRetrievalItem]:
+    if not _table_exists(connection, "ai_report_feedback_events"):
+        return []
+    try:
+        review = build_strategy_review(connection, week_label=week_label)
+    except sqlite3.Error:
+        return []
+    suggestions = review.get("suggestions") or {}
+    tasks = [task for task in _as_list(review.get("codex_tasks")) if isinstance(task, Mapping)]
+    title = f"Strategy Reviewer {week_label or 'all'}"
+    return [
+        IntelligenceRetrievalItem(
+            id=f"strategy_reviewer_note:{week_label or 'all'}",
+            item_type="strategy_reviewer_note",
+            week_label=week_label,
+            title=title,
+            summary=_join_text(*(suggestions.get("test_next_week") or [])) or None,
+            text=_join_text(
+                _json_text(suggestions),
+                _json_text(review.get("memory_only_updates")),
+                _json_text(review.get("approval_required")),
+                _json_text(tasks),
+            ),
+            source_refs=[],
+            atom_ids=[],
+            status="advisory_only",
+            created_at=_clean_text(review.get("generated_at")) or None,
+            updated_at=_clean_text(review.get("generated_at")) or None,
+        )
+    ]
+
+
+def _candidate_workbook_paths(
+    *,
+    week_label: str | None,
+    output_root: str | Path | None,
+    visual_output_root: str | Path | None,
+    ai_output_root: str | Path | None,
+) -> list[tuple[Path, str]]:
+    visual_dir, ai_dir = _workbook_dirs(
+        output_root=output_root,
+        visual_output_root=visual_output_root,
+        ai_output_root=ai_output_root,
+    )
+    clean_week = str(week_label or "").strip()
+    if clean_week:
+        return [
+            (visual_dir / f"{clean_week}.visual.json", "visual_workbook"),
+            (ai_dir / f"{clean_week}.json", "ai_intelligence_report"),
+        ]
+    candidates: list[tuple[str, int, float, Path, str]] = []
+    for path in visual_dir.glob("*.visual.json") if visual_dir.exists() else ():
+        week = _week_from_path(path)
+        if week:
+            candidates.append((week, 1, _mtime(path), path, "visual_workbook"))
+    for path in ai_dir.glob("*.json") if ai_dir.exists() else ():
+        week = _week_from_path(path)
+        if week:
+            candidates.append((week, 0, _mtime(path), path, "ai_intelligence_report"))
+    candidates.sort(key=lambda item: (item[0], item[1], item[2]), reverse=True)
+    return [(path, kind) for _week, _priority, _mtime_value, path, kind in candidates]
+
+
+def _candidate_mvp_paths(
+    week_label: str,
+    *,
+    output_root: str | Path | None,
+    mvp_output_root: str | Path | None,
+    radar_output_root: str | Path | None,
+) -> list[Path]:
+    mvp_dir, radar_dir = _mvp_dirs(
+        output_root=output_root,
+        mvp_output_root=mvp_output_root,
+        radar_output_root=radar_output_root,
+    )
+    return [
+        mvp_dir / f"mvp-weekly-{week_label}.json",
+        mvp_dir / f"{week_label}.json",
+        radar_dir / f"mvp-weekly-{week_label}.json",
+    ]
+
+
+def _workbook_dirs(
+    *,
+    output_root: str | Path | None,
+    visual_output_root: str | Path | None,
+    ai_output_root: str | Path | None,
+) -> tuple[Path, Path]:
+    root = Path(output_root) if output_root is not None else DEFAULT_OUTPUT_ROOT
+    visual = Path(visual_output_root) if visual_output_root is not None else root / "ai_visual_intelligence"
+    ai = Path(ai_output_root) if ai_output_root is not None else root / "ai_intelligence"
+    return visual, ai
+
+
+def _mvp_dirs(
+    *,
+    output_root: str | Path | None,
+    mvp_output_root: str | Path | None,
+    radar_output_root: str | Path | None,
+) -> tuple[Path, Path]:
+    root = Path(output_root) if output_root is not None else DEFAULT_OUTPUT_ROOT
+    mvp = Path(mvp_output_root) if mvp_output_root is not None else root / "mvp_weekly"
+    radar = (
+        Path(radar_output_root)
+        if radar_output_root is not None
+        else (root / "mvp_weekly" if output_root is not None else DEFAULT_RADAR_OUTPUT_DIR)
+    )
+    return mvp, radar
+
+
+def _normalize_mvp_payload(payload: Mapping[str, Any], path: Path) -> dict:
+    result = payload.get("result") if isinstance(payload.get("result"), Mapping) else {}
+    selected = payload.get("selected") if isinstance(payload.get("selected"), Mapping) else {}
+    source_mix = _first_dict(
+        result.get("selected_source_mix"),
+        selected.get("source_mix"),
+        payload.get("selected_source_mix"),
+    )
+    recommendation = _clean_text(
+        result.get("recommendation")
+        or selected.get("recommendation")
+        or payload.get("recommendation")
+    ) or None
+    dossier_status = _clean_text(
+        result.get("dossier_status")
+        or selected.get("dossier_status")
+        or payload.get("dossier_status")
+    ) or None
+    candidate = _clean_text(
+        result.get("selected_title")
+        or selected.get("title")
+        or payload.get("selected_title")
+        or payload.get("title")
+    ) or None
+    missing = _string_values(
+        selected.get("missing_evidence")
+        or result.get("missing_evidence")
+        or payload.get("missing_evidence")
+    )
+    next_validation = _string_values(
+        selected.get("next_validation")
+        or selected.get("next_step")
+        or result.get("next_validation")
+        or payload.get("next_validation")
+    )
+    kill = _string_values(
+        selected.get("kill_criteria")
+        or selected.get("kill_threshold")
+        or result.get("kill_criteria")
+        or payload.get("kill_criteria")
+    )
+    return {
+        "status": "loaded",
+        "source_path": str(path),
+        "selected_candidate": candidate,
+        "dossier_status": dossier_status,
+        "recommendation": recommendation,
+        "score": result.get("score") or selected.get("score") or payload.get("score"),
+        "source_mix": source_mix,
+        "missing_evidence": missing,
+        "next_validation": next_validation,
+        "kill_criteria": kill,
+    }
+
+
+def _public_item_dict(item: IntelligenceRetrievalItem, *, score: float | None) -> dict:
+    return {
+        "id": item.id,
+        "item_type": item.item_type,
+        "week_label": item.week_label,
+        "title": item.title,
+        "summary": item.summary,
+        "text": item.text,
+        "source_refs": list(item.source_refs or []),
+        "atom_ids": list(item.atom_ids or []),
+        "thread_slug": item.thread_slug,
+        "project_name": item.project_name,
+        "score": score,
+        "evidence_tier": item.evidence_tier,
+        "verification_status": item.verification_status,
+    }
+
+
+def _matches_filters(item: IntelligenceRetrievalItem, filters: Mapping[str, Any]) -> bool:
+    for key in ("week_label", "item_type", "project_name", "thread_slug", "status"):
+        value = filters.get(key)
+        if value in (None, "", [], ()):
+            continue
+        item_value = getattr(item, key)
+        accepted = {_normalize_filter_value(candidate) for candidate in _as_list(value)}
+        if _normalize_filter_value(item_value) not in accepted:
+            return False
+    return True
+
+
+def _search_score(item: IntelligenceRetrievalItem, query: str, tokens: list[str]) -> float:
+    if not tokens:
+        return 0.0
+    title = (item.title or "").lower()
+    summary = (item.summary or "").lower()
+    text = (item.text or "").lower()
+    item_id = item.id.lower()
+    phrase = str(query or "").strip().lower()
+    score = 0.0
+    if phrase:
+        if phrase in title:
+            score += 8.0
+        if phrase in summary:
+            score += 4.0
+        if phrase in text:
+            score += 2.0
+    for token in tokens:
+        if token in title:
+            score += 5.0
+        if token in summary:
+            score += 3.0
+        if token in text:
+            score += 1.0
+        if token in item_id:
+            score += 0.5
+    return score
+
+
+def _query_tokens(query: str) -> list[str]:
+    seen: list[str] = []
+    for match in TOKEN_RE.findall(str(query or "").lower()):
+        if match not in seen:
+            seen.append(match)
+    return seen
+
+
+def _optional_readonly_connection(db_path: object):
+    class _ConnectionContext:
+        def __init__(self, path_value: object) -> None:
+            self.path_value = path_value
+            self.connection: sqlite3.Connection | None = None
+
+        def __enter__(self) -> sqlite3.Connection | None:
+            if not self.path_value:
+                return None
+            path = Path(str(self.path_value))
+            if not path.exists():
+                return None
+            uri = f"file:{quote(str(path.resolve()), safe='/')}?mode=ro"
+            try:
+                self.connection = sqlite3.connect(uri, uri=True)
+                self.connection.row_factory = sqlite3.Row
+                return self.connection
+            except sqlite3.Error:
+                return None
+
+        def __exit__(self, exc_type, exc, traceback) -> None:
+            if self.connection is not None:
+                self.connection.close()
+
+    return _ConnectionContext(db_path)
+
+
+def _table_exists(connection: sqlite3.Connection, table_name: str) -> bool:
+    try:
+        row = connection.execute(
+            """
+            SELECT 1
+            FROM sqlite_master
+            WHERE type = 'table' AND name = ?
+            LIMIT 1
+            """,
+            (table_name,),
+        ).fetchone()
+    except sqlite3.Error:
+        return False
+    return row is not None
+
+
+def _thread_in_week_window(thread: Mapping[str, Any], week_label: str) -> bool:
+    try:
+        start, end = _week_bounds(week_label)
+    except ValueError:
+        return True
+    del start
+    last_seen = _parse_iso(thread.get("last_seen_at"))
+    if last_seen is None:
+        return True
+    return last_seen < end
+
+
+def _week_bounds(week_label: str) -> tuple[datetime, datetime]:
+    year_str, week_str = str(week_label).split("-W", maxsplit=1)
+    start_date = date.fromisocalendar(int(year_str), int(week_str), 1)
+    start = datetime.combine(start_date, datetime.min.time(), tzinfo=timezone.utc)
+    return start, start + timedelta(days=7)
+
+
+def _parse_iso(value: object) -> datetime | None:
+    text = _clean_text(value)
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = f"{text[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _section_payload(workbook: Mapping[str, Any], section_id: str, kind: str) -> object:
+    normalized = f"{section_id} {kind}".replace("-", "_")
+    if "decision" in normalized:
+        return workbook.get("decision_cards") or []
+    if "strong" in normalized:
+        return workbook.get("claim_cards") or []
+    if "deep" in normalized:
+        return workbook.get("deep_explanation_cards") or []
+    if "project" in normalized:
+        diagnostic = workbook.get("project_diagnostic") if isinstance(workbook.get("project_diagnostic"), Mapping) else {}
+        return {
+            "confirmed_leads": diagnostic.get("confirmed_leads") or [],
+            "project_watch": diagnostic.get("project_watch") or [],
+            "implementation_suggestions": diagnostic.get("implementation_suggestions") or [],
+        }
+    if "mvp" in normalized:
+        return workbook.get("mvp_radar") or {}
+    if "read" in normalized or "try" in normalized or "build" in normalized or "action" in normalized:
+        return workbook.get("action_cards") or workbook.get("actions") or []
+    if "feedback" in normalized:
+        return workbook.get("feedback_targets") or []
+    return []
+
+
+def _section_summary(section_items: object) -> str | None:
+    if isinstance(section_items, Mapping):
+        values = [
+            _section_summary(value)
+            for value in section_items.values()
+            if value not in (None, "", [], {})
+        ]
+        return next((value for value in values if value), None)
+    for item in _as_list(section_items):
+        if isinstance(item, Mapping):
+            for key in ("title", "claim", "summary", "next_step", "recommendation"):
+                text = _clean_text(item.get(key))
+                if text:
+                    return text
+        else:
+            text = _clean_text(item)
+            if text:
+                return text
+    return None
+
+
+def _atom_ids_from_objects(value: object) -> list[int | str]:
+    ids: list[int | str] = []
+    if isinstance(value, Mapping):
+        for key in ("evidence_atom_ids", "source_atom_ids", "atom_ids"):
+            ids.extend(_list_values(value.get(key)))
+        for nested in value.values():
+            ids.extend(_atom_ids_from_objects(nested))
+    elif isinstance(value, list):
+        for item in value:
+            ids.extend(_atom_ids_from_objects(item))
+    return _unique(ids)
+
+
+def _artifact_source_refs(workbook: Mapping[str, Any]) -> list[str]:
+    paths = workbook.get("_artifact_paths") if isinstance(workbook.get("_artifact_paths"), Mapping) else {}
+    return _unique([paths.get("html"), paths.get("json"), workbook.get("html_path"), workbook.get("json_path")])
+
+
+def _artifact_week_label(workbook: Mapping[str, Any]) -> str | None:
+    paths = workbook.get("_artifact_paths") if isinstance(workbook.get("_artifact_paths"), Mapping) else {}
+    for value in (paths.get("json"), paths.get("html"), workbook.get("json_path"), workbook.get("html_path")):
+        match = WEEK_RE.search(str(value or ""))
+        if match:
+            return match.group("week")
+    return None
+
+
+def _html_path_for_workbook(path: Path, payload: Mapping[str, Any], artifact_kind: str) -> Path | None:
+    html_path = _clean_text(payload.get("html_path"))
+    if html_path:
+        return Path(html_path)
+    if artifact_kind == "visual_workbook":
+        return path.with_name(path.name.replace(".visual.json", ".visual.html"))
+    if artifact_kind == "ai_intelligence_report":
+        return path.with_suffix(".html")
+    return None
+
+
+def _read_json_dict(path: Path) -> dict | None:
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _week_from_path(path: Path) -> str | None:
+    match = WEEK_RE.search(path.name)
+    return match.group("week") if match else None
+
+
+def _mtime(path: Path) -> float:
+    try:
+        return path.stat().st_mtime
+    except OSError:
+        return 0.0
+
+
+def _first_dict(*values: object) -> dict:
+    for value in values:
+        if isinstance(value, Mapping):
+            return dict(value)
+    return {}
+
+
+def _as_list(value: object) -> list:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    if isinstance(value, tuple):
+        return list(value)
+    return [value]
+
+
+def _string_values(value: object) -> list[str]:
+    return _unique(_clean_text(item) for item in _as_list(value) if _clean_text(item))
+
+
+def _list_values(value: object) -> list[int | str]:
+    result: list[int | str] = []
+    for item in _as_list(value):
+        if item is None:
+            continue
+        if isinstance(item, bool):
+            continue
+        if isinstance(item, int):
+            result.append(item)
+            continue
+        text = _clean_text(item)
+        if text:
+            result.append(text)
+    return _unique(result)
+
+
+def _unique(values: Iterable[Any]) -> list:
+    result = []
+    seen = set()
+    for value in values:
+        if value in (None, ""):
+            continue
+        key = str(value)
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(value)
+    return result
+
+
+def _clean_text(value: object) -> str:
+    return " ".join(str(value or "").split())
+
+
+def _join_text(*values: object) -> str:
+    parts = []
+    for value in values:
+        if value in (None, "", [], {}):
+            continue
+        if isinstance(value, (dict, list, tuple)):
+            text = _json_text(value)
+        else:
+            text = _clean_text(value)
+        if text:
+            parts.append(text)
+    return " ".join(parts)
+
+
+def _json_text(value: object) -> str:
+    if value in (None, "", [], {}):
+        return ""
+    try:
+        return json.dumps(value, ensure_ascii=False, sort_keys=True)
+    except TypeError:
+        return _clean_text(value)
+
+
+def _slug(value: object) -> str:
+    text = _clean_text(value).lower()
+    slug = re.sub(r"[^a-z0-9]+", "-", text).strip("-")
+    return slug[:80] or "item"
+
+
+def _float_or_none(value: object) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _normalize_filter_value(value: object) -> str:
+    return _clean_text(value).lower()
+
+
+def _dedupe_items(items: Iterable[IntelligenceRetrievalItem]) -> list[IntelligenceRetrievalItem]:
+    result: list[IntelligenceRetrievalItem] = []
+    seen: set[str] = set()
+    for item in items:
+        if item.id in seen:
+            continue
+        seen.add(item.id)
+        result.append(item)
+    return result

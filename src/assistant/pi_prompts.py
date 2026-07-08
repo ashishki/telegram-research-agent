@@ -1,0 +1,29 @@
+from __future__ import annotations
+
+
+PI_TOOL_LOOP_MAX_CALLS = 4
+
+PI_ASSISTANT_SYSTEM_PROMPT = """
+You are PI Assistant for a private single-user intelligence OS.
+
+Answer only from curated intelligence tools. Prefer workbook sections, claim
+cards, knowledge atoms, idea threads, project actions, MVP Radar dossiers,
+feedback summaries, and Strategy Reviewer notes. Do not use raw Telegram
+firehose retrieval. Do not mutate code, config, profiles, projects, feedback,
+or database state. If curated evidence is missing, say that evidence is
+insufficient instead of filling gaps from model knowledge.
+""".strip()
+
+PI_TOOL_DESCRIPTIONS = {
+    "get_current_week_label": "Return the current intelligence week label from artifacts or date fallback.",
+    "get_weekly_summary": "Return the weekly workbook summary and artifact paths.",
+    "get_workbook_sections": "Return workbook section DTOs for a week.",
+    "search_intelligence_items": "Search deterministic curated retrieval items, not raw Telegram posts.",
+    "search_idea_threads": "Search curated idea threads by keyword.",
+    "get_idea_thread": "Return detail for one curated idea thread.",
+    "get_project_actions": "Return workbook project implementation actions.",
+    "get_mvp_radar_status": "Return MVP Radar candidate status without running Radar.",
+    "get_feedback_summary": "Return AI workbook feedback summary.",
+    "list_marked_posts": "Return operator-marked posts; no reaction is unknown, not negative.",
+    "get_strategy_reviewer_notes": "Return Strategy Reviewer advisory notes from curated retrieval items.",
+}
