@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Callable
 from urllib import error
 
+from assistant.pi_facade import PersonalIntelligenceFacade
+from assistant.pi_tools import call_pi_tool
 from bot.telegram_delivery import _send_text_internal, send_document, send_report_preview, send_text
 from config.settings import PROJECT_ROOT, Settings
 from db.migrate import record_feedback, record_post_tag
@@ -28,6 +30,13 @@ TELEGRAM_POST_URL_RE = re.compile(r"^https?://t\.me/([A-Za-z0-9_]+)/(\d+)(?:\?.*
 MARKDOWN_V2_SPECIAL_CHARS = r"_*[]()~`>#+-=|{}.!"
 WEEK_LABEL_RE = re.compile(r"^\d{4}-W\d{2}$")
 COMMAND_DOCS: dict[str, tuple[str, str]] = {
+    "/weekly [week]": ("handle_weekly", "Show Hermes weekly workbook summary"),
+    "/actions [week]": ("handle_actions", "Show one to three workbook actions"),
+    "/explain <query>": ("handle_explain", "Explain a curated workbook signal"),
+    "/projects [week] [name]": ("handle_projects", "Show workbook project actions"),
+    "/mvp [week]": ("handle_mvp", "Show MVP Radar status and missing evidence"),
+    "/strategy [week]": ("handle_strategy", "Show Strategy Reviewer advisory notes"),
+    "/codex [focus]": ("handle_codex", "Prepare a Codex prompt draft; never executes Codex"),
     "/digest": ("handle_digest", "Show the current weekly brief"),
     "/topics": ("handle_topics", "List the strongest tracked topics"),
     "/insight": ("handle_insight", "Show retrospective project insights"),
@@ -121,6 +130,29 @@ def _format_post_snippet(text: str | None, limit: int = 150) -> str:
     return compact[: limit - 1].rstrip() + "…"
 
 
+def _format_optional_list(title: str, values: list, limit: int = 3) -> list[str]:
+    items = [str(value).strip() for value in values if str(value or "").strip()]
+    if not items:
+        return []
+    lines = [title]
+    for item in items[:limit]:
+        lines.append(f"- {item}")
+    return lines
+
+
+def _format_source_refs(source_refs: list, atom_ids: list | None = None, limit: int = 3) -> str:
+    refs = [str(ref).strip() for ref in source_refs if str(ref or "").strip()]
+    atoms = [f"atom:{atom_id}" for atom_id in atom_ids or [] if str(atom_id or "").strip()]
+    combined = [*refs, *atoms]
+    if not combined:
+        return "Sources: insufficient curated evidence"
+    return "Sources: " + ", ".join(combined[:limit])
+
+
+def _pi_tool(settings: Settings, name: str, args: dict | None = None) -> dict:
+    return call_pi_tool(name, args or {}, facade=PersonalIntelligenceFacade(settings=settings))
+
+
 def _normalize_tag(raw_tag: str) -> str | None:
     return TAG_ALIASES.get(raw_tag.strip().lower())
 
@@ -161,6 +193,16 @@ def _parse_week_label_args(args: str) -> tuple[str, str]:
     return _compute_week_label(), stripped
 
 
+def _parse_optional_week_label_args(args: str) -> tuple[str | None, str]:
+    stripped = args.strip()
+    if not stripped:
+        return None, ""
+    first, _, rest = stripped.partition(" ")
+    if WEEK_LABEL_RE.match(first):
+        return first, rest.strip()
+    return None, stripped
+
+
 def _extract_question_terms(question: str) -> list[str]:
     terms = []
     for raw_term in QUESTION_WORD_RE.findall(question.lower()):
@@ -199,6 +241,232 @@ def handle_start(chat_id: str, args: str, settings: Settings) -> None:
     lines = ["Telegram Research Agent", "", "Available commands:"]
     for command, (_, description) in COMMAND_DOCS.items():
         lines.append(f"{command} — {description}")
+    send_message(_get_bot_token(), chat_id, "\n".join(lines), parse_mode=None)
+
+
+def handle_weekly(chat_id: str, args: str, settings: Settings) -> None:
+    week_label, _rest = _parse_optional_week_label_args(args)
+    tool = _pi_tool(settings, "get_weekly_summary", {"week_label": week_label})
+    summary = tool["result"]
+    if tool["status"] != "ok":
+        send_message(
+            _get_bot_token(),
+            chat_id,
+            f"Hermes weekly: workbook is not ready for {week_label or 'latest week'}.\n{summary.get('message')}",
+            parse_mode=None,
+        )
+        return
+
+    lines = [f"Hermes weekly {summary.get('week_label') or week_label or 'latest'}"]
+    decision_brief = summary.get("decision_brief")
+    if isinstance(decision_brief, list) and decision_brief:
+        lines.append("")
+        lines.append("Decision brief")
+        for card in decision_brief[:3]:
+            if not isinstance(card, dict):
+                continue
+            title = card.get("title") or card.get("verdict") or "Decision"
+            body = card.get("summary") or card.get("next_action") or ""
+            lines.append(f"- {title}: {_format_post_snippet(body, limit=180)}")
+    strong_signals = [item for item in summary.get("strong_signals") or [] if isinstance(item, dict)]
+    if strong_signals:
+        lines.append("")
+        lines.append("Strong signals")
+        for signal in strong_signals[:3]:
+            claim = signal.get("claim") or signal.get("title") or "Signal"
+            lines.append(f"- {_format_post_snippet(claim, limit=180)}")
+    actions = [item for item in summary.get("actions") or [] if isinstance(item, dict)]
+    if actions:
+        lines.append("")
+        lines.append("Actions")
+        for action in actions[:3]:
+            title = action.get("title") or "Action"
+            next_step = action.get("next_step") or action.get("success_criterion") or ""
+            lines.append(f"- {title}: {_format_post_snippet(next_step, limit=160)}")
+    paths = summary.get("artifact_paths") or {}
+    if paths.get("html") or paths.get("json"):
+        lines.append("")
+        lines.append("Workbook")
+        if paths.get("html"):
+            lines.append(str(paths["html"]))
+        if paths.get("json"):
+            lines.append(str(paths["json"]))
+    if tool["evidence_status"] == "insufficient":
+        lines.append("")
+        lines.append("Evidence: insufficient curated evidence.")
+    send_message(_get_bot_token(), chat_id, "\n".join(lines), parse_mode=None)
+
+
+def handle_actions(chat_id: str, args: str, settings: Settings) -> None:
+    week_label, _rest = _parse_optional_week_label_args(args)
+    tool = _pi_tool(settings, "get_weekly_summary", {"week_label": week_label})
+    summary = tool["result"]
+    if tool["status"] != "ok":
+        send_message(
+            _get_bot_token(),
+            chat_id,
+            f"No workbook actions are available for {week_label or 'latest week'}.",
+            parse_mode=None,
+        )
+        return
+
+    lines = [f"Hermes actions {summary.get('week_label') or week_label or 'latest'}"]
+    shown = 0
+    for action in [item for item in summary.get("actions") or [] if isinstance(item, dict)]:
+        if shown >= 3:
+            break
+        title = action.get("title") or "Action"
+        next_step = action.get("next_step") or action.get("success_criterion") or ""
+        lines.append(f"- {title}: {_format_post_snippet(next_step, limit=180)}")
+        shown += 1
+    for action in [item for item in summary.get("project_actions") or [] if isinstance(item, dict)]:
+        if shown >= 3:
+            break
+        project = action.get("project") or "project"
+        body = action.get("action") or action.get("why") or ""
+        lines.append(f"- {project}: {_format_post_snippet(body, limit=180)}")
+        shown += 1
+    if shown == 0:
+        lines.append("No action cards are available in the curated workbook.")
+    send_message(_get_bot_token(), chat_id, "\n".join(lines), parse_mode=None)
+
+
+def handle_explain(chat_id: str, args: str, settings: Settings) -> None:
+    week_label, query = _parse_optional_week_label_args(args)
+    if not query:
+        send_message(_get_bot_token(), chat_id, "Usage: /explain [week] <query>", parse_mode=None)
+        return
+    filters = {"week_label": week_label} if week_label else {}
+    tool = _pi_tool(
+        settings,
+        "search_intelligence_items",
+        {"query": query, "filters": filters, "limit": 3},
+    )
+    items = [item for item in tool["result"].get("items") or [] if isinstance(item, dict)]
+    if not items:
+        send_message(
+            _get_bot_token(),
+            chat_id,
+            f"No curated explanation found for: {query}\nEvidence: insufficient curated evidence.",
+            parse_mode=None,
+        )
+        return
+    lines = [f"Hermes explain: {query}"]
+    for item in items:
+        title = item.get("title") or item.get("id") or "Curated item"
+        summary = item.get("summary") or item.get("text") or ""
+        lines.append("")
+        lines.append(f"{item.get('item_type')}: {title}")
+        if summary:
+            lines.append(_format_post_snippet(summary, limit=260))
+        lines.append(_format_source_refs(item.get("source_refs") or [], item.get("atom_ids") or []))
+    send_message(_get_bot_token(), chat_id, "\n".join(lines), parse_mode=None)
+
+
+def handle_projects(chat_id: str, args: str, settings: Settings) -> None:
+    week_label, project_query = _parse_optional_week_label_args(args)
+    tool = _pi_tool(settings, "get_project_actions", {"week_label": week_label})
+    items = [item for item in tool["result"].get("items") or [] if isinstance(item, dict)]
+    if project_query:
+        needle = project_query.lower()
+        items = [item for item in items if needle in str(item.get("project") or "").lower()]
+    if not items:
+        send_message(
+            _get_bot_token(),
+            chat_id,
+            f"No curated project actions are available for {project_query or week_label or 'latest week'}.",
+            parse_mode=None,
+        )
+        return
+    lines = [f"Hermes projects {tool['result'].get('week_label') or week_label or 'latest'}"]
+    for item in items[:5]:
+        project = item.get("project") or "project"
+        action = item.get("action") or item.get("why") or ""
+        lines.append("")
+        lines.append(f"{project}: {_format_post_snippet(action, limit=180)}")
+        if item.get("effort"):
+            lines.append(f"Effort: {item['effort']}")
+        if item.get("risk"):
+            lines.append(f"Risk: {_format_post_snippet(item['risk'], limit=140)}")
+        lines.append(_format_source_refs(item.get("source_refs") or []))
+    send_message(_get_bot_token(), chat_id, "\n".join(lines), parse_mode=None)
+
+
+def handle_mvp(chat_id: str, args: str, settings: Settings) -> None:
+    week_label, _rest = _parse_optional_week_label_args(args)
+    tool = _pi_tool(settings, "get_mvp_radar_status", {"week_label": week_label})
+    result = tool["result"]
+    if tool["status"] != "ok":
+        send_message(
+            _get_bot_token(),
+            chat_id,
+            f"MVP Radar status is missing for {week_label or 'latest week'}.\n{result.get('message')}",
+            parse_mode=None,
+        )
+        return
+    lines = [
+        f"Hermes MVP {result.get('week_label') or week_label or 'latest'}",
+        f"Candidate: {result.get('candidate') or 'none'}",
+        f"Dossier status: {result.get('dossier_status') or 'unknown'}",
+        f"Recommendation: {result.get('recommendation') or 'unknown'}",
+    ]
+    if result.get("source_mix"):
+        lines.append(f"Source mix: {result['source_mix']}")
+    lines.extend(_format_optional_list("Missing evidence", result.get("missing_evidence") or [], limit=5))
+    lines.extend(_format_optional_list("Next validation", result.get("next_validation") or [], limit=5))
+    if tool["evidence_status"] == "insufficient":
+        lines.append("Evidence: insufficient curated evidence.")
+    send_message(_get_bot_token(), chat_id, "\n".join(lines), parse_mode=None)
+
+
+def handle_strategy(chat_id: str, args: str, settings: Settings) -> None:
+    week_label, query = _parse_optional_week_label_args(args)
+    tool = _pi_tool(
+        settings,
+        "get_strategy_reviewer_notes",
+        {"week_label": week_label, "query": query or None, "limit": 3},
+    )
+    items = [item for item in tool["result"].get("items") or [] if isinstance(item, dict)]
+    if not items:
+        send_message(
+            _get_bot_token(),
+            chat_id,
+            f"No Strategy Reviewer notes are available for {week_label or 'latest week'}.",
+            parse_mode=None,
+        )
+        return
+    lines = [f"Hermes strategy {week_label or 'latest'}", "Advisory only; no changes were applied."]
+    for item in items:
+        lines.append("")
+        lines.append(item.get("title") or "Strategy Reviewer note")
+        text = item.get("summary") or item.get("text") or ""
+        if text:
+            lines.append(_format_post_snippet(text, limit=320))
+        lines.append(_format_source_refs(item.get("source_refs") or [], item.get("atom_ids") or []))
+    send_message(_get_bot_token(), chat_id, "\n".join(lines), parse_mode=None)
+
+
+def handle_codex(chat_id: str, args: str, settings: Settings) -> None:
+    del settings
+    focus = args.strip() or "Implement the next bounded HPI task from docs/tasks.md."
+    lines = [
+        "Codex prompt draft (manual approval required)",
+        "",
+        "Task:",
+        focus,
+        "",
+        "Constraints:",
+        "- Use curated PI/Hermes data only; no raw Telegram firehose RAG.",
+        "- Do not edit code/config/profile/projects unless the approved task requires code/docs edits.",
+        "- Do not run weekly pipelines unless explicitly needed for verification.",
+        "- Preserve evidence gates and insufficient-evidence states.",
+        "",
+        "Verification:",
+        "- Run focused unit tests for touched modules.",
+        "- Run relevant regressions before commit.",
+        "",
+        "No Codex command has been executed.",
+    ]
     send_message(_get_bot_token(), chat_id, "\n".join(lines), parse_mode=None)
 
 
@@ -769,6 +1037,13 @@ def handle_feedback_discard(chat_id: str, args: str, settings: Settings) -> None
 
 HANDLERS: dict[str, Callable[[str, str, Settings], None]] = {
     "/start": handle_start,
+    "/weekly": handle_weekly,
+    "/actions": handle_actions,
+    "/explain": handle_explain,
+    "/projects": handle_projects,
+    "/mvp": handle_mvp,
+    "/strategy": handle_strategy,
+    "/codex": handle_codex,
     "/digest": handle_digest,
     "/topics": handle_topics,
     "/insight": handle_insight,

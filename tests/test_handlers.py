@@ -129,6 +129,145 @@ class TestHandlers(unittest.TestCase):
             )
         )
 
+    def test_hpi_hermes_commands_are_registered(self):
+        for command in ["/weekly", "/actions", "/explain", "/projects", "/mvp", "/strategy", "/codex"]:
+            self.assertIn(command, handlers.HANDLERS)
+
+    def test_handle_weekly_formats_read_only_pi_summary(self):
+        settings = Settings(
+            db_path=":memory:",
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+        pi_result = {
+            "status": "ok",
+            "tool_name": "get_weekly_summary",
+            "read_only": True,
+            "evidence_status": "available",
+            "evidence": {"artifact_paths": {"html": "/tmp/2026-W28.visual.html"}},
+            "result": {
+                "status": "ok",
+                "week_label": "2026-W28",
+                "decision_brief": [
+                    {"title": "Study eval gates", "summary": "Eval gates matter this week."}
+                ],
+                "strong_signals": [
+                    {"claim": "Eval gates are becoming release infrastructure."}
+                ],
+                "actions": [
+                    {"title": "Try a tiny eval gate", "next_step": "Add one regression guard."}
+                ],
+                "project_actions": [],
+                "artifact_paths": {"html": "/tmp/2026-W28.visual.html", "json": "/tmp/2026-W28.visual.json"},
+                "message": "Workbook summary loaded.",
+            },
+            "message": "Workbook summary loaded.",
+        }
+
+        with patch.object(handlers, "_pi_tool", return_value=pi_result) as mock_pi_tool:
+            with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                with patch.object(handlers, "send_message") as mock_send_message:
+                    handlers.handle_weekly(chat_id="42", args="2026-W28", settings=settings)
+
+        mock_pi_tool.assert_called_once_with(settings, "get_weekly_summary", {"week_label": "2026-W28"})
+        message = mock_send_message.call_args.args[2]
+        self.assertIn("Hermes weekly 2026-W28", message)
+        self.assertIn("Eval gates are becoming release infrastructure", message)
+        self.assertIn("/tmp/2026-W28.visual.html", message)
+
+    def test_handle_explain_uses_curated_search_tool(self):
+        settings = Settings(
+            db_path=":memory:",
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+        pi_result = {
+            "status": "ok",
+            "tool_name": "search_intelligence_items",
+            "read_only": True,
+            "evidence_status": "available",
+            "evidence": {"source_refs": ["https://t.me/ai_lab/101"], "atom_ids": [101]},
+            "result": {
+                "status": "ok",
+                "items": [
+                    {
+                        "item_type": "claim_card",
+                        "title": "Eval gates",
+                        "summary": "A curated claim card summary.",
+                        "source_refs": ["https://t.me/ai_lab/101"],
+                        "atom_ids": [101],
+                    }
+                ],
+            },
+            "message": "Curated intelligence items matched deterministic search.",
+        }
+
+        with patch.object(handlers, "_pi_tool", return_value=pi_result) as mock_pi_tool:
+            with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                with patch.object(handlers, "send_message") as mock_send_message:
+                    handlers.handle_explain(chat_id="42", args="2026-W28 eval gates", settings=settings)
+
+        mock_pi_tool.assert_called_once_with(
+            settings,
+            "search_intelligence_items",
+            {"query": "eval gates", "filters": {"week_label": "2026-W28"}, "limit": 3},
+        )
+        message = mock_send_message.call_args.args[2]
+        self.assertIn("Hermes explain: eval gates", message)
+        self.assertIn("claim_card: Eval gates", message)
+        self.assertIn("https://t.me/ai_lab/101", message)
+
+    def test_handle_mvp_missing_status_returns_clear_fallback(self):
+        settings = Settings(
+            db_path=":memory:",
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+        pi_result = {
+            "status": "missing",
+            "tool_name": "get_mvp_radar_status",
+            "read_only": True,
+            "evidence_status": "insufficient",
+            "evidence": {},
+            "result": {
+                "status": "missing",
+                "week_label": "2026-W28",
+                "message": "MVP Radar result is missing.",
+            },
+            "message": "MVP Radar result is missing.",
+        }
+
+        with patch.object(handlers, "_pi_tool", return_value=pi_result):
+            with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                with patch.object(handlers, "send_message") as mock_send_message:
+                    handlers.handle_mvp(chat_id="42", args="2026-W28", settings=settings)
+
+        message = mock_send_message.call_args.args[2]
+        self.assertIn("MVP Radar status is missing", message)
+        self.assertIn("MVP Radar result is missing", message)
+
+    def test_handle_codex_only_prepares_prompt(self):
+        settings = Settings(
+            db_path=":memory:",
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+
+        with patch.object(handlers, "_pi_tool") as mock_pi_tool:
+            with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                with patch.object(handlers, "send_message") as mock_send_message:
+                    handlers.handle_codex(chat_id="42", args="HPI-4 test prompt", settings=settings)
+
+        mock_pi_tool.assert_not_called()
+        message = mock_send_message.call_args.args[2]
+        self.assertIn("Codex prompt draft", message)
+        self.assertIn("HPI-4 test prompt", message)
+        self.assertIn("No Codex command has been executed.", message)
+
     def test_handle_feedback_drafts_summary_without_memory_write_until_confirmed(self):
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
             db_path = tmp.name
