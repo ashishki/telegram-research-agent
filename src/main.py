@@ -161,12 +161,22 @@ def build_parser() -> argparse.ArgumentParser:
     ai_visual_parser.add_argument("--atoms-limit", type=int, default=8)
     ai_visual_parser.add_argument("--output-root", default=None)
     ai_visual_parser.add_argument("--archify-root", default=None, help="Path to the installed archify skill directory")
+    ai_visual_parser.add_argument("--mvp-radar-json", default=None, help="Path to an MVP Radar mvp-weekly JSON artifact")
     ai_visual_parser.add_argument("--skip-refresh", action="store_true", help="Do not refresh Idea Threads before rendering")
     ai_visual_parser.add_argument("--refresh-weeks", type=int, default=12, help="Idea Thread refresh lookback window")
     ai_visual_parser.add_argument("--deliver", action="store_true", help="Send the HTML report to Telegram as a document")
     ai_visual_parser.add_argument("--chat-id", default=None, help="Telegram chat/channel id for --deliver")
     ai_visual_parser.add_argument("--token", default=None, help="Telegram bot token for --deliver")
     ai_visual_parser.set_defaults(handler=handle_ai_visual_report)
+
+    strategy_parser = subparsers.add_parser(
+        "strategy-reviewer",
+        help="Produce advisory keep/change/demote/test-next-week suggestions from confirmed workbook feedback",
+    )
+    strategy_parser.add_argument("--week", default=None, help="Review feedback for one ISO week")
+    strategy_parser.add_argument("--before-week", default=None, help="Review feedback before an ISO week")
+    strategy_parser.add_argument("--output-path", default=None, help="Optional JSON output path")
+    strategy_parser.set_defaults(handler=handle_strategy_reviewer)
 
     obsidian_parser = subparsers.add_parser(
         "obsidian-export",
@@ -326,11 +336,19 @@ def build_parser() -> argparse.ArgumentParser:
             "too_shallow",
             "missed-important-post",
             "missed_important_post",
+            "no-missed-posts",
+            "no_missed_posts",
             "wrong-priority",
             "wrong_priority",
             "not-interested",
             "not_interested",
             "noise",
+            "trust-too-high",
+            "trust_too_high",
+            "trust-too-low",
+            "trust_too_low",
+            "verify-first",
+            "verify_first",
         ],
     )
     ai_feedback_parser.add_argument(
@@ -350,6 +368,10 @@ def build_parser() -> argparse.ArgumentParser:
             "read_queue",
             "experiment",
             "action",
+            "missed-post",
+            "missed_post",
+            "trust-correction",
+            "trust_correction",
         ],
     )
     ai_feedback_parser.add_argument("--target-ref", default=None)
@@ -401,7 +423,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     aif_parser = memory_sub.add_parser(
         "inspect-ai-report-feedback",
-        help="Inspect AI Intelligence report feedback and missed-post eval examples",
+        help="Inspect AI Intelligence report feedback and report-quality eval examples",
     )
     aif_parser.add_argument("--week", default=None)
     aif_parser.add_argument("--feedback", default=None)
@@ -1677,6 +1699,7 @@ def handle_ai_visual_report(args: argparse.Namespace) -> int:
             atoms_limit=max(1, args.atoms_limit),
             output_root=args.output_root,
             archify_root=args.archify_root,
+            mvp_radar_json_path=args.mvp_radar_json,
         )
         if args.deliver:
             summary = deliver_ai_visual_report(
@@ -1716,6 +1739,33 @@ def handle_ai_visual_report(args: argparse.Namespace) -> int:
         f"delivered_message_id={summary.delivered_message_id or ''}\n"
         f"notification={summary.notification_text}\n"
     )
+    return 0
+
+
+def handle_strategy_reviewer(args: argparse.Namespace) -> int:
+    from output.strategy_reviewer import build_strategy_review, write_strategy_review
+
+    settings = load_settings()
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+        with sqlite3.connect(settings.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            review = build_strategy_review(
+                connection,
+                week_label=args.week,
+                before_week_label=args.before_week,
+            )
+        if args.output_path:
+            output_path = write_strategy_review(review, args.output_path)
+            sys.stdout.write(f"{output_path}\n")
+        else:
+            sys.stdout.write(json.dumps(review, ensure_ascii=False, indent=2) + "\n")
+    except Exception as exc:
+        LOGGER.exception("Strategy reviewer failed")
+        sys.stdout.write(f"Strategy reviewer failed: {exc}\n")
+        return 1
     return 0
 
 
@@ -2142,8 +2192,8 @@ def _format_ai_report_feedback(row: dict) -> str:
 
 def handle_memory_inspect_ai_report_feedback(args: argparse.Namespace) -> int:
     from db.ai_report_feedback import (
+        fetch_ai_report_eval_examples,
         fetch_ai_report_feedback,
-        fetch_missed_post_eval_examples,
         format_ai_report_feedback_summary,
         summarize_ai_report_feedback,
     )
@@ -2171,11 +2221,7 @@ def handle_memory_inspect_ai_report_feedback(args: argparse.Namespace) -> int:
                 week_label=args.week,
                 limit=max(args.limit, 100),
             )
-            eval_examples = (
-                fetch_missed_post_eval_examples(connection, week_label=args.week, limit=args.limit)
-                if args.eval_examples
-                else []
-            )
+            eval_examples = fetch_ai_report_eval_examples(connection, week_label=args.week, limit=args.limit) if args.eval_examples else []
     except Exception as exc:
         sys.stdout.write(f"Error inspecting AI report feedback: {exc}\n")
         return 1
@@ -2183,7 +2229,7 @@ def handle_memory_inspect_ai_report_feedback(args: argparse.Namespace) -> int:
     lines = [
         "AI Report Feedback inspection",
         "source_of_truth: ai_report_feedback_events",
-        "retrieval_path: week, feedback_type, target_type, target_ref, missed-post eval examples",
+        "retrieval_path: week, feedback_type, target_type, target_ref, report-quality eval examples",
         (
             f"scope: week={args.week or 'any'} feedback={args.feedback or 'any'} "
             f"target_type={args.target_type or 'any'} target_ref={args.target_ref or 'any'}"
@@ -2196,12 +2242,14 @@ def handle_memory_inspect_ai_report_feedback(args: argparse.Namespace) -> int:
     else:
         lines.append("  none")
     if args.eval_examples:
-        lines.append(f"missed_post_eval_examples ({len(eval_examples)}):")
+        lines.append(f"feedback_eval_examples ({len(eval_examples)}):")
         if eval_examples:
             for example in eval_examples:
                 lines.append(
-                    f"  - week={example.get('week_label')} source_url={example.get('source_url') or 'n/a'} "
-                    f"target_ref={example.get('target_ref') or 'n/a'} notes={example.get('notes') or 'n/a'}"
+                    f"  - type={example.get('example_type')} week={example.get('week_label')} "
+                    f"feedback={example.get('feedback_type') or 'n/a'} source_url={example.get('source_url') or 'n/a'} "
+                    f"target={example.get('target_type') or 'n/a'}:{example.get('target_ref') or 'n/a'} "
+                    f"notes={example.get('notes') or 'n/a'}"
                 )
         else:
             lines.append("  none")
