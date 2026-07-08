@@ -177,6 +177,19 @@ def build_parser() -> argparse.ArgumentParser:
     ai_visual_parser.add_argument("--token", default=None, help="Telegram bot token for --deliver")
     ai_visual_parser.set_defaults(handler=handle_ai_visual_report)
 
+    split_report_parser = subparsers.add_parser(
+        "ai-split-report",
+        help="Generate separate Knowledge Atlas and Weekly Intelligence Brief HTML artifacts",
+    )
+    split_report_parser.add_argument("--week", default=None, help="ISO week label, e.g. 2026-W28 (default: current UTC week)")
+    split_report_parser.add_argument("--threads-limit", type=int, default=24)
+    split_report_parser.add_argument("--atoms-limit", type=int, default=8)
+    split_report_parser.add_argument("--output-root", default=None)
+    split_report_parser.add_argument("--mvp-radar-json", default=None, help="Path to an MVP Radar mvp-weekly JSON artifact")
+    split_report_parser.add_argument("--skip-refresh", action="store_true", help="Do not refresh Idea Threads before rendering")
+    split_report_parser.add_argument("--refresh-weeks", type=int, default=12, help="Idea Thread refresh lookback window")
+    split_report_parser.set_defaults(handler=handle_ai_split_report)
+
     strategy_parser = subparsers.add_parser(
         "strategy-reviewer",
         help="Produce advisory keep/change/demote/test-next-week suggestions from confirmed workbook feedback",
@@ -1771,6 +1784,69 @@ def handle_ai_visual_report(args: argparse.Namespace) -> int:
         f"project_links={summary.project_link_count} actions={summary.action_count} "
         f"archify={summary.archify_status} quality_findings={summary.quality_finding_count}\n"
         f"delivered_message_id={summary.delivered_message_id or ''}\n"
+        f"notification={summary.notification_text}\n"
+    )
+    return 0
+
+
+def handle_ai_split_report(args: argparse.Namespace) -> int:
+    from output.idea_threads import refresh_idea_threads
+    from output.knowledge_atlas_report import KnowledgeAtlasQualityError
+    from output.split_intelligence_reports import generate_split_intelligence_reports
+    from output.weekly_intelligence_brief import WeeklyIntelligenceBriefQualityError
+
+    settings = load_settings()
+
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+
+        if not args.skip_refresh:
+            LOGGER.info("Starting step=idea_threads refresh_weeks=%d", args.refresh_weeks)
+            refresh_idea_threads(settings, weeks=max(1, args.refresh_weeks))
+            LOGGER.info("Finished step=idea_threads")
+
+        LOGGER.info(
+            "Starting step=ai_split_report week=%s threads_limit=%d atoms_limit=%d",
+            args.week or "current",
+            args.threads_limit,
+            args.atoms_limit,
+        )
+        summary = generate_split_intelligence_reports(
+            settings,
+            week_label=args.week,
+            threads_limit=max(1, args.threads_limit),
+            atoms_limit=max(1, args.atoms_limit),
+            output_root=args.output_root,
+            mvp_radar_json_path=args.mvp_radar_json,
+        )
+        LOGGER.info(
+            "Finished step=ai_split_report week=%s atlas=%s brief=%s",
+            summary.week_label,
+            summary.knowledge_atlas.html_path,
+            summary.weekly_brief.html_path,
+        )
+    except (KnowledgeAtlasQualityError, WeeklyIntelligenceBriefQualityError) as exc:
+        LOGGER.exception("Split AI report failed quality gates")
+        lines = ["Split AI report failed quality gates:"]
+        lines.extend(f"- {finding.message}" for finding in exc.findings)
+        sys.stdout.write("\n".join(lines) + "\n")
+        return 1
+    except Exception as exc:
+        LOGGER.exception("Split AI report generation failed")
+        sys.stdout.write(f"Split AI report generation failed: {exc}\n")
+        return 1
+
+    sys.stdout.write(
+        f"weekly_brief={summary.weekly_brief.html_path}\n"
+        f"weekly_brief_json={summary.weekly_brief.json_path}\n"
+        f"knowledge_atlas={summary.knowledge_atlas.html_path}\n"
+        f"knowledge_atlas_json={summary.knowledge_atlas.json_path}\n"
+        f"week={summary.week_label} threads={summary.knowledge_atlas.thread_count} "
+        f"source_atoms={summary.knowledge_atlas.source_atom_count} "
+        f"changed={summary.weekly_brief.changed_thread_count} "
+        f"actions={summary.weekly_brief.action_count} mvp={summary.weekly_brief.mvp_status}\n"
         f"notification={summary.notification_text}\n"
     )
     return 0

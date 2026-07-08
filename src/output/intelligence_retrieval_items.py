@@ -19,6 +19,8 @@ from output.strategy_reviewer import build_strategy_review
 DEFAULT_OUTPUT_ROOT = PROJECT_ROOT / "data" / "output"
 DEFAULT_VISUAL_OUTPUT_DIR = DEFAULT_OUTPUT_ROOT / "ai_visual_intelligence"
 DEFAULT_AI_OUTPUT_DIR = DEFAULT_OUTPUT_ROOT / "ai_intelligence"
+DEFAULT_KNOWLEDGE_ATLAS_OUTPUT_DIR = DEFAULT_OUTPUT_ROOT / "knowledge_atlas"
+DEFAULT_WEEKLY_BRIEF_OUTPUT_DIR = DEFAULT_OUTPUT_ROOT / "weekly_intelligence_briefs"
 DEFAULT_MVP_OUTPUT_DIR = DEFAULT_OUTPUT_ROOT / "mvp_weekly"
 DEFAULT_RADAR_OUTPUT_DIR = PROJECT_ROOT.parent / "Demand-to-MVP-Radar" / "reports" / "mvp_of_week"
 WEEK_RE = re.compile(r"(?P<week>\d{4}-W\d{2})")
@@ -68,8 +70,20 @@ def build_retrieval_items(
         clean_week = _clean_text(workbook.get("week_label")) or _artifact_week_label(workbook)
 
     items: list[IntelligenceRetrievalItem] = []
+    loaded_artifact_paths: set[str] = set()
     if workbook:
         items.extend(_items_from_workbook(workbook))
+        paths = workbook.get("_artifact_paths") if isinstance(workbook.get("_artifact_paths"), Mapping) else {}
+        if paths.get("json"):
+            loaded_artifact_paths.add(str(paths["json"]))
+    for split_artifact in _load_split_sidecar_jsons(clean_week, output_root=output_root):
+        paths = split_artifact.get("_artifact_paths") if isinstance(split_artifact.get("_artifact_paths"), Mapping) else {}
+        json_path = str(paths.get("json") or "")
+        if json_path and json_path in loaded_artifact_paths:
+            continue
+        items.extend(_items_from_workbook(split_artifact))
+        if json_path:
+            loaded_artifact_paths.add(json_path)
 
     with _optional_readonly_connection(getattr(settings, "db_path", None)) as connection:
         if connection is not None:
@@ -193,6 +207,37 @@ def load_mvp_radar_status(
         if payload is not None:
             return _normalize_mvp_payload(payload, path)
     return None
+
+
+def _load_split_sidecar_jsons(
+    week_label: str | None,
+    *,
+    output_root: str | Path | None,
+) -> list[dict]:
+    clean_week = str(week_label or "").strip()
+    if not clean_week:
+        return []
+    atlas_dir, brief_dir = _split_artifact_dirs(output_root=output_root)
+    candidates = [
+        (brief_dir / f"{clean_week}.weekly-brief.json", "weekly_intelligence_brief"),
+        (atlas_dir / f"{clean_week}.knowledge-atlas.json", "knowledge_atlas"),
+    ]
+    artifacts = []
+    for path, artifact_kind in candidates:
+        payload = _read_json_dict(path)
+        if payload is None:
+            continue
+        html_path = _html_path_for_workbook(path, payload, artifact_kind)
+        result = dict(payload)
+        result["_artifact_kind"] = artifact_kind
+        result["_artifact_paths"] = {
+            "json": str(path),
+            "html": str(html_path) if html_path else None,
+        }
+        if not result.get("week_label"):
+            result["week_label"] = clean_week
+        artifacts.append(result)
+    return artifacts
 
 
 def _items_from_workbook(workbook: Mapping[str, Any]) -> list[IntelligenceRetrievalItem]:
@@ -622,17 +667,28 @@ def _candidate_workbook_paths(
         visual_output_root=visual_output_root,
         ai_output_root=ai_output_root,
     )
+    atlas_dir, brief_dir = _split_artifact_dirs(output_root=output_root)
     clean_week = str(week_label or "").strip()
     if clean_week:
         return [
             (visual_dir / f"{clean_week}.visual.json", "visual_workbook"),
+            (brief_dir / f"{clean_week}.weekly-brief.json", "weekly_intelligence_brief"),
+            (atlas_dir / f"{clean_week}.knowledge-atlas.json", "knowledge_atlas"),
             (ai_dir / f"{clean_week}.json", "ai_intelligence_report"),
         ]
     candidates: list[tuple[str, int, float, Path, str]] = []
     for path in visual_dir.glob("*.visual.json") if visual_dir.exists() else ():
         week = _week_from_path(path)
         if week:
-            candidates.append((week, 1, _mtime(path), path, "visual_workbook"))
+            candidates.append((week, 3, _mtime(path), path, "visual_workbook"))
+    for path in brief_dir.glob("*.weekly-brief.json") if brief_dir.exists() else ():
+        week = _week_from_path(path)
+        if week:
+            candidates.append((week, 2, _mtime(path), path, "weekly_intelligence_brief"))
+    for path in atlas_dir.glob("*.knowledge-atlas.json") if atlas_dir.exists() else ():
+        week = _week_from_path(path)
+        if week:
+            candidates.append((week, 1, _mtime(path), path, "knowledge_atlas"))
     for path in ai_dir.glob("*.json") if ai_dir.exists() else ():
         week = _week_from_path(path)
         if week:
@@ -670,6 +726,13 @@ def _workbook_dirs(
     visual = Path(visual_output_root) if visual_output_root is not None else root / "ai_visual_intelligence"
     ai = Path(ai_output_root) if ai_output_root is not None else root / "ai_intelligence"
     return visual, ai
+
+
+def _split_artifact_dirs(*, output_root: str | Path | None) -> tuple[Path, Path]:
+    if output_root is None:
+        return DEFAULT_KNOWLEDGE_ATLAS_OUTPUT_DIR, DEFAULT_WEEKLY_BRIEF_OUTPUT_DIR
+    root = Path(output_root) if output_root is not None else DEFAULT_OUTPUT_ROOT
+    return root / "knowledge_atlas", root / "weekly_intelligence_briefs"
 
 
 def _mvp_dirs(
@@ -887,6 +950,13 @@ def _parse_iso(value: object) -> datetime | None:
 
 
 def _section_payload(workbook: Mapping[str, Any], section_id: str, kind: str) -> object:
+    for section in _as_list(workbook.get("artifact_sections")):
+        if not isinstance(section, Mapping):
+            continue
+        if _clean_text(section.get("id")) == section_id:
+            return section
+        if kind and _clean_text(section.get("kind")) == kind:
+            return section
     normalized = f"{section_id} {kind}".replace("-", "_")
     if "decision" in normalized:
         return workbook.get("decision_cards") or []
@@ -966,6 +1036,10 @@ def _html_path_for_workbook(path: Path, payload: Mapping[str, Any], artifact_kin
         return path.with_name(path.name.replace(".visual.json", ".visual.html"))
     if artifact_kind == "ai_intelligence_report":
         return path.with_suffix(".html")
+    if artifact_kind == "knowledge_atlas":
+        return path.with_name(path.name.replace(".knowledge-atlas.json", ".knowledge-atlas.html"))
+    if artifact_kind == "weekly_intelligence_brief":
+        return path.with_name(path.name.replace(".weekly-brief.json", ".weekly-brief.html"))
     return None
 
 

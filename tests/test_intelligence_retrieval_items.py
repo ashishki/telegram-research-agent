@@ -115,6 +115,84 @@ class TestIntelligenceRetrievalItems(unittest.TestCase):
         self.assertIn("project_diagnostic", item_types)
         self.assertIn("mvp_dossier", item_types)
 
+    def test_builds_retrieval_items_from_split_weekly_brief_sidecar(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            visual_dir = root / "ai_visual_intelligence"
+            visual_dir.mkdir(parents=True)
+            visual_html = visual_dir / "2026-W28.visual.html"
+            visual_json = visual_dir / "2026-W28.visual.json"
+            visual_html.write_text("<!doctype html><title>workbook</title>", encoding="utf-8")
+            visual_json.write_text(
+                json.dumps(
+                    {
+                        "week_label": "2026-W28",
+                        "generated_at": "2026-07-08T00:00:00Z",
+                        "html_path": str(visual_html),
+                        "workbook_sections": [
+                            {"id": "decision-brief", "title": "Decision Brief", "title_en": "Decision Brief", "kind": "decision_brief"}
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            output_dir = root / "weekly_intelligence_briefs"
+            output_dir.mkdir(parents=True)
+            html_path = output_dir / "2026-W28.weekly-brief.html"
+            json_path = output_dir / "2026-W28.weekly-brief.json"
+            html_path.write_text("<!doctype html><title>Weekly Intelligence Brief</title>", encoding="utf-8")
+            json_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "split_ai_report.v1",
+                        "artifact_type": "weekly_intelligence_brief",
+                        "week_label": "2026-W28",
+                        "generated_at": "2026-07-08T00:00:00Z",
+                        "html_path": str(html_path),
+                        "workbook_sections": [
+                            {
+                                "id": "brief-actions",
+                                "title": "Actions And Read/Try Prompts",
+                                "title_en": "Actions And Read/Try Prompts",
+                                "kind": "actions",
+                                "summary": "Try a tiny eval gate.",
+                            }
+                        ],
+                        "artifact_sections": [
+                            {
+                                "id": "brief-actions",
+                                "title": "Actions And Read/Try Prompts",
+                                "kind": "actions",
+                                "summary": "Try a tiny eval gate.",
+                            }
+                        ],
+                        "actions": [
+                            {
+                                "title": "Try a tiny eval gate",
+                                "body": "Add one regression guard.",
+                                "source_count": 1,
+                            }
+                        ],
+                        "mvp_radar": {
+                            "selected_candidate": "Agent Eval Gate Scanner",
+                            "recommendation": "revisit_with_evidence_gap",
+                        },
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+
+            items = build_retrieval_items(self._settings(root), week_label="2026-W28", output_root=root)
+
+        brief_sections = [
+            item for item in items
+            if item.item_type == "workbook_section" and item.id.endswith(":brief-actions")
+        ]
+        self.assertEqual(len(brief_sections), 1)
+        self.assertIn("Try a tiny eval gate", brief_sections[0].text)
+        self.assertTrue(any(item.item_type == "mvp_dossier" for item in items))
+
     def test_search_returns_matching_item(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
