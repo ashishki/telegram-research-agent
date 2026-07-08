@@ -683,7 +683,7 @@ Stop conditions:
 
 ### HPI-11 - Hermes Telegram UX And Tbilisi Timezone Cleanup
 
-Status: next P0 implementation task.
+Status: implemented by HPI-11.
 
 Goal: make Hermes feel like a normal private assistant, not a slash-command
 debug console. Fix Telegram escaping, use the operator timezone, and keep slash
@@ -711,6 +711,29 @@ Files likely:
 - `tests/test_operator_reminders.py`
 - `README.md`
 - `docs/operator_workflow.md`
+
+Implemented files:
+
+- `src/bot/handlers.py`
+- `src/output/operator_reminders.py`
+- `systemd/telegram-reminders.timer`
+- `tests/test_handlers.py`
+- `tests/test_operator_reminders.py`
+- `README.md`
+- `docs/operator_workflow.md`
+- `docs/tasks.md`
+- `docs/CODEX_PROMPT.md`
+
+Implementation result:
+
+- `send_message(..., parse_mode=None)` sends plain text without MarkdownV2
+  escaping; escaping is applied only when `parse_mode` is `MarkdownV2`.
+- `/start` and `/help` start with normal private-assistant guidance: write text
+  or send voice first; slash commands remain available as manual fallbacks.
+- Reminder parsing, formatting, daily digest labels, and
+  `telegram-reminders.timer` use `Asia/Tbilisi`.
+- `REMINDER_TIMEZONE` remains an optional override and defaults to
+  `Asia/Tbilisi`.
 
 Implementation notes:
 
@@ -751,7 +774,7 @@ Stop conditions:
 
 ### HPI-12 - Opus Feedback Strategist
 
-Status: planned P0 after HPI-11.
+Status: next P0 after HPI-11.
 
 Goal: upgrade feedback handling from "parse and store" to "understand, propose,
 and confirm". Feedback should be interpreted by an Opus-class model with a

@@ -10,11 +10,12 @@ facade/tool catalog, Hermes concierge commands, action-status projection, and
 dogfood review layers are the primary direction. Current work is tracked in
 `docs/tasks.md`.
 
-Current next work: Hermes Telegram UX cleanup (`Asia/Tbilisi` reminders and no
-MarkdownV2 escape artifacts), Opus-class feedback strategy, a bounded
-market/business channel pack for MVP Radar, a split between Knowledge Atlas and
-Weekly Intelligence Brief HTML surfaces, and a curated-only semantic RAG
-decision/prototype. Raw Telegram firehose RAG and full-year archive processing
+Current next work: Opus-class feedback strategy, a bounded market/business
+channel pack for MVP Radar, a split between Knowledge Atlas and Weekly
+Intelligence Brief HTML surfaces, and a curated-only semantic RAG
+decision/prototype. Hermes Telegram UX cleanup is implemented: plain messages
+do not show MarkdownV2 escape artifacts, and reminders are scheduled/displayed
+in `Asia/Tbilisi`. Raw Telegram firehose RAG and full-year archive processing
 remain deferred.
 
 Reference integration: `docs/entropy_core_gensyn_integration.md`.
@@ -137,8 +138,8 @@ On the single-user VPS, the operational baseline is:
   processing window.
 - `telegram-study-reminder-tue.timer` and
   `telegram-study-reminder-fri.timer` send study reminders.
-- `telegram-reminders.timer` sends one daily operator reminder check-in with
-  inline `сделал` / `не сделал` buttons.
+- `telegram-reminders.timer` sends one daily `Asia/Tbilisi` operator reminder
+  check-in with inline `сделал` / `не сделал` buttons.
 
 Quick checks:
 
@@ -203,7 +204,7 @@ Environment:
 | `OPENAI_API_KEY` | Optional OpenAI audio transcription key for Telegram voice input |
 | `VOICE_TRANSCRIPTION_MODEL` | Optional transcription model override; defaults to `whisper-1` |
 | `TELEGRAM_VOICE_MEDIA_DIR` | Optional temporary directory for downloaded Telegram voice files |
-| `REMINDER_TIMEZONE` | Optional local timezone for daily operator reminders; defaults to `Europe/Berlin` |
+| `REMINDER_TIMEZONE` | Optional local timezone for daily operator reminders; defaults to `Asia/Tbilisi` |
 | `TELEGRAPH_TOKEN` | Stable Telegraph publishing account |
 | `RADAR_REPO_PATH` / `RADAR_PYTHON` | Demand-to-MVP Radar repo and local venv Python |
 | `DMR_MVP_SOURCE_CONFIG` | Radar weekly live-source config |

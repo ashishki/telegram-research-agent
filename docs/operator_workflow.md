@@ -109,15 +109,15 @@ manually:
 The confirmation rule is unchanged: the bot only drafts feedback first; memory
 changes happen after `/feedback_confirm <id>`.
 
-Daily reminders are local operator prompts, not a 30-minute notification loop.
-Create one with text or voice, or explicitly:
+Daily reminders are local operator prompts in `Asia/Tbilisi`, not a 30-minute
+notification loop. Create one with text or voice, or explicitly:
 
 ```text
 /remind завтра 18:00 дать feedback по Workbook
 /reminders
 ```
 
-`telegram-reminders.timer` sends one daily check-in with `сделал` /
+`telegram-reminders.timer` sends one daily `Asia/Tbilisi` check-in with `сделал` /
 `не сделал` buttons. Button clicks record the reminder outcome in SQLite; they
 do not change report scoring or code/config.
 
@@ -224,8 +224,6 @@ does not use vector search, and does not expose raw SQLite sessions.
 
 Next implementation queue before deeper dogfood:
 
-- fix Telegram escaping so plain messages do not show `\.` or `1\.`;
-- make reminders and visible times explicitly `Asia/Tbilisi`;
 - upgrade feedback interpretation to an Opus-class strategist while preserving
   confirmation-gated memory writes;
 - add a bounded market/business channel pack for MVP Radar from
@@ -236,6 +234,10 @@ Next implementation queue before deeper dogfood:
 - evaluate curated-only semantic RAG using Dream Motif retrieval patterns as
   reference. Obsidian remains a generated human navigation/audit projection,
   not runtime assistant memory.
+
+Implemented HPI-11 cleanup: plain Telegram messages are sent without MarkdownV2
+backslash artifacts when `parse_mode=None`; `/help` now starts with "just write
+or send voice"; reminders parse, display, and run in `Asia/Tbilisi`.
 
 Reaction readiness requires a live operator event. Put any personal reaction on
 a recent original channel post, then run:
