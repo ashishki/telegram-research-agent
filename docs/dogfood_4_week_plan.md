@@ -24,6 +24,32 @@ or actions, it is not successful.
 
 ## Weekly Routine
 
+### Week 1 Command Checklist
+
+Set `WEEK=<YYYY-WNN>` for the target ISO week, then run:
+
+```bash
+bash scripts/healthcheck.sh
+PYTHONPATH=src python3 src/main.py ops-validate
+PYTHONPATH=src python3 src/main.py knowledge-extract --weeks 12 --model cheap
+PYTHONPATH=src python3 src/main.py idea-threads --weeks 12
+PYTHONPATH=src python3 src/main.py frontier-analysis --week "$WEEK" --lookback-weeks 12 --model strong
+PYTHONPATH=src python3 src/main.py mvp-weekly --no-deliver
+PYTHONPATH=src python3 src/main.py ai-split-report --week "$WEEK" --skip-refresh --threads-limit 24 --atoms-limit 8
+```
+
+Telegram smoke checks after generation:
+
+```text
+/weekly
+/actions
+/mvp
+/strategy
+```
+
+Then test feedback, voice fallback/transcription, and one live reaction sync
+before treating week-1 metrics as valid.
+
 ### Step 1 - Generate Workbook
 
 Run the normal AI Knowledge Intelligence path for the target week.
@@ -99,7 +125,9 @@ Hermes should show:
 - possible Codex tasks;
 - items that will not change anything yet.
 
-No confirmed feedback means no memory writes.
+No confirmed feedback means no confirmed feedback memory events. Pending
+feedback drafts may store the submitted text or transcript until the operator
+confirms or discards them.
 
 ### Step 7 - Strategy Reviewer
 

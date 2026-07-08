@@ -180,11 +180,21 @@ def run_bot(settings: Settings) -> None:
             chat_id = str((message.get("chat") or {}).get("id", owner_chat_id))
             text = (message.get("text") or "").strip()
             if text.startswith("/"):
-                LOGGER.info("Dispatching bot command chat_id=%s text=%s", chat_id, text.splitlines()[0][:200])
+                command_name = text.split(maxsplit=1)[0][:80]
+                LOGGER.info(
+                    "Dispatching bot command chat_id=%s command=%s text_chars=%d",
+                    chat_id,
+                    command_name,
+                    len(text),
+                )
                 dispatch_command(chat_id=chat_id, text=text, settings=settings)
                 continue
             if text:
-                LOGGER.info("Dispatching Hermes operator message chat_id=%s text=%s", chat_id, text.splitlines()[0][:200])
+                LOGGER.info(
+                    "Dispatching Hermes operator message chat_id=%s text_chars=%d",
+                    chat_id,
+                    len(text),
+                )
                 dispatch_command(chat_id=chat_id, text=f"/message {text}", settings=settings)
                 continue
 

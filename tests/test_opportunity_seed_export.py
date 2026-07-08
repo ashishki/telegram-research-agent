@@ -313,6 +313,61 @@ class TestOpportunitySeedExport(unittest.TestCase):
             self.assertEqual(market_pack["radar_gate_audit"]["status"], "no_market_context")
             self.assertFalse(market_pack["radar_gate_audit"]["build_ready_evidence"])
 
+    def test_market_context_baseline_uses_twelve_week_window_for_radar_context(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = str(Path(tmpdir) / "agent.db")
+            with patch.dict(os.environ, {"AGENT_DB_PATH": db_path}):
+                run_migrations()
+
+            import sqlite3
+
+            with sqlite3.connect(db_path) as connection:
+                record_knowledge_atom(
+                    connection,
+                    week_label="2026-W21",
+                    atom_type="case_study",
+                    claim="Browser data export app generates recurring purchases at a $40-60 price point.",
+                    summary="A narrow export utility can monetize despite a single-use workflow.",
+                    evidence_quote="$2500/month from daily recurring purchases",
+                    source_post_ids=[544],
+                    source_urls=["https://t.me/its_capitan/544"],
+                    entities=["browser export", "solo founder"],
+                    confidence=0.9,
+                    novelty_score=0.7,
+                    practical_utility_score=0.93,
+                    first_seen_at="2026-06-01T08:00:00Z",
+                    last_seen_at="2026-06-01T08:00:00Z",
+                )
+
+            settings = Settings(
+                db_path=db_path,
+                llm_api_key="",
+                model_provider="anthropic",
+                telegram_session_path="",
+            )
+            out_path = Path(tmpdir) / "seeds.json"
+            result = export_opportunity_seeds(
+                settings,
+                days=7,
+                limit=10,
+                output_path=out_path,
+                now=datetime(2026, 7, 8, tzinfo=timezone.utc),
+            )
+            seeds = json.loads(out_path.read_text(encoding="utf-8"))
+            context_seed = next(seed for seed in seeds if seed.get("source_kind") == "market_analyst_context")
+            market_pack = json.loads(Path(result.market_pack_path).read_text(encoding="utf-8"))
+
+            self.assertEqual(result.seed_count, 1)
+            self.assertEqual(market_pack["status"], "available")
+            self.assertEqual(market_pack["curated_atom_count"], 1)
+            self.assertIn("Browser data export", context_seed["text"])
+            self.assertIn("Baseline:", context_seed["text"])
+            self.assertIn("Weekly delta:", context_seed["text"])
+            self.assertEqual(context_seed["radar_role"], "context_only")
+            self.assertTrue(Path(result.market_lens_path).exists())
+            self.assertTrue(Path(result.market_baseline_path).exists())
+            self.assertTrue(Path(result.market_delta_path).exists())
+
 
 if __name__ == "__main__":
     unittest.main()

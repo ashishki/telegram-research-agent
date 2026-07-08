@@ -30,6 +30,7 @@ CATEGORY_MODEL_MAP: dict[str, str] = {
     "feedback_intake_strategist": "claude-opus-4-8",
     "preference_judge":  "claude-sonnet-4-6",
     "mvp_weekly":        "claude-opus-4-7",
+    "market_lens":       "claude-opus-4-8",
     # Fast + cheap — called many times per run
     "project_insights":  "claude-haiku-4-5",
     "topic_detection":   "claude-haiku-4-5",

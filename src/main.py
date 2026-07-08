@@ -101,6 +101,17 @@ def build_parser() -> argparse.ArgumentParser:
     seed_parser.add_argument("--limit", type=int, default=80)
     seed_parser.add_argument("--out", default=None)
     seed_parser.add_argument("--include-channel", action="append", default=[])
+    seed_parser.add_argument(
+        "--market-context-days",
+        type=int,
+        default=84,
+        help="Lookback window for the persistent market lens baseline (default: 84)",
+    )
+    seed_parser.add_argument(
+        "--force-market-baseline",
+        action="store_true",
+        help="Regenerate the persistent market lens baseline instead of reusing it",
+    )
     seed_parser.set_defaults(handler=handle_export_opportunity_seeds)
 
     live_index_parser = subparsers.add_parser(
@@ -218,6 +229,17 @@ def build_parser() -> argparse.ArgumentParser:
     mvp_weekly_parser.add_argument("--days", type=int, default=7)
     mvp_weekly_parser.add_argument("--limit", type=int, default=80)
     mvp_weekly_parser.add_argument("--include-channel", action="append", default=[])
+    mvp_weekly_parser.add_argument(
+        "--market-context-days",
+        type=int,
+        default=84,
+        help="Lookback window for the persistent market lens baseline (default: 84)",
+    )
+    mvp_weekly_parser.add_argument(
+        "--force-market-baseline",
+        action="store_true",
+        help="Regenerate the persistent market lens baseline before the weekly Radar run",
+    )
     mvp_weekly_parser.add_argument("--run-id", default=None)
     mvp_weekly_parser.add_argument("--no-deliver", action="store_true")
     mvp_weekly_parser.add_argument("--with-live-source-index", action="store_true")
@@ -795,6 +817,8 @@ def handle_export_opportunity_seeds(args: argparse.Namespace) -> int:
             limit=max(1, args.limit),
             output_path=output_path,
             include_channels=tuple(args.include_channel or ()),
+            market_context_days=max(1, args.market_context_days),
+            force_market_baseline=bool(args.force_market_baseline),
         )
         LOGGER.info(
             "Finished step=export_opportunity_seeds week=%s seeds=%d scanned=%d knowledge_threads=%d output=%s",
@@ -810,6 +834,8 @@ def handle_export_opportunity_seeds(args: argparse.Namespace) -> int:
             f"knowledge_threads={summary.knowledge_thread_count} week={summary.week_label}\n"
             f"market_pack={summary.market_pack_path or ''} "
             f"market_status={(summary.market_pain_pack or {}).get('status') or 'unknown'}\n"
+            f"market_lens={summary.market_lens_path or ''} "
+            f"market_delta={summary.market_delta_path or ''}\n"
         )
     except Exception:
         LOGGER.exception("Opportunity seed export failed")
@@ -864,6 +890,8 @@ def handle_mvp_weekly(args: argparse.Namespace) -> int:
             days=max(1, args.days),
             limit=max(1, args.limit),
             include_channels=tuple(args.include_channel or ()),
+            market_context_days=max(1, args.market_context_days),
+            force_market_baseline=bool(args.force_market_baseline),
             run_id=args.run_id,
             deliver=not args.no_deliver,
             with_live_source_index=args.with_live_source_index,
@@ -888,6 +916,7 @@ def handle_mvp_weekly(args: argparse.Namespace) -> int:
             f"live_intelligence={summary.live_intelligence_path or ''}\n"
             f"market_pack={summary.market_pack_path or ''} "
             f"market_status={(summary.market_pain_pack or {}).get('status') or 'unknown'}\n"
+            f"market_lens={summary.market_lens_path or ''}\n"
             f"telegraph={summary.telegraph_url or ''}\n"
         )
     except Exception:

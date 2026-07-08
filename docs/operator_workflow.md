@@ -116,8 +116,10 @@ manually:
 /feedback_voice Что было полезно... Что было мимо... Что применил...
 ```
 
-The confirmation rule is unchanged: the bot only drafts feedback first; memory
-changes happen after `/feedback_confirm <id>`.
+The confirmation rule is unchanged: the bot drafts feedback first; confirmed
+feedback memory events happen after `/feedback_confirm <id>`. The pending
+draft may store the submitted text or transcript until it is confirmed or
+discarded.
 Feedback interpretation uses the `feedback_intake_strategist` LLM category
 (`claude-opus-4-8` by default, override with
 `LLM_MODEL_FEEDBACK_INTAKE_STRATEGIST`) to separate proposed memory events,

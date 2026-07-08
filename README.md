@@ -63,7 +63,7 @@ It is not a public bot, SaaS product, or generic summarizer.
   - `🕒 позже`
   - `⛔ отказал`
   - `🧠 интересно`
-- AI workbook feedback intake through `/feedback`, `/feedback_voice`, `/feedback_confirm`, and `/feedback_discard`; text and voice transcripts are interpreted by an Opus-class feedback strategist with deterministic fallback, and parsed feedback is stored only after confirmation.
+- AI workbook feedback intake through `/feedback`, `/feedback_voice`, `/feedback_confirm`, and `/feedback_discard`; text and voice transcripts are interpreted by an Opus-class feedback strategist with deterministic fallback, and confirmed feedback memory is stored only after confirmation.
 - Implementation Ideas cards are compact enough to decide from Telegram without opening Telegraph for every item.
 - Source-disciplined `Implementation Ideas`: actionable `[Implement]` and `[Build]` ideas require concrete Telegram message links and otherwise render an insufficient-evidence note.
 - Operator-authored Research Brief usefulness capture into `weekly_usefulness_logs`.
@@ -118,6 +118,7 @@ python3 src/main.py memory inspect-channel-intelligence --week 2026-W22 --projec
 python3 src/main.py channel-intelligence-report --week 2026-W22 --project telegram-research-agent
 
 # AI Knowledge Intelligence loop over the last 12 weeks
+# Replace 2026-W28 with the target ISO week.
 python3 src/main.py knowledge-extract --weeks 12 --model cheap
 python3 src/main.py idea-threads --weeks 12
 python3 src/main.py frontier-analysis --week 2026-W28 --lookback-weeks 12 --model strong
@@ -142,8 +143,7 @@ On the single-user VPS, the operational baseline is:
 - `telegram-mvp-weekly.timer` runs the Radar bridge after the weekly digest.
 - `telegram-cleanup.timer` strips raw JSON and old posts after the weekly
   processing window.
-- `telegram-study-reminder-tue.timer` and
-  `telegram-study-reminder-fri.timer` send study reminders.
+- `telegram-study-reminder.timer` sends the weekly Tuesday study reminder.
 - `telegram-reminders.timer` can send one daily `Asia/Tbilisi` operator
   reminder check-in with inline `сделал` / `не сделал` buttons; it is
   intentionally disabled until the operator re-enables reminders.

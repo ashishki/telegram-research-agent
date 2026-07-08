@@ -2,6 +2,10 @@ data/agent.db
 data/agent.db-wal
 data/agent.db-shm
 data/events/
+# Generated intelligence outputs are private operational artifacts by default.
+data/output/**
+!data/output/.gitkeep
+!data/output/**/.gitkeep
 data/output/live_source_intelligence/
 data/output/weekly_messages/
 *.session

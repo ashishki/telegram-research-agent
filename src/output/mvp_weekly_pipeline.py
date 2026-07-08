@@ -10,6 +10,7 @@ from bot.callbacks import build_artifact_feedback_markup
 from bot.telegram_delivery import send_document, send_text
 from config.settings import PROJECT_ROOT, Settings
 from output.opportunity_seed_export import export_opportunity_seeds
+from output.market_context_lens import summarize_market_context_lens
 from output.market_pain_intelligence import summarize_market_pain_pack
 from output.render_report import render_report_html
 from output.weekly_messages import build_mvp_message, write_weekly_message
@@ -49,6 +50,10 @@ class MvpWeeklyPipelineResult:
     knowledge_threads: list[dict] | None = None
     market_pack_path: str | None = None
     market_pain_pack: dict | None = None
+    market_lens_path: str | None = None
+    market_baseline_path: str | None = None
+    market_delta_path: str | None = None
+    market_context_lens: dict | None = None
 
 
 def run_mvp_weekly_pipeline(
@@ -57,6 +62,8 @@ def run_mvp_weekly_pipeline(
     days: int = 7,
     limit: int = 80,
     include_channels: tuple[str, ...] = (),
+    market_context_days: int = 84,
+    force_market_baseline: bool = False,
     run_id: str | None = None,
     deliver: bool = True,
     with_live_source_index: bool = False,
@@ -69,6 +76,8 @@ def run_mvp_weekly_pipeline(
         days=days,
         limit=limit,
         include_channels=include_channels,
+        market_context_days=market_context_days,
+        force_market_baseline=force_market_baseline,
     )
     effective_run_id = run_id or f"mvp-weekly-{seed_export.week_label}"
     live_path = _prepare_live_intelligence_path(
@@ -102,6 +111,10 @@ def run_mvp_weekly_pipeline(
         knowledge_threads=seed_export.knowledge_threads or [],
         market_pack_path=seed_export.market_pack_path,
         market_pain_pack=seed_export.market_pain_pack or {},
+        market_lens_path=seed_export.market_lens_path,
+        market_baseline_path=seed_export.market_baseline_path,
+        market_delta_path=seed_export.market_delta_path,
+        market_context_lens=seed_export.market_context_lens or {},
     )
     _write_mvp_operator_message(result)
     if deliver:
@@ -261,6 +274,8 @@ def _write_mvp_operator_message(result: MvpWeeklyPipelineResult) -> str:
         notification = f"{notification}\nKnowledge Threads в seed-контексте: {labels}"
     if result.market_pain_pack is not None:
         notification = f"{notification}\n{summarize_market_pain_pack(result.market_pain_pack)}"
+    if result.market_context_lens is not None:
+        notification = f"{notification}\n{summarize_market_context_lens(result.market_context_lens)}"
     write_weekly_message(result.week_label, "mvp", notification)
     return notification
 

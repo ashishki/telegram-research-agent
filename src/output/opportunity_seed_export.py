@@ -7,7 +7,11 @@ from pathlib import Path
 
 from config.settings import PROJECT_ROOT, Settings
 from output.downstream_knowledge import MVP_KNOWLEDGE_ATOM_TYPES, load_downstream_knowledge_threads
-from output.market_pain_intelligence import build_market_pain_pack, market_pack_context_seed
+from output.market_context_lens import (
+    DEFAULT_BASELINE_DAYS,
+    build_market_context_lens,
+    market_context_lens_seed,
+)
 
 
 OUTPUT_DIR = PROJECT_ROOT / "data" / "output" / "opportunity_seeds"
@@ -173,6 +177,10 @@ class OpportunitySeedExportResult:
     knowledge_threads: list[dict] | None = None
     market_pack_path: str | None = None
     market_pain_pack: dict | None = None
+    market_lens_path: str | None = None
+    market_baseline_path: str | None = None
+    market_delta_path: str | None = None
+    market_context_lens: dict | None = None
 
 
 def export_opportunity_seeds(
@@ -183,6 +191,8 @@ def export_opportunity_seeds(
     output_path: Path | None = None,
     include_channels: tuple[str, ...] = (),
     now: datetime | None = None,
+    market_context_days: int = DEFAULT_BASELINE_DAYS,
+    force_market_baseline: bool = False,
 ) -> OpportunitySeedExportResult:
     current = now or datetime.now(timezone.utc)
     cutoff = (current - timedelta(days=max(days, 1))).isoformat().replace("+00:00", "Z")
@@ -198,8 +208,16 @@ def export_opportunity_seeds(
             min_last_seen_at=cutoff,
             limit=max(1, min(limit, 20)),
         )
-        market_pack = build_market_pain_pack(connection, cutoff=cutoff, limit=MARKET_CONTEXT_LIMIT)
         rows = _fetch_recent_posts(connection, cutoff, scan_limit=max(limit * 8, 300))
+    market_lens = build_market_context_lens(
+        settings,
+        now=current,
+        baseline_days=max(1, market_context_days),
+        delta_days=max(1, days),
+        output_root=_market_lens_output_root_for(target_path),
+        force_baseline=force_market_baseline,
+    )
+    market_pack = market_lens.baseline_pack
 
     seeds = [_seed_from_knowledge_thread(thread) for thread in knowledge_threads]
     for row in rows:
@@ -220,7 +238,7 @@ def export_opportunity_seeds(
         seeds.append(_seed_from_row(row, surfaces=surfaces, manual_tags=manual_tags))
         if len(seeds) >= limit:
             break
-    market_seed = market_pack_context_seed(market_pack)
+    market_seed = market_context_lens_seed(market_lens.current_context)
     if market_seed is not None:
         seeds.append(market_seed)
 
@@ -245,6 +263,10 @@ def export_opportunity_seeds(
         ],
         market_pack_path=str(market_pack_path),
         market_pain_pack=market_pack,
+        market_lens_path=market_lens.current_path,
+        market_baseline_path=market_lens.baseline_path,
+        market_delta_path=market_lens.delta_path,
+        market_context_lens=market_lens.current_context,
     )
 
 
@@ -579,3 +601,9 @@ def _market_pack_path_for(seed_path: Path, week_label: str) -> Path:
     if seed_path.parent == OUTPUT_DIR:
         return MARKET_PACK_DIR / f"{week_label}.json"
     return seed_path.with_name(f"{seed_path.stem}.market_pain_pack.json")
+
+
+def _market_lens_output_root_for(seed_path: Path) -> Path | None:
+    if seed_path.parent == OUTPUT_DIR:
+        return None
+    return seed_path.with_name(f"{seed_path.stem}.market_context_lens")
