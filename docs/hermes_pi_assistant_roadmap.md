@@ -175,6 +175,15 @@ Defer:
 - Rich chat curation tools until the feedback confirmation loop is stable.
 - Cross-surface UI such as Mini App style flows.
 
+Adopt later if HPI-9-lite is approved:
+
+- Reuse the retrieval/tool-loop separation from Dream Motif, but apply it only
+  to curated intelligence objects.
+- Prefer deterministic search or SQLite FTS before adding embeddings.
+- If semantic retrieval is needed, keep filters and provenance before ranking:
+  week, item type, project, thread, status, source refs, atom IDs, evidence
+  tier, and insufficient-evidence states.
+
 Reject:
 
 - Domain-specific dream interpretation logic.
@@ -602,15 +611,26 @@ Stop and ask the operator if a task:
 
 ## Next Operational Task
 
-Run HPI dogfood week 1 and collect the weekly dogfood metrics.
+Implement HPI-11 first: Hermes Telegram UX and Tbilisi timezone cleanup.
 
 Scope:
 
-- generate or locate the weekly workbook;
-- use Hermes `/weekly`, `/actions`, `/mvp`, and `/strategy`;
-- complete at least one real read/try/project/MVP reject-defer action;
-- send and confirm voice/text feedback;
-- record HPI-8 dogfood metrics and keep generated artifacts private.
+- fix Telegram MarkdownV2 escaping so plain messages do not show `\.` or
+  `1\.`;
+- use `Asia/Tbilisi` for user-facing reminder parsing, formatting, and timer
+  scheduling;
+- keep slash commands as fallback/manual controls, not the main visible UX;
+- preserve the read-only Hermes/PI boundary and all existing explicit commands;
+- update tests/docs and restart the bot/timer if runtime units change.
 
-Do not implement vector retrieval, multi-profile Hermes, external Hermes
-memory, or mutation tools before dogfood evidence justifies them.
+Recommended follow-up order:
+
+1. HPI-12 - Opus Feedback Strategist.
+2. HPI-13 - Market Business Channel Pack for MVP Radar.
+3. HPI-14 - Split HTML into Knowledge Atlas and Weekly Intelligence Brief.
+4. HPI-9-lite - Curated Semantic RAG decision/prototype using Dream Motif
+   retrieval patterns as reference.
+
+Do not run the full-year archive pass yet. Do not implement raw Telegram RAG,
+multi-profile Hermes, external Hermes memory, or mutation tools before dogfood
+evidence justifies them.

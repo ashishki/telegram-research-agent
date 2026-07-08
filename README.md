@@ -10,6 +10,13 @@ facade/tool catalog, Hermes concierge commands, action-status projection, and
 dogfood review layers are the primary direction. Current work is tracked in
 `docs/tasks.md`.
 
+Current next work: Hermes Telegram UX cleanup (`Asia/Tbilisi` reminders and no
+MarkdownV2 escape artifacts), Opus-class feedback strategy, a bounded
+market/business channel pack for MVP Radar, a split between Knowledge Atlas and
+Weekly Intelligence Brief HTML surfaces, and a curated-only semantic RAG
+decision/prototype. Raw Telegram firehose RAG and full-year archive processing
+remain deferred.
+
 Reference integration: `docs/entropy_core_gensyn_integration.md`.
 
 ## What It Is

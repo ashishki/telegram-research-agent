@@ -681,6 +681,364 @@ Stop conditions:
 
 - stop if the review is skipped and new complex features are proposed anyway.
 
+### HPI-11 - Hermes Telegram UX And Tbilisi Timezone Cleanup
+
+Status: next P0 implementation task.
+
+Goal: make Hermes feel like a normal private assistant, not a slash-command
+debug console. Fix Telegram escaping, use the operator timezone, and keep slash
+commands as manual fallbacks instead of the primary visible UX.
+
+Problem statement:
+
+- Current Telegram messages can render escaped punctuation such as
+  `1\. Открой weekly HTML Workbook\.` because `send_message(...,
+  parse_mode=None)` still MarkdownV2-escapes text.
+- Reminder scheduling is operationally correct but should be explicitly
+  operator-local: `Asia/Tbilisi`.
+- Help/onboarding should not show a wall of `/commands` to the operator.
+
+Files likely:
+
+- `src/bot/handlers.py`
+- `src/bot/telegram_delivery.py`
+- `src/bot/callbacks.py`
+- `src/output/operator_reminders.py`
+- `systemd/telegram-reminders.timer`
+- `/srv/openclaw-you/.env` for non-secret `REMINDER_TIMEZONE=Asia/Tbilisi`
+- `tests/test_handlers.py`
+- `tests/test_callbacks.py`
+- `tests/test_operator_reminders.py`
+- `README.md`
+- `docs/operator_workflow.md`
+
+Implementation notes:
+
+- Fix `send_message` so escaping is applied only when `parse_mode` is
+  `MarkdownV2`. `parse_mode=None` must send plain text without backslashes.
+- Add tests that assert rendered/help text does not contain escaped dots such
+  as `\.` or escaped list numbers such as `1\.`
+- Use `Asia/Tbilisi` for all user-facing reminder parsing/formatting.
+- Prefer a daily reminder slot expressed in Tbilisi time. If systemd
+  `Timezone=Asia/Tbilisi` verifies cleanly, use it; otherwise use a UTC
+  `OnCalendar` equivalent and document the mapping.
+- Keep slash commands available, but remove slash-heavy lists from normal
+  help/onboarding text. Say "just write or send voice" first.
+- Add confirmation buttons for feedback drafts if the callback contract already
+  supports it cleanly; otherwise leave a small follow-up note for HPI-12.
+
+Acceptance:
+
+- Telegram help and normal bot messages render without `\.` / `1\.` artifacts.
+- Daily reminders are scheduled and displayed in `Asia/Tbilisi`.
+- `/help` is compact and user-facing; slash commands are presented only as
+  fallback/manual options.
+- Existing explicit commands still work.
+- No mutation/code/config/Codex capability is added.
+
+Verification:
+
+```bash
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m unittest tests.test_handlers tests.test_callbacks tests.test_operator_reminders
+systemd-analyze verify systemd/telegram-reminders.service systemd/telegram-reminders.timer
+systemctl list-timers 'telegram-*' --all --no-pager
+```
+
+Stop conditions:
+
+- stop if the fix requires switching Telegram delivery to a new gateway;
+- stop if user-facing text becomes another long command manual.
+
+### HPI-12 - Opus Feedback Strategist
+
+Status: planned P0 after HPI-11.
+
+Goal: upgrade feedback handling from "parse and store" to "understand, propose,
+and confirm". Feedback should be interpreted by an Opus-class model with a
+dedicated system prompt because it is the main learning signal for the private
+intelligence loop.
+
+Files likely:
+
+- `src/output/ai_report_feedback_intake.py`
+- `src/assistant/pi_intent.py`
+- `src/llm/client.py`
+- optional `src/assistant/feedback_prompts.py`
+- `src/bot/handlers.py`
+- `src/bot/callbacks.py`
+- `tests/test_ai_report_feedback.py`
+- `tests/test_handlers.py`
+- `tests/test_pi_intent.py`
+- `README.md`
+- `docs/operator_workflow.md`
+
+Model routing:
+
+- Add category `feedback_intake_strategist`.
+- Default model: `claude-opus-4-8`.
+- Env override: `LLM_MODEL_FEEDBACK_INTAKE_STRATEGIST`.
+- Transcription remains OpenAI audio (`VOICE_TRANSCRIPTION_MODEL`, default
+  `whisper-1`); only interpretation/strategy uses Opus.
+
+System prompt requirements:
+
+- Treat feedback as private operator learning signal.
+- Extract what was useful, wrong-priority, too shallow, missed, tried,
+  applied-to-project, not interesting, and trust corrections.
+- Propose confirmed memory events, but do not write memory until operator
+  confirmation.
+- Propose report/workbook changes separately from memory writes.
+- Propose Codex-ready tasks only as drafts requiring manual approval.
+- Never change scoring/config/profile/projects/code directly.
+- Preserve "no reaction is not negative".
+- Return explicit uncertainty when feedback is ambiguous.
+
+Output shape should separate:
+
+- `memory_events_proposed`;
+- `report_changes_suggested`;
+- `codex_tasks_suggested`;
+- `clarifying_questions`;
+- `risk_notes`;
+- `confirmation_summary`.
+
+Acceptance:
+
+- Text and voice feedback use the Opus strategist path after transcription.
+- Operator sees a concise confirmation summary and can confirm/discard.
+- Memory writes remain confirmation-gated.
+- Strategy suggestions do not mutate code/config/profile/projects.
+- Tests prove model category routing and fallback behavior.
+
+Verification:
+
+```bash
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m unittest tests.test_ai_report_feedback tests.test_handlers tests.test_pi_intent
+```
+
+Stop conditions:
+
+- stop if feedback interpretation writes memory without confirmation;
+- stop if Opus suggestions are treated as applied Strategy Reviewer changes.
+
+### HPI-13 - Market Business Channel Pack For MVP Radar
+
+Status: planned P1.
+
+Goal: create a separate market/business intelligence input for MVP Radar from
+operators who understand AI market pain, distribution, and business models.
+This should improve Radar context and audit whether current filters are too
+strict, without running a costly full-year archive pass.
+
+Requested channels:
+
+- `https://t.me/its_capitan`
+- `https://t.me/exitsexist`
+- `https://t.me/leadgenvalley`
+- `https://t.me/cryptoEssay`
+- `https://t.me/huntermikevolkov`
+
+Files likely:
+
+- `src/config/channels.yaml`
+- `src/ingestion/bootstrap_ingest.py`
+- `src/ingestion/incremental_ingest.py`
+- `src/output/knowledge_extraction.py`
+- `src/output/opportunity_seed_export.py`
+- `src/output/mvp_weekly_pipeline.py`
+- new optional `src/output/market_pain_intelligence.py`
+- `tests/test_opportunity_seed_export.py`
+- `tests/test_mvp_weekly_pipeline.py`
+- new tests for market pain pack
+- `docs/operator_workflow.md`
+
+Implementation notes:
+
+- First inspect whether those channels already exist in `channels.yaml` and the
+  local DB.
+- If missing, add them under a distinct group such as `market_business_ai`.
+- Do a bounded backfill/lookback only, for example 90 days or a configurable
+  limit. Do not start the one-year full archive pass in this task.
+- Extract a market pain pack from these sources:
+  - repeated pains;
+  - ICP/customer type;
+  - urgency/willingness-to-pay hints;
+  - distribution/channel hints;
+  - workflow/business-model opportunities;
+  - anti-signals and hype warnings;
+  - source refs.
+- Feed the pack to MVP Radar as context, not as unconditional build evidence.
+- Add a Radar gate audit explaining why recent weeks selected/rejected
+  candidates and whether the filter is too strict.
+- MVP Radar should surface several candidate ideas when evidence exists, but
+  still mark weak candidates as investigate/reject instead of build-worthy.
+
+Acceptance:
+
+- Market channels can be ingested or reused from existing DB data.
+- Market pain pack is deterministic, cited, and bounded.
+- MVP weekly can consume the pack without treating Telegram-only evidence as
+  build-ready proof.
+- Output explains "nothing passed" weeks instead of silently looking empty.
+- Regression tests for opportunity seed export and MVP weekly still pass.
+
+Verification:
+
+```bash
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m unittest tests.test_opportunity_seed_export tests.test_mvp_weekly_pipeline
+```
+
+Stop conditions:
+
+- stop if this turns into an unbounded annual backfill;
+- stop if market commentary alone bypasses Radar evidence gates;
+- stop if private generated reports are staged.
+
+### HPI-14 - Split HTML Into Knowledge Atlas And Weekly Intelligence Brief
+
+Status: planned P1 after HPI-11/HPI-12 and in parallel with HPI-13 if scoped.
+
+Goal: stop forcing one HTML artifact to be both a global knowledge map and a
+weekly action brief. Produce two distinct reader-facing HTML surfaces.
+
+Artifact 1: Knowledge Atlas.
+
+- cumulative/global view of how the knowledge base expanded;
+- new and evolving Knowledge Atoms and Idea Threads;
+- trend timelines and momentum;
+- source/channel contribution;
+- ideas the operator has not studied yet;
+- infographic/diagram-heavy knowledge map;
+- focus-maintenance document for long-running AI/business learning.
+
+Artifact 2: Weekly Intelligence Brief.
+
+- what changed this week;
+- concise decision brief;
+- implementation/action results;
+- MVP Radar result with several candidate ideas when evidence exists;
+- explicit reject/investigate/build/focused-experiment gates;
+- read/try/watch prompts;
+- feedback prompts.
+
+Files likely:
+
+- `src/output/ai_visual_report.py`
+- `src/output/ai_intelligence_report.py`
+- new optional `src/output/knowledge_atlas_report.py`
+- new optional `src/output/weekly_intelligence_brief.py`
+- `src/output/obsidian_export.py`
+- `tests/test_ai_visual_report.py`
+- `tests/test_ai_intelligence_report.py`
+- new report contract tests
+- `README.md`
+- `docs/operator_workflow.md`
+
+Implementation notes:
+
+- Do not duplicate heavy generation if shared JSON sidecars can be reused.
+- Keep JSON sidecars stable for Hermes/PI retrieval.
+- Atlas may be cumulative/rolling; Weekly Brief should stay short and
+  operational.
+- Obsidian remains a generated navigation/audit projection, not the runtime
+  source of truth.
+
+Acceptance:
+
+- Two HTML outputs have distinct filenames, titles, JSON sidecars, and delivery
+  semantics.
+- Weekly Brief can be read quickly and does not bury the week's actions.
+- Knowledge Atlas shows trend development over time.
+- Hermes/PI retrieval can still read the relevant sidecars.
+
+Verification:
+
+```bash
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m unittest tests.test_ai_visual_report tests.test_ai_intelligence_report tests.test_intelligence_retrieval_items tests.test_pi_facade
+```
+
+Stop conditions:
+
+- stop if this becomes visual polish without improving weekly comprehension;
+- stop if the Atlas becomes an unbounded mirror of every Telegram post.
+
+### HPI-9-lite - Curated Semantic RAG Decision And Prototype
+
+Status: planned design/prototype task; do not implement raw Telegram RAG.
+
+Goal: decide whether the PI Assistant needs semantic retrieval, and if yes,
+prototype it over curated knowledge objects only.
+
+Reference implementation:
+
+- `/srv/openclaw-you/workspace/Dream_Motif_Interpreter`
+- especially:
+  - `app/retrieval/query.py`
+  - `app/assistant/chat.py`
+  - `app/assistant/facade.py`
+  - `app/assistant/tools.py`
+  - `app/assistant/prompts.py`
+
+Architecture position:
+
+- SQLite + workbook/JSON sidecars remain source of truth.
+- Obsidian is a generated human navigation/audit layer, not runtime memory.
+- Deterministic curated retrieval remains baseline.
+- Semantic RAG, if added, searches curated items only:
+  - Knowledge Atoms;
+  - Idea Threads;
+  - claim cards;
+  - workbook sections;
+  - MVP dossiers;
+  - Strategy Reviewer notes;
+  - confirmed feedback summaries.
+- Raw Telegram posts are not default assistant memory.
+
+Files likely:
+
+- `src/output/intelligence_retrieval_items.py`
+- `src/assistant/pi_facade.py`
+- `src/assistant/pi_chat.py`
+- optional `src/assistant/semantic_retrieval.py`
+- `tests/test_intelligence_retrieval_items.py`
+- `tests/test_pi_facade.py`
+- `tests/test_pi_chat.py`
+- docs update capturing the retrieval decision
+
+Implementation plan:
+
+1. Read the Dream Motif retrieval code and summarize what is reusable.
+2. Add an architecture note: deterministic search vs SQLite FTS vs vector
+   retrieval over curated objects.
+3. Prefer SQLite FTS or deterministic+FTS as the first prototype if it solves
+   the observed misses.
+4. Add vector embeddings only if FTS cannot solve real dogfood misses.
+5. Keep filters before semantic search: week, item type, project, thread,
+   status.
+6. Preserve source refs, atom IDs, evidence tier, and insufficient-evidence
+   states.
+
+Acceptance:
+
+- Decision note explains whether RAG is needed now and why.
+- Prototype, if implemented, searches curated items only.
+- No raw Telegram firehose vector index is created.
+- PI Assistant answers include provenance and can still say insufficient
+  evidence.
+- Tests cover deterministic fallback and missing index behavior.
+
+Verification:
+
+```bash
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m unittest tests.test_intelligence_retrieval_items tests.test_pi_facade tests.test_pi_chat
+```
+
+Stop conditions:
+
+- stop if the task attempts raw-post RAG by default;
+- stop if the implementation requires Postgres/pgvector as P0;
+- stop if semantic retrieval weakens provenance.
+
 ## KIR-Q: AI Intelligence Quality / Workbook / Feedback / Radar Contract
 
 Status: active planning and implementation queue.

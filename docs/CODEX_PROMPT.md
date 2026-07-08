@@ -33,6 +33,12 @@ _v3.8 · 2026-07-08 · telegram-research-agent_
   one daily check-in with `сделал` / `не сделал` buttons. Strategy Reviewer
   remains advisory. Four-week dogfood validates real convenience/usefulness
   before adding complex features.
+- Operator-requested next queue is HPI-11..HPI-14 plus HPI-9-lite: fix
+  Telegram escaping and Tbilisi timezone, make feedback interpretation an
+  Opus-class strategist, add a bounded market/business channel pack for MVP
+  Radar, split HTML into Knowledge Atlas and Weekly Intelligence Brief, and
+  decide/prototype curated semantic RAG using Dream Motif Interpreter as a
+  reference. Do not run a full-year archive pass yet.
 - Operational incident on 2026-07-06: `telegram-digest.timer` had been inactive
   since 2026-06-22, so weekly Research Brief/Implementation Ideas stopped
   running while ingest and MVP weekly continued. The timer was manually
@@ -246,27 +252,37 @@ retrieval projection, bounded PI tool catalog, Hermes Telegram concierge
 commands and bounded chat, confirmation-gated feedback, managed voice
 transcription with chat/feedback/reminder intent routing, daily operator
 reminders with done/not-done callbacks, Strategy Reviewer Telegram delivery,
-action status projection, and compact dogfood review artifact helpers. The
-exact next task is operational dogfood, not another feature:
+action status projection, and compact dogfood review artifact helpers.
+
+The exact next task is HPI-11, because the current Telegram UX has a visible
+MarkdownV2 escaping bug and the operator wants Tbilisi-local reminder behavior:
 
 ```text
-HPI Dogfood Week 1 - Run, Measure, Review
+HPI-11 - Hermes Telegram UX And Tbilisi Timezone Cleanup
 ```
 
-Do not implement new assistant capabilities by default. Run the dogfood loop:
+Implement HPI-11 first:
 
-- generate or locate the weekly AI Intelligence Workbook;
-- use Hermes plain chat plus `/weekly`, `/actions`, `/mvp`, and `/strategy`;
-- complete at least one real read/try/project/MVP reject-defer action;
-- send voice/text feedback and confirm only correct memory writes;
-- record HPI-8 dogfood metrics in a private weekly review artifact;
-- inspect whether deterministic curated search is insufficient before
-  considering HPI-9.
+- fix `send_message` so `parse_mode=None` does not escape punctuation;
+- verify help/user-facing messages do not contain `\.` or `1\.`;
+- set reminders and user-facing reminder times to `Asia/Tbilisi`;
+- keep slash commands as fallback/manual controls, not the primary onboarding
+  surface;
+- keep existing explicit commands working;
+- update docs/tests and restart the bot/timer if implementation changes
+  runtime units.
 
-Do not implement vector retrieval yet. Do not implement assistant mutation
-tools. Do not let Telegram commands edit code/config/profile/projects or write
-feedback directly. Hermes remains a concierge/router, not source of truth. PI
-Assistant must use curated retrieval, not raw Telegram firehose RAG.
+After HPI-11, recommended order is HPI-12 Opus Feedback Strategist, HPI-13
+Market Business Channel Pack for MVP Radar, HPI-14 split HTML surfaces, then
+HPI-9-lite curated semantic RAG decision/prototype. Dream Motif Interpreter has
+the retrieval reference code at `/srv/openclaw-you/workspace/Dream_Motif_Interpreter`.
+
+Do not implement raw Telegram firehose RAG. Do not run the annual/full archive
+pass yet. Do not implement assistant mutation tools. Do not let Telegram
+commands edit code/config/profile/projects or write feedback directly. Hermes
+remains a concierge/router, not source of truth. PI Assistant must use curated
+retrieval unless HPI-9-lite explicitly proves and implements a curated-only
+semantic layer.
 
 Open/future items outside completed Q0..Q13 remain:
 

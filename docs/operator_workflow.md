@@ -222,6 +222,21 @@ curated retrieval items from workbook/claim/atom/thread/action/MVP/feedback
 and Strategy Reviewer projections. It does not run raw Telegram firehose RAG,
 does not use vector search, and does not expose raw SQLite sessions.
 
+Next implementation queue before deeper dogfood:
+
+- fix Telegram escaping so plain messages do not show `\.` or `1\.`;
+- make reminders and visible times explicitly `Asia/Tbilisi`;
+- upgrade feedback interpretation to an Opus-class strategist while preserving
+  confirmation-gated memory writes;
+- add a bounded market/business channel pack for MVP Radar from
+  `its_capitan`, `exitsexist`, `leadgenvalley`, `cryptoEssay`, and
+  `huntermikevolkov`;
+- split the HTML surface into a cumulative Knowledge Atlas and a short Weekly
+  Intelligence Brief;
+- evaluate curated-only semantic RAG using Dream Motif retrieval patterns as
+  reference. Obsidian remains a generated human navigation/audit projection,
+  not runtime assistant memory.
+
 Reaction readiness requires a live operator event. Put any personal reaction on
 a recent original channel post, then run:
 
