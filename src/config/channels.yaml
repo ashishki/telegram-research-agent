@@ -23,6 +23,7 @@ channels:
     label: "Crypto Essay"
     language: "ru"
     priority: high
+    group: market_business_ai
     active: true
   - username: "@llm_under_hood"
     label: "LLM Under the Hood"
@@ -38,6 +39,7 @@ channels:
     label: "Its Capitan"
     language: "ru"
     priority: high
+    group: market_business_ai
     active: true
   - username: "@log_OS_ru"
     label: "log OS ru"
@@ -58,6 +60,7 @@ channels:
     label: "Leadgen Valley"
     language: "ru"
     priority: medium
+    group: market_business_ai
     active: true
   - username: "@Redmadnews"
     label: "Redmad News"
@@ -98,4 +101,11 @@ channels:
     label: "Exits Exist"
     language: "ru"
     priority: low
+    group: market_business_ai
+    active: true
+  - username: "@huntermikevolkov"
+    label: "Hunter Mike Volkov"
+    language: "ru"
+    priority: low
+    group: market_business_ai
     active: true

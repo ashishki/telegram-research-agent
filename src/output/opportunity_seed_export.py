@@ -7,9 +7,12 @@ from pathlib import Path
 
 from config.settings import PROJECT_ROOT, Settings
 from output.downstream_knowledge import MVP_KNOWLEDGE_ATOM_TYPES, load_downstream_knowledge_threads
+from output.market_pain_intelligence import build_market_pain_pack, market_pack_context_seed
 
 
 OUTPUT_DIR = PROJECT_ROOT / "data" / "output" / "opportunity_seeds"
+MARKET_PACK_DIR = PROJECT_ROOT / "data" / "output" / "market_pain_packs"
+MARKET_CONTEXT_LIMIT = 120
 
 SURFACE_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
     (
@@ -168,6 +171,8 @@ class OpportunitySeedExportResult:
     scanned_count: int
     knowledge_thread_count: int = 0
     knowledge_threads: list[dict] | None = None
+    market_pack_path: str | None = None
+    market_pain_pack: dict | None = None
 
 
 def export_opportunity_seeds(
@@ -193,6 +198,7 @@ def export_opportunity_seeds(
             min_last_seen_at=cutoff,
             limit=max(1, min(limit, 20)),
         )
+        market_pack = build_market_pain_pack(connection, cutoff=cutoff, limit=MARKET_CONTEXT_LIMIT)
         rows = _fetch_recent_posts(connection, cutoff, scan_limit=max(limit * 8, 300))
 
     seeds = [_seed_from_knowledge_thread(thread) for thread in knowledge_threads]
@@ -214,9 +220,15 @@ def export_opportunity_seeds(
         seeds.append(_seed_from_row(row, surfaces=surfaces, manual_tags=manual_tags))
         if len(seeds) >= limit:
             break
+    market_seed = market_pack_context_seed(market_pack)
+    if market_seed is not None:
+        seeds.append(market_seed)
 
     target_path.parent.mkdir(parents=True, exist_ok=True)
     target_path.write_text(json.dumps(seeds, ensure_ascii=False, indent=2), encoding="utf-8")
+    market_pack_path = _market_pack_path_for(target_path, week_label)
+    market_pack_path.parent.mkdir(parents=True, exist_ok=True)
+    market_pack_path.write_text(json.dumps(market_pack, ensure_ascii=False, indent=2), encoding="utf-8")
     return OpportunitySeedExportResult(
         week_label=week_label,
         output_path=str(target_path),
@@ -231,6 +243,8 @@ def export_opportunity_seeds(
             }
             for thread in knowledge_threads
         ],
+        market_pack_path=str(market_pack_path),
+        market_pain_pack=market_pack,
     )
 
 
@@ -559,3 +573,9 @@ def _truncate(text: str, limit: int) -> str:
 def _week_label(current: datetime) -> str:
     year, week, _ = current.isocalendar()
     return f"{year}-W{week:02d}"
+
+
+def _market_pack_path_for(seed_path: Path, week_label: str) -> Path:
+    if seed_path.parent == OUTPUT_DIR:
+        return MARKET_PACK_DIR / f"{week_label}.json"
+    return seed_path.with_name(f"{seed_path.stem}.market_pain_pack.json")

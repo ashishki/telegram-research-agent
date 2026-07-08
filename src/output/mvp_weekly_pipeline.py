@@ -10,6 +10,7 @@ from bot.callbacks import build_artifact_feedback_markup
 from bot.telegram_delivery import send_document, send_text
 from config.settings import PROJECT_ROOT, Settings
 from output.opportunity_seed_export import export_opportunity_seeds
+from output.market_pain_intelligence import summarize_market_pain_pack
 from output.render_report import render_report_html
 from output.weekly_messages import build_mvp_message, write_weekly_message
 
@@ -46,6 +47,8 @@ class MvpWeeklyPipelineResult:
     live_intelligence_path: str | None = None
     knowledge_thread_count: int = 0
     knowledge_threads: list[dict] | None = None
+    market_pack_path: str | None = None
+    market_pain_pack: dict | None = None
 
 
 def run_mvp_weekly_pipeline(
@@ -97,6 +100,8 @@ def run_mvp_weekly_pipeline(
         live_intelligence_path=str(live_path) if live_path is not None else None,
         knowledge_thread_count=seed_export.knowledge_thread_count,
         knowledge_threads=seed_export.knowledge_threads or [],
+        market_pack_path=seed_export.market_pack_path,
+        market_pain_pack=seed_export.market_pain_pack or {},
     )
     _write_mvp_operator_message(result)
     if deliver:
@@ -254,6 +259,8 @@ def _write_mvp_operator_message(result: MvpWeeklyPipelineResult) -> str:
             for item in (result.knowledge_threads or [])[:3]
         )
         notification = f"{notification}\nKnowledge Threads в seed-контексте: {labels}"
+    if result.market_pain_pack is not None:
+        notification = f"{notification}\n{summarize_market_pain_pack(result.market_pain_pack)}"
     write_weekly_message(result.week_label, "mvp", notification)
     return notification
 

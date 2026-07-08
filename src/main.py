@@ -795,6 +795,8 @@ def handle_export_opportunity_seeds(args: argparse.Namespace) -> int:
             f"{summary.output_path}\n"
             f"seeds={summary.seed_count} scanned={summary.scanned_count} "
             f"knowledge_threads={summary.knowledge_thread_count} week={summary.week_label}\n"
+            f"market_pack={summary.market_pack_path or ''} "
+            f"market_status={(summary.market_pain_pack or {}).get('status') or 'unknown'}\n"
         )
     except Exception:
         LOGGER.exception("Opportunity seed export failed")
@@ -871,6 +873,8 @@ def handle_mvp_weekly(args: argparse.Namespace) -> int:
             f"dossier_status={summary.dossier_status or ''} "
             f"title={summary.selected_title or ''}\n"
             f"live_intelligence={summary.live_intelligence_path or ''}\n"
+            f"market_pack={summary.market_pack_path or ''} "
+            f"market_status={(summary.market_pain_pack or {}).get('status') or 'unknown'}\n"
             f"telegraph={summary.telegraph_url or ''}\n"
         )
     except Exception:

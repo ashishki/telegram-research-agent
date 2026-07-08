@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from output.mvp_weekly_pipeline import MvpWeeklyPipelineResult, _deliver_result, _run_radar
+from output.mvp_weekly_pipeline import MvpWeeklyPipelineResult, _deliver_result, _run_radar, _write_mvp_operator_message
 
 
 class TestMvpWeeklyPipeline(unittest.TestCase):
@@ -141,6 +141,36 @@ class TestMvpWeeklyPipeline(unittest.TestCase):
         self.assertEqual(payload["status"], "selected")
         self.assertIn("--live-intelligence", command)
         self.assertIn(str(live_path), command)
+
+    def test_operator_message_explains_empty_market_pack(self):
+        result = MvpWeeklyPipelineResult(
+            week_label="2026-W28",
+            seed_path="/tmp/seeds.json",
+            seed_count=0,
+            radar_status="no_candidate",
+            report_path=None,
+            json_path=None,
+            selected_title=None,
+            dossier_status="reject",
+            recommendation="needs_more_evidence",
+            score=None,
+            market_pack_path="/tmp/market.json",
+            market_pain_pack={
+                "status": "empty",
+                "posts_scanned": 0,
+                "radar_gate_audit": {
+                    "summary": "no market/business posts found in bounded lookback",
+                    "build_ready_evidence": False,
+                },
+            },
+        )
+
+        with patch("output.mvp_weekly_pipeline.write_weekly_message") as mock_write:
+            notification = _write_mvp_operator_message(result)
+
+        self.assertIn("Market pack: empty bounded lookback", notification)
+        self.assertIn("no market/business posts found", notification)
+        mock_write.assert_called_once()
 
 
 if __name__ == "__main__":
