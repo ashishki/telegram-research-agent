@@ -150,6 +150,11 @@ Implemented:
   2026-06-22; 2026-W28 Research Brief and Implementation Ideas were regenerated
   manually. This exposed the next product direction: convert the project from a
   project/MVP-centered weekly digest into an AI Knowledge Intelligence Desk.
+- VPS dogfood baseline was configured on 2026-07-08: Hermes bot polling,
+  weekly ingest/digest/MVP/cleanup/study timers, explicit runtime paths in the
+  environment, output ownership, healthcheck, manual scoring recovery after a
+  one-time persistent-timer DB lock, and production `ops-validate` evidence
+  checks are documented for dogfood readiness.
 
 ## Active Maintenance Queue
 

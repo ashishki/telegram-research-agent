@@ -117,6 +117,50 @@ python3 src/main.py strategy-reviewer --week 2026-W28 --output-path data/output/
 python3 src/main.py ai-visual-report --week 2026-W28 --skip-refresh --deliver
 ```
 
+## Production Readiness
+
+On the single-user VPS, the operational baseline is:
+
+- `telegram-bot.service` runs Hermes command polling with restart-on-failure.
+- `telegram-ingest.timer` refreshes Telegram data, reactions, clustering, and
+  scoring weekly.
+- `telegram-digest.timer` delivers the legacy weekly brief package.
+- `telegram-mvp-weekly.timer` runs the Radar bridge after the weekly digest.
+- `telegram-cleanup.timer` strips raw JSON and old posts after the weekly
+  processing window.
+- `telegram-study-reminder-tue.timer` and
+  `telegram-study-reminder-fri.timer` send study reminders.
+
+Quick checks:
+
+```bash
+systemctl is-active telegram-bot.service telegram-ingest.timer telegram-digest.timer telegram-mvp-weekly.timer telegram-cleanup.timer
+systemctl list-timers 'telegram-*' --all --no-pager
+bash scripts/healthcheck.sh
+PYTHONPATH=src python3 src/main.py ops-validate
+```
+
+Current Hermes scope is deliberately narrow. It works as a Telegram command
+concierge through `/weekly`, `/actions`, `/explain`, `/projects`, `/mvp`,
+`/strategy`, and `/codex`; `/codex` prepares prompt text only. It is not a full
+LLM chat agent, does not run Codex, does not mutate config/code/profile/project
+files, and does not replace the workbook as the primary reading surface.
+
+Current retrieval is deterministic curated retrieval over workbook sidecars,
+claim cards, Knowledge Atoms, Idea Threads, action cards, MVP/Strategy
+Reviewer/feedback projections, and related DTOs. There is no raw Telegram
+firehose RAG, no vector DB, and no assistant access to raw SQLite sessions.
+
+Telethon reaction sync uses the configured user session to inspect original
+channel posts. Any visible personal reaction is treated as interesting; no
+reaction is unknown, not negative. Before dogfood, validate it with a live
+reaction on a recent source post, then run:
+
+```bash
+PYTHONPATH=src python3 src/main.py sync-reactions --days 14 --limit 30
+PYTHONPATH=src python3 src/main.py ops-validate
+```
+
 ## Configuration
 
 | File | Purpose |

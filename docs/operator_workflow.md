@@ -158,6 +158,47 @@ Track the weekly dogfood metrics from `docs/dogfood_4_week_plan.md`, especially
 time to understand the week, confirmed feedback count, completed real actions,
 decisions changed, value score, and friction score.
 
+### Production Readiness Checklist
+
+Before starting dogfood on the VPS, verify the running baseline:
+
+```bash
+systemctl is-active telegram-bot.service telegram-ingest.timer telegram-digest.timer telegram-mvp-weekly.timer telegram-cleanup.timer
+systemctl list-timers 'telegram-*' --all --no-pager
+bash scripts/healthcheck.sh
+PYTHONPATH=src python3 src/main.py score-stats
+PYTHONPATH=src python3 src/main.py ops-validate
+```
+
+Expected interpretation:
+
+- `telegram-bot.service` should be `active`; it powers Hermes command polling.
+- The weekly timers should be `active`; they are the production schedule.
+- `healthcheck.sh` should end with `Healthcheck OK`.
+- `ops-validate` may return `needs_live_event` until a real Telegram reaction
+  or inline callback is observed in production.
+
+Hermes readiness does not mean PI Assistant chat is live. The deployed scope is
+Telegram command concierge only: `/weekly`, `/actions`, `/explain`,
+`/projects`, `/mvp`, `/strategy`, and `/codex`. `/codex` prepares prompt text
+for manual approval and never executes Codex.
+
+RAG readiness is intentionally limited. The assistant layer reads deterministic
+curated retrieval items from workbook/claim/atom/thread/action/MVP/feedback
+and Strategy Reviewer projections. It does not run raw Telegram firehose RAG,
+does not use vector search, and does not expose raw SQLite sessions.
+
+Reaction readiness requires a live operator event. Put any personal reaction on
+a recent original channel post, then run:
+
+```bash
+PYTHONPATH=src python3 src/main.py sync-reactions --days 14 --limit 30
+PYTHONPATH=src python3 src/main.py ops-validate
+```
+
+The rule remains: any visible personal reaction means interesting; no reaction
+means unknown, not negative.
+
 ### Reader-Facing Quality Contract
 
 The weekly package should behave like a decision brief, not a raw digest.
