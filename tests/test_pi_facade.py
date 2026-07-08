@@ -200,6 +200,19 @@ class TestPersonalIntelligenceFacade(unittest.TestCase):
         self.assertEqual(result["status"], "ok")
         self.assertTrue(result["strong_signals"])
 
+    def test_get_action_statuses_keeps_missing_feedback_unknown(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_workbook(root)
+            Path(root / "agent.db").touch()
+            facade = PersonalIntelligenceFacade(settings=self._settings(root), output_root=root)
+            result = facade.get_action_statuses("2026-W28")
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["items"][0]["status"], "unknown")
+        self.assertEqual(result["counts"]["unknown"], 1)
+        self.assertEqual(result["counts"]["not_interested"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

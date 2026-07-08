@@ -176,6 +176,48 @@ class TestHandlers(unittest.TestCase):
         self.assertIn("Eval gates are becoming release infrastructure", message)
         self.assertIn("/tmp/2026-W28.visual.html", message)
 
+    def test_handle_actions_formats_status_projection(self):
+        settings = Settings(
+            db_path=":memory:",
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+        pi_result = {
+            "status": "ok",
+            "tool_name": "get_action_statuses",
+            "read_only": True,
+            "evidence_status": "insufficient",
+            "evidence": {},
+            "result": {
+                "status": "ok",
+                "week_label": "2026-W28",
+                "items": [
+                    {
+                        "action_id": "action-1",
+                        "title": "Try eval gate",
+                        "status": "unknown",
+                        "follow_up_hint": "Report tried/useful or reject.",
+                        "outcome_policy": "Do not count without feedback.",
+                    }
+                ],
+                "counts": {"unknown": 1, "wrong_priority": 0, "not_interested": 0},
+            },
+            "message": "Action statuses loaded.",
+        }
+
+        with patch.object(handlers, "_pi_tool", return_value=pi_result) as mock_pi_tool:
+            with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                with patch.object(handlers, "send_message") as mock_send_message:
+                    handlers.handle_actions(chat_id="42", args="2026-W28", settings=settings)
+
+        mock_pi_tool.assert_called_once_with(settings, "get_action_statuses", {"week_label": "2026-W28"})
+        message = mock_send_message.call_args.args[2]
+        self.assertIn("Hermes actions 2026-W28", message)
+        self.assertIn("[unknown] Try eval gate", message)
+        self.assertIn("Status counts: unknown=1", message)
+        self.assertNotIn("not_interested=0", message)
+
     def test_handle_explain_uses_curated_search_tool(self):
         settings = Settings(
             db_path=":memory:",

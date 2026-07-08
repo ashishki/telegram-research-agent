@@ -299,9 +299,9 @@ def handle_weekly(chat_id: str, args: str, settings: Settings) -> None:
 
 def handle_actions(chat_id: str, args: str, settings: Settings) -> None:
     week_label, _rest = _parse_optional_week_label_args(args)
-    tool = _pi_tool(settings, "get_weekly_summary", {"week_label": week_label})
-    summary = tool["result"]
-    if tool["status"] != "ok":
+    tool = _pi_tool(settings, "get_action_statuses", {"week_label": week_label})
+    result = tool["result"]
+    if tool["status"] == "missing":
         send_message(
             _get_bot_token(),
             chat_id,
@@ -310,24 +310,22 @@ def handle_actions(chat_id: str, args: str, settings: Settings) -> None:
         )
         return
 
-    lines = [f"Hermes actions {summary.get('week_label') or week_label or 'latest'}"]
-    shown = 0
-    for action in [item for item in summary.get("actions") or [] if isinstance(item, dict)]:
-        if shown >= 3:
-            break
-        title = action.get("title") or "Action"
-        next_step = action.get("next_step") or action.get("success_criterion") or ""
-        lines.append(f"- {title}: {_format_post_snippet(next_step, limit=180)}")
-        shown += 1
-    for action in [item for item in summary.get("project_actions") or [] if isinstance(item, dict)]:
-        if shown >= 3:
-            break
-        project = action.get("project") or "project"
-        body = action.get("action") or action.get("why") or ""
-        lines.append(f"- {project}: {_format_post_snippet(body, limit=180)}")
-        shown += 1
-    if shown == 0:
+    items = [item for item in result.get("items") or [] if isinstance(item, dict)]
+    lines = [f"Hermes actions {result.get('week_label') or week_label or 'latest'}"]
+    for action in items[:3]:
+        title = action.get("title") or action.get("action_id") or "Action"
+        status = action.get("status") or "unknown"
+        lines.append(f"- [{status}] {title}")
+        if action.get("follow_up_hint"):
+            lines.append(f"  follow-up: {_format_post_snippet(action['follow_up_hint'], limit=160)}")
+        if action.get("outcome_policy"):
+            lines.append(f"  policy: {_format_post_snippet(action['outcome_policy'], limit=160)}")
+    if not items:
         lines.append("No action cards are available in the curated workbook.")
+    if result.get("counts"):
+        counts = ", ".join(f"{key}={value}" for key, value in sorted(result["counts"].items()) if value)
+        if counts:
+            lines.append(f"Status counts: {counts}")
     send_message(_get_bot_token(), chat_id, "\n".join(lines), parse_mode=None)
 
 

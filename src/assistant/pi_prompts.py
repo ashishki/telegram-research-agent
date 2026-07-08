@@ -18,6 +18,7 @@ PI_TOOL_DESCRIPTIONS = {
     "get_current_week_label": "Return the current intelligence week label from artifacts or date fallback.",
     "get_weekly_summary": "Return the weekly workbook summary and artifact paths.",
     "get_workbook_sections": "Return workbook section DTOs for a week.",
+    "get_action_statuses": "Return workbook action statuses from confirmed feedback; missing feedback stays unknown.",
     "search_intelligence_items": "Search deterministic curated retrieval items, not raw Telegram posts.",
     "search_idea_threads": "Search curated idea threads by keyword.",
     "get_idea_thread": "Return detail for one curated idea thread.",

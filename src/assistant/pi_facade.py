@@ -9,8 +9,9 @@ from typing import Any, Iterable, Iterator, Mapping
 from urllib.parse import quote
 
 from config.settings import Settings, load_settings
-from db.ai_report_feedback import summarize_ai_report_feedback
+from db.ai_report_feedback import fetch_ai_report_feedback, summarize_ai_report_feedback
 from db.idea_threads import fetch_idea_thread_atoms, fetch_idea_threads
+from output.action_status import build_action_status_projection, summarize_action_statuses
 from output.intelligence_retrieval_items import (
     build_retrieval_items,
     find_latest_week_label,
@@ -205,6 +206,37 @@ class PersonalIntelligenceFacade:
             "week_label": _clean_text(workbook.get("week_label")) or week_label,
             "items": items,
             "message": "Project actions loaded from workbook." if items else "No project actions are available.",
+        }
+
+    def get_action_statuses(self, week_label: str | None = None) -> dict:
+        workbook = self._load_workbook(week_label)
+        if workbook is None:
+            return {
+                "status": "missing",
+                "week_label": week_label,
+                "items": [],
+                "counts": summarize_action_statuses([]),
+                "message": "Workbook JSON sidecar is missing.",
+            }
+        actual_week = _clean_text(workbook.get("week_label")) or week_label
+        events: list[dict] = []
+        with self._readonly_connection() as connection:
+            if connection is not None and _table_exists(connection, "ai_report_feedback_events"):
+                try:
+                    events = fetch_ai_report_feedback(connection, week_label=actual_week, limit=200)
+                except sqlite3.Error:
+                    events = []
+        items = build_action_status_projection(workbook, events)
+        return {
+            "status": "ok" if items else "empty",
+            "week_label": actual_week,
+            "items": items,
+            "counts": summarize_action_statuses(items),
+            "message": (
+                "Action statuses loaded; missing feedback remains unknown."
+                if items
+                else "No workbook action cards are available."
+            ),
         }
 
     def get_mvp_radar_status(self, week_label: str | None = None) -> dict:
