@@ -16,7 +16,7 @@ from config.settings import Settings
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_REMINDER_HOUR = 10
-DEFAULT_TIMEZONE = "Europe/Berlin"
+DEFAULT_TIMEZONE = "Asia/Tbilisi"
 RELATIVE_RE = re.compile(
     r"(?:через|in)\s+(\d+)\s*(минут[уы]?|мин|m|час(?:а|ов)?|ч|h|д(?:ень|ня|ней)?|дн|d)",
     re.IGNORECASE,
@@ -70,7 +70,7 @@ def parse_reminder_request(raw_text: str, *, now: datetime | None = None) -> Par
     text = " ".join(str(raw_text or "").split())
     if not text:
         raise ValueError("Reminder request is empty")
-    timezone_name = os.environ.get("REMINDER_TIMEZONE", "").strip() or DEFAULT_TIMEZONE
+    timezone_name = get_reminder_timezone_name()
     tz = _load_timezone(timezone_name)
     local_now = (now or datetime.now(timezone.utc)).astimezone(tz)
     due_local, remaining = _parse_due_time(text, local_now)
@@ -131,7 +131,7 @@ def send_daily_reminder_digest(
     limit: int = 10,
     force: bool = False,
 ) -> dict:
-    timezone_name = os.environ.get("REMINDER_TIMEZONE", "").strip() or DEFAULT_TIMEZONE
+    timezone_name = get_reminder_timezone_name()
     tz = _load_timezone(timezone_name)
     current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     local_now = current.astimezone(tz)
@@ -170,7 +170,7 @@ def send_daily_reminder_digest(
                 "message": "No pending reminders are due for today's digest.",
             }
 
-        message = format_daily_reminder_digest(due_rows, now=local_now)
+        message = format_daily_reminder_digest(due_rows, now=local_now, timezone_name=timezone_name)
         send_text(
             chat_id=chat_id,
             text=message,
@@ -196,11 +196,19 @@ def send_daily_reminder_digest(
     }
 
 
-def format_daily_reminder_digest(rows: Sequence[dict], *, now: datetime | None = None) -> str:
+def format_daily_reminder_digest(
+    rows: Sequence[dict],
+    *,
+    now: datetime | None = None,
+    timezone_name: str | None = None,
+) -> str:
+    timezone_name = _valid_timezone_name(timezone_name or get_reminder_timezone_name())
+    tz = _load_timezone(timezone_name)
     current = now or datetime.now(timezone.utc)
     if current.tzinfo is None:
         current = current.replace(tzinfo=timezone.utc)
-    date_label = current.strftime("%Y-%m-%d")
+    local_current = current.astimezone(tz)
+    date_label = f"{local_current.strftime('%Y-%m-%d')} {timezone_name}"
     lines = [
         "Hermes: дневной чек-ин",
         date_label,
@@ -210,6 +218,8 @@ def format_daily_reminder_digest(rows: Sequence[dict], *, now: datetime | None =
         reminder_type = _human_reminder_type(str(row.get("reminder_type") or "general"))
         text = " ".join(str(row.get("text") or "").split())
         lines.append(f"{index}. [{reminder_type}] {text}")
+        if row.get("due_at"):
+            lines.append(f"   Когда: {format_reminder_due_at(str(row['due_at']), timezone_name=timezone_name)}")
     lines.extend(
         [
             "",
@@ -313,10 +323,36 @@ def _local_date(value: str | None, tz: ZoneInfo) -> str | None:
     return parsed.astimezone(tz).date().isoformat()
 
 
+def get_reminder_timezone_name() -> str:
+    configured = os.environ.get("REMINDER_TIMEZONE", "").strip() or DEFAULT_TIMEZONE
+    return _valid_timezone_name(configured)
+
+
+def _valid_timezone_name(name: str | None) -> str:
+    configured = str(name or "").strip() or DEFAULT_TIMEZONE
+    try:
+        ZoneInfo(configured)
+    except (ZoneInfoNotFoundError, ValueError):
+        return DEFAULT_TIMEZONE
+    return configured
+
+
+def format_reminder_due_at(iso_value: str, *, timezone_name: str | None = None) -> str:
+    timezone_name = _valid_timezone_name(timezone_name or get_reminder_timezone_name())
+    tz = _load_timezone(timezone_name)
+    try:
+        parsed = datetime.fromisoformat(str(iso_value).replace("Z", "+00:00"))
+    except ValueError:
+        return str(iso_value)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return f"{parsed.astimezone(tz).strftime('%Y-%m-%d %H:%M')} {timezone_name}"
+
+
 def _load_timezone(name: str) -> ZoneInfo:
     try:
         return ZoneInfo(name)
-    except ZoneInfoNotFoundError:
+    except (ZoneInfoNotFoundError, ValueError):
         return ZoneInfo(DEFAULT_TIMEZONE)
 
 

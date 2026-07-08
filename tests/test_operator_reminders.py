@@ -36,11 +36,13 @@ class TestOperatorReminders(unittest.TestCase):
 
     def test_parse_reminder_request_extracts_tomorrow_task(self):
         now = datetime(2026, 7, 8, 8, 0, tzinfo=timezone.utc)
-        parsed = parse_reminder_request("напомни завтра 18:00 дать feedback по Workbook", now=now)
+        with patch.dict(os.environ, {"REMINDER_TIMEZONE": ""}, clear=False):
+            parsed = parse_reminder_request("напомни завтра 18:00 дать feedback по Workbook", now=now)
 
         self.assertEqual(parsed.text, "дать feedback по Workbook")
         self.assertEqual(parsed.reminder_type, "feedback")
-        self.assertEqual(parsed.timezone_name, "Europe/Berlin")
+        self.assertEqual(parsed.timezone_name, "Asia/Tbilisi")
+        self.assertEqual(parsed.due_at, "2026-07-09T14:00:00Z")
 
     def test_create_and_list_pending_reminders(self):
         with sqlite3.connect(self.db_path) as connection:
@@ -75,7 +77,7 @@ class TestOperatorReminders(unittest.TestCase):
         now = datetime(2026, 7, 8, 16, 30, tzinfo=timezone.utc)
         with patch.dict(
             os.environ,
-            {"TELEGRAM_BOT_TOKEN": "token", "TELEGRAM_OWNER_CHAT_ID": "42"},
+            {"TELEGRAM_BOT_TOKEN": "token", "TELEGRAM_OWNER_CHAT_ID": "42", "REMINDER_TIMEZONE": "Asia/Tbilisi"},
             clear=False,
         ), patch("output.operator_reminders.send_text", side_effect=fake_send_text):
             result = send_daily_reminder_digest(self.settings, now=now)
@@ -85,6 +87,8 @@ class TestOperatorReminders(unittest.TestCase):
         self.assertEqual(result["prompted"], 1)
         self.assertEqual(second["status"], "empty")
         self.assertIn("дневной чек-ин", captured["text"])
+        self.assertIn("2026-07-08 Asia/Tbilisi", captured["text"])
+        self.assertIn("Когда: 2026-07-08 14:00 Asia/Tbilisi", captured["text"])
         self.assertIn("дать feedback по Workbook", captured["text"])
         callbacks = [
             button["callback_data"]
@@ -116,15 +120,19 @@ class TestOperatorReminders(unittest.TestCase):
             [
                 {
                     "id": 1,
+                    "due_at": "2026-07-08T10:00:00Z",
                     "text": "посмотреть источник",
                     "reminder_type": "read_watch",
                 }
             ],
             now=datetime(2026, 7, 8, 18, 30, tzinfo=timezone.utc),
+            timezone_name="Asia/Tbilisi",
         )
 
         self.assertIn("Hermes: дневной чек-ин", text)
+        self.assertIn("2026-07-08 Asia/Tbilisi", text)
         self.assertIn("1. [read/watch] посмотреть источник", text)
+        self.assertIn("Когда: 2026-07-08 14:00 Asia/Tbilisi", text)
         self.assertIn("сделал / не сделал", text)
 
 

@@ -3,7 +3,7 @@ Description=Operator reminders - daily check-in
 Requires=telegram-reminders.service
 
 [Timer]
-OnCalendar=*-*-* 18:30:00
+OnCalendar=*-*-* 18:30:00 Asia/Tbilisi
 Persistent=true
 Unit=telegram-reminders.service
 

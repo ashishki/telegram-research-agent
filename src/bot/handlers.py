@@ -23,7 +23,13 @@ from output.ai_report_feedback_intake import (
     discard_feedback_intake,
 )
 from output.mvp_weekly_pipeline import run_mvp_weekly_pipeline, source_mix_summary
-from output.operator_reminders import cancel_reminder, create_reminder, list_pending_reminders, parse_reminder_request
+from output.operator_reminders import (
+    cancel_reminder,
+    create_reminder,
+    format_reminder_due_at,
+    list_pending_reminders,
+    parse_reminder_request,
+)
 
 
 LOGGER = logging.getLogger(__name__)
@@ -104,7 +110,8 @@ def send_message(
     parse_mode: str | None = "MarkdownV2",
     escape_markdown: bool = True,
 ) -> None:
-    message_text = _escape_markdown_v2(text) if escape_markdown else text
+    should_escape = escape_markdown and str(parse_mode or "").casefold() == "markdownv2"
+    message_text = _escape_markdown_v2(text) if should_escape else text
     try:
         _send_text_internal(chat_id=chat_id, text=message_text, token=token, parse_mode=parse_mode)
     except Exception:
@@ -211,11 +218,7 @@ def _parse_optional_week_label_args(args: str) -> tuple[str | None, str]:
 
 
 def _format_local_due_at(iso_value: str) -> str:
-    try:
-        parsed = datetime.fromisoformat(str(iso_value).replace("Z", "+00:00"))
-    except ValueError:
-        return str(iso_value)
-    return parsed.astimezone().strftime("%Y-%m-%d %H:%M")
+    return format_reminder_due_at(iso_value)
 
 
 def _extract_question_terms(question: str) -> list[str]:
@@ -256,19 +259,16 @@ def handle_start(chat_id: str, args: str, settings: Settings) -> None:
     lines = [
         "Hermes",
         "",
-        "Основной режим: просто напиши вопрос или отправь голосовое.",
+        "Просто напиши вопрос или отправь голосовое.",
         "Я сам определю: чат, фидбек или напоминание.",
         "",
         "Рабочий цикл:",
         "1. Открой weekly HTML Workbook.",
-        "2. Спроси: /weekly, /actions, /mvp или /strategy.",
+        "2. Спроси обычным текстом, что важно и что делать дальше.",
         "3. После чтения дай feedback текстом или голосом.",
-        "4. Подтверди память через /feedback_confirm <id>.",
+        "4. Подтверди память, если draft правильный.",
         "",
-        "Напоминания:",
-        "/remind завтра 18:00 дать feedback по Workbook",
-        "/reminders",
-        "/remind_cancel <id>",
+        "Ручные команды остаются запасным вариантом: /weekly, /actions, /mvp, /strategy, /remind.",
         "",
         "Границы: read-only PI tools, curated intelligence, без raw Telegram RAG, без Codex/config/code mutations.",
     ]

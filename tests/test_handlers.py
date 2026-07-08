@@ -37,6 +37,46 @@ import bot.handlers as handlers  # noqa: E402
 
 
 class TestHandlers(unittest.TestCase):
+    def test_send_message_does_not_escape_plain_text_when_parse_mode_is_none(self):
+        with patch.object(handlers, "_send_text_internal") as mock_send:
+            handlers.send_message("bot-token", "42", "1. Открой weekly HTML Workbook.", parse_mode=None)
+
+        mock_send.assert_called_once_with(
+            chat_id="42",
+            text="1. Открой weekly HTML Workbook.",
+            token="bot-token",
+            parse_mode=None,
+        )
+
+    def test_send_message_escapes_only_markdown_v2_text(self):
+        with patch.object(handlers, "_send_text_internal") as mock_send:
+            handlers.send_message("bot-token", "42", "1. Открой weekly HTML Workbook.", parse_mode="MarkdownV2")
+
+        mock_send.assert_called_once_with(
+            chat_id="42",
+            text=r"1\. Открой weekly HTML Workbook\.",
+            token="bot-token",
+            parse_mode="MarkdownV2",
+        )
+
+    def test_handle_start_is_plain_compact_and_without_escape_artifacts(self):
+        settings = Settings(
+            db_path=":memory:",
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+
+        with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+            with patch.object(handlers, "send_message") as mock_send_message:
+                handlers.handle_start(chat_id="42", args="", settings=settings)
+
+        message = mock_send_message.call_args.args[2]
+        self.assertIn("Просто напиши вопрос или отправь голосовое.", message)
+        self.assertIn("Ручные команды остаются запасным вариантом", message)
+        self.assertNotIn(r"\.", message)
+        self.assertNotIn(r"1\.", message)
+
     def test_handle_digest_sends_markdown_content_without_parse_mode(self):
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
             db_path = tmp.name
@@ -496,6 +536,7 @@ class TestHandlers(unittest.TestCase):
 
             message = mock_send_message.call_args.args[2]
             self.assertIn("Напоминание добавлено #1", message)
+            self.assertIn("Asia/Tbilisi", message)
             self.assertIn("сделал / не сделал", message)
             with sqlite3.connect(db_path) as connection:
                 connection.row_factory = sqlite3.Row
@@ -539,6 +580,7 @@ class TestHandlers(unittest.TestCase):
 
             message = mock_send_message.call_args.args[2]
             self.assertIn("Активные напоминания", message)
+            self.assertIn("Asia/Tbilisi", message)
             self.assertIn("прочитать Workbook", message)
         finally:
             os.unlink(db_path)
