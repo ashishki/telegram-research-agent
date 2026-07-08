@@ -33,7 +33,7 @@ _v3.8 · 2026-07-08 · telegram-research-agent_
   one daily check-in with `сделал` / `не сделал` buttons. Strategy Reviewer
   remains advisory. Four-week dogfood validates real convenience/usefulness
   before adding complex features.
-- HPI-11, HPI-12, and HPI-13 are implemented. Telegram plain-text messages no longer
+- HPI-11, HPI-12, HPI-13, and HPI-14 are implemented. Telegram plain-text messages no longer
   show MarkdownV2 backslash artifacts when `parse_mode=None`, `/help` starts
   with normal private-assistant guidance, reminders parse/display/run in
   `Asia/Tbilisi`, and feedback drafts use the Opus-class
@@ -41,10 +41,11 @@ _v3.8 · 2026-07-08 · telegram-research-agent_
   writes remain confirmation-gated. MVP Radar now receives a bounded
   market/business analyst context pack from curated atoms/threads as context
   only, with raw fallback for channels not yet extracted and gate audits for
-  empty or weak weeks. Operator-requested next queue is HPI-14, then HPI-9-lite:
-  split HTML into Knowledge Atlas and Weekly Intelligence Brief, then
-  decide/prototype curated semantic RAG using Dream Motif Interpreter as a
-  reference. Do not run a full-year archive pass yet.
+  empty or weak weeks. `ai-split-report` now emits separate Knowledge Atlas
+  and Weekly Intelligence Brief HTML/JSON artifacts from one curated context
+  load. Operator-requested next queue is HPI-9-lite: decide/prototype curated
+  semantic RAG using Dream Motif Interpreter as a reference. Do not run a
+  full-year archive pass yet.
 - Operational incident on 2026-07-06: `telegram-digest.timer` had been inactive
   since 2026-06-22, so weekly Research Brief/Implementation Ideas stopped
   running while ingest and MVP weekly continued. The timer was manually
@@ -260,25 +261,27 @@ transcription with chat/feedback/reminder intent routing, daily operator
 reminders with done/not-done callbacks, Strategy Reviewer Telegram delivery,
 action status projection, and compact dogfood review artifact helpers.
 
-The exact next task is HPI-14, because HPI-13 has added the bounded
-market/business analyst context pack for MVP Radar while preserving Radar
-evidence gates:
+The exact next task is HPI-9-lite, because HPI-14 has split reader-facing HTML
+into a cumulative Knowledge Atlas and a short Weekly Intelligence Brief while
+keeping sidecars readable by Hermes/PI retrieval:
 
 ```text
-HPI-14 - Split HTML Into Knowledge Atlas And Weekly Intelligence Brief
+HPI-9-lite - Curated Semantic RAG Decision And Prototype
 ```
 
-Implement HPI-14 first:
+Implement HPI-9-lite first:
 
-- split the reader-facing HTML into a cumulative Knowledge Atlas and a short
-  Weekly Intelligence Brief;
-- keep shared JSON sidecars stable for Hermes/PI retrieval;
-- keep Weekly Brief operational and fast to read;
-- keep Atlas bounded/rolling, not a raw mirror of Telegram posts;
-- preserve MVP Radar, Strategy Reviewer, feedback, and Obsidian consumers.
+- inspect Dream Motif Interpreter retrieval patterns under
+  `/srv/openclaw-you/workspace/Dream_Motif_Interpreter`;
+- decide whether PI Assistant needs semantic retrieval beyond deterministic
+  curated retrieval;
+- if yes, prototype semantic retrieval only over curated objects such as
+  workbook cards, Knowledge Atoms, Idea Threads, actions, MVP dossiers,
+  feedback summaries, and Strategy Reviewer notes;
+- do not index raw Telegram firehose posts;
+- keep all assistant tools read-only.
 
-After HPI-14, recommended order is HPI-9-lite curated semantic RAG
-decision/prototype. Dream Motif Interpreter has the retrieval reference code at
+Dream Motif Interpreter has the retrieval reference code at
 `/srv/openclaw-you/workspace/Dream_Motif_Interpreter`.
 
 Do not implement raw Telegram firehose RAG. Do not run the annual/full archive

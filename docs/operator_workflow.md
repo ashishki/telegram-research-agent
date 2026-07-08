@@ -45,6 +45,7 @@ python3 src/main.py knowledge-extract --weeks 12 --model cheap
 python3 src/main.py idea-threads --weeks 12
 python3 src/main.py frontier-analysis --week 2026-W28 --lookback-weeks 12 --model strong
 python3 src/main.py ai-visual-report --week 2026-W28 --skip-refresh --threads-limit 12 --atoms-limit 8
+python3 src/main.py ai-split-report --week 2026-W28 --skip-refresh --threads-limit 24 --atoms-limit 8
 python3 src/main.py obsidian-export --week 2026-W28
 ```
 
@@ -230,8 +231,6 @@ does not use vector search, and does not expose raw SQLite sessions.
 
 Next implementation queue before deeper dogfood:
 
-- split the HTML surface into a cumulative Knowledge Atlas and a short Weekly
-  Intelligence Brief;
 - evaluate curated-only semantic RAG using Dream Motif retrieval patterns as
   reference. Obsidian remains a generated human navigation/audit projection,
   not runtime assistant memory.
@@ -248,6 +247,10 @@ curated Knowledge Atoms and Idea Threads first, raw fallback only for channels
 not yet extracted, adds context-only analyst notes beyond the ordinary seed
 limit, and keeps Telegram-only market commentary as context rather than
 build-ready evidence.
+Implemented HPI-14 split reports: `ai-split-report` writes a cumulative
+Knowledge Atlas and a short Weekly Intelligence Brief from one curated context
+load; both have distinct HTML/JSON sidecars and remain visible to read-only
+Hermes/PI retrieval.
 
 Reaction readiness requires a live operator event. Put any personal reaction on
 a recent original channel post, then run:
@@ -378,6 +381,7 @@ python3 src/main.py frontier-analysis --week 2026-W28 --lookback-weeks 12 --mode
 
 # Generate the stakeholder-facing HTML report and optional Obsidian projection
 python3 src/main.py ai-visual-report --week 2026-W28 --skip-refresh
+python3 src/main.py ai-split-report --week 2026-W28 --skip-refresh
 python3 src/main.py ai-visual-report --week 2026-W28 --skip-refresh --deliver
 python3 src/main.py obsidian-export --week 2026-W28
 ```

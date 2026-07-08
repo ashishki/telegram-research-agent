@@ -970,7 +970,7 @@ Stop conditions:
 
 ### HPI-14 - Split HTML Into Knowledge Atlas And Weekly Intelligence Brief
 
-Status: next P1 after HPI-13.
+Status: implemented by HPI-14.
 
 Goal: stop forcing one HTML artifact to be both a global knowledge map and a
 weekly action brief. Produce two distinct reader-facing HTML surfaces.
@@ -1008,6 +1008,25 @@ Files likely:
 - `README.md`
 - `docs/operator_workflow.md`
 
+Implemented:
+
+- `src/output/knowledge_atlas_report.py` renders a cumulative/rolling
+  Knowledge Atlas with overview metrics, Idea Thread map, trend board,
+  source/concept contribution, study backlog, and bounded audit metadata.
+- `src/output/weekly_intelligence_brief.py` renders a short Weekly
+  Intelligence Brief with decision snapshot, week changes, action/read/try
+  prompts, MVP Radar status, and feedback prompts.
+- `src/output/split_intelligence_reports.py` loads curated context once and
+  writes both surfaces with distinct HTML/JSON filenames and cross-linked
+  sidecars.
+- `src/main.py ai-split-report` exposes the split generation loop with
+  `--skip-refresh`, `--threads-limit`, `--atoms-limit`, `--output-root`, and
+  optional `--mvp-radar-json`.
+- `src/output/intelligence_retrieval_items.py` can discover split sidecars and
+  project their sections/MVP status into read-only Hermes/PI retrieval items.
+- Tests verify distinct Atlas/Brief outputs, sidecar cross-links, MVP Radar
+  inclusion, short Brief action ordering, and split-sidecar retrieval.
+
 Implementation notes:
 
 - Do not duplicate heavy generation if shared JSON sidecars can be reused.
@@ -1038,7 +1057,7 @@ Stop conditions:
 
 ### HPI-9-lite - Curated Semantic RAG Decision And Prototype
 
-Status: planned design/prototype task; do not implement raw Telegram RAG.
+Status: next P1 after HPI-14; planned design/prototype task; do not implement raw Telegram RAG.
 
 Goal: decide whether the PI Assistant needs semantic retrieval, and if yes,
 prototype it over curated knowledge objects only.

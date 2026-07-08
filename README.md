@@ -10,15 +10,14 @@ facade/tool catalog, Hermes concierge commands, action-status projection, and
 dogfood review layers are the primary direction. Current work is tracked in
 `docs/tasks.md`.
 
-Current next work: split Knowledge Atlas and Weekly Intelligence Brief HTML
-surfaces, then decide/prototype curated-only semantic RAG. Hermes Telegram UX
-cleanup is implemented: plain messages do not show MarkdownV2 escape artifacts,
-reminders are scheduled/displayed in `Asia/Tbilisi`, feedback drafts use an
-Opus-class strategist while remaining confirmation-gated, and MVP Radar now has
-a bounded market/business analyst context pack from curated atoms/threads with
-raw fallback for channels not yet extracted. It stays advisory rather than
-build-ready proof. Raw Telegram firehose RAG and full-year archive processing
-remain deferred.
+Current next work: decide/prototype curated-only semantic RAG. Hermes Telegram
+UX cleanup is implemented: plain messages do not show MarkdownV2 escape
+artifacts, reminders are scheduled/displayed in `Asia/Tbilisi`, feedback drafts
+use an Opus-class strategist while remaining confirmation-gated, MVP Radar now
+has a bounded market/business analyst context pack from curated atoms/threads,
+and the reader-facing HTML can be split into Knowledge Atlas plus Weekly
+Intelligence Brief surfaces. Raw Telegram firehose RAG and full-year archive
+processing remain deferred.
 
 Reference integration: `docs/entropy_core_gensyn_integration.md`.
 
@@ -84,6 +83,7 @@ It is not a public bot, SaaS product, or generic summarizer.
 - Temporal Idea Threads via `idea-threads`: deterministic grouping of atoms into evolving AI ideas with momentum and status.
 - Frontier-model synthesis via `frontier-analysis`: top-model weekly interpretation over compressed 12-week context.
 - Stakeholder-facing Weekly AI Intelligence Workbook via `ai-visual-report`: Russian decision brief, strong signals, deep explanation cards, claim evidence cards with quote verification/evidence tiers, concept diagrams, project implementation suggestions, MVP Radar section, feedback prompts, JSON sidecar, and embedded Archify/local diagrams when available.
+- Split reader-facing HTML via `ai-split-report`: a cumulative Knowledge Atlas for trend/source/study context and a short Weekly Intelligence Brief for decision, action, MVP Radar, and feedback prompts. Both write distinct HTML/JSON sidecars and reuse the same curated context load.
 - Strategy Reviewer via `strategy-reviewer`: advisory-only keep/change/demote/test-next-week suggestions and Codex-ready tasks from confirmed workbook feedback; it does not mutate source code, prompts, thresholds, profile, or projects.
 - HPI read-only foundation: `PersonalIntelligenceFacade`, deterministic curated retrieval items, and bounded PI tools expose workbook, thread, action, MVP, feedback, marked-post, Strategy Reviewer, and action-status DTOs without raw DB sessions, vector search, or mutation methods.
 - Hermes Telegram concierge commands: `/weekly`, `/actions`, `/explain`, `/projects`, `/mvp`, `/strategy`, and `/codex` provide short operator routing; `/codex` prepares prompt text only and never executes Codex.
@@ -121,6 +121,7 @@ python3 src/main.py idea-threads --weeks 12
 python3 src/main.py frontier-analysis --week 2026-W28 --lookback-weeks 12 --model strong
 python3 src/main.py ai-intelligence-report --week 2026-W28 --skip-refresh
 python3 src/main.py ai-visual-report --week 2026-W28 --skip-refresh --threads-limit 12 --atoms-limit 8
+python3 src/main.py ai-split-report --week 2026-W28 --skip-refresh --threads-limit 24 --atoms-limit 8
 python3 src/main.py obsidian-export --week 2026-W28
 python3 src/main.py strategy-reviewer --week 2026-W28 --output-path data/output/reviews/2026-W28-strategy-review.json
 
