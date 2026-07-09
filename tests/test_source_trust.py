@@ -59,8 +59,8 @@ class TestSourceTrust(unittest.TestCase):
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
-                (1, "noisy_source", 1, 101, "2026-05-20T10:00:00Z", "noise", "{}", "2026-05-20T10:01:00Z", ""),
-                (2, "noisy_source", 1, 102, "2026-05-21T10:00:00Z", "noise", "{}", "2026-05-21T10:01:00Z", "https://t.me/noisy_source/102"),
+                (1, "noisy_source", 1, 101, "2026-07-01T10:00:00Z", "noise", "{}", "2026-07-01T10:01:00Z", ""),
+                (2, "noisy_source", 1, 102, "2026-07-02T10:00:00Z", "noise", "{}", "2026-07-02T10:01:00Z", "https://t.me/noisy_source/102"),
             ],
         )
         connection.executemany(
@@ -71,8 +71,8 @@ class TestSourceTrust(unittest.TestCase):
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
-                (1, 1, "noisy_source", "noise", "2026-05-20T10:00:00Z", "2026-05-20T10:01:00Z", "noise", 0.0),
-                (2, 2, "noisy_source", "noise", "2026-05-21T10:00:00Z", "2026-05-21T10:01:00Z", "noise", 0.0),
+                (1, 1, "noisy_source", "noise", "2026-07-01T10:00:00Z", "2026-07-01T10:01:00Z", "noise", 0.0),
+                (2, 2, "noisy_source", "noise", "2026-07-02T10:00:00Z", "2026-07-02T10:01:00Z", "noise", 0.0),
             ],
         )
         connection.execute(
@@ -80,14 +80,14 @@ class TestSourceTrust(unittest.TestCase):
             INSERT INTO user_post_tags (post_id, tag, note, recorded_at)
             VALUES (?, ?, ?, ?)
             """,
-            (1, "low_signal", "bad", "2026-05-22T10:00:00Z"),
+            (1, "low_signal", "bad", "2026-07-03T10:00:00Z"),
         )
         connection.execute(
             """
             INSERT INTO signal_feedback (post_id, feedback, recorded_at)
             VALUES (?, ?, ?)
             """,
-            (1, "skipped", "2026-05-23T10:00:00Z"),
+            (1, "skipped", "2026-07-04T10:00:00Z"),
         )
         connection.execute(
             """
@@ -103,7 +103,7 @@ class TestSourceTrust(unittest.TestCase):
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            ("noisy_source", "2026-W21", 2, 1, 1, "{}", "2026-05-24T10:00:00Z", "2026-05-24T10:00:00Z"),
+            ("noisy_source", "2026-W27", 2, 1, 1, "{}", "2026-07-05T10:00:00Z", "2026-07-05T10:00:00Z"),
         )
         connection.commit()
 

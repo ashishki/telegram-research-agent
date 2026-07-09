@@ -132,7 +132,7 @@ class TestProductOps(unittest.TestCase):
             )
             VALUES (?, ?, ?, ?, ?, ?)
             """,
-            ("telegram_reaction", "source_a", 101, "🔥", "tag:strong", "2026-05-30T10:00:00Z"),
+            ("telegram_reaction", "source_a", 101, "🔥", "tag:strong", "2026-07-08T10:00:00Z"),
         )
         connection.execute(
             """
@@ -141,7 +141,7 @@ class TestProductOps(unittest.TestCase):
             )
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            ("insight", "insight_triage_id", "7", "acted_on", "button", "telegram_button", "2026-05-30T10:00:00Z"),
+            ("insight", "insight_triage_id", "7", "acted_on", "button", "telegram_button", "2026-07-08T10:00:00Z"),
         )
         connection.commit()
 

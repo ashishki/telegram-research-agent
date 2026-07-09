@@ -7,6 +7,7 @@ import tempfile
 import types
 import unittest
 from contextlib import redirect_stdout
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -126,6 +127,7 @@ class TestLiveSourceIntelligence(unittest.TestCase):
                 days=7,
                 event_root=root,
                 output_path=output,
+                now=datetime(2026, 6, 11, tzinfo=timezone.utc),
             )
             payload = json.loads(output.read_text(encoding="utf-8"))
 
