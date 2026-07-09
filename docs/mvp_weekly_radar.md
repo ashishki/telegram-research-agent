@@ -46,6 +46,15 @@ unless the source gates clearly support a build-ready recommendation.
      candidate. This pack is planning-only and makes no live external calls.
    - RVE-2 classifies matched external evidence for the selected candidate;
      source gates count only matched decision-grade external records.
+   - RVE-3 wires Search/SERP validation through live/cache-only/dry-run source
+     modes. Missing live credentials surface as `credential_limited`, and
+     matched evidence shows the query that produced each item.
+   - RVE-4 wires Reddit/forum complaint validation through the same source
+     boundary. Cache-only/dry-run modes bypass live credentials, missing
+     credentials and provider rate limits surface in
+     `validation_adapter_status`, and matched evidence preserves query,
+     subreddit/forum, public URL, source-created date, and privacy-preserving
+     author metadata when available.
 4. Telegram Research Agent publishes the Markdown report to Telegraph.
 5. The bot sends:
    - short Telegram notification;
@@ -349,6 +358,10 @@ Gate rules:
 - Missing credentials or disabled adapters degrade to
   `credential_limited` / `adapter_disabled`; they must not break the weekly
   run.
+- Search/SERP validation can run with `cache_only: true` or `dry_run: true`
+  without live external calls; live mode remains credential-gated.
+- Reddit/forum validation can run with `cache_only: true` or `dry_run: true`
+  without live external calls; adjacent-pain complaints remain context-only.
 - The query planner is deterministic and does not call external APIs.
 
 ## Cross-Repo AI Handoff

@@ -169,14 +169,22 @@ Implemented:
 - Operator reminders are stored locally and delivered as a once-daily Telegram
   check-in with `сделал` / `не сделал` inline buttons; they do not run every 30
   minutes and do not mutate workbook/report scoring.
-- RVE-0/RVE-2 Radar validation evidence foundation: documented the shared
+- RVE-0/RVE-4 Radar validation evidence foundation: documented the shared
   validation evidence contract in both repos, added deterministic
   candidate-specific `validation_queries`, rendered a Markdown Validation Query
   Pack, added matched external evidence classification, rendered a Markdown
   Matched External Evidence section, and wired candidate source gates through
   matched decision-grade external records while unmatched results remain
-  `decision_context.external_research_context`. No live external API calls were
-  added.
+  `decision_context.external_research_context`. Search/SERP validation now runs
+  through the existing source boundary with live/cache-only/dry-run modes,
+  credential-limited fallback, persisted SERP query provenance, and query
+  display for each matched item. Reddit/forum validation now captures complaint
+  text, subreddit/forum, public URL, source-created date, privacy-preserving
+  author hash when available, score/comment metadata, and query provenance;
+  cache-only/dry-run modes bypass live credentials, missing credentials and
+  rate limits surface in `validation_adapter_status`, repeated complaints and
+  manual workarounds are classified separately, and adjacent-pain forum
+  evidence remains context-only.
 
 ## Active Maintenance Queue
 
@@ -429,7 +437,7 @@ Stop conditions:
 
 ### RVE-3 - Search Demand / SERP Adapter
 
-Status: planned after RVE-1/RVE-2.
+Status: implemented on 2026-07-09.
 
 Goal: add the first external validation adapter for search demand and SERP
 evidence. Prefer existing SERP/source config first; add `yandex-search-api`
@@ -466,7 +474,7 @@ Stop conditions:
 
 ### RVE-4 - Reddit / Forum Complaint Adapter
 
-Status: planned after the search adapter.
+Status: implemented on 2026-07-09.
 
 Goal: validate whether real users complain about the same pain in public
 forums. Prefer `reddit-skill` or Reddit API exports when available; keep the
