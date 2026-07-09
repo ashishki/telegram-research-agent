@@ -1049,11 +1049,12 @@ Purpose: make sure the system reliably runs before product changes continue.
 
 Required work:
 
-- keep `telegram-digest.timer` active;
-- add a health check that fails if current-week digest is missing after the
-  scheduled run window;
+- keep `telegram-ai-split-report.timer` active for the Monday 09:00
+  Europe/Berlin split HTML delivery window;
+- add a health check that fails if the current-week Weekly Brief or Knowledge
+  Atlas HTML output is missing after the scheduled run window;
 - add a guard against root-owned files under `data/output`;
-- log/report if digest timer is inactive;
+- log/report if the split-report timer is inactive;
 - make `llm_usage` recording non-blocking and low-contention.
 
 Acceptance:

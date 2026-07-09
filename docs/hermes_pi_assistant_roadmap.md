@@ -575,9 +575,13 @@ The VPS production baseline is configured for dogfood:
   through the same chat/feedback/reminder classifier. A transcript classified
   as feedback still requires `/feedback_confirm` before memory writes.
 - Operator reminders run as a once-daily Telegram check-in with explicit
-  `сделал` / `не сделал` buttons.
-- Weekly ingestion, digest delivery, MVP Radar delivery, cleanup, study
-  reminders, and operator reminder check-ins run through systemd timers.
+  `сделал` / `не сделал` buttons when the reminder timer is explicitly
+  enabled.
+- The current dogfood systemd schedule keeps only `telegram-bot.service` and
+  `telegram-ai-split-report.timer` active for project operation. The weekly
+  split-report service refreshes ingestion, generates both HTML reports, and
+  delivers them to Telegram on Monday at 09:00 Europe/Berlin; legacy digest,
+  MVP, cleanup, study reminder, and reminder timers are disabled.
 - `scripts/healthcheck.sh` is the primary readiness check for DB/config/output
   ownership and weekly delivery state.
 - `ops-validate` distinguishes infrastructure readiness from live feedback

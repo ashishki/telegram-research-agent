@@ -108,7 +108,9 @@ Legacy phases (Phase 1–20 in the original numbering) are preserved as implemen
 **Decision:** Ingestion, normalization, deduplication, and storage are fully deterministic. LLM is invoked only for:
 - Topic label generation (per cluster)
 - Rubric/category discovery
-- Weekly digest composition
+- Legacy weekly digest composition
+- Weekly split-report synthesis for the Weekly Intelligence Brief and Knowledge
+  Atlas
 - Study recommendation generation
 - Project insight mapping
 - Experiment idea generation
@@ -421,7 +423,8 @@ incremental_ingest.py
 └── On success: trigger generate_digest.py
 ```
 
-Triggered by: `telegram-ingest.timer` (Monday 07:00)
+Triggered by: `telegram-ai-split-report.service` before weekly split HTML
+generation, or manually through `python3 src/main.py ingest`.
 
 ---
 
@@ -445,7 +448,7 @@ Rubrics are persistent topic categories that emerge from the data over time.
 
 ---
 
-## 11. Weekly Digest Pipeline
+## 11. Legacy Weekly Digest Pipeline
 
 ```
 generate_digest.py
@@ -555,33 +558,35 @@ python3 src/main.py health-check
 | Unit | Type | Purpose |
 |---|---|---|
 | `openclaw-you.service` | Service | OpenClaw runtime on host (not used for current LLM transport) |
-| `telegram-ingest.service` | Service | Runs incremental ingestion |
-| `telegram-digest.service` | Service | Runs digest + recommendations |
+| `telegram-bot.service` | Service | Runs Hermes Telegram command polling |
+| `telegram-ai-split-report.service` | Service | Refreshes ingestion, generates Weekly Intelligence Brief and Knowledge Atlas HTML, and delivers both files to Telegram |
 
 ### Timers
 
 | Unit | Schedule | Triggers |
 |---|---|---|
-| `telegram-ingest.timer` | Monday 07:00 | `telegram-ingest.service` |
-| `telegram-digest.timer` | Monday 09:00 | `telegram-digest.service` |
+| `telegram-ai-split-report.timer` | Monday 09:00 Europe/Berlin | `telegram-ai-split-report.service` |
 
-Two-hour gap ensures ingestion completes before digest runs.
+Legacy digest, ingest, MVP, cleanup, study reminder, and reminder timers are
+disabled in the current dogfood baseline unless explicitly re-enabled.
 
 ### Log Management
 
 All services log to journald. Access via:
 
 ```bash
-journalctl -u telegram-ingest.service -f
-journalctl -u telegram-digest.service --since "1 week ago"
+journalctl -u telegram-bot.service -f
+journalctl -u telegram-ai-split-report.service --since "1 week ago"
 ```
 
 ### Output Artifacts
 
 ```
 data/output/
-├── digests/
-│   └── YYYY-WXX.md
+├── weekly_intelligence_briefs/
+│   └── YYYY-WXX.weekly-brief.html
+├── knowledge_atlas/
+│   └── YYYY-WXX.knowledge-atlas.html
 ├── recommendations/
 │   └── YYYY-WXX.md
 ├── project_insights/
@@ -689,10 +694,9 @@ See `docs/tasks.md` for the active backlog and success criteria.
 │   ├── run_bootstrap.sh
 │   └── run_weekly.sh
 ├── systemd/
-│   ├── telegram-ingest.service
-│   ├── telegram-ingest.timer
-│   ├── telegram-digest.service
-│   └── telegram-digest.timer
+│   ├── telegram-bot.service
+│   ├── telegram-ai-split-report.service
+│   └── telegram-ai-split-report.timer
 └── data/
     ├── agent.db               ← SQLite (gitignored)
     └── output/

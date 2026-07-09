@@ -1,7 +1,7 @@
 # Current Backlog
 
 **Status:** Active lightweight backlog
-**Last updated:** 2026-07-08
+**Last updated:** 2026-07-09
 
 The historical memory-unification roadmap is complete and archived at
 `docs/archive/roadmaps/tasks-v5-memory-unification.md`.
@@ -90,8 +90,9 @@ Implemented:
   Telegram ingestion, deterministic live-source snapshots, Radar context-only
   consumption, and optional `mvp-weekly --with-live-source-index` bridge
 - weekly delivery health checks in `health-check`: inactive
-  `telegram-digest.timer`, missing current-week digest after the scheduled
-  Monday window, root-owned `data/output` files, and deployed
+  `telegram-ai-split-report.timer`, missing current-week Weekly Brief /
+  Knowledge Atlas HTML files after the scheduled Monday 09:00 Europe/Berlin
+  window, root-owned `data/output` files, and deployed
   `scripts/healthcheck.sh` wiring through the Python health surface
 - non-blocking best-effort `llm_usage` recording: short SQLite busy timeout,
   autocommit insert, closed usage connection, and quiet skip under database
@@ -169,6 +170,11 @@ Implemented:
 - Operator reminders are stored locally and delivered as a once-daily Telegram
   check-in with `сделал` / `не сделал` inline buttons; they do not run every 30
   minutes and do not mutate workbook/report scoring.
+- Current dogfood production schedule is simplified to one weekly project
+  report timer: `telegram-ai-split-report.timer` runs Monday 09:00
+  Europe/Berlin, refreshes ingestion, generates both split HTML reports, and
+  delivers them to Telegram. Legacy digest/ingest/MVP/cleanup/study/reminder
+  timers are disabled unless explicitly re-enabled.
 - RVE-0/RVE-7 Radar validation evidence foundation: documented the shared
   validation evidence contract in both repos, added deterministic
   candidate-specific `validation_queries`, rendered a Markdown Validation Query
@@ -1949,7 +1955,8 @@ Implemented:
   sidecars.
 - `src/main.py ai-split-report` exposes the split generation loop with
   `--skip-refresh`, `--threads-limit`, `--atoms-limit`, `--output-root`, and
-  optional `--mvp-radar-json`.
+  optional `--mvp-radar-json`; `--deliver` sends both HTML artifacts to
+  Telegram as documents.
 - `src/output/intelligence_retrieval_items.py` can discover split sidecars and
   project their sections/MVP status into read-only Hermes/PI retrieval items.
 - Tests verify distinct Atlas/Brief outputs, sidecar cross-links, MVP Radar

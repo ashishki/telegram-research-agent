@@ -106,7 +106,7 @@ It is not a public bot, SaaS product, or generic summarizer.
 - Temporal Idea Threads via `idea-threads`: deterministic grouping of atoms into evolving AI ideas with momentum and status.
 - Frontier-model synthesis via `frontier-analysis`: top-model weekly interpretation over compressed 12-week context.
 - Stakeholder-facing Weekly AI Intelligence Workbook via `ai-visual-report`: Russian decision brief, strong signals, deep explanation cards, claim evidence cards with quote verification/evidence tiers, concept diagrams, project implementation suggestions, MVP Radar section, feedback prompts, JSON sidecar, and embedded Archify/local diagrams when available.
-- Split reader-facing HTML via `ai-split-report`: a cumulative Knowledge Atlas for trend/source/study context and a short Weekly Intelligence Brief for decision, action, MVP Radar, and feedback prompts. Both write distinct HTML/JSON sidecars and reuse the same curated context load.
+- Split reader-facing HTML via `ai-split-report`: a cumulative Knowledge Atlas for trend/source/study context and a short Weekly Intelligence Brief for decision, action, MVP Radar, and feedback prompts. Both write distinct HTML/JSON sidecars, reuse the same curated context load, and can be delivered to Telegram with `--deliver`.
 - Strategy Reviewer via `strategy-reviewer`: advisory-only keep/change/demote/test-next-week suggestions and Codex-ready tasks from confirmed workbook feedback; it does not mutate source code, prompts, thresholds, profile, or projects.
 - HPI read-only foundation: `PersonalIntelligenceFacade`, curated retrieval items, transient SQLite FTS ranking, and bounded PI tools expose workbook, thread, action, MVP, feedback, marked-post, Strategy Reviewer, and action-status DTOs without raw DB sessions, vector search, or mutation methods.
 - Hermes Telegram concierge commands: `/weekly`, `/actions`, `/explain`, `/projects`, `/mvp`, `/strategy`, and `/codex` provide short operator routing; `/codex` prepares prompt text only and never executes Codex.
@@ -151,6 +151,9 @@ python3 src/main.py strategy-reviewer --week 2026-W28 --output-path data/output/
 
 # Send the visual HTML to Telegram as a document when bot credentials are configured
 python3 src/main.py ai-visual-report --week 2026-W28 --skip-refresh --deliver
+
+# Send the two split HTML reports to Telegram as documents
+python3 src/main.py ai-split-report --week 2026-W28 --skip-refresh --deliver
 ```
 
 ## Production Readiness
@@ -158,21 +161,24 @@ python3 src/main.py ai-visual-report --week 2026-W28 --skip-refresh --deliver
 On the single-user VPS, the operational baseline is:
 
 - `telegram-bot.service` runs Hermes command polling with restart-on-failure.
-- `telegram-ingest.timer` refreshes Telegram data, reactions, clustering, and
-  scoring weekly.
-- `telegram-digest.timer` delivers the legacy weekly brief package.
-- `telegram-mvp-weekly.timer` runs the Radar bridge after the weekly digest.
-- `telegram-cleanup.timer` strips raw JSON and old posts after the weekly
-  processing window.
-- `telegram-study-reminder.timer` sends the weekly Tuesday study reminder.
-- `telegram-reminders.timer` can send one daily `Asia/Tbilisi` operator
-  reminder check-in with inline `сделал` / `не сделал` buttons; it is
-  intentionally disabled until the operator re-enables reminders.
+- `telegram-ai-split-report.timer` is the only project weekly report timer. It
+  runs every Monday at 09:00 Europe/Berlin and triggers
+  `telegram-ai-split-report.service`.
+- `telegram-ai-split-report.service` refreshes Telegram ingestion first, then
+  runs `ai-split-report --deliver --threads-limit 24 --atoms-limit 8` so the
+  Weekly Intelligence Brief and Knowledge Atlas HTML files are delivered to
+  Telegram as documents.
+- Legacy `telegram-ingest.timer`, `telegram-digest.timer`,
+  `telegram-mvp-weekly.timer`, `telegram-cleanup.timer`,
+  `telegram-study-reminder-*.timer`, `telegram-reminders.timer`, and
+  `reminder.timer` are disabled in the current dogfood baseline. Re-enable them
+  only with an explicit schedule decision.
 
 Quick checks:
 
 ```bash
-systemctl is-active telegram-bot.service telegram-ingest.timer telegram-digest.timer telegram-mvp-weekly.timer telegram-cleanup.timer telegram-reminders.timer
+systemctl is-active telegram-bot.service telegram-ai-split-report.timer
+systemctl is-enabled telegram-ai-split-report.timer
 systemctl list-timers 'telegram-*' --all --no-pager
 bash scripts/healthcheck.sh
 PYTHONPATH=src python3 src/main.py ops-validate
@@ -257,6 +263,7 @@ Start here:
 - [docs/ai_intelligence_workbook_roadmap.md](docs/ai_intelligence_workbook_roadmap.md) — completed KIR-Q0..KIR-Q13 workbook, feedback, Radar contract, Strategy Reviewer, and Obsidian projection roadmap
 - [docs/hermes_pi_assistant_roadmap.md](docs/hermes_pi_assistant_roadmap.md) — HPI roadmap for Hermes concierge, PI Assistant bounded tools, curated FTS retrieval, dogfood, and deferred vector/post-dogfood gates
 - [docs/dogfood_4_week_plan.md](docs/dogfood_4_week_plan.md) — four-week dogfood metrics, weekly checklist, success criteria, and simplification triggers
+- [docs/release_notes.md](docs/release_notes.md) — operator-facing release notes for shipped changes
 - [docs/operator_workflow.md](docs/operator_workflow.md) — weekly operating workflow
 - [docs/architecture.md](docs/architecture.md) — current system shape
 - [docs/spec.md](docs/spec.md) — implementation-facing system specification

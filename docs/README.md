@@ -15,6 +15,7 @@ This directory keeps active operator and implementation guidance at the top leve
 | `hermes_pi_assistant_roadmap.md` | Post-KIR HPI roadmap and implementation state for Hermes concierge, PI Assistant bounded tools, curated FTS retrieval, Strategy Reviewer delivery, dogfood metrics, deferred vector gate, risks, and HPI-0..HPI-10 task plan |
 | `curated_semantic_retrieval.md` | HPI-9-lite retrieval decision: deterministic+SQLite FTS over filtered curated items, vector/raw Telegram RAG deferred, Dream Motif patterns adopted/deferred |
 | `dogfood_4_week_plan.md` | Four-week dogfood protocol for measuring real usefulness, feedback, actions, decisions changed, friction, and post-dogfood product decisions |
+| `release_notes.md` | Operator-facing release notes for shipped changes and production schedule changes |
 | `report_quality_roadmap.md` | Implemented historical roadmap for reader-facing report quality, artifact feedback buttons, internal cost guardrails, and Demand-to-MVP Radar candidate dossier handoff |
 | `operator_workflow.md` | Weekly workbook workflow, operator feedback, voice/text confirmation, artifact feedback, monthly report, OPS validation, tuning, and troubleshooting |
 | `report_format.md` | Weekly artifact contracts, boundaries, and Telegram source-link requirements |

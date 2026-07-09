@@ -191,30 +191,25 @@ sudo -u oc_you bash scripts/setup.sh
 # 4. Run bootstrap ingestion (one-time)
 sudo -u oc_you bash scripts/run_bootstrap.sh
 
-# 5. Install and enable systemd timers
-sudo cp systemd/telegram-ingest.service /etc/systemd/system/
-sudo cp systemd/telegram-ingest.timer /etc/systemd/system/
-sudo cp systemd/telegram-digest.service /etc/systemd/system/
-sudo cp systemd/telegram-digest.timer /etc/systemd/system/
+# 5. Install and enable the weekly split HTML report timer
+sudo cp systemd/telegram-ai-split-report.service /etc/systemd/system/
+sudo cp systemd/telegram-ai-split-report.timer /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now telegram-ingest.timer
-sudo systemctl enable --now telegram-digest.timer
+sudo systemctl enable --now telegram-ai-split-report.timer
 ```
 
 ### Checking Service Status
 
 ```bash
-systemctl status telegram-ingest.timer
-systemctl status telegram-digest.timer
-journalctl -u telegram-ingest.service -n 50
-journalctl -u telegram-digest.service -n 50
+systemctl status telegram-ai-split-report.timer
+journalctl -u telegram-ai-split-report.service -n 80
 ```
 
 ### Checking Output
 
 ```bash
-ls -la /srv/openclaw-you/workspace/telegram-research-agent/data/output/digests/
-cat /srv/openclaw-you/workspace/telegram-research-agent/data/output/digests/$(date +%Y-W%V).md
+ls -la /srv/openclaw-you/workspace/telegram-research-agent/data/output/weekly_intelligence_briefs/
+ls -la /srv/openclaw-you/workspace/telegram-research-agent/data/output/knowledge_atlas/
 ```
 
 ### Checking the Database
@@ -269,7 +264,7 @@ sudo journalctl --vacuum-time=30d
 ### Database Corrupted
 
 SQLite WAL mode reduces corruption risk. If corruption occurs:
-1. Stop timers: `sudo systemctl stop telegram-ingest.timer telegram-digest.timer`
+1. Stop timers: `sudo systemctl stop telegram-ai-split-report.timer`
 2. Check journal for the failing operation.
 3. Run `sqlite3 data/agent.db "PRAGMA integrity_check;"`
 4. If corrupt: restore from last known good backup (manual process; backup strategy is post-MVP).

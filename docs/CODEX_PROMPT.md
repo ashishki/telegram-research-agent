@@ -95,11 +95,17 @@ _v3.9 · 2026-07-09 · telegram-research-agent_
 - Operational incident on 2026-07-06: `telegram-digest.timer` had been inactive
   since 2026-06-22, so weekly Research Brief/Implementation Ideas stopped
   running while ingest and MVP weekly continued. The timer was manually
-  restarted and 2026-W28 artifacts were regenerated. Weekly delivery health
-  checks now cover inactive timers, missing current-week reports after the
-  scheduled window, and root-owned output files. SQLite usage logging is now a
-  best-effort, short-timeout autocommit insert that quietly skips under lock
-  contention so report generation is not delayed.
+  restarted and 2026-W28 artifacts were regenerated. On 2026-07-09 the
+  production weekly schedule was simplified: legacy digest/ingest/MVP/cleanup
+  and reminder timers were disabled, and `telegram-ai-split-report.timer` now
+  runs Monday at 09:00 Europe/Berlin. Its service refreshes ingestion and then
+  runs `ai-split-report --deliver --threads-limit 24 --atoms-limit 8`, sending
+  the Weekly Intelligence Brief and Knowledge Atlas HTML files to Telegram as
+  documents. Weekly delivery health checks now cover the split-report timer,
+  missing current-week split HTML files after the scheduled window, and
+  root-owned output files. SQLite usage logging is now a best-effort,
+  short-timeout autocommit insert that quietly skips under lock contention so
+  report generation is not delayed.
 - Recent shipped changes:
   - Telegram reaction sync treats any visible personal source-post reaction as
     `operator_marked_interesting` feedback plus an `interesting` tag; aggregate
@@ -170,9 +176,10 @@ _v3.9 · 2026-07-09 · telegram-research-agent_
     signal, repeatable validation searches, and concrete manual workaround
     examples.
   - `health-check` now reports weekly delivery status for
-    `telegram-digest.timer`, current-week digest presence after the scheduled
-    Monday window, and root-owned `data/output` files; `scripts/healthcheck.sh`
-    invokes this Python health surface.
+    `telegram-ai-split-report.timer`, current-week Weekly Brief / Knowledge
+    Atlas HTML presence after the scheduled Monday 09:00 Europe/Berlin window,
+    and root-owned `data/output` files; `scripts/healthcheck.sh` invokes this
+    Python health surface.
   - `llm_usage` recording no longer waits behind SQLite write contention:
     usage writes use a 50 ms busy timeout, autocommit, explicit connection
     closing, and quiet lock skips.

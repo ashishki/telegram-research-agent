@@ -68,7 +68,7 @@ PYTHONPATH=src python3 src/main.py knowledge-extract --weeks 12 --model cheap
 PYTHONPATH=src python3 src/main.py idea-threads --weeks 12
 PYTHONPATH=src python3 src/main.py frontier-analysis --week "$WEEK" --lookback-weeks 12 --model strong
 PYTHONPATH=src python3 src/main.py mvp-weekly --no-deliver
-PYTHONPATH=src python3 src/main.py ai-split-report --week "$WEEK" --skip-refresh --threads-limit 24 --atoms-limit 8
+PYTHONPATH=src python3 src/main.py ai-split-report --week "$WEEK" --skip-refresh --threads-limit 24 --atoms-limit 8 --deliver
 ```
 
 Telegram smoke checks after generation:

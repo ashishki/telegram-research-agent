@@ -48,12 +48,14 @@ python3 src/main.py knowledge-extract --weeks 12 --model cheap
 python3 src/main.py idea-threads --weeks 12
 python3 src/main.py frontier-analysis --week 2026-W28 --lookback-weeks 12 --model strong
 python3 src/main.py ai-visual-report --week 2026-W28 --skip-refresh --threads-limit 12 --atoms-limit 8
-python3 src/main.py ai-split-report --week 2026-W28 --skip-refresh --threads-limit 24 --atoms-limit 8
+python3 src/main.py ai-split-report --week 2026-W28 --skip-refresh --threads-limit 24 --atoms-limit 8 --deliver
 python3 src/main.py obsidian-export --week 2026-W28
 ```
 
 Add `--deliver` to `ai-visual-report` to send the HTML file to the configured
-Telegram owner chat/channel. The report is allowed to show zero project leads:
+Telegram owner chat/channel. `ai-split-report --deliver` sends both split HTML
+files to the same configured Telegram owner chat/channel. The report is allowed
+to show zero project leads:
 that means the evidence was not specific enough after broad terms like `AI`,
 `workflow`, and `evidence` were filtered out. Treat this as honest uncertainty,
 not as a pipeline failure.
@@ -217,7 +219,8 @@ decisions changed, value score, and friction score.
 Before starting dogfood on the VPS, verify the running baseline:
 
 ```bash
-systemctl is-active telegram-bot.service telegram-ingest.timer telegram-digest.timer telegram-mvp-weekly.timer telegram-cleanup.timer telegram-reminders.timer
+systemctl is-active telegram-bot.service telegram-ai-split-report.timer
+systemctl is-enabled telegram-ai-split-report.timer
 systemctl list-timers 'telegram-*' --all --no-pager
 bash scripts/healthcheck.sh
 PYTHONPATH=src python3 src/main.py score-stats
@@ -227,7 +230,11 @@ PYTHONPATH=src python3 src/main.py ops-validate
 Expected interpretation:
 
 - `telegram-bot.service` should be `active`; it powers Hermes command polling.
-- The weekly timers should be `active`; they are the production schedule.
+- `telegram-ai-split-report.timer` should be `active` and `enabled`; it is the
+  production weekly report schedule and should trigger Monday at 09:00
+  Europe/Berlin.
+- Legacy digest, ingest, MVP, cleanup, study reminder, and reminder timers
+  should remain disabled unless there is an explicit schedule change.
 - `healthcheck.sh` should end with `Healthcheck OK`.
 - `ops-validate` may return `needs_live_event` until a real Telegram reaction
   or inline callback is observed in production.
@@ -265,8 +272,8 @@ limit, and keeps Telegram-only market commentary as context rather than
 build-ready evidence.
 Implemented HPI-14 split reports: `ai-split-report` writes a cumulative
 Knowledge Atlas and a short Weekly Intelligence Brief from one curated context
-load; both have distinct HTML/JSON sidecars and remain visible to read-only
-Hermes/PI retrieval.
+load; both have distinct HTML/JSON sidecars, can be delivered to Telegram with
+`--deliver`, and remain visible to read-only Hermes/PI retrieval.
 Implemented HPI-9-lite curated retrieval decision: PI search now uses
 deterministic ranking plus transient SQLite FTS over filtered curated
 `IntelligenceRetrievalItem` objects. Vector retrieval and raw Telegram RAG
@@ -403,6 +410,7 @@ python3 src/main.py frontier-analysis --week 2026-W28 --lookback-weeks 12 --mode
 python3 src/main.py ai-visual-report --week 2026-W28 --skip-refresh
 python3 src/main.py ai-split-report --week 2026-W28 --skip-refresh
 python3 src/main.py ai-visual-report --week 2026-W28 --skip-refresh --deliver
+python3 src/main.py ai-split-report --week 2026-W28 --skip-refresh --deliver
 python3 src/main.py obsidian-export --week 2026-W28
 ```
 
@@ -651,7 +659,11 @@ This lets study planning, recommendations, and project insights reason from rece
 - [ ] Run `python3 src/main.py health-check` — verify DB and config presence
 - [ ] Run bootstrap ingestion for initial data
 - [ ] Run `python3 src/main.py score-stats` — verify scoring produces expected distribution
-- [ ] Run first digest — review output quality before enabling the timer
-- [ ] Run `python3 src/main.py mvp-weekly --no-deliver` — verify Radar artifact quality before enabling `telegram-mvp-weekly.timer`
+- [ ] Run `python3 src/main.py ai-split-report --skip-refresh --deliver` once
+      manually, then review the Weekly Brief and Knowledge Atlas before
+      enabling `telegram-ai-split-report.timer`
+- [ ] Run `python3 src/main.py mvp-weekly --no-deliver` only when you need a
+      standalone Radar artifact quality check; do not enable a separate Radar
+      timer in the current dogfood schedule
 
 For the complete MVP Radar bridge contract, see `docs/mvp_weekly_radar.md`.
