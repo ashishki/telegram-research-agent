@@ -165,13 +165,13 @@ class TestHealthCheckCli(unittest.TestCase):
             with patch.dict(os.environ, {"AGENT_DB_PATH": db_path}, clear=False):
                 run_migrations()
 
-            delivery_health = types.SimpleNamespace(failure_reasons=("current_week_digest_missing",))
+            delivery_health = types.SimpleNamespace(failure_reasons=("current_week_split_report_missing",))
             with patch.dict(os.environ, {"AGENT_DB_PATH": db_path}, clear=False):
                 with patch.object(main, "build_weekly_delivery_health", return_value=delivery_health):
                     with patch.object(
                         main,
                         "format_weekly_delivery_health",
-                        return_value=["weekly_delivery_failures: current_week_digest_missing"],
+                        return_value=["weekly_delivery_failures: current_week_split_report_missing"],
                     ):
                         with patch.object(sys, "argv", ["main.py", "health-check"]):
                             with redirect_stdout(stdout):
@@ -181,7 +181,7 @@ class TestHealthCheckCli(unittest.TestCase):
 
         output = stdout.getvalue()
         self.assertEqual(exit_code, 1)
-        self.assertIn("weekly_delivery_failures: current_week_digest_missing", output)
+        self.assertIn("weekly_delivery_failures: current_week_split_report_missing", output)
 
 
 if __name__ == "__main__":

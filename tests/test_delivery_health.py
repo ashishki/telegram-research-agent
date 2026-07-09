@@ -1,4 +1,3 @@
-import sqlite3
 import subprocess
 import tempfile
 import unittest
@@ -26,107 +25,90 @@ def _systemd_unavailable_runner(*_args, **_kwargs):
     )
 
 
+def _write_split_outputs(root: Path, week_label: str = "2026-W28") -> tuple[Path, Path]:
+    weekly_dir = root / "data" / "output" / "weekly_intelligence_briefs"
+    atlas_dir = root / "data" / "output" / "knowledge_atlas"
+    weekly_dir.mkdir(parents=True)
+    atlas_dir.mkdir(parents=True)
+    weekly_path = weekly_dir / f"{week_label}.weekly-brief.html"
+    atlas_path = atlas_dir / f"{week_label}.knowledge-atlas.html"
+    weekly_path.write_text("<html>brief</html>", encoding="utf-8")
+    atlas_path.write_text("<html>atlas</html>", encoding="utf-8")
+    return weekly_path, atlas_path
+
+
 class TestWeeklyDeliveryHealth(unittest.TestCase):
-    def _connection(self, week_label: str | None = None) -> sqlite3.Connection:
-        connection = sqlite3.connect(":memory:")
-        connection.execute(
-            """
-            CREATE TABLE digests (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                week_label TEXT NOT NULL UNIQUE,
-                generated_at TEXT NOT NULL,
-                content_md TEXT NOT NULL,
-                post_count INTEGER NOT NULL DEFAULT 0
-            )
-            """
-        )
-        if week_label:
-            connection.execute(
-                "INSERT INTO digests (week_label, generated_at, content_md, post_count) VALUES (?, ?, ?, ?)",
-                (week_label, "2026-07-06T06:00:00Z", "digest", 1),
-            )
-        return connection
-
-    def test_missing_current_week_digest_after_scheduled_window_is_failure(self):
+    def test_missing_current_week_split_reports_after_scheduled_window_is_failure(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            with self._connection() as connection:
-                health = build_weekly_delivery_health(
-                    connection=connection,
-                    project_root=Path(tmpdir),
-                    now=datetime(2026, 7, 6, 8, 0, tzinfo=timezone.utc),
-                    timer_runner=_active_timer_runner,
-                )
+            health = build_weekly_delivery_health(
+                project_root=Path(tmpdir),
+                now=datetime(2026, 7, 6, 10, 0, tzinfo=timezone.utc),
+                timer_runner=_active_timer_runner,
+            )
 
         rendered = "\n".join(format_weekly_delivery_health(health, relative_to=Path(tmpdir)))
-        self.assertIn("current_week_digest_missing", health.failure_reasons)
-        self.assertIn("WARNING: current-week digest missing after scheduled window week=2026-W28", rendered)
+        self.assertIn("current_week_split_report_missing", health.failure_reasons)
+        self.assertIn("WARNING: current-week split HTML reports missing after scheduled window week=2026-W28", rendered)
 
-    def test_missing_current_week_digest_before_scheduled_window_is_not_failure(self):
+    def test_missing_current_week_split_reports_before_scheduled_window_is_not_failure(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            with self._connection() as connection:
-                health = build_weekly_delivery_health(
-                    connection=connection,
-                    project_root=Path(tmpdir),
-                    now=datetime(2026, 7, 6, 6, 0, tzinfo=timezone.utc),
-                    timer_runner=_active_timer_runner,
-                )
+            health = build_weekly_delivery_health(
+                project_root=Path(tmpdir),
+                now=datetime(2026, 7, 6, 8, 0, tzinfo=timezone.utc),
+                timer_runner=_active_timer_runner,
+            )
 
-        self.assertFalse(health.digest_due)
-        self.assertNotIn("current_week_digest_missing", health.failure_reasons)
+        self.assertFalse(health.report_due)
+        self.assertNotIn("current_week_split_report_missing", health.failure_reasons)
 
-    def test_inactive_digest_timer_is_failure(self):
+    def test_inactive_weekly_report_timer_is_failure(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            with self._connection("2026-W28") as connection:
-                health = build_weekly_delivery_health(
-                    connection=connection,
-                    project_root=Path(tmpdir),
-                    now=datetime(2026, 7, 6, 8, 0, tzinfo=timezone.utc),
-                    timer_runner=_inactive_timer_runner,
-                )
+            root = Path(tmpdir)
+            _write_split_outputs(root)
+            health = build_weekly_delivery_health(
+                project_root=root,
+                now=datetime(2026, 7, 6, 10, 0, tzinfo=timezone.utc),
+                timer_runner=_inactive_timer_runner,
+            )
 
         rendered = "\n".join(format_weekly_delivery_health(health, relative_to=Path(tmpdir)))
-        self.assertIn("digest_timer_inactive", health.failure_reasons)
-        self.assertIn("weekly_delivery_timer: timer=telegram-digest.timer state=inactive checked=yes", rendered)
-        self.assertIn("WARNING: telegram-digest.timer is inactive", rendered)
+        self.assertIn("weekly_report_timer_inactive", health.failure_reasons)
+        self.assertIn("weekly_delivery_timer: timer=telegram-ai-split-report.timer state=inactive checked=yes", rendered)
+        self.assertIn("WARNING: telegram-ai-split-report.timer is inactive", rendered)
 
     def test_systemd_unavailable_is_reported_without_failure(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            with self._connection("2026-W28") as connection:
-                health = build_weekly_delivery_health(
-                    connection=connection,
-                    project_root=Path(tmpdir),
-                    now=datetime(2026, 7, 6, 8, 0, tzinfo=timezone.utc),
-                    timer_runner=_systemd_unavailable_runner,
-                )
+            root = Path(tmpdir)
+            _write_split_outputs(root)
+            health = build_weekly_delivery_health(
+                project_root=root,
+                now=datetime(2026, 7, 6, 10, 0, tzinfo=timezone.utc),
+                timer_runner=_systemd_unavailable_runner,
+            )
 
         rendered = "\n".join(format_weekly_delivery_health(health, relative_to=Path(tmpdir)))
-        self.assertNotIn("digest_timer_inactive", health.failure_reasons)
-        self.assertIn("weekly_delivery_timer: timer=telegram-digest.timer state=unavailable checked=no", rendered)
+        self.assertNotIn("weekly_report_timer_inactive", health.failure_reasons)
+        self.assertIn("weekly_delivery_timer: timer=telegram-ai-split-report.timer state=unavailable checked=no", rendered)
 
     def test_root_owned_output_files_are_reported(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
-            digest_dir = root / "data" / "output" / "digests"
-            digest_dir.mkdir(parents=True)
-            owned_file = digest_dir / "2026-W28.md"
-            owned_file.write_text("digest", encoding="utf-8")
+            owned_file, _atlas_file = _write_split_outputs(root)
 
             def fake_uid(path: Path) -> int:
                 return 0 if path == owned_file else 998
 
-            with self._connection("2026-W28") as connection:
-                with patch("output.delivery_health._path_uid", side_effect=fake_uid):
-                    health = build_weekly_delivery_health(
-                        connection=connection,
-                        project_root=root,
-                        now=datetime(2026, 7, 6, 8, 0, tzinfo=timezone.utc),
-                        timer_runner=_active_timer_runner,
-                    )
+            with patch("output.delivery_health._path_uid", side_effect=fake_uid):
+                health = build_weekly_delivery_health(
+                    project_root=root,
+                    now=datetime(2026, 7, 6, 8, 0, tzinfo=timezone.utc),
+                    timer_runner=_active_timer_runner,
+                )
 
         rendered = "\n".join(format_weekly_delivery_health(health, relative_to=root))
         self.assertIn("root_owned_output_paths", health.failure_reasons)
         self.assertIn("root_owned_output_paths: count=1", rendered)
-        self.assertIn("data/output/digests/2026-W28.md", rendered)
+        self.assertIn("data/output/weekly_intelligence_briefs/2026-W28.weekly-brief.html", rendered)
 
 
 if __name__ == "__main__":
