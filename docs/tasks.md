@@ -169,7 +169,7 @@ Implemented:
 - Operator reminders are stored locally and delivered as a once-daily Telegram
   check-in with `сделал` / `не сделал` inline buttons; they do not run every 30
   minutes and do not mutate workbook/report scoring.
-- RVE-0/RVE-5 Radar validation evidence foundation: documented the shared
+- RVE-0/RVE-6 Radar validation evidence foundation: documented the shared
   validation evidence contract in both repos, added deterministic
   candidate-specific `validation_queries`, rendered a Markdown Validation Query
   Pack, added matched external evidence classification, rendered a Markdown
@@ -189,7 +189,11 @@ Implemented:
   pricing hint, target ICP, page kind, and query provenance; live crawling is
   limited by explicit URLs/domains/page counts, competitor/integration pages
   support gates only when tied to the same candidate and ICP, and irrelevant or
-  hype-only pages remain visible as negative evidence.
+  hype-only pages remain visible as negative evidence. X/Twitter corroboration
+  is disabled by default, cache-first/dry-run capable, surfaces missing
+  credentials and rate limits, hashes author IDs, classifies trend chatter as
+  negative evidence, and renders matched X evidence as lower-confidence
+  non-gating corroboration.
 
 ## Active Maintenance Queue
 
@@ -550,7 +554,7 @@ Stop conditions:
 
 ### RVE-6 - X/Twitter Corroboration Adapter
 
-Status: planned P2, only after lower-noise adapters work.
+Status: implemented on 2026-07-09.
 
 Goal: use `x-research` / xAI/Grok-backed X research only as corroborating
 discussion evidence for a candidate, not as primary build proof.

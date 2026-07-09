@@ -60,6 +60,10 @@ unless the source gates clearly support a build-ready recommendation.
      explicit URLs/domains/page counts, and matched evidence preserves page
      kind, positioning, pricing hint, target ICP, landing URL, and query
      provenance.
+   - RVE-6 wires X/Twitter corroboration as source type `x`. It is disabled by
+     default, cache-first/dry-run capable, surfaces missing credentials and
+     rate limits, hashes author IDs, and renders matched X evidence as
+     lower-confidence non-gating corroboration.
 4. Telegram Research Agent publishes the Markdown report to Telegraph.
 5. The bot sends:
    - short Telegram notification;
@@ -371,6 +375,9 @@ Gate rules:
   `dry_run: true`; live mode is bounded by explicit URLs, allowed domains, and
   page limits. Competitor/integration pages support gates only when tied to the
   same candidate and target ICP; irrelevant pages remain negative evidence.
+- X/Twitter validation can run with `cache_only: true` or `dry_run: true`;
+  matched X evidence is lower-confidence corroboration and does not satisfy
+  gates by itself. Trend chatter remains negative evidence.
 - The query planner is deterministic and does not call external APIs.
 
 ## Cross-Repo AI Handoff
