@@ -60,7 +60,7 @@ _v3.9 · 2026-07-09 · telegram-research-agent_
   adapter status, and missing-evidence categories before any build/focused
   recommendation can strengthen. It is validation evidence, not broad idea
   generation.
-- RVE-0/RVE-4 are implemented. Demand-to-MVP Radar now documents the shared
+- RVE-0/RVE-5 are implemented. Demand-to-MVP Radar now documents the shared
   validation evidence contract, emits deterministic candidate-specific
   `validation_queries`, renders a Markdown Validation Query Pack, and writes
   JSON contract slots for `matched_external_evidence`,
@@ -77,7 +77,13 @@ _v3.9 · 2026-07-09 · telegram-research-agent_
   query provenance; cache-only/dry-run modes bypass live credentials, missing
   credentials and rate limits surface in `validation_adapter_status`, repeated
   complaints and manual workaround mentions are classified separately, and
-  adjacent-pain forum evidence remains context-only.
+  adjacent-pain forum evidence remains context-only. Competitor/workaround
+  crawler validation captures bounded landing/workaround pages with URL, title,
+  positioning, pricing hint, target ICP, page kind, and query provenance; live
+  crawling is limited by explicit URLs/domains/page counts,
+  competitor/integration pages support gates only when tied to the same
+  candidate and ICP, and irrelevant or hype-only pages remain visible as
+  negative evidence.
 - Operational incident on 2026-07-06: `telegram-digest.timer` had been inactive
   since 2026-06-22, so weekly Research Brief/Implementation Ideas stopped
   running while ingest and MVP weekly continued. The timer was manually
@@ -321,14 +327,14 @@ RVE: Radar Validation Evidence Layer
 Do this next:
 
 - start from `docs/tasks.md`, section `RVE: Radar Validation Evidence Layer`;
-- RVE-0/RVE-4 are complete; start with RVE-5 next in
+- RVE-0/RVE-5 are complete; start with RVE-6 next in
   `/srv/openclaw-you/workspace/Demand-to-MVP-Radar`;
-- add the bounded competitor/workaround crawler adapter behind RVE boundaries;
+- add the disabled-by-default X/Twitter corroboration adapter behind RVE
+  boundaries;
 - keep market/business lens records `context_only`;
 - keep external results unable to affect gates unless matched to the selected
   candidate;
-- after RVE-4, add adapters in this order: competitor/workaround crawler,
-  X/Twitter corroboration last;
+- after RVE-5, add X/Twitter corroboration last;
 - keep every external adapter cache-first, dry-run capable, credentials-gated,
   and failure-tolerant via `credential_limited` / `adapter_disabled` status.
 

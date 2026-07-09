@@ -55,6 +55,11 @@ unless the source gates clearly support a build-ready recommendation.
      `validation_adapter_status`, and matched evidence preserves query,
      subreddit/forum, public URL, source-created date, and privacy-preserving
      author metadata when available.
+   - RVE-5 wires competitor/workaround crawler validation as `crawl4ai`.
+     Cache-only/dry-run modes avoid live page fetches, live mode is bounded by
+     explicit URLs/domains/page counts, and matched evidence preserves page
+     kind, positioning, pricing hint, target ICP, landing URL, and query
+     provenance.
 4. Telegram Research Agent publishes the Markdown report to Telegraph.
 5. The bot sends:
    - short Telegram notification;
@@ -362,6 +367,10 @@ Gate rules:
   without live external calls; live mode remains credential-gated.
 - Reddit/forum validation can run with `cache_only: true` or `dry_run: true`
   without live external calls; adjacent-pain complaints remain context-only.
+- Competitor/workaround crawler validation can run with `cache_only: true` or
+  `dry_run: true`; live mode is bounded by explicit URLs, allowed domains, and
+  page limits. Competitor/integration pages support gates only when tied to the
+  same candidate and target ICP; irrelevant pages remain negative evidence.
 - The query planner is deterministic and does not call external APIs.
 
 ## Cross-Repo AI Handoff

@@ -169,7 +169,7 @@ Implemented:
 - Operator reminders are stored locally and delivered as a once-daily Telegram
   check-in with `сделал` / `не сделал` inline buttons; they do not run every 30
   minutes and do not mutate workbook/report scoring.
-- RVE-0/RVE-4 Radar validation evidence foundation: documented the shared
+- RVE-0/RVE-5 Radar validation evidence foundation: documented the shared
   validation evidence contract in both repos, added deterministic
   candidate-specific `validation_queries`, rendered a Markdown Validation Query
   Pack, added matched external evidence classification, rendered a Markdown
@@ -184,7 +184,12 @@ Implemented:
   cache-only/dry-run modes bypass live credentials, missing credentials and
   rate limits surface in `validation_adapter_status`, repeated complaints and
   manual workarounds are classified separately, and adjacent-pain forum
-  evidence remains context-only.
+  evidence remains context-only. Competitor/workaround crawler validation now
+  captures bounded landing/workaround pages with URL, title, positioning,
+  pricing hint, target ICP, page kind, and query provenance; live crawling is
+  limited by explicit URLs/domains/page counts, competitor/integration pages
+  support gates only when tied to the same candidate and ICP, and irrelevant or
+  hype-only pages remain visible as negative evidence.
 
 ## Active Maintenance Queue
 
@@ -510,7 +515,7 @@ Stop conditions:
 
 ### RVE-5 - Competitor / Workaround Crawler Adapter
 
-Status: planned after RVE-3/RVE-4.
+Status: implemented on 2026-07-09.
 
 Goal: use `crawl4ai-seo` or an equivalent crawler boundary to inspect
 competitor pages, alternatives, pricing pages, and public workaround guides
