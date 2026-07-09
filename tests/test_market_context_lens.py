@@ -15,7 +15,13 @@ class FakeMarketLensClient:
     calls: list[str] = []
 
     @staticmethod
-    def complete_json(prompt: str, system: str = "", category: str = "unknown", model: str | None = None):
+    def complete_json(
+        prompt: str,
+        system: str = "",
+        category: str = "unknown",
+        model: str | None = None,
+        max_tokens: int = 2048,
+    ):
         FakeMarketLensClient.calls.append(prompt)
         if "Update the persistent market lens" in prompt:
             return {

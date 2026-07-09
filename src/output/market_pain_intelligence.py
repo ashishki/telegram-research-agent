@@ -164,7 +164,7 @@ def build_market_pain_pack(
         "posts_scanned": len(raw_posts),
         "source_refs": _source_refs(atoms=atoms, raw_posts=raw_posts, limit=18),
         "market_threads": threads[:12],
-        "curated_atoms": [_public_atom(atom) for atom in atoms[:24]],
+        "curated_atoms": [_public_atom(atom) for atom in atoms[:120]],
         "raw_fallback_observations": [_raw_observation(post, "raw_fallback") for post in raw_posts[:12]],
         "analyst_context": analyst_context,
         # Compatibility fields for existing operator summaries/tests.

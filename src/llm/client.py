@@ -301,9 +301,16 @@ def complete_json(
     system: str = "",
     category: str = "unknown",
     model: str | None = None,
+    max_tokens: int = 2048,
 ) -> dict[str, Any] | list[Any]:
     response_text = _strip_code_fence(
-        complete(prompt=prompt, system=system, max_tokens=2048, category=category, model=model)
+        complete(
+            prompt=prompt,
+            system=system,
+            max_tokens=max_tokens,
+            category=category,
+            model=model,
+        )
     )
     try:
         data = json.loads(response_text)
@@ -333,8 +340,15 @@ class LLMClient:
         system: str = "",
         category: str = "unknown",
         model: str | None = None,
+        max_tokens: int = 2048,
     ) -> dict[str, Any] | list[Any]:
-        return complete_json(prompt=prompt, system=system, category=category, model=model)
+        return complete_json(
+            prompt=prompt,
+            system=system,
+            category=category,
+            model=model,
+            max_tokens=max_tokens,
+        )
 
     @staticmethod
     def complete_vision(prompt: str, image_path: str, model: str | None = None) -> str:

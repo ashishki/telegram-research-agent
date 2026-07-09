@@ -21,6 +21,8 @@ OUTPUT_DIR = PROJECT_ROOT / "data" / "output" / "market_context_lens"
 DEFAULT_BASELINE_DAYS = 84
 DEFAULT_DELTA_DAYS = 7
 DEFAULT_CONTEXT_LIMIT = 120
+BASELINE_MAX_TOKENS = 8192
+DELTA_MAX_TOKENS = 6144
 BASELINE_SCHEMA_VERSION = "market_context_lens.baseline.v1"
 DELTA_SCHEMA_VERSION = "market_context_lens.weekly_delta.v1"
 CURRENT_SCHEMA_VERSION = "market_context_lens.current.v1"
@@ -33,6 +35,7 @@ class MarketLensLlmClient(Protocol):
         system: str = "",
         category: str = "unknown",
         model: str | None = None,
+        max_tokens: int = 2048,
     ) -> dict[str, Any] | list[Any]:
         ...
 
@@ -243,6 +246,7 @@ def _synthesize_baseline_lens(
                 system=_market_lens_system(),
                 category="market_lens",
                 model=selected_model,
+                max_tokens=BASELINE_MAX_TOKENS,
             )
             return _normalize_baseline_payload(
                 payload,
@@ -301,6 +305,7 @@ def _synthesize_weekly_delta(
                 system=_market_lens_system(),
                 category="market_lens",
                 model=selected_model,
+                max_tokens=DELTA_MAX_TOKENS,
             )
             return _normalize_delta_payload(
                 payload,
@@ -715,15 +720,19 @@ def _baseline_prompt(*, pack: dict[str, Any], context_text: str) -> str:
         [
             "Create a persistent 12-week market lens for MVP selection.",
             "Use the evidence below as market/business context only.",
-            "Return strict JSON with keys:",
+            "Return strict JSON only, no markdown, with keys:",
             "executive_lens, decision_rules, rank_up_signals, rank_down_signals,",
             "buying_triggers, distribution_patterns, anti_patterns, validation_playbook, open_questions.",
-            "Each list item must be a concise actionable sentence grounded in the supplied evidence.",
+            "Keep executive_lens under 1400 characters.",
+            "Each list may contain up to 10 high-signal actionable strings; keep each string source-grounded.",
             "Do not invent revenue numbers, channels, or legal claims.",
             "",
             f"Source pack summary: {summarize_market_pain_pack(pack)}",
             "",
-            _truncate(context_text, 12000),
+            "Structured source pack excerpt:",
+            json.dumps(_pack_prompt_payload(pack, atom_limit=120, thread_limit=24), ensure_ascii=False, indent=2),
+            "",
+            _truncate(context_text, 30000),
         ]
     )
 
@@ -739,9 +748,11 @@ def _delta_prompt(*, baseline: dict[str, Any], pack: dict[str, Any], context_tex
     return "\n".join(
         [
             "Update the persistent market lens with this week's business-channel context.",
-            "Return strict JSON with keys:",
+            "Return strict JSON only, no markdown, with keys:",
             "delta_summary, reinforced_rules, new_signals, weakened_or_contradicted_rules,",
             "radar_adjustments, watch_next_week.",
+            "Keep delta_summary under 1200 characters.",
+            "Each list may contain up to 10 high-signal actionable strings; keep each string source-grounded.",
             "Only describe changes supported by this week's evidence. Keep context-only boundaries.",
             "",
             "Existing baseline lens:",
@@ -749,7 +760,10 @@ def _delta_prompt(*, baseline: dict[str, Any], pack: dict[str, Any], context_tex
             "",
             f"Weekly source pack summary: {summarize_market_pain_pack(pack)}",
             "",
-            _truncate(context_text, 10000),
+            "Structured weekly source pack excerpt:",
+            json.dumps(_pack_prompt_payload(pack, atom_limit=80, thread_limit=24), ensure_ascii=False, indent=2),
+            "",
+            _truncate(context_text, 20000),
         ]
     )
 
@@ -760,6 +774,26 @@ def _market_lens_system() -> str:
         "You produce source-grounded decision context, not candidate recommendations. "
         "Never treat Telegram commentary as build-ready proof."
     )
+
+
+def _pack_prompt_payload(pack: dict[str, Any], *, atom_limit: int, thread_limit: int) -> dict[str, Any]:
+    context = pack.get("analyst_context") if isinstance(pack.get("analyst_context"), dict) else {}
+    atoms = pack.get("curated_atoms") if isinstance(pack.get("curated_atoms"), list) else []
+    threads = pack.get("market_threads") if isinstance(pack.get("market_threads"), list) else []
+    return {
+        "schema_version": pack.get("schema_version"),
+        "status": pack.get("status"),
+        "cutoff": pack.get("cutoff"),
+        "channels_requested": pack.get("channels_requested") or [],
+        "channels_with_curated_atoms": pack.get("channels_with_curated_atoms") or [],
+        "channels_using_raw_fallback": pack.get("channels_using_raw_fallback") or [],
+        "curated_atom_count": pack.get("curated_atom_count") or 0,
+        "market_thread_count": pack.get("market_thread_count") or 0,
+        "analyst_context": context,
+        "market_threads": threads[:thread_limit],
+        "curated_atoms": atoms[:atom_limit],
+        "radar_gate_audit": pack.get("radar_gate_audit") or {},
+    }
 
 
 def _fallback_executive_lens(pack: dict[str, Any]) -> str:
