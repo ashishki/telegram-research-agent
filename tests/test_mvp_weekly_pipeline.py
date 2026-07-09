@@ -31,6 +31,15 @@ class TestMvpWeeklyPipeline(unittest.TestCase):
                     "reddit_api_status": "missing_credentials",
                     "missing_credentials": ["reddit_demand_live"],
                 },
+                matched_external_evidence=[],
+                decision_change_action={
+                    "matched_external_evidence_count": 0,
+                    "matched_external_source_types": [],
+                    "next_query": '"operator fit tool" workaround',
+                    "next_validation_action": (
+                        'Run `"operator fit tool" workaround` and attach only candidate-matched evidence.'
+                    ),
+                },
                 source_counts={
                     "live_intelligence": {
                         "events_scanned": 12,
@@ -62,6 +71,11 @@ class TestMvpWeeklyPipeline(unittest.TestCase):
             self.assertIn("Решение: пока не строим.", notification)
             self.assertIn("0 Telegram-сигналов", notification)
             self.assertIn("Live intelligence: найдено 2 повторяющихся тезисов.", notification)
+            self.assertIn(
+                'Валидация: 0 matched external evidence; types=none; '
+                'next query: "operator fit tool" workaround',
+                notification,
+            )
             self.assertIn("https://telegra.ph/mvp-weekly", notification)
             self.assertEqual(
                 mock_text.call_args.kwargs["reply_markup"]["inline_keyboard"][0][0]["callback_data"],

@@ -42,6 +42,10 @@ class MvpWeeklyPipelineResult:
     recommendation: str | None
     score: int | None
     selected_source_mix: dict[str, object] | None = None
+    validation_adapter_status: dict[str, object] | None = None
+    matched_external_evidence: list[dict[str, object]] | None = None
+    missing_evidence_by_category: dict[str, object] | None = None
+    decision_change_action: dict[str, object] | None = None
     telegraph_url: str | None = None
     source_counts: dict[str, object] | None = None
     source_errors: dict[str, str] | None = None
@@ -104,6 +108,10 @@ def run_mvp_weekly_pipeline(
         recommendation=_optional_str(radar_payload.get("recommendation")),
         score=_optional_int(radar_payload.get("score")),
         selected_source_mix=_optional_dict(radar_payload.get("selected_source_mix")),
+        validation_adapter_status=_optional_dict(radar_payload.get("validation_adapter_status")),
+        matched_external_evidence=_optional_dict_list(radar_payload.get("matched_external_evidence")),
+        missing_evidence_by_category=_optional_dict(radar_payload.get("missing_evidence_by_category")),
+        decision_change_action=_optional_dict(radar_payload.get("decision_change_action")),
         source_counts=_optional_dict(radar_payload.get("source_counts")),
         source_errors=_optional_str_dict(radar_payload.get("source_errors")),
         live_intelligence_path=str(live_path) if live_path is not None else None,
@@ -276,6 +284,9 @@ def _write_mvp_operator_message(result: MvpWeeklyPipelineResult) -> str:
         notification = f"{notification}\n{summarize_market_pain_pack(result.market_pain_pack)}"
     if result.market_context_lens is not None:
         notification = f"{notification}\n{summarize_market_context_lens(result.market_context_lens)}"
+    validation_line = _validation_gate_notification(result)
+    if validation_line:
+        notification = f"{notification}\n{validation_line}"
     write_weekly_message(result.week_label, "mvp", notification)
     return notification
 
@@ -329,10 +340,49 @@ def _optional_dict(value: object) -> dict[str, object] | None:
     return value if isinstance(value, dict) else None
 
 
+def _optional_dict_list(value: object) -> list[dict[str, object]] | None:
+    if not isinstance(value, list):
+        return None
+    return [item for item in value if isinstance(item, dict)]
+
+
 def _optional_str_dict(value: object) -> dict[str, str] | None:
     if not isinstance(value, dict):
         return None
     return {str(key): str(item) for key, item in value.items()}
+
+
+def _validation_gate_notification(result: MvpWeeklyPipelineResult) -> str:
+    action = result.decision_change_action or {}
+    matched_count = action.get("matched_external_evidence_count")
+    if matched_count is None:
+        matched_count = sum(
+            1
+            for item in (result.matched_external_evidence or [])
+            if bool(item.get("supports_gate")) and bool(item.get("decision_grade", True))
+        )
+    source_types = action.get("matched_external_source_types")
+    if isinstance(source_types, list):
+        source_type_text = ", ".join(str(item) for item in source_types if str(item).strip())
+    else:
+        source_type_text = ""
+    next_query = str(action.get("next_query") or "").strip()
+    next_action = str(action.get("next_validation_action") or "").strip()
+    if next_query:
+        return (
+            "Валидация: "
+            f"{matched_count} matched external evidence; types={source_type_text or 'none'}; "
+            f"next query: {next_query}"
+        )
+    if next_action:
+        return f"Валидация: {matched_count} matched external evidence; next action: {next_action}"
+    if result.validation_adapter_status:
+        statuses = ", ".join(
+            f"{key}={value.get('status') if isinstance(value, dict) else 'unknown'}"
+            for key, value in list(result.validation_adapter_status.items())[:4]
+        )
+        return f"Валидация: adapter status {statuses}"
+    return ""
 
 
 def source_mix_summary(result: MvpWeeklyPipelineResult) -> str:

@@ -17,7 +17,6 @@ from output.ai_intelligence_report import (
     _learning_actions,
     _link,
     _personal_learning_loop,
-    _source_links,
     _truncate_text,
     load_ai_intelligence_context,
 )
@@ -210,6 +209,11 @@ section {{ background:var(--panel); border:1px solid var(--line); border-radius:
 .tag {{ display:inline-block; border:1px solid #bdd2ff; background:#eff6ff; color:#1d4ed8; border-radius:999px; padding:2px 8px; font-size:12px; font-weight:700; }}
 .status-investigate {{ color:var(--warn); }}
 .status-build {{ color:var(--ok); }}
+.mvp-gate-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:10px; margin:10px 0 14px; }}
+.mvp-gate-panel, .mvp-action-panel {{ border:1px solid var(--line); border-radius:8px; padding:12px; background:#f7fafc; }}
+.mvp-gate-panel p:last-child, .mvp-action-panel p:last-child {{ margin-bottom:0; }}
+.evidence-list li, .missing-list li {{ margin-bottom:7px; }}
+code {{ background:#eef2f7; border:1px solid var(--line); border-radius:5px; padding:1px 5px; white-space:normal; overflow-wrap:anywhere; }}
 .action-list {{ display:grid; grid-template-columns:1fr; gap:10px; }}
 .action-card {{ border:1px solid var(--line); border-radius:8px; padding:13px; background:#fbfcfd; }}
 .sources {{ margin-top:6px; font-size:13px; }}
@@ -444,7 +448,10 @@ def _render_mvp_radar(mvp_radar: Mapping[str, object]) -> str:
     recommendation = str(mvp_radar.get("recommendation") or mvp_radar.get("dossier_status") or "needs_more_evidence")
     decision = "Do not build yet." if recommendation in NON_BUILD_READY_RECOMMENDATIONS else "Focused experiment may be allowed."
     missing = "".join(f"<li>{_escape(item)}</li>" for item in _string_values(mvp_radar.get("missing_evidence"))[:5])
-    next_validation = "".join(f"<li>{_escape(item)}</li>" for item in _string_values(mvp_radar.get("next_validation"))[:5])
+    summary = _mvp_validation_summary(mvp_radar)
+    missing_checklist = _render_missing_evidence_checklist(mvp_radar)
+    if not missing_checklist:
+        missing_checklist = f'<ul class="missing-list">{missing or "<li>No missing evidence listed.</li>"}</ul>'
     source_path = str(mvp_radar.get("source_path") or "")
     source_link = f'<p class="sources">{_link(source_path, "MVP Radar JSON")}</p>' if source_path else ""
     return (
@@ -452,10 +459,24 @@ def _render_mvp_radar(mvp_radar: Mapping[str, object]) -> str:
         f'<h3>{_escape(candidate)}</h3>'
         f'<p><span class="tag">{_escape(recommendation)}</span> {_escape(decision)}</p>'
         f'{source_link}'
-        "<h3>Missing Evidence</h3>"
-        f"<ul>{missing or '<li>No missing evidence listed.</li>'}</ul>"
-        "<h3>Next Validation</h3>"
-        f"<ul>{next_validation or '<li>Run Radar with fresh sources.</li>'}</ul>"
+        "<h3>MVP Radar Gate Card</h3>"
+        '<div class="mvp-gate-grid">'
+        '<div class="mvp-gate-panel">'
+        f'<p><b>Matched gate evidence:</b> {_escape(str(summary["matched_gate_count"]))} '
+        f'item(s), {_escape(summary["matched_source_types"])}.</p>'
+        f'<p class="muted">{_escape(summary["external_context_note"])}</p>'
+        '</div>'
+        '<div class="mvp-gate-panel">'
+        f'<p><b>Adapter status:</b> {_escape(summary["adapter_status"])}</p>'
+        '<p class="muted">Market context: context only, not proof.</p>'
+        '</div>'
+        '</div>'
+        f'{_render_validation_query_pack(mvp_radar, summary)}'
+        f'{_render_matched_evidence(mvp_radar)}'
+        "<h3>Missing Evidence Checklist</h3>"
+        f'{missing_checklist}'
+        "<h3>What Would Change The Decision</h3>"
+        f'{_render_decision_change_action(mvp_radar, summary)}'
         "</article>"
     )
 
@@ -502,6 +523,12 @@ def _normalize_mvp_radar(payload: Mapping[str, object]) -> dict:
         "source_mix": _first_mapping(result.get("selected_source_mix"), selected.get("source_mix"), payload.get("source_mix")),
         "missing_evidence": _string_values(selected.get("missing_evidence") or result.get("missing_evidence") or payload.get("missing_evidence")),
         "next_validation": _string_values(selected.get("next_validation") or selected.get("next_step") or result.get("next_validation") or payload.get("next_validation")),
+        "validation_queries": _first_mapping(selected.get("validation_queries"), payload.get("validation_queries"), result.get("validation_queries")),
+        "matched_external_evidence": _object_list(selected.get("matched_external_evidence") or payload.get("matched_external_evidence") or result.get("matched_external_evidence")),
+        "missing_evidence_by_category": _first_mapping(selected.get("missing_evidence_by_category"), payload.get("missing_evidence_by_category"), result.get("missing_evidence_by_category")),
+        "validation_adapter_status": _first_mapping(payload.get("validation_adapter_status"), result.get("validation_adapter_status")),
+        "decision_context": _first_mapping(payload.get("decision_context"), result.get("decision_context")),
+        "decision_change_action": _first_mapping(selected.get("decision_change_action"), payload.get("decision_change_action"), result.get("decision_change_action")),
         "source_path": _clean_text(payload.get("source_path")),
     }
 
@@ -529,7 +556,11 @@ def _section_metadata_summary(
     if section_id == "brief-actions":
         return "Short read/try/action queue for the operator."
     if section_id == "brief-mvp-radar":
-        return str(mvp_radar.get("recommendation") or mvp_radar.get("dossier_status") or "MVP Radar status.")
+        summary = _mvp_validation_summary(mvp_radar)
+        return (
+            f"{mvp_radar.get('recommendation') or mvp_radar.get('dossier_status') or 'MVP Radar status'}; "
+            f"{summary['matched_gate_count']} matched external gate item(s); next query: {summary['next_query'] or 'not listed'}."
+        )
     return "Feedback prompts for the next report loop."
 
 
@@ -550,3 +581,180 @@ def _first_mapping(*values: object) -> dict:
         if isinstance(value, Mapping):
             return dict(value)
     return {}
+
+
+def _object_list(value: object) -> list[dict]:
+    if not isinstance(value, (list, tuple)):
+        return []
+    return [dict(item) for item in value if isinstance(item, Mapping)]
+
+
+def _mvp_validation_summary(mvp_radar: Mapping[str, object]) -> dict[str, object]:
+    matches = _object_list(mvp_radar.get("matched_external_evidence"))
+    gate_matches = [
+        match
+        for match in matches
+        if bool(match.get("supports_gate")) and bool(match.get("decision_grade", True))
+    ]
+    source_types = sorted(
+        {
+            str(match.get("source_type") or "").strip()
+            for match in gate_matches
+            if str(match.get("source_type") or "").strip()
+        }
+    )
+    decision_context = _first_mapping(mvp_radar.get("decision_context"))
+    external_context = _first_mapping(decision_context.get("external_research_context"))
+    unmatched_count = _safe_int(external_context.get("record_count")) if external_context else 0
+    adapter_status = _adapter_status_summary(_first_mapping(mvp_radar.get("validation_adapter_status")))
+    next_query = _next_validation_query(mvp_radar)
+    if gate_matches:
+        context_note = "Matched decision-grade external evidence is allowed to affect Radar gates."
+    elif unmatched_count:
+        context_note = f"{unmatched_count} external context record(s) were unmatched and do not satisfy gates."
+    else:
+        context_note = "No matched external validation evidence found; run the next repeatable search."
+    return {
+        "matched_gate_count": len(gate_matches),
+        "matched_source_types": ", ".join(source_types) or "types: none",
+        "adapter_status": adapter_status,
+        "external_context_note": context_note,
+        "next_query": str(next_query.get("query") or ""),
+        "next_intent": str(next_query.get("intent") or ""),
+    }
+
+
+def _adapter_status_summary(statuses: Mapping[str, object]) -> str:
+    if not statuses:
+        return "not reported"
+    parts = []
+    for name, details in list(statuses.items())[:4]:
+        detail_map = _first_mapping(details)
+        parts.append(f"{name}={detail_map.get('status') or 'unknown'}")
+    return "; ".join(parts) or "not reported"
+
+
+def _safe_int(value: object) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _next_validation_query(mvp_radar: Mapping[str, object]) -> dict[str, object]:
+    action = _first_mapping(mvp_radar.get("decision_change_action"))
+    if action.get("next_query"):
+        return {
+            "query": str(action.get("next_query") or ""),
+            "intent": str(action.get("next_intent") or action.get("missing_category") or ""),
+            "source": "decision_change_action",
+        }
+    validation_queries = _first_mapping(mvp_radar.get("validation_queries"))
+    next_query = validation_queries.get("next_query")
+    if isinstance(next_query, Mapping) and next_query.get("query"):
+        return {
+            "query": str(next_query.get("query") or ""),
+            "intent": str(next_query.get("intent") or ""),
+            "source": "validation_queries",
+        }
+    missing = _first_mapping(mvp_radar.get("missing_evidence_by_category"))
+    for category, details in missing.items():
+        detail_map = _first_mapping(details)
+        if detail_map.get("next_query"):
+            return {
+                "query": str(detail_map.get("next_query") or ""),
+                "intent": str(detail_map.get("next_intent") or category),
+                "source": "missing_evidence_by_category",
+            }
+    for item in _string_values(mvp_radar.get("next_validation")):
+        return {"query": item, "intent": "operator_validation", "source": "legacy_next_validation"}
+    return {}
+
+
+def _render_validation_query_pack(mvp_radar: Mapping[str, object], summary: Mapping[str, object]) -> str:
+    validation_queries = _first_mapping(mvp_radar.get("validation_queries"))
+    queries_by_intent = _first_mapping(validation_queries.get("queries_by_intent"))
+    next_query = str(summary.get("next_query") or "")
+    next_intent = str(summary.get("next_intent") or "external_validation")
+    lead = (
+        f'<p><b>Next repeatable search:</b> <code>{_escape(next_query)}</code> '
+        f'<span class="muted">({ _escape(next_intent) })</span></p>'
+        if next_query
+        else '<p><b>Next repeatable search:</b> Run Radar with fresh validation sources.</p>'
+    )
+    items = []
+    for intent in ("search_demand", "manual_workarounds", "reddit_forum_complaints", "wtp_signals"):
+        records = queries_by_intent.get(intent)
+        if not isinstance(records, list) or not records:
+            continue
+        first = records[0]
+        if not isinstance(first, Mapping):
+            continue
+        query = str(first.get("query") or "").strip()
+        if query:
+            items.append(f"<li>{_escape(intent)}: <code>{_escape(query)}</code></li>")
+    query_list = f"<ul>{''.join(items[:4])}</ul>" if items else ""
+    return "<h3>Validation Query Pack</h3>" + lead + query_list
+
+
+def _render_matched_evidence(mvp_radar: Mapping[str, object]) -> str:
+    matches = _object_list(mvp_radar.get("matched_external_evidence"))
+    if not matches:
+        return (
+            "<h3>Matched Evidence By Source/Kind</h3>"
+            "<p>No matched external validation evidence found. External research context is context only until it matches the selected candidate.</p>"
+        )
+    items = []
+    for match in matches[:4]:
+        source = str(match.get("source_type") or "unknown")
+        kind = str(match.get("evidence_kind") or "unknown")
+        query = str(match.get("query") or "no query")
+        supports = "gating" if bool(match.get("supports_gate")) else "context only"
+        url = str(match.get("source_url") or "")
+        suffix = f" {_link(url, 'source')}" if url else ""
+        items.append(
+            f"<li><b>{_escape(source)} / {_escape(kind)}</b>: {_escape(supports)}; "
+            f"query <code>{_escape(query)}</code>.{suffix}</li>"
+        )
+    return "<h3>Matched Evidence By Source/Kind</h3><ul class=\"evidence-list\">" + "".join(items) + "</ul>"
+
+
+def _render_missing_evidence_checklist(mvp_radar: Mapping[str, object]) -> str:
+    missing = _first_mapping(mvp_radar.get("missing_evidence_by_category"))
+    items = []
+    for category, details in list(missing.items())[:5]:
+        detail_map = _first_mapping(details)
+        reasons = _string_values(detail_map.get("missing_evidence"))
+        reason = reasons[0] if reasons else str(detail_map.get("evidence_kind") or "missing evidence")
+        query = str(detail_map.get("next_query") or "").strip()
+        query_suffix = f" Next: <code>{_escape(query)}</code>" if query else ""
+        items.append(f"<li><b>{_escape(category)}</b>: {_escape(reason)}.{query_suffix}</li>")
+    if not items:
+        return ""
+    return '<ul class="missing-list">' + "".join(items) + "</ul>"
+
+
+def _render_decision_change_action(
+    mvp_radar: Mapping[str, object],
+    summary: Mapping[str, object],
+) -> str:
+    action = _first_mapping(mvp_radar.get("decision_change_action"))
+    action_text = str(action.get("next_validation_action") or "").strip()
+    required = str(action.get("required_gate_change") or "").strip()
+    context_rule = str(action.get("context_only_results_rule") or "").strip()
+    next_query = str(summary.get("next_query") or "")
+    if not action_text and next_query:
+        action_text = f"Run `{next_query}` and attach only candidate-matched external evidence."
+    if not action_text:
+        action_text = "Run the validation query pack and attach candidate-matched external evidence."
+    if not required:
+        required = "Two independent matched decision-grade external source types before build/focused status."
+    if not context_rule:
+        context_rule = "Unmatched external research and market lens records remain context only."
+    return (
+        '<div class="mvp-action-panel">'
+        f"<p>{_escape(action_text)}</p>"
+        f"<p><b>Gate change required:</b> {_escape(required)}</p>"
+        f'<p class="muted">{_escape(context_rule)}</p>'
+        "</div>"
+    )

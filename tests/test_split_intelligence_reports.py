@@ -128,6 +128,66 @@ class TestSplitIntelligenceReports(unittest.TestCase):
                             "missing_evidence": ["Need external demand."],
                             "next_validation": ["Interview five operators."],
                         },
+                        "validation_queries": {
+                            "schema_version": "radar_validation_evidence.v1",
+                            "next_query": {
+                                "query": '"agent eval gate scanner" problem',
+                                "intent": "search_demand",
+                            },
+                            "queries_by_intent": {
+                                "search_demand": [
+                                    {
+                                        "query": '"agent eval gate scanner" problem',
+                                        "intent": "search_demand",
+                                        "source_types": ["serp"],
+                                    }
+                                ],
+                                "manual_workarounds": [
+                                    {
+                                        "query": '"agent eval gate scanner" workaround',
+                                        "intent": "manual_workarounds",
+                                        "source_types": ["serp", "reddit"],
+                                    }
+                                ],
+                            },
+                        },
+                        "matched_external_evidence": [],
+                        "missing_evidence_by_category": {
+                            "external_corroboration": {
+                                "evidence_kind": "search_demand",
+                                "missing_evidence": ["Need external demand."],
+                                "next_intent": "search_demand",
+                                "next_query": '"agent eval gate scanner" problem',
+                            }
+                        },
+                        "validation_adapter_status": {
+                            "search_demand": {"status": "cache_only"},
+                            "reddit_forum_complaints": {"status": "credential_limited"},
+                        },
+                        "decision_change_action": {
+                            "current_gate": "investigate",
+                            "matched_external_evidence_count": 0,
+                            "matched_external_source_types": [],
+                            "next_query": '"agent eval gate scanner" problem',
+                            "next_intent": "search_demand",
+                            "next_validation_action": (
+                                'Run `"agent eval gate scanner" problem` and attach only candidate-matched evidence.'
+                            ),
+                            "required_gate_change": "two independent matched external source types",
+                            "context_only_results_rule": "unmatched external research remains context only",
+                        },
+                        "decision_context": {
+                            "market_context": {
+                                "status": "context_only",
+                                "record_count": 2,
+                                "source_gate_satisfied": False,
+                            },
+                            "external_research_context": {
+                                "status": "context_only",
+                                "record_count": 1,
+                                "source_gate_satisfied": False,
+                            },
+                        },
                     }
                 ),
                 encoding="utf-8",
@@ -166,6 +226,18 @@ class TestSplitIntelligenceReports(unittest.TestCase):
                 summary.knowledge_atlas.json_path,
             )
             self.assertEqual(brief_json["mvp_radar"]["selected_candidate"], "Agent Eval Gate Scanner")
+            self.assertIn("MVP Radar Gate Card", brief_html)
+            self.assertIn("Validation Query Pack", brief_html)
+            self.assertIn("Matched Evidence By Source/Kind", brief_html)
+            self.assertIn("Missing Evidence Checklist", brief_html)
+            self.assertIn("What Would Change The Decision", brief_html)
+            self.assertIn("No matched external validation evidence found", brief_html)
+            self.assertIn("Market context: context only, not proof.", brief_html)
+            self.assertIn("agent eval gate scanner", brief_html)
+            self.assertEqual(
+                brief_json["mvp_radar"]["decision_change_action"]["next_query"],
+                '"agent eval gate scanner" problem',
+            )
 
 
 if __name__ == "__main__":
