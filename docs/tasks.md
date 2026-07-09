@@ -169,7 +169,7 @@ Implemented:
 - Operator reminders are stored locally and delivered as a once-daily Telegram
   check-in with `сделал` / `не сделал` inline buttons; they do not run every 30
   minutes and do not mutate workbook/report scoring.
-- RVE-0/RVE-6 Radar validation evidence foundation: documented the shared
+- RVE-0/RVE-7 Radar validation evidence foundation: documented the shared
   validation evidence contract in both repos, added deterministic
   candidate-specific `validation_queries`, rendered a Markdown Validation Query
   Pack, added matched external evidence classification, rendered a Markdown
@@ -193,7 +193,11 @@ Implemented:
   is disabled by default, cache-first/dry-run capable, surfaces missing
   credentials and rate limits, hashes author IDs, classifies trend chatter as
   negative evidence, and renders matched X evidence as lower-confidence
-  non-gating corroboration.
+  non-gating corroboration. Radar now emits `decision_change_action`, renders a
+  `What Would Change The Decision` block in Markdown, and Weekly Brief surfaces
+  the MVP Radar Gate Card, Validation Query Pack, matched evidence,
+  missing-evidence checklist, context-only market label, and exact next
+  validation action.
 
 ## Active Maintenance Queue
 
@@ -572,7 +576,7 @@ Stop conditions:
 
 ### RVE-7 - Weekly Brief And Radar Validation Surface
 
-Status: planned after the core query/evidence contract lands.
+Status: implemented on 2026-07-09.
 
 Goal: make the validation layer readable in the Weekly Intelligence Brief and
 Radar Markdown/JSON so the operator can quickly see why a candidate is
@@ -606,10 +610,21 @@ Acceptance:
 Verification:
 
 ```bash
-PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m unittest tests.test_weekly_intelligence_brief tests.test_mvp_weekly_pipeline
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m unittest tests.test_split_intelligence_reports tests.test_mvp_weekly_pipeline
 cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
 .venv/bin/python -m pytest tests/integration/test_report_quality.py
 ```
+
+Implemented notes:
+
+- Radar Markdown includes a `What Would Change The Decision` action block after
+  matched external evidence.
+- Radar JSON and CLI stdout expose `decision_change_action`, matched evidence,
+  missing evidence by category, and adapter status for downstream surfaces.
+- Weekly Brief keeps a compact MVP Radar Gate Card and labels market context as
+  context only, not proof.
+- MVP weekly operator notification includes matched external evidence count and
+  the next validation query when Radar returns it.
 
 Stop conditions:
 

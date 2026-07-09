@@ -60,7 +60,7 @@ _v3.9 · 2026-07-09 · telegram-research-agent_
   adapter status, and missing-evidence categories before any build/focused
   recommendation can strengthen. It is validation evidence, not broad idea
   generation.
-- RVE-0/RVE-6 are implemented. Demand-to-MVP Radar now documents the shared
+- RVE-0/RVE-7 are implemented. Demand-to-MVP Radar now documents the shared
   validation evidence contract, emits deterministic candidate-specific
   `validation_queries`, renders a Markdown Validation Query Pack, and writes
   JSON contract slots for `matched_external_evidence`,
@@ -86,7 +86,12 @@ _v3.9 · 2026-07-09 · telegram-research-agent_
   negative evidence. X/Twitter corroboration is disabled by default,
   cache-first/dry-run capable, surfaces missing credentials and rate limits,
   hashes author IDs, classifies trend chatter as negative evidence, and renders
-  matched X evidence as lower-confidence non-gating corroboration.
+  matched X evidence as lower-confidence non-gating corroboration. Radar now
+  emits a structured `decision_change_action` and renders `What Would Change
+  The Decision`; Telegram Research Agent preserves these fields in Weekly Brief
+  JSON/HTML, shows a compact MVP Radar Gate Card, labels market context as
+  context only/not proof, and includes the next validation query in the MVP
+  weekly operator message.
 - Operational incident on 2026-07-06: `telegram-digest.timer` had been inactive
   since 2026-06-22, so weekly Research Brief/Implementation Ideas stopped
   running while ingest and MVP weekly continued. The timer was manually
@@ -330,14 +335,14 @@ RVE: Radar Validation Evidence Layer
 Do this next:
 
 - start from `docs/tasks.md`, section `RVE: Radar Validation Evidence Layer`;
-- RVE-0/RVE-6 are complete; start with RVE-7 next in
-  `/srv/openclaw-you/workspace/Demand-to-MVP-Radar`;
-- improve the Weekly Brief and Radar validation surface for validation
+- RVE-0/RVE-7 are complete; start with RVE-8 dogfood validation run next;
+- use the Weekly Brief and Radar validation surface to inspect validation
   evidence;
 - keep market/business lens records `context_only`;
 - keep external results unable to affect gates unless matched to the selected
   candidate;
-- after RVE-6, expose the validation layer in the Weekly Brief/Radar surface;
+- after RVE-7, run a bounded dogfood validation pass and inspect the Brief/Radar
+  gate card;
 - keep every external adapter cache-first, dry-run capable, credentials-gated,
   and failure-tolerant via `credential_limited` / `adapter_disabled` status.
 

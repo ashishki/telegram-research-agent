@@ -286,6 +286,7 @@ Status: investigate, score 64/100.
 Recommendation: revisit_with_evidence_gap.
 Seeds exported: 80.
 Source mix: readiness=credential_limited; telegram=80; external=119; external_types=github_public, rss, stack_exchange; reddit=missing_credentials; missing_credentials=reddit_demand_live; source_errors=serp_search_intent_live, youtube_creator_tutorial_demand_live.
+Валидация: 0 matched external evidence; types=none; next query: "Telegram Channel SEO Site Generator" problem
 https://telegra.ph/...
 ```
 
@@ -323,6 +324,7 @@ Confidence: low
 ## Source Mix
 ## Validation Query Pack
 ## Matched External Evidence
+## What Would Change The Decision
 ## Evidence
 ## Missing Evidence
 ## Next Experiment
@@ -353,6 +355,9 @@ Radar JSON must keep these fields distinct:
 - `validation_adapter_status`: per-source adapter state. Allowed values are
   `ok`, `adapter_disabled`, `credential_limited`, `rate_limited`,
   `cache_only`, and `error`.
+- `decision_change_action`: the exact next validation action, next query,
+  matched external evidence count/source types, and the gate change required
+  before a candidate can move toward `focused_experiment` or `build`.
 
 Gate rules:
 
