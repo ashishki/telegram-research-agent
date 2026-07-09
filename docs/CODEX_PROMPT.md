@@ -319,6 +319,12 @@ Do this next:
 
 Candidate resources to wire later as adapters:
 
+- Source repository: `https://github.com/artwist-polyakov/polyakov-claude-skills`.
+- Marketplace hint from that repository:
+  `/plugin marketplace add artwist-polyakov/polyakov-claude-skills`.
+- Do not assume the skills are already installed; inspect/install/fetch only
+  the needed skill docs or plugin code, then wrap each source behind the RVE
+  adapter boundary.
 - `yandex-wordstat` for search demand and monthly dynamics;
 - `yandex-search-api` for Yandex Cloud Search API v2 SERP evidence;
 - `reddit-skill` for Reddit API posts/comments/search;

@@ -239,6 +239,14 @@ Architecture rules:
 
 Candidate external resources to wire in as adapters:
 
+Source repository for these skills:
+
+- `https://github.com/artwist-polyakov/polyakov-claude-skills`
+- Marketplace hint from that repository: `/plugin marketplace add artwist-polyakov/polyakov-claude-skills`.
+- Do not assume these skills are installed in the current runtime. The next
+  implementation session should inspect/install/fetch only the needed skill
+  docs or plugin code, then wrap them behind the RVE adapter boundary.
+
 - `yandex-wordstat`: search demand and monthly demand dynamics.
 - `yandex-search-api`: Yandex Cloud Search API v2 SERP evidence.
 - `reddit-skill`: Reddit API search over posts/comments/subreddits with
