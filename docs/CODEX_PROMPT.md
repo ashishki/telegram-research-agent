@@ -60,6 +60,17 @@ _v3.9 · 2026-07-09 · telegram-research-agent_
   adapter status, and missing-evidence categories before any build/focused
   recommendation can strengthen. It is validation evidence, not broad idea
   generation.
+- RVE-0/RVE-2 are implemented. Demand-to-MVP Radar now documents the shared
+  validation evidence contract, emits deterministic candidate-specific
+  `validation_queries`, renders a Markdown Validation Query Pack, and writes
+  JSON contract slots for `matched_external_evidence`,
+  `decision_context.external_research_context`,
+  `missing_evidence_by_category`, and `validation_adapter_status`. It also
+  classifies matched external evidence for the selected candidate, renders a
+  Markdown Matched External Evidence section, and wires candidate source gates
+  through matched decision-grade external records only. The planner/matcher
+  make no live external API calls; all validation adapters remain disabled
+  until later RVE tasks.
 - Operational incident on 2026-07-06: `telegram-digest.timer` had been inactive
   since 2026-06-22, so weekly Research Brief/Implementation Ideas stopped
   running while ingest and MVP weekly continued. The timer was manually
@@ -303,14 +314,12 @@ RVE: Radar Validation Evidence Layer
 Do this next:
 
 - start from `docs/tasks.md`, section `RVE: Radar Validation Evidence Layer`;
-- implement RVE-0/RVE-1 first in
+- RVE-0/RVE-2 are complete; start with RVE-3 next in
   `/srv/openclaw-you/workspace/Demand-to-MVP-Radar`;
-- document the validation evidence contract and add a deterministic candidate
-  validation query planner;
-- do not make live external API calls in RVE-1;
+- add the cache-first Search/SERP demand adapter behind RVE boundaries;
 - keep market/business lens records `context_only`;
-- make sure external results cannot affect gates until RVE-2 matches them to
-  the selected candidate;
+- keep external results unable to affect gates unless matched to the selected
+  candidate;
 - after RVE-1/RVE-2, add adapters in this order: search/SERP demand,
   Reddit/forum complaints, competitor/workaround crawler, X/Twitter
   corroboration last;

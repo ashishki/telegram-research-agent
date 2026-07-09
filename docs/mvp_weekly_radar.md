@@ -1,7 +1,7 @@
 # MVP Weekly Radar Bridge
 
-Status: Active production bridge with KIR gates and market-context sidecar
-Date: 2026-07-08
+Status: Active production bridge with KIR gates, market-context sidecar, and RVE query contract
+Date: 2026-07-09
 
 ## Purpose
 
@@ -42,6 +42,10 @@ unless the source gates clearly support a build-ready recommendation.
 3. Radar imports Telegram seeds, collects configured external sources, applies
    source-mix and operator-fit gates, and writes Markdown/JSON under
    `Demand-to-MVP-Radar/reports/mvp_of_week/`.
+   - RVE-1 adds a deterministic `validation_queries` pack for the selected
+     candidate. This pack is planning-only and makes no live external calls.
+   - RVE-2 classifies matched external evidence for the selected candidate;
+     source gates count only matched decision-grade external records.
 4. Telegram Research Agent publishes the Markdown report to Telegraph.
 5. The bot sends:
    - short Telegram notification;
@@ -299,6 +303,8 @@ Confidence: low
 
 ## Why This Candidate
 ## Source Mix
+## Validation Query Pack
+## Matched External Evidence
 ## Evidence
 ## Missing Evidence
 ## Next Experiment
@@ -306,6 +312,44 @@ Confidence: low
 ## Operator Fit
 ## Anti-Complexity Guardrail
 ```
+
+## Radar Validation Evidence Contract
+
+RVE separates "what to validate next" from "what evidence is already strong
+enough to change a Radar decision." The contract is shared with
+`/srv/openclaw-you/workspace/Demand-to-MVP-Radar/docs/RADAR_VALIDATION_EVIDENCE.md`.
+
+Radar JSON must keep these fields distinct:
+
+- `validation_queries`: candidate-specific searches grouped by intent:
+  `search_demand`, `manual_workarounds`, `competitors`, `wtp_signals`,
+  `reddit_forum_complaints`, `github_discussions`, and `x_discussions`.
+- `matched_external_evidence`: external records explicitly tied to the
+  selected candidate and classified by evidence kind. Only decision-grade
+  records with `supports_gate=true` can satisfy gates.
+- `decision_context.external_research_context`: useful unmatched research.
+  It is context-only and cannot satisfy `source_gate_satisfied`,
+  `dossier_status`, or final recommendation gates.
+- `missing_evidence_by_category`: missing validation categories and the next
+  repeatable query to run for each category.
+- `validation_adapter_status`: per-source adapter state. Allowed values are
+  `ok`, `adapter_disabled`, `credential_limited`, `rate_limited`,
+  `cache_only`, and `error`.
+
+Gate rules:
+
+- Context-only market/business records never satisfy build or focused
+  experiment gates.
+- Unmatched external results never satisfy gates, even if they come from a
+  live adapter.
+- Search/SERP, Reddit/forum, crawler, and X results must be matched to the
+  selected candidate and classified as decision-grade validation evidence
+  before they affect `source_gate_satisfied`, `dossier_status`, or the final
+  recommendation.
+- Missing credentials or disabled adapters degrade to
+  `credential_limited` / `adapter_disabled`; they must not break the weekly
+  run.
+- The query planner is deterministic and does not call external APIs.
 
 ## Cross-Repo AI Handoff
 

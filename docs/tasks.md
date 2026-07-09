@@ -169,6 +169,14 @@ Implemented:
 - Operator reminders are stored locally and delivered as a once-daily Telegram
   check-in with `сделал` / `не сделал` inline buttons; they do not run every 30
   minutes and do not mutate workbook/report scoring.
+- RVE-0/RVE-2 Radar validation evidence foundation: documented the shared
+  validation evidence contract in both repos, added deterministic
+  candidate-specific `validation_queries`, rendered a Markdown Validation Query
+  Pack, added matched external evidence classification, rendered a Markdown
+  Matched External Evidence section, and wired candidate source gates through
+  matched decision-grade external records while unmatched results remain
+  `decision_context.external_research_context`. No live external API calls were
+  added.
 
 ## Active Maintenance Queue
 
@@ -271,7 +279,7 @@ Priority order:
 
 ### RVE-0 - Document Radar Validation Evidence Contract
 
-Status: planned.
+Status: implemented on 2026-07-09.
 
 Goal: define the JSON/report contract that separates candidate hypotheses,
 validation queries, matched external evidence, context-only research, and
@@ -321,7 +329,7 @@ Stop conditions:
 
 ### RVE-1 - Candidate Validation Query Planner
 
-Status: planned.
+Status: implemented on 2026-07-09.
 
 Goal: add a deterministic query planner in Demand-to-MVP Radar that turns the
 selected candidate and shortlist into concrete external validation queries.
@@ -376,7 +384,7 @@ Stop conditions:
 
 ### RVE-2 - Matched Evidence Contract And Gate Wiring
 
-Status: planned after RVE-1.
+Status: implemented on 2026-07-09.
 
 Goal: add a normalized evidence matcher so external records can affect Radar
 only when they are explicitly tied to the selected candidate and classified as
