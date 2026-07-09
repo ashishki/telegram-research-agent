@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+import os
 import sqlite3
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -19,6 +21,7 @@ from output.weekly_intelligence_brief import (
 
 
 OUTPUT_ROOT = PROJECT_ROOT / "data" / "output"
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -28,6 +31,7 @@ class SplitIntelligenceReportsSummary:
     knowledge_atlas: KnowledgeAtlasSummary
     weekly_brief: WeeklyIntelligenceBriefSummary
     notification_text: str
+    delivered_message_ids: tuple[int | None, ...] = ()
 
 
 def generate_split_intelligence_reports(
@@ -105,6 +109,49 @@ def build_split_reports_notification(summary: SplitIntelligenceReportsSummary) -
         f"Split AI intelligence reports {summary.week_label} are ready.\n"
         f"Weekly Brief: {summary.weekly_brief.html_path}\n"
         f"Knowledge Atlas: {summary.knowledge_atlas.html_path}"
+    )
+
+
+def deliver_split_intelligence_reports(
+    summary: SplitIntelligenceReportsSummary,
+    *,
+    chat_id: str | None = None,
+    token: str | None = None,
+) -> SplitIntelligenceReportsSummary:
+    from bot.telegram_delivery import send_document, send_text
+
+    clean_chat_id = str(chat_id or os.environ.get("TELEGRAM_OWNER_CHAT_ID", "")).strip()
+    clean_token = str(token or os.environ.get("TELEGRAM_BOT_TOKEN", "")).strip()
+    if not clean_chat_id or not clean_token:
+        LOGGER.info("Split AI report delivery skipped because Telegram credentials are missing")
+        return summary
+    message_ids = [
+        send_text(
+            chat_id=clean_chat_id,
+            text=summary.notification_text,
+            token=clean_token,
+            parse_mode=None,
+        ),
+        send_document(
+            chat_id=clean_chat_id,
+            file_path=str(summary.weekly_brief.html_path),
+            caption=f"Weekly Intelligence Brief {summary.week_label}",
+            token=clean_token,
+        ),
+        send_document(
+            chat_id=clean_chat_id,
+            file_path=str(summary.knowledge_atlas.html_path),
+            caption=f"Knowledge Atlas {summary.week_label}",
+            token=clean_token,
+        ),
+    ]
+    return SplitIntelligenceReportsSummary(
+        week_label=summary.week_label,
+        generated_at=summary.generated_at,
+        knowledge_atlas=summary.knowledge_atlas,
+        weekly_brief=summary.weekly_brief,
+        notification_text=summary.notification_text,
+        delivered_message_ids=tuple(message_ids),
     )
 
 

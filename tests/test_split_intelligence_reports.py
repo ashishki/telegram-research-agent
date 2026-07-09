@@ -12,7 +12,7 @@ from db.frontier_analysis import upsert_frontier_analysis
 from db.knowledge_atoms import record_knowledge_atom
 from db.migrate import run_migrations
 from output.idea_threads import refresh_idea_threads
-from output.split_intelligence_reports import generate_split_intelligence_reports
+from output.split_intelligence_reports import deliver_split_intelligence_reports, generate_split_intelligence_reports
 
 
 class TestSplitIntelligenceReports(unittest.TestCase):
@@ -238,6 +238,28 @@ class TestSplitIntelligenceReports(unittest.TestCase):
                 brief_json["mvp_radar"]["decision_change_action"]["next_query"],
                 '"agent eval gate scanner" problem',
             )
+
+            with patch.dict(
+                os.environ,
+                {"TELEGRAM_OWNER_CHAT_ID": "12345", "TELEGRAM_BOT_TOKEN": "token"},
+                clear=False,
+            ):
+                with patch("bot.telegram_delivery.send_text", return_value=10) as send_text:
+                    with patch("bot.telegram_delivery.send_document", side_effect=[11, 12]) as send_document:
+                        delivered = deliver_split_intelligence_reports(summary)
+
+            self.assertEqual(delivered.delivered_message_ids, (10, 11, 12))
+            self.assertIs(delivered.weekly_brief, summary.weekly_brief)
+            self.assertIs(delivered.knowledge_atlas, summary.knowledge_atlas)
+            send_text.assert_called_once_with(
+                chat_id="12345",
+                text=summary.notification_text,
+                token="token",
+                parse_mode=None,
+            )
+            self.assertEqual(send_document.call_count, 2)
+            self.assertEqual(send_document.call_args_list[0].kwargs["file_path"], str(summary.weekly_brief.html_path))
+            self.assertEqual(send_document.call_args_list[1].kwargs["file_path"], str(summary.knowledge_atlas.html_path))
 
 
 if __name__ == "__main__":

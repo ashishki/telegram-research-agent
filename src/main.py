@@ -199,6 +199,9 @@ def build_parser() -> argparse.ArgumentParser:
     split_report_parser.add_argument("--mvp-radar-json", default=None, help="Path to an MVP Radar mvp-weekly JSON artifact")
     split_report_parser.add_argument("--skip-refresh", action="store_true", help="Do not refresh Idea Threads before rendering")
     split_report_parser.add_argument("--refresh-weeks", type=int, default=12, help="Idea Thread refresh lookback window")
+    split_report_parser.add_argument("--deliver", action="store_true", help="Send both HTML reports to Telegram as documents")
+    split_report_parser.add_argument("--chat-id", default=None, help="Telegram chat/channel id for --deliver")
+    split_report_parser.add_argument("--token", default=None, help="Telegram bot token for --deliver")
     split_report_parser.set_defaults(handler=handle_ai_split_report)
 
     strategy_parser = subparsers.add_parser(
@@ -1821,7 +1824,10 @@ def handle_ai_visual_report(args: argparse.Namespace) -> int:
 def handle_ai_split_report(args: argparse.Namespace) -> int:
     from output.idea_threads import refresh_idea_threads
     from output.knowledge_atlas_report import KnowledgeAtlasQualityError
-    from output.split_intelligence_reports import generate_split_intelligence_reports
+    from output.split_intelligence_reports import (
+        deliver_split_intelligence_reports,
+        generate_split_intelligence_reports,
+    )
     from output.weekly_intelligence_brief import WeeklyIntelligenceBriefQualityError
 
     settings = load_settings()
@@ -1850,11 +1856,18 @@ def handle_ai_split_report(args: argparse.Namespace) -> int:
             output_root=args.output_root,
             mvp_radar_json_path=args.mvp_radar_json,
         )
+        if args.deliver:
+            summary = deliver_split_intelligence_reports(
+                summary,
+                chat_id=args.chat_id,
+                token=args.token,
+            )
         LOGGER.info(
-            "Finished step=ai_split_report week=%s atlas=%s brief=%s",
+            "Finished step=ai_split_report week=%s atlas=%s brief=%s delivered=%s",
             summary.week_label,
             summary.knowledge_atlas.html_path,
             summary.weekly_brief.html_path,
+            ",".join(str(item or "") for item in summary.delivered_message_ids),
         )
     except (KnowledgeAtlasQualityError, WeeklyIntelligenceBriefQualityError) as exc:
         LOGGER.exception("Split AI report failed quality gates")
@@ -1876,6 +1889,7 @@ def handle_ai_split_report(args: argparse.Namespace) -> int:
         f"source_atoms={summary.knowledge_atlas.source_atom_count} "
         f"changed={summary.weekly_brief.changed_thread_count} "
         f"actions={summary.weekly_brief.action_count} mvp={summary.weekly_brief.mvp_status}\n"
+        f"delivered_message_ids={','.join(str(item or '') for item in summary.delivered_message_ids)}\n"
         f"notification={summary.notification_text}\n"
     )
     return 0
