@@ -177,11 +177,16 @@ report quality, Radar handoff, cost guardrails, artifact consistency,
 editorial memory, initial Pathway-ready live source intelligence, and initial
 KIR plumbing are implemented.
 
-The active queue is now HPI: Hermes / Personal Intelligence Assistant /
-Dogfood. KIR plumbing and KIR-Q0..KIR-Q13 are implemented; the next stage must
-make the working knowledge-intelligence pipeline easier to use through a
-Telegram concierge, bounded curated Q&A, confirmation-gated feedback, and a
-four-week dogfood loop.
+HPI: Hermes / Personal Intelligence Assistant / Dogfood has shipped the first
+usable assistant loop, split Knowledge Atlas / Weekly Intelligence Brief
+artifacts, and a context-only market/business lens for MVP Radar. KIR plumbing
+and KIR-Q0..KIR-Q13 are implemented.
+
+The active next engineering queue is RVE: Radar Validation Evidence Layer. The
+goal is not to generate prettier ideas or ingest a raw external firehose. The
+goal is to let Radar test Telegram/market hypotheses against candidate-specific
+external demand evidence: search demand, public complaints, manual workaround
+examples, competitor traction, and willingness-to-pay signals.
 
 Implementation details, end-to-end stages, acceptance criteria, metrics, risks,
 and non-goals for the completed KIR queue remain in
@@ -189,9 +194,423 @@ and non-goals for the completed KIR queue remain in
 `docs/ai_intelligence_workbook_roadmap.md`. Historical report-quality and Radar
 paths remain in `docs/report_quality_roadmap.md`.
 
+## RVE: Radar Validation Evidence Layer
+
+Status: active next implementation queue after the first 2026-W28 split-HTML
+dogfood run.
+
+Context:
+
+- The 2026-W28 run produced both HTML artifacts:
+  - `data/output/knowledge_atlas/2026-W28.knowledge-atlas.html`;
+  - `data/output/weekly_intelligence_briefs/2026-W28.weekly-brief.html`.
+- Demand-to-MVP Radar selected `Hotkey Dictation Workflow Probe` with
+  `dossier_status=investigate`, `recommendation=revisit_with_evidence_gap`,
+  and score 60.
+- Radar correctly kept the market/business context lens as `context_only`, so
+  it did not become a candidate and did not satisfy build gates by itself.
+- The remaining evidence gap is structural: Radar can see Telegram signal, but
+  often lacks matched external validation for the selected candidate. Typical
+  missing evidence: fresh KIR thread, two independent non-Telegram sources,
+  WTP signal, repeatable search queries, and concrete manual workaround
+  examples.
+
+Goal:
+
+Make Radar produce and consume candidate-specific validation evidence before
+it recommends build/focused-experiment. The market/business lens should tell
+Radar what to look for and why; external adapters should validate or reject
+that candidate with public demand evidence.
+
+Architecture rules:
+
+- This is a validation-evidence layer, not an idea-generation layer.
+- Market/business context remains context-only unless a record is explicitly
+  matched to the selected candidate and source-gated as external evidence.
+- External results must be classified and tied to a candidate before they can
+  affect `source_gate_satisfied`, `dossier_status`, or final recommendation.
+- Unmatched external results can appear as research context, but cannot satisfy
+  build gates.
+- Missing credentials or disabled adapters must degrade to
+  `credential_limited` / `adapter_disabled`, not fail the weekly run.
+- Cache-first and dry-run behavior is required for every live external
+  adapter.
+- Do not weaken existing gates to make candidates look better.
+
+Candidate external resources to wire in as adapters:
+
+- `yandex-wordstat`: search demand and monthly demand dynamics.
+- `yandex-search-api`: Yandex Cloud Search API v2 SERP evidence.
+- `reddit-skill`: Reddit API search over posts/comments/subreddits with
+  cache-first and dry-run safeguards.
+- `x-research`: X/Twitter discussion research through xAI/Grok where
+  credentials exist.
+- `crawl4ai-seo`: competitor/landing-page/workaround crawling and SEO review.
+
+Priority order:
+
+1. Query planner and evidence contract.
+2. Search/SERP demand adapter.
+3. Reddit/forum complaint adapter.
+4. Competitor/workaround crawler.
+5. X/Twitter corroboration only after the lower-noise adapters work.
+6. Weekly Brief/Radar visual surface for validation evidence.
+
+### RVE-0 - Document Radar Validation Evidence Contract
+
+Status: planned.
+
+Goal: define the JSON/report contract that separates candidate hypotheses,
+validation queries, matched external evidence, context-only research, and
+missing evidence.
+
+Files likely:
+
+- `docs/tasks.md`
+- `docs/CODEX_PROMPT.md`
+- `docs/mvp_weekly_radar.md`
+- `/srv/openclaw-you/workspace/Demand-to-MVP-Radar/README.md`
+- `/srv/openclaw-you/workspace/Demand-to-MVP-Radar/demand_mvp_radar/mvp_weekly.py`
+
+Contract sketch:
+
+- `validation_queries`: candidate-specific searches grouped by intent:
+  `search_demand`, `manual_workarounds`, `competitors`, `wtp_signals`,
+  `reddit_forum_complaints`, `github_discussions`, `x_discussions`.
+- `matched_external_evidence`: evidence records that are explicitly tied to
+  the selected candidate and classified by evidence kind.
+- `decision_context.external_research_context`: useful but unmatched research
+  that cannot satisfy gates.
+- `missing_evidence_by_category`: what is still needed and which query should
+  be run next.
+- `validation_adapter_status`: per-source status, including
+  `ok`, `adapter_disabled`, `credential_limited`, `rate_limited`,
+  `cache_only`, and `error`.
+
+Acceptance:
+
+- The contract states that context-only market records never satisfy gates.
+- The contract states that unmatched external results never satisfy gates.
+- The contract is documented in both repos or linked clearly between them.
+- Future adapters have a stable target shape before implementation starts.
+
+Verification:
+
+```bash
+rg "validation_queries|matched_external_evidence|context_only|credential_limited" docs /srv/openclaw-you/workspace/Demand-to-MVP-Radar
+```
+
+Stop conditions:
+
+- stop if the design treats external search results as build evidence without
+  candidate matching;
+- stop if the design turns into raw external RAG or a broad idea crawler.
+
+### RVE-1 - Candidate Validation Query Planner
+
+Status: planned.
+
+Goal: add a deterministic query planner in Demand-to-MVP Radar that turns the
+selected candidate and shortlist into concrete external validation queries.
+This task should not make live network calls yet.
+
+Files likely:
+
+- `/srv/openclaw-you/workspace/Demand-to-MVP-Radar/demand_mvp_radar/mvp_weekly.py`
+- optional new `/srv/openclaw-you/workspace/Demand-to-MVP-Radar/demand_mvp_radar/validation_queries.py`
+- `/srv/openclaw-you/workspace/Demand-to-MVP-Radar/tests/test_mvp_of_week.py`
+- `/srv/openclaw-you/workspace/Demand-to-MVP-Radar/tests/integration/test_report_quality.py`
+
+Planner inputs:
+
+- selected candidate title/summary;
+- pain statement;
+- ICP/customer type if known;
+- workflow keywords;
+- existing project fit;
+- market lens hints;
+- current missing evidence.
+
+Planner output:
+
+- repeatable search queries for demand and pain;
+- manual workaround queries;
+- competitor/alternative queries;
+- WTP/pricing/buying-intent queries;
+- Reddit/forum complaint queries;
+- GitHub issue/discussion queries for developer workflow candidates;
+- X/Twitter corroboration queries marked lower confidence by default.
+
+Acceptance:
+
+- Radar JSON includes `validation_queries` for the selected candidate.
+- Radar Markdown includes a concise "Validation Query Pack" section.
+- Query pack is deterministic in tests.
+- Queries are candidate-specific and not just broad AI-market searches.
+- No live network dependency is introduced by this task.
+
+Verification:
+
+```bash
+cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
+.venv/bin/python -m pytest tests/test_mvp_of_week.py tests/integration/test_report_quality.py
+```
+
+Stop conditions:
+
+- stop if query planning calls external APIs;
+- stop if queries are generic trend mining instead of candidate validation.
+
+### RVE-2 - Matched Evidence Contract And Gate Wiring
+
+Status: planned after RVE-1.
+
+Goal: add a normalized evidence matcher so external records can affect Radar
+only when they are explicitly tied to the selected candidate and classified as
+decision-grade validation evidence.
+
+Files likely:
+
+- `/srv/openclaw-you/workspace/Demand-to-MVP-Radar/demand_mvp_radar/mvp_weekly.py`
+- optional new `/srv/openclaw-you/workspace/Demand-to-MVP-Radar/demand_mvp_radar/validation_evidence.py`
+- `/srv/openclaw-you/workspace/Demand-to-MVP-Radar/tests/test_mvp_of_week.py`
+
+Evidence kinds:
+
+- `repeated_complaint`
+- `manual_workaround`
+- `search_demand`
+- `competitor_traction`
+- `wtp_signal`
+- `developer_issue`
+- `negative_signal`
+
+Acceptance:
+
+- `matched_external_evidence` appears in Radar JSON and Markdown.
+- Only matched external evidence can satisfy external source gates.
+- Context-only market lens records remain excluded from candidate score and
+  source gates.
+- Unmatched external research appears only as decision context.
+- Missing evidence explains which evidence kind is absent.
+
+Verification:
+
+```bash
+cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
+.venv/bin/python -m pytest tests/test_mvp_of_week.py tests/test_telegram_research_bridge.py
+```
+
+Stop conditions:
+
+- stop if a context-only or unmatched record changes the candidate score;
+- stop if the matcher hides negative evidence.
+
+### RVE-3 - Search Demand / SERP Adapter
+
+Status: planned after RVE-1/RVE-2.
+
+Goal: add the first external validation adapter for search demand and SERP
+evidence. Prefer existing SERP/source config first; add `yandex-search-api`
+and optionally `yandex-wordstat` only behind credentials and cache/dry-run
+guards.
+
+Files likely:
+
+- `/srv/openclaw-you/workspace/Demand-to-MVP-Radar/demand_mvp_radar/sources/*`
+- `/srv/openclaw-you/workspace/Demand-to-MVP-Radar/config/mvp_weekly_sources.json`
+- `/srv/openclaw-you/workspace/Demand-to-MVP-Radar/tests/*`
+- `docs/mvp_weekly_radar.md`
+
+Acceptance:
+
+- Adapter can run in dry-run/cache-only mode.
+- Missing credentials produce `credential_limited`, not a crash.
+- Results are normalized into the RVE-2 evidence contract.
+- Search demand alone can support `investigate`/`focused_experiment` only when
+  matched to the candidate and corroborated as required by gates.
+- Report shows which query produced each matched item.
+
+Verification:
+
+```bash
+cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
+.venv/bin/python -m pytest
+```
+
+Stop conditions:
+
+- stop if credentials are hard-required for the weekly run;
+- stop if SERP snippets without matching are counted as source-gate evidence.
+
+### RVE-4 - Reddit / Forum Complaint Adapter
+
+Status: planned after the search adapter.
+
+Goal: validate whether real users complain about the same pain in public
+forums. Prefer `reddit-skill` or Reddit API exports when available; keep the
+adapter cache-first and credentials-gated.
+
+Files likely:
+
+- `/srv/openclaw-you/workspace/Demand-to-MVP-Radar/demand_mvp_radar/sources/*`
+- `/srv/openclaw-you/workspace/Demand-to-MVP-Radar/tests/*`
+- `docs/mvp_weekly_radar.md`
+
+Acceptance:
+
+- Adapter captures complaint text, subreddit/forum, URL, author/date when
+  available, and query provenance.
+- Evidence matcher classifies repeated complaints and manual workaround
+  mentions separately.
+- Reddit/forum evidence cannot satisfy gates if it is about an adjacent but
+  different pain.
+- Missing credentials/rate limits are surfaced in `validation_adapter_status`.
+
+Verification:
+
+```bash
+cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
+.venv/bin/python -m pytest tests/test_mvp_of_week.py tests/integration/test_report_quality.py
+```
+
+Stop conditions:
+
+- stop if generic AI subreddit posts are counted for a specific workflow pain;
+- stop if API errors break the weekly report.
+
+### RVE-5 - Competitor / Workaround Crawler Adapter
+
+Status: planned after RVE-3/RVE-4.
+
+Goal: use `crawl4ai-seo` or an equivalent crawler boundary to inspect
+competitor pages, alternatives, pricing pages, and public workaround guides
+for a selected candidate.
+
+Files likely:
+
+- `/srv/openclaw-you/workspace/Demand-to-MVP-Radar/demand_mvp_radar/sources/*`
+- `/srv/openclaw-you/workspace/Demand-to-MVP-Radar/tests/*`
+- `docs/mvp_weekly_radar.md`
+
+Acceptance:
+
+- Adapter records landing URL, title, positioning, pricing/WTP hints, and
+  whether the page is a competitor, workaround, integration, or irrelevant.
+- Crawler output is bounded by domain/page limits.
+- Competitor traction supports validation only when tied to the same pain and
+  ICP.
+- Negative evidence is shown when pages are irrelevant or only hype.
+
+Verification:
+
+```bash
+cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
+.venv/bin/python -m pytest
+```
+
+Stop conditions:
+
+- stop if crawling is unbounded;
+- stop if SEO/landing evidence is treated as proof of WTP without support.
+
+### RVE-6 - X/Twitter Corroboration Adapter
+
+Status: planned P2, only after lower-noise adapters work.
+
+Goal: use `x-research` / xAI/Grok-backed X research only as corroborating
+discussion evidence for a candidate, not as primary build proof.
+
+Acceptance:
+
+- Adapter is disabled by default unless credentials/config are present.
+- Results are classified lower-confidence unless independently corroborated.
+- Trend chatter without pain/workaround/WTP content does not satisfy gates.
+
+Stop conditions:
+
+- stop if X trends become the main source of product decisions;
+- stop if cost/rate limits are not bounded.
+
+### RVE-7 - Weekly Brief And Radar Validation Surface
+
+Status: planned after the core query/evidence contract lands.
+
+Goal: make the validation layer readable in the Weekly Intelligence Brief and
+Radar Markdown/JSON so the operator can quickly see why a candidate is
+investigate/reject/focused/build.
+
+Files likely:
+
+- `src/output/weekly_intelligence_brief.py`
+- `src/output/mvp_weekly_pipeline.py`
+- `src/output/split_intelligence_reports.py`
+- `tests/test_weekly_intelligence_brief.py`
+- `tests/test_mvp_weekly_pipeline.py`
+- `/srv/openclaw-you/workspace/Demand-to-MVP-Radar/demand_mvp_radar/mvp_weekly.py`
+
+UX blocks:
+
+- MVP Radar Gate Card.
+- Validation Query Pack.
+- Matched Evidence by source/kind.
+- Missing Evidence checklist.
+- "What would change the decision" action card.
+
+Acceptance:
+
+- Weekly Brief exposes external validation state without becoming long.
+- The operator can see the exact next validation action for the candidate.
+- Context-only market lens is clearly labeled as context, not proof.
+- If no external validation is found, the report says why and gives next
+  repeatable searches.
+
+Verification:
+
+```bash
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m unittest tests.test_weekly_intelligence_brief tests.test_mvp_weekly_pipeline
+cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
+.venv/bin/python -m pytest tests/integration/test_report_quality.py
+```
+
+Stop conditions:
+
+- stop if this becomes visual polish without better decision clarity;
+- stop if the Brief buries the decision and next action.
+
+### RVE-8 - Dogfood Validation Run
+
+Status: planned after RVE-1/RVE-2 and at least one adapter.
+
+Goal: rerun the weekly MVP + split HTML flow and judge whether Radar can now
+explain the selected candidate's external demand state.
+
+Commands:
+
+```bash
+set -a; source /srv/openclaw-you/.env; [ -f /etc/demand-mvp-radar.env ] && source /etc/demand-mvp-radar.env; set +a
+PYTHONPATH=src /srv/openclaw-you/venv/bin/python3 src/main.py mvp-weekly --no-deliver
+PYTHONPATH=src /srv/openclaw-you/venv/bin/python3 src/main.py ai-split-report --week 2026-W28 --skip-refresh --threads-limit 24 --atoms-limit 8 --mvp-radar-json /srv/openclaw-you/workspace/Demand-to-MVP-Radar/reports/mvp_of_week/mvp-weekly-2026-W28.json
+```
+
+Acceptance:
+
+- Radar JSON includes validation queries, adapter status, matched evidence,
+  and missing evidence by category.
+- Weekly Brief shows a clear gate card and next validation action.
+- A candidate with Telegram-only evidence remains investigate/reject unless
+  matched external evidence is present.
+- Manual voice/text feedback can be given after reviewing the HTML artifacts.
+
+Stop conditions:
+
+- stop if the run needs a full archive pass;
+- stop if private generated reports or large cache artifacts are staged.
+
 ## HPI: Hermes / Personal Intelligence Assistant / Dogfood
 
-Status: active post-KIR planning and implementation queue.
+Status: implemented post-KIR product layer; continue dogfood measurement while
+RVE handles the next Radar validation work.
 
 KIR-Q0..KIR-Q13 are implemented. The next phase is HPI: Hermes as a
 Telegram-facing operator concierge, PI Assistant as bounded Q&A over curated

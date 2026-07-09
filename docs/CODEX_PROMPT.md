@@ -1,5 +1,5 @@
 # CODEX_PROMPT — Session Handoff
-_v3.8 · 2026-07-08 · telegram-research-agent_
+_v3.9 · 2026-07-09 · telegram-research-agent_
 
 ---
 
@@ -47,6 +47,19 @@ _v3.8 · 2026-07-08 · telegram-research-agent_
   deterministic ranking plus transient SQLite FTS over filtered curated
   `IntelligenceRetrievalItem` objects. Vector retrieval and raw Telegram RAG
   remain deferred. Do not run a full-year archive pass yet.
+- The first 2026-W28 dogfood split run has been completed. It generated
+  `data/output/knowledge_atlas/2026-W28.knowledge-atlas.html` and
+  `data/output/weekly_intelligence_briefs/2026-W28.weekly-brief.html`, sent
+  both HTML files to the operator, and used the new MVP Radar JSON in the
+  Weekly Brief. Radar selected `Hotkey Dictation Workflow Probe` with
+  `dossier_status=investigate`, `recommendation=revisit_with_evidence_gap`,
+  and score 60. This is expected: the system has Telegram and market-context
+  signal, but lacks matched external validation evidence.
+- Active next engineering queue: RVE, Radar Validation Evidence Layer. This
+  should add candidate-specific validation queries, matched external evidence,
+  adapter status, and missing-evidence categories before any build/focused
+  recommendation can strengthen. It is validation evidence, not broad idea
+  generation.
 - Operational incident on 2026-07-06: `telegram-digest.timer` had been inactive
   since 2026-06-22, so weekly Research Brief/Implementation Ideas stopped
   running while ingest and MVP weekly continued. The timer was manually
@@ -113,6 +126,17 @@ _v3.8 · 2026-07-08 · telegram-research-agent_
     contract: Telegram ingestion writes append-only source events, `live-source-index`
     builds deterministic snapshots, and `mvp-weekly --with-live-source-index`
     passes context-only live intelligence to Demand-to-MVP Radar.
+  - Market/business context lens has been hardened end to end. The 84-day
+    Opus-class baseline and 7-day delta are emitted as context-only
+    `market_analyst_context`; Demand-to-MVP Radar preserves `radar_role`,
+    `context_only`, and `build_ready_evidence`, excludes context-only records
+    from candidate ranking/source gates, and keeps the lens in
+    `decision_context.market_context`.
+  - The 2026-W28 MVP dogfood run selected `Hotkey Dictation Workflow Probe` as
+    investigate/revisit-with-evidence-gap, not build-ready. Missing evidence is
+    now explicit: fresh KIR thread, two independent external sources, WTP
+    signal, repeatable validation searches, and concrete manual workaround
+    examples.
   - `health-check` now reports weekly delivery status for
     `telegram-digest.timer`, current-week digest presence after the scheduled
     Monday window, and root-owned `data/output` files; `scripts/healthcheck.sh`
@@ -227,10 +251,15 @@ _v3.8 · 2026-07-08 · telegram-research-agent_
   is a Pathway-ready JSONL event stream plus deterministic fallback snapshot;
   Radar treats the snapshot as context only, not decision-grade external
   evidence.
+- Radar still needs candidate-specific external validation adapters. The next
+  task queue is RVE in `docs/tasks.md`: query planner, matched evidence
+  contract, search/SERP demand adapter, Reddit/forum complaints, competitor /
+  workaround crawler, and X/Twitter corroboration later. These adapters must
+  validate a selected candidate; they are not a replacement for evidence gates.
 - The implemented workbook roadmap is `docs/ai_intelligence_workbook_roadmap.md`,
   with supporting context in `docs/ai_knowledge_intelligence_roadmap.md`.
-  Further work should start from HPI in `docs/tasks.md`, not from already
-  completed KIR-Q0..KIR-Q13 items.
+  Further work should start from RVE in `docs/tasks.md`, not from already
+  completed KIR-Q0..KIR-Q13 or HPI implementation items.
 
 ---
 
@@ -248,7 +277,8 @@ The weekly pipeline now has:
 ## Exact Next Execution Step
 
 KIR-Q0..KIR-Q13 under `KIR-Q: AI Intelligence Quality / Workbook / Feedback /
-Radar Contract` are implemented. HPI is now the active post-KIR roadmap:
+Radar Contract` are implemented. HPI has shipped the usable PI/Hermes dogfood
+foundation:
 
 ```text
 HPI: Hermes / Personal Intelligence Assistant / Dogfood
@@ -260,33 +290,46 @@ projection, transient SQLite FTS ranking, bounded PI tool catalog, Hermes
 Telegram concierge commands and bounded chat, confirmation-gated feedback,
 managed voice transcription with chat/feedback/reminder intent routing,
 operator reminders with done/not-done callbacks when enabled, Strategy Reviewer
-Telegram delivery, action status projection, and compact dogfood review
-artifact helpers.
+Telegram delivery, action status projection, compact dogfood review artifact
+helpers, market/business context lens, split Knowledge Atlas / Weekly
+Intelligence Brief artifacts, and the first W28 dogfood run.
 
-The exact next task is dogfood measurement over the implemented PI/Hermes
-workflow, because HPI-9-lite has already decided and prototyped curated-only
-retrieval without vector/raw-post RAG:
+The exact next task is RVE: Radar Validation Evidence Layer:
 
 ```text
-Dogfood PI/Hermes Curated Intelligence Workflow
+RVE: Radar Validation Evidence Layer
 ```
 
 Do this next:
 
-- run the weekly split report / Hermes / feedback / action-status loop on real
-  operator questions;
-- record concrete retrieval misses, wrong priorities, useful answers, actions
-  completed, and friction;
-- use `docs/curated_semantic_retrieval.md` as the retrieval decision record;
-- do not index raw Telegram firehose posts;
-- keep all assistant tools read-only.
+- start from `docs/tasks.md`, section `RVE: Radar Validation Evidence Layer`;
+- implement RVE-0/RVE-1 first in
+  `/srv/openclaw-you/workspace/Demand-to-MVP-Radar`;
+- document the validation evidence contract and add a deterministic candidate
+  validation query planner;
+- do not make live external API calls in RVE-1;
+- keep market/business lens records `context_only`;
+- make sure external results cannot affect gates until RVE-2 matches them to
+  the selected candidate;
+- after RVE-1/RVE-2, add adapters in this order: search/SERP demand,
+  Reddit/forum complaints, competitor/workaround crawler, X/Twitter
+  corroboration last;
+- keep every external adapter cache-first, dry-run capable, credentials-gated,
+  and failure-tolerant via `credential_limited` / `adapter_disabled` status.
+
+Candidate resources to wire later as adapters:
+
+- `yandex-wordstat` for search demand and monthly dynamics;
+- `yandex-search-api` for Yandex Cloud Search API v2 SERP evidence;
+- `reddit-skill` for Reddit API posts/comments/search;
+- `crawl4ai-seo` for competitor, landing, pricing, and workaround crawling;
+- `x-research` for lower-priority X/Twitter corroboration through xAI/Grok.
 
 Do not implement raw Telegram firehose RAG. Do not run the annual/full archive
 pass yet. Do not implement assistant mutation tools. Do not let Telegram
-commands edit code/config/profile/projects or write feedback directly. Hermes
-remains a concierge/router, not source of truth. PI Assistant must use curated
-retrieval; vector retrieval requires concrete dogfood misses against the
-current curated deterministic+FTS layer.
+commands edit code/config/profile/projects or write feedback directly. Do not
+turn external adapters into broad idea mining. RVE must validate Radar
+candidates against external demand evidence and preserve existing gates.
 
 Open/future items outside completed Q0..Q13 remain:
 
@@ -318,6 +361,13 @@ The new HPI implementation direction is:
 facade first -> curated retrieval projection -> bounded tools -> Telegram
 concierge commands -> confirmation-gated voice feedback -> dogfood metrics
 -> four-week product decision before optional vector retrieval
+```
+
+The new RVE implementation direction is:
+
+```text
+candidate dossier -> validation query pack -> external adapters ->
+matched evidence contract -> source gates -> Weekly Brief/Radar gate card
 ```
 
 Reference documents:
