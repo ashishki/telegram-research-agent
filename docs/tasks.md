@@ -188,6 +188,11 @@ goal is to let Radar test Telegram/market hypotheses against candidate-specific
 external demand evidence: search demand, public complaints, manual workaround
 examples, competitor traction, and willingness-to-pay signals.
 
+A parallel dogfood follow-up queue is DFX: Dogfood Feedback / Atlas UX /
+Personalization. DFX captures the 2026-W28 operator feedback that the split
+HTML artifacts are not yet a real knowledge map, Hermes answers can overstate
+feedback provenance, and current topic selection is not yet personal enough.
+
 Implementation details, end-to-end stages, acceptance criteria, metrics, risks,
 and non-goals for the completed KIR queue remain in
 `docs/ai_knowledge_intelligence_roadmap.md` and
@@ -615,10 +620,465 @@ Stop conditions:
 - stop if the run needs a full archive pass;
 - stop if private generated reports or large cache artifacts are staged.
 
+## DFX: Dogfood Feedback / Atlas UX / Personalization
+
+Status: planned dogfood follow-up queue after the first 2026-W28 Brief/Atlas
+review.
+
+Context:
+
+- The 2026-W28 Atlas/Brief run showed that the artifacts are readable but do
+  not yet feel like a real knowledge map.
+- The operator wants a beautiful, interactive knowledge artifact with nested
+  panels, readable source context, original Telegram/article links, timelines,
+  and infographic-like structure.
+- Hermes answered a feedback question too confidently: it did not clearly say
+  that the five W28 feedback events came from `ai_report_feedback_events`
+  manual eval rows, not Telegram reactions.
+- Current DB state at inspection time: `ai_report_feedback_events=5`,
+  `signal_feedback=0`, `reaction_sync_state=0`, and the W28 split artifacts
+  themselves had `feedback_context.event_count=0` because current-week
+  feedback affects future weeks, not already generated W28 artifacts.
+- Current Atlas topic selection is mostly freshness / momentum / source-count
+  based. It uses some profile/project context downstream, but it does not yet
+  make project-fit, operator context, business focus, or "why selected for
+  you" a first-class ranking/explanation surface.
+
+Goal:
+
+Make the weekly loop trustworthy and personally useful before adding more
+complex sources. Hermes must explain exactly where feedback came from and what
+it affected. Atlas/Brief must show why an item matters to this operator, not
+only that it is fresh. Atlas v2 should become an interactive study surface, not
+a static report.
+
+Architecture rules:
+
+- Do not auto-edit `profile.yaml`, `projects.yaml`, prompts, thresholds, or
+  code from feedback. Keep explicit operator approval.
+- Do not destructively delete accidental feedback. Prefer append-only
+  correction/retraction events or explicit status fields with audit trail.
+- Treat `read` and raw Telegram reactions as weak interest signals.
+- Treat `tried`, `useful`, and `applied_to_project` as stronger evidence.
+- No reaction remains unknown, not negative.
+- The old visual workbook can remain as a fallback, but Hermes should prefer
+  the new split Weekly Brief / Knowledge Atlas artifacts.
+- Atlas v2 should use repo-native HTML/CSS/JS/SVG and existing Archify/local
+  diagram patterns. Do not add image-generation as the default solution.
+
+### DFX-0 - Fix Hermes Weekly Artifact Awareness
+
+Status: planned.
+
+Goal: make Hermes/PI `get_weekly_summary` and `/weekly` prefer the split
+Weekly Intelligence Brief and Knowledge Atlas over the older visual workbook.
+
+Files likely:
+
+- `src/assistant/pi_facade.py`
+- `src/assistant/pi_tools.py`
+- `src/assistant/pi_prompts.py`
+- `src/assistant/pi_chat.py`
+- `src/bot/handlers.py`
+- `src/output/intelligence_retrieval_items.py`
+- `tests/test_pi_facade.py`
+- `tests/test_pi_tools.py`
+- `tests/test_pi_chat.py`
+- `tests/test_handlers.py`
+
+Implementation notes:
+
+- Keep the old visual workbook as compatibility fallback.
+- When split artifacts exist for a week, return both paths and label them
+  clearly as Weekly Brief and Knowledge Atlas.
+- `/weekly` should not tell the operator to open only `*.visual.html` when
+  `*.weekly-brief.html` and `*.knowledge-atlas.html` exist.
+- Tool descriptions should stop saying "workbook" as the only weekly surface.
+
+Acceptance:
+
+- `get_weekly_summary("2026-W28")` returns split artifact paths when present.
+- Telegram `/weekly 2026-W28` names Weekly Brief and Knowledge Atlas.
+- Old visual workbook paths appear only as fallback/legacy references.
+- Tests cover split-first and legacy-fallback behavior.
+
+Verification:
+
+```bash
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m unittest tests.test_pi_facade tests.test_pi_tools tests.test_pi_chat tests.test_handlers
+```
+
+Stop conditions:
+
+- stop if old workbook compatibility is removed without tests;
+- stop if Hermes still reports stale artifact paths as primary.
+
+### DFX-1 - Feedback Provenance And Effect Audit
+
+Status: planned.
+
+Goal: make Hermes answer "where did this feedback come from?" with exact
+source tables, timestamps, recorded actor, target refs, and whether the
+feedback already affected the current artifact or only future runs.
+
+Files likely:
+
+- `src/assistant/pi_facade.py`
+- `src/assistant/pi_prompts.py`
+- `src/assistant/pi_chat.py`
+- `src/db/ai_report_feedback.py`
+- `src/db/artifact_feedback.py`
+- `tests/test_pi_facade.py`
+- `tests/test_pi_chat.py`
+
+Provenance sources to distinguish:
+
+- `ai_report_feedback_events`: confirmed workbook/report feedback.
+- `ai_report_feedback_intakes`: text/voice feedback drafts and confirmation
+  state.
+- `artifact_feedback_logs`: Telegram artifact button feedback.
+- `signal_feedback`: source-post/manual signal feedback.
+- `reaction_sync_state`: Telegram reaction sync audit state.
+
+Acceptance:
+
+- Feedback summary exposes `origin_table`, `recorded_by`, `created_at`,
+  `target_type`, `target_ref`, `notes`, and confidence/effect status.
+- Hermes says when W28 feedback did not affect W28 split artifacts because
+  those artifacts loaded only prior-week feedback.
+- Hermes does not infer Telegram reactions when `signal_feedback` and
+  `reaction_sync_state` are empty.
+- The answer separates "recorded" from "used for ranking".
+
+Verification:
+
+```bash
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m unittest tests.test_pi_facade tests.test_pi_chat tests.test_ai_report_feedback
+```
+
+Stop conditions:
+
+- stop if the bot claims feedback came from reactions without DB evidence;
+- stop if feedback effect is described without generation-window context.
+
+### DFX-2 - Feedback Strength And Accidental-Correction Flow
+
+Status: planned.
+
+Goal: prevent weak or accidental signals from oversteering future ranking, and
+give the operator a safe way to correct accidental feedback.
+
+Files likely:
+
+- `src/db/ai_report_feedback.py`
+- `src/output/ai_intelligence_report.py`
+- `src/output/action_status.py`
+- `src/assistant/pi_facade.py`
+- `src/bot/handlers.py`
+- `src/main.py`
+- `tests/test_ai_report_feedback.py`
+- `tests/test_ai_intelligence_report.py`
+- `tests/test_handlers.py`
+
+Implementation notes:
+
+- Add explicit feedback strength semantics:
+  - `read`: weak positive;
+  - `operator_marked_interesting` / raw reaction: weak interest;
+  - `tried`, `useful`, `applied_to_project`: strong positive;
+  - `wrong_priority`, `not_interested`, `noise`: strong downrank;
+  - `verify_first`: trust/calibration signal, not topic promotion.
+- Add an append-only correction path, for example `retracted` /
+  `accidental` / `superseded_by` metadata or a correction event table.
+- Add CLI or Telegram-visible inspection so the operator can identify and
+  retract a mistaken event.
+- Ranking should ignore retracted feedback and treat weak signals with smaller
+  weight.
+
+Acceptance:
+
+- Accidental feedback can be corrected without deleting audit history.
+- `read` no longer promotes as strongly as `tried/useful/applied_to_project`.
+- `verify_first` does not promote the topic.
+- Tests prove corrected feedback no longer affects ranking.
+
+Verification:
+
+```bash
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m unittest tests.test_ai_report_feedback tests.test_ai_intelligence_report tests.test_handlers
+```
+
+Stop conditions:
+
+- stop if the implementation destructively deletes feedback rows;
+- stop if raw reactions become strong positive signals.
+
+### DFX-3 - Operator Context Profile
+
+Status: planned.
+
+Goal: add an explicit operator context layer beyond `profile.yaml` topic
+boosts and `projects.yaml` repo keywords. This should capture the operator's
+current work, product direction, business context, skills, constraints, and
+anti-priorities.
+
+Files likely:
+
+- new `src/config/operator_context.yaml`
+- `src/config/profile.yaml`
+- `src/config/projects.yaml`
+- `src/output/ai_intelligence_report.py`
+- `src/output/knowledge_atlas_report.py`
+- `src/output/weekly_intelligence_brief.py`
+- `src/assistant/pi_facade.py`
+- `tests/test_ai_intelligence_report.py`
+- `tests/test_split_intelligence_reports.py`
+
+Suggested fields:
+
+- current role / working mode;
+- active products and which ones matter most this month;
+- current technical stack and skill development goals;
+- business goals and market assumptions;
+- preferred idea shapes;
+- anti-priorities / topics that are interesting but not actionable now;
+- weekly decision criteria;
+- review date and stale-context warning.
+
+Acceptance:
+
+- Operator context is loaded read-only and never auto-mutated by Hermes.
+- Atlas/Brief ranking can use operator context as a scored factor.
+- Output can explain "why selected for you" using operator context.
+- Health-check warns when operator context is stale or missing.
+
+Verification:
+
+```bash
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m unittest tests.test_ai_intelligence_report tests.test_split_intelligence_reports tests.test_health_check
+```
+
+Stop conditions:
+
+- stop if the assistant writes operator context automatically;
+- stop if private context is copied into public/demo docs.
+
+### DFX-4 - Personalized Ranking Contract And "Why Selected For You"
+
+Status: planned after DFX-3.
+
+Goal: make topic selection explainable and more personal. Every major Atlas /
+Brief item should show why it was selected for this operator.
+
+Files likely:
+
+- `src/output/ai_intelligence_report.py`
+- `src/output/knowledge_atlas_report.py`
+- `src/output/weekly_intelligence_brief.py`
+- `src/output/intelligence_retrieval_items.py`
+- `tests/test_ai_intelligence_report.py`
+- `tests/test_split_intelligence_reports.py`
+
+Ranking factors:
+
+- freshness / momentum;
+- source strength and source diversity;
+- profile fit;
+- project fit;
+- operator context fit;
+- market/business fit;
+- feedback fit;
+- evidence confidence and verification status.
+
+Acceptance:
+
+- Atlas/Brief sidecars include per-item ranking factors.
+- HTML shows a compact "Why selected for you" explanation for top items.
+- Topic selection is not dominated by freshness/momentum alone.
+- The report can honestly state low personalization confidence when context or
+  feedback is sparse.
+
+Verification:
+
+```bash
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m unittest tests.test_ai_intelligence_report tests.test_split_intelligence_reports tests.test_intelligence_retrieval_items
+```
+
+Stop conditions:
+
+- stop if the explanation is generic and not backed by sidecar data;
+- stop if weak feedback outweighs explicit operator context.
+
+### DFX-5 - Knowledge Atlas V2 Interactive Study Surface
+
+Status: planned after DFX-0/DFX-4, can be implemented iteratively.
+
+Goal: turn Knowledge Atlas from a static report into an interactive knowledge
+map for reading, studying, and navigating source-backed ideas.
+
+Files likely:
+
+- `src/output/knowledge_atlas_report.py`
+- `src/output/split_intelligence_reports.py`
+- `tests/test_split_intelligence_reports.py`
+- optional new `src/output/knowledge_atlas_assets.py`
+
+UX requirements:
+
+- interactive idea-thread map;
+- nested thread panels / drawers;
+- atom/source reading pane in the same HTML;
+- original Telegram/post/article links visible next to claims;
+- timeline per thread;
+- source contribution map;
+- evidence strength ladder;
+- topic lifecycle/status view;
+- study backlog with "read next" and "why this matters";
+- responsive desktop/mobile layout.
+
+Implementation notes:
+
+- Use standalone HTML/CSS/vanilla JS/SVG unless the repo already has a local
+  renderer pattern that fits.
+- Use Archify/local SVG patterns for diagrams where helpful.
+- Do not use image generation as the default way to make the Atlas beautiful.
+- Keep generated HTML self-contained enough to send/open from Telegram.
+
+Acceptance:
+
+- Atlas has interactive panels without needing a dev server.
+- A reader can inspect a thread, its atoms, and original sources in one place.
+- HTML remains bounded and does not mirror every Telegram post.
+- Tests validate required UI sections and sidecar fields.
+
+Verification:
+
+```bash
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m unittest tests.test_split_intelligence_reports tests.test_ai_visual_report
+```
+
+Stop conditions:
+
+- stop if this becomes visual decoration without better study/navigation;
+- stop if cards are nested inside cards or source text overwhelms the page.
+
+### DFX-6 - Weekly Brief Decision UX Upgrade
+
+Status: planned after DFX-4.
+
+Goal: make Weekly Brief more obviously useful in the first minute: top
+decision, why it matters, what changed, what to do, why selected, and what
+feedback to give.
+
+Files likely:
+
+- `src/output/weekly_intelligence_brief.py`
+- `src/output/split_intelligence_reports.py`
+- `tests/test_split_intelligence_reports.py`
+- `tests/test_weekly_intelligence_brief.py`
+
+UX blocks:
+
+- Decision Snapshot.
+- Top 3 personally relevant themes.
+- Changed / stayed / ignore.
+- Action cards tied to active projects.
+- MVP Radar gate card.
+- Feedback prompt card with exact targets.
+- Links to Atlas panels for deeper reading.
+
+Acceptance:
+
+- Brief stays short and does not become another Atlas.
+- Each top item has a "why selected for you" line.
+- Actions name the active project or say no project fit.
+- Feedback prompts reference exact item refs that can be corrected later.
+
+Verification:
+
+```bash
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m unittest tests.test_weekly_intelligence_brief tests.test_split_intelligence_reports
+```
+
+Stop conditions:
+
+- stop if the Brief grows into a long study document;
+- stop if actions are not tied to active projects or explicit no-fit state.
+
+### DFX-7 - Feedback Instruction And Voice/Text Flow Cleanup
+
+Status: planned.
+
+Goal: make "how do I give feedback?" obvious and accurate in chat and inside
+the weekly artifacts.
+
+Files likely:
+
+- `src/assistant/pi_chat.py`
+- `src/assistant/pi_prompts.py`
+- `src/assistant/feedback_prompts.py`
+- `src/bot/handlers.py`
+- `src/output/weekly_intelligence_brief.py`
+- `src/output/knowledge_atlas_report.py`
+- `tests/test_pi_chat.py`
+- `tests/test_handlers.py`
+
+Acceptance:
+
+- Hermes explains the difference between report feedback, artifact button
+  feedback, source-post reaction sync, and voice/text feedback.
+- The answer includes the current safest path: say feedback in text/voice,
+  inspect the draft, then confirm/discard.
+- Artifact feedback prompts include exact refs, for example atom/thread/action
+  identifiers.
+- The system does not claim a feedback event was applied until confirmed.
+
+Verification:
+
+```bash
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m unittest tests.test_pi_chat tests.test_handlers tests.test_ai_report_feedback
+```
+
+Stop conditions:
+
+- stop if help text implies feedback writes directly without confirmation;
+- stop if chat instructions mention stale artifact names as primary.
+
+### DFX-8 - Dogfood Re-Run And Manual Quality Eval
+
+Status: planned after DFX-0 through DFX-4, and again after DFX-5.
+
+Goal: regenerate Weekly Brief and Knowledge Atlas, send/open them, and record a
+manual quality eval focused on personalization, feedback honesty, and Atlas
+usability.
+
+Commands:
+
+```bash
+PYTHONPATH=src /srv/openclaw-you/venv/bin/python3 src/main.py ai-split-report --week 2026-W28 --skip-refresh --threads-limit 24 --atoms-limit 8 --mvp-radar-json /srv/openclaw-you/workspace/Demand-to-MVP-Radar/reports/mvp_of_week/mvp-weekly-2026-W28.json
+```
+
+Eval checklist:
+
+- Does Hermes name the correct Brief/Atlas artifacts?
+- Can the operator see where feedback came from?
+- Can accidental feedback be corrected?
+- Do top themes feel like this operator's current priorities?
+- Does every top item explain why it was selected?
+- Does Atlas feel like a navigable knowledge map rather than a static report?
+- Are original sources easy to open?
+
+Stop conditions:
+
+- stop if generated private artifacts are staged;
+- stop if root-owned output files prevent normal operation.
+
 ## HPI: Hermes / Personal Intelligence Assistant / Dogfood
 
 Status: implemented post-KIR product layer; continue dogfood measurement while
-RVE handles the next Radar validation work.
+RVE handles Radar validation work and DFX handles feedback/Atlas/product-fit
+dogfood fixes.
+
 
 KIR-Q0..KIR-Q13 are implemented. The next phase is HPI: Hermes as a
 Telegram-facing operator concierge, PI Assistant as bounded Q&A over curated
