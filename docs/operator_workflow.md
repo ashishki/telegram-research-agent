@@ -260,9 +260,9 @@ not expose raw SQLite sessions.
 
 Next implementation queue:
 
-- PGI-001 through PGI-003 are implemented and pushed.
-- Start `PGI-004 - Knowledge Atlas V2 Thread Navigation` from `docs/tasks.md`
-  as a separate Atlas-sized slice.
+- PGI-001 through PGI-004 are implemented and pushed.
+- Start `PGI-005 - Project And Learning Intelligence Projections` from
+  `docs/tasks.md` as a separate slice.
 - Do not start vector retrieval, raw Telegram RAG, or assistant mutation tools
   before Atlas, evaluation, and dogfood evidence justify them.
 - Obsidian remains a generated human navigation/audit projection, not runtime

@@ -14,11 +14,10 @@ task graph below.
 
 - One active queue: Portfolio-Grade Intelligence (`PGI`).
 - One parallel Radar track: `RADAR-PGI`.
-- `PGI-001`, `PGI-002`, and `PGI-003` are implemented locally with focused
-  verification.
-- The next candidate task is `PGI-004 - Knowledge Atlas V2 Thread Navigation`.
-  It is marked XL and should start as a separate PR-sized slice after this
-  cockpit/Hermes/Radar gate commit is reviewed and pushed.
+- `PGI-001`, `PGI-002`, `PGI-003`, and `PGI-004` are implemented locally with
+  focused verification.
+- The next candidate task is
+  `PGI-005 - Project And Learning Intelligence Projections`.
 - Do not run expensive LLM jobs, full archive backfills, migrations, or
   production config changes from backlog grooming.
 - Market/business context remains `context_only`.
@@ -32,7 +31,7 @@ task graph below.
 | Knowledge Atom storage/extraction | `implemented_and_verified` |
 | Idea Thread storage/momentum | `implemented_and_verified` |
 | Weekly AI visual report/workbook contract | `implemented_and_verified`, `legacy_surface` |
-| Weekly Brief + Knowledge Atlas split | `implemented_and_verified` for PGI-003 Brief cockpit; Atlas remains `partial` |
+| Weekly Brief + Knowledge Atlas split | `implemented_and_verified` for PGI-003 Brief cockpit and PGI-004 Atlas thread navigation |
 | Hermes/PI facade/tools/chat | `implemented_but_not_dogfooded`; PGI-003 artifact freshness awareness added |
 | Feedback intake/action status | `implemented_and_verified` for PGI-002 provenance/ranking slice |
 | Strategy Reviewer | `implemented_and_verified` advisory-only |
@@ -42,11 +41,11 @@ task graph below.
 
 ## Next Candidate Task
 
-`PGI-004 - Knowledge Atlas V2 Thread Navigation`
+`PGI-005 - Project And Learning Intelligence Projections`
 
-Start only as a fresh XL/PR-sized slice after the PGI-003 diff is reviewed,
-committed, and pushed. Do not reopen KIR/HPI/RVE implementation unless the new
-contract discovers a regression.
+Start only as a fresh PR-sized slice after the PGI-004 Atlas navigation diff is
+reviewed, committed, and pushed. Do not reopen KIR/HPI/RVE implementation
+unless the new contract discovers a regression.
 
 ## Dependency Graph
 
@@ -300,7 +299,7 @@ PYTHONPATH=src python3 -m pytest tests/test_split_intelligence_reports.py tests/
 
 ### PGI-004 - Knowledge Atlas V2 Thread Navigation
 
-- Status: `next_p1_xl`
+- Status: `completed_local`
 - Priority: P1
 - Owner: `telegram-research-agent`
 - Problem: Atlas is a split artifact, but not yet a strong navigable cumulative
@@ -310,8 +309,7 @@ PYTHONPATH=src python3 -m pytest tests/test_split_intelligence_reports.py tests/
   open questions.
 - Why now: after the Brief is useful, Atlas must support deeper weekly review.
 - Dependencies: `PGI-001`, `PGI-003`.
-- Blocked by: not blocked by PGI-003, but estimated XL; split before
-  implementation into a safe Atlas V2 slice.
+- Blocked by: none for the completed navigation slice.
 - Files likely touched: `src/output/knowledge_atlas_report.py`,
   `src/output/split_intelligence_reports.py`,
   `src/output/intelligence_retrieval_items.py`,
@@ -345,10 +343,30 @@ PYTHONPATH=src python3 -m pytest tests/test_split_intelligence_reports.py tests/
 - Estimated size: XL.
 - Portfolio evidence produced: Atlas v2 screenshot and usability scorecard.
 - Radar impact: none.
+- Completion notes:
+  - Added `thread_navigation` sidecar DTO
+    (`knowledge_atlas_thread_navigation.v1`) with thread detail cards,
+    evidence growth, maturity, momentum-vs-evidence data, timeline entries,
+    source diversity, project connections, decision projection, open questions,
+    study-next items, and original source links.
+  - Added rendered Atlas `Thread Navigation` section with thread index, thread
+    timeline, claims, contradictions, open questions, study-next, momentum vs
+    evidence, source diversity, project connections, decisions, evidence pane,
+    and original source links.
+  - Kept Atlas bounded to curated Idea Threads and Knowledge Atoms; no raw
+    Telegram mirror, full archive backfill, or decorative/unbounded graph.
+  - Added `atlas_thread` retrieval items so Hermes/search can drill into Atlas
+    threads with source refs, atom IDs, and thread slugs.
+  - Verification passed:
+    `PYTHONPATH=src python3 -m pytest tests/test_split_intelligence_reports.py tests/test_intelligence_retrieval_items.py`.
+  - Additional touched-surface verification passed:
+    `PYTHONPATH=src python3 -m pytest tests/test_ai_report_contract.py tests/test_pi_tools.py tests/test_pi_chat.py tests/test_pi_facade.py`.
+  - No DB migration, production config change, expensive LLM run, full archive
+    backfill, hidden Hermes mutation tool, or Radar gate behavior change.
 
 ### PGI-005 - Project And Learning Intelligence Projections
 
-- Status: `planned`
+- Status: `next_p1`
 - Priority: P1
 - Owner: `telegram-research-agent`
 - Problem: project and learning implications exist only as partial sections,

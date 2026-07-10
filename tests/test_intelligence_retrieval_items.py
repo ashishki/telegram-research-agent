@@ -285,6 +285,74 @@ class TestIntelligenceRetrievalItems(unittest.TestCase):
         self.assertIn("source_refs", results[0])
         self.assertIn("atom_ids", results[0])
 
+    def test_builds_atlas_thread_retrieval_items_from_thread_navigation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            atlas_dir = root / "knowledge_atlas"
+            atlas_dir.mkdir(parents=True)
+            html_path = atlas_dir / "2026-W28.knowledge-atlas.html"
+            json_path = atlas_dir / "2026-W28.knowledge-atlas.json"
+            html_path.write_text("<!doctype html><title>Knowledge Atlas</title>", encoding="utf-8")
+            json_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "split_ai_report.v1",
+                        "artifact_type": "knowledge_atlas",
+                        "contract_version": INTELLIGENCE_CONTRACT_VERSION,
+                        "week_label": "2026-W28",
+                        "generated_at": "2026-07-08T00:00:00Z",
+                        "html_path": str(html_path),
+                        "workbook_sections": [
+                            {
+                                "id": "thread-navigation",
+                                "title": "Thread Navigation",
+                                "title_en": "Thread Navigation",
+                                "kind": "thread_navigation",
+                                "summary": "Atlas thread drill-down.",
+                            }
+                        ],
+                        "thread_navigation": {
+                            "schema_version": "knowledge_atlas_thread_navigation.v1",
+                            "threads": [
+                                {
+                                    "slug": "eval-gates",
+                                    "title": "Eval Gates",
+                                    "status": "active",
+                                    "current_understanding": "Eval gates are becoming release infrastructure.",
+                                    "change_since_previous_period": "More source-backed release evidence appeared.",
+                                    "claims": ["Eval gates matter before agent-written releases."],
+                                    "evidence_items": [
+                                        {
+                                            "atom_id": 101,
+                                            "claim": "Eval gates are becoming release infrastructure.",
+                                            "source_urls": ["https://t.me/ai_lab/101"],
+                                        }
+                                    ],
+                                    "source_urls": ["https://t.me/ai_lab/101"],
+                                    "source_diversity": {"source_count": 1, "channels": ["@ai_lab"]},
+                                    "project_connections": [{"connection_type": "project_watch", "rationale": "Relevant to agent evaluation."}],
+                                    "decisions": [{"decision": "verify_first", "rationale": "Verify source quality."}],
+                                    "open_questions": ["Can another source confirm it?"],
+                                    "study_next": ["Read the eval gate source."],
+                                }
+                            ],
+                        },
+                        "intelligence_contract": self._canonical_contract(),
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+
+            items = build_retrieval_items(self._settings(root), week_label="2026-W28", output_root=root)
+            results = search_retrieval_items(items, "release infrastructure", filters={"item_type": "atlas_thread"}, limit=3)
+
+        self.assertTrue(results)
+        self.assertEqual(results[0]["item_type"], "atlas_thread")
+        self.assertEqual(results[0]["thread_slug"], "eval-gates")
+        self.assertIn("https://t.me/ai_lab/101", results[0]["source_refs"])
+        self.assertIn(101, results[0]["atom_ids"])
+
     def test_filters_apply_before_broad_search(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

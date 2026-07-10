@@ -246,6 +246,7 @@ def _items_from_workbook(workbook: Mapping[str, Any]) -> list[IntelligenceRetrie
     artifact_refs = _artifact_source_refs(workbook)
     items: list[IntelligenceRetrievalItem] = []
     items.extend(_workbook_section_items(workbook, week_label=week, generated_at=generated_at, artifact_refs=artifact_refs))
+    items.extend(_atlas_thread_items(workbook, week_label=week, generated_at=generated_at, artifact_refs=artifact_refs))
     items.extend(_canonical_contract_items(workbook, week_label=week, generated_at=generated_at))
     items.extend(_claim_card_items(workbook, week_label=week, generated_at=generated_at))
     items.extend(_deep_explanation_items(workbook, week_label=week, generated_at=generated_at))
@@ -378,6 +379,73 @@ def _workbook_section_items(
                 source_refs=artifact_refs,
                 atom_ids=_atom_ids_from_objects(section_items),
                 status=_clean_text(section.get("kind")) or None,
+                created_at=generated_at,
+                updated_at=generated_at,
+            )
+        )
+    return result
+
+
+def _atlas_thread_items(
+    workbook: Mapping[str, Any],
+    *,
+    week_label: str | None,
+    generated_at: str | None,
+    artifact_refs: list[str],
+) -> list[IntelligenceRetrievalItem]:
+    navigation = workbook.get("thread_navigation") if isinstance(workbook.get("thread_navigation"), Mapping) else {}
+    threads = [item for item in _as_list(navigation.get("threads")) if isinstance(item, Mapping)]
+    result: list[IntelligenceRetrievalItem] = []
+    for index, thread in enumerate(threads, start=1):
+        title = _clean_text(thread.get("title")) or _clean_text(thread.get("slug")) or f"Atlas thread {index}"
+        evidence_items = [item for item in _as_list(thread.get("evidence_items")) if isinstance(item, Mapping)]
+        source_refs = _unique(
+            [
+                *artifact_refs,
+                *_string_values(thread.get("source_urls")),
+                *[
+                    source_url
+                    for evidence in evidence_items
+                    for source_url in _string_values(evidence.get("source_urls"))
+                ],
+            ]
+        )
+        atom_ids = _unique(
+            [
+                *[
+                    evidence.get("atom_id")
+                    for evidence in evidence_items
+                    if evidence.get("atom_id") not in (None, "")
+                ],
+                *_list_values(thread.get("atom_ids")),
+            ]
+        )
+        result.append(
+            IntelligenceRetrievalItem(
+                id=f"atlas_thread:{week_label or 'unknown'}:{_slug(thread.get('slug') or title)}",
+                item_type="atlas_thread",
+                week_label=week_label,
+                title=title,
+                summary=_clean_text(thread.get("current_understanding")) or None,
+                text=_join_text(
+                    title,
+                    thread.get("current_understanding"),
+                    thread.get("change_since_previous_period"),
+                    " ".join(_string_values(thread.get("claims"))),
+                    " ".join(_string_values(thread.get("contradictions"))),
+                    " ".join(_string_values(thread.get("open_questions"))),
+                    " ".join(_string_values(thread.get("study_next"))),
+                    _json_text(thread.get("source_diversity")),
+                    _json_text(thread.get("project_connections")),
+                    _json_text(thread.get("decisions")),
+                ),
+                source_refs=source_refs,
+                atom_ids=atom_ids,
+                thread_slug=_clean_text(thread.get("slug")) or None,
+                confidence=None,
+                evidence_tier="atlas_curated_thread",
+                verification_status=None,
+                status=_clean_text(thread.get("status")) or None,
                 created_at=generated_at,
                 updated_at=generated_at,
             )
@@ -1051,6 +1119,9 @@ def _parse_iso(value: object) -> datetime | None:
 
 
 def _section_payload(workbook: Mapping[str, Any], section_id: str, kind: str) -> object:
+    normalized = f"{section_id} {kind}".replace("-", "_")
+    if "thread_navigation" in normalized:
+        return workbook.get("thread_navigation") or {}
     for section in _as_list(workbook.get("artifact_sections")):
         if not isinstance(section, Mapping):
             continue
@@ -1058,7 +1129,6 @@ def _section_payload(workbook: Mapping[str, Any], section_id: str, kind: str) ->
             return section
         if kind and _clean_text(section.get("kind")) == kind:
             return section
-    normalized = f"{section_id} {kind}".replace("-", "_")
     if "decision" in normalized:
         return workbook.get("decision_cards") or []
     if "strong" in normalized:

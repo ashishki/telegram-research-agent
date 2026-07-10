@@ -11,14 +11,15 @@ Radar validation track.
 
 Canonical roadmap: `docs/portfolio_grade_intelligence_roadmap.md`.
 Canonical active backlog: `docs/tasks.md`.
-Next implementation candidate: `PGI-004 - Knowledge Atlas V2 Thread Navigation`
-after the pushed PGI-001..PGI-003 slices.
+Next implementation candidate:
+`PGI-005 - Project And Learning Intelligence Projections` after the pushed
+PGI-001..PGI-004 slices.
 
 Current baseline: knowledge atoms, idea threads, canonical report contracts,
-split Brief / Atlas artifacts, Brief decision cockpit, Hermes/PI read-only
-foundation, artifact freshness awareness, feedback provenance helpers, Strategy
-Reviewer, and Radar RVE bridge exist in code with focused tests. The honest gap
-is Atlas navigation, dogfood evidence, project/learning outcomes, and
+split Brief / Atlas artifacts, Brief decision cockpit, Atlas thread navigation,
+Hermes/PI read-only foundation, artifact freshness awareness, feedback
+provenance helpers, Strategy Reviewer, and Radar RVE bridge exist in code with
+focused tests. The honest gap is dogfood evidence, project/learning outcomes, and
 portfolio-ready evaluation. Raw Telegram firehose RAG, assistant mutations,
 full-year archive processing, and build-ready Radar decisions from context-only
 evidence remain out of scope.

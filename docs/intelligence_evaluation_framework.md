@@ -216,6 +216,10 @@ PGI-003 baseline fixtures now cover layers 16, 20, 21, 24, and 25 for Brief
 decision cockpit structure, exact feedback targets, read-only Hermes artifact
 awareness, missing/stale Radar warnings, market context as `context_only`, and
 matched external evidence as the only Radar gate input.
+PGI-004 baseline fixtures now cover layers 7-12 and 26 for Atlas thread
+navigation, thread timeline, evidence pane, contradictions/open questions,
+source diversity, maturity, momentum-vs-evidence, project connections,
+study-next cues, original source links, and `atlas_thread` retrieval items.
 24. Radar handoff
     - U: one Radar seed/context/dossier exchange. O: contract version, context
       markers, matched evidence, missing evidence, decision action. GT: Telegram

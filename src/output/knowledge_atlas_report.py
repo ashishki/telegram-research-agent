@@ -13,6 +13,7 @@ from output.ai_intelligence_report import (
     _changed_threads,
     _current_week_label,
     _escape,
+    _link,
     _metric_card,
     _momentum_bar,
     _source_channel_counts,
@@ -28,6 +29,7 @@ from output.report_quality import MATCHES_TRACE_RE, ReportQualityFinding, SEVERI
 OUTPUT_DIR = PROJECT_ROOT / "data" / "output" / "knowledge_atlas"
 ATLAS_SECTIONS = (
     ("atlas-overview", "Atlas Overview", "overview"),
+    ("thread-navigation", "Thread Navigation", "thread_navigation"),
     ("idea-map", "Idea Map", "idea_map"),
     ("trend-board", "Trend Board", "trend_board"),
     ("source-contribution", "Source Contribution", "source_contribution"),
@@ -147,6 +149,7 @@ def render_knowledge_atlas_html(context: dict, *, generated_at: str | None = Non
     generated = generated_at or _utc_now_iso()
     section_bodies = {
         "atlas-overview": _render_atlas_overview(context),
+        "thread-navigation": _render_thread_navigation(context),
         "idea-map": _render_idea_map(context),
         "trend-board": _render_trend_board(context),
         "source-contribution": _render_source_contribution(context),
@@ -189,6 +192,12 @@ section {{ background:var(--panel); border:1px solid var(--line); border-radius:
 .metric-detail {{ display:block; color:var(--muted); font-size:13px; }}
 .atlas-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:12px; }}
 .atlas-card {{ border:1px solid var(--line); border-radius:8px; padding:14px; background:#fbfcfd; }}
+.thread-nav-grid {{ display:grid; grid-template-columns:minmax(220px,300px) minmax(0,1fr); gap:14px; align-items:start; }}
+.thread-index {{ border:1px solid var(--line); border-radius:8px; padding:12px; background:#fbfcfd; }}
+.thread-index ol {{ margin:8px 0 0; padding-left:20px; }}
+.thread-detail {{ border:1px solid var(--line); border-radius:8px; padding:14px; background:#fbfcfd; margin:0 0 12px; }}
+.thread-detail-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:10px; }}
+.evidence-item {{ border:1px solid var(--line); border-radius:8px; padding:10px; background:#fff; }}
 .tag {{ display:inline-block; border:1px solid #b6ddd6; background:#ecfdf5; color:#115e59; border-radius:999px; padding:2px 8px; font-size:12px; font-weight:700; }}
 .momentum {{ height:8px; border-radius:999px; background:#e5e7eb; overflow:hidden; margin:6px 0 4px; }}
 .momentum span {{ display:block; height:100%; background:linear-gradient(90deg,#0f766e,#ca8a04); }}
@@ -199,6 +208,7 @@ section {{ background:var(--panel); border:1px solid var(--line); border-radius:
 .term-column {{ border:1px solid var(--line); border-radius:8px; padding:12px; background:#fbfcfd; }}
 table {{ width:100%; border-collapse:collapse; }}
 th, td {{ border-bottom:1px solid var(--line); text-align:left; padding:9px 8px; }}
+@media (max-width:860px) {{ .thread-nav-grid {{ grid-template-columns:1fr; }} }}
 @media (max-width:720px) {{ h1 {{ font-size:27px; }} header, main {{ padding-left:16px; padding-right:16px; }} section {{ padding:16px; }} }}
 </style>
 </head>
@@ -281,6 +291,7 @@ def _knowledge_atlas_metadata(
     threads = context.get("threads") or []
     atoms = _all_atoms(threads)
     intelligence_contract = build_canonical_intelligence_contract(context)
+    thread_navigation = _thread_navigation_model(context)
     sections = [
         {
             "id": section_id,
@@ -308,6 +319,7 @@ def _knowledge_atlas_metadata(
         "source_atom_count": len(atoms),
         "source_channel_count": len(context.get("source_channels") or []),
         "changed_thread_count": len(_changed_threads(threads)),
+        "thread_navigation": thread_navigation,
         "intelligence_contract": intelligence_contract,
         "compressed_context": context.get("compressed_context") or [],
         "source_channels": context.get("source_channels") or [],
@@ -332,6 +344,280 @@ def _render_atlas_overview(context: dict) -> str:
         + "</div>"
         '<p>This Atlas is for long-running AI/business learning: trend memory, source contribution, and study backlog. '
         "Weekly decisions live in the Weekly Intelligence Brief.</p>"
+    )
+
+
+def _thread_navigation_model(context: dict) -> dict:
+    threads = context.get("threads") or []
+    items = [_thread_navigation_item(thread) for thread in threads[:12]]
+    return {
+        "schema_version": "knowledge_atlas_thread_navigation.v1",
+        "week_label": context.get("week_label"),
+        "thread_count": len(items),
+        "source_atom_count": len(_all_atoms(threads)),
+        "threads": items,
+        "bounded_context_note": "Atlas navigation is built from curated Idea Threads and Knowledge Atoms, not raw Telegram firehose.",
+    }
+
+
+def _thread_navigation_item(thread: dict) -> dict:
+    atoms = [atom for atom in (thread.get("atoms") or []) if isinstance(atom, dict)]
+    evidence_items = [_atlas_evidence_item(atom) for atom in atoms[:6]]
+    source_urls = _unique_string(
+        url
+        for atom in atoms
+        for url in (atom.get("source_urls") or [])
+        if str(url or "").strip()
+    )
+    source_channels = _unique_string(
+        _source_channel_from_url(url)
+        for url in source_urls
+        if _source_channel_from_url(url)
+    )
+    current_claims = _string_values(thread.get("current_claims"))
+    contradictions = _string_values(thread.get("contradictions"))
+    superseded = _string_values(thread.get("superseded_claims"))
+    return {
+        "id": f"atlas-thread-{_slug(thread.get('slug') or thread.get('title') or 'thread')}",
+        "slug": thread.get("slug"),
+        "title": thread.get("title") or thread.get("slug") or "Untitled thread",
+        "status": thread.get("status") or "active",
+        "maturity": _thread_maturity(thread),
+        "momentum_30d": float(thread.get("momentum_30d") or 0.0),
+        "evidence_growth": {
+            "atom_count": int(thread.get("atom_count") or len(atoms)),
+            "rendered_evidence_count": len(evidence_items),
+            "source_channel_count": int(thread.get("source_channel_count") or len(source_channels)),
+            "changed_this_week": bool(thread.get("changed_this_week")),
+        },
+        "current_understanding": thread.get("summary") or (current_claims[0] if current_claims else ""),
+        "change_since_previous_period": _thread_change_summary(thread, atoms),
+        "timeline": _thread_timeline(atoms),
+        "claims": current_claims[:5],
+        "evidence_items": evidence_items,
+        "contradictions": contradictions[:5],
+        "superseded_claims": superseded[:5],
+        "source_diversity": {
+            "source_count": len(source_urls),
+            "source_channel_count": len(source_channels),
+            "channels": source_channels[:8],
+        },
+        "project_connections": _project_connections(thread, atoms),
+        "decisions": _thread_decisions(thread),
+        "open_questions": _open_questions(thread, atoms),
+        "study_next": _study_next(thread, atoms),
+        "source_urls": source_urls[:8],
+    }
+
+
+def _atlas_evidence_item(atom: dict) -> dict:
+    urls = _string_values(atom.get("source_urls"))
+    return {
+        "atom_id": atom.get("id"),
+        "claim": atom.get("claim"),
+        "summary": atom.get("summary"),
+        "evidence_quote": atom.get("evidence_quote"),
+        "relation": atom.get("relation") or "supports",
+        "atom_type": atom.get("atom_type"),
+        "week_label": atom.get("week_label"),
+        "last_seen_at": atom.get("last_seen_at"),
+        "confidence": atom.get("confidence"),
+        "source_urls": urls[:4],
+    }
+
+
+def _thread_timeline(atoms: list[dict]) -> list[dict]:
+    rows = []
+    for atom in sorted(atoms, key=lambda item: str(item.get("last_seen_at") or ""), reverse=True)[:6]:
+        rows.append(
+            {
+                "date": str(atom.get("last_seen_at") or "")[:10],
+                "atom_id": atom.get("id"),
+                "claim": atom.get("claim"),
+                "relation": atom.get("relation") or "supports",
+                "source_urls": _string_values(atom.get("source_urls"))[:3],
+            }
+        )
+    return rows
+
+
+def _thread_maturity(thread: dict) -> str:
+    atom_count = int(thread.get("atom_count") or len(thread.get("atoms") or []))
+    source_channels = int(thread.get("source_channel_count") or 0)
+    status = str(thread.get("status") or "")
+    if status in {"production_pattern", "resolved"} or (atom_count >= 4 and source_channels >= 2):
+        return "mature"
+    if atom_count >= 2:
+        return "developing"
+    return "early"
+
+
+def _thread_change_summary(thread: dict, atoms: list[dict]) -> str:
+    if thread.get("changed_this_week"):
+        latest = next((atom for atom in atoms if atom.get("claim")), None)
+        if latest:
+            return f"Current-week movement: {latest.get('claim')}"
+        return "Current-week movement is visible, but no rendered atom claim is available."
+    if atoms:
+        return "No current-week movement in the bounded Atlas window; keep as background context."
+    return "No atom-level evidence is available in this Atlas window."
+
+
+def _project_connections(thread: dict, atoms: list[dict]) -> list[dict]:
+    text = " ".join(
+        [
+            str(thread.get("title") or ""),
+            str(thread.get("summary") or ""),
+            " ".join(_string_values(thread.get("current_claims"))),
+            " ".join(str(atom.get("claim") or "") for atom in atoms),
+            " ".join(" ".join(_string_values(atom.get("tools"))) for atom in atoms),
+        ]
+    ).lower()
+    connections = []
+    if any(term in text for term in ("codex", "eval", "agent", "rag", "telegram")):
+        connections.append(
+            {
+                "project": "telegram-research-agent",
+                "connection_type": "project_watch",
+                "rationale": "Thread overlaps current AI intelligence and evaluation workflows; verify before turning into project work.",
+            }
+        )
+    if not connections:
+        connections.append(
+            {
+                "project": None,
+                "connection_type": "learning_only_implication",
+                "rationale": "No active project connection is explicit in the curated thread evidence.",
+            }
+        )
+    return connections[:3]
+
+
+def _thread_decisions(thread: dict) -> list[dict]:
+    status = str(thread.get("status") or "active")
+    if status in {"hype_only", "resolved"}:
+        decision = "defer"
+        rationale = f"Thread status is {status}; keep evidence visible but do not make it a weekly action."
+    elif bool(thread.get("changed_this_week")):
+        decision = "verify_first"
+        rationale = "Current-week movement exists; verify source evidence before acting."
+    else:
+        decision = "watch"
+        rationale = "No current-week change; keep it in Atlas context."
+    return [{"decision": decision, "rationale": rationale}]
+
+
+def _open_questions(thread: dict, atoms: list[dict]) -> list[str]:
+    questions = []
+    if not _string_values(thread.get("contradictions")):
+        questions.append("What would contradict the current understanding?")
+    if int(thread.get("source_channel_count") or 0) <= 1:
+        questions.append("Can an independent source confirm this thread?")
+    if not atoms:
+        questions.append("Which source atom should anchor this thread?")
+    return questions[:3]
+
+
+def _study_next(thread: dict, atoms: list[dict]) -> list[str]:
+    items = []
+    for atom in sorted(atoms, key=lambda item: float(item.get("practical_utility_score") or 0.0), reverse=True)[:2]:
+        if atom.get("claim"):
+            items.append(str(atom.get("claim")))
+    if not items:
+        items.append(f"Review thread: {thread.get('title') or thread.get('slug') or 'Untitled thread'}")
+    return items[:3]
+
+
+def _render_thread_navigation(context: dict) -> str:
+    navigation = _thread_navigation_model(context)
+    threads = [item for item in navigation.get("threads") or [] if isinstance(item, dict)]
+    if not threads:
+        return "<p>No navigable Idea Threads are available yet.</p>"
+    index_items = "".join(
+        f'<li><a href="#{_escape(thread["id"])}">{_escape(thread.get("title") or "Thread")}</a>'
+        f'<p class="muted">{_escape(thread.get("status") or "active")} · {_escape(thread.get("maturity") or "early")}</p></li>'
+        for thread in threads
+    )
+    detail_cards = "".join(_render_thread_detail(thread) for thread in threads[:8])
+    return (
+        '<div class="thread-nav-grid">'
+        '<aside class="thread-index"><h3>Thread Index</h3>'
+        f'<ol>{index_items}</ol>'
+        '<p class="muted">Bounded to curated Idea Threads; not a raw Telegram mirror.</p>'
+        '</aside>'
+        f'<div>{detail_cards}</div>'
+        '</div>'
+    )
+
+
+def _render_thread_detail(thread: dict) -> str:
+    evidence_items = [item for item in thread.get("evidence_items") or [] if isinstance(item, dict)]
+    timeline_items = [item for item in thread.get("timeline") or [] if isinstance(item, dict)]
+    claims = _html_list(thread.get("claims"), "No current claims captured.")
+    contradictions = _html_list(thread.get("contradictions"), "No explicit contradictions captured.")
+    questions = _html_list(thread.get("open_questions"), "No open questions captured.")
+    study = _html_list(thread.get("study_next"), "No study-next item captured.")
+    sources = "".join(f'<li>{_link(url, url)}</li>' for url in (thread.get("source_urls") or [])[:5]) or '<li class="muted">No source links captured.</li>'
+    evidence = "".join(_render_evidence_item(item) for item in evidence_items[:4]) or '<p class="muted">No rendered evidence items.</p>'
+    timeline = "".join(_render_timeline_item(item) for item in timeline_items[:5]) or '<li class="muted">No timeline entries captured.</li>'
+    project_connections = "".join(
+        f'<li><b>{_escape(item.get("connection_type") or "connection")}</b>: {_escape(item.get("rationale") or "")}</li>'
+        for item in (thread.get("project_connections") or [])[:3]
+        if isinstance(item, dict)
+    ) or '<li class="muted">No project connections.</li>'
+    decisions = "".join(
+        f'<li><b>{_escape(item.get("decision") or "watch")}</b>: {_escape(item.get("rationale") or "")}</li>'
+        for item in (thread.get("decisions") or [])[:3]
+        if isinstance(item, dict)
+    ) or '<li class="muted">No decision projection.</li>'
+    growth = thread.get("evidence_growth") if isinstance(thread.get("evidence_growth"), dict) else {}
+    diversity = thread.get("source_diversity") if isinstance(thread.get("source_diversity"), dict) else {}
+    return (
+        f'<article class="thread-detail" id="{_escape(thread.get("id") or "")}">'
+        f'<h3>{_escape(thread.get("title") or "Thread")}</h3>'
+        f'<p><span class="tag">{_escape(_status_label(thread.get("status") or "active"))}</span> '
+        f'<span class="muted">maturity {_escape(thread.get("maturity") or "early")}</span></p>'
+        f'<p>{_escape(_truncate_text(thread.get("current_understanding") or "", 260))}</p>'
+        f'<p class="muted"><b>Change since previous period:</b> {_escape(_truncate_text(thread.get("change_since_previous_period") or "", 220))}</p>'
+        f'<h3>Thread Timeline</h3><ol class="timeline">{timeline}</ol>'
+        '<div class="thread-detail-grid">'
+        f'<div><h3>Claims</h3>{claims}</div>'
+        f'<div><h3>Contradictions</h3>{contradictions}</div>'
+        f'<div><h3>Open Questions</h3>{questions}</div>'
+        f'<div><h3>Study Next</h3>{study}</div>'
+        '</div>'
+        '<div class="thread-detail-grid">'
+        f'<div><h3>Momentum Vs Evidence</h3><p>Momentum {_escape(str(thread.get("momentum_30d") or 0))}; {_escape(str(growth.get("atom_count", 0)))} atoms; {_escape(str(growth.get("source_channel_count", 0)))} source channel(s); changed this week: {_escape(str(bool(growth.get("changed_this_week"))).lower())}.</p></div>'
+        f'<div><h3>Source Diversity</h3><p>{_escape(str(diversity.get("source_count", 0)))} source link(s); channels: {_escape(", ".join(diversity.get("channels") or []) or "none")}.</p></div>'
+        f'<div><h3>Project Connections</h3><ul>{project_connections}</ul></div>'
+        f'<div><h3>Decisions</h3><ul>{decisions}</ul></div>'
+        '</div>'
+        f'<h3>Evidence Pane</h3><div class="thread-detail-grid">{evidence}</div>'
+        f'<h3>Original Source Links</h3><ul>{sources}</ul>'
+        '</article>'
+    )
+
+
+def _render_timeline_item(item: dict) -> str:
+    source_links = " ".join(_link(url, f"source {index}") for index, url in enumerate(item.get("source_urls") or [], start=1))
+    return (
+        "<li>"
+        f'<b>{_escape(item.get("date") or "unknown date")}</b> '
+        f'{_escape(item.get("claim") or "Timeline item")}'
+        f'<p class="muted">Atom {_escape(str(item.get("atom_id") or ""))} · {_escape(item.get("relation") or "supports")} {source_links}</p>'
+        "</li>"
+    )
+
+
+def _render_evidence_item(item: dict) -> str:
+    source_links = " ".join(_link(url, f"source {index}") for index, url in enumerate(item.get("source_urls") or [], start=1))
+    return (
+        '<div class="evidence-item">'
+        f'<p><b>{_escape(item.get("claim") or "Evidence item")}</b></p>'
+        f'<p class="muted">Atom { _escape(item.get("atom_id") or "") } · {_escape(item.get("atom_type") or "atom")} · {_escape(item.get("relation") or "supports")}</p>'
+        f'<p>{_escape(_truncate_text(item.get("evidence_quote") or item.get("summary") or "", 180))}</p>'
+        f'<p class="sources">{source_links or "source pending"}</p>'
+        '</div>'
     )
 
 
@@ -457,6 +743,8 @@ def _section_metadata_summary(context: dict, section_id: str) -> str:
     threads = context.get("threads") or []
     if section_id == "atlas-overview":
         return f"{len(threads)} threads and {len(_all_atoms(threads))} source atoms in bounded atlas context."
+    if section_id == "thread-navigation":
+        return f"{len(threads[:12])} navigable thread detail cards with evidence panes and source links."
     if section_id == "idea-map":
         return "Rolling map of current Idea Threads and claims."
     if section_id == "trend-board":
@@ -466,3 +754,49 @@ def _section_metadata_summary(context: dict, section_id: str) -> str:
     if section_id == "study-backlog":
         return "Highest-utility atoms to study later."
     return "Bounded audit metadata for the Atlas."
+
+
+def _html_list(value: object, empty_text: str) -> str:
+    items = _string_values(value)
+    if not items:
+        return f'<p class="muted">{_escape(empty_text)}</p>'
+    return "<ul>" + "".join(f"<li>{_escape(item)}</li>" for item in items[:6]) + "</ul>"
+
+
+def _string_values(value: object) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        values = [value]
+    elif isinstance(value, (list, tuple, set)):
+        values = list(value)
+    else:
+        values = [value]
+    return _unique_string(str(item).strip() for item in values if str(item).strip())
+
+
+def _unique_string(values) -> list[str]:
+    result = []
+    seen = set()
+    for value in values:
+        text = str(value or "").strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        result.append(text)
+    return result
+
+
+def _source_channel_from_url(url: object) -> str:
+    text = str(url or "").strip()
+    marker = "t.me/"
+    if marker not in text:
+        return ""
+    channel = text.split(marker, maxsplit=1)[1].split("/", maxsplit=1)[0].strip()
+    return f"@{channel}" if channel else ""
+
+
+def _slug(value: object) -> str:
+    text = "".join(ch.lower() if ch.isascii() and ch.isalnum() else "-" for ch in str(value or "item"))
+    parts = [part for part in text.split("-") if part]
+    return "-".join(parts[:8]) or "item"

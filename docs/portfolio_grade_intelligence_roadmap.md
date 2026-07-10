@@ -308,6 +308,13 @@ Tasks:
 - Learning Dashboard and study backlog.
 - Skill evidence and stale knowledge review.
 
+Current implementation note: PGI-004 now adds Atlas thread navigation with
+sidecar-backed thread timelines, current understanding, evidence panes,
+contradictions, source diversity, maturity, momentum-vs-evidence, project
+connections, decision projections, open questions, study-next items, original
+source links, and `atlas_thread` retrieval items. Project and Learning
+Intelligence projections remain the next PGI slice.
+
 ### Phase 6 - Evaluation And Dogfood
 
 Goal: prove that the system improves decisions and learning.

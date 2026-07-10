@@ -1,9 +1,9 @@
 # CODEX_PROMPT - Compact Session Handoff
 
-Version: 4.3
+Version: 4.4
 Date: 2026-07-10
-State: PGI-001, PGI-002, and PGI-003 implemented locally and verified; PGI-004
-is next but is XL and should start as a separate PR-sized slice
+State: PGI-001 through PGI-004 implemented locally and verified; PGI-005 is next
+and should start as a separate PR-sized slice
 
 ## Current Product Direction
 
@@ -31,7 +31,7 @@ docs/tasks.md
 Next implementation task:
 
 ```text
-PGI-004 - Knowledge Atlas V2 Thread Navigation
+PGI-005 - Project And Learning Intelligence Projections
 ```
 
 ## Verified Baseline
@@ -41,8 +41,8 @@ PGI-004 - Knowledge Atlas V2 Thread Navigation
 - Weekly AI visual report/workbook contract exists, but the workbook is now a
   historical/legacy surface rather than the target main product surface.
 - Split Weekly Intelligence Brief and Knowledge Atlas artifacts exist. PGI-003
-  completed the Brief decision cockpit and Radar gate behavior; Atlas remains
-  `partial` relative to the target navigable Atlas.
+  completed the Brief decision cockpit and Radar gate behavior; PGI-004 added
+  Atlas thread navigation and drill-down retrieval items.
 - Canonical intelligence sidecar contract `tra-intelligence-contract.v1` is now
   implemented locally for workbook/Brief/Atlas projections with sanitized eval
   fixtures.
@@ -262,29 +262,80 @@ Review notes:
 
 ## PGI-004 Handoff
 
+Status: completed locally on 2026-07-10.
+
 Goal: make Knowledge Atlas a navigable cumulative map of understanding with
 thread timeline, current understanding, evidence, contradictions, source
 diversity, project connections, decisions, open questions, and study-next cues.
 
-Status: next candidate, but XL. Split before implementation and keep it as a
-separate PR-sized slice.
+Implemented:
 
-Likely files:
+- `thread_navigation` sidecar DTO
+  (`knowledge_atlas_thread_navigation.v1`) with timeline, current
+  understanding, evidence, contradictions, source diversity, maturity,
+  momentum-vs-evidence data, project connections, decision projections, open
+  questions, study-next items, and original source links.
+- Rendered Atlas `Thread Navigation` section with thread index, detail cards,
+  Thread Timeline, Evidence Pane, Source Diversity, Project Connections,
+  Decisions, Open Questions, Study Next, and Original Source Links.
+- `atlas_thread` retrieval items so Hermes/search can drill into Atlas threads
+  with source refs, atom IDs, and thread slugs.
+- Atlas remains bounded to curated Idea Threads and Knowledge Atoms; no raw
+  Telegram mirror, full archive backfill, or decorative graph.
+
+Files changed for PGI-004:
 
 - `src/output/knowledge_atlas_report.py`
-- `src/output/split_intelligence_reports.py`
 - `src/output/intelligence_retrieval_items.py`
 - `tests/test_split_intelligence_reports.py`
 - `tests/test_intelligence_retrieval_items.py`
 
-Verification target:
+Verification passed:
 
 ```bash
 PYTHONPATH=src python3 -m pytest tests/test_split_intelligence_reports.py tests/test_intelligence_retrieval_items.py
+PYTHONPATH=src python3 -m pytest tests/test_ai_report_contract.py tests/test_pi_tools.py tests/test_pi_chat.py tests/test_pi_facade.py
 ```
 
-Stop before implementation if Atlas starts mirroring raw Telegram firehose,
-requires a full archive backfill, or needs unbounded/decorative graph work.
+Review notes:
+
+- Correctness: Atlas sidecar and rendered HTML now expose the same thread
+  navigation concepts.
+- Provenance/evidence safety: evidence panes carry atom IDs and source URLs;
+  Atlas states it is not raw Telegram firehose.
+- Sidecar/rendered parity: test coverage checks both sidecar DTO and rendered
+  navigation labels.
+- Backward compatibility: fields are additive; existing workbook/split readers
+  still load.
+- Privacy/secrets: no `.env`, secrets, private generated artifacts, expensive
+  LLM runs, production config changes, or full archive backfills.
+- Hermes/Radar: Hermes remains read-only; Radar gate behavior unchanged.
+
+## PGI-005 Handoff
+
+Goal: add durable Project Intelligence and Learning Intelligence projections so
+the operator can see which signals affect active repos and which skills moved
+from reading to implemented/tested outcomes.
+
+Status: next candidate.
+
+Likely files:
+
+- `src/output/project_relevance.py`
+- `src/output/weekly_intelligence_brief.py`
+- `src/output/knowledge_atlas_report.py`
+- `src/output/learning_layer.py`
+- tests for project relevance, learning projections, and split reports
+
+Verification target from task card:
+
+```bash
+PYTHONPATH=src python3 -m pytest tests/test_project_relevance.py tests/test_split_intelligence_reports.py tests/test_pi_tools.py
+```
+
+Stop before implementation if project links are broad keyword guesses, passive
+reading is counted as mastery, or DB migrations become necessary before fixture
+shape is proven.
 
 ## Non-Negotiable Rules
 
@@ -314,7 +365,6 @@ requires a full archive backfill, or needs unbounded/decorative graph work.
 
 ## Current Repository Caveat
 
-`docs/artifacts/ai-decision-intelligence-2026-W28/manual-quality-eval-2026-07-07.md`
-is untracked in the working tree at the time of this handoff. Treat it as
-operator/private review material unless the operator explicitly asks to commit
-or sanitize it.
+`docs/artifacts/**/manual-quality-eval-*.md` is ignored by `.gitignore`. Treat
+manual quality eval files as operator/private review material unless the
+operator explicitly asks to sanitize and commit one.
