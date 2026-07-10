@@ -175,6 +175,11 @@ Notation per layer:
       Data: 20 cards. Fail: no-code idea framed as implementation lead. Fix:
       project implication fixture. Review: weekly. Cost: medium. Threshold:
       confirmed lead must produce PR-ready scope.
+    - Implementation note: PGI-005 adds `project-learning-projection.v1` as the
+      deterministic sidecar input for layers 13, 18, and 19. The projection
+      records rejected broad overlaps, source refs for confirmed implications,
+      and learning stages without treating passive reading as mastery. PGI-006
+      still needs the scorecard/harness over these fields.
 20. Hermes retrieval
     - U: one Hermes tool query. O: curated retrieval items only, filters,
       provenance. GT: sidecar/DB fixture. A: reviewer checks returned items.

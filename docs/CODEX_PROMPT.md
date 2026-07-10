@@ -1,8 +1,8 @@
 # CODEX_PROMPT - Compact Session Handoff
 
-Version: 4.4
+Version: 4.5
 Date: 2026-07-10
-State: PGI-001 through PGI-004 implemented locally and verified; PGI-005 is next
+State: PGI-001 through PGI-005 implemented locally and verified; PGI-006 is next
 and should start as a separate PR-sized slice
 
 ## Current Product Direction
@@ -31,7 +31,7 @@ docs/tasks.md
 Next implementation task:
 
 ```text
-PGI-005 - Project And Learning Intelligence Projections
+PGI-006 - Evaluation Harness And Weekly Scorecard
 ```
 
 ## Verified Baseline
@@ -42,7 +42,9 @@ PGI-005 - Project And Learning Intelligence Projections
   historical/legacy surface rather than the target main product surface.
 - Split Weekly Intelligence Brief and Knowledge Atlas artifacts exist. PGI-003
   completed the Brief decision cockpit and Radar gate behavior; PGI-004 added
-  Atlas thread navigation and drill-down retrieval items.
+  Atlas thread navigation and drill-down retrieval items; PGI-005 added
+  durable Project/Learning Intelligence projections to Brief/Atlas sidecars,
+  rendered HTML, canonical contract projections, and retrieval items.
 - Canonical intelligence sidecar contract `tra-intelligence-contract.v1` is now
   implemented locally for workbook/Brief/Atlas projections with sanitized eval
   fixtures.
@@ -311,31 +313,71 @@ Review notes:
   LLM runs, production config changes, or full archive backfills.
 - Hermes/Radar: Hermes remains read-only; Radar gate behavior unchanged.
 
-## PGI-005 Handoff
+## PGI-005 Completion
 
-Goal: add durable Project Intelligence and Learning Intelligence projections so
-the operator can see which signals affect active repos and which skills moved
-from reading to implemented/tested outcomes.
+Status: completed locally on 2026-07-10.
+
+Implemented:
+
+- Additive `project-learning-projection.v1` DTO in
+  `src/output/learning_layer.py`.
+- Weekly Brief and Knowledge Atlas sidecars/rendered HTML expose Project
+  Intelligence fields: external signals, confirmed implications, weak watches,
+  rejected overlaps, tiny PR ideas, stale decisions, research debt, and
+  repeated themes without action.
+- Learning Intelligence distinguishes `read`, `understood`, `explained`,
+  `reproduced`, `implemented`, `tested`, `project-applied`, `measured`,
+  `stale`, and `prerequisite_gap`.
+- Canonical sidecars carry additive `project_implications`,
+  `learning_objectives`, and experiment/outcome projections derived from
+  source-backed action/feedback state.
+- Retrieval emits `project_intelligence` and `learning_objective` items.
+
+Review notes:
+
+- Correctness: broad-only `higher` project links are rejected and do not become
+  confirmed leads, weak watches, or tiny PR ideas.
+- Provenance/evidence safety: confirmed project implications require source
+  refs/atom IDs; market/business signals are marked `context_only`.
+- Sidecar/rendered parity: Brief and Atlas render the same projection categories
+  carried in sidecars.
+- Backward compatibility: fields are additive; no DB migration.
+- Privacy/secrets: no `.env`, secrets, private generated artifacts, expensive
+  LLM runs, production config changes, or full archive backfills.
+- Hermes/Radar: Hermes remains read-only; Radar gate behavior unchanged.
+
+Verification:
+
+```bash
+PYTHONPATH=src python3 -m pytest tests/test_ai_report_contract.py tests/test_split_intelligence_reports.py tests/test_action_status.py
+PYTHONPATH=src python3 -m pytest tests/test_learning_layer.py tests/test_intelligence_retrieval_items.py
+python3 -m py_compile src/output/learning_layer.py src/output/ai_report_contract.py src/output/weekly_intelligence_brief.py src/output/knowledge_atlas_report.py src/output/intelligence_retrieval_items.py
+git diff --check
+```
+
+## PGI-006 Handoff
+
+Goal: add a deterministic evaluation harness and weekly scorecard tied to
+correctness, relevance, decisions/actions, learning, UX, Radar honesty, and
+operations.
 
 Status: next candidate.
 
 Likely files:
 
-- `src/output/project_relevance.py`
-- `src/output/weekly_intelligence_brief.py`
-- `src/output/knowledge_atlas_report.py`
-- `src/output/learning_layer.py`
-- tests for project relevance, learning projections, and split reports
+- new eval scripts/tests;
+- `docs/intelligence_evaluation_framework.md`;
+- possible `src/output/dogfood_review.py` extensions.
 
 Verification target from task card:
 
 ```bash
-PYTHONPATH=src python3 -m pytest tests/test_project_relevance.py tests/test_split_intelligence_reports.py tests/test_pi_tools.py
+PYTHONPATH=src python3 -m pytest tests/test_dogfood_review.py tests/test_ai_report_contract.py
 ```
 
-Stop before implementation if project links are broad keyword guesses, passive
-reading is counted as mastery, or DB migrations become necessary before fixture
-shape is proven.
+Start with sanitized fixtures and deterministic scoring. Do not run LLM calls,
+do not backfill archives, and keep unknown metrics explicit rather than
+fabricated.
 
 ## Non-Negotiable Rules
 

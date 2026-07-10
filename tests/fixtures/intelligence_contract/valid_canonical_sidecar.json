@@ -92,6 +92,31 @@
       }
     ],
     "decisions": [],
+    "project_implications": [
+      {
+        "id": "project_implication:telegram-research-agent:eval-gates",
+        "project": "telegram-research-agent",
+        "thread_slug": "eval-gates",
+        "confirmation_state": "weak_watch",
+        "source_refs": ["https://t.me/ai_lab/101"],
+        "source_atom_ids": [1],
+        "next_step": "Verify source atoms before opening a project task.",
+        "source_policy": "not enough evidence for confirmed lead"
+      }
+    ],
+    "learning_objectives": [
+      {
+        "id": "learning-objective:atom:1",
+        "topic": "Eval gates are becoming release infrastructure for coding agents.",
+        "stage": "read",
+        "target_stage": "implemented",
+        "stage_evidence": "source atom with source refs",
+        "source_atom_ids": [1],
+        "source_refs": ["https://t.me/ai_lab/101"],
+        "feedback_state": "unknown",
+        "mastery_claim": "not_claimed"
+      }
+    ],
     "experiments": [],
     "outcomes": []
   }

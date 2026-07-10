@@ -366,7 +366,7 @@ PYTHONPATH=src python3 -m pytest tests/test_split_intelligence_reports.py tests/
 
 ### PGI-005 - Project And Learning Intelligence Projections
 
-- Status: `next_p1`
+- Status: `completed_local`
 - Priority: P1
 - Owner: `telegram-research-agent`
 - Problem: project and learning implications exist only as partial sections,
@@ -410,10 +410,34 @@ PYTHONPATH=src python3 -m pytest tests/test_ai_report_contract.py tests/test_spl
 - Estimated size: XL.
 - Portfolio evidence produced: project/learning intelligence sample.
 - Radar impact: `consumer` when existing-project overlap is displayed.
+- Completion notes (2026-07-10):
+  - Added additive `project-learning-projection.v1` DTO in
+    `src/output/learning_layer.py` with Project Intelligence and Learning
+    Intelligence projections.
+  - Weekly Brief and Knowledge Atlas sidecars/rendered HTML now expose
+    external signals, confirmed implications, weak watches, rejected overlaps,
+    tiny PR ideas, stale decisions, research debt, repeated themes without
+    action, and learning stage counts/objectives.
+  - Canonical sidecars now carry additive `project_implications` and
+    `learning_objectives` fields plus experiment/outcome projections derived
+    from source-backed actions/feedback state.
+  - Retrieval now emits `project_intelligence` and `learning_objective` items.
+  - Fixed review finding: broad-only `higher` project links are rejected and do
+    not become confirmed leads, weak watches, or tiny PR ideas.
+  - Fixed review finding: Weekly Brief rendered projection now includes
+    external signals and stale decisions, matching the sidecar.
+  - No DB migration, production config change, expensive LLM run, full archive
+    backfill, hidden Hermes mutation tool, or Radar gate behavior change.
+  - Verification passed:
+    `PYTHONPATH=src python3 -m pytest tests/test_ai_report_contract.py tests/test_split_intelligence_reports.py tests/test_action_status.py`.
+  - Additional touched-surface verification passed:
+    `PYTHONPATH=src python3 -m pytest tests/test_learning_layer.py tests/test_intelligence_retrieval_items.py`.
+  - Static verification passed: `python3 -m py_compile ...` for touched output
+    modules and `git diff --check`.
 
 ### PGI-006 - Evaluation Harness And Weekly Scorecard
 
-- Status: `planned`
+- Status: `next_p1`
 - Priority: P1
 - Owner: `telegram-research-agent`
 - Problem: tests exist, but there is no unified intelligence evaluation harness

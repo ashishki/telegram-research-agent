@@ -16,6 +16,7 @@ from output.ai_intelligence_report import (
     _link,
     _metric_card,
     _momentum_bar,
+    _learning_actions,
     _source_channel_counts,
     _source_links,
     _status_label,
@@ -23,6 +24,7 @@ from output.ai_intelligence_report import (
     _truncate_text,
     load_ai_intelligence_context,
 )
+from output.learning_layer import build_project_learning_projection
 from output.report_quality import MATCHES_TRACE_RE, ReportQualityFinding, SEVERITY_CRITICAL
 
 
@@ -30,6 +32,7 @@ OUTPUT_DIR = PROJECT_ROOT / "data" / "output" / "knowledge_atlas"
 ATLAS_SECTIONS = (
     ("atlas-overview", "Atlas Overview", "overview"),
     ("thread-navigation", "Thread Navigation", "thread_navigation"),
+    ("project-learning", "Project And Learning Intelligence", "project_learning"),
     ("idea-map", "Idea Map", "idea_map"),
     ("trend-board", "Trend Board", "trend_board"),
     ("source-contribution", "Source Contribution", "source_contribution"),
@@ -147,9 +150,11 @@ def generate_knowledge_atlas_report(
 def render_knowledge_atlas_html(context: dict, *, generated_at: str | None = None) -> str:
     week_label = str(context.get("week_label") or "")
     generated = generated_at or _utc_now_iso()
+    project_learning_projection = _atlas_project_learning_projection(context)
     section_bodies = {
         "atlas-overview": _render_atlas_overview(context),
         "thread-navigation": _render_thread_navigation(context),
+        "project-learning": _render_project_learning_projection(project_learning_projection),
         "idea-map": _render_idea_map(context),
         "trend-board": _render_trend_board(context),
         "source-contribution": _render_source_contribution(context),
@@ -290,7 +295,11 @@ def _knowledge_atlas_metadata(
 ) -> dict:
     threads = context.get("threads") or []
     atoms = _all_atoms(threads)
-    intelligence_contract = build_canonical_intelligence_contract(context)
+    project_learning_projection = _atlas_project_learning_projection(context)
+    intelligence_contract = build_canonical_intelligence_contract(
+        context,
+        project_learning_projection=project_learning_projection,
+    )
     thread_navigation = _thread_navigation_model(context)
     sections = [
         {
@@ -320,6 +329,7 @@ def _knowledge_atlas_metadata(
         "source_channel_count": len(context.get("source_channels") or []),
         "changed_thread_count": len(_changed_threads(threads)),
         "thread_navigation": thread_navigation,
+        "project_learning_projection": project_learning_projection,
         "intelligence_contract": intelligence_contract,
         "compressed_context": context.get("compressed_context") or [],
         "source_channels": context.get("source_channels") or [],
@@ -598,6 +608,91 @@ def _render_thread_detail(thread: dict) -> str:
     )
 
 
+def _atlas_project_learning_projection(context: dict) -> dict:
+    actions = _learning_actions(context.get("threads") or [], context.get("feedback_context") or {})
+    return build_project_learning_projection(
+        context,
+        actions=actions,
+        feedback_context=context.get("feedback_context") or {},
+    )
+
+
+def _render_project_learning_projection(projection: dict) -> str:
+    project = projection.get("project_intelligence") if isinstance(projection.get("project_intelligence"), dict) else {}
+    learning = projection.get("learning_intelligence") if isinstance(projection.get("learning_intelligence"), dict) else {}
+    external = "".join(
+        '<article class="atlas-card">'
+        f'<h3>{_escape(item.get("title") or "External signal")}</h3>'
+        f'<p class="muted">{_escape(item.get("atom_type") or "unknown")} · {_escape(item.get("context_policy") or "source_backed")}</p>'
+        f'<p class="sources">{_source_link_list(item.get("source_refs"))}</p>'
+        '</article>'
+        for item in _object_list(project.get("external_signals"))[:4]
+    )
+    confirmed = _projection_list(
+        project.get("confirmed_implications"),
+        empty_text="No confirmed project implication.",
+        title_key="project",
+        body_key="thread_title",
+    )
+    watches = _projection_list(
+        project.get("weak_watches"),
+        empty_text="No weak project watch.",
+        title_key="project",
+        body_key="thread_title",
+    )
+    rejected = "".join(
+        f'<li>{_escape(item.get("project") or "Project")} / {_escape(item.get("term") or "term")}: {_escape(item.get("reason") or "rejected")}</li>'
+        for item in _object_list(project.get("rejected_overlaps"))[:8]
+    ) or '<li class="muted">No rejected broad overlaps recorded.</li>'
+    ideas = _projection_list(
+        project.get("tiny_pr_ideas"),
+        empty_text="No source-backed tiny PR idea yet.",
+        title_key="title",
+        body_key="next_step",
+    )
+    stale = _projection_list(
+        project.get("stale_decisions"),
+        empty_text="No stale decision projection.",
+        title_key="title",
+        body_key="review_reason",
+    )
+    debt = "".join(
+        f'<li><b>{_escape(item.get("debt_type") or "debt")}</b>: {_escape(item.get("description") or "")}</li>'
+        for item in _object_list(project.get("research_debt"))[:8]
+    ) or '<li class="muted">No research debt recorded.</li>'
+    repeated = "".join(
+        f'<li>{_escape(item.get("theme") or "theme")} <span class="muted">{_escape(item.get("frequency") or 0)} atom(s)</span></li>'
+        for item in _object_list(project.get("repeated_themes_without_action"))[:8]
+    ) or '<li class="muted">No repeated source theme without action.</li>'
+    stage_counts = learning.get("stage_counts") if isinstance(learning.get("stage_counts"), dict) else {}
+    stage_rows = "".join(
+        f"<tr><td>{_escape(stage)}</td><td>{_escape(stage_counts.get(stage, 0))}</td></tr>"
+        for stage in learning.get("allowed_stages") or []
+    )
+    objectives = "".join(
+        f'<li><b>{_escape(item.get("topic") or "Learning objective")}</b> '
+        f'<span class="tag">{_escape(item.get("stage") or "unknown")}</span>'
+        f'<p class="muted">{_escape(item.get("stage_evidence") or "")}</p></li>'
+        for item in _object_list(learning.get("objectives"))[:8]
+    ) or '<li class="muted">No learning objectives projected.</li>'
+    return (
+        '<h3>External Signals</h3><div class="atlas-grid">'
+        + (external or '<article class="atlas-card"><p class="muted">No external signals projected.</p></article>')
+        + '</div><div class="thread-detail-grid">'
+        f'<div><h3>Confirmed Implications</h3>{confirmed}</div>'
+        f'<div><h3>Weak Watches</h3>{watches}</div>'
+        f'<div><h3>Rejected Overlaps</h3><ul>{rejected}</ul></div>'
+        f'<div><h3>Tiny PR Ideas</h3>{ideas}</div>'
+        f'<div><h3>Stale Decisions</h3>{stale}</div>'
+        f'<div><h3>Research Debt</h3><ul>{debt}</ul></div>'
+        f'<div><h3>Repeated Themes Without Action</h3><ul>{repeated}</ul></div>'
+        f'<div><h3>Learning Stages</h3><table><tbody>{stage_rows}</tbody></table>'
+        '<p class="muted">Passive reading is not mastery; no feedback stays unknown.</p>'
+        f'<ol>{objectives}</ol></div>'
+        '</div>'
+    )
+
+
 def _render_timeline_item(item: dict) -> str:
     source_links = " ".join(_link(url, f"source {index}") for index, url in enumerate(item.get("source_urls") or [], start=1))
     return (
@@ -745,6 +840,8 @@ def _section_metadata_summary(context: dict, section_id: str) -> str:
         return f"{len(threads)} threads and {len(_all_atoms(threads))} source atoms in bounded atlas context."
     if section_id == "thread-navigation":
         return f"{len(threads[:12])} navigable thread detail cards with evidence panes and source links."
+    if section_id == "project-learning":
+        return "Project implications, weak watches, rejected overlaps, research debt, and learning stage projection."
     if section_id == "idea-map":
         return "Rolling map of current Idea Threads and claims."
     if section_id == "trend-board":
@@ -756,11 +853,31 @@ def _section_metadata_summary(context: dict, section_id: str) -> str:
     return "Bounded audit metadata for the Atlas."
 
 
+def _projection_list(value: object, *, empty_text: str, title_key: str, body_key: str) -> str:
+    rows = []
+    for item in _object_list(value)[:8]:
+        title = _escape(item.get(title_key) or item.get("project") or item.get("title") or "Item")
+        body = _escape(item.get(body_key) or item.get("next_step") or item.get("source_policy") or "")
+        rows.append(f"<li><b>{title}</b><p class=\"muted\">{body}</p></li>")
+    if not rows:
+        return f'<p class="muted">{_escape(empty_text)}</p>'
+    return "<ul>" + "".join(rows) + "</ul>"
+
+
 def _html_list(value: object, empty_text: str) -> str:
     items = _string_values(value)
     if not items:
         return f'<p class="muted">{_escape(empty_text)}</p>'
     return "<ul>" + "".join(f"<li>{_escape(item)}</li>" for item in items[:6]) + "</ul>"
+
+
+def _object_list(value: object) -> list[dict]:
+    return [item for item in (value if isinstance(value, list) else []) if isinstance(item, dict)]
+
+
+def _source_link_list(value: object) -> str:
+    links = _string_values(value)
+    return " ".join(_link(url, f"source {index}") for index, url in enumerate(links[:4], start=1)) or '<span class="muted">source pending</span>'
 
 
 def _string_values(value: object) -> list[str]:

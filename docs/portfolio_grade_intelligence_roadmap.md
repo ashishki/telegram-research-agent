@@ -53,13 +53,13 @@ GitHub connector check for open PRs/issues, and recent git history on
 | Idea Thread storage and momentum | `implemented_and_verified` | `src/db/idea_threads.py`, `src/output/idea_threads.py`, `idea-threads` CLI, `tests/test_idea_threads.py` |
 | Frontier analysis | `implemented_but_not_dogfooded` | `src/output/frontier_analysis.py`, CLI path; fresh forced regeneration needs LLM credentials |
 | AI visual report / workbook contract | `implemented_and_verified`, `legacy surface` | `src/output/ai_visual_report.py`, `src/output/ai_report_contract.py`, `tests/test_ai_report_contract.py`; W28 committed fixture exists but represents old visual snapshot |
-| Weekly Intelligence Brief and Knowledge Atlas split | `implemented_locally` for PGI-003 Brief cockpit; Atlas still `partial` | `src/output/weekly_intelligence_brief.py`, `src/output/knowledge_atlas_report.py`, `src/output/split_intelligence_reports.py`, `tests/test_split_intelligence_reports.py`; Brief has first-screen cockpit and Radar gate DTO, Atlas v2 navigation remains unfinished |
-| Canonical intelligence sidecar contract | `implemented_locally` | `tra-intelligence-contract.v1` in `src/output/ai_report_contract.py`; Brief/Atlas sidecars carry canonical SourceObservation/EvidenceItem/Claim projections and tests under `tests/fixtures/intelligence_contract/` |
+| Weekly Intelligence Brief and Knowledge Atlas split | `implemented_locally` for PGI-003 through PGI-005 | `src/output/weekly_intelligence_brief.py`, `src/output/knowledge_atlas_report.py`, `src/output/split_intelligence_reports.py`, `tests/test_split_intelligence_reports.py`; Brief has first-screen cockpit/Radar gate plus Project/Learning projection section; Atlas has thread navigation plus Project/Learning projection section |
+| Canonical intelligence sidecar contract | `implemented_locally` | `tra-intelligence-contract.v1` in `src/output/ai_report_contract.py`; Brief/Atlas sidecars carry canonical SourceObservation/EvidenceItem/Claim plus additive ProjectImplication/LearningObjective projections and tests under `tests/fixtures/intelligence_contract/` |
 | Hermes / PI facade and bounded tools | `implemented_but_not_dogfooded` with PGI-003 artifact awareness | `src/assistant/pi_facade.py`, `pi_tools.py`, `pi_chat.py`, `pi_intent.py`, tests `test_pi_*`; read-only tools now expose current/stale/missing Brief, Atlas, and Radar state |
 | Feedback intake and action status | `partial` | `src/db/ai_report_feedback.py`, `src/output/action_status.py`, tests `test_ai_report_feedback.py`, `test_action_status.py`; provenance/effect timing and corrections need PGI work |
 | Strategy Reviewer | `implemented_and_verified` as advisory-only | `src/output/strategy_reviewer.py`, `tests/test_strategy_reviewer.py`; it must not mutate config/code/profile |
-| Project Intelligence | `partial` | conservative project diagnostics exist in report contract; no full project decision ledger/projection yet |
-| Learning Intelligence | `documentation_only` / `partial helpers` | learning sections and Obsidian projection exist; no canonical learning objective/outcome model |
+| Project Intelligence | `implemented_locally`, `needs_dogfood` | `project-learning-projection.v1` exposes external signals, confirmed implications, weak watches, rejected overlaps, tiny PR ideas, stale decisions, research debt, and repeated themes without action |
+| Learning Intelligence | `implemented_locally`, `needs_dogfood` | `project-learning-projection.v1` distinguishes read, understood, explained, reproduced, implemented, tested, project-applied, measured, stale, and prerequisite_gap without counting passive reading as mastery |
 | Market/business lens for Radar | `implemented_and_verified` as `context_only` | `src/output/market_pain_intelligence.py`, `src/output/opportunity_seed_export.py`, `tests/test_opportunity_seed_export.py`, `tests/test_market_context_lens.py` |
 | MVP Radar RVE contract | `implemented_and_verified`, `needs_live_validation` | sibling repo has `validation_queries.py`, `validation_evidence.py`, SERP/Reddit/crawler/X adapters and tests; real weekly validation evidence still needs dogfood |
 | Evaluation framework | `partial` | structural tests and fixtures exist; no unified layer-by-layer eval harness or weekly scorecard yet |
@@ -193,7 +193,7 @@ Derived projections:
 | C - Decision Interface | Weekly Brief as decision cockpit | `partial` | Phase 4 |
 | D - Knowledge Navigation | Atlas as navigable cumulative map | `partial` | Phase 5 |
 | E - Hermes / PI Assistant | Useful bounded interface over curated intelligence | `implemented_but_not_dogfooded` | Phase 4 |
-| F - Project and Learning Intelligence | Project implications and skill outcomes | `partial` / `documentation_only` | Phase 5 |
+| F - Project and Learning Intelligence | Project implications and skill outcomes | `implemented_locally`, `needs_dogfood` | Phase 5 |
 | G - Evaluation and Dogfood | Prove user value and reduce false confidence | `partial` | Phase 6 |
 | H - MVP Radar Parallel Track | External opportunity validation | `implemented_and_verified`, `needs_live_validation` | Parallel all phases |
 
@@ -312,8 +312,15 @@ Current implementation note: PGI-004 now adds Atlas thread navigation with
 sidecar-backed thread timelines, current understanding, evidence panes,
 contradictions, source diversity, maturity, momentum-vs-evidence, project
 connections, decision projections, open questions, study-next items, original
-source links, and `atlas_thread` retrieval items. Project and Learning
-Intelligence projections remain the next PGI slice.
+source links, and `atlas_thread` retrieval items.
+
+Current implementation note: PGI-005 now adds additive
+`project-learning-projection.v1` DTOs. Brief and Atlas sidecars/rendered HTML
+show Project Intelligence and Learning Intelligence projections; retrieval
+emits `project_intelligence` and `learning_objective` items. Broad keyword
+overlap is rejected rather than confirmed, market/business context remains
+`context_only`, and passive reading is not counted as mastery. No DB migration
+or LLM run was required.
 
 ### Phase 6 - Evaluation And Dogfood
 

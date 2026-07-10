@@ -9,6 +9,7 @@ from output.intelligence_retrieval_items import (
     build_retrieval_items,
     search_retrieval_items,
 )
+from output.learning_layer import LEARNING_STAGES, PROJECT_LEARNING_PROJECTION_VERSION
 
 
 class TestIntelligenceRetrievalItems(unittest.TestCase):
@@ -161,6 +162,77 @@ class TestIntelligenceRetrievalItems(unittest.TestCase):
                             }
                         ]
                     },
+                    "project_learning_projection": {
+                        "schema_version": PROJECT_LEARNING_PROJECTION_VERSION,
+                        "week_label": "2026-W28",
+                        "source_policy": {
+                            "confirmed_project_implication": "requires project-specific evidence and source refs",
+                            "broad_overlap": "rejected_not_confirmed",
+                            "market_business_context": "context_only",
+                            "no_feedback_semantics": "unknown",
+                            "passive_reading": "not_mastery",
+                        },
+                        "project_intelligence": {
+                            "external_signals": [
+                                {
+                                    "id": "external-signal:101",
+                                    "title": "Eval gates are becoming release infrastructure for coding agents.",
+                                    "thread_slug": "eval-gates",
+                                    "atom_type": "engineering_practice",
+                                    "context_policy": "source_backed",
+                                    "source_atom_ids": [101],
+                                    "source_refs": ["https://t.me/ai_lab/101"],
+                                    "evidence_state": "source_ref_available",
+                                }
+                            ],
+                            "confirmed_implications": [],
+                            "weak_watches": [],
+                            "rejected_overlaps": [
+                                {
+                                    "project": "telegram-research-agent",
+                                    "term": "workflow",
+                                    "reason": "broad_overlap_suppressed",
+                                    "confirmation_state": "rejected",
+                                }
+                            ],
+                            "tiny_pr_ideas": [
+                                {
+                                    "id": "project-action-1",
+                                    "project": "telegram-research-agent",
+                                    "title": "Add eval gate backlog item",
+                                    "next_step": "Draft one scoped issue.",
+                                    "source_atom_ids": [101],
+                                    "source_refs": ["https://t.me/ai_lab/101"],
+                                    "source_policy": "source refs required before project work",
+                                }
+                            ],
+                            "stale_decisions": [],
+                            "research_debt": [{"debt_type": "missing_evidence", "description": "Need project-specific source."}],
+                            "repeated_themes_without_action": [],
+                        },
+                        "learning_intelligence": {
+                            "allowed_stages": list(LEARNING_STAGES),
+                            "stage_definitions": {stage: stage for stage in LEARNING_STAGES},
+                            "stage_counts": {stage: (1 if stage == "read" else 0) for stage in LEARNING_STAGES},
+                            "objectives": [
+                                {
+                                    "id": "learning-objective:atom:101",
+                                    "topic": "Eval gates are becoming release infrastructure for coding agents.",
+                                    "stage": "read",
+                                    "target_stage": "implemented",
+                                    "stage_evidence": "source atom with source refs",
+                                    "source_atom_ids": [101],
+                                    "source_refs": ["https://t.me/ai_lab/101"],
+                                    "feedback_state": "unknown",
+                                    "mastery_claim": "not_claimed",
+                                }
+                            ],
+                            "experiments": [],
+                            "outcomes": [],
+                            "feedback_state": "unknown",
+                            "mastery_policy": "read is source exposure, not mastery",
+                        },
+                    },
                     "mvp_radar": {
                         "status": "loaded",
                         "selected_candidate": "LLM Guardrail Watchdog",
@@ -189,6 +261,8 @@ class TestIntelligenceRetrievalItems(unittest.TestCase):
         self.assertIn("claim_card", item_types)
         self.assertIn("action_card", item_types)
         self.assertIn("project_diagnostic", item_types)
+        self.assertIn("project_intelligence", item_types)
+        self.assertIn("learning_objective", item_types)
         self.assertIn("mvp_dossier", item_types)
 
     def test_builds_retrieval_items_from_split_weekly_brief_sidecar(self):

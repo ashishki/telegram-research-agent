@@ -224,9 +224,18 @@ class TestSplitIntelligenceReports(unittest.TestCase):
             self.assertIn("Momentum Vs Evidence", atlas_html)
             self.assertIn("Source Diversity", atlas_html)
             self.assertIn("Project Connections", atlas_html)
+            self.assertIn('id="project-learning"', atlas_html)
+            self.assertIn("Project And Learning Intelligence", atlas_html)
+            self.assertIn("Learning Stages", atlas_html)
+            self.assertIn("Passive reading is not mastery", atlas_html)
             self.assertIn("Open Questions", atlas_html)
             self.assertIn("Original Source Links", atlas_html)
             self.assertIn('id="brief-actions"', brief_html)
+            self.assertIn('id="brief-project-learning"', brief_html)
+            self.assertIn("External Signals", brief_html)
+            self.assertIn("Rejected Overlaps", brief_html)
+            self.assertIn("Stale Decisions", brief_html)
+            self.assertIn("Repeated Themes Without Action", brief_html)
             self.assertIn("Why selected:", brief_html)
             self.assertLess(brief_html.find('id="brief-actions"'), brief_html.find('id="brief-mvp-radar"'))
             self.assertEqual(atlas_json["artifact_type"], "knowledge_atlas")
@@ -254,6 +263,31 @@ class TestSplitIntelligenceReports(unittest.TestCase):
             self.assertTrue(brief_json["actions"][0]["why_selected"])
             self.assertTrue(brief_json["personal_learning_loop"]["read_items"][0]["ranking_factors"])
             self.assertTrue(brief_json["personal_learning_loop"]["read_items"][0]["why_selected"])
+            self.assertIn("project_learning_projection", atlas_json)
+            self.assertIn("project_learning_projection", brief_json)
+            self.assertEqual(
+                set(brief_json["project_learning_projection"]["learning_intelligence"]["allowed_stages"]),
+                {
+                    "read",
+                    "understood",
+                    "explained",
+                    "reproduced",
+                    "implemented",
+                    "tested",
+                    "project-applied",
+                    "measured",
+                    "stale",
+                    "prerequisite_gap",
+                },
+            )
+            self.assertEqual(
+                brief_json["project_learning_projection"]["source_policy"]["no_feedback_semantics"],
+                "unknown",
+            )
+            self.assertEqual(
+                atlas_json["project_learning_projection"]["source_policy"]["market_business_context"],
+                "context_only",
+            )
             self.assertIn("decision_cockpit", brief_json)
             self.assertEqual(brief_json["decision_cockpit"]["mvp_radar_gate"]["decision"], "do_not_build")
             self.assertEqual(brief_json["mvp_radar_gate"]["matched_gate_evidence_count"], 0)

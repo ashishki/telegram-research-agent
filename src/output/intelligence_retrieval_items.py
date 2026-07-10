@@ -252,6 +252,7 @@ def _items_from_workbook(workbook: Mapping[str, Any]) -> list[IntelligenceRetrie
     items.extend(_deep_explanation_items(workbook, week_label=week, generated_at=generated_at))
     items.extend(_action_card_items(workbook, week_label=week, generated_at=generated_at))
     items.extend(_project_diagnostic_items(workbook, week_label=week, generated_at=generated_at))
+    items.extend(_project_learning_projection_items(workbook, week_label=week, generated_at=generated_at))
     mvp = workbook.get("mvp_radar") if isinstance(workbook.get("mvp_radar"), Mapping) else None
     if mvp:
         items.append(_mvp_item(dict(mvp), week))
@@ -602,6 +603,110 @@ def _project_diagnostic_items(
                 thread_slug=_clean_text(suggestion.get("thread_slug")) or None,
                 project_name=project,
                 status=_clean_text(suggestion.get("suggestion_type")) or None,
+                created_at=generated_at,
+                updated_at=generated_at,
+            )
+        )
+    return result
+
+
+def _project_learning_projection_items(
+    workbook: Mapping[str, Any],
+    *,
+    week_label: str | None,
+    generated_at: str | None,
+) -> list[IntelligenceRetrievalItem]:
+    projection = (
+        workbook.get("project_learning_projection")
+        if isinstance(workbook.get("project_learning_projection"), Mapping)
+        else {}
+    )
+    if not projection:
+        return []
+    project = projection.get("project_intelligence") if isinstance(projection.get("project_intelligence"), Mapping) else {}
+    learning = projection.get("learning_intelligence") if isinstance(projection.get("learning_intelligence"), Mapping) else {}
+    result: list[IntelligenceRetrievalItem] = []
+    project_rows = [
+        ("external_signal", _as_list(project.get("external_signals"))),
+        ("confirmed_implication", _as_list(project.get("confirmed_implications"))),
+        ("weak_watch", _as_list(project.get("weak_watches"))),
+        ("rejected_overlap", _as_list(project.get("rejected_overlaps"))),
+        ("tiny_pr_idea", _as_list(project.get("tiny_pr_ideas"))),
+        ("stale_decision", _as_list(project.get("stale_decisions"))),
+        ("research_debt", _as_list(project.get("research_debt"))),
+        ("repeated_theme_without_action", _as_list(project.get("repeated_themes_without_action"))),
+    ]
+    for kind, rows in project_rows:
+        for index, row in enumerate(rows, start=1):
+            if not isinstance(row, Mapping):
+                continue
+            title = (
+                _clean_text(row.get("title"))
+                or _clean_text(row.get("thread_title"))
+                or _clean_text(row.get("theme"))
+                or _clean_text(row.get("term"))
+                or _clean_text(row.get("description"))
+                or f"Project intelligence {index}"
+            )
+            project_name = _clean_text(row.get("project")) or None
+            item_id = _clean_text(row.get("id")) or _slug(f"{kind} {project_name or ''} {title}")
+            result.append(
+                IntelligenceRetrievalItem(
+                    id=f"project_intelligence:{week_label or 'unknown'}:{kind}:{item_id}",
+                    item_type="project_intelligence",
+                    week_label=week_label,
+                    title=title,
+                    summary=_clean_text(row.get("confirmation_state"))
+                    or _clean_text(row.get("reason"))
+                    or _clean_text(row.get("debt_type"))
+                    or kind,
+                    text=_join_text(
+                        title,
+                        row.get("why"),
+                        row.get("next_step"),
+                        row.get("reason"),
+                        row.get("needed_evidence"),
+                        row.get("description"),
+                        row.get("source_policy"),
+                        _json_text(row.get("acceptance_criteria")),
+                    ),
+                    source_refs=_string_values(row.get("source_refs") or row.get("source_urls") or row.get("evidence_urls")),
+                    atom_ids=_list_values(row.get("source_atom_ids") or row.get("atom_ids")),
+                    thread_slug=_clean_text(row.get("thread_slug")) or None,
+                    project_name=project_name,
+                    evidence_tier="project_learning_projection",
+                    verification_status=_clean_text(row.get("confirmation_state")) or None,
+                    status=kind,
+                    created_at=generated_at,
+                    updated_at=generated_at,
+                )
+            )
+    for index, objective in enumerate(_as_list(learning.get("objectives")), start=1):
+        if not isinstance(objective, Mapping):
+            continue
+        title = _clean_text(objective.get("topic")) or f"Learning objective {index}"
+        objective_id = _clean_text(objective.get("id")) or _slug(title)
+        stage = _clean_text(objective.get("stage")) or "unknown"
+        result.append(
+            IntelligenceRetrievalItem(
+                id=f"learning_objective:{week_label or 'unknown'}:{objective_id}",
+                item_type="learning_objective",
+                week_label=week_label,
+                title=title,
+                summary=stage,
+                text=_join_text(
+                    title,
+                    objective.get("stage"),
+                    objective.get("target_stage"),
+                    objective.get("stage_evidence"),
+                    objective.get("feedback_state"),
+                    objective.get("mastery_claim"),
+                ),
+                source_refs=_string_values(objective.get("source_refs")),
+                atom_ids=_list_values(objective.get("source_atom_ids")),
+                evidence_tier="learning_stage_projection",
+                verification_status=_clean_text(objective.get("feedback_state")) or None,
+                status=stage,
                 created_at=generated_at,
                 updated_at=generated_at,
             )
@@ -1122,6 +1227,8 @@ def _section_payload(workbook: Mapping[str, Any], section_id: str, kind: str) ->
     normalized = f"{section_id} {kind}".replace("-", "_")
     if "thread_navigation" in normalized:
         return workbook.get("thread_navigation") or {}
+    if "project_learning" in normalized:
+        return workbook.get("project_learning_projection") or {}
     for section in _as_list(workbook.get("artifact_sections")):
         if not isinstance(section, Mapping):
             continue

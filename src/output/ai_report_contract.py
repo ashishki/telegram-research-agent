@@ -7,6 +7,11 @@ from datetime import datetime, timezone
 from typing import Any, Mapping
 from urllib.parse import urlparse
 
+from output.learning_layer import (
+    LEARNING_STAGES,
+    PROJECT_LEARNING_PROJECTION_VERSION,
+    build_project_learning_projection,
+)
 from output.report_quality import ReportQualityFinding, SEVERITY_CRITICAL
 
 
@@ -43,6 +48,7 @@ REPORT_CONTRACT_SCHEMA: dict[str, Any] = {
             "thread_deltas",
             "action_cards",
             "project_diagnostic",
+            "project_learning_projection",
             "feedback_targets",
             "intelligence_contract",
         ],
@@ -185,6 +191,13 @@ def build_weekly_ai_report_contract(
         projects=clean_projects,
         threads=threads,
     )
+    project_learning_projection = build_project_learning_projection(
+        context,
+        actions=action_cards,
+        project_diagnostic=project_diagnostic,
+        decision_cards=decision_cards,
+        feedback_context=feedback_context,
+    )
 
     return {
         "report_contract": {
@@ -213,12 +226,14 @@ def build_weekly_ai_report_contract(
         "thread_deltas": thread_deltas,
         "action_cards": action_cards,
         "project_diagnostic": project_diagnostic,
+        "project_learning_projection": project_learning_projection,
         "feedback_targets": feedback_targets,
         "intelligence_contract": build_canonical_intelligence_contract(
             context,
             claim_cards=claim_cards,
             thread_deltas=thread_deltas,
             decision_cards=decision_cards,
+            project_learning_projection=project_learning_projection,
         ),
     }
 
@@ -251,6 +266,7 @@ def validate_weekly_ai_report_contract(
     )
     _validate_action_cards(payload.get("action_cards"), feedback_ids, findings)
     _validate_project_diagnostic(payload.get("project_diagnostic"), findings)
+    _validate_project_learning_projection(payload.get("project_learning_projection"), findings)
     _validate_feedback_targets(feedback_targets, findings)
     findings.extend(validate_canonical_intelligence_contract(payload.get("intelligence_contract")))
     if html_text is not None:
@@ -287,6 +303,7 @@ def build_canonical_intelligence_contract(
     thread_deltas: list[dict] | None = None,
     decision_cards: list[dict] | None = None,
     mvp_radar: Mapping[str, Any] | None = None,
+    project_learning_projection: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build the canonical sidecar projection over curated intelligence objects."""
     threads = [thread for thread in (context.get("threads") or []) if isinstance(thread, dict)]
@@ -299,6 +316,21 @@ def build_canonical_intelligence_contract(
     atom_items = _canonical_atoms(atoms, claims, evidence_items)
     thread_items = _canonical_threads(threads, claims, evidence_items, deltas)
     decisions = _canonical_decisions(decision_cards or [], claims)
+    learning_projection = (
+        project_learning_projection
+        if isinstance(project_learning_projection, Mapping)
+        else build_project_learning_projection(context, decision_cards=decision_cards or [])
+    )
+    project_intelligence = (
+        learning_projection.get("project_intelligence")
+        if isinstance(learning_projection.get("project_intelligence"), Mapping)
+        else {}
+    )
+    learning_intelligence = (
+        learning_projection.get("learning_intelligence")
+        if isinstance(learning_projection.get("learning_intelligence"), Mapping)
+        else {}
+    )
     payload: dict[str, Any] = {
         "contract_version": INTELLIGENCE_CONTRACT_VERSION,
         "schema_version": INTELLIGENCE_CONTRACT_VERSION,
@@ -316,8 +348,10 @@ def build_canonical_intelligence_contract(
         "knowledge_atoms": atom_items,
         "idea_threads": thread_items,
         "decisions": decisions,
-        "experiments": [],
-        "outcomes": [],
+        "project_implications": _canonical_project_implications(project_intelligence),
+        "learning_objectives": _as_list(learning_intelligence.get("objectives")),
+        "experiments": _as_list(learning_intelligence.get("experiments")),
+        "outcomes": _as_list(learning_intelligence.get("outcomes")),
     }
     if mvp_radar is not None:
         payload["radar_exchange"] = _canonical_radar_exchange(mvp_radar)
@@ -746,6 +780,105 @@ def _validate_project_diagnostic(value: object, findings: list[ReportQualityFind
                 "project_diagnostic.rejected_broad_overlaps",
             )
         )
+
+
+def _validate_project_learning_projection(value: object, findings: list[ReportQualityFinding]) -> None:
+    projection = value if isinstance(value, Mapping) else {}
+    if not projection:
+        findings.append(_critical("Report must include project/learning intelligence projection", "project_learning_projection"))
+        return
+    if projection.get("schema_version") != PROJECT_LEARNING_PROJECTION_VERSION:
+        findings.append(
+            _critical(
+                "Project/learning projection version is missing or unsupported",
+                "project_learning_projection.schema_version",
+            )
+        )
+    project_intelligence = (
+        projection.get("project_intelligence")
+        if isinstance(projection.get("project_intelligence"), Mapping)
+        else {}
+    )
+    learning_intelligence = (
+        projection.get("learning_intelligence")
+        if isinstance(projection.get("learning_intelligence"), Mapping)
+        else {}
+    )
+    for key in (
+        "external_signals",
+        "confirmed_implications",
+        "weak_watches",
+        "rejected_overlaps",
+        "tiny_pr_ideas",
+        "stale_decisions",
+        "research_debt",
+        "repeated_themes_without_action",
+    ):
+        if key not in project_intelligence:
+            findings.append(
+                _critical(
+                    "Project Intelligence projection is missing required field",
+                    f"project_learning_projection.project_intelligence.{key}",
+                )
+            )
+    for index, implication in enumerate(_as_list(project_intelligence.get("confirmed_implications")), start=1):
+        if not isinstance(implication, Mapping):
+            continue
+        if not _as_list(implication.get("source_refs")) and not _as_list(implication.get("source_atom_ids")):
+            findings.append(
+                _critical(
+                    "Confirmed project implication must include source refs",
+                    f"project_learning_projection.project_intelligence.confirmed_implications[{index}]",
+                )
+            )
+        if _broad_only_project_terms(implication.get("shared_terms")):
+            findings.append(
+                _critical(
+                    "Broad keyword overlap must not be a confirmed project implication",
+                    f"project_learning_projection.project_intelligence.confirmed_implications[{index}].shared_terms",
+                )
+            )
+    allowed_stages = set(_as_list(learning_intelligence.get("allowed_stages")))
+    if allowed_stages != set(LEARNING_STAGES):
+        findings.append(
+            _critical(
+                "Learning Intelligence must distinguish the full stage vocabulary",
+                "project_learning_projection.learning_intelligence.allowed_stages",
+            )
+        )
+    stage_counts = learning_intelligence.get("stage_counts")
+    if not isinstance(stage_counts, Mapping) or set(LEARNING_STAGES) - set(stage_counts.keys()):
+        findings.append(
+            _critical(
+                "Learning Intelligence stage counts must include every stage",
+                "project_learning_projection.learning_intelligence.stage_counts",
+            )
+        )
+    for index, objective in enumerate(_as_list(learning_intelligence.get("objectives")), start=1):
+        if not isinstance(objective, Mapping):
+            continue
+        stage = str(objective.get("stage") or "")
+        if stage not in LEARNING_STAGES:
+            findings.append(
+                _critical(
+                    "Learning objective has unsupported stage",
+                    f"project_learning_projection.learning_intelligence.objectives[{index}].stage",
+                )
+            )
+        if stage == "read" and not _as_list(objective.get("source_refs")) and not _as_list(objective.get("source_atom_ids")):
+            findings.append(
+                _critical(
+                    "Read-stage learning objective must be source-backed",
+                    f"project_learning_projection.learning_intelligence.objectives[{index}]",
+                )
+            )
+        if stage != "read" and str(objective.get("mastery_claim") or "") == "claimed_from_reading_only":
+            findings.append(
+                _critical(
+                    "Passive reading must not be counted as mastery",
+                    f"project_learning_projection.learning_intelligence.objectives[{index}].mastery_claim",
+                )
+            )
 
 
 def _validate_feedback_targets(value: list, findings: list[ReportQualityFinding]) -> None:
@@ -1186,16 +1319,27 @@ def _project_diagnostic(
             "source_atom_ids": link.get("source_atom_ids") or [],
             "shared_terms": link.get("shared_terms") or [],
         }
-        if str(link.get("confidence") or "") == "higher" and len(link.get("evidence_urls") or []) >= 2:
+        broad_only = _broad_only_project_terms(link.get("shared_terms"))
+        if (
+            str(link.get("confidence") or "") == "higher"
+            and len(link.get("evidence_urls") or []) >= 2
+            and not broad_only
+        ):
             confirmed.append(item)
         else:
+            if broad_only:
+                item["rejection_reason"] = "broad_overlap_suppressed"
+                continue
             watch.append(item)
     close_signals = _close_but_not_enough_signals(
         projects=projects,
         threads=threads,
         linked_pairs={(str(link.get("project")), str(link.get("thread_slug"))) for link in project_links},
     )
-    rejected_broad = _rejected_broad_overlaps(close_signals)
+    rejected_broad = [
+        *_rejected_broad_overlaps(close_signals),
+        *_rejected_broad_project_links(clean_links=project_links),
+    ]
     study_items = _analysis_items(analysis, "study_now")
     learning = [
         {
@@ -1541,6 +1685,41 @@ def _canonical_decisions(decision_cards: list[dict], claims: list[dict]) -> list
     return result
 
 
+def _canonical_project_implications(project_intelligence: Mapping[str, Any]) -> list[dict]:
+    result = []
+    for item in _as_list(project_intelligence.get("confirmed_implications")):
+        if not isinstance(item, Mapping):
+            continue
+        result.append(
+            {
+                "id": f"project_implication:{_slug(item.get('project') or 'project')}:{_slug(item.get('thread_slug') or item.get('thread_title') or 'signal')}",
+                "project": str(item.get("project") or "unknown-project"),
+                "thread_slug": str(item.get("thread_slug") or ""),
+                "confirmation_state": "confirmed",
+                "source_refs": _as_list(item.get("source_refs")),
+                "source_atom_ids": _int_values(item.get("source_atom_ids")),
+                "next_step": str(item.get("next_step") or ""),
+                "source_policy": str(item.get("source_policy") or "project-specific source refs required"),
+            }
+        )
+    for item in _as_list(project_intelligence.get("weak_watches")):
+        if not isinstance(item, Mapping):
+            continue
+        result.append(
+            {
+                "id": f"project_implication:{_slug(item.get('project') or 'project')}:{_slug(item.get('thread_slug') or item.get('thread_title') or 'watch')}",
+                "project": str(item.get("project") or "unknown-project"),
+                "thread_slug": str(item.get("thread_slug") or ""),
+                "confirmation_state": str(item.get("confirmation_state") or "weak_watch"),
+                "source_refs": _as_list(item.get("source_refs")),
+                "source_atom_ids": _int_values(item.get("source_atom_ids")),
+                "next_step": str(item.get("next_step") or ""),
+                "source_policy": str(item.get("source_policy") or "not enough evidence for confirmed lead"),
+            }
+        )
+    return result[:12]
+
+
 def _canonical_radar_exchange(mvp_radar: Mapping[str, Any]) -> dict[str, Any]:
     matches = [item for item in _as_list(mvp_radar.get("matched_external_evidence")) if isinstance(item, Mapping)]
     context_only = [
@@ -1706,6 +1885,34 @@ def _rejected_broad_overlaps(signals: list[dict]) -> list[dict]:
                 }
             )
     return rejected[:12]
+
+
+def _rejected_broad_project_links(clean_links: list[dict]) -> list[dict]:
+    rejected: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for link in clean_links:
+        terms = [str(term).strip().lower() for term in _as_list(link.get("shared_terms")) if str(term or "").strip()]
+        if not terms or not all(term in BROAD_PROJECT_TERMS for term in terms):
+            continue
+        project = str(link.get("project") or "unknown-project")
+        for term in terms:
+            key = (project, term)
+            if key in seen:
+                continue
+            seen.add(key)
+            rejected.append(
+                {
+                    "project": project,
+                    "term": term,
+                    "reason": "broad_overlap_suppressed",
+                }
+            )
+    return rejected[:12]
+
+
+def _broad_only_project_terms(value: object) -> bool:
+    terms = [str(term).strip().lower() for term in _as_list(value) if str(term or "").strip()]
+    return bool(terms) and all(term in BROAD_PROJECT_TERMS for term in terms)
 
 
 def _project_terms(project: Mapping[str, Any]) -> list[str]:

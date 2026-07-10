@@ -175,6 +175,10 @@ cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
 - `PGI-003`: completed locally. Weekly Brief and Hermes consume Radar artifacts
   read-only, preserve matched external evidence fields, warn on missing/stale
   state, and keep market/business context `context_only`.
+- `PGI-005`: completed locally. Project/Learning Intelligence may display
+  existing-project overlap as a consumer projection, but it cannot satisfy Radar
+  build/focused gates. Broad project overlap remains rejected unless backed by
+  matched, source-specific evidence.
 - `RADAR-PGI-001`: add Radar-side cross-link and fixture parity checks for this
   contract version without changing runtime gates.
 - `RADAR-PGI-003`: run a bounded weekly validation dogfood pass when fresh

@@ -13,6 +13,7 @@ from output.ai_report_contract import (
     RADAR_INTELLIGENCE_CONTRACT_VERSION,
     build_canonical_intelligence_contract,
 )
+from output.learning_layer import build_project_learning_projection
 from output.ai_intelligence_report import (
     _all_atoms,
     _analysis_text,
@@ -33,6 +34,7 @@ BRIEF_SECTIONS = (
     ("brief-decision", "Decision Snapshot", "decision_snapshot"),
     ("brief-changes", "What Changed This Week", "week_delta"),
     ("brief-actions", "Actions And Read/Try Prompts", "actions"),
+    ("brief-project-learning", "Project And Learning Intelligence", "project_learning"),
     ("brief-mvp-radar", "MVP Radar", "mvp_radar"),
     ("brief-feedback", "Feedback Prompts", "feedback"),
 )
@@ -174,10 +176,16 @@ def render_weekly_intelligence_brief_html(
     actions = _learning_actions(context.get("threads") or [], context.get("feedback_context") or {})
     normalized_mvp = _normalize_mvp_radar(mvp_radar or {})
     decision_cockpit = _decision_cockpit(context, actions, normalized_mvp)
+    project_learning_projection = build_project_learning_projection(
+        context,
+        actions=actions,
+        feedback_context=context.get("feedback_context") or {},
+    )
     section_bodies = {
         "brief-decision": _render_decision_snapshot(decision_cockpit),
         "brief-changes": _render_week_changes(context),
         "brief-actions": _render_brief_actions(context, actions),
+        "brief-project-learning": _render_project_learning_projection(project_learning_projection),
         "brief-mvp-radar": _render_mvp_radar(normalized_mvp),
         "brief-feedback": _render_feedback_prompts(context),
     }
@@ -225,6 +233,8 @@ section {{ background:var(--panel); border:1px solid var(--line); border-radius:
 .mvp-gate-panel p:last-child, .mvp-action-panel p:last-child {{ margin-bottom:0; }}
 .evidence-list li, .missing-list li {{ margin-bottom:7px; }}
 code {{ background:#eef2f7; border:1px solid var(--line); border-radius:5px; padding:1px 5px; white-space:normal; overflow-wrap:anywhere; }}
+table {{ width:100%; border-collapse:collapse; margin:0 0 10px; }}
+td {{ border-bottom:1px solid var(--line); padding:6px 4px; }}
 .action-list {{ display:grid; grid-template-columns:1fr; gap:10px; }}
 .action-card {{ border:1px solid var(--line); border-radius:8px; padding:13px; background:#fbfcfd; }}
 .sources {{ margin-top:6px; font-size:13px; }}
@@ -347,9 +357,15 @@ def _weekly_brief_metadata(
     threads = context.get("threads") or []
     atoms = _all_atoms(threads)
     learning_loop = _personal_learning_loop(threads, actions, context.get("feedback_context") or {})
+    project_learning_projection = build_project_learning_projection(
+        context,
+        actions=actions,
+        feedback_context=context.get("feedback_context") or {},
+    )
     intelligence_contract = build_canonical_intelligence_contract(
         context,
         mvp_radar=mvp_radar,
+        project_learning_projection=project_learning_projection,
     )
     decision_cockpit = _decision_cockpit(context, actions, mvp_radar)
     sections = [
@@ -381,6 +397,7 @@ def _weekly_brief_metadata(
         "changed_thread_count": len(_changed_threads(threads)),
         "actions": actions,
         "personal_learning_loop": learning_loop,
+        "project_learning_projection": project_learning_projection,
         "decision_cockpit": decision_cockpit,
         "intelligence_contract": intelligence_contract,
         "mvp_radar": mvp_radar,
@@ -708,6 +725,84 @@ def _render_brief_actions(context: dict, actions: list[dict]) -> str:
     )
 
 
+def _render_project_learning_projection(projection: Mapping[str, object]) -> str:
+    project = projection.get("project_intelligence") if isinstance(projection.get("project_intelligence"), Mapping) else {}
+    learning = projection.get("learning_intelligence") if isinstance(projection.get("learning_intelligence"), Mapping) else {}
+    external = "".join(
+        f'<li><b>{_escape(item.get("title") or "External signal")}</b>'
+        f'<p class="muted">{_escape(item.get("atom_type") or "unknown")} · {_escape(item.get("context_policy") or "source_backed")}</p></li>'
+        for item in _object_list(project.get("external_signals"))[:4]
+    )
+    confirmed = "".join(
+        f'<li><b>{_escape(item.get("project") or "Project")}</b>: {_escape(item.get("thread_title") or item.get("thread_slug") or "signal")}'
+        f'<p class="muted">{_escape(item.get("source_policy") or "")}</p></li>'
+        for item in _object_list(project.get("confirmed_implications"))[:4]
+    )
+    watches = "".join(
+        f'<li><b>{_escape(item.get("project") or "Project")}</b>: {_escape(item.get("thread_title") or item.get("thread_slug") or item.get("reason") or "watch")}'
+        f'<p class="muted">{_escape(item.get("confirmation_state") or "weak_watch")}</p></li>'
+        for item in _object_list(project.get("weak_watches"))[:4]
+    )
+    rejected = "".join(
+        f'<li>{_escape(item.get("project") or "Project")} / {_escape(item.get("term") or "term")}: {_escape(item.get("reason") or "rejected")}</li>'
+        for item in _object_list(project.get("rejected_overlaps"))[:5]
+    )
+    ideas = "".join(
+        f'<li><b>{_escape(item.get("title") or "Tiny PR idea")}</b><p class="muted">{_escape(item.get("next_step") or "")}</p></li>'
+        for item in _object_list(project.get("tiny_pr_ideas"))[:4]
+    )
+    stale = "".join(
+        f'<li><b>{_escape(item.get("title") or "Decision")}</b><p class="muted">{_escape(item.get("review_reason") or "")}</p></li>'
+        for item in _object_list(project.get("stale_decisions"))[:4]
+    )
+    research_debt = "".join(
+        f'<li><b>{_escape(item.get("debt_type") or "debt")}</b>: {_escape(item.get("description") or "")}</li>'
+        for item in _object_list(project.get("research_debt"))[:5]
+    )
+    repeated = "".join(
+        f'<li>{_escape(item.get("theme") or "theme")} <span class="muted">{_escape(item.get("frequency") or 0)} source atom(s)</span></li>'
+        for item in _object_list(project.get("repeated_themes_without_action"))[:5]
+    )
+    stage_counts = learning.get("stage_counts") if isinstance(learning.get("stage_counts"), Mapping) else {}
+    stage_rows = "".join(
+        f"<tr><td>{_escape(stage)}</td><td>{_escape(stage_counts.get(stage, 0))}</td></tr>"
+        for stage in learning.get("allowed_stages") or []
+    )
+    objectives = "".join(
+        f'<li><b>{_escape(item.get("topic") or "Learning objective")}</b> '
+        f'<span class="tag">{_escape(item.get("stage") or "unknown")}</span>'
+        f'<p class="muted">{_escape(item.get("stage_evidence") or "")}</p></li>'
+        for item in _object_list(learning.get("objectives"))[:5]
+    )
+    return (
+        '<div class="cockpit-grid">'
+        '<div class="cockpit-panel"><h3>External Signals</h3><ul>'
+        + (external or '<li class="muted">No external signals projected.</li>')
+        + '</ul><h3>Confirmed Implications</h3><ul>'
+        + (confirmed or '<li class="muted">No confirmed project implication.</li>')
+        + '</ul><h3>Weak Watches</h3><ul>'
+        + (watches or '<li class="muted">No weak project watches.</li>')
+        + '</ul></div>'
+        '<div class="cockpit-panel"><h3>Rejected Overlaps</h3><ul>'
+        + (rejected or '<li class="muted">No rejected broad overlaps recorded.</li>')
+        + '</ul><h3>Tiny PR Ideas</h3><ul>'
+        + (ideas or '<li class="muted">No source-backed tiny PR idea yet.</li>')
+        + '</ul></div>'
+        '<div class="cockpit-panel"><h3>Stale Decisions</h3><ul>'
+        + (stale or '<li class="muted">No stale decision projection.</li>')
+        + '</ul><h3>Research Debt</h3><ul>'
+        + (research_debt or '<li class="muted">No research debt recorded.</li>')
+        + '</ul><h3>Repeated Themes Without Action</h3><ul>'
+        + (repeated or '<li class="muted">No repeated source theme without action.</li>')
+        + '</ul></div>'
+        '<div class="cockpit-panel"><h3>Learning Stages</h3>'
+        f'<table><tbody>{stage_rows}</tbody></table>'
+        '<p class="muted">Passive reading is not mastery; no feedback stays unknown.</p>'
+        f'<ol>{objectives}</ol></div>'
+        '</div>'
+    )
+
+
 def _render_mvp_radar(mvp_radar: Mapping[str, object]) -> str:
     candidate = str(mvp_radar.get("selected_candidate") or "No candidate selected")
     recommendation = str(mvp_radar.get("recommendation") or mvp_radar.get("dossier_status") or "needs_more_evidence")
@@ -821,6 +916,8 @@ def _section_metadata_summary(
         return "This week's frontier changes or changed Idea Threads."
     if section_id == "brief-actions":
         return "Short read/try/action queue for the operator."
+    if section_id == "brief-project-learning":
+        return "Project implications, weak watches, rejected overlaps, research debt, and learning stage projection."
     if section_id == "brief-mvp-radar":
         summary = _mvp_validation_summary(mvp_radar)
         return (

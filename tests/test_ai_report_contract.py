@@ -10,6 +10,7 @@ from output.ai_report_contract import (
     validate_canonical_intelligence_contract,
     validate_weekly_ai_report_contract,
 )
+from output.learning_layer import LEARNING_STAGES, PROJECT_LEARNING_PROJECTION_VERSION
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -217,6 +218,7 @@ def _complete_contract_metadata() -> dict:
             "no_confirmed_leads_reason": "Нет специфичной связи с проектом.",
             "missing_config_suggestions": ["Добавить специфичные project keywords."],
         },
+        "project_learning_projection": _complete_project_learning_projection(),
         "feedback_targets": [
             {
                 "id": "action-1-feedback",
@@ -262,6 +264,71 @@ def _complete_contract_metadata() -> dict:
             },
         ],
         "intelligence_contract": _complete_intelligence_contract(),
+    }
+
+
+def _complete_project_learning_projection() -> dict:
+    return {
+        "schema_version": PROJECT_LEARNING_PROJECTION_VERSION,
+        "week_label": "2026-W28",
+        "source_policy": {
+            "confirmed_project_implication": "requires project-specific evidence and source refs",
+            "broad_overlap": "rejected_not_confirmed",
+            "market_business_context": "context_only",
+            "no_feedback_semantics": "unknown",
+            "passive_reading": "not_mastery",
+        },
+        "project_intelligence": {
+            "external_signals": [
+                {
+                    "id": "external-signal:1",
+                    "title": "Eval gates are becoming release infrastructure.",
+                    "thread_slug": "eval-gates",
+                    "atom_type": "engineering_practice",
+                    "context_policy": "source_backed",
+                    "source_atom_ids": [1],
+                    "source_refs": ["https://t.me/source/1"],
+                    "evidence_state": "source_ref_available",
+                }
+            ],
+            "confirmed_implications": [],
+            "weak_watches": [],
+            "rejected_overlaps": [
+                {
+                    "project": "telegram-research-agent",
+                    "term": "workflow",
+                    "reason": "broad_overlap_suppressed",
+                    "confirmation_state": "rejected",
+                }
+            ],
+            "tiny_pr_ideas": [],
+            "stale_decisions": [],
+            "research_debt": [{"debt_type": "project_config_gap", "description": "Добавить специфичные project keywords."}],
+            "repeated_themes_without_action": [],
+            "no_confirmed_leads_reason": "Нет специфичной связи с проектом.",
+        },
+        "learning_intelligence": {
+            "allowed_stages": list(LEARNING_STAGES),
+            "stage_definitions": {stage: f"{stage} definition" for stage in LEARNING_STAGES},
+            "stage_counts": {stage: (1 if stage == "read" else 0) for stage in LEARNING_STAGES},
+            "objectives": [
+                {
+                    "id": "learning-objective:atom:1",
+                    "topic": "Eval gates are becoming release infrastructure.",
+                    "stage": "read",
+                    "target_stage": "implemented",
+                    "stage_evidence": "source atom with source refs",
+                    "source_atom_ids": [1],
+                    "source_refs": ["https://t.me/source/1"],
+                    "feedback_state": "unknown",
+                    "mastery_claim": "not_claimed",
+                }
+            ],
+            "experiments": [],
+            "outcomes": [],
+            "feedback_state": "unknown",
+            "mastery_policy": "read is source exposure, not mastery",
+        },
     }
 
 
@@ -627,6 +694,63 @@ class TestAiReportContract(unittest.TestCase):
             {thread["delta_basis"] for thread in intelligence_contract["idea_threads"]},
         )
 
+    def test_project_learning_projection_distinguishes_stages_without_reading_mastery(self):
+        contract = build_weekly_ai_report_contract(
+            {
+                "week_label": "2026-W28",
+                "week_start": "2026-07-06T00:00:00Z",
+                "week_end": "2026-07-13T00:00:00Z",
+                "threads": [
+                    {
+                        "id": 1,
+                        "slug": "eval-gates",
+                        "title": "Eval Gates",
+                        "summary": "Eval gates before agent-written releases.",
+                        "status": "active",
+                        "first_seen_at": "2026-07-06T08:00:00Z",
+                        "last_seen_at": "2026-07-06T08:00:00Z",
+                        "momentum_7d": 0.4,
+                        "momentum_30d": 0.4,
+                        "atom_count": 1,
+                        "source_channel_count": 1,
+                        "key_entities": ["eval gates"],
+                        "current_claims": ["Eval gates reduce release risk."],
+                        "changed_this_week": True,
+                        "atoms": [
+                            {
+                                "id": 1,
+                                "claim": "Eval gates reduce release risk for coding agents.",
+                                "summary": "A source describes eval gates before release.",
+                                "confidence": 0.84,
+                                "last_seen_at": "2026-07-06T08:00:00Z",
+                                "source_urls": ["https://t.me/ai_lab/101"],
+                                "atom_type": "engineering_practice",
+                                "practices": ["eval-gated release"],
+                            }
+                        ],
+                    }
+                ],
+                "frontier_analysis": {
+                    "actions": [{"title": "Implement eval guard", "next_step": "Add one guard.", "success_criterion": "Guard is tested."}],
+                    "study_now": [{"topic": "eval gates", "reason": "Useful skill."}],
+                },
+                "feedback_context": {"event_count": 0},
+            },
+            project_links=[],
+            projects=[],
+        )
+
+        learning = contract["project_learning_projection"]["learning_intelligence"]
+
+        self.assertEqual(set(learning["allowed_stages"]), set(LEARNING_STAGES))
+        self.assertEqual(set(learning["stage_counts"]), set(LEARNING_STAGES))
+        self.assertIn("read", {item["stage"] for item in learning["objectives"]})
+        self.assertIn("prerequisite_gap", {item["stage"] for item in learning["objectives"]})
+        self.assertTrue(
+            all(item["mastery_claim"] != "claimed_from_reading_only" for item in learning["objectives"])
+        )
+        self.assertEqual(learning["feedback_state"], "unknown")
+
     def test_project_diagnostic_explains_zero_leads_without_broad_match_noise(self):
         contract = build_weekly_ai_report_contract(
             {
@@ -681,6 +805,80 @@ class TestAiReportContract(unittest.TestCase):
         self.assertTrue(diagnostic["rejected_broad_overlaps"])
         self.assertTrue(diagnostic["missing_config_suggestions"])
         self.assertIn("Нет подтвержденных проектных лидов", diagnostic["no_confirmed_leads_reason"])
+
+    def test_broad_only_higher_project_link_is_rejected_not_confirmed(self):
+        context = {
+            "week_label": "2026-W28",
+            "week_start": "2026-07-06T00:00:00Z",
+            "week_end": "2026-07-13T00:00:00Z",
+            "threads": [
+                {
+                    "id": 1,
+                    "slug": "generic-workflow",
+                    "title": "AI workflow evidence",
+                    "summary": "Generic AI workflow evidence without a project-specific entity.",
+                    "status": "active",
+                    "first_seen_at": "2026-07-06T08:00:00Z",
+                    "last_seen_at": "2026-07-06T08:00:00Z",
+                    "momentum_7d": 0.4,
+                    "momentum_30d": 0.4,
+                    "atom_count": 1,
+                    "source_channel_count": 2,
+                    "key_entities": ["AI"],
+                    "current_claims": ["Teams discuss workflow evidence."],
+                    "changed_this_week": True,
+                    "atoms": [
+                        {
+                            "id": 1,
+                            "claim": "Generic workflow evidence matters.",
+                            "summary": "Generic source-backed workflow evidence.",
+                            "confidence": 0.7,
+                            "last_seen_at": "2026-07-06T08:00:00Z",
+                            "source_urls": ["https://t.me/source/1", "https://t.me/source/2"],
+                            "entities": ["AI"],
+                            "practices": ["workflow", "evidence"],
+                        }
+                    ],
+                }
+            ],
+            "frontier_analysis": {
+                "actions": [{"title": "Проверить", "next_step": "Проверить."}],
+                "study_now": [{"topic": "workflow", "reason": "Учебно полезно."}],
+            },
+            "feedback_context": {"event_count": 0},
+        }
+
+        contract = build_weekly_ai_report_contract(
+            context,
+            project_links=[
+                {
+                    "project": "workflow-to-agent-studio",
+                    "repo": "workflow-to-agent-studio",
+                    "thread_slug": "generic-workflow",
+                    "thread_title": "AI workflow evidence",
+                    "confidence": "higher",
+                    "why": "Matches generic AI workflow evidence.",
+                    "next_step": "Open a PR.",
+                    "evidence_urls": ["https://t.me/source/1", "https://t.me/source/2"],
+                    "source_atom_ids": [1],
+                    "shared_terms": ["ai", "workflow", "evidence", "tool"],
+                }
+            ],
+            projects=[{"name": "workflow-to-agent-studio", "keywords": ["AI", "workflow", "evidence", "tool"]}],
+        )
+
+        diagnostic = contract["project_diagnostic"]
+        projection = contract["project_learning_projection"]["project_intelligence"]
+
+        self.assertEqual(diagnostic["confirmed_leads"], [])
+        self.assertEqual(diagnostic["project_watch"], [])
+        self.assertEqual(diagnostic["implementation_suggestions"], [])
+        self.assertEqual(projection["confirmed_implications"], [])
+        self.assertTrue(projection["rejected_overlaps"])
+        self.assertEqual(
+            contract["intelligence_contract"]["project_implications"],
+            [],
+        )
 
     def test_feedback_changes_are_exposed_in_report_contract(self):
         contract = build_weekly_ai_report_contract(
