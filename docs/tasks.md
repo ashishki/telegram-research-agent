@@ -437,7 +437,7 @@ PYTHONPATH=src python3 -m pytest tests/test_ai_report_contract.py tests/test_spl
 
 ### PGI-006 - Evaluation Harness And Weekly Scorecard
 
-- Status: `next_p1`
+- Status: `completed_local`
 - Priority: P1
 - Owner: `telegram-research-agent`
 - Problem: tests exist, but there is no unified intelligence evaluation harness
@@ -473,6 +473,23 @@ PYTHONPATH=src python3 -m pytest tests/test_dogfood_review.py tests/test_ai_repo
 - Estimated size: M.
 - Portfolio evidence produced: evaluation report foundation.
 - Radar impact: `consumer`.
+- Completion notes (2026-07-10):
+  - Added `weekly-intelligence-scorecard.v1` deterministic scorecard builder,
+    validator, Markdown/JSON writer, and file-based fixture loader in
+    `src/output/dogfood_review.py`.
+  - Scorecard records correctness, relevance, decisions/actions, learning, UX,
+    Radar, and operations dimensions without inventing unavailable metrics.
+  - Unknown and not-measured metrics are explicit in `unknown_metrics`; string
+    `unknown` values remain unknown, not measured.
+  - False-confidence incidents are first-class scorecard entries with severity,
+    description, source refs, and status.
+  - File-based builder runs on sanitized sidecar fixtures without LLM calls.
+  - No DB migration, production config change, expensive LLM run, full archive
+    backfill, hidden Hermes mutation tool, or Radar gate behavior change.
+  - Verification passed:
+    `PYTHONPATH=src python3 -m pytest tests/test_dogfood_review.py tests/test_ai_report_contract.py`.
+  - Static verification passed: `python3 -m py_compile src/output/dogfood_review.py`
+    and `git diff --check`.
 
 ### PGI-007 - Four-Week Dogfood Evidence Series
 

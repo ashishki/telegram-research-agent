@@ -62,7 +62,7 @@ GitHub connector check for open PRs/issues, and recent git history on
 | Learning Intelligence | `implemented_locally`, `needs_dogfood` | `project-learning-projection.v1` distinguishes read, understood, explained, reproduced, implemented, tested, project-applied, measured, stale, and prerequisite_gap without counting passive reading as mastery |
 | Market/business lens for Radar | `implemented_and_verified` as `context_only` | `src/output/market_pain_intelligence.py`, `src/output/opportunity_seed_export.py`, `tests/test_opportunity_seed_export.py`, `tests/test_market_context_lens.py` |
 | MVP Radar RVE contract | `implemented_and_verified`, `needs_live_validation` | sibling repo has `validation_queries.py`, `validation_evidence.py`, SERP/Reddit/crawler/X adapters and tests; real weekly validation evidence still needs dogfood |
-| Evaluation framework | `partial` | structural tests and fixtures exist; no unified layer-by-layer eval harness or weekly scorecard yet |
+| Evaluation framework | `implemented_locally`, `needs_dogfood` | `weekly-intelligence-scorecard.v1` in `src/output/dogfood_review.py` records correctness, relevance, decisions/actions, learning, UX, Radar, and operations with explicit unknown/not-measured metrics |
 | Portfolio evidence | `partial` | code/tests/docs exist; no 4-8 week dogfood series, sanitized demo dataset, evaluation report, or case study |
 
 Open GitHub state: no open PRs and no open issues were returned by the GitHub
@@ -194,7 +194,7 @@ Derived projections:
 | D - Knowledge Navigation | Atlas as navigable cumulative map | `partial` | Phase 5 |
 | E - Hermes / PI Assistant | Useful bounded interface over curated intelligence | `implemented_but_not_dogfooded` | Phase 4 |
 | F - Project and Learning Intelligence | Project implications and skill outcomes | `implemented_locally`, `needs_dogfood` | Phase 5 |
-| G - Evaluation and Dogfood | Prove user value and reduce false confidence | `partial` | Phase 6 |
+| G - Evaluation and Dogfood | Prove user value and reduce false confidence | `scorecard_foundation_implemented`, `dogfood_blocked` | Phase 6 |
 | H - MVP Radar Parallel Track | External opportunity validation | `implemented_and_verified`, `needs_live_validation` | Parallel all phases |
 
 ## 10. Development Phases
@@ -325,6 +325,12 @@ or LLM run was required.
 ### Phase 6 - Evaluation And Dogfood
 
 Goal: prove that the system improves decisions and learning.
+
+Current implementation note: PGI-006 adds deterministic
+`weekly-intelligence-scorecard.v1` artifacts with JSON/Markdown writers,
+schema validation, file-based sanitized fixture loading, explicit
+unknown/not-measured metric handling, and false-confidence incident records.
+The four-week evidence series remains blocked on operator dogfood inputs.
 
 Minimum evidence:
 

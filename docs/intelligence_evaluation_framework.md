@@ -255,6 +255,13 @@ study-next cues, original source links, and `atlas_thread` retrieval items.
 Every dogfood week records a scorecard row. Do not fake precision before the
 baseline exists; record actual values, `unknown`, or `not_measured`.
 
+PGI-006 implementation note: `weekly-intelligence-scorecard.v1` now provides a
+deterministic JSON/Markdown artifact builder in `src/output/dogfood_review.py`.
+It can run from sanitized Brief/Atlas/dogfood/observation fixtures without LLM
+calls, records all dimensions below, keeps unknown metrics explicit, and allows
+false-confidence incidents to be recorded. Dogfood thresholds still require a
+four-week baseline.
+
 ### Correctness
 
 - provenance coverage for top claims;
@@ -333,3 +340,8 @@ PGI-001 adds sanitized canonical-contract fixtures under
   shape and source-bound decision-grade claims.
 - `unsupported_decision_grade_claim.json` for unsupported top-claim failure.
 - `context_only_radar_gate.json` for Radar context-only gate misuse.
+
+PGI-006 adds sanitized in-test scorecard fixtures in
+`tests/test_dogfood_review.py` for Brief/Atlas sidecars, manual observations,
+explicit unknown metrics, false-confidence incidents, and file-based fixture
+loading without LLM calls.

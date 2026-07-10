@@ -1,9 +1,9 @@
 # CODEX_PROMPT - Compact Session Handoff
 
-Version: 4.5
+Version: 4.6
 Date: 2026-07-10
-State: PGI-001 through PGI-005 implemented locally and verified; PGI-006 is next
-and should start as a separate PR-sized slice
+State: PGI-001 through PGI-006 implemented locally and verified; PGI-007 is
+blocked on operator dogfood evidence
 
 ## Current Product Direction
 
@@ -31,7 +31,7 @@ docs/tasks.md
 Next implementation task:
 
 ```text
-PGI-006 - Evaluation Harness And Weekly Scorecard
+PGI-007 - Four-Week Dogfood Evidence Series
 ```
 
 ## Verified Baseline
@@ -54,6 +54,10 @@ PGI-006 - Evaluation Harness And Weekly Scorecard
 - Feedback intake/action-status helpers now include PGI-002 provenance,
   correction/effect-window metadata, no-feedback unknown semantics, and
   sidecar-backed ranking explanations for top action/read/try items.
+- PGI-006 adds deterministic `weekly-intelligence-scorecard.v1` scorecards over
+  correctness, relevance, decisions/actions, learning, UX, Radar, and
+  operations. Unknown/not-measured metrics stay explicit; false-confidence
+  incidents can be recorded without LLM calls.
 - Strategy Reviewer exists as advisory-only and must not mutate code/config.
 - Market/business context for Radar exists and is `context_only`.
 - Sibling `Demand-to-MVP-Radar` repo exists at
@@ -355,29 +359,54 @@ python3 -m py_compile src/output/learning_layer.py src/output/ai_report_contract
 git diff --check
 ```
 
-## PGI-006 Handoff
+## PGI-006 Completion
 
-Goal: add a deterministic evaluation harness and weekly scorecard tied to
-correctness, relevance, decisions/actions, learning, UX, Radar honesty, and
-operations.
+Status: completed locally on 2026-07-10.
 
-Status: next candidate.
+Implemented:
 
-Likely files:
+- `weekly-intelligence-scorecard.v1` builder, validator, Markdown/JSON writer,
+  and file-based fixture loader in `src/output/dogfood_review.py`.
+- Scorecard dimensions: correctness, relevance, decisions/actions, learning,
+  UX, Radar, and operations.
+- Explicit `unknown_metrics` for unknown/not-measured values; no false zeroes or
+  fabricated precision.
+- False-confidence incidents as structured scorecard records.
+- Sanitized fixture-file path that runs without LLM calls.
 
-- new eval scripts/tests;
-- `docs/intelligence_evaluation_framework.md`;
-- possible `src/output/dogfood_review.py` extensions.
+Review notes:
 
-Verification target from task card:
+- Correctness: scorecard is deterministic over sidecar/dogfood/observation
+  inputs and validates all required dimensions.
+- Provenance/evidence safety: metric sources point to sidecar paths/fields; no
+  generated private reports are committed.
+- Sidecar/rendered parity: scorecard consumes Brief/Atlas sidecars and writes
+  JSON/Markdown artifacts from the same DTO.
+- Backward compatibility: existing dogfood review API remains intact.
+- Privacy/secrets: no `.env`, secrets, private generated artifacts, expensive
+  LLM runs, production config changes, or full archive backfills.
+- Hermes/Radar: Hermes remains read-only; Radar gate behavior unchanged and
+  context-only gate violation count remains explicit.
+
+Verification:
 
 ```bash
 PYTHONPATH=src python3 -m pytest tests/test_dogfood_review.py tests/test_ai_report_contract.py
+python3 -m py_compile src/output/dogfood_review.py
+git diff --check
 ```
 
-Start with sanitized fixtures and deterministic scoring. Do not run LLM calls,
-do not backfill archives, and keep unknown metrics explicit rather than
-fabricated.
+## PGI-007 Handoff
+
+Status: blocked.
+
+PGI-007 requires a four-week dogfood evidence series from operator/private
+weekly runs. Do not fabricate scorecards, thresholds, or outcomes. Generated
+private artifacts must remain ignored unless a sanitized sample is explicitly
+requested.
+
+Unblock when the operator provides sanitized weekly scorecard inputs or asks to
+start a local private dogfood log outside git.
 
 ## Non-Negotiable Rules
 

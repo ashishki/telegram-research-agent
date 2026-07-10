@@ -229,6 +229,10 @@ Implementation helper:
 - `src/output/dogfood_review.py` can normalize the weekly metrics above and
   write compact private JSON/Markdown review artifacts to an explicit output
   directory.
+- PGI-006 adds `weekly-intelligence-scorecard.v1` helpers in the same module:
+  build from sanitized Brief/Atlas/dogfood/observation fixtures, validate the
+  seven scorecard dimensions, keep unknown metrics explicit, and write compact
+  private JSON/Markdown scorecards.
 - Generated dogfood review artifacts are private operational outputs and should
   not be committed.
 
