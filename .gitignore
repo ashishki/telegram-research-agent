@@ -8,6 +8,7 @@ data/output/**
 !data/output/**/.gitkeep
 data/output/live_source_intelligence/
 data/output/weekly_messages/
+docs/artifacts/**/manual-quality-eval-*.md
 *.session
 .env
 __pycache__/

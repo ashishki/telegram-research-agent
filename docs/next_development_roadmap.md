@@ -1,18 +1,22 @@
 # Next Development Roadmap
 
-Status: active next-step roadmap
-Last updated: 2026-07-07
+Status: superseded implementation record
+Last updated: 2026-07-10
+
+Canonical active roadmap:
+`docs/portfolio_grade_intelligence_roadmap.md`.
+
+Canonical active backlog:
+`docs/tasks.md`.
 
 ## Purpose
 
 This roadmap originally turned the remaining report-quality, operator-feedback,
 Radar handoff, and internal guardrail ideas into AI-development tasks.
 
-As of 2026-07-07, the receipt/source-trust/report-quality/Radar/cost/editorial
-memory work described here is implemented. The active next-step roadmap is now
-the KIR quality/user-value queue in `docs/tasks.md` and the audit-driven
-roadmap section in `docs/ai_knowledge_intelligence_roadmap.md`, including the
-Russian final-HTML report requirement.
+As of 2026-07-10, the receipt/source-trust/report-quality/Radar/cost/editorial
+memory work described here is implemented and historical. The active
+development sequence is the PGI queue in `docs/tasks.md`.
 
 The product should stay a private operator research system until weekly briefs
 repeatedly influence real decisions. The next work should improve reader
@@ -20,8 +24,8 @@ usefulness, report consistency, feedback quality, and Radar honesty without
 adding a generic UI or a runtime dependency on Entropy Core.
 
 Detailed historical report-quality task scope lives in
-`docs/report_quality_roadmap.md`. Current KIR-Q tasks live in
-`docs/tasks.md`.
+`docs/report_quality_roadmap.md`. KIR/HPI/RVE task lineage is mapped into PGI
+in `docs/tasks.md`.
 
 ## Scope
 
@@ -82,7 +86,7 @@ Implemented:
   and digest facts, and a Radar report that both recommended
   `focused_experiment` and later downgraded the same candidate.
 
-Active next task details:
+Historical next task details:
 
 - `docs/tasks.md` lists the active KIR-Q queue.
 - `docs/ai_knowledge_intelligence_roadmap.md` contains the quality/user-value

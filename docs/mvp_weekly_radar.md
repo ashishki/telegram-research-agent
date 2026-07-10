@@ -1,7 +1,10 @@
 # MVP Weekly Radar Bridge
 
-Status: Active production bridge with KIR gates, market-context sidecar, and RVE query contract
-Date: 2026-07-09
+Status: supporting Radar bridge reference with KIR gates, market-context sidecar, and RVE query contract
+Date: 2026-07-10
+
+Canonical cross-repo contract:
+`docs/mvp_radar_integration_contract.md`.
 
 ## Purpose
 

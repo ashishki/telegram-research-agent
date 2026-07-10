@@ -1,35 +1,41 @@
 # Operator Workflow
 
 **Version:** 2.0
+**Last updated:** 2026-07-10
 **Audience:** System owner (single user, personal use)
+**Role:** supporting operating guide. Canonical roadmap:
+`docs/portfolio_grade_intelligence_roadmap.md`.
 
 ---
 
 ## Weekly Routine
 
-The system runs automatically via systemd timers. The owner's weekly interaction is minimal by design.
+The current dogfood baseline is the split AI Intelligence run: Weekly
+Intelligence Brief plus Knowledge Atlas. Legacy Research Brief /
+Implementation Ideas commands remain available, but they are not the target
+weekly product surface.
 
 ### Monday Morning — Pipeline Runs
 
 Schedule:
-- ingestion: Monday 07:00 `Asia/Tbilisi`
-- weekly delivery: Monday 09:00 `Asia/Tbilisi`
-- MVP of the Week delivery: Monday 09:20 `Asia/Tbilisi`
+- `telegram-ai-split-report.timer`: Monday 09:00 `Europe/Berlin`
 
-The systemd timer triggers the full pipeline:
-1. Incremental ingestion (new posts since last run)
-2. Normalization and preprocessing
-3. Scoring (`score_posts`)
-4. Digest generation and reader-facing signal report formatting
-5. Delivery: Telegram notifications + full artifacts
-6. Opportunity seed export to Demand-to-MVP Radar and `MVP of the Week` delivery
+The systemd timer refreshes Telegram ingestion and runs:
+
+```bash
+python3 src/main.py ai-split-report --deliver --threads-limit 24 --atoms-limit 8
+```
 
 Owner receives:
-- Telegram message: short `Research Brief` notification + Telegraph link
-- Telegram message: short `Implementation Ideas` notification + Telegraph link
-- Telegram message: short `MVP of the Week` notification + Telegraph link + source-mix summary
-- Telegram document: copyable `MVP of the Week` Markdown fallback with one candidate, evidence, missing evidence, risks, and next experiment
-- When run on demand, Telegram document: `AI Decision Intelligence` HTML report with a first-screen decision brief, actions, conservative project implications, trend board, source links, and an embedded Archify knowledge-flow diagram
+- Telegram document: `Weekly Intelligence Brief` HTML for decisions/actions,
+  Radar gate, project impact, and feedback targets.
+- Telegram document: `Knowledge Atlas` HTML for cumulative trend/source/study
+  context.
+- Optional/on-demand Radar candidate dossier when `mvp-weekly` is run or a
+  Radar JSON artifact is supplied to the split report.
+- Legacy Research Brief, Implementation Ideas, Study Plan, and visual report
+  artifacts can still be generated on demand, but they are supporting/legacy
+  outputs.
 - When run on demand, local split HTML files: a short `Weekly Intelligence
   Brief` for decisions/actions/Radar/feedback and a cumulative `Knowledge
   Atlas` for trends, source contribution, and study backlog
@@ -78,7 +84,7 @@ Monday:
 - open the Weekly Brief first;
 - check action/read/try prompts and MVP Radar status;
 - open Knowledge Atlas only for source/trend context;
-- optionally inspect the visual workbook for diagrams and deep explanation;
+- optionally inspect the visual report for diagrams and deep explanation;
 - choose the week's read/try/build targets.
 
 During the week:
@@ -252,11 +258,15 @@ deterministic ranking plus request-local SQLite FTS over those curated objects.
 It does not run raw Telegram firehose RAG, does not use vector search, and does
 not expose raw SQLite sessions.
 
-Next implementation queue before deeper dogfood:
+Next implementation queue:
 
-- dogfood the current Hermes/PI workflow and record concrete retrieval misses
-  before any vector retrieval decision. Obsidian remains a generated human
-  navigation/audit projection, not runtime assistant memory.
+- PGI-001 through PGI-003 are implemented and pushed.
+- Start `PGI-004 - Knowledge Atlas V2 Thread Navigation` from `docs/tasks.md`
+  as a separate Atlas-sized slice.
+- Do not start vector retrieval, raw Telegram RAG, or assistant mutation tools
+  before Atlas, evaluation, and dogfood evidence justify them.
+- Obsidian remains a generated human navigation/audit projection, not runtime
+  assistant memory.
 
 Implemented HPI-11 cleanup: plain Telegram messages are sent without MarkdownV2
 backslash artifacts when `parse_mode=None`; `/help` now starts with "just write

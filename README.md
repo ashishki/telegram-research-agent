@@ -2,23 +2,26 @@
 
 Personal research intelligence for Telegram channels: ingest posts, preserve evidence, extract AI knowledge atoms, track evolving idea threads, and produce weekly decision reports instead of a generic digest.
 
-Status: active AI Knowledge Intelligence Desk with a safe HPI dogfood
-foundation. The legacy Research Brief / Implementation Ideas loop still works,
-but the newer knowledge-atom, idea-thread, Weekly AI Intelligence Workbook,
-feedback, Strategy Reviewer, MVP Radar bridge, generated Obsidian, read-only PI
-facade/tool catalog, Hermes concierge commands, action-status projection, and
-dogfood review layers are the primary direction. Current work is tracked in
-`docs/tasks.md`.
+State: portfolio-grade Personal AI / Knowledge Intelligence System in progress.
+The legacy Research Brief / Implementation Ideas loop still works, but the
+product direction is now a private decision and learning intelligence system
+centered on the Weekly Intelligence Brief, Knowledge Atlas, bounded Hermes/PI
+assistant, Project Intelligence, Learning Intelligence, and a parallel MVP
+Radar validation track.
 
-Current next work: dogfood the PI/Hermes workflow before adding broader product
-surface area. Hermes Telegram UX cleanup is implemented: plain messages do not
-show MarkdownV2 escape artifacts, reminders are scheduled/displayed in
-`Asia/Tbilisi`, feedback drafts use an Opus-class strategist while remaining
-confirmation-gated, MVP Radar now has a bounded market/business analyst context
-pack from curated atoms/threads, the reader-facing HTML can be split into
-Knowledge Atlas plus Weekly Intelligence Brief surfaces, and PI curated search
-uses deterministic ranking plus transient SQLite FTS over curated objects only.
-Raw Telegram firehose RAG and full-year archive processing remain deferred.
+Canonical roadmap: `docs/portfolio_grade_intelligence_roadmap.md`.
+Canonical active backlog: `docs/tasks.md`.
+Next implementation candidate: `PGI-004 - Knowledge Atlas V2 Thread Navigation`
+after the pushed PGI-001..PGI-003 slices.
+
+Current baseline: knowledge atoms, idea threads, canonical report contracts,
+split Brief / Atlas artifacts, Brief decision cockpit, Hermes/PI read-only
+foundation, artifact freshness awareness, feedback provenance helpers, Strategy
+Reviewer, and Radar RVE bridge exist in code with focused tests. The honest gap
+is Atlas navigation, dogfood evidence, project/learning outcomes, and
+portfolio-ready evaluation. Raw Telegram firehose RAG, assistant mutations,
+full-year archive processing, and build-ready Radar decisions from context-only
+evidence remain out of scope.
 
 ## Dogfood Stabilization Note
 
@@ -256,13 +259,17 @@ Radar live-source credentials are loaded separately by `systemd/telegram-mvp-wee
 Start here:
 
 - [docs/README.md](docs/README.md) — documentation map
-- [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) — strategic project plan
-- [docs/next_development_roadmap.md](docs/next_development_roadmap.md) — next development roadmap and AI-ready tasks
-- [docs/report_quality_roadmap.md](docs/report_quality_roadmap.md) — report-quality, artifact feedback, internal cost guardrail, and Demand-to-MVP Radar handoff tasks
-- [docs/ai_knowledge_intelligence_roadmap.md](docs/ai_knowledge_intelligence_roadmap.md) — AI Knowledge Intelligence Desk architecture, phases, visual report, and Obsidian projection
-- [docs/ai_intelligence_workbook_roadmap.md](docs/ai_intelligence_workbook_roadmap.md) — completed KIR-Q0..KIR-Q13 workbook, feedback, Radar contract, Strategy Reviewer, and Obsidian projection roadmap
-- [docs/hermes_pi_assistant_roadmap.md](docs/hermes_pi_assistant_roadmap.md) — HPI roadmap for Hermes concierge, PI Assistant bounded tools, curated FTS retrieval, dogfood, and deferred vector/post-dogfood gates
-- [docs/dogfood_4_week_plan.md](docs/dogfood_4_week_plan.md) — four-week dogfood metrics, weekly checklist, success criteria, and simplification triggers
+- [docs/portfolio_grade_intelligence_roadmap.md](docs/portfolio_grade_intelligence_roadmap.md) — canonical product, architecture, evaluation, and portfolio roadmap
+- [docs/tasks.md](docs/tasks.md) — compact active backlog and next PGI task
+- [docs/intelligence_evaluation_framework.md](docs/intelligence_evaluation_framework.md) — evaluation layers and weekly scorecard
+- [docs/portfolio_evidence_plan.md](docs/portfolio_evidence_plan.md) — portfolio readiness gate and evidence plan
+- [docs/mvp_radar_integration_contract.md](docs/mvp_radar_integration_contract.md) — cross-repo Radar contract
+- [docs/operator_ai_systems_learning_roadmap.md](docs/operator_ai_systems_learning_roadmap.md) — AI Systems learning roadmap tied to implementation tasks
+- [docs/report_quality_roadmap.md](docs/report_quality_roadmap.md) — historical report-quality, artifact feedback, internal cost guardrail, and Demand-to-MVP Radar handoff tasks
+- [docs/ai_knowledge_intelligence_roadmap.md](docs/ai_knowledge_intelligence_roadmap.md) — component/historical AI Knowledge Intelligence roadmap
+- [docs/ai_intelligence_workbook_roadmap.md](docs/ai_intelligence_workbook_roadmap.md) — historical KIR-Q0..KIR-Q13 workbook, feedback, Radar contract, Strategy Reviewer, and Obsidian projection roadmap
+- [docs/hermes_pi_assistant_roadmap.md](docs/hermes_pi_assistant_roadmap.md) — Hermes/PI component roadmap and implementation record
+- [docs/dogfood_4_week_plan.md](docs/dogfood_4_week_plan.md) — supporting dogfood protocol
 - [docs/release_notes.md](docs/release_notes.md) — operator-facing release notes for shipped changes
 - [docs/operator_workflow.md](docs/operator_workflow.md) — weekly operating workflow
 - [docs/architecture.md](docs/architecture.md) — current system shape
@@ -278,6 +285,16 @@ Historical material lives under [docs/archive/](docs/archive/README.md).
 
 ## Development State
 
-The AI Knowledge Intelligence path is implemented end-to-end for local operation: raw posts can be atomized, atoms can be grouped into temporal threads, a frontier analysis can be persisted, the user-facing workbook HTML can be generated and delivered, feedback can be confirmed into memory, Strategy Reviewer can produce advisory improvement tasks, bounded Obsidian notes can be regenerated from the same knowledge layer, and Hermes/PI can read curated intelligence through bounded read-only interfaces.
+The AI Knowledge Intelligence path has substantial local plumbing: raw posts can
+be atomized, atoms can be grouped into temporal threads, a frontier analysis can
+be persisted, report HTML/JSON can be generated, feedback can be confirmed into
+memory, Strategy Reviewer can produce advisory improvement tasks, bounded
+Obsidian notes can be regenerated, and Hermes/PI can read curated intelligence
+through read-only interfaces.
 
-The honest limitation is quality of interpretation and dogfood proof, not missing plumbing: project implications are conservative keyword/evidence leads, not full project-priority decisions; empty project leads are allowed when evidence is too broad. User value is not proven until the four-week dogfood protocol produces real feedback, actions, decisions changed, and friction scores. Vector retrieval and HPI-10 post-dogfood product decisions stay deferred until dogfood shows concrete misses.
+The honest limitation is not missing plumbing; it is portfolio-grade
+correctness, personalization, dogfood proof, and presentation. Project
+implications remain conservative evidence leads, not full project-priority
+decisions. User value is not proven until the dogfood protocol produces real
+feedback, actions, decisions changed, experiments, learning outcomes, friction
+scores, and false-confidence review.

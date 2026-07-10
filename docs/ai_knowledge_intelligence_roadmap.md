@@ -1,8 +1,14 @@
 # AI Knowledge Intelligence Roadmap
 
-Status: active roadmap
+Status: component roadmap / historical KIR implementation record
 Created: 2026-07-06
-Last updated: 2026-07-07
+Last updated: 2026-07-10
+
+Canonical active roadmap:
+`docs/portfolio_grade_intelligence_roadmap.md`.
+
+This document remains useful for the original AI Knowledge Intelligence
+architecture and KIR quality history. It is not the active development queue.
 
 ## Why This Exists
 
@@ -53,14 +59,15 @@ Telegram channels over time and explains:
 - how current signals compare with the last 30/90 days of channel history.
 - how the evolving knowledge base can be browsed as a generated Obsidian vault.
 
-The main weekly artifact is a designed HTML report. Telegram should deliver a
+The originally proposed weekly output was a designed HTML report. The canonical
+product surface is now the Brief/Atlas split. Telegram should deliver a
 short notification with a link, not be the primary reading surface. Obsidian can
 be a long-lived navigation surface for threads, weekly notes, tools, practices,
 and learning actions, but not the runtime source of truth.
 
 ## Non-Goals
 
-- Do not make MVP Radar the center of the new system.
+- Do not make MVP Radar the primary product surface of the new system.
 - Do not use `project_state.md` as the main cross-project memory mechanism.
 - Do not rely on `strong/watch/noise` as the only filter for knowledge capture.
 - Do not feed thousands of raw posts directly to an expensive frontier model.
@@ -339,7 +346,7 @@ Feedback to capture:
 
 ## KIR Quality And User-Value Roadmap After 2026-W28 Audit
 
-Status: active quality/eval roadmap
+Status: historical quality/eval roadmap
 Source: committed repository state plus the versioned 2026-W28 visual artifact.
 The live DB/VPS pipeline was not evaluated for this audit.
 
@@ -549,7 +556,7 @@ Work:
 
 Acceptance:
 
-- docs no longer say no KIR work remains;
+- docs no longer freeze KIR as a closed product-quality topic;
 - fixture can be checked without live DB/VPS run;
 - tests can fail a structurally complete but low-value report;
 - tests can fail a final HTML report whose user-facing copy is not Russian.

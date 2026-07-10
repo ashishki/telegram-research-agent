@@ -1,7 +1,9 @@
 # Architecture
 
-**Version:** 6.1
-**Date:** 2026-04-13
+**Version:** 6.2
+**Date:** 2026-07-10
+**Status:** Supporting architecture reference. Canonical roadmap:
+`docs/portfolio_grade_intelligence_roadmap.md`.
 
 ---
 
@@ -21,7 +23,7 @@ Telegram ingestion
   -> deterministic scoring + project relevance
   -> explicit feedback + manual tags
   -> evidence recording (signal_evidence_items)
-  -> weekly outputs (brief / ideas / study)
+  -> weekly outputs (Weekly Brief / Knowledge Atlas plus legacy brief / ideas / study)
   -> operator usefulness log (weekly_usefulness_logs)
   -> decision journal (decision_journal)
 

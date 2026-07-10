@@ -1,8 +1,12 @@
 # Four-Week Dogfood Plan
 
-Status: planning protocol
+Status: supporting dogfood protocol
 Created: 2026-07-08
+Last updated: 2026-07-10
 Owner: private single-user operator workflow
+
+Canonical roadmap: `docs/portfolio_grade_intelligence_roadmap.md`.
+Canonical active backlog: `docs/tasks.md`.
 
 ## Purpose
 

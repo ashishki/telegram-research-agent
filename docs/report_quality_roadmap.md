@@ -1,7 +1,10 @@
 # Report Quality And Radar Handoff Roadmap
 
-Status: implemented AI-development roadmap
-Last updated: 2026-06-09
+Status: historical implemented AI-development roadmap
+Last updated: 2026-07-10
+
+Canonical active roadmap:
+`docs/portfolio_grade_intelligence_roadmap.md`.
 
 ## Purpose
 
@@ -10,7 +13,7 @@ multiple artifacts. The next product problem is reader usefulness: the operator
 must understand what was evaluated, why it matters, what changed, and what to
 do next without reverse-engineering the pipeline.
 
-This roadmap is the active handoff for improving:
+This roadmap is the historical handoff for improving:
 
 - Telegram Research Agent weekly Research Brief and supporting artifacts.
 - Implementation Ideas feedback loops.

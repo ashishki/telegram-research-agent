@@ -1,8 +1,17 @@
 # AI Intelligence Workbook Roadmap
 
-Status: active planning roadmap
+Status: superseded workbook roadmap / historical KIR-Q0..KIR-Q13 record
 Created: 2026-07-07
+Last updated: 2026-07-10
 Owner: private single-user operator workflow
+
+Canonical active roadmap:
+`docs/portfolio_grade_intelligence_roadmap.md`.
+
+The workbook work documented here shipped important KIR plumbing. The target
+product surface is now split into Weekly Intelligence Brief, Knowledge Atlas,
+Hermes/PI, Project Intelligence, Learning Intelligence, and a parallel MVP Radar
+track.
 
 ## Why This Exists
 
@@ -93,7 +102,9 @@ evidence gates.
 After KIR-Q0..KIR-Q13, the next roadmap layer is HPI: Hermes / Personal
 Intelligence Assistant / Dogfood.
 
-The Workbook remains the main weekly artifact. Hermes does not replace it.
+At the time of this roadmap, the Workbook was the primary weekly artifact.
+That product role has since been superseded by Weekly Intelligence Brief plus
+Knowledge Atlas. Hermes still does not replace the canonical artifacts.
 Hermes is the Telegram-facing concierge that helps the operator open the
 workbook, see the short weekly summary, choose one to three actions, route
 questions to PI Assistant, collect feedback, show Strategy Reviewer notes, and

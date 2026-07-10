@@ -1,11 +1,12 @@
 # Telegram Research Agent — System Specification
 
-**Version:** 3.1
-**Date:** 2026-04-06
-**Status:** Active
+**Version:** 3.2
+**Date:** 2026-07-10
+**Status:** Supporting specification
 
-> Workflow note: `docs/spec.md` is not the active source of truth for AI-development orchestration.
-> Use `docs/tasks.md`, `docs/memory_architecture.md`, `docs/dev-cycle.md`, and `docs/prompts/workflow_*.md`.
+> Workflow note: `docs/spec.md` is not the canonical source of truth for
+> AI-development orchestration. Use
+> `docs/portfolio_grade_intelligence_roadmap.md` and `docs/tasks.md` first.
 
 ---
 
@@ -17,7 +18,11 @@ It is not a digest bot, not a summarizer, and not a generic Telegram LLM wrapper
 
 Its function: ingest posts from curated Telegram channels, score them deterministically, route only high-value items to appropriate LLM tiers, apply personal taste and project relevance filters, and produce a structured weekly review artifact that supports real decisions.
 
-**Primary output:** a readable weekly review article delivered via Telegram — not a message blob, but a structured document with sections, source links, and decision-relevant framing. See `docs/report_format.md` for the full artifact specification.
+**Current target output:** a Weekly Intelligence Brief plus Knowledge Atlas
+delivered via Telegram as HTML documents. The older readable weekly review
+article remains a legacy/supporting artifact; see `docs/report_format.md` for
+its historical contract and `docs/portfolio_grade_intelligence_roadmap.md` for
+the current product model.
 
 **Core mechanism:** deterministic scoring before any LLM call. The `signal_score` is computed without LLMs from five weighted dimensions. This score controls routing. The majority of posts never reach an LLM. This is a product decision, not a cost optimization: it keeps the system auditable, reproducible, and tunable without retraining.
 
@@ -30,7 +35,10 @@ The system runs on a private VPS. LLM calls use the `anthropic` Python SDK with 
 
 ### Development History Note
 
-Legacy phases (Phase 1–20 in the original numbering) are preserved as implementation history. The current active roadmap is in `docs/tasks.md`.
+Legacy phases (Phase 1-20 in the original numbering) are preserved as
+implementation history. The canonical roadmap is
+`docs/portfolio_grade_intelligence_roadmap.md`; the compact active backlog is
+in `docs/tasks.md`.
 
 ---
 

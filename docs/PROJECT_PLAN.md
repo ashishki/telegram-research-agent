@@ -1,8 +1,12 @@
 # Telegram Research Agent - Project Plan
 
-Status: active observation / future product line
+Status: historical strategy snapshot
+Last updated: 2026-07-10
 Role: private Telegram channel research intelligence
 Priority: P0/P1
+
+Canonical active strategy:
+`docs/portfolio_grade_intelligence_roadmap.md`.
 
 ## Strategic Role
 
@@ -14,10 +18,9 @@ backed analysis of narratives, sources, claims, and project-relevant signals.
 
 ## Near-Term Roadmap
 
-Execution details for the next development cycle live in
-`docs/next_development_roadmap.md`. `docs/tasks.md` is the active AI
-development queue. Reader-facing report quality and Radar handoff details live
-in `docs/report_quality_roadmap.md`.
+Execution details for the next development cycle live in `docs/tasks.md`.
+Reader-facing report quality and Radar handoff history live in
+`docs/report_quality_roadmap.md`.
 
 ### P0 - Reader-Facing Report Quality
 

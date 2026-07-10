@@ -1,7 +1,10 @@
 # Pathway Live Source Intelligence Roadmap
 
-Status: active implementation roadmap
-Last updated: 2026-06-12
+Status: supporting / deferred implementation reference
+Last updated: 2026-07-10
+
+Canonical active roadmap:
+`docs/portfolio_grade_intelligence_roadmap.md`.
 
 ## Architectural Verdict
 

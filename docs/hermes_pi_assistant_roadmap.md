@@ -1,8 +1,15 @@
 # Hermes / Personal Intelligence Assistant Roadmap
 
-Status: implemented roadmap with active dogfood phase
+Status: Hermes/PI component roadmap and implementation record
 Created: 2026-07-08
+Last updated: 2026-07-10
 Owner: private single-user operator workflow
+
+Canonical active roadmap:
+`docs/portfolio_grade_intelligence_roadmap.md`.
+
+This document records the shipped HPI foundation and remaining assistant risks.
+The active implementation queue is `docs/tasks.md`.
 
 ## Why This Phase Exists
 
@@ -633,8 +640,10 @@ Stop and ask the operator if a task:
 
 ## Next Operational Task
 
-Dogfood the implemented PI/Hermes curated intelligence workflow before adding
-broader product surface area or vector retrieval.
+PGI-003 completed the Weekly Brief cockpit, Hermes artifact awareness, and
+Radar gate consumer behavior. The next code path is `PGI-004 - Knowledge Atlas
+V2 Thread Navigation` from `docs/tasks.md`, while Hermes dogfood remains
+required before adding vector/raw-post retrieval.
 
 Scope:
 
