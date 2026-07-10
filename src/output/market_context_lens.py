@@ -10,6 +10,7 @@ from typing import Any, Protocol
 
 from config.settings import PROJECT_ROOT, STRONG_MODEL, Settings
 from llm.client import LLMClient, LLMError, LLMSchemaError
+from output.ai_report_contract import INTELLIGENCE_CONTRACT_VERSION, RADAR_INTELLIGENCE_CONTRACT_VERSION
 from output.market_pain_intelligence import (
     build_market_pain_pack,
     market_pack_context_seed,
@@ -165,6 +166,8 @@ def market_context_lens_seed(current_context: dict[str, Any]) -> dict[str, objec
     ]
     return {
         "upstream_id": f"market-context-lens:{current_context.get('week_label') or 'current'}",
+        "contract_version": RADAR_INTELLIGENCE_CONTRACT_VERSION,
+        "intelligence_contract_version": INTELLIGENCE_CONTRACT_VERSION,
         "captured_at": str(current_context.get("generated_at") or ""),
         "title": "Context Only: Market Lens Baseline + Weekly Delta",
         "text": text,

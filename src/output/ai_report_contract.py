@@ -11,6 +11,8 @@ from output.report_quality import ReportQualityFinding, SEVERITY_CRITICAL
 
 
 REPORT_CONTRACT_VERSION = "weekly-ai-intelligence-v1"
+INTELLIGENCE_CONTRACT_VERSION = "tra-intelligence-contract.v1"
+RADAR_INTELLIGENCE_CONTRACT_VERSION = "tra-radar-intelligence-contract.v1"
 
 ALLOWED_DECISION_VERDICTS = {"apply", "study", "watch", "ignore", "defer", "verify_first"}
 ALLOWED_ACTION_SCOPES = {"skill", "project", "infra", "reading", "experiment", "verification"}
@@ -42,6 +44,20 @@ REPORT_CONTRACT_SCHEMA: dict[str, Any] = {
             "action_cards",
             "project_diagnostic",
             "feedback_targets",
+            "intelligence_contract",
+        ],
+    },
+    "intelligence_contract": {
+        "version": INTELLIGENCE_CONTRACT_VERSION,
+        "required_entities": [
+            "source_observations",
+            "evidence_items",
+            "claims",
+            "knowledge_atoms",
+            "idea_threads",
+            "decisions",
+            "experiments",
+            "outcomes",
         ],
     },
     "decision_cards": {
@@ -189,6 +205,7 @@ def build_weekly_ai_report_contract(
             "feedback_used_summary": _feedback_used_summary(feedback_context),
             "feedback_eval_example_count": len(_as_list(feedback_context.get("feedback_eval_examples"))),
             "frontier_prompt_guidance": _as_list(feedback_context.get("frontier_prompt_guidance")),
+            "canonical_contract_version": INTELLIGENCE_CONTRACT_VERSION,
         },
         "decision_cards": decision_cards,
         "claim_cards": claim_cards,
@@ -197,6 +214,12 @@ def build_weekly_ai_report_contract(
         "action_cards": action_cards,
         "project_diagnostic": project_diagnostic,
         "feedback_targets": feedback_targets,
+        "intelligence_contract": build_canonical_intelligence_contract(
+            context,
+            claim_cards=claim_cards,
+            thread_deltas=thread_deltas,
+            decision_cards=decision_cards,
+        ),
     }
 
 
@@ -229,6 +252,7 @@ def validate_weekly_ai_report_contract(
     _validate_action_cards(payload.get("action_cards"), feedback_ids, findings)
     _validate_project_diagnostic(payload.get("project_diagnostic"), findings)
     _validate_feedback_targets(feedback_targets, findings)
+    findings.extend(validate_canonical_intelligence_contract(payload.get("intelligence_contract")))
     if html_text is not None:
         findings.extend(validate_weekly_ai_report_html_language(html_text))
     return findings
@@ -253,6 +277,160 @@ def validate_weekly_ai_report_html_language(html_text: str) -> list[ReportQualit
                 "html language",
             )
         )
+    return findings
+
+
+def build_canonical_intelligence_contract(
+    context: Mapping[str, Any],
+    *,
+    claim_cards: list[dict] | None = None,
+    thread_deltas: list[dict] | None = None,
+    decision_cards: list[dict] | None = None,
+    mvp_radar: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Build the canonical sidecar projection over curated intelligence objects."""
+    threads = [thread for thread in (context.get("threads") or []) if isinstance(thread, dict)]
+    atoms = _all_atoms(threads)
+    cards = [card for card in (claim_cards or _claim_cards(atoms)) if isinstance(card, dict)]
+    deltas = [delta for delta in (thread_deltas or _thread_deltas(context, threads)) if isinstance(delta, dict)]
+    observations, observation_ids_by_atom = _canonical_source_observations(atoms)
+    evidence_items = _canonical_evidence_items(cards, atoms, observation_ids_by_atom)
+    claims = _canonical_claims(cards, evidence_items)
+    atom_items = _canonical_atoms(atoms, claims, evidence_items)
+    thread_items = _canonical_threads(threads, claims, evidence_items, deltas)
+    decisions = _canonical_decisions(decision_cards or [], claims)
+    payload: dict[str, Any] = {
+        "contract_version": INTELLIGENCE_CONTRACT_VERSION,
+        "schema_version": INTELLIGENCE_CONTRACT_VERSION,
+        "week_label": context.get("week_label"),
+        "projection_boundaries": {
+            "canonical_state": "SQLite rows and versioned JSON sidecars",
+            "rendered_surfaces": ["html", "markdown", "telegram_messages"],
+            "llm_prose": "derived_interpretation_not_source_of_truth",
+            "market_business_context": "context_only",
+            "no_feedback_semantics": "unknown",
+        },
+        "source_observations": observations,
+        "evidence_items": evidence_items,
+        "claims": claims,
+        "knowledge_atoms": atom_items,
+        "idea_threads": thread_items,
+        "decisions": decisions,
+        "experiments": [],
+        "outcomes": [],
+    }
+    if mvp_radar is not None:
+        payload["radar_exchange"] = _canonical_radar_exchange(mvp_radar)
+    return payload
+
+
+def validate_canonical_intelligence_contract(value: object) -> list[ReportQualityFinding]:
+    findings: list[ReportQualityFinding] = []
+    payload = value if isinstance(value, Mapping) else {}
+    if not payload:
+        findings.append(_critical("Canonical intelligence contract is missing", "intelligence_contract"))
+        return findings
+    if payload.get("contract_version") != INTELLIGENCE_CONTRACT_VERSION:
+        findings.append(
+            _critical(
+                "Canonical intelligence contract version is missing or unsupported",
+                "intelligence_contract.contract_version",
+            )
+        )
+    source_ids = {
+        str(item.get("id"))
+        for item in _as_list(payload.get("source_observations"))
+        if isinstance(item, Mapping) and str(item.get("id") or "").strip()
+    }
+    evidence_items = [item for item in _as_list(payload.get("evidence_items")) if isinstance(item, Mapping)]
+    evidence_by_id = {
+        str(item.get("id")): item
+        for item in evidence_items
+        if str(item.get("id") or "").strip()
+    }
+    for index, item in enumerate(evidence_items, start=1):
+        prefix = f"intelligence_contract.evidence_items[{index}]"
+        _require_text(
+            item,
+            (
+                "id",
+                "evidence_role",
+                "evidence_tier",
+                "verification_status",
+                "polarity",
+                "source_observation_id",
+            ),
+            findings,
+            prefix,
+        )
+        observation_id = str(item.get("source_observation_id") or "")
+        if observation_id and observation_id not in source_ids:
+            findings.append(_critical("Evidence item references an unknown source observation", f"{prefix}.source_observation_id"))
+        if item.get("decision_grade") is True:
+            if item.get("context_only") is True:
+                findings.append(_critical("Context-only evidence cannot be decision-grade", f"{prefix}.decision_grade"))
+            if observation_id not in source_ids:
+                findings.append(_critical("Decision-grade evidence must resolve to a source observation", f"{prefix}.source_observation_id"))
+            if item.get("quote_verified") is not True:
+                findings.append(_critical("Decision-grade evidence must have a verified quote/excerpt", f"{prefix}.quote_verified"))
+            tier = str(item.get("evidence_tier") or "")
+            if tier.startswith("weak") or tier == "unsupported":
+                findings.append(_critical("Weak or unsupported evidence cannot be decision-grade", f"{prefix}.evidence_tier"))
+    claims = [item for item in _as_list(payload.get("claims")) if isinstance(item, Mapping)]
+    claim_by_id = {
+        str(item.get("id")): item
+        for item in claims
+        if str(item.get("id") or "").strip()
+    }
+    for index, claim in enumerate(claims, start=1):
+        prefix = f"intelligence_contract.claims[{index}]"
+        _require_text(
+            claim,
+            ("id", "statement", "scope", "time_horizon", "confidence_band", "verification_state"),
+            findings,
+            prefix,
+        )
+        if "supporting_evidence_item_ids" not in claim:
+            findings.append(_critical("Claim must declare supporting evidence item refs", f"{prefix}.supporting_evidence_item_ids"))
+        if "contradicting_evidence_item_ids" not in claim:
+            findings.append(_critical("Claim must declare contradicting evidence item refs", f"{prefix}.contradicting_evidence_item_ids"))
+        supporting = [str(ref) for ref in _as_list(claim.get("supporting_evidence_item_ids"))]
+        contradicting = [str(ref) for ref in _as_list(claim.get("contradicting_evidence_item_ids"))]
+        for ref in [*supporting, *contradicting]:
+            if ref and ref not in evidence_by_id:
+                findings.append(_critical("Claim references unknown evidence item", f"{prefix}.evidence_item_ids"))
+        if claim.get("decision_grade") is True:
+            if not supporting:
+                findings.append(_critical("Decision-grade claim must cite supporting evidence", f"{prefix}.supporting_evidence_item_ids"))
+            if str(claim.get("verification_state") or "") != "verified":
+                findings.append(_critical("Decision-grade claim must have verified state", f"{prefix}.verification_state"))
+            if not _as_list(claim.get("source_observation_ids")):
+                findings.append(_critical("Decision-grade claim must cite source observations", f"{prefix}.source_observation_ids"))
+            for ref in supporting:
+                evidence = evidence_by_id.get(ref)
+                if evidence and evidence.get("decision_grade") is not True:
+                    findings.append(_critical("Decision-grade claim cites non-decision-grade evidence", f"{prefix}.supporting_evidence_item_ids"))
+    for index, decision in enumerate(_as_list(payload.get("decisions")), start=1):
+        if not isinstance(decision, Mapping):
+            continue
+        verdict = str(decision.get("verdict") or "")
+        if verdict not in {"apply", "study"}:
+            continue
+        for claim_id in _as_list(decision.get("claim_ids")):
+            claim = claim_by_id.get(str(claim_id))
+            if claim and claim.get("decision_grade") is not True:
+                findings.append(
+                    _critical(
+                        "Apply/study decision cannot cite a non-decision-grade canonical claim",
+                        f"intelligence_contract.decisions[{index}].claim_ids",
+                    )
+                )
+    radar = payload.get("radar_exchange") if isinstance(payload.get("radar_exchange"), Mapping) else None
+    if radar:
+        if radar.get("contract_version") != RADAR_INTELLIGENCE_CONTRACT_VERSION:
+            findings.append(_critical("Radar exchange contract version is missing or unsupported", "intelligence_contract.radar_exchange.contract_version"))
+        if radar.get("context_only_can_satisfy_gate") is not False:
+            findings.append(_critical("Radar context-only records must not satisfy demand evidence gates", "intelligence_contract.radar_exchange.context_only_can_satisfy_gate"))
     return findings
 
 
@@ -1058,6 +1236,383 @@ def _project_diagnostic(
     }
 
 
+def _canonical_source_observations(atoms: list[dict]) -> tuple[list[dict], dict[int, list[str]]]:
+    observations: list[dict] = []
+    observation_ids_by_atom: dict[int, list[str]] = {}
+    seen: set[str] = set()
+    for atom in atoms:
+        atom_id = _safe_int_value(atom.get("id"))
+        urls = [str(url).strip() for url in (atom.get("source_urls") or []) if str(url).strip()]
+        posts = [post for post in (atom.get("source_posts") or []) if isinstance(post, Mapping)]
+        for post in posts:
+            post_id = _safe_int_value(post.get("post_id"))
+            url = str(post.get("message_url") or "").strip() or (urls[0] if urls else "")
+            channel = str(post.get("channel_username") or "").strip()
+            observation_id = f"source_observation:telegram_post:{post_id or _slug(url or channel or atom_id)}"
+            if observation_id not in seen:
+                seen.add(observation_id)
+                observations.append(
+                    {
+                        "id": observation_id,
+                        "source_type": "telegram_post",
+                        "url": url,
+                        "observed_at": str(post.get("posted_at") or atom.get("last_seen_at") or atom.get("first_seen_at") or ""),
+                        "raw_excerpt": _source_excerpt(atom, post),
+                        "metadata": {
+                            "channel_username": channel,
+                            "post_id": post_id or None,
+                            "atom_ids": [atom_id] if atom_id else [],
+                        },
+                        "collection_method": "telegram_ingestion",
+                        "ingestion_provenance": {
+                            "derived_from": "knowledge_atom.source_posts",
+                            "knowledge_atom_id": atom_id or None,
+                        },
+                    }
+                )
+            if atom_id:
+                observation_ids_by_atom.setdefault(atom_id, [])
+                if observation_id not in observation_ids_by_atom[atom_id]:
+                    observation_ids_by_atom[atom_id].append(observation_id)
+        for index, url in enumerate(urls, start=1):
+            observation_id = f"source_observation:url:{_slug(url)}"
+            if observation_id not in seen:
+                seen.add(observation_id)
+                observations.append(
+                    {
+                        "id": observation_id,
+                        "source_type": "telegram_link" if "t.me/" in url else "web_link",
+                        "url": url,
+                        "observed_at": str(atom.get("last_seen_at") or atom.get("first_seen_at") or ""),
+                        "raw_excerpt": _source_excerpt(atom, {}),
+                        "metadata": {
+                            "atom_ids": [atom_id] if atom_id else [],
+                            "source_index": index,
+                        },
+                        "collection_method": "sidecar_projection",
+                        "ingestion_provenance": {
+                            "derived_from": "knowledge_atom.source_urls",
+                            "knowledge_atom_id": atom_id or None,
+                        },
+                    }
+                )
+            if atom_id:
+                observation_ids_by_atom.setdefault(atom_id, [])
+                if observation_id not in observation_ids_by_atom[atom_id]:
+                    observation_ids_by_atom[atom_id].append(observation_id)
+    return observations, observation_ids_by_atom
+
+
+def _canonical_evidence_items(
+    claim_cards: list[dict],
+    atoms: list[dict],
+    observation_ids_by_atom: dict[int, list[str]],
+) -> list[dict]:
+    atom_by_id = {_safe_int_value(atom.get("id")): atom for atom in atoms if _safe_int_value(atom.get("id"))}
+    items: list[dict] = []
+    for claim in claim_cards:
+        claim_id = str(claim.get("id") or "").strip() or "claim"
+        atom_ids = _int_values(claim.get("evidence_atom_ids"))
+        observation_ids = _unique(
+            observation_id
+            for atom_id in atom_ids
+            for observation_id in observation_ids_by_atom.get(atom_id, [])
+        )
+        if not observation_ids:
+            observation_ids = [""]
+        for index, observation_id in enumerate(observation_ids, start=1):
+            source_atom = next((atom_by_id.get(atom_id) for atom_id in atom_ids if atom_by_id.get(atom_id)), {})
+            polarity = _canonical_polarity(source_atom, claim)
+            context_only = bool(claim.get("context_only")) or str(claim.get("radar_role") or "") == "context_only"
+            quote_verified = bool(claim.get("quote_verified"))
+            tier = str(claim.get("evidence_tier") or "unsupported")
+            verification_status = str(claim.get("verification_status") or "unknown")
+            decision_grade = bool(
+                observation_id
+                and quote_verified
+                and bool(claim.get("decision_eligible"))
+                and not context_only
+                and not tier.startswith("weak")
+                and tier != "unsupported"
+            )
+            items.append(
+                {
+                    "id": f"evidence_item:{claim_id}:{index}",
+                    "claim_id": claim_id,
+                    "source_observation_id": observation_id,
+                    "source_observation_ref": observation_id,
+                    "atom_ids": atom_ids,
+                    "quote": str(claim.get("evidence_quote") or "").strip(),
+                    "verified_excerpt": str(claim.get("evidence_quote") or "").strip() if quote_verified else "",
+                    "evidence_role": str(claim.get("evidence_role") or "commentary"),
+                    "evidence_tier": tier,
+                    "independence_key": _canonical_independence_key(claim, index),
+                    "independence_keys": _as_list(claim.get("source_independence_keys")),
+                    "verification_status": verification_status,
+                    "quote_verified": quote_verified,
+                    "date_relevance": str(claim.get("staleness_status") or "unknown"),
+                    "scope": str(claim.get("claim_scope") or "general"),
+                    "expiry_hint": str(claim.get("expiry_hint") or ""),
+                    "polarity": polarity,
+                    "context_only": context_only,
+                    "decision_grade": decision_grade,
+                    "radar_gate_eligible": False,
+                }
+            )
+    return items
+
+
+def _canonical_claims(claim_cards: list[dict], evidence_items: list[dict]) -> list[dict]:
+    evidence_by_claim: dict[str, list[dict]] = {}
+    for item in evidence_items:
+        evidence_by_claim.setdefault(str(item.get("claim_id") or ""), []).append(item)
+    claims: list[dict] = []
+    for card in claim_cards:
+        claim_id = str(card.get("id") or "").strip()
+        if not claim_id:
+            continue
+        related = evidence_by_claim.get(claim_id, [])
+        supporting = [
+            str(item.get("id"))
+            for item in related
+            if str(item.get("polarity") or "") in {"supporting", "positive"}
+        ]
+        contradicting = [
+            str(item.get("id"))
+            for item in related
+            if str(item.get("polarity") or "") in {"contradicting", "negative"}
+        ]
+        source_observation_ids = _unique(item.get("source_observation_id") for item in related if item.get("source_observation_id"))
+        verification_state = "verified" if bool(card.get("quote_verified")) else str(card.get("verification_status") or "unknown")
+        decision_grade = bool(
+            card.get("decision_eligible")
+            and verification_state == "verified"
+            and supporting
+            and source_observation_ids
+            and all(item.get("decision_grade") is True for item in related if str(item.get("id")) in supporting)
+        )
+        claims.append(
+            {
+                "id": claim_id,
+                "statement": str(card.get("claim") or "").strip(),
+                "scope": str(card.get("claim_scope") or "general"),
+                "time_horizon": str(card.get("time_horizon") or "unknown"),
+                "supporting_evidence_item_ids": supporting,
+                "contradicting_evidence_item_ids": contradicting,
+                "source_observation_ids": source_observation_ids,
+                "source_independence": {
+                    "count": _safe_int_value(card.get("independent_sources")),
+                    "keys": _as_list(card.get("source_independence_keys"))
+                    or [str(card.get("source_independence_key") or "unknown")],
+                },
+                "confidence_band": str(card.get("confidence") or "unknown"),
+                "uncertainty_reasons": [str(card.get("caveat") or "").strip()] if str(card.get("caveat") or "").strip() else [],
+                "verification_state": verification_state,
+                "decision_grade": decision_grade,
+                "insufficient_evidence": not decision_grade,
+                "wording_policy": str(card.get("wording_policy") or ""),
+                "next_verification_step": str(card.get("next_verification_step") or ""),
+                "atom_ids": _int_values(card.get("evidence_atom_ids")),
+            }
+        )
+    return claims
+
+
+def _canonical_atoms(atoms: list[dict], claims: list[dict], evidence_items: list[dict]) -> list[dict]:
+    claim_ids_by_atom: dict[int, list[str]] = {}
+    evidence_ids_by_atom: dict[int, list[str]] = {}
+    for claim in claims:
+        for atom_id in _int_values(claim.get("atom_ids")):
+            claim_ids_by_atom.setdefault(atom_id, []).append(str(claim.get("id")))
+    for evidence in evidence_items:
+        for atom_id in _int_values(evidence.get("atom_ids")):
+            evidence_ids_by_atom.setdefault(atom_id, []).append(str(evidence.get("id")))
+    result: list[dict] = []
+    for atom in atoms:
+        atom_id = _safe_int_value(atom.get("id"))
+        if not atom_id:
+            continue
+        result.append(
+            {
+                "id": f"knowledge_atom:{atom_id}",
+                "atom_id": atom_id,
+                "claim": str(atom.get("claim") or ""),
+                "summary": str(atom.get("summary") or ""),
+                "atom_type": str(atom.get("atom_type") or ""),
+                "relation": str(atom.get("relation") or "supports"),
+                "why_it_matters": str(atom.get("why_it_matters") or ""),
+                "first_seen_at": str(atom.get("first_seen_at") or ""),
+                "last_seen_at": str(atom.get("last_seen_at") or ""),
+                "staleness_status": str(atom.get("staleness_status") or "active"),
+                "claim_ids": _unique(claim_ids_by_atom.get(atom_id, [])),
+                "evidence_item_ids": _unique(evidence_ids_by_atom.get(atom_id, [])),
+                "source_urls": [str(url) for url in (atom.get("source_urls") or []) if str(url).strip()],
+            }
+        )
+    return result
+
+
+def _canonical_threads(
+    threads: list[dict],
+    claims: list[dict],
+    evidence_items: list[dict],
+    thread_deltas: list[dict],
+) -> list[dict]:
+    claim_ids_by_atom: dict[int, list[str]] = {}
+    evidence_ids_by_atom: dict[int, list[str]] = {}
+    for claim in claims:
+        for atom_id in _int_values(claim.get("atom_ids")):
+            claim_ids_by_atom.setdefault(atom_id, []).append(str(claim.get("id")))
+    for evidence in evidence_items:
+        for atom_id in _int_values(evidence.get("atom_ids")):
+            evidence_ids_by_atom.setdefault(atom_id, []).append(str(evidence.get("id")))
+    deltas_by_slug = {
+        str(delta.get("thread_slug") or ""): delta
+        for delta in thread_deltas
+        if str(delta.get("thread_slug") or "").strip()
+    }
+    result: list[dict] = []
+    for thread in threads:
+        slug = str(thread.get("slug") or "").strip()
+        atoms = [atom for atom in (thread.get("atoms") or []) if isinstance(atom, Mapping)]
+        atom_ids = [_safe_int_value(atom.get("id")) for atom in atoms if _safe_int_value(atom.get("id"))]
+        delta = deltas_by_slug.get(slug, {})
+        result.append(
+            {
+                "id": f"idea_thread:{slug or _safe_int_value(thread.get('id'))}",
+                "thread_slug": slug,
+                "title": str(thread.get("title") or slug),
+                "status": str(thread.get("status") or "active"),
+                "atom_ids": atom_ids,
+                "claim_ids": _unique(claim_id for atom_id in atom_ids for claim_id in claim_ids_by_atom.get(atom_id, [])),
+                "evidence_item_ids": _unique(evidence_id for atom_id in atom_ids for evidence_id in evidence_ids_by_atom.get(atom_id, [])),
+                "previous_state": str(delta.get("previous_state") or ""),
+                "current_state": str(delta.get("updated_interpretation") or thread.get("summary") or ""),
+                "delta_basis": _thread_delta_basis(delta),
+                "new_evidence_atom_ids": _int_values(delta.get("new_evidence_atom_ids")),
+                "momentum_vs_evidence": {
+                    "momentum_7d": _float(thread.get("momentum_7d")),
+                    "momentum_30d": _float(thread.get("momentum_30d")),
+                    "evidence_growth": bool(_as_list(delta.get("new_evidence_atom_ids"))),
+                    "momentum_is_not_evidence": True,
+                },
+                "contradictions": _as_list(thread.get("contradictions")),
+                "merge_split_audit_status": str(delta.get("merge_split_audit_status") or ""),
+            }
+        )
+    return result
+
+
+def _canonical_decisions(decision_cards: list[dict], claims: list[dict]) -> list[dict]:
+    claim_ids_by_atom: dict[int, list[str]] = {}
+    decision_grade_claims = {str(claim.get("id")) for claim in claims if claim.get("decision_grade") is True}
+    for claim in claims:
+        for atom_id in _int_values(claim.get("atom_ids")):
+            claim_ids_by_atom.setdefault(atom_id, []).append(str(claim.get("id")))
+    result: list[dict] = []
+    for card in decision_cards:
+        atom_ids = _int_values(card.get("evidence_atom_ids"))
+        all_claim_ids = _unique(claim_id for atom_id in atom_ids for claim_id in claim_ids_by_atom.get(atom_id, []))
+        verdict = str(card.get("verdict") or "")
+        if verdict in {"apply", "study"}:
+            claim_ids = [claim_id for claim_id in all_claim_ids if claim_id in decision_grade_claims]
+            context_claim_ids = [claim_id for claim_id in all_claim_ids if claim_id not in decision_grade_claims]
+        else:
+            claim_ids = all_claim_ids
+            context_claim_ids = []
+        result.append(
+            {
+                "id": str(card.get("id") or ""),
+                "verdict": verdict,
+                "title": str(card.get("title") or ""),
+                "claim_ids": claim_ids,
+                "context_claim_ids": context_claim_ids,
+                "evidence_atom_ids": atom_ids,
+                "source_policy": "decision_grade_claims_required_for_apply_or_study",
+                "evidence_state": (
+                    "decision_grade"
+                    if claim_ids and all(claim_id in decision_grade_claims for claim_id in claim_ids)
+                    else "insufficient_or_verify_first"
+                ),
+                "next_action": str(card.get("next_action") or ""),
+                "success_criterion": str(card.get("success_criterion") or ""),
+            }
+        )
+    return result
+
+
+def _canonical_radar_exchange(mvp_radar: Mapping[str, Any]) -> dict[str, Any]:
+    matches = [item for item in _as_list(mvp_radar.get("matched_external_evidence")) if isinstance(item, Mapping)]
+    context_only = [
+        item
+        for item in matches
+        if item.get("context_only") is True or item.get("supports_gate") is False or str(item.get("radar_role") or "") == "context_only"
+    ]
+    matched_gate = [
+        item
+        for item in matches
+        if bool(item.get("supports_gate")) and bool(item.get("decision_grade", True)) and item.get("context_only") is not True
+    ]
+    return {
+        "contract_version": RADAR_INTELLIGENCE_CONTRACT_VERSION,
+        "status": str(mvp_radar.get("status") or "unknown"),
+        "selected_candidate": str(mvp_radar.get("selected_candidate") or ""),
+        "recommendation": str(mvp_radar.get("recommendation") or mvp_radar.get("dossier_status") or ""),
+        "matched_external_evidence_count": len(matched_gate),
+        "context_only_evidence_count": len(context_only),
+        "context_only_can_satisfy_gate": False,
+        "missing_evidence": [str(item) for item in _as_list(mvp_radar.get("missing_evidence")) if str(item).strip()],
+    }
+
+
+def _source_excerpt(atom: Mapping[str, Any], post: Mapping[str, Any]) -> str:
+    quote = str(atom.get("evidence_quote") or "").strip()
+    if quote:
+        return _compact(quote, 320)
+    summary = str(atom.get("summary") or atom.get("claim") or "").strip()
+    if summary:
+        return _compact(summary, 320)
+    return _compact(post.get("content") or "", 320)
+
+
+def _canonical_polarity(atom: Mapping[str, Any] | None, claim: Mapping[str, Any]) -> str:
+    atom = atom or {}
+    relation = str(atom.get("relation") or "").strip()
+    atom_type = str(atom.get("atom_type") or claim.get("source_type") or "").strip()
+    role = str(claim.get("evidence_role") or "").strip()
+    if relation == "contradicts" or role == "contradiction":
+        return "contradicting"
+    if atom_type in {"risk_warning", "opinion_shift"}:
+        return "negative"
+    return "supporting"
+
+
+def _canonical_independence_key(claim: Mapping[str, Any], index: int) -> str:
+    keys = _as_list(claim.get("source_independence_keys"))
+    if 0 <= index - 1 < len(keys):
+        return str(keys[index - 1] or "unknown")
+    return str(claim.get("source_independence_key") or "unknown")
+
+
+def _thread_delta_basis(delta: Mapping[str, Any]) -> str:
+    if not delta:
+        return "unknown"
+    if str(delta.get("state") or "") == "insufficient_history":
+        return "insufficient_history"
+    if _as_list(delta.get("new_evidence_atom_ids")):
+        return "new_evidence"
+    if str(delta.get("confidence_movement") or "") in {"up", "down_or_cooling"}:
+        return "momentum_without_new_evidence"
+    return "interpretation_update"
+
+
+def _safe_int_value(value: object) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def _implementation_suggestions(confirmed: list[dict], watch: list[dict]) -> list[dict]:
     suggestions: list[dict] = []
     for index, item in enumerate([*confirmed, *watch][:4], start=1):
@@ -1662,6 +2217,27 @@ def _float(value: object) -> float:
         return float(value or 0.0)
     except (TypeError, ValueError):
         return 0.0
+
+
+def _unique(values) -> list:
+    result = []
+    seen: set[str] = set()
+    for value in values:
+        if value in (None, ""):
+            continue
+        key = str(value)
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(value)
+    return result
+
+
+def _slug(value: object) -> str:
+    text = str(value or "").strip().lower()
+    text = re.sub(r"[^a-z0-9а-яё]+", "-", text)
+    text = re.sub(r"-+", "-", text).strip("-")
+    return text[:80] or "item"
 
 
 def _dedupe_by_id(values: list[dict]) -> list[dict]:

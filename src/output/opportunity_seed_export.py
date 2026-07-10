@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from config.settings import PROJECT_ROOT, Settings
+from output.ai_report_contract import INTELLIGENCE_CONTRACT_VERSION, RADAR_INTELLIGENCE_CONTRACT_VERSION
 from output.downstream_knowledge import MVP_KNOWLEDGE_ATOM_TYPES, load_downstream_knowledge_threads
 from output.market_context_lens import (
     DEFAULT_BASELINE_DAYS,
@@ -240,6 +241,8 @@ def export_opportunity_seeds(
             break
     market_seed = market_context_lens_seed(market_lens.current_context)
     if market_seed is not None:
+        market_seed.setdefault("contract_version", RADAR_INTELLIGENCE_CONTRACT_VERSION)
+        market_seed.setdefault("intelligence_contract_version", INTELLIGENCE_CONTRACT_VERSION)
         seeds.append(market_seed)
 
     target_path.parent.mkdir(parents=True, exist_ok=True)
@@ -369,6 +372,8 @@ def _seed_from_row(
     bucket = str(row["bucket"] or "")
     return {
         "upstream_id": f"telegram:{channel}:{message_id or row['post_id']}",
+        "contract_version": RADAR_INTELLIGENCE_CONTRACT_VERSION,
+        "intelligence_contract_version": INTELLIGENCE_CONTRACT_VERSION,
         "captured_at": str(row["posted_at"]),
         "title": mvp_shape,
         "text": content,
@@ -406,6 +411,8 @@ def _seed_from_knowledge_thread(thread: dict) -> dict[str, object]:
     mvp_shape = infer_mvp_shape(text, surfaces)
     return {
         "upstream_id": f"knowledge-thread:{thread.get('slug')}",
+        "contract_version": RADAR_INTELLIGENCE_CONTRACT_VERSION,
+        "intelligence_contract_version": INTELLIGENCE_CONTRACT_VERSION,
         "captured_at": str(thread.get("last_seen_at") or ""),
         "title": mvp_shape,
         "text": text,

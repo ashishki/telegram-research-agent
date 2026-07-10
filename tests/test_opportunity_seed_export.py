@@ -9,6 +9,7 @@ from unittest.mock import patch
 from config.settings import Settings
 from db.knowledge_atoms import record_knowledge_atom
 from db.migrate import run_migrations
+from output.ai_report_contract import INTELLIGENCE_CONTRACT_VERSION, RADAR_INTELLIGENCE_CONTRACT_VERSION
 from output.idea_threads import refresh_idea_threads
 from output.opportunity_seed_export import export_opportunity_seeds
 
@@ -92,6 +93,8 @@ class TestOpportunitySeedExport(unittest.TestCase):
             seeds = json.loads(out_path.read_text(encoding="utf-8"))
 
             self.assertEqual(result.seed_count, 1)
+            self.assertEqual(seeds[0]["contract_version"], RADAR_INTELLIGENCE_CONTRACT_VERSION)
+            self.assertEqual(seeds[0]["intelligence_contract_version"], INTELLIGENCE_CONTRACT_VERSION)
             self.assertEqual(seeds[0]["mvp_shape"], "Telegram Channel SEO Site Generator")
             self.assertIn("creator_content_gap", seeds[0]["demand_surfaces"])
             self.assertEqual(seeds[0]["source_url"], "https://t.me/its_capitan/100")
@@ -141,6 +144,8 @@ class TestOpportunitySeedExport(unittest.TestCase):
 
             self.assertEqual(result.knowledge_thread_count, 1)
             self.assertEqual(result.seed_count, 1)
+            self.assertEqual(seeds[0]["contract_version"], RADAR_INTELLIGENCE_CONTRACT_VERSION)
+            self.assertEqual(seeds[0]["intelligence_contract_version"], INTELLIGENCE_CONTRACT_VERSION)
             self.assertEqual(seeds[0]["source_kind"], "knowledge_thread")
             self.assertIn("knowledge_thread_slug", seeds[0])
             self.assertEqual(seeds[0]["source_atom_ids"], [1])
@@ -202,6 +207,8 @@ class TestOpportunitySeedExport(unittest.TestCase):
             self.assertFalse(context_seed["build_ready_evidence"])
             self.assertTrue(context_seed["context_only"])
             self.assertEqual(context_seed["radar_role"], "context_only")
+            self.assertEqual(context_seed["contract_version"], RADAR_INTELLIGENCE_CONTRACT_VERSION)
+            self.assertEqual(context_seed["intelligence_contract_version"], INTELLIGENCE_CONTRACT_VERSION)
             self.assertEqual(context_seed["evidence_strength"], "context_only_market_analyst_pack")
             self.assertNotIn("mvp_shape", context_seed)
             self.assertIn("do not select this context row", context_seed["verification_needed"][0])

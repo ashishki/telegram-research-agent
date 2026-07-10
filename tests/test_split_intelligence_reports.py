@@ -11,6 +11,7 @@ from config.settings import Settings
 from db.frontier_analysis import upsert_frontier_analysis
 from db.knowledge_atoms import record_knowledge_atom
 from db.migrate import run_migrations
+from output.ai_report_contract import INTELLIGENCE_CONTRACT_VERSION, RADAR_INTELLIGENCE_CONTRACT_VERSION
 from output.idea_threads import refresh_idea_threads
 from output.split_intelligence_reports import deliver_split_intelligence_reports, generate_split_intelligence_reports
 
@@ -212,11 +213,35 @@ class TestSplitIntelligenceReports(unittest.TestCase):
             self.assertTrue(summary.weekly_brief.html_path.endswith(".weekly-brief.html"))
             self.assertIn("<title>Knowledge Atlas 2026-W28</title>", atlas_html)
             self.assertIn("<title>Weekly Intelligence Brief 2026-W28</title>", brief_html)
+            self.assertIn(f'content="{INTELLIGENCE_CONTRACT_VERSION}"', atlas_html)
+            self.assertIn(f'content="{INTELLIGENCE_CONTRACT_VERSION}"', brief_html)
+            self.assertIn(f'content="{RADAR_INTELLIGENCE_CONTRACT_VERSION}"', brief_html)
             self.assertIn('id="trend-board"', atlas_html)
             self.assertIn('id="brief-actions"', brief_html)
             self.assertLess(brief_html.find('id="brief-actions"'), brief_html.find('id="brief-mvp-radar"'))
             self.assertEqual(atlas_json["artifact_type"], "knowledge_atlas")
             self.assertEqual(brief_json["artifact_type"], "weekly_intelligence_brief")
+            self.assertEqual(atlas_json["contract_version"], INTELLIGENCE_CONTRACT_VERSION)
+            self.assertEqual(brief_json["contract_version"], INTELLIGENCE_CONTRACT_VERSION)
+            self.assertEqual(brief_json["radar_contract_version"], RADAR_INTELLIGENCE_CONTRACT_VERSION)
+            self.assertEqual(
+                atlas_json["intelligence_contract"]["contract_version"],
+                INTELLIGENCE_CONTRACT_VERSION,
+            )
+            self.assertEqual(
+                brief_json["intelligence_contract"]["contract_version"],
+                INTELLIGENCE_CONTRACT_VERSION,
+            )
+            self.assertEqual(
+                brief_json["intelligence_contract"]["radar_exchange"]["contract_version"],
+                RADAR_INTELLIGENCE_CONTRACT_VERSION,
+            )
+            self.assertTrue(brief_json["intelligence_contract"]["source_observations"])
+            self.assertTrue(brief_json["intelligence_contract"]["evidence_items"])
+            self.assertTrue(brief_json["intelligence_contract"]["claims"])
+            self.assertFalse(
+                brief_json["intelligence_contract"]["radar_exchange"]["context_only_can_satisfy_gate"]
+            )
             self.assertEqual(
                 atlas_json["related_artifacts"]["weekly_brief_json_path"],
                 summary.weekly_brief.json_path,

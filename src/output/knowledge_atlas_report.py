@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from config.settings import PROJECT_ROOT, Settings
+from output.ai_report_contract import INTELLIGENCE_CONTRACT_VERSION, build_canonical_intelligence_contract
 from output.ai_intelligence_report import (
     _all_atoms,
     _changed_threads,
@@ -162,6 +163,7 @@ def render_knowledge_atlas_html(context: dict, *, generated_at: str | None = Non
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="intelligence-contract-version" content="{_escape(INTELLIGENCE_CONTRACT_VERSION)}">
 <title>Knowledge Atlas { _escape(week_label) }</title>
 <style>
 :root {{ color-scheme: light; --ink:#18212b; --muted:#66717e; --line:#d8dee6; --panel:#ffffff; --bg:#f5f7f9; --accent:#0f766e; --warn:#a16207; }}
@@ -278,6 +280,7 @@ def _knowledge_atlas_metadata(
 ) -> dict:
     threads = context.get("threads") or []
     atoms = _all_atoms(threads)
+    intelligence_contract = build_canonical_intelligence_contract(context)
     sections = [
         {
             "id": section_id,
@@ -290,6 +293,7 @@ def _knowledge_atlas_metadata(
     ]
     return {
         "schema_version": "split_ai_report.v1",
+        "contract_version": INTELLIGENCE_CONTRACT_VERSION,
         "artifact_type": "knowledge_atlas",
         "week_label": context.get("week_label"),
         "generated_at": generated_at,
@@ -304,6 +308,7 @@ def _knowledge_atlas_metadata(
         "source_atom_count": len(atoms),
         "source_channel_count": len(context.get("source_channels") or []),
         "changed_thread_count": len(_changed_threads(threads)),
+        "intelligence_contract": intelligence_contract,
         "compressed_context": context.get("compressed_context") or [],
         "source_channels": context.get("source_channels") or [],
         "quality_findings": [finding.as_dict() for finding in quality_findings],

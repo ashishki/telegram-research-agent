@@ -1,0 +1,86 @@
+{
+  "artifact_type": "contract_fixture",
+  "intelligence_contract": {
+    "contract_version": "tra-intelligence-contract.v1",
+    "schema_version": "tra-intelligence-contract.v1",
+    "week_label": "2026-W28",
+    "projection_boundaries": {
+      "canonical_state": "SQLite rows and versioned JSON sidecars",
+      "rendered_surfaces": ["html"],
+      "llm_prose": "derived_interpretation_not_source_of_truth",
+      "market_business_context": "context_only",
+      "no_feedback_semantics": "unknown"
+    },
+    "source_observations": [
+      {
+        "id": "source_observation:market_context:1",
+        "source_type": "market_context",
+        "url": "https://example.invalid/context",
+        "observed_at": "2026-07-06T08:00:00Z",
+        "raw_excerpt": "Market framing only.",
+        "metadata": {"atom_ids": [9]},
+        "collection_method": "market_context_lens",
+        "ingestion_provenance": {"derived_from": "market_context_lens"}
+      }
+    ],
+    "evidence_items": [
+      {
+        "id": "evidence_item:claim-context-only:1",
+        "claim_id": "claim-context-only",
+        "source_observation_id": "source_observation:market_context:1",
+        "source_observation_ref": "source_observation:market_context:1",
+        "atom_ids": [9],
+        "quote": "Market framing only.",
+        "verified_excerpt": "Market framing only.",
+        "evidence_role": "market_context",
+        "evidence_tier": "context_only",
+        "independence_key": "market_context:fixture",
+        "independence_keys": ["market_context:fixture"],
+        "verification_status": "verified",
+        "quote_verified": true,
+        "date_relevance": "active",
+        "scope": "market",
+        "expiry_hint": "Review weekly.",
+        "polarity": "supporting",
+        "context_only": true,
+        "decision_grade": true,
+        "radar_gate_eligible": true
+      }
+    ],
+    "claims": [
+      {
+        "id": "claim-context-only",
+        "statement": "Market context alone proves the selected MVP should be built.",
+        "scope": "market",
+        "time_horizon": "short",
+        "supporting_evidence_item_ids": ["evidence_item:claim-context-only:1"],
+        "contradicting_evidence_item_ids": [],
+        "source_observation_ids": ["source_observation:market_context:1"],
+        "source_independence": {"count": 1, "keys": ["market_context:fixture"]},
+        "confidence_band": "high",
+        "uncertainty_reasons": [],
+        "verification_state": "verified",
+        "decision_grade": true,
+        "insufficient_evidence": false,
+        "wording_policy": "source_bounded",
+        "next_verification_step": "None.",
+        "atom_ids": [9]
+      }
+    ],
+    "knowledge_atoms": [],
+    "idea_threads": [],
+    "decisions": [],
+    "experiments": [],
+    "outcomes": [],
+    "radar_exchange": {
+      "contract_version": "tra-radar-intelligence-contract.v1",
+      "status": "loaded",
+      "selected_candidate": "Context-only MVP",
+      "recommendation": "build",
+      "matched_external_evidence_count": 0,
+      "context_only_evidence_count": 1,
+      "context_only_can_satisfy_gate": true,
+      "missing_evidence": []
+    }
+  }
+}

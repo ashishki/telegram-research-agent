@@ -3,14 +3,18 @@ import unittest
 from pathlib import Path
 
 from output.ai_report_contract import (
+    INTELLIGENCE_CONTRACT_VERSION,
+    RADAR_INTELLIGENCE_CONTRACT_VERSION,
     REPORT_CONTRACT_VERSION,
     build_weekly_ai_report_contract,
+    validate_canonical_intelligence_contract,
     validate_weekly_ai_report_contract,
 )
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 W28_FIXTURE_ROOT = PROJECT_ROOT / "docs" / "artifacts" / "ai-decision-intelligence-2026-W28"
+CONTRACT_FIXTURE_ROOT = PROJECT_ROOT / "tests" / "fixtures" / "intelligence_contract"
 
 
 def _valid_html() -> str:
@@ -257,6 +261,150 @@ def _complete_contract_metadata() -> dict:
                 "event_options": ["trust_too_high", "verify_first"],
             },
         ],
+        "intelligence_contract": _complete_intelligence_contract(),
+    }
+
+
+def _complete_intelligence_contract() -> dict:
+    source_observations = [
+        {
+            "id": f"source_observation:url:source-{index}",
+            "source_type": "telegram_link",
+            "url": f"https://t.me/source/{index}",
+            "observed_at": "2026-07-06T08:00:00Z",
+            "raw_excerpt": f"Утверждение {index}",
+            "metadata": {"atom_ids": [index]},
+            "collection_method": "sidecar_projection",
+            "ingestion_provenance": {"derived_from": "fixture"},
+        }
+        for index in range(1, 4)
+    ]
+    evidence_items = [
+        {
+            "id": f"evidence_item:claim-{index}:1",
+            "claim_id": f"claim-{index}",
+            "source_observation_id": f"source_observation:url:source-{index}",
+            "source_observation_ref": f"source_observation:url:source-{index}",
+            "atom_ids": [index],
+            "quote": f"Утверждение {index}",
+            "verified_excerpt": f"Утверждение {index}",
+            "evidence_role": "practice_report",
+            "evidence_tier": "verified_single_source",
+            "independence_key": "telegram:source",
+            "independence_keys": ["telegram:source"],
+            "verification_status": "verified",
+            "quote_verified": True,
+            "date_relevance": "active",
+            "scope": "practice",
+            "expiry_hint": "Проверить заново через месяц.",
+            "polarity": "supporting",
+            "context_only": False,
+            "decision_grade": True,
+            "radar_gate_eligible": False,
+        }
+        for index in range(1, 4)
+    ]
+    claims = [
+        {
+            "id": f"claim-{index}",
+            "statement": f"Утверждение {index}",
+            "scope": "practice",
+            "time_horizon": "medium_to_long",
+            "supporting_evidence_item_ids": [f"evidence_item:claim-{index}:1"],
+            "contradicting_evidence_item_ids": [],
+            "source_observation_ids": [f"source_observation:url:source-{index}"],
+            "source_independence": {"count": 1, "keys": ["telegram:source"]},
+            "confidence_band": "medium",
+            "uncertainty_reasons": ["Цитата проверена, но источник один."],
+            "verification_state": "verified",
+            "decision_grade": True,
+            "insufficient_evidence": False,
+            "wording_policy": "source_bounded",
+            "next_verification_step": "Сверить источник и найти подтверждение.",
+            "atom_ids": [index],
+        }
+        for index in range(1, 4)
+    ]
+    return {
+        "contract_version": INTELLIGENCE_CONTRACT_VERSION,
+        "schema_version": INTELLIGENCE_CONTRACT_VERSION,
+        "week_label": "2026-W28",
+        "projection_boundaries": {
+            "canonical_state": "SQLite rows and versioned JSON sidecars",
+            "rendered_surfaces": ["html"],
+            "llm_prose": "derived_interpretation_not_source_of_truth",
+            "market_business_context": "context_only",
+            "no_feedback_semantics": "unknown",
+        },
+        "source_observations": source_observations,
+        "evidence_items": evidence_items,
+        "claims": claims,
+        "knowledge_atoms": [
+            {
+                "id": f"knowledge_atom:{index}",
+                "atom_id": index,
+                "claim": f"Утверждение {index}",
+                "summary": f"Утверждение {index}",
+                "atom_type": "engineering_practice",
+                "relation": "supports",
+                "why_it_matters": "Нужно для проверки контракта.",
+                "first_seen_at": "2026-07-06T08:00:00Z",
+                "last_seen_at": "2026-07-06T08:00:00Z",
+                "staleness_status": "active",
+                "claim_ids": [f"claim-{index}"],
+                "evidence_item_ids": [f"evidence_item:claim-{index}:1"],
+                "source_urls": [f"https://t.me/source/{index}"],
+            }
+            for index in range(1, 4)
+        ],
+        "idea_threads": [
+            {
+                "id": "idea_thread:eval-gates",
+                "thread_slug": "eval-gates",
+                "title": "eval-gates",
+                "status": "active",
+                "atom_ids": [1],
+                "claim_ids": ["claim-1"],
+                "evidence_item_ids": ["evidence_item:claim-1:1"],
+                "previous_state": "Раньше это было практикой отдельных задач.",
+                "current_state": "Теперь это релизная дисциплина.",
+                "delta_basis": "new_evidence",
+                "new_evidence_atom_ids": [1],
+                "momentum_vs_evidence": {
+                    "momentum_7d": 0.4,
+                    "momentum_30d": 0.3,
+                    "evidence_growth": True,
+                    "momentum_is_not_evidence": True,
+                },
+                "contradictions": [],
+                "merge_split_audit_status": "ok",
+            }
+        ],
+        "decisions": [
+            {
+                "id": "decision-1",
+                "verdict": "apply",
+                "title": "Проверить eval-гейт",
+                "claim_ids": ["claim-1"],
+                "evidence_atom_ids": [1],
+                "source_policy": "decision_grade_claims_required_for_apply_or_study",
+                "evidence_state": "decision_grade",
+                "next_action": "Запустить маленькую проверку.",
+                "success_criterion": "Плохое изменение заблокировано.",
+            }
+        ],
+        "experiments": [],
+        "outcomes": [],
+        "radar_exchange": {
+            "contract_version": RADAR_INTELLIGENCE_CONTRACT_VERSION,
+            "status": "loaded",
+            "selected_candidate": "Fixture candidate",
+            "recommendation": "investigate",
+            "matched_external_evidence_count": 0,
+            "context_only_evidence_count": 1,
+            "context_only_can_satisfy_gate": False,
+            "missing_evidence": ["Need matched external evidence."],
+        },
     }
 
 
@@ -303,6 +451,31 @@ class TestAiReportContract(unittest.TestCase):
         findings = validate_weekly_ai_report_contract(metadata, html_text=_valid_html())
 
         self.assertEqual(findings, [])
+
+    def test_valid_canonical_contract_fixture_passes(self):
+        payload = json.loads((CONTRACT_FIXTURE_ROOT / "valid_canonical_sidecar.json").read_text(encoding="utf-8"))
+
+        findings = validate_canonical_intelligence_contract(payload["intelligence_contract"])
+
+        self.assertEqual(findings, [])
+
+    def test_unsupported_decision_grade_fixture_fails(self):
+        payload = json.loads((CONTRACT_FIXTURE_ROOT / "unsupported_decision_grade_claim.json").read_text(encoding="utf-8"))
+
+        findings = validate_canonical_intelligence_contract(payload["intelligence_contract"])
+        messages = "\n".join(finding.message for finding in findings)
+
+        self.assertIn("Decision-grade claim must cite supporting evidence", messages)
+        self.assertIn("Decision-grade claim must cite source observations", messages)
+
+    def test_context_only_evidence_cannot_satisfy_radar_gate(self):
+        payload = json.loads((CONTRACT_FIXTURE_ROOT / "context_only_radar_gate.json").read_text(encoding="utf-8"))
+
+        findings = validate_canonical_intelligence_contract(payload["intelligence_contract"])
+        messages = "\n".join(finding.message for finding in findings)
+
+        self.assertIn("Context-only evidence cannot be decision-grade", messages)
+        self.assertIn("Radar context-only records must not satisfy demand evidence gates", messages)
 
     def test_unverified_claim_without_weak_label_fails(self):
         metadata = _complete_contract_metadata()
@@ -438,12 +611,21 @@ class TestAiReportContract(unittest.TestCase):
         )
 
         deltas = contract["thread_deltas"]
+        intelligence_contract = contract["intelligence_contract"]
 
         self.assertEqual(len(deltas), 5)
         self.assertTrue(all(delta["this_week_evidence"] for delta in deltas))
         self.assertTrue(all(delta["why_this_is_one_thread"] for delta in deltas))
         self.assertTrue(all(delta["merge_split_audit_status"] for delta in deltas))
         self.assertIn("insufficient_history", {delta["state"] for delta in deltas})
+        self.assertEqual(intelligence_contract["contract_version"], INTELLIGENCE_CONTRACT_VERSION)
+        self.assertTrue(intelligence_contract["source_observations"])
+        self.assertTrue(intelligence_contract["evidence_items"])
+        self.assertTrue(intelligence_contract["claims"])
+        self.assertIn(
+            "new_evidence",
+            {thread["delta_basis"] for thread in intelligence_contract["idea_threads"]},
+        )
 
     def test_project_diagnostic_explains_zero_leads_without_broad_match_noise(self):
         contract = build_weekly_ai_report_contract(

@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 
 from config.settings import Settings
+from output.ai_report_contract import INTELLIGENCE_CONTRACT_VERSION
 from output.intelligence_retrieval_items import (
     build_retrieval_items,
     search_retrieval_items,
@@ -18,6 +19,81 @@ class TestIntelligenceRetrievalItems(unittest.TestCase):
             model_provider="",
             telegram_session_path="",
         )
+
+    def _canonical_contract(self) -> dict:
+        return {
+            "contract_version": INTELLIGENCE_CONTRACT_VERSION,
+            "schema_version": INTELLIGENCE_CONTRACT_VERSION,
+            "week_label": "2026-W28",
+            "projection_boundaries": {
+                "canonical_state": "SQLite rows and versioned JSON sidecars",
+                "rendered_surfaces": ["html"],
+                "llm_prose": "derived_interpretation_not_source_of_truth",
+                "market_business_context": "context_only",
+                "no_feedback_semantics": "unknown",
+            },
+            "source_observations": [
+                {
+                    "id": "source_observation:telegram_post:101",
+                    "source_type": "telegram_post",
+                    "url": "https://t.me/ai_lab/101",
+                    "observed_at": "2026-07-08T00:00:00Z",
+                    "raw_excerpt": "eval gates before release",
+                    "metadata": {"atom_ids": [101]},
+                    "collection_method": "telegram_ingestion",
+                    "ingestion_provenance": {"derived_from": "fixture"},
+                }
+            ],
+            "evidence_items": [
+                {
+                    "id": "evidence_item:claim-1:1",
+                    "claim_id": "claim-1",
+                    "source_observation_id": "source_observation:telegram_post:101",
+                    "source_observation_ref": "source_observation:telegram_post:101",
+                    "atom_ids": [101],
+                    "quote": "eval gates before release",
+                    "verified_excerpt": "eval gates before release",
+                    "evidence_role": "practice_report",
+                    "evidence_tier": "verified_single_source",
+                    "independence_key": "telegram:ai_lab",
+                    "independence_keys": ["telegram:ai_lab"],
+                    "verification_status": "verified",
+                    "quote_verified": True,
+                    "date_relevance": "active",
+                    "scope": "practice",
+                    "expiry_hint": "Review next month.",
+                    "polarity": "supporting",
+                    "context_only": False,
+                    "decision_grade": True,
+                    "radar_gate_eligible": False,
+                }
+            ],
+            "claims": [
+                {
+                    "id": "claim-1",
+                    "statement": "Eval gates are becoming release infrastructure for coding agents.",
+                    "scope": "practice",
+                    "time_horizon": "medium_to_long",
+                    "supporting_evidence_item_ids": ["evidence_item:claim-1:1"],
+                    "contradicting_evidence_item_ids": [],
+                    "source_observation_ids": ["source_observation:telegram_post:101"],
+                    "source_independence": {"count": 1, "keys": ["telegram:ai_lab"]},
+                    "confidence_band": "medium",
+                    "uncertainty_reasons": ["Single-source until independently confirmed."],
+                    "verification_state": "verified",
+                    "decision_grade": True,
+                    "insufficient_evidence": False,
+                    "wording_policy": "source_bounded",
+                    "next_verification_step": "Find independent confirmation.",
+                    "atom_ids": [101],
+                }
+            ],
+            "knowledge_atoms": [],
+            "idea_threads": [],
+            "decisions": [],
+            "experiments": [],
+            "outcomes": [],
+        }
 
     def _write_workbook(self, root: Path) -> Path:
         output_dir = root / "ai_visual_intelligence"
@@ -146,6 +222,7 @@ class TestIntelligenceRetrievalItems(unittest.TestCase):
                     {
                         "schema_version": "split_ai_report.v1",
                         "artifact_type": "weekly_intelligence_brief",
+                        "contract_version": INTELLIGENCE_CONTRACT_VERSION,
                         "week_label": "2026-W28",
                         "generated_at": "2026-07-08T00:00:00Z",
                         "html_path": str(html_path),
@@ -177,6 +254,7 @@ class TestIntelligenceRetrievalItems(unittest.TestCase):
                             "selected_candidate": "Agent Eval Gate Scanner",
                             "recommendation": "revisit_with_evidence_gap",
                         },
+                        "intelligence_contract": self._canonical_contract(),
                     },
                     ensure_ascii=False,
                 ),
@@ -192,6 +270,8 @@ class TestIntelligenceRetrievalItems(unittest.TestCase):
         self.assertEqual(len(brief_sections), 1)
         self.assertIn("Try a tiny eval gate", brief_sections[0].text)
         self.assertTrue(any(item.item_type == "mvp_dossier" for item in items))
+        self.assertTrue(any(item.item_type == "canonical_claim" for item in items))
+        self.assertTrue(any(item.item_type == "canonical_evidence" for item in items))
 
     def test_search_returns_matching_item(self):
         with tempfile.TemporaryDirectory() as tmp:

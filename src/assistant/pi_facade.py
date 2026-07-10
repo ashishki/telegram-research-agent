@@ -622,18 +622,34 @@ def _decision_cards(workbook: Mapping[str, Any]) -> list:
 
 def _strong_signals(workbook: Mapping[str, Any]) -> list:
     cards = [card for card in workbook.get("claim_cards") or [] if isinstance(card, Mapping)]
+    if cards:
+        return [
+            {
+                "id": card.get("id"),
+                "claim": card.get("claim"),
+                "summary": card.get("caveat"),
+                "source_refs": list(card.get("source_urls") or []),
+                "atom_ids": list(card.get("evidence_atom_ids") or []),
+                "evidence_tier": card.get("evidence_tier"),
+                "verification_status": card.get("verification_status"),
+                "confidence": card.get("confidence"),
+            }
+            for card in cards
+        ]
+    contract = workbook.get("intelligence_contract") if isinstance(workbook.get("intelligence_contract"), Mapping) else {}
+    canonical_claims = [claim for claim in contract.get("claims") or [] if isinstance(claim, Mapping)]
     return [
         {
-            "id": card.get("id"),
-            "claim": card.get("claim"),
-            "summary": card.get("caveat"),
-            "source_refs": list(card.get("source_urls") or []),
-            "atom_ids": list(card.get("evidence_atom_ids") or []),
-            "evidence_tier": card.get("evidence_tier"),
-            "verification_status": card.get("verification_status"),
-            "confidence": card.get("confidence"),
+            "id": claim.get("id"),
+            "claim": claim.get("statement"),
+            "summary": " ".join(_string_values(claim.get("uncertainty_reasons"))),
+            "source_refs": list(claim.get("source_observation_ids") or []),
+            "atom_ids": list(claim.get("atom_ids") or []),
+            "evidence_tier": "decision_grade" if claim.get("decision_grade") is True else "insufficient_evidence",
+            "verification_status": claim.get("verification_state"),
+            "confidence": claim.get("confidence_band"),
         }
-        for card in cards
+        for claim in canonical_claims
     ]
 
 

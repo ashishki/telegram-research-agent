@@ -1,0 +1,98 @@
+{
+  "artifact_type": "contract_fixture",
+  "intelligence_contract": {
+    "contract_version": "tra-intelligence-contract.v1",
+    "schema_version": "tra-intelligence-contract.v1",
+    "week_label": "2026-W28",
+    "projection_boundaries": {
+      "canonical_state": "SQLite rows and versioned JSON sidecars",
+      "rendered_surfaces": ["html"],
+      "llm_prose": "derived_interpretation_not_source_of_truth",
+      "market_business_context": "context_only",
+      "no_feedback_semantics": "unknown"
+    },
+    "source_observations": [
+      {
+        "id": "source_observation:telegram_post:101",
+        "source_type": "telegram_post",
+        "url": "https://t.me/ai_lab/101",
+        "observed_at": "2026-07-06T08:00:00Z",
+        "raw_excerpt": "eval gates before release",
+        "metadata": {"channel_username": "@ai_lab", "post_id": 101, "atom_ids": [1]},
+        "collection_method": "telegram_ingestion",
+        "ingestion_provenance": {"derived_from": "knowledge_atom.source_posts", "knowledge_atom_id": 1}
+      }
+    ],
+    "evidence_items": [
+      {
+        "id": "evidence_item:claim-1:1",
+        "claim_id": "claim-1",
+        "source_observation_id": "source_observation:telegram_post:101",
+        "source_observation_ref": "source_observation:telegram_post:101",
+        "atom_ids": [1],
+        "quote": "eval gates before release",
+        "verified_excerpt": "eval gates before release",
+        "evidence_role": "practice_report",
+        "evidence_tier": "verified_single_source",
+        "independence_key": "telegram:ai_lab",
+        "independence_keys": ["telegram:ai_lab"],
+        "verification_status": "verified",
+        "quote_verified": true,
+        "date_relevance": "active",
+        "scope": "practice",
+        "expiry_hint": "Review next month.",
+        "polarity": "supporting",
+        "context_only": false,
+        "decision_grade": true,
+        "radar_gate_eligible": false
+      }
+    ],
+    "claims": [
+      {
+        "id": "claim-1",
+        "statement": "Eval gates are becoming release infrastructure for coding agents.",
+        "scope": "practice",
+        "time_horizon": "medium_to_long",
+        "supporting_evidence_item_ids": ["evidence_item:claim-1:1"],
+        "contradicting_evidence_item_ids": [],
+        "source_observation_ids": ["source_observation:telegram_post:101"],
+        "source_independence": {"count": 1, "keys": ["telegram:ai_lab"]},
+        "confidence_band": "medium",
+        "uncertainty_reasons": ["Single source; verify independently before trend wording."],
+        "verification_state": "verified",
+        "decision_grade": true,
+        "insufficient_evidence": false,
+        "wording_policy": "source_bounded",
+        "next_verification_step": "Find independent confirmation before strong trend wording.",
+        "atom_ids": [1]
+      }
+    ],
+    "knowledge_atoms": [],
+    "idea_threads": [
+      {
+        "id": "idea_thread:eval-gates",
+        "thread_slug": "eval-gates",
+        "title": "Eval gates",
+        "status": "active",
+        "atom_ids": [1],
+        "claim_ids": ["claim-1"],
+        "evidence_item_ids": ["evidence_item:claim-1:1"],
+        "previous_state": "Eval gates were a nice-to-have.",
+        "current_state": "Eval gates are part of release discipline.",
+        "delta_basis": "new_evidence",
+        "new_evidence_atom_ids": [1],
+        "momentum_vs_evidence": {
+          "momentum_7d": 0.4,
+          "momentum_30d": 0.3,
+          "evidence_growth": true,
+          "momentum_is_not_evidence": true
+        },
+        "contradictions": [],
+        "merge_split_audit_status": "ok"
+      }
+    ],
+    "decisions": [],
+    "experiments": [],
+    "outcomes": []
+  }
+}

@@ -246,6 +246,7 @@ def _items_from_workbook(workbook: Mapping[str, Any]) -> list[IntelligenceRetrie
     artifact_refs = _artifact_source_refs(workbook)
     items: list[IntelligenceRetrievalItem] = []
     items.extend(_workbook_section_items(workbook, week_label=week, generated_at=generated_at, artifact_refs=artifact_refs))
+    items.extend(_canonical_contract_items(workbook, week_label=week, generated_at=generated_at))
     items.extend(_claim_card_items(workbook, week_label=week, generated_at=generated_at))
     items.extend(_deep_explanation_items(workbook, week_label=week, generated_at=generated_at))
     items.extend(_action_card_items(workbook, week_label=week, generated_at=generated_at))
@@ -254,6 +255,88 @@ def _items_from_workbook(workbook: Mapping[str, Any]) -> list[IntelligenceRetrie
     if mvp:
         items.append(_mvp_item(dict(mvp), week))
     return items
+
+
+def _canonical_contract_items(
+    workbook: Mapping[str, Any],
+    *,
+    week_label: str | None,
+    generated_at: str | None,
+) -> list[IntelligenceRetrievalItem]:
+    contract = workbook.get("intelligence_contract") if isinstance(workbook.get("intelligence_contract"), Mapping) else {}
+    if not contract:
+        return []
+    evidence_by_id = {
+        str(item.get("id")): item
+        for item in _as_list(contract.get("evidence_items"))
+        if isinstance(item, Mapping) and str(item.get("id") or "").strip()
+    }
+    result: list[IntelligenceRetrievalItem] = []
+    for index, evidence in enumerate(evidence_by_id.values(), start=1):
+        evidence_id = _clean_text(evidence.get("id")) or f"evidence-{index}"
+        source_ref = _clean_text(evidence.get("source_observation_id"))
+        result.append(
+            IntelligenceRetrievalItem(
+                id=f"canonical_evidence:{week_label or 'unknown'}:{evidence_id}",
+                item_type="canonical_evidence",
+                week_label=week_label,
+                title=_clean_text(evidence.get("quote")) or _clean_text(evidence.get("evidence_role")) or f"Evidence item {index}",
+                summary=_clean_text(evidence.get("verification_status")) or None,
+                text=_join_text(
+                    evidence.get("quote"),
+                    evidence.get("verified_excerpt"),
+                    evidence.get("evidence_role"),
+                    evidence.get("evidence_tier"),
+                    evidence.get("polarity"),
+                    evidence.get("verification_status"),
+                ),
+                source_refs=[source_ref] if source_ref else [],
+                atom_ids=_list_values(evidence.get("atom_ids")),
+                confidence=None,
+                evidence_tier=_clean_text(evidence.get("evidence_tier")) or None,
+                verification_status=_clean_text(evidence.get("verification_status")) or None,
+                status=_clean_text(evidence.get("polarity")) or None,
+                created_at=generated_at,
+                updated_at=generated_at,
+            )
+        )
+    for index, claim in enumerate(_as_list(contract.get("claims")), start=1):
+        if not isinstance(claim, Mapping):
+            continue
+        claim_id = _clean_text(claim.get("id")) or f"claim-{index}"
+        evidence_refs = [
+            evidence_by_id[ref].get("source_observation_id")
+            for ref in [
+                *_string_values(claim.get("supporting_evidence_item_ids")),
+                *_string_values(claim.get("contradicting_evidence_item_ids")),
+            ]
+            if ref in evidence_by_id and evidence_by_id[ref].get("source_observation_id")
+        ]
+        result.append(
+            IntelligenceRetrievalItem(
+                id=f"canonical_claim:{week_label or 'unknown'}:{claim_id}",
+                item_type="canonical_claim",
+                week_label=week_label,
+                title=_clean_text(claim.get("statement")) or f"Canonical claim {index}",
+                summary=_join_text(*_string_values(claim.get("uncertainty_reasons"))) or None,
+                text=_join_text(
+                    claim.get("statement"),
+                    " ".join(_string_values(claim.get("uncertainty_reasons"))),
+                    claim.get("verification_state"),
+                    claim.get("wording_policy"),
+                    claim.get("next_verification_step"),
+                ),
+                source_refs=_unique(evidence_refs),
+                atom_ids=_list_values(claim.get("atom_ids")),
+                confidence=_float_or_none(claim.get("confidence_band")),
+                evidence_tier="decision_grade" if claim.get("decision_grade") is True else "insufficient_evidence",
+                verification_status=_clean_text(claim.get("verification_state")) or None,
+                status="decision_grade" if claim.get("decision_grade") is True else "insufficient_evidence",
+                created_at=generated_at,
+                updated_at=generated_at,
+            )
+        )
+    return result
 
 
 def _workbook_section_items(

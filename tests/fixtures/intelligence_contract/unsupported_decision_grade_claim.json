@@ -1,0 +1,42 @@
+{
+  "artifact_type": "contract_fixture",
+  "intelligence_contract": {
+    "contract_version": "tra-intelligence-contract.v1",
+    "schema_version": "tra-intelligence-contract.v1",
+    "week_label": "2026-W28",
+    "projection_boundaries": {
+      "canonical_state": "SQLite rows and versioned JSON sidecars",
+      "rendered_surfaces": ["html"],
+      "llm_prose": "derived_interpretation_not_source_of_truth",
+      "market_business_context": "context_only",
+      "no_feedback_semantics": "unknown"
+    },
+    "source_observations": [],
+    "evidence_items": [],
+    "claims": [
+      {
+        "id": "claim-unsupported",
+        "statement": "A broad summary sentence is treated as decision-grade.",
+        "scope": "practice",
+        "time_horizon": "medium",
+        "supporting_evidence_item_ids": [],
+        "contradicting_evidence_item_ids": [],
+        "source_observation_ids": [],
+        "source_independence": {"count": 0, "keys": []},
+        "confidence_band": "high",
+        "uncertainty_reasons": [],
+        "verification_state": "verified",
+        "decision_grade": true,
+        "insufficient_evidence": false,
+        "wording_policy": "source_bounded",
+        "next_verification_step": "None.",
+        "atom_ids": []
+      }
+    ],
+    "knowledge_atoms": [],
+    "idea_threads": [],
+    "decisions": [],
+    "experiments": [],
+    "outcomes": []
+  }
+}

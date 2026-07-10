@@ -8,6 +8,11 @@ from pathlib import Path
 from typing import Mapping
 
 from config.settings import PROJECT_ROOT, Settings
+from output.ai_report_contract import (
+    INTELLIGENCE_CONTRACT_VERSION,
+    RADAR_INTELLIGENCE_CONTRACT_VERSION,
+    build_canonical_intelligence_contract,
+)
 from output.ai_intelligence_report import (
     _all_atoms,
     _analysis_text,
@@ -185,6 +190,8 @@ def render_weekly_intelligence_brief_html(
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="intelligence-contract-version" content="{_escape(INTELLIGENCE_CONTRACT_VERSION)}">
+<meta name="radar-intelligence-contract-version" content="{_escape(RADAR_INTELLIGENCE_CONTRACT_VERSION)}">
 <title>Weekly Intelligence Brief { _escape(week_label) }</title>
 <style>
 :root {{ color-scheme: light; --ink:#17202a; --muted:#65717d; --line:#d8dee6; --panel:#ffffff; --bg:#f5f7f9; --accent:#1d4ed8; --ok:#166534; --warn:#92400e; }}
@@ -336,6 +343,10 @@ def _weekly_brief_metadata(
     threads = context.get("threads") or []
     atoms = _all_atoms(threads)
     learning_loop = _personal_learning_loop(threads, actions, context.get("feedback_context") or {})
+    intelligence_contract = build_canonical_intelligence_contract(
+        context,
+        mvp_radar=mvp_radar,
+    )
     sections = [
         {
             "id": section_id,
@@ -348,6 +359,8 @@ def _weekly_brief_metadata(
     ]
     return {
         "schema_version": "split_ai_report.v1",
+        "contract_version": INTELLIGENCE_CONTRACT_VERSION,
+        "radar_contract_version": RADAR_INTELLIGENCE_CONTRACT_VERSION,
         "artifact_type": "weekly_intelligence_brief",
         "week_label": context.get("week_label"),
         "generated_at": generated_at,
@@ -363,6 +376,7 @@ def _weekly_brief_metadata(
         "changed_thread_count": len(_changed_threads(threads)),
         "actions": actions,
         "personal_learning_loop": learning_loop,
+        "intelligence_contract": intelligence_contract,
         "mvp_radar": mvp_radar,
         "feedback_context": context.get("feedback_context") or {},
         "quality_findings": [finding.as_dict() for finding in quality_findings],

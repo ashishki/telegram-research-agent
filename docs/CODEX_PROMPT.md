@@ -1,434 +1,197 @@
-# CODEX_PROMPT — Session Handoff
-_v3.9 · 2026-07-09 · telegram-research-agent_
+# CODEX_PROMPT - Compact Session Handoff
 
----
+Version: 4.1
+Date: 2026-07-10
+State: PGI-001 implemented locally and verified; PGI-002 is next but should be
+started as a separate PR-sized slice
 
-## Current State
+## Current Product Direction
 
-- Memory unification and Roadmap v3 are complete.
-- Active strategic pivot: the project should become an AI Knowledge
-  Intelligence Desk. The main weekly artifact should be a human-readable HTML
-  intelligence report built from Telegram knowledge atoms and temporal idea
-  threads. MVP Radar and project recommendations remain downstream consumers,
-  not the center of the product. Obsidian is a generated human-facing knowledge
-  vault projection, not the runtime source of truth.
-- Current development state after the 2026-W28 artifact audit: KIR plumbing and
-  the Weekly AI Intelligence Workbook queue KIR-Q0..KIR-Q13 are implemented.
-  The next active roadmap is HPI: Hermes / Personal Intelligence Assistant /
-  Dogfood. End-to-end KIR context and the Russian final-HTML report requirement
-  live in `docs/ai_knowledge_intelligence_roadmap.md`.
-- Weekly AI Intelligence Workbook queue KIR-Q0..KIR-Q13 is implemented:
-  docs-first planning, Radar KIR provenance/gating, reaction and voice
-  feedback, feedback-driven ranking, workbook HTML, deep explanations,
-  diagrams, project implementation, MVP Radar section, Strategy Reviewer,
-  claim-card hardening, and bounded Obsidian projection.
-- HPI-0 is documented, and HPI-1..HPI-8 plus the first Hermes usability slice
-  are implemented. Hermes is a Telegram-facing bounded chat/concierge/router,
-  not source of truth. Plain text, `/chat`, `/hermes`, and `/ask` route through
-  intent classification and a read-only PI tool loop over curated intelligence
-  retrieval items, not raw Telegram RAG. Voice input uses OpenAI audio
-  transcription when `OPENAI_API_KEY` is configured, then routes as chat,
-  feedback, or reminder. Feedback still requires confirmation-gated
-  `/feedback_voice` / `/feedback_confirm`. Operator reminders are delivered as
-  one daily check-in with `сделал` / `не сделал` buttons. Strategy Reviewer
-  remains advisory. Four-week dogfood validates real convenience/usefulness
-  before adding complex features.
-- HPI-11, HPI-12, HPI-13, HPI-14, and HPI-9-lite are implemented. Telegram plain-text messages no longer
-  show MarkdownV2 backslash artifacts when `parse_mode=None`, `/help` starts
-  with normal private-assistant guidance, reminders parse/display/run in
-  `Asia/Tbilisi`, and feedback drafts use the Opus-class
-  `feedback_intake_strategist` path with deterministic fallback while memory
-  writes remain confirmation-gated. MVP Radar now receives a bounded
-  market/business analyst context pack from curated atoms/threads as context
-  only, with raw fallback for channels not yet extracted and gate audits for
-  empty or weak weeks. `ai-split-report` now emits separate Knowledge Atlas
-  and Weekly Intelligence Brief HTML/JSON artifacts from one curated context
-  load. HPI-9-lite adds a curated-only retrieval decision and prototype:
-  deterministic ranking plus transient SQLite FTS over filtered curated
-  `IntelligenceRetrievalItem` objects. Vector retrieval and raw Telegram RAG
-  remain deferred. Do not run a full-year archive pass yet.
-- The first 2026-W28 dogfood split run has been completed. It generated
-  `data/output/knowledge_atlas/2026-W28.knowledge-atlas.html` and
-  `data/output/weekly_intelligence_briefs/2026-W28.weekly-brief.html`, sent
-  both HTML files to the operator, and used the new MVP Radar JSON in the
-  Weekly Brief. Radar selected `Hotkey Dictation Workflow Probe` with
-  `dossier_status=investigate`, `recommendation=revisit_with_evidence_gap`,
-  and score 60. This is expected: the system has Telegram and market-context
-  signal, but lacks matched external validation evidence.
-- Active next engineering queue: RVE, Radar Validation Evidence Layer. This
-  should add candidate-specific validation queries, matched external evidence,
-  adapter status, and missing-evidence categories before any build/focused
-  recommendation can strengthen. It is validation evidence, not broad idea
-  generation.
-- RVE-0/RVE-7 are implemented. Demand-to-MVP Radar now documents the shared
-  validation evidence contract, emits deterministic candidate-specific
-  `validation_queries`, renders a Markdown Validation Query Pack, and writes
-  JSON contract slots for `matched_external_evidence`,
-  `decision_context.external_research_context`,
-  `missing_evidence_by_category`, and `validation_adapter_status`. It also
-  classifies matched external evidence for the selected candidate, renders a
-  Markdown Matched External Evidence section, and wires candidate source gates
-  through matched decision-grade external records only. Search/SERP validation
-  now runs through the existing source boundary with live/cache-only/dry-run
-  modes, credential-limited fallback, persisted SERP query provenance, and
-  query display for each matched item. Reddit/forum validation captures
-  complaint text, subreddit/forum, public URL, source-created date,
-  privacy-preserving author hash when available, score/comment metadata, and
-  query provenance; cache-only/dry-run modes bypass live credentials, missing
-  credentials and rate limits surface in `validation_adapter_status`, repeated
-  complaints and manual workaround mentions are classified separately, and
-  adjacent-pain forum evidence remains context-only. Competitor/workaround
-  crawler validation captures bounded landing/workaround pages with URL, title,
-  positioning, pricing hint, target ICP, page kind, and query provenance; live
-  crawling is limited by explicit URLs/domains/page counts,
-  competitor/integration pages support gates only when tied to the same
-  candidate and ICP, and irrelevant or hype-only pages remain visible as
-  negative evidence. X/Twitter corroboration is disabled by default,
-  cache-first/dry-run capable, surfaces missing credentials and rate limits,
-  hashes author IDs, classifies trend chatter as negative evidence, and renders
-  matched X evidence as lower-confidence non-gating corroboration. Radar now
-  emits a structured `decision_change_action` and renders `What Would Change
-  The Decision`; Telegram Research Agent preserves these fields in Weekly Brief
-  JSON/HTML, shows a compact MVP Radar Gate Card, labels market context as
-  context only/not proof, and includes the next validation query in the MVP
-  weekly operator message.
-- Operational incident on 2026-07-06: `telegram-digest.timer` had been inactive
-  since 2026-06-22, so weekly Research Brief/Implementation Ideas stopped
-  running while ingest and MVP weekly continued. The timer was manually
-  restarted and 2026-W28 artifacts were regenerated. On 2026-07-09 the
-  production weekly schedule was simplified: legacy digest/ingest/MVP/cleanup
-  and reminder timers were disabled, and `telegram-ai-split-report.timer` now
-  runs Monday at 09:00 Europe/Berlin. Its service refreshes ingestion and then
-  runs `ai-split-report --deliver --threads-limit 24 --atoms-limit 8`, sending
-  the Weekly Intelligence Brief and Knowledge Atlas HTML files to Telegram as
-  documents. Weekly delivery health checks now cover the split-report timer,
-  missing current-week split HTML files after the scheduled window, and
-  root-owned output files. SQLite usage logging is now a best-effort,
-  short-timeout autocommit insert that quietly skips under lock contention so
-  report generation is not delayed.
-- Recent shipped changes:
-  - Telegram reaction sync treats any visible personal source-post reaction as
-    `operator_marked_interesting` feedback plus an `interesting` tag; aggregate
-    reaction counts are not personal feedback.
-  - Implementation Ideas now send inline feedback cards and record decisions in `decision_journal`.
-  - Bot polling callback dispatch has an integration-style unit test around `bot.run_bot`.
-  - Implementation Ideas require concrete Telegram source-post links or render an insufficient-evidence note.
-  - Weekly Research Brief usefulness can be recorded through `log-usefulness` into `weekly_usefulness_logs`.
-  - Empty/low-signal digest health alerts are included in delivery notifications and trended in `score-stats` from Research Brief receipts.
-  - README and active docs are aligned with the current delivery/feedback behavior.
-  - Telegram Channel Intelligence design, schema migrations, deterministic repeated-claim extraction, canonical source-observation refresh, active-project intelligence links, narrative candidate refresh, inspection CLI, and optional Markdown report surface are captured in `docs/telegram_channel_intelligence.md`.
-  - Research Brief receipt schema, storage helpers, generation-time receipt creation, delivery ref updates, deterministic verification checks, CLI inspection, operator review, and optional operator-only audit notes are implemented via `research_brief_receipts`.
-  - `src/config/projects.yaml` has current project context for active repos.
-  - README/docs were cleaned; historical material moved under `docs/archive/`.
-  - Core schema compatibility tests, product-local Core boundary guards,
-    artifact-level feedback, monthly operator report, source down-rank
-    explanations, OPS validation surfaces, and the product split gate are
-    implemented.
-  - Deterministic report-quality gates now catch user-visible internal
-    `Matches: ...` traces, missing/buried summary structure, Study Plan/digest
-    contradictions, Project Insights contradictions, evidence/source-confidence
-    issues, and overlong unsummarized artifacts. Critical findings are logged
-    and included in Research Brief delivery notifications without blocking
-    delivery; `operator-report` surfaces monthly report-quality findings.
-  - Reader-facing Research Brief now starts with a deterministic Decision Brief,
-    Actions This Week, and early What Changed summary; Telegram notification
-    includes a compact post -> strong/watch/noise -> actions funnel.
-  - Artifact-level Telegram feedback buttons now attach to Research Brief,
-    Implementation Ideas, MVP weekly, and Study Plan delivery notifications and
-    record rows in `artifact_feedback_logs`.
-  - Research Brief delivery now adds a reader-facing `Evidence & Source Mix`
-    section and Telegram evidence line from local receipt evidence lookup,
-    source-link counts, top channels, fallback state, and deterministic
-    confidence wording.
-  - Demand-to-MVP Radar now rewrites contradictory LLM `mvp-of-week` Decision
-    Gate and Build-Worthy sections to deterministic gated truth; Markdown and
-    JSON agree on the final recommendation.
-  - Demand-to-MVP Radar now renders `mvp-of-week` as a Candidate Dossier with
-    canonical `dossier_status`, decision, confidence, next action, missing
-    evidence, next experiment, kill criteria, and explicit existing-project
-    context. Telegram Research Agent delivery can display the canonical status.
-  - Demand-to-MVP Radar now exposes selected-candidate source mix in Markdown
-    and JSON, including readiness, missing credentials, Reddit API vs
-    SERP-indexed Reddit status, and GitHub primary/repeated-variant role.
-    Telegram Research Agent delivery includes the readiness label.
-  - Demand-to-MVP Radar now has focused report-quality contract tests for the
-    Candidate Dossier top block, required sections, source-mix card, missing
-    evidence, kill criteria, existing-project context, and no contradictory
-    build-ready claims when gates fail.
-  - Weekly editorial memory now builds operator/system-authored
-    keep/change/demote/test-next-week notes from artifact feedback, usefulness
-    logs, report-quality findings, receipt health, and source down-rank
-    explanations via `memory inspect-editorial-memory`; monthly
-    `operator-report` summarizes weeks with editorial memory signals.
-  - Pathway-ready live source intelligence is implemented as an optional sidecar
-    contract: Telegram ingestion writes append-only source events, `live-source-index`
-    builds deterministic snapshots, and `mvp-weekly --with-live-source-index`
-    passes context-only live intelligence to Demand-to-MVP Radar.
-  - Market/business context lens has been hardened end to end. The 84-day
-    Opus-class baseline and 7-day delta are emitted as context-only
-    `market_analyst_context`; Demand-to-MVP Radar preserves `radar_role`,
-    `context_only`, and `build_ready_evidence`, excludes context-only records
-    from candidate ranking/source gates, and keeps the lens in
-    `decision_context.market_context`.
-  - The 2026-W28 MVP dogfood run selected `Hotkey Dictation Workflow Probe` as
-    investigate/revisit-with-evidence-gap, not build-ready. Missing evidence is
-    now explicit: fresh KIR thread, two independent external sources, WTP
-    signal, repeatable validation searches, and concrete manual workaround
-    examples.
-  - `health-check` now reports weekly delivery status for
-    `telegram-ai-split-report.timer`, current-week Weekly Brief / Knowledge
-    Atlas HTML presence after the scheduled Monday 09:00 Europe/Berlin window,
-    and root-owned `data/output` files; `scripts/healthcheck.sh` invokes this
-    Python health surface.
-  - `llm_usage` recording no longer waits behind SQLite write contention:
-    usage writes use a 50 ms busy timeout, autocommit, explicit connection
-    closing, and quiet lock skips.
-  - Knowledge Atom persistence is in place: `knowledge_extraction_batches`
-    and `knowledge_atoms` migrations plus `db.knowledge_atoms` helpers for
-    batch tracking, stable atom keys, source citations, confidence/novelty/
-    utility/relevance scores, and staleness status.
-  - `knowledge-extract --weeks N --model cheap` performs bounded batched
-    Knowledge Atom extraction from normalized posts with JSON validation,
-    idempotent completed-batch skips, failed-batch recording, source URL
-    derivation, and `memory inspect-knowledge-atoms`.
-  - `idea-threads` refreshes deterministic temporal Idea Threads from
-    Knowledge Atoms with 7/30/90 day momentum, source-channel counts,
-    active/stale/superseded/hype-only status handling, source-atom relations,
-    and `memory inspect-idea-threads` timeline inspection.
-  - `ai-intelligence-report` generates a standalone weekly HTML AI
-    Intelligence report from compressed Idea Thread / Knowledge Atom context,
-    writes a JSON sidecar, includes source map, appendix, read/try actions,
-    and blocks internal `Matches:` traces before writing invalid output.
-  - `ai-visual-report` generates the stakeholder-facing interactive
-    `AI Decision Intelligence` HTML artifact. It writes a JSON sidecar, starts
-    with a Decision Brief, puts top actions on the first screen, shows
-    conservative Project Implication leads only when evidence is specific enough,
-    renders the knowledge-flow diagram through Archify when `ARCHIFY_ROOT` or a
-    local skill install is available, falls back to a deterministic diagram when
-    it is not, and can send the HTML file to a Telegram chat/channel with
-    `--deliver --chat-id ...`.
-  - `obsidian-export` projects the same AI Intelligence layer into generated
-    Obsidian Markdown notes for weekly intelligence, idea threads,
-    tools/models, practices, channels, read queue, try/build, experiments,
-    project watch, feedback summary, and Strategy Reviewer with stable slugs,
-    frontmatter, generated markers, source references, HTML report section
-    links, scoped namespace support, and hand-authored note protection.
-  - AI Intelligence feedback is persisted via `ai_report_feedback_events`,
-    recorded with `log-ai-report-feedback`, inspected with
-    `memory inspect-ai-report-feedback`, and fed back into the next HTML report
-    as personalization context, missed-post eval examples, thread/atom
-    downranking, and a quality-gated personal learning loop with read/try/
-    experiment/skill-gap/reflection slots.
-  - MVP Radar, Implementation Ideas, and Project Insights now consume the
-    curated knowledge layer: Radar seeds can come from market/workflow
-    Knowledge Threads with source atom provenance, MVP weekly reports the
-    knowledge-thread seed context, Implementation Ideas gates stale
-    engineering/workflow threads before calling the LLM, and Project Insights
-    can use project-relevant Knowledge Threads instead of raw keyword-only
-    matches.
-  - 2026-W24 artifact review showed that internal signal quality improved but
-    reader-facing report quality is weak: no first-screen decision brief,
-    buried trend summary, visible internal `Matches: ...` traces, contradictions
-    between digest/study/project-insights outputs, and Radar gate contradiction.
-- The current report-quality, Radar handoff, cost, artifact consistency,
-  editorial memory, initial Pathway live-source-intelligence task queue,
-  KIR-Q0..KIR-Q13 queue and HPI-1..HPI-8 dogfood foundation are implemented.
-  Do not add random features. Start from the HPI queue in `docs/tasks.md`;
-  the next step is dogfood measurement, not HPI-9 vector retrieval.
-- VPS cognition vault:
-  `/srv/codex-entropy/repos/product-3/engineering-cognition-vault`; use it as
-  a downstream navigation layer, not as the source of truth. For AI source
-  intelligence, prefer a dedicated `ai-intelligence-vault` or a clearly scoped
-  generated namespace such as `_generated/ai-intelligence/`. Do not create one
-  note per Telegram post.
-- In this environment, `pytest` may be unavailable; verified fallback is `PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m unittest ...`.
-- Orchestrator-to-Codex execution path: write prompt to file, then `codex exec -s workspace-write < /tmp/prompt.md`
-
----
-
-## What Exists
-
-- Telegram ingestion, normalization, scoring, and topic assignment
-- project relevance, personalization, and weekly report generation
-- explicit feedback and tagging
-- operator-authored weekly usefulness logs
-- derived `channel_memory` and `project_context_snapshots`
-- `signal_evidence_items` and `decision_journal` tables (unified memory)
-- implementation-idea triage and rejection memory
-- implementation-idea evidence guard for missing/non-Telegram source-post URLs
-- scope-first retrieval helpers
-- autonomous signal discovery via preference judge (category + confidence gate)
-
----
-
-## Known Open Issues
-
-- Live validation still needed for Telegram reaction visibility through Telethon.
-- Live validation still needed for inline callback handling in the deployed bot process.
-- Low-signal weeks now produce alerts and `score-stats` reports recent empty/low-signal receipt trends.
-- June operator feedback is sparse: recent monthly report showed zero reaction
-  sync actions, zero weekly usefulness logs, and zero artifact feedback rows.
-  Low-friction artifact feedback buttons are now shipped; live operator use is
-  still needed before the system can learn taste from artifact-level feedback.
-- Weekly reports now have a reader-facing evidence/source-mix summary.
-  Deterministic quality gates still log/report the current failure examples
-  from `docs/report_quality_roadmap.md`.
-- Demand-to-MVP Radar final-gate contradictions, Candidate Dossier shape,
-  source-mix truth surface, and report-quality contract tests are fixed for
-  `mvp-of-week`.
-- Internal LLM cost guardrails now evaluate existing `llm_usage` rows without
-  new model calls. `cost-stats` and monthly `operator-report` show weekly
-  budget status, highest-cost category, spike warnings, and suggested actions.
-- Weekly artifact consistency validation now covers Study Plan vs Research
-  Brief signal counts, Project Insights vs Research Brief project section, MVP
-  delivery build-readiness contradictions, and monthly operator-report
-  consistency warnings.
-- Weekly editorial memory is now persisted as local operator/system-authored
-  Markdown sidecars under `data/output/editorial_memory/` when inspected
-  explicitly, and is summarized by monthly `operator-report`.
-- Pathway itself is not a required runtime dependency yet. The shipped boundary
-  is a Pathway-ready JSONL event stream plus deterministic fallback snapshot;
-  Radar treats the snapshot as context only, not decision-grade external
-  evidence.
-- Radar still needs candidate-specific external validation adapters. The next
-  task queue is RVE in `docs/tasks.md`: query planner, matched evidence
-  contract, search/SERP demand adapter, Reddit/forum complaints, competitor /
-  workaround crawler, and X/Twitter corroboration later. These adapters must
-  validate a selected candidate; they are not a replacement for evidence gates.
-- The implemented workbook roadmap is `docs/ai_intelligence_workbook_roadmap.md`,
-  with supporting context in `docs/ai_knowledge_intelligence_roadmap.md`.
-  Further work should start from RVE in `docs/tasks.md`, not from already
-  completed KIR-Q0..KIR-Q13 or HPI implementation items.
-
----
-
-## Active Architecture State
-
-The weekly pipeline now has:
-- project context snapshots (GitHub-derived)
-- channel memory
-- decision journal
-- evidence items
-- preference judge with generous inclusion policy
-
----
-
-## Exact Next Execution Step
-
-KIR-Q0..KIR-Q13 under `KIR-Q: AI Intelligence Quality / Workbook / Feedback /
-Radar Contract` are implemented. HPI has shipped the usable PI/Hermes dogfood
-foundation:
+`telegram-research-agent` is no longer a Telegram digest project. It is becoming
+a private Personal AI Decision & Learning Intelligence System:
 
 ```text
-HPI: Hermes / Personal Intelligence Assistant / Dogfood
+source observations -> evidence -> claims -> atoms -> threads ->
+Brief / Atlas / Hermes / Project Intelligence / Learning Intelligence ->
+decisions -> experiments -> outcomes -> feedback/evaluation
 ```
 
-HPI-0 documents the roadmap and dogfood plan. HPI-1 through HPI-9-lite plus the
-first usability slice have added the read-only facade, curated retrieval
-projection, transient SQLite FTS ranking, bounded PI tool catalog, Hermes
-Telegram concierge commands and bounded chat, confirmation-gated feedback,
-managed voice transcription with chat/feedback/reminder intent routing,
-operator reminders with done/not-done callbacks when enabled, Strategy Reviewer
-Telegram delivery, action status projection, compact dogfood review artifact
-helpers, market/business context lens, split Knowledge Atlas / Weekly
-Intelligence Brief artifacts, and the first W28 dogfood run.
-
-The exact next task is RVE: Radar Validation Evidence Layer:
+Canonical roadmap:
 
 ```text
-RVE: Radar Validation Evidence Layer
+docs/portfolio_grade_intelligence_roadmap.md
 ```
 
-Do this next:
-
-- start from `docs/tasks.md`, section `RVE: Radar Validation Evidence Layer`;
-- RVE-0/RVE-7 are complete; start with RVE-8 dogfood validation run next;
-- use the Weekly Brief and Radar validation surface to inspect validation
-  evidence;
-- keep market/business lens records `context_only`;
-- keep external results unable to affect gates unless matched to the selected
-  candidate;
-- after RVE-7, run a bounded dogfood validation pass and inspect the Brief/Radar
-  gate card;
-- keep every external adapter cache-first, dry-run capable, credentials-gated,
-  and failure-tolerant via `credential_limited` / `adapter_disabled` status.
-
-Candidate resources to wire later as adapters:
-
-- Source repository: `https://github.com/artwist-polyakov/polyakov-claude-skills`.
-- Marketplace hint from that repository:
-  `/plugin marketplace add artwist-polyakov/polyakov-claude-skills`.
-- Do not assume the skills are already installed; inspect/install/fetch only
-  the needed skill docs or plugin code, then wrap each source behind the RVE
-  adapter boundary.
-- `yandex-wordstat` for search demand and monthly dynamics;
-- `yandex-search-api` for Yandex Cloud Search API v2 SERP evidence;
-- `reddit-skill` for Reddit API posts/comments/search;
-- `crawl4ai-seo` for competitor, landing, pricing, and workaround crawling;
-- `x-research` for lower-priority X/Twitter corroboration through xAI/Grok.
-
-Do not implement raw Telegram firehose RAG. Do not run the annual/full archive
-pass yet. Do not implement assistant mutation tools. Do not let Telegram
-commands edit code/config/profile/projects or write feedback directly. Do not
-turn external adapters into broad idea mining. RVE must validate Radar
-candidates against external demand evidence and preserve existing gates.
-
-Open/future items outside completed Q0..Q13 remain:
+Canonical active backlog:
 
 ```text
-KIR-Q-008 - Regeneration And Manual Quality Eval
-  standard loop verified; forced frontier regeneration needs LLM_API_KEY or ANTHROPIC_API_KEY
-
-KIR-Q-009 - Referee, Thread Audit, Monthly Changed Beliefs
-  planned only after 3-4 stable weekly runs
+docs/tasks.md
 ```
 
-Do not start by prompt-tuning the old Research Brief. The strategic direction is:
+Next implementation task:
 
 ```text
-all Telegram posts -> knowledge atoms -> temporal idea threads ->
-Weekly AI Intelligence Workbook HTML -> generated Obsidian projection ->
-read / try / build / feedback loop -> Strategy Reviewer -> Codex-ready tasks
+PGI-002 - Operator Context, Feedback Provenance And Explainable Ranking
 ```
 
-The completed P0/P1/P2 implementation direction was:
+## Verified Baseline
+
+- Knowledge Atom storage/extraction exists and has focused tests.
+- Idea Thread storage/momentum exists and has focused tests.
+- Weekly AI visual report/workbook contract exists, but the workbook is now a
+  historical/legacy surface rather than the target main product surface.
+- Split Weekly Intelligence Brief and Knowledge Atlas artifacts exist, but they
+  are `partial` relative to the target decision cockpit and navigable Atlas.
+- Canonical intelligence sidecar contract `tra-intelligence-contract.v1` is now
+  implemented locally for workbook/Brief/Atlas projections with sanitized eval
+  fixtures.
+- Hermes/PI facade, tools, chat, and intent routing exist as a read-only,
+  bounded foundation; product dogfood/evals remain incomplete.
+- Feedback intake and action-status helpers exist; provenance, corrections,
+  effect windows, and ranking explanations remain incomplete.
+- Strategy Reviewer exists as advisory-only and must not mutate code/config.
+- Market/business context for Radar exists and is `context_only`.
+- Sibling `Demand-to-MVP-Radar` repo exists at
+  `/srv/openclaw-you/workspace/Demand-to-MVP-Radar`; RVE query planning,
+  matched external evidence, adapters, and gate tests are implemented there.
+  Live weekly validation still needs dogfood.
+- GitHub connector returned no open PRs or open issues for either repo on
+  2026-07-10.
+
+## Active Task Graph
+
+Primary sequence:
 
 ```text
-KIR-backed Radar contract first, then reaction/voice feedback, then workbook UI
+PGI-001 -> PGI-002 -> PGI-003 -> PGI-004 -> PGI-005 -> PGI-006 -> PGI-007 -> PGI-008
 ```
 
-The new HPI implementation direction is:
+Parallel Radar sequence:
 
 ```text
-facade first -> curated retrieval projection -> bounded tools -> Telegram
-concierge commands -> confirmation-gated voice feedback -> dogfood metrics
--> four-week product decision before optional vector retrieval
+RADAR-PGI-001 -> RADAR-PGI-002 -> RADAR-PGI-003
 ```
 
-The new RVE implementation direction is:
+Do not restart from KIR/HPI/RVE historical queues. Those are mapped in
+`docs/tasks.md`.
 
-```text
-candidate dossier -> validation query pack -> external adapters ->
-matched evidence contract -> source gates -> Weekly Brief/Radar gate card
+## PGI-001 Completion
+
+Status: completed locally on 2026-07-10.
+
+Implemented:
+
+- `tra-intelligence-contract.v1` constants, builder, and validator in
+  `src/output/ai_report_contract.py`.
+- Explicit SourceObservation, EvidenceItem, Claim, KnowledgeAtom, IdeaThread,
+  Decision, Experiment, Outcome, and projection-boundary fields in sidecars.
+- Weekly Brief and Knowledge Atlas sidecars now include `contract_version`,
+  `intelligence_contract`, and rendered HTML meta tags for contract parity.
+- Retrieval adds `canonical_claim` and `canonical_evidence` items while legacy
+  workbook readers remain compatible.
+- Hermes facade strong-signal fallback can read canonical claims when
+  `claim_cards` are absent.
+- Opportunity seeds and market context seed rows carry
+  `tra-radar-intelligence-contract.v1` plus
+  `intelligence_contract_version=tra-intelligence-contract.v1`.
+- Context-only Radar evidence remains unable to satisfy demand/build gates.
+- Sanitized fixtures were added under
+  `tests/fixtures/intelligence_contract/`.
+
+Files changed for PGI-001:
+
+- `src/output/ai_report_contract.py`
+- `src/output/weekly_intelligence_brief.py`
+- `src/output/knowledge_atlas_report.py`
+- `src/output/intelligence_retrieval_items.py`
+- `src/output/opportunity_seed_export.py`
+- `src/output/market_context_lens.py`
+- `src/assistant/pi_facade.py`
+- `tests/test_ai_report_contract.py`
+- `tests/test_split_intelligence_reports.py`
+- `tests/test_intelligence_retrieval_items.py`
+- `tests/test_opportunity_seed_export.py`
+- `tests/fixtures/intelligence_contract/`
+
+Verification passed:
+
+```bash
+PYTHONPATH=src python3 -m pytest tests/test_ai_report_contract.py tests/test_split_intelligence_reports.py tests/test_intelligence_retrieval_items.py tests/test_opportunity_seed_export.py
+PYTHONPATH=src python3 -m pytest tests/test_ai_visual_report.py tests/test_pi_facade.py tests/test_pi_tools.py
+git diff --check
 ```
 
-Reference documents:
+Review notes:
 
+- Correctness: unsupported decision-grade claims and context-only gate misuse
+  fail contract validation.
+- Provenance/evidence safety: decision-grade evidence requires source
+  observation refs, verified quote/excerpt, non-weak tier, and non-context-only
+  status.
+- Sidecar/rendered parity: Brief/Atlas HTML meta tags match sidecar contract
+  versions.
+- Backward compatibility: old workbook/split fixtures still read through legacy
+  readers; new canonical retrieval items are additive.
+- Privacy/secrets: fixtures are sanitized; no `.env`, secrets, private
+  generated reports, migrations, LLM runs, or full backfills were added.
+- Hermes/Radar: Hermes remains read-only; Radar context-only records still do
+  not satisfy demand gates.
+
+## PGI-002 Handoff
+
+Goal: add operator context, feedback provenance, and explainable ranking without
+weakening the PGI-001 evidence contract.
+
+Likely files:
+
+- `src/db/ai_report_feedback.py`
+- `src/output/personalize.py`
+- `src/output/ai_intelligence_report.py`
+- `src/output/weekly_intelligence_brief.py`
+- `src/assistant/pi_facade.py`
+- `tests/test_ai_report_feedback.py`
+- `tests/test_ai_intelligence_report.py`
+- `tests/test_pi_facade.py`
+
+Verification target:
+
+```bash
+PYTHONPATH=src python3 -m pytest tests/test_ai_report_feedback.py tests/test_ai_intelligence_report.py tests/test_pi_facade.py tests/test_action_status.py
+```
+
+Stop before PGI-002 implementation if the slice requires a DB migration plus
+renderer/ranking/Hermes changes in one pass; split it into append-only feedback
+provenance first.
+
+## Non-Negotiable Rules
+
+- Do not run full archive backfill unless a task explicitly scopes it.
+- Do not run expensive LLM jobs for ordinary verification.
+- Do not implement raw Telegram firehose RAG by default.
+- Do not add assistant mutation tools.
+- Do not let Hermes run Codex or edit YAML/profile/projects/scoring.
+- Do not treat no feedback as negative.
+- Do not treat market/business Telegram context as external demand evidence.
+- Do not hide Radar missing/stale/evidence-gap states.
+- Do not commit private generated reports, raw exports, secrets, or `.env`.
+
+## Key Docs
+
+- `docs/portfolio_grade_intelligence_roadmap.md`
 - `docs/tasks.md`
+- `docs/intelligence_evaluation_framework.md`
+- `docs/portfolio_evidence_plan.md`
+- `docs/mvp_radar_integration_contract.md`
+- `docs/operator_ai_systems_learning_roadmap.md`
+- `docs/operator_workflow.md`
 - `docs/hermes_pi_assistant_roadmap.md`
-- `docs/dogfood_4_week_plan.md`
-- `docs/next_development_roadmap.md`
-- `docs/report_quality_roadmap.md`
 - `docs/ai_knowledge_intelligence_roadmap.md`
 - `docs/ai_intelligence_workbook_roadmap.md`
 - `docs/mvp_weekly_radar.md`
-- `docs/COGNITION_MANIFEST.md`
-- `docs/VPS_COGNITION_VAULT.md`
-- `docs/IMPLEMENTATION_CONTRACT.md`
-- `docs/architecture.md`
 
-Radar cross-repo path for RADAR tasks:
+## Current Repository Caveat
 
-```text
-/srv/openclaw-you/workspace/Demand-to-MVP-Radar
-```
+`docs/artifacts/ai-decision-intelligence-2026-W28/manual-quality-eval-2026-07-07.md`
+is untracked in the working tree at the time of this handoff. Treat it as
+operator/private review material unless the operator explicitly asks to commit
+or sanitize it.
