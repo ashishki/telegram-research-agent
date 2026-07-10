@@ -1,6 +1,7 @@
 import json
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 
 from assistant.pi_facade import PersonalIntelligenceFacade
@@ -92,6 +93,22 @@ class TestPITools(unittest.TestCase):
             encoding="utf-8",
         )
 
+    def _write_split_artifacts(self, root: Path) -> None:
+        brief_dir = root / "weekly_intelligence_briefs"
+        atlas_dir = root / "knowledge_atlas"
+        brief_dir.mkdir(parents=True)
+        atlas_dir.mkdir(parents=True)
+        (brief_dir / "2026-W28.weekly-brief.html").write_text("<!doctype html><title>Brief</title>", encoding="utf-8")
+        (atlas_dir / "2026-W28.knowledge-atlas.html").write_text("<!doctype html><title>Atlas</title>", encoding="utf-8")
+        (brief_dir / "2026-W28.weekly-brief.json").write_text(
+            json.dumps({"week_label": "2026-W28", "generated_at": "2026-07-08T00:00:00Z"}),
+            encoding="utf-8",
+        )
+        (atlas_dir / "2026-W28.knowledge-atlas.json").write_text(
+            json.dumps({"week_label": "2026-W28", "generated_at": "2026-07-08T00:00:00Z"}),
+            encoding="utf-8",
+        )
+
     def _facade(self, root: Path) -> PersonalIntelligenceFacade:
         return PersonalIntelligenceFacade(settings=self._settings(root), output_root=root)
 
@@ -110,6 +127,7 @@ class TestPITools(unittest.TestCase):
 
         self.assertTrue(descriptors)
         self.assertIn("get_weekly_summary", {item["name"] for item in descriptors})
+        self.assertIn("get_artifact_status", {item["name"] for item in descriptors})
         self.assertTrue(all("handler" not in item for item in descriptors))
         self.assertTrue(all(item["read_only"] is True for item in descriptors))
 
@@ -129,6 +147,29 @@ class TestPITools(unittest.TestCase):
         self.assertEqual(result["evidence_status"], "available")
         self.assertIn("artifact_paths", result["evidence"])
         self.assertEqual(result["result"]["week_label"], "2026-W28")
+
+    def test_artifact_status_tool_reports_split_artifacts_and_missing_radar(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_split_artifacts(root)
+            facade = PersonalIntelligenceFacade(
+                settings=self._settings(root),
+                output_root=root,
+                now=datetime(2026, 7, 8, tzinfo=timezone.utc),
+            )
+            result = call_pi_tool(
+                "get_artifact_status",
+                {"week_label": "2026-W28"},
+                facade=facade,
+            )
+
+        self.assertEqual(result["status"], "partial")
+        self.assertEqual(result["evidence_status"], "available")
+        self.assertEqual(result["result"]["weekly_brief"]["status"], "current")
+        self.assertEqual(result["result"]["knowledge_atlas"]["status"], "current")
+        self.assertEqual(result["result"]["mvp_radar"]["status"], "missing")
+        self.assertEqual(result["result"]["mvp_radar_gate"]["decision"], "do_not_build")
+        self.assertIn("weekly_intelligence_brief_json", result["evidence"]["artifact_paths"])
 
     def test_missing_data_returns_insufficient_not_crash(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -173,8 +173,9 @@ def render_weekly_intelligence_brief_html(
     generated = generated_at or _utc_now_iso()
     actions = _learning_actions(context.get("threads") or [], context.get("feedback_context") or {})
     normalized_mvp = _normalize_mvp_radar(mvp_radar or {})
+    decision_cockpit = _decision_cockpit(context, actions, normalized_mvp)
     section_bodies = {
-        "brief-decision": _render_decision_snapshot(context, actions, normalized_mvp),
+        "brief-decision": _render_decision_snapshot(decision_cockpit),
         "brief-changes": _render_week_changes(context),
         "brief-actions": _render_brief_actions(context, actions),
         "brief-mvp-radar": _render_mvp_radar(normalized_mvp),
@@ -213,6 +214,9 @@ section {{ background:var(--panel); border:1px solid var(--line); border-radius:
 .decision-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; margin:0 0 14px; }}
 .decision-card, .brief-card {{ border:1px solid var(--line); border-radius:8px; padding:12px; background:#fbfcfd; }}
 .decision-value {{ display:block; font-size:23px; font-weight:700; }}
+.cockpit-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:10px; margin-top:12px; }}
+.cockpit-panel {{ border:1px solid var(--line); border-radius:8px; padding:12px; background:#fbfcfd; }}
+.cockpit-panel ul, .cockpit-panel ol {{ margin:8px 0 0; }}
 .tag {{ display:inline-block; border:1px solid #bdd2ff; background:#eff6ff; color:#1d4ed8; border-radius:999px; padding:2px 8px; font-size:12px; font-weight:700; }}
 .status-investigate {{ color:var(--warn); }}
 .status-build {{ color:var(--ok); }}
@@ -347,6 +351,7 @@ def _weekly_brief_metadata(
         context,
         mvp_radar=mvp_radar,
     )
+    decision_cockpit = _decision_cockpit(context, actions, mvp_radar)
     sections = [
         {
             "id": section_id,
@@ -376,28 +381,271 @@ def _weekly_brief_metadata(
         "changed_thread_count": len(_changed_threads(threads)),
         "actions": actions,
         "personal_learning_loop": learning_loop,
+        "decision_cockpit": decision_cockpit,
         "intelligence_contract": intelligence_contract,
         "mvp_radar": mvp_radar,
+        "mvp_radar_gate": decision_cockpit["mvp_radar_gate"],
         "feedback_context": context.get("feedback_context") or {},
         "quality_findings": [finding.as_dict() for finding in quality_findings],
         "retrieval_note": "Weekly Intelligence Brief is the short operational weekly surface; Knowledge Atlas owns cumulative context.",
     }
 
 
-def _render_decision_snapshot(context: dict, actions: list[dict], mvp_radar: Mapping[str, object]) -> str:
+def _decision_cockpit(context: dict, actions: list[dict], mvp_radar: Mapping[str, object]) -> dict:
     threads = context.get("threads") or []
     changed = _changed_threads(threads)
-    mvp_status = str(mvp_radar.get("dossier_status") or mvp_radar.get("recommendation") or mvp_radar.get("status") or "unknown")
-    decision_class = "status-build" if mvp_status in {"build", "focused_experiment"} else "status-investigate"
+    atoms = _all_atoms(threads)
+    gate = _mvp_gate_card(mvp_radar)
+    feedback = context.get("feedback_context") or {}
+    learning_loop = _personal_learning_loop(threads, actions, feedback)
+    canonical_claim_count = len(
+        [
+            claim
+            for claim in (build_canonical_intelligence_contract(context, mvp_radar=mvp_radar).get("claims") or [])
+            if isinstance(claim, Mapping)
+        ]
+    )
+    top_changes = _top_personal_changes(context, changed)
+    what_to_do = _cockpit_actions(actions)
+    ignore_defer = _cockpit_defer_items(mvp_radar, gate, changed)
+    project_impact = _cockpit_project_impact(context, actions)
+    return {
+        "decision_snapshot": {
+            "week_label": context.get("week_label"),
+            "changed_thread_count": len(changed),
+            "operator_action_count": len(actions),
+            "mvp_gate_decision": gate["decision"],
+            "brief_scope": "short_operational_surface",
+        },
+        "top_personal_changes": top_changes,
+        "evidence_trust_summary": {
+            "source_atom_count": len(atoms),
+            "canonical_claim_count": canonical_claim_count,
+            "feedback_state": _feedback_state(feedback),
+            "matched_external_gate_evidence_count": gate["matched_gate_evidence_count"],
+            "market_context_status": gate["market_context_status"],
+            "summary": (
+                f"{len(atoms)} source atom(s), {canonical_claim_count} canonical claim(s), "
+                f"{gate['matched_gate_evidence_count']} matched external gate evidence item(s). "
+                "Market/business context remains context_only."
+            ),
+        },
+        "what_to_do": what_to_do,
+        "ignore_defer": ignore_defer,
+        "project_impact": project_impact,
+        "mvp_radar_gate": gate,
+        "exact_feedback_targets": _cockpit_feedback_targets(actions, learning_loop, feedback),
+    }
+
+
+def _top_personal_changes(context: dict, changed_threads: list[dict]) -> list[dict]:
+    analysis = context.get("frontier_analysis") or {}
+    changes = analysis.get("what_changed") or []
+    result = []
+    for item in changes[:3]:
+        title = _analysis_text(item, "title", "change", "topic") or "Change"
+        result.append(
+            {
+                "title": title,
+                "summary": _truncate_text(_analysis_text(item, "summary", "why_it_matters", "reason") or "", 180),
+                "source": "frontier_analysis",
+            }
+        )
+    for thread in changed_threads:
+        if len(result) >= 3:
+            break
+        result.append(
+            {
+                "title": str(thread.get("title") or thread.get("slug") or "Untitled thread"),
+                "summary": _truncate_text(thread.get("summary") or "", 180),
+                "source": "idea_thread",
+            }
+        )
+    return result
+
+
+def _cockpit_actions(actions: list[dict]) -> list[dict]:
+    return [
+        {
+            "feedback_target_id": _feedback_target_id("action", index, action.get("title")),
+            "title": action.get("title") or "Action",
+            "summary": action.get("body") or action.get("claim") or "",
+            "why_selected": action.get("why_selected") or "",
+        }
+        for index, action in enumerate(actions[:3], start=1)
+    ]
+
+
+def _cockpit_defer_items(
+    mvp_radar: Mapping[str, object],
+    gate: Mapping[str, object],
+    changed_threads: list[dict],
+) -> list[dict]:
+    items = []
+    if gate.get("decision") == "do_not_build":
+        items.append(
+            {
+                "title": "MVP build/focused decision",
+                "summary": gate.get("warning") or gate.get("external_context_note") or "Wait for matched external evidence.",
+            }
+        )
+    for missing in _string_values(mvp_radar.get("missing_evidence"))[:2]:
+        items.append({"title": "Missing Radar evidence", "summary": missing})
+    for thread in changed_threads:
+        if len(items) >= 3:
+            break
+        if thread.get("status") in {"hype_only", "resolved"}:
+            items.append(
+                {
+                    "title": str(thread.get("title") or thread.get("slug") or "Thread"),
+                    "summary": f"Defer because status is {thread.get('status')}.",
+                }
+            )
+    return items[:3]
+
+
+def _cockpit_project_impact(context: dict, actions: list[dict]) -> list[dict]:
+    feedback = context.get("feedback_context") or {}
+    result = []
+    if int((feedback.get("counts_by_feedback") or {}).get("applied_to_project") or 0) > 0:
+        result.append(
+            {
+                "title": "Confirmed project application",
+                "summary": "At least one prior item was confirmed as applied_to_project; preserve source-backed ranking.",
+            }
+        )
+    for action in actions[:2]:
+        result.append(
+            {
+                "title": action.get("title") or "Project impact",
+                "summary": action.get("body") or "Apply only after source verification.",
+            }
+        )
+    if not result:
+        result.append({"title": "Project impact", "summary": "No project-specific impact is visible in the Brief sidecar."})
+    return result[:3]
+
+
+def _cockpit_feedback_targets(actions: list[dict], learning_loop: Mapping[str, object], feedback: Mapping[str, object]) -> list[dict]:
+    targets = []
+    for index, action in enumerate(actions[:3], start=1):
+        targets.append(
+            {
+                "id": _feedback_target_id("action", index, action.get("title")),
+                "target_type": "brief_action",
+                "target_ref": action.get("title") or f"action-{index}",
+                "prompt": "Did this action change a project decision?",
+                "event_options": ["applied_to_project", "tried", "wrong_priority"],
+            }
+        )
+    for index, item in enumerate((learning_loop.get("read_items") or [])[:2], start=1):
+        targets.append(
+            {
+                "id": _feedback_target_id("read", index, item.get("claim")),
+                "target_type": "read_item",
+                "target_ref": item.get("source_url") or item.get("claim") or f"read-{index}",
+                "prompt": "Did you actually open this read item?",
+                "event_options": ["read", "useful", "not_interested"],
+            }
+        )
+    missing = _string_values(_first_mapping(feedback.get("feedback_completion")).get("missing"))
+    for index, prompt in enumerate(missing[:2], start=1):
+        targets.append(
+            {
+                "id": _feedback_target_id("missing-feedback", index, prompt),
+                "target_type": "feedback_gap",
+                "target_ref": prompt,
+                "prompt": f"Close missing feedback: {prompt}",
+                "event_options": ["useful", "wrong_priority", "not_interested"],
+            }
+        )
+    return targets[:6]
+
+
+def _feedback_target_id(prefix: str, index: int, value: object) -> str:
+    return f"{prefix}-{index}-{_slug_fragment(value)}"
+
+
+def _slug_fragment(value: object) -> str:
+    text = "".join(ch.lower() if ch.isascii() and ch.isalnum() else "-" for ch in str(value or "target"))
+    parts = [part for part in text.split("-") if part]
+    return "-".join(parts[:6]) or "target"
+
+
+def _feedback_state(feedback: Mapping[str, object]) -> str:
+    if int(feedback.get("event_count") or 0) > 0:
+        return "confirmed_feedback_available"
+    return "unknown_no_feedback"
+
+
+def _render_decision_snapshot(cockpit: Mapping[str, object]) -> str:
+    snapshot = _first_mapping(cockpit.get("decision_snapshot"))
+    evidence = _first_mapping(cockpit.get("evidence_trust_summary"))
+    mvp_gate = _first_mapping(cockpit.get("mvp_radar_gate"))
+    mvp_status = str(snapshot.get("mvp_gate_decision") or "unknown")
+    decision_class = "status-build" if mvp_status in {"focused_experiment_allowed"} else "status-investigate"
+    personal_changes = _render_compact_items(cockpit.get("top_personal_changes"), "No personal changes surfaced.")
+    what_to_do = _render_compact_items(cockpit.get("what_to_do"), "No operator actions surfaced.")
+    ignore_defer = _render_compact_items(cockpit.get("ignore_defer"), "No explicit defer item surfaced.")
+    project_impact = _render_compact_items(cockpit.get("project_impact"), "No project impact surfaced.")
+    feedback_targets = _render_feedback_targets(cockpit.get("exact_feedback_targets"))
     return (
         '<div class="decision-grid">'
-        f'<div class="decision-card"><span class="decision-value">{_escape(len(changed))}</span><span class="muted">changed threads</span></div>'
-        f'<div class="decision-card"><span class="decision-value">{_escape(len(actions))}</span><span class="muted">operator actions</span></div>'
-        f'<div class="decision-card"><span class="decision-value {decision_class}">{_escape(mvp_status)}</span><span class="muted">MVP Radar status</span></div>'
-        f'<div class="decision-card"><span class="decision-value">{_escape(len(_all_atoms(threads)))}</span><span class="muted">source atoms in brief context</span></div>'
+        f'<div class="decision-card"><span class="decision-value">{_escape(str(snapshot.get("changed_thread_count", 0)))}</span><span class="muted">changed threads</span></div>'
+        f'<div class="decision-card"><span class="decision-value">{_escape(str(snapshot.get("operator_action_count", 0)))}</span><span class="muted">operator actions</span></div>'
+        f'<div class="decision-card"><span class="decision-value {decision_class}">{_escape(mvp_status)}</span><span class="muted">MVP Radar gate</span></div>'
+        f'<div class="decision-card"><span class="decision-value">{_escape(str(evidence.get("source_atom_count", 0)))}</span><span class="muted">source atoms in brief context</span></div>'
         "</div>"
-        "<p>Read this first for this week's decisions. Use Knowledge Atlas only when you need trend history or source contribution.</p>"
+        '<div class="cockpit-grid">'
+        '<div class="cockpit-panel"><h3>Top Personal Changes</h3>'
+        f"{personal_changes}</div>"
+        '<div class="cockpit-panel"><h3>Evidence / Trust</h3>'
+        f'<p>{_escape(evidence.get("summary") or "")}</p>'
+        f'<p class="muted">Matched external gate evidence: {_escape(str(mvp_gate.get("matched_gate_evidence_count", 0)))}; market context: {_escape(mvp_gate.get("market_context_status") or "context_only")}.</p>'
+        "</div>"
+        '<div class="cockpit-panel"><h3>What To Do</h3>'
+        f"{what_to_do}</div>"
+        '<div class="cockpit-panel"><h3>Ignore / Defer</h3>'
+        f"{ignore_defer}</div>"
+        '<div class="cockpit-panel"><h3>Project Impact</h3>'
+        f"{project_impact}</div>"
+        '<div class="cockpit-panel"><h3>MVP Radar Gate</h3>'
+        f'<p><b>{_escape(mvp_gate.get("decision_label") or "Do not build yet.")}</b></p>'
+        f'<p class="muted">{_escape(mvp_gate.get("warning") or mvp_gate.get("external_context_note") or "")}</p>'
+        "</div>"
+        '<div class="cockpit-panel"><h3>Exact Feedback Targets</h3>'
+        f"{feedback_targets}</div>"
+        "</div>"
+        "<p class=\"muted\">Read this first for this week's decisions. Use Knowledge Atlas only when you need trend history or source contribution.</p>"
     )
+
+
+def _render_compact_items(value: object, empty_text: str) -> str:
+    rows = [item for item in value or [] if isinstance(item, Mapping)] if isinstance(value, list) else []
+    if not rows:
+        return f"<p>{_escape(empty_text)}</p>"
+    items = []
+    for row in rows[:3]:
+        title = str(row.get("title") or row.get("target_ref") or "Item")
+        summary = str(row.get("summary") or row.get("why_selected") or row.get("prompt") or "")
+        detail = f"<p class=\"muted\">{_escape(summary)}</p>" if summary else ""
+        items.append(f"<li><b>{_escape(title)}</b>{detail}</li>")
+    return "<ol>" + "".join(items) + "</ol>"
+
+
+def _render_feedback_targets(value: object) -> str:
+    rows = [item for item in value or [] if isinstance(item, Mapping)] if isinstance(value, list) else []
+    if not rows:
+        return "<p>No exact feedback targets surfaced.</p>"
+    items = []
+    for row in rows[:5]:
+        items.append(
+            "<li>"
+            f"<code>{_escape(row.get('id') or '')}</code>: {_escape(row.get('prompt') or '')}"
+            f'<p class="muted">{_escape(row.get("target_type") or "")} - {_escape(row.get("target_ref") or "")}</p>'
+            "</li>"
+        )
+    return "<ul>" + "".join(items) + "</ul>"
 
 
 def _render_week_changes(context: dict) -> str:
@@ -463,14 +711,15 @@ def _render_brief_actions(context: dict, actions: list[dict]) -> str:
 def _render_mvp_radar(mvp_radar: Mapping[str, object]) -> str:
     candidate = str(mvp_radar.get("selected_candidate") or "No candidate selected")
     recommendation = str(mvp_radar.get("recommendation") or mvp_radar.get("dossier_status") or "needs_more_evidence")
-    decision = "Do not build yet." if recommendation in NON_BUILD_READY_RECOMMENDATIONS else "Focused experiment may be allowed."
     missing = "".join(f"<li>{_escape(item)}</li>" for item in _string_values(mvp_radar.get("missing_evidence"))[:5])
     summary = _mvp_validation_summary(mvp_radar)
+    decision = str(summary["decision_label"])
     missing_checklist = _render_missing_evidence_checklist(mvp_radar)
     if not missing_checklist:
         missing_checklist = f'<ul class="missing-list">{missing or "<li>No missing evidence listed.</li>"}</ul>'
     source_path = str(mvp_radar.get("source_path") or "")
-    source_link = f'<p class="sources">{_link(source_path, "MVP Radar JSON")}</p>' if source_path else ""
+    radar_status = str(mvp_radar.get("status") or "")
+    source_link = f'<p class="sources">{_link(source_path, "MVP Radar JSON")}</p>' if source_path and radar_status != "not_available" else ""
     return (
         '<article class="brief-card">'
         f'<h3>{_escape(candidate)}</h3>'
@@ -485,7 +734,7 @@ def _render_mvp_radar(mvp_radar: Mapping[str, object]) -> str:
         '</div>'
         '<div class="mvp-gate-panel">'
         f'<p><b>Adapter status:</b> {_escape(summary["adapter_status"])}</p>'
-        '<p class="muted">Market context: context only, not proof.</p>'
+        f'<p class="muted">Market context: context only, not proof. Status: {_escape(summary["market_context_status"])}.</p>'
         '</div>'
         '</div>'
         f'{_render_validation_query_pack(mvp_radar, summary)}'
@@ -606,6 +855,27 @@ def _object_list(value: object) -> list[dict]:
     return [dict(item) for item in value if isinstance(item, Mapping)]
 
 
+def _mvp_gate_card(mvp_radar: Mapping[str, object]) -> dict:
+    summary = _mvp_validation_summary(mvp_radar)
+    return {
+        "decision": summary["decision"],
+        "decision_label": summary["decision_label"],
+        "candidate": mvp_radar.get("selected_candidate"),
+        "recommendation": mvp_radar.get("recommendation") or mvp_radar.get("dossier_status"),
+        "radar_artifact_status": summary["radar_artifact_status"],
+        "matched_gate_evidence_count": summary["matched_gate_count"],
+        "matched_external_evidence_count": summary["matched_external_evidence_count"],
+        "matched_external_source_types": summary["matched_gate_source_types"],
+        "market_context_status": summary["market_context_status"],
+        "context_only_can_satisfy_gate": False,
+        "matched_external_evidence_required": True,
+        "external_context_note": summary["external_context_note"],
+        "warning": summary["warning"],
+        "next_query": summary["next_query"],
+        "adapter_status": summary["adapter_status"],
+    }
+
+
 def _mvp_validation_summary(mvp_radar: Mapping[str, object]) -> dict[str, object]:
     matches = _object_list(mvp_radar.get("matched_external_evidence"))
     gate_matches = [
@@ -621,19 +891,39 @@ def _mvp_validation_summary(mvp_radar: Mapping[str, object]) -> dict[str, object
         }
     )
     decision_context = _first_mapping(mvp_radar.get("decision_context"))
+    market_context = _first_mapping(decision_context.get("market_context"))
     external_context = _first_mapping(decision_context.get("external_research_context"))
     unmatched_count = _safe_int(external_context.get("record_count")) if external_context else 0
     adapter_status = _adapter_status_summary(_first_mapping(mvp_radar.get("validation_adapter_status")))
     next_query = _next_validation_query(mvp_radar)
+    recommendation = str(mvp_radar.get("recommendation") or mvp_radar.get("dossier_status") or "needs_more_evidence")
+    radar_status = str(mvp_radar.get("status") or "").strip()
+    artifact_missing = radar_status in {"not_available", "missing"}
+    gate_allows_focus = bool(gate_matches) and recommendation not in NON_BUILD_READY_RECOMMENDATIONS and not artifact_missing
+    decision = "focused_experiment_allowed" if gate_allows_focus else "do_not_build"
+    decision_label = "Focused experiment may be allowed." if gate_allows_focus else "Do not build yet."
     if gate_matches:
         context_note = "Matched decision-grade external evidence is allowed to affect Radar gates."
     elif unmatched_count:
         context_note = f"{unmatched_count} external context record(s) were unmatched and do not satisfy gates."
     else:
         context_note = "No matched external validation evidence found; run the next repeatable search."
+    if artifact_missing:
+        warning = "MVP Radar artifact is missing; Brief/Atlas continue, but no build/focused decision is allowed."
+    elif not gate_matches:
+        warning = "Build/focused decisions require matched external evidence; market/business context stays context_only."
+    else:
+        warning = "Gate has matched external evidence; still verify candidate scope before action."
     return {
         "matched_gate_count": len(gate_matches),
         "matched_source_types": ", ".join(source_types) or "types: none",
+        "matched_gate_source_types": source_types,
+        "matched_external_evidence_count": len(matches),
+        "market_context_status": str(market_context.get("status") or "context_only"),
+        "radar_artifact_status": "missing" if artifact_missing else "loaded",
+        "decision": decision,
+        "decision_label": decision_label,
+        "warning": warning,
         "adapter_status": adapter_status,
         "external_context_note": context_note,
         "next_query": str(next_query.get("query") or ""),

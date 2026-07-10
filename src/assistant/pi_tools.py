@@ -72,6 +72,12 @@ def build_pi_tool_catalog() -> dict[str, PITool]:
             input_schema=_schema({"week_label": {"type": ["string", "null"]}}),
             handler=lambda facade, args: facade.get_workbook_summary(_optional_string(args.get("week_label"))),
         ),
+        "get_artifact_status": PITool(
+            name="get_artifact_status",
+            description=PI_TOOL_DESCRIPTIONS["get_artifact_status"],
+            input_schema=_schema({"week_label": {"type": ["string", "null"]}}),
+            handler=lambda facade, args: facade.get_artifact_status(_optional_string(args.get("week_label"))),
+        ),
         "get_workbook_sections": PITool(
             name="get_workbook_sections",
             description=PI_TOOL_DESCRIPTIONS["get_workbook_sections"],

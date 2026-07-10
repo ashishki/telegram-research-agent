@@ -886,6 +886,24 @@ def _normalize_mvp_payload(payload: Mapping[str, Any], path: Path) -> dict:
         "missing_evidence": missing,
         "next_validation": next_validation,
         "kill_criteria": kill,
+        "validation_queries": _first_dict(selected.get("validation_queries"), payload.get("validation_queries"), result.get("validation_queries")),
+        "matched_external_evidence": _mapping_list(
+            selected.get("matched_external_evidence")
+            or payload.get("matched_external_evidence")
+            or result.get("matched_external_evidence")
+        ),
+        "missing_evidence_by_category": _first_dict(
+            selected.get("missing_evidence_by_category"),
+            payload.get("missing_evidence_by_category"),
+            result.get("missing_evidence_by_category"),
+        ),
+        "validation_adapter_status": _first_dict(payload.get("validation_adapter_status"), result.get("validation_adapter_status")),
+        "decision_context": _first_dict(payload.get("decision_context"), result.get("decision_context")),
+        "decision_change_action": _first_dict(
+            selected.get("decision_change_action"),
+            payload.get("decision_change_action"),
+            result.get("decision_change_action"),
+        ),
     }
 
 
@@ -1153,6 +1171,12 @@ def _first_dict(*values: object) -> dict:
         if isinstance(value, Mapping):
             return dict(value)
     return {}
+
+
+def _mapping_list(value: object) -> list[dict]:
+    if not isinstance(value, (list, tuple)):
+        return []
+    return [dict(item) for item in value if isinstance(item, Mapping)]
 
 
 def _as_list(value: object) -> list:

@@ -229,6 +229,11 @@ class TestSplitIntelligenceReports(unittest.TestCase):
             self.assertTrue(brief_json["actions"][0]["why_selected"])
             self.assertTrue(brief_json["personal_learning_loop"]["read_items"][0]["ranking_factors"])
             self.assertTrue(brief_json["personal_learning_loop"]["read_items"][0]["why_selected"])
+            self.assertIn("decision_cockpit", brief_json)
+            self.assertEqual(brief_json["decision_cockpit"]["mvp_radar_gate"]["decision"], "do_not_build")
+            self.assertEqual(brief_json["mvp_radar_gate"]["matched_gate_evidence_count"], 0)
+            self.assertFalse(brief_json["mvp_radar_gate"]["context_only_can_satisfy_gate"])
+            self.assertTrue(brief_json["decision_cockpit"]["exact_feedback_targets"])
             self.assertEqual(
                 atlas_json["intelligence_contract"]["contract_version"],
                 INTELLIGENCE_CONTRACT_VERSION,
@@ -256,6 +261,13 @@ class TestSplitIntelligenceReports(unittest.TestCase):
                 summary.knowledge_atlas.json_path,
             )
             self.assertEqual(brief_json["mvp_radar"]["selected_candidate"], "Agent Eval Gate Scanner")
+            self.assertIn("Top Personal Changes", brief_html)
+            self.assertIn("Evidence / Trust", brief_html)
+            self.assertIn("What To Do", brief_html)
+            self.assertIn("Ignore / Defer", brief_html)
+            self.assertIn("Project Impact", brief_html)
+            self.assertIn("Exact Feedback Targets", brief_html)
+            self.assertIn("Do not build yet.", brief_html)
             self.assertIn("MVP Radar Gate Card", brief_html)
             self.assertIn("Validation Query Pack", brief_html)
             self.assertIn("Matched Evidence By Source/Kind", brief_html)
@@ -290,6 +302,32 @@ class TestSplitIntelligenceReports(unittest.TestCase):
             self.assertEqual(send_document.call_count, 2)
             self.assertEqual(send_document.call_args_list[0].kwargs["file_path"], str(summary.weekly_brief.html_path))
             self.assertEqual(send_document.call_args_list[1].kwargs["file_path"], str(summary.knowledge_atlas.html_path))
+
+    def test_missing_mvp_radar_does_not_break_brief_or_atlas(self):
+        db_path = self._make_db()
+        settings = self._seed(db_path)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            summary = generate_split_intelligence_reports(
+                settings,
+                week_label="2026-W28",
+                threads_limit=8,
+                atoms_limit=4,
+                output_root=root,
+                mvp_radar_json_path=root / "missing-mvp-weekly-2026-W28.json",
+                now=datetime(2026, 7, 8, tzinfo=timezone.utc),
+            )
+
+            brief_html = Path(summary.weekly_brief.html_path).read_text(encoding="utf-8")
+            brief_json = json.loads(Path(summary.weekly_brief.json_path).read_text(encoding="utf-8"))
+            atlas_exists = Path(summary.knowledge_atlas.html_path).exists()
+
+        self.assertTrue(atlas_exists)
+        self.assertEqual(brief_json["mvp_radar"]["status"], "not_available")
+        self.assertEqual(brief_json["mvp_radar_gate"]["radar_artifact_status"], "missing")
+        self.assertEqual(brief_json["mvp_radar_gate"]["decision"], "do_not_build")
+        self.assertIn("MVP Radar artifact is missing", brief_html)
+        self.assertIn("No candidate selected", brief_html)
 
 
 if __name__ == "__main__":

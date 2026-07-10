@@ -13,6 +13,25 @@ class _FakeFacade:
             "message": "Workbook summary loaded.",
         }
 
+    def get_artifact_status(self, week_label=None):
+        return {
+            "status": "partial",
+            "week_label": week_label or "2026-W28",
+            "weekly_brief": {"display_name": "Weekly Brief", "status": "current"},
+            "knowledge_atlas": {"display_name": "Knowledge Atlas", "status": "current"},
+            "mvp_radar": {"display_name": "MVP Radar", "status": "missing"},
+            "mvp_radar_gate": {
+                "decision": "do_not_build",
+                "matched_gate_evidence_count": 0,
+                "market_context_status": "context_only",
+            },
+            "artifact_paths": {
+                "weekly_intelligence_brief_json": "/tmp/2026-W28.weekly-brief.json",
+                "knowledge_atlas_json": "/tmp/2026-W28.knowledge-atlas.json",
+            },
+            "message": "Weekly Brief: current; Knowledge Atlas: current; MVP Radar: missing",
+        }
+
     def search_intelligence_items(self, query, filters=None, limit=10):
         return {
             "status": "ok",
@@ -76,6 +95,12 @@ class _BrokenPlannerLLM(_FakeLLM):
         return "Hermes found curated actions and evidence. Source: https://t.me/source/1."
 
 
+class _NoAnswerLLM(_BrokenPlannerLLM):
+    @staticmethod
+    def complete(prompt, system="", max_tokens=2048, category="unknown", model=None):
+        raise RuntimeError("answer unavailable")
+
+
 class TestPIChat(unittest.TestCase):
     def test_answer_pi_chat_runs_llm_planned_read_only_tools(self):
         result = answer_pi_chat("Что с eval gates?", facade=_FakeFacade(), llm_client=_FakeLLM)
@@ -104,6 +129,15 @@ class TestPIChat(unittest.TestCase):
         self.assertEqual(result["status"], "ok")
         self.assertTrue(result["tool_calls"])
         self.assertIn("Source:", result["answer"])
+
+    def test_answer_pi_chat_falls_back_to_artifact_status_for_brief_atlas_radar(self):
+        result = answer_pi_chat("Какие артефакты Brief Atlas Radar актуальны?", facade=_FakeFacade(), llm_client=_NoAnswerLLM)
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["tool_calls"][0]["name"], "get_artifact_status")
+        self.assertIn("get_artifact_status", result["answer"])
+        self.assertIn("MVP Radar", result["tool_results"][0]["result"]["message"])
+        self.assertIn("/tmp/2026-W28.weekly-brief.json", result["answer"])
 
     def test_answer_pi_chat_handles_empty_question(self):
         result = answer_pi_chat("", facade=_FakeFacade(), llm_client=_FakeLLM)

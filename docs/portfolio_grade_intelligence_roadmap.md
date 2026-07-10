@@ -53,9 +53,9 @@ GitHub connector check for open PRs/issues, and recent git history on
 | Idea Thread storage and momentum | `implemented_and_verified` | `src/db/idea_threads.py`, `src/output/idea_threads.py`, `idea-threads` CLI, `tests/test_idea_threads.py` |
 | Frontier analysis | `implemented_but_not_dogfooded` | `src/output/frontier_analysis.py`, CLI path; fresh forced regeneration needs LLM credentials |
 | AI visual report / workbook contract | `implemented_and_verified`, `legacy surface` | `src/output/ai_visual_report.py`, `src/output/ai_report_contract.py`, `tests/test_ai_report_contract.py`; W28 committed fixture exists but represents old visual snapshot |
-| Weekly Intelligence Brief and Knowledge Atlas split | `partial` | `src/output/weekly_intelligence_brief.py`, `src/output/knowledge_atlas_report.py`, `src/output/split_intelligence_reports.py`, `tests/test_split_intelligence_reports.py`; target UX and decision cockpit are not finished |
+| Weekly Intelligence Brief and Knowledge Atlas split | `implemented_locally` for PGI-003 Brief cockpit; Atlas still `partial` | `src/output/weekly_intelligence_brief.py`, `src/output/knowledge_atlas_report.py`, `src/output/split_intelligence_reports.py`, `tests/test_split_intelligence_reports.py`; Brief has first-screen cockpit and Radar gate DTO, Atlas v2 navigation remains unfinished |
 | Canonical intelligence sidecar contract | `implemented_locally` | `tra-intelligence-contract.v1` in `src/output/ai_report_contract.py`; Brief/Atlas sidecars carry canonical SourceObservation/EvidenceItem/Claim projections and tests under `tests/fixtures/intelligence_contract/` |
-| Hermes / PI facade and bounded tools | `implemented_but_not_dogfooded` | `src/assistant/pi_facade.py`, `pi_tools.py`, `pi_chat.py`, `pi_intent.py`, tests `test_pi_*`; current-week/stale-artifact awareness remains incomplete |
+| Hermes / PI facade and bounded tools | `implemented_but_not_dogfooded` with PGI-003 artifact awareness | `src/assistant/pi_facade.py`, `pi_tools.py`, `pi_chat.py`, `pi_intent.py`, tests `test_pi_*`; read-only tools now expose current/stale/missing Brief, Atlas, and Radar state |
 | Feedback intake and action status | `partial` | `src/db/ai_report_feedback.py`, `src/output/action_status.py`, tests `test_ai_report_feedback.py`, `test_action_status.py`; provenance/effect timing and corrections need PGI work |
 | Strategy Reviewer | `implemented_and_verified` as advisory-only | `src/output/strategy_reviewer.py`, `tests/test_strategy_reviewer.py`; it must not mutate config/code/profile |
 | Project Intelligence | `partial` | conservative project diagnostics exist in report contract; no full project decision ledger/projection yet |
@@ -289,6 +289,12 @@ Tasks:
 - MVP Radar Gate Card with graceful missing/stale state.
 
 Primary task: `PGI-003`.
+
+Current implementation note: PGI-003 now adds a sidecar-backed Weekly Brief
+decision cockpit, exact feedback target refs, strict Radar gate DTO, missing
+Radar graceful degradation, and read-only Hermes artifact freshness awareness.
+Radar build/focused decisions remain impossible without matched decision-grade
+external evidence; market/business context remains `context_only`.
 
 ### Phase 5 - Atlas, Project Intelligence And Learning
 

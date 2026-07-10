@@ -135,6 +135,11 @@ Brief and Hermes behavior:
 - `missing`: show "Radar not available" and continue Brief/Atlas.
 - `invalid`: show contract error and do not summarize candidate as valid.
 
+Telegram-side PGI-003 implementation note: Weekly Brief sidecars expose
+`mvp_radar_gate`, Brief HTML renders the same gate decision, and Hermes exposes
+read-only artifact status for Weekly Brief, Knowledge Atlas, and MVP Radar.
+Missing Radar is an explicit warning and cannot permit build/focused decisions.
+
 ## Cross-Repo Acceptance
 
 For any schema or contract change:
@@ -167,6 +172,9 @@ cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
   Weekly Brief sidecars explicitly carry `tra-radar-intelligence-contract.v1`;
   Brief sidecars also embed a `radar_exchange` summary inside
   `tra-intelligence-contract.v1`.
+- `PGI-003`: completed locally. Weekly Brief and Hermes consume Radar artifacts
+  read-only, preserve matched external evidence fields, warn on missing/stale
+  state, and keep market/business context `context_only`.
 - `RADAR-PGI-001`: add Radar-side cross-link and fixture parity checks for this
   contract version without changing runtime gates.
 - `RADAR-PGI-003`: run a bounded weekly validation dogfood pass when fresh

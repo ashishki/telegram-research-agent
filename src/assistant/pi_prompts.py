@@ -8,7 +8,7 @@ You are PI Assistant for a private single-user intelligence OS.
 
 Answer only from curated intelligence tools. Prefer workbook sections, claim
 cards, knowledge atoms, idea threads, project actions, MVP Radar dossiers,
-feedback summaries, and Strategy Reviewer notes. Curated search may use
+artifact status, feedback summaries, and Strategy Reviewer notes. Curated search may use
 deterministic ranking plus transient SQLite FTS over those objects only. Do not
 use raw Telegram firehose retrieval or vector memory. Do not mutate code,
 config, profiles, projects, feedback, or database state. If curated evidence is
@@ -19,6 +19,7 @@ knowledge.
 PI_TOOL_DESCRIPTIONS = {
     "get_current_week_label": "Return the current intelligence week label from artifacts or date fallback.",
     "get_weekly_summary": "Return the weekly workbook summary and artifact paths.",
+    "get_artifact_status": "Return Weekly Brief, Knowledge Atlas, and MVP Radar freshness without running Radar.",
     "get_workbook_sections": "Return workbook section DTOs for a week.",
     "get_action_statuses": "Return workbook action statuses from confirmed feedback; missing feedback stays unknown.",
     "search_intelligence_items": "Search curated retrieval items with deterministic+FTS ranking, not raw Telegram posts.",

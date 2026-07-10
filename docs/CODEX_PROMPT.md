@@ -1,9 +1,9 @@
 # CODEX_PROMPT - Compact Session Handoff
 
-Version: 4.2
+Version: 4.3
 Date: 2026-07-10
-State: PGI-001 and PGI-002 implemented locally and verified; PGI-003 is next
-but should be started as a separate PR-sized slice
+State: PGI-001, PGI-002, and PGI-003 implemented locally and verified; PGI-004
+is next but is XL and should start as a separate PR-sized slice
 
 ## Current Product Direction
 
@@ -31,7 +31,7 @@ docs/tasks.md
 Next implementation task:
 
 ```text
-PGI-003 - Weekly Decision Cockpit, Hermes Awareness And Radar Gate
+PGI-004 - Knowledge Atlas V2 Thread Navigation
 ```
 
 ## Verified Baseline
@@ -40,13 +40,15 @@ PGI-003 - Weekly Decision Cockpit, Hermes Awareness And Radar Gate
 - Idea Thread storage/momentum exists and has focused tests.
 - Weekly AI visual report/workbook contract exists, but the workbook is now a
   historical/legacy surface rather than the target main product surface.
-- Split Weekly Intelligence Brief and Knowledge Atlas artifacts exist, but they
-  are `partial` relative to the target decision cockpit and navigable Atlas.
+- Split Weekly Intelligence Brief and Knowledge Atlas artifacts exist. PGI-003
+  completed the Brief decision cockpit and Radar gate behavior; Atlas remains
+  `partial` relative to the target navigable Atlas.
 - Canonical intelligence sidecar contract `tra-intelligence-contract.v1` is now
   implemented locally for workbook/Brief/Atlas projections with sanitized eval
   fixtures.
 - Hermes/PI facade, tools, chat, and intent routing exist as a read-only,
-  bounded foundation; product dogfood/evals remain incomplete.
+  bounded foundation. PGI-003 added artifact freshness awareness for Brief,
+  Atlas, and Radar; product dogfood/evals remain incomplete.
 - Feedback intake/action-status helpers now include PGI-002 provenance,
   correction/effect-window metadata, no-feedback unknown semantics, and
   sidecar-backed ranking explanations for top action/read/try items.
@@ -200,32 +202,89 @@ Review notes:
 
 ## PGI-003 Handoff
 
-Goal: turn the split Weekly Brief into a first-screen decision cockpit and make
-Hermes aware of current/stale/missing Brief, Atlas, and Radar artifacts without
-weakening PGI-001/PGI-002 contracts.
+Status: completed locally on 2026-07-10.
 
-Likely files:
+Implemented:
+
+- Weekly Brief sidecars include `decision_cockpit` and `mvp_radar_gate`.
+- The first Brief section renders decision snapshot, top personal changes,
+  evidence/trust summary, what to do, ignore/defer, project impact, MVP Radar
+  gate, and exact feedback targets.
+- MVP Radar gate decisions require matched decision-grade external evidence
+  before focused/build allowance; market/business context remains
+  `context_only`.
+- Missing Radar artifacts do not break Brief/Atlas generation and render an
+  explicit warning.
+- Hermes/PI facade exposes read-only `get_artifact_status` for current, stale,
+  and missing Weekly Brief, Knowledge Atlas, and MVP Radar artifacts.
+- Hermes chat planner/fallback can request artifact status and the answer
+  prompt distinguishes source-backed facts, interpretation, model background,
+  market context, and matched external evidence.
+- Radar JSON retrieval normalization preserves validation queries, matched
+  external evidence, missing evidence categories, adapter status, decision
+  context, and decision-change action fields.
+
+Files changed for PGI-003:
 
 - `src/output/weekly_intelligence_brief.py`
-- `src/output/split_intelligence_reports.py`
 - `src/output/intelligence_retrieval_items.py`
 - `src/assistant/pi_facade.py`
 - `src/assistant/pi_chat.py`
 - `src/assistant/pi_tools.py`
+- `src/assistant/pi_prompts.py`
 - `tests/test_split_intelligence_reports.py`
+- `tests/test_pi_facade.py`
 - `tests/test_pi_chat.py`
 - `tests/test_pi_tools.py`
-- `tests/test_mvp_weekly_pipeline.py`
+
+Verification passed:
+
+```bash
+PYTHONPATH=src python3 -m pytest tests/test_split_intelligence_reports.py tests/test_pi_chat.py tests/test_pi_tools.py tests/test_mvp_weekly_pipeline.py
+PYTHONPATH=src python3 -m pytest tests/test_pi_facade.py tests/test_intelligence_retrieval_items.py
+```
+
+Review notes:
+
+- Correctness: Brief cockpit sidecar and rendered HTML share the same Radar
+  gate DTO; no build/focused decision is allowed without matched external
+  evidence.
+- Provenance/evidence safety: Radar market/business context is rendered and
+  exposed as `context_only`; missing Radar remains an explicit warning.
+- Sidecar/rendered parity: first-screen cockpit blocks and exact feedback
+  targets are sidecar-backed.
+- Backward compatibility: fields are additive; legacy workbook summaries still
+  load, and missing split/Radar artifacts return read-only DTOs instead of
+  crashing.
+- Privacy/secrets: no `.env`, secrets, private generated artifacts, expensive
+  LLM runs, production config changes, or full archive backfills.
+- Hermes/Radar: Hermes remains read-only and does not run Codex or Radar.
+
+## PGI-004 Handoff
+
+Goal: make Knowledge Atlas a navigable cumulative map of understanding with
+thread timeline, current understanding, evidence, contradictions, source
+diversity, project connections, decisions, open questions, and study-next cues.
+
+Status: next candidate, but XL. Split before implementation and keep it as a
+separate PR-sized slice.
+
+Likely files:
+
+- `src/output/knowledge_atlas_report.py`
+- `src/output/split_intelligence_reports.py`
+- `src/output/intelligence_retrieval_items.py`
+- `tests/test_split_intelligence_reports.py`
+- `tests/test_intelligence_retrieval_items.py`
 
 Verification target:
 
 ```bash
-PYTHONPATH=src python3 -m pytest tests/test_split_intelligence_reports.py tests/test_pi_chat.py tests/test_pi_tools.py tests/test_mvp_weekly_pipeline.py
+PYTHONPATH=src python3 -m pytest tests/test_split_intelligence_reports.py tests/test_intelligence_retrieval_items.py
 ```
 
-Stop before PGI-003 implementation if market context can look like demand
-evidence, Hermes would need mutation capabilities, or the Brief starts hiding
-missing/stale Radar states.
+Stop before implementation if Atlas starts mirroring raw Telegram firehose,
+requires a full archive backfill, or needs unbounded/decorative graph work.
 
 ## Non-Negotiable Rules
 

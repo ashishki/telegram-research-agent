@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import sqlite3
 from contextlib import contextmanager
@@ -13,6 +14,8 @@ from db.ai_report_feedback import fetch_ai_report_feedback, summarize_ai_report_
 from db.idea_threads import fetch_idea_thread_atoms, fetch_idea_threads
 from output.action_status import build_action_status_projection, summarize_action_statuses
 from output.intelligence_retrieval_items import (
+    DEFAULT_KNOWLEDGE_ATLAS_OUTPUT_DIR,
+    DEFAULT_WEEKLY_BRIEF_OUTPUT_DIR,
     build_retrieval_items,
     find_latest_week_label,
     load_latest_workbook_json,
@@ -23,6 +26,13 @@ from output.strategy_reviewer import build_strategy_review
 
 
 TOKEN_RE = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_-]{1,}")
+NON_BUILD_READY_RECOMMENDATIONS = {
+    "revisit_with_evidence_gap",
+    "needs_more_evidence",
+    "needs_more_specific_scope",
+    "existing_project_context",
+    "reject",
+}
 
 
 class PersonalIntelligenceFacade:
@@ -89,17 +99,21 @@ class PersonalIntelligenceFacade:
             }
         actual_week = _clean_text(workbook.get("week_label")) or week_label
         mvp_payload = workbook.get("mvp_radar") if isinstance(workbook.get("mvp_radar"), Mapping) else None
+        artifact_status = self.get_artifact_status(actual_week)
         return {
             "status": "ok",
             "week_label": actual_week,
             "title": f"Weekly AI Intelligence Workbook {actual_week}" if actual_week else "Weekly AI Intelligence Workbook",
+            "artifact_type": _clean_text(workbook.get("_artifact_kind") or workbook.get("artifact_type")) or "workbook",
             "generated_at": _clean_text(workbook.get("generated_at")) or None,
             "decision_brief": _decision_cards(workbook),
             "strong_signals": _strong_signals(workbook),
             "actions": _action_cards(workbook),
             "project_actions": _project_actions(workbook),
             "mvp_status": _mvp_status(mvp_payload, actual_week) if mvp_payload else None,
+            "mvp_radar_gate": _mvp_gate_status(mvp_payload),
             "artifact_paths": _artifact_paths(workbook),
+            "artifact_status": artifact_status,
             "message": "Workbook summary loaded from JSON sidecar.",
         }
 
@@ -260,14 +274,73 @@ class PersonalIntelligenceFacade:
                 "source_mix": None,
                 "missing_evidence": [],
                 "next_validation": [],
+                "mvp_radar_gate": _mvp_gate_status(None),
                 "message": "MVP Radar result is missing.",
             }
         normalized = _mvp_status(payload, clean_week)
         missing_result = normalized["candidate"] is None and normalized["dossier_status"] is None
         return {
             **normalized,
+            "mvp_radar_gate": _mvp_gate_status(payload),
             "status": "missing" if missing_result else "ok",
             "message": "MVP Radar status loaded." if not missing_result else "MVP Radar result is insufficient.",
+        }
+
+    def get_artifact_status(self, week_label: str | None = None) -> dict:
+        clean_week = str(week_label or "").strip() or self.get_current_week_label()["week_label"]
+        current_week = self._current_week_label()
+        brief_json, brief_html = self._split_artifact_paths(clean_week, "weekly_brief")
+        atlas_json, atlas_html = self._split_artifact_paths(clean_week, "knowledge_atlas")
+        mvp_payload = load_mvp_radar_status(
+            clean_week,
+            output_root=self._output_root,
+            mvp_output_root=self._mvp_output_root,
+            radar_output_root=self._radar_output_root,
+        )
+        mvp_path = Path(str(mvp_payload.get("source_path"))) if isinstance(mvp_payload, Mapping) and mvp_payload.get("source_path") else None
+        weekly_brief = _artifact_descriptor(
+            artifact_type="weekly_intelligence_brief",
+            display_name="Weekly Brief",
+            week_label=clean_week,
+            current_week_label=current_week,
+            json_path=brief_json,
+            html_path=brief_html,
+        )
+        knowledge_atlas = _artifact_descriptor(
+            artifact_type="knowledge_atlas",
+            display_name="Knowledge Atlas",
+            week_label=clean_week,
+            current_week_label=current_week,
+            json_path=atlas_json,
+            html_path=atlas_html,
+        )
+        mvp_radar = _artifact_descriptor(
+            artifact_type="mvp_radar",
+            display_name="MVP Radar",
+            week_label=clean_week,
+            current_week_label=current_week,
+            json_path=mvp_path,
+            html_path=None,
+            missing_message="MVP Radar artifact is missing; do not infer build/focused permission.",
+        )
+        mvp_gate = _mvp_gate_status(mvp_payload)
+        if mvp_radar["status"] != "missing" and mvp_gate["decision"] == "do_not_build":
+            mvp_radar["warning"] = mvp_gate["warning"]
+        artifacts = [weekly_brief, knowledge_atlas, mvp_radar]
+        status = "ok" if all(item["status"] == "current" for item in artifacts) else "partial"
+        if all(item["status"] == "missing" for item in artifacts):
+            status = "missing"
+        return {
+            "status": status,
+            "week_label": clean_week,
+            "current_week_label": current_week,
+            "weekly_brief": weekly_brief,
+            "knowledge_atlas": knowledge_atlas,
+            "mvp_radar": mvp_radar,
+            "mvp_radar_gate": mvp_gate,
+            "artifact_paths": _artifact_status_paths(artifacts),
+            "evidence_boundaries": _evidence_boundaries(mvp_gate),
+            "message": _artifact_status_message(artifacts),
         }
 
     def get_feedback_summary(self, week_label: str | None = None) -> dict:
@@ -397,6 +470,23 @@ class PersonalIntelligenceFacade:
             output_root=self._output_root,
             visual_output_root=self._visual_output_root,
             ai_output_root=self._ai_output_root,
+        )
+
+    def _split_artifact_paths(self, week_label: str, artifact_type: str) -> tuple[Path, Path]:
+        if self._output_root is None:
+            atlas_dir = DEFAULT_KNOWLEDGE_ATLAS_OUTPUT_DIR
+            brief_dir = DEFAULT_WEEKLY_BRIEF_OUTPUT_DIR
+        else:
+            atlas_dir = self._output_root / "knowledge_atlas"
+            brief_dir = self._output_root / "weekly_intelligence_briefs"
+        if artifact_type == "knowledge_atlas":
+            return (
+                atlas_dir / f"{week_label}.knowledge-atlas.json",
+                atlas_dir / f"{week_label}.knowledge-atlas.html",
+            )
+        return (
+            brief_dir / f"{week_label}.weekly-brief.json",
+            brief_dir / f"{week_label}.weekly-brief.html",
         )
 
     @contextmanager
@@ -579,13 +669,16 @@ class PersonalIntelligenceFacade:
             "status": "missing",
             "week_label": week_label,
             "title": None,
+            "artifact_type": None,
             "generated_at": None,
             "decision_brief": None,
             "strong_signals": [],
             "actions": [],
             "project_actions": [],
             "mvp_status": None,
+            "mvp_radar_gate": _mvp_gate_status(None),
             "artifact_paths": {"html": None, "json": None},
+            "artifact_status": None,
             "message": "",
         }
 
@@ -691,6 +784,7 @@ def _project_actions(workbook: Mapping[str, Any]) -> list:
 def _mvp_status(payload: Mapping[str, Any] | None, week_label: str | None) -> dict:
     payload = payload or {}
     candidate = _clean_text(payload.get("selected_candidate") or payload.get("selected_title") or payload.get("title")) or None
+    matches = _object_list(payload.get("matched_external_evidence"))
     return {
         "status": "ok",
         "week_label": week_label,
@@ -700,7 +794,159 @@ def _mvp_status(payload: Mapping[str, Any] | None, week_label: str | None) -> di
         "source_mix": dict(payload.get("source_mix") or {}) if isinstance(payload.get("source_mix"), Mapping) else None,
         "missing_evidence": _string_values(payload.get("missing_evidence")),
         "next_validation": _string_values(payload.get("next_validation")),
+        "matched_external_evidence_count": len(matches),
+        "matched_external_source_types": _matched_external_source_types(matches),
+        "market_context_status": _market_context_status(payload),
         "message": "",
+    }
+
+
+def _mvp_gate_status(payload: Mapping[str, Any] | None) -> dict:
+    if not isinstance(payload, Mapping) or not payload:
+        return {
+            "decision": "do_not_build",
+            "decision_label": "Do not build yet.",
+            "radar_artifact_status": "missing",
+            "matched_gate_evidence_count": 0,
+            "matched_external_evidence_count": 0,
+            "matched_external_source_types": [],
+            "market_context_status": "context_only",
+            "context_only_can_satisfy_gate": False,
+            "matched_external_evidence_required": True,
+            "warning": "MVP Radar artifact is missing; do not infer build/focused permission.",
+        }
+    matches = _object_list(payload.get("matched_external_evidence"))
+    gate_matches = [
+        match
+        for match in matches
+        if bool(match.get("supports_gate")) and bool(match.get("decision_grade", True))
+    ]
+    recommendation = _clean_text(payload.get("recommendation") or payload.get("dossier_status")) or "needs_more_evidence"
+    artifact_status = "missing" if _clean_text(payload.get("status")) in {"missing", "not_available"} else "loaded"
+    allowed = bool(gate_matches) and recommendation not in NON_BUILD_READY_RECOMMENDATIONS and artifact_status != "missing"
+    if artifact_status == "missing":
+        warning = "MVP Radar artifact is missing; do not infer build/focused permission."
+    elif not gate_matches:
+        warning = "Build/focused decisions require matched external evidence; market/business context stays context_only."
+    else:
+        warning = "Matched external evidence exists; keep candidate scope and source fit explicit."
+    return {
+        "decision": "focused_experiment_allowed" if allowed else "do_not_build",
+        "decision_label": "Focused experiment may be allowed." if allowed else "Do not build yet.",
+        "radar_artifact_status": artifact_status,
+        "matched_gate_evidence_count": len(gate_matches),
+        "matched_external_evidence_count": len(matches),
+        "matched_external_source_types": _matched_external_source_types(gate_matches),
+        "market_context_status": _market_context_status(payload),
+        "context_only_can_satisfy_gate": False,
+        "matched_external_evidence_required": True,
+        "warning": warning,
+    }
+
+
+def _object_list(value: object) -> list[dict]:
+    if not isinstance(value, (list, tuple)):
+        return []
+    return [dict(item) for item in value if isinstance(item, Mapping)]
+
+
+def _matched_external_source_types(matches: Iterable[Mapping[str, Any]]) -> list[str]:
+    return _unique(
+        _clean_text(match.get("source_type"))
+        for match in matches
+        if _clean_text(match.get("source_type"))
+    )
+
+
+def _market_context_status(payload: Mapping[str, Any]) -> str:
+    decision_context = payload.get("decision_context") if isinstance(payload.get("decision_context"), Mapping) else {}
+    market_context = decision_context.get("market_context") if isinstance(decision_context.get("market_context"), Mapping) else {}
+    return _clean_text(market_context.get("status")) or "context_only"
+
+
+def _artifact_descriptor(
+    *,
+    artifact_type: str,
+    display_name: str,
+    week_label: str,
+    current_week_label: str,
+    json_path: Path | None,
+    html_path: Path | None,
+    missing_message: str | None = None,
+) -> dict:
+    generated_at = None
+    json_exists = bool(json_path and json_path.exists())
+    html_exists = bool(html_path and html_path.exists()) if html_path is not None else False
+    if json_exists and json_path is not None:
+        metadata = _read_json_metadata(json_path)
+        generated_at = _clean_text(metadata.get("generated_at")) or None
+    if not json_exists:
+        status = "missing"
+        message = missing_message or f"{display_name} artifact is missing."
+    elif week_label != current_week_label:
+        status = "stale"
+        message = f"{display_name} exists for {week_label}, but current week is {current_week_label}."
+    else:
+        status = "current"
+        message = f"{display_name} is current for {week_label}."
+    return {
+        "artifact_type": artifact_type,
+        "display_name": display_name,
+        "week_label": week_label,
+        "status": status,
+        "generated_at": generated_at,
+        "json_path": str(json_path) if json_path else None,
+        "html_path": str(html_path) if html_path else None,
+        "json_exists": json_exists,
+        "html_exists": html_exists,
+        "artifact_paths": {
+            "json": str(json_path) if json_exists and json_path else None,
+            "html": str(html_path) if html_exists and html_path else None,
+        },
+        "message": message,
+    }
+
+
+def _read_json_metadata(path: Path) -> dict:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _artifact_status_paths(artifacts: Iterable[Mapping[str, Any]]) -> dict:
+    paths: dict[str, str] = {}
+    for artifact in artifacts:
+        artifact_type = _clean_text(artifact.get("artifact_type"))
+        artifact_paths = artifact.get("artifact_paths") if isinstance(artifact.get("artifact_paths"), Mapping) else {}
+        for key, value in artifact_paths.items():
+            clean = _clean_text(value)
+            if clean:
+                paths[f"{artifact_type}_{key}"] = clean
+    return paths
+
+
+def _artifact_status_message(artifacts: Iterable[Mapping[str, Any]]) -> str:
+    parts = []
+    for artifact in artifacts:
+        detail = _clean_text(artifact.get("warning") or artifact.get("message"))
+        suffix = f" ({detail})" if artifact.get("status") in {"missing", "stale"} and detail else ""
+        parts.append(f"{artifact.get('display_name')}: {artifact.get('status')}{suffix}")
+    return "; ".join(parts)
+
+
+def _evidence_boundaries(mvp_gate: Mapping[str, Any]) -> dict:
+    return {
+        "facts": "Use source-backed workbook/atom/Radar fields only.",
+        "interpretation": "Hermes may summarize curated fields but must label uncertainty.",
+        "model_background": "Model knowledge can explain terms only; it is not evidence.",
+        "market_context": "context_only",
+        "matched_external_evidence": (
+            "available_for_gate"
+            if int(mvp_gate.get("matched_gate_evidence_count") or 0) > 0
+            else "missing_for_gate"
+        ),
     }
 
 

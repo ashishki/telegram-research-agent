@@ -14,11 +14,11 @@ task graph below.
 
 - One active queue: Portfolio-Grade Intelligence (`PGI`).
 - One parallel Radar track: `RADAR-PGI`.
-- One next P0 task after the local PGI-002 implementation:
-  `PGI-003 - Weekly Decision Cockpit, Hermes Awareness And Radar Gate`.
-- `PGI-001` and `PGI-002` are implemented locally with focused verification;
-  start PGI-003 only as a separate PR-sized slice after reviewing the feedback
-  provenance/ranking diff.
+- `PGI-001`, `PGI-002`, and `PGI-003` are implemented locally with focused
+  verification.
+- The next candidate task is `PGI-004 - Knowledge Atlas V2 Thread Navigation`.
+  It is marked XL and should start as a separate PR-sized slice after this
+  cockpit/Hermes/Radar gate commit is reviewed and pushed.
 - Do not run expensive LLM jobs, full archive backfills, migrations, or
   production config changes from backlog grooming.
 - Market/business context remains `context_only`.
@@ -32,21 +32,21 @@ task graph below.
 | Knowledge Atom storage/extraction | `implemented_and_verified` |
 | Idea Thread storage/momentum | `implemented_and_verified` |
 | Weekly AI visual report/workbook contract | `implemented_and_verified`, `legacy_surface` |
-| Weekly Brief + Knowledge Atlas split | `partial` |
-| Hermes/PI facade/tools/chat | `implemented_but_not_dogfooded` |
+| Weekly Brief + Knowledge Atlas split | `implemented_and_verified` for PGI-003 Brief cockpit; Atlas remains `partial` |
+| Hermes/PI facade/tools/chat | `implemented_but_not_dogfooded`; PGI-003 artifact freshness awareness added |
 | Feedback intake/action status | `implemented_and_verified` for PGI-002 provenance/ranking slice |
 | Strategy Reviewer | `implemented_and_verified` advisory-only |
 | Market/business Radar context | `implemented_and_verified` as `context_only` |
 | Radar RVE contract/adapters in sibling repo | `implemented_and_verified`, `needs_live_validation` |
 | Portfolio dogfood evidence | `partial` |
 
-## Next P0 Task
+## Next Candidate Task
 
-`PGI-003 - Weekly Decision Cockpit, Hermes Awareness And Radar Gate`
+`PGI-004 - Knowledge Atlas V2 Thread Navigation`
 
-Start here after the PGI-002 feedback/ranking changes are reviewed. Do not
-reopen KIR/HPI/RVE implementation unless the new contract discovers a
-regression.
+Start only as a fresh XL/PR-sized slice after the PGI-003 diff is reviewed,
+committed, and pushed. Do not reopen KIR/HPI/RVE implementation unless the new
+contract discovers a regression.
 
 ## Dependency Graph
 
@@ -221,7 +221,7 @@ PYTHONPATH=src python3 -m pytest tests/test_ai_report_feedback.py tests/test_ai_
 
 ### PGI-003 - Weekly Decision Cockpit, Hermes Awareness And Radar Gate
 
-- Status: `next_p0`
+- Status: `completed_local`
 - Priority: P0
 - Owner: `telegram-research-agent`
 - Problem: Brief/Atlas split exists, but the Brief is not yet a complete
@@ -270,10 +270,37 @@ PYTHONPATH=src python3 -m pytest tests/test_split_intelligence_reports.py tests/
 - Estimated size: L.
 - Portfolio evidence produced: decision cockpit and assistant quality slice.
 - Radar impact: `consumer`.
+- Completion notes:
+  - Weekly Brief JSON sidecars now include `decision_cockpit` and
+    `mvp_radar_gate` DTOs covering decision snapshot, top personal changes,
+    evidence/trust summary, what to do, ignore/defer, project impact, Radar
+    gate, and exact feedback targets.
+  - Weekly Brief HTML renders the same cockpit blocks in the first section and
+    keeps MVP detail in the Radar section.
+  - MVP Radar gate decisions now require matched decision-grade external
+    evidence before any focused/build allowance; market/business context remains
+    `context_only` and cannot satisfy the gate.
+  - Missing Radar artifacts do not break Brief/Atlas generation and render an
+    explicit missing-artifact warning.
+  - Hermes/PI facade now exposes read-only `get_artifact_status` with current,
+    stale, and missing states for Weekly Brief, Knowledge Atlas, and MVP Radar.
+  - Hermes chat planning/fallback can ask for artifact status, names current
+    Brief/Atlas artifacts, warns on stale/missing Radar, and keeps facts,
+    interpretation, model background, market context, and matched external
+    evidence distinct.
+  - Radar JSON retrieval normalization preserves validation queries, matched
+    external evidence, missing evidence categories, adapter status, decision
+    context, and decision-change actions.
+  - Verification passed:
+    `PYTHONPATH=src python3 -m pytest tests/test_split_intelligence_reports.py tests/test_pi_chat.py tests/test_pi_tools.py tests/test_mvp_weekly_pipeline.py`.
+  - Additional touched-surface verification passed:
+    `PYTHONPATH=src python3 -m pytest tests/test_pi_facade.py tests/test_intelligence_retrieval_items.py`.
+  - No production config change, expensive LLM run, full archive backfill,
+    hidden Hermes mutation tool, or Radar gate weakening.
 
 ### PGI-004 - Knowledge Atlas V2 Thread Navigation
 
-- Status: `planned`
+- Status: `next_p1_xl`
 - Priority: P1
 - Owner: `telegram-research-agent`
 - Problem: Atlas is a split artifact, but not yet a strong navigable cumulative
@@ -283,7 +310,8 @@ PYTHONPATH=src python3 -m pytest tests/test_split_intelligence_reports.py tests/
   open questions.
 - Why now: after the Brief is useful, Atlas must support deeper weekly review.
 - Dependencies: `PGI-001`, `PGI-003`.
-- Blocked by: missing canonical thread/evidence/delta contract.
+- Blocked by: not blocked by PGI-003, but estimated XL; split before
+  implementation into a safe Atlas V2 slice.
 - Files likely touched: `src/output/knowledge_atlas_report.py`,
   `src/output/split_intelligence_reports.py`,
   `src/output/intelligence_retrieval_items.py`,

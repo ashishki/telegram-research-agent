@@ -99,6 +99,7 @@ def _plan_tool_calls(question: str, *, catalog: Mapping[str, Any], llm_client: t
         "- Use only listed tools.\n"
         f"- Use at most {PI_TOOL_LOOP_MAX_CALLS} tool calls.\n"
         "- Prefer get_weekly_summary for weekly orientation.\n"
+        "- Prefer get_artifact_status for Brief/Atlas/Radar freshness or stale/missing artifact questions.\n"
         "- Prefer search_intelligence_items for specific questions.\n"
         "- Prefer get_mvp_radar_status for MVP/product opportunity questions.\n"
         "- Prefer get_strategy_reviewer_notes for improvement/Codex/process questions.\n"
@@ -135,6 +136,9 @@ def _synthesize_answer(
         "- Be concise and practical.\n"
         "- Use only the provided read-only tool results for source-grounded claims.\n"
         "- If evidence is missing, say what is missing instead of guessing.\n"
+        "- Distinguish source-backed facts, interpretation, model background, market/business context, and matched external evidence.\n"
+        "- Market/business context is context_only and cannot satisfy MVP Radar gates.\n"
+        "- Missing or stale Radar never permits build/focused decisions.\n"
         "- Do not claim you changed code/config/profile/projects or ran Codex.\n"
         "- If the operator asks for feedback/voice, explain the confirmation flow.\n"
         "- Include source refs, atom ids, thread slugs, or artifact paths when useful.\n\n"
@@ -157,6 +161,8 @@ def _synthesize_answer(
 def _fallback_tool_calls(question: str) -> list[dict]:
     lowered = question.casefold()
     calls: list[dict] = []
+    if any(term in lowered for term in ("artifact", "артефакт", "brief", "бриф", "atlas", "атлас", "stale", "устар", "missing", "пропал", "нет радара")):
+        calls.append({"name": "get_artifact_status", "arguments": {}})
     if any(term in lowered for term in ("mvp", "радар", "продукт", "opportunity", "startup")):
         calls.append({"name": "get_mvp_radar_status", "arguments": {}})
     if any(term in lowered for term in ("кодекс", "codex", "стратег", "strategy", "улучш", "следующ")):

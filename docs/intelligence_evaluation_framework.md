@@ -211,6 +211,11 @@ PGI-002 baseline fixtures now cover layers 14, 15, 22, and 23 for confirmed vs
 pending feedback, append-only correction/retraction, no-feedback as `unknown`,
 `read` as weak observation, feedback effect windows, and sidecar-backed
 `ranking_factors`/`why_selected` HTML parity.
+
+PGI-003 baseline fixtures now cover layers 16, 20, 21, 24, and 25 for Brief
+decision cockpit structure, exact feedback targets, read-only Hermes artifact
+awareness, missing/stale Radar warnings, market context as `context_only`, and
+matched external evidence as the only Radar gate input.
 24. Radar handoff
     - U: one Radar seed/context/dossier exchange. O: contract version, context
       markers, matched evidence, missing evidence, decision action. GT: Telegram

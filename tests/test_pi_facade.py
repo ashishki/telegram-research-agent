@@ -106,6 +106,34 @@ class TestPersonalIntelligenceFacade(unittest.TestCase):
             encoding="utf-8",
         )
 
+    def _write_split_artifacts(self, root: Path) -> None:
+        brief_dir = root / "weekly_intelligence_briefs"
+        atlas_dir = root / "knowledge_atlas"
+        brief_dir.mkdir(parents=True)
+        atlas_dir.mkdir(parents=True)
+        (brief_dir / "2026-W28.weekly-brief.html").write_text("<!doctype html><title>Brief</title>", encoding="utf-8")
+        (atlas_dir / "2026-W28.knowledge-atlas.html").write_text("<!doctype html><title>Atlas</title>", encoding="utf-8")
+        (brief_dir / "2026-W28.weekly-brief.json").write_text(
+            json.dumps(
+                {
+                    "artifact_type": "weekly_intelligence_brief",
+                    "week_label": "2026-W28",
+                    "generated_at": "2026-07-08T00:00:00Z",
+                }
+            ),
+            encoding="utf-8",
+        )
+        (atlas_dir / "2026-W28.knowledge-atlas.json").write_text(
+            json.dumps(
+                {
+                    "artifact_type": "knowledge_atlas",
+                    "week_label": "2026-W28",
+                    "generated_at": "2026-07-08T00:00:00Z",
+                }
+            ),
+            encoding="utf-8",
+        )
+
     def test_facade_instantiates_without_external_api_keys(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -190,13 +218,16 @@ class TestPersonalIntelligenceFacade(unittest.TestCase):
             "status",
             "week_label",
             "title",
+            "artifact_type",
             "generated_at",
             "decision_brief",
             "strong_signals",
             "actions",
             "project_actions",
             "mvp_status",
+            "mvp_radar_gate",
             "artifact_paths",
+            "artifact_status",
             "message",
         }
         with tempfile.TemporaryDirectory() as tmp:
@@ -210,6 +241,31 @@ class TestPersonalIntelligenceFacade(unittest.TestCase):
         self.assertTrue(result["strong_signals"])
         self.assertEqual(result["actions"][0]["why_selected"], "Selected for source-backed utility with confirmed feedback.")
         self.assertEqual(result["actions"][0]["ranking_factors"][0]["label"], "feedback_score")
+        self.assertEqual(result["mvp_radar_gate"]["decision"], "do_not_build")
+        self.assertIn(result["artifact_status"]["status"], {"partial", "missing"})
+
+    def test_get_artifact_status_names_stale_split_artifacts_and_missing_radar(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_split_artifacts(root)
+            facade = PersonalIntelligenceFacade(
+                settings=self._settings(root),
+                output_root=root,
+                now=datetime(2026, 7, 15, tzinfo=timezone.utc),
+            )
+            result = facade.get_artifact_status("2026-W28")
+
+        self.assertEqual(result["status"], "partial")
+        self.assertEqual(result["current_week_label"], "2026-W29")
+        self.assertEqual(result["weekly_brief"]["status"], "stale")
+        self.assertEqual(result["knowledge_atlas"]["status"], "stale")
+        self.assertEqual(result["mvp_radar"]["status"], "missing")
+        self.assertEqual(result["mvp_radar_gate"]["decision"], "do_not_build")
+        self.assertEqual(result["evidence_boundaries"]["market_context"], "context_only")
+        self.assertIn("Weekly Brief", result["message"])
+        self.assertIn("Knowledge Atlas", result["message"])
+        self.assertIn("MVP Radar", result["message"])
+        self.assertIn("weekly_intelligence_brief_json", result["artifact_paths"])
 
     def test_get_action_statuses_keeps_missing_feedback_unknown(self):
         with tempfile.TemporaryDirectory() as tmp:
