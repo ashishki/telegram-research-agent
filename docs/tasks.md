@@ -14,10 +14,10 @@ task graph below.
 
 - One active queue: Portfolio-Grade Intelligence (`PGI`).
 - One parallel Radar track: `RADAR-PGI`.
-- `PGI-001`, `PGI-002`, `PGI-003`, and `PGI-004` are implemented locally with
-  focused verification.
-- The next candidate task is
-  `PGI-005 - Project And Learning Intelligence Projections`.
+- `PGI-001` through `PGI-006` are implemented locally with focused
+  verification and pushed commits.
+- The next task gate is `PGI-007 - Four-Week Dogfood Evidence Series`, which is
+  blocked on real operator dogfood evidence.
 - Do not run expensive LLM jobs, full archive backfills, migrations, or
   production config changes from backlog grooming.
 - Market/business context remains `context_only`.
@@ -31,21 +31,24 @@ task graph below.
 | Knowledge Atom storage/extraction | `implemented_and_verified` |
 | Idea Thread storage/momentum | `implemented_and_verified` |
 | Weekly AI visual report/workbook contract | `implemented_and_verified`, `legacy_surface` |
-| Weekly Brief + Knowledge Atlas split | `implemented_and_verified` for PGI-003 Brief cockpit and PGI-004 Atlas thread navigation |
+| Weekly Brief + Knowledge Atlas split | `implemented_and_verified` for PGI-003 Brief cockpit, PGI-004 Atlas thread navigation, and PGI-005 Project/Learning projections |
 | Hermes/PI facade/tools/chat | `implemented_but_not_dogfooded`; PGI-003 artifact freshness awareness added |
 | Feedback intake/action status | `implemented_and_verified` for PGI-002 provenance/ranking slice |
+| Weekly intelligence scorecard | `implemented_and_verified` for PGI-006 deterministic scorecard fixtures |
 | Strategy Reviewer | `implemented_and_verified` advisory-only |
 | Market/business Radar context | `implemented_and_verified` as `context_only` |
 | Radar RVE contract/adapters in sibling repo | `implemented_and_verified`, `needs_live_validation` |
-| Portfolio dogfood evidence | `partial` |
+| Portfolio dogfood evidence | `blocked_on_operator_runs` |
 
 ## Next Candidate Task
 
-`PGI-005 - Project And Learning Intelligence Projections`
+`PGI-007 - Four-Week Dogfood Evidence Series`
 
-Start only as a fresh PR-sized slice after the PGI-004 Atlas navigation diff is
-reviewed, committed, and pushed. Do not reopen KIR/HPI/RVE implementation
-unless the new contract discovers a regression.
+Do not fabricate scorecards, thresholds, learning outcomes, decision impact, or
+Radar validation claims. Start only when the operator has current private
+Brief/Atlas/Radar artifacts and can provide sanitized weekly scorecard inputs or
+explicitly asks to start a local private dogfood log outside git. Do not reopen
+KIR/HPI/RVE implementation unless dogfood evidence discovers a regression.
 
 ## Dependency Graph
 
@@ -501,7 +504,8 @@ PYTHONPATH=src python3 -m pytest tests/test_dogfood_review.py tests/test_ai_repo
   decisions, actions, learning, and information overload.
 - Why now: required before portfolio readiness and post-dogfood product claims.
 - Dependencies: `PGI-003`, `PGI-006`.
-- Blocked by: decision cockpit and scorecard not landed.
+- Blocked by: four current operator dogfood weeks or sanitized weekly
+  scorecard inputs.
 - Files likely touched: dogfood scorecard docs/artifacts only; generated private
   raw outputs must remain ignored.
 - Schema impact: none unless scorecard schema changes.

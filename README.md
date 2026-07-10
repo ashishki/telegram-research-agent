@@ -11,18 +11,19 @@ Radar validation track.
 
 Canonical roadmap: `docs/portfolio_grade_intelligence_roadmap.md`.
 Canonical active backlog: `docs/tasks.md`.
-Next implementation candidate:
-`PGI-005 - Project And Learning Intelligence Projections` after the pushed
-PGI-001..PGI-004 slices.
+Current implementation gate:
+`PGI-007 - Four-Week Dogfood Evidence Series` is blocked on operator dogfood
+evidence after the pushed PGI-001..PGI-006 slices.
 
 Current baseline: knowledge atoms, idea threads, canonical report contracts,
 split Brief / Atlas artifacts, Brief decision cockpit, Atlas thread navigation,
+durable Project/Learning Intelligence projections, weekly scorecard fixtures,
 Hermes/PI read-only foundation, artifact freshness awareness, feedback
 provenance helpers, Strategy Reviewer, and Radar RVE bridge exist in code with
-focused tests. The honest gap is dogfood evidence, project/learning outcomes, and
-portfolio-ready evaluation. Raw Telegram firehose RAG, assistant mutations,
-full-year archive processing, and build-ready Radar decisions from context-only
-evidence remain out of scope.
+focused tests. The honest gap is four-week dogfood evidence and portfolio-ready
+evaluation proof from real operator runs. Raw Telegram firehose RAG, assistant
+mutations, full-year archive processing, and build-ready Radar decisions from
+context-only evidence remain out of scope.
 
 ## Dogfood Stabilization Note
 
@@ -111,10 +112,11 @@ It is not a public bot, SaaS product, or generic summarizer.
 - Frontier-model synthesis via `frontier-analysis`: top-model weekly interpretation over compressed 12-week context.
 - Stakeholder-facing Weekly AI Intelligence Workbook via `ai-visual-report`: Russian decision brief, strong signals, deep explanation cards, claim evidence cards with quote verification/evidence tiers, concept diagrams, project implementation suggestions, MVP Radar section, feedback prompts, JSON sidecar, and embedded Archify/local diagrams when available.
 - Split reader-facing HTML via `ai-split-report`: a cumulative Knowledge Atlas for trend/source/study context and a short Weekly Intelligence Brief for decision, action, MVP Radar, and feedback prompts. Both write distinct HTML/JSON sidecars, reuse the same curated context load, and can be delivered to Telegram with `--deliver`.
+- Project and Learning Intelligence projections: Brief/Atlas sidecars and HTML expose external project signals, confirmed implications, weak watches, rejected broad overlaps, tiny PR ideas, stale decisions, research debt, repeated themes without action, learning objectives, and learning stage counts without treating passive reading as mastery.
 - Strategy Reviewer via `strategy-reviewer`: advisory-only keep/change/demote/test-next-week suggestions and Codex-ready tasks from confirmed workbook feedback; it does not mutate source code, prompts, thresholds, profile, or projects.
 - HPI read-only foundation: `PersonalIntelligenceFacade`, curated retrieval items, transient SQLite FTS ranking, and bounded PI tools expose workbook, thread, action, MVP, feedback, marked-post, Strategy Reviewer, and action-status DTOs without raw DB sessions, vector search, or mutation methods.
 - Hermes Telegram concierge commands: `/weekly`, `/actions`, `/explain`, `/projects`, `/mvp`, `/strategy`, and `/codex` provide short operator routing; `/codex` prepares prompt text only and never executes Codex.
-- Dogfood review helper: compact private weekly dogfood JSON/Markdown artifacts can track time-to-understand, sections read, completed actions, feedback counts, MVP status, decisions changed, user value, and friction before vector retrieval or HPI-10 product decisions.
+- Dogfood review and scorecard helper: compact private weekly dogfood JSON/Markdown artifacts plus `weekly-intelligence-scorecard.v1` can track correctness, relevance, decisions/actions, learning, UX, Radar honesty, operations, time-to-understand, sections read, completed actions, feedback counts, MVP status, decisions changed, user value, friction, and false-confidence incidents before portfolio claims.
 - Generated Obsidian projection via `obsidian-export`: bounded weekly, thread, tool/model, practice, channel, read-queue, try/build, experiment, project-watch, feedback-summary, and strategy-review notes with generated-file markers and source links.
 - Honest project implications: the visual report suppresses broad keyword overlaps like `AI`, `workflow`, and `evidence`; a zero project-lead count means the current atom/thread evidence was too weak for a user-facing project claim.
 
@@ -294,8 +296,8 @@ Obsidian notes can be regenerated, and Hermes/PI can read curated intelligence
 through read-only interfaces.
 
 The honest limitation is not missing plumbing; it is portfolio-grade
-correctness, personalization, dogfood proof, and presentation. Project
-implications remain conservative evidence leads, not full project-priority
-decisions. User value is not proven until the dogfood protocol produces real
-feedback, actions, decisions changed, experiments, learning outcomes, friction
-scores, and false-confidence review.
+correctness, personalization, dogfood proof, and presentation. Project and
+learning projections remain conservative evidence leads, not full
+project-priority or mastery claims. User value is not proven until the dogfood
+protocol produces real feedback, actions, decisions changed, experiments,
+learning outcomes, friction scores, scorecards, and false-confidence review.
