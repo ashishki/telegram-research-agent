@@ -206,6 +206,11 @@ Notation per layer:
       weeks. Fail: feedback claimed to affect already-generated artifact. Fix:
       feedback effect fixture. Review: weekly. Cost: low-medium. Threshold:
       every cited feedback effect has provenance and timing.
+
+PGI-002 baseline fixtures now cover layers 14, 15, 22, and 23 for confirmed vs
+pending feedback, append-only correction/retraction, no-feedback as `unknown`,
+`read` as weak observation, feedback effect windows, and sidecar-backed
+`ranking_factors`/`why_selected` HTML parity.
 24. Radar handoff
     - U: one Radar seed/context/dossier exchange. O: contract version, context
       markers, matched evidence, missing evidence, decision action. GT: Telegram

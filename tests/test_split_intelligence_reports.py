@@ -218,12 +218,17 @@ class TestSplitIntelligenceReports(unittest.TestCase):
             self.assertIn(f'content="{RADAR_INTELLIGENCE_CONTRACT_VERSION}"', brief_html)
             self.assertIn('id="trend-board"', atlas_html)
             self.assertIn('id="brief-actions"', brief_html)
+            self.assertIn("Why selected:", brief_html)
             self.assertLess(brief_html.find('id="brief-actions"'), brief_html.find('id="brief-mvp-radar"'))
             self.assertEqual(atlas_json["artifact_type"], "knowledge_atlas")
             self.assertEqual(brief_json["artifact_type"], "weekly_intelligence_brief")
             self.assertEqual(atlas_json["contract_version"], INTELLIGENCE_CONTRACT_VERSION)
             self.assertEqual(brief_json["contract_version"], INTELLIGENCE_CONTRACT_VERSION)
             self.assertEqual(brief_json["radar_contract_version"], RADAR_INTELLIGENCE_CONTRACT_VERSION)
+            self.assertTrue(brief_json["actions"][0]["ranking_factors"])
+            self.assertTrue(brief_json["actions"][0]["why_selected"])
+            self.assertTrue(brief_json["personal_learning_loop"]["read_items"][0]["ranking_factors"])
+            self.assertTrue(brief_json["personal_learning_loop"]["read_items"][0]["why_selected"])
             self.assertEqual(
                 atlas_json["intelligence_contract"]["contract_version"],
                 INTELLIGENCE_CONTRACT_VERSION,

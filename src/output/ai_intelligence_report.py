@@ -340,14 +340,19 @@ def load_ai_intelligence_context(
                     "trust_correction_count": 0,
                 },
                 "feedback_changes": {
-                    "status": "low_confidence",
-                    "summary": "No prior feedback is available; personalization confidence is low.",
-                    "items": ["No confirmed feedback has changed ranking yet."],
+                    "status": "unknown",
+                    "summary": "No prior feedback is available; personalization state is unknown.",
+                    "items": ["No confirmed feedback has changed ranking yet; no-feedback is not a negative signal."],
                     "downranked": [],
                     "promoted": [],
                     "eval_example_count": 0,
                 },
-                "frontier_prompt_guidance": ["No prior feedback is available; state low personalization confidence."],
+                "feedback_corrections": [],
+                "feedback_effect_traces": [],
+                "confirmed_event_count": 0,
+                "pending_draft_count": 0,
+                "confirmation_state": "confirmed_only",
+                "frontier_prompt_guidance": ["No prior feedback is available; state unknown personalization confidence."],
                 "recent_events": [],
             }
         ),
@@ -587,6 +592,64 @@ def _atom_feedback_score(atom: dict, thread: dict, feedback: dict) -> int:
     return score
 
 
+def _ranking_factor(label: str, value: object, weight: str, evidence: object | None = None) -> dict:
+    return {
+        "label": label,
+        "value": value,
+        "weight": weight,
+        "evidence": evidence,
+    }
+
+
+def _atom_ranking_factors(atom: dict, thread: dict, feedback: dict) -> list[dict]:
+    feedback_score = _atom_feedback_score(atom, thread, feedback)
+    factors = [
+        _ranking_factor("practical_utility", round(float(atom.get("practical_utility_score") or 0.0), 3), "high"),
+        _ranking_factor("novelty", round(float(atom.get("novelty_score") or 0.0), 3), "medium"),
+        _ranking_factor("confidence", round(float(atom.get("confidence") or 0.0), 3), "medium"),
+        _ranking_factor("freshness", str(atom.get("last_seen_at") or "")[:10], "medium"),
+        _ranking_factor("source_refs", len(atom.get("source_urls") or []), "high", atom.get("source_urls") or []),
+        _ranking_factor("feedback_score", feedback_score, "high", _feedback_factor_evidence(feedback)),
+    ]
+    if thread.get("slug"):
+        factors.append(_ranking_factor("thread", thread.get("slug"), "medium"))
+    return factors
+
+
+def _thread_ranking_factors(thread: dict, feedback: dict) -> list[dict]:
+    feedback_score = _thread_feedback_score(thread, feedback)
+    return [
+        _ranking_factor("momentum_30d", round(float(thread.get("momentum_30d") or 0.0), 3), "medium"),
+        _ranking_factor("source_channel_count", int(thread.get("source_channel_count") or 0), "medium"),
+        _ranking_factor("status", thread.get("status") or "active", "medium"),
+        _ranking_factor("feedback_score", feedback_score, "high", _feedback_factor_evidence(feedback)),
+    ]
+
+
+def _feedback_factor_evidence(feedback: dict) -> dict:
+    return {
+        "promoted": list(feedback.get("promoted_target_refs") or [])[:5],
+        "downranked": list(feedback.get("downranked_target_refs") or [])[:5],
+        "event_count": int(feedback.get("event_count") or 0),
+        "confirmation_state": feedback.get("confirmation_state") or "confirmed_only",
+    }
+
+
+def _why_selected_from_factors(factors: list[dict]) -> str:
+    feedback = next((factor for factor in factors if factor.get("label") == "feedback_score"), {})
+    feedback_value = int(feedback.get("value") or 0)
+    if feedback_value > 0:
+        return "Selected because confirmed feedback promoted similar targets, with source-backed utility still checked."
+    if feedback_value < 0:
+        return "Kept only with caution because confirmed feedback downranked a related target."
+    source_refs = next((factor for factor in factors if factor.get("label") == "source_refs"), {})
+    source_count = int(source_refs.get("value") or 0)
+    utility = next((factor for factor in factors if factor.get("label") == "practical_utility"), {})
+    if source_count > 0:
+        return f"Selected for source-backed utility ({utility.get('value', 'unknown')}) with no confirmed feedback override."
+    return "Selected as a fallback because no stronger source-backed personalized item was available."
+
+
 def _read_queue_atoms(threads: list[dict], feedback_context: dict | None = None) -> list[dict]:
     feedback = feedback_context or {}
     downranked_threads = set(feedback.get("downranked_thread_slugs") or [])
@@ -603,6 +666,8 @@ def _read_queue_atoms(threads: list[dict], feedback_context: dict | None = None)
             seen.add(atom_id)
             scored_atom = dict(atom)
             scored_atom["_feedback_score"] = _atom_feedback_score(atom, thread, feedback)
+            scored_atom["_ranking_factors"] = _atom_ranking_factors(atom, thread, feedback)
+            scored_atom["_why_selected"] = _why_selected_from_factors(scored_atom["_ranking_factors"])
             atoms.append(scored_atom)
     preferred = [atom for atom in atoms if atom.get("atom_type") in READ_QUEUE_TYPES]
     fallback = [atom for atom in atoms if atom.get("atom_type") not in READ_QUEUE_TYPES]
@@ -640,6 +705,8 @@ def _personal_learning_loop(
             "claim": atom.get("claim") or "Untitled source",
             "summary": atom.get("summary") or atom.get("why_it_matters") or "",
             "source_url": _primary_source_url(atom),
+            "ranking_factors": atom.get("_ranking_factors") or [],
+            "why_selected": atom.get("_why_selected") or "",
         }
         for atom in read_atoms[:PERSONAL_READ_TARGET_COUNT]
     ]
@@ -651,6 +718,11 @@ def _personal_learning_loop(
                 "claim": f"Open read slot {slot}",
                 "summary": "Backfill this slot by running Knowledge Atom extraction for the current week.",
                 "source_url": "",
+                "ranking_factors": [
+                    _ranking_factor("fallback", "open_slot", "low"),
+                    _ranking_factor("feedback_score", 0, "high", _feedback_factor_evidence(feedback)),
+                ],
+                "why_selected": "Open slot because no source-backed read target was available; no-feedback is unknown, not negative.",
             }
         )
 
@@ -670,6 +742,12 @@ def _personal_learning_loop(
                 "title": f"{item['kind']}: {item['name']}",
                 "body": f"Try it against one current workflow and note whether it changes speed, quality, or review effort.",
                 "source_count": item["count"],
+                "ranking_factors": [
+                    _ranking_factor("term_kind", item["kind"], "medium"),
+                    _ranking_factor("source_mentions", item["count"], "medium"),
+                    _ranking_factor("feedback_score", 0, "high", _feedback_factor_evidence(feedback)),
+                ],
+                "why_selected": "Selected because the term appears in curated source atoms and has no confirmed feedback override.",
             }
         )
         if len(try_items) >= PERSONAL_TRY_TARGET_COUNT:
@@ -679,11 +757,15 @@ def _personal_learning_loop(
             "title": "Workflow: source-grounded eval checklist",
             "body": "Apply the strongest thread claim to a tiny eval checklist before trusting agent output.",
             "source_count": 0,
+            "ranking_factors": [_ranking_factor("fallback", "source_grounded_eval", "low")],
+            "why_selected": "Fallback workflow when source-backed personalized try items are sparse.",
         },
         {
             "title": "Workflow: weekly read/try note",
             "body": "Turn one read item into a short implementation note with source links and a next action.",
             "source_count": 0,
+            "ranking_factors": [_ranking_factor("fallback", "weekly_read_try_note", "low")],
+            "why_selected": "Fallback workflow to preserve the read-to-action loop.",
         },
     ]
     for item in fallback_try:
@@ -754,6 +836,7 @@ def _learning_actions(threads: list[dict], feedback_context: dict | None = None)
             continue
         title = thread.get("title") or thread.get("slug") or "Untitled thread"
         claims = thread.get("current_claims") or thread.get("superseded_claims") or []
+        ranking_factors = _thread_ranking_factors(thread, feedback)
         actions.append(
             {
                 "title": f"Verify and apply: {title}",
@@ -764,6 +847,8 @@ def _learning_actions(threads: list[dict], feedback_context: dict | None = None)
                 ),
                 "claim": claims[0] if claims else "",
                 "source_count": len({url for atom in thread.get("atoms") or [] for url in atom.get("source_urls") or []}),
+                "ranking_factors": ranking_factors,
+                "why_selected": _why_selected_from_factors(ranking_factors),
             }
         )
         if len(actions) >= 4:
@@ -780,6 +865,11 @@ def _learning_actions(threads: list[dict], feedback_context: dict | None = None)
                 ),
                 "claim": example.get("notes") or "",
                 "source_count": 1 if example.get("source_url") else 0,
+                "ranking_factors": [
+                    _ranking_factor("missed_post_eval_example", example.get("source_url") or example.get("target_ref"), "high"),
+                    _ranking_factor("feedback_score", 1, "high", _feedback_factor_evidence(feedback)),
+                ],
+                "why_selected": "Selected because confirmed missed-post feedback created an eval example for the next report.",
             }
         )
     if not actions:
@@ -789,6 +879,8 @@ def _learning_actions(threads: list[dict], feedback_context: dict | None = None)
                 "body": "Run Knowledge Atom extraction and Idea Thread refresh before the next weekly report.",
                 "claim": "",
                 "source_count": 0,
+                "ranking_factors": [_ranking_factor("fallback", "knowledge_layer_backfill", "low")],
+                "why_selected": "Fallback action because no ranked source-backed thread action was available.",
             }
         )
     return actions
@@ -863,8 +955,8 @@ def _render_feedback_context(context: dict) -> str:
     changes = feedback.get("feedback_changes") or {}
     change_items = changes.get("items") or []
     if not change_items:
-        change_items = ["No confirmed feedback has changed ranking yet."]
-    change_summary = changes.get("summary") or "No prior feedback is available; personalization confidence is low."
+        change_items = ["No confirmed feedback has changed ranking yet; no-feedback is not a negative signal."]
+    change_summary = changes.get("summary") or "No prior feedback is available; personalization state is unknown."
     missed = feedback.get("missed_post_eval_examples") or []
     missed_text = ""
     if missed:
@@ -1141,6 +1233,7 @@ def _render_personal_learning_loop(context: dict, actions: list[dict]) -> str:
             '<li class="learning-read-item">'
             f'<b>{_escape(index)}. {_escape(item.get("claim") or "Untitled source")}</b>'
             f'<p>{_escape(item.get("summary") or "")}</p>'
+            f'<p class="muted">Why selected: {_escape(item.get("why_selected") or "")}</p>'
             f'<p class="sources">{source_link}</p>'
             '</li>'
         )
@@ -1150,6 +1243,7 @@ def _render_personal_learning_loop(context: dict, actions: list[dict]) -> str:
             '<li class="learning-try-item">'
             f'<b>{_escape(item.get("title") or "Try item")}</b>'
             f'<p>{_escape(item.get("body") or "")}</p>'
+            f'<p class="muted">Why selected: {_escape(item.get("why_selected") or "")}</p>'
             f'<p class="muted">Source mentions: {_escape(item.get("source_count", 0))}</p>'
             '</li>'
         )
@@ -1187,6 +1281,7 @@ def _render_try_this_week(context: dict, actions: list[dict]) -> str:
             '<article class="action-card">'
             f'<h3>{_escape(action["title"])}</h3>'
             f'<p>{_escape(action["body"])}</p>'
+            f'<p class="muted">Why selected: {_escape(action.get("why_selected") or "")}</p>'
             f'{claim}'
             f'<p class="muted">Source links in action context: {_escape(action.get("source_count", 0))}</p>'
             '</article>'

@@ -194,10 +194,10 @@ def build_weekly_ai_report_contract(
             "source_quote_language": "original",
             "schema": REPORT_CONTRACT_SCHEMA,
             "personalization_confidence": (
-                "low" if int(feedback_context.get("event_count") or 0) <= 0 else "observed"
+                "unknown" if int(feedback_context.get("event_count") or 0) <= 0 else "observed"
             ),
             "personalization_note": (
-                "Нет свежего фидбека: уверенность персонализации низкая."
+                "Нет свежего фидбека: состояние персонализации unknown, не negative."
                 if int(feedback_context.get("event_count") or 0) <= 0
                 else "Свежий фидбек учтен в ранжировании."
             ),
@@ -790,7 +790,7 @@ def _feedback_used_summary(feedback_context: Mapping[str, Any]) -> dict:
     if int(feedback_context.get("event_count") or 0) <= 0:
         return {
             "status": "no_feedback",
-            "summary": changes.get("summary") or "Нет prior feedback: персонализация остается низкой.",
+            "summary": changes.get("summary") or "Нет prior feedback: персонализация unknown, не negative.",
             "downranked": [],
             "promoted": [],
             "eval_example_count": 0,

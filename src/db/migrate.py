@@ -128,12 +128,17 @@ def _ensure_ai_report_feedback_contract_types(connection: sqlite3.Connection) ->
     ).fetchone()
     table_sql = str(row[0] if row else "")
     required_tokens = (
-        "no_missed_posts",
-        "trust_too_high",
-        "trust_too_low",
-        "verify_first",
-        "missed_post",
-        "trust_correction",
+        "'no_missed_posts'",
+        "'trust_too_high'",
+        "'trust_too_low'",
+        "'verify_first'",
+        "'correction'",
+        "'retraction'",
+        "'accidental_feedback'",
+        "'missed_post'",
+        "'trust_correction'",
+        "'feedback_event'",
+        "'operator_context'",
     )
     if not table_sql or all(token in table_sql for token in required_tokens):
         return
@@ -160,7 +165,10 @@ def _ensure_ai_report_feedback_contract_types(connection: sqlite3.Connection) ->
                     'noise',
                     'trust_too_high',
                     'trust_too_low',
-                    'verify_first'
+                    'verify_first',
+                    'correction',
+                    'retraction',
+                    'accidental_feedback'
                 )),
             target_type TEXT NOT NULL DEFAULT 'report'
                 CHECK(target_type IN (
@@ -173,7 +181,9 @@ def _ensure_ai_report_feedback_contract_types(connection: sqlite3.Connection) ->
                     'experiment',
                     'action',
                     'missed_post',
-                    'trust_correction'
+                    'trust_correction',
+                    'feedback_event',
+                    'operator_context'
                 )),
             target_ref TEXT,
             source_url TEXT,
@@ -686,7 +696,10 @@ def run_migrations() -> Path:
                         'noise',
                         'trust_too_high',
                         'trust_too_low',
-                        'verify_first'
+                        'verify_first',
+                        'correction',
+                        'retraction',
+                        'accidental_feedback'
                     )),
                 target_type TEXT NOT NULL DEFAULT 'report'
                     CHECK(target_type IN (
@@ -699,7 +712,9 @@ def run_migrations() -> Path:
                         'experiment',
                         'action',
                         'missed_post',
-                        'trust_correction'
+                        'trust_correction',
+                        'feedback_event',
+                        'operator_context'
                     )),
                 target_ref TEXT,
                 source_url TEXT,

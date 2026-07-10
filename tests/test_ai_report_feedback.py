@@ -46,6 +46,7 @@ from db.ai_report_feedback import (  # noqa: E402
     fetch_ai_report_feedback_intake,
     fetch_missed_post_eval_examples,
     record_ai_report_feedback,
+    record_ai_report_feedback_correction,
     summarize_ai_report_feedback,
 )
 from db.knowledge_atoms import record_knowledge_atom  # noqa: E402
@@ -206,6 +207,80 @@ class TestAiReportFeedback(unittest.TestCase):
         ]:
             self.assertIn(column, intake_columns)
 
+    def test_migration_rebuilds_old_feedback_check_for_corrections(self):
+        tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+        tmp.close()
+        db_path = tmp.name
+        try:
+            with sqlite3.connect(db_path) as connection:
+                connection.executescript(
+                    """
+                    CREATE TABLE ai_report_feedback_events (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        week_label TEXT NOT NULL CHECK(length(trim(week_label)) > 0),
+                        report_path TEXT,
+                        feedback_type TEXT NOT NULL CHECK(feedback_type IN (
+                            'read',
+                            'useful',
+                            'tried',
+                            'applied_to_project',
+                            'too_shallow',
+                            'missed_important_post',
+                            'no_missed_posts',
+                            'wrong_priority',
+                            'not_interested',
+                            'noise',
+                            'trust_too_high',
+                            'trust_too_low',
+                            'verify_first'
+                        )),
+                        target_type TEXT NOT NULL DEFAULT 'report' CHECK(target_type IN (
+                            'report',
+                            'report_section',
+                            'idea_thread',
+                            'knowledge_atom',
+                            'source_channel',
+                            'read_queue',
+                            'experiment',
+                            'action',
+                            'missed_post',
+                            'trust_correction'
+                        )),
+                        target_ref TEXT,
+                        source_url TEXT,
+                        notes TEXT,
+                        created_at TEXT NOT NULL,
+                        recorded_by TEXT NOT NULL DEFAULT 'operator'
+                    );
+                    INSERT INTO ai_report_feedback_events (
+                        week_label, feedback_type, target_type, target_ref, notes, created_at, recorded_by
+                    )
+                    VALUES (
+                        '2026-W27', 'wrong_priority', 'idea_thread', 'agent-frameworks',
+                        'Original event before contract expansion.', '2026-07-01T09:00:00Z', 'operator'
+                    );
+                    """
+                )
+            with patch.dict(os.environ, {"AGENT_DB_PATH": db_path}, clear=False):
+                run_migrations()
+            with sqlite3.connect(db_path) as connection:
+                connection.row_factory = sqlite3.Row
+                original = fetch_ai_report_feedback(connection, feedback_id=1, limit=1)[0]
+                correction = record_ai_report_feedback_correction(
+                    connection,
+                    week_label="2026-W27",
+                    corrected_feedback_id=1,
+                    correction_type="retraction",
+                    notes="Append-only correction after migration.",
+                    created_at="2026-07-01T10:00:00Z",
+                )
+        finally:
+            os.unlink(db_path)
+
+        self.assertEqual(original["feedback_type"], "wrong_priority")
+        self.assertEqual(correction["feedback_type"], "retraction")
+        self.assertEqual(correction["target_type"], "feedback_event")
+
     def test_feedback_text_parser_extracts_feedback_and_manual_suggestions(self):
         parsed = parse_feedback_text(
             """
@@ -353,6 +428,78 @@ class TestAiReportFeedback(unittest.TestCase):
         self.assertIn("Strategist summary: Two memory events proposed", intake["confirmation_summary"])
         self.assertIn("No memory has been written yet.", intake["confirmation_summary"])
 
+    def test_feedback_events_include_provenance_and_effect_window(self):
+        db_path = self._make_db()
+        try:
+            with sqlite3.connect(db_path) as connection:
+                connection.row_factory = sqlite3.Row
+                event = record_ai_report_feedback(
+                    connection,
+                    week_label="2026-W27",
+                    report_path="data/output/ai_intelligence/2026-W27.html",
+                    feedback_type="useful",
+                    target_type="idea_thread",
+                    target_ref="eval-gates",
+                    source_url="https://t.me/ai_lab/101",
+                    notes="Useful because it changed the weekly read queue.",
+                    created_at="2026-07-01T10:00:00Z",
+                    recorded_by="operator",
+                )
+                summary = summarize_ai_report_feedback(connection, before_week_label="2026-W28")
+        finally:
+            os.unlink(db_path)
+
+        self.assertEqual(event["confirmation_state"], "confirmed")
+        self.assertEqual(event["signal_strength"], "strong_positive")
+        self.assertEqual(event["feedback_provenance"]["source"], "operator_feedback_event")
+        self.assertEqual(event["feedback_provenance"]["event_id"], event["id"])
+        self.assertEqual(event["feedback_provenance"]["source_url"], "https://t.me/ai_lab/101")
+        self.assertEqual(event["effect_window"]["feedback_week_label"], "2026-W27")
+        self.assertEqual(event["effect_window"]["applies_from_week_label"], "2026-W28")
+        self.assertTrue(event["effect_window"]["applies_to_future_artifacts_only"])
+        self.assertEqual(summary["confirmation_state"], "confirmed_only")
+        self.assertEqual(summary["confirmed_event_count"], 1)
+        self.assertEqual(summary["pending_draft_count"], 0)
+        self.assertEqual(summary["feedback_effect_traces"][0]["provenance"]["event_id"], event["id"])
+
+    def test_feedback_correction_appends_without_rewriting_prior_event(self):
+        db_path = self._make_db()
+        try:
+            with sqlite3.connect(db_path) as connection:
+                connection.row_factory = sqlite3.Row
+                original = record_ai_report_feedback(
+                    connection,
+                    week_label="2026-W27",
+                    feedback_type="wrong_priority",
+                    target_type="idea_thread",
+                    target_ref="agent-frameworks",
+                    notes="I thought this was the wrong priority.",
+                    created_at="2026-07-01T09:00:00Z",
+                )
+                correction = record_ai_report_feedback_correction(
+                    connection,
+                    week_label="2026-W27",
+                    corrected_feedback_id=int(original["id"]),
+                    correction_type="retraction",
+                    notes="Retracted after review; the thread was relevant.",
+                    created_at="2026-07-01T10:00:00Z",
+                )
+                fetched = fetch_ai_report_feedback(connection, week_label="2026-W27", limit=10)
+                original_after = fetch_ai_report_feedback(connection, feedback_id=int(original["id"]), limit=1)[0]
+                summary = summarize_ai_report_feedback(connection, before_week_label="2026-W28")
+        finally:
+            os.unlink(db_path)
+
+        self.assertEqual(len(fetched), 2)
+        self.assertEqual(original_after["feedback_type"], "wrong_priority")
+        self.assertEqual(correction["feedback_type"], "retraction")
+        self.assertEqual(correction["target_type"], "feedback_event")
+        self.assertEqual(correction["correction"]["corrects_feedback_id"], original["id"])
+        self.assertTrue(correction["correction"]["append_only"])
+        self.assertFalse(correction["correction"]["rewrites_prior_event"])
+        self.assertEqual(summary["feedback_corrections"][0]["corrects_feedback_id"], original["id"])
+        self.assertFalse(summary["feedback_corrections"][0]["rewrites_prior_event"])
+
     def test_record_fetch_summary_and_missed_eval_examples(self):
         db_path = self._make_db()
         try:
@@ -402,6 +549,7 @@ class TestAiReportFeedback(unittest.TestCase):
         self.assertEqual(summary["counts_by_feedback"]["too_shallow"], 1)
         self.assertEqual(summary["downranked_atom_refs"], ["42"])
         self.assertIn("action:eval-gates-tried-4", summary["promoted_target_refs"] or [])
+        self.assertNotIn("read_queue:eval-gates-read-1", summary["promoted_target_refs"] or [])
         self.assertEqual(len(summary["missed_post_eval_examples"]), 1)
         self.assertEqual(len(summary["priority_eval_examples"]), 2)
         self.assertGreaterEqual(len(summary["feedback_eval_examples"]), 3)
@@ -564,6 +712,18 @@ class TestAiReportFeedback(unittest.TestCase):
         self.assertEqual(summary["counts_by_feedback"]["no_missed_posts"], 1)
         self.assertEqual(summary["counts_by_feedback"]["trust_too_low"], 1)
         self.assertIn("read_items", summary["feedback_completion"]["missing"])
+
+    def test_no_feedback_summary_is_unknown_not_negative(self):
+        db_path = self._make_db()
+        try:
+            with sqlite3.connect(db_path) as connection:
+                summary = summarize_ai_report_feedback(connection, before_week_label="2026-W28")
+        finally:
+            os.unlink(db_path)
+
+        self.assertEqual(summary["event_count"], 0)
+        self.assertEqual(summary["feedback_changes"]["status"], "unknown")
+        self.assertIn("no-feedback is not a negative signal", summary["feedback_changes"]["items"][0])
 
 
 if __name__ == "__main__":

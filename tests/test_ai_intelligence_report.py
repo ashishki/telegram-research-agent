@@ -276,7 +276,9 @@ class TestAiIntelligenceReport(unittest.TestCase):
         self.assertIn("action-card", html_text)
         self.assertIn("Personal Learning Loop", html_text)
         self.assertIn("What Feedback Changed This Week", html_text)
-        self.assertIn("personalization confidence is low", html_text)
+        self.assertIn("personalization state is unknown", html_text)
+        self.assertIn("no-feedback is not a negative signal", html_text)
+        self.assertIn("Why selected:", html_text)
         self.assertIn("Posts you marked this week", html_text)
         self.assertIn("https://t.me/ai_lab/701", html_text)
         self.assertEqual(metadata["marked_posts"][0]["feedback"], "operator_marked_interesting")
@@ -290,8 +292,14 @@ class TestAiIntelligenceReport(unittest.TestCase):
         self.assertEqual(metadata["frontier_analysis"]["model"], "claude-opus-4-6")
         self.assertTrue(metadata["compressed_context"])
         self.assertTrue(metadata["actions"])
+        self.assertTrue(metadata["actions"][0]["ranking_factors"])
+        self.assertTrue(metadata["actions"][0]["why_selected"])
         self.assertEqual(len(metadata["personal_learning_loop"]["read_items"]), 5)
         self.assertEqual(len(metadata["personal_learning_loop"]["try_items"]), 2)
+        self.assertTrue(metadata["personal_learning_loop"]["read_items"][0]["ranking_factors"])
+        self.assertTrue(metadata["personal_learning_loop"]["read_items"][0]["why_selected"])
+        self.assertTrue(metadata["personal_learning_loop"]["try_items"][0]["ranking_factors"])
+        self.assertTrue(metadata["personal_learning_loop"]["try_items"][0]["why_selected"])
         self.assertIn("reflection_question", metadata["personal_learning_loop"])
         self.assertIn("AI Intelligence Report 2026-W28 is ready", summary.notification_text)
 
@@ -414,6 +422,8 @@ class TestAiIntelligenceReport(unittest.TestCase):
         )
 
         self.assertEqual(atoms[0]["id"], 2)
+        self.assertTrue(atoms[0]["_ranking_factors"])
+        self.assertIn("confirmed feedback promoted", atoms[0]["_why_selected"])
 
     def test_feedback_downranks_related_learning_actions(self):
         threads = [
@@ -449,6 +459,8 @@ class TestAiIntelligenceReport(unittest.TestCase):
         )
 
         self.assertIn("Eval Gates", actions[0]["title"])
+        self.assertTrue(actions[0]["ranking_factors"])
+        self.assertIn("confirmed feedback promoted", actions[0]["why_selected"])
 
 
 if __name__ == "__main__":

@@ -664,6 +664,8 @@ def _action_cards(workbook: Mapping[str, Any]) -> list:
             "effort": card.get("effort"),
             "scope": card.get("scope"),
             "feedback_target_id": card.get("feedback_target_id"),
+            "why_selected": card.get("why_selected"),
+            "ranking_factors": [dict(item) for item in card.get("ranking_factors") or [] if isinstance(item, Mapping)],
         }
         for card in cards
     ]

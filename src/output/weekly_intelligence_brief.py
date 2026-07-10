@@ -431,6 +431,7 @@ def _render_brief_actions(context: dict, actions: list[dict]) -> str:
             '<article class="action-card">'
             f'<h3>{_escape(action.get("title") or "Action")}</h3>'
             f'<p>{_escape(action.get("body") or "")}</p>'
+            f'<p class="muted">Why selected: {_escape(action.get("why_selected") or "")}</p>'
             f'<p class="muted">Source links in action context: {_escape(action.get("source_count", 0))}</p>'
             '</article>'
         )
@@ -439,10 +440,12 @@ def _render_brief_actions(context: dict, actions: list[dict]) -> str:
     for index, item in enumerate((loop.get("read_items") or [])[:3], start=1):
         source = _link(item.get("source_url") or "", f"Read {index}") if item.get("source_url") else '<span class="muted">source pending</span>'
         read_items.append(
-            f'<li><b>{_escape(item.get("claim") or "Read item")}</b><br>{source}</li>'
+            f'<li><b>{_escape(item.get("claim") or "Read item")}</b>'
+            f'<p class="muted">Why selected: {_escape(item.get("why_selected") or "")}</p>{source}</li>'
         )
     try_items = "".join(
-        f'<li><b>{_escape(item.get("title") or "Try item")}</b>: {_escape(item.get("body") or "")}</li>'
+        f'<li><b>{_escape(item.get("title") or "Try item")}</b>: {_escape(item.get("body") or "")}'
+        f'<p class="muted">Why selected: {_escape(item.get("why_selected") or "")}</p></li>'
         for item in (loop.get("try_items") or [])[:2]
     )
     return (

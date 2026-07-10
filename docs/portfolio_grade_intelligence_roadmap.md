@@ -252,6 +252,13 @@ Tasks:
 
 Primary task: `PGI-002`.
 
+Current implementation note: PGI-002 now records feedback provenance,
+future-only effect windows, signal strength, and append-only correction/
+retraction events. AI report and Weekly Brief sidecars carry
+`ranking_factors`/`why_selected` for top action/read/try items, and rendered
+HTML copies those data-backed explanations. `read` remains a weak observation;
+no-feedback is `unknown`, not negative. Hermes/PI exposes the fields read-only.
+
 ### Phase 3 - Explainable Personalized Ranking
 
 Goal: every top item explains why it was selected.
@@ -513,6 +520,10 @@ Likely files:
 Schema/API impact: append-only feedback correction/provenance fields may need a
 versioned migration; operator context should start as read-only config/sidecar.
 
+Implemented note: the current slice uses an idempotent SQLite constraint rebuild
+for expanded feedback event/target enums and additive sidecar fields; no
+production config change is required.
+
 Tests/evals:
 
 - no-feedback stays unknown;
@@ -536,6 +547,11 @@ Verification:
 ```bash
 PYTHONPATH=src python3 -m pytest tests/test_ai_report_feedback.py tests/test_ai_intelligence_report.py tests/test_pi_facade.py
 ```
+
+Current verified command set also includes `tests/test_action_status.py`,
+`tests/test_split_intelligence_reports.py`, `tests/test_strategy_reviewer.py`,
+`tests/test_pi_tools.py`, `tests/test_pi_chat.py`, and
+`tests/test_intelligence_retrieval_items.py`.
 
 Portfolio evidence: explainable personalization and feedback safety.
 

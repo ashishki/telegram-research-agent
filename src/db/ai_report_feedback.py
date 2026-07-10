@@ -1,7 +1,7 @@
 import json
 import sqlite3
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 
 FEEDBACK_TYPES = {
@@ -18,6 +18,9 @@ FEEDBACK_TYPES = {
     "trust_too_high",
     "trust_too_low",
     "verify_first",
+    "correction",
+    "retraction",
+    "accidental_feedback",
 }
 TARGET_TYPES = {
     "report",
@@ -30,6 +33,8 @@ TARGET_TYPES = {
     "action",
     "missed_post",
     "trust_correction",
+    "feedback_event",
+    "operator_context",
 }
 INTAKE_INPUT_KINDS = {"text", "voice_transcript"}
 INTAKE_STATUSES = {"pending", "confirmed", "discarded"}
@@ -63,7 +68,7 @@ def _normalize_choice(value: str, allowed: set[str], field_name: str) -> str:
 
 def _row_to_feedback(columns: list[str], row: sqlite3.Row | tuple) -> dict:
     values = dict(zip(columns, row))
-    return {
+    feedback = {
         "id": int(values["id"]),
         "week_label": values["week_label"],
         "report_path": values["report_path"],
@@ -75,6 +80,88 @@ def _row_to_feedback(columns: list[str], row: sqlite3.Row | tuple) -> dict:
         "created_at": values["created_at"],
         "recorded_by": values["recorded_by"],
     }
+    feedback["confirmation_state"] = "confirmed"
+    feedback["signal_strength"] = _feedback_signal_strength(feedback["feedback_type"])
+    feedback["feedback_provenance"] = _feedback_provenance(feedback)
+    feedback["effect_window"] = _feedback_effect_window(feedback)
+    feedback["correction"] = _feedback_correction_info(feedback)
+    return feedback
+
+
+def _feedback_signal_strength(feedback_type: str) -> str:
+    if feedback_type in {"useful", "applied_to_project"}:
+        return "strong_positive"
+    if feedback_type in {"wrong_priority", "not_interested", "noise"}:
+        return "strong_negative"
+    if feedback_type in {"trust_too_high", "trust_too_low", "verify_first"}:
+        return "trust_calibration"
+    if feedback_type in {"correction", "retraction", "accidental_feedback"}:
+        return "correction"
+    if feedback_type in {"tried", "too_shallow", "missed_important_post"}:
+        return "medium"
+    if feedback_type in {"read", "no_missed_posts"}:
+        return "weak_observation"
+    return "unknown"
+
+
+def _feedback_provenance(feedback: dict) -> dict:
+    return {
+        "source": "operator_feedback_event",
+        "event_id": int(feedback["id"]),
+        "recorded_by": feedback.get("recorded_by") or "operator",
+        "created_at": feedback.get("created_at"),
+        "report_path": feedback.get("report_path"),
+        "source_url": feedback.get("source_url"),
+        "confirmation_state": "confirmed",
+    }
+
+
+def _feedback_effect_window(feedback: dict) -> dict:
+    return {
+        "feedback_week_label": feedback.get("week_label"),
+        "applies_from_week_label": _next_week_label(feedback.get("week_label")),
+        "applies_to_future_artifacts_only": True,
+        "does_not_rewrite_report_path": feedback.get("report_path"),
+        "created_at": feedback.get("created_at"),
+    }
+
+
+def _feedback_correction_info(feedback: dict) -> dict:
+    feedback_type = str(feedback.get("feedback_type") or "")
+    is_correction = feedback_type in {"correction", "retraction", "accidental_feedback"}
+    return {
+        "is_correction": is_correction,
+        "corrects_feedback_id": _feedback_event_ref_id(feedback.get("target_ref")) if is_correction else None,
+        "append_only": True,
+        "rewrites_prior_event": False,
+    }
+
+
+def _feedback_event_ref_id(value: object) -> int | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if ":" in text:
+        text = text.rsplit(":", maxsplit=1)[-1]
+    try:
+        clean = int(text)
+    except (TypeError, ValueError):
+        return None
+    return clean if clean > 0 else None
+
+
+def _next_week_label(week_label: object) -> str | None:
+    text = str(week_label or "").strip()
+    if "-W" not in text:
+        return None
+    try:
+        year_text, week_text = text.split("-W", maxsplit=1)
+        current = datetime.fromisocalendar(int(year_text), int(week_text), 1).replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        return None
+    next_week = current + timedelta(days=7)
+    year, week, _ = next_week.isocalendar()
+    return f"{year}-W{week:02d}"
 
 
 def _cursor_to_feedback(cursor: sqlite3.Cursor) -> list[dict]:
@@ -174,6 +261,38 @@ def record_ai_report_feedback(
     if not rows:
         raise RuntimeError("AI report feedback insert could not be read back")
     return rows[0]
+
+
+def record_ai_report_feedback_correction(
+    connection: sqlite3.Connection,
+    *,
+    week_label: str,
+    corrected_feedback_id: int,
+    correction_type: str = "correction",
+    notes: str | None = None,
+    report_path: str | None = None,
+    source_url: str | None = None,
+    created_at: str | None = None,
+    recorded_by: str = "operator",
+    commit: bool = True,
+) -> dict:
+    clean_type = _normalize_choice(correction_type, {"correction", "retraction", "accidental_feedback"}, "correction_type")
+    prior_rows = fetch_ai_report_feedback(connection, feedback_id=int(corrected_feedback_id), limit=1)
+    if not prior_rows:
+        raise ValueError(f"AI report feedback event not found: {corrected_feedback_id}")
+    return record_ai_report_feedback(
+        connection,
+        week_label=week_label,
+        feedback_type=clean_type,
+        target_type="feedback_event",
+        target_ref=f"feedback_event:{int(corrected_feedback_id)}",
+        report_path=report_path,
+        source_url=source_url,
+        notes=notes,
+        created_at=created_at,
+        recorded_by=recorded_by,
+        commit=commit,
+    )
 
 
 def record_ai_report_feedback_intake(
@@ -414,7 +533,7 @@ def summarize_ai_report_feedback(
 def _summarize_events(events: list[dict]) -> dict:
     counts = Counter(event["feedback_type"] for event in events)
     downrank_feedback = {"not_interested", "noise", "wrong_priority"}
-    positive_feedback = {"useful", "tried", "applied_to_project", "read"}
+    positive_feedback = {"useful", "tried", "applied_to_project"}
     downranked_threads = sorted(
         {
             str(event.get("target_ref") or "")
@@ -474,6 +593,8 @@ def _summarize_events(events: list[dict]) -> dict:
         if event.get("feedback_type") in {"wrong_priority", "not_interested"}
     ]
     completion = _minimum_feedback_completion(events)
+    corrections = _feedback_corrections(events)
+    effect_traces = _feedback_effect_traces(events)
     guidance = _frontier_prompt_guidance(
         counts=counts,
         downranked_threads=downranked_threads,
@@ -501,9 +622,51 @@ def _summarize_events(events: list[dict]) -> dict:
         "feedback_eval_examples": [*missed_examples, *priority_examples][:12],
         "feedback_completion": completion,
         "feedback_changes": feedback_changes,
+        "feedback_corrections": corrections,
+        "feedback_effect_traces": effect_traces,
+        "confirmed_event_count": len(events),
+        "pending_draft_count": 0,
+        "confirmation_state": "confirmed_only",
         "frontier_prompt_guidance": guidance,
         "recent_events": events[:10],
     }
+
+
+def _feedback_corrections(events: list[dict]) -> list[dict]:
+    corrections = []
+    for event in events:
+        info = event.get("correction") or {}
+        if not info.get("is_correction"):
+            continue
+        corrections.append(
+            {
+                "event_id": event.get("id"),
+                "feedback_type": event.get("feedback_type"),
+                "corrects_feedback_id": info.get("corrects_feedback_id"),
+                "target_ref": event.get("target_ref"),
+                "notes": event.get("notes"),
+                "append_only": True,
+                "rewrites_prior_event": False,
+            }
+        )
+    return corrections[:20]
+
+
+def _feedback_effect_traces(events: list[dict]) -> list[dict]:
+    traces = []
+    for event in events:
+        traces.append(
+            {
+                "event_id": event.get("id"),
+                "feedback_type": event.get("feedback_type"),
+                "target_type": event.get("target_type"),
+                "target_ref": event.get("target_ref"),
+                "signal_strength": event.get("signal_strength"),
+                "provenance": event.get("feedback_provenance") or {},
+                "effect_window": event.get("effect_window") or {},
+            }
+        )
+    return traces[:20]
 
 
 def _feedback_changes_summary(
@@ -517,9 +680,9 @@ def _feedback_changes_summary(
 ) -> dict:
     if event_count <= 0:
         return {
-            "status": "low_confidence",
-            "summary": "No prior feedback is available; personalization confidence is low.",
-            "items": ["No confirmed feedback has changed ranking yet."],
+            "status": "unknown",
+            "summary": "No prior feedback is available; personalization state is unknown.",
+            "items": ["No confirmed feedback has changed ranking yet; no-feedback is not a negative signal."],
             "downranked": [],
             "promoted": [],
             "eval_example_count": 0,
@@ -529,7 +692,7 @@ def _feedback_changes_summary(
     if downranked_targets:
         items.append(f"Downranked {len(downranked_targets)} target(s) related to wrong-priority or not-interested feedback.")
     if promoted_targets:
-        items.append(f"Promoted {len(promoted_targets)} target(s) marked useful, tried, read, or applied-to-project.")
+        items.append(f"Promoted {len(promoted_targets)} target(s) marked useful, tried, or applied-to-project.")
     if missed_examples:
         items.append(f"Added {len(missed_examples)} missed-post eval example(s) for next report coverage.")
     if priority_examples:
@@ -613,14 +776,14 @@ def _frontier_prompt_guidance(
         )
     if promoted_targets or counts.get("useful") or counts.get("tried"):
         guidance.append(
-            "Promote similar items when prior feedback marked them read, tried, useful, or applied_to_project."
+            "Promote similar items when prior feedback marked them tried, useful, or applied_to_project; treat read as weak observation."
         )
     if eval_examples:
         guidance.append(
             "Treat missed-post and priority-calibration feedback as eval examples for coverage and ranking."
         )
     if not guidance:
-        guidance.append("No prior feedback is available; state low personalization confidence.")
+        guidance.append("No prior feedback is available; state unknown personalization confidence.")
     return guidance
 
 

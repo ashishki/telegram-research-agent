@@ -22,8 +22,8 @@ Return JSON with exactly these top-level keys:
 {{
   "memory_events_proposed": [
     {{
-      "feedback_type": "read|useful|tried|applied_to_project|too_shallow|missed_important_post|no_missed_posts|wrong_priority|not_interested|noise|trust_too_high|trust_too_low|verify_first",
-      "target_type": "report|report_section|idea_thread|knowledge_atom|source_channel|read_queue|experiment|action|missed_post|trust_correction",
+      "feedback_type": "read|useful|tried|applied_to_project|too_shallow|missed_important_post|no_missed_posts|wrong_priority|not_interested|noise|trust_too_high|trust_too_low|verify_first|correction|retraction|accidental_feedback",
+      "target_type": "report|report_section|idea_thread|knowledge_atom|source_channel|read_queue|experiment|action|missed_post|trust_correction|feedback_event|operator_context",
       "target_ref": "optional stable reference",
       "source_url": "optional URL",
       "notes": "operator-grounded note"
@@ -51,6 +51,7 @@ Extraction guidance:
 - Wrong priority, not interesting, noisy, or too shallow feedback should become calibration memory events.
 - Missed important source/post feedback should preserve source URLs when present.
 - Trust corrections should use trust_too_high, trust_too_low, or verify_first.
+- Correction/retraction feedback should target an existing feedback_event and stay append-only.
 - Requests to change config, prompts, projects, code, scoring, or profiles are manual suggestions or Codex task drafts, not memory events.
 - If feedback asks for direct mutation, add a risk note that manual approval is required.
 

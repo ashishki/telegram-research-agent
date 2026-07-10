@@ -64,6 +64,15 @@ class TestPersonalIntelligenceFacade(unittest.TestCase):
                             "success_criterion": "Bad agent edit fails before merge.",
                             "effort": "30 min",
                             "scope": "verification",
+                            "why_selected": "Selected for source-backed utility with confirmed feedback.",
+                            "ranking_factors": [
+                                {
+                                    "label": "feedback_score",
+                                    "value": 1,
+                                    "weight": "high",
+                                    "evidence": {"event_count": 1, "confirmation_state": "confirmed_only"},
+                                }
+                            ],
                         }
                     ],
                     "project_diagnostic": {
@@ -199,6 +208,8 @@ class TestPersonalIntelligenceFacade(unittest.TestCase):
         self.assertEqual(set(result.keys()), expected_keys)
         self.assertEqual(result["status"], "ok")
         self.assertTrue(result["strong_signals"])
+        self.assertEqual(result["actions"][0]["why_selected"], "Selected for source-backed utility with confirmed feedback.")
+        self.assertEqual(result["actions"][0]["ranking_factors"][0]["label"], "feedback_score")
 
     def test_get_action_statuses_keeps_missing_feedback_unknown(self):
         with tempfile.TemporaryDirectory() as tmp:

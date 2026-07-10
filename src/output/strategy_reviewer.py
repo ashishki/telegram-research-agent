@@ -58,14 +58,14 @@ def build_strategy_review(
     ]
 
     if not has_feedback:
-        keep.append("Keep the feedback prompt visible; personalization confidence stays low until confirmed feedback exists.")
+        keep.append("Keep the feedback prompt visible; personalization state is unknown until confirmed feedback exists.")
         change.append("Ask for at least one read/try/missed/trust feedback item after the workbook.")
         test_next_week.append("Run the workbook with explicit feedback targets and inspect completion.")
-        risks.append("Personalization confidence is low until confirmed feedback exists.")
+        risks.append("No confirmed feedback is an unknown state, not a negative signal.")
     else:
         memory_only.append("Confirmed feedback is already stored in ai_report_feedback_events; no profile/config edit is required.")
-        if counts.get("useful") or counts.get("tried") or counts.get("applied_to_project") or counts.get("read"):
-            keep.append("Keep promoting read/try/build items that received useful, tried, read, or applied-to-project feedback.")
+        if counts.get("useful") or counts.get("tried") or counts.get("applied_to_project"):
+            keep.append("Keep promoting try/build items that received useful, tried, or applied-to-project feedback.")
         if counts.get("too_shallow"):
             change.append("Increase source-depth checks for sections marked too_shallow.")
             approval_required.append(

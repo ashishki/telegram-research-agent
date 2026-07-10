@@ -14,10 +14,11 @@ task graph below.
 
 - One active queue: Portfolio-Grade Intelligence (`PGI`).
 - One parallel Radar track: `RADAR-PGI`.
-- One next P0 task after the local PGI-001 implementation:
-  `PGI-002 - Operator Context, Feedback Provenance And Explainable Ranking`.
-- `PGI-001` is implemented locally with focused verification; start PGI-002 only
-  as a separate PR-sized slice after reviewing the contract diff.
+- One next P0 task after the local PGI-002 implementation:
+  `PGI-003 - Weekly Decision Cockpit, Hermes Awareness And Radar Gate`.
+- `PGI-001` and `PGI-002` are implemented locally with focused verification;
+  start PGI-003 only as a separate PR-sized slice after reviewing the feedback
+  provenance/ranking diff.
 - Do not run expensive LLM jobs, full archive backfills, migrations, or
   production config changes from backlog grooming.
 - Market/business context remains `context_only`.
@@ -33,7 +34,7 @@ task graph below.
 | Weekly AI visual report/workbook contract | `implemented_and_verified`, `legacy_surface` |
 | Weekly Brief + Knowledge Atlas split | `partial` |
 | Hermes/PI facade/tools/chat | `implemented_but_not_dogfooded` |
-| Feedback intake/action status | `partial` |
+| Feedback intake/action status | `implemented_and_verified` for PGI-002 provenance/ranking slice |
 | Strategy Reviewer | `implemented_and_verified` advisory-only |
 | Market/business Radar context | `implemented_and_verified` as `context_only` |
 | Radar RVE contract/adapters in sibling repo | `implemented_and_verified`, `needs_live_validation` |
@@ -41,10 +42,11 @@ task graph below.
 
 ## Next P0 Task
 
-`PGI-002 - Operator Context, Feedback Provenance And Explainable Ranking`
+`PGI-003 - Weekly Decision Cockpit, Hermes Awareness And Radar Gate`
 
-Start here after the PGI-001 contract changes are reviewed. Do not reopen
-KIR/HPI/RVE implementation unless the new contract discovers a regression.
+Start here after the PGI-002 feedback/ranking changes are reviewed. Do not
+reopen KIR/HPI/RVE implementation unless the new contract discovers a
+regression.
 
 ## Dependency Graph
 
@@ -149,7 +151,7 @@ PYTHONPATH=src python3 -m pytest tests/test_ai_report_contract.py tests/test_spl
 
 ### PGI-002 - Operator Context, Feedback Provenance And Explainable Ranking
 
-- Status: `next_p0`
+- Status: `completed_local`
 - Priority: P0
 - Owner: `telegram-research-agent`
 - Problem: feedback exists, but signal strength, provenance, effect timing,
@@ -194,10 +196,32 @@ PYTHONPATH=src python3 -m pytest tests/test_ai_report_feedback.py tests/test_ai_
 - Estimated size: L.
 - Portfolio evidence produced: explainable personalization audit.
 - Radar impact: none.
+- Completion notes:
+  - Added confirmed feedback DTO fields for `confirmation_state`,
+    `signal_strength`, `feedback_provenance`, `effect_window`, and append-only
+    `correction` metadata.
+  - Added append-only correction/retraction/accidental-feedback event support
+    using `target_type=feedback_event`; prior events are not rewritten.
+  - Updated schema and idempotent migration rebuild for the expanded feedback
+    CHECK constraints; migration preservation is covered by a regression test.
+  - Pending intake drafts remain separate from confirmed memory events.
+  - `read` is a weak observation, not a promoted preference; no-feedback is
+    `unknown`, never negative.
+  - AI report and Weekly Brief sidecars now carry `ranking_factors` and
+    `why_selected` for actions/read/try items, and rendered HTML copies the
+    sidecar-backed "Why selected" explanation.
+  - PI/Hermes facade action summaries expose `ranking_factors` and
+    `why_selected` read-only; no mutation tools were added.
+  - Verification passed:
+    `PYTHONPATH=src python3 -m pytest tests/test_ai_report_feedback.py tests/test_ai_intelligence_report.py tests/test_pi_facade.py tests/test_action_status.py`.
+  - Additional touched-surface verification passed:
+    `PYTHONPATH=src python3 -m pytest tests/test_split_intelligence_reports.py tests/test_strategy_reviewer.py` and
+    `PYTHONPATH=src python3 -m pytest tests/test_pi_tools.py tests/test_pi_chat.py tests/test_intelligence_retrieval_items.py`.
+  - No production config change, expensive LLM run, or full archive backfill.
 
 ### PGI-003 - Weekly Decision Cockpit, Hermes Awareness And Radar Gate
 
-- Status: `planned`
+- Status: `next_p0`
 - Priority: P0
 - Owner: `telegram-research-agent`
 - Problem: Brief/Atlas split exists, but the Brief is not yet a complete
@@ -206,8 +230,8 @@ PYTHONPATH=src python3 -m pytest tests/test_ai_report_feedback.py tests/test_ai_
 - User outcome: the operator can understand the week, Radar state, and next
   actions in 3-5 minutes, then ask Hermes grounded follow-ups.
 - Why now: this is the main product surface and portfolio demo slice.
-- Dependencies: `PGI-001`; best after `PGI-002`.
-- Blocked by: missing contract/factor sidecar fields.
+- Dependencies: `PGI-001`, `PGI-002`.
+- Blocked by: none known; keep as a separate PR-sized slice.
 - Files likely touched: `src/output/weekly_intelligence_brief.py`,
   `src/output/split_intelligence_reports.py`,
   `src/output/intelligence_retrieval_items.py`, `src/assistant/pi_facade.py`,

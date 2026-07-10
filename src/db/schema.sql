@@ -240,7 +240,10 @@ CREATE TABLE IF NOT EXISTS ai_report_feedback_events (
             'noise',
             'trust_too_high',
             'trust_too_low',
-            'verify_first'
+            'verify_first',
+            'correction',
+            'retraction',
+            'accidental_feedback'
         )),
     target_type TEXT NOT NULL DEFAULT 'report'
         CHECK(target_type IN (
@@ -253,7 +256,9 @@ CREATE TABLE IF NOT EXISTS ai_report_feedback_events (
             'experiment',
             'action',
             'missed_post',
-            'trust_correction'
+            'trust_correction',
+            'feedback_event',
+            'operator_context'
         )),
     target_ref TEXT,
     source_url TEXT,

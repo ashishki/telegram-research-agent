@@ -1,9 +1,9 @@
 # CODEX_PROMPT - Compact Session Handoff
 
-Version: 4.1
+Version: 4.2
 Date: 2026-07-10
-State: PGI-001 implemented locally and verified; PGI-002 is next but should be
-started as a separate PR-sized slice
+State: PGI-001 and PGI-002 implemented locally and verified; PGI-003 is next
+but should be started as a separate PR-sized slice
 
 ## Current Product Direction
 
@@ -31,7 +31,7 @@ docs/tasks.md
 Next implementation task:
 
 ```text
-PGI-002 - Operator Context, Feedback Provenance And Explainable Ranking
+PGI-003 - Weekly Decision Cockpit, Hermes Awareness And Radar Gate
 ```
 
 ## Verified Baseline
@@ -47,8 +47,9 @@ PGI-002 - Operator Context, Feedback Provenance And Explainable Ranking
   fixtures.
 - Hermes/PI facade, tools, chat, and intent routing exist as a read-only,
   bounded foundation; product dogfood/evals remain incomplete.
-- Feedback intake and action-status helpers exist; provenance, corrections,
-  effect windows, and ranking explanations remain incomplete.
+- Feedback intake/action-status helpers now include PGI-002 provenance,
+  correction/effect-window metadata, no-feedback unknown semantics, and
+  sidecar-backed ranking explanations for top action/read/try items.
 - Strategy Reviewer exists as advisory-only and must not mutate code/config.
 - Market/business context for Radar exists and is `context_only`.
 - Sibling `Demand-to-MVP-Radar` repo exists at
@@ -137,31 +138,94 @@ Review notes:
 - Hermes/Radar: Hermes remains read-only; Radar context-only records still do
   not satisfy demand gates.
 
-## PGI-002 Handoff
+## PGI-002 Completion
 
-Goal: add operator context, feedback provenance, and explainable ranking without
-weakening the PGI-001 evidence contract.
+Status: completed locally on 2026-07-10.
 
-Likely files:
+Implemented:
+
+- Confirmed feedback events now expose `confirmation_state`, `signal_strength`,
+  `feedback_provenance`, `effect_window`, and append-only correction metadata.
+- Added correction/retraction/accidental-feedback events against
+  `target_type=feedback_event`; prior events are preserved.
+- Updated SQLite schema and idempotent migration rebuild for the expanded
+  feedback event/target CHECK constraints.
+- Pending feedback intakes remain drafts until explicitly confirmed.
+- `read` is a weak observation, not a promotion signal; no feedback is
+  `unknown`, never negative.
+- AI report and Weekly Brief JSON sidecars include `ranking_factors` and
+  `why_selected`; rendered HTML copies "Why selected" from sidecar data.
+- PI/Hermes facade exposes ranking explanation fields read-only; no mutation
+  tools were added.
+
+Files changed for PGI-002:
 
 - `src/db/ai_report_feedback.py`
-- `src/output/personalize.py`
+- `src/db/migrate.py`
+- `src/db/schema.sql`
 - `src/output/ai_intelligence_report.py`
 - `src/output/weekly_intelligence_brief.py`
+- `src/output/ai_report_contract.py`
+- `src/output/frontier_analysis.py`
+- `src/output/strategy_reviewer.py`
 - `src/assistant/pi_facade.py`
+- `src/assistant/feedback_prompts.py`
 - `tests/test_ai_report_feedback.py`
 - `tests/test_ai_intelligence_report.py`
 - `tests/test_pi_facade.py`
+- `tests/test_split_intelligence_reports.py`
+
+Verification passed:
+
+```bash
+PYTHONPATH=src python3 -m pytest tests/test_ai_report_feedback.py tests/test_ai_intelligence_report.py tests/test_pi_facade.py tests/test_action_status.py
+PYTHONPATH=src python3 -m pytest tests/test_split_intelligence_reports.py tests/test_strategy_reviewer.py
+PYTHONPATH=src python3 -m pytest tests/test_pi_tools.py tests/test_pi_chat.py tests/test_intelligence_retrieval_items.py
+git diff --check
+```
+
+Review notes:
+
+- Correctness: old SQLite feedback CHECK constraints rebuild without losing
+  existing events; corrections append and require an existing prior event.
+- Provenance/evidence safety: feedback effects include source/provenance and
+  future-only effect windows; no already-rendered artifact is rewritten.
+- Sidecar/rendered parity: AI report and Brief HTML explanations are backed by
+  sidecar `why_selected`/`ranking_factors`.
+- Backward compatibility: fields are additive for readers; migration preserves
+  existing rows and indexes.
+- Privacy/secrets: no `.env`, secrets, private generated artifacts, expensive
+  LLM runs, production config changes, or full archive backfills.
+- Hermes/Radar: Hermes remains read-only; no Radar gate behavior changed.
+
+## PGI-003 Handoff
+
+Goal: turn the split Weekly Brief into a first-screen decision cockpit and make
+Hermes aware of current/stale/missing Brief, Atlas, and Radar artifacts without
+weakening PGI-001/PGI-002 contracts.
+
+Likely files:
+
+- `src/output/weekly_intelligence_brief.py`
+- `src/output/split_intelligence_reports.py`
+- `src/output/intelligence_retrieval_items.py`
+- `src/assistant/pi_facade.py`
+- `src/assistant/pi_chat.py`
+- `src/assistant/pi_tools.py`
+- `tests/test_split_intelligence_reports.py`
+- `tests/test_pi_chat.py`
+- `tests/test_pi_tools.py`
+- `tests/test_mvp_weekly_pipeline.py`
 
 Verification target:
 
 ```bash
-PYTHONPATH=src python3 -m pytest tests/test_ai_report_feedback.py tests/test_ai_intelligence_report.py tests/test_pi_facade.py tests/test_action_status.py
+PYTHONPATH=src python3 -m pytest tests/test_split_intelligence_reports.py tests/test_pi_chat.py tests/test_pi_tools.py tests/test_mvp_weekly_pipeline.py
 ```
 
-Stop before PGI-002 implementation if the slice requires a DB migration plus
-renderer/ranking/Hermes changes in one pass; split it into append-only feedback
-provenance first.
+Stop before PGI-003 implementation if market context can look like demand
+evidence, Hermes would need mutation capabilities, or the Brief starts hiding
+missing/stale Radar states.
 
 ## Non-Negotiable Rules
 
