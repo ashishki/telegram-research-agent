@@ -1,7 +1,7 @@
 # Documentation Map
 
-Version: 2.0
-Last updated: 2026-07-10
+Version: 2.1
+Last updated: 2026-07-11
 State: documentation index
 
 This directory keeps current operator and implementation guidance at the top
@@ -27,6 +27,7 @@ baseline examples live under `docs/archive/`.
 | `spec.md` | Implementation-facing system specification and maintenance lanes |
 | `operator_workflow.md` | Weekly operator workflow for Brief, Atlas, Hermes, feedback, and Radar |
 | `mvp_weekly_radar.md` | Existing Radar bridge, market/business context sidecar, KIR/RVE gates, and credentials |
+| `mvp_skill_research_sources.md` | Locally installed Codex/Claude research skills for auxiliary MVP source discovery and gate-safe usage |
 | `dogfood_4_week_plan.md` | Supporting dogfood protocol; canonical phases live in the portfolio roadmap |
 | `report_format.md` | Legacy weekly artifact contracts and source-link requirements |
 | `curated_semantic_retrieval.md` | HPI-9-lite retrieval decision: curated deterministic+SQLite FTS; raw/vector RAG deferred |

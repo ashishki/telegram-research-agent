@@ -64,6 +64,12 @@ PGI-007 - Four-Week Dogfood Evidence Series
   `/srv/openclaw-you/workspace/Demand-to-MVP-Radar`; RVE query planning,
   matched external evidence, adapters, and gate tests are implemented there.
   Live weekly validation still needs dogfood.
+- Auxiliary research skills from
+  `artwist-polyakov/polyakov-claude-skills` are installed under
+  `/root/.codex/skills/`: `reddit-skill`, `x-research`,
+  `yandex-search-api`, `yandex-wordstat`, `telegram-channel-parser`, and
+  `crawl4ai-seo`. Use them only as gate-safe research collectors; raw skill
+  output is context until normalized and matched to a Radar candidate.
 - GitHub connector returned no open PRs or open issues for either repo on
   2026-07-10.
 
@@ -427,6 +433,7 @@ start a local private dogfood log outside git.
 - `docs/intelligence_evaluation_framework.md`
 - `docs/portfolio_evidence_plan.md`
 - `docs/mvp_radar_integration_contract.md`
+- `docs/mvp_skill_research_sources.md`
 - `docs/operator_ai_systems_learning_roadmap.md`
 - `docs/operator_workflow.md`
 - `docs/hermes_pi_assistant_roadmap.md`

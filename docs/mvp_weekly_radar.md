@@ -101,6 +101,37 @@ Radar's active weekly source bundle includes:
 Confident recommendations are gated in Radar. Telegram-only candidates cannot
 become `focused_experiment`.
 
+## Skill-Assisted Source Layer
+
+Local Codex research skills from
+`artwist-polyakov/polyakov-claude-skills` are installed as an auxiliary layer
+for broader MVP research:
+
+- `reddit-skill`;
+- `x-research`;
+- `yandex-search-api`;
+- `yandex-wordstat`;
+- `telegram-channel-parser`;
+- `crawl4ai-seo`.
+
+Use them after a Radar run has produced candidate-specific validation queries
+or missing-evidence categories. They are not a replacement for the production
+Radar source bundle. Any skill artifact must be summarized with query, source
+URL, excerpt/snippet, candidate match, evidence role, and limitations before it
+can be considered by the operator.
+
+Default evidence policy:
+
+- Telegram parser and market/business findings are `context_only`.
+- X/Twitter findings are lower-confidence corroboration and non-gating.
+- Yandex Wordstat volume is context until SERP intent is verified.
+- Reddit/Yandex SERP/crawl findings can help only when they match the same
+  candidate, ICP, pain, and workaround.
+- `crawl4ai-seo` is currently scaffold-only/partial readiness until `crawl4ai`
+  and Playwright are installed for the skill.
+
+Detailed local workflow: `docs/mvp_skill_research_sources.md`.
+
 ## Market/Business Analyst Context
 
 HPI-13 added a separate market/business context pack for Radar. The pack is

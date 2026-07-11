@@ -105,6 +105,29 @@ consumer can read the selected object without chasing top-level JSON.
 - Cross-repo schema changes must be versioned and tested.
 - Sidecar JSON and rendered Markdown/HTML must not contradict each other.
 
+## Skill-Assisted Research Boundary
+
+Codex may use locally installed research skills from
+`artwist-polyakov/polyakov-claude-skills` as an auxiliary discovery layer:
+`reddit-skill`, `x-research`, `yandex-search-api`, `yandex-wordstat`,
+`telegram-channel-parser`, and `crawl4ai-seo`.
+
+This layer is not a source-of-truth shortcut. Skill output must be treated as
+one of:
+
+- `context_only`;
+- `matched_external`;
+- `negative`;
+- `irrelevant`;
+- `credential_limited`;
+- `not_run`.
+
+Only `matched_external` records that reference the same selected candidate,
+ICP, pain, and workaround may contribute to Radar gates. Search volume, Telegram
+commentary, market/business context, or X/Twitter discussion cannot upgrade a
+candidate by themselves. See `docs/mvp_skill_research_sources.md` for the local
+operator workflow.
+
 ## Evidence Roles
 
 | Role | Can satisfy Radar gate? | Notes |
@@ -112,7 +135,10 @@ consumer can read the selected object without chasing top-level JSON.
 | Knowledge Thread seed | no by itself | useful candidate provenance |
 | Market/business analyst context | no | context-only framing and hints |
 | Live source intelligence snapshot | no | context-only freshness and repeated-claim hint |
+| Skill-assisted Telegram channel parse | no by itself | useful fresh context; same Telegram-only gate boundary |
 | Matched external SERP/search demand | sometimes | must match selected candidate and pass source gate |
+| Matched Yandex SERP/search demand | sometimes | must verify intent and candidate match |
+| Yandex Wordstat demand volume | no by itself | volume/context only unless paired with verified intent evidence |
 | Matched Reddit/forum complaint | sometimes | same pain and candidate, not adjacent topic |
 | Matched competitor/workaround crawler evidence | sometimes | bounded source, same ICP/pain, not hype-only |
 | X/Twitter corroboration | no by itself | lower-confidence corroboration only |

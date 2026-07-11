@@ -279,6 +279,7 @@ Start here:
 - [docs/spec.md](docs/spec.md) — implementation-facing system specification
 - [docs/report_format.md](docs/report_format.md) — weekly artifact contract
 - [docs/mvp_weekly_radar.md](docs/mvp_weekly_radar.md) — MVP Radar bridge, market-context sidecar, evidence gates, and credentials
+- [docs/mvp_skill_research_sources.md](docs/mvp_skill_research_sources.md) — installed auxiliary research skills for gate-safe MVP source discovery
 - [docs/research_brief_receipt.md](docs/research_brief_receipt.md) — Research Brief receipt audit contract with implemented SQLite schema/storage helpers, generation-time receipt creation, delivery ref updates, deterministic verification checks, CLI inspection, operator review, and optional operator-only audit notes
 - [docs/telegram_channel_intelligence.md](docs/telegram_channel_intelligence.md) — Channel Intelligence design, implemented schema migrations, deterministic repeated-claim extraction, source-observation refresh, active-project links, narrative candidates, inspection CLI, and optional Markdown report surface
 - [docs/memory_architecture.md](docs/memory_architecture.md) — memory model
