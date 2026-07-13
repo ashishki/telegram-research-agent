@@ -1,7 +1,19 @@
 import json
 import sqlite3
+from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 from typing import Iterable
+from urllib.parse import urlparse
+
+from output.idea_threads import (
+    _momentum as _idea_thread_momentum,
+    _thread_status as _idea_thread_status,
+    _thread_terms as _idea_thread_terms,
+)
+from output.reporting_period import (
+    register_reporting_period_sqlite,
+    reporting_timestamp_sort_key,
+)
 
 
 MVP_KNOWLEDGE_ATOM_TYPES = {
@@ -72,6 +84,25 @@ def _normalize_atom_types(atom_types: Iterable[str] | None) -> list[str]:
     return normalized
 
 
+def _claims_as_of(atoms: list[dict], *, include_current: bool) -> list[str]:
+    claims: list[str] = []
+    non_current = {"superseded", "resolved", "hype_only", "stale"}
+    for atom in sorted(
+        atoms,
+        key=lambda item: reporting_timestamp_sort_key(item.get("last_seen_at")),
+        reverse=True,
+    ):
+        is_current = str(atom.get("staleness_status") or "active") not in non_current
+        if include_current != is_current:
+            continue
+        claim = str(atom.get("claim") or "").strip()
+        if claim and claim not in claims:
+            claims.append(claim)
+        if len(claims) >= 6:
+            break
+    return claims
+
+
 def _keywords_match(corpus: str, keywords: Iterable[str] | None) -> bool:
     normalized = [str(keyword).strip().lower() for keyword in keywords or () if str(keyword).strip()]
     if not normalized:
@@ -86,14 +117,18 @@ def load_downstream_knowledge_threads(
     atom_types: Iterable[str] | None = None,
     keywords: Iterable[str] | None = None,
     min_last_seen_at: str | None = None,
+    min_atom_last_seen_at: str | None = None,
+    max_atom_last_seen_at: str | None = None,
     limit: int = 8,
 ) -> list[dict]:
+    register_reporting_period_sqlite(connection)
     if not _table_exists(connection, "idea_threads") or not _table_exists(connection, "idea_thread_atoms"):
         return []
     if not _table_exists(connection, "knowledge_atoms"):
         return []
 
-    clauses = ["idea_threads.status NOT IN ('hype_only', 'resolved')"]
+    bounded_as_of = bool(min_atom_last_seen_at or max_atom_last_seen_at)
+    clauses = [] if bounded_as_of else ["idea_threads.status NOT IN ('hype_only', 'resolved')"]
     params: list[object] = []
     normalized_types = _normalize_atom_types(atom_types)
     if normalized_types:
@@ -103,7 +138,13 @@ def load_downstream_knowledge_threads(
     if min_last_seen_at:
         clauses.append("idea_threads.last_seen_at >= ?")
         params.append(str(min_last_seen_at))
-    where_sql = " AND ".join(clauses)
+    if min_atom_last_seen_at:
+        clauses.append("reporting_utc_micros(knowledge_atoms.last_seen_at) >= reporting_utc_micros(?)")
+        params.append(str(min_atom_last_seen_at))
+    if max_atom_last_seen_at:
+        clauses.append("reporting_utc_micros(knowledge_atoms.last_seen_at) < reporting_utc_micros(?)")
+        params.append(str(max_atom_last_seen_at))
+    where_sql = " AND ".join(clauses) or "1 = 1"
     rows = connection.execute(
         f"""
         SELECT
@@ -132,6 +173,8 @@ def load_downstream_knowledge_threads(
             knowledge_atoms.confidence AS atom_confidence,
             knowledge_atoms.novelty_score AS atom_novelty_score,
             knowledge_atoms.practical_utility_score AS atom_practical_utility_score,
+            knowledge_atoms.staleness_status AS atom_staleness_status,
+            knowledge_atoms.first_seen_at AS atom_first_seen_at,
             knowledge_atoms.last_seen_at AS atom_last_seen_at
         FROM idea_threads
         JOIN idea_thread_atoms ON idea_thread_atoms.thread_id = idea_threads.id
@@ -139,9 +182,9 @@ def load_downstream_knowledge_threads(
         WHERE {where_sql}
         ORDER BY
             idea_threads.momentum_30d DESC,
-            idea_threads.last_seen_at DESC,
+            reporting_utc_micros(idea_threads.last_seen_at) DESC,
             knowledge_atoms.practical_utility_score DESC,
-            knowledge_atoms.last_seen_at DESC,
+            reporting_utc_micros(knowledge_atoms.last_seen_at) DESC,
             knowledge_atoms.id DESC
         """,
         params,
@@ -184,12 +227,23 @@ def load_downstream_knowledge_threads(
             "confidence": float(row["atom_confidence"] or 0.0),
             "novelty_score": float(row["atom_novelty_score"] or 0.0),
             "practical_utility_score": float(row["atom_practical_utility_score"] or 0.0),
+            "staleness_status": str(row["atom_staleness_status"] or "active"),
+            "first_seen_at": str(row["atom_first_seen_at"] or ""),
             "last_seen_at": str(row["atom_last_seen_at"] or ""),
         }
         thread["atoms"].append(atom)
 
     threads = []
     for thread in threads_by_slug.values():
+        if bounded_as_of:
+            _project_downstream_thread_as_of(
+                thread,
+                analysis_period_end=max_atom_last_seen_at,
+            )
+            # Preserve the existing downstream/Radar eligibility gate against
+            # the reconstructed historical status, not the mutable current row.
+            if thread.get("status") in {"hype_only", "resolved"}:
+                continue
         corpus = " ".join(
             [
                 thread.get("title", ""),
@@ -218,12 +272,84 @@ def load_downstream_knowledge_threads(
     threads.sort(
         key=lambda thread: (
             float(thread.get("momentum_30d") or 0.0),
-            str(thread.get("last_seen_at") or ""),
+            reporting_timestamp_sort_key(thread.get("last_seen_at")),
             len(thread.get("source_atom_ids") or []),
         ),
         reverse=True,
     )
     return threads[: max(1, int(limit or 8))]
+
+
+def _project_downstream_thread_as_of(
+    thread: dict,
+    *,
+    analysis_period_end: str | None,
+) -> None:
+    atoms = thread.get("atoms") or []
+    if not atoms:
+        return
+    first_seen = [str(atom.get("first_seen_at") or "") for atom in atoms if atom.get("first_seen_at")]
+    last_seen = [str(atom.get("last_seen_at") or "") for atom in atoms if atom.get("last_seen_at")]
+    claims = _claims_as_of(atoms, include_current=True)
+    superseded_claims = _claims_as_of(atoms, include_current=False)
+    source_channels = []
+    display_terms: list[str] = []
+    historical_slugs: list[str] = []
+    for atom in sorted(
+        atoms,
+        key=lambda item: (
+            reporting_timestamp_sort_key(item.get("last_seen_at")),
+            int(item.get("id") or 0),
+        ),
+    ):
+        slug_terms, atom_terms = _idea_thread_terms(atom)
+        historical_slugs.append("-".join(slug_terms) or f"atom-{int(atom.get('id') or 0)}")
+        for term in atom_terms:
+            if term not in display_terms:
+                display_terms.append(term)
+        for url in atom.get("source_urls") or []:
+            channel = _source_channel(url)
+            if channel and channel not in source_channels:
+                source_channels.append(channel)
+    period_end = _parse_iso(analysis_period_end)
+    if period_end is not None:
+        thread["momentum_30d"] = _idea_thread_momentum(
+            atoms,
+            now=period_end,
+            days=30,
+            saturation_count=12,
+        )
+        thread["status"] = _idea_thread_status(
+            atoms,
+            now=period_end,
+            source_channel_count=len(source_channels),
+        )
+    thread["first_seen_at"] = min(first_seen, key=reporting_timestamp_sort_key) if first_seen else ""
+    thread["last_seen_at"] = max(last_seen, key=reporting_timestamp_sort_key) if last_seen else ""
+    historical_slug = (
+        sorted(Counter(historical_slugs).items(), key=lambda item: (-item[1], item[0]))[0][0]
+        if historical_slugs
+        else str(thread.get("slug") or "")
+    )
+    thread["slug"] = historical_slug
+    thread["title"] = " / ".join(display_terms[:3]) or historical_slug
+    thread["current_claims"] = claims[:6]
+    summary_claim = claims[0] if claims else (superseded_claims[0] if superseded_claims else "")
+    thread["summary"] = (
+        f"{len(atoms)} atoms across {len(source_channels)} source channel(s)."
+        + (f" Latest: {summary_claim}" if summary_claim else "")
+    )
+    thread["source_channels"] = sorted(source_channels)
+    thread["key_entities"] = display_terms
+
+
+def _source_channel(url: str) -> str:
+    parsed = urlparse(str(url or ""))
+    if parsed.netloc.endswith("t.me"):
+        parts = [part for part in parsed.path.split("/") if part]
+        if parts:
+            return parts[0]
+    return parsed.netloc or ""
 
 
 def evaluate_knowledge_freshness(
@@ -253,7 +379,7 @@ def evaluate_knowledge_freshness(
     latest_seen = ""
     for thread in threads:
         seen = str(thread.get("last_seen_at") or "")
-        if seen > latest_seen:
+        if reporting_timestamp_sort_key(seen) > reporting_timestamp_sort_key(latest_seen):
             latest_seen = seen
     blocking_reasons = []
     if not threads:

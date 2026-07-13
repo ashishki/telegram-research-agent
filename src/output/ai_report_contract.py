@@ -13,6 +13,7 @@ from output.learning_layer import (
     build_project_learning_projection,
 )
 from output.report_quality import ReportQualityFinding, SEVERITY_CRITICAL
+from output.reporting_period import reporting_timestamp_sort_key
 
 
 REPORT_CONTRACT_VERSION = "weekly-ai-intelligence-v1"
@@ -335,6 +336,12 @@ def build_canonical_intelligence_contract(
         "contract_version": INTELLIGENCE_CONTRACT_VERSION,
         "schema_version": INTELLIGENCE_CONTRACT_VERSION,
         "week_label": context.get("week_label"),
+        "run_date": context.get("run_date"),
+        "generated_at": context.get("generated_at"),
+        "reporting_week": context.get("reporting_week") or context.get("week_label"),
+        "period_mode": context.get("period_mode"),
+        "analysis_period_start": context.get("analysis_period_start") or context.get("week_start"),
+        "analysis_period_end": context.get("analysis_period_end") or context.get("week_end"),
         "projection_boundaries": {
             "canonical_state": "SQLite rows and versioned JSON sidecars",
             "rendered_surfaces": ["html", "markdown", "telegram_messages"],
@@ -1248,16 +1255,18 @@ def _decision_cards(
 def _thread_deltas(context: Mapping[str, Any], threads: list[dict]) -> list[dict]:
     week_start = _parse_iso(context.get("week_start"))
     week_end = _parse_iso(context.get("week_end"))
-    candidates = [thread for thread in threads if thread.get("changed_this_week")] or threads
+    candidates = [thread for thread in threads if thread.get("changed_this_week")]
     deltas: list[dict] = []
     for thread in candidates[:5]:
         atoms = sorted(
-            [atom for atom in (thread.get("atoms") or []) if isinstance(atom, dict)],
-            key=lambda item: str(item.get("last_seen_at") or ""),
+            [
+                atom
+                for atom in (thread.get("_delta_atoms") or thread.get("atoms") or [])
+                if isinstance(atom, dict)
+            ],
+            key=lambda item: reporting_timestamp_sort_key(item.get("last_seen_at")),
         )
         previous_atoms, this_week_atoms = _split_thread_atoms(atoms, week_start=week_start, week_end=week_end)
-        if not this_week_atoms:
-            this_week_atoms = atoms[-2:] if atoms else []
         insufficient = not previous_atoms
         new_evidence_ids = [int(atom.get("id") or 0) for atom in this_week_atoms if int(atom.get("id") or 0)]
         previous_state = _previous_thread_state(previous_atoms)
@@ -1984,7 +1993,10 @@ def _split_thread_atoms(
 def _previous_thread_state(previous_atoms: list[dict]) -> str:
     if not previous_atoms:
         return "Недостаточно истории до этой недели."
-    latest = sorted(previous_atoms, key=lambda item: str(item.get("last_seen_at") or ""), reverse=True)[0]
+    latest = max(
+        previous_atoms,
+        key=lambda item: reporting_timestamp_sort_key(item.get("last_seen_at")),
+    )
     return _compact(str(latest.get("claim") or latest.get("summary") or "Предыдущий атом без краткого утверждения."), 260)
 
 

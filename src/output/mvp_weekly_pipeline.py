@@ -3,6 +3,7 @@ import logging
 import os
 import subprocess
 from dataclasses import dataclass, replace
+from datetime import datetime, timezone
 from pathlib import Path
 
 from delivery.telegraph import publish_article
@@ -13,6 +14,13 @@ from output.opportunity_seed_export import export_opportunity_seeds
 from output.market_context_lens import summarize_market_context_lens
 from output.market_pain_intelligence import summarize_market_pain_pack
 from output.render_report import render_report_html
+from output.reporting_period import (
+    PARTIAL_ISO_WEEK,
+    TRAILING_SEVEN_DAYS,
+    ReportingPeriod,
+    format_period_display_label,
+    resolve_reporting_period,
+)
 from output.weekly_messages import build_mvp_message, write_weekly_message
 
 
@@ -58,12 +66,21 @@ class MvpWeeklyPipelineResult:
     market_baseline_path: str | None = None
     market_delta_path: str | None = None
     market_context_lens: dict | None = None
+    run_date: str = ""
+    generated_at: str = ""
+    reporting_week: str = ""
+    period_mode: str = ""
+    analysis_period_start: str = ""
+    analysis_period_end: str = ""
 
 
 def run_mvp_weekly_pipeline(
     settings: Settings,
     *,
-    days: int = 7,
+    days: int | None = None,
+    week_label: str | None = None,
+    period_mode: str | None = None,
+    now: datetime | None = None,
     limit: int = 80,
     include_channels: tuple[str, ...] = (),
     market_context_days: int = 84,
@@ -75,9 +92,24 @@ def run_mvp_weekly_pipeline(
     live_index_days: int | None = None,
     backfill_live_source_events: bool = False,
 ) -> MvpWeeklyPipelineResult:
+    if days is not None and int(days) != 7:
+        raise ValueError("rolling MVP weekly mode supports exactly seven days")
+    if days is not None and period_mode is not None:
+        raise ValueError("rolling --days cannot be combined with another period mode")
+    if week_label is not None and days is not None:
+        raise ValueError("--week cannot be combined with rolling --days")
+    resolved_mode = period_mode
+    if days is not None and resolved_mode is None and week_label is None:
+        resolved_mode = TRAILING_SEVEN_DAYS
+    period = resolve_reporting_period(
+        now,
+        week_label=week_label,
+        period_mode=resolved_mode,
+    )
+    period_fields = period.to_dict()
     seed_export = export_opportunity_seeds(
         settings,
-        days=days,
+        reporting_period=period,
         limit=limit,
         include_channels=include_channels,
         market_context_days=market_context_days,
@@ -88,7 +120,8 @@ def run_mvp_weekly_pipeline(
         settings,
         explicit_path=live_intelligence_path,
         enabled=with_live_source_index,
-        days=live_index_days or days,
+        reporting_period=period,
+        requested_days=live_index_days,
         backfill=backfill_live_source_events,
     )
     radar_payload = _run_radar(
@@ -123,6 +156,12 @@ def run_mvp_weekly_pipeline(
         market_baseline_path=seed_export.market_baseline_path,
         market_delta_path=seed_export.market_delta_path,
         market_context_lens=seed_export.market_context_lens or {},
+        run_date=period_fields["run_date"],
+        generated_at=period_fields["generated_at"],
+        reporting_week=period_fields["reporting_week"],
+        period_mode=period_fields["period_mode"],
+        analysis_period_start=period_fields["analysis_period_start"],
+        analysis_period_end=period_fields["analysis_period_end"],
     )
     _write_mvp_operator_message(result)
     if deliver:
@@ -136,17 +175,36 @@ def _prepare_live_intelligence_path(
     *,
     explicit_path: Path | str | None,
     enabled: bool,
-    days: int,
+    reporting_period: ReportingPeriod,
+    requested_days: int | None,
     backfill: bool,
 ) -> Path | None:
+    from output.live_source_intelligence import (
+        build_live_source_intelligence_snapshot,
+        load_live_source_intelligence,
+    )
+
     if explicit_path is not None:
         path = Path(explicit_path)
         if not path.exists():
             raise FileNotFoundError(f"Live intelligence snapshot not found: {path}")
+        payload = load_live_source_intelligence(path)
+        window = payload.get("window") if isinstance(payload.get("window"), dict) else {}
+        start = payload.get("analysis_period_start") or window.get("start")
+        end = payload.get("analysis_period_end") or window.get("end")
+        if (
+            _utc_timestamp(start) != reporting_period.analysis_period_start
+            or _utc_timestamp(end) != reporting_period.analysis_period_end
+        ):
+            raise ValueError("live intelligence snapshot does not match the resolved reporting period")
         return path
     if not enabled:
         return None
-    from output.live_source_intelligence import build_live_source_intelligence_snapshot
+    period_seconds = (
+        reporting_period.analysis_period_end - reporting_period.analysis_period_start
+    ).total_seconds()
+    if requested_days is not None and period_seconds != max(1, int(requested_days)) * 86_400:
+        raise ValueError("--live-index-days must match the resolved reporting period")
     from output.source_events import backfill_recent_source_events
 
     if backfill:
@@ -154,8 +212,12 @@ def _prepare_live_intelligence_path(
 
         with sqlite3.connect(settings.db_path) as connection:
             connection.row_factory = sqlite3.Row
-            backfill_recent_source_events(connection, days=max(1, int(days or 7)))
-    result = build_live_source_intelligence_snapshot(days=max(1, int(days or 7)))
+            backfill_recent_source_events(
+                connection,
+                analysis_period_start=reporting_period.analysis_period_start,
+                analysis_period_end=reporting_period.analysis_period_end,
+            )
+    result = build_live_source_intelligence_snapshot(reporting_period=reporting_period)
     return result.output_path
 
 
@@ -257,7 +319,7 @@ def _deliver_result(result: MvpWeeklyPipelineResult) -> str | None:
         send_document(
             chat_id=chat_id,
             file_path=result.report_path,
-            caption=f"MVP of the Week {result.week_label}",
+            caption=_mvp_artifact_title(result),
             token=token,
         )
     return telegraph_url
@@ -266,7 +328,7 @@ def _deliver_result(result: MvpWeeklyPipelineResult) -> str | None:
 def _write_mvp_operator_message(result: MvpWeeklyPipelineResult) -> str:
     live = (result.source_counts or {}).get("live_intelligence")
     notification = build_mvp_message(
-        week_label=result.week_label,
+        week_label=_period_display_label(result),
         title=result.selected_title or "No candidate selected",
         status=_notification_status(result),
         recommendation=result.recommendation or result.radar_status,
@@ -313,11 +375,41 @@ def _publish_mvp_telegraph(result: MvpWeeklyPipelineResult) -> str | None:
     try:
         markdown = report_path.read_text(encoding="utf-8")
         html = render_report_html(markdown)
-        title = f"MVP of the Week {result.week_label}"
+        title = _mvp_artifact_title(result)
         return publish_article(title=title, html_content=html)
     except Exception:
         LOGGER.warning("MVP weekly Telegraph publish failed", exc_info=True)
         return None
+
+
+def _period_display_label(result: MvpWeeklyPipelineResult) -> str:
+    return format_period_display_label(
+        period_mode=result.period_mode,
+        reporting_week=result.reporting_week or result.week_label,
+        analysis_period_start=result.analysis_period_start,
+        analysis_period_end=result.analysis_period_end,
+    )
+
+
+def _mvp_artifact_title(result: MvpWeeklyPipelineResult) -> str:
+    if result.period_mode in {TRAILING_SEVEN_DAYS, PARTIAL_ISO_WEEK}:
+        return f"MVP — {_period_display_label(result)}"
+    return f"MVP of the Week {result.week_label}"
+
+
+def _utc_timestamp(value: object) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = f"{text[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return None
+    return parsed.astimezone(timezone.utc)
 
 
 def _optional_str(value: object) -> str | None:

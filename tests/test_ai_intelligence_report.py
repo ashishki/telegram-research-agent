@@ -41,6 +41,7 @@ _install_stub("sklearn.feature_extraction.text", ENGLISH_STOP_WORDS=set(), Tfidf
 _install_stub("sklearn.metrics", silhouette_score=lambda *_args, **_kwargs: 0.0)
 
 from config.settings import Settings  # noqa: E402
+from db.ai_report_feedback import record_ai_report_feedback  # noqa: E402
 from db.frontier_analysis import upsert_frontier_analysis  # noqa: E402
 from db.knowledge_atoms import record_knowledge_atom  # noqa: E402
 from db.migrate import run_migrations  # noqa: E402
@@ -50,13 +51,40 @@ from output.ai_intelligence_report import (  # noqa: E402
     _learning_actions,
     _read_queue_atoms,
     generate_ai_intelligence_report,
+    load_ai_intelligence_context,
     validate_ai_intelligence_html,
 )
+from output.ai_report_contract import _thread_deltas  # noqa: E402
 from output.idea_threads import refresh_idea_threads  # noqa: E402
+from output.reporting_period import resolve_reporting_period  # noqa: E402
 import main  # noqa: E402
 
 
 class TestAiIntelligenceReport(unittest.TestCase):
+    def test_thread_deltas_do_not_relabel_old_atoms_as_current_period_evidence(self):
+        context = {
+            "week_start": "2026-07-06T00:00:00Z",
+            "week_end": "2026-07-13T00:00:00Z",
+        }
+        threads = [
+            {
+                "id": 1,
+                "slug": "historical-only",
+                "title": "Historical only",
+                "changed_this_week": False,
+                "atoms": [
+                    {
+                        "id": 10,
+                        "claim": "Evidence from before the reporting period.",
+                        "last_seen_at": "2026-07-05T23:59:59Z",
+                        "confidence": 0.8,
+                    }
+                ],
+            }
+        ]
+
+        self.assertEqual(_thread_deltas(context, threads), [])
+
     def _make_db(self) -> str:
         tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
         tmp.close()
@@ -136,8 +164,22 @@ class TestAiIntelligenceReport(unittest.TestCase):
             )
 
     def _seed_marked_post(self, db_path: str) -> None:
+        self._insert_marked_post(
+            db_path,
+            post_id=701,
+            posted_at="2026-07-07T11:00:00Z",
+            recorded_at="2026-07-07T12:00:00Z",
+        )
+
+    def _insert_marked_post(
+        self,
+        db_path: str,
+        *,
+        post_id: int,
+        posted_at: str,
+        recorded_at: str,
+    ) -> None:
         with sqlite3.connect(db_path) as connection:
-            posted_at = "2026-07-07T11:00:00Z"
             connection.execute(
                 """
                 INSERT INTO raw_posts (
@@ -148,17 +190,17 @@ class TestAiIntelligenceReport(unittest.TestCase):
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    701,
+                    post_id,
                     "@ai_lab",
                     10,
-                    701,
+                    post_id,
                     posted_at,
                     "Operator-marked source post about eval-gated agent workflows.",
                     None,
                     None,
                     None,
                     100,
-                    "https://t.me/ai_lab/701",
+                    f"https://t.me/ai_lab/{post_id}",
                     "{}",
                     posted_at,
                     None,
@@ -173,8 +215,8 @@ class TestAiIntelligenceReport(unittest.TestCase):
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    701,
-                    701,
+                    post_id,
+                    post_id,
                     "@ai_lab",
                     posted_at,
                     "Operator-marked source post about eval-gated agent workflows.",
@@ -191,7 +233,7 @@ class TestAiIntelligenceReport(unittest.TestCase):
                 INSERT INTO signal_feedback (post_id, feedback, recorded_at)
                 VALUES (?, ?, ?)
                 """,
-                (701, "operator_marked_interesting", "2026-07-07T12:00:00Z"),
+                (post_id, "operator_marked_interesting", recorded_at),
             )
             connection.commit()
 
@@ -244,13 +286,22 @@ class TestAiIntelligenceReport(unittest.TestCase):
                             }
                         ],
                         caveats=["Evidence is still bounded to the current thread set."],
-                        analysis={},
+                        analysis={
+                            "source_context": {
+                                "run_date": "2026-07-13",
+                                "generated_at": "2026-07-13T07:02:52Z",
+                                "reporting_week": "2026-W28",
+                                "week_label": "2026-W28",
+                                "period_mode": "completed_iso_week",
+                                "analysis_period_start": "2026-07-06T00:00:00Z",
+                                "analysis_period_end": "2026-07-13T00:00:00Z",
+                            }
+                        },
                     )
                 summary = generate_ai_intelligence_report(
                     settings,
-                    week_label="2026-W28",
                     output_root=output_dir,
-                    now=datetime(2026, 7, 8, tzinfo=timezone.utc),
+                    now=datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc),
                 )
                 html_text = Path(summary.html_path).read_text(encoding="utf-8")
                 metadata = json.loads(Path(summary.json_path).read_text(encoding="utf-8"))
@@ -266,7 +317,8 @@ class TestAiIntelligenceReport(unittest.TestCase):
             self.assertIn(f'id="{section_id}"', html_text)
             self.assertIn(title, html_text)
         self.assertIn("<!doctype html>", html_text)
-        self.assertIn("AI Intelligence Report - 2026-W28", html_text)
+        self.assertIn("AI Intelligence Report - 6-12 июля 2026 (2026-W28)", html_text)
+        self.assertIn("Generated 2026-07-13T07:02:52Z", html_text)
         self.assertIn("Frontier Analysis", html_text)
         self.assertIn("Top-model synthesis says eval-gated agent workflows are becoming practical.", html_text)
         self.assertIn("Coding-agent eval design", html_text)
@@ -289,6 +341,12 @@ class TestAiIntelligenceReport(unittest.TestCase):
         self.assertIn("Reflection Question", html_text)
         self.assertNotIn("Matches:", html_text)
         self.assertEqual(metadata["thread_count"], 1)
+        self.assertEqual(metadata["run_date"], "2026-07-13")
+        self.assertEqual(metadata["reporting_week"], "2026-W28")
+        self.assertEqual(metadata["week_label"], "2026-W28")
+        self.assertEqual(metadata["period_mode"], "completed_iso_week")
+        self.assertEqual(metadata["analysis_period_start"], "2026-07-06T00:00:00Z")
+        self.assertEqual(metadata["analysis_period_end"], "2026-07-13T00:00:00Z")
         self.assertEqual(metadata["frontier_analysis"]["model"], "claude-opus-4-6")
         self.assertTrue(metadata["compressed_context"])
         self.assertTrue(metadata["actions"])
@@ -302,6 +360,265 @@ class TestAiIntelligenceReport(unittest.TestCase):
         self.assertTrue(metadata["personal_learning_loop"]["try_items"][0]["why_selected"])
         self.assertIn("reflection_question", metadata["personal_learning_loop"])
         self.assertIn("AI Intelligence Report 2026-W28 is ready", summary.notification_text)
+
+    def test_historical_context_excludes_future_atom_and_rebuilds_thread_as_of_period_end(self):
+        db_path = self._make_db()
+        settings = self._settings(db_path)
+        try:
+            with sqlite3.connect(db_path) as connection:
+                record_knowledge_atom(
+                    connection,
+                    week_label="2026-W28",
+                    atom_type="engineering_practice",
+                    claim="Historical eval gates protect agent releases.",
+                    summary="The completed-week state.",
+                    evidence_quote="historical eval gate",
+                    source_post_ids=[901],
+                    source_urls=["https://t.me/ai_lab/901"],
+                    entities=["shared eval gates"],
+                    practices=["bounded releases"],
+                    first_seen_at="2026-07-06T00:00:00Z",
+                    last_seen_at="2026-07-12T23:59:59Z",
+                )
+                record_knowledge_atom(
+                    connection,
+                    week_label="2026-W29",
+                    atom_type="risk_warning",
+                    claim="Future claim must not leak into W28.",
+                    summary="State learned after the historical boundary.",
+                    evidence_quote="future state",
+                    source_post_ids=[902],
+                    source_urls=["https://t.me/ai_lab/902"],
+                    entities=["shared eval gates"],
+                    practices=["bounded releases"],
+                    first_seen_at="2026-07-13T00:00:00Z",
+                    last_seen_at="2026-07-13T00:00:00Z",
+                )
+            refresh_idea_threads(
+                settings,
+                weeks=12,
+                now=datetime(2026, 7, 15, tzinfo=timezone.utc),
+            )
+            period = resolve_reporting_period(
+                datetime(2026, 7, 20, 8, tzinfo=timezone.utc),
+                week_label="2026-W28",
+            )
+            with sqlite3.connect(db_path) as connection:
+                context = load_ai_intelligence_context(
+                    connection,
+                    week_label=period.week_label,
+                    reporting_period=period,
+                    threads_limit=8,
+                    atoms_limit=8,
+                )
+        finally:
+            os.unlink(db_path)
+
+        self.assertEqual(len(context["threads"]), 1)
+        thread = context["threads"][0]
+        self.assertEqual([atom["claim"] for atom in thread["atoms"]], ["Historical eval gates protect agent releases."])
+        self.assertEqual(thread["current_claims"], ["Historical eval gates protect agent releases."])
+        self.assertEqual(thread["last_seen_at"], "2026-07-12T23:59:59Z")
+        self.assertTrue(thread["changed_this_week"])
+        self.assertNotIn("Future claim", json.dumps(context, ensure_ascii=False))
+
+    def test_as_of_thread_projection_uses_all_eligible_atoms_before_display_limit(self):
+        db_path = self._make_db()
+        settings = self._settings(db_path)
+        try:
+            with sqlite3.connect(db_path) as connection:
+                for index in range(10):
+                    channel = "bounded_a" if index % 2 == 0 else "bounded_b"
+                    record_knowledge_atom(
+                        connection,
+                        week_label="2026-W28",
+                        atom_type="engineering_practice",
+                        claim=f"Bounded aggregation evidence {index}.",
+                        summary=f"Eligible historical evidence {index}.",
+                        evidence_quote=f"bounded evidence {index}",
+                        source_post_ids=[1000 + index],
+                        source_urls=[f"https://t.me/{channel}/{1000 + index}"],
+                        entities=["bounded aggregation"],
+                        practical_utility_score=0.9,
+                        first_seen_at=f"2026-07-{6 + index // 3:02d}T00:00:00Z",
+                        last_seen_at=f"2026-07-{6 + index // 3:02d}T00:00:00Z",
+                    )
+            refresh_idea_threads(
+                settings,
+                weeks=12,
+                now=datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc),
+            )
+            period = resolve_reporting_period(
+                datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc)
+            )
+            with sqlite3.connect(db_path) as connection:
+                context = load_ai_intelligence_context(
+                    connection,
+                    week_label=period.week_label,
+                    reporting_period=period,
+                    threads_limit=8,
+                    atoms_limit=2,
+                )
+        finally:
+            os.unlink(db_path)
+
+        self.assertEqual(len(context["threads"]), 1)
+        thread = context["threads"][0]
+        self.assertEqual(thread["atom_count"], 10)
+        self.assertEqual(thread["source_channel_count"], 2)
+        self.assertEqual(thread["status"], "production_pattern")
+        self.assertAlmostEqual(thread["momentum_30d"], 10 / 12)
+        self.assertEqual(len(thread["atoms"]), 2)
+
+    def test_display_atom_limit_does_not_truncate_period_delta_history(self):
+        db_path = self._make_db()
+        settings = self._settings(db_path)
+        try:
+            with sqlite3.connect(db_path) as connection:
+                for index, (claim, observed_at, confidence) in enumerate(
+                    (
+                        ("Prior bounded-delta state.", "2026-07-05T12:00:00Z", 0.4),
+                        ("First completed-week delta.", "2026-07-07T12:00:00Z", 0.8),
+                        ("Second completed-week delta.", "2026-07-08T12:00:00Z", 0.9),
+                    ),
+                    start=1,
+                ):
+                    record_knowledge_atom(
+                        connection,
+                        week_label="2026-W28",
+                        atom_type="engineering_practice",
+                        claim=claim,
+                        summary=claim,
+                        evidence_quote=f"bounded delta evidence {index}",
+                        source_post_ids=[1100 + index],
+                        source_urls=[f"https://t.me/bounded_delta/{1100 + index}"],
+                        entities=["bounded delta"],
+                        confidence=confidence,
+                        first_seen_at=observed_at,
+                        last_seen_at=observed_at,
+                    )
+            refresh_idea_threads(
+                settings,
+                weeks=12,
+                now=datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc),
+            )
+            period = resolve_reporting_period(
+                datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc)
+            )
+            with sqlite3.connect(db_path) as connection:
+                context = load_ai_intelligence_context(
+                    connection,
+                    week_label=period.week_label,
+                    reporting_period=period,
+                    atoms_limit=2,
+                )
+            deltas = _thread_deltas(context, context["threads"])
+        finally:
+            os.unlink(db_path)
+
+        self.assertEqual(len(context["threads"][0]["atoms"]), 2)
+        self.assertEqual(len(deltas), 1)
+        self.assertEqual(deltas[0]["previous_state"], "Prior bounded-delta state.")
+        self.assertEqual(deltas[0]["confidence_change"], "up")
+        self.assertEqual(len(deltas[0]["new_evidence_atom_ids"]), 2)
+
+    def test_context_ignores_frontier_analysis_from_a_different_period(self):
+        db_path = self._make_db()
+        try:
+            with sqlite3.connect(db_path) as connection:
+                upsert_frontier_analysis(
+                    connection,
+                    week_label="2026-W28",
+                    generated_at="2026-07-10T00:00:00Z",
+                    model="test-model",
+                    prompt_version="frontier-analysis-v1",
+                    lookback_weeks=12,
+                    threads_analyzed=0,
+                    atoms_analyzed=0,
+                    executive_brief="Partial analysis must not leak.",
+                    what_changed=[],
+                    trend_narratives=[],
+                    study_now=[],
+                    actions=[],
+                    caveats=[],
+                    analysis={
+                        "source_context": {
+                            "reporting_week": "2026-W28",
+                            "week_label": "2026-W28",
+                            "period_mode": "partial_iso_week",
+                            "analysis_period_start": "2026-07-06T00:00:00Z",
+                            "analysis_period_end": "2026-07-10T00:00:00Z",
+                        }
+                    },
+                )
+                period = resolve_reporting_period(
+                    datetime(2026, 7, 20, 8, tzinfo=timezone.utc),
+                    week_label="2026-W28",
+                )
+                context = load_ai_intelligence_context(
+                    connection,
+                    week_label=period.week_label,
+                    reporting_period=period,
+                )
+        finally:
+            os.unlink(db_path)
+
+        self.assertIsNone(context["frontier_analysis"])
+
+    def test_marked_post_eligibility_uses_source_period_and_run_snapshot(self):
+        db_path = self._make_db()
+        try:
+            self._insert_marked_post(
+                db_path,
+                post_id=801,
+                posted_at="2026-07-12T23:59:59Z",
+                recorded_at="2026-07-13T07:00:00Z",
+            )
+            self._insert_marked_post(
+                db_path,
+                post_id=802,
+                posted_at="2026-07-13T00:00:00Z",
+                recorded_at="2026-07-13T07:00:00Z",
+            )
+            self._insert_marked_post(
+                db_path,
+                post_id=803,
+                posted_at="2026-07-12T10:00:00Z",
+                recorded_at="2026-07-13T08:00:00Z",
+            )
+            self._insert_marked_post(
+                db_path,
+                post_id=804,
+                posted_at="2026-07-12T12:00:00Z",
+                recorded_at="2026-07-13T07:02:52Z",
+            )
+            self._insert_marked_post(
+                db_path,
+                post_id=805,
+                posted_at="2026-07-12T23:59:59.999999Z",
+                recorded_at="2026-07-13T07:02:52.987600Z",
+            )
+            self._insert_marked_post(
+                db_path,
+                post_id=806,
+                posted_at="2026-07-12T12:00:00Z",
+                recorded_at="2026-07-13T07:02:52.987655Z",
+            )
+            period = resolve_reporting_period(
+                datetime(2026, 7, 13, 7, 2, 52, 987654, tzinfo=timezone.utc)
+            )
+            with sqlite3.connect(db_path) as connection:
+                context = load_ai_intelligence_context(
+                    connection,
+                    week_label=period.week_label,
+                    reporting_period=period,
+                )
+        finally:
+            os.unlink(db_path)
+
+        self.assertEqual([post["post_id"] for post in context["marked_posts"]], [805, 804, 801])
+        self.assertEqual(context["analysis_period_start"], "2026-07-06T00:00:00Z")
+        self.assertEqual(context["analysis_period_end"], "2026-07-13T00:00:00Z")
 
     def test_quality_gate_blocks_internal_match_traces(self):
         all_sections = "".join(
@@ -328,7 +645,7 @@ class TestAiIntelligenceReport(unittest.TestCase):
                             settings,
                             week_label="2026-W28",
                             output_root=output_dir,
-                            now=datetime(2026, 7, 8, tzinfo=timezone.utc),
+                            now=datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc),
                         )
             finally:
                 os.unlink(db_path)
@@ -346,21 +663,28 @@ class TestAiIntelligenceReport(unittest.TestCase):
                     now=datetime(2026, 7, 8, tzinfo=timezone.utc),
                 )
                 with patch.dict(os.environ, {"AGENT_DB_PATH": db_path}, clear=False):
-                    with patch.object(
-                        sys,
-                        "argv",
-                        [
-                            "main.py",
-                            "ai-intelligence-report",
-                            "--week",
-                            "2026-W28",
-                            "--skip-refresh",
-                            "--output-root",
-                            output_dir,
-                        ],
+                    with patch(
+                        "output.ai_intelligence_report.resolve_reporting_period",
+                        side_effect=lambda _now=None, **kwargs: resolve_reporting_period(
+                            datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc),
+                            **kwargs,
+                        ),
                     ):
-                        with redirect_stdout(stdout):
-                            exit_code = main.main()
+                        with patch.object(
+                            sys,
+                            "argv",
+                            [
+                                "main.py",
+                                "ai-intelligence-report",
+                                "--week",
+                                "2026-W28",
+                                "--skip-refresh",
+                                "--output-root",
+                                output_dir,
+                            ],
+                        ):
+                            with redirect_stdout(stdout):
+                                exit_code = main.main()
                 html_path = Path(output_dir) / "2026-W28.html"
                 json_path = Path(output_dir) / "2026-W28.json"
                 html_exists = html_path.exists()

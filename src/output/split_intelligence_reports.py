@@ -8,11 +8,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from config.settings import PROJECT_ROOT, Settings
-from output.ai_intelligence_report import _current_week_label, load_ai_intelligence_context
+from output.ai_intelligence_report import load_ai_intelligence_context
 from output.knowledge_atlas_report import (
     KnowledgeAtlasSummary,
     build_knowledge_atlas_artifact,
 )
+from output.reporting_period import format_period_display_label, resolve_reporting_period
 from output.weekly_intelligence_brief import (
     WeeklyIntelligenceBriefSummary,
     build_weekly_intelligence_brief_artifact,
@@ -32,20 +33,32 @@ class SplitIntelligenceReportsSummary:
     weekly_brief: WeeklyIntelligenceBriefSummary
     notification_text: str
     delivered_message_ids: tuple[int | None, ...] = ()
+    reporting_week: str = ""
+    run_date: str = ""
+    analysis_period_start: str = ""
+    analysis_period_end: str = ""
+    period_mode: str = ""
 
 
 def generate_split_intelligence_reports(
     settings: Settings,
     *,
     week_label: str | None = None,
+    period_mode: str | None = None,
     threads_limit: int = 24,
     atoms_limit: int = 8,
     output_root: str | Path | None = None,
     mvp_radar_json_path: str | Path | None = None,
     now: datetime | None = None,
 ) -> SplitIntelligenceReportsSummary:
-    clean_week = str(week_label or _current_week_label(now)).strip()
-    generated_at = (now or _utc_now()).astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    reporting_period = resolve_reporting_period(
+        now=now,
+        week_label=week_label,
+        period_mode=period_mode,
+    )
+    period_metadata = reporting_period.to_dict()
+    clean_week = reporting_period.week_label
+    generated_at = period_metadata["generated_at"]
     root = Path(output_root) if output_root is not None else OUTPUT_ROOT
     atlas_root = root / "knowledge_atlas"
     brief_root = root / "weekly_intelligence_briefs"
@@ -55,6 +68,7 @@ def generate_split_intelligence_reports(
         context = load_ai_intelligence_context(
             connection,
             week_label=clean_week,
+            reporting_period=reporting_period,
             threads_limit=max(1, int(threads_limit or 24)),
             atoms_limit=max(1, int(atoms_limit or 8)),
         )
@@ -89,7 +103,12 @@ def generate_split_intelligence_reports(
     )
     summary = SplitIntelligenceReportsSummary(
         week_label=clean_week,
+        reporting_week=reporting_period.reporting_week,
+        run_date=period_metadata["run_date"],
         generated_at=generated_at,
+        analysis_period_start=period_metadata["analysis_period_start"],
+        analysis_period_end=period_metadata["analysis_period_end"],
+        period_mode=reporting_period.period_mode,
         knowledge_atlas=knowledge_atlas,
         weekly_brief=weekly_brief,
         notification_text="",
@@ -105,8 +124,9 @@ def generate_split_intelligence_reports(
 
 
 def build_split_reports_notification(summary: SplitIntelligenceReportsSummary) -> str:
+    period_label = _period_display_label(summary)
     return (
-        f"Split AI intelligence reports {summary.week_label} are ready.\n"
+        f"Split AI intelligence reports {period_label} are ready.\n"
         f"Weekly Brief: {summary.weekly_brief.html_path}\n"
         f"Knowledge Atlas: {summary.knowledge_atlas.html_path}"
     )
@@ -125,6 +145,7 @@ def deliver_split_intelligence_reports(
     if not clean_chat_id or not clean_token:
         LOGGER.info("Split AI report delivery skipped because Telegram credentials are missing")
         return summary
+    period_label = _period_display_label(summary)
     message_ids = [
         send_text(
             chat_id=clean_chat_id,
@@ -135,23 +156,37 @@ def deliver_split_intelligence_reports(
         send_document(
             chat_id=clean_chat_id,
             file_path=str(summary.weekly_brief.html_path),
-            caption=f"Weekly Intelligence Brief {summary.week_label}",
+            caption=f"Weekly Intelligence Brief {period_label}",
             token=clean_token,
         ),
         send_document(
             chat_id=clean_chat_id,
             file_path=str(summary.knowledge_atlas.html_path),
-            caption=f"Knowledge Atlas {summary.week_label}",
+            caption=f"Knowledge Atlas {period_label}",
             token=clean_token,
         ),
     ]
     return SplitIntelligenceReportsSummary(
         week_label=summary.week_label,
+        reporting_week=summary.reporting_week,
+        run_date=summary.run_date,
         generated_at=summary.generated_at,
+        analysis_period_start=summary.analysis_period_start,
+        analysis_period_end=summary.analysis_period_end,
+        period_mode=summary.period_mode,
         knowledge_atlas=summary.knowledge_atlas,
         weekly_brief=summary.weekly_brief,
         notification_text=summary.notification_text,
         delivered_message_ids=tuple(message_ids),
+    )
+
+
+def _period_display_label(summary: SplitIntelligenceReportsSummary) -> str:
+    return format_period_display_label(
+        period_mode=summary.period_mode,
+        reporting_week=summary.reporting_week or summary.week_label,
+        analysis_period_start=summary.analysis_period_start,
+        analysis_period_end=summary.analysis_period_end,
     )
 
 

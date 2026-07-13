@@ -244,7 +244,17 @@ class TestAiVisualReport(unittest.TestCase):
                     }
                 ],
                 caveats=["Доказательства ограничены экспортированным набором тем и требуют проверки цитат."],
-                analysis={},
+                analysis={
+                    "source_context": {
+                        "run_date": "2026-07-13",
+                        "generated_at": "2026-07-13T07:02:52Z",
+                        "analysis_period_start": "2026-07-06T00:00:00Z",
+                        "analysis_period_end": "2026-07-13T00:00:00Z",
+                        "reporting_week": "2026-W28",
+                        "week_label": "2026-W28",
+                        "period_mode": "explicit_iso_week",
+                    }
+                },
             )
         refresh_idea_threads(settings, weeks=12, now=datetime(2026, 7, 8, tzinfo=timezone.utc))
         return settings
@@ -322,7 +332,7 @@ process.exit(2);
                     output_root=output_dir,
                     archify_root=archify_root,
                     mvp_radar_json_path=mvp_json_path,
-                    now=datetime(2026, 7, 8, tzinfo=timezone.utc),
+                    now=datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc),
                 )
                 html_text = Path(summary.html_path).read_text(encoding="utf-8")
                 metadata = json.loads(Path(summary.json_path).read_text(encoding="utf-8"))
@@ -334,7 +344,8 @@ process.exit(2);
         self.assertEqual(summary.archify_status, "rendered")
         self.assertTrue(diagram_html_exists)
         self.assertTrue(diagram_ir_exists)
-        self.assertIn("AI-интеллект за неделю - 2026-W28", html_text)
+        self.assertIn("AI-интеллект за неделю: 6-12 июля 2026", html_text)
+        self.assertIn("Сгенерировано 2026-07-13T07:02:52Z", html_text)
         self.assertIn("Операторский вердикт", html_text)
         self.assertIn("Сильные сигналы", html_text)
         self.assertIn("Глубокое объяснение", html_text)
@@ -367,6 +378,12 @@ process.exit(2);
         self.assertIn("Дизайн eval для coding agents", html_text)
         self.assertNotIn("Matches:", html_text)
         self.assertLess(len(html_text), 250000)
+        self.assertEqual(metadata["run_date"], "2026-07-13")
+        self.assertEqual(metadata["reporting_week"], "2026-W28")
+        self.assertEqual(metadata["week_label"], "2026-W28")
+        self.assertEqual(metadata["period_mode"], "explicit_iso_week")
+        self.assertEqual(metadata["analysis_period_start"], "2026-07-06T00:00:00Z")
+        self.assertEqual(metadata["analysis_period_end"], "2026-07-13T00:00:00Z")
         self.assertEqual(metadata["archify"]["status"], "rendered")
         self.assertEqual(metadata["diagram_ir"]["diagram_type"], "dataflow")
         self.assertEqual(metadata["diagram_ir"]["meta"]["evidence_role"], "explanatory_only")
@@ -497,7 +514,7 @@ process.exit(2);
                     week_label="2026-W28",
                     output_root=output_dir,
                     archify_root="/missing/archify",
-                    now=datetime(2026, 7, 8, tzinfo=timezone.utc),
+                    now=datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc),
                 )
                 html_text = Path(summary.html_path).read_text(encoding="utf-8")
             finally:

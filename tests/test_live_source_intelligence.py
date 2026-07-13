@@ -42,8 +42,16 @@ _install_stub("sklearn.metrics", silhouette_score=lambda *_args, **_kwargs: 0.0)
 
 from db.migrate import run_migrations  # noqa: E402
 from output.live_source_intelligence import build_live_source_intelligence_snapshot  # noqa: E402
+from output.reporting_period import TRAILING_SEVEN_DAYS, resolve_reporting_period  # noqa: E402
 from output.source_events import append_source_events, telegram_source_event_from_row  # noqa: E402
 import main  # noqa: E402
+
+
+class _FrozenDateTime(datetime):
+    @classmethod
+    def now(cls, tz=None):
+        value = cls(2026, 6, 11, 12, 0, 0, tzinfo=timezone.utc)
+        return value.astimezone(tz) if tz is not None else value.replace(tzinfo=None)
 
 
 class TestLiveSourceIntelligence(unittest.TestCase):
@@ -136,6 +144,77 @@ class TestLiveSourceIntelligence(unittest.TestCase):
         self.assertTrue(payload["radar_context"]["context_only"])
         self.assertIn("Context only", payload["radar_context"]["summary"])
 
+    def test_reporting_period_snapshot_uses_exact_half_open_post_window(self):
+        generated_at = datetime(2026, 7, 13, 7, 2, 52, 987654, tzinfo=timezone.utc)
+        period = resolve_reporting_period(
+            generated_at,
+            period_mode=TRAILING_SEVEN_DAYS,
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir) / "events"
+            events = []
+            for message_id, posted_at in (
+                (1, "2026-07-13T07:02:52Z"),
+                (2, "2026-07-13T07:02:52.987654Z"),
+            ):
+                events.append(
+                    telegram_source_event_from_row(
+                        {
+                            "channel_username": "@source_a",
+                            "channel_id": 11,
+                            "message_id": message_id,
+                            "posted_at": posted_at,
+                            "text": "Teams repeat a concrete workflow pain across multiple sources.",
+                            "media_type": "none",
+                            "view_count": 1,
+                            "ingested_at": "2026-07-14T00:00:00Z",
+                        }
+                    )
+                )
+            append_source_events(events, event_root=root)
+            output = Path(tmpdir) / "snapshot.json"
+            result = build_live_source_intelligence_snapshot(
+                event_root=root,
+                output_path=output,
+                reporting_period=period,
+            )
+            payload = json.loads(output.read_text(encoding="utf-8"))
+
+        self.assertEqual(result.event_count, 1)
+        self.assertEqual(payload["generated_at"], "2026-07-13T07:02:52.987654Z")
+        self.assertEqual(payload["analysis_period_end"], "2026-07-13T07:02:52.987654Z")
+        self.assertEqual(payload["window"]["end"], "2026-07-13T07:02:52.987654Z")
+        self.assertEqual(payload["period_mode"], TRAILING_SEVEN_DAYS)
+
+    def test_offset_source_event_is_partitioned_and_loaded_by_utc_date(self):
+        period = resolve_reporting_period(
+            datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc)
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir) / "events"
+            event = telegram_source_event_from_row(
+                {
+                    "channel_username": "@offset_source",
+                    "channel_id": 22,
+                    "message_id": 9001,
+                    "posted_at": "2026-07-05T23:30:00-02:00",
+                    "text": "A UTC-week boundary event carries a concrete workflow observation.",
+                    "media_type": "none",
+                    "view_count": 1,
+                    "ingested_at": "2026-07-06T02:00:00Z",
+                }
+            )
+            written = append_source_events([event], event_root=root)
+            output = Path(tmpdir) / "snapshot.json"
+            result = build_live_source_intelligence_snapshot(
+                event_root=root,
+                output_path=output,
+                reporting_period=period,
+            )
+
+        self.assertEqual([path.name for path in written], ["2026-07-06.jsonl"])
+        self.assertEqual(result.event_count, 1)
+
     def test_live_source_index_cli_backfills_from_sqlite(self):
         db_path = self._make_db()
         stdout = io.StringIO()
@@ -146,23 +225,25 @@ class TestLiveSourceIntelligence(unittest.TestCase):
                 with sqlite3.connect(db_path) as connection:
                     self._seed_raw_posts(connection)
                 with patch.dict(os.environ, {"AGENT_DB_PATH": db_path}, clear=False):
-                    with patch.object(
-                        sys,
-                        "argv",
-                        [
-                            "main.py",
-                            "live-source-index",
-                            "--days",
-                            "30",
-                            "--event-root",
-                            str(event_root),
-                            "--out",
-                            str(output),
-                            "--backfill-from-db",
-                        ],
-                    ):
-                        with redirect_stdout(stdout):
-                            exit_code = main.main()
+                    with patch("output.source_events.datetime", _FrozenDateTime):
+                        with patch("output.live_source_intelligence.datetime", _FrozenDateTime):
+                            with patch.object(
+                                sys,
+                                "argv",
+                                [
+                                    "main.py",
+                                    "live-source-index",
+                                    "--days",
+                                    "30",
+                                    "--event-root",
+                                    str(event_root),
+                                    "--out",
+                                    str(output),
+                                    "--backfill-from-db",
+                                ],
+                            ):
+                                with redirect_stdout(stdout):
+                                    exit_code = main.main()
                 payload = json.loads(output.read_text(encoding="utf-8"))
         finally:
             os.unlink(db_path)

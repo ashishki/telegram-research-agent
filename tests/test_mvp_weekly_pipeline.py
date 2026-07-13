@@ -1,13 +1,179 @@
 import tempfile
 import types
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
-from output.mvp_weekly_pipeline import MvpWeeklyPipelineResult, _deliver_result, _run_radar, _write_mvp_operator_message
+from output.mvp_weekly_pipeline import (
+    MvpWeeklyPipelineResult,
+    _deliver_result,
+    _mvp_artifact_title,
+    _period_display_label,
+    _prepare_live_intelligence_path,
+    _run_radar,
+    _write_mvp_operator_message,
+    run_mvp_weekly_pipeline,
+)
+from output.reporting_period import TRAILING_SEVEN_DAYS, resolve_reporting_period
 
 
 class TestMvpWeeklyPipeline(unittest.TestCase):
+    def test_default_pipeline_propagates_completed_period_to_radar_seed_export(self):
+        seed_export = types.SimpleNamespace(
+            week_label="2026-W28",
+            output_path="/tmp/2026-W28.json",
+            seed_count=1,
+            knowledge_thread_count=0,
+            knowledge_threads=[],
+            market_pack_path=None,
+            market_pain_pack={},
+            market_lens_path=None,
+            market_baseline_path=None,
+            market_delta_path=None,
+            market_context_lens={},
+        )
+        generated_at = datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc)
+        with patch("output.mvp_weekly_pipeline.export_opportunity_seeds", return_value=seed_export) as export:
+            with patch("output.mvp_weekly_pipeline._run_radar", return_value={"status": "no_candidate"}) as radar:
+                with patch("output.mvp_weekly_pipeline._write_mvp_operator_message"):
+                    result = run_mvp_weekly_pipeline(
+                        object(),  # type: ignore[arg-type]
+                        now=generated_at,
+                        deliver=False,
+                    )
+
+        period = export.call_args.kwargs["reporting_period"]
+        self.assertEqual(period.reporting_week, "2026-W28")
+        self.assertEqual(period.period_mode, "completed_iso_week")
+        self.assertEqual(period.analysis_period_start.isoformat(), "2026-07-06T00:00:00+00:00")
+        self.assertEqual(period.analysis_period_end.isoformat(), "2026-07-13T00:00:00+00:00")
+        self.assertEqual(radar.call_args.kwargs["run_id"], "mvp-weekly-2026-W28")
+        self.assertEqual(result.reporting_week, "2026-W28")
+        self.assertEqual(result.period_mode, "completed_iso_week")
+        self.assertEqual(result.analysis_period_end, "2026-07-13T00:00:00Z")
+
+    def test_legacy_days_mode_passes_one_typed_trailing_period_to_seed_export(self):
+        seed_export = types.SimpleNamespace(
+            week_label="2026-W29",
+            output_path="/tmp/2026-W29.json",
+            seed_count=0,
+            knowledge_thread_count=0,
+            knowledge_threads=[],
+            market_pack_path=None,
+            market_pain_pack={},
+            market_lens_path=None,
+            market_baseline_path=None,
+            market_delta_path=None,
+            market_context_lens={},
+        )
+        generated_at = datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc)
+        with patch("output.mvp_weekly_pipeline.export_opportunity_seeds", return_value=seed_export) as export:
+            with patch("output.mvp_weekly_pipeline._run_radar", return_value={"status": "no_candidate"}):
+                with patch("output.mvp_weekly_pipeline._write_mvp_operator_message"):
+                    result = run_mvp_weekly_pipeline(
+                        object(),  # type: ignore[arg-type]
+                        days=7,
+                        now=generated_at,
+                        deliver=False,
+                    )
+
+        period = export.call_args.kwargs["reporting_period"]
+        self.assertNotIn("days", export.call_args.kwargs)
+        self.assertEqual(period.period_mode, TRAILING_SEVEN_DAYS)
+        self.assertEqual(period.analysis_period_start.isoformat(), "2026-07-06T07:02:52+00:00")
+        self.assertEqual(period.analysis_period_end, generated_at)
+        self.assertEqual(result.period_mode, TRAILING_SEVEN_DAYS)
+
+    def test_explicit_week_compatibility_propagates_historical_period(self):
+        seed_export = types.SimpleNamespace(
+            week_label="2026-W28",
+            output_path="/tmp/2026-W28.json",
+            seed_count=0,
+            knowledge_thread_count=0,
+            knowledge_threads=[],
+            market_pack_path=None,
+            market_pain_pack={},
+            market_lens_path=None,
+            market_baseline_path=None,
+            market_delta_path=None,
+            market_context_lens={},
+        )
+        with patch("output.mvp_weekly_pipeline.export_opportunity_seeds", return_value=seed_export) as export:
+            with patch("output.mvp_weekly_pipeline._run_radar", return_value={"status": "no_candidate"}):
+                with patch("output.mvp_weekly_pipeline._write_mvp_operator_message"):
+                    result = run_mvp_weekly_pipeline(
+                        object(),  # type: ignore[arg-type]
+                        week_label="2026-W28",
+                        now=datetime(2026, 7, 20, 8, tzinfo=timezone.utc),
+                        deliver=False,
+                    )
+
+        period = export.call_args.kwargs["reporting_period"]
+        self.assertEqual(period.period_mode, "explicit_iso_week")
+        self.assertEqual(period.analysis_period_start.isoformat(), "2026-07-06T00:00:00+00:00")
+        self.assertEqual(period.analysis_period_end.isoformat(), "2026-07-13T00:00:00+00:00")
+        self.assertEqual(result.reporting_week, "2026-W28")
+
+    def test_live_snapshot_and_backfill_receive_the_resolved_period(self):
+        period = resolve_reporting_period(
+            datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc)
+        )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            settings = types.SimpleNamespace(db_path=str(Path(tmp_dir) / "agent.db"))
+            live_result = types.SimpleNamespace(output_path=Path(tmp_dir) / "live.json")
+            with patch(
+                "output.source_events.backfill_recent_source_events"
+            ) as backfill:
+                with patch(
+                    "output.live_source_intelligence.build_live_source_intelligence_snapshot",
+                    return_value=live_result,
+                ) as build_snapshot:
+                    output_path = _prepare_live_intelligence_path(
+                        settings,  # type: ignore[arg-type]
+                        explicit_path=None,
+                        enabled=True,
+                        reporting_period=period,
+                        requested_days=7,
+                        backfill=True,
+                    )
+
+        self.assertEqual(output_path, live_result.output_path)
+        self.assertEqual(
+            backfill.call_args.kwargs["analysis_period_start"],
+            period.analysis_period_start,
+        )
+        self.assertEqual(
+            backfill.call_args.kwargs["analysis_period_end"],
+            period.analysis_period_end,
+        )
+        self.assertIs(
+            build_snapshot.call_args.kwargs["reporting_period"],
+            period,
+        )
+
+    def test_trailing_mode_is_not_presented_as_an_iso_week_report(self):
+        result = MvpWeeklyPipelineResult(
+            week_label="2026-W29",
+            seed_path="/tmp/seeds.json",
+            seed_count=0,
+            radar_status="no_candidate",
+            report_path=None,
+            json_path=None,
+            selected_title=None,
+            dossier_status=None,
+            recommendation=None,
+            score=None,
+            period_mode=TRAILING_SEVEN_DAYS,
+            analysis_period_start="2026-07-06T07:02:52Z",
+            analysis_period_end="2026-07-13T07:02:52Z",
+        )
+
+        label = _period_display_label(result)
+        self.assertIn("trailing seven days", label)
+        self.assertNotIn("2026-W29", label)
+        self.assertEqual(_mvp_artifact_title(result), f"MVP — {label}")
+
     def test_deliver_result_publishes_telegraph_and_sends_document(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             report_path = Path(tmp_dir) / "mvp.md"

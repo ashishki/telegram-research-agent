@@ -1,7 +1,7 @@
 # Intelligence Report V2 Product Contract
 
 Version: `tra-intelligence-contract.v2`  
-Status: planned contract; not implemented  
+Status: planned reader contract; IRX-1 shared period foundation implemented
 Queue: `IRX - Intelligence Report Experience And Editorial Quality`
 
 This contract defines the reader-facing behavior of Weekly Intelligence Brief

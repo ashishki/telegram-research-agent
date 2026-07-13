@@ -45,6 +45,7 @@ from db.knowledge_atoms import record_knowledge_atom  # noqa: E402
 from db.migrate import run_migrations  # noqa: E402
 from output.frontier_analysis import run_frontier_analysis  # noqa: E402
 from output.idea_threads import refresh_idea_threads  # noqa: E402
+from output.reporting_period import resolve_reporting_period  # noqa: E402
 import main  # noqa: E402
 
 
@@ -155,6 +156,7 @@ class TestFrontierAnalysis(unittest.TestCase):
                 summary = run_frontier_analysis(
                     settings,
                     week_label="2026-W28",
+                    now=datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc),
                     lookback_weeks=12,
                     model="strong",
                     force=True,
@@ -172,6 +174,14 @@ class TestFrontierAnalysis(unittest.TestCase):
         self.assertIsNotNone(row)
         self.assertIn("eval-gated release discipline", row["executive_brief"])
         self.assertEqual(row["study_now"][0]["topic"], "Eval design for coding agents")
+        source_context = row["analysis"]["source_context"]
+        self.assertEqual(source_context["run_date"], "2026-07-13")
+        self.assertEqual(source_context["reporting_week"], "2026-W28")
+        self.assertEqual(source_context["week_label"], "2026-W28")
+        self.assertEqual(source_context["period_mode"], "explicit_iso_week")
+        self.assertEqual(source_context["analysis_period_start"], "2026-07-06T00:00:00Z")
+        self.assertEqual(source_context["analysis_period_end"], "2026-07-13T00:00:00Z")
+        self.assertEqual(summary.generated_at, "2026-07-13T07:02:52Z")
 
     def test_frontier_analysis_cli_skips_existing_without_force(self):
         db_path = self._make_db()
@@ -179,16 +189,28 @@ class TestFrontierAnalysis(unittest.TestCase):
         try:
             settings = self._seed_threads(db_path)
             with patch("output.frontier_analysis.complete", return_value=self._payload()):
-                run_frontier_analysis(settings, week_label="2026-W28", force=True)
+                run_frontier_analysis(
+                    settings,
+                    week_label="2026-W28",
+                    now=datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc),
+                    force=True,
+                )
             with patch.dict(os.environ, {"AGENT_DB_PATH": db_path}, clear=False):
                 with patch("output.frontier_analysis.complete", side_effect=AssertionError("should skip")):
-                    with patch.object(
-                        sys,
-                        "argv",
-                        ["main.py", "frontier-analysis", "--week", "2026-W28"],
+                    with patch(
+                        "output.frontier_analysis.resolve_reporting_period",
+                        side_effect=lambda _now=None, **kwargs: resolve_reporting_period(
+                            datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc),
+                            **kwargs,
+                        ),
                     ):
-                        with redirect_stdout(stdout):
-                            exit_code = main.main()
+                        with patch.object(
+                            sys,
+                            "argv",
+                            ["main.py", "frontier-analysis", "--week", "2026-W28"],
+                        ):
+                            with redirect_stdout(stdout):
+                                exit_code = main.main()
         finally:
             os.unlink(db_path)
 

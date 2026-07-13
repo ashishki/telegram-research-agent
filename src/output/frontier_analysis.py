@@ -2,12 +2,17 @@ import json
 import logging
 import sqlite3
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 
 from config.settings import MID_MODEL, STRONG_MODEL, Settings
 from db.frontier_analysis import fetch_frontier_analysis, upsert_frontier_analysis
 from llm.client import complete
-from output.ai_intelligence_report import _current_week_label, load_ai_intelligence_context
+from output.ai_intelligence_report import load_ai_intelligence_context
+from output.reporting_period import (
+    ReportingPeriod,
+    format_period_display_label,
+    resolve_reporting_period,
+)
 
 
 LOGGER = logging.getLogger(__name__)
@@ -40,10 +45,12 @@ class FrontierAnalysisSummary:
     action_count: int
     caveat_count: int
     skipped_existing: bool = False
-
-
-def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    run_date: str = ""
+    generated_at: str = ""
+    reporting_week: str = ""
+    period_mode: str = ""
+    analysis_period_start: str = ""
+    analysis_period_end: str = ""
 
 
 def resolve_frontier_model(model: str | None) -> str:
@@ -194,6 +201,7 @@ def _build_prompt(context: dict, *, lookback_weeks: int) -> str:
 
 
 def _analysis_summary(row: dict, *, skipped_existing: bool = False) -> FrontierAnalysisSummary:
+    source_context = (row.get("analysis") or {}).get("source_context") or {}
     return FrontierAnalysisSummary(
         week_label=row["week_label"],
         model=row["model"],
@@ -208,6 +216,26 @@ def _analysis_summary(row: dict, *, skipped_existing: bool = False) -> FrontierA
         action_count=len(row.get("actions") or []),
         caveat_count=len(row.get("caveats") or []),
         skipped_existing=skipped_existing,
+        run_date=str(source_context.get("run_date") or str(row.get("generated_at") or "")[:10]),
+        generated_at=str(source_context.get("generated_at") or row.get("generated_at") or ""),
+        reporting_week=str(source_context.get("reporting_week") or row.get("week_label") or ""),
+        period_mode=str(source_context.get("period_mode") or "explicit_iso_week"),
+        analysis_period_start=str(source_context.get("analysis_period_start") or source_context.get("week_start") or ""),
+        analysis_period_end=str(source_context.get("analysis_period_end") or source_context.get("week_end") or ""),
+    )
+
+
+def _analysis_matches_period(row: dict, period_fields: dict[str, str]) -> bool:
+    source_context = (row.get("analysis") or {}).get("source_context") or {}
+    return all(
+        str(source_context.get(field) or "") == str(period_fields[field])
+        for field in (
+            "reporting_week",
+            "week_label",
+            "period_mode",
+            "analysis_period_start",
+            "analysis_period_end",
+        )
     )
 
 
@@ -215,23 +243,38 @@ def run_frontier_analysis(
     settings: Settings,
     *,
     week_label: str | None = None,
+    period_mode: str | None = None,
+    reporting_period: ReportingPeriod | None = None,
+    now: datetime | None = None,
     lookback_weeks: int = 12,
     model: str = "strong",
     threads_limit: int = DEFAULT_THREADS_LIMIT,
     atoms_limit: int = DEFAULT_ATOMS_LIMIT,
     force: bool = False,
 ) -> FrontierAnalysisSummary:
-    clean_week = str(week_label or _current_week_label()).strip()
+    if reporting_period is not None:
+        if week_label is not None or period_mode is not None or now is not None:
+            raise ValueError("reporting_period cannot be combined with week_label, period_mode, or now")
+        period = reporting_period
+    else:
+        period = resolve_reporting_period(
+            now,
+            week_label=week_label,
+            period_mode=period_mode,
+        )
+    period_fields = period.to_dict()
+    clean_week = period.week_label
     resolved_model = resolve_frontier_model(model)
     with sqlite3.connect(settings.db_path) as connection:
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON;")
         existing = fetch_frontier_analysis(connection, week_label=clean_week)
-        if existing and not force:
+        if existing and not force and _analysis_matches_period(existing, period_fields):
             return _analysis_summary(existing, skipped_existing=True)
         context = load_ai_intelligence_context(
             connection,
             week_label=clean_week,
+            reporting_period=period,
             threads_limit=max(1, int(threads_limit or DEFAULT_THREADS_LIMIT)),
             atoms_limit=max(1, int(atoms_limit or DEFAULT_ATOMS_LIMIT)),
         )
@@ -250,7 +293,7 @@ def run_frontier_analysis(
         analysis = {
             **payload,
             "source_context": {
-                "week_label": clean_week,
+                **period_fields,
                 "lookback_weeks": max(1, int(lookback_weeks or 1)),
                 "threads_analyzed": len(threads),
                 "atoms_analyzed": atoms_seen,
@@ -259,7 +302,7 @@ def run_frontier_analysis(
         row = upsert_frontier_analysis(
             connection,
             week_label=clean_week,
-            generated_at=_utc_now_iso(),
+            generated_at=period_fields["generated_at"],
             model=resolved_model,
             prompt_version=PROMPT_VERSION,
             lookback_weeks=max(1, int(lookback_weeks or 1)),
@@ -278,9 +321,18 @@ def run_frontier_analysis(
 
 def format_frontier_analysis_summary(summary: FrontierAnalysisSummary) -> str:
     skipped = " skipped_existing=true" if summary.skipped_existing else ""
+    period_label = summary.week_label
+    if summary.period_mode and summary.analysis_period_start and summary.analysis_period_end:
+        period_label = format_period_display_label(
+            period_mode=summary.period_mode,
+            reporting_week=summary.reporting_week or summary.week_label,
+            analysis_period_start=summary.analysis_period_start,
+            analysis_period_end=summary.analysis_period_end,
+        )
     return (
         "Frontier analysis summary\n"
-        f"week={summary.week_label} model={summary.model} prompt_version={summary.prompt_version}{skipped}\n"
+        f"period={period_label} week_alias={summary.week_label} "
+        f"model={summary.model} prompt_version={summary.prompt_version}{skipped}\n"
         f"counts: threads={summary.threads_analyzed} atoms={summary.atoms_analyzed} "
         f"what_changed={summary.what_changed_count} narratives={summary.trend_narrative_count} "
         f"study_now={summary.study_now_count} actions={summary.action_count} caveats={summary.caveat_count}\n"

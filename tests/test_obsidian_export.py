@@ -217,7 +217,7 @@ class TestObsidianExport(unittest.TestCase):
             settings,
             week_label="2026-W28",
             output_root=report_root,
-            now=datetime(2026, 7, 8, tzinfo=timezone.utc),
+            now=datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc),
         )
         return settings
 

@@ -12,9 +12,118 @@ from db.migrate import run_migrations
 from output.ai_report_contract import INTELLIGENCE_CONTRACT_VERSION, RADAR_INTELLIGENCE_CONTRACT_VERSION
 from output.idea_threads import refresh_idea_threads
 from output.opportunity_seed_export import export_opportunity_seeds
+from output.reporting_period import resolve_reporting_period
 
 
 class TestOpportunitySeedExport(unittest.TestCase):
+    def test_period_inputs_reject_ambiguous_rolling_combinations(self):
+        settings = Settings(
+            db_path=":memory:",
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+        now = datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc)
+        with self.assertRaisesRegex(ValueError, "week_label cannot be combined"):
+            export_opportunity_seeds(
+                settings,
+                days=7,
+                week_label="2026-W28",
+                now=now,
+            )
+        with self.assertRaisesRegex(ValueError, "reporting_period cannot be combined"):
+            export_opportunity_seeds(
+                settings,
+                days=7,
+                reporting_period=resolve_reporting_period(now),
+            )
+
+    def test_completed_week_seed_selection_is_half_open_and_carries_period_identity(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = str(Path(tmpdir) / "agent.db")
+            with patch.dict(os.environ, {"AGENT_DB_PATH": db_path}):
+                run_migrations()
+
+            import sqlite3
+
+            with sqlite3.connect(db_path) as connection:
+                for post_id, posted_at in (
+                    (1, "2026-07-06T00:00:00Z"),
+                    (2, "2026-07-13T00:00:00Z"),
+                ):
+                    content = f"How to automate this workflow manually, boundary post {post_id}."
+                    connection.execute(
+                        """
+                        INSERT INTO raw_posts (
+                            id, channel_username, channel_id, message_id, posted_at, text,
+                            media_type, media_caption, forward_from, view_count, message_url,
+                            raw_json, ingested_at, image_description
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            post_id,
+                            "@boundary",
+                            10,
+                            post_id,
+                            posted_at,
+                            content,
+                            None,
+                            None,
+                            None,
+                            10,
+                            f"https://t.me/boundary/{post_id}",
+                            "{}",
+                            posted_at,
+                            None,
+                        ),
+                    )
+                    connection.execute(
+                        """
+                        INSERT INTO posts (
+                            id, raw_post_id, channel_username, posted_at, content,
+                            url_count, has_code, language_detected, word_count, normalized_at,
+                            bucket, signal_score
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            post_id,
+                            post_id,
+                            "@boundary",
+                            posted_at,
+                            content,
+                            0,
+                            0,
+                            "en",
+                            9,
+                            posted_at,
+                            "noise",
+                            0.1,
+                        ),
+                    )
+                connection.commit()
+
+            out_path = Path(tmpdir) / "seeds.json"
+            result = export_opportunity_seeds(
+                Settings(
+                    db_path=db_path,
+                    llm_api_key="",
+                    model_provider="anthropic",
+                    telegram_session_path="",
+                ),
+                limit=10,
+                output_path=out_path,
+                now=datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc),
+            )
+            seeds = json.loads(out_path.read_text(encoding="utf-8"))
+
+            self.assertEqual(result.week_label, "2026-W28")
+            self.assertEqual(result.period_mode, "completed_iso_week")
+            self.assertEqual(result.analysis_period_start, "2026-07-06T00:00:00Z")
+            self.assertEqual(result.analysis_period_end, "2026-07-13T00:00:00Z")
+            self.assertEqual([seed["post_id"] for seed in seeds], ["1"])
+            self.assertEqual(seeds[0]["reporting_week"], "2026-W28")
+            self.assertEqual(seeds[0]["period_mode"], "completed_iso_week")
+
     def test_exports_demand_surface_seed_for_radar(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = str(Path(tmpdir) / "agent.db")
@@ -150,6 +259,51 @@ class TestOpportunitySeedExport(unittest.TestCase):
             self.assertIn("knowledge_thread_slug", seeds[0])
             self.assertEqual(seeds[0]["source_atom_ids"], [1])
             self.assertEqual(seeds[0]["source_url"], "https://t.me/market_ai/501")
+
+    def test_bounded_hype_only_thread_remains_ineligible_for_radar_seed(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = str(Path(tmpdir) / "agent.db")
+            with patch.dict(os.environ, {"AGENT_DB_PATH": db_path}):
+                run_migrations()
+
+            import sqlite3
+
+            with sqlite3.connect(db_path) as connection:
+                record_knowledge_atom(
+                    connection,
+                    week_label="2026-W28",
+                    atom_type="market_signal",
+                    claim="A hype-only workflow claim must not become a Radar seed.",
+                    summary="The bounded projection still preserves the legacy status gate.",
+                    evidence_quote="hype-only workflow claim",
+                    source_post_ids=[601],
+                    source_urls=["https://t.me/non_market_channel/601"],
+                    entities=["hype-only workflow"],
+                    staleness_status="hype_only",
+                    first_seen_at="2026-07-07T08:00:00Z",
+                    last_seen_at="2026-07-07T08:00:00Z",
+                )
+            settings = Settings(
+                db_path=db_path,
+                llm_api_key="",
+                model_provider="anthropic",
+                telegram_session_path="",
+            )
+            refresh_idea_threads(
+                settings,
+                weeks=12,
+                now=datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc),
+            )
+            output = Path(tmpdir) / "seeds.json"
+            result = export_opportunity_seeds(
+                settings,
+                output_path=output,
+                now=datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc),
+            )
+            seeds = json.loads(output.read_text(encoding="utf-8"))
+
+        self.assertEqual(result.knowledge_thread_count, 0)
+        self.assertFalse(any(seed.get("source_kind") == "knowledge_thread" for seed in seeds))
 
     def test_exports_curated_market_analyst_context_without_displacing_seed_limit(self):
         with tempfile.TemporaryDirectory() as tmpdir:

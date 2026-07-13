@@ -3,7 +3,20 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
+from collections import Counter
+from datetime import datetime, timezone
 from typing import Iterable
+
+from output.idea_threads import (
+    _momentum as _idea_thread_momentum,
+    _thread_status as _idea_thread_status,
+    _thread_terms as _idea_thread_terms,
+)
+from output.reporting_period import (
+    ReportingPeriod,
+    register_reporting_period_sqlite,
+    reporting_timestamp_sort_key,
+)
 
 
 MARKET_BUSINESS_CHANNELS = (
@@ -115,14 +128,22 @@ def build_market_pain_pack(
     connection: sqlite3.Connection,
     *,
     cutoff: str,
+    analysis_period_end: str | None = None,
+    reporting_period: ReportingPeriod | None = None,
     limit: int = 120,
     channels: Iterable[str] = MARKET_BUSINESS_CHANNELS,
 ) -> dict:
+    register_reporting_period_sqlite(connection)
+    period_end = _resolve_period_end(
+        analysis_period_end=analysis_period_end,
+        reporting_period=reporting_period,
+    )
     normalized_channels = sorted({_normalize_channel(channel) for channel in channels if channel})
     bounded_limit = max(1, min(int(limit or 120), 300))
     atoms = _fetch_market_atoms(
         connection,
         cutoff=cutoff,
+        analysis_period_end=period_end,
         limit=bounded_limit,
         normalized_channels=normalized_channels,
     )
@@ -138,12 +159,14 @@ def build_market_pain_pack(
     raw_posts = _fetch_market_posts(
         connection,
         cutoff=cutoff,
+        analysis_period_end=period_end,
         limit=max(20, min(bounded_limit, 80)),
         normalized_channels=fallback_channels,
     )
     threads = _fetch_market_threads(
         connection,
         cutoff=cutoff,
+        analysis_period_end=period_end,
         limit=max(8, min(24, bounded_limit // 4)),
         normalized_channels=normalized_channels,
     )
@@ -154,6 +177,8 @@ def build_market_pain_pack(
         "status": status,
         "bounded": True,
         "cutoff": cutoff,
+        "source_window_start": cutoff,
+        "source_window_end": period_end,
         "channels_requested": [f"@{channel}" for channel in normalized_channels],
         "channels_with_curated_atoms": [f"@{channel}" for channel in curated_channels],
         "channels_using_raw_fallback": [f"@{channel}" for channel in fallback_channels],
@@ -175,6 +200,8 @@ def build_market_pain_pack(
         "workflow_business_model_opportunities": analyst_context["workflow_opportunities"],
         "anti_signals_hype_warnings": analyst_context["what_does_not_work"],
     }
+    if reporting_period is not None:
+        pack.update(reporting_period.to_dict())
     pack["radar_gate_audit"] = _radar_gate_audit(pack)
     return pack
 
@@ -256,6 +283,7 @@ def _fetch_market_atoms(
     connection: sqlite3.Connection,
     *,
     cutoff: str,
+    analysis_period_end: str | None,
     limit: int,
     normalized_channels: list[str],
 ) -> list[dict]:
@@ -263,17 +291,28 @@ def _fetch_market_atoms(
         return []
     atom_placeholders = ",".join("?" for _ in MARKET_CONTEXT_ATOM_TYPES)
     channel_clause, channel_params = _source_url_channel_clause("source_urls_json", normalized_channels)
+    end_clause = (
+        "AND reporting_utc_micros(last_seen_at) < reporting_utc_micros(?)"
+        if analysis_period_end
+        else ""
+    )
+    params: list[object] = [cutoff]
+    if analysis_period_end:
+        params.append(analysis_period_end)
+    params.extend((*MARKET_CONTEXT_ATOM_TYPES, *channel_params, limit))
     rows = connection.execute(
         f"""
         SELECT *
         FROM knowledge_atoms
-        WHERE last_seen_at >= ?
+        WHERE reporting_utc_micros(last_seen_at) >= reporting_utc_micros(?)
+          {end_clause}
           AND atom_type IN ({atom_placeholders})
           AND ({channel_clause})
-        ORDER BY practical_utility_score DESC, confidence DESC, last_seen_at DESC, id DESC
+        ORDER BY practical_utility_score DESC, confidence DESC,
+                 reporting_utc_micros(last_seen_at) DESC, id DESC
         LIMIT ?
         """,
-        (cutoff, *MARKET_CONTEXT_ATOM_TYPES, *channel_params, limit),
+        params,
     ).fetchall()
     return [_row_to_atom(row, normalized_channels) for row in rows]
 
@@ -282,6 +321,7 @@ def _fetch_market_threads(
     connection: sqlite3.Connection,
     *,
     cutoff: str,
+    analysis_period_end: str | None,
     limit: int,
     normalized_channels: list[str],
 ) -> list[dict]:
@@ -290,52 +330,197 @@ def _fetch_market_threads(
         return []
     atom_placeholders = ",".join("?" for _ in MARKET_CONTEXT_ATOM_TYPES)
     channel_clause, channel_params = _source_url_channel_clause("knowledge_atoms.source_urls_json", normalized_channels)
+    if analysis_period_end is None:
+        rows = connection.execute(
+            f"""
+            SELECT DISTINCT
+                idea_threads.id,
+                idea_threads.title,
+                idea_threads.slug,
+                idea_threads.summary,
+                idea_threads.status,
+                idea_threads.first_seen_at,
+                idea_threads.last_seen_at,
+                idea_threads.momentum_30d,
+                idea_threads.momentum_90d,
+                idea_threads.atom_count,
+                idea_threads.source_channel_count,
+                idea_threads.source_channels_json,
+                idea_threads.key_entities_json,
+                idea_threads.current_claims_json
+            FROM idea_threads
+            JOIN idea_thread_atoms ON idea_thread_atoms.thread_id = idea_threads.id
+            JOIN knowledge_atoms ON knowledge_atoms.id = idea_thread_atoms.atom_id
+            WHERE idea_threads.last_seen_at >= ?
+              AND knowledge_atoms.atom_type IN ({atom_placeholders})
+              AND ({channel_clause})
+            ORDER BY
+                idea_threads.momentum_30d DESC,
+                idea_threads.last_seen_at DESC,
+                idea_threads.atom_count DESC,
+                idea_threads.title ASC
+            LIMIT ?
+            """,
+            (cutoff, *MARKET_CONTEXT_ATOM_TYPES, *channel_params, limit),
+        ).fetchall()
+        return [_row_to_thread(row) for row in rows]
+
+    params: list[object] = [cutoff, analysis_period_end]
+    params.extend((*MARKET_CONTEXT_ATOM_TYPES, *channel_params))
     rows = connection.execute(
         f"""
-        SELECT DISTINCT
-            idea_threads.id,
-            idea_threads.title,
-            idea_threads.slug,
-            idea_threads.summary,
-            idea_threads.status,
-            idea_threads.first_seen_at,
-            idea_threads.last_seen_at,
-            idea_threads.momentum_30d,
-            idea_threads.momentum_90d,
-            idea_threads.atom_count,
-            idea_threads.source_channel_count,
-            idea_threads.source_channels_json,
-            idea_threads.key_entities_json,
-            idea_threads.current_claims_json
+        SELECT
+            idea_threads.id AS thread_id,
+            idea_threads.slug AS thread_slug,
+            knowledge_atoms.id AS atom_id,
+            knowledge_atoms.atom_type,
+            knowledge_atoms.claim,
+            knowledge_atoms.summary,
+            knowledge_atoms.source_urls_json,
+            knowledge_atoms.entities_json,
+            knowledge_atoms.tools_json,
+            knowledge_atoms.models_json,
+            knowledge_atoms.practices_json,
+            knowledge_atoms.practical_utility_score,
+            knowledge_atoms.staleness_status,
+            knowledge_atoms.first_seen_at,
+            knowledge_atoms.last_seen_at
         FROM idea_threads
         JOIN idea_thread_atoms ON idea_thread_atoms.thread_id = idea_threads.id
         JOIN knowledge_atoms ON knowledge_atoms.id = idea_thread_atoms.atom_id
-        WHERE idea_threads.last_seen_at >= ?
-          AND knowledge_atoms.last_seen_at >= ?
+        WHERE reporting_utc_micros(knowledge_atoms.last_seen_at) >= reporting_utc_micros(?)
+          AND reporting_utc_micros(knowledge_atoms.last_seen_at) < reporting_utc_micros(?)
           AND knowledge_atoms.atom_type IN ({atom_placeholders})
           AND ({channel_clause})
-        ORDER BY
-            idea_threads.momentum_30d DESC,
-            idea_threads.last_seen_at DESC,
-            idea_threads.atom_count DESC,
-            idea_threads.title ASC
-        LIMIT ?
+        ORDER BY reporting_utc_micros(knowledge_atoms.last_seen_at) ASC, knowledge_atoms.id ASC
         """,
-        (cutoff, cutoff, *MARKET_CONTEXT_ATOM_TYPES, *channel_params, limit),
+        params,
     ).fetchall()
-    return [_row_to_thread(row) for row in rows]
+    period_end = datetime.fromisoformat(analysis_period_end.replace("Z", "+00:00"))
+    atoms_by_thread: dict[int, dict] = {}
+    for row in rows:
+        thread_id = int(row["thread_id"])
+        group = atoms_by_thread.setdefault(
+            thread_id,
+            {"id": thread_id, "slug": str(row["thread_slug"] or ""), "atoms": []},
+        )
+        group["atoms"].append(
+            {
+                "id": int(row["atom_id"]),
+                "atom_type": str(row["atom_type"] or ""),
+                "claim": str(row["claim"] or ""),
+                "summary": str(row["summary"] or ""),
+                "source_urls": _parse_array(row["source_urls_json"]),
+                "entities": _parse_array(row["entities_json"]),
+                "tools": _parse_array(row["tools_json"]),
+                "models": _parse_array(row["models_json"]),
+                "practices": _parse_array(row["practices_json"]),
+                "practical_utility_score": float(row["practical_utility_score"] or 0.0),
+                "staleness_status": str(row["staleness_status"] or "active"),
+                "first_seen_at": str(row["first_seen_at"] or ""),
+                "last_seen_at": str(row["last_seen_at"] or ""),
+            }
+        )
+
+    threads = [
+        _bounded_market_thread(group, period_end=period_end)
+        for group in atoms_by_thread.values()
+        if group.get("atoms")
+    ]
+    threads.sort(key=lambda item: str(item.get("title") or ""))
+    threads.sort(key=lambda item: int(item.get("atom_count") or 0), reverse=True)
+    threads.sort(
+        key=lambda item: reporting_timestamp_sort_key(item.get("last_seen_at")),
+        reverse=True,
+    )
+    threads.sort(key=lambda item: float(item.get("momentum_30d") or 0.0), reverse=True)
+    return threads[:limit]
+
+
+def _bounded_market_thread(group: dict, *, period_end: datetime) -> dict:
+    atoms = list(group.get("atoms") or [])
+    source_channels = sorted(
+        {
+            channel
+            for atom in atoms
+            for url in atom.get("source_urls") or []
+            for channel in [_source_channel(url)]
+            if channel
+        }
+    )
+    display_terms: list[str] = []
+    historical_slugs: list[str] = []
+    for atom in atoms:
+        slug_terms, atom_terms = _idea_thread_terms(atom)
+        historical_slugs.append("-".join(slug_terms) or f"atom-{int(atom.get('id') or 0)}")
+        for term in atom_terms:
+            if term not in display_terms:
+                display_terms.append(term)
+    current_claims = _claims_as_of(atoms, include_current=True)
+    superseded_claims = _claims_as_of(atoms, include_current=False)
+    summary_claim = current_claims[0] if current_claims else (superseded_claims[0] if superseded_claims else "")
+    first_seen = [str(atom.get("first_seen_at") or "") for atom in atoms if atom.get("first_seen_at")]
+    last_seen = [str(atom.get("last_seen_at") or "") for atom in atoms if atom.get("last_seen_at")]
+    historical_slug = (
+        sorted(Counter(historical_slugs).items(), key=lambda item: (-item[1], item[0]))[0][0]
+        if historical_slugs
+        else str(group.get("slug") or "")
+    )
+    return {
+        "id": int(group["id"]),
+        "title": " / ".join(display_terms[:3]) or historical_slug,
+        "slug": historical_slug,
+        "summary": (
+            f"{len(atoms)} atoms across {len(source_channels)} source channel(s)."
+            + (f" Latest: {summary_claim}" if summary_claim else "")
+        ),
+        "status": _idea_thread_status(
+            atoms,
+            now=period_end,
+            source_channel_count=len(source_channels),
+        ),
+        "first_seen_at": min(first_seen, key=reporting_timestamp_sort_key) if first_seen else "",
+        "last_seen_at": max(last_seen, key=reporting_timestamp_sort_key) if last_seen else "",
+        "momentum_30d": _idea_thread_momentum(
+            atoms,
+            now=period_end,
+            days=30,
+            saturation_count=12,
+        ),
+        "momentum_90d": _idea_thread_momentum(
+            atoms,
+            now=period_end,
+            days=90,
+            saturation_count=24,
+        ),
+        "atom_count": len(atoms),
+        "source_channel_count": len(source_channels),
+        "source_channels": source_channels,
+        "key_entities": display_terms,
+        "current_claims": current_claims,
+    }
 
 
 def _fetch_market_posts(
     connection: sqlite3.Connection,
     *,
     cutoff: str,
+    analysis_period_end: str | None,
     limit: int,
     normalized_channels: list[str],
 ) -> list[dict]:
     if not normalized_channels or not _table_exists(connection, "posts") or not _table_exists(connection, "raw_posts"):
         return []
     placeholders = ",".join("?" for _ in normalized_channels)
+    end_clause = (
+        "AND reporting_utc_micros(p.posted_at) < reporting_utc_micros(?)"
+        if analysis_period_end
+        else ""
+    )
+    params: list[object] = [cutoff]
+    if analysis_period_end:
+        params.append(analysis_period_end)
+    params.extend((*normalized_channels, limit))
     rows = connection.execute(
         f"""
         SELECT
@@ -350,12 +535,13 @@ def _fetch_market_posts(
             r.view_count
         FROM posts p
         INNER JOIN raw_posts r ON r.id = p.raw_post_id
-        WHERE p.posted_at >= ?
+        WHERE reporting_utc_micros(p.posted_at) >= reporting_utc_micros(?)
+          {end_clause}
           AND lower(replace(p.channel_username, '@', '')) IN ({placeholders})
-        ORDER BY p.posted_at DESC, p.id DESC
+        ORDER BY reporting_utc_micros(p.posted_at) DESC, p.id DESC
         LIMIT ?
         """,
-        (cutoff, *normalized_channels, limit),
+        params,
     ).fetchall()
     return [_row_to_post(row) for row in rows]
 
@@ -715,6 +901,25 @@ def _parse_array(value: str | None) -> list:
     return parsed if isinstance(parsed, list) else []
 
 
+def _claims_as_of(atoms: list[dict], *, include_current: bool) -> list[str]:
+    claims: list[str] = []
+    non_current = {"superseded", "resolved", "hype_only", "stale"}
+    for atom in sorted(
+        atoms,
+        key=lambda item: reporting_timestamp_sort_key(item.get("last_seen_at")),
+        reverse=True,
+    ):
+        is_current = str(atom.get("staleness_status") or "active") not in non_current
+        if include_current != is_current:
+            continue
+        claim = str(atom.get("claim") or "").strip()
+        if claim and claim not in claims:
+            claims.append(claim)
+        if len(claims) >= 6:
+            break
+    return claims
+
+
 def _atom_text(atom: dict) -> str:
     parts = [
         atom.get("claim"),
@@ -776,6 +981,35 @@ def _normalize_channel(channel: str) -> str:
 
 def _date_slug(value: str) -> str:
     return re.sub(r"[^0-9A-Za-z_-]+", "-", value).strip("-") or "bounded"
+
+
+def _resolve_period_end(
+    *,
+    analysis_period_end: str | None,
+    reporting_period: ReportingPeriod | None,
+) -> str | None:
+    explicit_end = _normalize_utc_iso(analysis_period_end) if analysis_period_end else None
+    period_end = (
+        _normalize_utc_iso(reporting_period.analysis_period_end)
+        if reporting_period is not None
+        else None
+    )
+    if explicit_end and period_end and explicit_end != period_end:
+        raise ValueError("analysis_period_end must match reporting_period")
+    return period_end or explicit_end
+
+
+def _normalize_utc_iso(value: datetime | str) -> str:
+    if isinstance(value, datetime):
+        parsed = value
+    else:
+        text = str(value).strip()
+        if text.endswith("Z"):
+            text = f"{text[:-1]}+00:00"
+        parsed = datetime.fromisoformat(text)
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError("analysis_period_end must include an explicit timezone")
+    return parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def _truncate(text: str, limit: int) -> str:

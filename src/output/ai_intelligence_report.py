@@ -11,10 +11,22 @@ from urllib.parse import urlparse
 from config.settings import PROJECT_ROOT, Settings
 from db.ai_report_feedback import summarize_ai_report_feedback
 from db.frontier_analysis import fetch_frontier_analysis
+from output.idea_threads import _thread_terms as _idea_thread_terms
 from output.report_quality import (
     MATCHES_TRACE_RE,
     ReportQualityFinding,
     SEVERITY_CRITICAL,
+)
+from output.reporting_period import (
+    EXPLICIT_ISO_WEEK,
+    PARTIAL_ISO_WEEK,
+    TRAILING_SEVEN_DAYS,
+    ReportingPeriod,
+    format_human_period_label,
+    format_period_display_label,
+    register_reporting_period_sqlite,
+    reporting_timestamp_sort_key,
+    resolve_reporting_period,
 )
 
 
@@ -48,6 +60,11 @@ class AiIntelligenceReportSummary:
     action_count: int
     quality_finding_count: int
     notification_text: str
+    run_date: str = ""
+    reporting_week: str = ""
+    period_mode: str = ""
+    analysis_period_start: str = ""
+    analysis_period_end: str = ""
 
 
 class AiIntelligenceReportQualityError(ValueError):
@@ -173,7 +190,7 @@ def _load_thread_atoms(
     connection: sqlite3.Connection,
     *,
     thread_id: int,
-    limit: int,
+    analysis_period_end: datetime,
 ) -> list[dict]:
     rows = connection.execute(
         """
@@ -183,17 +200,23 @@ def _load_thread_atoms(
         FROM idea_thread_atoms
         JOIN knowledge_atoms ON knowledge_atoms.id = idea_thread_atoms.atom_id
         WHERE idea_thread_atoms.thread_id = ?
-        ORDER BY knowledge_atoms.last_seen_at DESC, knowledge_atoms.id DESC
-        LIMIT ?
+          AND reporting_utc_micros(knowledge_atoms.last_seen_at) < reporting_utc_micros(?)
+        ORDER BY reporting_utc_micros(knowledge_atoms.last_seen_at) DESC, knowledge_atoms.id DESC
         """,
-        (int(thread_id), max(1, int(limit or 8))),
+        (
+            int(thread_id),
+            _iso_for_sql(analysis_period_end),
+        ),
     ).fetchall()
-    atoms = [_atom_from_row(row) for row in rows]
-    _attach_source_posts(connection, atoms)
-    return atoms
+    return [_atom_from_row(row) for row in rows]
 
 
-def _attach_source_posts(connection: sqlite3.Connection, atoms: list[dict]) -> None:
+def _attach_source_posts(
+    connection: sqlite3.Connection,
+    atoms: list[dict],
+    *,
+    analysis_period_end: datetime,
+) -> None:
     if not atoms or not _table_exists(connection, "posts"):
         return
     source_ids: list[int] = []
@@ -222,8 +245,9 @@ def _attach_source_posts(connection: sqlite3.Connection, atoms: list[dict]) -> N
             FROM posts
             LEFT JOIN raw_posts ON raw_posts.id = posts.raw_post_id
             WHERE posts.id IN ({placeholders})
+              AND reporting_utc_micros(posts.posted_at) < reporting_utc_micros(?)
             """,
-            source_ids,
+            [*source_ids, _iso_for_sql(analysis_period_end)],
         ).fetchall()
     else:
         rows = connection.execute(
@@ -237,8 +261,9 @@ def _attach_source_posts(connection: sqlite3.Connection, atoms: list[dict]) -> N
                 NULL AS raw_text
             FROM posts
             WHERE posts.id IN ({placeholders})
+              AND reporting_utc_micros(posts.posted_at) < reporting_utc_micros(?)
             """,
-            source_ids,
+            [*source_ids, _iso_for_sql(analysis_period_end)],
         ).fetchall()
     source_posts = {
         int(row["post_id"]): {
@@ -263,55 +288,280 @@ def _attach_source_posts(connection: sqlite3.Connection, atoms: list[dict]) -> N
         atom["source_posts"] = linked
 
 
+def _legacy_reporting_period(week_label: str, generated_at: datetime | None = None) -> ReportingPeriod:
+    """Build an unchecked period for legacy context-only callers.
+
+    Weekly artifact entry points resolve and validate periods before calling the
+    loader. A few older projections still call the loader directly with only a
+    week label, so this adapter preserves that API without weakening generator
+    validation.
+    """
+
+    current = (generated_at or _utc_now()).astimezone(timezone.utc).replace(microsecond=0)
+    period_start, period_end = _week_bounds(week_label)
+    return ReportingPeriod(
+        run_date=current.date(),
+        generated_at=current,
+        analysis_period_start=period_start,
+        analysis_period_end=period_end,
+        reporting_week=week_label,
+        period_mode=EXPLICIT_ISO_WEEK,
+    )
+
+
+def _context_period_fields(period: ReportingPeriod) -> dict[str, str]:
+    fields = period.to_dict()
+    # Retain the V1 aliases consumed by the canonical delta projection.
+    fields["week_start"] = fields["analysis_period_start"]
+    fields["week_end"] = fields["analysis_period_end"]
+    return fields
+
+
+def _frontier_analysis_for_period(
+    connection: sqlite3.Connection,
+    *,
+    reporting_period: ReportingPeriod,
+) -> dict | None:
+    analysis = fetch_frontier_analysis(
+        connection,
+        week_label=reporting_period.reporting_week,
+    )
+    if not analysis:
+        return None
+    source_context = (analysis.get("analysis") or {}).get("source_context") or {}
+    expected = reporting_period.to_dict()
+    identity_fields = (
+        "reporting_week",
+        "week_label",
+        "period_mode",
+        "analysis_period_start",
+        "analysis_period_end",
+    )
+    if any(
+        str(source_context.get(field) or "") != str(expected[field])
+        for field in identity_fields
+    ):
+        return None
+    return analysis
+
+
+def _unique_strings(values) -> list[str]:
+    result: list[str] = []
+    for value in values:
+        clean = str(value or "").strip()
+        if clean and clean not in result:
+            result.append(clean)
+    return result
+
+
+def _claims_as_of(atoms: list[dict], *, current: bool) -> list[str]:
+    claims: list[str] = []
+    non_current = {"superseded", "resolved", "hype_only", "stale"}
+    for atom in sorted(
+        atoms,
+        key=lambda item: reporting_timestamp_sort_key(item.get("last_seen_at")),
+        reverse=True,
+    ):
+        is_current = str(atom.get("staleness_status") or "active") not in non_current
+        if is_current != current:
+            continue
+        claim = str(atom.get("claim") or "").strip()
+        if claim and claim not in claims:
+            claims.append(claim)
+        if len(claims) >= 6:
+            break
+    return claims
+
+
+def _thread_status_as_of(atoms: list[dict], *, period_end: datetime, source_channel_count: int) -> str:
+    statuses = {str(atom.get("staleness_status") or "active") for atom in atoms}
+    non_current = {"superseded", "resolved", "hype_only", "stale"}
+    if statuses and all(status in non_current for status in statuses):
+        for status in ("superseded", "resolved", "hype_only", "stale"):
+            if status in statuses:
+                return status
+    last_seen = [_parse_iso(atom.get("last_seen_at")) for atom in atoms]
+    observed = [value for value in last_seen if value is not None]
+    if observed and max(observed) < period_end - timedelta(days=30):
+        return "stale"
+    average_utility = sum(float(atom.get("practical_utility_score") or 0.0) for atom in atoms) / max(1, len(atoms))
+    if len(atoms) >= 3 and source_channel_count >= 2 and average_utility >= 0.75:
+        return "production_pattern"
+    return "active"
+
+
+def _momentum_as_of(atoms: list[dict], *, period_end: datetime, days: int, saturation: int) -> float:
+    cutoff = period_end - timedelta(days=days)
+    count = sum(
+        1
+        for atom in atoms
+        if (observed := _parse_iso(atom.get("last_seen_at"))) is not None and observed >= cutoff
+    )
+    return min(1.0, count / max(1, saturation))
+
+
+def _project_thread_as_of(thread: dict, atoms: list[dict], *, period_end: datetime) -> dict:
+    """Replace mutable all-time thread aggregates with bounded atom state."""
+
+    source_channels = sorted(
+        {
+            _source_channel(url)
+            for atom in atoms
+            for url in (atom.get("source_urls") or [])
+            if _source_channel(url)
+        }
+    )
+    current_claims = _claims_as_of(atoms, current=True)
+    superseded_claims = _claims_as_of(atoms, current=False)
+    summary_claim = current_claims[0] if current_claims else (superseded_claims[0] if superseded_claims else "")
+    contradictions = _unique_strings(
+        atom.get("claim")
+        for atom in atoms
+        if atom.get("atom_type") in {"risk_warning", "opinion_shift"}
+        or any(
+            marker in str(atom.get("claim") or "").lower()
+            for marker in (" not ", " risk", " fails", " broken", " contradict")
+        )
+    )[:6]
+    display_terms: list[str] = []
+    historical_slugs: list[str] = []
+    for atom in sorted(
+        atoms,
+        key=lambda item: (
+            reporting_timestamp_sort_key(item.get("last_seen_at")),
+            int(item.get("id") or 0),
+        ),
+    ):
+        slug_terms, atom_terms = _idea_thread_terms(atom)
+        historical_slugs.append("-".join(slug_terms) or f"atom-{int(atom.get('id') or 0)}")
+        for term in atom_terms:
+            if term not in display_terms:
+                display_terms.append(term)
+    key_entities = display_terms[:8]
+    historical_slug = (
+        sorted(Counter(historical_slugs).items(), key=lambda item: (-item[1], item[0]))[0][0]
+        if historical_slugs
+        else str(thread.get("slug") or "")
+    )
+    first_seen_values = [str(atom.get("first_seen_at") or "") for atom in atoms if atom.get("first_seen_at")]
+    last_seen_values = [str(atom.get("last_seen_at") or "") for atom in atoms if atom.get("last_seen_at")]
+    bounded = {
+        **thread,
+        "slug": historical_slug,
+        "title": " / ".join(display_terms[:3]) or historical_slug,
+        "summary": (
+            f"{len(atoms)} atoms across {len(source_channels)} source channel(s)."
+            + (f" Latest: {summary_claim}" if summary_claim else "")
+        ),
+        "first_seen_at": (
+            min(first_seen_values, key=reporting_timestamp_sort_key)
+            if first_seen_values
+            else ""
+        ),
+        "last_seen_at": (
+            max(last_seen_values, key=reporting_timestamp_sort_key)
+            if last_seen_values
+            else ""
+        ),
+        "momentum_7d": _momentum_as_of(atoms, period_end=period_end, days=7, saturation=5),
+        "momentum_30d": _momentum_as_of(atoms, period_end=period_end, days=30, saturation=12),
+        "momentum_90d": _momentum_as_of(atoms, period_end=period_end, days=90, saturation=24),
+        "atom_count": len(atoms),
+        "source_channel_count": len(source_channels),
+        "source_channels": source_channels,
+        "key_entities": key_entities,
+        "current_claims": current_claims,
+        "superseded_claims": superseded_claims,
+        "contradictions": contradictions,
+        "atoms": atoms,
+    }
+    bounded["status"] = _thread_status_as_of(
+        atoms,
+        period_end=period_end,
+        source_channel_count=len(source_channels),
+    )
+    return bounded
+
+
 def load_ai_intelligence_context(
     connection: sqlite3.Connection,
     *,
     week_label: str,
+    reporting_period: ReportingPeriod | None = None,
     threads_limit: int = 8,
     atoms_limit: int = 8,
 ) -> dict:
     connection.row_factory = sqlite3.Row
+    register_reporting_period_sqlite(connection)
+    period = reporting_period or _legacy_reporting_period(week_label)
+    if period.week_label != str(week_label).strip():
+        raise ValueError("week_label must match reporting_period.week_label")
+    period_fields = _context_period_fields(period)
     if not _table_exists(connection, "idea_threads") or not _table_exists(connection, "idea_thread_atoms"):
-        return {"week_label": week_label, "threads": [], "source_channels": []}
+        return {
+            **period_fields,
+            "threads": [],
+            "source_channels": [],
+            "marked_posts": [],
+        }
 
-    week_start, week_end = _week_bounds(week_label)
-    week_start_sql = _iso_for_sql(week_start)
+    week_start = period.analysis_period_start
+    week_end = period.analysis_period_end
     week_end_sql = _iso_for_sql(week_end)
     rows = connection.execute(
         """
-        SELECT *
+        SELECT idea_threads.*
         FROM idea_threads
-        WHERE last_seen_at < ?
-        ORDER BY
-            CASE WHEN last_seen_at >= ? THEN 0 ELSE 1 END ASC,
-            momentum_30d DESC,
-            source_channel_count DESC,
-            last_seen_at DESC,
-            atom_count DESC,
-            title ASC
-        LIMIT ?
+        WHERE EXISTS (
+            SELECT 1
+            FROM idea_thread_atoms
+            JOIN knowledge_atoms ON knowledge_atoms.id = idea_thread_atoms.atom_id
+            WHERE idea_thread_atoms.thread_id = idea_threads.id
+              AND reporting_utc_micros(knowledge_atoms.last_seen_at) < reporting_utc_micros(?)
+        )
         """,
-        (week_end_sql, week_start_sql, max(1, int(threads_limit or 8))),
+        (week_end_sql,),
     ).fetchall()
     threads = []
     for row in rows:
         thread = _thread_from_row(row)
-        thread["atoms"] = _load_thread_atoms(
+        all_atoms = _load_thread_atoms(
             connection,
             thread_id=thread["id"],
-            limit=atoms_limit,
+            analysis_period_end=week_end,
         )
+        if not all_atoms:
+            continue
+        thread = _project_thread_as_of(thread, all_atoms, period_end=week_end)
         thread["changed_this_week"] = _thread_changed_this_week(thread, week_start, week_end)
+        # Delta calculation needs the complete bounded history even when the
+        # reader-facing atom list is intentionally compressed.
+        thread["_delta_atoms"] = all_atoms
+        thread["atoms"] = all_atoms[: max(1, int(atoms_limit or 8))]
+        _attach_source_posts(
+            connection,
+            thread["atoms"],
+            analysis_period_end=week_end,
+        )
         threads.append(thread)
+    # Match the established ordering using only the bounded as-of projection.
+    threads.sort(key=lambda item: str(item.get("title") or ""))
+    threads.sort(key=lambda item: int(item.get("atom_count") or 0), reverse=True)
+    threads.sort(
+        key=lambda item: reporting_timestamp_sort_key(item.get("last_seen_at")),
+        reverse=True,
+    )
+    threads.sort(key=lambda item: int(item.get("source_channel_count") or 0), reverse=True)
+    threads.sort(key=lambda item: float(item.get("momentum_30d") or 0.0), reverse=True)
+    threads.sort(key=lambda item: bool(item.get("changed_this_week")), reverse=True)
+    threads = threads[: max(1, int(threads_limit or 8))]
     return {
-        "week_label": week_label,
-        "week_start": week_start_sql,
-        "week_end": week_end_sql,
+        **period_fields,
         "threads": threads,
         "source_channels": _source_channel_counts(threads),
-        "marked_posts": _marked_posts_for_week(connection, week_label=week_label),
+        "marked_posts": _marked_posts_for_period(connection, reporting_period=period),
         "frontier_analysis": (
-            fetch_frontier_analysis(connection, week_label=week_label)
+            _frontier_analysis_for_period(connection, reporting_period=period)
             if _table_exists(connection, "frontier_analyses")
             else None
         ),
@@ -364,8 +614,7 @@ def _thread_changed_this_week(thread: dict, week_start: datetime, week_end: date
         last_seen = _parse_iso(atom.get("last_seen_at"))
         if last_seen and week_start <= last_seen < week_end:
             return True
-    last_seen = _parse_iso(thread.get("last_seen_at"))
-    return bool(last_seen and week_start <= last_seen < week_end)
+    return False
 
 
 def _compressed_context(threads: list[dict]) -> list[dict]:
@@ -410,16 +659,15 @@ def _source_channel_counts(threads: list[dict]) -> list[dict]:
     ]
 
 
-def _marked_posts_for_week(
+def _marked_posts_for_period(
     connection: sqlite3.Connection,
     *,
-    week_label: str,
+    reporting_period: ReportingPeriod,
     limit: int = 8,
 ) -> list[dict]:
     required_tables = ("signal_feedback", "posts", "raw_posts")
     if not all(_table_exists(connection, table_name) for table_name in required_tables):
         return []
-    week_start, week_end = _week_bounds(week_label)
     rows = connection.execute(
         """
         SELECT
@@ -427,20 +675,23 @@ def _marked_posts_for_week(
             signal_feedback.recorded_at,
             posts.id AS post_id,
             posts.channel_username,
+            posts.posted_at,
             posts.content,
             raw_posts.message_url
         FROM signal_feedback
         JOIN posts ON posts.id = signal_feedback.post_id
         LEFT JOIN raw_posts ON raw_posts.id = posts.raw_post_id
         WHERE signal_feedback.feedback IN ('operator_marked_interesting', 'marked_important')
-          AND signal_feedback.recorded_at >= ?
-          AND signal_feedback.recorded_at < ?
-        ORDER BY signal_feedback.recorded_at DESC, signal_feedback.id DESC
+          AND reporting_utc_micros(posts.posted_at) >= reporting_utc_micros(?)
+          AND reporting_utc_micros(posts.posted_at) < reporting_utc_micros(?)
+          AND reporting_utc_micros(signal_feedback.recorded_at) <= reporting_utc_micros(?)
+        ORDER BY reporting_utc_micros(signal_feedback.recorded_at) DESC, signal_feedback.id DESC
         LIMIT ?
         """,
         (
-            _iso_for_sql(week_start),
-            _iso_for_sql(week_end),
+            _iso_for_sql(reporting_period.analysis_period_start),
+            _iso_for_sql(reporting_period.analysis_period_end),
+            _iso_for_sql(reporting_period.generated_at),
             max(1, int(limit or 8)),
         ),
     ).fetchall()
@@ -449,6 +700,7 @@ def _marked_posts_for_week(
             "post_id": int(row["post_id"]),
             "feedback": str(row["feedback"] or ""),
             "recorded_at": str(row["recorded_at"] or ""),
+            "posted_at": str(row["posted_at"] or ""),
             "channel_username": str(row["channel_username"] or ""),
             "content": str(row["content"] or ""),
             "source_url": str(row["message_url"] or ""),
@@ -1329,10 +1581,47 @@ def _render_appendix(context: dict) -> str:
     return "".join(parts)
 
 
+def _human_period_label(context: dict) -> str:
+    period_start = _parse_iso(context.get("analysis_period_start") or context.get("week_start"))
+    period_end = _parse_iso(context.get("analysis_period_end") or context.get("week_end"))
+    if period_start is None or period_end is None:
+        try:
+            period_start, period_end = _week_bounds(str(context.get("week_label") or ""))
+        except (TypeError, ValueError):
+            return str(context.get("week_label") or "")
+    return format_human_period_label(
+        period_mode=str(context.get("period_mode") or EXPLICIT_ISO_WEEK),
+        reporting_week=str(context.get("reporting_week") or context.get("week_label") or ""),
+        analysis_period_start=period_start,
+        analysis_period_end=period_end,
+    )
+
+
+def _period_title(context: dict, artifact_name: str) -> str:
+    label = _human_period_label(context)
+    week_label = str(context.get("week_label") or "")
+    if str(context.get("period_mode") or "") in {TRAILING_SEVEN_DAYS, PARTIAL_ISO_WEEK}:
+        return f"{artifact_name} - {label}"
+    return f"{artifact_name} - {label} ({week_label})" if week_label else f"{artifact_name} - {label}"
+
+
+def _period_metadata(context: dict, *, generated_at: str) -> dict[str, object]:
+    return {
+        "run_date": context.get("run_date") or generated_at[:10],
+        "generated_at": generated_at,
+        "reporting_week": context.get("reporting_week") or context.get("week_label"),
+        "week_label": context.get("week_label") or context.get("reporting_week"),
+        "period_mode": context.get("period_mode") or EXPLICIT_ISO_WEEK,
+        "analysis_period_start": context.get("analysis_period_start") or context.get("week_start"),
+        "analysis_period_end": context.get("analysis_period_end") or context.get("week_end"),
+    }
+
+
 def render_ai_intelligence_html(context: dict, *, generated_at: str | None = None) -> tuple[str, list[dict]]:
     week_label = context["week_label"]
     actions = _learning_actions(context["threads"], context.get("feedback_context") or {})
-    generated = generated_at or _utc_now_iso()
+    generated = generated_at or str(context.get("generated_at") or _utc_now_iso())
+    report_title = _period_title(context, "AI Intelligence Report")
     section_bodies = {
         "executive-brief": _render_executive_brief(context, actions),
         "frontier-analysis": _render_frontier_analysis(context),
@@ -1355,7 +1644,7 @@ def render_ai_intelligence_html(context: dict, *, generated_at: str | None = Non
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AI Intelligence Report { _escape(week_label) }</title>
+<title>{_escape(report_title)}</title>
 <style>
 :root {{ color-scheme: light; --ink:#1d252c; --muted:#65717d; --line:#d8dee4; --panel:#ffffff; --bg:#f3f5f7; --accent:#166534; --accent-2:#92400e; }}
 * {{ box-sizing: border-box; }}
@@ -1410,7 +1699,9 @@ summary {{ cursor:pointer; font-weight:700; }}
 <body>
 <header>
 <p class="kicker">AI Knowledge Intelligence</p>
-<h1>AI Intelligence Report - {_escape(week_label)}</h1>
+<h1>{_escape(report_title)}</h1>
+<p class="muted">Analysis period: {_escape(_human_period_label(context))}.</p>
+<p class="muted">Period mode: {_escape(str(context.get("period_mode") or EXPLICIT_ISO_WEEK))}.</p>
 <p class="muted">Generated {_escape(generated)} from compressed Idea Thread and Knowledge Atom context.</p>
 <nav>{nav}</nav>
 </header>
@@ -1518,8 +1809,14 @@ def _write_report_files(
 
 
 def build_ai_intelligence_notification(summary: AiIntelligenceReportSummary) -> str:
+    period_label = format_period_display_label(
+        period_mode=summary.period_mode,
+        reporting_week=summary.reporting_week or summary.week_label,
+        analysis_period_start=summary.analysis_period_start,
+        analysis_period_end=summary.analysis_period_end,
+    )
     return (
-        f"AI Intelligence Report {summary.week_label} is ready.\n"
+        f"AI Intelligence Report {period_label} is ready.\n"
         f"Threads: {summary.thread_count} | Source atoms: {summary.source_atom_count} | Actions: {summary.action_count}\n"
         f"Open: {summary.html_path}"
     )
@@ -1529,19 +1826,27 @@ def generate_ai_intelligence_report(
     settings: Settings,
     *,
     week_label: str | None = None,
+    period_mode: str | None = None,
     threads_limit: int = 8,
     atoms_limit: int = 8,
     output_root: Path | str | None = None,
     now: datetime | None = None,
 ) -> AiIntelligenceReportSummary:
-    clean_week = str(week_label or _current_week_label(now)).strip()
-    generated_at = (now or _utc_now()).astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    period = resolve_reporting_period(
+        now,
+        week_label=week_label,
+        period_mode=period_mode,
+    )
+    clean_week = period.week_label
+    period_fields = period.to_dict()
+    generated_at = period_fields["generated_at"]
     with sqlite3.connect(settings.db_path) as connection:
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON;")
         context = load_ai_intelligence_context(
             connection,
             week_label=clean_week,
+            reporting_period=period,
             threads_limit=threads_limit,
             atoms_limit=atoms_limit,
         )
@@ -1559,8 +1864,7 @@ def generate_ai_intelligence_report(
     threads = context["threads"]
     atoms = _all_atoms(threads)
     metadata = {
-        "week_label": clean_week,
-        "generated_at": generated_at,
+        **_period_metadata(context, generated_at=generated_at),
         "thread_count": len(threads),
         "source_atom_count": len(atoms),
         "source_channel_count": len(context.get("source_channels") or []),
@@ -1583,6 +1887,11 @@ def generate_ai_intelligence_report(
     summary = AiIntelligenceReportSummary(
         week_label=clean_week,
         generated_at=generated_at,
+        run_date=period_fields["run_date"],
+        reporting_week=period_fields["reporting_week"],
+        period_mode=period_fields["period_mode"],
+        analysis_period_start=period_fields["analysis_period_start"],
+        analysis_period_end=period_fields["analysis_period_end"],
         html_path=str(html_path),
         json_path=str(json_path),
         thread_count=len(threads),

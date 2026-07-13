@@ -14,7 +14,6 @@ import yaml
 
 from config.settings import PROJECT_ROOT, Settings
 from output.ai_intelligence_report import (
-    _current_week_label,
     _source_channel,
     _week_bounds,
     load_ai_intelligence_context,
@@ -24,6 +23,7 @@ from output.ai_report_contract import (
     validate_weekly_ai_report_contract,
 )
 from output.report_quality import MATCHES_TRACE_RE, ReportQualityFinding, SEVERITY_CRITICAL
+from output.reporting_period import format_human_period_label, resolve_reporting_period
 
 
 LOGGER = logging.getLogger(__name__)
@@ -1531,6 +1531,14 @@ def _render_html(
     mvp_radar: dict,
 ) -> str:
     week_label = context["week_label"]
+    period_title = week_label
+    if context.get("analysis_period_start") and context.get("analysis_period_end"):
+        period_title = format_human_period_label(
+            period_mode=str(context.get("period_mode") or "explicit_iso_week"),
+            reporting_week=str(context.get("reporting_week") or week_label),
+            analysis_period_start=context["analysis_period_start"],
+            analysis_period_end=context["analysis_period_end"],
+        )
     threads = context.get("threads") or []
     atoms = _all_atoms(threads)
     nav = "".join(f'<a href="#{section_id}">{_escape(title)}</a>' for section_id, title in VISUAL_REQUIRED_SECTIONS)
@@ -1580,7 +1588,7 @@ def _render_html(
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Еженедельная AI-разведка { _escape(week_label) }</title>
+<title>Еженедельная AI-разведка: {_escape(period_title)}</title>
 <style>
 :root {{ color-scheme: light; --ink:#172026; --muted:#62717f; --bg:#eef3f1; --panel:#fff; --line:#d6dfdc; --green:#0f766e; --blue:#2563eb; --rose:#be123c; --amber:#b45309; --soft:#f8fafc; }}
 * {{ box-sizing:border-box; }}
@@ -1656,7 +1664,7 @@ details > *:not(summary) {{ margin-top:12px; }}
 <div class="hero">
 <div>
 <p class="kicker">Еженедельная AI-разведка</p>
-<h1>AI-интеллект за неделю - {_escape(week_label)}</h1>
+<h1>AI-интеллект за неделю: {_escape(period_title)}</h1>
 <p>Операторский отчет: что изменилось, какие утверждения доказаны слабо, что читать, что пробовать и какой фидбек оставить.</p>
 <p class="profile-note">Якоря профиля: {_escape(boost_topics or "темы профиля недоступны")}</p>
 {hero_actions_html}
@@ -1806,8 +1814,10 @@ def generate_ai_visual_report(
     mvp_radar_json_path: str | Path | None = None,
     now: datetime | None = None,
 ) -> AiVisualReportSummary:
-    clean_week = str(week_label or _current_week_label(now)).strip()
-    generated_at = (now or _utc_now()).astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    reporting_period = resolve_reporting_period(now, week_label=week_label)
+    clean_week = reporting_period.week_label
+    period_fields = reporting_period.to_dict()
+    generated_at = period_fields["generated_at"]
     root = Path(output_root) if output_root is not None else OUTPUT_DIR
     root.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(settings.db_path) as connection:
@@ -1816,6 +1826,7 @@ def generate_ai_visual_report(
         context = load_ai_intelligence_context(
             connection,
             week_label=clean_week,
+            reporting_period=reporting_period,
             threads_limit=max(1, int(threads_limit or 12)),
             atoms_limit=max(1, int(atoms_limit or 8)),
         )
@@ -1855,8 +1866,7 @@ def generate_ai_visual_report(
     threads = context.get("threads") or []
     atoms = _all_atoms(threads)
     metadata = {
-        "week_label": clean_week,
-        "generated_at": generated_at,
+        **period_fields,
         "thread_count": len(threads),
         "source_atom_count": len(atoms),
         "source_channel_count": len(_source_counts(threads)),

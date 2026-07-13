@@ -95,9 +95,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     seed_parser = subparsers.add_parser(
         "export-opportunity-seeds",
-        help="Export recent Telegram demand signals for Demand-to-MVP Radar",
+        help="Export completed-week Telegram demand signals for Demand-to-MVP Radar",
     )
-    seed_parser.add_argument("--days", type=int, default=7)
+    seed_period_group = seed_parser.add_mutually_exclusive_group()
+    seed_period_group.add_argument("--week", default=None, help="Completed historical ISO week, e.g. 2026-W28")
+    seed_period_group.add_argument("--days", type=int, default=None, help="Legacy rolling mode; only 7 is supported")
+    seed_period_group.add_argument("--partial-week", action="store_true", help="Diagnostic current partial ISO week")
     seed_parser.add_argument("--limit", type=int, default=80)
     seed_parser.add_argument("--out", default=None)
     seed_parser.add_argument("--include-channel", action="append", default=[])
@@ -151,7 +154,9 @@ def build_parser() -> argparse.ArgumentParser:
         "frontier-analysis",
         help="Run top-model synthesis over Idea Threads and Knowledge Atoms",
     )
-    frontier_parser.add_argument("--week", default=None, help="ISO week label, e.g. 2026-W28 (default: current UTC week)")
+    frontier_period_group = frontier_parser.add_mutually_exclusive_group()
+    frontier_period_group.add_argument("--week", default=None, help="Completed historical ISO week, e.g. 2026-W28 (default: last completed week)")
+    frontier_period_group.add_argument("--partial-week", action="store_true", help="Diagnostic current partial ISO week")
     frontier_parser.add_argument("--lookback-weeks", type=int, default=12)
     frontier_parser.add_argument("--model", default="strong", help="strong, mid, or explicit model id")
     frontier_parser.add_argument("--threads-limit", type=int, default=24)
@@ -163,7 +168,9 @@ def build_parser() -> argparse.ArgumentParser:
         "ai-intelligence-report",
         help="Generate the standalone weekly AI Intelligence HTML report",
     )
-    ai_report_parser.add_argument("--week", default=None, help="ISO week label, e.g. 2026-W28 (default: current UTC week)")
+    ai_report_period_group = ai_report_parser.add_mutually_exclusive_group()
+    ai_report_period_group.add_argument("--week", default=None, help="Completed historical ISO week, e.g. 2026-W28 (default: last completed week)")
+    ai_report_period_group.add_argument("--partial-week", action="store_true", help="Diagnostic current partial ISO week")
     ai_report_parser.add_argument("--threads-limit", type=int, default=8)
     ai_report_parser.add_argument("--atoms-limit", type=int, default=8)
     ai_report_parser.add_argument("--output-root", default=None)
@@ -175,7 +182,7 @@ def build_parser() -> argparse.ArgumentParser:
         "ai-visual-report",
         help="Generate an interactive Archify-backed AI Intelligence HTML artifact",
     )
-    ai_visual_parser.add_argument("--week", default=None, help="ISO week label, e.g. 2026-W28 (default: current UTC week)")
+    ai_visual_parser.add_argument("--week", default=None, help="Completed historical ISO week, e.g. 2026-W28 (default: last completed week)")
     ai_visual_parser.add_argument("--threads-limit", type=int, default=12)
     ai_visual_parser.add_argument("--atoms-limit", type=int, default=8)
     ai_visual_parser.add_argument("--output-root", default=None)
@@ -192,7 +199,9 @@ def build_parser() -> argparse.ArgumentParser:
         "ai-split-report",
         help="Generate separate Knowledge Atlas and Weekly Intelligence Brief HTML artifacts",
     )
-    split_report_parser.add_argument("--week", default=None, help="ISO week label, e.g. 2026-W28 (default: current UTC week)")
+    split_report_period_group = split_report_parser.add_mutually_exclusive_group()
+    split_report_period_group.add_argument("--week", default=None, help="Completed historical ISO week, e.g. 2026-W28 (default: last completed week)")
+    split_report_period_group.add_argument("--partial-week", action="store_true", help="Diagnostic current partial ISO week")
     split_report_parser.add_argument("--threads-limit", type=int, default=24)
     split_report_parser.add_argument("--atoms-limit", type=int, default=8)
     split_report_parser.add_argument("--output-root", default=None)
@@ -217,7 +226,7 @@ def build_parser() -> argparse.ArgumentParser:
         "obsidian-export",
         help="Export the AI Intelligence knowledge layer into generated Obsidian Markdown notes",
     )
-    obsidian_parser.add_argument("--week", default=None, help="ISO week label, e.g. 2026-W28 (default: current UTC week)")
+    obsidian_parser.add_argument("--week", default=None, help="Completed historical ISO week, e.g. 2026-W28 (default: last completed week)")
     obsidian_parser.add_argument("--vault-path", default=None, help="Dedicated vault path (default: data/output/ai_intelligence_vault)")
     obsidian_parser.add_argument("--namespace", default=None, help="Optional scoped namespace inside the vault")
     obsidian_parser.add_argument("--report-root", default=None, help="Directory containing AI Intelligence HTML reports")
@@ -229,7 +238,10 @@ def build_parser() -> argparse.ArgumentParser:
         "mvp-weekly",
         help="Generate and optionally deliver the weekly MVP artifact through Demand-to-MVP Radar",
     )
-    mvp_weekly_parser.add_argument("--days", type=int, default=7)
+    mvp_period_group = mvp_weekly_parser.add_mutually_exclusive_group()
+    mvp_period_group.add_argument("--week", default=None, help="Completed historical ISO week, e.g. 2026-W28")
+    mvp_period_group.add_argument("--days", type=int, default=None, help="Legacy rolling mode; only 7 is supported")
+    mvp_period_group.add_argument("--partial-week", action="store_true", help="Diagnostic current partial ISO week")
     mvp_weekly_parser.add_argument("--limit", type=int, default=80)
     mvp_weekly_parser.add_argument("--include-channel", action="append", default=[])
     mvp_weekly_parser.add_argument(
@@ -816,7 +828,9 @@ def handle_export_opportunity_seeds(args: argparse.Namespace) -> int:
         output_path = Path(args.out) if args.out else None
         summary = export_opportunity_seeds(
             settings,
-            days=max(1, args.days),
+            days=args.days,
+            week_label=args.week,
+            period_mode="partial_iso_week" if args.partial_week else None,
             limit=max(1, args.limit),
             output_path=output_path,
             include_channels=tuple(args.include_channel or ()),
@@ -835,6 +849,8 @@ def handle_export_opportunity_seeds(args: argparse.Namespace) -> int:
             f"{summary.output_path}\n"
             f"seeds={summary.seed_count} scanned={summary.scanned_count} "
             f"knowledge_threads={summary.knowledge_thread_count} week={summary.week_label}\n"
+            f"period_mode={summary.period_mode} "
+            f"analysis_period=[{summary.analysis_period_start}, {summary.analysis_period_end})\n"
             f"market_pack={summary.market_pack_path or ''} "
             f"market_status={(summary.market_pain_pack or {}).get('status') or 'unknown'}\n"
             f"market_lens={summary.market_lens_path or ''} "
@@ -890,7 +906,9 @@ def handle_mvp_weekly(args: argparse.Namespace) -> int:
         LOGGER.info("Starting step=mvp_weekly")
         summary = run_mvp_weekly_pipeline(
             settings,
-            days=max(1, args.days),
+            days=args.days,
+            week_label=args.week,
+            period_mode="partial_iso_week" if args.partial_week else None,
             limit=max(1, args.limit),
             include_channels=tuple(args.include_channel or ()),
             market_context_days=max(1, args.market_context_days),
@@ -916,6 +934,8 @@ def handle_mvp_weekly(args: argparse.Namespace) -> int:
             f"knowledge_threads={summary.knowledge_thread_count} "
             f"dossier_status={summary.dossier_status or ''} "
             f"title={summary.selected_title or ''}\n"
+            f"period_mode={summary.period_mode} "
+            f"analysis_period=[{summary.analysis_period_start}, {summary.analysis_period_end})\n"
             f"live_intelligence={summary.live_intelligence_path or ''}\n"
             f"market_pack={summary.market_pack_path or ''} "
             f"market_status={(summary.market_pain_pack or {}).get('status') or 'unknown'}\n"
@@ -1653,13 +1673,14 @@ def handle_frontier_analysis(args: argparse.Namespace) -> int:
 
         LOGGER.info(
             "Starting step=frontier_analysis week=%s lookback_weeks=%d model=%s",
-            args.week or "current",
+            args.week or "last_completed",
             args.lookback_weeks,
             args.model,
         )
         summary = run_frontier_analysis(
             settings,
             week_label=args.week,
+            period_mode="partial_iso_week" if args.partial_week else None,
             lookback_weeks=max(1, args.lookback_weeks),
             model=args.model,
             threads_limit=max(1, args.threads_limit),
@@ -1704,13 +1725,14 @@ def handle_ai_intelligence_report(args: argparse.Namespace) -> int:
 
         LOGGER.info(
             "Starting step=ai_intelligence_report week=%s threads_limit=%d atoms_limit=%d",
-            args.week or "current",
+            args.week or "last_completed",
             args.threads_limit,
             args.atoms_limit,
         )
         summary = generate_ai_intelligence_report(
             settings,
             week_label=args.week,
+            period_mode="partial_iso_week" if args.partial_week else None,
             threads_limit=max(1, args.threads_limit),
             atoms_limit=max(1, args.atoms_limit),
             output_root=args.output_root,
@@ -1766,7 +1788,7 @@ def handle_ai_visual_report(args: argparse.Namespace) -> int:
 
         LOGGER.info(
             "Starting step=ai_visual_report week=%s threads_limit=%d atoms_limit=%d archify_root=%s",
-            args.week or "current",
+            args.week or "last_completed",
             args.threads_limit,
             args.atoms_limit,
             args.archify_root or "auto",
@@ -1844,13 +1866,14 @@ def handle_ai_split_report(args: argparse.Namespace) -> int:
 
         LOGGER.info(
             "Starting step=ai_split_report week=%s threads_limit=%d atoms_limit=%d",
-            args.week or "current",
+            args.week or "last_completed",
             args.threads_limit,
             args.atoms_limit,
         )
         summary = generate_split_intelligence_reports(
             settings,
             week_label=args.week,
+            period_mode="partial_iso_week" if args.partial_week else None,
             threads_limit=max(1, args.threads_limit),
             atoms_limit=max(1, args.atoms_limit),
             output_root=args.output_root,
@@ -1934,7 +1957,7 @@ def handle_obsidian_export(args: argparse.Namespace) -> int:
 
         LOGGER.info(
             "Starting step=obsidian_export week=%s vault=%s namespace=%s",
-            args.week or "current",
+            args.week or "last_completed",
             args.vault_path or "default",
             args.namespace or "",
         )

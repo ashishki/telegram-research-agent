@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from config.settings import PROJECT_ROOT
+from output.reporting_period import register_reporting_period_sqlite
 
 
 EVENT_SCHEMA_VERSION = "source_event.v1"
@@ -78,18 +79,40 @@ def backfill_recent_source_events(
     days: int = 14,
     event_root: Path | str | None = None,
     limit: int = 5000,
+    analysis_period_start: datetime | str | None = None,
+    analysis_period_end: datetime | str | None = None,
 ) -> int:
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=max(1, int(days or 14)))).isoformat()
+    register_reporting_period_sqlite(connection)
+    if (analysis_period_start is None) != (analysis_period_end is None):
+        raise ValueError("analysis_period_start and analysis_period_end must be supplied together")
+    if analysis_period_start is not None and analysis_period_end is not None:
+        cutoff = _utc_boundary(analysis_period_start, "analysis_period_start")
+        period_end = _utc_boundary(analysis_period_end, "analysis_period_end")
+        if datetime.fromisoformat(period_end.replace("Z", "+00:00")) < datetime.fromisoformat(
+            cutoff.replace("Z", "+00:00")
+        ):
+            raise ValueError("analysis_period_end must not precede analysis_period_start")
+        end_clause = "AND reporting_utc_micros(posted_at) < reporting_utc_micros(?)"
+        params: tuple[object, ...] = (
+            cutoff,
+            period_end,
+            max(1, int(limit or 5000)),
+        )
+    else:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=max(1, int(days or 14)))).isoformat()
+        end_clause = ""
+        params = (cutoff, max(1, int(limit or 5000)))
     rows = connection.execute(
-        """
+        f"""
         SELECT channel_username, channel_id, message_id, posted_at, text, media_type,
                media_caption, view_count, message_url, image_description, ingested_at
         FROM raw_posts
-        WHERE posted_at >= ?
-        ORDER BY posted_at ASC, id ASC
+        WHERE reporting_utc_micros(posted_at) >= reporting_utc_micros(?)
+          {end_clause}
+        ORDER BY reporting_utc_micros(posted_at) ASC, id ASC
         LIMIT ?
         """,
-        (cutoff, max(1, int(limit or 5000))),
+        params,
     ).fetchall()
     events = [telegram_source_event_from_row(row) for row in rows]
     append_source_events(_dedupe_events(events), event_root=event_root)
@@ -109,9 +132,14 @@ def _dedupe_events(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _event_date(event: dict[str, Any]) -> str:
-    value = _text(event.get("captured_at")) or _text(event.get("posted_at"))
+    # Partition by the same publication timestamp used for reporting-period
+    # eligibility so historical backfills remain discoverable by date.
+    value = _text(event.get("posted_at")) or _text(event.get("captured_at"))
     try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00")).date().isoformat()
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            return datetime.now(timezone.utc).date().isoformat()
+        return parsed.astimezone(timezone.utc).date().isoformat()
     except ValueError:
         return datetime.now(timezone.utc).date().isoformat()
 
@@ -152,3 +180,19 @@ def _content_hash(*, channel: str, message_id: int, text: str) -> str:
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _utc_boundary(value: datetime | str, field_name: str) -> str:
+    if isinstance(value, datetime):
+        parsed = value
+    else:
+        text = str(value).strip()
+        if text.endswith("Z"):
+            text = f"{text[:-1]}+00:00"
+        try:
+            parsed = datetime.fromisoformat(text)
+        except ValueError as exc:
+            raise ValueError(f"{field_name} must be an ISO-8601 timestamp") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError(f"{field_name} must include an explicit timezone")
+    return parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")

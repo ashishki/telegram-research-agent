@@ -42,17 +42,19 @@ below, but active implementation starts from the IRX task graph.
 | Strategy Reviewer | `implemented_and_verified` advisory-only |
 | Market/business Radar context | `implemented_and_verified` as `context_only` |
 | Radar RVE contract/adapters in sibling repo | `implemented_and_verified`, `needs_live_validation` |
-| Report V2 contract and roadmap | `implemented_documentation_only` as IRX-0; no V2 runtime is implemented |
+| Report V2 contract and roadmap | `implementation_in_progress`; IRX-0 documentation and IRX-1 completed-week runtime semantics are implemented and verified |
 | Portfolio dogfood evidence | `blocked_on_IRX-14_start_gate` |
 
 ## Next Candidate Task
 
-`IRX-1 - Completed-Week Reporting Semantics`
+`IRX-2 - Weekly Run Manifest And Required Radar Artifact Contract`
 
-Implement the shared completed-week period contract before changing rendering,
-editorial prompts, personalization weights, thread curation, or Radar gates.
-The exact implementation prompt is in `docs/CODEX_PROMPT.md` and
-`docs/intelligence_report_v2_roadmap.md`.
+Build the additive one-run manifest/orchestration path on top of the verified
+IRX-1 period contract. Bind the real same-period Radar artifact and make stage
+failure, wrong-period output, and intentional disablement explicit. Preserve
+V1 commands and Radar evidence gates. The exact implementation prompt is in
+`docs/CODEX_PROMPT.md`; the binding task and manifest contracts are in
+`docs/intelligence_report_v2_roadmap.md` and `docs/weekly_run_manifest.md`.
 
 ## Dependency Graph
 
@@ -72,8 +74,8 @@ contract.
 | ID | Priority | Status | Summary | Direct dependencies |
 |---|---|---|---|---|
 | IRX-0 | P0 | `implemented_documentation_only` | W29 audit, Report V2 roadmap, and product contracts | none |
-| IRX-1 | P0 | `ready` | Separate generation time from the last completed ISO-week analysis period | IRX-0 |
-| IRX-2 | P0 | `planned` | One weekly run manifest and required same-run Radar artifact contract | IRX-1 |
+| IRX-1 | P0 | `implemented_and_verified` | Separate generation time from the last completed ISO-week analysis period | IRX-0 |
+| IRX-2 | P0 | `ready` | One weekly run manifest and required same-run Radar artifact contract | IRX-1 |
 | IRX-3 | P0 | `planned` | Map reactions through posts/atoms and a thread-resolution interface into a weak boost/receipt; canonical acceptance closes in IRX-4 | IRX-1, IRX-2 |
 | IRX-4 | P0 | `planned` | Curate stable idea-level threads with merge/split lifecycle and provenance | IRX-1, IRX-2, IRX-3 |
 | IRX-5 | P0 | `planned` | Produce schema-validated Russian editorial intelligence JSON from bounded cited inputs | IRX-1..IRX-4 |
@@ -89,6 +91,38 @@ contract.
 
 Full task cards, acceptance criteria, likely files, failure states, tests, and
 rollout implications are in `docs/intelligence_report_v2_roadmap.md`.
+
+## IRX Implementation Journal
+
+### 2026-07-13 - IRX-1 Completed-Week Reporting Semantics
+
+- Status: `implemented_and_verified`.
+- Added one immutable typed reporting-period resolver with exact UTC
+  `generated_at`, inclusive start, exclusive end, `reporting_week`, explicit
+  `period_mode`, and additive `week_label` compatibility.
+- Default weekly generation now resolves the last fully completed ISO week;
+  explicit completed history remains supported, rolling mode is separately
+  labelled, and current partial-week mode is diagnostic opt-in only.
+- Brief, Atlas, split context, Frontier, marked-post/reaction eligibility,
+  opportunity/Radar seed selection, live/market projections, and MVP weekly
+  plumbing share the same half-open boundaries.
+- Historical contexts exclude atoms and source posts after the period end and
+  recompute bounded thread aggregates instead of trusting only current
+  `last_seen_at` state.
+- Existing command names, filename conventions, V1 sidecar contracts,
+  `week_label`, scoring, prompts, feedback semantics, database schema, and Radar
+  gates remain compatible. Weekly default semantics intentionally changed;
+  period flags and sidecar fields are additive. No generated artifact files
+  were edited.
+- Required focused verification: 44 tests passed. Extended affected-surface
+  verification: 38 tests passed; feedback recheck: 14 tests passed.
+  `py_compile` and `git diff --check` passed. Heavy pipelines and the full suite
+  were intentionally not run.
+- Known boundary: destructive edits to an existing atom/thread cannot be
+  perfectly reconstructed without versioned history. That schema/curation work
+  is outside IRX-1.
+- Handoff: IRX-2 remains intentionally open and is now the next task. No
+  manifest/orchestrator or same-run Radar binding was implemented by IRX-1.
 
 ## Existing-Work Reconciliation
 

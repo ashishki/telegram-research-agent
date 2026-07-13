@@ -1,7 +1,7 @@
 # Weekly Run Manifest Contract
 
 Version: `weekly_run_manifest.v1`  
-Status: planned contract for IRX-1 and IRX-2  
+Status: IRX-1 time semantics implemented; IRX-2 manifest/orchestration planned
 Owner: `telegram-research-agent`
 
 The weekly run manifest is the identity and state spine for one intelligence

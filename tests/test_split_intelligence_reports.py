@@ -196,12 +196,11 @@ class TestSplitIntelligenceReports(unittest.TestCase):
 
             summary = generate_split_intelligence_reports(
                 settings,
-                week_label="2026-W28",
                 threads_limit=8,
                 atoms_limit=4,
                 output_root=root,
                 mvp_radar_json_path=mvp_path,
-                now=datetime(2026, 7, 8, tzinfo=timezone.utc),
+                now=datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc),
             )
 
             atlas_html = Path(summary.knowledge_atlas.html_path).read_text(encoding="utf-8")
@@ -211,8 +210,10 @@ class TestSplitIntelligenceReports(unittest.TestCase):
 
             self.assertTrue(summary.knowledge_atlas.html_path.endswith(".knowledge-atlas.html"))
             self.assertTrue(summary.weekly_brief.html_path.endswith(".weekly-brief.html"))
-            self.assertIn("<title>Knowledge Atlas 2026-W28</title>", atlas_html)
-            self.assertIn("<title>Weekly Intelligence Brief 2026-W28</title>", brief_html)
+            self.assertIn("<title>Knowledge Atlas 6-12 июля 2026</title>", atlas_html)
+            self.assertIn("<title>Weekly Intelligence Brief 6-12 июля 2026</title>", brief_html)
+            self.assertIn("Generated 2026-07-13T07:02:52Z", atlas_html)
+            self.assertIn("Generated 2026-07-13T07:02:52Z", brief_html)
             self.assertIn(f'content="{INTELLIGENCE_CONTRACT_VERSION}"', atlas_html)
             self.assertIn(f'content="{INTELLIGENCE_CONTRACT_VERSION}"', brief_html)
             self.assertIn(f'content="{RADAR_INTELLIGENCE_CONTRACT_VERSION}"', brief_html)
@@ -243,6 +244,25 @@ class TestSplitIntelligenceReports(unittest.TestCase):
             self.assertEqual(atlas_json["contract_version"], INTELLIGENCE_CONTRACT_VERSION)
             self.assertEqual(brief_json["contract_version"], INTELLIGENCE_CONTRACT_VERSION)
             self.assertEqual(brief_json["radar_contract_version"], RADAR_INTELLIGENCE_CONTRACT_VERSION)
+            period_fields = {
+                "run_date",
+                "generated_at",
+                "reporting_week",
+                "week_label",
+                "period_mode",
+                "analysis_period_start",
+                "analysis_period_end",
+            }
+            self.assertEqual(
+                {key: atlas_json[key] for key in period_fields},
+                {key: brief_json[key] for key in period_fields},
+            )
+            self.assertEqual(brief_json["reporting_week"], "2026-W28")
+            self.assertEqual(brief_json["period_mode"], "completed_iso_week")
+            self.assertEqual(brief_json["analysis_period_start"], "2026-07-06T00:00:00Z")
+            self.assertEqual(brief_json["analysis_period_end"], "2026-07-13T00:00:00Z")
+            self.assertEqual(summary.reporting_week, "2026-W28")
+            self.assertEqual(summary.period_mode, "completed_iso_week")
             self.assertIn("thread_navigation", atlas_json)
             self.assertEqual(
                 atlas_json["thread_navigation"]["schema_version"],
@@ -374,7 +394,7 @@ class TestSplitIntelligenceReports(unittest.TestCase):
                 atoms_limit=4,
                 output_root=root,
                 mvp_radar_json_path=root / "missing-mvp-weekly-2026-W28.json",
-                now=datetime(2026, 7, 8, tzinfo=timezone.utc),
+                now=datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc),
             )
 
             brief_html = Path(summary.weekly_brief.html_path).read_text(encoding="utf-8")

@@ -16,6 +16,7 @@ from output.market_pain_intelligence import (
     market_pack_context_seed,
     summarize_market_pain_pack,
 )
+from output.reporting_period import ReportingPeriod
 
 
 OUTPUT_DIR = PROJECT_ROOT / "data" / "output" / "market_context_lens"
@@ -60,6 +61,7 @@ class MarketContextLensResult:
 def build_market_context_lens(
     settings: Settings,
     *,
+    reporting_period: ReportingPeriod | None = None,
     now: datetime | None = None,
     baseline_days: int = DEFAULT_BASELINE_DAYS,
     delta_days: int = DEFAULT_DELTA_DAYS,
@@ -69,10 +71,22 @@ def build_market_context_lens(
     model: str | None = None,
     use_llm: bool | None = None,
 ) -> MarketContextLensResult:
-    current = now or datetime.now(timezone.utc)
-    if current.tzinfo is None:
-        current = current.replace(tzinfo=timezone.utc)
-    week_label = _week_label(current)
+    current = (
+        reporting_period.generated_at
+        if reporting_period is not None
+        else (now or datetime.now(timezone.utc))
+    )
+    current = _as_utc(current)
+    analysis_period_end = (
+        reporting_period.analysis_period_end
+        if reporting_period is not None
+        else current
+    )
+    week_label = (
+        reporting_period.reporting_week
+        if reporting_period is not None
+        else _week_label(current)
+    )
     root = Path(output_root) if output_root is not None else OUTPUT_DIR
     baseline_path = root / "baseline.json"
     delta_path = root / "weekly" / f"{week_label}.json"
@@ -80,25 +94,44 @@ def build_market_context_lens(
     baseline_pack_path = root / "source_packs" / f"{week_label}.baseline-{max(1, baseline_days)}d.json"
     weekly_pack_path = root / "source_packs" / f"{week_label}.weekly-{max(1, delta_days)}d.json"
 
-    baseline_cutoff = _cutoff(current, baseline_days)
-    weekly_cutoff = _cutoff(current, delta_days)
+    baseline_cutoff = _cutoff(analysis_period_end, baseline_days)
+    weekly_cutoff = (
+        _iso(reporting_period.analysis_period_start)
+        if reporting_period is not None
+        else _cutoff(current, delta_days)
+    )
+    period_end_iso = _iso(analysis_period_end)
     with sqlite3.connect(settings.db_path) as connection:
         connection.row_factory = sqlite3.Row
         baseline_pack = build_market_pain_pack(
             connection,
             cutoff=baseline_cutoff,
+            analysis_period_end=period_end_iso,
+            reporting_period=reporting_period,
             limit=DEFAULT_CONTEXT_LIMIT,
         )
         weekly_pack = build_market_pain_pack(
             connection,
             cutoff=weekly_cutoff,
+            analysis_period_end=period_end_iso,
+            reporting_period=reporting_period,
             limit=DEFAULT_CONTEXT_LIMIT,
         )
 
     _write_json(baseline_pack_path, baseline_pack)
     _write_json(weekly_pack_path, weekly_pack)
 
-    baseline_created = force_baseline or not baseline_path.exists()
+    cached_baseline = _read_json_object(baseline_path) if baseline_path.exists() else None
+    baseline_created = (
+        force_baseline
+        or cached_baseline is None
+        or not _baseline_cache_is_compatible(
+            cached_baseline,
+            reporting_period=reporting_period,
+            source_window_start=baseline_cutoff,
+            source_window_end=period_end_iso,
+        )
+    )
     if baseline_created:
         baseline_lens = _synthesize_baseline_lens(
             pack=baseline_pack,
@@ -108,9 +141,16 @@ def build_market_context_lens(
             model=model,
             use_llm=use_llm,
         )
+        baseline_lens = _with_source_window(
+            baseline_lens,
+            source_window_start=baseline_cutoff,
+            source_window_end=period_end_iso,
+            reporting_period=reporting_period,
+        )
         _write_json(baseline_path, baseline_lens)
     else:
-        baseline_lens = _read_json_object(baseline_path)
+        assert cached_baseline is not None
+        baseline_lens = cached_baseline
 
     weekly_delta = _synthesize_weekly_delta(
         baseline=baseline_lens,
@@ -121,6 +161,12 @@ def build_market_context_lens(
         llm_client=llm_client,
         model=model,
         use_llm=use_llm,
+    )
+    weekly_delta = _with_source_window(
+        weekly_delta,
+        source_window_start=weekly_cutoff,
+        source_window_end=period_end_iso,
+        reporting_period=reporting_period,
     )
     _write_json(delta_path, weekly_delta)
 
@@ -134,6 +180,12 @@ def build_market_context_lens(
         current_path=current_path,
         baseline_pack_path=baseline_pack_path,
         weekly_pack_path=weekly_pack_path,
+    )
+    current_context = _with_source_window(
+        current_context,
+        source_window_start=weekly_cutoff,
+        source_window_end=period_end_iso,
+        reporting_period=reporting_period,
     )
     _write_json(current_path, current_context)
 
@@ -906,6 +958,73 @@ def _read_json_object(path: Path) -> dict[str, Any]:
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _with_source_window(
+    payload: dict[str, Any],
+    *,
+    source_window_start: str,
+    source_window_end: str,
+    reporting_period: ReportingPeriod | None,
+) -> dict[str, Any]:
+    bounded = {
+        **payload,
+        "source_window_start": source_window_start,
+        "source_window_end": source_window_end,
+    }
+    if reporting_period is not None:
+        bounded.update(reporting_period.to_dict())
+    return bounded
+
+
+def _baseline_cache_is_compatible(
+    baseline: dict[str, Any],
+    *,
+    reporting_period: ReportingPeriod | None,
+    source_window_start: str,
+    source_window_end: str,
+) -> bool:
+    if reporting_period is None:
+        return True
+    cached_start = _parse_utc(baseline.get("source_window_start"))
+    cached_end = _parse_utc(baseline.get("source_window_end"))
+    expected_start = _parse_utc(source_window_start)
+    expected_end = _parse_utc(source_window_end)
+    if None in {cached_start, cached_end, expected_start, expected_end}:
+        return False
+    period_fields = reporting_period.to_dict()
+    identity_matches = all(
+        str(baseline.get(field) or "") == period_fields[field]
+        for field in (
+            "reporting_week",
+            "week_label",
+            "period_mode",
+            "analysis_period_start",
+            "analysis_period_end",
+        )
+    )
+    return cached_start == expected_start and cached_end == expected_end and identity_matches
+
+
+def _parse_utc(value: object) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = f"{text[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return None
+    return parsed.astimezone(timezone.utc)
+
+
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None or value.utcoffset() is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
 
 
 def _cutoff(current: datetime, days: int) -> str:

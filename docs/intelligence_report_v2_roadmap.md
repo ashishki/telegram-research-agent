@@ -145,8 +145,8 @@ behavior; it does not reopen the gate logic.
 | ID | Task | Status | Priority | Direct dependencies |
 |---|---|---|---|---|
 | IRX-0 | Report V2 audit, roadmap, and product contract | `implemented_documentation_only` | P0 | none |
-| IRX-1 | Completed-week reporting semantics | `ready` | P0 | IRX-0 |
-| IRX-2 | Weekly run manifest and required Radar artifact contract | `planned` | P0 | IRX-1 |
+| IRX-1 | Completed-week reporting semantics | `implemented_and_verified` | P0 | IRX-0 |
+| IRX-2 | Weekly run manifest and required Radar artifact contract | `ready` | P0 | IRX-1 |
 | IRX-3 | Reaction-to-ranking personalization and effect receipt | `planned` | P0 | IRX-1, IRX-2 |
 | IRX-4 | Canonical Idea Thread curation and merge/split lifecycle | `planned` | P0 | IRX-1, IRX-2, IRX-3 |
 | IRX-5 | Editorial Intelligence synthesis contract | `planned` | P0 | IRX-1 through IRX-4 |
@@ -260,7 +260,7 @@ documents.
   acceptance criteria, tests, failure behavior, stop conditions, and rollout
   implications.
 - Existing queues are reconciled rather than silently copied.
-- IRX-1 is selected as the first implementation task; no code is changed.
+- IRX-1 was selected as the first implementation task; IRX-0 changed no code.
 
 **Tests and verification commands:**
 
@@ -279,12 +279,12 @@ acceptance criteria keeps IRX-0 incomplete.
 deletes the Audit Explorer, starts dogfood, or changes product code/generated
 artifacts.
 
-**Rollout implications:** Documentation only. Marks PGI-007 dogfood blocked and
-makes IRX-1 the next implementation task.
+**Rollout implications:** Documentation only. Marked PGI-007 dogfood blocked
+and made IRX-1 the next implementation task at IRX-0 completion.
 
 ### IRX-1 - Completed-Week Reporting Semantics
 
-**Status:** `ready`. **Priority:** P0.
+**Status:** `implemented_and_verified` on 2026-07-13. **Priority:** P0.
 
 **Problem:** A Monday run derives the current ISO label, so the W29 report
 analyzed the almost-empty week that had just started. Generation time, report
@@ -351,9 +351,29 @@ implicit.
 **Rollout implications:** Additive V1 fields first; existing artifact paths and
 commands remain. This unblocks all same-run and completed-period work.
 
+**Implementation receipt (2026-07-13):** Added the shared immutable
+`ReportingPeriod` resolver and propagated exact half-open UTC boundaries through
+Brief, Atlas, split context, Frontier, reaction/marked-post selection,
+opportunity/Radar seeds, live/market projections, MVP weekly plumbing, existing
+sidecars, and compatible titles. The default is the last fully completed ISO
+week; completed explicit history, separately labelled rolling periods, and
+diagnostic opt-in partial weeks remain supported. Historical context bounds
+atoms/source posts at `analysis_period_end` and derives thread aggregates from
+bounded evidence. Existing command names, filename conventions, V1 schemas,
+`week_label`, scoring, prompts, feedback semantics, database schema, and Radar
+gates remain compatible. Weekly default semantics intentionally changed;
+period flags and sidecar fields are additive, and no generated artifact files
+were edited. Required focused verification passed 44 tests;
+extended affected verification passed 38 tests; the feedback recheck passed 14
+tests; `py_compile` and `git diff --check` passed. The full suite and heavy
+pipelines were not run. Without versioned atom/thread history, later destructive
+mutation of the same record cannot be perfectly reconstructed; that remains
+outside IRX-1. IRX-2 manifest/orchestration and same-run Radar binding were
+intentionally left open.
+
 ### IRX-2 - Weekly Run Manifest And Required Radar Artifact Contract
 
-**Status:** `planned`. **Priority:** P0.
+**Status:** `ready`. **Priority:** P0.
 
 **Problem:** Radar and split reports are separate commands that infer identity
 from filenames. A valid W28 Radar dossier existed while the W29 Brief reported
@@ -1301,56 +1321,58 @@ is implemented:
    choose whether the old Atlas path becomes an alias or a separately named
    artifact after consumer inventory.
 
-## 14. Exact Next Codex Prompt - IRX-1
+## 14. Exact Next Codex Prompt - IRX-2
 
-Use the following prompt unchanged for the first implementation task:
+Use the following prompt unchanged for the next implementation task:
 
 ```text
 You are Codex working in /srv/openclaw-you/workspace/telegram-research-agent.
-Mode: IMPLEMENTATION for IRX-1 only.
-Implement IRX-1, using these binding docs:
+Mode: IMPLEMENTATION for IRX-2 only.
+Implement IRX-2, using these binding docs:
   docs/intelligence_report_v2_roadmap.md
   docs/intelligence_report_v2_contract.md
   docs/weekly_run_manifest.md
-Do not implement IRX-2 or later work: no persisted manifest/orchestrator, same-run Radar handoff, reaction boost, canonical curator, editorial LLM, V2 schema/render redesign, reader-value gates, or Radar gate changes.
+  docs/mvp_radar_integration_contract.md
+Do not implement IRX-3 or later work: no reaction boost, canonical curator, editorial LLM, V2 schema/render redesign, reader-value gates, report-specific feedback redesign, or Radar gate changes.
 Before editing run:
   git status
   git branch
   git log --oneline -20
   git diff --stat
 Preserve pre-existing dirty changes. Do not edit or commit generated reports.
-Read the current period flow and focused tests for:
-  src/output/ai_intelligence_report.py, weekly_intelligence_brief.py,
-  knowledge_atlas_report.py, split_intelligence_reports.py, frontier_analysis.py,
-  opportunity_seed_export.py, mvp_weekly_pipeline.py, and src/main.py.
-Add one shared typed resolver, preferably src/output/reporting_period.py, with run_date, generated_at, inclusive UTC analysis_period_start, exclusive UTC analysis_period_end, reporting_week, and period_mode.
-Keep week_label as an additive compatibility alias. Add fields to existing contexts/sidecars; do not replace their contracts.
+Read the current period/run/Radar flow and focused tests for:
+  src/output/split_intelligence_reports.py, weekly_intelligence_brief.py,
+  knowledge_atlas_report.py, ai_intelligence_report.py,
+  mvp_weekly_pipeline.py, opportunity_seed_export.py, ai_report_contract.py,
+  pi_facade.py, and src/main.py.
+Add an additive weekly_run_manifest.v1 module and one explicit orchestration command alongside existing V1 commands. Reuse the IRX-1 ReportingPeriod unchanged.
 Required behavior:
-1. Default weekly generation uses the last fully completed ISO week.
-2. At 2026-07-13T07:02:52Z resolve [2026-07-06T00:00:00Z, 2026-07-13T00:00:00Z), reporting_week=2026-W28, period_mode=completed_iso_week.
-3. Preserve explicit completed historical YYYY-Www generation.
-4. Label trailing-seven-day mode separately if retained.
-5. Current partial-week mode is diagnostic opt-in only and labeled partial_iso_week; reject future/incomplete explicit weeks otherwise.
-6. Brief, Atlas, split context, Frontier, marked-post/reaction selection, and opportunity/Radar seed selection use identical half-open boundaries.
-7. Historical output excludes atom/thread state after analysis_period_end; do not rely only on current thread.last_seen_at.
-8. Titles show human-readable inclusive dates and generated_at separately, without redesigning the reports.
-Add deterministic tests, including tests/test_reporting_period.py, covering Sunday/Monday, ISO year boundary, standard-calendar leap handling, explicit history, future/current rejection, rolling/partial labels if supported, period propagation to deltas/reactions/Radar seeds, future-state exclusion, and --week compatibility.
-Likely files are the modules above plus focused report/Frontier/Radar tests.
-Do not change scoring, prompts, DB schema, information architecture, visual design, feedback semantics, cross-repo code, or evidence gates. Do not run heavy pipelines or the full suite.
+1. One command creates an immutable run_id and atomically maintained weekly_run_manifest.v1 for one ReportingPeriod.
+2. The manifest records period identity, declared stage policy, stage statuses, warnings/failed stages, snapshot/reference fields, artifact paths, checksums, run_status, and partial exactly as the binding contract requires.
+3. Every artifact produced or bound by the orchestrated path repeats the same run_id, period, and manifest identity additively; old commands and paths remain compatible.
+4. Bind the real same-period Radar JSON by structured payload identity and checksum, never filename adjacency. The real candidate/status reaches the Brief sidecar/context.
+5. Required Radar missing, failed, malformed, or wrong-period makes the package partial or failed. Intentional disablement must be declared before execution and reader-visible; it must never masquerade as success.
+6. Stage transitions and final run status are deterministic. Atomic writes never expose invalid JSON, and regeneration never overwrites a prior run identity.
+7. Reaction sync failure, Radar failure/wrong period/disablement, render failure, and supported fallback states are explicit in the manifest and tested without weakening existing evidence gates.
+8. Delivery must not present a stale prior Brief as the current successful package.
+Add deterministic tests for manifest validation, immutable identity, atomic persistence, success, partial/failure aggregation, wrong-run/period Radar rejection, intentional Radar disablement, reaction failure, render failure, sidecar identity propagation, stale-artifact exclusion, and legacy command compatibility.
+Do not change scoring, prompts, DB schema, information architecture, visual design, feedback semantics, IRX-1 period behavior, cross-repo evidence logic, or Radar gates. Do not run live/expensive pipelines or the full suite.
 Run:
   PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache \
-    python3 -m unittest tests.test_reporting_period \
-    tests.test_ai_intelligence_report tests.test_frontier_analysis \
-    tests.test_split_intelligence_reports tests.test_mvp_weekly_pipeline
+    python3 -m unittest tests.test_weekly_run_manifest \
+    tests.test_split_intelligence_reports tests.test_mvp_weekly_pipeline \
+    tests.test_pi_facade
+  cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar && \
+    .venv/bin/python -m pytest tests/test_mvp_of_week.py
   git diff --check
   git diff --stat
-Report files changed, exact semantics, compatibility behavior, test results, the IRX-2 handoff intentionally left open, and confirmation that generated artifacts and Radar gates were unchanged.
+Report files changed, manifest/run-state semantics, same-run Radar binding, compatibility behavior, exact test results, the IRX-3 handoff intentionally left open, and confirmation that generated artifacts and Radar gates were unchanged.
 ```
 
-## 15. Suggested Second Task
+## 15. Suggested Following Task
 
-After IRX-1 is reviewed and its focused tests pass, implement **IRX-2 - Weekly
-Run Manifest And Required Radar Artifact Contract**. Do not skip directly to
-visual/report rendering: the Brief cannot truthfully present Radar,
-personalization snapshots, or partial state until one manifest binds the stages
-to the same completed period and run ID.
+After IRX-2 is reviewed and its focused tests pass, implement **IRX-3 -
+Reaction-To-Ranking Personalization And Effect Receipt**. Do not skip directly
+to curation, editorial synthesis, or visual/report rendering: reaction influence
+must first become bounded, weak, traceable, and attached to the same completed
+period/run snapshot.

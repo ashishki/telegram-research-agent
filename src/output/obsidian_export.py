@@ -10,11 +10,11 @@ from config.settings import PROJECT_ROOT, Settings
 from db.ai_report_feedback import summarize_ai_report_feedback
 from output.ai_intelligence_report import (
     OUTPUT_DIR as AI_REPORT_OUTPUT_DIR,
-    _current_week_label,
     load_ai_intelligence_context,
 )
 from output.ai_report_contract import build_weekly_ai_report_contract
 from output.ai_visual_report import _load_projects, _project_links
+from output.reporting_period import resolve_reporting_period
 from output.strategy_reviewer import build_strategy_review
 
 
@@ -1266,7 +1266,8 @@ def export_obsidian_vault(
     threads_limit: int = 100,
     atoms_limit: int = 20,
 ) -> ObsidianExportSummary:
-    clean_week = str(week_label or _current_week_label()).strip()
+    reporting_period = resolve_reporting_period(week_label=week_label)
+    clean_week = reporting_period.week_label
     root = _vault_root(vault_path, namespace)
     report_path = _report_path_for_week(clean_week, report_root)
     with sqlite3.connect(settings.db_path) as connection:
@@ -1274,6 +1275,7 @@ def export_obsidian_vault(
         context = load_ai_intelligence_context(
             connection,
             week_label=clean_week,
+            reporting_period=reporting_period,
             threads_limit=threads_limit,
             atoms_limit=atoms_limit,
         )

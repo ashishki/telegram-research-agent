@@ -154,10 +154,10 @@ starting point for a Knowledge Audit Explorer, not the reader-facing Atlas V2.
 ## Period Bug Analysis
 
 The artifacts were generated at `2026-07-13T07:02:52Z`, on the first morning of
-ISO week W29, and were labeled `2026-W29`. The current default resolves
-`datetime.isocalendar()` and passes the current week directly through context,
+ISO week W29, and were labeled `2026-W29`. At audit time, the default resolved
+`datetime.isocalendar()` and passed the current week directly through context,
 Frontier Analysis, split rendering, reaction selection, and Radar path lookup.
-The Monday systemd report command supplies no explicit week.
+The Monday systemd report command supplied no explicit week.
 
 Local data demonstrates the impact:
 
@@ -169,10 +169,17 @@ Local data demonstrates the impact:
 The changed-thread calculation is internally consistent with the wrong W29
 window. The product bug is selecting that window for a Monday weekly report.
 
-There is a second historical correctness risk: thread selection uses a thread's
-current `last_seen_at`, and atom loading has no `analysis_period_end` cutoff.
-Regenerating an old week can therefore include future state unless IRX-1 makes
-the upper boundary explicit throughout the query path.
+There was a second historical correctness risk: thread selection used a
+thread's current `last_seen_at`, and atom loading had no
+`analysis_period_end` cutoff. Regenerating an old week could therefore include
+future state before IRX-1 made the upper boundary explicit throughout the query
+path.
+
+Resolution note (2026-07-13): IRX-1 now defaults to the last completed ISO
+week, shares one exact half-open UTC period across these paths, and bounds
+historical atom/source-post context at the exclusive period end. Perfect
+reconstruction after destructive mutation of an existing record still requires
+versioned history and remains outside IRX-1.
 
 ## Reaction And Feedback Pipeline Analysis
 

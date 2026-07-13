@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass
@@ -10,6 +11,7 @@ from typing import Any
 
 from config.settings import PROJECT_ROOT
 from output.opportunity_seed_export import classify_demand_surfaces
+from output.reporting_period import ReportingPeriod
 from output.source_events import DEFAULT_SOURCE_EVENT_ROOT
 
 
@@ -32,20 +34,41 @@ def build_live_source_intelligence_snapshot(
     event_root: Path | str | None = None,
     output_path: Path | str | None = None,
     now: datetime | None = None,
+    reporting_period: ReportingPeriod | None = None,
 ) -> LiveSourceIntelligenceResult:
-    current = now or datetime.now(timezone.utc)
-    window_days = max(1, int(days or 14))
-    window_start = current - timedelta(days=window_days)
+    if reporting_period is not None and now is not None:
+        raise ValueError("reporting_period cannot be combined with now")
+    generated_at = (
+        reporting_period.generated_at
+        if reporting_period is not None
+        else (now or datetime.now(timezone.utc))
+    )
+    generated_at = _as_utc(generated_at)
+    if reporting_period is not None:
+        window_start = reporting_period.analysis_period_start
+        window_end = reporting_period.analysis_period_end
+        window_days = max(
+            1,
+            math.ceil((window_end - window_start).total_seconds() / 86_400),
+        )
+        week_label = reporting_period.week_label
+    else:
+        window_days = max(1, int(days or 14))
+        window_end = generated_at
+        window_start = window_end - timedelta(days=window_days)
+        week_label = _week_label(generated_at)
     root = Path(event_root) if event_root is not None else DEFAULT_SOURCE_EVENT_ROOT
-    events = _load_events(root, window_start=window_start, window_end=current)
+    events = _load_events(root, window_start=window_start, window_end=window_end)
     snapshot = _build_snapshot(
         events,
         event_root=root,
         window_start=window_start,
-        window_end=current,
+        window_end=window_end,
+        generated_at=generated_at,
         days=window_days,
     )
-    week_label = _week_label(current)
+    if reporting_period is not None:
+        snapshot.update(reporting_period.to_dict())
     target = Path(output_path) if output_path is not None else DEFAULT_LIVE_INTELLIGENCE_ROOT / f"{week_label}.json"
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
@@ -73,10 +96,12 @@ def _build_snapshot(
     event_root: Path,
     window_start: datetime,
     window_end: datetime,
+    generated_at: datetime,
     days: int,
 ) -> dict[str, Any]:
     channel_counts: Counter[str] = Counter()
     channel_latest: dict[str, str] = {}
+    channel_latest_time: dict[str, datetime] = {}
     surface_counts: Counter[str] = Counter()
     claim_events: dict[str, list[dict[str, Any]]] = defaultdict(list)
 
@@ -84,8 +109,12 @@ def _build_snapshot(
         channel = _text(event.get("channel_username")) or "unknown"
         channel_counts[channel] += 1
         posted_at = _text(event.get("posted_at"))
-        if posted_at and posted_at > channel_latest.get(channel, ""):
+        posted_time = _event_time(event)
+        if posted_at and posted_time is not None and (
+            channel not in channel_latest_time or posted_time > channel_latest_time[channel]
+        ):
             channel_latest[channel] = posted_at
+            channel_latest_time[channel] = posted_time
 
         text = _text(event.get("text"))
         for surface in classify_demand_surfaces(text):
@@ -110,7 +139,7 @@ def _build_snapshot(
     pathway_available = _pathway_available()
     return {
         "schema_version": SNAPSHOT_SCHEMA_VERSION,
-        "generated_at": window_end.isoformat().replace("+00:00", "Z"),
+        "generated_at": generated_at.isoformat().replace("+00:00", "Z"),
         "generation_mode": "deterministic_event_log",
         "source_event_root": str(event_root),
         "window": {
@@ -159,7 +188,7 @@ def _load_events(
             if not isinstance(event, dict):
                 continue
             event_time = _event_time(event)
-            if window_start <= event_time <= window_end:
+            if event_time is not None and window_start <= event_time < window_end:
                 events.append(event)
     return _dedupe_events(events)
 
@@ -172,15 +201,23 @@ def _date_file_overlaps(path: Path, *, window_start: datetime, window_end: datet
     return window_start.date() <= file_date <= window_end.date()
 
 
-def _event_time(event: dict[str, Any]) -> datetime:
-    value = _text(event.get("captured_at")) or _text(event.get("posted_at"))
+def _event_time(event: dict[str, Any]) -> datetime | None:
+    # Reporting evidence belongs to the post's publication period. Capture time
+    # remains provenance, but must not move a historical post into a later run.
+    value = _text(event.get("posted_at")) or _text(event.get("captured_at"))
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
-        return datetime.now(timezone.utc)
+        return None
     if parsed.tzinfo is None:
         return parsed.replace(tzinfo=timezone.utc)
     return parsed.astimezone(timezone.utc)
+
+
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("now must include an explicit timezone")
+    return value.astimezone(timezone.utc)
 
 
 def _dedupe_events(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -190,7 +227,14 @@ def _dedupe_events(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if not upstream_id:
             continue
         by_id[upstream_id] = event
-    return sorted(by_id.values(), key=lambda item: (_text(item.get("posted_at")), _text(item.get("upstream_id"))))
+    minimum = datetime.min.replace(tzinfo=timezone.utc)
+    return sorted(
+        by_id.values(),
+        key=lambda item: (
+            _event_time(item) or minimum,
+            _text(item.get("upstream_id")),
+        ),
+    )
 
 
 def _normalized_claim(text: str) -> str:

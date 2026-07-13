@@ -13,17 +13,19 @@
 
 ### Report V2 Transition Hold
 
-The W29 audit found that the current split run analyzes the newly started week
+The W29 audit found that the pre-IRX-1 split run analyzed the newly started week
 by default, can miss a separately generated Radar artifact, does not show a
 reaction effect receipt, and renders generic actions and fragmented threads.
 The split artifacts remain available for diagnosis, but they are not an
 acceptable dogfood baseline. Do not begin dogfood or treat the Monday delivery
 as a completed Report V2 package.
 
-The first implementation task is `IRX-1`; the target one-command workflow is
-owned by `IRX-2` and is not implemented yet. Until those tasks land, pass an
-explicit completed historical week for diagnostic generation and verify the
-Radar week separately. Do not infer completion from successful HTML creation.
+IRX-1 completed-week semantics are implemented and verified: the default report
+period is now the last fully completed ISO week and explicit completed history
+remains available. The target one-command workflow is owned by `IRX-2` and is
+not implemented yet. Until IRX-2 lands, verify the separately generated Radar
+artifact against the report period. Do not infer package completion from
+successful HTML creation.
 
 Legacy Research Brief / Implementation Ideas commands remain available, but
 they are not the target weekly product surface.
@@ -280,9 +282,10 @@ not expose raw SQLite sessions.
 
 Next implementation queue:
 
-- Start `IRX-1 - Completed-Week Reporting Semantics` from `docs/tasks.md` with
-  the exact prompt in `docs/CODEX_PROMPT.md`.
-- Follow with IRX-2 only after IRX-1 review; do not jump to renderer polish.
+- IRX-1 completed-week semantics are implemented and focused-test verified.
+- Start `IRX-2 - Weekly Run Manifest And Required Radar Artifact Contract`
+  from `docs/tasks.md` with the exact prompt in `docs/CODEX_PROMPT.md`; do not
+  jump to personalization, curation, editorial synthesis, or renderer polish.
 - Do not start vector retrieval, raw Telegram RAG, or assistant mutation tools
   before Atlas, evaluation, and dogfood evidence justify them.
 - Obsidian remains a generated human navigation/audit projection, not runtime

@@ -14,8 +14,10 @@ Active Report V2 roadmap: `docs/intelligence_report_v2_roadmap.md`.
 Broader product roadmap: `docs/portfolio_grade_intelligence_roadmap.md`.
 Canonical active backlog: `docs/tasks.md`.
 Current implementation gate:
-`IRX-1 - Completed-Week Reporting Semantics`. `PGI-007` dogfood is superseded
-as the next action and remains blocked until the `IRX-14` start gate passes.
+`IRX-2 - Weekly Run Manifest And Required Radar Artifact Contract`; IRX-1
+completed-week semantics are implemented and verified. `PGI-007` dogfood is
+superseded as the next action and remains blocked until the `IRX-14` start gate
+passes.
 
 Current baseline: knowledge atoms, idea threads, canonical report contracts,
 split Brief / Atlas artifacts, Brief cockpit plumbing, Atlas audit navigation,
@@ -25,8 +27,9 @@ provenance helpers, Strategy Reviewer, and Radar RVE bridge exist in code with
 focused tests. The honest gap is four-week dogfood evidence and portfolio-ready
 evaluation proof from real operator runs. The W29 artifacts are technically
 valid but not reader-ready: they expose wrong-period, Radar-handoff,
-personalization, editorial, thread-curation, and visualization failures. Report
-V2 is planned, not implemented, and dogfood has not started. Raw Telegram
+personalization, editorial, thread-curation, and visualization failures. The
+shared Report V2 period foundation is implemented; manifest/orchestration and
+reader surfaces remain planned, and dogfood has not started. Raw Telegram
 firehose RAG, assistant
 mutations, full-year archive processing, and build-ready Radar decisions from
 context-only evidence remain out of scope.
@@ -74,7 +77,7 @@ It is not a public bot, SaaS product, or generic summarizer.
 5. **Record evidence** in `signal_evidence_items` with source channel, Telegram link, week, project scope, and selection reason.
 6. **Extract Knowledge Atoms** from recent posts with cheap bounded LLM batches.
 7. **Refresh Idea Threads** with 7/30/90 day momentum, source counts, and stale/superseded status.
-8. **Run Frontier Analysis** over compressed thread/atom context for the current week.
+8. **Run Frontier Analysis** over compressed thread/atom context for the resolved reporting period (the last completed ISO week by default).
 9. **Generate weekly artifacts**:
    - `Weekly AI Intelligence Workbook` visual HTML report
    - split `Knowledge Atlas` and `Weekly Intelligence Brief` HTML/JSON surfaces

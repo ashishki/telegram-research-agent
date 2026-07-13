@@ -11,7 +11,6 @@ from output.ai_report_contract import INTELLIGENCE_CONTRACT_VERSION, build_canon
 from output.ai_intelligence_report import (
     _all_atoms,
     _changed_threads,
-    _current_week_label,
     _escape,
     _link,
     _metric_card,
@@ -26,6 +25,12 @@ from output.ai_intelligence_report import (
 )
 from output.learning_layer import build_project_learning_projection
 from output.report_quality import MATCHES_TRACE_RE, ReportQualityFinding, SEVERITY_CRITICAL
+from output.reporting_period import (
+    format_human_period_label,
+    format_period_display_label,
+    reporting_timestamp_sort_key,
+    resolve_reporting_period,
+)
 
 
 OUTPUT_DIR = PROJECT_ROOT / "data" / "output" / "knowledge_atlas"
@@ -53,6 +58,11 @@ class KnowledgeAtlasSummary:
     trend_count: int
     quality_finding_count: int
     notification_text: str
+    reporting_week: str = ""
+    run_date: str = ""
+    analysis_period_start: str = ""
+    analysis_period_end: str = ""
+    period_mode: str = ""
 
 
 class KnowledgeAtlasQualityError(ValueError):
@@ -90,6 +100,7 @@ def build_knowledge_atlas_artifact(
     json_path = root / f"{week_label}.knowledge-atlas.json"
     threads = context.get("threads") or []
     atoms = _all_atoms(threads)
+    period_metadata = _period_metadata(context, generated_at=generated_at)
     metadata = _knowledge_atlas_metadata(
         context,
         generated_at=generated_at,
@@ -102,7 +113,12 @@ def build_knowledge_atlas_artifact(
     json_path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
     summary = KnowledgeAtlasSummary(
         week_label=week_label,
+        reporting_week=period_metadata["reporting_week"],
+        run_date=period_metadata["run_date"],
         generated_at=generated_at,
+        analysis_period_start=period_metadata["analysis_period_start"],
+        analysis_period_end=period_metadata["analysis_period_end"],
+        period_mode=period_metadata["period_mode"],
         html_path=str(html_path),
         json_path=str(json_path),
         thread_count=len(threads),
@@ -124,19 +140,26 @@ def generate_knowledge_atlas_report(
     settings: Settings,
     *,
     week_label: str | None = None,
+    period_mode: str | None = None,
     threads_limit: int = 24,
     atoms_limit: int = 8,
     output_root: str | Path | None = None,
     now: datetime | None = None,
 ) -> KnowledgeAtlasSummary:
-    clean_week = str(week_label or _current_week_label(now)).strip()
-    generated_at = (now or _utc_now()).astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    reporting_period = resolve_reporting_period(
+        now=now,
+        week_label=week_label,
+        period_mode=period_mode,
+    )
+    clean_week = reporting_period.week_label
+    generated_at = reporting_period.to_dict()["generated_at"]
     with sqlite3.connect(settings.db_path) as connection:
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON;")
         context = load_ai_intelligence_context(
             connection,
             week_label=clean_week,
+            reporting_period=reporting_period,
             threads_limit=max(1, int(threads_limit or 24)),
             atoms_limit=max(1, int(atoms_limit or 8)),
         )
@@ -149,7 +172,8 @@ def generate_knowledge_atlas_report(
 
 def render_knowledge_atlas_html(context: dict, *, generated_at: str | None = None) -> str:
     week_label = str(context.get("week_label") or "")
-    generated = generated_at or _utc_now_iso()
+    period_label = _human_period_label(context) or week_label
+    generated = generated_at or str(context.get("generated_at") or _utc_now_iso())
     project_learning_projection = _atlas_project_learning_projection(context)
     section_bodies = {
         "atlas-overview": _render_atlas_overview(context),
@@ -172,7 +196,7 @@ def render_knowledge_atlas_html(context: dict, *, generated_at: str | None = Non
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="intelligence-contract-version" content="{_escape(INTELLIGENCE_CONTRACT_VERSION)}">
-<title>Knowledge Atlas { _escape(week_label) }</title>
+<title>Knowledge Atlas { _escape(period_label) }</title>
 <style>
 :root {{ color-scheme: light; --ink:#18212b; --muted:#66717e; --line:#d8dee6; --panel:#ffffff; --bg:#f5f7f9; --accent:#0f766e; --warn:#a16207; }}
 * {{ box-sizing:border-box; }}
@@ -220,8 +244,10 @@ th, td {{ border-bottom:1px solid var(--line); text-align:left; padding:9px 8px;
 <body>
 <header>
 <p class="kicker">AI Knowledge Atlas</p>
-<h1>Knowledge Atlas - {_escape(week_label)}</h1>
-<p class="muted">Generated {_escape(generated)} from bounded Idea Thread and Knowledge Atom context. This is a rolling knowledge map, not a raw Telegram mirror.</p>
+<h1>Knowledge Atlas - {_escape(period_label)}</h1>
+<p class="muted">Period mode: {_escape(str(context.get("period_mode") or "explicit_iso_week"))}.</p>
+<p class="muted">Generated {_escape(generated)}.</p>
+<p class="muted">Bounded Idea Thread and Knowledge Atom context. This is a rolling knowledge map, not a raw Telegram mirror.</p>
 <nav>{nav}</nav>
 </header>
 <main>
@@ -277,8 +303,14 @@ def validate_knowledge_atlas_html(html_text: str) -> list[ReportQualityFinding]:
 
 
 def build_knowledge_atlas_notification(summary: KnowledgeAtlasSummary) -> str:
+    period_label = format_period_display_label(
+        period_mode=summary.period_mode,
+        reporting_week=summary.reporting_week or summary.week_label,
+        analysis_period_start=summary.analysis_period_start,
+        analysis_period_end=summary.analysis_period_end,
+    )
     return (
-        f"Knowledge Atlas {summary.week_label} is ready.\n"
+        f"Knowledge Atlas {period_label} is ready.\n"
         f"Threads: {summary.thread_count} | Atoms: {summary.source_atom_count} | Changed: {summary.trend_count}\n"
         f"Open: {summary.html_path}"
     )
@@ -315,8 +347,7 @@ def _knowledge_atlas_metadata(
         "schema_version": "split_ai_report.v1",
         "contract_version": INTELLIGENCE_CONTRACT_VERSION,
         "artifact_type": "knowledge_atlas",
-        "week_label": context.get("week_label"),
-        "generated_at": generated_at,
+        **_period_metadata(context, generated_at=generated_at),
         "html_path": str(html_path),
         "json_path": str(json_path),
         "artifact_paths": {"html": str(html_path), "json": str(json_path)},
@@ -336,6 +367,46 @@ def _knowledge_atlas_metadata(
         "quality_findings": [finding.as_dict() for finding in quality_findings],
         "retrieval_note": "Knowledge Atlas is a rolling/cumulative knowledge map over curated objects, not raw Telegram runtime memory.",
     }
+
+
+def _period_metadata(context: dict, *, generated_at: str) -> dict[str, str]:
+    """Return additive period identity while accepting legacy report contexts."""
+
+    week_label = str(context.get("week_label") or context.get("reporting_week") or "").strip()
+    reporting_week = str(context.get("reporting_week") or week_label).strip()
+    analysis_period_start = str(
+        context.get("analysis_period_start") or context.get("week_start") or ""
+    ).strip()
+    analysis_period_end = str(
+        context.get("analysis_period_end") or context.get("week_end") or ""
+    ).strip()
+    clean_generated_at = str(generated_at or context.get("generated_at") or "").strip()
+    run_date = str(context.get("run_date") or clean_generated_at[:10]).strip()
+    return {
+        "run_date": run_date,
+        "generated_at": clean_generated_at,
+        "analysis_period_start": analysis_period_start,
+        "analysis_period_end": analysis_period_end,
+        "reporting_week": reporting_week,
+        "week_label": week_label,
+        "period_mode": str(context.get("period_mode") or "explicit_iso_week").strip(),
+    }
+
+
+def _human_period_label(context: dict) -> str:
+    start = str(context.get("analysis_period_start") or context.get("week_start") or "").strip()
+    end = str(context.get("analysis_period_end") or context.get("week_end") or "").strip()
+    if start and end:
+        try:
+            return format_human_period_label(
+                period_mode=str(context.get("period_mode") or "explicit_iso_week"),
+                reporting_week=str(context.get("reporting_week") or context.get("week_label") or ""),
+                analysis_period_start=start,
+                analysis_period_end=end,
+            )
+        except (TypeError, ValueError):
+            pass
+    return str(context.get("reporting_week") or context.get("week_label") or "").strip()
 
 
 def _render_atlas_overview(context: dict) -> str:
@@ -438,7 +509,11 @@ def _atlas_evidence_item(atom: dict) -> dict:
 
 def _thread_timeline(atoms: list[dict]) -> list[dict]:
     rows = []
-    for atom in sorted(atoms, key=lambda item: str(item.get("last_seen_at") or ""), reverse=True)[:6]:
+    for atom in sorted(
+        atoms,
+        key=lambda item: reporting_timestamp_sort_key(item.get("last_seen_at")),
+        reverse=True,
+    )[:6]:
         rows.append(
             {
                 "date": str(atom.get("last_seen_at") or "")[:10],

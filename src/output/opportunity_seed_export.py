@@ -1,8 +1,9 @@
 import json
+import math
 import re
 import sqlite3
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from pathlib import Path
 
 from config.settings import PROJECT_ROOT, Settings
@@ -12,6 +13,12 @@ from output.market_context_lens import (
     DEFAULT_BASELINE_DAYS,
     build_market_context_lens,
     market_context_lens_seed,
+)
+from output.reporting_period import (
+    TRAILING_SEVEN_DAYS,
+    ReportingPeriod,
+    register_reporting_period_sqlite,
+    resolve_reporting_period,
 )
 
 
@@ -182,12 +189,21 @@ class OpportunitySeedExportResult:
     market_baseline_path: str | None = None
     market_delta_path: str | None = None
     market_context_lens: dict | None = None
+    run_date: str = ""
+    generated_at: str = ""
+    reporting_week: str = ""
+    period_mode: str = ""
+    analysis_period_start: str = ""
+    analysis_period_end: str = ""
 
 
 def export_opportunity_seeds(
     settings: Settings,
     *,
-    days: int = 7,
+    days: int | None = None,
+    week_label: str | None = None,
+    period_mode: str | None = None,
+    reporting_period: ReportingPeriod | None = None,
     limit: int = 80,
     output_path: Path | None = None,
     include_channels: tuple[str, ...] = (),
@@ -195,10 +211,32 @@ def export_opportunity_seeds(
     market_context_days: int = DEFAULT_BASELINE_DAYS,
     force_market_baseline: bool = False,
 ) -> OpportunitySeedExportResult:
-    current = now or datetime.now(timezone.utc)
-    cutoff = (current - timedelta(days=max(days, 1))).isoformat().replace("+00:00", "Z")
-    week_label = _week_label(current)
-    target_path = output_path or OUTPUT_DIR / f"{week_label}.json"
+    if reporting_period is not None:
+        if days is not None or week_label is not None or period_mode is not None or now is not None:
+            raise ValueError(
+                "reporting_period cannot be combined with days, week_label, period_mode, or now"
+            )
+        period = reporting_period
+    else:
+        if days is not None and int(days) != 7:
+            raise ValueError("rolling opportunity export supports exactly seven days")
+        if days is not None and week_label is not None:
+            raise ValueError("week_label cannot be combined with rolling days")
+        if days is not None and period_mode is not None:
+            raise ValueError("rolling --days cannot be combined with another period mode")
+        resolved_mode = period_mode
+        if days is not None and resolved_mode is None and week_label is None:
+            resolved_mode = TRAILING_SEVEN_DAYS
+        period = resolve_reporting_period(
+            now,
+            week_label=week_label,
+            period_mode=resolved_mode,
+        )
+    period_fields = period.to_dict()
+    period_start = period_fields["analysis_period_start"]
+    period_end = period_fields["analysis_period_end"]
+    clean_week = period.week_label
+    target_path = output_path or OUTPUT_DIR / f"{clean_week}.json"
     normalized_channels = {_normalize_channel(channel) for channel in include_channels if channel}
 
     with sqlite3.connect(settings.db_path) as connection:
@@ -206,15 +244,27 @@ def export_opportunity_seeds(
         knowledge_threads = load_downstream_knowledge_threads(
             connection,
             atom_types=MVP_KNOWLEDGE_ATOM_TYPES,
-            min_last_seen_at=cutoff,
+            min_atom_last_seen_at=period_start,
+            max_atom_last_seen_at=period_end,
             limit=max(1, min(limit, 20)),
         )
-        rows = _fetch_recent_posts(connection, cutoff, scan_limit=max(limit * 8, 300))
+        rows = _fetch_recent_posts(
+            connection,
+            period_start,
+            period_end,
+            scan_limit=max(limit * 8, 300),
+        )
     market_lens = build_market_context_lens(
         settings,
-        now=current,
+        reporting_period=period,
         baseline_days=max(1, market_context_days),
-        delta_days=max(1, days),
+        delta_days=max(
+            1,
+            math.ceil(
+                (period.analysis_period_end - period.analysis_period_start).total_seconds()
+                / 86_400
+            ),
+        ),
         output_root=_market_lens_output_root_for(target_path),
         force_baseline=force_market_baseline,
     )
@@ -245,13 +295,16 @@ def export_opportunity_seeds(
         market_seed.setdefault("intelligence_contract_version", INTELLIGENCE_CONTRACT_VERSION)
         seeds.append(market_seed)
 
+    for seed in seeds:
+        seed.update(period_fields)
+
     target_path.parent.mkdir(parents=True, exist_ok=True)
     target_path.write_text(json.dumps(seeds, ensure_ascii=False, indent=2), encoding="utf-8")
-    market_pack_path = _market_pack_path_for(target_path, week_label)
+    market_pack_path = _market_pack_path_for(target_path, clean_week)
     market_pack_path.parent.mkdir(parents=True, exist_ok=True)
     market_pack_path.write_text(json.dumps(market_pack, ensure_ascii=False, indent=2), encoding="utf-8")
     return OpportunitySeedExportResult(
-        week_label=week_label,
+        week_label=clean_week,
         output_path=str(target_path),
         seed_count=len(seeds),
         scanned_count=len(rows),
@@ -270,6 +323,12 @@ def export_opportunity_seeds(
         market_baseline_path=market_lens.baseline_path,
         market_delta_path=market_lens.delta_path,
         market_context_lens=market_lens.current_context,
+        run_date=period_fields["run_date"],
+        generated_at=period_fields["generated_at"],
+        reporting_week=period_fields["reporting_week"],
+        period_mode=period_fields["period_mode"],
+        analysis_period_start=period_fields["analysis_period_start"],
+        analysis_period_end=period_fields["analysis_period_end"],
     )
 
 
@@ -290,10 +349,12 @@ def classify_demand_surfaces(text: str) -> list[str]:
 
 def _fetch_recent_posts(
     connection: sqlite3.Connection,
-    cutoff: str,
+    analysis_period_start: str,
+    analysis_period_end: str,
     *,
     scan_limit: int,
 ) -> list[sqlite3.Row]:
+    register_reporting_period_sqlite(connection)
     return list(
         connection.execute(
             """
@@ -323,7 +384,8 @@ def _fetch_recent_posts(
                 ) AS project_names
             FROM posts p
             INNER JOIN raw_posts r ON r.id = p.raw_post_id
-            WHERE p.posted_at >= ?
+            WHERE reporting_utc_micros(p.posted_at) >= reporting_utc_micros(?)
+              AND reporting_utc_micros(p.posted_at) < reporting_utc_micros(?)
             ORDER BY
                 CASE p.bucket
                     WHEN 'strong' THEN 0
@@ -332,11 +394,11 @@ def _fetch_recent_posts(
                     ELSE 3
                 END,
                 COALESCE(p.user_adjusted_score, p.signal_score, 0) DESC,
-                p.posted_at DESC,
+                reporting_utc_micros(p.posted_at) DESC,
                 p.id DESC
             LIMIT ?
             """,
-            (cutoff, scan_limit),
+            (analysis_period_start, analysis_period_end, scan_limit),
         ).fetchall()
     )
 
@@ -597,11 +659,6 @@ def _truncate(text: str, limit: int) -> str:
     if len(compact) <= limit:
         return compact
     return compact[: limit - 1].rstrip() + "…"
-
-
-def _week_label(current: datetime) -> str:
-    year, week, _ = current.isocalendar()
-    return f"{year}-W{week:02d}"
 
 
 def _market_pack_path_for(seed_path: Path, week_label: str) -> Path:
