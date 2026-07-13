@@ -1,0 +1,72 @@
+{
+  "as_of": "2026-07-13",
+  "blocked_claims": [
+    {
+      "claim": "four consecutive public dogfood weeks completed",
+      "reason": "No privacy-reviewed scorecard from a real operator week has been published.",
+      "status": "not_evidenced"
+    },
+    {
+      "claim": "the workflow changed a real operator decision or action",
+      "reason": "No published operator review or decision receipt supports this claim.",
+      "status": "not_evidenced"
+    },
+    {
+      "claim": "the workflow saves operator time or produces user value",
+      "reason": "No published real-run time or value observations exist.",
+      "status": "not_evidenced"
+    },
+    {
+      "claim": "the checked-in deployment is production reliable",
+      "reason": "Repository tests and service files do not establish live reliability.",
+      "status": "not_evidenced"
+    }
+  ],
+  "current": {
+    "status": "blocked_before_week_1",
+    "verified_public_week_count": 0,
+    "verified_public_weeks": []
+  },
+  "next_evidence_gate": {
+    "blocker": "Requires real operator runs plus privacy review; repository fixtures cannot satisfy this gate.",
+    "required_artifacts": [
+      "four consecutive privacy-reviewed real-run scorecards",
+      "source-bound decision or action receipts when an outcome is claimed",
+      "explicit unknown values for every metric that was not measured"
+    ]
+  },
+  "operation_model": "private_single_operator",
+  "portfolio_role": "secondary_project",
+  "privacy_boundary": {
+    "excluded_from_public_evidence": [
+      "raw Telegram content",
+      "Telegram session material",
+      "credentials or environment files",
+      "private feedback text or voice transcripts",
+      "unreviewed generated operator reports"
+    ]
+  },
+  "project": "telegram-research-agent",
+  "public_evidence_items": [
+    {
+      "does_not_support": [
+        "dogfood_week",
+        "operator_outcome",
+        "production_reliability",
+        "user_or_design_partner_validation"
+      ],
+      "id": "synthetic-scorecard-demo-v1",
+      "kind": "synthetic_fixture",
+      "path": "docs/evidence/public_demo_scorecard.json",
+      "sha256": "7b8e3203ade62c17a624888d3532b7ab6e7d639d141d6a0a78487dac18694b83",
+      "supports": [
+        "credential_free_scorecard_contract"
+      ],
+      "verification_command": "PYTHONPATH=src python3 scripts/public_scorecard_demo.py --check"
+    }
+  ],
+  "schema_version": "public-dogfood-evidence-ledger.v1",
+  "target": {
+    "required_verified_public_weeks": 4
+  }
+}

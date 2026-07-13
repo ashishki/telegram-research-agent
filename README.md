@@ -1,14 +1,24 @@
 # Telegram Research Agent
 
-Personal research intelligence for Telegram channels: ingest posts, preserve evidence, extract AI knowledge atoms, track evolving idea threads, and produce weekly decision reports instead of a generic digest.
+Private, single-operator research intelligence for curated Telegram channels.
+The repository is a secondary portfolio project: it demonstrates bounded
+ingestion, evidence-preserving analysis, and report contracts, but it is not a
+public service or a proven production system.
 
-State: portfolio-grade Personal AI / Knowledge Intelligence System in progress;
-Report V2 product correction active after the W29 reader-value audit.
-The legacy Research Brief / Implementation Ideas loop still works, but the
-product direction is now a private decision and learning intelligence system
-centered on the Weekly Intelligence Brief, Knowledge Atlas, bounded Hermes/PI
-assistant, Project Intelligence, Learning Intelligence, and a parallel MVP
-Radar validation track.
+Public evidence status as of 2026-07-13: **0/4 verified public dogfood weeks**.
+No public artifact currently supports claims about operator value, changed
+decisions, time saved, or production reliability. The machine-readable status
+and blocked-claim ledger is
+[`docs/evidence/public_dogfood_status.json`](docs/evidence/public_dogfood_status.json).
+A credential-free synthetic scorecard demo verifies only the deterministic
+contract; it is not a dogfood run.
+
+Report V2 product correction is active after the W29 reader-value audit. The
+legacy Research Brief / Implementation Ideas loop remains in the codebase, but
+the current direction is a private decision and learning workflow centered on
+the Weekly Intelligence Brief, Knowledge Atlas, bounded Hermes/PI assistant,
+Project Intelligence, Learning Intelligence, and a parallel MVP Radar
+validation track.
 
 Active Report V2 roadmap: `docs/intelligence_report_v2_roadmap.md`.
 Broader product roadmap: `docs/portfolio_grade_intelligence_roadmap.md`.
@@ -61,7 +71,9 @@ Reference integration: `docs/entropy_core_gensyn_integration.md`.
 
 ## What It Is
 
-This is a private, single-user pipeline that runs on a VPS and processes curated Telegram channels. It is designed for one operator who follows too many technical channels and wants a weekly brief that answers:
+This is a private, single-user pipeline for processing curated Telegram
+channels. It is designed for one operator who wants a weekly brief that
+answers:
 
 - what mattered this week
 - why it matters for active projects
@@ -176,13 +188,15 @@ python3 src/main.py ai-visual-report --week 2026-W28 --skip-refresh --deliver
 python3 src/main.py ai-split-report --week 2026-W28 --skip-refresh --deliver
 ```
 
-## Production Readiness
+## Private Deployment Notes
 
-The services below describe the current diagnostic V1 deployment. Scheduled
-HTML success is not Report V2 readiness, and the four-week dogfood is paused
-until IRX-14.
+The repository contains service definitions and runbooks for a diagnostic V1
+private deployment. These checked-in files do not verify that the services are
+currently active, reliable, or completing scheduled runs. Scheduled HTML
+success alone would not establish Report V2 readiness, and the four-week
+dogfood remains paused until IRX-14.
 
-On the single-user VPS, the operational baseline is:
+The intended single-user deployment baseline is:
 
 - `weekly-intelligence-v2` is the explicit additive IRX-2 package command. It
   creates a new immutable run directory, binds same-run artifacts by identity

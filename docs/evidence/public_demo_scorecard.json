@@ -1,0 +1,272 @@
+{
+  "artifact_type": "weekly_intelligence_scorecard",
+  "dimensions": {
+    "correctness": {
+      "metrics": {
+        "canonical_contract_present": {
+          "note": null,
+          "source": "weekly_brief.intelligence_contract",
+          "state": "measured",
+          "value": true
+        },
+        "false_confidence_incident_count": {
+          "note": null,
+          "source": "observations.false_confidence_incidents",
+          "state": "measured",
+          "value": 1
+        },
+        "quality_finding_count": {
+          "note": null,
+          "source": "split_sidecars.quality_findings",
+          "state": "measured",
+          "value": 1
+        },
+        "unsupported_claim_rate": {
+          "note": "needs reviewer-labeled claim fixture",
+          "source": "not_available",
+          "state": "unknown",
+          "value": "unknown"
+        }
+      },
+      "status": "measured"
+    },
+    "decisions_actions": {
+      "metrics": {
+        "action_count": {
+          "note": null,
+          "source": "weekly_brief.actions",
+          "state": "measured",
+          "value": 0
+        },
+        "actions_completed": {
+          "note": "dogfood summary not recorded yet",
+          "source": "dogfood_review.review",
+          "state": "unknown",
+          "value": "unknown"
+        },
+        "decisions_changed_count": {
+          "note": "not available in deterministic fixture",
+          "source": "dogfood_review.metrics",
+          "state": "unknown",
+          "value": "unknown"
+        },
+        "experiments_completed": {
+          "note": "dogfood metric not recorded yet",
+          "source": "dogfood_review.metrics",
+          "state": "unknown",
+          "value": "unknown"
+        }
+      },
+      "status": "measured"
+    },
+    "learning": {
+      "metrics": {
+        "implemented_or_tested_objective_count": {
+          "note": null,
+          "source": "project_learning_projection.learning_intelligence.stage_counts",
+          "state": "measured",
+          "value": 0
+        },
+        "learning_linked_to_project_evidence": {
+          "note": "requires outcome evidence after dogfood",
+          "source": "not_available",
+          "state": "unknown",
+          "value": "unknown"
+        },
+        "learning_objective_count": {
+          "note": null,
+          "source": "project_learning_projection.learning_intelligence.objectives",
+          "state": "measured",
+          "value": 0
+        },
+        "read_counted_as_mastery_incident_count": {
+          "note": null,
+          "source": "project_learning_projection.learning_intelligence.objectives",
+          "state": "measured",
+          "value": 0
+        }
+      },
+      "status": "measured"
+    },
+    "operations": {
+      "metrics": {
+        "artifact_generation_success": {
+          "note": null,
+          "source": "weekly_brief.artifact_paths",
+          "state": "measured",
+          "value": true
+        },
+        "generation_cost_usd": {
+          "note": "cost is not recorded by deterministic fixture",
+          "source": "not_measured",
+          "state": "not_measured",
+          "value": "not_measured"
+        },
+        "generation_latency_seconds": {
+          "note": "latency is not recorded by deterministic fixture",
+          "source": "not_measured",
+          "state": "not_measured",
+          "value": "not_measured"
+        },
+        "missing_artifact_count": {
+          "note": null,
+          "source": "split_sidecars.artifact_paths",
+          "state": "measured",
+          "value": 0
+        },
+        "test_regression_count": {
+          "note": "manual observation not recorded yet",
+          "source": "observations.test_regression_count",
+          "state": "unknown",
+          "value": "unknown"
+        }
+      },
+      "status": "measured"
+    },
+    "radar": {
+      "metrics": {
+        "context_only_gate_violation_count": {
+          "note": null,
+          "source": "weekly_brief.mvp_radar_gate",
+          "state": "measured",
+          "value": 0
+        },
+        "matched_gate_evidence_count": {
+          "note": null,
+          "source": "weekly_brief.mvp_radar_gate",
+          "state": "measured",
+          "value": 0
+        },
+        "radar_gate_decision": {
+          "note": null,
+          "source": "weekly_brief.mvp_radar_gate",
+          "state": "measured",
+          "value": "do_not_build"
+        },
+        "stale_or_missing_radar_incident_count": {
+          "note": null,
+          "source": "weekly_brief.mvp_radar_gate",
+          "state": "measured",
+          "value": 0
+        }
+      },
+      "status": "measured"
+    },
+    "relevance": {
+      "metrics": {
+        "ignored_but_repeated_topic_rate": {
+          "note": "requires repeated-theme labels",
+          "source": "not_available",
+          "state": "unknown",
+          "value": "unknown"
+        },
+        "personalization_confidence": {
+          "note": "explicitly unknown",
+          "source": "weekly_brief.report_contract",
+          "state": "unknown",
+          "value": "unknown"
+        },
+        "precision_at_3_personally_useful": {
+          "note": "requires dogfood labels",
+          "source": "not_available",
+          "state": "unknown",
+          "value": "unknown"
+        },
+        "wrong_priority_count": {
+          "note": "dogfood metric not recorded yet",
+          "source": "dogfood_review.metrics",
+          "state": "unknown",
+          "value": "unknown"
+        }
+      },
+      "status": "unknown"
+    },
+    "ux": {
+      "metrics": {
+        "atlas_find_source_task_success": {
+          "note": "manual observation not recorded yet",
+          "source": "observations.atlas_find_source_task_success",
+          "state": "unknown",
+          "value": "unknown"
+        },
+        "brief_first_screen_task_success": {
+          "note": "manual observation not recorded yet",
+          "source": "observations.brief_first_screen_task_success",
+          "state": "unknown",
+          "value": "unknown"
+        },
+        "feedback_friction_score": {
+          "note": "dogfood metric not recorded yet",
+          "source": "dogfood_review.metrics",
+          "state": "unknown",
+          "value": "unknown"
+        },
+        "time_to_understand_week_minutes": {
+          "note": "dogfood metric not recorded yet",
+          "source": "dogfood_review.metrics",
+          "state": "unknown",
+          "value": "unknown"
+        }
+      },
+      "status": "unknown"
+    }
+  },
+  "evidence_boundary": {
+    "data_class": "synthetic_fixture",
+    "does_not_support": [
+      "dogfood_week",
+      "operator_outcome",
+      "production_reliability",
+      "user_or_design_partner_validation"
+    ],
+    "supports": [
+      "credential_free_scorecard_contract"
+    ]
+  },
+  "false_confidence_incidents": [
+    {
+      "description": "Synthetic failure case: an unsupported candidate claim must not be promoted.",
+      "id": "synthetic-unsupported-claim",
+      "severity": "medium",
+      "source_refs": [
+        "examples/public_scorecard_demo/knowledge-atlas.json"
+      ],
+      "status": "fixture"
+    }
+  ],
+  "generated_at": "2026-07-13T00:00:00Z",
+  "privacy": "sanitized_fixture_or_private_operator_artifact",
+  "schema_version": "weekly-intelligence-scorecard.v1",
+  "source_artifacts": {
+    "knowledge_atlas_json_path": "examples/public_scorecard_demo/knowledge-atlas.json",
+    "observations_json_path": "examples/public_scorecard_demo/observations.json",
+    "weekly_brief_json_path": "examples/public_scorecard_demo/weekly-brief.json"
+  },
+  "summary": {
+    "dimension_count": 7,
+    "false_confidence_incident_count": 1,
+    "measured_metric_count": 13,
+    "quality_finding_count": 1,
+    "scorecard_status": "needs_baseline",
+    "unknown_metric_count": 16
+  },
+  "unknown_metrics": [
+    "correctness.unsupported_claim_rate",
+    "relevance.personalization_confidence",
+    "relevance.wrong_priority_count",
+    "relevance.precision_at_3_personally_useful",
+    "relevance.ignored_but_repeated_topic_rate",
+    "decisions_actions.actions_completed",
+    "decisions_actions.decisions_changed_count",
+    "decisions_actions.experiments_completed",
+    "learning.learning_linked_to_project_evidence",
+    "ux.time_to_understand_week_minutes",
+    "ux.brief_first_screen_task_success",
+    "ux.atlas_find_source_task_success",
+    "ux.feedback_friction_score",
+    "operations.test_regression_count",
+    "operations.generation_cost_usd",
+    "operations.generation_latency_seconds"
+  ],
+  "week_label": "2026-W28"
+}

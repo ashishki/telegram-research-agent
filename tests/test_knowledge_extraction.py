@@ -7,6 +7,7 @@ import tempfile
 import types
 import unittest
 from contextlib import redirect_stdout
+from datetime import datetime, timezone
 from unittest.mock import patch
 
 
@@ -42,6 +43,10 @@ from db.knowledge_atoms import record_knowledge_atom, record_knowledge_extractio
 from db.migrate import run_migrations  # noqa: E402
 from llm.client import LLMError  # noqa: E402
 import main  # noqa: E402
+from output.knowledge_extraction import week_labels_for_lookback  # noqa: E402
+
+
+FIXED_EXTRACTION_NOW = datetime(2026, 7, 6, 12, 0, tzinfo=timezone.utc)
 
 
 class TestKnowledgeExtractionCli(unittest.TestCase):
@@ -145,7 +150,8 @@ class TestKnowledgeExtractionCli(unittest.TestCase):
             }
         )
 
-    def test_knowledge_extract_cli_records_atoms_and_batches(self):
+    @patch("output.knowledge_extraction._utc_now", return_value=FIXED_EXTRACTION_NOW)
+    def test_knowledge_extract_cli_records_atoms_and_batches(self, _fixed_now):
         db_path = self._make_db()
         stdout = io.StringIO()
         try:
@@ -177,7 +183,8 @@ class TestKnowledgeExtractionCli(unittest.TestCase):
         self.assertEqual(batch_row[0], "completed")
         self.assertEqual(batch_row[1], 1)
 
-    def test_knowledge_extract_skips_completed_batches(self):
+    @patch("output.knowledge_extraction._utc_now", return_value=FIXED_EXTRACTION_NOW)
+    def test_knowledge_extract_skips_completed_batches(self, _fixed_now):
         db_path = self._make_db()
         first_stdout = io.StringIO()
         second_stdout = io.StringIO()
@@ -209,7 +216,8 @@ class TestKnowledgeExtractionCli(unittest.TestCase):
         self.assertEqual(atom_count, 1)
         self.assertIn("batches_skipped=1", second_stdout.getvalue())
 
-    def test_knowledge_extract_marks_batch_failed_on_invalid_json(self):
+    @patch("output.knowledge_extraction._utc_now", return_value=FIXED_EXTRACTION_NOW)
+    def test_knowledge_extract_marks_batch_failed_on_invalid_json(self, _fixed_now):
         db_path = self._make_db()
         stdout = io.StringIO()
         try:
@@ -236,7 +244,8 @@ class TestKnowledgeExtractionCli(unittest.TestCase):
         self.assertEqual(atom_count, 0)
         self.assertIn("errors=1", stdout.getvalue())
 
-    def test_knowledge_extract_retries_invalid_json_once(self):
+    @patch("output.knowledge_extraction._utc_now", return_value=FIXED_EXTRACTION_NOW)
+    def test_knowledge_extract_retries_invalid_json_once(self, _fixed_now):
         db_path = self._make_db()
         stdout = io.StringIO()
         try:
@@ -267,7 +276,8 @@ class TestKnowledgeExtractionCli(unittest.TestCase):
         self.assertEqual(atom_count, 1)
         self.assertIn("errors=0", stdout.getvalue())
 
-    def test_knowledge_extract_aborts_on_low_credit_error(self):
+    @patch("output.knowledge_extraction._utc_now", return_value=FIXED_EXTRACTION_NOW)
+    def test_knowledge_extract_aborts_on_low_credit_error(self, _fixed_now):
         db_path = self._make_db()
         stdout = io.StringIO()
         quota_error = LLMError("Anthropic completion failed")
@@ -305,6 +315,14 @@ class TestKnowledgeExtractionCli(unittest.TestCase):
         self.assertEqual(batch_rows[0][0], "failed")
         self.assertIn("Anthropic completion failed", batch_rows[0][1])
         self.assertIn("batches_total=1", stdout.getvalue())
+
+    def test_lookback_labels_preserve_iso_year_at_calendar_boundary(self):
+        labels = week_labels_for_lookback(
+            3,
+            now=datetime(2024, 12, 31, 23, 59, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual(labels, ("2024-W51", "2024-W52", "2025-W01"))
 
     def test_memory_inspect_knowledge_atoms_prints_batches_and_atoms(self):
         db_path = self._make_db()

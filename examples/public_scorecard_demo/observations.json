@@ -1,0 +1,13 @@
+{
+  "false_confidence_incidents": [
+    {
+      "description": "Synthetic failure case: an unsupported candidate claim must not be promoted.",
+      "id": "synthetic-unsupported-claim",
+      "severity": "medium",
+      "source_refs": [
+        "examples/public_scorecard_demo/knowledge-atlas.json"
+      ],
+      "status": "fixture"
+    }
+  ]
+}
