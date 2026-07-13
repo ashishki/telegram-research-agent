@@ -1,7 +1,7 @@
 # Reaction Personalization Contract
 
-Contract version: `reaction_personalization.v1`  
-Status: planned (`IRX-3`; not implemented)  
+Contract version: `reaction_personalization.v1`
+Status: `implemented_and_verified` (`IRX-3`; 2026-07-13)
 Applies to: Weekly Intelligence Brief V2, Knowledge Atlas V2, Editorial
 Intelligence input, and Knowledge Audit Explorer
 
@@ -18,18 +18,20 @@ complete lineage:
 
 ```text
 visible personal reaction
+  -> stored raw Telegram post
   -> normalized source post
   -> Knowledge Atom
-  -> canonical Idea Thread
+  -> current compatibility Idea Thread
+  -> optional canonical Idea Thread (IRX-4)
   -> weak ranking boost
   -> selected signal/action/study item
   -> reader-facing effect receipt
 ```
 
-The W29 reports stop after loading marked posts into a separate context list.
-They do not perform the atom/thread projection, do not apply a selection boost,
-and do not show consumed or unconsumed effects. Existing ingestion is reusable;
-the missing capability is the report-time projection and receipt.
+The audited W29 reports stopped after loading marked posts into a separate
+context list. IRX-3 now performs the deterministic report-time projection,
+bounded selection influence, and consumed/unconsumed receipt. Stable canonical
+thread identity and historical as-of thread lineage remain owned by IRX-4.
 
 ## Normative Semantics
 
@@ -79,8 +81,8 @@ true:
 - the normalized post can be resolved;
 - the source post belongs to the run's analysis period;
 - at least one Knowledge Atom cites that post through `source_post_ids`;
-- at least one cited atom maps through `idea_thread_atoms` to an active canonical
-  thread;
+- at least one cited atom maps through `idea_thread_atoms` to an eligible current
+  compatibility thread;
 - the candidate signal still passes evidence, freshness, duplication, and
   editorial eligibility rules.
 
@@ -113,15 +115,16 @@ Selection precedence is:
 4. bounded implicit reaction interest;
 5. stable deterministic tie-breakers.
 
-IRX-3 may choose a numeric implementation only if it preserves this order. The
-reaction contribution must be capped so that it can break a close comparison
-between eligible candidates but cannot rescue weak, stale, contradicted, or
-uncited evidence. A confirmed explicit correction or negative priority signal
-wins over an implicit positive reaction on the same target.
+The implemented contribution is a single bounded adjacent promotion between
+otherwise equal eligible candidates inside the exact reader selector. It cannot
+cross stronger evidence or confirmed-feedback ordering, and cannot rescue weak,
+stale, contradicted, superseded, or uncited evidence. A confirmed explicit
+correction or negative priority signal wins over an implicit positive reaction
+on the same target.
 
 The counterfactual result must be retained:
 
-- `boost_applied`: an eligible canonical thread received the weak boost;
+- `boost_applied`: an eligible resolved current thread received the weak boost;
 - `rank_changed`: the boost changed deterministic order;
 - `selection_changed`: the boost changed which bounded report item appeared;
 - `linked_only`: a selected item was related to a reaction, but would have been
@@ -140,15 +143,17 @@ matching:
 | Reaction -> raw post | `channel_username` plus Telegram `message_id` | `post_not_found` |
 | Raw post -> normalized post | `posts.raw_post_id` | `post_not_found` |
 | Post -> atom | post ID in `knowledge_atoms.source_post_ids_json` | `knowledge_atom_not_extracted` |
-| Atom -> raw thread | `idea_thread_atoms.atom_id` | `no_thread_link` |
-| Raw thread -> canonical thread | canonical registry/alias from IRX-4 | `no_canonical_thread_link` |
+| Atom -> current compatibility thread | `idea_thread_atoms.atom_id` and stored relation | `no_thread_link` |
+| Current thread -> canonical thread | optional resolver result; registry/alias from IRX-4 | `no_canonical_thread_link` when canonical identity is required |
 | Thread -> candidate | report candidate and evidence validation | eligibility reason |
 | Candidate -> report item | versioned deterministic ranking trace | selected, duplicate, or limit reason |
 
 One reacted post may cite several atoms and threads. All valid links remain in
-the audit trace, but each canonical thread receives at most one boost per source
-post. Alias, merge, and split resolution must preserve the original atom and
-post provenance.
+the audit trace, but each resolved thread receives at most one post-level boost
+per source post. IRX-3 emits `compatibility_thread_ref`, `current_thread_ref`, a
+nullable `canonical_thread_ref`, and an explicit resolution status. IRX-4 must
+preserve the original atom/post provenance when it adds alias, merge, split, and
+historical as-of resolution.
 
 The strong-model editorial pass may read the summarized effect trace. It may
 explain the effect in Russian, but it may not invent a mapping, adjust the boost,
@@ -156,10 +161,19 @@ or decide that an unlinked reaction was consumed.
 
 ## Effect Receipt JSON
 
-Every Brief V2 sidecar contains `reaction_effect`; Atlas V2 contains the same
-schema with `surface="knowledge_atlas"`. The manifest holds the snapshot
-reference, while raw post, atom, thread, and rank identifiers remain in the
-Audit Explorer or audit sidecar.
+When an IRX-2 manifest binds a rich verified reaction snapshot, every succeeded
+Brief and Atlas sidecar contains a validated `reaction_effect`; the two receipts
+share run/period/snapshot/policy identity, pre-selection funnel counts, and
+non-selection attribution. They may differ in `surface`, status, selected
+items/counts, counterfactuals, and selector-dependent unconsumed results. A
+legacy count-only reaction stage remains explicitly unbound/unavailable,
+creates no fresh boost, and does not make a receipt mandatory. Brief classifies
+against its four-item learning-action selector. Atlas classifies against its
+twelve-item ranked thread-navigation selector. Both use exact
+`surface_item_ref="thread:<slug>"` identities. The manifest binds the same-run
+snapshot reference and validates the receipt against snapshot post/reaction
+lineage; opaque post, reaction, atom, thread, and rank references remain in JSON
+and retrieval/audit projections.
 
 ```json
 {
@@ -173,38 +187,85 @@ Audit Explorer or audit sidecar.
   "snapshot_status": "complete",
   "status": "effects_applied",
   "counts": {
-    "personal_reaction_events_detected": 18,
-    "unique_reacted_posts": 15,
-    "posts_resolved": 15,
-    "eligible_period_posts": 13,
-    "unique_atoms_linked": 11,
-    "unique_canonical_threads_linked": 6,
-    "canonical_threads_boosted": 6,
-    "selected_items_linked": 3,
-    "selected_signals_influenced": 3,
+    "personal_reaction_events_detected": 5,
+    "unique_reacted_posts": 5,
+    "posts_resolved": 5,
+    "eligible_period_posts": 2,
+    "unique_atoms_linked": 2,
+    "unique_canonical_threads_linked": 0,
+    "canonical_threads_boosted": 0,
+    "unique_compatibility_threads_linked": 1,
+    "compatibility_threads_boosted": 1,
+    "selected_items_linked": 1,
+    "selected_signals_influenced": 1,
     "unconsumed_reaction_events": 3
   },
   "influenced_items": [
     {
-      "surface_item_ref": "signal:agent-evaluation-discipline",
+      "surface_item_ref": "thread:agent-evaluation-discipline",
       "effect": "selection_changed",
       "reacted_post_count": 2,
-      "canonical_thread_ref": "agentic-engineering-production-discipline",
+      "compatibility_thread_ref": "idea_thread:agent-evaluation-discipline",
+      "current_thread_ref": "idea_thread:agent-evaluation-discipline",
+      "canonical_thread_ref": null,
+      "thread_resolution_status": "compatibility_current_thread_only",
       "boost_role": "weak_implicit_interest",
-      "reader_reason_ru": "Вы отметили два связанных поста за период.",
+      "reader_reason_ru": "Вы отметили 2 связанных поста за отчётный период.",
+      "reacted_post_refs": [
+        "reaction-post:111111111111111111111111",
+        "reaction-post:222222222222222222222222"
+      ],
+      "source_refs": ["telegram:@ai_lab"],
+      "boost_applied": true,
+      "rank_changed": true,
+      "selection_changed": true,
+      "linked_only": false,
       "evidence_refs": ["atom:1282", "atom:1289"]
     }
   ],
   "linked_only_items": [],
+  "eligible_thread_audit": [
+    {
+      "surface_item_ref": "thread:agent-evaluation-discipline",
+      "reacted_post_count": 2,
+      "compatibility_thread_ref": "idea_thread:agent-evaluation-discipline",
+      "current_thread_ref": "idea_thread:agent-evaluation-discipline",
+      "canonical_thread_ref": null,
+      "thread_resolution_status": "compatibility_current_thread_only",
+      "boost_role": "weak_implicit_interest",
+      "reader_reason_ru": "Вы отметили 2 связанных поста за отчётный период.",
+      "reacted_post_refs": [
+        "reaction-post:111111111111111111111111",
+        "reaction-post:222222222222222222222222"
+      ],
+      "source_refs": ["telegram:@ai_lab"],
+      "evidence_refs": ["atom:1282", "atom:1289"],
+      "selected": true,
+      "counterfactual_effect": "selection_changed",
+      "boost_applied": true
+    }
+  ],
   "unconsumed_by_reason": {
-    "outside_analysis_period": 2,
-    "report_limit_reached": 1
+    "outside_analysis_period": 3
   },
   "unconsumed": [
     {
-      "reaction_ref": "reaction:opaque-audit-ref",
+      "reaction_ref": "reaction:333333333333333333333333",
       "reason": "outside_analysis_period",
-      "audit_detail": "source post timestamp precedes analysis_period_start"
+      "reasons": ["outside_analysis_period"],
+      "audit_detail": "source post timestamp falls outside the half-open analysis period"
+    },
+    {
+      "reaction_ref": "reaction:444444444444444444444444",
+      "reason": "outside_analysis_period",
+      "reasons": ["outside_analysis_period"],
+      "audit_detail": "source post timestamp falls outside the half-open analysis period"
+    },
+    {
+      "reaction_ref": "reaction:555555555555555555555555",
+      "reason": "outside_analysis_period",
+      "reasons": ["outside_analysis_period"],
+      "audit_detail": "source post timestamp falls outside the half-open analysis period"
     }
   ],
   "ranking_policy": {
@@ -212,7 +273,8 @@ Audit Explorer or audit sidecar.
     "strength": "weak",
     "below_confirmed_feedback": true,
     "can_change_evidence_gate": false
-  }
+  },
+  "reader_summary_ru": "5 личных реакций → 5 постов найдено → 2 атомов знаний → 1 тем → 1 сигналов изменили позицию."
 }
 ```
 
@@ -247,6 +309,7 @@ The machine-readable reason vocabulary is:
 | `duplicate_signal` | stronger equivalent signal already represents the idea |
 | `superseded_by_confirmed_feedback` | explicit confirmed feedback controls ordering |
 | `report_limit_reached` | eligible item falls below the three-signal/action limits |
+| `confirmed_feedback_snapshot_unverified` | current reaction visibility is complete but the run's confirmed-feedback context cannot be attested |
 | `snapshot_unverified` | current personal visibility cannot be attested |
 
 When several reasons apply, record all in the audit trace and choose the first
@@ -261,7 +324,8 @@ funnel is lineage, not proof of claim quality.
 
 Example complete state:
 
-> **Как реакции повлияли на бриф**  
+> **Как реакции повлияли на бриф**
+>
 > 18 личных реакций -> 15 постов найдено -> 11 атомов знаний -> 6 тем -> 3
 > сигнала изменили позицию в брифе.
 
@@ -297,11 +361,12 @@ period. A repeated pattern may become a Strategy Reviewer **proposal**, never an
 automatic preference.
 
 Strategy Reviewer may suggest a standing profile/config change only when the
-same canonical interest pattern appears in at least three distinct completed
+same resolved interest pattern appears in at least three distinct completed
 weeks within a rolling 12-week window and is supported by at least four distinct
-reacted posts. The proposal must include:
+reacted posts. Before IRX-4 this pattern is explicitly compatibility-thread
+attribution, not a claim of stable canonical identity. The proposal must include:
 
-- canonical threads and aliases involved;
+- resolved compatibility/canonical pattern refs and aliases involved;
 - weeks, post count, and source diversity;
 - decay/recency information;
 - confirmed feedback that supports or contradicts the pattern;
@@ -354,28 +419,32 @@ Reader-facing example:
 - Do not require a new source, vector retrieval, raw Telegram RAG, or a global
   regeneration of knowledge.
 - IRX-3 depends on IRX-1 period resolution and the IRX-2 reaction snapshot/run
-  identity. It establishes a thread-resolution interface before IRX-4, so the
-  post/atom projection and bounded boost can be implemented in priority order.
-  IRX-4 then supplies the canonical registry; until that registry is available,
-  reader-facing thread attribution remains partial rather than pretending raw
-  entity clusters are canonical.
+  identity. Its additive thread-resolution interface exposes current
+  compatibility refs and nullable future canonical refs without relabelling raw
+  entity clusters as canonical. IRX-4 must supply the registry, merge/split
+  aliases, and period-end as-of lineage; that boundary remains intentionally
+  open.
 - IRX-5 consumes only the validated summary. IRX-6 and IRX-7 render it. IRX-11
   validates receipt presence and agreement. IRX-12 remains the stronger,
   confirmation-gated explicit feedback path.
 
-## Likely Implementation Files
+## Implementation Files And Compatibility Adapters
 
 - `src/ingestion/reaction_sync.py`
+- `src/output/reaction_personalization.py`
 - `src/output/ai_intelligence_report.py`
 - `src/output/weekly_intelligence_brief.py`
 - `src/output/knowledge_atlas_report.py`
-- a new deterministic reaction projection helper under `src/output/`
-- `src/db/ai_report_feedback.py` only where an additive projection/adapter is
-  necessary
-- `src/output/report_quality.py`
 - `src/output/split_intelligence_reports.py`
-- `tests/test_reaction_sync.py`
-- report-ranking, split-report, quality, and retrieval compatibility tests
+- `src/output/weekly_intelligence_orchestrator.py`
+- `src/output/weekly_run_manifest.py`
+- `src/output/intelligence_retrieval_items.py`
+- `src/output/strategy_reviewer.py`
+- `src/output/obsidian_export.py`
+- `src/assistant/pi_facade.py`
+- `src/main.py`
+- focused reaction, report, manifest/orchestrator, Strategy Reviewer, retrieval,
+  and PI tests
 
 ## Acceptance And Test Matrix
 
@@ -388,7 +457,8 @@ IRX-3 is accepted only when all of the following are demonstrated:
 - a Sunday source post first synchronized by Monday's run influences the
   completed-week candidate set;
 - a post outside the analysis period is not used by that Brief;
-- post -> atom -> canonical thread provenance uses stored identities;
+- post -> atom -> current compatibility thread provenance uses stored
+  identities, with the missing canonical/as-of link explicit;
 - an otherwise equal eligible item receives the bounded reaction boost;
 - weak/stale evidence cannot be rescued by a reaction;
 - confirmed report feedback overrides a conflicting implicit reaction;
@@ -404,19 +474,59 @@ IRX-3 is accepted only when all of the following are demonstrated:
   standing profile/config value changes until explicit confirmation;
 - V1 retrieval, Hermes/PI, and Obsidian compatibility tests continue to pass.
 
-Focused verification commands for implementation:
+Focused verification commands used for implementation:
 
 ```bash
-PYTHONPATH=src python3 -m pytest -q \
-  tests/test_reaction_sync.py tests/test_ai_intelligence_report.py
-PYTHONPATH=src python3 -m pytest -q \
-  tests/test_split_intelligence_reports.py \
-  tests/test_intelligence_retrieval_items.py tests/test_pi_facade.py
-rg -n "reaction_effect|operator_marked_interesting|no_eligible_reactions" src tests
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache \
+  python3 -m unittest tests.test_reaction_personalization \
+  tests.test_reaction_sync tests.test_ai_intelligence_report \
+  tests.test_ai_report_feedback tests.test_strategy_reviewer \
+  tests.test_split_intelligence_reports \
+  tests.test_intelligence_retrieval_items tests.test_pi_facade
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache \
+  python3 -m unittest tests.test_weekly_run_manifest \
+  tests.test_weekly_intelligence_orchestrator
+git diff --check
 ```
 
-The implementation must add focused ranking/receipt tests rather than relying
-only on the existing ingestion tests.
+Focused verification passed on 2026-07-13: 145 tests in the core
+reaction/report/feedback/Strategy/split/retrieval/PI matrix and 45 tests in the
+manifest/orchestrator matrix. `git diff --check` passed; live/heavy pipelines
+and the full suite were intentionally not run.
+
+## IRX-3 Implementation Receipt - 2026-07-13
+
+- Only a complete, current, checksum- and identity-validated same-run IRX-2
+  snapshot can create fresh interest. Partial, unavailable, stale, truncated,
+  wrong-period, or tampered inputs fail closed; an unattested feedback snapshot
+  produces a distinct partial receipt and no boost.
+- Every operator-visible emoji is equivalent positive provenance. Events are
+  deduplicated to one weak signal per post; aggregate reactions are ignored and
+  absence remains unknown.
+- Attribution uses stored Telegram channel/message identity through raw and
+  normalized posts, bounded atoms, and `idea_thread_atoms`. Opaque lineage refs,
+  full eligible-thread audit, bounded unconsumed samples, funnel counts, and
+  counterfactual effects are strictly validated.
+- Brief and Atlas classify the same personalized order against their exact
+  four-action and twelve-thread selectors and emit surface-specific receipts
+  whose common identity, pre-selection funnel, non-selection attribution,
+  snapshot lineage, and policy must agree. Within each surface, its own JSON and
+  HTML totals must agree; selector-dependent status, selected counts,
+  counterfactuals, and unconsumed results may legitimately differ.
+- Evidence/safety/freshness/deduplication gates and confirmed explicit feedback
+  remain stronger. The weak reaction marker performs at most one adjacent
+  promotion among otherwise equal eligible items and never changes global
+  scoring, evidence confidence, feedback semantics, or Radar gates.
+- Repeated interest can only create an unapproved, advisory Strategy Reviewer
+  proposal after three completed weeks and four distinct posts. It never mutates
+  profile, config, prompt, project, source policy, or code.
+- Existing standalone/V1 output, legacy reaction-sync return values and tag
+  aliases, Brief/Atlas contexts, Hermes/PI, retrieval, and Obsidian consumers
+  remain compatible through additive fields/adapters. No database schema,
+  prompt, generated report, or cross-repository code change was required.
+- IRX-4 is the explicit next owner of a durable canonical registry and historical
+  period-end as-of thread lineage. IRX-3 deliberately does not claim that
+  current compatibility threads are stable canonical threads.
 
 ## Stop Conditions
 

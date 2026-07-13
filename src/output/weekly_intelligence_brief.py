@@ -24,6 +24,9 @@ from output.ai_intelligence_report import (
     _learning_actions,
     _link,
     _personal_learning_loop,
+    _reaction_effect_for_surface,
+    _render_reaction_effect_receipt,
+    _render_reaction_item_reason,
     _truncate_text,
     load_ai_intelligence_context,
 )
@@ -322,9 +325,15 @@ def render_weekly_intelligence_brief_html(
     week_label = str(context.get("week_label") or "")
     period_label = _human_period_label(context) or week_label
     generated = generated_at or str(context.get("generated_at") or _utc_now_iso())
-    actions = _learning_actions(context.get("threads") or [], context.get("feedback_context") or {})
+    actions = _learning_actions(
+        context.get("threads") or [],
+        context.get("reaction_ranking_context")
+        or context.get("feedback_context")
+        or {},
+    )
     normalized_mvp = _normalize_mvp_radar(mvp_radar or {})
     run_status_notice = _render_run_status_notice(context)
+    reaction_receipt = _render_reaction_effect_receipt(context, "weekly_brief")
     run_identity_metadata = _render_run_identity_metadata(context)
     decision_cockpit = _decision_cockpit(context, actions, normalized_mvp)
     project_learning_projection = build_project_learning_projection(
@@ -401,6 +410,7 @@ ol, ul {{ padding-left:22px; }}
 <p class="muted">Period mode: {_escape(str(context.get("period_mode") or "explicit_iso_week"))}.</p>
 <p class="muted">Generated {_escape(generated)}.</p>
 {run_status_notice}
+{reaction_receipt}
 <p class="muted">Short operational readout; the cumulative map lives in Knowledge Atlas.</p>
 <nav>{nav}</nav>
 </header>
@@ -566,6 +576,11 @@ def _weekly_brief_metadata(
         "mvp_radar": mvp_radar,
         "mvp_radar_gate": decision_cockpit["mvp_radar_gate"],
         "feedback_context": context.get("feedback_context") or {},
+        **(
+            {"reaction_effect": reaction_effect}
+            if (reaction_effect := _reaction_effect_for_surface(context, "weekly_brief")) is not None
+            else {}
+        ),
         "quality_findings": [finding.as_dict() for finding in quality_findings],
         "retrieval_note": "Weekly Intelligence Brief is the short operational weekly surface; Knowledge Atlas owns cumulative context.",
     }
@@ -899,12 +914,18 @@ def _render_week_changes(context: dict) -> str:
 def _render_brief_actions(context: dict, actions: list[dict]) -> str:
     cards = []
     for action in actions[:4]:
+        reaction_reason = _render_reaction_item_reason(
+            context,
+            "weekly_brief",
+            action.get("surface_item_ref"),
+        )
         cards.append(
             '<article class="action-card">'
             f'<h3>{_escape(action.get("title") or "Action")}</h3>'
             f'<p>{_escape(action.get("body") or "")}</p>'
             f'<p class="muted">Why selected: {_escape(action.get("why_selected") or "")}</p>'
             f'<p class="muted">Source links in action context: {_escape(action.get("source_count", 0))}</p>'
+            f'{reaction_reason}'
             '</article>'
         )
     loop = _personal_learning_loop(context.get("threads") or [], actions, context.get("feedback_context") or {})

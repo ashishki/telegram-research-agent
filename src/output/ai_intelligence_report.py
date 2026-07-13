@@ -6,6 +6,7 @@ from collections import Counter
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from typing import Mapping, Sequence
 from urllib.parse import urlparse
 
 from config.settings import PROJECT_ROOT, Settings
@@ -46,6 +47,7 @@ REQUIRED_SECTIONS = (
 READ_QUEUE_TYPES = {"tutorial_resource", "case_study", "research_claim", "benchmark_claim"}
 PERSONAL_READ_TARGET_COUNT = 5
 PERSONAL_TRY_TARGET_COUNT = 2
+REACTION_RECEIPT_ITEM_LIMIT = 4
 
 
 @dataclass(frozen=True)
@@ -505,6 +507,56 @@ def _project_thread_as_of(thread: dict, atoms: list[dict], *, period_end: dateti
     return bounded
 
 
+def _feedback_context_for_report(
+    connection: sqlite3.Connection,
+    *,
+    week_label: str,
+    feedback_snapshot: datetime | None,
+) -> dict:
+    if _table_exists(connection, "ai_report_feedback_events"):
+        return summarize_ai_report_feedback(
+            connection,
+            before_week_label=week_label,
+            created_before=feedback_snapshot,
+        )
+    return {
+        "event_count": 0,
+        "counts_by_feedback": {},
+        "downranked_thread_slugs": [],
+        "downranked_atom_refs": [],
+        "downranked_target_refs": [],
+        "promoted_target_refs": [],
+        "missed_post_eval_examples": [],
+        "priority_eval_examples": [],
+        "feedback_eval_examples": [],
+        "feedback_completion": {
+            "completed": False,
+            "completed_count": 0,
+            "required_count": 4,
+            "missing": ["read_items", "action_outcome", "missed_or_no_missed", "trust_correction"],
+            "read_event_count": 0,
+            "action_event_count": 0,
+            "has_missed_or_no_missed": False,
+            "trust_correction_count": 0,
+        },
+        "feedback_changes": {
+            "status": "unknown",
+            "summary": "No prior feedback is available; personalization state is unknown.",
+            "items": ["No confirmed feedback has changed ranking yet; no-feedback is not a negative signal."],
+            "downranked": [],
+            "promoted": [],
+            "eval_example_count": 0,
+        },
+        "feedback_corrections": [],
+        "feedback_effect_traces": [],
+        "confirmed_event_count": 0,
+        "pending_draft_count": 0,
+        "confirmation_state": "confirmed_only",
+        "frontier_prompt_guidance": ["No prior feedback is available; state unknown personalization confidence."],
+        "recent_events": [],
+    }
+
+
 def load_ai_intelligence_context(
     connection: sqlite3.Connection,
     *,
@@ -512,6 +564,9 @@ def load_ai_intelligence_context(
     reporting_period: ReportingPeriod | None = None,
     reaction_snapshot_at: datetime | str | None = None,
     feedback_snapshot_at: datetime | str | None = None,
+    reaction_snapshot_binding: dict | None = None,
+    reaction_snapshot: dict | None = None,
+    feedback_snapshot_usable: bool = True,
     threads_limit: int = 8,
     atoms_limit: int = 8,
 ) -> dict:
@@ -521,12 +576,12 @@ def load_ai_intelligence_context(
     if period.week_label != str(week_label).strip():
         raise ValueError("week_label must match reporting_period.week_label")
     period_fields = _context_period_fields(period)
-    reaction_snapshot = (
+    reaction_snapshot_cutoff = (
         period.generated_at
         if reaction_snapshot_at is None
         else _explicit_utc_timestamp(reaction_snapshot_at, field_name="reaction_snapshot_at")
     )
-    reaction_snapshot_iso = _iso_for_sql(reaction_snapshot)
+    reaction_snapshot_iso = _iso_for_sql(reaction_snapshot_cutoff)
     feedback_snapshot = (
         None
         if feedback_snapshot_at is None
@@ -535,14 +590,39 @@ def load_ai_intelligence_context(
             field_name="feedback_snapshot_at",
         )
     )
+    feedback_context = _feedback_context_for_report(
+        connection,
+        week_label=week_label,
+        feedback_snapshot=feedback_snapshot,
+    )
     if not _table_exists(connection, "idea_threads") or not _table_exists(connection, "idea_thread_atoms"):
-        return {
+        result = {
             **period_fields,
             "reaction_snapshot_at": reaction_snapshot_iso,
             "threads": [],
             "source_channels": [],
             "marked_posts": [],
+            "frontier_analysis": None,
+            "compressed_context": [],
+            "feedback_context": feedback_context,
         }
+        if reaction_snapshot_binding is not None:
+            _threads, reaction_effect, reaction_effects = _personalize_report_surfaces(
+                connection,
+                reporting_period=period,
+                snapshot_binding=reaction_snapshot_binding,
+                snapshot=reaction_snapshot,
+                baseline_candidates=[],
+                feedback_context=feedback_context,
+                limit=max(1, int(threads_limit or 8)),
+                receipt_limit=REACTION_RECEIPT_ITEM_LIMIT,
+                feedback_snapshot_usable=feedback_snapshot_usable,
+            )
+            if reaction_effect is not None:
+                result["reaction_effect"] = reaction_effect
+                result["reaction_effects"] = reaction_effects
+                result["reaction_ranking_context"] = dict(feedback_context)
+        return result
 
     week_start = period.analysis_period_start
     week_end = period.analysis_period_end
@@ -593,8 +673,34 @@ def load_ai_intelligence_context(
     threads.sort(key=lambda item: int(item.get("source_channel_count") or 0), reverse=True)
     threads.sort(key=lambda item: float(item.get("momentum_30d") or 0.0), reverse=True)
     threads.sort(key=lambda item: bool(item.get("changed_this_week")), reverse=True)
-    threads = threads[: max(1, int(threads_limit or 8))]
-    return {
+    selected_limit = max(1, int(threads_limit or 8))
+    reaction_effect = None
+    reaction_ranking_context = None
+    if reaction_snapshot_binding is not None:
+        reaction_feedback_context = dict(feedback_context)
+        reaction_feedback_context["_thread_feedback_scores"] = {
+            str(thread.get("slug") or ""): _thread_feedback_score(
+                thread,
+                feedback_context,
+            )
+            for thread in threads
+            if str(thread.get("slug") or "").strip()
+        }
+        reaction_ranking_context = reaction_feedback_context
+        threads, reaction_effect, reaction_effects = _personalize_report_surfaces(
+            connection,
+            reporting_period=period,
+            snapshot_binding=reaction_snapshot_binding,
+            snapshot=reaction_snapshot,
+            baseline_candidates=threads,
+            feedback_context=reaction_feedback_context,
+            limit=selected_limit,
+            receipt_limit=min(REACTION_RECEIPT_ITEM_LIMIT, selected_limit),
+            feedback_snapshot_usable=feedback_snapshot_usable,
+        )
+    else:
+        threads = threads[:selected_limit]
+    result = {
         **period_fields,
         "reaction_snapshot_at": reaction_snapshot_iso,
         "threads": threads,
@@ -602,7 +708,7 @@ def load_ai_intelligence_context(
         "marked_posts": _marked_posts_for_period(
             connection,
             reporting_period=period,
-            reaction_snapshot_at=reaction_snapshot,
+            reaction_snapshot_at=reaction_snapshot_cutoff,
         ),
         "frontier_analysis": (
             _frontier_analysis_for_period(connection, reporting_period=period)
@@ -610,51 +716,83 @@ def load_ai_intelligence_context(
             else None
         ),
         "compressed_context": _compressed_context(threads),
-        "feedback_context": (
-            summarize_ai_report_feedback(
-                connection,
-                before_week_label=week_label,
-                created_before=feedback_snapshot,
-            )
-            if _table_exists(connection, "ai_report_feedback_events")
-            else {
-                "event_count": 0,
-                "counts_by_feedback": {},
-                "downranked_thread_slugs": [],
-                "downranked_atom_refs": [],
-                "downranked_target_refs": [],
-                "promoted_target_refs": [],
-                "missed_post_eval_examples": [],
-                "priority_eval_examples": [],
-                "feedback_eval_examples": [],
-                "feedback_completion": {
-                    "completed": False,
-                    "completed_count": 0,
-                    "required_count": 4,
-                    "missing": ["read_items", "action_outcome", "missed_or_no_missed", "trust_correction"],
-                    "read_event_count": 0,
-                    "action_event_count": 0,
-                    "has_missed_or_no_missed": False,
-                    "trust_correction_count": 0,
-                },
-                "feedback_changes": {
-                    "status": "unknown",
-                    "summary": "No prior feedback is available; personalization state is unknown.",
-                    "items": ["No confirmed feedback has changed ranking yet; no-feedback is not a negative signal."],
-                    "downranked": [],
-                    "promoted": [],
-                    "eval_example_count": 0,
-                },
-                "feedback_corrections": [],
-                "feedback_effect_traces": [],
-                "confirmed_event_count": 0,
-                "pending_draft_count": 0,
-                "confirmation_state": "confirmed_only",
-                "frontier_prompt_guidance": ["No prior feedback is available; state unknown personalization confidence."],
-                "recent_events": [],
-            }
-        ),
+        "feedback_context": feedback_context,
     }
+    if reaction_effect is not None:
+        result["reaction_effect"] = reaction_effect
+        result["reaction_effects"] = reaction_effects
+        result["reaction_ranking_context"] = reaction_ranking_context
+    return result
+
+
+def _personalize_report_surfaces(
+    connection: sqlite3.Connection,
+    *,
+    reporting_period: ReportingPeriod,
+    snapshot_binding: Mapping[str, object],
+    snapshot: Mapping[str, object] | None,
+    baseline_candidates: list[dict],
+    feedback_context: Mapping[str, object],
+    limit: int,
+    receipt_limit: int,
+    feedback_snapshot_usable: bool,
+) -> tuple[list[dict], dict | None, dict[str, dict]]:
+    """Classify effects against the exact bounded Brief and Atlas selectors."""
+
+    from output.reaction_personalization import personalize_thread_candidates
+
+    def brief_projection(values: Sequence[Mapping[str, object]]) -> list[str]:
+        actions = _learning_actions(
+            [dict(value) for value in values],
+            dict(feedback_context),
+        )
+        return [
+            str(action.get("surface_item_ref") or "").strip()
+            for action in actions[:4]
+            if str(action.get("surface_item_ref") or "").strip()
+        ]
+
+    def atlas_projection(values: Sequence[Mapping[str, object]]) -> list[str]:
+        return [
+            f"thread:{str(value.get('slug') or '').strip()}"
+            for value in _reaction_ranked_threads_for_navigation(
+                values,
+                feedback_context,
+                limit=12,
+            )
+            if str(value.get("slug") or "").strip()
+        ]
+
+    common = {
+        "reporting_period": reporting_period,
+        "snapshot_binding": snapshot_binding,
+        "snapshot": snapshot,
+        "baseline_candidates": baseline_candidates,
+        "feedback_context": feedback_context,
+        "limit": limit,
+        "receipt_limit": receipt_limit,
+        "feedback_snapshot_usable": feedback_snapshot_usable,
+    }
+    ordered, brief_effect = personalize_thread_candidates(
+        connection,
+        **common,
+        selection_projector=brief_projection,
+        receipt_surface="weekly_brief",
+    )
+    atlas_ordered, atlas_effect = personalize_thread_candidates(
+        connection,
+        **common,
+        selection_projector=atlas_projection,
+        receipt_surface="knowledge_atlas",
+    )
+    if [item.get("id") for item in ordered] != [item.get("id") for item in atlas_ordered]:
+        raise RuntimeError("reaction personalization produced divergent surface order")
+    effects = {
+        effect["surface"]: effect
+        for effect in (brief_effect, atlas_effect)
+        if isinstance(effect, dict)
+    }
+    return ordered, brief_effect, effects
 
 
 def _thread_changed_this_week(thread: dict, week_start: datetime, week_end: datetime) -> bool:
@@ -1120,27 +1258,61 @@ def _learning_actions(threads: list[dict], feedback_context: dict | None = None)
     if int(counts.get("wrong_priority") or 0) > 0:
         priority_note = " Recent feedback flagged priority drift, so tie the trial to an active workflow."
     actions = []
-    ranked = sorted(
-        threads,
-        key=lambda thread: (
-            _thread_feedback_score(thread, feedback),
+    def action_order_key(thread: Mapping[str, object]) -> tuple[object, ...]:
+        return (
+            _thread_feedback_score(dict(thread), feedback),
             thread.get("status") == "production_pattern",
             float(thread.get("momentum_30d") or 0.0),
             int(thread.get("source_channel_count") or 0),
+        )
+
+    baseline_seeded = sorted(
+        threads,
+        key=lambda thread: int(
+            thread.get("_reaction_baseline_position")
+            if isinstance(thread.get("_reaction_baseline_position"), int)
+            else len(threads)
         ),
+    )
+    ranked = sorted(
+        (
+            thread
+            for thread in baseline_seeded
+            if thread.get("slug") not in downranked
+            and thread.get("status") not in {"hype_only", "resolved"}
+        ),
+        key=action_order_key,
         reverse=True,
     )
+    # IRX-3 is one weak adjacent promotion inside the exact Brief action
+    # selector.  Existing evidence/feedback sorting remains untouched when the
+    # marker is absent, and unequal stronger keys can never be crossed.
+    from output.reaction_personalization import reaction_close_order_key
+
+    index = 1
+    while index < len(ranked):
+        candidate = ranked[index]
+        previous = ranked[index - 1]
+        if (
+            candidate.get("_reaction_interest") is True
+            and previous.get("_reaction_interest") is not True
+            and action_order_key(candidate) == action_order_key(previous)
+            and reaction_close_order_key(candidate, feedback)
+            == reaction_close_order_key(previous, feedback)
+        ):
+            ranked[index - 1], ranked[index] = candidate, previous
+            index += 1
+            continue
+        index += 1
     for thread in ranked:
-        if thread.get("slug") in downranked:
-            continue
-        if thread.get("status") in {"hype_only", "resolved"}:
-            continue
         title = thread.get("title") or thread.get("slug") or "Untitled thread"
         claims = thread.get("current_claims") or thread.get("superseded_claims") or []
         ranking_factors = _thread_ranking_factors(thread, feedback)
         actions.append(
             {
                 "title": f"Verify and apply: {title}",
+                "thread_slug": thread.get("slug"),
+                "surface_item_ref": f"thread:{thread.get('slug')}",
                 "body": (
                     "Pick one source-backed claim from this thread, verify the cited posts, "
                     "and turn it into a 30-minute read/try note."
@@ -1187,6 +1359,45 @@ def _learning_actions(threads: list[dict], feedback_context: dict | None = None)
     return actions
 
 
+def _reaction_ranked_threads_for_navigation(
+    threads: Sequence[Mapping[str, object]],
+    feedback_context: Mapping[str, object] | None = None,
+    *,
+    limit: int = 12,
+) -> list[dict]:
+    """Apply one IRX-3 tie promotion inside the exact Atlas navigation cap."""
+
+    values = [dict(thread) for thread in threads]
+    ranked = sorted(
+        values,
+        key=lambda thread: int(
+            thread.get("_reaction_baseline_position")
+            if isinstance(thread.get("_reaction_baseline_position"), int)
+            else len(values)
+        ),
+    )
+    from output.reaction_personalization import reaction_close_order_key
+
+    boundary = min(len(ranked), max(1, int(limit or 1)) + 1)
+    index = 1
+    while index < boundary:
+        candidate = ranked[index]
+        previous = ranked[index - 1]
+        if (
+            candidate.get("_reaction_interest") is True
+            and previous.get("_reaction_interest") is not True
+            and _thread_feedback_score(candidate, dict(feedback_context or {}))
+            == _thread_feedback_score(previous, dict(feedback_context or {}))
+            and reaction_close_order_key(candidate, feedback_context or {})
+            == reaction_close_order_key(previous, feedback_context or {})
+        ):
+            ranked[index - 1], ranked[index] = candidate, previous
+            index += 1
+            continue
+        index += 1
+    return ranked[: max(1, int(limit or 1))]
+
+
 def _status_label(status: str) -> str:
     return str(status or "active").replace("_", " ")
 
@@ -1198,6 +1409,232 @@ def _safe_id(value: str) -> str:
 
 def _escape(value: object) -> str:
     return html.escape(str(value or ""), quote=True)
+
+
+def _reaction_effect_for_surface(context: dict, surface: str) -> dict | None:
+    effects = context.get("reaction_effects")
+    if isinstance(effects, Mapping):
+        surface_effect = effects.get(surface)
+        if isinstance(surface_effect, dict):
+            from output.reaction_personalization import validate_reaction_effect
+
+            return validate_reaction_effect(surface_effect)
+    raw = context.get("reaction_effect")
+    if not isinstance(raw, dict) or raw.get("schema_version") != "reaction_personalization.v1":
+        return None
+    from output.reaction_personalization import reaction_effect_for_surface
+
+    return reaction_effect_for_surface(raw, surface=surface)
+
+
+def _render_reaction_effect_receipt(context: dict, surface: str) -> str:
+    """Render only deterministic Russian totals; audit identities stay in JSON."""
+
+    effect = _reaction_effect_for_surface(context, surface)
+    if effect is None:
+        return ""
+    status = str(effect.get("status") or "")
+    snapshot_status = str(effect.get("snapshot_status") or "")
+    counts = effect.get("counts") if isinstance(effect.get("counts"), dict) else {}
+    events = max(0, int(counts.get("personal_reaction_events_detected") or 0))
+    posts = max(
+        0,
+        int(
+            counts.get("unique_reacted_posts")
+            if status == "partial" and snapshot_status == "complete"
+            else counts.get("posts_resolved")
+            or 0
+        ),
+    )
+    posts_label = (
+        "постов с подтверждёнными реакциями"
+        if status == "partial" and snapshot_status == "complete"
+        else "найдено постов"
+    )
+    atoms = max(0, int(counts.get("unique_atoms_linked") or 0))
+    canonical_threads = max(
+        0,
+        int(counts.get("unique_canonical_threads_linked") or 0),
+    )
+    compatibility_threads = max(
+        0,
+        int(counts.get("unique_compatibility_threads_linked") or 0),
+    )
+    threads = canonical_threads or compatibility_threads
+    influenced = max(0, int(counts.get("selected_signals_influenced") or 0))
+    selected_linked = max(0, int(counts.get("selected_items_linked") or 0))
+    linked_only = max(0, selected_linked - influenced)
+    unconsumed = max(0, int(counts.get("unconsumed_reaction_events") or 0))
+    if status in {"partial", "unavailable"}:
+        if snapshot_status == "complete":
+            if events:
+                message = (
+                    "Личные реакции на источники периода подтверждены, но контекст "
+                    "явной обратной связи не удалось полностью проверить. Поэтому "
+                    "персонализация по реакциям не применялась."
+                )
+            else:
+                message = (
+                    "Снимок личных реакций за период подтверждён, но контекст "
+                    "явной обратной связи не удалось полностью проверить. Поэтому "
+                    "персонализация по реакциям не применялась."
+                )
+        else:
+            message = (
+                "Синхронизация реакций не завершена. Персонализация по реакциям "
+                "для этого запуска не применялась."
+            )
+    elif status == "no_eligible_reactions":
+        if int(counts.get("compatibility_threads_boosted") or 0) > 0:
+            message = (
+                "Личные реакции связаны с темами, прошедшими условия, но эти "
+                "темы остались за пределом краткой выборки и не изменили выпуск. "
+                "Это не снижало оценки тем."
+            )
+        elif events:
+            message = (
+                "Личные реакции на источники периода найдены, но ни одна не прошла "
+                "все условия для влияния на выпуск. Это не снижало оценки тем."
+            )
+        else:
+            message = (
+                "Для источников этого периода личные реакции не найдены. Это не снижало "
+                "оценки тем и не трактовалось как отсутствие интереса."
+            )
+    elif status == "linked_no_selection_effect":
+        if selected_linked == 0 and int(counts.get("compatibility_threads_boosted") or 0) > 0:
+            message = (
+                "Личные реакции связаны с темами, прошедшими условия, но эти "
+                "темы остались за пределом краткой выборки и не изменили выпуск. "
+                "Это не снижало оценки тем."
+            )
+        else:
+            message = (
+                "Ваши отметки связаны с темами выпуска, но не изменили их место: "
+                "они уже прошли по силе доказательств."
+            )
+    else:
+        message = (
+            f"{events} личных реакций → {posts} постов найдено → {atoms} атомов знаний "
+            f"→ {threads} тем → {influenced} сигналов изменили позицию в выпуске."
+        )
+    totals = (
+        f"Сводка: {events} личных реакций; {posts_label} — {posts}; "
+        f"атомов знаний — {atoms}; связанных тем — {threads}; "
+        f"изменённых сигналов — {influenced}; связей без изменения — {linked_only}; "
+        f"не использовано реакций — {unconsumed}."
+    )
+    item_reasons: list[str] = []
+    for index, item in enumerate(effect.get("influenced_items") or [], start=1):
+        if not isinstance(item, dict):
+            continue
+        post_count = max(0, int(item.get("reacted_post_count") or 0))
+        title = _reaction_reader_item_title(context, item, index=index)
+        item_reasons.append(
+            f"{title}. Почему сигнал изменил место: вы отметили "
+            f"{post_count} связанных постов за отчётный период. "
+            "Сигнал всё равно прошёл проверку доказательств."
+        )
+    for index, item in enumerate(effect.get("linked_only_items") or [], start=1):
+        if not isinstance(item, dict):
+            continue
+        post_count = max(0, int(item.get("reacted_post_count") or 0))
+        title = _reaction_reader_item_title(context, item, index=index)
+        item_reasons.append(
+            f"{title}. {post_count} отмеченных постов связаны с сигналом, "
+            "но не изменили его место: "
+            "он уже входил в выборку по силе доказательств."
+        )
+    reason_labels = {
+        "post_not_found": "исходный пост не найден в сохранённых данных",
+        "outside_analysis_period": "пост находится вне отчётного периода",
+        "knowledge_atom_not_extracted": "для поста ещё нет атома знаний",
+        "no_thread_link": "атом пока не связан с темой",
+        "no_canonical_thread_link": "каноническая связь темы ещё не подтверждена",
+        "stale_or_low_confidence_evidence": "доказательства устарели или недостаточно надёжны",
+        "contradicted_or_retracted_evidence": "доказательства опровергнуты или отозваны",
+        "duplicate_signal": "идея уже представлена более сильным сигналом",
+        "superseded_by_confirmed_feedback": "приоритет определила подтверждённая обратная связь",
+        "report_limit_reached": "сигнал остался за пределом краткой выборки",
+        "confirmed_feedback_snapshot_unverified": "контекст подтверждённой обратной связи не удалось проверить",
+        "snapshot_unverified": "текущую видимость реакции не удалось подтвердить",
+    }
+    reason_summary = []
+    raw_reason_counts = effect.get("unconsumed_by_reason")
+    if isinstance(raw_reason_counts, dict):
+        for reason, count in raw_reason_counts.items():
+            if reason in reason_labels and int(count or 0) > 0:
+                reason_summary.append(f"{int(count)} — {reason_labels[reason]}")
+    reason_html = (
+        "<p><strong>Почему часть реакций не использована:</strong> "
+        + _escape("; ".join(reason_summary))
+        + ".</p>"
+        if reason_summary
+        else ""
+    )
+    item_html = (
+        "<ul>" + "".join(f"<li>{_escape(reason)}</li>" for reason in item_reasons) + "</ul>"
+        if item_reasons
+        else ""
+    )
+    return (
+        '<aside class="reaction-receipt">'
+        "<h2>Как реакции повлияли на выпуск</h2>"
+        f"<p>{_escape(message)}</p>"
+        f'<p class="muted">{_escape(totals)}</p>'
+        f"{item_html}{reason_html}"
+        "</aside>"
+    )
+
+
+def _render_reaction_item_reason(
+    context: dict,
+    surface: str,
+    surface_item_ref: object,
+) -> str:
+    """Return a card-level Russian receipt without exposing audit identity."""
+
+    clean_ref = str(surface_item_ref or "").strip()
+    if not clean_ref:
+        return ""
+    effect = _reaction_effect_for_surface(context, surface)
+    if effect is None:
+        return ""
+    for field in ("influenced_items", "linked_only_items"):
+        for item in effect.get(field) or []:
+            if not isinstance(item, dict) or item.get("surface_item_ref") != clean_ref:
+                continue
+            post_count = max(0, int(item.get("reacted_post_count") or 0))
+            if field == "influenced_items":
+                copy = (
+                    "Почему этот сигнал здесь: вы отметили "
+                    f"{post_count} связанных постов за отчётный период. "
+                    "Сигнал всё равно прошёл проверку доказательств."
+                )
+            else:
+                copy = (
+                    f"{post_count} отмеченных постов связаны с этим сигналом, "
+                    "но не изменили его место: он уже входил в выборку по "
+                    "силе доказательств."
+                )
+            return f'<p class="reaction-item-reason"><strong>{_escape(copy)}</strong></p>'
+    return ""
+
+
+def _reaction_reader_item_title(
+    context: Mapping[str, object],
+    item: Mapping[str, object],
+    *,
+    index: int,
+) -> str:
+    ref = str(item.get("surface_item_ref") or "")
+    for thread in context.get("threads") or []:
+        if not isinstance(thread, Mapping):
+            continue
+        slug = str(thread.get("slug") or "").strip()
+        if slug and ref == f"thread:{slug}":
+            return str(thread.get("title") or slug)
+    return f"Связанный сигнал {index}"
 
 
 def _truncate_text(value: str, limit: int) -> str:

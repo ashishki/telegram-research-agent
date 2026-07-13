@@ -49,6 +49,7 @@ from output.ai_intelligence_report import (  # noqa: E402
     AiIntelligenceReportQualityError,
     REQUIRED_SECTIONS,
     _learning_actions,
+    _reaction_ranked_threads_for_navigation,
     _read_queue_atoms,
     generate_ai_intelligence_report,
     load_ai_intelligence_context,
@@ -817,6 +818,118 @@ class TestAiIntelligenceReport(unittest.TestCase):
         self.assertIn("Eval Gates", actions[0]["title"])
         self.assertTrue(actions[0]["ranking_factors"])
         self.assertIn("confirmed feedback promoted", actions[0]["why_selected"])
+
+    def test_reaction_interest_promotes_exactly_one_visible_action_after_filtering(self):
+        def thread(slug, position, *, status="active", reacted=False):
+            return {
+                "id": position + 1,
+                "slug": slug,
+                "title": slug,
+                "status": status,
+                "momentum_30d": 0.5,
+                "source_channel_count": 2,
+                "changed_this_week": False,
+                "last_seen_at": "2026-07-12T00:00:00Z",
+                "atom_count": 2,
+                "current_claims": [slug],
+                "atoms": [],
+                "_reaction_baseline_position": position,
+                **({"_reaction_interest": True} if reacted else {}),
+            }
+
+        # The reacted item arrives in raw personalized order ahead of one row,
+        # while a filtered hype row also separates it from visible actions.
+        # Baseline positions prevent stacking that raw move with the one Brief move.
+        threads = [
+            thread("one", 0),
+            thread("reacted", 3, reacted=True),
+            thread("two", 1),
+            thread("hidden", 2, status="hype_only"),
+        ]
+
+        actions = _learning_actions(threads, {})
+
+        self.assertEqual(
+            [action["thread_slug"] for action in actions[:3]],
+            ["one", "reacted", "two"],
+        )
+
+    def test_reaction_interest_cannot_cross_stronger_close_order_tiebreaks(self):
+        base = {
+            "status": "active",
+            "momentum_30d": 0.5,
+            "source_channel_count": 2,
+            "current_claims": ["claim"],
+            "atoms": [],
+        }
+        stronger_cases = (
+            ("changed_this_week", {"changed_this_week": True}),
+            ("last_seen_at", {"last_seen_at": "2026-07-12T00:00:01Z"}),
+            ("atom_count", {"atom_count": 3}),
+        )
+        for label, stronger_field in stronger_cases:
+            with self.subTest(label=label):
+                first = {
+                    **base,
+                    "id": 1,
+                    "slug": "stronger",
+                    "title": "Stronger",
+                    "changed_this_week": False,
+                    "last_seen_at": "2026-07-12T00:00:00Z",
+                    "atom_count": 2,
+                    "_reaction_baseline_position": 0,
+                    **stronger_field,
+                }
+                reacted = {
+                    **base,
+                    "id": 2,
+                    "slug": "reacted",
+                    "title": "Reacted",
+                    "changed_this_week": False,
+                    "last_seen_at": "2026-07-12T00:00:00Z",
+                    "atom_count": 2,
+                    "_reaction_baseline_position": 1,
+                    "_reaction_interest": True,
+                }
+
+                actions = _learning_actions([first, reacted], {})
+
+                self.assertEqual(
+                    [action["thread_slug"] for action in actions[:2]],
+                    ["stronger", "reacted"],
+                )
+
+    def test_adjacent_reacted_items_each_gain_one_step_on_brief_and_atlas(self):
+        threads = [
+            {
+                "id": index,
+                "slug": f"thread-{index}",
+                "title": f"Thread {index}",
+                "status": "active",
+                "momentum_30d": 0.5,
+                "source_channel_count": 2,
+                "changed_this_week": False,
+                "last_seen_at": "2026-07-12T00:00:00Z",
+                "atom_count": 2,
+                "current_claims": [f"claim {index}"],
+                "atoms": [],
+                "_reaction_baseline_position": index - 1,
+                **({"_reaction_interest": True} if index in {2, 3} else {}),
+            }
+            for index in (1, 2, 3)
+        ]
+
+        actions = _learning_actions(threads, {})
+        navigation = _reaction_ranked_threads_for_navigation(threads, {}, limit=3)
+
+        self.assertEqual(
+            [action["thread_slug"] for action in actions[:3]],
+            ["thread-2", "thread-3", "thread-1"],
+        )
+        self.assertEqual(
+            [thread["slug"] for thread in navigation],
+            ["thread-2", "thread-3", "thread-1"],
+        )
 
 
 if __name__ == "__main__":

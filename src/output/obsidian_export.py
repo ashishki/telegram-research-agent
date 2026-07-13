@@ -15,7 +15,7 @@ from output.ai_intelligence_report import (
 from output.ai_report_contract import build_weekly_ai_report_contract
 from output.ai_visual_report import _load_projects, _project_links
 from output.reporting_period import resolve_reporting_period
-from output.strategy_reviewer import build_strategy_review
+from output.strategy_reviewer import DEFAULT_WEEKLY_RUN_ROOT, build_strategy_review
 
 
 DEFAULT_VAULT_PATH = PROJECT_ROOT / "data" / "output" / "ai_intelligence_vault"
@@ -1197,6 +1197,18 @@ def _strategy_review_note(week_label: str, report_path: Path, strategy_review: d
             approval_lines.append(f"- {item.get('change_type') or 'change'}: {item.get('reason') or 'approval required'}")
     if not approval_lines:
         approval_lines = ["- No approval-gated change suggested."]
+    proposal_lines = []
+    for proposal in strategy_review.get("reaction_pattern_proposals") or []:
+        if not isinstance(proposal, dict):
+            continue
+        proposal_lines.append(
+            "- Unapproved reaction pattern: "
+            f"{int(proposal.get('distinct_week_count') or 0)} completed weeks, "
+            f"{int(proposal.get('distinct_reacted_post_count') or 0)} reacted posts; "
+            "no standing preference was applied."
+        )
+    if not proposal_lines:
+        proposal_lines = ["- No completed-week reaction pattern reached the proposal threshold."]
     body = "\n".join(
         [
             f"Backlinks: {_wiki(f'10-weekly/{week_label}', week_label)}, "
@@ -1222,6 +1234,9 @@ def _strategy_review_note(week_label: str, report_path: Path, strategy_review: d
             "## Approval Required",
             *approval_lines,
             "",
+            "## Reaction Pattern Proposals",
+            *proposal_lines,
+            "",
             "## Mutation Policy",
             "- Advisory only: no source, prompt, threshold, profile, or project mutation is applied by export.",
             "",
@@ -1238,6 +1253,9 @@ def _strategy_review_note(week_label: str, report_path: Path, strategy_review: d
                 "week_label": week_label,
                 "approval_required_count": len(strategy_review.get("approval_required") or []),
                 "codex_task_count": len(strategy_review.get("codex_tasks") or []),
+                "reaction_pattern_proposal_count": len(
+                    strategy_review.get("reaction_pattern_proposals") or []
+                ),
             },
         ),
     )
@@ -1263,6 +1281,7 @@ def export_obsidian_vault(
     vault_path: str | Path | None = None,
     namespace: str | None = None,
     report_root: str | Path | None = None,
+    weekly_run_root: str | Path | None = None,
     threads_limit: int = 100,
     atoms_limit: int = 20,
 ) -> ObsidianExportSummary:
@@ -1280,7 +1299,11 @@ def export_obsidian_vault(
             atoms_limit=atoms_limit,
         )
         feedback_summary = summarize_ai_report_feedback(connection, week_label=clean_week)
-        strategy_review = build_strategy_review(connection, week_label=clean_week)
+        strategy_review = build_strategy_review(
+            connection,
+            week_label=clean_week,
+            weekly_run_root=weekly_run_root or DEFAULT_WEEKLY_RUN_ROOT,
+        )
     projection = _projection_context(context)
     all_threads = projection.get("all_threads") or []
     threads = projection.get("exported_threads") or []

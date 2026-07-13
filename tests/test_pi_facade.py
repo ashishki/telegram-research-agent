@@ -1,4 +1,5 @@
 import json
+import sqlite3
 import tempfile
 import unittest
 from datetime import datetime, timezone
@@ -22,6 +23,48 @@ from output.weekly_run_manifest import (
 
 
 class TestPersonalIntelligenceFacade(unittest.TestCase):
+    def _unavailable_reaction_effect(self, run_id: str) -> dict:
+        return {
+            "schema_version": "reaction_personalization.v1",
+            "run_id": run_id,
+            "surface": "weekly_brief",
+            "reporting_week": "2026-W28",
+            "analysis_period_start": "2026-07-06T00:00:00Z",
+            "analysis_period_end": "2026-07-13T00:00:00Z",
+            "snapshot_ref": f"reaction-snapshot:{run_id}",
+            "snapshot_status": "unavailable",
+            "status": "unavailable",
+            "reader_summary_ru": (
+                "Синхронизация реакций не завершена. Персонализация по реакциям "
+                "для этого запуска не применялась."
+            ),
+            "counts": {
+                "personal_reaction_events_detected": 0,
+                "unique_reacted_posts": 0,
+                "posts_resolved": 0,
+                "eligible_period_posts": 0,
+                "unique_atoms_linked": 0,
+                "unique_canonical_threads_linked": 0,
+                "canonical_threads_boosted": 0,
+                "unique_compatibility_threads_linked": 0,
+                "compatibility_threads_boosted": 0,
+                "selected_items_linked": 0,
+                "selected_signals_influenced": 0,
+                "unconsumed_reaction_events": 0,
+            },
+            "influenced_items": [],
+            "linked_only_items": [],
+            "eligible_thread_audit": [],
+            "unconsumed_by_reason": {},
+            "unconsumed": [],
+            "ranking_policy": {
+                "policy_version": "reaction-ranking.v1",
+                "strength": "weak",
+                "below_confirmed_feedback": True,
+                "can_change_evidence_gate": False,
+            },
+        }
+
     def _settings(self, root: Path) -> Settings:
         return Settings(
             db_path=str(root / "agent.db"),
@@ -157,6 +200,7 @@ class TestPersonalIntelligenceFacade(unittest.TestCase):
         failed: bool = False,
         leave_running: bool = False,
         marked_posts: list[dict] | None = None,
+        reaction_effect: dict | None = None,
     ) -> tuple[Path, dict]:
         period = resolve_reporting_period(generated_at, week_label="2026-W28")
         manifest = build_initial_manifest(
@@ -292,6 +336,11 @@ class TestPersonalIntelligenceFacade(unittest.TestCase):
                         "json": str(brief_json.resolve()),
                     },
                     "marked_posts": list(marked_posts or []),
+                    **(
+                        {"reaction_effect": {**reaction_effect, "surface": "weekly_brief"}}
+                        if reaction_effect is not None
+                        else {}
+                    ),
                     "action_cards": [
                         {
                             "id": "manifest-action",
@@ -340,6 +389,11 @@ class TestPersonalIntelligenceFacade(unittest.TestCase):
                             }
                         ]
                     },
+                    **(
+                        {"reaction_effect": {**reaction_effect, "surface": "knowledge_atlas"}}
+                        if reaction_effect is not None
+                        else {}
+                    ),
                 }
             ),
             encoding="utf-8",
@@ -744,6 +798,126 @@ class TestPersonalIntelligenceFacade(unittest.TestCase):
         self.assertEqual(legacy["status"], "empty")
         self.assertEqual(legacy["items"], [])
 
+    def test_manifest_reaction_receipt_is_available_through_bound_retrieval_only(self):
+        run_id = "pi-reaction-receipt"
+        receipt = {
+            "schema_version": "reaction_personalization.v1",
+            "run_id": run_id,
+            "surface": "weekly_brief",
+            "reporting_week": "2026-W28",
+            "analysis_period_start": "2026-07-06T00:00:00Z",
+            "analysis_period_end": "2026-07-13T00:00:00Z",
+            "snapshot_ref": f"reaction-snapshot:{run_id}",
+            "snapshot_status": "unavailable",
+            "status": "unavailable",
+            "reader_summary_ru": (
+                "Синхронизация реакций не завершена. Персонализация по реакциям "
+                "для этого запуска не применялась."
+            ),
+            "counts": {
+                "personal_reaction_events_detected": 0,
+                "unique_reacted_posts": 0,
+                "posts_resolved": 0,
+                "eligible_period_posts": 0,
+                "unique_atoms_linked": 0,
+                "unique_canonical_threads_linked": 0,
+                "canonical_threads_boosted": 0,
+                "unique_compatibility_threads_linked": 0,
+                "compatibility_threads_boosted": 0,
+                "selected_items_linked": 0,
+                "selected_signals_influenced": 0,
+                "unconsumed_reaction_events": 0,
+            },
+            "influenced_items": [],
+            "linked_only_items": [],
+            "eligible_thread_audit": [],
+            "unconsumed_by_reason": {},
+            "unconsumed": [],
+            "ranking_policy": {
+                "policy_version": "reaction-ranking.v1",
+                "strength": "weak",
+                "below_confirmed_feedback": True,
+                "can_change_evidence_gate": False,
+            },
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_manifest_run(
+                root,
+                run_id=run_id,
+                generated_at=datetime(2026, 7, 13, 7, 8, tzinfo=timezone.utc),
+                reaction_effect=receipt,
+            )
+            facade = PersonalIntelligenceFacade(settings=self._settings(root), output_root=root)
+            with patch(
+                "assistant.pi_facade.build_retrieval_items",
+                side_effect=AssertionError("legacy and DB retrieval must not run"),
+            ):
+                result = facade.search_intelligence_items(
+                    "reaction personalization receipt",
+                    filters={"week_label": "2026-W28"},
+                    limit=5,
+                )
+
+        self.assertEqual(result["status"], "ok")
+        self.assertTrue(any(item["item_type"] == "reaction_effect" for item in result["items"]))
+
+    def test_foreign_nested_reaction_receipt_invalidates_bound_reader_artifacts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest_path, manifest = self._write_manifest_run(
+                root,
+                run_id="pi-local-receipt-run",
+                generated_at=datetime(2026, 7, 13, 7, 8, tzinfo=timezone.utc),
+                reaction_effect=self._unavailable_reaction_effect("foreign-run"),
+            )
+            facade = PersonalIntelligenceFacade(settings=self._settings(root), output_root=root)
+
+            status = facade.get_artifact_status("2026-W28")
+            workbook = facade.get_workbook_summary("2026-W28")
+            retrieval = facade.search_intelligence_items(
+                "reaction personalization receipt",
+                filters={"week_label": "2026-W28"},
+                limit=5,
+            )
+
+        self.assertEqual(status["status"], "ok")
+        self.assertEqual(status["run_id"], manifest["run_id"])
+        self.assertEqual(status["manifest_path"], str(manifest_path.resolve()))
+        self.assertEqual(workbook["status"], "missing")
+        self.assertEqual(retrieval["status"], "empty")
+        self.assertFalse(
+            any(item.get("item_type") == "reaction_effect" for item in retrieval["items"])
+        )
+
+    def test_uncontained_manifest_symlink_is_invalid_and_blocks_fallback(self):
+        with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as external:
+            root = Path(tmp)
+            self._write_manifest_run(
+                root,
+                run_id="pi-old-2026-W28",
+                generated_at=datetime(2026, 7, 13, 7, 0, tzinfo=timezone.utc),
+            )
+            external_root = Path(external)
+            external_manifest, _external = self._write_manifest_run(
+                external_root,
+                run_id="external-run",
+                generated_at=datetime(2026, 7, 13, 8, 0, tzinfo=timezone.utc),
+            )
+            lexical_dir = root / "weekly_intelligence_runs" / "newer-2026-W28"
+            lexical_dir.mkdir()
+            lexical_manifest = lexical_dir / "manifest.json"
+            lexical_manifest.symlink_to(external_manifest)
+            self._write_split_artifacts(root)
+            facade = PersonalIntelligenceFacade(settings=self._settings(root), output_root=root)
+
+            status = facade.get_artifact_status("2026-W28")
+            workbook = facade.get_workbook_summary("2026-W28")
+
+        self.assertEqual(status["status"], "invalid")
+        self.assertEqual(status["manifest_path"], str(lexical_manifest.absolute()))
+        self.assertEqual(workbook["status"], "missing")
+
     def test_newest_failed_manifest_blocks_older_success_and_legacy_fallback(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -949,6 +1123,50 @@ class TestPersonalIntelligenceFacade(unittest.TestCase):
         self.assertEqual(result["retrieval_decision"]["mode"], "curated_deterministic_plus_sqlite_fts")
         self.assertEqual(result["retrieval_decision"]["raw_telegram_status"], "disabled")
         self.assertTrue(any(item["item_type"] == "mvp_dossier" for item in result["items"]))
+
+    def test_strategy_reviewer_uses_bound_weekly_run_root_and_exposes_proposals(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            weekly_run_root = root / "custom-weekly-runs"
+            weekly_run_root.mkdir()
+            with sqlite3.connect(root / "agent.db") as connection:
+                connection.execute("CREATE TABLE ai_report_feedback_events (id INTEGER)")
+            proposal = {
+                "proposal_id": "reaction-pattern:test",
+                "status": "unapproved",
+                "applied": False,
+            }
+            review = {
+                "generated_at": "2026-07-13T08:00:00Z",
+                "suggestions": {
+                    "keep": [],
+                    "change": [],
+                    "demote": [],
+                    "test_next_week": [],
+                },
+                "memory_only_updates": [],
+                "approval_required": [],
+                "codex_tasks": [],
+                "reaction_pattern_proposals": [proposal],
+                "risks": [],
+                "mutation_policy": {"profile": "do_not_modify"},
+                "feedback_summary": {},
+            }
+            facade = PersonalIntelligenceFacade(
+                settings=self._settings(root),
+                weekly_run_root=weekly_run_root,
+            )
+            with patch(
+                "assistant.pi_facade.build_strategy_review",
+                return_value=review,
+            ) as build_review:
+                result = facade.get_strategy_reviewer_notes("2026-W28")
+
+        self.assertEqual(result["reaction_pattern_proposals"], [proposal])
+        self.assertEqual(
+            build_review.call_args.kwargs["weekly_run_root"],
+            weekly_run_root,
+        )
 
 
 if __name__ == "__main__":

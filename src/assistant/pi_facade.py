@@ -47,6 +47,7 @@ NON_BUILD_READY_RECOMMENDATIONS = {
     "reject",
 }
 _INVALID_MANIFEST_MARKER = "_weekly_manifest_invalid"
+_UNCONTAINED_MANIFEST_MARKER = "_weekly_manifest_uncontained"
 _ISO_WEEK_SEARCH_RE = re.compile(r"(?<![0-9A-Z])([0-9]{4}-W(?:0[1-9]|[1-4][0-9]|5[0-3]))(?![0-9])")
 
 
@@ -526,7 +527,11 @@ class PersonalIntelligenceFacade:
             if connection is None or not _table_exists(connection, "ai_report_feedback_events"):
                 return _empty_strategy_review(clean_week, "missing", "AI report feedback table is missing.")
             try:
-                review = build_strategy_review(connection, week_label=clean_week)
+                review = build_strategy_review(
+                    connection,
+                    week_label=clean_week,
+                    weekly_run_root=self._weekly_run_root,
+                )
             except sqlite3.Error:
                 return _empty_strategy_review(clean_week, "missing", "Strategy Reviewer notes could not be loaded.")
         suggestions = review.get("suggestions") if isinstance(review.get("suggestions"), Mapping) else {}
@@ -543,6 +548,11 @@ class PersonalIntelligenceFacade:
             "memory_only_updates": _string_values(review.get("memory_only_updates")),
             "approval_required": [dict(item) for item in review.get("approval_required") or [] if isinstance(item, Mapping)],
             "codex_tasks": [_codex_task(item) for item in review.get("codex_tasks") or [] if isinstance(item, Mapping)],
+            "reaction_pattern_proposals": [
+                dict(item)
+                for item in review.get("reaction_pattern_proposals") or []
+                if isinstance(item, Mapping)
+            ],
             "risks": _string_values(review.get("risks")),
             "mutation_policy": dict(review.get("mutation_policy") or {}),
             "feedback_summary": dict(review.get("feedback_summary") or {}),
@@ -696,13 +706,43 @@ class PersonalIntelligenceFacade:
     ) -> tuple[dict[str, Any], Path] | None:
         """Select one authoritative candidate without skipping invalid newer runs."""
 
-        if not self._weekly_run_root.is_dir():
+        try:
+            weekly_run_root = self._weekly_run_root.expanduser().resolve()
+        except (OSError, RuntimeError):
+            return None
+        if not weekly_run_root.is_dir():
             return None
         clean_week = str(week_label or "").strip() or None
         candidates: list[
             tuple[tuple[int, str, str], dict[str, Any], Path, str | None, bool]
         ] = []
-        for path in self._weekly_run_root.glob("*/manifest.json"):
+        for lexical_path in weekly_run_root.glob("*/manifest.json"):
+            try:
+                resolved_path = lexical_path.resolve()
+            except (OSError, RuntimeError):
+                resolved_path = lexical_path.absolute()
+            if resolved_path.parent.parent != weekly_run_root:
+                week_clues = _manifest_candidate_week_clues({}, lexical_path)
+                candidate_week = _majority_week_clue(week_clues)
+                if clean_week and candidate_week and clean_week != candidate_week:
+                    continue
+                payload = {
+                    _INVALID_MANIFEST_MARKER: True,
+                    _UNCONTAINED_MANIFEST_MARKER: True,
+                    "_candidate_reporting_week": candidate_week or clean_week,
+                    "_candidate_run_id": lexical_path.parent.name,
+                }
+                candidates.append(
+                    (
+                        (2**63 - 1, lexical_path.parent.name, str(lexical_path.absolute())),
+                        payload,
+                        lexical_path.absolute(),
+                        candidate_week or clean_week,
+                        True,
+                    )
+                )
+                continue
+            path = resolved_path
             parse_failed = False
             try:
                 loaded = json.loads(path.read_text(encoding="utf-8"))
@@ -806,6 +846,19 @@ class PersonalIntelligenceFacade:
 
         if manifest.get(_INVALID_MANIFEST_MARKER):
             return None
+        run_dir = manifest_path.parent.resolve()
+        try:
+            checked_manifest = load_manifest(
+                manifest_path,
+                path_base=run_dir,
+                allowed_roots=(run_dir,),
+                check_artifact_existence=True,
+            )
+        except (OSError, UnicodeError, TypeError, ValueError, WeeklyRunManifestError):
+            return None
+        if checked_manifest.get("run_id") != manifest.get("run_id"):
+            return None
+        manifest = checked_manifest
         if manifest.get("run_status") not in {"complete", "partial"}:
             return None
         stage = manifest["stages"][stage_name]
@@ -1709,7 +1762,11 @@ def _manifest_identity(manifest: Mapping[str, Any], manifest_path: Path) -> dict
             or manifest.get("run_id")
             or manifest_path.parent.name
         ),
-        "manifest_path": str(manifest_path.resolve()),
+        "manifest_path": str(
+            manifest_path.absolute()
+            if manifest.get(_UNCONTAINED_MANIFEST_MARKER)
+            else manifest_path.resolve()
+        ),
         "run_status": "invalid" if invalid else str(manifest.get("run_status") or ""),
         "partial": bool(manifest.get("partial")),
         "pipeline_profile": str(manifest.get("pipeline_profile") or ""),
@@ -1909,6 +1966,7 @@ def _empty_strategy_review(week_label: str | None, status: str, message: str) ->
         "memory_only_updates": [],
         "approval_required": [],
         "codex_tasks": [],
+        "reaction_pattern_proposals": [],
         "risks": [],
         "mutation_policy": {
             "source_code": "do_not_modify",

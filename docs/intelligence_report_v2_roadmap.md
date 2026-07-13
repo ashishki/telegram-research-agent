@@ -147,8 +147,8 @@ behavior; it does not reopen the gate logic.
 | IRX-0 | Report V2 audit, roadmap, and product contract | `implemented_documentation_only` | P0 | none |
 | IRX-1 | Completed-week reporting semantics | `implemented_and_verified` | P0 | IRX-0 |
 | IRX-2 | Weekly run manifest and required Radar artifact contract | `implemented_and_verified` | P0 | IRX-1 |
-| IRX-3 | Reaction-to-ranking personalization and effect receipt | `ready` | P0 | IRX-1, IRX-2 |
-| IRX-4 | Canonical Idea Thread curation and merge/split lifecycle | `planned` | P0 | IRX-1, IRX-2, IRX-3 |
+| IRX-3 | Reaction-to-ranking personalization and effect receipt | `implemented_and_verified` | P0 | IRX-1, IRX-2 |
+| IRX-4 | Canonical Idea Thread curation and merge/split lifecycle | `ready` | P0 | IRX-1, IRX-2, IRX-3 |
 | IRX-5 | Editorial Intelligence synthesis contract | `planned` | P0 | IRX-1 through IRX-4 |
 | IRX-6 | Weekly Intelligence Brief V2 | `planned` | P1 | IRX-2 through IRX-5, IRX-8 through IRX-10 |
 | IRX-7 | Knowledge Atlas V2 and Knowledge Audit Explorer separation | `planned` | P2 | IRX-4, IRX-5, IRX-8, IRX-11 |
@@ -459,13 +459,14 @@ create a new run and may set `supersedes_run_id`; only the core transition model
 can increment an attempt inside an unfinalized manifest. Existing V1 commands,
 week-named compatibility paths, scoring, prompts, feedback semantics, database
 schema, and Radar evidence/context-only gates are unchanged. No generated
-report artifact or sibling Radar code was edited. Curation, reaction ranking,
-editorial synthesis, V2 reader redesign, Audit Explorer separation, and
-reader-value gates remain owned by later tasks.
+report artifact or sibling Radar code was edited. At the IRX-2 boundary,
+curation, reaction ranking, editorial synthesis, V2 reader redesign, Audit
+Explorer separation, and reader-value gates remained owned by later tasks. The
+IRX-3 reaction-ranking handoff is now closed below; IRX-4 owns curation next.
 
 ### IRX-3 - Reaction-To-Ranking Personalization And Effect Receipt
 
-**Status:** `ready`. **Priority:** P0.
+**Status:** `implemented_and_verified` on 2026-07-13. **Priority:** P0.
 
 **Problem:** Reactions are ingested with useful semantics but marked posts are
 loaded separately from report ranking. Neither HTML nor JSON proves whether a
@@ -490,12 +491,13 @@ or stale evidence, duplicate signal, or report limit.
 **Dependencies:** IRX-1 and IRX-2. IRX-4 later maps compatibility thread IDs to
 stable canonical IDs without changing reaction semantics.
 
-**Likely files:** `src/ingestion/reaction_sync.py`;
+**Implemented files:** `src/ingestion/reaction_sync.py`;
+`src/output/reaction_personalization.py`;
 `src/output/ai_intelligence_report.py`;
 `src/output/weekly_intelligence_brief.py`;
-`src/output/knowledge_atlas_report.py`; `src/db/ai_report_feedback.py` or a new
-projection helper; `tests/test_reaction_sync.py`;
-`tests/test_ai_intelligence_report.py`; `tests/test_ai_report_feedback.py`.
+`src/output/knowledge_atlas_report.py`; manifest/orchestrator, split, retrieval,
+Obsidian, Strategy Reviewer, PI, CLI adapters; and focused tests for those
+surfaces.
 
 **Acceptance criteria:**
 
@@ -516,9 +518,14 @@ projection helper; `tests/test_reaction_sync.py`;
 
 ```bash
 PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache \
-  python3 -m unittest tests.test_reaction_sync \
-  tests.test_ai_intelligence_report tests.test_ai_report_feedback \
-  tests.test_strategy_reviewer tests.test_split_intelligence_reports
+  python3 -m unittest tests.test_reaction_personalization \
+  tests.test_reaction_sync tests.test_ai_intelligence_report \
+  tests.test_ai_report_feedback tests.test_strategy_reviewer \
+  tests.test_split_intelligence_reports \
+  tests.test_intelligence_retrieval_items tests.test_pi_facade
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache \
+  python3 -m unittest tests.test_weekly_run_manifest \
+  tests.test_weekly_intelligence_orchestrator
 ```
 
 **Failure states:** Absence penalty, emoji sentiment scoring, unexplained boost,
@@ -528,12 +535,43 @@ preference mutation, or receipt/report count mismatch fails the task.
 **Stop conditions:** Stop before any automatic standing preference/config
 change or any interpretation of no reaction as dislike.
 
-**Rollout implications:** Begin with receipt-only shadow comparison, then enable
-the bounded weak boost after fixture review. Preserve old ranking fields.
+**Implementation receipt (2026-07-13):** A complete, current, checksum- and
+identity-validated same-run reaction snapshot is required for any fresh boost.
+Every personal emoji has equal positive provenance, is deduplicated to one weak
+post-level interest signal, and aggregate/absent reactions do not change
+ranking. Stored Telegram -> raw post -> normalized post -> bounded atom ->
+current compatibility-thread identity is the only attribution path. Brief and
+Atlas classify the same bounded order against their exact four-action and
+twelve-thread selectors and emit strict surface receipts whose common identity,
+pre-selection funnel, non-selection attribution, snapshot lineage, and policy
+must agree. Each receipt's JSON totals must match its own rendered surface;
+selector-dependent status, selected counts, counterfactuals, and unconsumed
+results may differ. Evidence, safety, freshness, deduplication, and confirmed
+explicit feedback remain stronger; the marker can perform at most one adjacent
+promotion among otherwise equal eligible items. Repeated interest creates only
+an unapproved Strategy Reviewer proposal after three completed weeks and four
+distinct posts; no profile/config/prompt/project/source/code mutation is
+automatic.
+
+Focused verification passed: 145 tests in the core
+reaction/report/feedback/Strategy/split/retrieval/PI matrix and 45 tests in the
+manifest/orchestrator matrix. `git diff --check` passed. Live/heavy pipelines
+and the full suite were intentionally not run. Existing standalone/V1
+commands and sidecars, legacy sync return values and aliases, Hermes/PI,
+retrieval, Obsidian, IRX-1/IRX-2 identity, feedback semantics, global scoring,
+database schema, prompts, and Radar gates remain compatible through additive
+fields/adapters. Legacy count-only IRX-2 reaction output remains explicitly
+unbound/unavailable, creates no boost, and does not require a rich reader
+receipt. Generated artifacts and sibling Radar code were unchanged.
+
+**IRX-4 handoff:** Current compatibility-thread refs are not canonical. IRX-4
+must add the durable registry, aliases, merge/split lifecycle, and historical
+period-end as-of thread lineage while preserving IRX-3 post/atom provenance and
+reaction semantics.
 
 ### IRX-4 - Canonical Idea Thread Curation And Merge/Split Lifecycle
 
-**Status:** `planned`. **Priority:** P0.
+**Status:** `ready`. **Priority:** P0.
 
 **Problem:** Existing threads are often normalized entity combinations such as
 Fable/Anthropic and Claude/model-version variants rather than stable ideas.
@@ -1329,19 +1367,21 @@ Stop and ask the operator before any proposal or implementation that:
 ## 13. Unresolved Questions And Default Assumptions
 
 These questions are assigned to their owning tasks and do not reopen completed
-IRX-1/IRX-2 semantics:
+IRX-1/IRX-2/IRX-3 semantics:
 
 1. **V2 path naming:** use explicit versioned directories plus V1 aliases; IRX-14
    freezes exact paths after parallel-run evidence.
 2. **Reader display time zone:** store all boundaries in UTC and render
    generated time in the configured operator zone (`Europe/Berlin` today);
    analysis boundaries remain explicit UTC.
-3. **Reaction eligibility:** default to source post timestamp inside the
-   analysis period and reaction observed by the run snapshot. A Monday sync may
-   therefore apply a reaction to a completed-week post. IRX-3 freezes edge cases.
-4. **Canonical registry persistence:** prefer additive tables and compatibility
-   views; IRX-4 decides exact schema only after testing incremental lifecycle
-   requirements.
+3. **Reaction eligibility:** source-post time must be inside the half-open
+   analysis period and current personal visibility must be attested by the
+   same-run snapshot. Monday may therefore apply a Sunday post from the completed
+   week. IRX-3 has frozen these semantics.
+4. **Canonical registry and as-of lineage:** prefer additive tables and
+   compatibility views; IRX-4 must freeze the incremental merge/split schema and
+   resolve a historical run against period-end membership without destroying raw
+   thread history.
 5. **Graph relation vocabulary:** derive only validated relations such as
    supports, contradicts, prerequisite, and related-by-evidence; do not infer
    decorative edges merely to fill the graph.
@@ -1351,68 +1391,64 @@ IRX-1/IRX-2 semantics:
    choose whether the old Atlas path becomes an alias or a separately named
    artifact after consumer inventory.
 
-## 14. Exact Next Codex Prompt - IRX-3
+## 14. Exact Next Codex Prompt - IRX-4
 
 Use the following prompt unchanged for the next implementation task:
 
 ```text
 You are Codex working in /srv/openclaw-you/workspace/telegram-research-agent.
-Mode: IMPLEMENTATION for IRX-3 only.
-Implement IRX-3, using these binding docs:
+Mode: IMPLEMENTATION for IRX-4 only.
+Implement IRX-4, using these binding docs:
   docs/intelligence_report_v2_roadmap.md
   docs/intelligence_report_v2_contract.md
   docs/weekly_run_manifest.md
   docs/reaction_personalization_contract.md
-Do not implement IRX-4 or later work: no canonical-thread registry/merge-split curator, editorial LLM, V2 information-architecture or visual redesign, project-intelligence redesign, Radar reader redesign, reader-value gates, report-specific feedback redesign, rollout, or dogfood start.
+Do not implement IRX-5 or later work: no editorial-intelligence LLM, V2 information-architecture or visual redesign, project-intelligence redesign, Radar reader redesign, reader-value gates, report-specific feedback redesign, rollout, or dogfood start. Do not change IRX-3 reaction semantics or Radar gates.
 Before editing run:
   git status
   git branch
   git log --oneline -20
   git diff --stat
 Preserve pre-existing dirty changes. Do not edit or commit generated reports.
-Read the current manifest reaction snapshot, reaction ingestion/storage, report-context selection/ranking, explicit-feedback precedence, Strategy Reviewer proposal flow, Brief/Atlas sidecars/renderers, PI/retrieval adapters, and focused tests for:
-  src/output/weekly_intelligence_orchestrator.py,
-  src/output/weekly_run_manifest.py,
-  src/ingestion/reaction_sync.py,
+Read the current raw Idea Thread storage/membership/lifecycle, historical period bounding, IRX-3 compatibility resolver and provenance, Brief/Atlas/Frontier contexts, retrieval/Obsidian adapters, and focused tests for:
+  src/db/idea_threads.py,
+  src/output/idea_threads.py,
+  src/output/reaction_personalization.py,
   src/output/ai_intelligence_report.py,
-  src/output/weekly_intelligence_brief.py,
-  src/output/knowledge_atlas_report.py,
-  src/output/split_intelligence_reports.py,
-  src/db/ai_report_feedback.py,
-  src/output/strategy_reviewer.py,
+  src/output/frontier_analysis.py,
   src/output/intelligence_retrieval_items.py,
-  src/assistant/pi_facade.py, and src/main.py.
-Add one deterministic typed reaction-personalization projection/validator, preferably src/output/reaction_personalization.py, and an additive reaction_effect receipt in existing run-scoped Brief/Atlas JSON plus minimal Russian receipt copy. Reuse the IRX-1 ReportingPeriod and IRX-2 manifest/snapshot identity unchanged.
+  src/output/obsidian_export.py,
+  tests/test_idea_threads.py,
+  tests/test_ai_intelligence_report.py,
+  tests/test_frontier_analysis.py,
+  tests/test_intelligence_retrieval_items.py,
+  tests/test_obsidian_export.py, and tests/test_reaction_personalization.py.
+Add an incremental canonical Idea Thread registry, deterministic lifecycle validator, compatibility/alias projection, and bounded curator proposal flow. Prefer additive persistence and compatibility views; preserve raw threads and memberships as audit provenance. Reuse the IRX-1 ReportingPeriod, IRX-2 run identity, and IRX-3 reaction receipt/provenance unchanged.
 Required behavior:
-1. Consume only a usable same-run IRX-2 reaction snapshot. Eligibility is source-post time inside the exact half-open analysis period; a Sunday post first synchronized on Monday is eligible. Failed/stale/unverified sync yields a partial/unavailable receipt and no fresh boost.
-2. Treat every operator-visible emoji as the same positive implicit-interest signal, deduplicated once per post. Emoji is provenance only; aggregate reactions produce no signal; absence remains unknown and never penalizes ranking.
-3. Resolve reaction -> raw post -> normalized post -> atom -> current thread by stored identities only. Introduce a thread-resolution interface with compatibility/current-thread refs and an optional future canonical ref. Do not call raw/entity-cluster IDs canonical; unresolved canonical attribution is explicit until IRX-4 closes it.
-4. Apply the weak bounded boost only after period/evidence/safety/freshness/deduplication eligibility. It may break an otherwise equal/close ordering but cannot rescue weak, stale, contradicted, uncited, unsafe, or Radar-ineligible evidence. Confirmed explicit feedback remains stronger.
-5. Retain deterministic counterfactuals and distinguish boost_applied, rank_changed, selection_changed, and linked_only. Never claim ranking causation for linked_only.
-6. Emit reaction_personalization.v1 identity, snapshot status, stable funnel counts, influenced/linked-only items, ranking policy, and bounded unconsumed reasons. Counts deduplicate at the named entity level and JSON/HTML totals agree.
-7. Reader copy is concise Russian and contains no raw emoji, database/thread IDs, enum names, boost values, or ranking traces. Audit/retrieval projections retain provenance additively.
-8. Repeated interest below three distinct completed weeks/four distinct reacted posts creates no Strategy Reviewer proposal. A qualifying pattern creates an unapproved proposal only; it never mutates profile, config, prompt, project, source policy, or code.
-9. Existing standalone/V1 report, Hermes/PI, retrieval, Obsidian, feedback, and IRX-2 manifest consumers remain compatible. Any new sidecar fields are additive.
-Add deterministic tests, including tests/test_reaction_personalization.py, for emoji equivalence, aggregate exclusion, post deduplication, no-reaction unknown semantics, Monday/Sunday and out-of-period eligibility, identity-based post/atom/thread joins, missing links, bounded close-order boost, evidence/feedback precedence, counterfactual effect labels, every unconsumed reason, receipt/render parity, partial sync, compatibility-thread labeling, proposal threshold/no mutation, and V1/PI/retrieval compatibility.
-Do not change global evidence scoring, LLM prompts, existing feedback semantics, IRX-1 period behavior, IRX-2 run/Radar binding, DB schema unless an additive migration is proven unavoidable, cross-repo code, Radar evidence logic, or Radar gates. Do not run live/expensive pipelines or the full suite.
+1. Give every canonical thread a stable identity/slug, titles, thesis, lifecycle status, first/last seen, raw-thread aliases, atom/source provenance, merge/split ancestry, and curator version. Never relabel a mutable raw/entity cluster as canonical.
+2. Generate deterministic grouping candidates. Same-vendor/entity overlap alone cannot merge; model-version difference alone cannot split. Any strong-model curator output is proposal-only until strict deterministic validation passes.
+3. Preserve raw threads, atom memberships, source provenance, and old references. Reject atom loss, ambiguous ownership, duplicate active membership/title, alias collisions, merge/split cycles, and unstable slug churn.
+4. Support incremental create/update/merge/split/stale transitions and auditable operator corrections without destructive history rewrite or full regeneration.
+5. Resolve historical reports against canonical membership and lifecycle state as of analysis_period_end. Do not infer historical canonical state from only the current raw thread or current alias map.
+6. Implement the IRX-3 ThreadResolver canonical side through stored identities. Preserve compatibility/current refs, opaque post/atom provenance, reaction strength, evidence/feedback precedence, counterfactuals, and surface receipts; canonical attribution must not change which reactions are eligible.
+7. Feed bounded canonical threads to existing contexts while keeping raw compatibility/audit projections additive. Default Atlas input contains at most 8-12 primary canonical threads.
+8. Existing V1 reports, Frontier, Hermes/PI, retrieval, Obsidian, Strategy Reviewer, IRX-2 manifests, and IRX-3 receipts remain compatible. Any DB/schema/sidecar change is additive and migrated deterministically.
+Add deterministic tests for Fable/Claude-style fragmentation, false entity-only merges, model-version aliases, stable IDs/slugs, incremental reruns, merge/split provenance, aliases and old refs, lifecycle cycles/collisions, period-end as-of resolution, raw compatibility parity, reaction canonical attribution without ranking-semantic drift, bounded Atlas input, operator correction, and retrieval/Obsidian compatibility.
+Do not change global evidence scoring, reaction weights/meaning, prompts outside the bounded curator contract, explicit feedback semantics, IRX-1 period behavior, IRX-2 run/Radar binding, cross-repo code, Radar evidence logic, or Radar gates. Do not run live/expensive pipelines, full archive regeneration, or the full suite.
 Run:
   PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache \
-    python3 -m unittest tests.test_reaction_personalization \
-    tests.test_reaction_sync tests.test_ai_intelligence_report \
-    tests.test_ai_report_feedback tests.test_strategy_reviewer \
-    tests.test_split_intelligence_reports \
-    tests.test_intelligence_retrieval_items tests.test_pi_facade
-  PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache \
-    python3 -m unittest tests.test_weekly_run_manifest \
-    tests.test_weekly_intelligence_orchestrator
+    python3 -m unittest tests.test_idea_threads \
+    tests.test_ai_intelligence_report tests.test_frontier_analysis \
+    tests.test_intelligence_retrieval_items tests.test_obsidian_export \
+    tests.test_reaction_personalization
   git diff --check
   git diff --stat
-Report files changed, exact signal/eligibility/ranking/receipt semantics, compatibility behavior, exact test results, the IRX-4 canonical-thread closure intentionally left open, and confirmation that generated artifacts, standing preferences/config, Radar gates, and cross-repo code were unchanged.
+Report files changed, canonical identity/lifecycle/as-of semantics, compatibility behavior, exact test results, and confirmation that generated artifacts, IRX-3 reaction semantics, Radar gates, and cross-repo code were unchanged. Stop before IRX-5.
 ```
 
 ## 15. Suggested Following Task
 
-After IRX-3 is reviewed and its focused tests pass, implement **IRX-4 -
-Canonical Idea Thread Curation And Merge/Split Lifecycle**. IRX-4 must replace
-compatibility/current-thread resolution with stable canonical aliases while
-preserving the IRX-3 post/atom provenance and reaction semantics.
+IRX-4 is ready and is the only next implementation scope. It must replace
+compatibility/current-thread-only resolution with durable canonical aliases and
+period-end as-of lifecycle history while preserving IRX-3 post/atom provenance
+and reaction semantics. IRX-5 and later work remain planned, not implemented.

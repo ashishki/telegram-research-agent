@@ -26,6 +26,9 @@ from output.reporting_period import PARTIAL_ISO_WEEK, ReportingPeriod, Reporting
 MANIFEST_SCHEMA_VERSION = "weekly_run_manifest.v1"
 PIPELINE_PROFILE = "irx2_orchestration.v1"
 RADAR_BINDING_SCHEMA_VERSION = "radar_run_binding.v1"
+REACTION_SNAPSHOT_SCHEMA_VERSION = "reaction_visibility_snapshot.v1"
+REACTION_SNAPSHOT_PATH = "reaction_sync/reaction-snapshot.json"
+REACTION_EFFECT_SCHEMA_VERSION = "reaction_personalization.v1"
 
 PENDING = "pending"
 RUNNING = "running"
@@ -734,6 +737,39 @@ def verify_file_checksum(path: str | os.PathLike[str], expected_sha256: str) -> 
         )
 
 
+def load_bound_reaction_snapshot(
+    manifest: Mapping[str, Any],
+    *,
+    path_base: str | os.PathLike[str] | None = None,
+    allowed_roots: Sequence[str | os.PathLike[str]] = (),
+    verify_file: bool = True,
+) -> dict[str, Any] | None:
+    """Load a validated run-scoped reaction snapshot when one is bound.
+
+    IRX-2 manifests predate this optional artifact.  A successful legacy
+    ``reaction_sync`` stage with no ``artifact_refs.snapshot_path`` therefore
+    remains valid and returns ``None``; callers must not promote that legacy
+    count-only result into fresh personalization evidence.
+    """
+
+    validate_manifest(
+        manifest,
+        path_base=path_base,
+        allowed_roots=allowed_roots,
+        check_artifact_existence=False,
+    )
+    stage = manifest["stages"]["reaction_sync"]
+    binding = _optional_reaction_snapshot_binding(stage)
+    if stage["status"] != SUCCEEDED or binding is None:
+        return None
+    return _validate_reaction_snapshot_output(
+        manifest,
+        path_base=path_base,
+        allowed_roots=allowed_roots,
+        verify_file=verify_file,
+    )
+
+
 def build_radar_run_binding(
     manifest: Mapping[str, Any],
     *,
@@ -1169,9 +1205,17 @@ def _validate_stage_record(
             raise WeeklyRunManifestError(f"{name}.{key} must be an object")
         _ensure_json_value(record[key], field=f"stages.{name}.{key}")
 
-    if name == "reaction_sync" and status == SUCCEEDED:
-        _nonempty_bounded(record.get("snapshot_ref"), 300)
-        _canonical_timestamp(record.get("observed_through"), field="reaction observed_through")
+    if name == "reaction_sync":
+        binding = _optional_reaction_snapshot_binding(record)
+        if binding is not None and status != SUCCEEDED:
+            raise WeeklyRunManifestError(
+                "reaction snapshot binding requires a succeeded stage"
+            )
+        if status == SUCCEEDED:
+            _nonempty_bounded(record.get("snapshot_ref"), 300)
+            _canonical_timestamp(
+                record.get("observed_through"), field="reaction observed_through"
+            )
     if name == "feedback_snapshot":
         cutoff = record.get("cutoff")
         if cutoff is not None and cutoff != _canonical_timestamp(
@@ -1285,8 +1329,234 @@ def _validate_succeeded_stage_outputs(
             allowed_roots=allowed_roots,
         )
 
+    reaction_stage = manifest["stages"]["reaction_sync"]
+    reaction_snapshot_payload: dict[str, Any] | None = None
+    if (
+        reaction_stage["status"] == SUCCEEDED
+        and _optional_reaction_snapshot_binding(reaction_stage) is not None
+    ):
+        reaction_snapshot_payload = _validate_reaction_snapshot_output(
+            manifest,
+            path_base=path_base,
+            allowed_roots=allowed_roots,
+            verify_file=True,
+        )
+
     if _all_enabled_stages_terminal(manifest):
-        _validate_reader_sidecar_identities(manifest, path_base=path_base)
+        _validate_reader_sidecar_identities(
+            manifest,
+            path_base=path_base,
+            reaction_snapshot_payload=reaction_snapshot_payload,
+        )
+
+
+def _optional_reaction_snapshot_binding(
+    stage: Mapping[str, Any],
+) -> tuple[str, str] | None:
+    artifact_refs = stage.get("artifact_refs")
+    checksums = stage.get("checksums")
+    if not isinstance(artifact_refs, Mapping) or not isinstance(checksums, Mapping):
+        return None
+    has_path = "snapshot_path" in artifact_refs
+    has_checksum = "snapshot_path" in checksums
+    if has_path != has_checksum:
+        raise WeeklyRunManifestError(
+            "reaction snapshot path and checksum must be bound together"
+        )
+    if not has_path:
+        return None
+    path = artifact_refs.get("snapshot_path")
+    if path != REACTION_SNAPSHOT_PATH:
+        raise WeeklyRunManifestError(
+            f"reaction snapshot path must equal {REACTION_SNAPSHOT_PATH!r}"
+        )
+    checksum = _required_checksum(checksums, "snapshot_path", stage="reaction_sync")
+    return str(path), checksum
+
+
+def _validate_reaction_snapshot_output(
+    manifest: Mapping[str, Any],
+    *,
+    path_base: str | os.PathLike[str] | None,
+    allowed_roots: Sequence[str | os.PathLike[str]],
+    verify_file: bool,
+) -> dict[str, Any]:
+    stage = manifest["stages"]["reaction_sync"]
+    binding = _optional_reaction_snapshot_binding(stage)
+    if stage.get("status") != SUCCEEDED or binding is None:
+        raise WeeklyRunManifestError("reaction snapshot is not bound to a succeeded stage")
+    path, checksum = binding
+    _validate_one_path(path, path_base=path_base, allowed_roots=allowed_roots)
+    resolved = _resolve_artifact_path(path, path_base)
+    if not resolved.is_file():
+        raise WeeklyRunManifestError(
+            f"successful stage artifact does not exist: reaction_sync: {path}"
+        )
+    if verify_file:
+        verify_file_checksum(resolved, checksum)
+    payload = dict(_load_json_object(resolved, label="reaction snapshot"))
+    if payload.get("schema_version") != REACTION_SNAPSHOT_SCHEMA_VERSION:
+        raise WeeklyRunManifestError("reaction snapshot schema_version mismatch")
+    for field in (
+        "run_id",
+        "run_date",
+        "generated_at",
+        "reporting_week",
+        "week_label",
+        "period_mode",
+        "analysis_period_start",
+        "analysis_period_end",
+    ):
+        if payload.get(field) != manifest.get(field):
+            raise WeeklyRunManifestError(
+                f"reaction snapshot identity mismatch: {field}"
+            )
+    if payload.get("snapshot_ref") != stage.get("snapshot_ref"):
+        raise WeeklyRunManifestError(
+            "reaction snapshot identity mismatch: snapshot_ref"
+        )
+    expected_snapshot_ref = f"reaction-snapshot:{manifest['run_id']}"
+    if stage.get("snapshot_ref") != expected_snapshot_ref:
+        raise WeeklyRunManifestError(
+            "bound reaction snapshot_ref does not match the manifest run_id"
+        )
+    if payload.get("observed_through") != stage.get("observed_through"):
+        raise WeeklyRunManifestError(
+            "reaction snapshot identity mismatch: observed_through"
+        )
+    observed_at = _parse_timestamp(
+        payload.get("observed_through"), field="reaction snapshot observed_through"
+    )
+    started_at = _parse_timestamp(
+        stage.get("started_at"), field="reaction_sync started_at"
+    )
+    finished_at = _parse_timestamp(
+        stage.get("finished_at"), field="reaction_sync finished_at"
+    )
+    if observed_at < started_at or observed_at > finished_at:
+        raise WeeklyRunManifestError(
+            "reaction snapshot observed_through must fall within the stage attempt"
+        )
+    generated_at = _parse_timestamp(
+        manifest.get("generated_at"), field="manifest generated_at"
+    )
+    if observed_at < generated_at:
+        raise WeeklyRunManifestError(
+            "reaction snapshot observed_through precedes manifest generation"
+        )
+
+    coverage = payload.get("coverage")
+    if not isinstance(coverage, Mapping):
+        raise WeeklyRunManifestError("reaction snapshot coverage must be an object")
+    candidate_count = _nonnegative_int(
+        coverage.get("candidate_count"),
+        field="reaction snapshot coverage.candidate_count",
+    )
+    checked_count = _nonnegative_int(
+        coverage.get("checked_count"),
+        field="reaction snapshot coverage.checked_count",
+    )
+    for field in ("coverage_complete", "visibility_verified"):
+        if not isinstance(coverage.get(field), bool):
+            raise WeeklyRunManifestError(
+                f"reaction snapshot coverage.{field} must be boolean"
+            )
+    if checked_count > candidate_count:
+        raise WeeklyRunManifestError(
+            "reaction snapshot checked_count cannot exceed candidate_count"
+        )
+    if not coverage.get("coverage_complete") or checked_count != candidate_count:
+        raise WeeklyRunManifestError("reaction snapshot coverage is incomplete")
+    if not coverage.get("visibility_verified"):
+        raise WeeklyRunManifestError("reaction snapshot visibility is unverified")
+
+    posts = payload.get("observed_personal_posts")
+    if not isinstance(posts, list):
+        raise WeeklyRunManifestError(
+            "reaction snapshot observed_personal_posts must be a list"
+        )
+    if len(posts) > checked_count:
+        raise WeeklyRunManifestError(
+            "reaction snapshot observed post count exceeds checked_count"
+        )
+    record_counts = stage.get("record_counts")
+    if not isinstance(record_counts, Mapping):
+        raise WeeklyRunManifestError(
+            "bound reaction snapshot requires stage record_counts"
+        )
+    event_count = 0
+    expected_record_counts = {
+        "candidate_count": candidate_count,
+        "checked_count": checked_count,
+        "posts_checked": checked_count,
+        "observed_personal_posts": len(posts),
+        "posts_with_reactions": len(posts),
+        "errors": 0,
+    }
+    for field, expected in expected_record_counts.items():
+        if record_counts.get(field) != expected:
+            raise WeeklyRunManifestError(
+                f"reaction snapshot/stage record_counts mismatch: {field}"
+            )
+    manifest_period_start = _parse_timestamp(
+        manifest.get("analysis_period_start"), field="analysis_period_start"
+    )
+    manifest_period_end = _parse_timestamp(
+        manifest.get("analysis_period_end"), field="analysis_period_end"
+    )
+    identities: set[tuple[str, int]] = set()
+    post_ids: set[int] = set()
+    for index, post in enumerate(posts):
+        if not isinstance(post, Mapping):
+            raise WeeklyRunManifestError(
+                f"reaction snapshot post {index} must be an object"
+            )
+        post_id = _nonnegative_int(
+            post.get("post_id"), field=f"reaction snapshot post {index}.post_id", positive=True
+        )
+        if post_id in post_ids:
+            raise WeeklyRunManifestError(
+                "reaction snapshot repeats one normalized post identity"
+            )
+        post_ids.add(post_id)
+        channel = _nonempty_bounded(post.get("channel_username"), 300)
+        message_id = _nonnegative_int(
+            post.get("message_id"),
+            field=f"reaction snapshot post {index}.message_id",
+            positive=True,
+        )
+        identity = (channel.strip().lstrip("@").casefold(), message_id)
+        if identity in identities:
+            raise WeeklyRunManifestError("reaction snapshot contains duplicate posts")
+        identities.add(identity)
+        posted_at = _parse_timestamp(
+            post.get("posted_at"), field=f"reaction snapshot post {index}.posted_at"
+        )
+        if not (
+            manifest_period_start <= posted_at < manifest_period_end
+        ):
+            raise WeeklyRunManifestError(
+                f"reaction snapshot post {index} falls outside the reporting period"
+            )
+        raw_emojis = post.get("raw_emojis")
+        if (
+            not isinstance(raw_emojis, list)
+            or not raw_emojis
+            or any(not isinstance(item, str) or not item.strip() for item in raw_emojis)
+            or raw_emojis != sorted(set(raw_emojis))
+        ):
+            raise WeeklyRunManifestError(
+                f"reaction snapshot post {index}.raw_emojis must be sorted unique strings"
+            )
+        event_count += len(raw_emojis)
+    if record_counts.get("personal_reaction_events_detected") != event_count:
+        raise WeeklyRunManifestError(
+            "reaction snapshot/stage record_counts mismatch: "
+            "personal_reaction_events_detected"
+        )
+    _ensure_json_value(payload, field="reaction snapshot")
+    return payload
+    return payload
 
 
 def _validate_radar_stage_outputs(
@@ -1356,6 +1626,7 @@ def _validate_reader_sidecar_identities(
     manifest: Mapping[str, Any],
     *,
     path_base: str | os.PathLike[str] | None,
+    reaction_snapshot_payload: Mapping[str, Any] | None,
 ) -> None:
     expected_status = _expected_terminal_status(manifest)
     expected_identity = {
@@ -1378,6 +1649,12 @@ def _validate_reader_sidecar_identities(
     expected_identity["warnings"] = list(manifest["warnings"])
     expected_manifest_path = (
         (Path(path_base).resolve() / "manifest.json") if path_base is not None else None
+    )
+    reaction_effects: dict[str, dict[str, Any]] = {}
+    reaction_stage = manifest["stages"]["reaction_sync"]
+    rich_reaction_snapshot_bound = (
+        reaction_stage["status"] == SUCCEEDED
+        and _optional_reaction_snapshot_binding(reaction_stage) is not None
     )
 
     for stage_name in ("weekly_brief", "knowledge_atlas"):
@@ -1434,6 +1711,388 @@ def _validate_reader_sidecar_identities(
                 raise WeeklyRunManifestError(
                     f"{stage_name} sidecar artifact_paths.{key} mismatch"
                 )
+
+        reaction_effect = sidecar.get("reaction_effect")
+        if reaction_effect is None and rich_reaction_snapshot_bound:
+            raise WeeklyRunManifestError(
+                f"{stage_name} sidecar reaction_effect is required when a verified "
+                "reaction snapshot is bound"
+            )
+        if reaction_effect is not None:
+            reaction_effects[stage_name] = _validate_reader_reaction_effect(
+                reaction_effect,
+                manifest=manifest,
+                stage_name=stage_name,
+                reaction_snapshot_payload=reaction_snapshot_payload,
+            )
+            _validate_reaction_effect_surface_refs(
+                reaction_effects[stage_name],
+                sidecar=sidecar,
+                stage_name=stage_name,
+            )
+
+    brief_succeeded = manifest["stages"]["weekly_brief"]["status"] == SUCCEEDED
+    atlas_succeeded = manifest["stages"]["knowledge_atlas"]["status"] == SUCCEEDED
+    if brief_succeeded and atlas_succeeded:
+        if bool(reaction_effects.get("weekly_brief")) != bool(
+            reaction_effects.get("knowledge_atlas")
+        ):
+            raise WeeklyRunManifestError(
+                "reader reaction_effect must be present on both succeeded surfaces"
+            )
+        if reaction_effects:
+            _validate_cross_surface_reaction_effects(
+                reaction_effects["weekly_brief"],
+                reaction_effects["knowledge_atlas"],
+            )
+
+
+def _validate_cross_surface_reaction_effects(
+    brief_effect: Mapping[str, Any],
+    atlas_effect: Mapping[str, Any],
+) -> None:
+    common_identity_fields = (
+        "schema_version",
+        "run_id",
+        "reporting_week",
+        "analysis_period_start",
+        "analysis_period_end",
+        "snapshot_ref",
+        "snapshot_status",
+        "ranking_policy",
+    )
+    if any(
+        brief_effect.get(field) != atlas_effect.get(field)
+        for field in common_identity_fields
+    ):
+        raise WeeklyRunManifestError(
+            "reader reaction_effect common identity differs across surfaces"
+        )
+    common_count_fields = (
+        "personal_reaction_events_detected",
+        "unique_reacted_posts",
+        "posts_resolved",
+        "eligible_period_posts",
+        "unique_atoms_linked",
+        "unique_canonical_threads_linked",
+        "canonical_threads_boosted",
+        "unique_compatibility_threads_linked",
+        "compatibility_threads_boosted",
+    )
+    brief_counts = brief_effect.get("counts")
+    atlas_counts = atlas_effect.get("counts")
+    if not isinstance(brief_counts, Mapping) or not isinstance(atlas_counts, Mapping) or any(
+        brief_counts.get(field) != atlas_counts.get(field)
+        for field in common_count_fields
+    ):
+        raise WeeklyRunManifestError(
+            "reader reaction_effect common funnel differs across surfaces"
+        )
+
+    def shared_audit(effect: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+        result: dict[str, dict[str, Any]] = {}
+        for item in effect.get("eligible_thread_audit") or []:
+            if not isinstance(item, Mapping):
+                continue
+            compatibility_ref = str(item.get("compatibility_thread_ref") or "")
+            result[compatibility_ref] = {
+                key: value
+                for key, value in item.items()
+                if key not in {"selected", "counterfactual_effect"}
+            }
+        return result
+
+    if shared_audit(brief_effect) != shared_audit(atlas_effect):
+        raise WeeklyRunManifestError(
+            "reader reaction_effect attribution differs across surfaces"
+        )
+
+
+def _validate_reader_reaction_effect(
+    value: Any,
+    *,
+    manifest: Mapping[str, Any],
+    stage_name: str,
+    reaction_snapshot_payload: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    if not isinstance(value, Mapping):
+        raise WeeklyRunManifestError(
+            f"{stage_name} sidecar reaction_effect must be an object"
+        )
+    effect = dict(value)
+    if effect.get("schema_version") != REACTION_EFFECT_SCHEMA_VERSION:
+        raise WeeklyRunManifestError(
+            f"{stage_name} sidecar reaction_effect schema mismatch"
+        )
+    expected_surface = (
+        "weekly_brief" if stage_name == "weekly_brief" else "knowledge_atlas"
+    )
+    if effect.get("surface") != expected_surface:
+        raise WeeklyRunManifestError(
+            f"{stage_name} sidecar reaction_effect surface mismatch"
+        )
+    if effect.get("run_id") != manifest.get("run_id"):
+        raise WeeklyRunManifestError(
+            f"{stage_name} sidecar reaction_effect run_id mismatch"
+        )
+    for field in (
+        "reporting_week",
+        "analysis_period_start",
+        "analysis_period_end",
+    ):
+        if effect.get(field) != manifest.get(field):
+            raise WeeklyRunManifestError(
+                f"{stage_name} sidecar reaction_effect period mismatch: {field}"
+            )
+    for optional_field in ("run_date", "generated_at", "week_label", "period_mode"):
+        if optional_field in effect and effect.get(optional_field) != manifest.get(
+            optional_field
+        ):
+            raise WeeklyRunManifestError(
+                f"{stage_name} sidecar reaction_effect period mismatch: {optional_field}"
+            )
+    reaction_stage = manifest["stages"]["reaction_sync"]
+    if effect.get("snapshot_ref") != reaction_stage.get("snapshot_ref"):
+        raise WeeklyRunManifestError(
+            f"{stage_name} sidecar reaction_effect snapshot_ref mismatch"
+        )
+    expected_snapshot_status = (
+        "complete"
+        if (
+            reaction_stage["status"] == SUCCEEDED
+            and _optional_reaction_snapshot_binding(reaction_stage) is not None
+        )
+        else "unavailable"
+        if reaction_stage["status"] == SUCCEEDED
+        else "partial"
+    )
+    if effect.get("snapshot_status") != expected_snapshot_status:
+        raise WeeklyRunManifestError(
+            f"{stage_name} sidecar reaction_effect snapshot_status mismatch"
+        )
+    counts = effect.get("counts")
+    if not isinstance(counts, Mapping):
+        raise WeeklyRunManifestError(
+            f"{stage_name} sidecar reaction_effect counts must be an object"
+        )
+    for key, count in counts.items():
+        if not isinstance(key, str) or not key:
+            raise WeeklyRunManifestError(
+                f"{stage_name} sidecar reaction_effect count key is invalid"
+            )
+        _nonnegative_int(
+            count,
+            field=f"{stage_name} sidecar reaction_effect counts.{key}",
+        )
+    # Keep the manifest quality gate in lockstep with the deterministic
+    # ranking receipt: identity parity alone must not bless a logically
+    # contradictory effect claim.
+    from output.reaction_personalization import (
+        ReactionPersonalizationError,
+        validate_reaction_effect,
+    )
+
+    try:
+        validate_reaction_effect(effect)
+    except ReactionPersonalizationError as exc:
+        raise WeeklyRunManifestError(
+            f"{stage_name} sidecar reaction_effect is invalid: {exc}"
+        ) from exc
+    rich_reaction_snapshot_bound = (
+        reaction_stage["status"] == SUCCEEDED
+        and _optional_reaction_snapshot_binding(reaction_stage) is not None
+    )
+    if rich_reaction_snapshot_bound:
+        if reaction_snapshot_payload is None:
+            raise WeeklyRunManifestError(
+                f"{stage_name} sidecar reaction_effect has no validated reaction snapshot"
+            )
+        _validate_reaction_effect_snapshot_lineage(
+            effect,
+            snapshot_payload=reaction_snapshot_payload,
+            stage_name=stage_name,
+        )
+    feedback_succeeded = manifest["stages"]["feedback_snapshot"]["status"] == SUCCEEDED
+    if rich_reaction_snapshot_bound and not feedback_succeeded:
+        if effect.get("status") != "partial":
+            raise WeeklyRunManifestError(
+                f"{stage_name} sidecar reaction_effect must be partial when the "
+                "confirmed-feedback snapshot is unavailable"
+            )
+        event_count = int(effect["counts"]["personal_reaction_events_detected"])
+        expected_reasons = (
+            {"confirmed_feedback_snapshot_unverified": event_count}
+            if event_count
+            else {}
+        )
+        if effect.get("unconsumed_by_reason") != expected_reasons:
+            raise WeeklyRunManifestError(
+                f"{stage_name} sidecar reaction_effect must attribute unavailable "
+                "personalization to the confirmed-feedback snapshot"
+            )
+    elif rich_reaction_snapshot_bound and effect.get("status") in {
+        "partial",
+        "unavailable",
+    }:
+        raise WeeklyRunManifestError(
+            f"{stage_name} sidecar reaction_effect cannot be partial when both "
+            "reaction and confirmed-feedback snapshots succeeded"
+        )
+    _ensure_json_value(effect, field=f"{stage_name} sidecar reaction_effect")
+    return effect
+
+
+def _validate_reaction_effect_snapshot_lineage(
+    effect: Mapping[str, Any],
+    *,
+    snapshot_payload: Mapping[str, Any],
+    stage_name: str,
+) -> None:
+    posts = snapshot_payload.get("observed_personal_posts")
+    if not isinstance(posts, list):
+        raise WeeklyRunManifestError("validated reaction snapshot lost its post list")
+
+    post_sources: dict[str, str] = {}
+    reaction_to_post: dict[str, str] = {}
+    ordered_reaction_refs: list[str] = []
+    event_count = 0
+    for post in posts:
+        if not isinstance(post, Mapping):
+            raise WeeklyRunManifestError("validated reaction snapshot contains an invalid post")
+        normalized_channel = str(post.get("channel_username") or "").strip().lstrip("@").casefold()
+        message_id = str(post.get("message_id") or "")
+        post_id = str(post.get("post_id") or "")
+        post_value = ":".join((normalized_channel, message_id, post_id))
+        post_ref = "reaction-post:" + hashlib.sha256(
+            post_value.encode("utf-8")
+        ).hexdigest()[:24]
+        post_sources[post_ref] = f"telegram:@{normalized_channel}"
+        raw_emojis = post.get("raw_emojis")
+        if not isinstance(raw_emojis, list):
+            raise WeeklyRunManifestError("validated reaction snapshot lost reaction events")
+        for raw_emoji in raw_emojis:
+            reaction_value = ":".join(
+                (normalized_channel, message_id, str(raw_emoji))
+            )
+            reaction_ref = (
+                "reaction:"
+                + hashlib.sha256(reaction_value.encode("utf-8")).hexdigest()[:24]
+            )
+            reaction_to_post[reaction_ref] = post_ref
+            ordered_reaction_refs.append(reaction_ref)
+            event_count += 1
+
+    counts = effect["counts"]
+    expected_counts = {
+        "personal_reaction_events_detected": event_count,
+        "unique_reacted_posts": len(posts),
+    }
+    for field, expected in expected_counts.items():
+        if counts.get(field) != expected:
+            raise WeeklyRunManifestError(
+                f"{stage_name} sidecar reaction_effect/snapshot mismatch: {field}"
+            )
+
+    for collection_name in (
+        "influenced_items",
+        "linked_only_items",
+        "eligible_thread_audit",
+    ):
+        items = effect.get(collection_name)
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if not isinstance(item, Mapping):
+                continue
+            item_post_refs = item.get("reacted_post_refs")
+            item_source_refs = item.get("source_refs")
+            if not isinstance(item_post_refs, list) or any(
+                post_ref not in post_sources for post_ref in item_post_refs
+            ):
+                raise WeeklyRunManifestError(
+                    f"{stage_name} sidecar reaction_effect contains a post outside "
+                    "the bound reaction snapshot"
+                )
+            expected_sources = sorted({post_sources[post_ref] for post_ref in item_post_refs})
+            if item_source_refs != expected_sources:
+                raise WeeklyRunManifestError(
+                    f"{stage_name} sidecar reaction_effect source lineage contradicts "
+                    "the bound reaction snapshot"
+                )
+
+    audit = effect.get("eligible_thread_audit")
+    consumed_post_refs = {
+        post_ref
+        for item in audit or []
+        if isinstance(item, Mapping) and item.get("selected") is True
+        for post_ref in item.get("reacted_post_refs") or []
+    }
+    expected_unconsumed_refs = [
+        reaction_ref
+        for reaction_ref in ordered_reaction_refs
+        if reaction_to_post[reaction_ref] not in consumed_post_refs
+    ]
+    if counts.get("unconsumed_reaction_events") != len(expected_unconsumed_refs):
+        raise WeeklyRunManifestError(
+            f"{stage_name} sidecar reaction_effect loses or double-consumes "
+            "snapshot reaction events"
+        )
+    unconsumed = effect.get("unconsumed")
+    actual_unconsumed_refs = [
+        item.get("reaction_ref")
+        for item in unconsumed or []
+        if isinstance(item, Mapping)
+    ]
+    expected_sample = expected_unconsumed_refs[:25]
+    if (
+        not isinstance(unconsumed, list)
+        or len(actual_unconsumed_refs) != len(unconsumed)
+        or actual_unconsumed_refs != expected_sample
+    ):
+        raise WeeklyRunManifestError(
+            f"{stage_name} sidecar reaction_effect unconsumed lineage does not "
+            "match the bound reaction snapshot"
+        )
+
+
+def _validate_reaction_effect_surface_refs(
+    effect: Mapping[str, Any],
+    *,
+    sidecar: Mapping[str, Any],
+    stage_name: str,
+) -> None:
+    selected_refs = {
+        str(item.get("surface_item_ref") or "").strip()
+        for collection_name in ("influenced_items", "linked_only_items")
+        for item in effect.get(collection_name) or []
+        if isinstance(item, Mapping)
+    }
+    if not selected_refs:
+        return
+    if stage_name == "weekly_brief":
+        available_refs = {
+            str(item.get("surface_item_ref") or "").strip()
+            for item in sidecar.get("actions") or []
+            if isinstance(item, Mapping)
+        }
+    else:
+        navigation = sidecar.get("thread_navigation")
+        navigation_threads = (
+            navigation.get("threads")
+            if isinstance(navigation, Mapping)
+            else []
+        )
+        available_refs = {
+            f"thread:{str(item.get('slug') or '').strip()}"
+            for item in navigation_threads or []
+            if isinstance(item, Mapping) and str(item.get("slug") or "").strip()
+        }
+    missing = sorted(selected_refs.difference(available_refs))
+    if missing:
+        raise WeeklyRunManifestError(
+            f"{stage_name} sidecar reaction_effect references items absent from "
+            f"the rendered surface: {', '.join(missing)}"
+        )
 
 
 def _load_json_object(path: Path, *, label: str) -> Mapping[str, Any]:

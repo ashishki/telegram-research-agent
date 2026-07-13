@@ -42,19 +42,19 @@ below, but active implementation starts from the IRX task graph.
 | Strategy Reviewer | `implemented_and_verified` advisory-only |
 | Market/business Radar context | `implemented_and_verified` as `context_only` |
 | Radar RVE contract/adapters in sibling repo | `implemented_and_verified`, `needs_live_validation` |
-| Report V2 contract and roadmap | `implementation_in_progress`; IRX-0 documentation plus IRX-1 period and IRX-2 run-manifest/Radar semantics are implemented and verified |
+| Report V2 contract and roadmap | `implementation_in_progress`; IRX-0 documentation plus IRX-1 period, IRX-2 run-manifest/Radar, and IRX-3 reaction-personalization semantics are implemented and verified |
 | Portfolio dogfood evidence | `blocked_on_IRX-14_start_gate` |
 
 ## Next Candidate Task
 
-`IRX-3 - Reaction-To-Ranking Personalization And Effect Receipt`
+`IRX-4 - Canonical Idea Thread Curation And Merge/Split Lifecycle`
 
-Build the deterministic reaction -> post -> atom -> thread-resolution -> weak
-ranking boost -> effect-receipt projection on top of the verified IRX-1 period
-and IRX-2 reaction-snapshot/run identity. Preserve evidence precedence, unknown
-semantics for absent reactions, V1 consumers, and all Radar gates. The exact
-implementation prompt is in `docs/CODEX_PROMPT.md`; the binding contract is
-`docs/reaction_personalization_contract.md`.
+Add a durable canonical registry, aliases, incremental merge/split lifecycle,
+and period-end as-of lineage on top of raw Idea Threads. Close the nullable
+canonical side of the IRX-3 resolver without changing reaction eligibility,
+strength, evidence/feedback precedence, provenance, V1 consumers, or Radar
+gates. The exact implementation prompt is in `docs/CODEX_PROMPT.md`; the task
+card is in `docs/intelligence_report_v2_roadmap.md`.
 
 ## Dependency Graph
 
@@ -76,8 +76,8 @@ contract.
 | IRX-0 | P0 | `implemented_documentation_only` | W29 audit, Report V2 roadmap, and product contracts | none |
 | IRX-1 | P0 | `implemented_and_verified` | Separate generation time from the last completed ISO-week analysis period | IRX-0 |
 | IRX-2 | P0 | `implemented_and_verified` | One weekly run manifest and required same-run Radar artifact contract | IRX-1 |
-| IRX-3 | P0 | `ready` | Map reactions through posts/atoms and a thread-resolution interface into a weak boost/receipt; canonical acceptance closes in IRX-4 | IRX-1, IRX-2 |
-| IRX-4 | P0 | `planned` | Curate stable idea-level threads with merge/split lifecycle and provenance | IRX-1, IRX-2, IRX-3 |
+| IRX-3 | P0 | `implemented_and_verified` | Map reactions through posts/atoms and a thread-resolution interface into a weak boost/receipt; canonical acceptance closes in IRX-4 | IRX-1, IRX-2 |
+| IRX-4 | P0 | `ready` | Curate stable idea-level threads with merge/split lifecycle, provenance, and historical as-of resolution | IRX-1, IRX-2, IRX-3 |
 | IRX-5 | P0 | `planned` | Produce schema-validated Russian editorial intelligence JSON from bounded cited inputs | IRX-1..IRX-4 |
 | IRX-8 | P1 | `planned` | Shared deterministic, offline static visualization components | IRX-4, IRX-5 |
 | IRX-9 | P1 | `planned` | Evidence-backed, named, PR-sized project implications | IRX-4, IRX-5, IRX-8 |
@@ -160,9 +160,60 @@ rollout implications are in `docs/intelligence_report_v2_roadmap.md`.
   new run and may record `supersedes_run_id`; it does not expose same-ID resume.
   The core state machine permits retry transitions only while a manifest is
   still unfinalized.
-- Handoff: IRX-3 is ready and is the only next implementation scope. IRX-2 did
-  not add a reaction boost, canonical curator, editorial LLM, V2 redesign,
-  reader-value gates, or report-specific feedback redesign.
+- Historical handoff at IRX-2 completion: IRX-3 became the only next
+  implementation scope. IRX-2 itself did not add a reaction boost, canonical
+  curator, editorial LLM, V2 redesign, reader-value gates, or report-specific
+  feedback redesign; the IRX-3 handoff is now closed below.
+
+### 2026-07-13 - IRX-3 Reaction-To-Ranking Personalization
+
+- Status: `implemented_and_verified`; 145 core
+  reaction/report/feedback/Strategy/split/retrieval/PI tests and 45
+  manifest/orchestrator tests passed. `git diff --check` passed. Live/heavy
+  pipelines and the full suite were intentionally not run.
+- A rich current reaction snapshot is immutable and same-run bound by run,
+  period, path, checksum, coverage, observed posts, and event counts. Only a
+  complete verified snapshot can create fresh interest; incomplete, stale,
+  truncated, wrong-period, or tampered input fails closed. Legacy count-only
+  IRX-2 output remains supported only as explicitly unbound/unavailable: it
+  creates no fresh boost and does not require a rich receipt.
+  A complete reaction snapshot with an unattested confirmed-feedback stage gets
+  a distinct partial receipt and no boost.
+- Every operator-visible emoji is equal positive implicit-interest provenance,
+  deduplicated once per post. Aggregate reactions are ignored, removed/absent
+  reactions are unknown rather than negative, and source-post time must fall in
+  the exact IRX-1 half-open period; Monday can therefore consume an eligible
+  Sunday source post from the completed week.
+- Stored identity is the only lineage: Telegram channel/message -> raw post ->
+  normalized post -> bounded atom -> `idea_thread_atoms` -> current
+  compatibility thread. Opaque post/reaction/atom/source refs, full eligible
+  audit, bounded unconsumed reasons, and counterfactual effects are validated.
+  Current refs are explicitly not stable canonical identity.
+- The weak marker acts only after evidence, safety, period, freshness,
+  contradiction/supersession, and deduplication eligibility and below confirmed
+  explicit feedback. It can make at most one adjacent promotion among otherwise
+  equal eligible candidates; global scores, evidence confidence, feedback
+  semantics, and Radar gates are unchanged.
+- Brief and Atlas classify the same personalized order against their exact
+  four-action and twelve-thread selectors. Their additive
+  `reaction_personalization.v1` receipts use exact `thread:<slug>` surface refs
+  and must agree on run/period/snapshot/policy identity, pre-selection funnel,
+  non-selection attribution, and snapshot lineage. Each receipt agrees with its
+  own rendered totals; selector-dependent status, selected counts,
+  counterfactuals, and unconsumed results may differ.
+- Strategy Reviewer can only produce an unapproved advisory proposal after the
+  same pattern appears in at least three completed weeks and four distinct
+  reacted posts. IRX-3 never mutates profile, config, prompt, project, source
+  policy, or code.
+- Compatibility: standalone/V1 runs without a bound snapshot keep prior order
+  and contracts; legacy reaction-sync integer results and `marked_important`
+  alias remain readable; Brief/Atlas, split, retrieval, Hermes/PI, Obsidian, and
+  Strategy Reviewer additions are additive. No DB schema, LLM prompt, generated
+  artifact, sibling Radar code, or cross-repository gate changed.
+- Handoff: IRX-4 is ready and is the only next implementation scope. It must add
+  the durable canonical registry, aliases, merge/split lifecycle, and historical
+  period-end as-of membership while preserving IRX-3 post/atom provenance and
+  reaction semantics. IRX-5 and later work remain planned.
 
 ## Existing-Work Reconciliation
 
@@ -842,17 +893,16 @@ cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
 
 ## Next-Task Verification Command Set
 
-For IRX-3, use the exact focused matrix in `docs/CODEX_PROMPT.md`; do not run
+For IRX-4, use the exact focused matrix in `docs/CODEX_PROMPT.md`; do not run
 expensive LLM jobs or the full suite for normal slice verification.
 
 ```bash
 git diff --check
 PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache \
-  python3 -m unittest tests.test_reaction_personalization \
-  tests.test_reaction_sync tests.test_ai_intelligence_report \
-  tests.test_ai_report_feedback tests.test_strategy_reviewer \
-  tests.test_split_intelligence_reports \
-  tests.test_intelligence_retrieval_items tests.test_pi_facade
+  python3 -m unittest tests.test_idea_threads \
+  tests.test_ai_intelligence_report tests.test_frontier_analysis \
+  tests.test_intelligence_retrieval_items tests.test_obsidian_export \
+  tests.test_reaction_personalization
 ```
 
 ## Backlog Stop Conditions

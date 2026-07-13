@@ -19,6 +19,10 @@ from output.ai_intelligence_report import (
     _metric_card,
     _momentum_bar,
     _learning_actions,
+    _reaction_effect_for_surface,
+    _reaction_ranked_threads_for_navigation,
+    _render_reaction_effect_receipt,
+    _render_reaction_item_reason,
     _source_channel_counts,
     _source_links,
     _status_label,
@@ -297,6 +301,7 @@ def render_knowledge_atlas_html(context: dict, *, generated_at: str | None = Non
     period_label = _human_period_label(context) or week_label
     generated = generated_at or str(context.get("generated_at") or _utc_now_iso())
     run_status_notice = _render_run_status_notice(context)
+    reaction_receipt = _render_reaction_effect_receipt(context, "knowledge_atlas")
     run_identity_metadata = _render_run_identity_metadata(context)
     project_learning_projection = _atlas_project_learning_projection(context)
     section_bodies = {
@@ -373,6 +378,7 @@ th, td {{ border-bottom:1px solid var(--line); text-align:left; padding:9px 8px;
 <p class="muted">Period mode: {_escape(str(context.get("period_mode") or "explicit_iso_week"))}.</p>
 <p class="muted">Generated {_escape(generated)}.</p>
 {run_status_notice}
+{reaction_receipt}
 <p class="muted">Bounded Idea Thread and Knowledge Atom context. This is a rolling knowledge map, not a raw Telegram mirror.</p>
 <nav>{nav}</nav>
 </header>
@@ -492,6 +498,11 @@ def _knowledge_atlas_metadata(
         "intelligence_contract": intelligence_contract,
         "compressed_context": context.get("compressed_context") or [],
         "source_channels": context.get("source_channels") or [],
+        **(
+            {"reaction_effect": reaction_effect}
+            if (reaction_effect := _reaction_effect_for_surface(context, "knowledge_atlas")) is not None
+            else {}
+        ),
         "quality_findings": [finding.as_dict() for finding in quality_findings],
         "retrieval_note": "Knowledge Atlas is a rolling/cumulative knowledge map over curated objects, not raw Telegram runtime memory.",
     }
@@ -562,7 +573,14 @@ def _render_atlas_overview(context: dict) -> str:
 
 def _thread_navigation_model(context: dict) -> dict:
     threads = context.get("threads") or []
-    items = [_thread_navigation_item(thread) for thread in threads[:12]]
+    navigation_threads = _reaction_ranked_threads_for_navigation(
+        threads,
+        context.get("reaction_ranking_context")
+        or context.get("feedback_context")
+        or {},
+        limit=12,
+    )
+    items = [_thread_navigation_item(thread) for thread in navigation_threads]
     return {
         "schema_version": "knowledge_atlas_thread_navigation.v1",
         "week_label": context.get("week_label"),
@@ -755,7 +773,9 @@ def _render_thread_navigation(context: dict) -> str:
         f'<p class="muted">{_escape(thread.get("status") or "active")} · {_escape(thread.get("maturity") or "early")}</p></li>'
         for thread in threads
     )
-    detail_cards = "".join(_render_thread_detail(thread) for thread in threads[:8])
+    detail_cards = "".join(
+        _render_thread_detail(thread, context=context) for thread in threads[:8]
+    )
     return (
         '<div class="thread-nav-grid">'
         '<aside class="thread-index"><h3>Thread Index</h3>'
@@ -767,7 +787,7 @@ def _render_thread_navigation(context: dict) -> str:
     )
 
 
-def _render_thread_detail(thread: dict) -> str:
+def _render_thread_detail(thread: dict, *, context: dict) -> str:
     evidence_items = [item for item in thread.get("evidence_items") or [] if isinstance(item, dict)]
     timeline_items = [item for item in thread.get("timeline") or [] if isinstance(item, dict)]
     claims = _html_list(thread.get("claims"), "No current claims captured.")
@@ -789,12 +809,18 @@ def _render_thread_detail(thread: dict) -> str:
     ) or '<li class="muted">No decision projection.</li>'
     growth = thread.get("evidence_growth") if isinstance(thread.get("evidence_growth"), dict) else {}
     diversity = thread.get("source_diversity") if isinstance(thread.get("source_diversity"), dict) else {}
+    reaction_reason = _render_reaction_item_reason(
+        context,
+        "knowledge_atlas",
+        f"thread:{thread.get('slug')}",
+    )
     return (
         f'<article class="thread-detail" id="{_escape(thread.get("id") or "")}">'
         f'<h3>{_escape(thread.get("title") or "Thread")}</h3>'
         f'<p><span class="tag">{_escape(_status_label(thread.get("status") or "active"))}</span> '
         f'<span class="muted">maturity {_escape(thread.get("maturity") or "early")}</span></p>'
         f'<p>{_escape(_truncate_text(thread.get("current_understanding") or "", 260))}</p>'
+        f'{reaction_reason}'
         f'<p class="muted"><b>Change since previous period:</b> {_escape(_truncate_text(thread.get("change_since_previous_period") or "", 220))}</p>'
         f'<h3>Thread Timeline</h3><ol class="timeline">{timeline}</ol>'
         '<div class="thread-detail-grid">'
@@ -816,9 +842,25 @@ def _render_thread_detail(thread: dict) -> str:
 
 
 def _atlas_project_learning_projection(context: dict) -> dict:
-    actions = _learning_actions(context.get("threads") or [], context.get("feedback_context") or {})
+    threads = [
+        {
+            key: value
+            for key, value in thread.items()
+            if not str(key).startswith("_reaction_")
+        }
+        for thread in sorted(
+            (item for item in context.get("threads") or [] if isinstance(item, dict)),
+            key=lambda item: int(
+                item.get("_reaction_baseline_position")
+                if isinstance(item.get("_reaction_baseline_position"), int)
+                else len(context.get("threads") or [])
+            ),
+        )
+    ]
+    neutral_context = {**context, "threads": threads}
+    actions = _learning_actions(threads, context.get("feedback_context") or {})
     return build_project_learning_projection(
-        context,
+        neutral_context,
         actions=actions,
         feedback_context=context.get("feedback_context") or {},
     )

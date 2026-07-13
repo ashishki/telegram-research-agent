@@ -14,6 +14,10 @@ from db.ai_report_feedback import summarize_ai_report_feedback
 from db.idea_threads import fetch_idea_thread_atoms, fetch_idea_threads
 from db.knowledge_atoms import fetch_knowledge_atoms
 from output.strategy_reviewer import build_strategy_review
+from output.reaction_personalization import (
+    ReactionPersonalizationError,
+    validate_reaction_effect,
+)
 
 
 DEFAULT_OUTPUT_ROOT = PROJECT_ROOT / "data" / "output"
@@ -21,6 +25,7 @@ DEFAULT_VISUAL_OUTPUT_DIR = DEFAULT_OUTPUT_ROOT / "ai_visual_intelligence"
 DEFAULT_AI_OUTPUT_DIR = DEFAULT_OUTPUT_ROOT / "ai_intelligence"
 DEFAULT_KNOWLEDGE_ATLAS_OUTPUT_DIR = DEFAULT_OUTPUT_ROOT / "knowledge_atlas"
 DEFAULT_WEEKLY_BRIEF_OUTPUT_DIR = DEFAULT_OUTPUT_ROOT / "weekly_intelligence_briefs"
+DEFAULT_WEEKLY_RUN_ROOT = DEFAULT_OUTPUT_ROOT / "weekly_intelligence_runs"
 DEFAULT_MVP_OUTPUT_DIR = DEFAULT_OUTPUT_ROOT / "mvp_weekly"
 DEFAULT_RADAR_OUTPUT_DIR = PROJECT_ROOT.parent / "Demand-to-MVP-Radar" / "reports" / "mvp_of_week"
 WEEK_RE = re.compile(r"(?P<week>\d{4}-W\d{2})")
@@ -90,7 +95,18 @@ def build_retrieval_items(
             items.extend(_knowledge_atom_items(connection, week_label=clean_week))
             items.extend(_idea_thread_items(connection, week_label=clean_week))
             items.extend(_feedback_summary_items(connection, week_label=clean_week))
-            items.extend(_strategy_reviewer_items(connection, week_label=clean_week))
+            weekly_run_root = (
+                Path(output_root) / "weekly_intelligence_runs"
+                if output_root is not None
+                else DEFAULT_WEEKLY_RUN_ROOT
+            )
+            items.extend(
+                _strategy_reviewer_items(
+                    connection,
+                    week_label=clean_week,
+                    weekly_run_root=weekly_run_root,
+                )
+            )
 
     if clean_week and not any(item.item_type == "mvp_dossier" for item in items):
         mvp = load_mvp_radar_status(
@@ -253,10 +269,192 @@ def _items_from_workbook(workbook: Mapping[str, Any]) -> list[IntelligenceRetrie
     items.extend(_action_card_items(workbook, week_label=week, generated_at=generated_at))
     items.extend(_project_diagnostic_items(workbook, week_label=week, generated_at=generated_at))
     items.extend(_project_learning_projection_items(workbook, week_label=week, generated_at=generated_at))
+    items.extend(_reaction_effect_items(workbook, week_label=week, generated_at=generated_at))
     mvp = workbook.get("mvp_radar") if isinstance(workbook.get("mvp_radar"), Mapping) else None
     if mvp:
         items.append(_mvp_item(dict(mvp), week))
     return items
+
+
+def _reaction_effect_items(
+    workbook: Mapping[str, Any],
+    *,
+    week_label: str | None,
+    generated_at: str | None,
+) -> list[IntelligenceRetrievalItem]:
+    """Expose the additive IRX-3 receipt as audit-friendly retrieval items.
+
+    The reader HTML deliberately hides snapshot and lineage identifiers.  The
+    retrieval projection is the compatible machine-facing surface where those
+    already-validated sidecar references remain queryable.
+    """
+
+    effect = workbook.get("reaction_effect")
+    if not isinstance(effect, Mapping):
+        return []
+    schema_version = _clean_text(effect.get("schema_version"))
+    if schema_version != "reaction_personalization.v1":
+        return []
+    try:
+        effect = validate_reaction_effect(effect)
+    except (TypeError, ValueError, ReactionPersonalizationError):
+        return []
+    surface = _clean_text(effect.get("surface")) or _clean_text(workbook.get("artifact_type")) or "unknown"
+    snapshot_ref = _clean_text(effect.get("snapshot_ref"))
+    run_id = _clean_text(effect.get("run_id"))
+    status = _clean_text(effect.get("status")) or "unavailable"
+    counts = effect.get("counts") if isinstance(effect.get("counts"), Mapping) else {}
+    source_refs = _unique(
+        value
+        for value in (
+            snapshot_ref,
+            run_id,
+            *_artifact_source_refs(workbook),
+        )
+        if value
+    )
+    result = [
+        IntelligenceRetrievalItem(
+            id=f"reaction_effect:{week_label or 'unknown'}:{_slug(surface)}",
+            item_type="reaction_effect",
+            week_label=week_label,
+            title="Reaction personalization receipt",
+            summary=_clean_text(effect.get("reader_summary_ru")) or None,
+            text=_join_text(
+                effect.get("reader_summary_ru"),
+                {"status": status, "snapshot_status": effect.get("snapshot_status"), "counts": counts},
+            ),
+            source_refs=source_refs,
+            status=status,
+            created_at=generated_at,
+            updated_at=generated_at,
+        )
+    ]
+
+    selected_thread_refs: set[str] = set()
+    for bucket_name, item_type in (
+        ("influenced_items", "reaction_influence"),
+        ("linked_only_items", "reaction_linked_only"),
+    ):
+        for index, raw_item in enumerate(_as_list(effect.get(bucket_name)), start=1):
+            if not isinstance(raw_item, Mapping):
+                continue
+            item_ref = _clean_text(raw_item.get("surface_item_ref")) or f"item-{index}"
+            compatibility_ref = _clean_text(
+                raw_item.get("compatibility_thread_ref") or raw_item.get("current_thread_ref")
+            )
+            if compatibility_ref:
+                selected_thread_refs.add(compatibility_ref)
+            evidence_refs = _string_values(raw_item.get("evidence_refs"))
+            reacted_post_refs = _string_values(raw_item.get("reacted_post_refs"))
+            item_source_refs = _string_values(raw_item.get("source_refs"))
+            atom_ids: list[int | str] = []
+            for ref in evidence_refs:
+                if ref.startswith("atom:"):
+                    value = ref.removeprefix("atom:")
+                    atom_ids.extend(_list_values(int(value) if value.isdigit() else value))
+            result.append(
+                IntelligenceRetrievalItem(
+                    id=f"{item_type}:{week_label or 'unknown'}:{_slug(surface)}:{_slug(item_ref)}",
+                    item_type=item_type,
+                    week_label=week_label,
+                    title=_clean_text(raw_item.get("reader_reason_ru")) or item_ref,
+                    summary=_clean_text(raw_item.get("effect")) or None,
+                    text=_json_text(dict(raw_item)),
+                    source_refs=_unique(
+                        [
+                            *source_refs,
+                            *reacted_post_refs,
+                            *item_source_refs,
+                            *evidence_refs,
+                        ]
+                    ),
+                    atom_ids=_unique(atom_ids),
+                    thread_slug=_reaction_thread_slug(compatibility_ref),
+                    status=_clean_text(raw_item.get("effect")) or None,
+                    created_at=generated_at,
+                    updated_at=generated_at,
+                )
+            )
+
+    for index, raw_item in enumerate(
+        _as_list(effect.get("eligible_thread_audit")),
+        start=1,
+    ):
+        if not isinstance(raw_item, Mapping):
+            continue
+        compatibility_ref = _clean_text(
+            raw_item.get("compatibility_thread_ref")
+            or raw_item.get("current_thread_ref")
+        )
+        if compatibility_ref and compatibility_ref in selected_thread_refs:
+            continue
+        item_ref = _clean_text(raw_item.get("surface_item_ref")) or f"item-{index}"
+        evidence_refs = _string_values(raw_item.get("evidence_refs"))
+        reacted_post_refs = _string_values(raw_item.get("reacted_post_refs"))
+        item_source_refs = _string_values(raw_item.get("source_refs"))
+        atom_ids: list[int | str] = []
+        for ref in evidence_refs:
+            if ref.startswith("atom:"):
+                value = ref.removeprefix("atom:")
+                atom_ids.extend(_list_values(int(value) if value.isdigit() else value))
+        result.append(
+            IntelligenceRetrievalItem(
+                id=(
+                    f"reaction_eligible_unselected:{week_label or 'unknown'}:"
+                    f"{_slug(surface)}:{_slug(item_ref)}"
+                ),
+                item_type="reaction_eligible_unselected",
+                week_label=week_label,
+                title=_clean_text(raw_item.get("reader_reason_ru")) or item_ref,
+                summary=_clean_text(raw_item.get("counterfactual_effect")) or None,
+                text=_json_text(dict(raw_item)),
+                source_refs=_unique(
+                    [
+                        *source_refs,
+                        *reacted_post_refs,
+                        *item_source_refs,
+                        *evidence_refs,
+                    ]
+                ),
+                atom_ids=_unique(atom_ids),
+                thread_slug=_reaction_thread_slug(compatibility_ref),
+                status=_clean_text(raw_item.get("counterfactual_effect")) or None,
+                created_at=generated_at,
+                updated_at=generated_at,
+            )
+        )
+
+    for index, raw_item in enumerate(_as_list(effect.get("unconsumed")), start=1):
+        if not isinstance(raw_item, Mapping):
+            continue
+        reaction_ref = _clean_text(raw_item.get("reaction_ref")) or f"event-{index}"
+        reason = _clean_text(raw_item.get("reason")) or "snapshot_unverified"
+        result.append(
+            IntelligenceRetrievalItem(
+                id=f"reaction_unconsumed:{week_label or 'unknown'}:{_slug(surface)}:{_slug(reaction_ref)}",
+                item_type="reaction_unconsumed",
+                week_label=week_label,
+                title="Unconsumed reaction signal",
+                summary=reason,
+                text=_json_text(dict(raw_item)),
+                source_refs=_unique([*source_refs, reaction_ref]),
+                status=reason,
+                created_at=generated_at,
+                updated_at=generated_at,
+            )
+        )
+    return result
+
+
+def _reaction_thread_slug(reference: str) -> str | None:
+    clean = _clean_text(reference)
+    if not clean:
+        return None
+    for prefix in ("idea_thread:", "thread:"):
+        if clean.startswith(prefix):
+            return clean[len(prefix) :] or None
+    return clean
 
 
 def _canonical_contract_items(
@@ -879,15 +1077,25 @@ def _strategy_reviewer_items(
     connection: sqlite3.Connection,
     *,
     week_label: str | None,
+    weekly_run_root: str | Path,
 ) -> list[IntelligenceRetrievalItem]:
     if not _table_exists(connection, "ai_report_feedback_events"):
         return []
     try:
-        review = build_strategy_review(connection, week_label=week_label)
+        review = build_strategy_review(
+            connection,
+            week_label=week_label,
+            weekly_run_root=weekly_run_root,
+        )
     except sqlite3.Error:
         return []
     suggestions = review.get("suggestions") or {}
     tasks = [task for task in _as_list(review.get("codex_tasks")) if isinstance(task, Mapping)]
+    proposals = [
+        item
+        for item in _as_list(review.get("reaction_pattern_proposals"))
+        if isinstance(item, Mapping)
+    ]
     title = f"Strategy Reviewer {week_label or 'all'}"
     return [
         IntelligenceRetrievalItem(
@@ -895,12 +1103,17 @@ def _strategy_reviewer_items(
             item_type="strategy_reviewer_note",
             week_label=week_label,
             title=title,
-            summary=_join_text(*(suggestions.get("test_next_week") or [])) or None,
+            summary=(
+                f"{len(proposals)} unapproved reaction pattern proposal(s)."
+                if proposals
+                else _join_text(*(suggestions.get("test_next_week") or [])) or None
+            ),
             text=_join_text(
                 _json_text(suggestions),
                 _json_text(review.get("memory_only_updates")),
                 _json_text(review.get("approval_required")),
                 _json_text(tasks),
+                _json_text(proposals),
             ),
             source_refs=[],
             atom_ids=[],

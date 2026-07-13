@@ -14,7 +14,12 @@ from db.migrate import run_migrations
 from output.ai_report_contract import INTELLIGENCE_CONTRACT_VERSION, RADAR_INTELLIGENCE_CONTRACT_VERSION
 from output.ai_intelligence_report import load_ai_intelligence_context
 from output.idea_threads import refresh_idea_threads
-from output.knowledge_atlas_report import render_knowledge_atlas_html
+from output.knowledge_atlas_report import (
+    _atlas_project_learning_projection,
+    _thread_navigation_model,
+    build_knowledge_atlas_artifact,
+    render_knowledge_atlas_html,
+)
 from output.reporting_period import resolve_reporting_period
 from output.split_intelligence_reports import deliver_split_intelligence_reports, generate_split_intelligence_reports
 from output.weekly_intelligence_brief import (
@@ -24,6 +29,102 @@ from output.weekly_intelligence_brief import (
 
 
 class TestSplitIntelligenceReports(unittest.TestCase):
+    def test_atlas_secondary_learning_projection_is_reaction_neutral(self):
+        baseline_threads = [
+            {
+                "id": index,
+                "slug": slug,
+                "title": slug,
+                "status": "active",
+                "momentum_30d": 0.5,
+                "source_channel_count": 2,
+                "current_claims": [slug],
+                "atoms": [],
+            }
+            for index, slug in enumerate(("one", "two", "reacted"), start=1)
+        ]
+        personalized_threads = [
+            {**baseline_threads[0], "_reaction_baseline_position": 0},
+            {
+                **baseline_threads[2],
+                "_reaction_baseline_position": 2,
+                "_reaction_interest": True,
+            },
+            {**baseline_threads[1], "_reaction_baseline_position": 1},
+        ]
+
+        def capture(context, *, actions, **_kwargs):
+            return {
+                "thread_slugs": [thread["slug"] for thread in context["threads"]],
+                "action_slugs": [action.get("thread_slug") for action in actions],
+                "has_reaction_markers": any(
+                    any(str(key).startswith("_reaction_") for key in thread)
+                    for thread in context["threads"]
+                ),
+            }
+
+        with patch(
+            "output.knowledge_atlas_report.build_project_learning_projection",
+            side_effect=capture,
+        ):
+            baseline = _atlas_project_learning_projection(
+                {"threads": baseline_threads, "feedback_context": {}}
+            )
+            personalized = _atlas_project_learning_projection(
+                {"threads": personalized_threads, "feedback_context": {}}
+            )
+
+        self.assertEqual(personalized, baseline)
+        self.assertFalse(personalized["has_reaction_markers"])
+
+    def test_atlas_navigation_uses_the_same_reaction_feedback_tie_context(self):
+        threads = [
+            {
+                "id": 1,
+                "slug": "stronger-feedback",
+                "title": "Stronger feedback",
+                "status": "active",
+                "momentum_30d": 0.5,
+                "source_channel_count": 2,
+                "changed_this_week": False,
+                "last_seen_at": "2026-07-12T00:00:00Z",
+                "atom_count": 2,
+                "atoms": [],
+                "_reaction_baseline_position": 0,
+            },
+            {
+                "id": 2,
+                "slug": "reacted",
+                "title": "Reacted",
+                "status": "active",
+                "momentum_30d": 0.5,
+                "source_channel_count": 2,
+                "changed_this_week": False,
+                "last_seen_at": "2026-07-12T00:00:00Z",
+                "atom_count": 2,
+                "atoms": [],
+                "_reaction_baseline_position": 1,
+                "_reaction_interest": True,
+            },
+        ]
+
+        navigation = _thread_navigation_model(
+            {
+                "threads": threads,
+                "feedback_context": {
+                    "promoted_target_refs": ["topic:stronger-feedback"],
+                },
+                "reaction_ranking_context": {
+                    "promoted_target_refs": ["topic:stronger-feedback"],
+                },
+            }
+        )
+
+        self.assertEqual(
+            [thread["slug"] for thread in navigation["threads"]],
+            ["stronger-feedback", "reacted"],
+        )
+
     def _make_db(self) -> str:
         tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
         tmp.close()
@@ -581,6 +682,156 @@ class TestSplitIntelligenceReports(unittest.TestCase):
             os.unlink(db_path)
 
         self.assertEqual(sidecar["marked_posts"], marked_posts)
+
+    def test_reaction_receipt_is_additive_reader_safe_and_equal_across_surfaces(self):
+        context = {
+            "week_label": "2026-W28",
+            "reporting_week": "2026-W28",
+            "run_date": "2026-07-13",
+            "generated_at": "2026-07-13T07:02:52Z",
+            "period_mode": "completed_iso_week",
+            "analysis_period_start": "2026-07-06T00:00:00Z",
+            "analysis_period_end": "2026-07-13T00:00:00Z",
+            "threads": [
+                {
+                    "id": 7,
+                    "slug": "evaluation-discipline",
+                    "title": "Evaluation discipline",
+                    "status": "active",
+                    "momentum_30d": 0.5,
+                    "source_channel_count": 1,
+                    "atom_count": 0,
+                    "changed_this_week": False,
+                    "current_claims": ["Verify evaluation claims."],
+                    "superseded_claims": [],
+                    "contradictions": [],
+                    "atoms": [],
+                }
+            ],
+            "source_channels": [],
+            "feedback_context": {},
+            "reaction_effect": {
+                "schema_version": "reaction_personalization.v1",
+                "run_id": "tra-weekly-2026-W28-secret",
+                "surface": "weekly_brief",
+                "reporting_week": "2026-W28",
+                "analysis_period_start": "2026-07-06T00:00:00Z",
+                "analysis_period_end": "2026-07-13T00:00:00Z",
+                "snapshot_ref": "reaction-snapshot:secret",
+                "snapshot_status": "complete",
+                "status": "effects_applied",
+                "counts": {
+                    "personal_reaction_events_detected": 2,
+                    "unique_reacted_posts": 2,
+                    "posts_resolved": 1,
+                    "eligible_period_posts": 1,
+                    "unique_atoms_linked": 1,
+                    "unique_canonical_threads_linked": 0,
+                    "canonical_threads_boosted": 0,
+                    "unique_compatibility_threads_linked": 1,
+                    "compatibility_threads_boosted": 1,
+                    "selected_items_linked": 1,
+                    "selected_signals_influenced": 1,
+                    "unconsumed_reaction_events": 1,
+                },
+                "influenced_items": [
+                    {
+                        "surface_item_ref": "thread:evaluation-discipline",
+                        "effect": "rank_changed",
+                        "boost_applied": True,
+                        "rank_changed": True,
+                        "selection_changed": False,
+                        "linked_only": False,
+                        "compatibility_thread_ref": "idea_thread:evaluation-discipline",
+                        "current_thread_ref": "idea_thread:evaluation-discipline",
+                        "canonical_thread_ref": None,
+                        "thread_resolution_status": "compatibility_current_thread_only",
+                        "boost_role": "weak_implicit_interest",
+                        "reacted_post_count": 1,
+                        "reader_reason_ru": "Вы отметили один связанный пост за отчётный период.",
+                        "reacted_post_refs": ["reaction-post:222222222222222222222222"],
+                        "source_refs": ["telegram:@source"],
+                        "evidence_refs": ["atom:999"],
+                    }
+                ],
+                "linked_only_items": [],
+                "eligible_thread_audit": [
+                    {
+                        "surface_item_ref": "thread:evaluation-discipline",
+                        "selected": True,
+                        "counterfactual_effect": "rank_changed",
+                        "boost_applied": True,
+                        "compatibility_thread_ref": "idea_thread:evaluation-discipline",
+                        "current_thread_ref": "idea_thread:evaluation-discipline",
+                        "canonical_thread_ref": None,
+                        "thread_resolution_status": "compatibility_current_thread_only",
+                        "boost_role": "weak_implicit_interest",
+                        "reacted_post_count": 1,
+                        "reader_reason_ru": "Вы отметили один связанный пост за отчётный период.",
+                        "reacted_post_refs": ["reaction-post:222222222222222222222222"],
+                        "source_refs": ["telegram:@source"],
+                        "evidence_refs": ["atom:999"],
+                    }
+                ],
+                "unconsumed_by_reason": {"report_limit_reached": 1},
+                "unconsumed": [
+                    {
+                        "reaction_ref": "reaction:333333333333333333333333",
+                        "reason": "report_limit_reached",
+                        "reasons": ["report_limit_reached"],
+                        "audit_detail": "eligible compatibility thread remained below the report limit",
+                    }
+                ],
+                "ranking_policy": {
+                    "policy_version": "reaction-ranking.v1",
+                    "strength": "weak",
+                    "below_confirmed_feedback": True,
+                    "can_change_evidence_gate": False,
+                },
+                "reader_summary_ru": (
+                    "2 личных реакций → 1 постов найдено → 1 атомов знаний → "
+                    "1 тем → 1 сигналов изменили позицию."
+                ),
+            },
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            brief = build_weekly_intelligence_brief_artifact(
+                context,
+                generated_at=context["generated_at"],
+                output_root=root / "brief",
+                mvp_radar={},
+            )
+            atlas = build_knowledge_atlas_artifact(
+                context,
+                generated_at=context["generated_at"],
+                output_root=root / "atlas",
+            )
+            brief_json = json.loads(Path(brief.json_path).read_text(encoding="utf-8"))
+            atlas_json = json.loads(Path(atlas.json_path).read_text(encoding="utf-8"))
+            brief_html = Path(brief.html_path).read_text(encoding="utf-8")
+            atlas_html = Path(atlas.html_path).read_text(encoding="utf-8")
+
+        self.assertEqual(brief_json["schema_version"], "split_ai_report.v1")
+        self.assertEqual(atlas_json["schema_version"], "split_ai_report.v1")
+        self.assertEqual(brief_json["reaction_effect"]["surface"], "weekly_brief")
+        self.assertEqual(atlas_json["reaction_effect"]["surface"], "knowledge_atlas")
+        self.assertEqual(
+            brief_json["reaction_effect"]["counts"],
+            atlas_json["reaction_effect"]["counts"],
+        )
+        for reader_html in (brief_html, atlas_html):
+            self.assertIn("Как реакции повлияли на выпуск", reader_html)
+            self.assertIn("2 личных реакций", reader_html)
+            self.assertIn("найдено постов — 1", reader_html)
+            self.assertIn("Почему сигнал изменил место", reader_html)
+            self.assertIn("Evaluation discipline", reader_html)
+            self.assertIn("Почему этот сигнал здесь", reader_html)
+            self.assertIn("сигнал остался за пределом краткой выборки", reader_html)
+            self.assertNotIn("reaction-snapshot:secret", reader_html)
+            self.assertNotIn("idea_thread:secret", reader_html)
+            self.assertNotIn("rank_changed", reader_html)
+            self.assertNotIn("🔥", reader_html)
 
 
 if __name__ == "__main__":

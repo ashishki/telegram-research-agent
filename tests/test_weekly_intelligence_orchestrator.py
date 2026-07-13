@@ -136,8 +136,16 @@ class TestWeeklyIntelligenceOrchestrator(unittest.TestCase):
         return invoke
 
     def _run(self, **kwargs):
+        run_id = kwargs.pop("run_id", "irx2-test-run")
+        real_context_loader = orchestrator_module.load_ai_intelligence_context
         context_error = kwargs.pop("_context_error", None)
         context_override = kwargs.pop("_context", None)
+        context_calls = kwargs.pop("_context_calls", None)
+        feedback_error = kwargs.pop("_feedback_error", None)
+        real_context = kwargs.pop("_real_context", context_override is None)
+        reaction_outcome = kwargs.pop(
+            "_reaction_outcome", self._empty_verified_reaction_outcome()
+        )
         knowledge = types.SimpleNamespace(
             atoms_seen=0,
             threads_refreshed=0,
@@ -151,28 +159,62 @@ class TestWeeklyIntelligenceOrchestrator(unittest.TestCase):
             "frontier_analysis": None,
             "feedback_context": {},
         }
-        context_patch = patch(
-            "output.weekly_intelligence_orchestrator.load_ai_intelligence_context",
-            side_effect=context_error,
-        ) if context_error is not None else patch(
-            "output.weekly_intelligence_orchestrator.load_ai_intelligence_context",
-            return_value=context,
+        if (
+            context_override is not None
+            and not context.get("reaction_effect")
+            and isinstance(reaction_outcome, dict)
+            and reaction_outcome.get("observed_personal_posts") == []
+        ):
+            context["reaction_effect"] = self._empty_complete_reaction_effect(run_id)
+
+        def load_context(*_args, **call_kwargs):
+            if context_calls is not None:
+                context_calls.append(call_kwargs)
+            return context
+
+        def load_real_context(*args, **call_kwargs):
+            if context_calls is not None:
+                context_calls.append(call_kwargs)
+            return real_context_loader(*args, **call_kwargs)
+
+        context_patch = (
+            patch(
+                "output.weekly_intelligence_orchestrator.load_ai_intelligence_context",
+                side_effect=context_error,
+            )
+            if context_error is not None
+            else patch(
+                "output.weekly_intelligence_orchestrator.load_ai_intelligence_context",
+                side_effect=load_real_context,
+            )
+            if real_context
+            else patch(
+                "output.weekly_intelligence_orchestrator.load_ai_intelligence_context",
+                side_effect=load_context,
+            )
         )
         with patch(
             "output.weekly_intelligence_orchestrator.refresh_idea_threads",
             return_value=knowledge,
         ), patch(
             "output.weekly_intelligence_orchestrator._sync_reactions",
-            return_value={"posts_checked": 0, "errors": 0},
+            return_value=reaction_outcome,
         ), patch(
             "output.weekly_intelligence_orchestrator._feedback_snapshot",
-            return_value={
-                "snapshot_id": "feedback-snapshot:test",
-                "cutoff": self.period.to_dict()["analysis_period_end"],
-                "confirmed_event_count": 0,
-                "pending_event_count": 0,
-                "record_counts": {"confirmed_events": 0, "pending_intakes": 0},
-            },
+            side_effect=(
+                feedback_error
+                if feedback_error is not None
+                else lambda *_args, **_kwargs: {
+                    "snapshot_id": "feedback-snapshot:test",
+                    "cutoff": self.period.to_dict()["analysis_period_end"],
+                    "confirmed_event_count": 0,
+                    "pending_event_count": 0,
+                    "record_counts": {
+                        "confirmed_events": 0,
+                        "pending_intakes": 0,
+                    },
+                }
+            ),
         ), patch(
             "output.weekly_intelligence_orchestrator._frontier_stage",
             side_effect=self._frontier,
@@ -184,9 +226,97 @@ class TestWeeklyIntelligenceOrchestrator(unittest.TestCase):
                 self.settings,
                 reporting_period=self.period,
                 output_root=self.root / "runs",
-                run_id=kwargs.pop("run_id", "irx2-test-run"),
+                run_id=run_id,
                 **kwargs,
             )
+
+    def _empty_verified_reaction_outcome(self):
+        return {
+            "summary": {
+                "posts_checked": 0,
+                "posts_with_reactions": 0,
+                "matched_reactions": 0,
+                "applied_tags": 0,
+                "applied_feedback": 0,
+                "skipped_unknown": 0,
+                "skipped_existing": 0,
+                "errors": 0,
+            },
+            "observed_personal_posts": [],
+            "candidate_count": 0,
+            "checked_count": 0,
+            "coverage_complete": True,
+            "visibility_verified": True,
+        }
+
+    def _empty_complete_reaction_effect(self, run_id):
+        return {
+            "schema_version": "reaction_personalization.v1",
+            "run_id": run_id,
+            "surface": "weekly_brief",
+            "reporting_week": self.period.reporting_week,
+            "analysis_period_start": "2026-07-06T00:00:00Z",
+            "analysis_period_end": "2026-07-13T00:00:00Z",
+            "snapshot_ref": f"reaction-snapshot:{run_id}",
+            "snapshot_status": "complete",
+            "status": "no_eligible_reactions",
+            "reader_summary_ru": (
+                "Для источников этого периода личные реакции не найдены. Это не снижало "
+                "оценки тем и не трактовалось как отсутствие интереса."
+            ),
+            "counts": {
+                "personal_reaction_events_detected": 0,
+                "unique_reacted_posts": 0,
+                "posts_resolved": 0,
+                "eligible_period_posts": 0,
+                "unique_atoms_linked": 0,
+                "unique_canonical_threads_linked": 0,
+                "canonical_threads_boosted": 0,
+                "unique_compatibility_threads_linked": 0,
+                "compatibility_threads_boosted": 0,
+                "selected_items_linked": 0,
+                "selected_signals_influenced": 0,
+                "unconsumed_reaction_events": 0,
+            },
+            "influenced_items": [],
+            "linked_only_items": [],
+            "eligible_thread_audit": [],
+            "unconsumed_by_reason": {},
+            "unconsumed": [],
+            "ranking_policy": {
+                "policy_version": "reaction-ranking.v1",
+                "strength": "weak",
+                "below_confirmed_feedback": True,
+                "can_change_evidence_gate": False,
+            },
+        }
+
+    def _verified_reaction_outcome(self):
+        return {
+            "summary": {
+                "posts_checked": 2,
+                "posts_with_reactions": 1,
+                "matched_reactions": 2,
+                "applied_tags": 2,
+                "applied_feedback": 2,
+                "skipped_unknown": 0,
+                "skipped_existing": 0,
+                "errors": 0,
+            },
+            "observed_personal_posts": [
+                {
+                    "post_id": 41,
+                    "channel_username": "@source",
+                    "message_id": 77,
+                    "posted_at": "2026-07-12T23:59:59Z",
+                    "raw_emojis": ["custom_emoji:123", "🔥"],
+                }
+            ],
+            "candidate_count": 2,
+            "checked_count": 2,
+            "coverage_complete": True,
+            "visibility_verified": True,
+        }
 
     def test_success_binds_one_run_period_radar_and_reader_sidecars(self):
         result = self._run()
@@ -258,6 +388,317 @@ class TestWeeklyIntelligenceOrchestrator(unittest.TestCase):
         brief = json.loads(Path(result.weekly_brief_json_path).read_text(encoding="utf-8"))
         self.assertEqual(brief["reaction_snapshot_at"], self.period.to_dict()["generated_at"])
         self.assertEqual(brief["run_status"], "partial")
+
+    def test_verified_reaction_outcome_is_immutable_bound_and_passed_to_context(self):
+        seen = []
+        context_calls = []
+        original = orchestrator_module.build_weekly_intelligence_brief_artifact
+
+        def capture(context, **kwargs):
+            seen.append(
+                (
+                    context.get("reaction_snapshot_binding"),
+                    context.get("reaction_snapshot"),
+                )
+            )
+            return original(context, **kwargs)
+
+        with patch(
+            "output.weekly_intelligence_orchestrator.build_weekly_intelligence_brief_artifact",
+            side_effect=capture,
+        ):
+            result = self._run(
+                run_id="irx3-reaction-snapshot",
+                _reaction_outcome=self._verified_reaction_outcome(),
+                _context_calls=context_calls,
+            )
+
+        manifest_path = Path(result.manifest_path)
+        manifest = load_manifest(
+            manifest_path,
+            path_base=manifest_path.parent,
+            allowed_roots=(manifest_path.parent,),
+            check_artifact_existence=True,
+        )
+        stage = manifest["stages"]["reaction_sync"]
+        self.assertEqual(stage["status"], "succeeded")
+        self.assertEqual(
+            stage["artifact_refs"],
+            {"snapshot_path": "reaction_sync/reaction-snapshot.json"},
+        )
+        snapshot_path = manifest_path.parent / stage["artifact_refs"]["snapshot_path"]
+        self.assertEqual(
+            stage["checksums"]["snapshot_path"], sha256_file(snapshot_path)
+        )
+        snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+        self.assertEqual(snapshot["schema_version"], "reaction_visibility_snapshot.v1")
+        self.assertEqual(snapshot["run_id"], result.run_id)
+        self.assertEqual(snapshot["snapshot_ref"], stage["snapshot_ref"])
+        self.assertEqual(snapshot["observed_through"], stage["observed_through"])
+        for field, expected in self.period.to_dict().items():
+            self.assertEqual(snapshot[field], expected)
+        self.assertEqual(
+            snapshot["coverage"],
+            {
+                "candidate_count": 2,
+                "checked_count": 2,
+                "coverage_complete": True,
+                "visibility_verified": True,
+            },
+        )
+        self.assertEqual(snapshot["observed_personal_posts"][0]["post_id"], 41)
+        self.assertTrue(seen)
+        for binding, context_snapshot in seen:
+            self.assertEqual(context_snapshot, snapshot)
+            self.assertEqual(binding["snapshot_ref"], stage["snapshot_ref"])
+            self.assertEqual(
+                binding["snapshot_path"], "reaction_sync/reaction-snapshot.json"
+            )
+            self.assertEqual(
+                binding["snapshot_sha256"], stage["checksums"]["snapshot_path"]
+            )
+            self.assertEqual(binding["snapshot_status"], "complete")
+            self.assertTrue(binding["usable"])
+        self.assertEqual(len(context_calls), 1)
+        self.assertEqual(context_calls[0]["reaction_snapshot"], snapshot)
+        self.assertEqual(
+            context_calls[0]["reaction_snapshot_binding"]["snapshot_status"],
+            "complete",
+        )
+        self.assertTrue(context_calls[0]["feedback_snapshot_usable"])
+
+    def test_legacy_count_only_reaction_success_remains_unbound(self):
+        seen = []
+        context_calls = []
+        original = orchestrator_module.build_weekly_intelligence_brief_artifact
+
+        def capture(context, **kwargs):
+            seen.append(
+                (
+                    context.get("reaction_snapshot_binding"),
+                    context.get("reaction_snapshot"),
+                )
+            )
+            return original(context, **kwargs)
+
+        with patch(
+            "output.weekly_intelligence_orchestrator.build_weekly_intelligence_brief_artifact",
+            side_effect=capture,
+        ):
+            result = self._run(
+                run_id="irx3-legacy-reaction-outcome",
+                _reaction_outcome={"posts_checked": 0, "errors": 0},
+                _context_calls=context_calls,
+            )
+
+        manifest_path = Path(result.manifest_path)
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        stage = manifest["stages"]["reaction_sync"]
+        self.assertEqual(result.run_status, "partial")
+        self.assertEqual(stage["status"], "failed")
+        self.assertEqual(stage["artifact_refs"], {})
+        self.assertEqual(stage["checksums"], {})
+        self.assertFalse(
+            (manifest_path.parent / "reaction_sync/reaction-snapshot.json").exists()
+        )
+        self.assertTrue(seen)
+        for binding, context_snapshot in seen:
+            self.assertIsNone(context_snapshot)
+            self.assertEqual(binding["run_id"], result.run_id)
+            self.assertEqual(binding["stage_status"], "failed")
+            self.assertEqual(binding["snapshot_status"], "partial")
+            self.assertFalse(binding["usable"])
+            self.assertNotIn("snapshot_path", binding)
+        self.assertEqual(len(context_calls), 1)
+        self.assertIsNone(context_calls[0]["reaction_snapshot"])
+        self.assertEqual(
+            context_calls[0]["reaction_snapshot_binding"]["snapshot_status"],
+            "partial",
+        )
+
+    def test_failed_feedback_snapshot_disables_reaction_personalization_input(self):
+        context_calls = []
+
+        result = self._run(
+            run_id="irx3-feedback-unusable",
+            _reaction_outcome=self._verified_reaction_outcome(),
+            _feedback_error=RuntimeError("feedback snapshot failed"),
+            _context_calls=context_calls,
+            _real_context=True,
+        )
+
+        self.assertEqual(result.run_status, "partial")
+        self.assertEqual(len(context_calls), 1)
+        self.assertTrue(
+            context_calls[0]["reaction_snapshot_binding"]["usable"]
+        )
+        self.assertIsNotNone(context_calls[0]["reaction_snapshot"])
+        self.assertFalse(context_calls[0]["feedback_snapshot_usable"])
+
+    def test_real_reader_context_emits_unavailable_legacy_receipt_on_both_surfaces(self):
+        result = self._run(
+            run_id="irx3-real-context-legacy",
+            _real_context=True,
+            _reaction_outcome={"posts_checked": 0, "errors": 0},
+        )
+
+        brief = json.loads(Path(result.weekly_brief_json_path).read_text(encoding="utf-8"))
+        atlas = json.loads(Path(result.atlas_json_path).read_text(encoding="utf-8"))
+        brief_effect = brief["reaction_effect"]
+        atlas_effect = atlas["reaction_effect"]
+        self.assertEqual(result.run_status, "partial")
+        self.assertEqual(brief_effect["status"], "partial")
+        self.assertEqual(brief_effect["snapshot_status"], "partial")
+        self.assertEqual(brief_effect["surface"], "weekly_brief")
+        self.assertEqual(atlas_effect["surface"], "knowledge_atlas")
+        brief_effect.pop("surface")
+        atlas_effect.pop("surface")
+        self.assertEqual(brief_effect, atlas_effect)
+        for path in (result.weekly_brief_html_path, result.atlas_html_path):
+            self.assertIn(
+                "Как реакции повлияли на выпуск",
+                Path(path).read_text(encoding="utf-8"),
+            )
+
+    def test_real_reader_context_consumes_only_the_bound_verified_snapshot(self):
+        result = self._run(
+            run_id="irx3-real-context-verified",
+            _real_context=True,
+            _reaction_outcome=self._verified_reaction_outcome(),
+        )
+
+        manifest_path = Path(result.manifest_path)
+        manifest = load_manifest(
+            manifest_path,
+            path_base=manifest_path.parent,
+            allowed_roots=(manifest_path.parent,),
+            check_artifact_existence=True,
+        )
+        brief = json.loads(Path(result.weekly_brief_json_path).read_text(encoding="utf-8"))
+        effect = brief["reaction_effect"]
+        self.assertEqual(effect["snapshot_status"], "complete")
+        self.assertEqual(
+            effect["snapshot_ref"], manifest["stages"]["reaction_sync"]["snapshot_ref"]
+        )
+        self.assertEqual(effect["status"], "no_eligible_reactions")
+        self.assertEqual(effect["counts"]["unique_reacted_posts"], 1)
+        self.assertEqual(
+            effect["counts"]["personal_reaction_events_detected"], 2
+        )
+
+    def test_real_reader_context_keeps_complete_snapshot_identity_when_feedback_fails(self):
+        result = self._run(
+            run_id="irx3-real-context-feedback-partial",
+            _real_context=True,
+            _reaction_outcome=self._verified_reaction_outcome(),
+            _feedback_error=RuntimeError("feedback snapshot failed"),
+        )
+
+        self.assertEqual(result.run_status, "partial")
+        brief = json.loads(Path(result.weekly_brief_json_path).read_text(encoding="utf-8"))
+        effect = brief["reaction_effect"]
+        self.assertEqual(effect["status"], "partial")
+        self.assertEqual(effect["snapshot_status"], "complete")
+        brief_html = Path(result.weekly_brief_html_path).read_text(encoding="utf-8")
+        self.assertIn("контекст явной обратной связи", brief_html)
+        self.assertNotIn("Синхронизация реакций не завершена", brief_html)
+        self.assertNotIn("найдено постов — 0", brief_html)
+        self.assertIn("постов с подтверждёнными реакциями — 1", brief_html)
+        manifest_path = Path(result.manifest_path)
+        load_manifest(
+            manifest_path,
+            path_base=manifest_path.parent,
+            allowed_roots=(manifest_path.parent,),
+            check_artifact_existence=True,
+        )
+
+    def test_real_reader_context_marks_unverified_reaction_stage_partial_without_payload(self):
+        outcome = {
+            **self._verified_reaction_outcome(),
+            "visibility_verified": False,
+        }
+        result = self._run(
+            run_id="irx3-real-context-reaction-partial",
+            _real_context=True,
+            _reaction_outcome=outcome,
+        )
+
+        self.assertEqual(result.run_status, "partial")
+        manifest_path = Path(result.manifest_path)
+        manifest = load_manifest(
+            manifest_path,
+            path_base=manifest_path.parent,
+            allowed_roots=(manifest_path.parent,),
+            check_artifact_existence=True,
+        )
+        self.assertEqual(manifest["stages"]["reaction_sync"]["status"], "failed")
+        self.assertEqual(manifest["stages"]["reaction_sync"]["artifact_refs"], {})
+        brief = json.loads(Path(result.weekly_brief_json_path).read_text(encoding="utf-8"))
+        self.assertEqual(brief["reaction_effect"]["status"], "partial")
+        self.assertEqual(brief["reaction_effect"]["snapshot_status"], "partial")
+
+    def test_unverified_incomplete_or_error_outcome_fails_without_a_usable_snapshot(self):
+        valid = self._verified_reaction_outcome()
+        cases = {
+            "unverified": {**valid, "visibility_verified": False},
+            "truncated": {
+                **valid,
+                "candidate_count": 3,
+                "coverage_complete": False,
+            },
+            "errors": {
+                **valid,
+                "summary": {**valid["summary"], "errors": 1},
+            },
+            "summary-checked-mismatch": {
+                **valid,
+                "summary": {**valid["summary"], "posts_checked": 0},
+            },
+            "summary-observed-mismatch": {
+                **valid,
+                "summary": {**valid["summary"], "posts_with_reactions": 0},
+            },
+            "summary-event-mismatch": {
+                **valid,
+                "summary": {
+                    **valid["summary"],
+                    "matched_reactions": 0,
+                    "skipped_existing": 0,
+                },
+            },
+            "missing-coverage": {
+                key: value
+                for key, value in valid.items()
+                if key != "coverage_complete"
+            },
+        }
+        for suffix, outcome in cases.items():
+            with self.subTest(suffix=suffix):
+                context_calls = []
+                result = self._run(
+                    run_id=f"irx3-reaction-{suffix}",
+                    _reaction_outcome=outcome,
+                    _context_calls=context_calls,
+                )
+                manifest_path = Path(result.manifest_path)
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                stage = manifest["stages"]["reaction_sync"]
+                self.assertEqual(result.run_status, "partial")
+                self.assertEqual(stage["status"], "failed")
+                self.assertEqual(stage["artifact_refs"], {})
+                self.assertEqual(stage["checksums"], {})
+                self.assertFalse(
+                    (
+                        manifest_path.parent
+                        / "reaction_sync/reaction-snapshot.json"
+                    ).exists()
+                )
+                self.assertEqual(len(context_calls), 1)
+                self.assertIsNone(context_calls[0]["reaction_snapshot"])
+                descriptor = context_calls[0]["reaction_snapshot_binding"]
+                self.assertEqual(descriptor["stage_status"], "failed")
+                self.assertEqual(descriptor["snapshot_status"], "partial")
+                self.assertFalse(descriptor["usable"])
 
     def test_wrong_period_radar_is_rejected_and_package_is_partial(self):
         wrong = self._radar(reporting_week="2026-W27", week_label="2026-W27")

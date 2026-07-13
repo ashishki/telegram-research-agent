@@ -58,6 +58,9 @@ def generate_split_intelligence_reports(
     mvp_radar_json_path: str | Path | None = None,
     now: datetime | None = None,
     reaction_snapshot_at: datetime | str | None = None,
+    reaction_snapshot_binding: Mapping[str, object] | None = None,
+    reaction_snapshot: Mapping[str, object] | None = None,
+    feedback_snapshot_usable: bool = True,
     run_identity: Mapping[str, object] | None = None,
 ) -> SplitIntelligenceReportsSummary:
     resolved_period = _resolve_split_reporting_period(
@@ -80,6 +83,13 @@ def generate_split_intelligence_reports(
             week_label=clean_week,
             reporting_period=resolved_period,
             reaction_snapshot_at=reaction_snapshot_at,
+            reaction_snapshot_binding=(
+                dict(reaction_snapshot_binding)
+                if reaction_snapshot_binding is not None
+                else None
+            ),
+            reaction_snapshot=(dict(reaction_snapshot) if reaction_snapshot is not None else None),
+            feedback_snapshot_usable=feedback_snapshot_usable,
             threads_limit=max(1, int(threads_limit or 24)),
             atoms_limit=max(1, int(atoms_limit or 8)),
         )

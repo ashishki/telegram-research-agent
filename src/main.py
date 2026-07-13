@@ -219,6 +219,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     strategy_parser.add_argument("--week", default=None, help="Review feedback for one ISO week")
     strategy_parser.add_argument("--before-week", default=None, help="Review feedback before an ISO week")
+    strategy_parser.add_argument(
+        "--weekly-run-root",
+        default=None,
+        help="Weekly-run manifest root used for completed-week reaction pattern proposals",
+    )
     strategy_parser.add_argument("--output-path", default=None, help="Optional JSON output path")
     strategy_parser.set_defaults(handler=handle_strategy_reviewer)
 
@@ -230,6 +235,11 @@ def build_parser() -> argparse.ArgumentParser:
     obsidian_parser.add_argument("--vault-path", default=None, help="Dedicated vault path (default: data/output/ai_intelligence_vault)")
     obsidian_parser.add_argument("--namespace", default=None, help="Optional scoped namespace inside the vault")
     obsidian_parser.add_argument("--report-root", default=None, help="Directory containing AI Intelligence HTML reports")
+    obsidian_parser.add_argument(
+        "--weekly-run-root",
+        default=None,
+        help="Weekly-run manifest root used by the Strategy Reviewer note",
+    )
     obsidian_parser.add_argument("--threads-limit", type=int, default=100)
     obsidian_parser.add_argument("--atoms-limit", type=int, default=20)
     obsidian_parser.set_defaults(handler=handle_obsidian_export)
@@ -2028,7 +2038,11 @@ def handle_ai_split_report(args: argparse.Namespace) -> int:
 
 
 def handle_strategy_reviewer(args: argparse.Namespace) -> int:
-    from output.strategy_reviewer import build_strategy_review, write_strategy_review
+    from output.strategy_reviewer import (
+        DEFAULT_WEEKLY_RUN_ROOT,
+        build_strategy_review,
+        write_strategy_review,
+    )
 
     settings = load_settings()
     try:
@@ -2041,6 +2055,9 @@ def handle_strategy_reviewer(args: argparse.Namespace) -> int:
                 connection,
                 week_label=args.week,
                 before_week_label=args.before_week,
+                weekly_run_root=(
+                    getattr(args, "weekly_run_root", None) or DEFAULT_WEEKLY_RUN_ROOT
+                ),
             )
         if args.output_path:
             output_path = write_strategy_review(review, args.output_path)
@@ -2076,6 +2093,7 @@ def handle_obsidian_export(args: argparse.Namespace) -> int:
             vault_path=args.vault_path,
             namespace=args.namespace,
             report_root=args.report_root,
+            weekly_run_root=getattr(args, "weekly_run_root", None),
             threads_limit=max(1, args.threads_limit),
             atoms_limit=max(1, args.atoms_limit),
         )

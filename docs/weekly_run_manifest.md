@@ -1,7 +1,7 @@
 # Weekly Run Manifest Contract
 
 Version: `weekly_run_manifest.v1`  
-Status: IRX-2 `implemented_and_verified`; IRX-3 ready
+Status: IRX-2 and IRX-3 `implemented_and_verified`; IRX-4 ready
 Owner: `telegram-research-agent`
 
 The weekly run manifest is the identity and state spine for one intelligence
@@ -556,7 +556,44 @@ Implemented on 2026-07-13 as an additive path beside the V1 commands:
 
 Existing V1 commands and paths remain compatibility surfaces. No generated
 report was edited or committed, and no Radar evidence or context-only gate was
-changed. IRX-3 is the next implementation task.
+changed. The historical IRX-3 handoff is closed by the additive binding below;
+IRX-4 is the next implementation task.
+
+## IRX-3 Reaction Snapshot And Effect Binding
+
+Implemented on 2026-07-13 without changing `weekly_run_manifest.v1` or the
+`irx2_orchestration.v1` policy identity:
+
+- a new IRX-3 invocation accepts reaction sync as successful only when it
+  returns the rich current-attempt outcome and binds
+  `reaction_sync/reaction-snapshot.json` by exact manifest identity, declared
+  path, SHA-256 checksum, `snapshot_ref`, and `observed_through`;
+- `reaction_visibility_snapshot.v1` records exact IRX-1 period identity,
+  candidate/checked coverage, observed-post count, event count, and opaque
+  per-post/per-emoji provenance. Candidate/checked and event-count parity is
+  required; partial, failed, truncated, wrong-period, stale, or tampered input
+  cannot create a fresh ranking signal;
+- the reaction stage records both unique reacted posts and raw personal emoji
+  events. Multiple visible emoji remain separate provenance events but collapse
+  to one equal positive interest signal per post; aggregate-only reactions are
+  not personal events;
+- every succeeded Brief and Atlas in a run with a verified rich snapshot must
+  carry a strict `reaction_personalization.v1` effect receipt. The manifest
+  binds each receipt to the same run, period, snapshot, source-post lineage,
+  funnel, attribution, and actual surface refs, and rejects lost or
+  double-consumed reaction events;
+- Brief and Atlas may legitimately differ in surface-specific selected items,
+  influence status, and bounded unconsumed reasons. Their common identity,
+  snapshot lineage, pre-surface funnel, policy, and attribution must agree, and
+  each sidecar/HTML disclosure must match its own receipt;
+- legacy IRX-2 manifests without the rich snapshot binding remain readable,
+  and the legacy count-only reaction-sync API remains available. A new IRX-3
+  orchestration run does not treat that count-only result as an attested
+  snapshot and therefore fails closed to a visible partial state.
+
+No canonical thread registry or historical period-end thread membership was
+added here. Those versioned lineage guarantees are the explicit IRX-4 handoff;
+IRX-3 receipts retain current compatibility refs plus nullable canonical refs.
 
 ## Stop Conditions
 

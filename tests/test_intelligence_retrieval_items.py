@@ -1,7 +1,9 @@
 import json
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from config.settings import Settings
 from output.ai_report_contract import INTELLIGENCE_CONTRACT_VERSION
@@ -96,7 +98,7 @@ class TestIntelligenceRetrievalItems(unittest.TestCase):
             "outcomes": [],
         }
 
-    def _write_workbook(self, root: Path) -> Path:
+    def _write_workbook(self, root: Path, *, reaction_effect: dict | None = None) -> Path:
         output_dir = root / "ai_visual_intelligence"
         output_dir.mkdir(parents=True)
         json_path = output_dir / "2026-W28.visual.json"
@@ -242,6 +244,7 @@ class TestIntelligenceRetrievalItems(unittest.TestCase):
                         "missing_evidence": ["Need external demand."],
                         "next_validation": ["Interview operators."],
                     },
+                    **({"reaction_effect": reaction_effect} if reaction_effect is not None else {}),
                     "feedback_targets": [],
                 },
                 ensure_ascii=False,
@@ -264,6 +267,127 @@ class TestIntelligenceRetrievalItems(unittest.TestCase):
         self.assertIn("project_intelligence", item_types)
         self.assertIn("learning_objective", item_types)
         self.assertIn("mvp_dossier", item_types)
+
+    def test_reaction_effect_is_available_as_additive_audit_retrieval(self):
+        receipt = {
+            "schema_version": "reaction_personalization.v1",
+            "run_id": "tra-weekly-2026-W28-test",
+            "surface": "weekly_brief",
+            "reporting_week": "2026-W28",
+            "analysis_period_start": "2026-07-06T00:00:00Z",
+            "analysis_period_end": "2026-07-13T00:00:00Z",
+            "snapshot_ref": "reaction-snapshot:tra-weekly-2026-W28-test",
+            "snapshot_status": "complete",
+            "status": "effects_applied",
+            "reader_summary_ru": (
+                "1 личных реакций → 1 постов найдено → 1 атомов знаний → "
+                "2 тем → 1 сигналов изменили позицию."
+            ),
+            "counts": {
+                "personal_reaction_events_detected": 1,
+                "unique_reacted_posts": 1,
+                "posts_resolved": 1,
+                "eligible_period_posts": 1,
+                "unique_atoms_linked": 1,
+                "unique_canonical_threads_linked": 0,
+                "canonical_threads_boosted": 0,
+                "unique_compatibility_threads_linked": 2,
+                "compatibility_threads_boosted": 2,
+                "selected_items_linked": 1,
+                "selected_signals_influenced": 1,
+                "unconsumed_reaction_events": 0,
+            },
+            "influenced_items": [
+                {
+                    "surface_item_ref": "signal:eval-gates",
+                    "effect": "rank_changed",
+                    "boost_applied": True,
+                    "rank_changed": True,
+                    "selection_changed": False,
+                    "linked_only": False,
+                    "compatibility_thread_ref": "idea_thread:eval-gates",
+                    "current_thread_ref": "idea_thread:eval-gates",
+                    "canonical_thread_ref": None,
+                    "thread_resolution_status": "compatibility_current_thread_only",
+                    "boost_role": "weak_implicit_interest",
+                    "reacted_post_count": 1,
+                    "reacted_post_refs": ["reaction-post:111111111111111111111111"],
+                    "source_refs": ["telegram:@source"],
+                    "evidence_refs": ["atom:101"],
+                    "reader_reason_ru": "Вы отметили один связанный пост за отчётный период.",
+                }
+            ],
+            "linked_only_items": [],
+            "eligible_thread_audit": [
+                {
+                    "surface_item_ref": "signal:eval-gates",
+                    "selected": True,
+                    "counterfactual_effect": "rank_changed",
+                    "boost_applied": True,
+                    "compatibility_thread_ref": "idea_thread:eval-gates",
+                    "current_thread_ref": "idea_thread:eval-gates",
+                    "canonical_thread_ref": None,
+                    "thread_resolution_status": "compatibility_current_thread_only",
+                    "boost_role": "weak_implicit_interest",
+                    "reacted_post_count": 1,
+                    "reacted_post_refs": ["reaction-post:111111111111111111111111"],
+                    "source_refs": ["telegram:@source"],
+                    "evidence_refs": ["atom:101"],
+                    "reader_reason_ru": "Вы отметили один связанный пост за отчётный период.",
+                },
+                {
+                    "surface_item_ref": "signal:eval-runtime",
+                    "selected": False,
+                    "counterfactual_effect": "report_limit_reached",
+                    "boost_applied": True,
+                    "compatibility_thread_ref": "idea_thread:eval-runtime",
+                    "current_thread_ref": "idea_thread:eval-runtime",
+                    "canonical_thread_ref": None,
+                    "thread_resolution_status": "compatibility_current_thread_only",
+                    "boost_role": "weak_implicit_interest",
+                    "reacted_post_count": 1,
+                    "reacted_post_refs": ["reaction-post:111111111111111111111111"],
+                    "source_refs": ["telegram:@source"],
+                    "evidence_refs": ["atom:101"],
+                    "reader_reason_ru": "Вы отметили один связанный пост за отчётный период.",
+                },
+            ],
+            "unconsumed_by_reason": {},
+            "unconsumed": [],
+            "ranking_policy": {
+                "policy_version": "reaction-ranking.v1",
+                "strength": "weak",
+                "below_confirmed_feedback": True,
+                "can_change_evidence_gate": False,
+            },
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_workbook(root, reaction_effect=receipt)
+            items = build_retrieval_items(self._settings(root), week_label="2026-W28", output_root=root)
+
+        summary = next(item for item in items if item.item_type == "reaction_effect")
+        influence = next(item for item in items if item.item_type == "reaction_influence")
+        unselected = next(
+            item for item in items if item.item_type == "reaction_eligible_unselected"
+        )
+        self.assertEqual(summary.status, "effects_applied")
+        self.assertEqual(influence.thread_slug, "eval-gates")
+        self.assertEqual(influence.atom_ids, [101])
+        self.assertIn("reaction-snapshot:tra-weekly-2026-W28-test", influence.source_refs)
+        self.assertIn("reaction-post:111111111111111111111111", influence.source_refs)
+        self.assertIn("telegram:@source", influence.source_refs)
+        self.assertEqual(unselected.thread_slug, "eval-runtime")
+        self.assertEqual(unselected.status, "report_limit_reached")
+        self.assertIn("reaction-post:111111111111111111111111", unselected.source_refs)
+
+    def test_workbook_without_reaction_receipt_keeps_v1_retrieval_compatible(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_workbook(root)
+            items = build_retrieval_items(self._settings(root), week_label="2026-W28", output_root=root)
+
+        self.assertNotIn("reaction_effect", {item.item_type for item in items})
 
     def test_builds_retrieval_items_from_split_weekly_brief_sidecar(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -469,6 +593,43 @@ class TestIntelligenceRetrievalItems(unittest.TestCase):
         self.assertIn("atom_ids", results[0])
         self.assertEqual(results[0]["source_refs"], [])
         self.assertEqual(results[0]["atom_ids"], [])
+
+    def test_strategy_reviewer_projection_uses_output_scoped_weekly_runs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with sqlite3.connect(root / "missing.db") as connection:
+                connection.execute("CREATE TABLE ai_report_feedback_events (id INTEGER)")
+            review = {
+                "generated_at": "2026-07-13T08:00:00Z",
+                "suggestions": {"test_next_week": []},
+                "memory_only_updates": [],
+                "approval_required": [],
+                "codex_tasks": [],
+                "reaction_pattern_proposals": [
+                    {
+                        "proposal_id": "reaction-pattern:test",
+                        "status": "unapproved",
+                        "applied": False,
+                    }
+                ],
+            }
+            with patch(
+                "output.intelligence_retrieval_items.build_strategy_review",
+                return_value=review,
+            ) as build_review:
+                items = build_retrieval_items(
+                    self._settings(root),
+                    week_label="2026-W28",
+                    output_root=root,
+                )
+
+        strategy_item = next(item for item in items if item.item_type == "strategy_reviewer_note")
+        self.assertIn("1 unapproved reaction pattern", strategy_item.summary or "")
+        self.assertIn("reaction-pattern:test", strategy_item.text)
+        self.assertEqual(
+            build_review.call_args.kwargs["weekly_run_root"],
+            root / "weekly_intelligence_runs",
+        )
 
 
 if __name__ == "__main__":

@@ -39,6 +39,8 @@ from output.weekly_run_manifest import (
     CANCELLED,
     FAILED,
     PIPELINE_PROFILE,
+    REACTION_SNAPSHOT_PATH,
+    REACTION_SNAPSHOT_SCHEMA_VERSION,
     SKIPPED_DEPENDENCY,
     SUCCEEDED,
     append_warning,
@@ -46,6 +48,7 @@ from output.weekly_run_manifest import (
     create_manifest,
     fail_stage,
     finalize_manifest,
+    load_bound_reaction_snapshot,
     load_manifest,
     sha256_file,
     start_stage,
@@ -149,6 +152,8 @@ def run_weekly_intelligence_v2(
         return value
 
     reaction_snapshot_at: str = manifest["generated_at"]
+    reaction_snapshot_binding: dict[str, Any] | None = None
+    reaction_snapshot_payload: dict[str, Any] | None = None
     radar_brief_path: Path | None = None
 
     # Knowledge refresh is foundational.  A failure stops downstream work and
@@ -183,28 +188,89 @@ def run_weekly_intelligence_v2(
         return _result_from_manifest(manifest_path, manifest)
 
     manifest = persist(start_stage(manifest, "reaction_sync"))
+    reaction_snapshot_written: Path | None = None
     try:
         reaction_summary = _sync_reactions(settings, period, max(1, int(reaction_limit or 1)))
-        reaction_counts = _integer_counts(reaction_summary)
+        reaction_counts, reaction_outcome = _validated_reaction_outcome(reaction_summary)
+        if reaction_outcome is None:
+            raise RuntimeError(
+                "IRX-3 weekly runs require a rich reaction visibility outcome"
+            )
         if reaction_counts.get("errors", 0):
             raise RuntimeError(
                 f"reaction sync completed with {reaction_counts['errors']} error(s)"
             )
         observed = _utc_now_iso()
         reaction_snapshot_at = observed
-        manifest = persist(
-            succeed_stage(
+        snapshot_ref = f"reaction-snapshot:{manifest['run_id']}"
+        reaction_updates: dict[str, Any] = {
+            "snapshot_ref": snapshot_ref,
+            "observed_through": observed,
+            "record_counts": reaction_counts,
+        }
+        if reaction_outcome is not None:
+            snapshot_payload = {
+                "schema_version": REACTION_SNAPSHOT_SCHEMA_VERSION,
+                **period.to_dict(),
+                "run_id": manifest["run_id"],
+                "snapshot_ref": snapshot_ref,
+                "observed_through": observed,
+                "coverage": {
+                    "candidate_count": reaction_outcome["candidate_count"],
+                    "checked_count": reaction_outcome["checked_count"],
+                    "coverage_complete": reaction_outcome["coverage_complete"],
+                    "visibility_verified": reaction_outcome["visibility_verified"],
+                },
+                "observed_personal_posts": reaction_outcome[
+                    "observed_personal_posts"
+                ],
+            }
+            snapshot_path = run_dir / REACTION_SNAPSHOT_PATH
+            _atomic_write_json(
+                snapshot_path,
+                snapshot_payload,
+                exclusive=True,
+            )
+            reaction_snapshot_written = snapshot_path
+            checksum = sha256_file(snapshot_path)
+            reaction_updates.update(
+                {
+                    "artifact_refs": {"snapshot_path": REACTION_SNAPSHOT_PATH},
+                    "checksums": {"snapshot_path": checksum},
+                }
+            )
+            candidate = succeed_stage(
                 manifest,
                 "reaction_sync",
-                updates={
-                    "snapshot_ref": f"reaction-snapshot:{manifest['run_id']}",
-                    "observed_through": observed,
-                    "record_counts": reaction_counts,
-                },
+                updates=reaction_updates,
             )
-        )
+            reaction_snapshot_payload = load_bound_reaction_snapshot(
+                candidate,
+                path_base=run_dir,
+                allowed_roots=allowed_roots,
+                verify_file=True,
+            )
+            if reaction_snapshot_payload is None:
+                raise RuntimeError("reaction snapshot binding was not validated")
+            reaction_snapshot_binding = _reaction_snapshot_descriptor(
+                candidate,
+                snapshot_payload=reaction_snapshot_payload,
+            )
+            manifest = persist(candidate)
+            reaction_snapshot_written = None
     except Exception as exc:
-        counts = _integer_counts(locals().get("reaction_summary", {}))
+        if reaction_snapshot_written is not None:
+            try:
+                reaction_snapshot_written.unlink(missing_ok=True)
+            except OSError:
+                LOGGER.warning(
+                    "Could not remove unbound reaction snapshot run_id=%s",
+                    manifest["run_id"],
+                    exc_info=True,
+                )
+        reaction_snapshot_binding = None
+        reaction_snapshot_payload = None
+        counts = _reaction_counts(locals().get("reaction_summary", {}))
         manifest = persist(
             fail_stage(
                 manifest,
@@ -224,6 +290,10 @@ def run_weekly_intelligence_v2(
                 "Reaction sync failed; reader context is limited to the pre-run reaction cutoff.",
             ),
             check_outputs=False,
+        )
+        reaction_snapshot_binding = _reaction_snapshot_descriptor(
+            manifest,
+            snapshot_payload=None,
         )
 
     manifest = persist(start_stage(manifest, "feedback_snapshot"))
@@ -308,6 +378,8 @@ def run_weekly_intelligence_v2(
             persist=persist,
             run_dir=run_dir,
             reaction_snapshot_at=reaction_snapshot_at,
+            reaction_snapshot_binding=reaction_snapshot_binding,
+            reaction_snapshot_payload=reaction_snapshot_payload,
             radar_brief_path=radar_brief_path,
             radar_enabled=radar_enabled,
             threads_limit=max(1, int(threads_limit or 1)),
@@ -373,12 +445,13 @@ def _sync_reactions(
     settings: Settings,
     period: ReportingPeriod,
     limit: int,
-) -> dict[str, int]:
-    from ingestion.reaction_sync import sync_reactions
+) -> dict[str, object]:
+    from ingestion.reaction_sync import sync_reactions_with_outcome
 
-    return asyncio.run(
-        sync_reactions(settings, reporting_period=period, limit=limit)
+    outcome = asyncio.run(
+        sync_reactions_with_outcome(settings, reporting_period=period, limit=limit)
     )
+    return outcome.to_dict()
 
 
 def _feedback_snapshot(
@@ -720,11 +793,41 @@ def _render_reader_stages(
     persist,
     run_dir: Path,
     reaction_snapshot_at: str,
+    reaction_snapshot_binding: Mapping[str, Any] | None,
+    reaction_snapshot_payload: Mapping[str, Any] | None,
     radar_brief_path: Path | None,
     radar_enabled: bool,
     threads_limit: int,
     atoms_limit: int,
 ) -> dict[str, Any]:
+    validated_snapshot = load_bound_reaction_snapshot(
+        manifest,
+        path_base=run_dir,
+        allowed_roots=(run_dir,),
+        verify_file=True,
+    )
+    supplied_snapshot = (
+        dict(reaction_snapshot_payload)
+        if reaction_snapshot_payload is not None
+        else None
+    )
+    if validated_snapshot != supplied_snapshot:
+        raise RuntimeError("reaction snapshot payload changed before reader rendering")
+    expected_binding = _reaction_snapshot_descriptor(
+        manifest,
+        snapshot_payload=validated_snapshot,
+    )
+    supplied_binding = (
+        dict(reaction_snapshot_binding)
+        if reaction_snapshot_binding is not None
+        else None
+    )
+    if expected_binding != supplied_binding:
+        raise RuntimeError("reaction snapshot binding changed before reader rendering")
+    feedback_snapshot_usable = (
+        manifest["stages"]["feedback_snapshot"]["status"] == SUCCEEDED
+    )
+
     with sqlite3.connect(settings.db_path) as connection:
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON;")
@@ -734,12 +837,33 @@ def _render_reader_stages(
             reporting_period=period,
             reaction_snapshot_at=reaction_snapshot_at,
             feedback_snapshot_at=period.analysis_period_end,
+            reaction_snapshot_binding=(
+                dict(supplied_binding)
+                if supplied_binding is not None
+                else None
+            ),
+            reaction_snapshot=(
+                dict(validated_snapshot)
+                if validated_snapshot is not None
+                else None
+            ),
+            feedback_snapshot_usable=feedback_snapshot_usable,
             threads_limit=threads_limit,
             atoms_limit=atoms_limit,
         )
     context = {
         **context,
         "reaction_snapshot_at": reaction_snapshot_at,
+        "reaction_snapshot_binding": (
+            dict(supplied_binding)
+            if supplied_binding is not None
+            else None
+        ),
+        "reaction_snapshot": (
+            dict(validated_snapshot)
+            if validated_snapshot is not None
+            else None
+        ),
         # The mutable week-keyed DB row is not authoritative for an IRX-2 run.
         # Bind the reader to this run's immutable Frontier snapshot, or suppress
         # Frontier content when that stage failed.
@@ -1217,6 +1341,220 @@ def _integer_counts(values: Mapping[str, Any] | object) -> dict[str, int]:
         for key, value in values.items()
         if isinstance(value, int) and not isinstance(value, bool)
     }
+
+
+_REACTION_OUTCOME_KEYS = frozenset(
+    {
+        "observed_personal_posts",
+        "candidate_count",
+        "checked_count",
+        "coverage_complete",
+        "visibility_verified",
+    }
+)
+
+
+def _reaction_snapshot_descriptor(
+    manifest: Mapping[str, Any],
+    *,
+    snapshot_payload: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Describe reaction availability without promoting an unbound result."""
+
+    stage = manifest["stages"]["reaction_sync"]
+    usable = snapshot_payload is not None
+    descriptor: dict[str, Any] = {
+        "run_id": manifest["run_id"],
+        "snapshot_ref": stage.get("snapshot_ref"),
+        "observed_through": stage.get("observed_through"),
+        "stage_status": stage["status"],
+        "snapshot_status": (
+            "complete"
+            if usable
+            else "unavailable"
+            if stage["status"] == SUCCEEDED
+            else "partial"
+        ),
+        "usable": usable,
+    }
+    if usable:
+        descriptor.update(
+            {
+                "snapshot_path": stage["artifact_refs"]["snapshot_path"],
+                "snapshot_sha256": stage["checksums"]["snapshot_path"],
+            }
+        )
+    return descriptor
+
+
+def _reaction_counts(values: Mapping[str, Any] | object) -> dict[str, int]:
+    if not isinstance(values, Mapping):
+        return {}
+    summary = values.get("summary")
+    return _integer_counts(summary if isinstance(summary, Mapping) else values)
+
+
+def _validated_reaction_outcome(
+    values: Mapping[str, Any] | object,
+) -> tuple[dict[str, int], dict[str, Any] | None]:
+    """Separate legacy counts from a fully attested rich sync outcome."""
+
+    if not isinstance(values, Mapping):
+        raise RuntimeError("reaction sync outcome must be an object")
+    counts = _reaction_counts(values)
+    present = _REACTION_OUTCOME_KEYS.intersection(values)
+    if not present:
+        return counts, None
+    missing = sorted(_REACTION_OUTCOME_KEYS.difference(values))
+    if missing:
+        raise RuntimeError(
+            "reaction sync outcome is incomplete: " + ", ".join(missing)
+        )
+    candidate_count = _strict_nonnegative_int(
+        values.get("candidate_count"), field="candidate_count"
+    )
+    checked_count = _strict_nonnegative_int(
+        values.get("checked_count"), field="checked_count"
+    )
+    coverage_complete = values.get("coverage_complete")
+    visibility_verified = values.get("visibility_verified")
+    if not isinstance(coverage_complete, bool):
+        raise RuntimeError("reaction sync coverage_complete must be boolean")
+    if not isinstance(visibility_verified, bool):
+        raise RuntimeError("reaction sync visibility_verified must be boolean")
+    if checked_count > candidate_count:
+        raise RuntimeError("reaction sync checked_count exceeds candidate_count")
+    if not coverage_complete or checked_count != candidate_count:
+        raise RuntimeError("reaction sync coverage is incomplete or truncated")
+    if not visibility_verified:
+        raise RuntimeError("reaction sync personal visibility is unverified")
+    posts = _normalize_observed_personal_posts(
+        values.get("observed_personal_posts"), checked_count=checked_count
+    )
+    for field in (
+        "posts_checked",
+        "posts_with_reactions",
+        "matched_reactions",
+        "skipped_existing",
+        "errors",
+    ):
+        if field not in counts:
+            raise RuntimeError(
+                f"reaction sync summary is missing required count: {field}"
+            )
+    if counts["posts_checked"] != checked_count:
+        raise RuntimeError(
+            "reaction sync summary posts_checked contradicts checked_count"
+        )
+    if counts["posts_with_reactions"] != len(posts):
+        raise RuntimeError(
+            "reaction sync summary posts_with_reactions contradicts observed posts"
+        )
+    if counts["errors"] != 0:
+        raise RuntimeError(
+            "verified reaction sync outcome cannot contain errors"
+        )
+    event_count = sum(len(post["raw_emojis"]) for post in posts)
+    if counts["matched_reactions"] + counts["skipped_existing"] != event_count:
+        raise RuntimeError(
+            "reaction sync summary event counts contradict observed reactions"
+        )
+    counts.update(
+        {
+            "candidate_count": candidate_count,
+            "checked_count": checked_count,
+            "observed_personal_posts": len(posts),
+            "personal_reaction_events_detected": event_count,
+        }
+    )
+    return counts, {
+        "observed_personal_posts": posts,
+        "candidate_count": candidate_count,
+        "checked_count": checked_count,
+        "coverage_complete": coverage_complete,
+        "visibility_verified": visibility_verified,
+    }
+
+
+def _strict_nonnegative_int(value: object, *, field: str) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise RuntimeError(f"reaction sync {field} must be a non-negative integer")
+    return value
+
+
+def _normalize_observed_personal_posts(
+    value: object,
+    *,
+    checked_count: int,
+) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        raise RuntimeError("reaction sync observed_personal_posts must be a list")
+    if len(value) > checked_count:
+        raise RuntimeError("reaction sync observed post count exceeds checked_count")
+    posts: list[dict[str, Any]] = []
+    identities: set[tuple[str, int]] = set()
+    post_ids: set[int] = set()
+    for index, item in enumerate(value):
+        if not isinstance(item, Mapping):
+            raise RuntimeError(f"reaction sync observed post {index} must be an object")
+        post_id = _strict_positive_int(item.get("post_id"), field=f"post {index}.post_id")
+        if post_id in post_ids:
+            raise RuntimeError(
+                "reaction sync outcome repeats one normalized post identity"
+            )
+        post_ids.add(post_id)
+        message_id = _strict_positive_int(
+            item.get("message_id"), field=f"post {index}.message_id"
+        )
+        channel = str(item.get("channel_username") or "").strip()
+        if not channel or len(channel) > 300:
+            raise RuntimeError(
+                f"reaction sync post {index}.channel_username is invalid"
+            )
+        identity = (channel.lstrip("@").casefold(), message_id)
+        if identity in identities:
+            raise RuntimeError("reaction sync outcome contains duplicate posts")
+        identities.add(identity)
+        posted_at = item.get("posted_at")
+        if not isinstance(posted_at, str) or not _is_canonical_utc_timestamp(posted_at):
+            raise RuntimeError(f"reaction sync post {index}.posted_at is invalid")
+        raw_emojis = item.get("raw_emojis")
+        if (
+            not isinstance(raw_emojis, list)
+            or not raw_emojis
+            or any(not isinstance(emoji, str) or not emoji.strip() for emoji in raw_emojis)
+            or raw_emojis != sorted(set(raw_emojis))
+        ):
+            raise RuntimeError(
+                f"reaction sync post {index}.raw_emojis must be sorted unique strings"
+            )
+        posts.append(
+            {
+                "post_id": post_id,
+                "channel_username": channel,
+                "message_id": message_id,
+                "posted_at": posted_at,
+                "raw_emojis": list(raw_emojis),
+            }
+        )
+    return posts
+
+
+def _strict_positive_int(value: object, *, field: str) -> int:
+    result = _strict_nonnegative_int(value, field=field)
+    if result == 0:
+        raise RuntimeError(f"reaction sync {field} must be positive")
+    return result
+
+
+def _is_canonical_utc_timestamp(value: str) -> bool:
+    if not value.endswith("Z"):
+        return False
+    try:
+        parsed = datetime.fromisoformat(value[:-1] + "+00:00")
+    except ValueError:
+        return False
+    return parsed.tzinfo is not None and parsed.utcoffset() is not None
 
 
 def _table_exists(connection: sqlite3.Connection, table_name: str) -> bool:
