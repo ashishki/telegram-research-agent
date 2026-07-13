@@ -1,9 +1,9 @@
 # CODEX_PROMPT - Compact Session Handoff
 
-Version: 4.6
-Date: 2026-07-10
-State: PGI-001 through PGI-006 implemented locally and verified; PGI-007 is
-blocked on operator dogfood evidence
+Version: 5.0
+Date: 2026-07-13
+State: IRX-0 documentation complete; IRX-1 is the next implementation task;
+dogfood is blocked until IRX-14
 
 ## Current Product Direction
 
@@ -16,11 +16,13 @@ Brief / Atlas / Hermes / Project Intelligence / Learning Intelligence ->
 decisions -> experiments -> outcomes -> feedback/evaluation
 ```
 
-Canonical roadmap:
+Active Report V2 roadmap:
 
 ```text
-docs/portfolio_grade_intelligence_roadmap.md
+docs/intelligence_report_v2_roadmap.md
 ```
+
+Broader product roadmap: `docs/portfolio_grade_intelligence_roadmap.md`.
 
 Canonical active backlog:
 
@@ -31,8 +33,17 @@ docs/tasks.md
 Next implementation task:
 
 ```text
-PGI-007 - Four-Week Dogfood Evidence Series
+IRX-1 - Completed-Week Reporting Semantics
 ```
+
+## W29 Product Correction
+
+The W29 Brief and Atlas are structurally valid but failed as reader products.
+The default run analyzed the newly started W29, missed the valid W28 Radar
+artifact, did not expose reaction influence, repeated generic actions, rendered
+entity-fragmented threads, and provided no meaningful visual map. The current
+detailed Atlas becomes the Knowledge Audit Explorer foundation. Report V2 is
+planned, not implemented, and dogfood has not started.
 
 ## Verified Baseline
 
@@ -75,10 +86,12 @@ PGI-007 - Four-Week Dogfood Evidence Series
 
 ## Active Task Graph
 
-Primary sequence:
+Active Report V2 sequence:
 
 ```text
-PGI-001 -> PGI-002 -> PGI-003 -> PGI-004 -> PGI-005 -> PGI-006 -> PGI-007 -> PGI-008
+IRX-0 -> IRX-1 -> IRX-2 -> IRX-3 -> IRX-4 -> IRX-5
+  -> IRX-8 -> IRX-9 -> IRX-10 -> IRX-6 -> IRX-11
+  -> IRX-7 -> IRX-12 -> IRX-13 -> IRX-14
 ```
 
 Parallel Radar sequence:
@@ -87,7 +100,8 @@ Parallel Radar sequence:
 RADAR-PGI-001 -> RADAR-PGI-002 -> RADAR-PGI-003
 ```
 
-Do not restart from KIR/HPI/RVE historical queues. Those are mapped in
+Do not restart from KIR/HPI/RVE or continue Report V2 work under generic PGI.
+Those records are reconciled in `docs/intelligence_report_v2_roadmap.md` and
 `docs/tasks.md`.
 
 ## PGI-001 Completion
@@ -402,17 +416,66 @@ python3 -m py_compile src/output/dogfood_review.py
 git diff --check
 ```
 
-## PGI-007 Handoff
+## Exact Next Codex Prompt - IRX-1
 
-Status: blocked.
+Use the following prompt unchanged for the first implementation task:
+
+```text
+You are Codex working in /srv/openclaw-you/workspace/telegram-research-agent.
+Mode: IMPLEMENTATION for IRX-1 only.
+Implement IRX-1, using these binding docs:
+  docs/intelligence_report_v2_roadmap.md
+  docs/intelligence_report_v2_contract.md
+  docs/weekly_run_manifest.md
+Do not implement IRX-2 or later work: no persisted manifest/orchestrator, same-run Radar handoff, reaction boost, canonical curator, editorial LLM, V2 schema/render redesign, reader-value gates, or Radar gate changes.
+Before editing run:
+  git status
+  git branch
+  git log --oneline -20
+  git diff --stat
+Preserve pre-existing dirty changes. Do not edit or commit generated reports.
+Read the current period flow and focused tests for:
+  src/output/ai_intelligence_report.py, weekly_intelligence_brief.py,
+  knowledge_atlas_report.py, split_intelligence_reports.py, frontier_analysis.py,
+  opportunity_seed_export.py, mvp_weekly_pipeline.py, and src/main.py.
+Add one shared typed resolver, preferably src/output/reporting_period.py, with run_date, generated_at, inclusive UTC analysis_period_start, exclusive UTC analysis_period_end, reporting_week, and period_mode.
+Keep week_label as an additive compatibility alias. Add fields to existing contexts/sidecars; do not replace their contracts.
+Required behavior:
+1. Default weekly generation uses the last fully completed ISO week.
+2. At 2026-07-13T07:02:52Z resolve [2026-07-06T00:00:00Z, 2026-07-13T00:00:00Z), reporting_week=2026-W28, period_mode=completed_iso_week.
+3. Preserve explicit completed historical YYYY-Www generation.
+4. Label trailing-seven-day mode separately if retained.
+5. Current partial-week mode is diagnostic opt-in only and labeled partial_iso_week; reject future/incomplete explicit weeks otherwise.
+6. Brief, Atlas, split context, Frontier, marked-post/reaction selection, and opportunity/Radar seed selection use identical half-open boundaries.
+7. Historical output excludes atom/thread state after analysis_period_end; do not rely only on current thread.last_seen_at.
+8. Titles show human-readable inclusive dates and generated_at separately, without redesigning the reports.
+Add deterministic tests, including tests/test_reporting_period.py, covering Sunday/Monday, ISO year boundary, standard-calendar leap handling, explicit history, future/current rejection, rolling/partial labels if supported, period propagation to deltas/reactions/Radar seeds, future-state exclusion, and --week compatibility.
+Likely files are the modules above plus focused report/Frontier/Radar tests.
+Do not change scoring, prompts, DB schema, information architecture, visual design, feedback semantics, cross-repo code, or evidence gates. Do not run heavy pipelines or the full suite.
+Run:
+  PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache \
+    python3 -m unittest tests.test_reporting_period \
+    tests.test_ai_intelligence_report tests.test_frontier_analysis \
+    tests.test_split_intelligence_reports tests.test_mvp_weekly_pipeline
+  git diff --check
+  git diff --stat
+Report files changed, exact semantics, compatibility behavior, test results, the IRX-2 handoff intentionally left open, and confirmation that generated artifacts and Radar gates were unchanged.
+```
+
+Suggested second task after review: `IRX-2 - Weekly Run Manifest And Required
+Radar Artifact Contract`.
+
+## Historical PGI-007 Handoff
+
+Status: superseded as the immediate next task and blocked by IRX-14.
 
 PGI-007 requires a four-week dogfood evidence series from operator/private
 weekly runs. Do not fabricate scorecards, thresholds, or outcomes. Generated
 private artifacts must remain ignored unless a sanitized sample is explicitly
 requested.
 
-Unblock when the operator provides sanitized weekly scorecard inputs or asks to
-start a local private dogfood log outside git.
+Resume only after the IRX-14 Report V2 start gate passes. Do not fabricate
+scorecards or use the current W29 reports as Week 1 evidence.
 
 ## Non-Negotiable Rules
 
@@ -428,6 +491,12 @@ start a local private dogfood log outside git.
 
 ## Key Docs
 
+- `docs/intelligence_report_v2_audit.md`
+- `docs/intelligence_report_v2_roadmap.md`
+- `docs/intelligence_report_v2_contract.md`
+- `docs/weekly_run_manifest.md`
+- `docs/reaction_personalization_contract.md`
+- `docs/static_visualization_system.md`
 - `docs/portfolio_grade_intelligence_roadmap.md`
 - `docs/tasks.md`
 - `docs/intelligence_evaluation_framework.md`

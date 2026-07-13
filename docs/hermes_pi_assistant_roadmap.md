@@ -2,14 +2,20 @@
 
 Status: Hermes/PI component roadmap and implementation record
 Created: 2026-07-08
-Last updated: 2026-07-10
+Last updated: 2026-07-13
 Owner: private single-user operator workflow
 
-Canonical active roadmap:
-`docs/portfolio_grade_intelligence_roadmap.md`.
+Canonical active report roadmap:
+`docs/intelligence_report_v2_roadmap.md`.
 
 This document records the shipped HPI foundation and remaining assistant risks.
 The active implementation queue is `docs/tasks.md`.
+
+W29 correction: Hermes/PI is reusable read-only retrieval infrastructure, but
+it does not compensate for a bad canonical artifact. Report V2 work belongs to
+IRX, not a new HPI task. V1 sidecars and `atlas_thread` retrieval must remain
+readable while V2 projections are added; any incompatible change requires an
+explicit adapter and migration plan. Dogfood remains blocked by IRX-14.
 
 ## Why This Phase Exists
 
@@ -19,8 +25,9 @@ frontier analysis, Weekly AI Intelligence Workbook, split Knowledge
 Atlas/Weekly Intelligence Brief HTML surfaces, MVP Radar section, feedback,
 Strategy Reviewer, and generated Obsidian projection.
 
-The next phase is not another report feature. The next phase is convenience and
-usefulness:
+The W29 audit changes the immediate order: report correctness and reader value
+must be repaired before further assistant convenience work. The long-term loop
+remains:
 
 ```text
 Telegram posts

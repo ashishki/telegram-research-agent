@@ -1,23 +1,27 @@
 # Current Backlog
 
-Version: 2.0
-Last updated: 2026-07-10
+Version: 3.0
+Last updated: 2026-07-13
 State: canonical active backlog
 
-Canonical roadmap: `docs/portfolio_grade_intelligence_roadmap.md`.
+Canonical product-correction roadmap:
+`docs/intelligence_report_v2_roadmap.md`.
 
 This file is intentionally compact. Historical KIR/HPI/RVE/DFX detail remains
-in component roadmaps and git history; active implementation starts from the PGI
-task graph below.
+in component roadmaps and git history. The PGI implementation record remains
+below, but active implementation starts from the IRX task graph.
 
 ## Operating Rules
 
-- One active queue: Portfolio-Grade Intelligence (`PGI`).
-- One parallel Radar track: `RADAR-PGI`.
+- One active product-correction queue: Intelligence Report Experience And
+  Editorial Quality (`IRX`).
+- PGI and KIR/HPI/RQ/RVE remain historical or component records; do not add
+  Report V2 work to those queues.
 - `PGI-001` through `PGI-006` are implemented locally with focused
-  verification and pushed commits.
-- The next task gate is `PGI-007 - Four-Week Dogfood Evidence Series`, which is
-  blocked on real operator dogfood evidence.
+  verification. Their infrastructure is reusable, but W29 disproved the claim
+  that the split reports are ready for reader-value dogfood.
+- `PGI-007` is superseded as the next gate by `IRX-14`; dogfood must not start
+  until the Report V2 start checklist passes.
 - Do not run expensive LLM jobs, full archive backfills, migrations, or
   production config changes from backlog grooming.
 - Market/business context remains `context_only`.
@@ -31,47 +35,78 @@ task graph below.
 | Knowledge Atom storage/extraction | `implemented_and_verified` |
 | Idea Thread storage/momentum | `implemented_and_verified` |
 | Weekly AI visual report/workbook contract | `implemented_and_verified`, `legacy_surface` |
-| Weekly Brief + Knowledge Atlas split | `implemented_and_verified` for PGI-003 Brief cockpit, PGI-004 Atlas thread navigation, and PGI-005 Project/Learning projections |
+| Weekly Brief + Knowledge Atlas split | `implemented_structurally`, `failed_W29_reader_value_audit`; PGI-003/004/005 plumbing is reusable but does not satisfy Report V2 |
 | Hermes/PI facade/tools/chat | `implemented_but_not_dogfooded`; PGI-003 artifact freshness awareness added |
 | Feedback intake/action status | `implemented_and_verified` for PGI-002 provenance/ranking slice |
 | Weekly intelligence scorecard | `implemented_and_verified` for PGI-006 deterministic scorecard fixtures |
 | Strategy Reviewer | `implemented_and_verified` advisory-only |
 | Market/business Radar context | `implemented_and_verified` as `context_only` |
 | Radar RVE contract/adapters in sibling repo | `implemented_and_verified`, `needs_live_validation` |
-| Portfolio dogfood evidence | `blocked_on_operator_runs` |
+| Report V2 contract and roadmap | `implemented_documentation_only` as IRX-0; no V2 runtime is implemented |
+| Portfolio dogfood evidence | `blocked_on_IRX-14_start_gate` |
 
 ## Next Candidate Task
 
-`PGI-007 - Four-Week Dogfood Evidence Series`
+`IRX-1 - Completed-Week Reporting Semantics`
 
-Do not fabricate scorecards, thresholds, learning outcomes, decision impact, or
-Radar validation claims. Start only when the operator has current private
-Brief/Atlas/Radar artifacts and can provide sanitized weekly scorecard inputs or
-explicitly asks to start a local private dogfood log outside git. Do not reopen
-KIR/HPI/RVE implementation unless dogfood evidence discovers a regression.
+Implement the shared completed-week period contract before changing rendering,
+editorial prompts, personalization weights, thread curation, or Radar gates.
+The exact implementation prompt is in `docs/CODEX_PROMPT.md` and
+`docs/intelligence_report_v2_roadmap.md`.
 
 ## Dependency Graph
 
 ```text
-PGI-001
-  -> PGI-002
-  -> PGI-003
-  -> PGI-004
-  -> PGI-005
-  -> PGI-006
-  -> PGI-007
-  -> PGI-008
-
-RADAR-PGI-001
-  -> RADAR-PGI-002
-  -> RADAR-PGI-003
+P0: IRX-0 -> IRX-1 -> IRX-2 -> IRX-3 -> IRX-4 -> IRX-5
+P1: IRX-5 -> IRX-8 -> IRX-9 -> IRX-10 -> IRX-6 -> IRX-11
+P2: IRX-4/5/8/11 -> IRX-7 -> IRX-12 -> IRX-13 -> IRX-14
 ```
 
-`RADAR-PGI-*` can run in parallel after `PGI-001` freezes the shared contract
-version. `PGI-003` consumes Radar output but must degrade gracefully when Radar
-is missing/stale.
+`IRX-13` remains a P2 delivery task, but sanitized period fixtures should be
+introduced with IRX-1 and extended in every slice. IRX-8 precedes the Brief V2
+renderer because both reader surfaces need the same deterministic visual
+contract.
 
-## Active Task Cards
+## IRX Queue
+
+| ID | Priority | Status | Summary | Direct dependencies |
+|---|---|---|---|---|
+| IRX-0 | P0 | `implemented_documentation_only` | W29 audit, Report V2 roadmap, and product contracts | none |
+| IRX-1 | P0 | `ready` | Separate generation time from the last completed ISO-week analysis period | IRX-0 |
+| IRX-2 | P0 | `planned` | One weekly run manifest and required same-run Radar artifact contract | IRX-1 |
+| IRX-3 | P0 | `planned` | Map reactions through posts/atoms and a thread-resolution interface into a weak boost/receipt; canonical acceptance closes in IRX-4 | IRX-1, IRX-2 |
+| IRX-4 | P0 | `planned` | Curate stable idea-level threads with merge/split lifecycle and provenance | IRX-1, IRX-2, IRX-3 |
+| IRX-5 | P0 | `planned` | Produce schema-validated Russian editorial intelligence JSON from bounded cited inputs | IRX-1..IRX-4 |
+| IRX-8 | P1 | `planned` | Shared deterministic, offline static visualization components | IRX-4, IRX-5 |
+| IRX-9 | P1 | `planned` | Evidence-backed, named, PR-sized project implications | IRX-4, IRX-5, IRX-8 |
+| IRX-10 | P1 | `planned_reader_contract`; context exclusion already implemented | Bind same-run Radar JSON and explain candidate, evidence gaps, next validation, and kill criteria | IRX-2, IRX-5, IRX-8 |
+| IRX-6 | P1 | `planned` | Russian 5-7 minute Weekly Intelligence Brief V2 | IRX-1..IRX-5, IRX-8..IRX-10 |
+| IRX-11 | P1 | `planned` | Reader-value gates for period, editorial, personalization, visual, project, and Radar quality | IRX-6, IRX-8 |
+| IRX-7 | P2 | `planned` | Visual Knowledge Atlas V2 plus preserved Knowledge Audit Explorer | IRX-4, IRX-5, IRX-8, IRX-11 |
+| IRX-12 | P2 | `planned` | Report- and section-specific confirmation-gated learning loop | IRX-2, IRX-3, IRX-5, IRX-6, IRX-7, IRX-10 |
+| IRX-13 | P2 | `planned`; fixture scaffolding starts in IRX-1 | Sanitized golden fixtures, evaluation dataset, and desktop/mobile regression | IRX-1..IRX-12 |
+| IRX-14 | P2 | `planned` | Versioned rollout, compatibility, and dogfood restart gate | IRX-1..IRX-13 |
+
+Full task cards, acceptance criteria, likely files, failure states, tests, and
+rollout implications are in `docs/intelligence_report_v2_roadmap.md`.
+
+## Existing-Work Reconciliation
+
+- `PGI-003` is the structural Brief/Radar cockpit foundation; IRX-2, IRX-5,
+  IRX-6, and IRX-10 correct its period, orchestration, editorial, and reader
+  contracts.
+- `PGI-004` is thread navigation and becomes the Knowledge Audit Explorer
+  foundation; IRX-4 and IRX-7 add canonical curation and the reader Atlas.
+- `PGI-005` supplies project/learning projections; IRX-9 makes the reader action
+  contract concrete and evidence-backed.
+- `PGI-006` supplies scorecard plumbing; IRX-11 and IRX-13 add gates that make
+  current W29 patterns fail.
+- `PGI-007` is not deleted. Its evidence-series intent resumes only through
+  IRX-14 after the start gate passes.
+- Radar RVE/context-only exclusion is reused. IRX-2 and IRX-10 add same-run
+  binding and reader explanation without weakening gates.
+
+## Historical PGI Task Cards
 
 ### PGI-001 - Canonical Intelligence Contract And Eval Fixtures
 
@@ -223,7 +258,8 @@ PYTHONPATH=src python3 -m pytest tests/test_ai_report_feedback.py tests/test_ai_
 
 ### PGI-003 - Weekly Decision Cockpit, Hermes Awareness And Radar Gate
 
-- Status: `completed_local`
+- Status: `completed_local_structural`; W29 reader outcome failed and is
+  corrected by IRX-2, IRX-5, IRX-6, and IRX-10
 - Priority: P0
 - Owner: `telegram-research-agent`
 - Problem: Brief/Atlas split exists, but the Brief is not yet a complete
@@ -300,9 +336,10 @@ PYTHONPATH=src python3 -m pytest tests/test_split_intelligence_reports.py tests/
   - No production config change, expensive LLM run, full archive backfill,
     hidden Hermes mutation tool, or Radar gate weakening.
 
-### PGI-004 - Knowledge Atlas V2 Thread Navigation
+### PGI-004 - Atlas Thread Navigation (Historical Audit Explorer Foundation)
 
-- Status: `completed_local`
+- Status: `completed_local_structural`; reclassified by the W29 audit as the
+  Knowledge Audit Explorer foundation, not reader-facing Atlas V2
 - Priority: P1
 - Owner: `telegram-research-agent`
 - Problem: Atlas is a split artifact, but not yet a strong navigable cumulative
@@ -494,9 +531,9 @@ PYTHONPATH=src python3 -m pytest tests/test_dogfood_review.py tests/test_ai_repo
   - Static verification passed: `python3 -m py_compile src/output/dogfood_review.py`
     and `git diff --check`.
 
-### PGI-007 - Four-Week Dogfood Evidence Series
+### PGI-007 - Four-Week Dogfood Evidence Series (Historical)
 
-- Status: `blocked`
+- Status: `blocked_by_IRX-14`
 - Priority: P1
 - Owner: `operator`
 - Problem: user value is not proven by code or one artifact.
@@ -504,8 +541,8 @@ PYTHONPATH=src python3 -m pytest tests/test_dogfood_review.py tests/test_ai_repo
   decisions, actions, learning, and information overload.
 - Why now: required before portfolio readiness and post-dogfood product claims.
 - Dependencies: `PGI-003`, `PGI-006`.
-- Blocked by: four current operator dogfood weeks or sanitized weekly
-  scorecard inputs.
+- Blocked by: IRX-14 Report V2 start gate, then four current operator dogfood
+  weeks or sanitized weekly scorecard inputs.
 - Files likely touched: dogfood scorecard docs/artifacts only; generated private
   raw outputs must remain ignored.
 - Schema impact: none unless scorecard schema changes.
@@ -529,8 +566,9 @@ PYTHONPATH=src python3 -m pytest tests/test_dogfood_review.py
 - Metrics: Weekly Verified Decision Impact, time to understand, actions
   completed, false-confidence incidents, friction.
 - Risks: dogfood artifacts leak private data; weekly run skipped but counted.
-- Stop conditions: no current Brief/Atlas; generated private artifact would be
-  committed; false-confidence incident unaddressed.
+- Stop conditions: IRX-14 gate not passed; no current valid Brief/Atlas;
+  generated private artifact would be committed; false-confidence incident
+  unaddressed.
 - Estimated size: XL over calendar time.
 - Portfolio evidence produced: product evidence gate.
 - Radar impact: `consumer`.

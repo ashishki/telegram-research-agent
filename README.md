@@ -2,26 +2,32 @@
 
 Personal research intelligence for Telegram channels: ingest posts, preserve evidence, extract AI knowledge atoms, track evolving idea threads, and produce weekly decision reports instead of a generic digest.
 
-State: portfolio-grade Personal AI / Knowledge Intelligence System in progress.
+State: portfolio-grade Personal AI / Knowledge Intelligence System in progress;
+Report V2 product correction active after the W29 reader-value audit.
 The legacy Research Brief / Implementation Ideas loop still works, but the
 product direction is now a private decision and learning intelligence system
 centered on the Weekly Intelligence Brief, Knowledge Atlas, bounded Hermes/PI
 assistant, Project Intelligence, Learning Intelligence, and a parallel MVP
 Radar validation track.
 
-Canonical roadmap: `docs/portfolio_grade_intelligence_roadmap.md`.
+Active Report V2 roadmap: `docs/intelligence_report_v2_roadmap.md`.
+Broader product roadmap: `docs/portfolio_grade_intelligence_roadmap.md`.
 Canonical active backlog: `docs/tasks.md`.
 Current implementation gate:
-`PGI-007 - Four-Week Dogfood Evidence Series` is blocked on operator dogfood
-evidence after the pushed PGI-001..PGI-006 slices.
+`IRX-1 - Completed-Week Reporting Semantics`. `PGI-007` dogfood is superseded
+as the next action and remains blocked until the `IRX-14` start gate passes.
 
 Current baseline: knowledge atoms, idea threads, canonical report contracts,
-split Brief / Atlas artifacts, Brief decision cockpit, Atlas thread navigation,
+split Brief / Atlas artifacts, Brief cockpit plumbing, Atlas audit navigation,
 durable Project/Learning Intelligence projections, weekly scorecard fixtures,
 Hermes/PI read-only foundation, artifact freshness awareness, feedback
 provenance helpers, Strategy Reviewer, and Radar RVE bridge exist in code with
 focused tests. The honest gap is four-week dogfood evidence and portfolio-ready
-evaluation proof from real operator runs. Raw Telegram firehose RAG, assistant
+evaluation proof from real operator runs. The W29 artifacts are technically
+valid but not reader-ready: they expose wrong-period, Radar-handoff,
+personalization, editorial, thread-curation, and visualization failures. Report
+V2 is planned, not implemented, and dogfood has not started. Raw Telegram
+firehose RAG, assistant
 mutations, full-year archive processing, and build-ready Radar decisions from
 context-only evidence remain out of scope.
 
@@ -111,7 +117,10 @@ It is not a public bot, SaaS product, or generic summarizer.
 - Temporal Idea Threads via `idea-threads`: deterministic grouping of atoms into evolving AI ideas with momentum and status.
 - Frontier-model synthesis via `frontier-analysis`: top-model weekly interpretation over compressed 12-week context.
 - Stakeholder-facing Weekly AI Intelligence Workbook via `ai-visual-report`: Russian decision brief, strong signals, deep explanation cards, claim evidence cards with quote verification/evidence tiers, concept diagrams, project implementation suggestions, MVP Radar section, feedback prompts, JSON sidecar, and embedded Archify/local diagrams when available.
-- Split reader-facing HTML via `ai-split-report`: a cumulative Knowledge Atlas for trend/source/study context and a short Weekly Intelligence Brief for decision, action, MVP Radar, and feedback prompts. Both write distinct HTML/JSON sidecars, reuse the same curated context load, and can be delivered to Telegram with `--deliver`.
+- Split V1 HTML via `ai-split-report`: a detailed Atlas/audit surface and a
+  short Brief shell. Both write distinct HTML/JSON sidecars and can be
+  delivered to Telegram, but the W29 audit found that they do not yet satisfy
+  the Report V2 reader contract.
 - Project and Learning Intelligence projections: Brief/Atlas sidecars and HTML expose external project signals, confirmed implications, weak watches, rejected broad overlaps, tiny PR ideas, stale decisions, research debt, repeated themes without action, learning objectives, and learning stage counts without treating passive reading as mastery.
 - Strategy Reviewer via `strategy-reviewer`: advisory-only keep/change/demote/test-next-week suggestions and Codex-ready tasks from confirmed workbook feedback; it does not mutate source code, prompts, thresholds, profile, or projects.
 - HPI read-only foundation: `PersonalIntelligenceFacade`, curated retrieval items, transient SQLite FTS ranking, and bounded PI tools expose workbook, thread, action, MVP, feedback, marked-post, Strategy Reviewer, and action-status DTOs without raw DB sessions, vector search, or mutation methods.
@@ -164,6 +173,10 @@ python3 src/main.py ai-split-report --week 2026-W28 --skip-refresh --deliver
 
 ## Production Readiness
 
+The services below describe the current diagnostic V1 deployment. Scheduled
+HTML success is not Report V2 readiness, and the four-week dogfood is paused
+until IRX-14.
+
 On the single-user VPS, the operational baseline is:
 
 - `telegram-bot.service` runs Hermes command polling with restart-on-failure.
@@ -177,8 +190,8 @@ On the single-user VPS, the operational baseline is:
 - Legacy `telegram-ingest.timer`, `telegram-digest.timer`,
   `telegram-mvp-weekly.timer`, `telegram-cleanup.timer`,
   `telegram-study-reminder-*.timer`, `telegram-reminders.timer`, and
-  `reminder.timer` are disabled in the current dogfood baseline. Re-enable them
-  only with an explicit schedule decision.
+  `reminder.timer` are disabled in the current V1 deployment baseline.
+  Re-enable them only with an explicit schedule decision.
 
 Quick checks:
 
@@ -262,8 +275,14 @@ Radar live-source credentials are loaded separately by `systemd/telegram-mvp-wee
 Start here:
 
 - [docs/README.md](docs/README.md) — documentation map
+- [docs/intelligence_report_v2_audit.md](docs/intelligence_report_v2_audit.md) — W29 current-state audit
+- [docs/intelligence_report_v2_roadmap.md](docs/intelligence_report_v2_roadmap.md) — active IRX-0..IRX-14 queue
+- [docs/intelligence_report_v2_contract.md](docs/intelligence_report_v2_contract.md) — Brief V2, Atlas V2, and Audit Explorer product contract
+- [docs/weekly_run_manifest.md](docs/weekly_run_manifest.md) — completed-period and same-run artifact contract
+- [docs/reaction_personalization_contract.md](docs/reaction_personalization_contract.md) — reaction influence and effect receipt contract
+- [docs/static_visualization_system.md](docs/static_visualization_system.md) — offline visualization component contract
 - [docs/portfolio_grade_intelligence_roadmap.md](docs/portfolio_grade_intelligence_roadmap.md) — canonical product, architecture, evaluation, and portfolio roadmap
-- [docs/tasks.md](docs/tasks.md) — compact active backlog and next PGI task
+- [docs/tasks.md](docs/tasks.md) — compact active IRX backlog and historical PGI record
 - [docs/intelligence_evaluation_framework.md](docs/intelligence_evaluation_framework.md) — evaluation layers and weekly scorecard
 - [docs/portfolio_evidence_plan.md](docs/portfolio_evidence_plan.md) — portfolio readiness gate and evidence plan
 - [docs/mvp_radar_integration_contract.md](docs/mvp_radar_integration_contract.md) — cross-repo Radar contract

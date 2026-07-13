@@ -2,13 +2,19 @@
 
 Status: component roadmap / historical KIR implementation record
 Created: 2026-07-06
-Last updated: 2026-07-10
+Last updated: 2026-07-13
 
-Canonical active roadmap:
-`docs/portfolio_grade_intelligence_roadmap.md`.
+Canonical active report roadmap:
+`docs/intelligence_report_v2_roadmap.md`.
 
 This document remains useful for the original AI Knowledge Intelligence
 architecture and KIR quality history. It is not the active development queue.
+
+W29 reconciliation: atom extraction, temporal metrics, Frontier Analysis, and
+source provenance remain foundations. Current deterministic entity grouping is
+only a candidate generator; it does not satisfy the canonical idea-thread
+contract in IRX-4. Do not rewrite historical KIR completion records as Report
+V2 completion.
 
 ## Why This Exists
 

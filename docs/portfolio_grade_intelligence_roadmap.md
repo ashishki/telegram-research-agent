@@ -1,12 +1,21 @@
 # Portfolio-Grade Personal Intelligence Roadmap
 
 Version: 1.0
-Last updated: 2026-07-10
-Status: canonical active roadmap
+Last updated: 2026-07-13
+Status: canonical broader product roadmap; IRX is the active report correction
 
 This is the canonical product, architecture, evaluation, and portfolio-readiness
 roadmap for `telegram-research-agent`. Other roadmap documents are component
 records, historical implementation logs, or supporting specifications.
+
+## W29 Product Correction
+
+The W29 Brief and Atlas passed the structural PGI checks but failed as
+information products. `docs/intelligence_report_v2_roadmap.md` is therefore the
+active implementation order. PGI-003 through PGI-006 remain reusable
+infrastructure records, not proof of Report V2 reader value. PGI-007 dogfood is
+held until IRX-14 confirms correct periods, same-run Radar, visible reaction
+effects, canonical threads, useful editorial actions, and reader-value gates.
 
 ## 1. Executive Target
 

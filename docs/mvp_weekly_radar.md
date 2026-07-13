@@ -1,10 +1,20 @@
 # MVP Weekly Radar Bridge
 
-Status: supporting Radar bridge reference with KIR gates, market-context sidecar, and RVE query contract
-Date: 2026-07-10
+Status: supporting Radar bridge reference; Report V2 same-run binding is planned
+Date: 2026-07-13
 
 Canonical cross-repo contract:
 `docs/mvp_radar_integration_contract.md`.
+
+Report V2 integration contract:
+`docs/weekly_run_manifest.md` and IRX-2/IRX-10 in
+`docs/intelligence_report_v2_roadmap.md`.
+
+The W29 Brief missed the valid W28 Radar result because the two artifacts were
+generated and resolved independently. The current commands remain diagnostic;
+IRX-2 must bind one Radar JSON, period, and run identity through a weekly
+manifest. Expected missing or wrong-week Radar makes the package explicitly
+partial, not silently complete.
 
 ## Purpose
 
@@ -31,7 +41,8 @@ unless the source gates clearly support a build-ready recommendation.
    evidence into `data/output/opportunity_seeds/`.
    - Standard seeds represent candidate pain/opportunity signals.
    - A special `market_analyst_context` seed can carry bounded business/market
-     context without consuming the ordinary seed limit.
+     context without consuming the ordinary seed limit. It is excluded from
+     candidate ranking as proof and cannot increase candidate evidence score.
    - A sidecar JSON is written under
      `data/output/opportunity_seeds/market_context/`.
 2. The pipeline runs Radar with:
@@ -205,9 +216,9 @@ Clarifications:
 - Telegram-only remains `investigate` or `reject`.
 - Live source intelligence is context-only and does not satisfy external
   evidence gates.
-- Market/business analyst context is also context-only. It may help rank or
-  explain candidates, but it must not make a candidate build-ready without
-  external demand evidence.
+- Market/business analyst context is also context-only. It may frame and
+  explain candidates, but it is excluded from candidate ranking as proof,
+  cannot increase an evidence score, and cannot make a candidate build-ready.
 - Existing-project context is `investigate/apply-to-existing`, not a new
   standalone MVP.
 - External-first standalone Radar runs should remain possible. Apply the KIR

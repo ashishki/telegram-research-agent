@@ -2,16 +2,22 @@
 
 Status: superseded workbook roadmap / historical KIR-Q0..KIR-Q13 record
 Created: 2026-07-07
-Last updated: 2026-07-10
+Last updated: 2026-07-13
 Owner: private single-user operator workflow
 
-Canonical active roadmap:
-`docs/portfolio_grade_intelligence_roadmap.md`.
+Canonical active report roadmap:
+`docs/intelligence_report_v2_roadmap.md`.
 
 The workbook work documented here shipped important KIR plumbing. The target
 product surface is now split into Weekly Intelligence Brief, Knowledge Atlas,
 Hermes/PI, Project Intelligence, Learning Intelligence, and a parallel MVP Radar
 track.
+
+W29 reconciliation: KIR-Q workbook prompts, Russian copy, claim/evidence cards,
+local SVG/Archify fallback, and progressive-disclosure patterns are reusable.
+Their existence does not mean the split reports meet Report V2. The current
+detailed Atlas renderer becomes the Knowledge Audit Explorer baseline; IRX-5,
+IRX-6, IRX-7, and IRX-8 own the new editorial and reader surfaces.
 
 ## Why This Exists
 

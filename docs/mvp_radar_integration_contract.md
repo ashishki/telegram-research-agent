@@ -1,9 +1,15 @@
 # MVP Radar Integration Contract
 
 Version: 1.0
-Last updated: 2026-07-10
-Status: supporting cross-repo contract
+Last updated: 2026-07-13
+Status: supporting cross-repo evidence contract; same-run V2 binding planned
 Contract version: `tra-radar-intelligence-contract.v1`
+
+IRX-2 adds `weekly_run_manifest.v1` around this exchange. The evidence contract
+remains compatible; a Report V2 package must additionally match run identity,
+reporting week, and half-open analysis boundaries. Expected missing, wrong-run,
+or wrong-week Radar must not crash rendering, but it must make the package
+visibly partial rather than complete-looking.
 
 This contract defines how `telegram-research-agent` and
 `Demand-to-MVP-Radar` exchange intelligence. Radar is a parallel downstream
@@ -99,9 +105,10 @@ consumer can read the selected object without chasing top-level JSON.
 - Hermes must explain which conclusions came from market lens and which came
   from matched external evidence.
 - Stale Radar artifact must be explicitly marked.
-- Missing Radar artifact must not break Atlas or Brief generation.
-- AI Intelligence and Radar pipelines are contract-linked but not fully
-  blocking.
+- Missing Radar artifact must not crash Atlas or Brief rendering; when Radar is
+  required, it must make the run partial or failed.
+- V1 diagnostic pipelines may remain separately callable. A complete V2 weekly
+  package is manifest-linked and requires its declared Radar stage.
 - Cross-repo schema changes must be versioned and tested.
 - Sidecar JSON and rendered Markdown/HTML must not contradict each other.
 

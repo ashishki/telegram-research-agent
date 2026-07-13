@@ -1,12 +1,33 @@
 # Four-Week Dogfood Plan
 
-Status: supporting dogfood protocol
+Status: blocked pending IRX-14 Report V2 start gate
 Created: 2026-07-08
-Last updated: 2026-07-10
+Last updated: 2026-07-13
 Owner: private single-user operator workflow
 
 Canonical roadmap: `docs/portfolio_grade_intelligence_roadmap.md`.
 Canonical active backlog: `docs/tasks.md`.
+
+## W29 Correction
+
+Do not start Week 1 with the current W29 split artifacts. The reports passed
+structural checks but failed reader value: wrong default period, missing
+same-run Radar, no visible reaction influence, generic repeated actions,
+fragmented threads, and no meaningful visual map. The active correction is
+`IRX-0..IRX-14` in `docs/intelligence_report_v2_roadmap.md`.
+
+Dogfood Week 1 may start only when all of the following are true:
+
+- the completed-week period and human dates are visible;
+- the real same-run Radar result is included;
+- a reaction effect receipt is visible;
+- the Brief contains a source-backed weekly thesis and non-generic action;
+- at least one useful data visualization is present;
+- duplicate primary threads do not dominate Atlas;
+- reader-value quality gates pass;
+- the report-specific voice feedback flow is verified.
+
+Until then, commands below are diagnostic smoke checks, not dogfood evidence.
 
 ## Purpose
 
@@ -28,7 +49,7 @@ or actions, it is not successful.
 
 ## Readiness Hygiene Status
 
-Completed before starting dogfood:
+Infrastructure hygiene completed before the Report V2 correction:
 
 - isolated the market context lens sidecar for temp/custom seed exports so
   stale repo-level market context cannot contaminate tests or one-off Radar
@@ -42,7 +63,7 @@ Completed before starting dogfood:
 - clarified that `/feedback` and voice feedback create pending drafts first,
   while confirmed feedback memory events are written only after
   `/feedback_confirm`;
-- added the Week 1 command checklist below.
+- retained the former Week 1 commands below as a diagnostic checklist only.
 
 Verification already run:
 
@@ -61,7 +82,7 @@ Known remaining cleanup:
 
 ## Weekly Routine
 
-### Week 1 Command Checklist
+### Legacy Diagnostic Checklist - Not Dogfood Week 1
 
 Set `WEEK=<YYYY-WNN>` for the target ISO week, then run:
 
@@ -75,7 +96,7 @@ PYTHONPATH=src python3 src/main.py mvp-weekly --no-deliver
 PYTHONPATH=src python3 src/main.py ai-split-report --week "$WEEK" --skip-refresh --threads-limit 24 --atoms-limit 8 --deliver
 ```
 
-Telegram smoke checks after generation:
+Telegram diagnostic checks after generation:
 
 ```text
 /weekly

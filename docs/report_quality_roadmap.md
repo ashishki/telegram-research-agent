@@ -1,10 +1,17 @@
 # Report Quality And Radar Handoff Roadmap
 
 Status: historical implemented AI-development roadmap
-Last updated: 2026-07-10
+Last updated: 2026-07-13
 
-Canonical active roadmap:
-`docs/portfolio_grade_intelligence_roadmap.md`.
+Canonical active report roadmap:
+`docs/intelligence_report_v2_roadmap.md`.
+
+W29 reconciliation: this roadmap improved legacy structural validity and Radar
+handoff behavior, but its checks did not measure completed-week correctness,
+Russian reader language, reaction influence, repeated generic actions,
+canonical thread purity, semantic visualizations, or project specificity.
+IRX-11 supersedes it for reader-value gates while preserving reusable
+`ReportQualityFinding` plumbing and historical tests.
 
 ## Purpose
 
