@@ -152,7 +152,7 @@ behavior; it does not reopen the gate logic.
 | IRX-5 | Editorial Intelligence synthesis contract | `implemented_and_verified` | P0 | IRX-1 through IRX-4 |
 | IRX-6 | Weekly Intelligence Brief V2 | `planned` | P1 | IRX-2 through IRX-5, IRX-8 through IRX-10 |
 | IRX-7 | Knowledge Atlas V2 and Knowledge Audit Explorer separation | `planned` | P2 | IRX-4, IRX-5, IRX-8, IRX-11 |
-| IRX-8 | Static visualization component system | `planned` | P1 | IRX-4, IRX-5 |
+| IRX-8 | Static visualization component system | `implemented_and_verified` | P1 | IRX-4, IRX-5 |
 | IRX-9 | Project Intelligence V2 | `planned` | P1 | IRX-4, IRX-5, IRX-8 |
 | IRX-10 | MVP Radar reader contract and context-only hardening | `partially_implemented`; context-only gates and IRX-2 same-run binding verified, reader projection planned | P1 | IRX-2, IRX-5, IRX-8 |
 | IRX-11 | Reader-value quality gates | `planned` | P1 | IRX-6, IRX-8 and upstream contracts |
@@ -753,7 +753,7 @@ change was made.
 
 ### IRX-8 - Static Visualization Component System
 
-**Status:** `planned`. **Priority:** P1.
+**Status:** `implemented_and_verified`. **Priority:** P1.
 
 **Problem:** Current reports contain cards, tables, and CSS bars but no
 meaningful graph, heatmap, funnel, decision matrix, evidence distribution, or
@@ -812,6 +812,19 @@ visual that implies stronger proof than its underlying evidence.
 
 **Rollout implications:** Land component fixtures before reader renderers.
 Components are additive and do not alter V1 output until explicitly selected.
+
+**IRX-8 completion receipt (2026-07-14):** Added the stdlib-only shared
+`src/output/report_visuals.py` library with strict versioned envelopes and all
+ten component schemas, explicit data/render/source/role markers, accessible
+semantic HTML and inline SVG, offline CSP, responsive/print styles, safe
+source-reference and numeric boundaries, exact completed-week/run identity,
+and honest normal/empty/unavailable/stale/failed behavior. Added the sanitized
+`visual_components.v1.json` fixture pack and byte-exact standalone HTML gallery
+plus 23 focused tests. The combined visualization and unchanged V1
+compatibility matrix passed 54 tests; Ruff format/check, focused compilation,
+and `git diff --check` passed. V1 renderers are intentionally not wired to the
+library, project/Radar computation is unchanged, and browser geometry/snapshot
+evidence is not claimed before IRX-13.
 
 ### IRX-9 - Project Intelligence V2
 
@@ -1502,6 +1515,6 @@ Report files changed, canonical identity/lifecycle/as-of semantics, compatibilit
 
 ## 15. Suggested Following Task
 
-IRX-1 through IRX-5 are implemented and verified. IRX-8 is the next planned
-implementation scope. IRX-8 and all later reader-surface, rollout, and dogfood
-work remain unimplemented by the IRX-5 slice.
+IRX-1 through IRX-5 and IRX-8 are implemented and verified. IRX-9 is the next
+planned implementation scope. Reader-surface activation, rollout, and dogfood
+remain unimplemented and gated by their later tasks.

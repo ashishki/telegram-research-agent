@@ -1,7 +1,7 @@
 # Current Backlog
 
-Version: 3.2
-Last updated: 2026-07-13
+Version: 3.3
+Last updated: 2026-07-14
 State: canonical active backlog
 
 Canonical product-correction roadmap:
@@ -43,17 +43,19 @@ below, but active implementation starts from the IRX task graph.
 | Market/business Radar context | `implemented_and_verified` as `context_only` |
 | Radar RVE contract/adapters in sibling repo | `implemented_and_verified`, `needs_live_validation` |
 | Editorial intelligence shadow | `implemented_and_verified`; separate opt-in `editorial_intelligence.v1` run artifact, not consumed by V1 renderers |
-| Report V2 contract and roadmap | `implementation_in_progress`; IRX-0 documentation plus IRX-1 period, IRX-2 run-manifest/Radar, IRX-3 reaction-personalization, IRX-4 canonical-thread lifecycle, and IRX-5 editorial-synthesis semantics are implemented and verified |
+| Static visualization component system | `implemented_and_verified`; shared offline `report_visuals.v1` library and sanitized fixture gallery, not activated in V1 renderers |
+| Report V2 contract and roadmap | `implementation_in_progress`; IRX-0 documentation plus IRX-1 period, IRX-2 run-manifest/Radar, IRX-3 reaction-personalization, IRX-4 canonical-thread lifecycle, IRX-5 editorial-synthesis semantics, and IRX-8 shared visuals are implemented and verified |
 | Portfolio dogfood evidence | `blocked_on_IRX-14_start_gate` |
 
 ## Next Candidate Task
 
-`IRX-8 - Static Visualization Component System`
+`IRX-9 - Project Intelligence V2`
 
-Create shared deterministic offline visualization components after the verified
-IRX-5 editorial JSON boundary. IRX-8 must not activate the V2 renderers or
-change the frozen IRX-2 stage policy outside its own declared scope. Its task
-card is in `docs/intelligence_report_v2_roadmap.md`.
+Create at most two evidence-backed, repository-named, PR-sized project
+implications after the verified editorial and visualization contracts. IRX-9
+must preserve existing project/learning compatibility projections and must not
+activate V2 renderers, mutate repositories, or broaden Radar authority. Its
+task card is in `docs/intelligence_report_v2_roadmap.md`.
 
 ## Dependency Graph
 
@@ -78,7 +80,7 @@ contract.
 | IRX-3 | P0 | `implemented_and_verified` | Map reactions through posts/atoms and a thread-resolution interface into a weak boost/receipt; canonical attribution is supplied by IRX-4 | IRX-1, IRX-2 |
 | IRX-4 | P0 | `implemented_and_verified` | Curate stable idea-level threads with merge/split lifecycle, provenance, and historical as-of resolution | IRX-1, IRX-2, IRX-3 |
 | IRX-5 | P0 | `implemented_and_verified` | Produce schema-validated Russian editorial intelligence JSON from bounded cited inputs | IRX-1..IRX-4 |
-| IRX-8 | P1 | `planned` | Shared deterministic, offline static visualization components | IRX-4, IRX-5 |
+| IRX-8 | P1 | `implemented_and_verified` | Shared deterministic, offline static visualization components | IRX-4, IRX-5 |
 | IRX-9 | P1 | `planned` | Evidence-backed, named, PR-sized project implications | IRX-4, IRX-5, IRX-8 |
 | IRX-10 | P1 | `planned_reader_contract`; context exclusion and IRX-2 same-run binding implemented | Explain the bound candidate, evidence gaps, next validation, and kill criteria | IRX-2, IRX-5, IRX-8 |
 | IRX-6 | P1 | `planned` | Russian 5-7 minute Weekly Intelligence Brief V2 | IRX-1..IRX-5, IRX-8..IRX-10 |
@@ -305,6 +307,34 @@ rollout implications are in `docs/intelligence_report_v2_roadmap.md`.
   archive regeneration, cross-repository edit, Radar gate change, V2 renderer,
   visualization component, or dogfood start was performed. IRX-8 is the next
   implementation task.
+
+### 2026-07-14 - IRX-8 Static Visualization Component System
+
+- Status: `implemented_and_verified`.
+- Added a stdlib-only shared `report_visuals.v1` renderer with exact closed
+  schemas for ten component kinds: decision matrix, reaction lineage, Radar
+  gate, project impact, knowledge graph, 12-week timeline, source/thread
+  heatmap, evidence maturity, learning progression, and evidence badge.
+- Every component is deterministic, standalone/offline, accessible, and
+  explicit about run/period identity, source count, visual role, render state,
+  and `available`/`empty`/`unavailable`/`stale` data state. Validation rejects
+  unknown fields, unsafe refs, non-finite or oversized numbers, false evidence
+  maturity, decision escalation, mislabeled periods, and host-label laundering.
+- Added responsive/print CSS, collision-safe namespaced DOM/SVG IDs, readable
+  graph audit paths, null-versus-zero time-series semantics, and nonblank local
+  failure rendering. A document with multiple malformed specs now retains
+  distinct accessible failed sections instead of crashing on fallback IDs.
+- Added a sanitized ten-schema JSON fixture pack and byte-exact standalone HTML
+  gallery under `tests/fixtures/report_v2/`. No scripts, network resources,
+  remote fonts, private identifiers, or generated production reports are used.
+- Verification: 23 focused tests and the combined 54-test visualization/V1
+  compatibility matrix passed. Ruff format/check, focused `py_compile`, and
+  `git diff --check` passed. Adversarial mutation review exercised 5,324
+  malformed component variants without an uncaught component-render exception.
+- Compatibility: V1 Brief/Atlas output, editorial JSON, IRX-2 orchestration,
+  project computation, Radar gates, cross-repository code, and private report
+  artifacts remain unchanged. Browser screenshot regression remains IRX-13;
+  no screenshot or dogfood evidence is claimed. IRX-9 is the next task.
 
 ## Existing-Work Reconciliation
 

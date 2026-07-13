@@ -1,7 +1,7 @@
 # Static Visualization System Contract
 
-Version: `report_visuals.v1`  
-Status: planned under IRX-8; not implemented  
+Version: `report_visuals.v1`
+Status: implemented and focused-test verified under IRX-8
 Consumers: Weekly Intelligence Brief V2 and Knowledge Atlas V2
 
 This contract defines reusable, deterministic, offline visualization components
@@ -72,8 +72,15 @@ The root element exposes machine-detectable quality markers:
   data-render-status="complete"
   data-data-status="available"
   data-source-ref-count="1"
+  data-visual-role="data"
 >
 ```
+
+`data-visual-role` is `data` for the nine data components, `supporting` for an
+evidence badge, and `invalid` for schema-failure output. It describes component
+semantics only. It is not an IRX-11 pass/fail or meaningful-count decision;
+future quality policy must also evaluate render/data state, required placement,
+information value, and duplication.
 
 Quality gates count a component as meaningful only when:
 
@@ -102,9 +109,8 @@ All component schemas extend this envelope:
   "analysis_period_start": "2026-07-06T00:00:00Z",
   "analysis_period_end": "2026-07-13T00:00:00Z",
   "data_status": "available",
-  "source_refs": [],
-  "data_note_ru": "Источник и ограничение данных",
-  "items": []
+  "source_refs": ["artifacts/<run_id>/weekly-run-manifest.json#visual-input"],
+  "data_note_ru": "Источник и ограничение данных"
 }
 ```
 
@@ -118,6 +124,62 @@ Rules:
   silently converted into proof.
 - User-authored/source text is escaped. Links are restricted to accepted local
   paths and safe `http`/`https` source URLs.
+
+### V1 Schema Clarifications
+
+IRX-8 freezes the following renderer-local details so a component never has to
+guess missing semantics:
+
+- `partial_reasons_ru` is the shared ordered-independent list of visible
+  reasons for an otherwise valid partial result. `state_reason_ru` is required
+  for `unavailable` and `stale`; stale input additionally names
+  `stale_from_run_id` and `stale_from_period`.
+- The generic envelope does not add an `items` field. Each component uses only
+  its domain collection (`items`, `stages`, `nodes`/`edges`, `series`,
+  `sources`/`threads`/`cells`, or `levels`). Unknown fields fail validation.
+- A decision item has `emphasis: none|primary_action|explicit_defer`. Available
+  data has exactly one primary action in `act` and one explicit defer in
+  `ignore`; the renderer does not choose them.
+- Radar input has `snapshot_status: complete|failed`. This distinguishes a
+  producer-declared successful empty selection from a missing or failed
+  snapshot without recomputing any Radar decision. Exact same-run authority is
+  established upstream by the manifest/Radar binding, not inferred by this
+  renderer.
+- A graph node has non-negative integer `display_priority`. More than 12 valid
+  nodes are reduced by descending priority and canonical ID, with an explicit
+  partial warning and excluded-node count.
+- A heatmap source has `classification_status: available|unavailable`.
+  Missing cells for a classified source mean observed zero; an unavailable
+  classification remains unknown and cannot have cells.
+- Timeline event types are `merge`, `split`, `milestone`, and `contradiction`.
+  Momentum is a finite non-negative value or `null`; all compared series use a
+  common zero-based scale. A complete current timeline has 12 consecutive ISO
+  weeks; a shorter available history requires an explicit partial reason, and
+  a series with no observed momentum cannot produce a blank baseline chart.
+- Evidence maturity supplies all six fixed levels plus an explicit `unknown`
+  bucket whenever data is available. Empty/unavailable states carry no level
+  rows rather than seven misleading zeroes.
+- Every learning stage carries `observation_status`, `confirmation_kind`, and
+  `evidence_refs`. A confirmed count requires the stage-specific event kind;
+  unknown uses `count=null`, `confirmation_kind=none`, and no refs. A reaction
+  is accepted only for `marked`.
+- Reaction, evidence-maturity, and learning stage labels are host-bound to their
+  fixed keys. Caller text cannot relabel a weak stage as a decision or measured
+  outcome. Reaction lineage has exactly five stages, propagates an upstream
+  zero to all downstream stages, and inherits the editorial maximum of three
+  selected signals.
+- Evidence-badge values are `null` in empty/unavailable states. Project
+  `effort` is reader-facing Russian text, and `likely_files` are validated
+  relative POSIX paths rather than executable links.
+
+For `available`, `empty`, and `stale`, at least one envelope `source_ref`
+identifies the supplying/query artifact. `unavailable` has no source ref and
+must name the failed or missing upstream in `state_reason_ru`. Opaque evidence
+references are counted but are not exposed as reader copy.
+
+A standalone document accepts only one exact `run_id`, `reporting_week`, and
+analysis-period tuple across all valid components. It also rejects collisions
+between generated SVG/text IDs, not only duplicate root `component_id` values.
 
 ## Determinism Rules
 
@@ -167,7 +229,8 @@ Schema: `report_visual.decision_matrix.v1`
       "label_ru": "Проверить контракт периода",
       "signal_ref": "signal-period-semantics",
       "confidence": "low|medium|high",
-      "evidence_maturity": "single_source|repeated_signal|multi_channel|primary_verified|externally_corroborated|decision_grade"
+      "evidence_maturity": "single_source|repeated_signal|multi_channel|primary_verified|externally_corroborated|decision_grade",
+      "emphasis": "none|primary_action|explicit_defer"
     }
   ]
 }
@@ -220,6 +283,7 @@ Schema: `report_visual.radar_gate.v1`
 
 ```json
 {
+  "snapshot_status": "complete|failed",
   "candidate_name": "Hotkey Dictation Workflow Probe",
   "dossier_status": "investigate",
   "reader_decision": "investigate|reject|build_allowed|unavailable",
@@ -255,10 +319,11 @@ Schema: `report_visual.project_impact.v1`
     {
       "project_name": "telegram-research-agent",
       "signal_ref": "signal-reaction-effect",
+      "signal_label_ru": "Влияние реакций на отбор сигналов",
       "suggested_change_ru": "Показать отчет о влиянии реакций",
       "affected_component": "Weekly Brief",
       "likely_files": ["src/output/weekly_intelligence_brief.py"],
-      "effort": "1-2 hours",
+      "effort": "1–2 часа",
       "confidence": "high",
       "acceptance_criteria": ["Бриф показывает, сколько реакций изменило отбор"],
       "risk_ru": "Не путать связь с фактическим изменением ранга",
@@ -290,6 +355,7 @@ Schema: `report_visual.knowledge_graph.v1`
     "node_border": "evidence_maturity",
     "node_accent": "operator_interest"
   },
+  "audit_explorer_path": "audit/knowledge-audit-explorer.html",
   "nodes": [
     {
       "canonical_thread_id": "...",
@@ -297,7 +363,8 @@ Schema: `report_visual.knowledge_graph.v1`
       "status": "growing|watch|stale|contradicted",
       "evidence_volume": 8,
       "evidence_maturity": "multi_channel",
-      "operator_interest_score": 0.25
+      "operator_interest_score": 0.25,
+      "display_priority": 10
     }
   ],
   "edges": [
@@ -362,7 +429,7 @@ Schema: `report_visual.source_thread_heatmap.v1`
 ```json
 {
   "value": "independent_support_count",
-  "sources": [{"source_id": "...", "label": "...", "independence_group": "..."}],
+  "sources": [{"source_id": "...", "label": "...", "independence_group": "...", "classification_status": "available|unavailable"}],
   "threads": [{"canonical_thread_id": "...", "title_ru": "..."}],
   "cells": [
     {
@@ -393,8 +460,13 @@ Schema: `report_visual.evidence_maturity.v1`
 ```json
 {
   "levels": [
-    {"key": "single_source", "label_ru": "Один Telegram-источник", "count": 4},
-    {"key": "repeated_signal", "label_ru": "Повторяющийся сигнал", "count": 3}
+    {"key": "single_source", "label_ru": "Один источник", "count": 4},
+    {"key": "repeated_signal", "label_ru": "Повторяющийся сигнал", "count": 3},
+    {"key": "multi_channel", "label_ru": "Несколько независимых каналов", "count": 2},
+    {"key": "primary_verified", "label_ru": "Проверено первичным источником", "count": 1},
+    {"key": "externally_corroborated", "label_ru": "Подтверждено внешними данными", "count": 1},
+    {"key": "decision_grade", "label_ru": "Достаточно для решения", "count": 0},
+    {"key": "unknown", "label_ru": "Зрелость неизвестна", "count": 1}
   ],
   "thread_count": 12
 }
@@ -416,13 +488,13 @@ Schema: `report_visual.learning_progression.v1`
 ```json
 {
   "stages": [
-    {"key": "marked", "label_ru": "Отмечено", "count": 18},
-    {"key": "read", "label_ru": "Прочитано", "count": 9},
-    {"key": "understood", "label_ru": "Понято", "count": 4},
-    {"key": "explained", "label_ru": "Объяснено", "count": 2},
-    {"key": "tried", "label_ru": "Испробовано", "count": 1},
-    {"key": "implemented", "label_ru": "Внедрено", "count": 1},
-    {"key": "measured", "label_ru": "Измерено", "count": 0}
+    {"key": "marked", "label_ru": "Отмечено", "count": 18, "observation_status": "confirmed", "confirmation_kind": "reaction", "evidence_refs": ["evidence:marked"]},
+    {"key": "read", "label_ru": "Прочитано", "count": 9, "observation_status": "confirmed", "confirmation_kind": "read_receipt", "evidence_refs": ["evidence:read"]},
+    {"key": "understood", "label_ru": "Понято", "count": 4, "observation_status": "confirmed", "confirmation_kind": "comprehension_check", "evidence_refs": ["evidence:understood"]},
+    {"key": "explained", "label_ru": "Объяснено", "count": 2, "observation_status": "confirmed", "confirmation_kind": "explanation", "evidence_refs": ["evidence:explained"]},
+    {"key": "tried", "label_ru": "Испробовано", "count": 1, "observation_status": "confirmed", "confirmation_kind": "trial", "evidence_refs": ["evidence:tried"]},
+    {"key": "implemented", "label_ru": "Внедрено", "count": 1, "observation_status": "confirmed", "confirmation_kind": "implementation", "evidence_refs": ["evidence:implemented"]},
+    {"key": "measured", "label_ru": "Измерено", "count": 0, "observation_status": "confirmed", "confirmation_kind": "measurement", "evidence_refs": ["evidence:measured"]}
   ]
 }
 ```

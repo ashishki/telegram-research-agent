@@ -1,9 +1,9 @@
 # CODEX_PROMPT - Compact Session Handoff
 
-Version: 5.5
-Date: 2026-07-13
-State: IRX-1 through IRX-5 `implemented_and_verified`; IRX-8 is the next
-planned implementation task; dogfood is blocked until IRX-14
+Version: 5.6
+Date: 2026-07-14
+State: IRX-1 through IRX-5 and IRX-8 `implemented_and_verified`; IRX-9 is the
+next planned implementation task; dogfood is blocked until IRX-14
 
 ## Current Product Direction
 
@@ -33,7 +33,7 @@ docs/tasks.md
 Next implementation task:
 
 ```text
-IRX-8 - Static Visualization Component System
+IRX-9 - Project Intelligence V2
 ```
 
 ## W29 Product Correction
@@ -45,9 +45,9 @@ entity-fragmented threads, and provided no meaningful visual map. The current
 detailed Atlas becomes the Knowledge Audit Explorer foundation. IRX-1 fixed the
 shared completed-period semantics, IRX-2 added the manifest-bound package,
 IRX-3 added bounded auditable reaction personalization, IRX-4 added canonical
-curation, and IRX-5 added a strict run-bound editorial shadow artifact. Static
-visualization components and reader V2 surfaces remain planned, and dogfood has
-not started.
+curation, IRX-5 added a strict run-bound editorial shadow artifact, and IRX-8
+added the shared deterministic offline visualization contract and fixture
+gallery. Reader V2 surfaces remain planned, and dogfood has not started.
 
 ## Verified Baseline
 
@@ -86,6 +86,11 @@ not started.
   validation, exact deterministic partial and zero-change projections, an
   immutable run path, and an audit-only model/token/cost/latency receipt. V1
   renderers and the frozen IRX-2 stage policy remain unchanged.
+- IRX-8 adds one strict `report_visuals.v1` library for ten deterministic,
+  offline, accessible component schemas plus a sanitized standalone fixture
+  gallery. It validates exact run/period identity, data states, evidence
+  boundaries, safe refs, numeric bounds, honest partial/empty/stale output, and
+  collision-free DOM/SVG IDs. V1 renderers do not consume it yet.
 - Canonical intelligence sidecar contract `tra-intelligence-contract.v1` is now
   implemented locally for workbook/Brief/Atlas projections with sanitized eval
   fixtures.
@@ -336,7 +341,44 @@ Verification and compatibility:
 - no live or expensive LLM call, generated report run, archive regeneration,
   cross-repository code change, Radar gate change, visualization implementation,
   V2 renderer, rollout, or dogfood start was performed;
-- IRX-8 is the next implementation task.
+- At the IRX-5 boundary IRX-8 was the next task; its completion is recorded
+  below.
+
+## IRX-8 Completion
+
+Status: `implemented_and_verified` on 2026-07-14.
+
+Implemented:
+
+- one stdlib-only shared renderer with exact schemas and deterministic output
+  for decision matrix, reaction lineage, Radar gate, project impact, knowledge
+  graph, 12-week timeline, source/thread heatmap, evidence maturity, learning
+  progression, and evidence badge components;
+- accessible semantic HTML and inline SVG, offline CSP, responsive/print styles,
+  namespaced IDs, explicit `available`/`empty`/`unavailable`/`stale` states, and
+  machine-readable component/render/data/source/role markers;
+- strict closed-world validation for run and completed-week identity, bounded
+  numbers, safe source references, evidence and decision authority, non-laundered
+  host labels, honest zero/unknown semantics, and accessible component-local
+  failures, including multiple malformed specs in one standalone document;
+- a sanitized ten-component JSON fixture pack and byte-exact standalone HTML
+  gallery. The shared API is ready for both future reader surfaces without
+  duplicating markup.
+
+Verification and compatibility:
+
+- 23 focused IRX-8 tests and the combined 54-test visualization/V1 compatibility
+  matrix passed; Ruff format/check, focused compilation, and
+  `git diff --check` passed;
+- systematic mutation probes covered 5,324 malformed component variants without
+  an uncaught component-render exception; adversarial review also covered URL,
+  period/stale, Radar escalation, graph audit-link, document identity, DOM/ARIA,
+  and empty/zero boundaries;
+- V1 Brief/Atlas renderers, editorial output, the frozen IRX-2 stage policy,
+  project computation, Radar gates, cross-repository code, and generated private
+  reports remain unchanged. IRX-8 did not claim browser screenshot evidence;
+  the documented desktop/mobile regression harness remains IRX-13 scope.
+- IRX-9 is the next implementation task.
 
 ## PGI-001 Completion
 
@@ -706,8 +748,8 @@ Report files changed, canonical identity/lifecycle/as-of semantics, compatibilit
 ```
 
 This exact historical prompt stopped at the IRX-4 boundary as required. IRX-4
-is implemented and verified; the subsequent IRX-5 handoff is now closed by the
-completion record above. IRX-8 is the next planned scope.
+is implemented and verified; the subsequent IRX-5 and IRX-8 handoffs are now
+closed by the completion records above. IRX-9 is the next planned scope.
 
 ## Historical PGI-007 Handoff
 

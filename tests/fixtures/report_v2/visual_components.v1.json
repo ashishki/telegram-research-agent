@@ -1,0 +1,625 @@
+{
+  "fixture_version": "report_visual_fixture_pack.v1",
+  "specs": [
+    {
+      "schema_version": "report_visual.decision_matrix.v1",
+      "component_id": "weekly-decision-matrix",
+      "title_ru": "Матрица решений недели",
+      "summary_ru": "Проверенные сигналы распределены по четырём явным вариантам решения.",
+      "run_id": "weekly-2026-W27",
+      "reporting_week": "2026-W27",
+      "analysis_period_start": "2026-06-29T00:00:00Z",
+      "analysis_period_end": "2026-07-06T00:00:00Z",
+      "data_status": "available",
+      "source_refs": [
+        "artifacts/weekly-2026-W27/editorial-intelligence.json#decisions"
+      ],
+      "data_note_ru": "Решения отражают только доказательства текущего недельного запуска; зрелость и уверенность показаны раздельно.",
+      "items": [
+        {
+          "decision": "watch",
+          "label_ru": "Наблюдать за повторяемостью малых языковых моделей на устройствах",
+          "signal_ref": "signal/on-device-models",
+          "confidence": "medium",
+          "evidence_maturity": "repeated_signal",
+          "emphasis": "none"
+        },
+        {
+          "decision": "act",
+          "label_ru": "Добавить проверку происхождения данных перед публикацией отчёта",
+          "signal_ref": "signal/provenance-gate",
+          "confidence": "high",
+          "evidence_maturity": "primary_verified",
+          "emphasis": "primary_action"
+        },
+        {
+          "decision": "ignore",
+          "label_ru": "Отложить перенос интерфейса на новый фреймворк без пользовательского эффекта",
+          "signal_ref": "signal/framework-migration",
+          "confidence": "high",
+          "evidence_maturity": "multi_channel",
+          "emphasis": "explicit_defer"
+        },
+        {
+          "decision": "study",
+          "label_ru": "Проверить устойчивость локального поиска на длинных русских запросах",
+          "signal_ref": "signal/local-search-evaluation",
+          "confidence": "medium",
+          "evidence_maturity": "multi_channel",
+          "emphasis": "none"
+        }
+      ]
+    },
+    {
+      "schema_version": "report_visual.reaction_funnel.v1",
+      "component_id": "weekly-reaction-lineage",
+      "title_ru": "Происхождение личных реакций",
+      "summary_ru": "Стадии показывают связывание событий с постами, атомами знаний, темами и сигналами.",
+      "run_id": "weekly-2026-W27",
+      "reporting_week": "2026-W27",
+      "analysis_period_start": "2026-06-29T00:00:00Z",
+      "analysis_period_end": "2026-07-06T00:00:00Z",
+      "data_status": "available",
+      "source_refs": [
+        "artifacts/weekly-2026-W27/reaction-snapshot.json#lineage"
+      ],
+      "data_note_ru": "Это цепочка происхождения, а не процентная воронка; одна запись может связать несколько атомов знаний.",
+      "snapshot_status": "complete",
+      "stages": [
+        {
+          "key": "detected",
+          "label_ru": "Реакции",
+          "count": 148
+        },
+        {
+          "key": "posts_resolved",
+          "label_ru": "Посты найдены",
+          "count": 62
+        },
+        {
+          "key": "atoms_linked",
+          "label_ru": "Связаны с атомами",
+          "count": 78
+        },
+        {
+          "key": "threads_linked",
+          "label_ru": "Связаны с темами",
+          "count": 31
+        },
+        {
+          "key": "signals_selected",
+          "label_ru": "Повлияли на сигналы",
+          "count": 3
+        }
+      ],
+      "unconsumed_reasons": [
+        "Часть постов ещё не сопоставлена с атомами знаний",
+        "Повторные события одной личной реакции объединены на уровне поста"
+      ]
+    },
+    {
+      "schema_version": "report_visual.radar_gate.v1",
+      "component_id": "weekly-radar-gate",
+      "title_ru": "Проверки кандидата Radar",
+      "summary_ru": "Доказательства кандидата отделены от рыночного контекста, который не заполняет проверки.",
+      "run_id": "weekly-2026-W27",
+      "reporting_week": "2026-W27",
+      "analysis_period_start": "2026-06-29T00:00:00Z",
+      "analysis_period_end": "2026-07-06T00:00:00Z",
+      "data_status": "available",
+      "source_refs": [
+        "artifacts/weekly-2026-W27/radar-snapshot.json#candidate-local-evaluation"
+      ],
+      "data_note_ru": "Контекстные наблюдения показаны отдельно и не увеличивают прогресс проверок Radar.",
+      "snapshot_status": "complete",
+      "candidate_name": "Local Evaluation Kit",
+      "dossier_status": "investigate",
+      "reader_decision": "investigate",
+      "gates": [
+        {
+          "key": "problem-evidence",
+          "status": "pass",
+          "reason_ru": "Проблема воспроизводится на трёх независимых наборах запросов"
+        },
+        {
+          "key": "operator-fit",
+          "status": "pass",
+          "reason_ru": "Сценарий соответствует текущему процессу недельной проверки"
+        },
+        {
+          "key": "measurable-outcome",
+          "status": "missing",
+          "reason_ru": "Порог допустимого ухудшения качества ещё не утверждён"
+        }
+      ],
+      "candidate_evidence_count": 7,
+      "context_only_count": 4,
+      "missing_evidence": [
+        "Утверждённый порог качества для длинных русских запросов"
+      ],
+      "next_validation_ru": "Сравнить результаты на фиксированном наборе запросов с заранее утверждённым порогом.",
+      "kill_criteria_ru": "Остановить проверку, если качество ниже порога в двух последовательных запусках."
+    },
+    {
+      "schema_version": "report_visual.project_impact.v1",
+      "component_id": "weekly-project-impact",
+      "title_ru": "Влияние сигналов на проекты",
+      "summary_ru": "Проверяемые изменения связаны с конкретными компонентами, файлами, рисками и критериями приёмки.",
+      "run_id": "weekly-2026-W27",
+      "reporting_week": "2026-W27",
+      "analysis_period_start": "2026-06-29T00:00:00Z",
+      "analysis_period_end": "2026-07-06T00:00:00Z",
+      "data_status": "available",
+      "source_refs": [
+        "artifacts/weekly-2026-W27/project-impact.json#items"
+      ],
+      "data_note_ru": "Компонент отображает подготовленные связи и не выводит проектные действия из совпадения ключевых слов.",
+      "items": [
+        {
+          "project_name": "telegram-research-agent",
+          "signal_ref": "signal/provenance-gate",
+          "signal_label_ru": "Проверка происхождения данных перед публикацией",
+          "suggested_change_ru": "Добавить детерминированную проверку ссылок происхождения перед сборкой читательского отчёта.",
+          "affected_component": "report pipeline",
+          "likely_files": [
+            "src/output/report_visuals.py",
+            "tests/test_report_visuals.py"
+          ],
+          "effort": "Небольшая проверка и набор сфокусированных тестов",
+          "confidence": "high",
+          "acceptance_criteria": [
+            "Недоступные источники не подменяются нулевыми значениями",
+            "Повторный запуск создаёт побайтово одинаковый результат"
+          ],
+          "risk_ru": "Слишком строгая проверка может отклонить старую корректную фикстуру.",
+          "evidence_refs": [
+            "evidence/provenance-gate/primary",
+            "evidence/provenance-gate/regression"
+          ],
+          "status": "confirmed"
+        },
+        {
+          "project_name": "local-search-evaluator",
+          "signal_ref": "signal/on-device-models",
+          "signal_label_ru": "Повторяемость локальных моделей на длинных запросах",
+          "suggested_change_ru": "Провести ограниченный эксперимент до изменения основного пути поиска.",
+          "affected_component": "evaluation harness",
+          "likely_files": [
+            "benchmarks/local_search.yaml"
+          ],
+          "effort": "Один исследовательский цикл без изменения поставки",
+          "confidence": "medium",
+          "acceptance_criteria": [
+            "Результаты сравниваются на одном фиксированном наборе запросов"
+          ],
+          "risk_ru": "Выборочный набор может переоценить пользу локальной модели.",
+          "evidence_refs": [
+            "evidence/on-device-models/repeated-signal"
+          ],
+          "status": "watch"
+        }
+      ]
+    },
+    {
+      "schema_version": "report_visual.knowledge_graph.v1",
+      "component_id": "weekly-knowledge-graph",
+      "title_ru": "Карта связей канонических тем",
+      "summary_ru": "Типизированные связи показывают поддержку, зависимость и противоречие между темами.",
+      "run_id": "weekly-2026-W27",
+      "reporting_week": "2026-W27",
+      "analysis_period_start": "2026-06-29T00:00:00Z",
+      "analysis_period_end": "2026-07-06T00:00:00Z",
+      "data_status": "available",
+      "source_refs": [
+        "artifacts/weekly-2026-W27/canonical-threads.json#graph"
+      ],
+      "data_note_ru": "Размер отражает объём доказательств, граница — их зрелость, а акцент — отдельный интерес оператора.",
+      "encoding": {
+        "node_size": "evidence_volume",
+        "node_border": "evidence_maturity",
+        "node_accent": "operator_interest"
+      },
+      "audit_explorer_path": "audit/knowledge-audit-explorer.html",
+      "nodes": [
+        {
+          "canonical_thread_id": "thread/local-evaluation",
+          "title_ru": "Локальная оценка качества поиска",
+          "status": "growing",
+          "evidence_volume": 11,
+          "evidence_maturity": "primary_verified",
+          "operator_interest_score": 0.9,
+          "display_priority": 30
+        },
+        {
+          "canonical_thread_id": "thread/report-provenance",
+          "title_ru": "Происхождение данных отчёта",
+          "status": "growing",
+          "evidence_volume": 9,
+          "evidence_maturity": "multi_channel",
+          "operator_interest_score": 0.8,
+          "display_priority": 20
+        },
+        {
+          "canonical_thread_id": "thread/framework-migration",
+          "title_ru": "Миграция интерфейсного фреймворка",
+          "status": "contradicted",
+          "evidence_volume": 4,
+          "evidence_maturity": "repeated_signal",
+          "operator_interest_score": 0.2,
+          "display_priority": 10
+        }
+      ],
+      "edges": [
+        {
+          "source_thread_id": "thread/report-provenance",
+          "target_thread_id": "thread/local-evaluation",
+          "relation": "supports",
+          "weight": 3,
+          "evidence_refs": [
+            "evidence/graph/provenance-supports-evaluation"
+          ]
+        },
+        {
+          "source_thread_id": "thread/framework-migration",
+          "target_thread_id": "thread/report-provenance",
+          "relation": "contradicts",
+          "weight": 1,
+          "evidence_refs": [
+            "evidence/graph/migration-priority-contradiction"
+          ]
+        }
+      ]
+    },
+    {
+      "schema_version": "report_visual.thread_timeline.v1",
+      "component_id": "weekly-thread-timeline",
+      "title_ru": "Динамика тем по неделям",
+      "summary_ru": "Общая шкала различает наблюдаемый ноль и отсутствие измерения, а события сохраняют историю темы.",
+      "run_id": "weekly-2026-W27",
+      "reporting_week": "2026-W27",
+      "analysis_period_start": "2026-06-29T00:00:00Z",
+      "analysis_period_end": "2026-07-06T00:00:00Z",
+      "data_status": "available",
+      "source_refs": [
+        "artifacts/weekly-2026-W27/thread-history.json#timeline"
+      ],
+      "data_note_ru": "Пропуск означает недоступное наблюдение; ноль означает измеренное отсутствие импульса.",
+      "weeks": [
+        "2026-W16",
+        "2026-W17",
+        "2026-W18",
+        "2026-W19",
+        "2026-W20",
+        "2026-W21",
+        "2026-W22",
+        "2026-W23",
+        "2026-W24",
+        "2026-W25",
+        "2026-W26",
+        "2026-W27"
+      ],
+      "series": [
+        {
+          "canonical_thread_id": "thread/report-provenance",
+          "title_ru": "Происхождение данных отчёта",
+          "momentum": [
+            0.4,
+            0.6,
+            0.8,
+            0.9,
+            1,
+            1.1,
+            1.2,
+            1.3,
+            1.5,
+            2.2,
+            3.1,
+            4.4
+          ],
+          "evidence_count": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            2,
+            2,
+            2,
+            4,
+            6,
+            9
+          ],
+          "events": [
+            {
+              "week": "2026-W26",
+              "type": "milestone",
+              "label_ru": "Добавлена проверка первичного источника"
+            }
+          ]
+        },
+        {
+          "canonical_thread_id": "thread/local-evaluation",
+          "title_ru": "Локальная оценка качества поиска",
+          "momentum": [
+            0,
+            0.2,
+            0.3,
+            0.4,
+            0.5,
+            0.6,
+            0.7,
+            0.8,
+            0,
+            null,
+            1.8,
+            2.6
+          ],
+          "evidence_count": [
+            0,
+            1,
+            1,
+            1,
+            1,
+            2,
+            2,
+            2,
+            0,
+            null,
+            3,
+            5
+          ],
+          "events": [
+            {
+              "week": "2026-W26",
+              "type": "split",
+              "label_ru": "Оценка качества выделена из общей темы локальных моделей"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "schema_version": "report_visual.source_thread_heatmap.v1",
+      "component_id": "weekly-source-thread-heatmap",
+      "title_ru": "Поддержка тем по источникам",
+      "summary_ru": "Матрица отдельно показывает число упоминаний и число независимых подтверждений.",
+      "run_id": "weekly-2026-W27",
+      "reporting_week": "2026-W27",
+      "analysis_period_start": "2026-06-29T00:00:00Z",
+      "analysis_period_end": "2026-07-06T00:00:00Z",
+      "data_status": "available",
+      "source_refs": [
+        "artifacts/weekly-2026-W27/source-thread-support.json#matrix"
+      ],
+      "data_note_ru": "Интенсивность кодирует независимую поддержку; неклассифицированный источник не приравнивается к нулю.",
+      "value": "independent_support_count",
+      "sources": [
+        {
+          "source_id": "source/telegram-ai-lab",
+          "label": "Telegram AI Lab",
+          "independence_group": "publisher/ai-lab",
+          "classification_status": "available"
+        },
+        {
+          "source_id": "source/vendor-blog",
+          "label": "Vendor Engineering Blog",
+          "independence_group": "publisher/vendor",
+          "classification_status": "available"
+        },
+        {
+          "source_id": "source/archive-pending",
+          "label": "Archive Classified No Contribution",
+          "independence_group": "publisher/archive",
+          "classification_status": "available"
+        }
+      ],
+      "threads": [
+        {
+          "canonical_thread_id": "thread/local-evaluation",
+          "title_ru": "Локальная оценка качества поиска"
+        },
+        {
+          "canonical_thread_id": "thread/report-provenance",
+          "title_ru": "Происхождение данных отчёта"
+        }
+      ],
+      "cells": [
+        {
+          "source_id": "source/telegram-ai-lab",
+          "canonical_thread_id": "thread/local-evaluation",
+          "mention_count": 5,
+          "independent_support_count": 2,
+          "evidence_refs": [
+            "evidence/heatmap/ai-lab-local-evaluation"
+          ]
+        },
+        {
+          "source_id": "source/telegram-ai-lab",
+          "canonical_thread_id": "thread/report-provenance",
+          "mention_count": 2,
+          "independent_support_count": 1,
+          "evidence_refs": [
+            "evidence/heatmap/ai-lab-report-provenance"
+          ]
+        },
+        {
+          "source_id": "source/vendor-blog",
+          "canonical_thread_id": "thread/local-evaluation",
+          "mention_count": 3,
+          "independent_support_count": 1,
+          "evidence_refs": [
+            "evidence/heatmap/vendor-local-evaluation"
+          ]
+        },
+        {
+          "source_id": "source/vendor-blog",
+          "canonical_thread_id": "thread/report-provenance",
+          "mention_count": 0,
+          "independent_support_count": 0,
+          "evidence_refs": []
+        }
+      ]
+    },
+    {
+      "schema_version": "report_visual.evidence_maturity.v1",
+      "component_id": "weekly-evidence-maturity",
+      "title_ru": "Зрелость доказательств по темам",
+      "summary_ru": "Все канонические темы распределены по фиксированным уровням, включая неизвестную зрелость.",
+      "run_id": "weekly-2026-W27",
+      "reporting_week": "2026-W27",
+      "analysis_period_start": "2026-06-29T00:00:00Z",
+      "analysis_period_end": "2026-07-06T00:00:00Z",
+      "data_status": "available",
+      "source_refs": [
+        "artifacts/weekly-2026-W27/canonical-threads.json#maturity"
+      ],
+      "data_note_ru": "Сумма уровней равна полной популяции тем; неизвестная зрелость вынесена в отдельную группу.",
+      "levels": [
+        {
+          "key": "single_source",
+          "label_ru": "Один источник",
+          "count": 6
+        },
+        {
+          "key": "repeated_signal",
+          "label_ru": "Повторяющийся сигнал",
+          "count": 8
+        },
+        {
+          "key": "multi_channel",
+          "label_ru": "Несколько независимых каналов",
+          "count": 5
+        },
+        {
+          "key": "primary_verified",
+          "label_ru": "Проверено первичным источником",
+          "count": 3
+        },
+        {
+          "key": "externally_corroborated",
+          "label_ru": "Подтверждено внешними данными",
+          "count": 2
+        },
+        {
+          "key": "decision_grade",
+          "label_ru": "Достаточно для решения",
+          "count": 1
+        },
+        {
+          "key": "unknown",
+          "label_ru": "Зрелость неизвестна",
+          "count": 2
+        }
+      ],
+      "thread_count": 27
+    },
+    {
+      "schema_version": "report_visual.learning_progression.v1",
+      "component_id": "weekly-learning-progression",
+      "title_ru": "Подтверждённый путь обучения",
+      "summary_ru": "Каждая стадия опирается на собственное наблюдаемое событие и не выводится из одной реакции.",
+      "run_id": "weekly-2026-W27",
+      "reporting_week": "2026-W27",
+      "analysis_period_start": "2026-06-29T00:00:00Z",
+      "analysis_period_end": "2026-07-06T00:00:00Z",
+      "data_status": "available",
+      "source_refs": [
+        "artifacts/weekly-2026-W27/learning-events.json#progression"
+      ],
+      "data_note_ru": "Личная реакция подтверждает только отметку; чтение, понимание и внедрение требуют отдельных событий.",
+      "stages": [
+        {
+          "key": "marked",
+          "label_ru": "Отмечено",
+          "count": 40,
+          "observation_status": "confirmed",
+          "confirmation_kind": "reaction",
+          "evidence_refs": [
+            "evidence/learning/marked-events"
+          ]
+        },
+        {
+          "key": "read",
+          "label_ru": "Прочитано",
+          "count": 32,
+          "observation_status": "confirmed",
+          "confirmation_kind": "read_receipt",
+          "evidence_refs": [
+            "evidence/learning/read-receipts"
+          ]
+        },
+        {
+          "key": "understood",
+          "label_ru": "Понято",
+          "count": 21,
+          "observation_status": "confirmed",
+          "confirmation_kind": "comprehension_check",
+          "evidence_refs": [
+            "evidence/learning/comprehension-checks"
+          ]
+        },
+        {
+          "key": "explained",
+          "label_ru": "Объяснено",
+          "count": 12,
+          "observation_status": "confirmed",
+          "confirmation_kind": "explanation",
+          "evidence_refs": [
+            "evidence/learning/explanations"
+          ]
+        },
+        {
+          "key": "tried",
+          "label_ru": "Испробовано",
+          "count": 6,
+          "observation_status": "confirmed",
+          "confirmation_kind": "trial",
+          "evidence_refs": [
+            "evidence/learning/trials"
+          ]
+        },
+        {
+          "key": "implemented",
+          "label_ru": "Внедрено",
+          "count": 3,
+          "observation_status": "confirmed",
+          "confirmation_kind": "implementation",
+          "evidence_refs": [
+            "evidence/learning/implementations"
+          ]
+        },
+        {
+          "key": "measured",
+          "label_ru": "Измерено",
+          "count": 2,
+          "observation_status": "confirmed",
+          "confirmation_kind": "measurement",
+          "evidence_refs": [
+            "evidence/learning/measurements"
+          ]
+        }
+      ]
+    },
+    {
+      "schema_version": "report_visual.evidence_badge.v1",
+      "component_id": "weekly-evidence-badge",
+      "title_ru": "Маркировка уверенности и зрелости",
+      "summary_ru": "Поддерживающая маркировка разделяет уверенность вывода и зрелость его доказательств.",
+      "run_id": "weekly-2026-W27",
+      "reporting_week": "2026-W27",
+      "analysis_period_start": "2026-06-29T00:00:00Z",
+      "analysis_period_end": "2026-07-06T00:00:00Z",
+      "data_status": "available",
+      "source_refs": [
+        "artifacts/weekly-2026-W27/editorial-intelligence.json#primary-claim"
+      ],
+      "data_note_ru": "Маркировка поясняет связанное утверждение и не считается отдельной содержательной визуализацией.",
+      "confidence": "high",
+      "confidence_reason_ru": "Вывод повторён в независимых каналах и проверен по первичному источнику.",
+      "evidence_maturity": "primary_verified",
+      "source_count": 5,
+      "independent_source_count": 3
+    }
+  ]
+}
