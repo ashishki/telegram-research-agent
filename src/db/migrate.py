@@ -24,6 +24,80 @@ DEFAULT_DB_PATH = "data/agent.db"
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 
 
+def _verify_canonical_idea_thread_schema(connection: sqlite3.Connection) -> None:
+    """Fail deterministically if an old partial IRX-4 schema is encountered."""
+
+    required_columns = {
+        "canonical_idea_threads": {
+            "canonical_thread_id",
+            "stable_slug",
+            "title_ru",
+            "title_en",
+            "thesis",
+            "status",
+            "first_seen_at",
+            "last_seen_at",
+            "evidence_maturity",
+            "operator_interest",
+            "entities_json",
+            "curator_version",
+            "current_version",
+        },
+        "canonical_idea_thread_versions": {
+            "canonical_thread_id",
+            "version",
+            "operation",
+            "decision_id",
+            "valid_from",
+            "valid_to",
+        },
+        "canonical_idea_thread_atom_history": {
+            "canonical_thread_id",
+            "atom_id",
+            "raw_thread_id",
+            "valid_from",
+            "valid_to",
+        },
+        "canonical_idea_thread_alias_history": {
+            "canonical_thread_id",
+            "alias_type",
+            "alias_value",
+            "normalized_alias",
+            "valid_from",
+            "valid_to",
+        },
+        "canonical_idea_thread_lineage": {
+            "relation_type",
+            "from_thread_id",
+            "to_thread_id",
+            "event_at",
+        },
+        "canonical_idea_thread_curator_decisions": {
+            "decision_id",
+            "run_id",
+            "operation",
+            "proposal_json",
+            "model",
+            "model_version",
+            "curator_version",
+            "reason",
+            "validation_status",
+            "decision_status",
+        },
+    }
+    for table_name, expected in required_columns.items():
+        columns = {
+            str(row[1])
+            for row in connection.execute(f"PRAGMA table_info({table_name})").fetchall()
+        }
+        missing = sorted(expected - columns)
+        if missing:
+            raise RuntimeError(
+                f"incompatible partial {table_name} schema; missing columns: "
+                + ", ".join(missing)
+            )
+
+
 def get_db_path() -> Path:
     raw_path = os.environ.get("AGENT_DB_PATH", DEFAULT_DB_PATH)
     path = Path(raw_path)
@@ -386,6 +460,7 @@ def run_migrations() -> Path:
         connection.execute("PRAGMA foreign_keys = ON;")
         connection.execute("PRAGMA journal_mode = WAL;")
         connection.executescript(schema_sql)
+        _verify_canonical_idea_thread_schema(connection)
         connection.executescript(
             """
             CREATE TABLE IF NOT EXISTS reaction_sync_state (

@@ -447,6 +447,75 @@ class TestReactionPersonalization(unittest.TestCase):
         self.assertEqual(receipt["counts"]["unique_canonical_threads_linked"], 1)
         self.assertEqual(receipt["counts"]["canonical_threads_boosted"], 1)
 
+    def test_canonical_attribution_changes_only_receipt_identity_not_ranking_semantics(self):
+        self._seed_lineage(1, 2)
+        baseline = [self._candidate(1), self._candidate(2)]
+        compatibility_order, compatibility = self._personalize(
+            baseline,
+            [self._observation(1)],
+        )
+
+        class StoredIdentityResolver:
+            def resolve(self, thread):
+                slug = str(thread.get("slug") or "")
+                return ThreadResolution(
+                    compatibility_thread_ref=f"idea_thread:{slug}",
+                    current_thread_ref=f"idea_thread:{slug}",
+                    canonical_thread_ref="canonical_thread:stored-stable-thread",
+                    resolution_status="canonical_membership_resolved",
+                )
+
+        canonical_order, canonical = self._personalize(
+            baseline,
+            [self._observation(1)],
+            thread_resolver=StoredIdentityResolver(),
+        )
+
+        self.assertEqual(
+            [item["id"] for item in canonical_order],
+            [item["id"] for item in compatibility_order],
+        )
+        self.assertEqual(
+            [bool(item.get("_reaction_interest")) for item in canonical_order],
+            [bool(item.get("_reaction_interest")) for item in compatibility_order],
+        )
+        for key, value in compatibility["counts"].items():
+            if key not in {
+                "unique_canonical_threads_linked",
+                "canonical_threads_boosted",
+            }:
+                self.assertEqual(canonical["counts"][key], value, key)
+        effect_field = (
+            "influenced_items"
+            if compatibility["influenced_items"]
+            else "linked_only_items"
+        )
+        compatibility_item = compatibility[effect_field][0]
+        canonical_item = canonical[effect_field][0]
+        for field in (
+            "surface_item_ref",
+            "compatibility_thread_ref",
+            "current_thread_ref",
+            "reacted_post_refs",
+            "source_refs",
+            "evidence_refs",
+            "boost_role",
+            "reacted_post_count",
+        ):
+            self.assertEqual(canonical_item.get(field), compatibility_item.get(field), field)
+        self.assertIsNone(compatibility_item["canonical_thread_ref"])
+        self.assertEqual(
+            canonical_item["canonical_thread_ref"],
+            "canonical_thread:stored-stable-thread",
+        )
+        self.assertEqual(canonical["counts"]["unique_canonical_threads_linked"], 1)
+        self.assertEqual(canonical["counts"]["canonical_threads_boosted"], 1)
+        for field in ("selected", "counterfactual_effect", "boost_applied"):
+            self.assertEqual(
+                canonical["eligible_thread_audit"][0][field],
+                compatibility["eligible_thread_audit"][0][field],
+            )
+
     def test_multiple_emoji_are_events_but_only_one_post_and_one_thread_boost(self):
         self._seed_lineage(1, 2)
         baseline = [self._candidate(1), self._candidate(2)]

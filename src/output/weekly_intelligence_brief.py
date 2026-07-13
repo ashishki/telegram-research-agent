@@ -19,6 +19,7 @@ from output.learning_layer import build_project_learning_projection
 from output.ai_intelligence_report import (
     _all_atoms,
     _analysis_text,
+    _canonical_thread_sidecar,
     _changed_threads,
     _escape,
     _learning_actions,
@@ -527,6 +528,11 @@ def _weekly_brief_metadata(
     run_identity: Mapping[str, object],
 ) -> dict:
     threads = context.get("threads") or []
+    canonical_threads = [
+        _canonical_thread_sidecar(thread)
+        for thread in (context.get("canonical_threads") or [])
+        if isinstance(thread, Mapping)
+    ][:12]
     atoms = _all_atoms(threads)
     learning_loop = _personal_learning_loop(threads, actions, context.get("feedback_context") or {})
     project_learning_projection = build_project_learning_projection(
@@ -565,6 +571,12 @@ def _weekly_brief_metadata(
         "workbook_sections": sections,
         "artifact_sections": sections,
         "thread_count": len(threads),
+        "canonical_thread_count": len(canonical_threads),
+        "canonical_threads": canonical_threads,
+        "canonical_thread_snapshot": dict(
+            context.get("canonical_thread_snapshot") or {}
+        ),
+        "raw_compatibility_thread_count": len(threads),
         "source_atom_count": len(atoms),
         "changed_thread_count": len(_changed_threads(threads)),
         "marked_posts": [dict(item) for item in context.get("marked_posts") or []],

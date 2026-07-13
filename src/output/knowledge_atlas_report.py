@@ -13,6 +13,7 @@ from config.settings import PROJECT_ROOT, Settings
 from output.ai_report_contract import INTELLIGENCE_CONTRACT_VERSION, build_canonical_intelligence_contract
 from output.ai_intelligence_report import (
     _all_atoms,
+    _canonical_thread_sidecar,
     _changed_threads,
     _escape,
     _link,
@@ -459,6 +460,11 @@ def _knowledge_atlas_metadata(
     run_identity: Mapping[str, object],
 ) -> dict:
     threads = context.get("threads") or []
+    canonical_threads = [
+        _canonical_thread_sidecar(thread)
+        for thread in (context.get("canonical_threads") or [])
+        if isinstance(thread, Mapping)
+    ][:12]
     atoms = _all_atoms(threads)
     project_learning_projection = _atlas_project_learning_projection(context)
     intelligence_contract = build_canonical_intelligence_contract(
@@ -490,6 +496,20 @@ def _knowledge_atlas_metadata(
         "workbook_sections": sections,
         "artifact_sections": sections,
         "thread_count": len(threads),
+        # IRX-4 keeps the V1/raw thread projection above intact while exposing
+        # the bounded canonical registry as an additive reader input.  The
+        # current detailed Atlas remains the compatibility/audit surface.
+        "canonical_thread_count": len(canonical_threads),
+        "primary_canonical_thread_ids": [
+            str(thread.get("canonical_thread_id") or "")
+            for thread in canonical_threads
+            if str(thread.get("canonical_thread_id") or "").strip()
+        ],
+        "canonical_threads": canonical_threads,
+        "canonical_thread_snapshot": dict(
+            context.get("canonical_thread_snapshot") or {}
+        ),
+        "raw_compatibility_thread_count": len(threads),
         "source_atom_count": len(atoms),
         "source_channel_count": len(context.get("source_channels") or []),
         "changed_thread_count": len(_changed_threads(threads)),

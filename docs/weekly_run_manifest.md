@@ -1,7 +1,8 @@
 # Weekly Run Manifest Contract
 
 Version: `weekly_run_manifest.v1`  
-Status: IRX-2 and IRX-3 `implemented_and_verified`; IRX-4 ready
+Status: IRX-2 through IRX-4 `implemented_and_verified`; canonical curation
+remains an additive registry and does not change the frozen IRX-2 stage policy
 Owner: `telegram-research-agent`
 
 The weekly run manifest is the identity and state spine for one intelligence
@@ -557,7 +558,7 @@ Implemented on 2026-07-13 as an additive path beside the V1 commands:
 Existing V1 commands and paths remain compatibility surfaces. No generated
 report was edited or committed, and no Radar evidence or context-only gate was
 changed. The historical IRX-3 handoff is closed by the additive binding below;
-IRX-4 is the next implementation task.
+the subsequent IRX-4 handoff is closed by its additive registry receipt.
 
 ## IRX-3 Reaction Snapshot And Effect Binding
 
@@ -592,8 +593,30 @@ Implemented on 2026-07-13 without changing `weekly_run_manifest.v1` or the
   snapshot and therefore fails closed to a visible partial state.
 
 No canonical thread registry or historical period-end thread membership was
-added here. Those versioned lineage guarantees are the explicit IRX-4 handoff;
-IRX-3 receipts retain current compatibility refs plus nullable canonical refs.
+added by IRX-3. Those versioned lineage guarantees were its explicit IRX-4
+handoff; IRX-3 receipts continue to retain compatibility refs while the stored
+IRX-4 resolver fills their nullable canonical refs.
+
+## IRX-4 Canonical Registry Binding
+
+Implemented on 2026-07-13 without changing `weekly_run_manifest.v1`,
+`irx2_orchestration.v1`, required-stage membership, or Radar binding:
+
+- curator decisions may carry the existing immutable run identity for audit,
+  while canonical lifecycle and membership are resolved historically against
+  the same exclusive `analysis_period_end` used by the run;
+- canonical persistence is append-only and separate from raw threads. Existing
+  manifests, raw compatibility refs, checksums, stage transitions, and terminal
+  aggregation remain readable and unchanged;
+- the predeclared `canonical_thread_curation` stage remains disabled and
+  non-required in the frozen IRX-2 profile. Enabling or revising orchestration
+  policy is not implicit in registry implementation and was outside IRX-4;
+- report/Frontier sidecars carry bounded canonical snapshots additively, so a
+  same-period curator correction invalidates its exact dependent cache without
+  weakening manifest or Radar freshness checks.
+
+No generated package, live pipeline, Radar artifact, evidence rule, or sibling
+repository was changed.
 
 ## Stop Conditions
 

@@ -197,6 +197,232 @@ CREATE TABLE IF NOT EXISTS idea_thread_atoms (
     FOREIGN KEY(atom_id) REFERENCES knowledge_atoms(id) ON DELETE CASCADE
 );
 
+-- IRX-4 canonical curation is deliberately additive.  The mutable
+-- idea_threads/idea_thread_atoms tables above remain raw compatibility and
+-- audit provenance; canonical identity and history live only in these tables.
+CREATE TABLE IF NOT EXISTS canonical_idea_threads (
+    canonical_thread_id TEXT PRIMARY KEY
+        CHECK(canonical_thread_id GLOB 'ct_[0-9a-f]*'
+              AND substr(canonical_thread_id, 4) NOT GLOB '*[^0-9a-f]*'
+              AND length(canonical_thread_id) = 27),
+    stable_slug TEXT NOT NULL UNIQUE
+        CHECK(length(trim(stable_slug)) BETWEEN 1 AND 96
+              AND stable_slug = lower(stable_slug)
+              AND stable_slug NOT GLOB '*[^a-z0-9-]*'
+              AND stable_slug NOT GLOB '-*'
+              AND stable_slug NOT GLOB '*-'
+              AND stable_slug NOT GLOB '*--*'),
+    title_ru TEXT NOT NULL CHECK(length(trim(title_ru)) > 0),
+    normalized_title_ru TEXT NOT NULL CHECK(length(trim(normalized_title_ru)) > 0),
+    title_en TEXT NOT NULL CHECK(length(trim(title_en)) > 0),
+    normalized_title_en TEXT NOT NULL CHECK(length(trim(normalized_title_en)) > 0),
+    thesis TEXT NOT NULL CHECK(length(trim(thesis)) > 0),
+    status TEXT NOT NULL DEFAULT 'active'
+        CHECK(status IN ('active', 'stale', 'merged', 'split', 'resolved', 'archived')),
+    first_seen_at TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL,
+    evidence_maturity TEXT NOT NULL DEFAULT 'single_source'
+        CHECK(evidence_maturity IN (
+            'single_source',
+            'repeated_signal',
+            'multi_channel',
+            'primary_verified',
+            'externally_corroborated',
+            'decision_grade'
+        )),
+    operator_interest REAL NOT NULL DEFAULT 0.0
+        CHECK(operator_interest >= 0.0 AND operator_interest <= 1.0),
+    entities_json TEXT NOT NULL DEFAULT '[]'
+        CHECK(json_valid(entities_json) AND json_type(entities_json) = 'array'),
+    curator_version TEXT NOT NULL CHECK(length(trim(curator_version)) > 0),
+    current_version INTEGER NOT NULL DEFAULT 1 CHECK(current_version >= 1),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_canonical_idea_threads_active_title_ru
+    ON canonical_idea_threads(normalized_title_ru)
+    WHERE status = 'active';
+CREATE UNIQUE INDEX IF NOT EXISTS uq_canonical_idea_threads_active_title_en
+    ON canonical_idea_threads(normalized_title_en)
+    WHERE status = 'active';
+CREATE INDEX IF NOT EXISTS idx_canonical_idea_threads_status
+    ON canonical_idea_threads(status);
+CREATE INDEX IF NOT EXISTS idx_canonical_idea_threads_last_seen
+    ON canonical_idea_threads(last_seen_at);
+
+CREATE TABLE IF NOT EXISTS canonical_idea_thread_versions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    canonical_thread_id TEXT NOT NULL,
+    version INTEGER NOT NULL CHECK(version >= 1),
+    stable_slug TEXT NOT NULL
+        CHECK(length(trim(stable_slug)) BETWEEN 1 AND 96
+              AND stable_slug = lower(stable_slug)
+              AND stable_slug NOT GLOB '*[^a-z0-9-]*'
+              AND stable_slug NOT GLOB '-*'
+              AND stable_slug NOT GLOB '*-'
+              AND stable_slug NOT GLOB '*--*'),
+    title_ru TEXT NOT NULL CHECK(length(trim(title_ru)) > 0),
+    normalized_title_ru TEXT NOT NULL CHECK(length(trim(normalized_title_ru)) > 0),
+    title_en TEXT NOT NULL CHECK(length(trim(title_en)) > 0),
+    normalized_title_en TEXT NOT NULL CHECK(length(trim(normalized_title_en)) > 0),
+    thesis TEXT NOT NULL CHECK(length(trim(thesis)) > 0),
+    status TEXT NOT NULL
+        CHECK(status IN ('active', 'stale', 'merged', 'split', 'resolved', 'archived')),
+    first_seen_at TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL,
+    evidence_maturity TEXT NOT NULL
+        CHECK(evidence_maturity IN (
+            'single_source',
+            'repeated_signal',
+            'multi_channel',
+            'primary_verified',
+            'externally_corroborated',
+            'decision_grade'
+        )),
+    operator_interest REAL NOT NULL
+        CHECK(operator_interest >= 0.0 AND operator_interest <= 1.0),
+    entities_json TEXT NOT NULL DEFAULT '[]'
+        CHECK(json_valid(entities_json) AND json_type(entities_json) = 'array'),
+    curator_version TEXT NOT NULL CHECK(length(trim(curator_version)) > 0),
+    operation TEXT NOT NULL
+        CHECK(operation IN (
+            'create', 'update', 'merge', 'split', 'stale', 'operator_correction',
+            'keep_separate', 'keep_together', 'defer'
+        )),
+    decision_id TEXT NOT NULL CHECK(length(trim(decision_id)) > 0),
+    valid_from TEXT NOT NULL,
+    valid_to TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE(canonical_thread_id, version),
+    CHECK(valid_to IS NULL OR valid_to > valid_from),
+    FOREIGN KEY(canonical_thread_id)
+        REFERENCES canonical_idea_threads(canonical_thread_id) ON DELETE RESTRICT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_canonical_idea_thread_versions_current
+    ON canonical_idea_thread_versions(canonical_thread_id)
+    WHERE valid_to IS NULL;
+CREATE INDEX IF NOT EXISTS idx_canonical_idea_thread_versions_as_of
+    ON canonical_idea_thread_versions(canonical_thread_id, valid_from, valid_to);
+CREATE INDEX IF NOT EXISTS idx_canonical_idea_thread_versions_slug_as_of
+    ON canonical_idea_thread_versions(stable_slug, valid_from, valid_to);
+
+CREATE TABLE IF NOT EXISTS canonical_idea_thread_atom_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    canonical_thread_id TEXT NOT NULL,
+    atom_id INTEGER NOT NULL,
+    raw_thread_id INTEGER,
+    relation TEXT NOT NULL DEFAULT 'supports'
+        CHECK(relation IN ('supports', 'contradicts', 'supersedes', 'related')),
+    valid_from TEXT NOT NULL,
+    valid_to TEXT,
+    assigned_decision_id TEXT NOT NULL CHECK(length(trim(assigned_decision_id)) > 0),
+    retired_decision_id TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE(canonical_thread_id, atom_id, valid_from),
+    CHECK(valid_to IS NULL OR valid_to > valid_from),
+    FOREIGN KEY(canonical_thread_id)
+        REFERENCES canonical_idea_threads(canonical_thread_id) ON DELETE RESTRICT,
+    FOREIGN KEY(atom_id) REFERENCES knowledge_atoms(id) ON DELETE RESTRICT,
+    FOREIGN KEY(raw_thread_id) REFERENCES idea_threads(id) ON DELETE RESTRICT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_canonical_atom_current_owner
+    ON canonical_idea_thread_atom_history(atom_id)
+    WHERE valid_to IS NULL;
+CREATE INDEX IF NOT EXISTS idx_canonical_atom_history_thread_as_of
+    ON canonical_idea_thread_atom_history(canonical_thread_id, valid_from, valid_to);
+CREATE INDEX IF NOT EXISTS idx_canonical_atom_history_atom_as_of
+    ON canonical_idea_thread_atom_history(atom_id, valid_from, valid_to);
+CREATE INDEX IF NOT EXISTS idx_canonical_atom_history_raw_thread
+    ON canonical_idea_thread_atom_history(raw_thread_id);
+
+CREATE TABLE IF NOT EXISTS canonical_idea_thread_alias_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    canonical_thread_id TEXT NOT NULL,
+    alias_type TEXT NOT NULL
+        CHECK(alias_type IN (
+            'raw_thread_id',
+            'raw_thread_slug',
+            'compatibility_ref',
+            'legacy_ref',
+            'title',
+            'model_version',
+            'manual'
+        )),
+    alias_value TEXT NOT NULL CHECK(length(trim(alias_value)) > 0),
+    normalized_alias TEXT NOT NULL CHECK(length(trim(normalized_alias)) > 0),
+    valid_from TEXT NOT NULL,
+    valid_to TEXT,
+    assigned_decision_id TEXT NOT NULL CHECK(length(trim(assigned_decision_id)) > 0),
+    retired_decision_id TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE(canonical_thread_id, alias_type, normalized_alias, valid_from),
+    CHECK(valid_to IS NULL OR valid_to > valid_from),
+    FOREIGN KEY(canonical_thread_id)
+        REFERENCES canonical_idea_threads(canonical_thread_id) ON DELETE RESTRICT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_canonical_alias_current_owner
+    ON canonical_idea_thread_alias_history(alias_type, normalized_alias)
+    WHERE valid_to IS NULL;
+CREATE INDEX IF NOT EXISTS idx_canonical_alias_history_thread_as_of
+    ON canonical_idea_thread_alias_history(canonical_thread_id, valid_from, valid_to);
+CREATE INDEX IF NOT EXISTS idx_canonical_alias_history_lookup_as_of
+    ON canonical_idea_thread_alias_history(normalized_alias, valid_from, valid_to);
+
+CREATE TABLE IF NOT EXISTS canonical_idea_thread_lineage (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    relation_type TEXT NOT NULL CHECK(relation_type IN ('merge', 'split')),
+    from_thread_id TEXT NOT NULL,
+    to_thread_id TEXT NOT NULL,
+    decision_id TEXT NOT NULL CHECK(length(trim(decision_id)) > 0),
+    event_at TEXT NOT NULL,
+    reason TEXT NOT NULL CHECK(length(trim(reason)) > 0),
+    created_at TEXT NOT NULL,
+    UNIQUE(relation_type, from_thread_id, to_thread_id, event_at),
+    CHECK(from_thread_id <> to_thread_id),
+    FOREIGN KEY(from_thread_id)
+        REFERENCES canonical_idea_threads(canonical_thread_id) ON DELETE RESTRICT,
+    FOREIGN KEY(to_thread_id)
+        REFERENCES canonical_idea_threads(canonical_thread_id) ON DELETE RESTRICT
+);
+CREATE INDEX IF NOT EXISTS idx_canonical_lineage_from
+    ON canonical_idea_thread_lineage(from_thread_id, event_at);
+CREATE INDEX IF NOT EXISTS idx_canonical_lineage_to
+    ON canonical_idea_thread_lineage(to_thread_id, event_at);
+
+CREATE TABLE IF NOT EXISTS canonical_idea_thread_curator_decisions (
+    decision_id TEXT PRIMARY KEY CHECK(length(trim(decision_id)) > 0),
+    run_id TEXT NOT NULL CHECK(length(trim(run_id)) > 0),
+    operation TEXT NOT NULL
+        CHECK(operation IN (
+            'create', 'update', 'merge', 'split', 'stale', 'operator_correction',
+            'keep_separate', 'keep_together', 'defer'
+        )),
+    proposal_json TEXT NOT NULL CHECK(json_valid(proposal_json)),
+    evidence_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(evidence_json)),
+    model TEXT NOT NULL CHECK(length(trim(model)) > 0),
+    model_version TEXT NOT NULL CHECK(length(trim(model_version)) > 0),
+    curator_version TEXT NOT NULL CHECK(length(trim(curator_version)) > 0),
+    reason TEXT NOT NULL CHECK(length(trim(reason)) > 0),
+    validation_status TEXT NOT NULL DEFAULT 'pending'
+        CHECK(validation_status IN ('pending', 'passed', 'rejected')),
+    validation_errors_json TEXT NOT NULL DEFAULT '[]'
+        CHECK(json_valid(validation_errors_json)
+              AND json_type(validation_errors_json) = 'array'),
+    decision_status TEXT NOT NULL DEFAULT 'proposed'
+        CHECK(decision_status IN ('proposed', 'applied', 'rejected')),
+    actor TEXT NOT NULL DEFAULT 'curator' CHECK(length(trim(actor)) > 0),
+    proposed_at TEXT NOT NULL,
+    validated_at TEXT,
+    applied_at TEXT,
+    result_json TEXT CHECK(result_json IS NULL OR json_valid(result_json)),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_canonical_curator_decisions_run
+    ON canonical_idea_thread_curator_decisions(run_id, operation);
+CREATE INDEX IF NOT EXISTS idx_canonical_curator_decisions_status
+    ON canonical_idea_thread_curator_decisions(decision_status, validation_status);
+
 CREATE TABLE IF NOT EXISTS frontier_analyses (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     week_label TEXT NOT NULL UNIQUE CHECK(length(trim(week_label)) > 0),

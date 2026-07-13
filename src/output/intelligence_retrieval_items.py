@@ -94,6 +94,7 @@ def build_retrieval_items(
         if connection is not None:
             items.extend(_knowledge_atom_items(connection, week_label=clean_week))
             items.extend(_idea_thread_items(connection, week_label=clean_week))
+            items.extend(_canonical_idea_thread_items(connection, week_label=clean_week))
             items.extend(_feedback_summary_items(connection, week_label=clean_week))
             weekly_run_root = (
                 Path(output_root) / "weekly_intelligence_runs"
@@ -263,6 +264,14 @@ def _items_from_workbook(workbook: Mapping[str, Any]) -> list[IntelligenceRetrie
     items: list[IntelligenceRetrievalItem] = []
     items.extend(_workbook_section_items(workbook, week_label=week, generated_at=generated_at, artifact_refs=artifact_refs))
     items.extend(_atlas_thread_items(workbook, week_label=week, generated_at=generated_at, artifact_refs=artifact_refs))
+    items.extend(
+        _canonical_thread_registry_items(
+            workbook,
+            week_label=week,
+            generated_at=generated_at,
+            artifact_refs=artifact_refs,
+        )
+    )
     items.extend(_canonical_contract_items(workbook, week_label=week, generated_at=generated_at))
     items.extend(_claim_card_items(workbook, week_label=week, generated_at=generated_at))
     items.extend(_deep_explanation_items(workbook, week_label=week, generated_at=generated_at))
@@ -274,6 +283,90 @@ def _items_from_workbook(workbook: Mapping[str, Any]) -> list[IntelligenceRetrie
     if mvp:
         items.append(_mvp_item(dict(mvp), week))
     return items
+
+
+def _canonical_thread_registry_items(
+    workbook: Mapping[str, Any],
+    *,
+    week_label: str | None,
+    generated_at: str | None,
+    artifact_refs: list[str],
+) -> list[IntelligenceRetrievalItem]:
+    """Project IRX-4 registry rows without replacing V1 atlas/raw items."""
+
+    threads = [
+        item
+        for item in _as_list(workbook.get("canonical_threads"))
+        if isinstance(item, Mapping)
+    ][:12]
+    result: list[IntelligenceRetrievalItem] = []
+    for index, thread in enumerate(threads, start=1):
+        canonical_id = _clean_text(thread.get("canonical_thread_id"))
+        stable_slug = _clean_text(thread.get("stable_slug") or thread.get("slug"))
+        if not canonical_id or not stable_slug:
+            continue
+        title = (
+            _clean_text(thread.get("title_ru"))
+            or _clean_text(thread.get("title_en"))
+            or stable_slug
+        )
+        aliases: list[str] = []
+        for raw_alias in _as_list(
+            thread.get("aliases") or thread.get("raw_thread_aliases")
+        ):
+            if isinstance(raw_alias, Mapping):
+                value = _clean_text(
+                    raw_alias.get("alias_value") or raw_alias.get("value")
+                )
+            else:
+                value = _clean_text(raw_alias)
+            if value and value not in aliases:
+                aliases.append(value)
+        atom_ids = _unique(
+            [
+                *_list_values(thread.get("atom_ids")),
+                *[
+                    atom.get("id")
+                    for atom in _as_list(thread.get("atoms"))
+                    if isinstance(atom, Mapping) and atom.get("id") not in (None, "")
+                ],
+            ]
+        )
+        source_refs = _unique(
+            [
+                *artifact_refs,
+                *_string_values(thread.get("source_refs")),
+                *_string_values(thread.get("source_urls")),
+            ]
+        )
+        result.append(
+            IntelligenceRetrievalItem(
+                id=f"canonical_thread:{stable_slug}",
+                item_type="canonical_thread",
+                week_label=week_label,
+                title=title or f"Canonical thread {index}",
+                summary=_clean_text(thread.get("thesis") or thread.get("summary")) or None,
+                text=_join_text(
+                    title,
+                    thread.get("title_en"),
+                    thread.get("thesis"),
+                    canonical_id,
+                    " ".join(aliases),
+                    " ".join(_string_values(thread.get("entities"))),
+                    " ".join(_string_values(thread.get("merged_from"))),
+                    " ".join(_string_values(thread.get("split_from"))),
+                    thread.get("curator_version"),
+                ),
+                source_refs=source_refs,
+                atom_ids=atom_ids,
+                thread_slug=stable_slug,
+                evidence_tier=_clean_text(thread.get("evidence_maturity")) or None,
+                status=_clean_text(thread.get("status")) or None,
+                created_at=_clean_text(thread.get("first_seen_at")) or generated_at,
+                updated_at=_clean_text(thread.get("last_seen_at")) or generated_at,
+            )
+        )
+    return result
 
 
 def _reaction_effect_items(
@@ -1037,6 +1130,113 @@ def _idea_thread_items(
     return result
 
 
+def _canonical_idea_thread_items(
+    connection: sqlite3.Connection,
+    *,
+    week_label: str | None,
+) -> list[IntelligenceRetrievalItem]:
+    """Expose versioned IRX-4 identities beside unchanged raw Idea Threads."""
+
+    if not _table_exists(connection, "canonical_idea_threads"):
+        return []
+    from db.canonical_idea_threads import fetch_canonical_threads
+
+    as_of = None
+    if week_label:
+        try:
+            _start, end = _week_bounds(week_label)
+        except ValueError:
+            return []
+        as_of = end.isoformat().replace("+00:00", "Z")
+    try:
+        threads = fetch_canonical_threads(
+            connection,
+            as_of=as_of,
+            limit=200,
+            include_atoms=True,
+        )
+    except sqlite3.Error:
+        return []
+    result: list[IntelligenceRetrievalItem] = []
+    for thread in threads:
+        canonical_id = _clean_text(thread.get("canonical_thread_id"))
+        stable_slug = _clean_text(thread.get("stable_slug"))
+        if not canonical_id or not stable_slug:
+            continue
+        aliases: list[str] = []
+        for raw_alias in _as_list(
+            thread.get("aliases") or thread.get("raw_thread_aliases")
+        ):
+            if isinstance(raw_alias, Mapping):
+                value = _clean_text(
+                    raw_alias.get("alias_value") or raw_alias.get("value")
+                )
+            else:
+                value = _clean_text(raw_alias)
+            if value and value not in aliases:
+                aliases.append(value)
+        atoms = [
+            atom
+            for atom in _as_list(thread.get("atoms"))
+            if isinstance(atom, Mapping)
+        ]
+        atom_ids = _unique(
+            [
+                *_list_values(thread.get("atom_ids")),
+                *[
+                    atom.get("id") or atom.get("atom_id")
+                    for atom in atoms
+                    if atom.get("id") or atom.get("atom_id")
+                ],
+            ]
+        )
+        source_refs = _unique(
+            [
+                *_string_values(thread.get("source_urls")),
+                *[
+                    url
+                    for atom in atoms
+                    for url in _string_values(atom.get("source_urls"))
+                ],
+            ]
+        )
+        title = (
+            _clean_text(thread.get("title_ru"))
+            or _clean_text(thread.get("title_en"))
+            or stable_slug
+        )
+        result.append(
+            IntelligenceRetrievalItem(
+                id=f"canonical_thread:{stable_slug}",
+                item_type="canonical_thread",
+                week_label=week_label,
+                title=title,
+                summary=_clean_text(thread.get("thesis")) or None,
+                text=_join_text(
+                    title,
+                    thread.get("title_en"),
+                    thread.get("thesis"),
+                    canonical_id,
+                    stable_slug,
+                    " ".join(aliases),
+                    " ".join(_string_values(thread.get("entities"))),
+                    " ".join(_string_values(thread.get("merged_from"))),
+                    " ".join(_string_values(thread.get("split_from"))),
+                    " ".join(_clean_text(atom.get("claim")) for atom in atoms),
+                    thread.get("curator_version"),
+                ),
+                source_refs=source_refs,
+                atom_ids=atom_ids,
+                thread_slug=stable_slug,
+                evidence_tier=_clean_text(thread.get("evidence_maturity")) or None,
+                status=_clean_text(thread.get("status")) or None,
+                created_at=_clean_text(thread.get("first_seen_at")) or None,
+                updated_at=_clean_text(thread.get("last_seen_at")) or None,
+            )
+        )
+    return result
+
+
 def _feedback_summary_items(
     connection: sqlite3.Connection,
     *,
@@ -1659,10 +1859,15 @@ def _normalize_filter_value(value: object) -> str:
 
 def _dedupe_items(items: Iterable[IntelligenceRetrievalItem]) -> list[IntelligenceRetrievalItem]:
     result: list[IntelligenceRetrievalItem] = []
-    seen: set[str] = set()
+    positions: dict[str, int] = {}
     for item in items:
-        if item.id in seen:
+        if item.id in positions:
+            # Canonical DB rows are appended after artifact projections and
+            # carry the complete as-of alias/atom/source search text.  Prefer
+            # that richer projection while keeping one stable retrieval ref.
+            if item.item_type == "canonical_thread":
+                result[positions[item.id]] = item
             continue
-        seen.add(item.id)
+        positions[item.id] = len(result)
         result.append(item)
     return result

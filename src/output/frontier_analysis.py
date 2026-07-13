@@ -170,12 +170,13 @@ def _thread_for_prompt(thread: dict) -> dict:
 
 
 def _build_prompt(context: dict, *, lookback_weeks: int) -> str:
+    analysis_threads = context.get("canonical_threads") or context.get("threads") or []
     prompt_context = {
         "week_label": context.get("week_label"),
         "week_start": context.get("week_start"),
         "week_end": context.get("week_end"),
         "lookback_weeks": lookback_weeks,
-        "threads": [_thread_for_prompt(thread) for thread in context.get("threads") or []],
+        "threads": [_thread_for_prompt(thread) for thread in analysis_threads],
         "feedback_context": context.get("feedback_context") or {},
     }
     return (
@@ -262,6 +263,12 @@ def _analysis_matches_period(
     period_fields: dict[str, str],
     *,
     feedback_snapshot_at: str | None = None,
+    canonical_snapshot_fingerprint: str | None = None,
+    model: str | None = None,
+    prompt_version: str | None = None,
+    lookback_weeks: int | None = None,
+    threads_limit: int | None = None,
+    atoms_limit: int | None = None,
 ) -> bool:
     source_context = (row.get("analysis") or {}).get("source_context") or {}
     period_matches = all(
@@ -276,10 +283,36 @@ def _analysis_matches_period(
     )
     if not period_matches:
         return False
-    return feedback_snapshot_at is None or (
-        str(source_context.get("feedback_snapshot_at") or "")
-        == feedback_snapshot_at
+    stored_feedback_snapshot = (
+        str(source_context.get("feedback_snapshot_at") or "") or None
     )
+    # Preserve the established standalone/V1 cache contract: an omitted
+    # feedback cutoff is a compatibility wildcard.  Bound IRX-2/IRX-3 calls
+    # still require the exact supplied snapshot, while IRX-4 adds its canonical
+    # fingerprint independently below.
+    if (
+        feedback_snapshot_at is not None
+        and stored_feedback_snapshot != feedback_snapshot_at
+    ):
+        return False
+    stored_canonical_snapshot = (
+        str(source_context.get("canonical_thread_snapshot_fingerprint") or "") or None
+    )
+    if stored_canonical_snapshot != canonical_snapshot_fingerprint:
+        return False
+    if model is not None and str(row.get("model") or "") != model:
+        return False
+    if prompt_version is not None and str(row.get("prompt_version") or "") != prompt_version:
+        return False
+    if lookback_weeks is not None and int(row.get("lookback_weeks") or 0) != lookback_weeks:
+        return False
+    for field, expected in (
+        ("threads_limit", threads_limit),
+        ("atoms_limit", atoms_limit),
+    ):
+        if expected is not None and int(source_context.get(field) or 0) != expected:
+            return False
+    return True
 
 
 def _canonical_optional_utc_timestamp(
@@ -335,30 +368,47 @@ def run_frontier_analysis(
     )
     clean_week = period.week_label
     resolved_model = resolve_frontier_model(model)
+    clean_lookback = max(1, int(lookback_weeks or 1))
+    clean_threads_limit = max(1, int(threads_limit or DEFAULT_THREADS_LIMIT))
+    clean_atoms_limit = max(1, int(atoms_limit or DEFAULT_ATOMS_LIMIT))
     with sqlite3.connect(settings.db_path) as connection:
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON;")
-        existing = fetch_frontier_analysis(connection, week_label=clean_week)
-        if existing and not force and _analysis_matches_period(
-            existing,
-            period_fields,
-            feedback_snapshot_at=feedback_cutoff,
-        ):
-            return _analysis_summary(existing, skipped_existing=True)
         context = load_ai_intelligence_context(
             connection,
             week_label=clean_week,
             reporting_period=period,
             feedback_snapshot_at=feedback_cutoff,
-            threads_limit=max(1, int(threads_limit or DEFAULT_THREADS_LIMIT)),
-            atoms_limit=max(1, int(atoms_limit or DEFAULT_ATOMS_LIMIT)),
+            threads_limit=clean_threads_limit,
+            atoms_limit=clean_atoms_limit,
         )
-        threads = context.get("threads") or []
+        canonical_snapshot = (
+            context.get("canonical_thread_snapshot")
+            if isinstance(context.get("canonical_thread_snapshot"), Mapping)
+            else {}
+        )
+        canonical_snapshot_fingerprint = (
+            str(canonical_snapshot.get("fingerprint") or "") or None
+        )
+        existing = fetch_frontier_analysis(connection, week_label=clean_week)
+        if existing and not force and _analysis_matches_period(
+            existing,
+            period_fields,
+            feedback_snapshot_at=feedback_cutoff,
+            canonical_snapshot_fingerprint=canonical_snapshot_fingerprint,
+            model=resolved_model,
+            prompt_version=PROMPT_VERSION,
+            lookback_weeks=clean_lookback,
+            threads_limit=clean_threads_limit,
+            atoms_limit=clean_atoms_limit,
+        ):
+            return _analysis_summary(existing, skipped_existing=True)
+        threads = context.get("canonical_threads") or context.get("threads") or []
         if not threads:
             raise FrontierAnalysisError("no Idea Threads available; run knowledge-extract and idea-threads first")
         atoms_seen = len({atom["id"] for thread in threads for atom in thread.get("atoms") or []})
         raw = complete(
-            prompt=_build_prompt(context, lookback_weeks=max(1, int(lookback_weeks or 1))),
+            prompt=_build_prompt(context, lookback_weeks=clean_lookback),
             system="You synthesize source-grounded AI intelligence into strict JSON for a human weekly report.",
             max_tokens=FRONTIER_ANALYSIS_MAX_TOKENS,
             category="frontier_analysis",
@@ -374,9 +424,19 @@ def run_frontier_analysis(
                     if feedback_cutoff is not None
                     else {}
                 ),
-                "lookback_weeks": max(1, int(lookback_weeks or 1)),
+                "lookback_weeks": clean_lookback,
+                "threads_limit": clean_threads_limit,
+                "atoms_limit": clean_atoms_limit,
                 "threads_analyzed": len(threads),
                 "atoms_analyzed": atoms_seen,
+                **(
+                    {
+                        "canonical_thread_snapshot_fingerprint": canonical_snapshot_fingerprint,
+                        "canonical_thread_snapshot_as_of": canonical_snapshot.get("as_of"),
+                    }
+                    if canonical_snapshot_fingerprint is not None
+                    else {}
+                ),
             },
         }
         row = upsert_frontier_analysis(
@@ -385,7 +445,7 @@ def run_frontier_analysis(
             generated_at=period_fields["generated_at"],
             model=resolved_model,
             prompt_version=PROMPT_VERSION,
-            lookback_weeks=max(1, int(lookback_weeks or 1)),
+            lookback_weeks=clean_lookback,
             threads_analyzed=len(threads),
             atoms_analyzed=atoms_seen,
             executive_brief=payload["executive_brief"],

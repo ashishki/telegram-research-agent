@@ -1,9 +1,9 @@
 # CODEX_PROMPT - Compact Session Handoff
 
-Version: 5.3
+Version: 5.4
 Date: 2026-07-13
-State: IRX-1, IRX-2, and IRX-3 `implemented_and_verified`; IRX-4 is the next
-implementation task; dogfood is blocked until IRX-14
+State: IRX-1 through IRX-4 `implemented_and_verified`; IRX-5 is the next
+planned implementation task; dogfood is blocked until IRX-14
 
 ## Current Product Direction
 
@@ -33,7 +33,7 @@ docs/tasks.md
 Next implementation task:
 
 ```text
-IRX-4 - Canonical Idea Thread Curation And Merge/Split Lifecycle
+IRX-5 - Editorial Intelligence Synthesis Contract
 ```
 
 ## W29 Product Correction
@@ -73,9 +73,12 @@ started.
   `reaction_personalization.v1` validation, exact stored-identity
   post/atom/current-thread attribution, one weak bounded adjacent promotion,
   Brief/Atlas surface receipts, additive PI/retrieval/Obsidian projections, and
-  advisory-only repeated-pattern proposals. Current compatibility threads are
-  not canonical; the durable registry and historical as-of lineage remain
-  IRX-4 scope.
+  advisory-only repeated-pattern proposals.
+- IRX-4 adds the separate durable canonical registry, deterministic proposal
+  and lifecycle validation, append-only merge/split/alias history, exclusive
+  period-end as-of resolution, stored IRX-3 canonical attribution, and bounded
+  additive report/retrieval/Obsidian projections. Mutable compatibility threads
+  remain raw audit provenance rather than canonical identity.
 - Canonical intelligence sidecar contract `tra-intelligence-contract.v1` is now
   implemented locally for workbook/Brief/Atlas projections with sanitized eval
   fixtures.
@@ -204,7 +207,7 @@ Verification and compatibility:
 - at the IRX-2 boundary, reaction ranking/effect receipt, canonical curation,
   editorial synthesis, reader V2 redesign, and reader-value gates remained
   intentionally open. The IRX-3 handoff is now closed by the completion record
-  below; IRX-4 is the current scope.
+  below; that historical IRX-4 handoff is now closed by its completion record.
 
 ## IRX-3 Completion
 
@@ -248,9 +251,42 @@ Verification and compatibility:
   reader receipt;
 - no generated report artifact, standing profile/config/project/source setting,
   cross-repository code, or sibling Radar gate was changed;
-- IRX-4 is now the only active implementation scope. It must add the durable
-  canonical registry, aliases, merge/split lifecycle, and period-end historical
-  as-of membership without changing IRX-3 provenance or reaction semantics.
+- Historical handoff: IRX-4 was the next scope and had to add the durable
+  canonical registry without changing IRX-3 provenance or reaction semantics;
+  that handoff is now closed below.
+
+## IRX-4 Completion
+
+Status: implemented and focused-test verified on 2026-07-13.
+
+Implemented:
+
+- additive canonical current/version, atom/alias history, ancestry, and curator
+  decision persistence with stable IDs/slugs and raw provenance preserved;
+- atomic incremental create/update/merge/split/stale/operator-correction
+  transitions with deterministic rejection of atom loss, ambiguous ownership,
+  duplicate active title/membership, alias collisions, cycles, and slug churn;
+  curator snapshot/semantic checks share the same writer transaction, and
+  merge/update identities are bound to the candidate's exact current owners;
+- bounded deterministic grouping and proposal-only strong-model curation, with
+  entity/vendor-only merge and model-version-only split explicitly rejected;
+- exact historical canonical lifecycle and membership resolution as of the
+  exclusive `analysis_period_end`, plus stored stable-slug canonical refs for
+  the unchanged IRX-3 resolver;
+- bounded additive canonical projections for Brief/Atlas/Frontier, Hermes/PI,
+  retrieval, Obsidian, Strategy Reviewer, and sidecars while raw/V1 audit
+  projections remain available. Atlas primary canonical input is capped at 12.
+
+Verification and compatibility:
+
+- the exact required compatibility matrix passed 83 tests; canonical
+  persistence/curator tests passed 28 tests; an extended affected-surface
+  matrix passed 109 tests; focused compilation and `git diff --check` passed;
+- no live/expensive pipeline, archive regeneration, or full suite was run;
+- no generated artifact, IRX-3 reaction semantic, global evidence score,
+  explicit-feedback semantic, IRX-1 period rule, IRX-2 manifest/Radar binding,
+  Radar gate, standing configuration, or cross-repository code changed;
+- IRX-5 and later work remain planned and were not implemented.
 
 ## PGI-001 Completion
 
@@ -564,9 +600,9 @@ python3 -m py_compile src/output/dogfood_review.py
 git diff --check
 ```
 
-## Exact Next Codex Prompt - IRX-4
+## Executed Codex Prompt - IRX-4
 
-Use the following prompt unchanged for the next implementation task:
+The following prompt was executed unchanged for the IRX-4 implementation task:
 
 ```text
 You are Codex working in /srv/openclaw-you/workspace/telegram-research-agent.
@@ -619,8 +655,8 @@ Run:
 Report files changed, canonical identity/lifecycle/as-of semantics, compatibility behavior, exact test results, and confirmation that generated artifacts, IRX-3 reaction semantics, Radar gates, and cross-repo code were unchanged. Stop before IRX-5.
 ```
 
-IRX-4 is ready and is the only next implementation scope. IRX-5 and later work
-remain planned, not implemented.
+IRX-4 is implemented and verified. IRX-5 is the next planned scope and was not
+implemented in this slice.
 
 ## Historical PGI-007 Handoff
 

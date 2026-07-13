@@ -40,6 +40,7 @@ _install_stub("sklearn.feature_extraction.text", ENGLISH_STOP_WORDS=set(), Tfidf
 _install_stub("sklearn.metrics", silhouette_score=lambda *_args, **_kwargs: 0.0)
 
 from config.settings import Settings  # noqa: E402
+from db.canonical_idea_threads import apply_canonical_lifecycle  # noqa: E402
 from db.ai_report_feedback import record_ai_report_feedback  # noqa: E402
 from db.knowledge_atoms import record_knowledge_atom  # noqa: E402
 from db.migrate import run_migrations  # noqa: E402
@@ -317,6 +318,86 @@ class TestObsidianExport(unittest.TestCase):
         self.assertIn("useful: 1", feedback_text)
         self.assertIn("## Codex Tasks", strategy_text)
         self.assertIn("## Mutation Policy", strategy_text)
+
+    def test_raw_thread_note_path_survives_additive_canonical_attribution(self):
+        db_path = self._make_db()
+        self._seed_atoms(db_path)
+        with tempfile.TemporaryDirectory() as vault_dir, tempfile.TemporaryDirectory() as report_root:
+            try:
+                settings = self._prepare_context(db_path, report_root)
+                with sqlite3.connect(db_path) as connection:
+                    raw = connection.execute(
+                        "SELECT id, slug FROM idea_threads ORDER BY id LIMIT 1"
+                    ).fetchone()
+                    memberships = [
+                        {"atom_id": int(row[0]), "raw_thread_id": int(raw[0])}
+                        for row in connection.execute(
+                            """
+                            SELECT atom_id FROM idea_thread_atoms
+                            WHERE thread_id = ? ORDER BY atom_id
+                            """,
+                            (int(raw[0]),),
+                        ).fetchall()
+                    ]
+                    result = apply_canonical_lifecycle(
+                        connection,
+                        proposal={
+                            "operation": "create",
+                            "thread": {
+                                "stable_slug": "canonical-eval-gated-release",
+                                "title_ru": "Канонический eval-релиз",
+                                "title_en": "Canonical eval-gated release",
+                                "thesis": "Eval gates make agent releases safer.",
+                                "status": "active",
+                                "first_seen_at": "2026-07-06T08:00:00Z",
+                                "last_seen_at": "2026-07-07T10:00:00Z",
+                                "evidence_maturity": "multi_channel",
+                                "operator_interest": 0.6,
+                                "entities": ["Codex", "Claude"],
+                            },
+                            "atom_memberships": memberships,
+                        },
+                        run_id="obsidian-canonical-create",
+                        model="deterministic-test-curator",
+                        model_version="1",
+                        curator_version="irx4-test.v1",
+                        reason="Obsidian compatibility fixture",
+                        event_at="2026-07-11T00:00:00Z",
+                    )
+                first = export_obsidian_vault(
+                    settings,
+                    week_label="2026-W28",
+                    vault_path=vault_dir,
+                    report_root=report_root,
+                )
+                raw_path = Path(vault_dir) / "20-idea-threads" / f"{raw[1]}.md"
+                first_text = raw_path.read_text(encoding="utf-8")
+                second = export_obsidian_vault(
+                    settings,
+                    week_label="2026-W28",
+                    vault_path=vault_dir,
+                    report_root=report_root,
+                )
+                second_text = raw_path.read_text(encoding="utf-8")
+                canonical_path_exists = (
+                    Path(vault_dir)
+                    / "20-idea-threads"
+                    / "canonical-eval-gated-release.md"
+                ).exists()
+            finally:
+                os.unlink(db_path)
+
+        canonical_id = result["affected_thread_ids"][0]
+        self.assertEqual(first.files_written, second.files_written)
+        self.assertIn("## Canonical Registry", first_text)
+        self.assertIn(
+            "canonical_thread:canonical-eval-gated-release",
+            first_text,
+        )
+        self.assertIn(str(canonical_id), first_text)
+        self.assertIn(f'slug: "{raw[1]}"', first_text)
+        self.assertIn("canonical_membership_resolved", second_text)
+        self.assertFalse(canonical_path_exists)
 
     def test_export_prunes_one_off_terms_channels_and_read_notes(self):
         db_path = self._make_db()

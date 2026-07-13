@@ -40,6 +40,10 @@ _install_stub("sklearn.feature_extraction.text", ENGLISH_STOP_WORDS=set(), Tfidf
 _install_stub("sklearn.metrics", silhouette_score=lambda *_args, **_kwargs: 0.0)
 
 from config.settings import Settings  # noqa: E402
+from db.canonical_idea_threads import (  # noqa: E402
+    apply_canonical_lifecycle,
+    stable_canonical_thread_id,
+)
 from db.frontier_analysis import fetch_frontier_analysis  # noqa: E402
 from db.knowledge_atoms import record_knowledge_atom  # noqa: E402
 from db.migrate import run_migrations  # noqa: E402
@@ -148,6 +152,47 @@ class TestFrontierAnalysis(unittest.TestCase):
             }
         )
 
+    def _create_canonical_thread(self, db_path: str) -> str:
+        canonical_id = stable_canonical_thread_id("canonical-eval-release-gates")
+        with sqlite3.connect(db_path) as connection:
+            memberships = [
+                {"atom_id": int(row[0]), "raw_thread_id": int(row[1])}
+                for row in connection.execute(
+                    """
+                    SELECT atom_id, thread_id
+                    FROM idea_thread_atoms
+                    ORDER BY atom_id
+                    """
+                ).fetchall()
+            ]
+            apply_canonical_lifecycle(
+                connection,
+                proposal={
+                    "operation": "create",
+                    "thread": {
+                        "canonical_thread_id": canonical_id,
+                        "stable_slug": "canonical-eval-release-gates",
+                        "title_ru": "Канонические eval-гейты релизов",
+                        "title_en": "Canonical eval release gates",
+                        "thesis": "Canonical release gates connect agent practice and risk evidence.",
+                        "status": "active",
+                        "first_seen_at": "2026-07-06T08:00:00Z",
+                        "last_seen_at": "2026-07-07T10:00:00Z",
+                        "evidence_maturity": "multi_channel",
+                        "operator_interest": 0.5,
+                        "entities": ["Codex", "Claude"],
+                    },
+                    "atom_memberships": memberships,
+                },
+                run_id="frontier-canonical-create",
+                model="deterministic-test-curator",
+                model_version="1",
+                curator_version="irx4-test.v1",
+                reason="frontier canonical fixture",
+                event_at="2026-07-11T00:00:00Z",
+            )
+        return canonical_id
+
     def test_frontier_analysis_records_top_model_synthesis(self):
         db_path = self._make_db()
         try:
@@ -215,6 +260,10 @@ class TestFrontierAnalysis(unittest.TestCase):
                     reporting_period=period,
                     feedback_snapshot_at=period.analysis_period_end,
                 )
+                legacy_cached = run_frontier_analysis(
+                    settings,
+                    reporting_period=period,
+                )
             with sqlite3.connect(db_path) as connection:
                 row = fetch_frontier_analysis(connection, week_label="2026-W28")
         finally:
@@ -223,10 +272,88 @@ class TestFrontierAnalysis(unittest.TestCase):
         regenerated.assert_called_once()
         self.assertFalse(summary.skipped_existing)
         self.assertTrue(cached.skipped_existing)
+        self.assertTrue(legacy_cached.skipped_existing)
         self.assertEqual(
             row["analysis"]["source_context"]["feedback_snapshot_at"],
             "2026-07-13T00:00:00Z",
         )
+
+    def test_canonical_prompt_and_same_period_correction_invalidate_cache(self):
+        db_path = self._make_db()
+        period = resolve_reporting_period(
+            datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc)
+        )
+        try:
+            settings = self._seed_threads(db_path)
+            canonical_id = self._create_canonical_thread(db_path)
+            with patch(
+                "output.frontier_analysis.complete", return_value=self._payload()
+            ) as initial_complete:
+                initial = run_frontier_analysis(
+                    settings,
+                    reporting_period=period,
+                    force=True,
+                )
+            initial_prompt = initial_complete.call_args.kwargs["prompt"]
+            with sqlite3.connect(db_path) as connection:
+                initial_row = fetch_frontier_analysis(
+                    connection, week_label="2026-W28"
+                )
+                apply_canonical_lifecycle(
+                    connection,
+                    proposal={
+                        "operation": "operator_correction",
+                        "thread": {
+                            "canonical_thread_id": canonical_id,
+                            "title_ru": "Исправленные канонические eval-гейты",
+                            "title_en": "Corrected canonical eval release gates",
+                            "thesis": "A same-period operator correction changes synthesis input.",
+                        },
+                    },
+                    run_id="frontier-canonical-correction",
+                    model="operator",
+                    model_version="1",
+                    curator_version="irx4-test.v2",
+                    reason="invalidate same-period synthesis",
+                    event_at="2026-07-12T12:00:00Z",
+                    actor="operator:owner",
+                )
+            with patch(
+                "output.frontier_analysis.complete", return_value=self._payload()
+            ) as regenerated_complete:
+                regenerated = run_frontier_analysis(
+                    settings,
+                    reporting_period=period,
+                )
+            with patch(
+                "output.frontier_analysis.complete",
+                side_effect=AssertionError("matching canonical input should reuse cache"),
+            ):
+                cached = run_frontier_analysis(
+                    settings,
+                    reporting_period=period,
+                )
+            with sqlite3.connect(db_path) as connection:
+                corrected_row = fetch_frontier_analysis(
+                    connection, week_label="2026-W28"
+                )
+        finally:
+            os.unlink(db_path)
+
+        self.assertFalse(initial.skipped_existing)
+        self.assertIn('"slug": "canonical-eval-release-gates"', initial_prompt)
+        self.assertIn("Канонические eval-гейты релизов", initial_prompt)
+        self.assertNotIn('"slug": "codex-claude-ai-agents"', initial_prompt)
+        regenerated_complete.assert_called_once()
+        self.assertFalse(regenerated.skipped_existing)
+        self.assertTrue(cached.skipped_existing)
+        initial_source = initial_row["analysis"]["source_context"]
+        corrected_source = corrected_row["analysis"]["source_context"]
+        self.assertNotEqual(
+            initial_source["canonical_thread_snapshot_fingerprint"],
+            corrected_source["canonical_thread_snapshot_fingerprint"],
+        )
+        self.assertEqual(corrected_source["threads_analyzed"], 1)
 
     def test_frontier_analysis_cli_skips_existing_without_force(self):
         db_path = self._make_db()

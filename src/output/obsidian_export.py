@@ -569,6 +569,33 @@ def _thread_note(week_label: str, thread: dict, report_path: Path) -> tuple[Path
     atom_urls = [url for atom in thread.get("atoms") or [] for url in atom.get("source_urls") or []]
     claims = thread.get("current_claims") or []
     superseded = thread.get("superseded_claims") or []
+    canonical_ids = [
+        str(value)
+        for value in thread.get("canonical_thread_ids") or []
+        if str(value).strip()
+    ]
+    canonical_refs = [
+        str(value)
+        for value in thread.get("canonical_thread_refs") or []
+        if str(value).strip()
+    ]
+    canonical_slugs = [
+        str(value)
+        for value in thread.get("canonical_stable_slugs") or []
+        if str(value).strip()
+    ]
+    canonical_registry = [
+        "## Canonical Registry",
+        "- Raw compatibility identity and note path are preserved.",
+        "- Resolution: "
+        + str(
+            thread.get("canonical_resolution_status")
+            or "compatibility_current_thread_only"
+        ),
+        "- Canonical refs: " + (", ".join(canonical_refs) or "not resolved"),
+        "- Stable slugs: " + (", ".join(canonical_slugs) or "not resolved"),
+        "",
+    ]
     timeline = []
     for atom in reversed(thread.get("atoms") or []):
         timeline.append(
@@ -583,6 +610,7 @@ def _thread_note(week_label: str, thread: dict, report_path: Path) -> tuple[Path
             "",
             thread.get("summary") or "",
             "",
+            *canonical_registry,
             "## Current Claims",
             *(f"- {claim}" for claim in claims[:8]),
             *([] if claims else ["- No current claims."]),
@@ -617,6 +645,13 @@ def _thread_note(week_label: str, thread: dict, report_path: Path) -> tuple[Path
                 "momentum_90d": thread["momentum_90d"],
                 "channels": thread.get("source_channels") or [],
                 "entities": thread.get("key_entities") or [],
+                "canonical_thread_ids": canonical_ids,
+                "canonical_thread_refs": canonical_refs,
+                "canonical_stable_slugs": canonical_slugs,
+                "canonical_resolution_status": thread.get(
+                    "canonical_resolution_status"
+                )
+                or "compatibility_current_thread_only",
                 "source_count": len(set(atom_urls)),
             },
         ),

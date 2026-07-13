@@ -30,8 +30,9 @@ visible personal reaction
 
 The audited W29 reports stopped after loading marked posts into a separate
 context list. IRX-3 now performs the deterministic report-time projection,
-bounded selection influence, and consumed/unconsumed receipt. Stable canonical
-thread identity and historical as-of thread lineage remain owned by IRX-4.
+bounded selection influence, and consumed/unconsumed receipt. IRX-4 now
+supplies stable canonical thread identity and historical as-of lineage through
+the same nullable resolver contract without changing these semantics.
 
 ## Normative Semantics
 
@@ -151,9 +152,9 @@ matching:
 One reacted post may cite several atoms and threads. All valid links remain in
 the audit trace, but each resolved thread receives at most one post-level boost
 per source post. IRX-3 emits `compatibility_thread_ref`, `current_thread_ref`, a
-nullable `canonical_thread_ref`, and an explicit resolution status. IRX-4 must
-preserve the original atom/post provenance when it adds alias, merge, split, and
-historical as-of resolution.
+nullable `canonical_thread_ref`, and an explicit resolution status. IRX-4
+preserves the original atom/post provenance when it adds alias, merge, split,
+and historical as-of resolution.
 
 The strong-model editorial pass may read the summarized effect trace. It may
 explain the effect in Russian, but it may not invent a mapping, adjust the boost,
@@ -420,10 +421,10 @@ Reader-facing example:
   regeneration of knowledge.
 - IRX-3 depends on IRX-1 period resolution and the IRX-2 reaction snapshot/run
   identity. Its additive thread-resolution interface exposes current
-  compatibility refs and nullable future canonical refs without relabelling raw
-  entity clusters as canonical. IRX-4 must supply the registry, merge/split
-  aliases, and period-end as-of lineage; that boundary remains intentionally
-  open.
+  compatibility refs and nullable canonical refs without relabelling raw entity
+  clusters as canonical. IRX-4 supplies the stored registry, merge/split
+  aliases, and period-end as-of lineage; the ranking and receipt boundary
+  itself remains unchanged.
 - IRX-5 consumes only the validated summary. IRX-6 and IRX-7 render it. IRX-11
   validates receipt presence and agreement. IRX-12 remains the stronger,
   confirmation-gated explicit feedback path.
@@ -524,9 +525,10 @@ and the full suite were intentionally not run.
   aliases, Brief/Atlas contexts, Hermes/PI, retrieval, and Obsidian consumers
   remain compatible through additive fields/adapters. No database schema,
   prompt, generated report, or cross-repository code change was required.
-- IRX-4 is the explicit next owner of a durable canonical registry and historical
-  period-end as-of thread lineage. IRX-3 deliberately does not claim that
-  current compatibility threads are stable canonical threads.
+- IRX-4 implements the durable canonical registry and historical period-end
+  as-of thread lineage. IRX-3 still does not claim that current compatibility
+  threads are stable canonical threads: stored canonical resolution is
+  separate and nullable, and raw refs/provenance remain present.
 
 ## Stop Conditions
 

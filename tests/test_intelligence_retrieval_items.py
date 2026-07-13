@@ -1,4 +1,5 @@
 import json
+import os
 import sqlite3
 import tempfile
 import unittest
@@ -6,6 +7,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 from config.settings import Settings
+from db.canonical_idea_threads import apply_canonical_lifecycle
+from db.idea_threads import link_idea_thread_atom, upsert_idea_thread
+from db.knowledge_atoms import record_knowledge_atom
+from db.migrate import run_migrations
 from output.ai_report_contract import INTELLIGENCE_CONTRACT_VERSION
 from output.intelligence_retrieval_items import (
     build_retrieval_items,
@@ -482,6 +487,114 @@ class TestIntelligenceRetrievalItems(unittest.TestCase):
         self.assertIn("eval", results[0]["title"].lower())
         self.assertIn("source_refs", results[0])
         self.assertIn("atom_ids", results[0])
+
+    def test_canonical_retrieval_is_additive_and_old_refs_remain_searchable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            db_path = root / "agent.db"
+            with patch.dict(os.environ, {"AGENT_DB_PATH": str(db_path)}, clear=False):
+                run_migrations()
+            with sqlite3.connect(db_path) as connection:
+                atom = record_knowledge_atom(
+                    connection,
+                    week_label="2026-W28",
+                    atom_type="engineering_practice",
+                    claim="Fable-generated software changes code-port economics.",
+                    summary="Canonical retrieval fixture.",
+                    evidence_quote="code-port economics",
+                    source_post_ids=[501],
+                    source_urls=["https://t.me/fable_lab/501"],
+                    entities=["Fable 5"],
+                    models=["Fable 5"],
+                    practices=["generated software porting"],
+                    first_seen_at="2026-07-07T00:00:00Z",
+                    last_seen_at="2026-07-07T00:00:00Z",
+                )
+                raw = upsert_idea_thread(
+                    connection,
+                    slug="fable-5-code-port",
+                    title="Fable 5 code port",
+                    summary="Mutable raw compatibility thread.",
+                    status="active",
+                    first_seen_at="2026-07-07T00:00:00Z",
+                    last_seen_at="2026-07-07T00:00:00Z",
+                    momentum_7d=0.5,
+                    momentum_30d=0.5,
+                    momentum_90d=0.5,
+                    atom_count=1,
+                    source_channels=["fable_lab"],
+                    key_entities=["Fable 5"],
+                    current_claims=[atom["claim"]],
+                )
+                link_idea_thread_atom(
+                    connection,
+                    thread_id=int(raw["id"]),
+                    atom_id=int(atom["id"]),
+                )
+                apply_canonical_lifecycle(
+                    connection,
+                    proposal={
+                        "operation": "create",
+                        "thread": {
+                            "stable_slug": "fable-generated-software-porting",
+                            "title_ru": "Портирование ПО с Fable",
+                            "title_en": "Fable generated software porting",
+                            "thesis": "Generated software changes porting economics.",
+                            "status": "active",
+                            "first_seen_at": "2026-07-07T00:00:00Z",
+                            "last_seen_at": "2026-07-07T00:00:00Z",
+                            "evidence_maturity": "single_source",
+                            "operator_interest": 0.4,
+                            "entities": ["Fable", "Fable 5"],
+                        },
+                        "atom_memberships": [
+                            {
+                                "atom_id": int(atom["id"]),
+                                "raw_thread_id": int(raw["id"]),
+                            }
+                        ],
+                        "aliases": [
+                            {
+                                "alias_type": "legacy_ref",
+                                "alias_value": "old fable reference",
+                            }
+                        ],
+                    },
+                    run_id="retrieval-canonical-create",
+                    model="deterministic-test-curator",
+                    model_version="1",
+                    curator_version="irx4-test.v1",
+                    reason="retrieval compatibility fixture",
+                    event_at="2026-07-11T00:00:00Z",
+                )
+            settings = Settings(
+                db_path=str(db_path),
+                llm_api_key="",
+                model_provider="",
+                telegram_session_path="",
+            )
+            items = build_retrieval_items(
+                settings,
+                week_label="2026-W28",
+                output_root=root,
+            )
+            results = search_retrieval_items(
+                items,
+                "old fable reference",
+                filters={"item_type": "canonical_thread"},
+                limit=3,
+            )
+
+        ids = {item.id for item in items}
+        self.assertIn("idea_thread:fable-5-code-port", ids)
+        self.assertIn("canonical_thread:fable-generated-software-porting", ids)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(
+            results[0]["id"],
+            "canonical_thread:fable-generated-software-porting",
+        )
+        self.assertIn(int(atom["id"]), results[0]["atom_ids"])
+        self.assertIn("https://t.me/fable_lab/501", results[0]["source_refs"])
 
     def test_builds_atlas_thread_retrieval_items_from_thread_navigation(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -1,3 +1,4 @@
+import hashlib
 import html
 import json
 import re
@@ -345,6 +346,7 @@ def _frontier_analysis_for_period(
     connection: sqlite3.Connection,
     *,
     reporting_period: ReportingPeriod,
+    canonical_snapshot_fingerprint: str | None = None,
 ) -> dict | None:
     analysis = fetch_frontier_analysis(
         connection,
@@ -365,6 +367,11 @@ def _frontier_analysis_for_period(
         str(source_context.get(field) or "") != str(expected[field])
         for field in identity_fields
     ):
+        return None
+    stored_canonical_fingerprint = (
+        str(source_context.get("canonical_thread_snapshot_fingerprint") or "") or None
+    )
+    if stored_canonical_fingerprint != canonical_snapshot_fingerprint:
         return None
     return analysis
 
@@ -507,6 +514,360 @@ def _project_thread_as_of(thread: dict, atoms: list[dict], *, period_end: dateti
     return bounded
 
 
+def _canonical_atoms_as_of(
+    connection: sqlite3.Connection,
+    *,
+    canonical_thread_id: str,
+    analysis_period_end: datetime,
+) -> list[dict]:
+    """Load the complete versioned membership before applying display caps."""
+
+    rows = connection.execute(
+        """
+        SELECT history.relation, knowledge_atoms.*
+        FROM canonical_idea_thread_atom_history AS history
+        JOIN knowledge_atoms ON knowledge_atoms.id = history.atom_id
+        WHERE history.canonical_thread_id = ?
+          AND reporting_utc_micros(history.valid_from) < reporting_utc_micros(?)
+          AND (
+              history.valid_to IS NULL
+              OR reporting_utc_micros(history.valid_to) >= reporting_utc_micros(?)
+          )
+          AND reporting_utc_micros(knowledge_atoms.last_seen_at) < reporting_utc_micros(?)
+        ORDER BY reporting_utc_micros(knowledge_atoms.last_seen_at) DESC,
+                 knowledge_atoms.id DESC
+        """,
+        (
+            canonical_thread_id,
+            _iso_for_sql(analysis_period_end),
+            _iso_for_sql(analysis_period_end),
+            _iso_for_sql(analysis_period_end),
+        ),
+    ).fetchall()
+    return [_atom_from_row(row) for row in rows]
+
+
+def _canonical_snapshot_payload(
+    threads: Sequence[Mapping[str, object]],
+    *,
+    analysis_period_end: datetime,
+) -> dict[str, object]:
+    identity = []
+    for thread in threads:
+        aliases = []
+        for alias in thread.get("aliases") or []:
+            if isinstance(alias, Mapping):
+                aliases.append(
+                    (
+                        str(alias.get("alias_type") or ""),
+                        str(alias.get("alias_value") or alias.get("value") or ""),
+                    )
+                )
+            else:
+                aliases.append(("legacy_ref", str(alias or "")))
+        identity.append(
+            {
+                "canonical_thread_id": thread.get("canonical_thread_id"),
+                "stable_slug": thread.get("stable_slug"),
+                "version": thread.get("version") or thread.get("current_version"),
+                "title_ru": thread.get("title_ru"),
+                "title_en": thread.get("title_en"),
+                "thesis": thread.get("thesis"),
+                "status": thread.get("status"),
+                "first_seen_at": thread.get("first_seen_at"),
+                "last_seen_at": thread.get("last_seen_at"),
+                "evidence_maturity": thread.get("evidence_maturity"),
+                "operator_interest": thread.get("operator_interest"),
+                "curator_version": thread.get("curator_version"),
+                "atom_ids": sorted(int(value) for value in thread.get("atom_ids") or []),
+                "aliases": sorted(aliases),
+                "merged_from": sorted(str(value) for value in thread.get("merged_from") or []),
+                "split_from": sorted(str(value) for value in thread.get("split_from") or []),
+                # Frontier cache identity includes the exact bounded fields its
+                # unchanged prompt serializer consumes, not only atom IDs.
+                "frontier_projection": {
+                    "slug": thread.get("slug"),
+                    "title": thread.get("title"),
+                    "status": thread.get("status"),
+                    "first_seen_at": thread.get("first_seen_at"),
+                    "last_seen_at": thread.get("last_seen_at"),
+                    "momentum_7d": thread.get("momentum_7d"),
+                    "momentum_30d": thread.get("momentum_30d"),
+                    "momentum_90d": thread.get("momentum_90d"),
+                    "atom_count": thread.get("atom_count"),
+                    "current_claims": list(thread.get("current_claims") or [])[:6],
+                    "superseded_claims": list(
+                        thread.get("superseded_claims") or []
+                    )[:4],
+                    "contradictions": list(thread.get("contradictions") or [])[:4],
+                    "atoms": [
+                        {
+                            "id": atom.get("id"),
+                            "type": atom.get("atom_type"),
+                            "claim": atom.get("claim"),
+                            "summary": atom.get("summary"),
+                            "why_it_matters": atom.get("why_it_matters"),
+                            "confidence": atom.get("confidence"),
+                            "novelty": atom.get("novelty_score"),
+                            "utility": atom.get("practical_utility_score"),
+                            "last_seen_at": atom.get("last_seen_at"),
+                        }
+                        for atom in list(thread.get("atoms") or [])[:8]
+                        if isinstance(atom, Mapping)
+                    ],
+                },
+            }
+        )
+    identity.sort(key=lambda item: str(item.get("canonical_thread_id") or ""))
+    encoded = json.dumps(
+        identity,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return {
+        "schema_version": "canonical_idea_threads.snapshot.v1",
+        "as_of": _iso_for_sql(analysis_period_end),
+        "thread_count": len(identity),
+        "canonical_thread_ids": [
+            str(item["canonical_thread_id"])
+            for item in identity
+            if str(item.get("canonical_thread_id") or "").strip()
+        ],
+        "fingerprint": "sha256:" + hashlib.sha256(encoded).hexdigest(),
+    }
+
+
+def _canonical_threads_as_of(
+    connection: sqlite3.Connection,
+    *,
+    analysis_period_start: datetime,
+    analysis_period_end: datetime,
+    atoms_limit: int,
+    primary_limit: int = 12,
+) -> tuple[list[dict], dict[str, object], list[dict]]:
+    """Return bounded primary canonical rows plus the complete audit snapshot."""
+
+    required = (
+        "canonical_idea_threads",
+        "canonical_idea_thread_versions",
+        "canonical_idea_thread_atom_history",
+    )
+    if any(not _table_exists(connection, table) for table in required):
+        return [], {}, []
+    from db.canonical_idea_threads import fetch_canonical_threads
+
+    stored_threads = fetch_canonical_threads(
+        connection,
+        as_of=_iso_for_sql(analysis_period_end),
+        limit=501,
+        include_atoms=False,
+    )
+    if len(stored_threads) > 500:
+        raise ValueError("canonical registry exceeds the bounded 500-thread snapshot")
+    projected: list[dict] = []
+    for stored in stored_threads:
+        thread = dict(stored)
+        canonical_id = str(thread.get("canonical_thread_id") or "").strip()
+        stable_slug = str(thread.get("stable_slug") or "").strip()
+        if not canonical_id or not stable_slug:
+            continue
+        all_atoms = _canonical_atoms_as_of(
+            connection,
+            canonical_thread_id=canonical_id,
+            analysis_period_end=analysis_period_end,
+        )
+        source_channels = sorted(
+            {
+                _source_channel(url)
+                for atom in all_atoms
+                for url in atom.get("source_urls") or []
+                if _source_channel(url)
+            }
+        )
+        current_claims = _claims_as_of(all_atoms, current=True)
+        superseded_claims = _claims_as_of(all_atoms, current=False)
+        contradictions = _unique_strings(
+            atom.get("claim")
+            for atom in all_atoms
+            if atom.get("atom_type") in {"risk_warning", "opinion_shift"}
+        )[:6]
+        aliases = [
+            dict(alias) if isinstance(alias, Mapping) else alias
+            for alias in thread.get("aliases") or thread.get("raw_thread_aliases") or []
+        ]
+        atom_ids = [int(atom["id"]) for atom in all_atoms]
+        source_post_ids = sorted(
+            {
+                int(value)
+                for atom in all_atoms
+                for value in atom.get("source_post_ids") or []
+                if str(value).strip().isdigit()
+            }
+        )
+        source_urls = _unique_strings(
+            value for atom in all_atoms for value in atom.get("source_urls") or []
+        )
+        title = str(thread.get("title_ru") or thread.get("title_en") or stable_slug)
+        projection = {
+            **thread,
+            "id": canonical_id,
+            "canonical_thread_id": canonical_id,
+            "canonical_thread_ref": f"canonical_thread:{stable_slug}",
+            "stable_slug": stable_slug,
+            # Legacy-shaped fields let existing bounded consumers read the
+            # canonical projection without renaming raw compatibility rows.
+            "slug": stable_slug,
+            "title": title,
+            "summary": str(thread.get("thesis") or ""),
+            "aliases": aliases,
+            "atom_ids": atom_ids,
+            "source_post_ids": source_post_ids,
+            "source_urls": source_urls,
+            "source_refs": source_urls,
+            "atom_count": len(all_atoms),
+            "source_channel_count": len(source_channels),
+            "source_channels": source_channels,
+            "key_entities": list(thread.get("entities") or []),
+            "current_claims": current_claims,
+            "superseded_claims": superseded_claims,
+            "contradictions": contradictions,
+            "momentum_7d": _momentum_as_of(
+                all_atoms, period_end=analysis_period_end, days=7, saturation=5
+            ),
+            "momentum_30d": _momentum_as_of(
+                all_atoms, period_end=analysis_period_end, days=30, saturation=12
+            ),
+            "momentum_90d": _momentum_as_of(
+                all_atoms, period_end=analysis_period_end, days=90, saturation=24
+            ),
+            "changed_this_week": (
+                any(
+                    (observed := _parse_iso(atom.get("last_seen_at"))) is not None
+                    and analysis_period_start <= observed < analysis_period_end
+                    for atom in all_atoms
+                )
+                or (
+                    (version_at := _parse_iso(thread.get("valid_from"))) is not None
+                    and analysis_period_start <= version_at < analysis_period_end
+                )
+                or any(
+                    (event_at := _parse_iso(item.get("event_at"))) is not None
+                    and analysis_period_start <= event_at < analysis_period_end
+                    for item in thread.get("lineage") or []
+                    if isinstance(item, Mapping)
+                )
+            ),
+            "atoms": all_atoms[: max(1, int(atoms_limit or 8))],
+        }
+        _attach_source_posts(
+            connection,
+            projection["atoms"],
+            analysis_period_end=analysis_period_end,
+        )
+        projected.append(projection)
+
+    snapshot = (
+        _canonical_snapshot_payload(
+            projected,
+            analysis_period_end=analysis_period_end,
+        )
+        if projected
+        else {}
+    )
+    primary = [
+        thread
+        for thread in projected
+        if str(thread.get("status") or "active") in {"active", "stale"}
+        and thread.get("atom_ids")
+    ]
+    primary.sort(key=lambda item: str(item.get("stable_slug") or ""))
+    primary.sort(
+        key=lambda item: reporting_timestamp_sort_key(item.get("last_seen_at")),
+        reverse=True,
+    )
+    primary.sort(key=lambda item: bool(item.get("changed_this_week")), reverse=True)
+    primary.sort(key=lambda item: str(item.get("status") or "active") == "active", reverse=True)
+    return primary[: max(1, min(12, int(primary_limit or 12)))], snapshot, projected
+
+
+def _attach_canonical_compatibility_refs(
+    raw_threads: Sequence[dict],
+    canonical_threads: Sequence[Mapping[str, object]],
+) -> None:
+    owners_by_atom: dict[int, set[tuple[str, str]]] = {}
+    for canonical in canonical_threads:
+        canonical_id = str(canonical.get("canonical_thread_id") or "").strip()
+        stable_slug = str(canonical.get("stable_slug") or "").strip()
+        if not canonical_id or not stable_slug:
+            continue
+        for atom_id in canonical.get("atom_ids") or []:
+            owners_by_atom.setdefault(int(atom_id), set()).add((canonical_id, stable_slug))
+    for thread in raw_threads:
+        atom_ids = {
+            int(atom.get("id") or 0)
+            for atom in thread.get("_delta_atoms") or thread.get("atoms") or []
+            if int(atom.get("id") or 0) > 0
+        }
+        owners = sorted(
+            {owner for atom_id in atom_ids for owner in owners_by_atom.get(atom_id, set())}
+        )
+        thread["canonical_thread_ids"] = [item[0] for item in owners]
+        thread["canonical_thread_refs"] = [f"canonical_thread:{item[1]}" for item in owners]
+        thread["canonical_stable_slugs"] = [item[1] for item in owners]
+        if len(owners) == 1:
+            thread["canonical_thread_id"] = owners[0][0]
+            thread["canonical_thread_ref"] = f"canonical_thread:{owners[0][1]}"
+            thread["canonical_stable_slug"] = owners[0][1]
+            thread["canonical_resolution_status"] = "canonical_membership_resolved"
+        else:
+            thread["canonical_thread_id"] = None
+            thread["canonical_thread_ref"] = None
+            thread["canonical_stable_slug"] = None
+            thread["canonical_resolution_status"] = (
+                "canonical_membership_ambiguous"
+                if owners
+                else "compatibility_current_thread_only"
+            )
+
+
+def _canonical_thread_sidecar(
+    thread: Mapping[str, object],
+    *,
+    provenance_limit: int = 100,
+) -> dict[str, object]:
+    """Return the bounded public DTO; full provenance remains queryable in DB."""
+
+    clean_limit = max(1, min(100, int(provenance_limit or 100)))
+    result = {
+        str(key): value
+        for key, value in thread.items()
+        if not str(key).startswith("_")
+    }
+    atom_ids = list(result.get("atom_ids") or [])
+    source_post_ids = list(result.get("source_post_ids") or [])
+    source_urls = list(result.get("source_urls") or [])
+    source_refs = list(result.get("source_refs") or [])
+    result.update(
+        {
+            "atom_ids": atom_ids[:clean_limit],
+            "source_post_ids": source_post_ids[:clean_limit],
+            "source_urls": source_urls[:clean_limit],
+            "source_refs": source_refs[:clean_limit],
+            "provenance_counts": {
+                "atom_ids": len(atom_ids),
+                "source_post_ids": len(source_post_ids),
+                "source_urls": len(source_urls),
+            },
+            "provenance_truncated": any(
+                len(values) > clean_limit
+                for values in (atom_ids, source_post_ids, source_urls, source_refs)
+            ),
+        }
+    )
+    return result
+
+
 def _feedback_context_for_report(
     connection: sqlite3.Connection,
     *,
@@ -595,11 +956,23 @@ def load_ai_intelligence_context(
         week_label=week_label,
         feedback_snapshot=feedback_snapshot,
     )
+    canonical_threads, canonical_snapshot, canonical_audit_threads = (
+        _canonical_threads_as_of(
+            connection,
+            analysis_period_start=period.analysis_period_start,
+            analysis_period_end=period.analysis_period_end,
+            atoms_limit=atoms_limit,
+            primary_limit=min(12, max(1, int(threads_limit or 8))),
+        )
+    )
     if not _table_exists(connection, "idea_threads") or not _table_exists(connection, "idea_thread_atoms"):
         result = {
             **period_fields,
             "reaction_snapshot_at": reaction_snapshot_iso,
             "threads": [],
+            "compatibility_threads": [],
+            "canonical_threads": canonical_threads,
+            "canonical_thread_snapshot": canonical_snapshot,
             "source_channels": [],
             "marked_posts": [],
             "frontier_analysis": None,
@@ -663,6 +1036,7 @@ def load_ai_intelligence_context(
             analysis_period_end=week_end,
         )
         threads.append(thread)
+    _attach_canonical_compatibility_refs(threads, canonical_audit_threads)
     # Match the established ordering using only the bounded as-of projection.
     threads.sort(key=lambda item: str(item.get("title") or ""))
     threads.sort(key=lambda item: int(item.get("atom_count") or 0), reverse=True)
@@ -704,6 +1078,9 @@ def load_ai_intelligence_context(
         **period_fields,
         "reaction_snapshot_at": reaction_snapshot_iso,
         "threads": threads,
+        "compatibility_threads": threads,
+        "canonical_threads": canonical_threads,
+        "canonical_thread_snapshot": canonical_snapshot,
         "source_channels": _source_channel_counts(threads),
         "marked_posts": _marked_posts_for_period(
             connection,
@@ -711,7 +1088,13 @@ def load_ai_intelligence_context(
             reaction_snapshot_at=reaction_snapshot_cutoff,
         ),
         "frontier_analysis": (
-            _frontier_analysis_for_period(connection, reporting_period=period)
+            _frontier_analysis_for_period(
+                connection,
+                reporting_period=period,
+                canonical_snapshot_fingerprint=(
+                    str(canonical_snapshot.get("fingerprint") or "") or None
+                ),
+            )
             if _table_exists(connection, "frontier_analyses")
             else None
         ),
@@ -739,6 +1122,7 @@ def _personalize_report_surfaces(
 ) -> tuple[list[dict], dict | None, dict[str, dict]]:
     """Classify effects against the exact bounded Brief and Atlas selectors."""
 
+    from output.idea_thread_curator import StoredCanonicalThreadResolver
     from output.reaction_personalization import personalize_thread_candidates
 
     def brief_projection(values: Sequence[Mapping[str, object]]) -> list[str]:
@@ -772,6 +1156,10 @@ def _personalize_report_surfaces(
         "limit": limit,
         "receipt_limit": receipt_limit,
         "feedback_snapshot_usable": feedback_snapshot_usable,
+        "thread_resolver": StoredCanonicalThreadResolver(
+            connection,
+            as_of=_iso_for_sql(reporting_period.analysis_period_end),
+        ),
     }
     ordered, brief_effect = personalize_thread_candidates(
         connection,
@@ -2352,6 +2740,16 @@ def generate_ai_intelligence_report(
     metadata = {
         **_period_metadata(context, generated_at=generated_at),
         "thread_count": len(threads),
+        "canonical_thread_count": len(context.get("canonical_threads") or []),
+        "canonical_threads": [
+            _canonical_thread_sidecar(thread)
+            for thread in (context.get("canonical_threads") or [])
+            if isinstance(thread, Mapping)
+        ][:12],
+        "canonical_thread_snapshot": dict(
+            context.get("canonical_thread_snapshot") or {}
+        ),
+        "raw_compatibility_thread_count": len(threads),
         "source_atom_count": len(atoms),
         "source_channel_count": len(context.get("source_channels") or []),
         "action_count": len(actions),

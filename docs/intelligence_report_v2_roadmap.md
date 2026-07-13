@@ -462,7 +462,8 @@ schema, and Radar evidence/context-only gates are unchanged. No generated
 report artifact or sibling Radar code was edited. At the IRX-2 boundary,
 curation, reaction ranking, editorial synthesis, V2 reader redesign, Audit
 Explorer separation, and reader-value gates remained owned by later tasks. The
-IRX-3 reaction-ranking handoff is now closed below; IRX-4 owns curation next.
+IRX-3 reaction-ranking handoff is closed below, and the IRX-4 completion record
+closes canonical curation without entering IRX-5.
 
 ### IRX-3 - Reaction-To-Ranking Personalization And Effect Receipt
 
@@ -564,14 +565,15 @@ fields/adapters. Legacy count-only IRX-2 reaction output remains explicitly
 unbound/unavailable, creates no boost, and does not require a rich reader
 receipt. Generated artifacts and sibling Radar code were unchanged.
 
-**IRX-4 handoff:** Current compatibility-thread refs are not canonical. IRX-4
-must add the durable registry, aliases, merge/split lifecycle, and historical
-period-end as-of thread lineage while preserving IRX-3 post/atom provenance and
-reaction semantics.
+**Historical IRX-4 handoff:** Current compatibility-thread refs were not
+canonical. IRX-4 had to add the durable registry, aliases, merge/split
+lifecycle, and historical period-end as-of thread lineage while preserving
+IRX-3 post/atom provenance and reaction semantics. The implementation receipt
+below closes that handoff.
 
 ### IRX-4 - Canonical Idea Thread Curation And Merge/Split Lifecycle
 
-**Status:** `ready`. **Priority:** P0.
+**Status:** `implemented_and_verified` on 2026-07-13. **Priority:** P0.
 
 **Problem:** Existing threads are often normalized entity combinations such as
 Fable/Anthropic and Claude/model-version variants rather than stable ideas.
@@ -595,10 +597,12 @@ evidence, validation result, model/version, and reason.
 through compatibility thread IDs and add canonical aliases without changing
 reaction semantics.
 
-**Likely files:** `src/output/idea_threads.py`; `src/db/idea_threads.py`; optional
-new `src/output/idea_thread_curator.py`; DB migration/helper files if an
-additive registry is required; Frontier/report context loaders;
-`tests/test_idea_threads.py`; report fixture tests.
+**Implemented files:** new `src/db/canonical_idea_threads.py`; new
+`src/output/idea_thread_curator.py`; additive DB schema/migration; existing
+Frontier/report/retrieval/Obsidian context loaders; and focused canonical,
+curator, report, retrieval, Obsidian, and reaction compatibility tests. Raw
+`src/db/idea_threads.py` and `src/output/idea_threads.py` semantics remain
+unchanged.
 
 **Acceptance criteria:**
 
@@ -631,6 +635,23 @@ erase raw threads, or merge solely on shared entity tokens.
 **Rollout implications:** Run canonical curation beside raw threads, publish a
 compatibility map, and keep raw memberships in Audit Explorer until retrieval
 and Obsidian consumers prove parity.
+
+**Implementation receipt:** The additive registry stores stable identity,
+versioned lifecycle state, alias/atom history, source provenance, lineage, and
+curator decisions. Deterministic atomic validation supports incremental
+create/update/merge/split/stale/operator-correction transitions and rejects
+atom loss, ambiguous ownership, active duplicates, alias collisions, cycles,
+and slug churn. Candidate freshness/semantic validation and the write share one
+writer transaction; merge/update participants must be the candidate's exact
+current owners and nested overrides fail closed. Historical reads resolve the
+state and memberships recorded as of the exclusive `analysis_period_end`; typed
+alias history makes the stored IRX-3 resolver independent of future raw-thread
+atoms without changing ranking or receipt semantics. Existing contexts
+receive bounded canonical sidecars beside unchanged raw audit projections, with
+at most 12 primary Atlas threads. The required 83-test matrix, 28 canonical
+persistence/curator tests, and 109 extended affected-surface tests passed;
+focused compilation and `git diff --check` passed. Generated artifacts, Radar
+gates, cross-repository code, and IRX-5+ work were unchanged.
 
 ### IRX-5 - Editorial Intelligence Synthesis Contract
 
@@ -1367,7 +1388,7 @@ Stop and ask the operator before any proposal or implementation that:
 ## 13. Unresolved Questions And Default Assumptions
 
 These questions are assigned to their owning tasks and do not reopen completed
-IRX-1/IRX-2/IRX-3 semantics:
+IRX-1 through IRX-4 semantics:
 
 1. **V2 path naming:** use explicit versioned directories plus V1 aliases; IRX-14
    freezes exact paths after parallel-run evidence.
@@ -1378,10 +1399,9 @@ IRX-1/IRX-2/IRX-3 semantics:
    analysis period and current personal visibility must be attested by the
    same-run snapshot. Monday may therefore apply a Sunday post from the completed
    week. IRX-3 has frozen these semantics.
-4. **Canonical registry and as-of lineage:** prefer additive tables and
-   compatibility views; IRX-4 must freeze the incremental merge/split schema and
-   resolve a historical run against period-end membership without destroying raw
-   thread history.
+4. **Canonical registry and as-of lineage:** IRX-4 froze additive tables and
+   compatibility projections, incremental merge/split history, and historical
+   period-end membership without destroying raw thread history.
 5. **Graph relation vocabulary:** derive only validated relations such as
    supports, contradicts, prerequisite, and related-by-evidence; do not infer
    decorative edges merely to fill the graph.
@@ -1391,9 +1411,9 @@ IRX-1/IRX-2/IRX-3 semantics:
    choose whether the old Atlas path becomes an alias or a separately named
    artifact after consumer inventory.
 
-## 14. Exact Next Codex Prompt - IRX-4
+## 14. Executed Codex Prompt - IRX-4
 
-Use the following prompt unchanged for the next implementation task:
+The following prompt was executed unchanged for the IRX-4 implementation task:
 
 ```text
 You are Codex working in /srv/openclaw-you/workspace/telegram-research-agent.
@@ -1448,7 +1468,5 @@ Report files changed, canonical identity/lifecycle/as-of semantics, compatibilit
 
 ## 15. Suggested Following Task
 
-IRX-4 is ready and is the only next implementation scope. It must replace
-compatibility/current-thread-only resolution with durable canonical aliases and
-period-end as-of lifecycle history while preserving IRX-3 post/atom provenance
-and reaction semantics. IRX-5 and later work remain planned, not implemented.
+IRX-4 is implemented and verified. IRX-5 is the next planned implementation
+scope; it and all later work remain unimplemented by this slice.

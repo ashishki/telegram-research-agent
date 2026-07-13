@@ -41,7 +41,10 @@ _install_stub("sklearn.feature_extraction.text", ENGLISH_STOP_WORDS=set(), Tfidf
 _install_stub("sklearn.metrics", silhouette_score=lambda *_args, **_kwargs: 0.0)
 
 from config.settings import Settings  # noqa: E402
-from db.ai_report_feedback import record_ai_report_feedback  # noqa: E402
+from db.canonical_idea_threads import (  # noqa: E402
+    apply_canonical_lifecycle,
+    stable_canonical_thread_id,
+)
 from db.frontier_analysis import upsert_frontier_analysis  # noqa: E402
 from db.knowledge_atoms import record_knowledge_atom  # noqa: E402
 from db.migrate import run_migrations  # noqa: E402
@@ -49,6 +52,7 @@ from output.ai_intelligence_report import (  # noqa: E402
     AiIntelligenceReportQualityError,
     REQUIRED_SECTIONS,
     _learning_actions,
+    _canonical_threads_as_of,
     _reaction_ranked_threads_for_navigation,
     _read_queue_atoms,
     generate_ai_intelligence_report,
@@ -171,6 +175,53 @@ class TestAiIntelligenceReport(unittest.TestCase):
             posted_at="2026-07-07T11:00:00Z",
             recorded_at="2026-07-07T12:00:00Z",
         )
+
+    def _create_canonical_eval_thread(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        event_at: str = "2026-07-11T00:00:00Z",
+    ) -> str:
+        rows = connection.execute(
+            """
+            SELECT idea_thread_atoms.atom_id, idea_thread_atoms.thread_id
+            FROM idea_thread_atoms
+            ORDER BY idea_thread_atoms.atom_id
+            """
+        ).fetchall()
+        proposal = {
+            "operation": "create",
+            "thread": {
+                "stable_slug": "eval-gated-agent-releases",
+                "title_ru": "Eval-гейты для релизов агентов",
+                "title_en": "Eval-gated agent releases",
+                "thesis": "Eval gates are becoming release infrastructure for coding agents.",
+                "status": "active",
+                "first_seen_at": "2026-07-06T08:00:00Z",
+                "last_seen_at": "2026-07-07T10:00:00Z",
+                "evidence_maturity": "multi_channel",
+                "operator_interest": 0.7,
+                "entities": ["Claude", "Codex"],
+            },
+            "atom_memberships": [
+                {
+                    "atom_id": int(row[0]),
+                    "raw_thread_id": int(row[1]),
+                }
+                for row in rows
+            ],
+        }
+        result = apply_canonical_lifecycle(
+            connection,
+            proposal=proposal,
+            run_id=f"canonical-context-{event_at}",
+            model="deterministic-test-curator",
+            model_version="1",
+            curator_version="irx4-test.v1",
+            reason="canonical context fixture",
+            event_at=event_at,
+        )
+        return str(result["affected_thread_ids"][0])
 
     def _insert_marked_post(
         self,
@@ -522,6 +573,183 @@ class TestAiIntelligenceReport(unittest.TestCase):
         self.assertEqual(deltas[0]["previous_state"], "Prior bounded-delta state.")
         self.assertEqual(deltas[0]["confidence_change"], "up")
         self.assertEqual(len(deltas[0]["new_evidence_atom_ids"]), 2)
+
+    def test_canonical_context_is_period_end_bounded_and_raw_compatible(self):
+        db_path = self._make_db()
+        try:
+            self._seed_atoms(db_path)
+            settings = self._settings(db_path)
+            refresh_idea_threads(
+                settings,
+                weeks=12,
+                now=datetime(2026, 7, 8, tzinfo=timezone.utc),
+            )
+            period_w28 = resolve_reporting_period(
+                datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc),
+                week_label="2026-W28",
+            )
+            period_w29 = resolve_reporting_period(
+                datetime(2026, 7, 20, 7, 2, 52, tzinfo=timezone.utc),
+                week_label="2026-W29",
+            )
+            with sqlite3.connect(db_path) as connection:
+                before = load_ai_intelligence_context(
+                    connection,
+                    week_label="2026-W28",
+                    reporting_period=period_w28,
+                    atoms_limit=1,
+                )
+                canonical_id = self._create_canonical_eval_thread(connection)
+                apply_canonical_lifecycle(
+                    connection,
+                    proposal={
+                        "operation": "operator_correction",
+                        "thread": {
+                            "canonical_thread_id": canonical_id,
+                            "title_ru": "Исправленный тезис об eval-гейтах",
+                            "title_en": "Corrected eval-gated agent releases",
+                            "thesis": "An operator correction at the exclusive boundary.",
+                        },
+                    },
+                    run_id="canonical-boundary-correction",
+                    model="operator",
+                    model_version="1",
+                    curator_version="irx4-test.v2",
+                    reason="period boundary regression",
+                    event_at="2026-07-13T00:00:00Z",
+                    actor="operator:owner",
+                )
+                at_boundary = load_ai_intelligence_context(
+                    connection,
+                    week_label="2026-W28",
+                    reporting_period=period_w28,
+                    atoms_limit=1,
+                )
+                after_boundary = load_ai_intelligence_context(
+                    connection,
+                    week_label="2026-W29",
+                    reporting_period=period_w29,
+                    atoms_limit=1,
+                )
+        finally:
+            os.unlink(db_path)
+
+        def raw_signature(context: dict) -> list[tuple[str, list[int]]]:
+            return [
+                (
+                    str(thread["slug"]),
+                    [int(atom["id"]) for atom in thread.get("atoms") or []],
+                )
+                for thread in context["threads"]
+            ]
+
+        self.assertEqual(raw_signature(at_boundary), raw_signature(before))
+        self.assertEqual(at_boundary["threads"], at_boundary["compatibility_threads"])
+        self.assertEqual(len(at_boundary["canonical_threads"]), 1)
+        canonical = at_boundary["canonical_threads"][0]
+        self.assertEqual(canonical["canonical_thread_id"], canonical_id)
+        self.assertEqual(canonical_id, stable_canonical_thread_id(canonical["stable_slug"]))
+        self.assertEqual(canonical["title_en"], "Eval-gated agent releases")
+        self.assertEqual(canonical["atom_count"], 3)
+        self.assertEqual(len(canonical["atom_ids"]), 3)
+        self.assertEqual(len(canonical["atoms"]), 1)
+        self.assertEqual(
+            at_boundary["threads"][0]["canonical_thread_ref"],
+            "canonical_thread:eval-gated-agent-releases",
+        )
+        self.assertRegex(
+            at_boundary["canonical_thread_snapshot"]["fingerprint"],
+            r"^sha256:[0-9a-f]{64}$",
+        )
+        self.assertEqual(
+            after_boundary["canonical_threads"][0]["title_en"],
+            "Corrected eval-gated agent releases",
+        )
+        self.assertTrue(after_boundary["canonical_threads"][0]["changed_this_week"])
+        self.assertNotEqual(
+            at_boundary["canonical_thread_snapshot"]["fingerprint"],
+            after_boundary["canonical_thread_snapshot"]["fingerprint"],
+        )
+
+    def test_primary_canonical_context_is_independently_capped_at_twelve(self):
+        db_path = self._make_db()
+        stored = [
+            {
+                "canonical_thread_id": f"ct_{index:024x}",
+                "stable_slug": f"canonical-{index}",
+                "title_ru": f"Каноническая тема {index}",
+                "title_en": f"Canonical thread {index}",
+                "thesis": f"Bounded thesis {index}",
+                "status": "active",
+                "first_seen_at": "2026-07-06T00:00:00.000000Z",
+                "last_seen_at": "2026-07-12T00:00:00.000000Z",
+                "valid_from": "2026-07-10T00:00:00.000000Z",
+                "evidence_maturity": "single_source",
+                "operator_interest": 0.0,
+                "entities": [],
+                "aliases": [],
+                "merged_from": [],
+                "split_from": [],
+                "lineage": [],
+                "curator_version": "irx4-test.v1",
+                "current_version": 1,
+            }
+            for index in range(1, 14)
+        ]
+
+        def atom_for_thread(*_args, canonical_thread_id: str, **_kwargs):
+            atom_id = int(canonical_thread_id[-6:], 16)
+            return [
+                {
+                    "id": atom_id,
+                    "relation": "supports",
+                    "week_label": "2026-W28",
+                    "atom_type": "engineering_practice",
+                    "claim": f"Bounded claim {atom_id}",
+                    "summary": "Bounded summary",
+                    "evidence_quote": "bounded evidence",
+                    "source_post_ids": [],
+                    "source_urls": [],
+                    "entities": [],
+                    "tools": [],
+                    "models": [],
+                    "practices": [],
+                    "confidence": 0.8,
+                    "novelty_score": 0.5,
+                    "practical_utility_score": 0.5,
+                    "staleness_status": "active",
+                    "why_it_matters": "",
+                    "first_seen_at": "2026-07-12T00:00:00Z",
+                    "last_seen_at": "2026-07-12T00:00:00Z",
+                }
+            ]
+
+        try:
+            with sqlite3.connect(db_path) as connection:
+                with patch(
+                    "db.canonical_idea_threads.fetch_canonical_threads",
+                    return_value=stored,
+                ), patch(
+                    "output.ai_intelligence_report._canonical_atoms_as_of",
+                    side_effect=atom_for_thread,
+                ):
+                    primary, snapshot, audit = _canonical_threads_as_of(
+                        connection,
+                        analysis_period_start=datetime(
+                            2026, 7, 6, tzinfo=timezone.utc
+                        ),
+                        analysis_period_end=datetime(
+                            2026, 7, 13, tzinfo=timezone.utc
+                        ),
+                        atoms_limit=1,
+                        primary_limit=99,
+                    )
+        finally:
+            os.unlink(db_path)
+
+        self.assertEqual(len(primary), 12)
+        self.assertEqual(len(audit), 13)
+        self.assertEqual(snapshot["thread_count"], 13)
 
     def test_context_ignores_frontier_analysis_from_a_different_period(self):
         db_path = self._make_db()

@@ -1,6 +1,6 @@
 # Current Backlog
 
-Version: 3.0
+Version: 3.1
 Last updated: 2026-07-13
 State: canonical active backlog
 
@@ -42,19 +42,17 @@ below, but active implementation starts from the IRX task graph.
 | Strategy Reviewer | `implemented_and_verified` advisory-only |
 | Market/business Radar context | `implemented_and_verified` as `context_only` |
 | Radar RVE contract/adapters in sibling repo | `implemented_and_verified`, `needs_live_validation` |
-| Report V2 contract and roadmap | `implementation_in_progress`; IRX-0 documentation plus IRX-1 period, IRX-2 run-manifest/Radar, and IRX-3 reaction-personalization semantics are implemented and verified |
+| Report V2 contract and roadmap | `implementation_in_progress`; IRX-0 documentation plus IRX-1 period, IRX-2 run-manifest/Radar, IRX-3 reaction-personalization, and IRX-4 canonical-thread lifecycle semantics are implemented and verified |
 | Portfolio dogfood evidence | `blocked_on_IRX-14_start_gate` |
 
 ## Next Candidate Task
 
-`IRX-4 - Canonical Idea Thread Curation And Merge/Split Lifecycle`
+`IRX-5 - Editorial Intelligence Synthesis Contract`
 
-Add a durable canonical registry, aliases, incremental merge/split lifecycle,
-and period-end as-of lineage on top of raw Idea Threads. Close the nullable
-canonical side of the IRX-3 resolver without changing reaction eligibility,
-strength, evidence/feedback precedence, provenance, V1 consumers, or Radar
-gates. The exact implementation prompt is in `docs/CODEX_PROMPT.md`; the task
-card is in `docs/intelligence_report_v2_roadmap.md`.
+Produce schema-validated Russian editorial intelligence from bounded cited
+inputs after deterministic eligibility and ranking. IRX-5 remains planned and
+was not started by the IRX-4 slice. Its task card is in
+`docs/intelligence_report_v2_roadmap.md`.
 
 ## Dependency Graph
 
@@ -76,8 +74,8 @@ contract.
 | IRX-0 | P0 | `implemented_documentation_only` | W29 audit, Report V2 roadmap, and product contracts | none |
 | IRX-1 | P0 | `implemented_and_verified` | Separate generation time from the last completed ISO-week analysis period | IRX-0 |
 | IRX-2 | P0 | `implemented_and_verified` | One weekly run manifest and required same-run Radar artifact contract | IRX-1 |
-| IRX-3 | P0 | `implemented_and_verified` | Map reactions through posts/atoms and a thread-resolution interface into a weak boost/receipt; canonical acceptance closes in IRX-4 | IRX-1, IRX-2 |
-| IRX-4 | P0 | `ready` | Curate stable idea-level threads with merge/split lifecycle, provenance, and historical as-of resolution | IRX-1, IRX-2, IRX-3 |
+| IRX-3 | P0 | `implemented_and_verified` | Map reactions through posts/atoms and a thread-resolution interface into a weak boost/receipt; canonical attribution is supplied by IRX-4 | IRX-1, IRX-2 |
+| IRX-4 | P0 | `implemented_and_verified` | Curate stable idea-level threads with merge/split lifecycle, provenance, and historical as-of resolution | IRX-1, IRX-2, IRX-3 |
 | IRX-5 | P0 | `planned` | Produce schema-validated Russian editorial intelligence JSON from bounded cited inputs | IRX-1..IRX-4 |
 | IRX-8 | P1 | `planned` | Shared deterministic, offline static visualization components | IRX-4, IRX-5 |
 | IRX-9 | P1 | `planned` | Evidence-backed, named, PR-sized project implications | IRX-4, IRX-5, IRX-8 |
@@ -210,10 +208,56 @@ rollout implications are in `docs/intelligence_report_v2_roadmap.md`.
   alias remain readable; Brief/Atlas, split, retrieval, Hermes/PI, Obsidian, and
   Strategy Reviewer additions are additive. No DB schema, LLM prompt, generated
   artifact, sibling Radar code, or cross-repository gate changed.
-- Handoff: IRX-4 is ready and is the only next implementation scope. It must add
-  the durable canonical registry, aliases, merge/split lifecycle, and historical
-  period-end as-of membership while preserving IRX-3 post/atom provenance and
-  reaction semantics. IRX-5 and later work remain planned.
+- Historical handoff: IRX-4 was the next implementation scope and had to add
+  the durable canonical registry while preserving IRX-3 post/atom provenance
+  and reaction semantics. That handoff is closed by the record below.
+
+### 2026-07-13 - IRX-4 Canonical Idea Thread Curation And Lifecycle
+
+- Status: `implemented_and_verified`. Added an additive canonical registry with
+  stable IDs/slugs, bilingual titles, thesis, lifecycle state, first/last seen,
+  curator version, raw aliases, atom/source provenance, append-only versions,
+  alias history, merge/split lineage, and auditable curator/operator decisions.
+  Raw Idea Threads and their memberships remain immutable audit provenance and
+  are never relabelled as canonical.
+- Deterministic create/update/merge/split/stale/operator-correction validation
+  rejects atom loss, ambiguous active ownership, duplicate active titles or
+  memberships, alias collisions, ancestry cycles, and slug churn. Each accepted
+  transition is atomic and incremental; candidate freshness/semantic checks and
+  the canonical write share one `BEGIN IMMEDIATE`, and rejected proposals remain
+  durable audit-only decisions. Merge/update participants are bound to the exact
+  candidate atom owners; nested payload overrides are rejected.
+- Deterministic Fable/Claude-style candidate generation treats entity/vendor
+  overlap as insufficient to merge and model-version difference as insufficient
+  to split. The bounded strong-model adapter can only return a proposal; stored
+  lifecycle mutation still requires the deterministic validator.
+- Historical lookup reads versioned canonical state, alias membership, atom
+  membership, and lineage as of the exclusive IRX-1
+  `analysis_period_end`; it does not reconstruct history from the current raw
+  cluster or current alias map. Typed alias history keeps W28 attribution stable
+  when the mutable raw thread gains W29 atoms and fails closed on split/terminal
+  ambiguity. Stable public refs use
+  `canonical_thread:<stable_slug>`, while canonical IDs remain separate.
+- The stored IRX-3 resolver fills nullable canonical attribution without
+  changing reaction eligibility, strength, evidence/feedback precedence,
+  ordering, counterfactuals, or receipt provenance. Brief/Atlas/Frontier,
+  Hermes/PI, retrieval, Obsidian, Strategy Reviewer, and report sidecars receive
+  bounded additive canonical projections; raw/V1 compatibility projections and
+  paths remain intact. Atlas primary canonical context is capped at 12.
+- Frontier cache identity includes the exact bounded canonical prompt snapshot,
+  so an in-period curator correction invalidates stale output. Retrieval and
+  Obsidian accept canonical aliases/refs while retaining raw thread records and
+  note paths. The IRX-2 manifest schema/stage policy and Radar binding are
+  unchanged.
+- Verification: the exact required compatibility command passed 83 tests in
+  60.753s; canonical persistence/curator tests passed 28 tests in 28.884s; an
+  extended affected-surface matrix passed 109 tests in 48.139s. Focused
+  `py_compile` and `git diff --check` passed. Live/expensive pipelines, archive
+  regeneration, and the full suite were intentionally not run.
+- Scope confirmation: no generated report artifact, IRX-3 reaction rule or
+  weight, global evidence score, explicit-feedback semantic, IRX-1 period rule,
+  IRX-2 run/Radar binding, Radar gate, standing configuration, or cross-repo
+  code was changed. IRX-5 and later work were not implemented.
 
 ## Existing-Work Reconciliation
 
@@ -891,10 +935,10 @@ cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
 - Verification commands pass or failures are reported with reason.
 - Stop conditions are checked explicitly.
 
-## Next-Task Verification Command Set
+## IRX-4 Verification Record
 
-For IRX-4, use the exact focused matrix in `docs/CODEX_PROMPT.md`; do not run
-expensive LLM jobs or the full suite for normal slice verification.
+The completed IRX-4 slice used the exact focused matrix from
+`docs/CODEX_PROMPT.md`; expensive LLM jobs and the full suite were not run.
 
 ```bash
 git diff --check
