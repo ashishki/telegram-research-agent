@@ -462,6 +462,43 @@ class TestAiReportFeedback(unittest.TestCase):
         self.assertEqual(summary["pending_draft_count"], 0)
         self.assertEqual(summary["feedback_effect_traces"][0]["provenance"]["event_id"], event["id"])
 
+    def test_optional_feedback_cutoff_is_exact_and_legacy_summary_stays_unbounded(self):
+        db_path = self._make_db()
+        try:
+            with sqlite3.connect(db_path) as connection:
+                connection.row_factory = sqlite3.Row
+                record_ai_report_feedback(
+                    connection,
+                    week_label="2026-W27",
+                    feedback_type="useful",
+                    target_type="idea_thread",
+                    target_ref="before-cutoff",
+                    created_at="2026-07-12T23:59:59.999999Z",
+                )
+                record_ai_report_feedback(
+                    connection,
+                    week_label="2026-W27",
+                    feedback_type="useful",
+                    target_type="idea_thread",
+                    target_ref="at-cutoff-equivalent-offset",
+                    created_at="2026-07-13T02:00:00+02:00",
+                )
+                bounded = summarize_ai_report_feedback(
+                    connection,
+                    before_week_label="2026-W28",
+                    created_before="2026-07-13T00:00:00Z",
+                )
+                legacy = summarize_ai_report_feedback(
+                    connection,
+                    before_week_label="2026-W28",
+                )
+        finally:
+            os.unlink(db_path)
+
+        self.assertEqual(bounded["event_count"], 1)
+        self.assertEqual(bounded["promoted_target_refs"], ["idea_thread:before-cutoff"])
+        self.assertEqual(legacy["event_count"], 2)
+
     def test_feedback_correction_appends_without_rewriting_prior_event(self):
         db_path = self._make_db()
         try:

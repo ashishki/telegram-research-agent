@@ -263,6 +263,51 @@ def build_parser() -> argparse.ArgumentParser:
     mvp_weekly_parser.add_argument("--backfill-live-source-events", action="store_true")
     mvp_weekly_parser.set_defaults(handler=handle_mvp_weekly)
 
+    weekly_v2_parser = subparsers.add_parser(
+        "weekly-intelligence-v2",
+        help="Build one run-scoped weekly intelligence package and manifest",
+    )
+    weekly_v2_period = weekly_v2_parser.add_mutually_exclusive_group()
+    weekly_v2_period.add_argument(
+        "--week",
+        default=None,
+        help="Completed historical ISO week, e.g. 2026-W28 (default: last completed week)",
+    )
+    weekly_v2_period.add_argument(
+        "--partial-week",
+        action="store_true",
+        help="Diagnostic current partial ISO week",
+    )
+    weekly_v2_parser.add_argument("--run-id", default=None)
+    weekly_v2_parser.add_argument("--supersedes-run-id", default=None)
+    weekly_v2_parser.add_argument(
+        "--output-root",
+        default=None,
+        help="Run parent directory (default: data/output/weekly_intelligence_runs)",
+    )
+    weekly_v2_parser.add_argument(
+        "--disable-radar",
+        action="store_true",
+        help="Predeclare Radar disabled; blocks dogfood eligibility and emits no build decision",
+    )
+    weekly_v2_parser.add_argument("--refresh-weeks", type=int, default=12)
+    weekly_v2_parser.add_argument("--reaction-limit", type=int, default=300)
+    weekly_v2_parser.add_argument("--frontier-lookback-weeks", type=int, default=12)
+    weekly_v2_parser.add_argument("--frontier-model", default="strong")
+    weekly_v2_parser.add_argument("--force-frontier", action="store_true")
+    weekly_v2_parser.add_argument("--threads-limit", type=int, default=24)
+    weekly_v2_parser.add_argument("--atoms-limit", type=int, default=8)
+    weekly_v2_parser.add_argument("--radar-limit", type=int, default=80)
+    weekly_v2_parser.add_argument("--include-channel", action="append", default=[])
+    weekly_v2_parser.add_argument("--market-context-days", type=int, default=84)
+    weekly_v2_parser.add_argument("--force-market-baseline", action="store_true")
+    weekly_v2_parser.add_argument("--with-live-source-index", action="store_true")
+    weekly_v2_parser.add_argument("--live-intelligence-path", default=None)
+    weekly_v2_parser.add_argument("--deliver", action="store_true")
+    weekly_v2_parser.add_argument("--chat-id", default=None)
+    weekly_v2_parser.add_argument("--token", default=None)
+    weekly_v2_parser.set_defaults(handler=handle_weekly_intelligence_v2)
+
     channel_intel_report_parser = subparsers.add_parser(
         "channel-intelligence-report",
         help="Render an optional Markdown report from derived Channel Intelligence rows",
@@ -946,6 +991,70 @@ def handle_mvp_weekly(args: argparse.Namespace) -> int:
         LOGGER.exception("MVP weekly pipeline failed")
         return 1
     return 0
+
+
+def handle_weekly_intelligence_v2(args: argparse.Namespace) -> int:
+    from output.weekly_intelligence_orchestrator import run_weekly_intelligence_v2
+
+    settings = load_settings()
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+        LOGGER.info(
+            "Starting step=weekly_intelligence_v2 week=%s radar_enabled=%s",
+            args.week or ("partial_current" if args.partial_week else "last_completed"),
+            not args.disable_radar,
+        )
+        result = run_weekly_intelligence_v2(
+            settings,
+            week_label=args.week,
+            period_mode="partial_iso_week" if args.partial_week else None,
+            run_id=args.run_id,
+            supersedes_run_id=args.supersedes_run_id,
+            output_root=args.output_root,
+            radar_enabled=not args.disable_radar,
+            refresh_weeks=max(1, args.refresh_weeks),
+            reaction_limit=max(1, args.reaction_limit),
+            frontier_lookback_weeks=max(1, args.frontier_lookback_weeks),
+            frontier_model=args.frontier_model,
+            force_frontier=bool(args.force_frontier),
+            threads_limit=max(1, args.threads_limit),
+            atoms_limit=max(1, args.atoms_limit),
+            radar_limit=max(1, args.radar_limit),
+            include_channels=tuple(args.include_channel or ()),
+            market_context_days=max(1, args.market_context_days),
+            force_market_baseline=bool(args.force_market_baseline),
+            with_live_source_index=bool(args.with_live_source_index),
+            live_intelligence_path=args.live_intelligence_path,
+            deliver=bool(args.deliver),
+            chat_id=args.chat_id,
+            token=args.token,
+        )
+        LOGGER.info(
+            "Finished step=weekly_intelligence_v2 run_id=%s status=%s manifest=%s",
+            result.run_id,
+            result.run_status,
+            result.manifest_path,
+        )
+    except Exception as exc:
+        LOGGER.exception("Weekly Intelligence V2 orchestration failed")
+        sys.stdout.write(f"Weekly Intelligence V2 orchestration failed: {exc}\n")
+        return 1
+
+    sys.stdout.write(
+        f"manifest={result.manifest_path}\n"
+        f"run_id={result.run_id} run_status={result.run_status} partial={str(result.partial).lower()}\n"
+        f"reporting_week={result.reporting_week} "
+        f"analysis_period=[{result.analysis_period_start}, {result.analysis_period_end})\n"
+        f"weekly_brief={result.weekly_brief_html_path or ''}\n"
+        f"knowledge_atlas={result.atlas_html_path or ''}\n"
+        f"radar_json={result.radar_json_path or ''}\n"
+        f"delivered_message_ids={','.join(str(item or '') for item in result.delivered_message_ids)}\n"
+    )
+    if result.run_status in {"failed", "cancelled"}:
+        return 1
+    return 2 if result.run_status == "partial" else 0
 
 
 def handle_score(args: argparse.Namespace) -> int:

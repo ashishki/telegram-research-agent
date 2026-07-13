@@ -116,6 +116,28 @@ def _parse_iso(value: str | None) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
+def _explicit_utc_timestamp(value: datetime | str, *, field_name: str) -> datetime:
+    """Parse a caller-owned timestamp without accepting an implicit timezone."""
+
+    if isinstance(value, datetime):
+        parsed = value
+    elif isinstance(value, str):
+        text = value.strip()
+        if not text:
+            raise ValueError(f"{field_name} must not be empty")
+        if text.endswith("Z"):
+            text = f"{text[:-1]}+00:00"
+        try:
+            parsed = datetime.fromisoformat(text)
+        except ValueError as exc:
+            raise ValueError(f"{field_name} must be an ISO-8601 UTC timestamp") from exc
+    else:
+        raise TypeError(f"{field_name} must be a datetime or ISO-8601 string")
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError(f"{field_name} must include an explicit UTC offset")
+    return parsed.astimezone(timezone.utc)
+
+
 def _parse_array(value: str | None) -> list[str]:
     try:
         parsed = json.loads(value or "[]")
@@ -488,6 +510,8 @@ def load_ai_intelligence_context(
     *,
     week_label: str,
     reporting_period: ReportingPeriod | None = None,
+    reaction_snapshot_at: datetime | str | None = None,
+    feedback_snapshot_at: datetime | str | None = None,
     threads_limit: int = 8,
     atoms_limit: int = 8,
 ) -> dict:
@@ -497,9 +521,24 @@ def load_ai_intelligence_context(
     if period.week_label != str(week_label).strip():
         raise ValueError("week_label must match reporting_period.week_label")
     period_fields = _context_period_fields(period)
+    reaction_snapshot = (
+        period.generated_at
+        if reaction_snapshot_at is None
+        else _explicit_utc_timestamp(reaction_snapshot_at, field_name="reaction_snapshot_at")
+    )
+    reaction_snapshot_iso = _iso_for_sql(reaction_snapshot)
+    feedback_snapshot = (
+        None
+        if feedback_snapshot_at is None
+        else _explicit_utc_timestamp(
+            feedback_snapshot_at,
+            field_name="feedback_snapshot_at",
+        )
+    )
     if not _table_exists(connection, "idea_threads") or not _table_exists(connection, "idea_thread_atoms"):
         return {
             **period_fields,
+            "reaction_snapshot_at": reaction_snapshot_iso,
             "threads": [],
             "source_channels": [],
             "marked_posts": [],
@@ -557,9 +596,14 @@ def load_ai_intelligence_context(
     threads = threads[: max(1, int(threads_limit or 8))]
     return {
         **period_fields,
+        "reaction_snapshot_at": reaction_snapshot_iso,
         "threads": threads,
         "source_channels": _source_channel_counts(threads),
-        "marked_posts": _marked_posts_for_period(connection, reporting_period=period),
+        "marked_posts": _marked_posts_for_period(
+            connection,
+            reporting_period=period,
+            reaction_snapshot_at=reaction_snapshot,
+        ),
         "frontier_analysis": (
             _frontier_analysis_for_period(connection, reporting_period=period)
             if _table_exists(connection, "frontier_analyses")
@@ -567,7 +611,11 @@ def load_ai_intelligence_context(
         ),
         "compressed_context": _compressed_context(threads),
         "feedback_context": (
-            summarize_ai_report_feedback(connection, before_week_label=week_label)
+            summarize_ai_report_feedback(
+                connection,
+                before_week_label=week_label,
+                created_before=feedback_snapshot,
+            )
             if _table_exists(connection, "ai_report_feedback_events")
             else {
                 "event_count": 0,
@@ -663,6 +711,7 @@ def _marked_posts_for_period(
     connection: sqlite3.Connection,
     *,
     reporting_period: ReportingPeriod,
+    reaction_snapshot_at: datetime,
     limit: int = 8,
 ) -> list[dict]:
     required_tables = ("signal_feedback", "posts", "raw_posts")
@@ -691,7 +740,7 @@ def _marked_posts_for_period(
         (
             _iso_for_sql(reporting_period.analysis_period_start),
             _iso_for_sql(reporting_period.analysis_period_end),
-            _iso_for_sql(reporting_period.generated_at),
+            _iso_for_sql(reaction_snapshot_at),
             max(1, int(limit or 8)),
         ),
     ).fetchall()

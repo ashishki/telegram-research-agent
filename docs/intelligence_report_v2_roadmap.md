@@ -146,15 +146,15 @@ behavior; it does not reopen the gate logic.
 |---|---|---|---|---|
 | IRX-0 | Report V2 audit, roadmap, and product contract | `implemented_documentation_only` | P0 | none |
 | IRX-1 | Completed-week reporting semantics | `implemented_and_verified` | P0 | IRX-0 |
-| IRX-2 | Weekly run manifest and required Radar artifact contract | `ready` | P0 | IRX-1 |
-| IRX-3 | Reaction-to-ranking personalization and effect receipt | `planned` | P0 | IRX-1, IRX-2 |
+| IRX-2 | Weekly run manifest and required Radar artifact contract | `implemented_and_verified` | P0 | IRX-1 |
+| IRX-3 | Reaction-to-ranking personalization and effect receipt | `ready` | P0 | IRX-1, IRX-2 |
 | IRX-4 | Canonical Idea Thread curation and merge/split lifecycle | `planned` | P0 | IRX-1, IRX-2, IRX-3 |
 | IRX-5 | Editorial Intelligence synthesis contract | `planned` | P0 | IRX-1 through IRX-4 |
 | IRX-6 | Weekly Intelligence Brief V2 | `planned` | P1 | IRX-2 through IRX-5, IRX-8 through IRX-10 |
 | IRX-7 | Knowledge Atlas V2 and Knowledge Audit Explorer separation | `planned` | P2 | IRX-4, IRX-5, IRX-8, IRX-11 |
 | IRX-8 | Static visualization component system | `planned` | P1 | IRX-4, IRX-5 |
 | IRX-9 | Project Intelligence V2 | `planned` | P1 | IRX-4, IRX-5, IRX-8 |
-| IRX-10 | MVP Radar reader contract and context-only hardening | `partially_implemented`; reader/same-run work planned | P1 | IRX-2, IRX-5, IRX-8 |
+| IRX-10 | MVP Radar reader contract and context-only hardening | `partially_implemented`; context-only gates and IRX-2 same-run binding verified, reader projection planned | P1 | IRX-2, IRX-5, IRX-8 |
 | IRX-11 | Reader-value quality gates | `planned` | P1 | IRX-6, IRX-8 and upstream contracts |
 | IRX-12 | Report-specific feedback and learning loop | `planned` | P2 | IRX-2, IRX-3, IRX-5 through IRX-7, IRX-10 |
 | IRX-13 | Golden fixtures, evaluation dataset, and visual regression | `planned`; scaffolding begins after IRX-1 | P2 | incremental upstream fixtures; finalizes after IRX-6, IRX-7, IRX-11 |
@@ -373,7 +373,7 @@ intentionally left open.
 
 ### IRX-2 - Weekly Run Manifest And Required Radar Artifact Contract
 
-**Status:** `ready`. **Priority:** P0.
+**Status:** `implemented_and_verified` on 2026-07-13. **Priority:** P0.
 
 **Problem:** Radar and split reports are separate commands that infer identity
 from filenames. A valid W28 Radar dossier existed while the W29 Brief reported
@@ -410,7 +410,7 @@ new manifest/orchestration module; `tests/test_split_intelligence_reports.py`;
 - Expected missing/wrong-run Radar makes the run partial or failed; intentional
   disablement is declared before execution and reader-visible.
 - Success, Radar failure, wrong period, intentionally disabled Radar, reaction
-  sync failure, editorial fallback, and render failure are tested.
+  sync failure, generic degraded aggregation, and render failure are tested.
 - Manifest writes are atomic and regeneration does not overwrite prior run
   identity.
 
@@ -434,9 +434,38 @@ or break old commands/paths without a compatibility adapter.
 **Rollout implications:** Introduces the V2 orchestration path alongside V1
 commands. V1 remains inspectable until IRX-14 migration evidence is complete.
 
+**Implementation receipt (2026-07-13):** Added the typed manifest/state-machine
+core and explicit `weekly-intelligence-v2` orchestrator. Each invocation creates
+an exclusive run-scoped directory, freezes required/disabled policy, propagates
+one IRX-1 period, atomically persists validated stage transitions, and finalizes
+only quiescent stages. Brief, Atlas, Frontier, opportunity seeds, optional
+run-scoped live intelligence, market lens, raw Radar JSON, and
+`radar_run_binding.v1` are tied to the same manifest by structured identity,
+declared paths, and SHA-256 checksums. Feedback snapshot, readers, and Frontier
+share the exclusive period-end cutoff; Frontier cache identity includes that
+cutoff and a content fingerprint prevents binding a concurrently replaced week
+row. Required Radar
+failure, malformed/wrong-period identity, missing/tampered bytes, reaction
+failure, render failure, and intentional predeclared Radar disablement remain
+explicit and cannot reuse a stale candidate. Hermes/PI treats the newest
+manifest candidate as authority and exposes it only after validation; an
+invalid newest manifest blocks older-run and V1 fallback.
+The focused local manifest/orchestrator/report/PI suites and unchanged sibling
+Radar focused suite passed; live/heavy pipelines and the full suite were not
+run.
+
+The public CLI intentionally has no same-ID resume option. Terminal retries
+create a new run and may set `supersedes_run_id`; only the core transition model
+can increment an attempt inside an unfinalized manifest. Existing V1 commands,
+week-named compatibility paths, scoring, prompts, feedback semantics, database
+schema, and Radar evidence/context-only gates are unchanged. No generated
+report artifact or sibling Radar code was edited. Curation, reaction ranking,
+editorial synthesis, V2 reader redesign, Audit Explorer separation, and
+reader-value gates remain owned by later tasks.
+
 ### IRX-3 - Reaction-To-Ranking Personalization And Effect Receipt
 
-**Status:** `planned`. **Priority:** P0.
+**Status:** `ready`. **Priority:** P0.
 
 **Problem:** Reactions are ingested with useful semantics but marked posts are
 loaded separately from report ranking. Neither HTML nor JSON proves whether a
@@ -755,8 +784,9 @@ preserve current projection keys for retrieval compatibility.
 
 ### IRX-10 - MVP Radar Reader Contract And Context-Only Hardening
 
-**Status:** `partially_implemented`: context-only ranking exclusion is verified;
-same-run handoff and reader contract are planned. **Priority:** P1.
+**Status:** `partially_implemented`: context-only ranking exclusion and IRX-2
+same-run handoff are verified; the bounded reader contract is planned.
+**Priority:** P1.
 
 **Problem:** Radar correctly produced a W28 investigate dossier, but the Brief
 looked for W29 by filename and said the artifact was missing. Raw enums and
@@ -766,8 +796,8 @@ evidence categories are not translated into a coherent reader decision.
 build was chosen, what evidence is missing, what would change the decision, and
 what would kill it.
 
-**Architecture:** Verify and freeze Radar's existing candidate/context split,
-then bind the immutable Radar JSON through IRX-2. Normalize it into a bounded
+**Architecture:** Preserve Radar's verified candidate/context split and the
+immutable IRX-2 JSON binding. Normalize that bound artifact into a bounded
 reader projection without changing gates. Deterministic validation compares
 run/week, matched evidence, context-only records, and final recommendation.
 
@@ -1298,8 +1328,8 @@ Stop and ask the operator before any proposal or implementation that:
 
 ## 13. Unresolved Questions And Default Assumptions
 
-These questions do not block IRX-1. Each must be decided before the owning task
-is implemented:
+These questions are assigned to their owning tasks and do not reopen completed
+IRX-1/IRX-2 semantics:
 
 1. **V2 path naming:** use explicit versioned directories plus V1 aliases; IRX-14
    freezes exact paths after parallel-run evidence.
@@ -1321,58 +1351,68 @@ is implemented:
    choose whether the old Atlas path becomes an alias or a separately named
    artifact after consumer inventory.
 
-## 14. Exact Next Codex Prompt - IRX-2
+## 14. Exact Next Codex Prompt - IRX-3
 
 Use the following prompt unchanged for the next implementation task:
 
 ```text
 You are Codex working in /srv/openclaw-you/workspace/telegram-research-agent.
-Mode: IMPLEMENTATION for IRX-2 only.
-Implement IRX-2, using these binding docs:
+Mode: IMPLEMENTATION for IRX-3 only.
+Implement IRX-3, using these binding docs:
   docs/intelligence_report_v2_roadmap.md
   docs/intelligence_report_v2_contract.md
   docs/weekly_run_manifest.md
-  docs/mvp_radar_integration_contract.md
-Do not implement IRX-3 or later work: no reaction boost, canonical curator, editorial LLM, V2 schema/render redesign, reader-value gates, report-specific feedback redesign, or Radar gate changes.
+  docs/reaction_personalization_contract.md
+Do not implement IRX-4 or later work: no canonical-thread registry/merge-split curator, editorial LLM, V2 information-architecture or visual redesign, project-intelligence redesign, Radar reader redesign, reader-value gates, report-specific feedback redesign, rollout, or dogfood start.
 Before editing run:
   git status
   git branch
   git log --oneline -20
   git diff --stat
 Preserve pre-existing dirty changes. Do not edit or commit generated reports.
-Read the current period/run/Radar flow and focused tests for:
-  src/output/split_intelligence_reports.py, weekly_intelligence_brief.py,
-  knowledge_atlas_report.py, ai_intelligence_report.py,
-  mvp_weekly_pipeline.py, opportunity_seed_export.py, ai_report_contract.py,
-  pi_facade.py, and src/main.py.
-Add an additive weekly_run_manifest.v1 module and one explicit orchestration command alongside existing V1 commands. Reuse the IRX-1 ReportingPeriod unchanged.
+Read the current manifest reaction snapshot, reaction ingestion/storage, report-context selection/ranking, explicit-feedback precedence, Strategy Reviewer proposal flow, Brief/Atlas sidecars/renderers, PI/retrieval adapters, and focused tests for:
+  src/output/weekly_intelligence_orchestrator.py,
+  src/output/weekly_run_manifest.py,
+  src/ingestion/reaction_sync.py,
+  src/output/ai_intelligence_report.py,
+  src/output/weekly_intelligence_brief.py,
+  src/output/knowledge_atlas_report.py,
+  src/output/split_intelligence_reports.py,
+  src/db/ai_report_feedback.py,
+  src/output/strategy_reviewer.py,
+  src/output/intelligence_retrieval_items.py,
+  src/assistant/pi_facade.py, and src/main.py.
+Add one deterministic typed reaction-personalization projection/validator, preferably src/output/reaction_personalization.py, and an additive reaction_effect receipt in existing run-scoped Brief/Atlas JSON plus minimal Russian receipt copy. Reuse the IRX-1 ReportingPeriod and IRX-2 manifest/snapshot identity unchanged.
 Required behavior:
-1. One command creates an immutable run_id and atomically maintained weekly_run_manifest.v1 for one ReportingPeriod.
-2. The manifest records period identity, declared stage policy, stage statuses, warnings/failed stages, snapshot/reference fields, artifact paths, checksums, run_status, and partial exactly as the binding contract requires.
-3. Every artifact produced or bound by the orchestrated path repeats the same run_id, period, and manifest identity additively; old commands and paths remain compatible.
-4. Bind the real same-period Radar JSON by structured payload identity and checksum, never filename adjacency. The real candidate/status reaches the Brief sidecar/context.
-5. Required Radar missing, failed, malformed, or wrong-period makes the package partial or failed. Intentional disablement must be declared before execution and reader-visible; it must never masquerade as success.
-6. Stage transitions and final run status are deterministic. Atomic writes never expose invalid JSON, and regeneration never overwrites a prior run identity.
-7. Reaction sync failure, Radar failure/wrong period/disablement, render failure, and supported fallback states are explicit in the manifest and tested without weakening existing evidence gates.
-8. Delivery must not present a stale prior Brief as the current successful package.
-Add deterministic tests for manifest validation, immutable identity, atomic persistence, success, partial/failure aggregation, wrong-run/period Radar rejection, intentional Radar disablement, reaction failure, render failure, sidecar identity propagation, stale-artifact exclusion, and legacy command compatibility.
-Do not change scoring, prompts, DB schema, information architecture, visual design, feedback semantics, IRX-1 period behavior, cross-repo evidence logic, or Radar gates. Do not run live/expensive pipelines or the full suite.
+1. Consume only a usable same-run IRX-2 reaction snapshot. Eligibility is source-post time inside the exact half-open analysis period; a Sunday post first synchronized on Monday is eligible. Failed/stale/unverified sync yields a partial/unavailable receipt and no fresh boost.
+2. Treat every operator-visible emoji as the same positive implicit-interest signal, deduplicated once per post. Emoji is provenance only; aggregate reactions produce no signal; absence remains unknown and never penalizes ranking.
+3. Resolve reaction -> raw post -> normalized post -> atom -> current thread by stored identities only. Introduce a thread-resolution interface with compatibility/current-thread refs and an optional future canonical ref. Do not call raw/entity-cluster IDs canonical; unresolved canonical attribution is explicit until IRX-4 closes it.
+4. Apply the weak bounded boost only after period/evidence/safety/freshness/deduplication eligibility. It may break an otherwise equal/close ordering but cannot rescue weak, stale, contradicted, uncited, unsafe, or Radar-ineligible evidence. Confirmed explicit feedback remains stronger.
+5. Retain deterministic counterfactuals and distinguish boost_applied, rank_changed, selection_changed, and linked_only. Never claim ranking causation for linked_only.
+6. Emit reaction_personalization.v1 identity, snapshot status, stable funnel counts, influenced/linked-only items, ranking policy, and bounded unconsumed reasons. Counts deduplicate at the named entity level and JSON/HTML totals agree.
+7. Reader copy is concise Russian and contains no raw emoji, database/thread IDs, enum names, boost values, or ranking traces. Audit/retrieval projections retain provenance additively.
+8. Repeated interest below three distinct completed weeks/four distinct reacted posts creates no Strategy Reviewer proposal. A qualifying pattern creates an unapproved proposal only; it never mutates profile, config, prompt, project, source policy, or code.
+9. Existing standalone/V1 report, Hermes/PI, retrieval, Obsidian, feedback, and IRX-2 manifest consumers remain compatible. Any new sidecar fields are additive.
+Add deterministic tests, including tests/test_reaction_personalization.py, for emoji equivalence, aggregate exclusion, post deduplication, no-reaction unknown semantics, Monday/Sunday and out-of-period eligibility, identity-based post/atom/thread joins, missing links, bounded close-order boost, evidence/feedback precedence, counterfactual effect labels, every unconsumed reason, receipt/render parity, partial sync, compatibility-thread labeling, proposal threshold/no mutation, and V1/PI/retrieval compatibility.
+Do not change global evidence scoring, LLM prompts, existing feedback semantics, IRX-1 period behavior, IRX-2 run/Radar binding, DB schema unless an additive migration is proven unavoidable, cross-repo code, Radar evidence logic, or Radar gates. Do not run live/expensive pipelines or the full suite.
 Run:
   PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache \
+    python3 -m unittest tests.test_reaction_personalization \
+    tests.test_reaction_sync tests.test_ai_intelligence_report \
+    tests.test_ai_report_feedback tests.test_strategy_reviewer \
+    tests.test_split_intelligence_reports \
+    tests.test_intelligence_retrieval_items tests.test_pi_facade
+  PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache \
     python3 -m unittest tests.test_weekly_run_manifest \
-    tests.test_split_intelligence_reports tests.test_mvp_weekly_pipeline \
-    tests.test_pi_facade
-  cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar && \
-    .venv/bin/python -m pytest tests/test_mvp_of_week.py
+    tests.test_weekly_intelligence_orchestrator
   git diff --check
   git diff --stat
-Report files changed, manifest/run-state semantics, same-run Radar binding, compatibility behavior, exact test results, the IRX-3 handoff intentionally left open, and confirmation that generated artifacts and Radar gates were unchanged.
+Report files changed, exact signal/eligibility/ranking/receipt semantics, compatibility behavior, exact test results, the IRX-4 canonical-thread closure intentionally left open, and confirmation that generated artifacts, standing preferences/config, Radar gates, and cross-repo code were unchanged.
 ```
 
 ## 15. Suggested Following Task
 
-After IRX-2 is reviewed and its focused tests pass, implement **IRX-3 -
-Reaction-To-Ranking Personalization And Effect Receipt**. Do not skip directly
-to curation, editorial synthesis, or visual/report rendering: reaction influence
-must first become bounded, weak, traceable, and attached to the same completed
-period/run snapshot.
+After IRX-3 is reviewed and its focused tests pass, implement **IRX-4 -
+Canonical Idea Thread Curation And Merge/Split Lifecycle**. IRX-4 must replace
+compatibility/current-thread resolution with stable canonical aliases while
+preserving the IRX-3 post/atom provenance and reaction semantics.

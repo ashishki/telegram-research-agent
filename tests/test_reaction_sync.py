@@ -2,6 +2,7 @@ import os
 import sqlite3
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -190,6 +191,47 @@ class TestReactionSync(unittest.TestCase):
         )
 
         self.assertEqual(_extract_self_reactions_from_message(message, self_user_id=123), {"🔥"})
+
+    def test_candidate_selection_uses_exact_reporting_period_when_supplied(self):
+        from ingestion.reaction_sync import _load_candidate_posts
+        from output.reporting_period import resolve_reporting_period
+
+        connection, _post_id = self._connection_with_post()
+        connection.execute(
+            "UPDATE posts SET posted_at = ?",
+            ("2026-07-12T23:59:59.999999Z",),
+        )
+        connection.execute(
+            """
+            INSERT INTO raw_posts (
+                channel_username, channel_id, message_id, posted_at,
+                text, raw_json, ingested_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            ("@future", 101, 78, "2026-07-13T00:00:00Z", "Future", "{}", "2026-07-13T00:01:00Z"),
+        )
+        future_raw_id = int(connection.execute("SELECT max(id) FROM raw_posts").fetchone()[0])
+        connection.execute(
+            """
+            INSERT INTO posts (raw_post_id, channel_username, posted_at, content, normalized_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (future_raw_id, "@future", "2026-07-13T00:00:00Z", "Future", "2026-07-13T00:02:00Z"),
+        )
+        connection.commit()
+        period = resolve_reporting_period(
+            datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc)
+        )
+
+        rows = _load_candidate_posts(
+            connection,
+            days=14,
+            limit=20,
+            reporting_period=period,
+        )
+
+        self.assertEqual([row["message_id"] for row in rows], [77])
 
 
 class _Object:

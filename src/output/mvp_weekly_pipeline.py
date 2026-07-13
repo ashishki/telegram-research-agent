@@ -72,6 +72,7 @@ class MvpWeeklyPipelineResult:
     period_mode: str = ""
     analysis_period_start: str = ""
     analysis_period_end: str = ""
+    radar_run_id: str = ""
 
 
 def run_mvp_weekly_pipeline(
@@ -80,42 +81,62 @@ def run_mvp_weekly_pipeline(
     days: int | None = None,
     week_label: str | None = None,
     period_mode: str | None = None,
+    reporting_period: ReportingPeriod | None = None,
     now: datetime | None = None,
     limit: int = 80,
     include_channels: tuple[str, ...] = (),
     market_context_days: int = 84,
     force_market_baseline: bool = False,
+    seed_output_path: Path | None = None,
     run_id: str | None = None,
+    radar_run_id: str | None = None,
     deliver: bool = True,
+    emit_operator_outputs: bool = True,
     with_live_source_index: bool = False,
     live_intelligence_path: Path | str | None = None,
     live_index_days: int | None = None,
     backfill_live_source_events: bool = False,
 ) -> MvpWeeklyPipelineResult:
-    if days is not None and int(days) != 7:
-        raise ValueError("rolling MVP weekly mode supports exactly seven days")
-    if days is not None and period_mode is not None:
-        raise ValueError("rolling --days cannot be combined with another period mode")
-    if week_label is not None and days is not None:
-        raise ValueError("--week cannot be combined with rolling --days")
-    resolved_mode = period_mode
-    if days is not None and resolved_mode is None and week_label is None:
-        resolved_mode = TRAILING_SEVEN_DAYS
-    period = resolve_reporting_period(
-        now,
-        week_label=week_label,
-        period_mode=resolved_mode,
-    )
+    require_live_period_identity = reporting_period is not None
+    if reporting_period is not None:
+        if (
+            days is not None
+            or week_label is not None
+            or period_mode is not None
+            or now is not None
+        ):
+            raise ValueError(
+                "reporting_period cannot be combined with days, week_label, period_mode, or now"
+            )
+        period = reporting_period
+    else:
+        if days is not None and int(days) != 7:
+            raise ValueError("rolling MVP weekly mode supports exactly seven days")
+        if days is not None and period_mode is not None:
+            raise ValueError("rolling --days cannot be combined with another period mode")
+        if week_label is not None and days is not None:
+            raise ValueError("--week cannot be combined with rolling --days")
+        resolved_mode = period_mode
+        if days is not None and resolved_mode is None and week_label is None:
+            resolved_mode = TRAILING_SEVEN_DAYS
+        period = resolve_reporting_period(
+            now,
+            week_label=week_label,
+            period_mode=resolved_mode,
+        )
     period_fields = period.to_dict()
+    if run_id is not None and radar_run_id is not None and run_id != radar_run_id:
+        raise ValueError("run_id and radar_run_id must match when both are provided")
     seed_export = export_opportunity_seeds(
         settings,
         reporting_period=period,
         limit=limit,
+        output_path=seed_output_path,
         include_channels=include_channels,
         market_context_days=market_context_days,
         force_market_baseline=force_market_baseline,
     )
-    effective_run_id = run_id or f"mvp-weekly-{seed_export.week_label}"
+    effective_run_id = radar_run_id or run_id or f"mvp-weekly-{seed_export.week_label}"
     live_path = _prepare_live_intelligence_path(
         settings,
         explicit_path=live_intelligence_path,
@@ -123,12 +144,18 @@ def run_mvp_weekly_pipeline(
         reporting_period=period,
         requested_days=live_index_days,
         backfill=backfill_live_source_events,
+        require_period_identity=require_live_period_identity,
     )
     radar_payload = _run_radar(
         seed_path=Path(seed_export.output_path),
         run_id=effective_run_id,
         live_intelligence_path=live_path,
     )
+    result_run_id = radar_payload.get("run_id")
+    if not isinstance(result_run_id, str) or result_run_id != effective_run_id:
+        raise RuntimeError(
+            "Demand-to-MVP Radar result run_id does not match the requested radar_run_id"
+        )
     result = MvpWeeklyPipelineResult(
         week_label=seed_export.week_label,
         seed_path=seed_export.output_path,
@@ -140,6 +167,7 @@ def run_mvp_weekly_pipeline(
         dossier_status=_optional_str(radar_payload.get("dossier_status")),
         recommendation=_optional_str(radar_payload.get("recommendation")),
         score=_optional_int(radar_payload.get("score")),
+        radar_run_id=result_run_id,
         selected_source_mix=_optional_dict(radar_payload.get("selected_source_mix")),
         validation_adapter_status=_optional_dict(radar_payload.get("validation_adapter_status")),
         matched_external_evidence=_optional_dict_list(radar_payload.get("matched_external_evidence")),
@@ -163,10 +191,11 @@ def run_mvp_weekly_pipeline(
         analysis_period_start=period_fields["analysis_period_start"],
         analysis_period_end=period_fields["analysis_period_end"],
     )
-    _write_mvp_operator_message(result)
-    if deliver:
-        telegraph_url = _deliver_result(result)
-        result = replace(result, telegraph_url=telegraph_url)
+    if emit_operator_outputs:
+        _write_mvp_operator_message(result)
+        if deliver:
+            telegraph_url = _deliver_result(result)
+            result = replace(result, telegraph_url=telegraph_url)
     return result
 
 
@@ -178,6 +207,7 @@ def _prepare_live_intelligence_path(
     reporting_period: ReportingPeriod,
     requested_days: int | None,
     backfill: bool,
+    require_period_identity: bool = False,
 ) -> Path | None:
     from output.live_source_intelligence import (
         build_live_source_intelligence_snapshot,
@@ -197,6 +227,14 @@ def _prepare_live_intelligence_path(
             or _utc_timestamp(end) != reporting_period.analysis_period_end
         ):
             raise ValueError("live intelligence snapshot does not match the resolved reporting period")
+        if require_period_identity:
+            expected = reporting_period.to_dict()
+            for field in ("reporting_week", "week_label", "period_mode"):
+                if str(payload.get(field) or "") != expected[field]:
+                    raise ValueError(
+                        "live intelligence snapshot does not match the resolved "
+                        f"reporting period: {field}"
+                    )
         return path
     if not enabled:
         return None
@@ -284,7 +322,37 @@ def _run_radar(
     stdout = completed.stdout.strip()
     if not stdout:
         raise RuntimeError("Demand-to-MVP Radar returned empty output")
-    return json.loads(stdout)
+    try:
+        payload = json.loads(stdout)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("Demand-to-MVP Radar returned malformed JSON output") from exc
+    if not isinstance(payload, dict):
+        raise RuntimeError("Demand-to-MVP Radar output must be a JSON object")
+    if payload.get("run_id") != run_id:
+        raise RuntimeError(
+            "Demand-to-MVP Radar result run_id does not match the requested run_id"
+        )
+
+    json_path_value = payload.get("json_path")
+    if not isinstance(json_path_value, str) or not json_path_value.strip():
+        raise RuntimeError("Demand-to-MVP Radar result is missing json_path")
+    json_path = Path(json_path_value.strip())
+    if not json_path.is_absolute():
+        json_path = radar_repo / json_path
+    if not json_path.is_file():
+        raise RuntimeError(f"Demand-to-MVP Radar JSON result not found: {json_path}")
+    try:
+        result_payload = json.loads(json_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"Demand-to-MVP Radar JSON result is malformed: {json_path}") from exc
+    if not isinstance(result_payload, dict):
+        raise RuntimeError("Demand-to-MVP Radar JSON result must be an object")
+    result_record = result_payload.get("result")
+    if not isinstance(result_record, dict) or result_record.get("run_id") != run_id:
+        raise RuntimeError(
+            "Demand-to-MVP Radar JSON result.run_id does not match the requested run_id"
+        )
+    return payload
 
 
 def _radar_python_command(radar_repo: Path) -> list[str]:

@@ -1,8 +1,8 @@
 # CODEX_PROMPT - Compact Session Handoff
 
-Version: 5.1
+Version: 5.2
 Date: 2026-07-13
-State: IRX-1 implemented and focused-test verified; IRX-2 is the next
+State: IRX-1 and IRX-2 `implemented_and_verified`; IRX-3 is the next
 implementation task; dogfood is blocked until IRX-14
 
 ## Current Product Direction
@@ -33,7 +33,7 @@ docs/tasks.md
 Next implementation task:
 
 ```text
-IRX-2 - Weekly Run Manifest And Required Radar Artifact Contract
+IRX-3 - Reaction-To-Ranking Personalization And Effect Receipt
 ```
 
 ## W29 Product Correction
@@ -42,9 +42,10 @@ The W29 Brief and Atlas are structurally valid but failed as reader products.
 The default run analyzed the newly started W29, missed the valid W28 Radar
 artifact, did not expose reaction influence, repeated generic actions, rendered
 entity-fragmented threads, and provided no meaningful visual map. The current
-detailed Atlas becomes the Knowledge Audit Explorer foundation. IRX-1 now fixes
-the shared completed-period semantics; the manifest, editorial, and reader V2
-surfaces remain planned, and dogfood has not started.
+detailed Atlas becomes the Knowledge Audit Explorer foundation. IRX-1 fixes the
+shared completed-period semantics and IRX-2 provides an additive manifest-bound
+technical package. Personalization, curation, editorial synthesis, and reader
+V2 surfaces remain planned, and dogfood has not started.
 
 ## Verified Baseline
 
@@ -62,6 +63,11 @@ surfaces remain planned, and dogfood has not started.
   labels rolling/diagnostic partial modes honestly, and propagates exact
   half-open UTC boundaries through report, Frontier, reaction, opportunity,
   Radar-seed, live/market, and MVP weekly paths.
+- IRX-2 adds `weekly_run_manifest.v1`, immutable run-scoped packages, the
+  explicit `weekly-intelligence-v2` command, deterministic stage aggregation,
+  exact sidecar/checksum identity, same-run `radar_run_binding.v1`, and
+  manifest-aware Hermes/PI selection. V1 commands remain available and Radar
+  evidence/context-only gates are unchanged.
 - Canonical intelligence sidecar contract `tra-intelligence-contract.v1` is now
   implemented locally for workbook/Brief/Atlas projections with sanitized eval
   fixtures.
@@ -147,8 +153,49 @@ Compatibility and handoff:
 - destructive mutation of an existing atom/thread cannot be reconstructed
   perfectly without versioned history; that schema/curation problem is outside
   IRX-1;
-- IRX-2 persisted manifest/orchestration and same-run Radar binding were
-  intentionally left open and are now the only active implementation scope.
+- IRX-1 intentionally left persisted manifest/orchestration and same-run Radar
+  binding to IRX-2; that historical handoff is now closed.
+
+## IRX-2 Completion
+
+Status: implemented and focused-test verified on 2026-07-13.
+
+Implemented:
+
+- typed `weekly_run_manifest.v1` state machine with immutable identity, frozen
+  `irx2_orchestration.v1` policy, exclusive run directories, atomic validated
+  writes, sanitized errors, and deterministic terminal aggregation;
+- one explicit additive `weekly-intelligence-v2` orchestration command sharing
+  the unchanged IRX-1 `ReportingPeriod` across knowledge refresh, reaction sync,
+  feedback snapshot, Frontier, Radar, Brief, and Atlas;
+- predeclared disabled/non-required placeholders for IRX-4 curation, IRX-5
+  editorial intelligence, IRX-7 Audit Explorer separation, and IRX-11
+  reader-value gates;
+- immutable seed/optional-live-intelligence/market/raw-Radar/binding/Frontier/
+  Brief/Atlas paths and SHA-256 checksums, with distinct manifest and Radar run
+  IDs and strict cross-artifact period/identity validation;
+- one exclusive period-end feedback cutoff shared by the snapshot, readers,
+  and Frontier cache identity, with a content fingerprint preventing a
+  concurrently replaced Frontier week row from being bound;
+- partial/failed/disabled reader disclosure and manifest-aware Hermes/PI reads
+  that do not reuse a stale prior candidate or live database state for a bound
+  historical package.
+
+Verification and compatibility:
+
+- focused local manifest/orchestrator/report/PI suites and the unchanged sibling
+  Radar focused suite passed; live/heavy pipelines and the full suite were not
+  run;
+- existing V1 commands, week-named diagnostics, sidecar contracts, scoring,
+  prompts, feedback semantics, database schema, IRX-1 time behavior, Radar
+  evidence logic, and context-only gates remain unchanged;
+- no generated report artifacts or sibling Radar code were edited or committed;
+- terminal retries create a new run and may set `supersedes_run_id`; the public
+  CLI does not expose same-ID resume, while core retry transitions are limited
+  to an unfinalized manifest;
+- reaction ranking/effect receipt, canonical curation, editorial synthesis,
+  reader V2 redesign, and reader-value gates remain intentionally open. IRX-3
+  is now the only active implementation scope.
 
 ## PGI-001 Completion
 
@@ -462,56 +509,67 @@ python3 -m py_compile src/output/dogfood_review.py
 git diff --check
 ```
 
-## Exact Next Codex Prompt - IRX-2
+## Exact Next Codex Prompt - IRX-3
 
 Use the following prompt unchanged for the next implementation task:
 
 ```text
 You are Codex working in /srv/openclaw-you/workspace/telegram-research-agent.
-Mode: IMPLEMENTATION for IRX-2 only.
-Implement IRX-2, using these binding docs:
+Mode: IMPLEMENTATION for IRX-3 only.
+Implement IRX-3, using these binding docs:
   docs/intelligence_report_v2_roadmap.md
   docs/intelligence_report_v2_contract.md
   docs/weekly_run_manifest.md
-  docs/mvp_radar_integration_contract.md
-Do not implement IRX-3 or later work: no reaction boost, canonical curator, editorial LLM, V2 schema/render redesign, reader-value gates, report-specific feedback redesign, or Radar gate changes.
+  docs/reaction_personalization_contract.md
+Do not implement IRX-4 or later work: no canonical-thread registry/merge-split curator, editorial LLM, V2 information-architecture or visual redesign, project-intelligence redesign, Radar reader redesign, reader-value gates, report-specific feedback redesign, rollout, or dogfood start.
 Before editing run:
   git status
   git branch
   git log --oneline -20
   git diff --stat
 Preserve pre-existing dirty changes. Do not edit or commit generated reports.
-Read the current period/run/Radar flow and focused tests for:
-  src/output/split_intelligence_reports.py, weekly_intelligence_brief.py,
-  knowledge_atlas_report.py, ai_intelligence_report.py,
-  mvp_weekly_pipeline.py, opportunity_seed_export.py, ai_report_contract.py,
-  pi_facade.py, and src/main.py.
-Add an additive weekly_run_manifest.v1 module and one explicit orchestration command alongside existing V1 commands. Reuse the IRX-1 ReportingPeriod unchanged.
+Read the current manifest reaction snapshot, reaction ingestion/storage, report-context selection/ranking, explicit-feedback precedence, Strategy Reviewer proposal flow, Brief/Atlas sidecars/renderers, PI/retrieval adapters, and focused tests for:
+  src/output/weekly_intelligence_orchestrator.py,
+  src/output/weekly_run_manifest.py,
+  src/ingestion/reaction_sync.py,
+  src/output/ai_intelligence_report.py,
+  src/output/weekly_intelligence_brief.py,
+  src/output/knowledge_atlas_report.py,
+  src/output/split_intelligence_reports.py,
+  src/db/ai_report_feedback.py,
+  src/output/strategy_reviewer.py,
+  src/output/intelligence_retrieval_items.py,
+  src/assistant/pi_facade.py, and src/main.py.
+Add one deterministic typed reaction-personalization projection/validator, preferably src/output/reaction_personalization.py, and an additive reaction_effect receipt in existing run-scoped Brief/Atlas JSON plus minimal Russian receipt copy. Reuse the IRX-1 ReportingPeriod and IRX-2 manifest/snapshot identity unchanged.
 Required behavior:
-1. One command creates an immutable run_id and atomically maintained weekly_run_manifest.v1 for one ReportingPeriod.
-2. The manifest records period identity, declared stage policy, stage statuses, warnings/failed stages, snapshot/reference fields, artifact paths, checksums, run_status, and partial exactly as the binding contract requires.
-3. Every artifact produced or bound by the orchestrated path repeats the same run_id, period, and manifest identity additively; old commands and paths remain compatible.
-4. Bind the real same-period Radar JSON by structured payload identity and checksum, never filename adjacency. The real candidate/status reaches the Brief sidecar/context.
-5. Required Radar missing, failed, malformed, or wrong-period makes the package partial or failed. Intentional disablement must be declared before execution and reader-visible; it must never masquerade as success.
-6. Stage transitions and final run status are deterministic. Atomic writes never expose invalid JSON, and regeneration never overwrites a prior run identity.
-7. Reaction sync failure, Radar failure/wrong period/disablement, render failure, and supported fallback states are explicit in the manifest and tested without weakening existing evidence gates.
-8. Delivery must not present a stale prior Brief as the current successful package.
-Add deterministic tests for manifest validation, immutable identity, atomic persistence, success, partial/failure aggregation, wrong-run/period Radar rejection, intentional Radar disablement, reaction failure, render failure, sidecar identity propagation, stale-artifact exclusion, and legacy command compatibility.
-Do not change scoring, prompts, DB schema, information architecture, visual design, feedback semantics, IRX-1 period behavior, cross-repo evidence logic, or Radar gates. Do not run live/expensive pipelines or the full suite.
+1. Consume only a usable same-run IRX-2 reaction snapshot. Eligibility is source-post time inside the exact half-open analysis period; a Sunday post first synchronized on Monday is eligible. Failed/stale/unverified sync yields a partial/unavailable receipt and no fresh boost.
+2. Treat every operator-visible emoji as the same positive implicit-interest signal, deduplicated once per post. Emoji is provenance only; aggregate reactions produce no signal; absence remains unknown and never penalizes ranking.
+3. Resolve reaction -> raw post -> normalized post -> atom -> current thread by stored identities only. Introduce a thread-resolution interface with compatibility/current-thread refs and an optional future canonical ref. Do not call raw/entity-cluster IDs canonical; unresolved canonical attribution is explicit until IRX-4 closes it.
+4. Apply the weak bounded boost only after period/evidence/safety/freshness/deduplication eligibility. It may break an otherwise equal/close ordering but cannot rescue weak, stale, contradicted, uncited, unsafe, or Radar-ineligible evidence. Confirmed explicit feedback remains stronger.
+5. Retain deterministic counterfactuals and distinguish boost_applied, rank_changed, selection_changed, and linked_only. Never claim ranking causation for linked_only.
+6. Emit reaction_personalization.v1 identity, snapshot status, stable funnel counts, influenced/linked-only items, ranking policy, and bounded unconsumed reasons. Counts deduplicate at the named entity level and JSON/HTML totals agree.
+7. Reader copy is concise Russian and contains no raw emoji, database/thread IDs, enum names, boost values, or ranking traces. Audit/retrieval projections retain provenance additively.
+8. Repeated interest below three distinct completed weeks/four distinct reacted posts creates no Strategy Reviewer proposal. A qualifying pattern creates an unapproved proposal only; it never mutates profile, config, prompt, project, source policy, or code.
+9. Existing standalone/V1 report, Hermes/PI, retrieval, Obsidian, feedback, and IRX-2 manifest consumers remain compatible. Any new sidecar fields are additive.
+Add deterministic tests, including tests/test_reaction_personalization.py, for emoji equivalence, aggregate exclusion, post deduplication, no-reaction unknown semantics, Monday/Sunday and out-of-period eligibility, identity-based post/atom/thread joins, missing links, bounded close-order boost, evidence/feedback precedence, counterfactual effect labels, every unconsumed reason, receipt/render parity, partial sync, compatibility-thread labeling, proposal threshold/no mutation, and V1/PI/retrieval compatibility.
+Do not change global evidence scoring, LLM prompts, existing feedback semantics, IRX-1 period behavior, IRX-2 run/Radar binding, DB schema unless an additive migration is proven unavoidable, cross-repo code, Radar evidence logic, or Radar gates. Do not run live/expensive pipelines or the full suite.
 Run:
   PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache \
+    python3 -m unittest tests.test_reaction_personalization \
+    tests.test_reaction_sync tests.test_ai_intelligence_report \
+    tests.test_ai_report_feedback tests.test_strategy_reviewer \
+    tests.test_split_intelligence_reports \
+    tests.test_intelligence_retrieval_items tests.test_pi_facade
+  PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache \
     python3 -m unittest tests.test_weekly_run_manifest \
-    tests.test_split_intelligence_reports tests.test_mvp_weekly_pipeline \
-    tests.test_pi_facade
-  cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar && \
-    .venv/bin/python -m pytest tests/test_mvp_of_week.py
+    tests.test_weekly_intelligence_orchestrator
   git diff --check
   git diff --stat
-Report files changed, manifest/run-state semantics, same-run Radar binding, compatibility behavior, exact test results, the IRX-3 handoff intentionally left open, and confirmation that generated artifacts and Radar gates were unchanged.
+Report files changed, exact signal/eligibility/ranking/receipt semantics, compatibility behavior, exact test results, the IRX-4 canonical-thread closure intentionally left open, and confirmation that generated artifacts, standing preferences/config, Radar gates, and cross-repo code were unchanged.
 ```
 
-Suggested following task after review: `IRX-3 - Reaction-To-Ranking
-Personalization And Effect Receipt`.
+Suggested following task after IRX-3 review: `IRX-4 - Canonical Idea Thread
+Curation And Merge/Split Lifecycle`.
 
 ## Historical PGI-007 Handoff
 

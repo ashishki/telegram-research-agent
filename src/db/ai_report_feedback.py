@@ -505,6 +505,7 @@ def summarize_ai_report_feedback(
     *,
     before_week_label: str | None = None,
     week_label: str | None = None,
+    created_before: datetime | str | None = None,
     limit: int = 100,
 ) -> dict:
     clauses: list[str] = []
@@ -515,6 +516,14 @@ def summarize_ai_report_feedback(
     if before_week_label:
         clauses.append("week_label < ?")
         params.append(str(before_week_label).strip())
+    if created_before is not None:
+        from output.reporting_period import register_reporting_period_sqlite
+
+        register_reporting_period_sqlite(connection)
+        clauses.append(
+            "reporting_utc_micros(created_at) < reporting_utc_micros(?)"
+        )
+        params.append(_explicit_utc_iso(created_before, field_name="created_before"))
     where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     cursor = connection.execute(
         f"""
@@ -528,6 +537,22 @@ def summarize_ai_report_feedback(
     )
     events = _cursor_to_feedback(cursor)
     return _summarize_events(events)
+
+
+def _explicit_utc_iso(value: datetime | str, *, field_name: str) -> str:
+    if isinstance(value, datetime):
+        parsed = value
+    else:
+        text = str(value or "").strip()
+        if text.endswith("Z"):
+            text = f"{text[:-1]}+00:00"
+        try:
+            parsed = datetime.fromisoformat(text)
+        except ValueError as exc:
+            raise ValueError(f"{field_name} must be an ISO-8601 timestamp") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError(f"{field_name} must include an explicit timezone")
+    return parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def _summarize_events(events: list[dict]) -> dict:

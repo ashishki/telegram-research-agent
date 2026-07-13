@@ -2,14 +2,22 @@
 
 Version: 1.0
 Last updated: 2026-07-13
-Status: supporting cross-repo evidence contract; same-run V2 binding planned
+Status: supporting cross-repo evidence contract; IRX-2 same-run binding
+`implemented_and_verified`
 Contract version: `tra-radar-intelligence-contract.v1`
 
-IRX-2 adds `weekly_run_manifest.v1` around this exchange. The evidence contract
+IRX-2 added `weekly_run_manifest.v1` around this exchange. The evidence contract
 remains compatible; a Report V2 package must additionally match run identity,
 reporting week, and half-open analysis boundaries. Expected missing, wrong-run,
 or wrong-week Radar must not crash rendering, but it must make the package
 visibly partial rather than complete-looking.
+
+IRX-2 freezes this additive identity layer as `radar_run_binding.v1`. The
+manifest run ID and Radar run ID are separate. Telegram Research Agent validates
+the raw Radar result, then writes an immutable binding envelope containing both
+IDs, the full reporting period, contract version, seed/Radar paths and SHA-256
+checksums, and the selected candidate/status projection. Existing Radar V1
+evidence fields and gates are not changed by this wrapper.
 
 This contract defines how `telegram-research-agent` and
 `Demand-to-MVP-Radar` exchange intelligence. Radar is a parallel downstream
@@ -37,12 +45,21 @@ dogfood evidence.
 
 ## Telegram Research Agent Sends To Radar
 
-Required fields:
+The sibling invocation receives the Radar-specific run ID as `--run-id`, the
+immutable opportunity-seed export, and, when present, the immutable
+live-intelligence snapshot. Period and intelligence fields below travel in
+those input documents. `manifest_run_id` is Telegram-side package identity and
+is not sent to the sibling process.
+
+Required exchange inputs:
 
 - `contract_version`: `tra-radar-intelligence-contract.v1`;
+- `radar_run_id` assigned specifically to the Radar invocation;
 - `intelligence_contract_version`: `tra-intelligence-contract.v1` when the row
   is derived from Telegram Research Agent canonical intelligence;
-- `week_label`;
+- `reporting_week` and compatibility `week_label`;
+- `analysis_period_start` and `analysis_period_end`;
+- `period_mode`;
 - `generated_at`;
 - Knowledge Thread-backed opportunity seeds;
 - source atom provenance;
@@ -67,10 +84,10 @@ Market/business analyst context remains:
 
 ## Radar Returns To Telegram Research Agent
 
-Required fields:
+Required raw response/result fields:
 
 - `contract_version` or `schema_version`;
-- `week_label`;
+- Radar `run_id` matching the requested `radar_run_id`;
 - `generated_at`;
 - candidate list;
 - selected candidate;
@@ -91,6 +108,12 @@ Required fields:
 - existing-project overlap;
 - artifact path.
 
+After validating and copying the raw result, Telegram Research Agent creates
+`radar_run_binding.v1`; Radar does not return this envelope. The companion adds
+`manifest_run_id`, `radar_run_id`, `reporting_week`, compatibility `week_label`,
+the half-open analysis boundaries, `period_mode`, declared seed/raw-result
+paths and SHA-256 checksums, and the selected candidate/status projection.
+
 The selected candidate should repeat the key contract fields so a downstream
 consumer can read the selected object without chasing top-level JSON.
 
@@ -109,8 +132,19 @@ consumer can read the selected object without chasing top-level JSON.
   required, it must make the run partial or failed.
 - V1 diagnostic pipelines may remain separately callable. A complete V2 weekly
   package is manifest-linked and requires its declared Radar stage.
+- Filename adjacency and a week-shaped filename are never identity proof. The
+  raw result `run_id`, binding envelope, validated seed period, and SHA-256 must
+  agree before the Radar stage succeeds.
+- Manifest-aware consumers treat the bound raw result and envelope as
+  authoritative. If either file, identity, period, path, or checksum is missing
+  or mismatched, they report the Radar artifact unavailable/invalid and do not
+  recover a candidate from an older Brief or adjacent week-named file.
 - Cross-repo schema changes must be versioned and tested.
 - Sidecar JSON and rendered Markdown/HTML must not contradict each other.
+
+IRX-2 implemented only this identity and orchestration wrapper. Candidate
+evidence categories, source matching, recommendation semantics,
+`context_only` exclusion, and every existing Radar gate remain unchanged.
 
 ## Skill-Assisted Research Boundary
 
@@ -153,7 +187,7 @@ operator workflow.
 
 ## Stale And Missing Artifact Semantics
 
-`telegram-research-agent` should classify Radar state as:
+Legacy/V1 diagnostic paths may classify Radar state as:
 
 - `current`: Radar week matches Brief week and generated timestamp is within
   expected freshness window.
@@ -161,12 +195,18 @@ operator workflow.
 - `missing`: no artifact was provided or discovered.
 - `invalid`: JSON/Markdown violates the contract or cannot parse.
 
-Brief and Hermes behavior:
+Legacy/V1 Brief and Hermes diagnostic behavior:
 
 - `current`: show Radar Gate Card normally.
 - `stale`: show candidate, but label stale and avoid new weekly decisions.
 - `missing`: show "Radar not available" and continue Brief/Atlas.
 - `invalid`: show contract error and do not summarize candidate as valid.
+
+Manifest-bound V2 behavior is stricter: an old or wrong-period artifact is an
+unavailable/invalid binding, no candidate is exposed from it, and consumers do
+not fall back to an older Brief or adjacent week-named file. The required Radar
+stage then keeps the package visibly partial or failed according to the frozen
+stage policy.
 
 Telegram-side PGI-003 implementation note: Weekly Brief sidecars expose
 `mvp_radar_gate`, Brief HTML renders the same gate decision, and Hermes exposes

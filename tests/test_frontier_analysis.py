@@ -182,6 +182,51 @@ class TestFrontierAnalysis(unittest.TestCase):
         self.assertEqual(source_context["analysis_period_start"], "2026-07-06T00:00:00Z")
         self.assertEqual(source_context["analysis_period_end"], "2026-07-13T00:00:00Z")
         self.assertEqual(summary.generated_at, "2026-07-13T07:02:52Z")
+        self.assertEqual(len(summary.analysis_sha256), 64)
+
+    def test_v2_feedback_cutoff_is_part_of_frontier_cache_identity(self):
+        db_path = self._make_db()
+        period = resolve_reporting_period(
+            datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc)
+        )
+        try:
+            settings = self._seed_threads(db_path)
+            with patch("output.frontier_analysis.complete", return_value=self._payload()):
+                run_frontier_analysis(
+                    settings,
+                    reporting_period=period,
+                    force=True,
+                )
+            with patch(
+                "output.frontier_analysis.complete",
+                return_value=self._payload(),
+            ) as regenerated:
+                summary = run_frontier_analysis(
+                    settings,
+                    reporting_period=period,
+                    feedback_snapshot_at=period.analysis_period_end,
+                )
+            with patch(
+                "output.frontier_analysis.complete",
+                side_effect=AssertionError("matching bounded cache should be reused"),
+            ):
+                cached = run_frontier_analysis(
+                    settings,
+                    reporting_period=period,
+                    feedback_snapshot_at=period.analysis_period_end,
+                )
+            with sqlite3.connect(db_path) as connection:
+                row = fetch_frontier_analysis(connection, week_label="2026-W28")
+        finally:
+            os.unlink(db_path)
+
+        regenerated.assert_called_once()
+        self.assertFalse(summary.skipped_existing)
+        self.assertTrue(cached.skipped_existing)
+        self.assertEqual(
+            row["analysis"]["source_context"]["feedback_snapshot_at"],
+            "2026-07-13T00:00:00Z",
+        )
 
     def test_frontier_analysis_cli_skips_existing_without_force(self):
         db_path = self._make_db()

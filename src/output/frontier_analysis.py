@@ -1,8 +1,10 @@
+import hashlib
 import json
 import logging
 import sqlite3
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
+from typing import Mapping
 
 from config.settings import MID_MODEL, STRONG_MODEL, Settings
 from db.frontier_analysis import fetch_frontier_analysis, upsert_frontier_analysis
@@ -51,6 +53,7 @@ class FrontierAnalysisSummary:
     period_mode: str = ""
     analysis_period_start: str = ""
     analysis_period_end: str = ""
+    analysis_sha256: str = ""
 
 
 def resolve_frontier_model(model: str | None) -> str:
@@ -222,12 +225,46 @@ def _analysis_summary(row: dict, *, skipped_existing: bool = False) -> FrontierA
         period_mode=str(source_context.get("period_mode") or "explicit_iso_week"),
         analysis_period_start=str(source_context.get("analysis_period_start") or source_context.get("week_start") or ""),
         analysis_period_end=str(source_context.get("analysis_period_end") or source_context.get("week_end") or ""),
+        analysis_sha256=frontier_analysis_fingerprint(row),
     )
 
 
-def _analysis_matches_period(row: dict, period_fields: dict[str, str]) -> bool:
+def frontier_analysis_fingerprint(row: Mapping[str, object]) -> str:
+    """Fingerprint exact persisted Frontier content, excluding row timestamps."""
+
+    fields = (
+        "week_label",
+        "generated_at",
+        "model",
+        "prompt_version",
+        "lookback_weeks",
+        "threads_analyzed",
+        "atoms_analyzed",
+        "executive_brief",
+        "what_changed",
+        "trend_narratives",
+        "study_now",
+        "actions",
+        "caveats",
+        "analysis",
+    )
+    encoded = json.dumps(
+        {field: row.get(field) for field in fields},
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _analysis_matches_period(
+    row: dict,
+    period_fields: dict[str, str],
+    *,
+    feedback_snapshot_at: str | None = None,
+) -> bool:
     source_context = (row.get("analysis") or {}).get("source_context") or {}
-    return all(
+    period_matches = all(
         str(source_context.get(field) or "") == str(period_fields[field])
         for field in (
             "reporting_week",
@@ -237,6 +274,34 @@ def _analysis_matches_period(row: dict, period_fields: dict[str, str]) -> bool:
             "analysis_period_end",
         )
     )
+    if not period_matches:
+        return False
+    return feedback_snapshot_at is None or (
+        str(source_context.get("feedback_snapshot_at") or "")
+        == feedback_snapshot_at
+    )
+
+
+def _canonical_optional_utc_timestamp(
+    value: datetime | str | None,
+    *,
+    field_name: str,
+) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        parsed = value
+    else:
+        text = str(value).strip()
+        if text.endswith("Z"):
+            text = f"{text[:-1]}+00:00"
+        try:
+            parsed = datetime.fromisoformat(text)
+        except ValueError as exc:
+            raise ValueError(f"{field_name} must be an ISO-8601 timestamp") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError(f"{field_name} must include an explicit timezone")
+    return parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def run_frontier_analysis(
@@ -245,6 +310,7 @@ def run_frontier_analysis(
     week_label: str | None = None,
     period_mode: str | None = None,
     reporting_period: ReportingPeriod | None = None,
+    feedback_snapshot_at: datetime | str | None = None,
     now: datetime | None = None,
     lookback_weeks: int = 12,
     model: str = "strong",
@@ -263,18 +329,27 @@ def run_frontier_analysis(
             period_mode=period_mode,
         )
     period_fields = period.to_dict()
+    feedback_cutoff = _canonical_optional_utc_timestamp(
+        feedback_snapshot_at,
+        field_name="feedback_snapshot_at",
+    )
     clean_week = period.week_label
     resolved_model = resolve_frontier_model(model)
     with sqlite3.connect(settings.db_path) as connection:
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON;")
         existing = fetch_frontier_analysis(connection, week_label=clean_week)
-        if existing and not force and _analysis_matches_period(existing, period_fields):
+        if existing and not force and _analysis_matches_period(
+            existing,
+            period_fields,
+            feedback_snapshot_at=feedback_cutoff,
+        ):
             return _analysis_summary(existing, skipped_existing=True)
         context = load_ai_intelligence_context(
             connection,
             week_label=clean_week,
             reporting_period=period,
+            feedback_snapshot_at=feedback_cutoff,
             threads_limit=max(1, int(threads_limit or DEFAULT_THREADS_LIMIT)),
             atoms_limit=max(1, int(atoms_limit or DEFAULT_ATOMS_LIMIT)),
         )
@@ -294,6 +369,11 @@ def run_frontier_analysis(
             **payload,
             "source_context": {
                 **period_fields,
+                **(
+                    {"feedback_snapshot_at": feedback_cutoff}
+                    if feedback_cutoff is not None
+                    else {}
+                ),
                 "lookback_weeks": max(1, int(lookback_weeks or 1)),
                 "threads_analyzed": len(threads),
                 "atoms_analyzed": atoms_seen,

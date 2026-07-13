@@ -14,8 +14,9 @@ Active Report V2 roadmap: `docs/intelligence_report_v2_roadmap.md`.
 Broader product roadmap: `docs/portfolio_grade_intelligence_roadmap.md`.
 Canonical active backlog: `docs/tasks.md`.
 Current implementation gate:
-`IRX-2 - Weekly Run Manifest And Required Radar Artifact Contract`; IRX-1
-completed-week semantics are implemented and verified. `PGI-007` dogfood is
+`IRX-3 - Reaction-To-Ranking Personalization And Effect Receipt`; IRX-1
+completed-week semantics and the additive IRX-2 manifest/same-run Radar
+orchestration are implemented and focused-test verified. `PGI-007` dogfood is
 superseded as the next action and remains blocked until the `IRX-14` start gate
 passes.
 
@@ -28,9 +29,10 @@ focused tests. The honest gap is four-week dogfood evidence and portfolio-ready
 evaluation proof from real operator runs. The W29 artifacts are technically
 valid but not reader-ready: they expose wrong-period, Radar-handoff,
 personalization, editorial, thread-curation, and visualization failures. The
-shared Report V2 period foundation is implemented; manifest/orchestration and
-reader surfaces remain planned, and dogfood has not started. Raw Telegram
-firehose RAG, assistant
+shared Report V2 period foundation and technical manifest package are
+implemented. Reaction personalization, canonical curation, editorial synthesis,
+and the reader V2 surfaces remain planned, and dogfood has not started. Raw
+Telegram firehose RAG, assistant
 mutations, full-year archive processing, and build-ready Radar decisions from
 context-only evidence remain out of scope.
 
@@ -181,6 +183,12 @@ HTML success is not Report V2 readiness, and the four-week dogfood is paused
 until IRX-14.
 
 On the single-user VPS, the operational baseline is:
+
+- `weekly-intelligence-v2` is the explicit additive IRX-2 package command. It
+  creates a new immutable run directory, binds same-run artifacts by identity
+  and checksum, and leaves the deployed V1 timer/commands intact. Inspect its
+  bounded options with
+  `PYTHONPATH=src python3 src/main.py weekly-intelligence-v2 --help`.
 
 - `telegram-bot.service` runs Hermes command polling with restart-on-failure.
 - `telegram-ai-split-report.timer` is the only project weekly report timer. It

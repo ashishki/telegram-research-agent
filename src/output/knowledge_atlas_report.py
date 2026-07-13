@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
+import tempfile
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Mapping
 
 from config.settings import PROJECT_ROOT, Settings
 from output.ai_report_contract import INTELLIGENCE_CONTRACT_VERSION, build_canonical_intelligence_contract
@@ -44,6 +47,28 @@ ATLAS_SECTIONS = (
     ("study-backlog", "Study Backlog", "study_backlog"),
     ("atlas-appendix", "Atlas Audit", "atlas_audit"),
 )
+RUN_IDENTITY_FIELDS = (
+    "run_id",
+    "manifest_path",
+    "run_status",
+    "partial",
+    "pipeline_profile",
+    "failed_stages",
+    "warnings",
+)
+RUN_STAGE_LABELS_RU = {
+    "knowledge_refresh": "обновление базы знаний",
+    "reaction_sync": "синхронизация реакций",
+    "feedback_snapshot": "снимок обратной связи",
+    "canonical_thread_curation": "каноническая курация тем",
+    "frontier_analysis": "Frontier Analysis",
+    "radar": "MVP Radar",
+    "editorial_intelligence": "редакционная аналитика",
+    "weekly_brief": "Weekly Intelligence Brief",
+    "knowledge_atlas": "Knowledge Atlas",
+    "knowledge_audit_explorer": "аудит Knowledge Atlas",
+    "reader_value_gates": "проверки reader value",
+}
 
 
 @dataclass(frozen=True)
@@ -63,6 +88,11 @@ class KnowledgeAtlasSummary:
     analysis_period_start: str = ""
     analysis_period_end: str = ""
     period_mode: str = ""
+    run_id: str = ""
+    manifest_path: str = ""
+    run_status: str = ""
+    partial: bool = False
+    pipeline_profile: str = ""
 
 
 class KnowledgeAtlasQualityError(ValueError):
@@ -80,14 +110,96 @@ def _utc_now_iso() -> str:
     return _utc_now().isoformat().replace("+00:00", "Z")
 
 
+def _atomic_write_text(path: Path, content: str) -> None:
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temporary_path = Path(handle.name)
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_path, path)
+    except BaseException:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+        raise
+
+
+def _run_identity_fields(
+    context: Mapping[str, object],
+    run_identity: Mapping[str, object] | None,
+) -> dict[str, object]:
+    source = run_identity if run_identity is not None else context
+    return {field: source[field] for field in RUN_IDENTITY_FIELDS if field in source}
+
+
+def _render_run_status_notice(context: Mapping[str, object]) -> str:
+    status = str(context.get("run_status") or "").strip().lower()
+    is_partial = bool(context.get("partial")) or str(context.get("period_mode") or "") == "partial_iso_week"
+    if status == "failed":
+        message = "Выпуск не завершён. Запуск завершился ошибкой."
+        display_status = "failed"
+    elif status == "partial" or is_partial:
+        message = "Частичный выпуск. Выводы ниже ограничены; решение о сборке запрещено."
+        display_status = "partial"
+    elif status == "complete":
+        message = "Полный выпуск. Все обязательные этапы завершены."
+        display_status = "complete"
+    else:
+        return ""
+    failed_stage_names = []
+    failed_stages = context.get("failed_stages") or []
+    if isinstance(failed_stages, (list, tuple)):
+        for raw_name in failed_stages:
+            name = str(raw_name).strip()
+            if not name:
+                continue
+            label = RUN_STAGE_LABELS_RU.get(name, name.replace("_", " "))
+            if label not in failed_stage_names:
+                failed_stage_names.append(label)
+    failed_stage_notice = (
+        f" Не завершены этапы: {', '.join(failed_stage_names)}."
+        if failed_stage_names
+        else ""
+    )
+    return (
+        f'<p class="run-status run-status-{display_status}" '
+        f'data-run-status="{display_status}"><strong>'
+        f'{_escape(message + failed_stage_notice)}</strong></p>'
+    )
+
+
+def _render_run_identity_metadata(context: Mapping[str, object]) -> str:
+    identity = (
+        ("weekly-run-id", context.get("run_id")),
+        ("weekly-run-manifest", context.get("manifest_path")),
+        ("weekly-pipeline-profile", context.get("pipeline_profile")),
+    )
+    return "\n".join(
+        f'<meta name="{name}" content="{_escape(str(value))}">'
+        for name, value in identity
+        if str(value or "").strip()
+    )
+
+
 def build_knowledge_atlas_artifact(
     context: dict,
     *,
     generated_at: str,
     output_root: str | Path | None = None,
     related_artifacts: dict | None = None,
+    run_identity: Mapping[str, object] | None = None,
 ) -> KnowledgeAtlasSummary:
-    html_text = render_knowledge_atlas_html(context, generated_at=generated_at)
+    identity = _run_identity_fields(context, run_identity)
+    artifact_context = {**context, **identity}
+    html_text = render_knowledge_atlas_html(artifact_context, generated_at=generated_at)
     findings = validate_knowledge_atlas_html(html_text)
     critical = [finding for finding in findings if finding.severity == SEVERITY_CRITICAL]
     if critical:
@@ -98,19 +210,20 @@ def build_knowledge_atlas_artifact(
     week_label = str(context.get("week_label") or "")
     html_path = root / f"{week_label}.knowledge-atlas.html"
     json_path = root / f"{week_label}.knowledge-atlas.json"
-    threads = context.get("threads") or []
+    threads = artifact_context.get("threads") or []
     atoms = _all_atoms(threads)
-    period_metadata = _period_metadata(context, generated_at=generated_at)
+    period_metadata = _period_metadata(artifact_context, generated_at=generated_at)
     metadata = _knowledge_atlas_metadata(
-        context,
+        artifact_context,
         generated_at=generated_at,
         html_path=html_path,
         json_path=json_path,
         quality_findings=findings,
         related_artifacts=related_artifacts or {},
+        run_identity=identity,
     )
-    html_path.write_text(html_text, encoding="utf-8")
-    json_path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
+    _atomic_write_text(html_path, html_text)
+    _atomic_write_text(json_path, json.dumps(metadata, ensure_ascii=False, indent=2))
     summary = KnowledgeAtlasSummary(
         week_label=week_label,
         reporting_week=period_metadata["reporting_week"],
@@ -119,6 +232,11 @@ def build_knowledge_atlas_artifact(
         analysis_period_start=period_metadata["analysis_period_start"],
         analysis_period_end=period_metadata["analysis_period_end"],
         period_mode=period_metadata["period_mode"],
+        run_id=str(identity.get("run_id") or ""),
+        manifest_path=str(identity.get("manifest_path") or ""),
+        run_status=str(identity.get("run_status") or ""),
+        partial=bool(identity.get("partial", False)),
+        pipeline_profile=str(identity.get("pipeline_profile") or ""),
         html_path=str(html_path),
         json_path=str(json_path),
         thread_count=len(threads),
@@ -145,6 +263,8 @@ def generate_knowledge_atlas_report(
     atoms_limit: int = 8,
     output_root: str | Path | None = None,
     now: datetime | None = None,
+    reaction_snapshot_at: datetime | str | None = None,
+    run_identity: Mapping[str, object] | None = None,
 ) -> KnowledgeAtlasSummary:
     reporting_period = resolve_reporting_period(
         now=now,
@@ -160,6 +280,7 @@ def generate_knowledge_atlas_report(
             connection,
             week_label=clean_week,
             reporting_period=reporting_period,
+            reaction_snapshot_at=reaction_snapshot_at,
             threads_limit=max(1, int(threads_limit or 24)),
             atoms_limit=max(1, int(atoms_limit or 8)),
         )
@@ -167,6 +288,7 @@ def generate_knowledge_atlas_report(
         context,
         generated_at=generated_at,
         output_root=output_root,
+        run_identity=run_identity,
     )
 
 
@@ -174,6 +296,8 @@ def render_knowledge_atlas_html(context: dict, *, generated_at: str | None = Non
     week_label = str(context.get("week_label") or "")
     period_label = _human_period_label(context) or week_label
     generated = generated_at or str(context.get("generated_at") or _utc_now_iso())
+    run_status_notice = _render_run_status_notice(context)
+    run_identity_metadata = _render_run_identity_metadata(context)
     project_learning_projection = _atlas_project_learning_projection(context)
     section_bodies = {
         "atlas-overview": _render_atlas_overview(context),
@@ -196,6 +320,7 @@ def render_knowledge_atlas_html(context: dict, *, generated_at: str | None = Non
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="intelligence-contract-version" content="{_escape(INTELLIGENCE_CONTRACT_VERSION)}">
+{run_identity_metadata}
 <title>Knowledge Atlas { _escape(period_label) }</title>
 <style>
 :root {{ color-scheme: light; --ink:#18212b; --muted:#66717e; --line:#d8dee6; --panel:#ffffff; --bg:#f5f7f9; --accent:#0f766e; --warn:#a16207; }}
@@ -247,6 +372,7 @@ th, td {{ border-bottom:1px solid var(--line); text-align:left; padding:9px 8px;
 <h1>Knowledge Atlas - {_escape(period_label)}</h1>
 <p class="muted">Period mode: {_escape(str(context.get("period_mode") or "explicit_iso_week"))}.</p>
 <p class="muted">Generated {_escape(generated)}.</p>
+{run_status_notice}
 <p class="muted">Bounded Idea Thread and Knowledge Atom context. This is a rolling knowledge map, not a raw Telegram mirror.</p>
 <nav>{nav}</nav>
 </header>
@@ -324,6 +450,7 @@ def _knowledge_atlas_metadata(
     json_path: Path,
     quality_findings: list[ReportQualityFinding],
     related_artifacts: dict,
+    run_identity: Mapping[str, object],
 ) -> dict:
     threads = context.get("threads") or []
     atoms = _all_atoms(threads)
@@ -348,6 +475,7 @@ def _knowledge_atlas_metadata(
         "contract_version": INTELLIGENCE_CONTRACT_VERSION,
         "artifact_type": "knowledge_atlas",
         **_period_metadata(context, generated_at=generated_at),
+        **run_identity,
         "html_path": str(html_path),
         "json_path": str(json_path),
         "artifact_paths": {"html": str(html_path), "json": str(json_path)},
@@ -369,7 +497,7 @@ def _knowledge_atlas_metadata(
     }
 
 
-def _period_metadata(context: dict, *, generated_at: str) -> dict[str, str]:
+def _period_metadata(context: dict, *, generated_at: str) -> dict[str, object]:
     """Return additive period identity while accepting legacy report contexts."""
 
     week_label = str(context.get("week_label") or context.get("reporting_week") or "").strip()
@@ -382,7 +510,7 @@ def _period_metadata(context: dict, *, generated_at: str) -> dict[str, str]:
     ).strip()
     clean_generated_at = str(generated_at or context.get("generated_at") or "").strip()
     run_date = str(context.get("run_date") or clean_generated_at[:10]).strip()
-    return {
+    metadata: dict[str, object] = {
         "run_date": run_date,
         "generated_at": clean_generated_at,
         "analysis_period_start": analysis_period_start,
@@ -391,6 +519,10 @@ def _period_metadata(context: dict, *, generated_at: str) -> dict[str, str]:
         "week_label": week_label,
         "period_mode": str(context.get("period_mode") or "explicit_iso_week").strip(),
     }
+    reaction_snapshot_at = str(context.get("reaction_snapshot_at") or "").strip()
+    if reaction_snapshot_at:
+        metadata["reaction_snapshot_at"] = reaction_snapshot_at
+    return metadata
 
 
 def _human_period_label(context: dict) -> str:

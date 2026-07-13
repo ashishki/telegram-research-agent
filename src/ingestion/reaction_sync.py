@@ -6,6 +6,7 @@ from typing import Any
 
 from config.settings import Settings
 from db.migrate import record_feedback, record_post_tag
+from output.reporting_period import ReportingPeriod, register_reporting_period_sqlite
 
 
 LOGGER = logging.getLogger(__name__)
@@ -226,7 +227,36 @@ def _merge_summary(target: dict[str, int], update: dict[str, int]) -> None:
         target[key] = target.get(key, 0) + int(value or 0)
 
 
-def _load_candidate_posts(connection: sqlite3.Connection, days: int, limit: int) -> list[sqlite3.Row]:
+def _load_candidate_posts(
+    connection: sqlite3.Connection,
+    days: int,
+    limit: int,
+    *,
+    reporting_period: ReportingPeriod | None = None,
+) -> list[sqlite3.Row]:
+    if reporting_period is not None:
+        register_reporting_period_sqlite(connection)
+        return connection.execute(
+            """
+            SELECT
+                p.id AS post_id,
+                p.channel_username,
+                r.message_id
+            FROM posts p
+            INNER JOIN raw_posts r ON r.id = p.raw_post_id
+            WHERE reporting_utc_micros(p.posted_at) >= reporting_utc_micros(?)
+              AND reporting_utc_micros(p.posted_at) < reporting_utc_micros(?)
+              AND r.message_id IS NOT NULL
+              AND p.channel_username IS NOT NULL
+            ORDER BY reporting_utc_micros(p.posted_at) DESC, p.id DESC
+            LIMIT ?
+            """,
+            (
+                reporting_period.to_dict()["analysis_period_start"],
+                reporting_period.to_dict()["analysis_period_end"],
+                max(1, int(limit or 300)),
+            ),
+        ).fetchall()
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat().replace("+00:00", "Z")
     return connection.execute(
         """
@@ -246,7 +276,13 @@ def _load_candidate_posts(connection: sqlite3.Connection, days: int, limit: int)
     ).fetchall()
 
 
-async def sync_reactions(settings: Settings, *, days: int = 14, limit: int = 300) -> dict[str, int]:
+async def sync_reactions(
+    settings: Settings,
+    *,
+    days: int = 14,
+    limit: int = 300,
+    reporting_period: ReportingPeriod | None = None,
+) -> dict[str, int]:
     from ingestion.telegram_client import make_client
 
     summary = {
@@ -263,7 +299,12 @@ async def sync_reactions(settings: Settings, *, days: int = 14, limit: int = 300
     with sqlite3.connect(settings.db_path) as connection:
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON;")
-        candidates = _load_candidate_posts(connection, days=days, limit=limit)
+        candidates = _load_candidate_posts(
+            connection,
+            days=days,
+            limit=limit,
+            reporting_period=reporting_period,
+        )
 
         client = await make_client(settings)
         try:

@@ -1,7 +1,7 @@
 # Weekly Run Manifest Contract
 
 Version: `weekly_run_manifest.v1`  
-Status: IRX-1 time semantics implemented; IRX-2 manifest/orchestration planned
+Status: IRX-2 `implemented_and_verified`; IRX-3 ready
 Owner: `telegram-research-agent`
 
 The weekly run manifest is the identity and state spine for one intelligence
@@ -69,10 +69,16 @@ The reader title uses inclusive human dates, for example:
 
 ## Manifest Shape
 
+The following policy-bearing example is abridged only at the common per-stage
+bookkeeping level. The required-stage set, complete stage-policy membership,
+and disabled later-owned stages are normative.
+
 ```json
 {
   "schema_version": "weekly_run_manifest.v1",
+  "pipeline_profile": "irx2_orchestration.v1",
   "run_id": "tra-weekly-2026-W28-20260713T070252Z",
+  "supersedes_run_id": null,
   "run_date": "2026-07-13",
   "generated_at": "2026-07-13T07:02:52Z",
   "reporting_week": "2026-W28",
@@ -82,87 +88,170 @@ The reader title uses inclusive human dates, for example:
   "analysis_period_end": "2026-07-13T00:00:00Z",
   "run_status": "running",
   "partial": false,
-  "knowledge_refresh_status": "succeeded",
-  "reaction_sync_status": "succeeded",
-  "frontier_analysis_id": 42,
-  "frontier_analysis_path": "data/output/frontier_analysis/2026-W28.json",
-  "market_lens_path": "data/output/market_context_lens/current.json",
-  "radar_status": "succeeded",
-  "radar_json_path": "../Demand-to-MVP-Radar/reports/mvp_of_week/mvp-weekly-2026-W28.json",
+  "cancellation_requested": false,
+  "finalized_at": null,
+  "knowledge_refresh_status": "pending",
+  "reaction_sync_status": "pending",
+  "frontier_analysis_id": null,
+  "frontier_analysis_path": null,
+  "market_lens_path": null,
+  "radar_status": "pending",
+  "radar_json_path": null,
   "weekly_brief_html_path": null,
   "weekly_brief_json_path": null,
   "atlas_html_path": null,
   "atlas_json_path": null,
   "audit_explorer_path": null,
-  "feedback_snapshot": "feedback-before-2026-W28-end",
+  "feedback_snapshot": null,
   "report_generation_status": "pending",
   "required_stages": [
     "knowledge_refresh",
     "reaction_sync",
+    "feedback_snapshot",
     "frontier_analysis",
     "radar",
-    "editorial_intelligence",
     "weekly_brief",
-    "knowledge_atlas",
-    "knowledge_audit_explorer"
+    "knowledge_atlas"
   ],
+  "stage_policy": {
+    "knowledge_refresh": {
+      "enabled": true,
+      "required": true,
+      "fatal": true,
+      "degrades_on_failure": false
+    },
+    "reaction_sync": {
+      "enabled": true,
+      "required": true,
+      "fatal": false,
+      "degrades_on_failure": true
+    },
+    "feedback_snapshot": {
+      "enabled": true,
+      "required": true,
+      "fatal": false,
+      "degrades_on_failure": true
+    },
+    "canonical_thread_curation": {
+      "enabled": false,
+      "required": false,
+      "fatal": false,
+      "degrades_on_failure": false
+    },
+    "frontier_analysis": {
+      "enabled": true,
+      "required": true,
+      "fatal": false,
+      "degrades_on_failure": true
+    },
+    "radar": {
+      "enabled": true,
+      "required": true,
+      "fatal": false,
+      "degrades_on_failure": true
+    },
+    "editorial_intelligence": {
+      "enabled": false,
+      "required": false,
+      "fatal": false,
+      "degrades_on_failure": false
+    },
+    "weekly_brief": {
+      "enabled": true,
+      "required": true,
+      "fatal": true,
+      "degrades_on_failure": false
+    },
+    "knowledge_atlas": {
+      "enabled": true,
+      "required": true,
+      "fatal": false,
+      "degrades_on_failure": true
+    },
+    "knowledge_audit_explorer": {
+      "enabled": false,
+      "required": false,
+      "fatal": false,
+      "degrades_on_failure": false
+    },
+    "reader_value_gates": {
+      "enabled": false,
+      "required": false,
+      "fatal": false,
+      "degrades_on_failure": false
+    }
+  },
   "stages": {
     "knowledge_refresh": {
-      "status": "succeeded",
-      "started_at": "2026-07-13T07:02:53Z",
-      "finished_at": "2026-07-13T07:04:10Z",
+      "status": "pending",
+      "started_at": null,
+      "finished_at": null,
       "artifact_path": null,
-      "record_counts": {"atoms": 35, "threads": 24},
+      "record_counts": {},
       "error": null
     },
     "reaction_sync": {
-      "status": "succeeded",
-      "started_at": "2026-07-13T07:04:10Z",
-      "finished_at": "2026-07-13T07:04:50Z",
-      "snapshot_ref": "reaction-snapshot:tra-weekly-2026-W28-20260713T070252Z",
-      "record_counts": {
-        "reactions_detected": 18,
-        "posts_resolved": 15
-      },
+      "status": "pending",
+      "started_at": null,
+      "finished_at": null,
+      "snapshot_ref": null,
+      "record_counts": {},
+      "error": null
+    },
+    "feedback_snapshot": {
+      "status": "pending",
+      "snapshot_id": null,
+      "cutoff": null,
+      "confirmed_event_count": 0,
+      "pending_event_count": 0,
+      "error": null
+    },
+    "canonical_thread_curation": {
+      "status": "disabled",
+      "artifact_path": null,
       "error": null
     },
     "frontier_analysis": {
-      "status": "succeeded",
-      "analysis_id": 42,
-      "artifact_path": "data/output/frontier_analysis/2026-W28.json",
+      "status": "pending",
+      "analysis_id": null,
+      "artifact_path": null,
       "error": null
     },
     "radar": {
-      "status": "succeeded",
+      "status": "pending",
       "required": true,
-      "radar_run_id": "mvp-weekly-2026-W28",
-      "artifact_path": "../Demand-to-MVP-Radar/reports/mvp_of_week/mvp-weekly-2026-W28.json",
-      "artifact_sha256": "<sha256>",
-      "reporting_week": "2026-W28",
+      "radar_run_id": null,
+      "artifact_path": null,
+      "artifact_sha256": null,
+      "reporting_week": null,
       "error": null
     },
     "editorial_intelligence": {
-      "status": "pending",
+      "status": "disabled",
       "artifact_path": null,
       "error": null
     },
     "weekly_brief": {"status": "pending", "html_path": null, "json_path": null},
     "knowledge_atlas": {"status": "pending", "html_path": null, "json_path": null},
-    "knowledge_audit_explorer": {"status": "pending", "html_path": null, "json_path": null}
+    "knowledge_audit_explorer": {"status": "disabled", "html_path": null, "json_path": null},
+    "reader_value_gates": {"status": "disabled", "artifact_path": null}
   },
   "frontier_analysis_ref": {
-    "id": 42,
-    "path": "data/output/frontier_analysis/2026-W28.json"
+    "id": null,
+    "path": null
   },
   "radar_json_ref": {
-    "path": "../Demand-to-MVP-Radar/reports/mvp_of_week/mvp-weekly-2026-W28.json",
-    "run_id": "mvp-weekly-2026-W28",
+    "path": null,
+    "sha256": null,
+    "binding_path": null,
+    "binding_sha256": null,
+    "run_id": null,
     "reporting_week": "2026-W28"
   },
   "feedback_snapshot_ref": {
-    "snapshot_id": "feedback-before-2026-W28-end",
+    "snapshot_id": null,
     "cutoff": "2026-07-13T00:00:00Z",
-    "confirmed_event_count": 5,
+    "confirmed_event_count": 0,
     "pending_event_count": 0
   },
   "artifacts": {
@@ -193,6 +282,51 @@ full execution detail. Validators require exact parity between each summary
 field and its nested canonical record; neither representation may drift or be
 filled from an unrelated prior run.
 
+## IRX-2 Orchestration Profile
+
+IRX-2 implements `pipeline_profile=irx2_orchestration.v1`. This is a complete
+technical package against the IRX-2 stage policy; it is not a claim that Report
+V2 or the IRX-14 dogfood gate is complete.
+
+The initial manifest freezes `stage_policy` before execution. Each entry has
+`enabled`, `required`, `fatal`, and `degrades_on_failure`. Membership in
+`required_stages` must exactly match `required=true`.
+
+Required and enabled by default in this profile:
+
+- `knowledge_refresh` (the existing bounded Idea Thread refresh/bind step);
+- `reaction_sync`;
+- `feedback_snapshot`;
+- `frontier_analysis`;
+- `radar`;
+- `weekly_brief`;
+- `knowledge_atlas`.
+
+Reserved for their owning later tasks and predeclared disabled/non-required:
+
+- `canonical_thread_curation` (IRX-4);
+- `editorial_intelligence` (IRX-5);
+- `knowledge_audit_explorer` as a dedicated surface (IRX-7);
+- `reader_value_gates` (IRX-11).
+
+The current detailed Atlas remains inspectable through its V1 compatibility
+path; IRX-2 does not relabel or redesign it. Aligned opportunity-seed export,
+market-lens inputs, and their checksums are canonical dependencies inside the
+Radar stage rather than independent reader stages.
+
+An operator may predeclare Radar disabled. In that case its policy is
+`enabled=false`, `required=false`, its stage starts `disabled`, the Brief states
+that no build decision was produced, and the manifest records a dogfood-blocking
+warning. Unexpected Radar absence is never converted into this state.
+
+`report_generation_status` is a deterministic flat projection: `pending` or
+`running` while either reader stage is active, `failed` when either render stage
+fails, and `succeeded` only when both Brief and Atlas succeed. The overall run
+may still be `partial` when Atlas fails but a valid Brief exists. Dedicated
+Audit Explorer paths remain null under this profile. `market_lens_path` must
+equal the Radar stage dependency ref, and all other flat refs must equal their
+nested canonical records.
+
 ## Identity Rules
 
 - `run_id` is unique and immutable.
@@ -205,6 +339,21 @@ filled from an unrelated prior run.
   rewrite the prior manifest.
 - `generated_at` may differ across stage artifacts, but their `run_id` and
   analysis period must match.
+
+Manifest `run_id` and Radar `radar_run_id` are distinct identifiers. IRX-2 uses
+an additive `radar_run_binding.v1` envelope containing both IDs, all reporting
+period fields, Radar contract/schema version, seed export path/checksum, Radar
+JSON path/checksum, and the selected candidate/status projection. The raw Radar
+V1 payload remains gate-authoritative; the envelope proves which immutable raw
+bytes belong to the weekly run. A zero-seed export receives the same companion
+identity envelope, because a bare empty JSON array cannot prove period identity.
+
+The reaction stage records `snapshot_ref` and `observed_through`. The latter is
+the successful sync completion timestamp and may be later than manifest
+`generated_at`; source-post eligibility still uses the analysis period. If sync
+fails, the report uses only the pre-run cutoff and declares the reaction
+snapshot partial. Feedback snapshot cutoff remains the exclusive analysis
+period end unless its owning future task versions that semantic.
 
 ## Stage Status Contract
 
@@ -238,6 +387,44 @@ Such a run does not pass the IRX-14 dogfood start gate.
 Unexpected missing, wrong-week, wrong-run, invalid, or failed Radar always makes
 the reader package partial or failed.
 
+Every stage record contains immutable `enabled`, `required`, `fatal`, and
+`degrades_on_failure`, plus `status`, `attempt`, nullable start/finish times,
+bounded sanitized `error`, `record_counts`, dependency/artifact refs, and
+checksums. A `degraded=true` marker represents a validated fallback without
+pretending that ordinary `succeeded` is full quality.
+
+Allowed transitions are:
+
+```text
+pending -> running | skipped_dependency | cancelled
+running -> succeeded | failed | cancelled
+failed | skipped_dependency | cancelled -> running
+  only while the manifest is still unfinalized, with attempt incremented
+succeeded | disabled -> terminal
+```
+
+Enabled stages start `pending`; predeclared disabled stages start `disabled`.
+Terminal manifests are immutable. The state machine permits a failed, skipped,
+or cancelled stage to transition back to `running` only inside an unfinalized
+manifest and increments its attempt counter. The public
+`weekly-intelligence-v2` CLI does not expose same-ID resume: an operational retry
+creates a new `run_id` and may set `supersedes_run_id`.
+
+Run aggregation order is deterministic:
+
+1. explicit cancellation -> `cancelled`;
+2. manifest validation or a fatal stage failure, including Weekly Brief render
+   failure -> `failed`;
+3. otherwise any partial period, required/nonfatal failure, unexpected enabled
+   stage failure/skip, failed reaction or feedback snapshot, unavailable exact
+   Frontier result, Radar mismatch/failure, validated fallback, or Atlas failure
+   -> `partial`;
+4. otherwise all required stages succeeded with no degradation -> `complete`.
+
+An empty completed period is `complete` when all stages succeed. `partial` is a
+derived boolean and is always true for `run_status=partial`; it is never used to
+hide a failed run.
+
 ## Partial And Failed Behavior
 
 | Condition | Manifest result | Reader behavior |
@@ -245,10 +432,9 @@ the reader package partial or failed.
 | Radar expected but missing | `partial`, Radar `failed` | visible partial banner; no candidate fiction |
 | Radar wrong week/run | `partial`, Radar `failed` | mismatch named in technical details |
 | Reaction sync failed | `partial` | receipt says reactions were not refreshed |
-| Editorial model failed, deterministic fallback succeeds | `partial` | fallback banner; no claim of full editorial quality |
+| Any enabled stage is explicitly marked `degraded` after a validated fallback | `partial` | degraded stage named; no complete-quality claim |
 | Brief render failed | `failed` | do not deliver a stale prior Brief as current |
 | Atlas render failed, Brief succeeds | `partial` | Brief may deliver with Atlas unavailable |
-| Audit Explorer fails | `partial` | reader surfaces may deliver; technical link unavailable |
 | Current-week diagnostic requested | `partial` | exact partial dates in header |
 | Empty completed period with successful stages | `complete` | explicit zero-evidence report, not pipeline-failure copy |
 
@@ -269,11 +455,21 @@ labeling it stale and outside the current run.
 5. Sanitize exceptions into a bounded `error` object; do not store secrets.
 6. Recompute `partial`, `failed_stages`, and `run_status` after every stage.
 7. Deliver only from the finalized manifest.
-8. A resumed run retains its run ID and records `attempt` per stage.
+8. The core records `attempt` for transitions inside an unfinalized manifest;
+   the public CLI retries as a new run, optionally linked by
+   `supersedes_run_id`.
+
+IRX-2 uses a provisional internal run-scoped root
+`data/output/weekly_intelligence_runs/<run_id>/`. This does not choose final V2
+aliases or retention; IRX-14 still owns those decisions. Initial creation is
+exclusive, manifest updates use a same-directory temporary file plus validated
+atomic rename, and terminal manifests/artifacts are immutable. V1 week-named
+paths remain diagnostic compatibility surfaces and are never package identity.
 
 ## Orchestrator Ownership
 
-IRX-2 will define one command that owns the package. The target flow is:
+IRX-2 defines the explicit additive `weekly-intelligence-v2` command as the
+owner of the technical package. Its target lifecycle is:
 
 ```text
 resolve period
@@ -292,9 +488,11 @@ resolve period
   -> deliver finalized artifacts
 ```
 
-The existing standalone commands remain available for diagnostics and
-historical regeneration. They do not independently claim to have produced a
-complete V2 package.
+Under `irx2_orchestration.v1`, future-owned curation/editorial/Audit
+Explorer/reader-gate steps in the target flow are recorded as predeclared
+disabled stages. The existing standalone commands remain available for
+diagnostics and historical regeneration. They do not independently claim to
+have produced a complete V2 package.
 
 ## Validation Requirements
 
@@ -308,14 +506,16 @@ complete V2 package.
 - `partial=false` cannot coexist with `run_status=partial`.
 - expected output file must exist and validate before a stage succeeds.
 
-## Planned Verification
+## Implementation Verification
 
 ```bash
-PYTHONPATH=src python3 -m pytest \
-  tests/test_reporting_period.py \
-  tests/test_weekly_run_manifest.py \
-  tests/test_split_intelligence_reports.py \
-  tests/test_mvp_weekly_pipeline.py
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache \
+  python3 -m unittest tests.test_reporting_period \
+  tests.test_weekly_run_manifest \
+  tests.test_weekly_intelligence_orchestrator \
+  tests.test_split_intelligence_reports \
+  tests.test_mvp_weekly_pipeline \
+  tests.test_pi_facade
 ```
 
 ```bash
@@ -328,10 +528,35 @@ Cross-repository:
 ```bash
 cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
 .venv/bin/python -m pytest \
-  tests/test_mvp_of_week.py \
-  tests/test_telegram_research_bridge.py \
-  tests/test_validation_evidence.py
+  tests/test_mvp_of_week.py
 ```
+
+The IRX-2 focused local suites and the unchanged sibling Radar focused suite
+passed during implementation review. Heavy/live pipelines and the full suite
+were intentionally not run.
+
+## IRX-2 Implementation Receipt
+
+Implemented on 2026-07-13 as an additive path beside the V1 commands:
+
+- one immutable run directory and atomically replaced manifest per invocation;
+- frozen stage policy, deterministic transitions/aggregation, sanitized errors,
+  warnings, failed-stage disclosure, and validated terminal delivery;
+- exact run/period/checksum binding for the seed export, optional immutable
+  `radar/live-intelligence.json`, market lens, raw Radar result,
+  `radar_run_binding.v1`, Frontier snapshot, Brief, and Atlas;
+- one exclusive `analysis_period_end` feedback cutoff shared by the snapshot,
+  readers, and Frontier cache identity, plus a content fingerprint that rejects
+  a concurrently replaced Frontier week row before it is bound;
+- manifest-aware Hermes/PI artifact selection that rejects failed, stale,
+  mismatched, or tampered same-run inputs instead of falling back to adjacency;
+- visible partial/disabled behavior while curation, editorial synthesis, the
+  dedicated Audit Explorer, and reader-value gates remain disabled and owned by
+  their later IRX tasks.
+
+Existing V1 commands and paths remain compatibility surfaces. No generated
+report was edited or committed, and no Radar evidence or context-only gate was
+changed. IRX-3 is the next implementation task.
 
 ## Stop Conditions
 

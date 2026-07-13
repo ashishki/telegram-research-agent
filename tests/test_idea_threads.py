@@ -292,6 +292,59 @@ class TestIdeaThreads(unittest.TestCase):
         self.assertEqual(len(atoms), 1)
         self.assertIn("workflow claim", atoms[0]["claim"])
 
+    def test_historical_refresh_excludes_atoms_at_or_after_exclusive_utc_end(self):
+        db_path = self._make_db()
+        timestamps = (
+            "2026-07-12T23:59:59.999999Z",
+            "2026-07-13T00:00:00Z",
+            "2026-07-13T02:00:00+02:00",
+            "2026-07-13T00:00:00.000001Z",
+        )
+        with sqlite3.connect(db_path) as connection:
+            for index, timestamp in enumerate(timestamps, start=1):
+                record_knowledge_atom(
+                    connection,
+                    week_label="2026-W28" if index == 1 else "2026-W29",
+                    atom_type="research_claim",
+                    claim=f"Historical boundary claim {index} has distinct evidence.",
+                    evidence_quote=f"historical boundary evidence {index}",
+                    source_post_ids=[700 + index],
+                    source_urls=[f"https://t.me/boundary/{700 + index}"],
+                    entities=[f"boundary-{index}"],
+                    confidence=0.7,
+                    first_seen_at=timestamp,
+                    last_seen_at=timestamp,
+                )
+        try:
+            bounded = refresh_idea_threads(
+                self._settings(db_path),
+                weeks=12,
+                now=datetime(2026, 7, 13, tzinfo=timezone.utc),
+                analysis_period_end="2026-07-13T02:00:00+02:00",
+            )
+            unbounded = refresh_idea_threads(
+                self._settings(db_path),
+                weeks=12,
+                now=datetime(2026, 7, 13, tzinfo=timezone.utc),
+            )
+        finally:
+            os.unlink(db_path)
+
+        self.assertEqual(bounded.atoms_seen, 1)
+        self.assertEqual(bounded.threads_refreshed, 1)
+        self.assertEqual(unbounded.atoms_seen, 4)
+
+    def test_historical_refresh_rejects_naive_analysis_period_end(self):
+        db_path = self._make_db()
+        try:
+            with self.assertRaisesRegex(ValueError, "explicit timezone"):
+                refresh_idea_threads(
+                    self._settings(db_path),
+                    analysis_period_end=datetime(2026, 7, 13),
+                )
+        finally:
+            os.unlink(db_path)
+
     def test_idea_threads_cli_refreshes_threads(self):
         db_path = self._make_db()
         self._seed_atoms(db_path)

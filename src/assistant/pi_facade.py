@@ -9,13 +9,15 @@ from pathlib import Path
 from typing import Any, Iterable, Iterator, Mapping
 from urllib.parse import quote
 
-from config.settings import Settings, load_settings
+from config.settings import PROJECT_ROOT, Settings, load_settings
 from db.ai_report_feedback import fetch_ai_report_feedback, summarize_ai_report_feedback
 from db.idea_threads import fetch_idea_thread_atoms, fetch_idea_threads
 from output.action_status import build_action_status_projection, summarize_action_statuses
 from output.intelligence_retrieval_items import (
     DEFAULT_KNOWLEDGE_ATLAS_OUTPUT_DIR,
     DEFAULT_WEEKLY_BRIEF_OUTPUT_DIR,
+    _dedupe_items,
+    _items_from_workbook,
     build_retrieval_items,
     find_latest_week_label,
     load_latest_workbook_json,
@@ -23,6 +25,17 @@ from output.intelligence_retrieval_items import (
 )
 from assistant.semantic_retrieval import retrieval_decision_note, search_curated_semantic_items
 from output.strategy_reviewer import build_strategy_review
+from output.weekly_intelligence_brief import (
+    RADAR_DISABLED_DISCLOSURE_RU,
+    load_mvp_radar_summary as load_bound_mvp_radar_summary,
+)
+from output.weekly_run_manifest import (
+    WeeklyRunManifestError,
+    load_manifest,
+    validate_manifest,
+    validate_radar_run_binding,
+    verify_file_checksum,
+)
 
 
 TOKEN_RE = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_-]{1,}")
@@ -33,6 +46,8 @@ NON_BUILD_READY_RECOMMENDATIONS = {
     "existing_project_context",
     "reject",
 }
+_INVALID_MANIFEST_MARKER = "_weekly_manifest_invalid"
+_ISO_WEEK_SEARCH_RE = re.compile(r"(?<![0-9A-Z])([0-9]{4}-W(?:0[1-9]|[1-4][0-9]|5[0-3]))(?![0-9])")
 
 
 class PersonalIntelligenceFacade:
@@ -48,6 +63,7 @@ class PersonalIntelligenceFacade:
         ai_output_root: str | Path | None = None,
         mvp_output_root: str | Path | None = None,
         radar_output_root: str | Path | None = None,
+        weekly_run_root: str | Path | None = None,
         now: datetime | None = None,
     ) -> None:
         base_settings = settings or load_settings()
@@ -64,9 +80,48 @@ class PersonalIntelligenceFacade:
         self._ai_output_root = Path(ai_output_root) if ai_output_root is not None else None
         self._mvp_output_root = Path(mvp_output_root) if mvp_output_root is not None else None
         self._radar_output_root = Path(radar_output_root) if radar_output_root is not None else None
+        self._weekly_run_root = (
+            Path(weekly_run_root)
+            if weekly_run_root is not None
+            else (
+                self._output_root / "weekly_intelligence_runs"
+                if self._output_root is not None
+                else PROJECT_ROOT / "data" / "output" / "weekly_intelligence_runs"
+            )
+        )
         self._now = now
 
     def get_current_week_label(self) -> dict:
+        manifest_selection = self._select_weekly_manifest(None)
+        if manifest_selection is not None:
+            manifest, manifest_path = manifest_selection
+            if manifest.get(_INVALID_MANIFEST_MARKER):
+                identity = _manifest_identity(manifest, manifest_path)
+                return {
+                    "status": "invalid",
+                    "week_label": str(
+                        manifest.get("_candidate_reporting_week")
+                        or manifest.get("reporting_week")
+                        or self._current_week_label()
+                    ),
+                    "source": "weekly_run_manifest",
+                    **identity,
+                    "message": (
+                        "The latest weekly run manifest is invalid; older runs and "
+                        "legacy artifacts were not substituted."
+                    ),
+                }
+            return {
+                "status": "ok",
+                "week_label": manifest["reporting_week"],
+                "source": "weekly_run_manifest",
+                "run_id": manifest["run_id"],
+                "manifest_path": str(manifest_path),
+                "run_status": manifest["run_status"],
+                "partial": bool(manifest["partial"]),
+                "pipeline_profile": manifest["pipeline_profile"],
+                "message": "Latest weekly run manifest found.",
+            }
         week = find_latest_week_label(
             self._settings,
             output_root=self._output_root,
@@ -186,11 +241,21 @@ class PersonalIntelligenceFacade:
             "message": "Idea threads matched deterministic search." if items else "No matching idea threads found.",
         }
 
-    def get_idea_thread(self, slug: str) -> dict:
+    def get_idea_thread(self, slug: str, week_label: str | None = None) -> dict:
         clean_slug = str(slug or "").strip()
         if not clean_slug:
             return self._missing_idea_thread(clean_slug, "Idea thread slug is required.")
-        detail = self._idea_thread_detail_from_db(clean_slug) or self._idea_thread_detail_from_workbook(clean_slug)
+        manifest_selection = self._select_weekly_manifest(week_label)
+        if manifest_selection is not None:
+            detail = self._idea_thread_detail_from_manifest(
+                clean_slug,
+                *manifest_selection,
+            )
+        else:
+            detail = self._idea_thread_detail_from_db(clean_slug) or self._idea_thread_detail_from_workbook(
+                clean_slug,
+                week_label=week_label,
+            )
         if detail is None:
             return self._missing_idea_thread(clean_slug, "Idea thread is missing.")
         return {
@@ -254,7 +319,89 @@ class PersonalIntelligenceFacade:
         }
 
     def get_mvp_radar_status(self, week_label: str | None = None) -> dict:
-        clean_week = str(week_label or "").strip() or self.get_current_week_label()["week_label"]
+        clean_week, manifest_selection = self._resolve_weekly_manifest_request(
+            week_label
+        )
+        if manifest_selection is not None:
+            manifest, manifest_path = manifest_selection
+            identity = _manifest_identity(manifest, manifest_path)
+            if manifest.get(_INVALID_MANIFEST_MARKER):
+                return {
+                    "status": "invalid",
+                    "week_label": clean_week,
+                    "candidate": None,
+                    "dossier_status": None,
+                    "recommendation": None,
+                    "source_mix": None,
+                    "missing_evidence": [],
+                    "next_validation": [],
+                    "matched_external_evidence_count": 0,
+                    "matched_external_source_types": [],
+                    "market_context_status": "context_only",
+                    "mvp_radar_gate": _mvp_gate_status(None),
+                    **identity,
+                    "run_identity": identity,
+                    "message": (
+                        "The authoritative weekly run manifest is invalid; "
+                        "older Radar artifacts were not substituted."
+                    ),
+                }
+            radar_stage = manifest["stages"]["radar"]
+            if radar_stage["status"] == "disabled":
+                gate = _mvp_gate_status({"status": "intentionally_disabled", "disabled": True})
+                return {
+                    "status": "disabled",
+                    "week_label": clean_week,
+                    "candidate": None,
+                    "dossier_status": None,
+                    "recommendation": None,
+                    "source_mix": None,
+                    "missing_evidence": [RADAR_DISABLED_DISCLOSURE_RU],
+                    "next_validation": [],
+                    "matched_external_evidence_count": 0,
+                    "matched_external_source_types": [],
+                    "market_context_status": "context_only",
+                    "mvp_radar_gate": gate,
+                    **identity,
+                    "run_identity": identity,
+                    "message": RADAR_DISABLED_DISCLOSURE_RU,
+                }
+            payload = (
+                self._load_manifest_radar_payload(manifest, manifest_path, clean_week)
+                if radar_stage["status"] == "succeeded"
+                and manifest.get("run_status") in {"complete", "partial"}
+                else None
+            )
+            if not payload:
+                return {
+                    "status": "missing",
+                    "week_label": clean_week,
+                    "candidate": None,
+                    "dossier_status": None,
+                    "recommendation": None,
+                    "source_mix": None,
+                    "missing_evidence": [],
+                    "next_validation": [],
+                    "matched_external_evidence_count": 0,
+                    "matched_external_source_types": [],
+                    "market_context_status": "context_only",
+                    "mvp_radar_gate": _mvp_gate_status(None),
+                    **identity,
+                    "run_identity": identity,
+                    "message": (
+                        "MVP Radar is not available in the authoritative weekly run; "
+                        "legacy artifacts were not substituted."
+                    ),
+                }
+            normalized = _mvp_status(payload, clean_week)
+            return {
+                **normalized,
+                "mvp_radar_gate": _mvp_gate_status(payload),
+                **identity,
+                "run_identity": identity,
+                "status": "ok",
+                "message": "MVP Radar status loaded from the authoritative weekly run.",
+            }
         workbook = self._load_workbook(clean_week)
         payload = workbook.get("mvp_radar") if isinstance(workbook, Mapping) and isinstance(workbook.get("mvp_radar"), Mapping) else None
         if not payload or _clean_text(payload.get("status")) == "not_available":
@@ -287,7 +434,11 @@ class PersonalIntelligenceFacade:
         }
 
     def get_artifact_status(self, week_label: str | None = None) -> dict:
-        clean_week = str(week_label or "").strip() or self.get_current_week_label()["week_label"]
+        clean_week, manifest_selection = self._resolve_weekly_manifest_request(
+            week_label
+        )
+        if manifest_selection is not None:
+            return self._manifest_artifact_status(clean_week, *manifest_selection)
         current_week = self._current_week_label()
         brief_json, brief_html = self._split_artifact_paths(clean_week, "weekly_brief")
         atlas_json, atlas_html = self._split_artifact_paths(clean_week, "knowledge_atlas")
@@ -399,7 +550,48 @@ class PersonalIntelligenceFacade:
         }
 
     def list_marked_posts(self, week_label: str | None = None, limit: int = 20) -> dict:
-        clean_week = str(week_label or "").strip() or self.get_current_week_label()["week_label"]
+        clean_week, manifest_selection = self._resolve_weekly_manifest_request(
+            week_label
+        )
+        if manifest_selection is not None:
+            workbook = self._load_manifest_workbook(*manifest_selection)
+            if workbook is None:
+                return {
+                    "status": "missing",
+                    "week_label": clean_week,
+                    "items": [],
+                    "message": (
+                        "The authoritative weekly run Brief is unavailable or invalid; "
+                        "live marked-post rows were not substituted."
+                    ),
+                }
+            manifest_posts = workbook.get("marked_posts")
+            if not isinstance(manifest_posts, list):
+                return {
+                    "status": "missing",
+                    "week_label": clean_week,
+                    "items": [],
+                    "message": (
+                        "The authoritative weekly run Brief has no valid marked-post snapshot; "
+                        "live rows were not substituted."
+                    ),
+                }
+            items = [
+                _marked_post_item(post)
+                for post in manifest_posts
+                if isinstance(post, Mapping)
+            ][: max(1, int(limit or 20))]
+            return {
+                "status": "ok" if items else "empty",
+                "week_label": clean_week,
+                "items": items,
+                "message": (
+                    "Marked posts loaded from the authoritative weekly run Brief."
+                    if items
+                    else "The authoritative weekly run contains no marked posts."
+                ),
+            }
+
         workbook = self._load_workbook(clean_week)
         workbook_posts = [
             _marked_post_item(post)
@@ -437,15 +629,19 @@ class PersonalIntelligenceFacade:
         limit: int = 10,
     ) -> dict:
         clean_filters = dict(filters or {})
-        items = build_retrieval_items(
-            self._settings,
-            week_label=clean_filters.get("week_label"),
-            output_root=self._output_root,
-            visual_output_root=self._visual_output_root,
-            ai_output_root=self._ai_output_root,
-            mvp_output_root=self._mvp_output_root,
-            radar_output_root=self._radar_output_root,
-        )
+        manifest_selection = self._select_weekly_manifest(clean_filters.get("week_label"))
+        if manifest_selection is not None:
+            items = self._manifest_retrieval_items(*manifest_selection)
+        else:
+            items = build_retrieval_items(
+                self._settings,
+                week_label=clean_filters.get("week_label"),
+                output_root=self._output_root,
+                visual_output_root=self._visual_output_root,
+                ai_output_root=self._ai_output_root,
+                mvp_output_root=self._mvp_output_root,
+                radar_output_root=self._radar_output_root,
+            )
         results = search_curated_semantic_items(items, query, filters=clean_filters, limit=limit)
         return {
             "status": "ok" if results else "empty",
@@ -464,6 +660,10 @@ class PersonalIntelligenceFacade:
         return f"{year}-W{week:02d}"
 
     def _load_workbook(self, week_label: str | None) -> dict | None:
+        manifest_selection = self._select_weekly_manifest(week_label)
+        if manifest_selection is not None:
+            manifest, manifest_path = manifest_selection
+            return self._load_manifest_workbook(manifest, manifest_path)
         return load_latest_workbook_json(
             self._settings,
             week_label,
@@ -471,6 +671,469 @@ class PersonalIntelligenceFacade:
             visual_output_root=self._visual_output_root,
             ai_output_root=self._ai_output_root,
         )
+
+    def _resolve_weekly_manifest_request(
+        self,
+        week_label: str | None,
+    ) -> tuple[str, tuple[dict[str, Any], Path] | None]:
+        clean_week = str(week_label or "").strip()
+        if clean_week:
+            return clean_week, self._select_weekly_manifest(clean_week)
+        selection = self._select_weekly_manifest(None)
+        if selection is not None:
+            manifest, _manifest_path = selection
+            selected_week = str(
+                manifest.get("_candidate_reporting_week")
+                or manifest.get("reporting_week")
+                or self._current_week_label()
+            )
+            return selected_week, selection
+        return str(self.get_current_week_label()["week_label"]), None
+
+    def _select_weekly_manifest(
+        self,
+        week_label: str | None,
+    ) -> tuple[dict[str, Any], Path] | None:
+        """Select one authoritative candidate without skipping invalid newer runs."""
+
+        if not self._weekly_run_root.is_dir():
+            return None
+        clean_week = str(week_label or "").strip() or None
+        candidates: list[
+            tuple[tuple[int, str, str], dict[str, Any], Path, str | None, bool]
+        ] = []
+        for path in self._weekly_run_root.glob("*/manifest.json"):
+            parse_failed = False
+            try:
+                loaded = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeError, json.JSONDecodeError):
+                loaded = None
+                parse_failed = True
+            if isinstance(loaded, Mapping):
+                payload = dict(loaded)
+            else:
+                payload = {}
+                parse_failed = True
+            invalid_candidate = parse_failed
+            if not invalid_candidate:
+                try:
+                    validate_manifest(payload)
+                except (TypeError, ValueError):
+                    invalid_candidate = True
+            if invalid_candidate:
+                # Invalid identity cannot be trusted as a single filter key. Keep
+                # conflicting/unassignable candidates fail-closed for explicit reads.
+                week_clues = _manifest_candidate_week_clues(payload, path)
+                candidate_weeks = set(week_clues)
+                candidate_week = _majority_week_clue(week_clues)
+                reliable_other_week = (
+                    len(week_clues) >= 2 and len(candidate_weeks) == 1
+                )
+                if (
+                    clean_week
+                    and clean_week not in candidate_weeks
+                    and reliable_other_week
+                ):
+                    continue
+            else:
+                candidate_week = str(payload["reporting_week"])
+                if clean_week and clean_week != candidate_week:
+                    continue
+            try:
+                path_stat = path.stat()
+                parent_stat = path.parent.stat()
+                freshness_ns = max(
+                    path_stat.st_mtime_ns,
+                    path_stat.st_ctime_ns,
+                    parent_stat.st_mtime_ns,
+                    parent_stat.st_ctime_ns,
+                )
+            except OSError:
+                filesystem_freshness_ns = 0
+            else:
+                filesystem_freshness_ns = freshness_ns
+            freshness_ns = (
+                # Preserve canonical run ordering for valid concurrent runs; use
+                # filesystem evidence only when the manifest cannot authenticate it.
+                filesystem_freshness_ns
+                if invalid_candidate
+                else _manifest_generated_at_ns(payload)
+            )
+            run_id = str(payload.get("run_id") or path.parent.name)
+            key = (
+                freshness_ns,
+                run_id,
+                str(path.resolve()),
+            )
+            candidates.append(
+                (key, payload, path.resolve(), candidate_week, invalid_candidate)
+            )
+        if not candidates:
+            return None
+        _key, manifest, path, candidate_week, invalid_candidate = max(
+            candidates,
+            key=lambda item: item[0],
+        )
+        if invalid_candidate:
+            manifest[_INVALID_MANIFEST_MARKER] = True
+            manifest["_candidate_reporting_week"] = candidate_week or clean_week
+            manifest["_candidate_run_id"] = str(
+                manifest.get("run_id") or path.parent.name
+            )
+        return manifest, path
+
+    def _load_manifest_workbook(
+        self,
+        manifest: Mapping[str, Any],
+        manifest_path: Path,
+    ) -> dict | None:
+        return self._load_manifest_reader_sidecar(
+            manifest,
+            manifest_path,
+            stage_name="weekly_brief",
+            artifact_type="weekly_intelligence_brief",
+        )
+
+    def _load_manifest_reader_sidecar(
+        self,
+        manifest: Mapping[str, Any],
+        manifest_path: Path,
+        *,
+        stage_name: str,
+        artifact_type: str,
+    ) -> dict | None:
+        """Load only a fully identity-bound Brief/Atlas sidecar and its HTML pair."""
+
+        if manifest.get(_INVALID_MANIFEST_MARKER):
+            return None
+        if manifest.get("run_status") not in {"complete", "partial"}:
+            return None
+        stage = manifest["stages"][stage_name]
+        if stage.get("status") != "succeeded":
+            return None
+        json_path = _manifest_artifact_path(manifest_path, stage.get("json_path"))
+        html_path = _manifest_artifact_path(manifest_path, stage.get("html_path"))
+        if json_path is None or html_path is None or not json_path.is_file() or not html_path.is_file():
+            return None
+        checksums = stage.get("checksums") if isinstance(stage.get("checksums"), Mapping) else {}
+        try:
+            verify_file_checksum(json_path, str(checksums.get("json_path") or ""))
+            verify_file_checksum(html_path, str(checksums.get("html_path") or ""))
+        except (WeeklyRunManifestError, UnicodeError):
+            return None
+        payload = _read_json_metadata(json_path)
+        if not payload or payload.get("artifact_type") != artifact_type:
+            return None
+        if not isinstance(payload.get("partial"), bool):
+            return None
+        expected_identity = {
+            "run_id": manifest.get("run_id"),
+            "run_date": manifest.get("run_date"),
+            "generated_at": manifest.get("generated_at"),
+            "reporting_week": manifest.get("reporting_week"),
+            "week_label": manifest.get("week_label"),
+            "period_mode": manifest.get("period_mode"),
+            "analysis_period_start": manifest.get("analysis_period_start"),
+            "analysis_period_end": manifest.get("analysis_period_end"),
+            "pipeline_profile": manifest.get("pipeline_profile"),
+            "run_status": manifest.get("run_status"),
+            "partial": manifest.get("partial"),
+            "manifest_path": str(manifest_path.resolve()),
+            "failed_stages": list(manifest.get("failed_stages") or []),
+            "warnings": list(manifest.get("warnings") or []),
+        }
+        if any(payload.get(field) != value for field, value in expected_identity.items()):
+            return None
+        if not _path_identity_matches(payload.get("json_path"), json_path):
+            return None
+        if not _path_identity_matches(payload.get("html_path"), html_path):
+            return None
+        artifact_paths = payload.get("artifact_paths")
+        if not isinstance(artifact_paths, Mapping):
+            return None
+        if not _path_identity_matches(artifact_paths.get("json"), json_path):
+            return None
+        if not _path_identity_matches(artifact_paths.get("html"), html_path):
+            return None
+        payload["_artifact_kind"] = artifact_type
+        payload["_artifact_paths"] = {
+            "json": str(json_path),
+            "html": str(html_path),
+        }
+        return payload
+
+    def _load_manifest_radar_payload(
+        self,
+        manifest: Mapping[str, Any],
+        manifest_path: Path,
+        week_label: str,
+    ) -> dict | None:
+        """Validate and load the immutable raw Radar artifact, never Brief-embedded data."""
+
+        run_dir = manifest_path.parent.resolve()
+        try:
+            checked = load_manifest(
+                manifest_path,
+                path_base=run_dir,
+                allowed_roots=(run_dir,),
+                check_artifact_existence=True,
+            )
+        except (WeeklyRunManifestError, UnicodeError):
+            return None
+        if checked.get("run_id") != manifest.get("run_id"):
+            return None
+        stage = checked["stages"]["radar"]
+        if stage.get("status") != "succeeded":
+            return None
+        raw_path = _manifest_artifact_path(manifest_path, stage.get("artifact_path"))
+        binding_path = _manifest_artifact_path(manifest_path, stage.get("binding_path"))
+        seed_path = _manifest_artifact_path(manifest_path, stage.get("seed_export_path"))
+        if any(path is None or not path.is_file() for path in (raw_path, binding_path, seed_path)):
+            return None
+        assert raw_path is not None and binding_path is not None and seed_path is not None
+        try:
+            verify_file_checksum(raw_path, str(stage.get("artifact_sha256") or ""))
+            verify_file_checksum(binding_path, str(stage.get("binding_sha256") or ""))
+            verify_file_checksum(seed_path, str(stage.get("seed_export_sha256") or ""))
+        except WeeklyRunManifestError:
+            return None
+        binding = _read_json_metadata(binding_path)
+        try:
+            validate_radar_run_binding(
+                binding,
+                manifest=checked,
+                path_base=run_dir,
+                allowed_roots=(run_dir,),
+                verify_files=True,
+            )
+        except WeeklyRunManifestError:
+            return None
+        if binding.get("radar_run_id") != stage.get("radar_run_id"):
+            return None
+        refs = {
+            "radar_json_ref": (raw_path, stage.get("artifact_sha256")),
+            "seed_export_ref": (seed_path, stage.get("seed_export_sha256")),
+        }
+        for ref_name, (expected_path, expected_checksum) in refs.items():
+            ref = binding.get(ref_name)
+            if not isinstance(ref, Mapping):
+                return None
+            bound_path = _manifest_artifact_path(manifest_path, ref.get("path"))
+            if bound_path != expected_path or ref.get("sha256") != expected_checksum:
+                return None
+        raw = _read_json_metadata(raw_path)
+        result = raw.get("result") if isinstance(raw.get("result"), Mapping) else {}
+        if result.get("run_id") != stage.get("radar_run_id"):
+            return None
+        payload = load_bound_mvp_radar_summary(week_label, raw_path)
+        if payload.get("status") == "not_available":
+            return None
+        return payload
+
+    def _manifest_retrieval_items(
+        self,
+        manifest: Mapping[str, Any],
+        manifest_path: Path,
+    ) -> list:
+        sidecars = [
+            self._load_manifest_reader_sidecar(
+                manifest,
+                manifest_path,
+                stage_name="weekly_brief",
+                artifact_type="weekly_intelligence_brief",
+            ),
+            self._load_manifest_reader_sidecar(
+                manifest,
+                manifest_path,
+                stage_name="knowledge_atlas",
+                artifact_type="knowledge_atlas",
+            ),
+        ]
+        return _dedupe_items(
+            item
+            for sidecar in sidecars
+            if sidecar is not None
+            for item in _items_from_workbook(sidecar)
+        )
+
+    def _manifest_artifact_status(
+        self,
+        clean_week: str,
+        manifest: Mapping[str, Any],
+        manifest_path: Path,
+    ) -> dict:
+        if manifest.get(_INVALID_MANIFEST_MARKER):
+            return self._invalid_manifest_artifact_status(
+                clean_week,
+                manifest,
+                manifest_path,
+            )
+        current_week = self._current_week_label()
+        run_status = str(manifest.get("run_status") or "running")
+        terminal_reader_run = run_status in {"complete", "partial"}
+        validated_reader_sidecars = {
+            "weekly_brief": self._load_manifest_reader_sidecar(
+                manifest,
+                manifest_path,
+                stage_name="weekly_brief",
+                artifact_type="weekly_intelligence_brief",
+            ),
+            "knowledge_atlas": self._load_manifest_reader_sidecar(
+                manifest,
+                manifest_path,
+                stage_name="knowledge_atlas",
+                artifact_type="knowledge_atlas",
+            ),
+        }
+        radar_payload = (
+            self._load_manifest_radar_payload(manifest, manifest_path, clean_week)
+            if terminal_reader_run and manifest["stages"]["radar"]["status"] == "succeeded"
+            else None
+        )
+
+        def stage_descriptor(
+            stage_name: str,
+            *,
+            artifact_type: str,
+            display_name: str,
+            json_key: str,
+            html_key: str | None,
+            missing_message: str | None = None,
+        ) -> dict:
+            stage = manifest["stages"][stage_name]
+            stage_status = str(stage.get("status") or "pending")
+            json_path = _manifest_artifact_path(manifest_path, stage.get(json_key))
+            html_path = (
+                _manifest_artifact_path(manifest_path, stage.get(html_key))
+                if html_key is not None
+                else None
+            )
+            if stage_status == "disabled":
+                authoritative = "disabled"
+                message = RADAR_DISABLED_DISCLOSURE_RU
+            elif stage_status in {"failed", "skipped_dependency", "cancelled"}:
+                authoritative = "failed"
+                message = missing_message or f"{display_name} failed in this weekly run."
+            elif stage_status == "succeeded" and terminal_reader_run:
+                artifact_is_valid = (
+                    validated_reader_sidecars.get(stage_name) is not None
+                    if stage_name in validated_reader_sidecars
+                    else radar_payload is not None
+                )
+                if artifact_is_valid:
+                    authoritative = "current"
+                    message = f"{display_name} is bound to finalized run {manifest['run_id']}."
+                else:
+                    authoritative = "missing"
+                    message = (
+                        f"{display_name} failed authoritative identity, checksum, or file validation "
+                        f"for run {manifest['run_id']}."
+                    )
+            else:
+                authoritative = "pending"
+                message = f"{display_name} is not finalized in run {manifest['run_id']}."
+            return _artifact_descriptor(
+                artifact_type=artifact_type,
+                display_name=display_name,
+                week_label=clean_week,
+                current_week_label=current_week,
+                json_path=json_path,
+                html_path=html_path,
+                missing_message=missing_message,
+                authoritative_status=authoritative,
+                authoritative_message=message,
+            )
+
+        weekly_brief = stage_descriptor(
+            "weekly_brief",
+            artifact_type="weekly_intelligence_brief",
+            display_name="Weekly Brief",
+            json_key="json_path",
+            html_key="html_path",
+        )
+        knowledge_atlas = stage_descriptor(
+            "knowledge_atlas",
+            artifact_type="knowledge_atlas",
+            display_name="Knowledge Atlas",
+            json_key="json_path",
+            html_key="html_path",
+        )
+        mvp_radar = stage_descriptor(
+            "radar",
+            artifact_type="mvp_radar",
+            display_name="MVP Radar",
+            json_key="artifact_path",
+            html_key=None,
+            missing_message="MVP Radar is unavailable in this run; do not infer build/focused permission.",
+        )
+        mvp_payload = radar_payload
+        if mvp_radar["status"] == "disabled":
+            mvp_payload = {"status": "intentionally_disabled", "disabled": True}
+        mvp_gate = _mvp_gate_status(mvp_payload)
+        if mvp_radar["status"] not in {"missing", "failed", "disabled", "pending"} and mvp_gate["decision"] == "do_not_build":
+            mvp_radar["warning"] = mvp_gate["warning"]
+        artifacts = [weekly_brief, knowledge_atlas, mvp_radar]
+        identity = _manifest_identity(manifest, manifest_path)
+        return {
+            "status": "ok" if run_status == "complete" else run_status,
+            "week_label": clean_week,
+            "current_week_label": current_week,
+            **identity,
+            "run_identity": identity,
+            "weekly_brief": weekly_brief,
+            "knowledge_atlas": knowledge_atlas,
+            "mvp_radar": mvp_radar,
+            "mvp_radar_gate": mvp_gate,
+            "artifact_paths": _artifact_status_paths(artifacts),
+            "evidence_boundaries": _evidence_boundaries(mvp_gate),
+            "message": _artifact_status_message(artifacts),
+        }
+
+    def _invalid_manifest_artifact_status(
+        self,
+        clean_week: str,
+        manifest: Mapping[str, Any],
+        manifest_path: Path,
+    ) -> dict:
+        current_week = self._current_week_label()
+        message = (
+            "The latest weekly run manifest is invalid; older runs and legacy "
+            "artifacts were not substituted."
+        )
+        artifacts = [
+            _artifact_descriptor(
+                artifact_type=artifact_type,
+                display_name=display_name,
+                week_label=clean_week,
+                current_week_label=current_week,
+                json_path=None,
+                html_path=None,
+                authoritative_status="invalid",
+                authoritative_message=message,
+            )
+            for artifact_type, display_name in (
+                ("weekly_intelligence_brief", "Weekly Brief"),
+                ("knowledge_atlas", "Knowledge Atlas"),
+                ("mvp_radar", "MVP Radar"),
+            )
+        ]
+        weekly_brief, knowledge_atlas, mvp_radar = artifacts
+        mvp_gate = _mvp_gate_status(None)
+        identity = _manifest_identity(manifest, manifest_path)
+        return {
+            "status": "invalid",
+            "week_label": clean_week,
+            "current_week_label": current_week,
+            **identity,
+            "run_identity": identity,
+            "weekly_brief": weekly_brief,
+            "knowledge_atlas": knowledge_atlas,
+            "mvp_radar": mvp_radar,
+            "mvp_radar_gate": mvp_gate,
+            "artifact_paths": _artifact_status_paths(artifacts),
+            "evidence_boundaries": _evidence_boundaries(mvp_gate),
+            "message": message,
+        }
 
     def _split_artifact_paths(self, week_label: str, artifact_type: str) -> tuple[Path, Path]:
         if self._output_root is None:
@@ -508,6 +1171,33 @@ class PersonalIntelligenceFacade:
                 connection.close()
 
     def _idea_thread_summaries(self, *, week_label: str | None) -> list[dict]:
+        manifest_selection = self._select_weekly_manifest(week_label)
+        if manifest_selection is not None:
+            manifest, manifest_path = manifest_selection
+            sidecars = [
+                self._load_manifest_reader_sidecar(
+                    manifest,
+                    manifest_path,
+                    stage_name="knowledge_atlas",
+                    artifact_type="knowledge_atlas",
+                ),
+                self._load_manifest_reader_sidecar(
+                    manifest,
+                    manifest_path,
+                    stage_name="weekly_brief",
+                    artifact_type="weekly_intelligence_brief",
+                ),
+            ]
+            combined: list[dict] = []
+            seen: set[str] = set()
+            for sidecar in sidecars:
+                for thread in _idea_threads_from_workbook(sidecar or {}):
+                    slug = str(thread.get("slug") or "").strip()
+                    if not slug or slug in seen:
+                        continue
+                    seen.add(slug)
+                    combined.append(thread)
+            return combined
         summaries = self._idea_threads_from_db(week_label=week_label)
         if summaries:
             return summaries
@@ -589,20 +1279,35 @@ class PersonalIntelligenceFacade:
             "timeline": timeline,
         }
 
-    def _idea_thread_detail_from_workbook(self, slug: str) -> dict | None:
-        workbook = self._load_workbook(None)
-        for thread in _idea_threads_from_workbook(workbook or {}):
-            if thread.get("slug") != slug:
-                continue
-            return {
-                "title": thread.get("title"),
-                "summary": thread.get("summary"),
-                "claims": [{"claim": claim, "atom_id": None, "evidence_quote": None, "source_urls": []} for claim in thread.get("claims") or []],
-                "source_atom_ids": list(thread.get("source_atom_ids") or []),
-                "source_urls": list(thread.get("source_urls") or []),
-                "timeline": [],
-            }
+    def _idea_thread_detail_from_manifest(
+        self,
+        slug: str,
+        manifest: Mapping[str, Any],
+        manifest_path: Path,
+    ) -> dict | None:
+        for stage_name, artifact_type in (
+            ("knowledge_atlas", "knowledge_atlas"),
+            ("weekly_brief", "weekly_intelligence_brief"),
+        ):
+            workbook = self._load_manifest_reader_sidecar(
+                manifest,
+                manifest_path,
+                stage_name=stage_name,
+                artifact_type=artifact_type,
+            )
+            detail = _idea_thread_detail_from_payload(workbook or {}, slug)
+            if detail is not None:
+                return detail
         return None
+
+    def _idea_thread_detail_from_workbook(
+        self,
+        slug: str,
+        *,
+        week_label: str | None = None,
+    ) -> dict | None:
+        workbook = self._load_workbook(week_label)
+        return _idea_thread_detail_from_payload(workbook or {}, slug)
 
     def _thread_atoms(self, connection: sqlite3.Connection, thread: Mapping[str, Any]) -> list[dict]:
         try:
@@ -815,6 +1520,20 @@ def _mvp_gate_status(payload: Mapping[str, Any] | None) -> dict:
             "matched_external_evidence_required": True,
             "warning": "MVP Radar artifact is missing; do not infer build/focused permission.",
         }
+    radar_status = _clean_text(payload.get("status"))
+    if radar_status in {"disabled", "intentionally_disabled"} or bool(payload.get("disabled")):
+        return {
+            "decision": "do_not_build",
+            "decision_label": "Do not build yet.",
+            "radar_artifact_status": "disabled",
+            "matched_gate_evidence_count": 0,
+            "matched_external_evidence_count": 0,
+            "matched_external_source_types": [],
+            "market_context_status": "context_only",
+            "context_only_can_satisfy_gate": False,
+            "matched_external_evidence_required": True,
+            "warning": RADAR_DISABLED_DISCLOSURE_RU,
+        }
     matches = _object_list(payload.get("matched_external_evidence"))
     gate_matches = [
         match
@@ -873,6 +1592,8 @@ def _artifact_descriptor(
     json_path: Path | None,
     html_path: Path | None,
     missing_message: str | None = None,
+    authoritative_status: str | None = None,
+    authoritative_message: str | None = None,
 ) -> dict:
     generated_at = None
     json_exists = bool(json_path and json_path.exists())
@@ -880,7 +1601,13 @@ def _artifact_descriptor(
     if json_exists and json_path is not None:
         metadata = _read_json_metadata(json_path)
         generated_at = _clean_text(metadata.get("generated_at")) or None
-    if not json_exists:
+    if authoritative_status == "current" and not json_exists:
+        status = "missing"
+        message = missing_message or f"{display_name} manifest path is missing."
+    elif authoritative_status is not None:
+        status = authoritative_status
+        message = authoritative_message or f"{display_name}: {authoritative_status}."
+    elif not json_exists:
         status = "missing"
         message = missing_message or f"{display_name} artifact is missing."
     elif week_label != current_week_label:
@@ -907,10 +1634,114 @@ def _artifact_descriptor(
     }
 
 
+def _manifest_candidate_week_clues(
+    manifest: Mapping[str, Any],
+    manifest_path: Path,
+) -> list[str]:
+    clues: list[str] = []
+    for field in ("reporting_week", "week_label"):
+        value = manifest.get(field)
+        if isinstance(value, str) and _ISO_WEEK_SEARCH_RE.fullmatch(value):
+            clues.append(value)
+    start_week = _week_clue_from_timestamp(manifest.get("analysis_period_start"))
+    if start_week:
+        clues.append(start_week)
+    end_week = _week_clue_from_timestamp(
+        manifest.get("analysis_period_end"),
+        exclusive_end=True,
+    )
+    if end_week:
+        clues.append(end_week)
+    path_match = _ISO_WEEK_SEARCH_RE.search(manifest_path.parent.name)
+    if path_match:
+        clues.append(path_match.group(1))
+    return clues
+
+
+def _majority_week_clue(clues: Iterable[str]) -> str | None:
+    values = list(clues)
+    if not values:
+        return None
+    first_index = {value: values.index(value) for value in set(values)}
+    return max(
+        first_index,
+        key=lambda value: (values.count(value), -first_index[value]),
+    )
+
+
+def _week_clue_from_timestamp(
+    value: object,
+    *,
+    exclusive_end: bool = False,
+) -> str | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    normalized = f"{value[:-1]}+00:00" if value.endswith("Z") else value
+    try:
+        instant = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if instant.tzinfo is None:
+        return None
+    utc_instant = instant.astimezone(timezone.utc)
+    if exclusive_end:
+        utc_instant -= timedelta(microseconds=1)
+    year, week, _weekday = utc_instant.isocalendar()
+    return f"{year}-W{week:02d}"
+
+
+def _manifest_generated_at_ns(manifest: Mapping[str, Any]) -> int:
+    value = str(manifest["generated_at"])
+    normalized = f"{value[:-1]}+00:00" if value.endswith("Z") else value
+    instant = datetime.fromisoformat(normalized).astimezone(timezone.utc)
+    delta = instant - datetime(1970, 1, 1, tzinfo=timezone.utc)
+    return (
+        (delta.days * 86_400 + delta.seconds) * 1_000_000
+        + delta.microseconds
+    ) * 1_000
+
+
+def _manifest_identity(manifest: Mapping[str, Any], manifest_path: Path) -> dict[str, Any]:
+    invalid = bool(manifest.get(_INVALID_MANIFEST_MARKER))
+    return {
+        "run_id": str(
+            manifest.get("_candidate_run_id")
+            or manifest.get("run_id")
+            or manifest_path.parent.name
+        ),
+        "manifest_path": str(manifest_path.resolve()),
+        "run_status": "invalid" if invalid else str(manifest.get("run_status") or ""),
+        "partial": bool(manifest.get("partial")),
+        "pipeline_profile": str(manifest.get("pipeline_profile") or ""),
+    }
+
+
+def _manifest_artifact_path(manifest_path: Path, value: object) -> Path | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    run_dir = manifest_path.parent.resolve()
+    candidate = Path(value)
+    resolved = candidate.resolve() if candidate.is_absolute() else (run_dir / candidate).resolve()
+    try:
+        resolved.relative_to(run_dir)
+    except ValueError:
+        return None
+    return resolved
+
+
+def _path_identity_matches(value: object, expected: Path) -> bool:
+    if not isinstance(value, str) or not value.strip():
+        return False
+    try:
+        return Path(value).resolve() == expected.resolve()
+    except OSError:
+        return False
+
+
 def _read_json_metadata(path: Path) -> dict:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except (OSError, UnicodeError, json.JSONDecodeError):
         return {}
     return payload if isinstance(payload, dict) else {}
 
@@ -931,7 +1762,12 @@ def _artifact_status_message(artifacts: Iterable[Mapping[str, Any]]) -> str:
     parts = []
     for artifact in artifacts:
         detail = _clean_text(artifact.get("warning") or artifact.get("message"))
-        suffix = f" ({detail})" if artifact.get("status") in {"missing", "stale"} and detail else ""
+        suffix = (
+            f" ({detail})"
+            if artifact.get("status") in {"missing", "stale", "failed", "disabled", "pending"}
+            and detail
+            else ""
+        )
         parts.append(f"{artifact.get('display_name')}: {artifact.get('status')}{suffix}")
     return "; ".join(parts)
 
@@ -1114,8 +1950,55 @@ def _marked_post_item(post: Mapping[str, Any]) -> dict:
 
 def _idea_threads_from_workbook(workbook: Mapping[str, Any]) -> list[dict]:
     result: list[dict] = []
+    navigation = workbook.get("thread_navigation")
+    navigation_threads = (
+        navigation.get("threads")
+        if isinstance(navigation, Mapping) and isinstance(navigation.get("threads"), list)
+        else []
+    )
+    for item in navigation_threads:
+        if not isinstance(item, Mapping):
+            continue
+        evidence_items = [
+            evidence
+            for evidence in item.get("evidence_items") or []
+            if isinstance(evidence, Mapping)
+        ]
+        result.append(
+            {
+                "slug": item.get("slug"),
+                "title": item.get("title") or item.get("slug"),
+                "summary": item.get("current_understanding"),
+                "status": item.get("status"),
+                "momentum": item.get("momentum_30d"),
+                "last_seen_at": item.get("last_seen_at"),
+                "claims": list(item.get("claims") or []),
+                "source_atom_ids": _unique(
+                    [
+                        *list(item.get("atom_ids") or []),
+                        *[
+                            evidence.get("atom_id")
+                            for evidence in evidence_items
+                            if evidence.get("atom_id") not in (None, "")
+                        ],
+                    ]
+                ),
+                "source_urls": _unique(
+                    [
+                        *_string_values(item.get("source_urls")),
+                        *[
+                            source_url
+                            for evidence in evidence_items
+                            for source_url in _string_values(evidence.get("source_urls"))
+                        ],
+                    ]
+                ),
+            }
+        )
     for item in workbook.get("compressed_context") or []:
         if not isinstance(item, Mapping):
+            continue
+        if item.get("slug") and any(existing.get("slug") == item.get("slug") for existing in result):
             continue
         result.append(
             {
@@ -1150,6 +2033,29 @@ def _idea_threads_from_workbook(workbook: Mapping[str, Any]) -> list[dict]:
             }
         )
     return result
+
+
+def _idea_thread_detail_from_payload(workbook: Mapping[str, Any], slug: str) -> dict | None:
+    for thread in _idea_threads_from_workbook(workbook):
+        if thread.get("slug") != slug:
+            continue
+        return {
+            "title": thread.get("title"),
+            "summary": thread.get("summary"),
+            "claims": [
+                {
+                    "claim": claim,
+                    "atom_id": None,
+                    "evidence_quote": None,
+                    "source_urls": [],
+                }
+                for claim in thread.get("claims") or []
+            ],
+            "source_atom_ids": list(thread.get("source_atom_ids") or []),
+            "source_urls": list(thread.get("source_urls") or []),
+            "timeline": [],
+        }
+    return None
 
 
 def _thread_in_week_window(thread: Mapping[str, Any], week_label: str) -> bool:

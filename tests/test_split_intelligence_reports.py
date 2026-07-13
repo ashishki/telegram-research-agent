@@ -12,8 +12,15 @@ from db.frontier_analysis import upsert_frontier_analysis
 from db.knowledge_atoms import record_knowledge_atom
 from db.migrate import run_migrations
 from output.ai_report_contract import INTELLIGENCE_CONTRACT_VERSION, RADAR_INTELLIGENCE_CONTRACT_VERSION
+from output.ai_intelligence_report import load_ai_intelligence_context
 from output.idea_threads import refresh_idea_threads
+from output.knowledge_atlas_report import render_knowledge_atlas_html
+from output.reporting_period import resolve_reporting_period
 from output.split_intelligence_reports import deliver_split_intelligence_reports, generate_split_intelligence_reports
+from output.weekly_intelligence_brief import (
+    build_weekly_intelligence_brief_artifact,
+    render_weekly_intelligence_brief_html,
+)
 
 
 class TestSplitIntelligenceReports(unittest.TestCase):
@@ -407,6 +414,173 @@ class TestSplitIntelligenceReports(unittest.TestCase):
         self.assertEqual(brief_json["mvp_radar_gate"]["decision"], "do_not_build")
         self.assertIn("MVP Radar artifact is missing", brief_html)
         self.assertIn("No candidate selected", brief_html)
+        self.assertNotIn("run_id", brief_json)
+        self.assertTrue(summary.weekly_brief.html_path.endswith("2026-W28.weekly-brief.html"))
+        self.assertTrue(summary.knowledge_atlas.html_path.endswith("2026-W28.knowledge-atlas.html"))
+
+    def test_orchestrated_sidecars_share_identity_snapshot_partial_banner_and_disabled_radar(self):
+        db_path = self._make_db()
+        settings = self._seed(db_path)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            radar_path = root / "radar-disabled.json"
+            radar_path.write_text(
+                json.dumps({"status": "disabled", "recommendation": "needs_more_evidence"}),
+                encoding="utf-8",
+            )
+            period = resolve_reporting_period(
+                datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc)
+            )
+            run_identity = {
+                "run_id": "tra-weekly-2026-W28-20260713T070252Z",
+                "manifest_path": str(root / "weekly-run-manifest.json"),
+                "run_status": "partial",
+                "partial": True,
+                "pipeline_profile": "irx2_orchestration.v1",
+                "failed_stages": ["reaction_sync", "radar"],
+                "warnings": ["Reaction snapshot is incomplete."],
+            }
+            summary = generate_split_intelligence_reports(
+                settings,
+                reporting_period=period,
+                reaction_snapshot_at="2026-07-13T08:04:10Z",
+                run_identity=run_identity,
+                threads_limit=8,
+                atoms_limit=4,
+                output_root=root,
+                mvp_radar_json_path=radar_path,
+            )
+            atlas_html = Path(summary.knowledge_atlas.html_path).read_text(encoding="utf-8")
+            brief_html = Path(summary.weekly_brief.html_path).read_text(encoding="utf-8")
+            atlas_json = json.loads(Path(summary.knowledge_atlas.json_path).read_text(encoding="utf-8"))
+            brief_json = json.loads(Path(summary.weekly_brief.json_path).read_text(encoding="utf-8"))
+            leftovers = list(root.rglob("*.tmp"))
+
+        identity_fields = {
+            "run_id",
+            "manifest_path",
+            "run_status",
+            "partial",
+            "pipeline_profile",
+            "failed_stages",
+            "warnings",
+        }
+        self.assertEqual(
+            {key: brief_json[key] for key in identity_fields},
+            run_identity,
+        )
+        self.assertEqual(
+            {key: atlas_json[key] for key in identity_fields},
+            run_identity,
+        )
+        self.assertEqual(brief_json["schema_version"], "split_ai_report.v1")
+        self.assertEqual(atlas_json["schema_version"], "split_ai_report.v1")
+        self.assertEqual(brief_json["reaction_snapshot_at"], "2026-07-13T08:04:10Z")
+        self.assertEqual(atlas_json["reaction_snapshot_at"], "2026-07-13T08:04:10Z")
+        self.assertEqual(summary.run_id, run_identity["run_id"])
+        self.assertTrue(summary.partial)
+        self.assertIn('data-run-status="partial"', brief_html)
+        self.assertIn('data-run-status="partial"', atlas_html)
+        self.assertIn("Частичный выпуск.", brief_html)
+        self.assertIn("Частичный выпуск.", atlas_html)
+        self.assertIn("синхронизация реакций", brief_html)
+        self.assertIn("синхронизация реакций", atlas_html)
+        self.assertIn("MVP Radar", brief_html)
+        self.assertIn("MVP Radar", atlas_html)
+        self.assertIn(
+            f'<meta name="weekly-run-id" content="{run_identity["run_id"]}">',
+            brief_html,
+        )
+        self.assertIn(
+            f'<meta name="weekly-run-id" content="{run_identity["run_id"]}">',
+            atlas_html,
+        )
+        self.assertIn(
+            "MVP Radar отключен для этого запуска. Решение по сборке не сформировано.",
+            brief_html,
+        )
+        self.assertEqual(brief_json["mvp_radar_gate"]["radar_artifact_status"], "disabled")
+        self.assertEqual(
+            brief_json["mvp_radar_gate"]["warning"],
+            "MVP Radar отключен для этого запуска. Решение по сборке не сформировано.",
+        )
+        self.assertEqual(leftovers, [])
+
+    def test_resolved_period_rejects_conflicting_legacy_arguments(self):
+        period = resolve_reporting_period(
+            datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc)
+        )
+        with self.assertRaisesRegex(ValueError, "week_label conflicts"):
+            generate_split_intelligence_reports(
+                self._settings("/tmp/not-opened.db"),
+                reporting_period=period,
+                week_label="2026-W27",
+            )
+
+    def test_reader_headers_show_complete_partial_and_failed_run_statuses(self):
+        base_context = {
+            "week_label": "2026-W28",
+            "reporting_week": "2026-W28",
+            "period_mode": "explicit_iso_week",
+            "analysis_period_start": "2026-07-06T00:00:00Z",
+            "analysis_period_end": "2026-07-13T00:00:00Z",
+            "threads": [],
+            "source_channels": [],
+            "feedback_context": {},
+        }
+        for status in ("complete", "partial", "failed"):
+            with self.subTest(status=status):
+                context = {
+                    **base_context,
+                    "run_status": status,
+                    "partial": status == "partial",
+                }
+                brief_html, _actions = render_weekly_intelligence_brief_html(
+                    context,
+                    generated_at="2026-07-13T07:02:52Z",
+                )
+                atlas_html = render_knowledge_atlas_html(
+                    context,
+                    generated_at="2026-07-13T07:02:52Z",
+                )
+                self.assertIn(f'data-run-status="{status}"', brief_html)
+                self.assertIn(f'data-run-status="{status}"', atlas_html)
+
+    def test_weekly_brief_sidecar_preserves_bounded_marked_posts_snapshot(self):
+        db_path = self._make_db()
+        self._seed(db_path)
+        marked_posts = [
+            {
+                "post_id": 901,
+                "channel_username": "ai_lab",
+                "posted_at": "2026-07-12T23:59:59Z",
+                "feedback": "operator_marked_interesting",
+            }
+        ]
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                root = Path(tmpdir)
+                period = resolve_reporting_period(
+                    datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc)
+                )
+                with sqlite3.connect(db_path) as connection:
+                    connection.row_factory = sqlite3.Row
+                    context = load_ai_intelligence_context(
+                        connection,
+                        reporting_period=period,
+                        week_label=period.week_label,
+                    )
+                context["marked_posts"] = marked_posts
+                summary = build_weekly_intelligence_brief_artifact(
+                    context,
+                    generated_at=period.to_dict()["generated_at"],
+                    output_root=root,
+                )
+                sidecar = json.loads(Path(summary.json_path).read_text(encoding="utf-8"))
+        finally:
+            os.unlink(db_path)
+
+        self.assertEqual(sidecar["marked_posts"], marked_posts)
 
 
 if __name__ == "__main__":

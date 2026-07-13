@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
+import tempfile
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -49,6 +51,31 @@ NON_BUILD_READY_RECOMMENDATIONS = {
     "existing_project_context",
     "reject",
 }
+RUN_IDENTITY_FIELDS = (
+    "run_id",
+    "manifest_path",
+    "run_status",
+    "partial",
+    "pipeline_profile",
+    "failed_stages",
+    "warnings",
+)
+RUN_STAGE_LABELS_RU = {
+    "knowledge_refresh": "обновление базы знаний",
+    "reaction_sync": "синхронизация реакций",
+    "feedback_snapshot": "снимок обратной связи",
+    "canonical_thread_curation": "каноническая курация тем",
+    "frontier_analysis": "Frontier Analysis",
+    "radar": "MVP Radar",
+    "editorial_intelligence": "редакционная аналитика",
+    "weekly_brief": "Weekly Intelligence Brief",
+    "knowledge_atlas": "Knowledge Atlas",
+    "knowledge_audit_explorer": "аудит Knowledge Atlas",
+    "reader_value_gates": "проверки reader value",
+}
+RADAR_DISABLED_DISCLOSURE_RU = (
+    "MVP Radar отключен для этого запуска. Решение по сборке не сформировано."
+)
 
 
 @dataclass(frozen=True)
@@ -69,6 +96,11 @@ class WeeklyIntelligenceBriefSummary:
     analysis_period_start: str = ""
     analysis_period_end: str = ""
     period_mode: str = ""
+    run_id: str = ""
+    manifest_path: str = ""
+    run_status: str = ""
+    partial: bool = False
+    pipeline_profile: str = ""
 
 
 class WeeklyIntelligenceBriefQualityError(ValueError):
@@ -86,6 +118,87 @@ def _utc_now_iso() -> str:
     return _utc_now().isoformat().replace("+00:00", "Z")
 
 
+def _atomic_write_text(path: Path, content: str) -> None:
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temporary_path = Path(handle.name)
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_path, path)
+    except BaseException:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+        raise
+
+
+def _run_identity_fields(
+    context: Mapping[str, object],
+    run_identity: Mapping[str, object] | None,
+) -> dict[str, object]:
+    """Return only the additive run fields owned by the manifest contract."""
+
+    source = run_identity if run_identity is not None else context
+    return {field: source[field] for field in RUN_IDENTITY_FIELDS if field in source}
+
+
+def _render_run_status_notice(context: Mapping[str, object]) -> str:
+    status = str(context.get("run_status") or "").strip().lower()
+    is_partial = bool(context.get("partial")) or str(context.get("period_mode") or "") == "partial_iso_week"
+    if status == "failed":
+        message = "Выпуск не завершён. Запуск завершился ошибкой."
+        display_status = "failed"
+    elif status == "partial" or is_partial:
+        message = "Частичный выпуск. Выводы ниже ограничены; решение о сборке запрещено."
+        display_status = "partial"
+    elif status == "complete":
+        message = "Полный выпуск. Все обязательные этапы завершены."
+        display_status = "complete"
+    else:
+        return ""
+    failed_stage_names = []
+    failed_stages = context.get("failed_stages") or []
+    if isinstance(failed_stages, (list, tuple)):
+        for raw_name in failed_stages:
+            name = str(raw_name).strip()
+            if not name:
+                continue
+            label = RUN_STAGE_LABELS_RU.get(name, name.replace("_", " "))
+            if label not in failed_stage_names:
+                failed_stage_names.append(label)
+    failed_stage_notice = (
+        f" Не завершены этапы: {', '.join(failed_stage_names)}."
+        if failed_stage_names
+        else ""
+    )
+    return (
+        f'<p class="run-status run-status-{display_status}" '
+        f'data-run-status="{display_status}"><strong>'
+        f'{_escape(message + failed_stage_notice)}</strong></p>'
+    )
+
+
+def _render_run_identity_metadata(context: Mapping[str, object]) -> str:
+    identity = (
+        ("weekly-run-id", context.get("run_id")),
+        ("weekly-run-manifest", context.get("manifest_path")),
+        ("weekly-pipeline-profile", context.get("pipeline_profile")),
+    )
+    return "\n".join(
+        f'<meta name="{name}" content="{_escape(str(value))}">'
+        for name, value in identity
+        if str(value or "").strip()
+    )
+
+
 def build_weekly_intelligence_brief_artifact(
     context: dict,
     *,
@@ -93,10 +206,13 @@ def build_weekly_intelligence_brief_artifact(
     output_root: str | Path | None = None,
     mvp_radar: Mapping[str, object] | None = None,
     related_artifacts: dict | None = None,
+    run_identity: Mapping[str, object] | None = None,
 ) -> WeeklyIntelligenceBriefSummary:
+    identity = _run_identity_fields(context, run_identity)
+    artifact_context = {**context, **identity}
     normalized_mvp = _normalize_mvp_radar(mvp_radar or {})
     html_text, actions = render_weekly_intelligence_brief_html(
-        context,
+        artifact_context,
         generated_at=generated_at,
         mvp_radar=normalized_mvp,
     )
@@ -110,11 +226,11 @@ def build_weekly_intelligence_brief_artifact(
     week_label = str(context.get("week_label") or "")
     html_path = root / f"{week_label}.weekly-brief.html"
     json_path = root / f"{week_label}.weekly-brief.json"
-    threads = context.get("threads") or []
+    threads = artifact_context.get("threads") or []
     atoms = _all_atoms(threads)
-    period_metadata = _period_metadata(context, generated_at=generated_at)
+    period_metadata = _period_metadata(artifact_context, generated_at=generated_at)
     metadata = _weekly_brief_metadata(
-        context,
+        artifact_context,
         generated_at=generated_at,
         html_path=html_path,
         json_path=json_path,
@@ -122,9 +238,10 @@ def build_weekly_intelligence_brief_artifact(
         mvp_radar=normalized_mvp,
         quality_findings=findings,
         related_artifacts=related_artifacts or {},
+        run_identity=identity,
     )
-    html_path.write_text(html_text, encoding="utf-8")
-    json_path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
+    _atomic_write_text(html_path, html_text)
+    _atomic_write_text(json_path, json.dumps(metadata, ensure_ascii=False, indent=2))
     summary = WeeklyIntelligenceBriefSummary(
         week_label=week_label,
         reporting_week=period_metadata["reporting_week"],
@@ -133,6 +250,11 @@ def build_weekly_intelligence_brief_artifact(
         analysis_period_start=period_metadata["analysis_period_start"],
         analysis_period_end=period_metadata["analysis_period_end"],
         period_mode=period_metadata["period_mode"],
+        run_id=str(identity.get("run_id") or ""),
+        manifest_path=str(identity.get("manifest_path") or ""),
+        run_status=str(identity.get("run_status") or ""),
+        partial=bool(identity.get("partial", False)),
+        pipeline_profile=str(identity.get("pipeline_profile") or ""),
         html_path=str(html_path),
         json_path=str(json_path),
         thread_count=len(threads),
@@ -161,6 +283,8 @@ def generate_weekly_intelligence_brief(
     output_root: str | Path | None = None,
     mvp_radar_json_path: str | Path | None = None,
     now: datetime | None = None,
+    reaction_snapshot_at: datetime | str | None = None,
+    run_identity: Mapping[str, object] | None = None,
 ) -> WeeklyIntelligenceBriefSummary:
     reporting_period = resolve_reporting_period(
         now=now,
@@ -176,6 +300,7 @@ def generate_weekly_intelligence_brief(
             connection,
             week_label=clean_week,
             reporting_period=reporting_period,
+            reaction_snapshot_at=reaction_snapshot_at,
             threads_limit=max(1, int(threads_limit or 12)),
             atoms_limit=max(1, int(atoms_limit or 8)),
         )
@@ -184,6 +309,7 @@ def generate_weekly_intelligence_brief(
         generated_at=generated_at,
         output_root=output_root,
         mvp_radar=load_mvp_radar_summary(clean_week, mvp_radar_json_path),
+        run_identity=run_identity,
     )
 
 
@@ -198,6 +324,8 @@ def render_weekly_intelligence_brief_html(
     generated = generated_at or str(context.get("generated_at") or _utc_now_iso())
     actions = _learning_actions(context.get("threads") or [], context.get("feedback_context") or {})
     normalized_mvp = _normalize_mvp_radar(mvp_radar or {})
+    run_status_notice = _render_run_status_notice(context)
+    run_identity_metadata = _render_run_identity_metadata(context)
     decision_cockpit = _decision_cockpit(context, actions, normalized_mvp)
     project_learning_projection = build_project_learning_projection(
         context,
@@ -224,6 +352,7 @@ def render_weekly_intelligence_brief_html(
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="intelligence-contract-version" content="{_escape(INTELLIGENCE_CONTRACT_VERSION)}">
 <meta name="radar-intelligence-contract-version" content="{_escape(RADAR_INTELLIGENCE_CONTRACT_VERSION)}">
+{run_identity_metadata}
 <title>Weekly Intelligence Brief { _escape(period_label) }</title>
 <style>
 :root {{ color-scheme: light; --ink:#17202a; --muted:#65717d; --line:#d8dee6; --panel:#ffffff; --bg:#f5f7f9; --accent:#1d4ed8; --ok:#166534; --warn:#92400e; }}
@@ -271,6 +400,7 @@ ol, ul {{ padding-left:22px; }}
 <h1>Weekly Intelligence Brief - {_escape(period_label)}</h1>
 <p class="muted">Period mode: {_escape(str(context.get("period_mode") or "explicit_iso_week"))}.</p>
 <p class="muted">Generated {_escape(generated)}.</p>
+{run_status_notice}
 <p class="muted">Short operational readout; the cumulative map lives in Knowledge Atlas.</p>
 <nav>{nav}</nav>
 </header>
@@ -384,6 +514,7 @@ def _weekly_brief_metadata(
     mvp_radar: dict,
     quality_findings: list[ReportQualityFinding],
     related_artifacts: dict,
+    run_identity: Mapping[str, object],
 ) -> dict:
     threads = context.get("threads") or []
     atoms = _all_atoms(threads)
@@ -415,6 +546,7 @@ def _weekly_brief_metadata(
         "radar_contract_version": RADAR_INTELLIGENCE_CONTRACT_VERSION,
         "artifact_type": "weekly_intelligence_brief",
         **_period_metadata(context, generated_at=generated_at),
+        **run_identity,
         "html_path": str(html_path),
         "json_path": str(json_path),
         "artifact_paths": {"html": str(html_path), "json": str(json_path)},
@@ -425,6 +557,7 @@ def _weekly_brief_metadata(
         "thread_count": len(threads),
         "source_atom_count": len(atoms),
         "changed_thread_count": len(_changed_threads(threads)),
+        "marked_posts": [dict(item) for item in context.get("marked_posts") or []],
         "actions": actions,
         "personal_learning_loop": learning_loop,
         "project_learning_projection": project_learning_projection,
@@ -438,7 +571,7 @@ def _weekly_brief_metadata(
     }
 
 
-def _period_metadata(context: Mapping[str, object], *, generated_at: str) -> dict[str, str]:
+def _period_metadata(context: Mapping[str, object], *, generated_at: str) -> dict[str, object]:
     """Return additive period identity while accepting legacy report contexts."""
 
     week_label = str(context.get("week_label") or context.get("reporting_week") or "").strip()
@@ -451,7 +584,7 @@ def _period_metadata(context: Mapping[str, object], *, generated_at: str) -> dic
     ).strip()
     clean_generated_at = str(generated_at or context.get("generated_at") or "").strip()
     run_date = str(context.get("run_date") or clean_generated_at[:10]).strip()
-    return {
+    metadata: dict[str, object] = {
         "run_date": run_date,
         "generated_at": clean_generated_at,
         "analysis_period_start": analysis_period_start,
@@ -460,6 +593,10 @@ def _period_metadata(context: Mapping[str, object], *, generated_at: str) -> dic
         "week_label": week_label,
         "period_mode": str(context.get("period_mode") or "explicit_iso_week").strip(),
     }
+    reaction_snapshot_at = str(context.get("reaction_snapshot_at") or "").strip()
+    if reaction_snapshot_at:
+        metadata["reaction_snapshot_at"] = reaction_snapshot_at
+    return metadata
 
 
 def _human_period_label(context: Mapping[str, object]) -> str:
@@ -884,9 +1021,15 @@ def _render_mvp_radar(mvp_radar: Mapping[str, object]) -> str:
         missing_checklist = f'<ul class="missing-list">{missing or "<li>No missing evidence listed.</li>"}</ul>'
     source_path = str(mvp_radar.get("source_path") or "")
     radar_status = str(mvp_radar.get("status") or "")
+    disabled_disclosure = (
+        f'<p class="run-status radar-disabled"><strong>{_escape(RADAR_DISABLED_DISCLOSURE_RU)}</strong></p>'
+        if radar_status in {"disabled", "intentionally_disabled"} or bool(mvp_radar.get("disabled"))
+        else ""
+    )
     source_link = f'<p class="sources">{_link(source_path, "MVP Radar JSON")}</p>' if source_path and radar_status != "not_available" else ""
     return (
         '<article class="brief-card">'
+        f'{disabled_disclosure}'
         f'<h3>{_escape(candidate)}</h3>'
         f'<p><span class="tag">{_escape(recommendation)}</span> {_escape(decision)}</p>'
         f'{source_link}'
@@ -946,7 +1089,13 @@ def _normalize_mvp_radar(payload: Mapping[str, object]) -> dict:
         or _clean_text(payload.get("dossier_status"))
     )
     return {
-        "status": _clean_text(payload.get("status")) or "loaded",
+        "status": (
+            _clean_text(payload.get("status"))
+            or _clean_text(result.get("status"))
+            or _clean_text(selected.get("status"))
+            or "loaded"
+        ),
+        "disabled": bool(payload.get("disabled")),
         "selected_candidate": candidate,
         "dossier_status": dossier_status,
         "recommendation": recommendation,
@@ -1065,8 +1214,16 @@ def _mvp_validation_summary(mvp_radar: Mapping[str, object]) -> dict[str, object
     next_query = _next_validation_query(mvp_radar)
     recommendation = str(mvp_radar.get("recommendation") or mvp_radar.get("dossier_status") or "needs_more_evidence")
     radar_status = str(mvp_radar.get("status") or "").strip()
+    radar_disabled = radar_status in {"disabled", "intentionally_disabled"} or bool(
+        mvp_radar.get("disabled")
+    )
     artifact_missing = radar_status in {"not_available", "missing"}
-    gate_allows_focus = bool(gate_matches) and recommendation not in NON_BUILD_READY_RECOMMENDATIONS and not artifact_missing
+    gate_allows_focus = (
+        bool(gate_matches)
+        and recommendation not in NON_BUILD_READY_RECOMMENDATIONS
+        and not artifact_missing
+        and not radar_disabled
+    )
     decision = "focused_experiment_allowed" if gate_allows_focus else "do_not_build"
     decision_label = "Focused experiment may be allowed." if gate_allows_focus else "Do not build yet."
     if gate_matches:
@@ -1075,7 +1232,9 @@ def _mvp_validation_summary(mvp_radar: Mapping[str, object]) -> dict[str, object
         context_note = f"{unmatched_count} external context record(s) were unmatched and do not satisfy gates."
     else:
         context_note = "No matched external validation evidence found; run the next repeatable search."
-    if artifact_missing:
+    if radar_disabled:
+        warning = RADAR_DISABLED_DISCLOSURE_RU
+    elif artifact_missing:
         warning = "MVP Radar artifact is missing; Brief/Atlas continue, but no build/focused decision is allowed."
     elif not gate_matches:
         warning = "Build/focused decisions require matched external evidence; market/business context stays context_only."
@@ -1087,7 +1246,9 @@ def _mvp_validation_summary(mvp_radar: Mapping[str, object]) -> dict[str, object
         "matched_gate_source_types": source_types,
         "matched_external_evidence_count": len(matches),
         "market_context_status": str(market_context.get("status") or "context_only"),
-        "radar_artifact_status": "missing" if artifact_missing else "loaded",
+        "radar_artifact_status": (
+            "disabled" if radar_disabled else ("missing" if artifact_missing else "loaded")
+        ),
         "decision": decision,
         "decision_label": decision_label,
         "warning": warning,

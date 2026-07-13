@@ -42,19 +42,19 @@ below, but active implementation starts from the IRX task graph.
 | Strategy Reviewer | `implemented_and_verified` advisory-only |
 | Market/business Radar context | `implemented_and_verified` as `context_only` |
 | Radar RVE contract/adapters in sibling repo | `implemented_and_verified`, `needs_live_validation` |
-| Report V2 contract and roadmap | `implementation_in_progress`; IRX-0 documentation and IRX-1 completed-week runtime semantics are implemented and verified |
+| Report V2 contract and roadmap | `implementation_in_progress`; IRX-0 documentation plus IRX-1 period and IRX-2 run-manifest/Radar semantics are implemented and verified |
 | Portfolio dogfood evidence | `blocked_on_IRX-14_start_gate` |
 
 ## Next Candidate Task
 
-`IRX-2 - Weekly Run Manifest And Required Radar Artifact Contract`
+`IRX-3 - Reaction-To-Ranking Personalization And Effect Receipt`
 
-Build the additive one-run manifest/orchestration path on top of the verified
-IRX-1 period contract. Bind the real same-period Radar artifact and make stage
-failure, wrong-period output, and intentional disablement explicit. Preserve
-V1 commands and Radar evidence gates. The exact implementation prompt is in
-`docs/CODEX_PROMPT.md`; the binding task and manifest contracts are in
-`docs/intelligence_report_v2_roadmap.md` and `docs/weekly_run_manifest.md`.
+Build the deterministic reaction -> post -> atom -> thread-resolution -> weak
+ranking boost -> effect-receipt projection on top of the verified IRX-1 period
+and IRX-2 reaction-snapshot/run identity. Preserve evidence precedence, unknown
+semantics for absent reactions, V1 consumers, and all Radar gates. The exact
+implementation prompt is in `docs/CODEX_PROMPT.md`; the binding contract is
+`docs/reaction_personalization_contract.md`.
 
 ## Dependency Graph
 
@@ -75,13 +75,13 @@ contract.
 |---|---|---|---|---|
 | IRX-0 | P0 | `implemented_documentation_only` | W29 audit, Report V2 roadmap, and product contracts | none |
 | IRX-1 | P0 | `implemented_and_verified` | Separate generation time from the last completed ISO-week analysis period | IRX-0 |
-| IRX-2 | P0 | `ready` | One weekly run manifest and required same-run Radar artifact contract | IRX-1 |
-| IRX-3 | P0 | `planned` | Map reactions through posts/atoms and a thread-resolution interface into a weak boost/receipt; canonical acceptance closes in IRX-4 | IRX-1, IRX-2 |
+| IRX-2 | P0 | `implemented_and_verified` | One weekly run manifest and required same-run Radar artifact contract | IRX-1 |
+| IRX-3 | P0 | `ready` | Map reactions through posts/atoms and a thread-resolution interface into a weak boost/receipt; canonical acceptance closes in IRX-4 | IRX-1, IRX-2 |
 | IRX-4 | P0 | `planned` | Curate stable idea-level threads with merge/split lifecycle and provenance | IRX-1, IRX-2, IRX-3 |
 | IRX-5 | P0 | `planned` | Produce schema-validated Russian editorial intelligence JSON from bounded cited inputs | IRX-1..IRX-4 |
 | IRX-8 | P1 | `planned` | Shared deterministic, offline static visualization components | IRX-4, IRX-5 |
 | IRX-9 | P1 | `planned` | Evidence-backed, named, PR-sized project implications | IRX-4, IRX-5, IRX-8 |
-| IRX-10 | P1 | `planned_reader_contract`; context exclusion already implemented | Bind same-run Radar JSON and explain candidate, evidence gaps, next validation, and kill criteria | IRX-2, IRX-5, IRX-8 |
+| IRX-10 | P1 | `planned_reader_contract`; context exclusion and IRX-2 same-run binding implemented | Explain the bound candidate, evidence gaps, next validation, and kill criteria | IRX-2, IRX-5, IRX-8 |
 | IRX-6 | P1 | `planned` | Russian 5-7 minute Weekly Intelligence Brief V2 | IRX-1..IRX-5, IRX-8..IRX-10 |
 | IRX-11 | P1 | `planned` | Reader-value gates for period, editorial, personalization, visual, project, and Radar quality | IRX-6, IRX-8 |
 | IRX-7 | P2 | `planned` | Visual Knowledge Atlas V2 plus preserved Knowledge Audit Explorer | IRX-4, IRX-5, IRX-8, IRX-11 |
@@ -121,8 +121,48 @@ rollout implications are in `docs/intelligence_report_v2_roadmap.md`.
 - Known boundary: destructive edits to an existing atom/thread cannot be
   perfectly reconstructed without versioned history. That schema/curation work
   is outside IRX-1.
-- Handoff: IRX-2 remains intentionally open and is now the next task. No
-  manifest/orchestrator or same-run Radar binding was implemented by IRX-1.
+- Historical handoff: IRX-1 intentionally left manifest/orchestration and
+  same-run Radar binding to IRX-2; that handoff is now closed by the IRX-2
+  implementation below.
+
+### 2026-07-13 - IRX-2 Weekly Run Manifest And Same-Run Radar Binding
+
+- Status: `implemented_and_verified` with focused local and sibling Radar
+  suites; heavy/live pipelines and the full suite were intentionally not run.
+- Added `weekly_run_manifest.v1`, the frozen
+  `irx2_orchestration.v1` stage policy, immutable run-scoped directories,
+  validated atomic manifest transitions, deterministic complete/partial/failed
+  aggregation, and the explicit additive `weekly-intelligence-v2` command.
+- Required/enabled stages are knowledge refresh, reaction sync, feedback
+  snapshot, Frontier, Radar, Brief, and Atlas. Canonical curation, editorial
+  intelligence, the dedicated Audit Explorer, and reader-value gates are
+  predeclared disabled/non-required for their later IRX owners.
+- Radar input/output is bound through `radar_run_binding.v1` using separate
+  manifest/Radar run IDs, exact period identity, declared paths, and SHA-256
+  checksums. Missing, failed, malformed, wrong-period, or tampered Radar cannot
+  reuse an adjacent or prior candidate; intentional disablement is declared at
+  run creation and remains reader-visible.
+- Optional live intelligence is copied to immutable
+  `radar/live-intelligence.json`, full-period validated, and checksum-recorded
+  as the exact Radar dependency. Feedback snapshot, readers, and Frontier use
+  the same exclusive period-end cutoff; Frontier cache identity and content
+  fingerprint reject a stale or concurrently replaced row.
+- Brief/Atlas/Frontier snapshots carry the same immutable run and period
+  identity. Hermes/PI treats the newest manifest candidate as authority and
+  refuses invalid, failed, running, mismatched, missing, or tampered bound
+  artifacts rather than silently falling back to an older run, V1 artifact, or
+  mutable current state.
+- Existing V1 commands, week-named diagnostic paths, report contracts, period
+  semantics, scoring, prompts, feedback semantics, database schema, and Radar
+  evidence/context-only gates remain compatible. No generated report artifacts
+  were edited or committed, and no sibling Radar code was changed.
+- Retry behavior: terminal manifests are immutable. The public CLI creates a
+  new run and may record `supersedes_run_id`; it does not expose same-ID resume.
+  The core state machine permits retry transitions only while a manifest is
+  still unfinalized.
+- Handoff: IRX-3 is ready and is the only next implementation scope. IRX-2 did
+  not add a reaction boost, canonical curator, editorial LLM, V2 redesign,
+  reader-value gates, or report-specific feedback redesign.
 
 ## Existing-Work Reconciliation
 
@@ -137,8 +177,8 @@ rollout implications are in `docs/intelligence_report_v2_roadmap.md`.
   current W29 patterns fail.
 - `PGI-007` is not deleted. Its evidence-series intent resumes only through
   IRX-14 after the start gate passes.
-- Radar RVE/context-only exclusion is reused. IRX-2 and IRX-10 add same-run
-  binding and reader explanation without weakening gates.
+- Radar RVE/context-only exclusion is reused. IRX-2 added same-run binding;
+  IRX-10 adds reader explanation without weakening gates.
 
 ## Historical PGI Task Cards
 
@@ -800,13 +840,19 @@ cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
 - Verification commands pass or failures are reported with reason.
 - Stop conditions are checked explicitly.
 
-## Current Verification Command Set
+## Next-Task Verification Command Set
 
-Use focused tests; do not run expensive LLM jobs for normal PR verification.
+For IRX-3, use the exact focused matrix in `docs/CODEX_PROMPT.md`; do not run
+expensive LLM jobs or the full suite for normal slice verification.
 
 ```bash
 git diff --check
-PYTHONPATH=src python3 -m pytest tests/test_ai_report_contract.py tests/test_split_intelligence_reports.py tests/test_intelligence_retrieval_items.py tests/test_pi_tools.py tests/test_pi_chat.py tests/test_opportunity_seed_export.py tests/test_mvp_weekly_pipeline.py
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache \
+  python3 -m unittest tests.test_reaction_personalization \
+  tests.test_reaction_sync tests.test_ai_intelligence_report \
+  tests.test_ai_report_feedback tests.test_strategy_reviewer \
+  tests.test_split_intelligence_reports \
+  tests.test_intelligence_retrieval_items tests.test_pi_facade
 ```
 
 ## Backlog Stop Conditions

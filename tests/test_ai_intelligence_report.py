@@ -619,6 +619,38 @@ class TestAiIntelligenceReport(unittest.TestCase):
         self.assertEqual([post["post_id"] for post in context["marked_posts"]], [805, 804, 801])
         self.assertEqual(context["analysis_period_start"], "2026-07-06T00:00:00Z")
         self.assertEqual(context["analysis_period_end"], "2026-07-13T00:00:00Z")
+        self.assertEqual(context["reaction_snapshot_at"], "2026-07-13T07:02:52.987654Z")
+
+    def test_explicit_reaction_snapshot_includes_same_run_sync_and_excludes_later_reactions(self):
+        db_path = self._make_db()
+        try:
+            self._insert_marked_post(
+                db_path,
+                post_id=811,
+                posted_at="2026-07-12T18:00:00Z",
+                recorded_at="2026-07-13T07:45:00Z",
+            )
+            self._insert_marked_post(
+                db_path,
+                post_id=812,
+                posted_at="2026-07-12T19:00:00Z",
+                recorded_at="2026-07-13T08:00:00.000001Z",
+            )
+            period = resolve_reporting_period(
+                datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc)
+            )
+            with sqlite3.connect(db_path) as connection:
+                context = load_ai_intelligence_context(
+                    connection,
+                    week_label=period.week_label,
+                    reporting_period=period,
+                    reaction_snapshot_at="2026-07-13T08:00:00Z",
+                )
+        finally:
+            os.unlink(db_path)
+
+        self.assertEqual([post["post_id"] for post in context["marked_posts"]], [811])
+        self.assertEqual(context["reaction_snapshot_at"], "2026-07-13T08:00:00Z")
 
     def test_quality_gate_blocks_internal_match_traces(self):
         all_sections = "".join(

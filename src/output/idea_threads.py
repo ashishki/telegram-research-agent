@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 
 from config.settings import Settings
 from db.idea_threads import link_idea_thread_atom, upsert_idea_thread
+from output.reporting_period import register_reporting_period_sqlite
 
 
 STOPWORDS = {
@@ -71,13 +72,45 @@ def _parse_array(value: str | None) -> list[str]:
     return [str(item).strip() for item in parsed if str(item).strip()]
 
 
-def _load_atoms(connection: sqlite3.Connection, *, weeks: int, limit: int | None, now: datetime) -> list[dict]:
+def _normalize_utc_boundary(value: datetime | str, *, field_name: str) -> datetime:
+    if isinstance(value, str):
+        text = value.strip()
+        if text.endswith("Z"):
+            text = f"{text[:-1]}+00:00"
+        try:
+            parsed = datetime.fromisoformat(text)
+        except ValueError as exc:
+            raise ValueError(f"{field_name} must be an ISO-8601 timestamp") from exc
+    elif isinstance(value, datetime):
+        parsed = value
+    else:
+        raise TypeError(f"{field_name} must be a datetime or ISO-8601 timestamp")
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError(f"{field_name} must include an explicit timezone")
+    return parsed.astimezone(timezone.utc)
+
+
+def _load_atoms(
+    connection: sqlite3.Connection,
+    *,
+    weeks: int,
+    limit: int | None,
+    now: datetime,
+    analysis_period_end: datetime | None,
+) -> list[dict]:
     clauses: list[str] = []
     params: list[object] = []
     if weeks and weeks > 0:
         cutoff = now - timedelta(days=weeks * 7)
-        clauses.append("last_seen_at >= ?")
+        clauses.append(
+            "reporting_utc_micros(last_seen_at) >= reporting_utc_micros(?)"
+        )
         params.append(cutoff.isoformat().replace("+00:00", "Z"))
+    if analysis_period_end is not None:
+        clauses.append(
+            "reporting_utc_micros(last_seen_at) < reporting_utc_micros(?)"
+        )
+        params.append(analysis_period_end.isoformat().replace("+00:00", "Z"))
     limit_sql = "LIMIT ?" if limit and limit > 0 else ""
     if limit and limit > 0:
         params.append(int(limit))
@@ -87,7 +120,7 @@ def _load_atoms(connection: sqlite3.Connection, *, weeks: int, limit: int | None
         SELECT *
         FROM knowledge_atoms
         {where_sql}
-        ORDER BY last_seen_at ASC, id ASC
+        ORDER BY reporting_utc_micros(last_seen_at) ASC, id ASC
         {limit_sql}
         """,
         params,
@@ -253,17 +286,33 @@ def refresh_idea_threads(
     weeks: int = 12,
     limit: int | None = None,
     now: datetime | None = None,
+    analysis_period_end: datetime | str | None = None,
 ) -> IdeaThreadSummary:
     current = now or _utc_now()
     if current.tzinfo is None:
         current = current.replace(tzinfo=timezone.utc)
     else:
         current = current.astimezone(timezone.utc)
+    exclusive_end = (
+        _normalize_utc_boundary(
+            analysis_period_end,
+            field_name="analysis_period_end",
+        )
+        if analysis_period_end is not None
+        else None
+    )
     links_refreshed = 0
     with sqlite3.connect(settings.db_path) as connection:
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON;")
-        atoms = _load_atoms(connection, weeks=weeks, limit=limit, now=current)
+        register_reporting_period_sqlite(connection)
+        atoms = _load_atoms(
+            connection,
+            weeks=weeks,
+            limit=limit,
+            now=current,
+            analysis_period_end=exclusive_end,
+        )
         groups = _group_atoms(atoms)
         for group in groups.values():
             group_atoms = group["atoms"]

@@ -1,7 +1,9 @@
 import json
 import math
+import os
 import re
 import sqlite3
+import tempfile
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -298,11 +300,9 @@ def export_opportunity_seeds(
     for seed in seeds:
         seed.update(period_fields)
 
-    target_path.parent.mkdir(parents=True, exist_ok=True)
-    target_path.write_text(json.dumps(seeds, ensure_ascii=False, indent=2), encoding="utf-8")
+    _atomic_write_json(target_path, seeds)
     market_pack_path = _market_pack_path_for(target_path, clean_week)
-    market_pack_path.parent.mkdir(parents=True, exist_ok=True)
-    market_pack_path.write_text(json.dumps(market_pack, ensure_ascii=False, indent=2), encoding="utf-8")
+    _atomic_write_json(market_pack_path, market_pack)
     return OpportunitySeedExportResult(
         week_label=clean_week,
         output_path=str(target_path),
@@ -671,3 +671,25 @@ def _market_lens_output_root_for(seed_path: Path) -> Path | None:
     if seed_path.parent == OUTPUT_DIR:
         return None
     return seed_path.with_name(f"{seed_path.stem}.market_context_lens")
+
+
+def _atomic_write_json(path: Path, payload: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temporary = Path(handle.name)
+            json.dump(payload, handle, ensure_ascii=False, indent=2)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
