@@ -1,0 +1,43 @@
+{
+  "actions": [],
+  "artifact_paths": {
+    "json": "examples/public_scorecard_demo/weekly-brief.json"
+  },
+  "artifact_type": "weekly_intelligence_brief",
+  "fixture_metadata": {
+    "contains_operator_data": false,
+    "data_class": "synthetic_fixture",
+    "supports_dogfood_claims": false
+  },
+  "intelligence_contract": {
+    "contract_version": "tra-intelligence-contract.v1"
+  },
+  "mvp_radar_gate": {
+    "context_only_can_satisfy_gate": false,
+    "decision": "do_not_build",
+    "matched_gate_evidence_count": 0,
+    "radar_artifact_status": "loaded"
+  },
+  "project_learning_projection": {
+    "learning_intelligence": {
+      "objectives": [],
+      "stage_counts": {
+        "explained": 0,
+        "implemented": 0,
+        "measured": 0,
+        "prerequisite_gap": 0,
+        "project-applied": 0,
+        "read": 0,
+        "reproduced": 0,
+        "stale": 0,
+        "tested": 0,
+        "understood": 0
+      }
+    }
+  },
+  "quality_findings": [],
+  "report_contract": {
+    "personalization_confidence": "unknown"
+  },
+  "week_label": "2026-W28"
+}
