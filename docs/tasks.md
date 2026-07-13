@@ -1,6 +1,6 @@
 # Current Backlog
 
-Version: 3.3
+Version: 3.4
 Last updated: 2026-07-14
 State: canonical active backlog
 
@@ -44,18 +44,19 @@ below, but active implementation starts from the IRX task graph.
 | Radar RVE contract/adapters in sibling repo | `implemented_and_verified`, `needs_live_validation` |
 | Editorial intelligence shadow | `implemented_and_verified`; separate opt-in `editorial_intelligence.v1` run artifact, not consumed by V1 renderers |
 | Static visualization component system | `implemented_and_verified`; shared offline `report_visuals.v1` library and sanitized fixture gallery, not activated in V1 renderers |
-| Report V2 contract and roadmap | `implementation_in_progress`; IRX-0 documentation plus IRX-1 period, IRX-2 run-manifest/Radar, IRX-3 reaction-personalization, IRX-4 canonical-thread lifecycle, IRX-5 editorial-synthesis semantics, and IRX-8 shared visuals are implemented and verified |
+| Project Intelligence V2 shadow | `implemented_and_verified`; separate opt-in `project_intelligence.v2` run artifact with exact project/thread/evidence authority and no V1 renderer activation |
+| Report V2 contract and roadmap | `implementation_in_progress`; IRX-0 documentation plus IRX-1 period, IRX-2 run-manifest/Radar, IRX-3 reaction-personalization, IRX-4 canonical-thread lifecycle, IRX-5 editorial-synthesis semantics, IRX-8 shared visuals, and IRX-9 project actions are implemented and verified |
 | Portfolio dogfood evidence | `blocked_on_IRX-14_start_gate` |
 
 ## Next Candidate Task
 
-`IRX-9 - Project Intelligence V2`
+`IRX-10 - MVP Radar Reader Contract And Context-Only Hardening`
 
-Create at most two evidence-backed, repository-named, PR-sized project
-implications after the verified editorial and visualization contracts. IRX-9
-must preserve existing project/learning compatibility projections and must not
-activate V2 renderers, mutate repositories, or broaden Radar authority. Its
-task card is in `docs/intelligence_report_v2_roadmap.md`.
+Normalize the immutable same-run Radar binding into a bounded reader projection
+that explains the candidate, recommendation, evidence gaps, next validation,
+change condition, and kill criteria without changing Radar scoring or allowing
+context-only evidence to satisfy a gate. Its task card is in
+`docs/intelligence_report_v2_roadmap.md`.
 
 ## Dependency Graph
 
@@ -81,7 +82,7 @@ contract.
 | IRX-4 | P0 | `implemented_and_verified` | Curate stable idea-level threads with merge/split lifecycle, provenance, and historical as-of resolution | IRX-1, IRX-2, IRX-3 |
 | IRX-5 | P0 | `implemented_and_verified` | Produce schema-validated Russian editorial intelligence JSON from bounded cited inputs | IRX-1..IRX-4 |
 | IRX-8 | P1 | `implemented_and_verified` | Shared deterministic, offline static visualization components | IRX-4, IRX-5 |
-| IRX-9 | P1 | `planned` | Evidence-backed, named, PR-sized project implications | IRX-4, IRX-5, IRX-8 |
+| IRX-9 | P1 | `implemented_and_verified` | Evidence-backed, named, PR-sized project implications | IRX-4, IRX-5, IRX-8 |
 | IRX-10 | P1 | `planned_reader_contract`; context exclusion and IRX-2 same-run binding implemented | Explain the bound candidate, evidence gaps, next validation, and kill criteria | IRX-2, IRX-5, IRX-8 |
 | IRX-6 | P1 | `planned` | Russian 5-7 minute Weekly Intelligence Brief V2 | IRX-1..IRX-5, IRX-8..IRX-10 |
 | IRX-11 | P1 | `planned` | Reader-value gates for period, editorial, personalization, visual, project, and Radar quality | IRX-6, IRX-8 |
@@ -334,7 +335,45 @@ rollout implications are in `docs/intelligence_report_v2_roadmap.md`.
 - Compatibility: V1 Brief/Atlas output, editorial JSON, IRX-2 orchestration,
   project computation, Radar gates, cross-repository code, and private report
   artifacts remain unchanged. Browser screenshot regression remains IRX-13;
-  no screenshot or dogfood evidence is claimed. IRX-9 is the next task.
+  no screenshot or dogfood evidence is claimed. The historical IRX-9 handoff is
+  now closed by the completion record below.
+
+### 2026-07-14 - IRX-9 Project Intelligence V2
+
+- Status: `implemented_and_verified`.
+- Added the pure, deterministic `project_intelligence.v2` shadow contract and
+  immutable `<output>/<run_id>/project/project-intelligence.v2.json` artifact.
+  It has no model, network, database, clock, environment, or repository-write
+  authority.
+- Added opt-in `project_action_permissions.v1` descriptors. A confirmed action
+  must name the configured project and repository and copy its host-owned
+  component, change, configured normalized repository-relative files, effort,
+  acceptance criteria, risk, and priority exactly.
+- Confirmation requires an exact configured canonical thread, the same bounded
+  IRX-5 signal, medium-or-higher signal ceiling, and one or more decision-grade,
+  non-context evidence refs owned by that signal. Broad/legacy keyword overlap
+  cannot create authority. Explicit weak, rejected, learning-only, and
+  existing-context diagnostics remain non-actionable audit records.
+- The reader projection returns no more than two distinct permission/signal
+  actions. A Russian `no_confirmed_implication` state is valid; accepted audit
+  input is bounded to 32 records without silent truncation. Stable action/audit
+  refs, exact schemas, safe text/paths/refs, period identity, immutable cache
+  bytes, and editorial permission closure fail closed.
+- Split generation can opt into the project shadow only after unchanged V1
+  Brief/Atlas construction. Project-only generation performs no LLM call;
+  project and editorial failures are isolated; non-empty IRX-5 permissions are
+  revalidated against the exact preliminary package and loaded descriptors.
+- Added a sanitized fixture covering concrete, weak, rejected, learning,
+  existing-context, and empty outcomes, plus focused pure and split tests. The
+  required IRX-9 matrix passed 41 tests and the extended affected V1/editorial/
+  retrieval compatibility matrix passed 140 tests. Mutation review exercised
+  2,650 malformed variants without an uncaught exception. Ruff format/check,
+  focused compilation, JSON validation, and `git diff --check` passed.
+  Live/heavy pipelines and the full suite were not run.
+- Compatibility: existing PGI-005 projection/retrieval keys, V1 Brief/Atlas
+  bytes, IRX-5 model contract, reaction and feedback semantics, Radar gates,
+  cross-repository code, and generated private artifacts remain unchanged.
+  Reader rendering is deferred to IRX-6; IRX-10 is the next task.
 
 ## Existing-Work Reconciliation
 

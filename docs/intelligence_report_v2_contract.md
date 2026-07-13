@@ -1,8 +1,8 @@
 # Intelligence Report V2 Product Contract
 
 Version: `tra-intelligence-contract.v2`  
-Status: planned reader contract; IRX-1 through IRX-5 correctness foundation
-implemented and verified
+Status: planned reader contract; IRX-1 through IRX-5 plus IRX-8 and IRX-9
+foundations implemented and verified
 Queue: `IRX - Intelligence Report Experience And Editorial Quality`
 
 This contract defines the reader-facing behavior of Weekly Intelligence Brief
@@ -144,6 +144,60 @@ weak evidence to decision-grade evidence.
   and full quotations belong in the Audit Explorer.
 - Charts summarize and navigate evidence. They never count as evidence for the
   claim they visualize.
+
+## Project Intelligence V2
+
+`project_intelligence.v2` is the deterministic project-action authority for
+future Report V2 readers. IRX-9 persists it only as an explicit shadow artifact
+at `<output>/<run_id>/project/project-intelligence.v2.json`; V1 Brief, Atlas,
+retrieval, and Obsidian projections remain unchanged. IRX-6 owns the reader
+adapter and may consume no other source as Project Impact authority.
+
+Project-specific action copy is host-owned in an opt-in
+`project_action_permissions.v1` block under the active project descriptor. Each
+permission fixes:
+
+- configured `project_name` and repository;
+- one or more exact canonical-thread refs;
+- `why_this_project`, affected component, and suggested change;
+- one to eight normalized repository-relative likely files;
+- bounded `XS|S|M` effort;
+- Russian acceptance criteria and risk;
+- deterministic priority.
+
+A `confirmed` action requires all of the following in the same run:
+
+1. the configured project and permission exist;
+2. the signal and descriptor share the exact canonical-thread ref;
+3. the signal belongs to the bounded IRX-5 input package;
+4. confidence ceiling is `medium` or `high`;
+5. at least one cited ref belongs to that signal and is both decision-grade and
+   non-context;
+6. component, change, files, effort, criteria, risk, repository, and priority
+   equal the host descriptor exactly.
+
+Lexical project relevance and legacy keyword diagnostics cannot satisfy these
+conditions. They may remain `watch` or `rejected_overlap` audit context only.
+The other non-actionable states are `learning_only` and
+`existing_project_context`. The zero state is
+`no_confirmed_implication`. Reader surfaces collapse these states into concise
+Russian copy, while the sidecar retains their distinct bounded reasons and
+evidence closure.
+
+The projection returns no more than two distinct permission/signal actions.
+Stable action/audit refs, exact run and completed-week identity, immutable input
+hash/cache bytes, safe text/refs/paths, deterministic selection, and the
+32-record audit boundary fail closed. An unselected `confirmed` audit is valid
+only after the two-action cap or when the same permission/signal authority is
+already represented through another exact canonical ref.
+
+Only revalidated non-empty actions may be converted to the existing IRX-5
+permission shape (`project_action_ref`, `signal_id`, project, `allowed`, and
+same-signal evidence refs). The extractor requires the exact preliminary input
+package and loaded descriptors; empty context cannot grant authority. Project
+shadow failure produces zero editorial permissions and cannot block V1 or a
+separately requested editorial shadow. Project-only generation performs no LLM,
+network, database mutation, or repository change.
 
 ## Editorial Intelligence V1
 

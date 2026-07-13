@@ -6,7 +6,7 @@ import sqlite3
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Mapping
+from typing import TYPE_CHECKING, Callable, Mapping, Sequence
 
 from config.settings import PROJECT_ROOT, Settings
 from output.ai_intelligence_report import load_ai_intelligence_context
@@ -14,7 +14,11 @@ from output.knowledge_atlas_report import (
     KnowledgeAtlasSummary,
     build_knowledge_atlas_artifact,
 )
-from output.reporting_period import ReportingPeriod, format_period_display_label, resolve_reporting_period
+from output.reporting_period import (
+    ReportingPeriod,
+    format_period_display_label,
+    resolve_reporting_period,
+)
 from output.weekly_intelligence_brief import (
     WeeklyIntelligenceBriefSummary,
     build_weekly_intelligence_brief_artifact,
@@ -24,6 +28,7 @@ from output.weekly_intelligence_brief import (
 if TYPE_CHECKING:
     from llm.client import LLMCompletionReceipt
     from output.editorial_intelligence import EditorialIntelligenceSummary
+    from output.project_intelligence import ProjectIntelligenceSummary
 
 
 OUTPUT_ROOT = PROJECT_ROOT / "data" / "output"
@@ -48,6 +53,8 @@ class SplitIntelligenceReportsSummary:
     run_status: str = ""
     partial: bool = False
     pipeline_profile: str = ""
+    project_intelligence: ProjectIntelligenceSummary | None = None
+    project_intelligence_error: str = ""
     editorial_intelligence: EditorialIntelligenceSummary | None = None
     editorial_intelligence_error: str = ""
 
@@ -69,6 +76,9 @@ def generate_split_intelligence_reports(
     feedback_snapshot_at: datetime | str | None = None,
     feedback_snapshot_usable: bool = True,
     run_identity: Mapping[str, object] | None = None,
+    project_intelligence_output_root: str | Path | None = None,
+    project_intelligence_projects_path: str | Path | None = None,
+    project_intelligence_diagnostics: Sequence[Mapping[str, object]] | None = None,
     editorial_output_root: str | Path | None = None,
     editorial_radar_binding: Mapping[str, object] | None = None,
     editorial_completion: Callable[..., LLMCompletionReceipt] | None = None,
@@ -101,7 +111,9 @@ def generate_split_intelligence_reports(
                 if reaction_snapshot_binding is not None
                 else None
             ),
-            reaction_snapshot=(dict(reaction_snapshot) if reaction_snapshot is not None else None),
+            reaction_snapshot=(
+                dict(reaction_snapshot) if reaction_snapshot is not None else None
+            ),
             feedback_snapshot_usable=feedback_snapshot_usable,
             threads_limit=max(1, int(threads_limit or 24)),
             atoms_limit=max(1, int(atoms_limit or 8)),
@@ -138,22 +150,28 @@ def generate_split_intelligence_reports(
         },
         run_identity=run_identity,
     )
+    project_intelligence = None
+    project_intelligence_error = ""
+    project_permissions: Sequence[Mapping[str, object]] = ()
     editorial_intelligence = None
     editorial_intelligence_error = ""
-    if editorial_output_root is not None:
-        try:
-            from output.editorial_intelligence import (
-                generate_editorial_intelligence_artifact,
-            )
 
+    shadow_requested = (
+        project_intelligence_output_root is not None
+        or editorial_output_root is not None
+    )
+    shadow_context = context
+    shadow_context_error: Exception | None = None
+    feedback_count = 0
+    if shadow_requested:
+        try:
             # A shadow-only reload binds mutable feedback reads to the run
             # cutoff without changing the already-built V1 reader surfaces.
-            editorial_context = context
             if feedback_snapshot_at is None:
                 with sqlite3.connect(settings.db_path) as connection:
                     connection.row_factory = sqlite3.Row
                     connection.execute("PRAGMA foreign_keys = ON;")
-                    editorial_context = load_ai_intelligence_context(
+                    shadow_context = load_ai_intelligence_context(
                         connection,
                         week_label=clean_week,
                         reporting_period=resolved_period,
@@ -173,21 +191,93 @@ def generate_split_intelligence_reports(
                         threads_limit=max(1, int(threads_limit or 24)),
                         atoms_limit=max(1, int(atoms_limit or 8)),
                     )
-            editorial_identity = {
-                **period_metadata,
-                **(dict(run_identity) if isinstance(run_identity, Mapping) else {}),
-            }
-            feedback_context = editorial_context.get("feedback_context")
+            feedback_context = shadow_context.get("feedback_context")
             feedback_count = (
                 int(feedback_context.get("confirmed_event_count") or 0)
                 if isinstance(feedback_context, Mapping)
                 else 0
             )
+        except Exception as exc:  # Shadow context must never block V1 delivery.
+            shadow_context_error = exc
+
+    shadow_identity = {
+        **period_metadata,
+        **(dict(run_identity) if isinstance(run_identity, Mapping) else {}),
+    }
+
+    if project_intelligence_output_root is not None:
+        try:
+            if shadow_context_error is not None:
+                raise shadow_context_error
+            from output.editorial_intelligence import build_editorial_input_package
+            from output.project_intelligence import (
+                PROJECTS_YAML_PATH,
+                generate_project_intelligence_artifact,
+                load_project_action_descriptors,
+                load_project_intelligence_artifact,
+                project_editorial_permissions,
+            )
+
+            preliminary_package = build_editorial_input_package(
+                shadow_context,
+                run_identity=shadow_identity,
+                radar_binding=editorial_radar_binding,
+                project_permissions=(),
+                feedback_snapshot_count=feedback_count,
+            )
+            diagnostic_options = (
+                {"diagnostic_records": tuple(project_intelligence_diagnostics)}
+                if project_intelligence_diagnostics is not None
+                else {}
+            )
+            if project_intelligence_projects_path is None:
+                project_summary = generate_project_intelligence_artifact(
+                    preliminary_package,
+                    output_root=project_intelligence_output_root,
+                    **diagnostic_options,
+                )
+            else:
+                project_summary = generate_project_intelligence_artifact(
+                    preliminary_package,
+                    output_root=project_intelligence_output_root,
+                    projects_yaml_path=Path(project_intelligence_projects_path),
+                    **diagnostic_options,
+                )
+            project_artifact = load_project_intelligence_artifact(project_summary.path)
+            projects_path = (
+                Path(project_intelligence_projects_path)
+                if project_intelligence_projects_path is not None
+                else PROJECTS_YAML_PATH
+            )
+            project_descriptors = load_project_action_descriptors(projects_path)
+            project_permissions = project_editorial_permissions(
+                project_artifact,
+                input_package=preliminary_package,
+                projects=project_descriptors,
+            )
+            project_intelligence = project_summary
+        except Exception as exc:  # Project shadow must never block V1 or editorial.
+            project_intelligence_error = exc.__class__.__name__
+            project_permissions = ()
+            LOGGER.warning(
+                "Project intelligence shadow failed without blocking V1 reports: %s",
+                project_intelligence_error,
+            )
+
+    if editorial_output_root is not None:
+        try:
+            if shadow_context_error is not None:
+                raise shadow_context_error
+            from output.editorial_intelligence import (
+                generate_editorial_intelligence_artifact,
+            )
+
             editorial_intelligence = generate_editorial_intelligence_artifact(
-                editorial_context,
-                run_identity=editorial_identity,
+                shadow_context,
+                run_identity=shadow_identity,
                 output_root=editorial_output_root,
                 radar_binding=editorial_radar_binding,
+                project_permissions=project_permissions,
                 feedback_snapshot_count=feedback_count,
                 completion=editorial_completion,
                 model=editorial_model,
@@ -214,6 +304,8 @@ def generate_split_intelligence_reports(
         pipeline_profile=str((run_identity or {}).get("pipeline_profile") or ""),
         knowledge_atlas=knowledge_atlas,
         weekly_brief=weekly_brief,
+        project_intelligence=project_intelligence,
+        project_intelligence_error=project_intelligence_error,
         editorial_intelligence=editorial_intelligence,
         editorial_intelligence_error=editorial_intelligence_error,
         notification_text="",
@@ -223,6 +315,8 @@ def generate_split_intelligence_reports(
             **asdict(summary),
             "knowledge_atlas": knowledge_atlas,
             "weekly_brief": weekly_brief,
+            "project_intelligence": project_intelligence,
+            "project_intelligence_error": project_intelligence_error,
             "editorial_intelligence": editorial_intelligence,
             "editorial_intelligence_error": editorial_intelligence_error,
             "notification_text": build_split_reports_notification(summary),
@@ -250,7 +344,9 @@ def deliver_split_intelligence_reports(
     clean_chat_id = str(chat_id or os.environ.get("TELEGRAM_OWNER_CHAT_ID", "")).strip()
     clean_token = str(token or os.environ.get("TELEGRAM_BOT_TOKEN", "")).strip()
     if not clean_chat_id or not clean_token:
-        LOGGER.info("Split AI report delivery skipped because Telegram credentials are missing")
+        LOGGER.info(
+            "Split AI report delivery skipped because Telegram credentials are missing"
+        )
         return summary
     period_label = _period_display_label(summary)
     message_ids = [
@@ -290,6 +386,8 @@ def deliver_split_intelligence_reports(
         run_status=summary.run_status,
         partial=summary.partial,
         pipeline_profile=summary.pipeline_profile,
+        project_intelligence=summary.project_intelligence,
+        project_intelligence_error=summary.project_intelligence_error,
         editorial_intelligence=summary.editorial_intelligence,
         editorial_intelligence_error=summary.editorial_intelligence_error,
     )
@@ -319,9 +417,15 @@ def _resolve_split_reporting_period(
         )
     if not isinstance(reporting_period, ReportingPeriod):
         raise TypeError("reporting_period must be a ReportingPeriod")
-    if week_label is not None and str(week_label).strip() != reporting_period.week_label:
+    if (
+        week_label is not None
+        and str(week_label).strip() != reporting_period.week_label
+    ):
         raise ValueError("week_label conflicts with reporting_period")
-    if period_mode is not None and str(period_mode).strip() != reporting_period.period_mode:
+    if (
+        period_mode is not None
+        and str(period_mode).strip() != reporting_period.period_mode
+    ):
         raise ValueError("period_mode conflicts with reporting_period")
     if now is not None:
         supplied_now = resolve_reporting_period(

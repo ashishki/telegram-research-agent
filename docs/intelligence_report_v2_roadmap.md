@@ -153,7 +153,7 @@ behavior; it does not reopen the gate logic.
 | IRX-6 | Weekly Intelligence Brief V2 | `planned` | P1 | IRX-2 through IRX-5, IRX-8 through IRX-10 |
 | IRX-7 | Knowledge Atlas V2 and Knowledge Audit Explorer separation | `planned` | P2 | IRX-4, IRX-5, IRX-8, IRX-11 |
 | IRX-8 | Static visualization component system | `implemented_and_verified` | P1 | IRX-4, IRX-5 |
-| IRX-9 | Project Intelligence V2 | `planned` | P1 | IRX-4, IRX-5, IRX-8 |
+| IRX-9 | Project Intelligence V2 | `implemented_and_verified` | P1 | IRX-4, IRX-5, IRX-8 |
 | IRX-10 | MVP Radar reader contract and context-only hardening | `partially_implemented`; context-only gates and IRX-2 same-run binding verified, reader projection planned | P1 | IRX-2, IRX-5, IRX-8 |
 | IRX-11 | Reader-value quality gates | `planned` | P1 | IRX-6, IRX-8 and upstream contracts |
 | IRX-12 | Report-specific feedback and learning loop | `planned` | P2 | IRX-2, IRX-3, IRX-5 through IRX-7, IRX-10 |
@@ -828,7 +828,7 @@ evidence is not claimed before IRX-13.
 
 ### IRX-9 - Project Intelligence V2
 
-**Status:** `planned`. **Priority:** P1.
+**Status:** `implemented_and_verified`. **Priority:** P1.
 
 **Problem:** Current Project Impact copies generic learning actions, names no
 repository, and omits affected files, effort, evidence, and acceptance criteria.
@@ -887,6 +887,30 @@ changes, or an action unsupported by deterministic project permission.
 
 **Rollout implications:** Shadow the V2 projection against current diagnostics;
 preserve current projection keys for retrieval compatibility.
+
+**IRX-9 completion receipt (2026-07-14):** Added the separate opt-in
+`project_intelligence.v2` immutable run artifact and
+`project_action_permissions.v1` host descriptor boundary. A confirmed action
+requires an exact configured project permission, exact canonical-thread fit,
+the same bounded IRX-5 signal, and decision-grade non-context evidence owned by
+that signal; lexical overlap alone cannot grant authority. Output contains no
+more than two distinct permission/signal actions with repository, component,
+change, configured normalized relative files, effort, Russian acceptance
+criteria, risk, confidence, evidence, stable refs, and exact audit/editorial
+closure. Weak,
+rejected, learning-only, and existing-context states stay audit-only, while an
+explicit Russian zero state is valid. Split generation may shadow the artifact
+after unchanged V1 readers and pass only revalidated permissions into IRX-5;
+project-only execution makes no model call and shadow failures do not block V1
+or editorial output. Sanitized pure and split fixtures cover all required
+states, unsafe inputs, empty authority, deterministic bounds/cache, and default
+integration. The required 41-test matrix and a 140-test extended affected
+V1/editorial/retrieval compatibility matrix passed; mutation review exercised
+2,650 malformed variants without an uncaught exception. Ruff, focused
+compilation, JSON validation, and diff checks passed. Current PGI-005
+projection/retrieval keys, V1 renderers, reaction/feedback semantics, Radar
+gates, generated artifacts, and cross-repository code were not changed. Reader
+activation remains IRX-6.
 
 ### IRX-10 - MVP Radar Reader Contract And Context-Only Hardening
 
@@ -1515,6 +1539,6 @@ Report files changed, canonical identity/lifecycle/as-of semantics, compatibilit
 
 ## 15. Suggested Following Task
 
-IRX-1 through IRX-5 and IRX-8 are implemented and verified. IRX-9 is the next
-planned implementation scope. Reader-surface activation, rollout, and dogfood
-remain unimplemented and gated by their later tasks.
+IRX-1 through IRX-5, IRX-8, and IRX-9 are implemented and verified. IRX-10 is
+the next planned implementation scope. Reader-surface activation, rollout, and
+dogfood remain unimplemented and gated by their later tasks.

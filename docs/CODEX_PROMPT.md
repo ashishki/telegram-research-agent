@@ -1,9 +1,10 @@
 # CODEX_PROMPT - Compact Session Handoff
 
-Version: 5.6
+Version: 5.7
 Date: 2026-07-14
-State: IRX-1 through IRX-5 and IRX-8 `implemented_and_verified`; IRX-9 is the
-next planned implementation task; dogfood is blocked until IRX-14
+State: IRX-1 through IRX-5, IRX-8, and IRX-9
+`implemented_and_verified`; IRX-10 is the next planned implementation task;
+dogfood is blocked until IRX-14
 
 ## Current Product Direction
 
@@ -33,7 +34,7 @@ docs/tasks.md
 Next implementation task:
 
 ```text
-IRX-9 - Project Intelligence V2
+IRX-10 - MVP Radar Reader Contract And Context-Only Hardening
 ```
 
 ## W29 Product Correction
@@ -45,9 +46,10 @@ entity-fragmented threads, and provided no meaningful visual map. The current
 detailed Atlas becomes the Knowledge Audit Explorer foundation. IRX-1 fixed the
 shared completed-period semantics, IRX-2 added the manifest-bound package,
 IRX-3 added bounded auditable reaction personalization, IRX-4 added canonical
-curation, IRX-5 added a strict run-bound editorial shadow artifact, and IRX-8
-added the shared deterministic offline visualization contract and fixture
-gallery. Reader V2 surfaces remain planned, and dogfood has not started.
+curation, IRX-5 added a strict run-bound editorial shadow artifact, IRX-8 added
+the shared deterministic offline visualization contract and fixture gallery,
+and IRX-9 added the exact evidence-bound Project Intelligence V2 shadow.
+Reader V2 surfaces remain planned, and dogfood has not started.
 
 ## Verified Baseline
 
@@ -91,6 +93,13 @@ gallery. Reader V2 surfaces remain planned, and dogfood has not started.
   gallery. It validates exact run/period identity, data states, evidence
   boundaries, safe refs, numeric bounds, honest partial/empty/stale output, and
   collision-free DOM/SVG IDs. V1 renderers do not consume it yet.
+- IRX-9 adds the separate opt-in `project_intelligence.v2` immutable run
+  artifact and `project_action_permissions.v1` host boundary. At most two
+  actions can pass exact project, canonical-thread, same-signal,
+  decision-grade/non-context evidence, descriptor-copy, and confidence gates;
+  weak/rejected/learning/existing states remain audit-only and an explicit
+  Russian zero is valid. Its permissions may feed IRX-5 only after rebinding to
+  the exact package and descriptors; V1 and retrieval projections are unchanged.
 - Canonical intelligence sidecar contract `tra-intelligence-contract.v1` is now
   implemented locally for workbook/Brief/Atlas projections with sanitized eval
   fixtures.
@@ -378,7 +387,49 @@ Verification and compatibility:
   project computation, Radar gates, cross-repository code, and generated private
   reports remain unchanged. IRX-8 did not claim browser screenshot evidence;
   the documented desktop/mobile regression harness remains IRX-13 scope.
-- IRX-9 is the next implementation task.
+- The historical IRX-9 handoff is closed by the completion record below.
+
+## IRX-9 Completion
+
+Status: `implemented_and_verified` on 2026-07-14.
+
+Implemented:
+
+- separate pure `project_intelligence.v2` projection and immutable
+  `<output>/<run_id>/project/project-intelligence.v2.json` artifact, with no
+  model, network, database, clock, environment, or repository mutation;
+- opt-in `project_action_permissions.v1` descriptors containing the configured
+  repository, exact canonical refs, host-owned project rationale/component/
+  change/files/effort/criteria/risk/priority, and one concrete future Brief V2
+  adapter permission for this repository;
+- exact confirmation closure over a configured permission, the same bounded
+  IRX-5 signal and canonical thread, medium-or-higher confidence ceiling, and
+  decision-grade non-context evidence owned by that signal. Legacy/lexical
+  overlap cannot grant action authority;
+- at most two distinct permission/signal actions, stable deterministic refs,
+  Russian explicit-zero and non-actionable audit states, a fail-closed
+  32-record diagnostic boundary, strict text/path/ref/period/schema bounds,
+  immutable-byte cache reuse, and an authority-bound IRX-5 permission adapter;
+- opt-in split shadow generation after unchanged V1 Brief/Atlas construction,
+  shared feedback cutoff context, project-only no-LLM behavior, and independent
+  project/editorial failure isolation. Non-empty permissions are revalidated
+  against the exact preliminary package and loaded descriptors before use.
+
+Verification and compatibility:
+
+- sanitized concrete/weak/rejected/learning/existing/empty fixtures, 17 pure
+  contract tests, 7 split integration tests, and the combined required 41-test
+  IRX-9 matrix passed. The extended affected V1/editorial/retrieval matrix
+  passed 140 tests, and 2,650 malformed mutation variants produced no uncaught
+  exception. Ruff format/check, focused compilation, JSON validation, and
+  `git diff --check` passed;
+- V1 Brief/Atlas output, current PGI-005 projection/retrieval keys, the IRX-5
+  model contract, reactions, feedback, Radar scoring/gates, generated private
+  artifacts, and cross-repository code remain unchanged. No live/heavy pipeline,
+  full suite, V2 reader activation, repository mutation, or dogfood run was
+  performed;
+- IRX-10 is the next implementation task. Project reader rendering remains
+  owned by IRX-6.
 
 ## PGI-001 Completion
 
@@ -748,8 +799,9 @@ Report files changed, canonical identity/lifecycle/as-of semantics, compatibilit
 ```
 
 This exact historical prompt stopped at the IRX-4 boundary as required. IRX-4
-is implemented and verified; the subsequent IRX-5 and IRX-8 handoffs are now
-closed by the completion records above. IRX-9 is the next planned scope.
+is implemented and verified; the subsequent IRX-5, IRX-8, and IRX-9 handoffs
+are now closed by the completion records above. IRX-10 is the next planned
+scope.
 
 ## Historical PGI-007 Handoff
 

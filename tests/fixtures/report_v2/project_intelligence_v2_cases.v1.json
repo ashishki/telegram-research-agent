@@ -1,0 +1,463 @@
+{
+  "schema_version": "project_intelligence_v2_cases.v1",
+  "run_id": "tra-weekly-2026-W28-project-test",
+  "reporting_period": {
+    "reporting_week": "2026-W28",
+    "analysis_period_start": "2026-07-06T00:00:00Z",
+    "analysis_period_end": "2026-07-13T00:00:00Z"
+  },
+  "project_descriptor": {
+    "name": "telegram-research-agent",
+    "repo": "ashishki/telegram-research-agent",
+    "description": "Sanitized fixture project for evidence-bound weekly intelligence.",
+    "focus": "Deterministic report evidence and reader-safe project actions.",
+    "keywords": [
+      "evidence",
+      "report"
+    ],
+    "project_intelligence": {
+      "schema_version": "project_action_permissions.v1",
+      "action_permissions": [
+        {
+          "permission_id": "brief-evidence-receipt",
+          "canonical_thread_refs": [
+            "canonical_thread:evidence-bound-brief"
+          ],
+          "why_this_project": "Проект уже формирует недельный отчёт и может показать границу доказательств без изменения источников.",
+          "affected_component": "Weekly Intelligence Brief evidence receipt",
+          "suggested_change": "Добавить в существующую секцию явный список использованных decision-grade доказательств и причин отклонения остальных.",
+          "likely_files": [
+            "src/output/weekly_intelligence_brief.py",
+            "tests/test_split_intelligence_reports.py"
+          ],
+          "effort": "S",
+          "acceptance_criteria": [
+            "Секция перечисляет только evidence refs выбранного сигнала.",
+            "Контекстные и неподтверждённые записи видны только в аудите."
+          ],
+          "risk": "Можно перегрузить Brief внутренними деталями, поэтому список должен быть ограничен.",
+          "priority": 10
+        },
+        {
+          "permission_id": "atlas-audit-link",
+          "canonical_thread_refs": [
+            "canonical_thread:auditable-atlas"
+          ],
+          "why_this_project": "Проект хранит канонические ссылки и уже имеет audit-поверхность для проверки происхождения вывода.",
+          "affected_component": "Knowledge Atlas audit navigation",
+          "suggested_change": "Добавить локальную ссылку из проектного действия к ограниченному audit-разделу канонической темы.",
+          "likely_files": [
+            "src/output/knowledge_atlas_report.py",
+            "tests/test_split_intelligence_reports.py"
+          ],
+          "effort": "S",
+          "acceptance_criteria": [
+            "Ссылка ведёт только к канонической теме того же сигнала.",
+            "При отсутствии темы действие не подтверждается."
+          ],
+          "risk": "Неверная ссылка может создать ложную трассируемость между темами.",
+          "priority": 20
+        },
+        {
+          "permission_id": "confidence-boundary-copy",
+          "canonical_thread_refs": [
+            "canonical_thread:confidence-boundary"
+          ],
+          "why_this_project": "Проект уже вычисляет confidence ceiling и может объяснить его без новой модели или источника.",
+          "affected_component": "Project Intelligence confidence explanation",
+          "suggested_change": "Показать рядом с действием краткую host-owned причину ограничения уверенности.",
+          "likely_files": [
+            "src/output/project_intelligence.py",
+            "tests/test_project_intelligence.py"
+          ],
+          "effort": "S",
+          "acceptance_criteria": [
+            "Причина строится детерминированно из evidence gate.",
+            "Текст не повышает confidence выше ceiling сигнала."
+          ],
+          "risk": "Слишком общий текст может выглядеть как дополнительное доказательство.",
+          "priority": 30
+        }
+      ]
+    }
+  },
+  "input_package": {
+    "schema_version": "editorial_intelligence_input.v1",
+    "run_id": "tra-weekly-2026-W28-project-test",
+    "reporting_period": {
+      "reporting_week": "2026-W28",
+      "analysis_period_start": "2026-07-06T00:00:00Z",
+      "analysis_period_end": "2026-07-13T00:00:00Z"
+    },
+    "signal_candidates": [
+      {
+        "signal_id": "signal:evidence-bound-brief",
+        "source_thread_refs": [
+          "idea_thread:evidence-brief-fragment"
+        ],
+        "canonical_thread_refs": [
+          "canonical_thread:evidence-bound-brief"
+        ],
+        "title": "Граница доказательств в недельном Brief",
+        "summary": "Независимые записи подтверждают необходимость видимой трассировки решения.",
+        "status": "active",
+        "changed_this_week": true,
+        "current_claims": [
+          "Читателю нужна проверяемая связь действия с evidence refs."
+        ],
+        "evidence_refs": [
+          "evidence:brief-primary",
+          "evidence:brief-secondary"
+        ],
+        "confidence_ceiling": "medium",
+        "allowed_decisions": [
+          "act",
+          "study",
+          "watch",
+          "ignore",
+          "verify_first"
+        ],
+        "project_name": "safe-but-undeclared-project",
+        "suggested_change": "Скопировать общий редакционный совет.",
+        "likely_files": [
+          "safe/but/undeclared.py"
+        ]
+      },
+      {
+        "signal_id": "signal:auditable-atlas",
+        "source_thread_refs": [
+          "idea_thread:atlas-audit-fragment"
+        ],
+        "canonical_thread_refs": [
+          "canonical_thread:auditable-atlas"
+        ],
+        "title": "Переход от действия к аудиту темы",
+        "summary": "Второй независимый сигнал связывает читательское действие с канонической темой.",
+        "status": "active",
+        "changed_this_week": true,
+        "current_claims": [
+          "Локальная audit-ссылка уменьшает стоимость проверки решения."
+        ],
+        "evidence_refs": [
+          "evidence:atlas-primary"
+        ],
+        "confidence_ceiling": "medium",
+        "allowed_decisions": [
+          "act",
+          "study",
+          "watch",
+          "ignore",
+          "verify_first"
+        ]
+      },
+      {
+        "signal_id": "signal:confidence-boundary",
+        "source_thread_refs": [
+          "idea_thread:confidence-boundary-fragment"
+        ],
+        "canonical_thread_refs": [
+          "canonical_thread:confidence-boundary"
+        ],
+        "title": "Объяснение ограничения уверенности",
+        "summary": "Третий gate-valid сигнал нужен для проверки детерминированного ограничения до двух действий.",
+        "status": "active",
+        "changed_this_week": true,
+        "current_claims": [
+          "Confidence ceiling должен оставаться видимым ограничением."
+        ],
+        "evidence_refs": [
+          "evidence:confidence-primary"
+        ],
+        "confidence_ceiling": "medium",
+        "allowed_decisions": [
+          "act",
+          "study",
+          "watch",
+          "ignore",
+          "verify_first"
+        ]
+      },
+      {
+        "signal_id": "signal:keyword-overlap",
+        "source_thread_refs": [
+          "idea_thread:generic-evidence"
+        ],
+        "canonical_thread_refs": [
+          "canonical_thread:generic-evidence"
+        ],
+        "title": "Общий keyword overlap",
+        "summary": "Слова evidence и report совпали, но точного host permission нет.",
+        "status": "active",
+        "changed_this_week": true,
+        "current_claims": [
+          "Широкое совпадение не подтверждает проектное действие."
+        ],
+        "evidence_refs": [
+          "evidence:keyword-only"
+        ],
+        "confidence_ceiling": "medium",
+        "allowed_decisions": [
+          "act",
+          "study",
+          "watch",
+          "ignore",
+          "verify_first"
+        ]
+      },
+      {
+        "signal_id": "signal:context-only",
+        "source_thread_refs": [
+          "idea_thread:context-only"
+        ],
+        "canonical_thread_refs": [
+          "canonical_thread:evidence-bound-brief"
+        ],
+        "title": "Контекстный сигнал",
+        "summary": "Контекст помогает сформулировать вопрос, но не удовлетворяет evidence gate.",
+        "status": "active",
+        "changed_this_week": true,
+        "current_claims": [
+          "Context-only evidence не разрешает проектное действие."
+        ],
+        "evidence_refs": [
+          "evidence:context-only"
+        ],
+        "confidence_ceiling": "low",
+        "allowed_decisions": [
+          "study",
+          "watch",
+          "ignore",
+          "verify_first"
+        ]
+      },
+      {
+        "signal_id": "signal:non-decision",
+        "source_thread_refs": [
+          "idea_thread:non-decision"
+        ],
+        "canonical_thread_refs": [
+          "canonical_thread:evidence-bound-brief"
+        ],
+        "title": "Неподтверждённый сигнал",
+        "summary": "Источник доступен, но evidence item не является decision-grade.",
+        "status": "active",
+        "changed_this_week": true,
+        "current_claims": [
+          "Наличие ссылки само по себе не закрывает evidence gate."
+        ],
+        "evidence_refs": [
+          "evidence:non-decision"
+        ],
+        "confidence_ceiling": "low",
+        "allowed_decisions": [
+          "study",
+          "watch",
+          "ignore",
+          "verify_first"
+        ]
+      }
+    ],
+    "evidence_catalog": [
+      {
+        "evidence_ref": "evidence:brief-primary",
+        "claim_ref": "claim:brief-primary",
+        "statement": "Reader actions need visible evidence closure.",
+        "verified_excerpt": "A bounded receipt made the action auditable.",
+        "evidence_tier": "source_backed",
+        "verification_status": "verified",
+        "decision_grade": true,
+        "context_only": false,
+        "polarity": "supporting",
+        "source_independence": {
+          "count": 2
+        },
+        "uncertainty_reasons": []
+      },
+      {
+        "evidence_ref": "evidence:brief-secondary",
+        "claim_ref": "claim:brief-secondary",
+        "statement": "A second independent observation supports the same bounded change.",
+        "verified_excerpt": "The audit receipt reduced manual verification time.",
+        "evidence_tier": "source_backed",
+        "verification_status": "verified",
+        "decision_grade": true,
+        "context_only": false,
+        "polarity": "supporting",
+        "source_independence": {
+          "count": 2
+        },
+        "uncertainty_reasons": []
+      },
+      {
+        "evidence_ref": "evidence:atlas-primary",
+        "claim_ref": "claim:atlas-primary",
+        "statement": "Audit navigation helps verify a canonical topic.",
+        "verified_excerpt": "Readers followed the bounded local reference.",
+        "evidence_tier": "source_backed",
+        "verification_status": "verified",
+        "decision_grade": true,
+        "context_only": false,
+        "polarity": "supporting",
+        "source_independence": {
+          "count": 2
+        },
+        "uncertainty_reasons": []
+      },
+      {
+        "evidence_ref": "evidence:confidence-primary",
+        "claim_ref": "claim:confidence-primary",
+        "statement": "Visible confidence limits reduce overclaiming.",
+        "verified_excerpt": "The host-owned ceiling prevented an unsupported high-confidence action.",
+        "evidence_tier": "source_backed",
+        "verification_status": "verified",
+        "decision_grade": true,
+        "context_only": false,
+        "polarity": "supporting",
+        "source_independence": {
+          "count": 2
+        },
+        "uncertainty_reasons": []
+      },
+      {
+        "evidence_ref": "evidence:keyword-only",
+        "claim_ref": "claim:keyword-only",
+        "statement": "Generic evidence/report vocabulary overlaps with project keywords.",
+        "verified_excerpt": "Only broad terms matched.",
+        "evidence_tier": "source_backed",
+        "verification_status": "verified",
+        "decision_grade": true,
+        "context_only": false,
+        "polarity": "supporting",
+        "source_independence": {
+          "count": 2
+        },
+        "uncertainty_reasons": []
+      },
+      {
+        "evidence_ref": "evidence:context-only",
+        "claim_ref": "claim:context-only",
+        "statement": "Business context may inform a question.",
+        "verified_excerpt": "This record is context only.",
+        "evidence_tier": "source_backed",
+        "verification_status": "verified",
+        "decision_grade": true,
+        "context_only": true,
+        "polarity": "supporting",
+        "source_independence": {
+          "count": 2
+        },
+        "uncertainty_reasons": [
+          "Context cannot satisfy a decision gate."
+        ]
+      },
+      {
+        "evidence_ref": "evidence:non-decision",
+        "claim_ref": "claim:non-decision",
+        "statement": "A source mention exists without decision-grade verification.",
+        "verified_excerpt": "The record needs verification.",
+        "evidence_tier": "source_backed",
+        "verification_status": "unverified",
+        "decision_grade": false,
+        "context_only": false,
+        "polarity": "supporting",
+        "source_independence": {
+          "count": 1
+        },
+        "uncertainty_reasons": [
+          "A second independent source is missing."
+        ]
+      }
+    ]
+  },
+  "diagnostic_records": {
+    "concrete": [
+      {
+        "project_name": "telegram-research-agent",
+        "permission_id": "brief-evidence-receipt",
+        "signal_id": "signal:evidence-bound-brief",
+        "canonical_thread_ref": "canonical_thread:evidence-bound-brief",
+        "status": "confirmed",
+        "reason_ru": "Точный проект, каноническая тема и decision-grade evidence совпали с host permission.",
+        "evidence_refs": [
+          "evidence:brief-primary",
+          "evidence:brief-secondary"
+        ]
+      },
+      {
+        "project_name": "telegram-research-agent",
+        "permission_id": "atlas-audit-link",
+        "signal_id": "signal:auditable-atlas",
+        "canonical_thread_ref": "canonical_thread:auditable-atlas",
+        "status": "confirmed",
+        "reason_ru": "Audit-ссылка разрешена для точной канонической темы и закрыта evidence ref.",
+        "evidence_refs": [
+          "evidence:atlas-primary"
+        ]
+      },
+      {
+        "project_name": "telegram-research-agent",
+        "permission_id": "confidence-boundary-copy",
+        "signal_id": "signal:confidence-boundary",
+        "canonical_thread_ref": "canonical_thread:confidence-boundary",
+        "status": "confirmed",
+        "reason_ru": "Третий валидный кандидат остаётся в аудите после лимита reader actions.",
+        "evidence_refs": [
+          "evidence:confidence-primary"
+        ]
+      }
+    ],
+    "weak": [
+      {
+        "project_name": "telegram-research-agent",
+        "permission_id": "brief-evidence-receipt",
+        "signal_id": "signal:evidence-bound-brief",
+        "canonical_thread_ref": "canonical_thread:evidence-bound-brief",
+        "status": "watch",
+        "reason_ru": "Точная тема найдена, но диагностике пока нужна дополнительная проектная проверка перед действием.",
+        "evidence_refs": [
+          "evidence:brief-primary"
+        ]
+      }
+    ],
+    "rejected": [
+      {
+        "project_name": "telegram-research-agent",
+        "permission_id": "brief-evidence-receipt",
+        "signal_id": "signal:keyword-overlap",
+        "canonical_thread_ref": "canonical_thread:generic-evidence",
+        "status": "rejected_overlap",
+        "reason_ru": "Широкий keyword overlap отклонён и не является проектным доказательством.",
+        "evidence_refs": [
+          "evidence:keyword-only"
+        ]
+      }
+    ],
+    "learning": [
+      {
+        "project_name": "telegram-research-agent",
+        "permission_id": "brief-evidence-receipt",
+        "signal_id": "signal:evidence-bound-brief",
+        "canonical_thread_ref": "canonical_thread:evidence-bound-brief",
+        "status": "learning_only",
+        "reason_ru": "Сигнал полезен для изучения, но не разрешает изменение проекта.",
+        "evidence_refs": [
+          "evidence:brief-primary"
+        ]
+      }
+    ],
+    "existing": [
+      {
+        "project_name": "telegram-research-agent",
+        "permission_id": "brief-evidence-receipt",
+        "signal_id": "signal:evidence-bound-brief",
+        "canonical_thread_ref": "canonical_thread:evidence-bound-brief",
+        "status": "existing_project_context",
+        "reason_ru": "Изменение уже представлено в существующем проектном контексте и не является новым действием.",
+        "evidence_refs": [
+          "evidence:brief-primary"
+        ]
+      }
+    ],
+    "empty": []
+  }
+}

@@ -183,6 +183,25 @@ projects:
       - pipeline
     exclude_keywords:
       - film
+    project_intelligence:
+      schema_version: project_action_permissions.v1
+      action_permissions:
+        - permission_id: brief-v2-project-impact-adapter
+          canonical_thread_refs:
+            - canonical_thread:project-intelligence
+            - canonical_thread:project-intelligence-v2
+          why_this_project: "Проект уже формирует immutable Project Intelligence V2 sidecar и имеет общий статический компонент для ограниченного Project Impact в будущем Brief V2."
+          affected_component: "Weekly Intelligence Brief V2 Project Impact adapter"
+          suggested_change: "В рамках IRX-6 подключить к Brief V2 read-only адаптер не более чем двух confirmed actions из того же Project Intelligence V2 запуска и передать их в общий project-impact visual без изменения V1 Brief."
+          likely_files:
+            - src/output/weekly_intelligence_brief.py
+            - tests/test_split_intelligence_reports.py
+          effort: S
+          acceptance_criteria:
+            - "Brief V2 показывает не более двух действий и не повышает статус watch, rejected, learning-only или existing-context записей."
+            - "Пустое состояние явно сообщает об отсутствии подтверждённого влияния, а V1 Brief остаётся побайтно совместимым."
+          risk: "Адаптер может смешать запуски или превратить audit-контекст в разрешение, поэтому identity mismatch и любой не-confirmed статус должны закрывать действие."
+          priority: 10
 
   - name: gdev-agent
     repo: ashishki/gdev-agent
