@@ -218,6 +218,237 @@ class TestSplitIntelligenceReports(unittest.TestCase):
         )
         return settings
 
+    def test_default_split_path_does_not_invoke_editorial_shadow(self):
+        db_path = self._make_db()
+        settings = self._seed(db_path)
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                with patch(
+                    "output.editorial_intelligence.generate_editorial_intelligence_artifact"
+                ) as generate_editorial:
+                    summary = generate_split_intelligence_reports(
+                        settings,
+                        week_label="2026-W28",
+                        output_root=Path(tmpdir),
+                        now=datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc),
+                    )
+
+            generate_editorial.assert_not_called()
+            self.assertIsNone(summary.editorial_intelligence)
+            self.assertEqual(summary.editorial_intelligence_error, "")
+        finally:
+            os.unlink(db_path)
+
+    def test_opt_in_editorial_shadow_is_persisted_but_never_enters_v1_renderers(self):
+        db_path = self._make_db()
+        settings = self._seed(db_path)
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                root = Path(tmpdir)
+                shadow_root = root / "editorial-shadow"
+                mvp_path = root / "mvp-weekly-2026-W28.json"
+                mvp_path.write_text(
+                    json.dumps(
+                        {
+                            "result": {
+                                "selected_title": "Week Named Candidate",
+                                "dossier_status": "investigate",
+                                "recommendation": "revisit_with_evidence_gap",
+                            }
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                run_identity = {
+                    "run_id": "tra-weekly-shadow-valid",
+                    "run_status": "complete",
+                    "partial": False,
+                    "pipeline_profile": "irx2_orchestration.v1",
+                }
+                summary = generate_split_intelligence_reports(
+                    settings,
+                    week_label="2026-W28",
+                    output_root=root / "v1",
+                    mvp_radar_json_path=mvp_path,
+                    now=datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc),
+                    run_identity=run_identity,
+                    editorial_output_root=shadow_root,
+                    editorial_generated_at="2026-07-13T07:03:00Z",
+                )
+                editorial = summary.editorial_intelligence
+                self.assertIsNotNone(editorial)
+                assert editorial is not None
+                editorial_path = Path(editorial.path)
+                editorial_payload = json.loads(editorial_path.read_text(encoding="utf-8"))
+                brief_json_text = Path(summary.weekly_brief.json_path).read_text(encoding="utf-8")
+                atlas_json_text = Path(summary.knowledge_atlas.json_path).read_text(encoding="utf-8")
+                brief_html = Path(summary.weekly_brief.html_path).read_text(encoding="utf-8")
+                atlas_html = Path(summary.knowledge_atlas.html_path).read_text(encoding="utf-8")
+
+                self.assertTrue(editorial_path.is_file())
+                self.assertEqual(editorial.generation_status, "partial")
+                self.assertTrue(editorial.partial)
+                self.assertEqual(editorial_payload["generation_status"], "partial")
+                self.assertEqual(
+                    editorial_payload["fallback_reason"],
+                    "deterministic_input_partial",
+                )
+                self.assertNotIn(
+                    "feedback_snapshot_cutoff_unbound",
+                    editorial_payload["generation_receipt"]["validation_errors"],
+                )
+                self.assertNotIn(
+                    "feedback_snapshot_cutoff_mismatch",
+                    editorial_payload["generation_receipt"]["validation_errors"],
+                )
+                self.assertEqual(summary.editorial_intelligence_error, "")
+                self.assertEqual(
+                    editorial_payload["mvp_summary"]["reader_decision"],
+                    "unavailable",
+                )
+                self.assertEqual(editorial_payload["mvp_summary"]["radar_ref"], "")
+                for reader_text in (
+                    brief_json_text,
+                    atlas_json_text,
+                    brief_html,
+                    atlas_html,
+                ):
+                    self.assertNotIn("Частичный редакционный выпуск", reader_text)
+                    self.assertNotIn(str(editorial_path), reader_text)
+                    self.assertNotIn("editorial-intelligence.v1.json", reader_text)
+
+                brief_sidecar = json.loads(brief_json_text)
+                self.assertEqual(
+                    brief_sidecar["mvp_radar"]["selected_candidate"],
+                    "Week Named Candidate",
+                )
+
+                with patch.dict(
+                    os.environ,
+                    {"TELEGRAM_OWNER_CHAT_ID": "12345", "TELEGRAM_BOT_TOKEN": "token"},
+                    clear=False,
+                ):
+                    with (
+                        patch("bot.telegram_delivery.send_text", return_value=10),
+                        patch(
+                            "bot.telegram_delivery.send_document",
+                            side_effect=[11, 12],
+                        ),
+                    ):
+                        delivered = deliver_split_intelligence_reports(summary)
+                self.assertIs(delivered.editorial_intelligence, editorial)
+        finally:
+            os.unlink(db_path)
+
+    def test_editorial_input_mismatch_does_not_block_v1_split(self):
+        db_path = self._make_db()
+        settings = self._seed(db_path)
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                root = Path(tmpdir)
+                summary = generate_split_intelligence_reports(
+                    settings,
+                    week_label="2026-W28",
+                    output_root=root / "v1",
+                    now=datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc),
+                    run_identity={
+                        "run_id": "tra-weekly-shadow-input-mismatch",
+                        "analysis_period_end": "2026-07-01T00:00:00Z",
+                    },
+                    editorial_output_root=root / "shadow",
+                    editorial_generated_at="2026-07-13T07:03:00Z",
+                )
+
+                self.assertIsNone(summary.editorial_intelligence)
+                self.assertEqual(
+                    summary.editorial_intelligence_error,
+                    "EditorialInputError",
+                )
+                self.assertTrue(Path(summary.weekly_brief.html_path).is_file())
+                self.assertTrue(Path(summary.knowledge_atlas.html_path).is_file())
+        finally:
+            os.unlink(db_path)
+
+    def test_editorial_identity_failure_does_not_block_v1_split(self):
+        db_path = self._make_db()
+        settings = self._seed(db_path)
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                summary = generate_split_intelligence_reports(
+                    settings,
+                    week_label="2026-W28",
+                    output_root=Path(tmpdir) / "v1",
+                    now=datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc),
+                    editorial_output_root=Path(tmpdir) / "shadow",
+                    run_identity={},
+                )
+
+                self.assertIsNone(summary.editorial_intelligence)
+                self.assertEqual(
+                    summary.editorial_intelligence_error,
+                    "EditorialInputError",
+                )
+                self.assertTrue(Path(summary.weekly_brief.html_path).is_file())
+                self.assertTrue(Path(summary.knowledge_atlas.html_path).is_file())
+        finally:
+            os.unlink(db_path)
+
+    def test_editorial_persistence_failure_does_not_block_v1_split(self):
+        db_path = self._make_db()
+        settings = self._seed(db_path)
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                root = Path(tmpdir)
+                shadow_root = root / "shadow-is-a-file"
+                shadow_root.write_text("occupied", encoding="utf-8")
+                summary = generate_split_intelligence_reports(
+                    settings,
+                    week_label="2026-W28",
+                    output_root=root / "v1",
+                    now=datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc),
+                    editorial_output_root=shadow_root,
+                    run_identity={"run_id": "tra-weekly-shadow-persistence-fail"},
+                    editorial_generated_at="2026-07-13T07:03:00Z",
+                )
+
+                self.assertIsNone(summary.editorial_intelligence)
+                self.assertEqual(
+                    summary.editorial_intelligence_error,
+                    "NotADirectoryError",
+                )
+                self.assertTrue(Path(summary.weekly_brief.html_path).is_file())
+                self.assertTrue(Path(summary.knowledge_atlas.html_path).is_file())
+        finally:
+            os.unlink(db_path)
+
+    def test_unexpected_editorial_runtime_failure_does_not_block_v1_split(self):
+        db_path = self._make_db()
+        settings = self._seed(db_path)
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                root = Path(tmpdir)
+                with patch(
+                    "output.editorial_intelligence.generate_editorial_intelligence_artifact",
+                    side_effect=RuntimeError("unexpected shadow failure"),
+                ):
+                    summary = generate_split_intelligence_reports(
+                        settings,
+                        week_label="2026-W28",
+                        output_root=root / "v1",
+                        now=datetime(2026, 7, 13, 7, 2, 52, tzinfo=timezone.utc),
+                        editorial_output_root=root / "shadow",
+                        run_identity={"run_id": "tra-weekly-shadow-runtime-fail"},
+                    )
+
+                self.assertIsNone(summary.editorial_intelligence)
+                self.assertEqual(summary.editorial_intelligence_error, "RuntimeError")
+                self.assertTrue(Path(summary.weekly_brief.html_path).is_file())
+                self.assertTrue(Path(summary.weekly_brief.json_path).is_file())
+                self.assertTrue(Path(summary.knowledge_atlas.html_path).is_file())
+                self.assertTrue(Path(summary.knowledge_atlas.json_path).is_file())
+        finally:
+            os.unlink(db_path)
+
     def test_generates_distinct_atlas_and_brief_surfaces_from_shared_context(self):
         db_path = self._make_db()
         settings = self._seed(db_path)

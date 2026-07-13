@@ -1,6 +1,6 @@
 # Current Backlog
 
-Version: 3.1
+Version: 3.2
 Last updated: 2026-07-13
 State: canonical active backlog
 
@@ -42,17 +42,18 @@ below, but active implementation starts from the IRX task graph.
 | Strategy Reviewer | `implemented_and_verified` advisory-only |
 | Market/business Radar context | `implemented_and_verified` as `context_only` |
 | Radar RVE contract/adapters in sibling repo | `implemented_and_verified`, `needs_live_validation` |
-| Report V2 contract and roadmap | `implementation_in_progress`; IRX-0 documentation plus IRX-1 period, IRX-2 run-manifest/Radar, IRX-3 reaction-personalization, and IRX-4 canonical-thread lifecycle semantics are implemented and verified |
+| Editorial intelligence shadow | `implemented_and_verified`; separate opt-in `editorial_intelligence.v1` run artifact, not consumed by V1 renderers |
+| Report V2 contract and roadmap | `implementation_in_progress`; IRX-0 documentation plus IRX-1 period, IRX-2 run-manifest/Radar, IRX-3 reaction-personalization, IRX-4 canonical-thread lifecycle, and IRX-5 editorial-synthesis semantics are implemented and verified |
 | Portfolio dogfood evidence | `blocked_on_IRX-14_start_gate` |
 
 ## Next Candidate Task
 
-`IRX-5 - Editorial Intelligence Synthesis Contract`
+`IRX-8 - Static Visualization Component System`
 
-Produce schema-validated Russian editorial intelligence from bounded cited
-inputs after deterministic eligibility and ranking. IRX-5 remains planned and
-was not started by the IRX-4 slice. Its task card is in
-`docs/intelligence_report_v2_roadmap.md`.
+Create shared deterministic offline visualization components after the verified
+IRX-5 editorial JSON boundary. IRX-8 must not activate the V2 renderers or
+change the frozen IRX-2 stage policy outside its own declared scope. Its task
+card is in `docs/intelligence_report_v2_roadmap.md`.
 
 ## Dependency Graph
 
@@ -76,7 +77,7 @@ contract.
 | IRX-2 | P0 | `implemented_and_verified` | One weekly run manifest and required same-run Radar artifact contract | IRX-1 |
 | IRX-3 | P0 | `implemented_and_verified` | Map reactions through posts/atoms and a thread-resolution interface into a weak boost/receipt; canonical attribution is supplied by IRX-4 | IRX-1, IRX-2 |
 | IRX-4 | P0 | `implemented_and_verified` | Curate stable idea-level threads with merge/split lifecycle, provenance, and historical as-of resolution | IRX-1, IRX-2, IRX-3 |
-| IRX-5 | P0 | `planned` | Produce schema-validated Russian editorial intelligence JSON from bounded cited inputs | IRX-1..IRX-4 |
+| IRX-5 | P0 | `implemented_and_verified` | Produce schema-validated Russian editorial intelligence JSON from bounded cited inputs | IRX-1..IRX-4 |
 | IRX-8 | P1 | `planned` | Shared deterministic, offline static visualization components | IRX-4, IRX-5 |
 | IRX-9 | P1 | `planned` | Evidence-backed, named, PR-sized project implications | IRX-4, IRX-5, IRX-8 |
 | IRX-10 | P1 | `planned_reader_contract`; context exclusion and IRX-2 same-run binding implemented | Explain the bound candidate, evidence gaps, next validation, and kill criteria | IRX-2, IRX-5, IRX-8 |
@@ -258,6 +259,52 @@ rollout implications are in `docs/intelligence_report_v2_roadmap.md`.
   weight, global evidence score, explicit-feedback semantic, IRX-1 period rule,
   IRX-2 run/Radar binding, Radar gate, standing configuration, or cross-repo
   code was changed. IRX-5 and later work were not implemented.
+
+### 2026-07-13 - IRX-5 Editorial Intelligence Synthesis Contract
+
+- Status: `implemented_and_verified`.
+- Added a separate run-bound `editorial_intelligence.v1` shadow artifact. A
+  full eligible run makes one call through the strong synthesis route over one
+  bounded deterministic package; preflight-partial and cached runs make no
+  editorial model call. The model cannot read the raw archive, expand beyond
+  deterministic candidate/evidence permissions, render HTML/SVG, or mutate
+  persistent product state.
+- The package closes over the exact run/period and canonical snapshot, eligible
+  source observations/evidence/claims, at most eight preselected candidates,
+  validated reaction effects, confirmed-feedback classifications, explicit
+  project permissions, and the same-run Radar result. Output is capped at three
+  main signals and two project-action references.
+- Strict validation enforces the exact JSON schema, exact unpadded refs and
+  matrix coverage, Russian string fields, per-field cautious wording for low
+  evidence, evidence-derived confidence ceilings, reaction receipt parity,
+  loaded-versus-applied confirmed-feedback semantics, project/Radar authority,
+  bounded investigation-only actions, and rejection of invented readiness,
+  deployment, or persistent-mutation narratives.
+- Missing, malformed, mismatched, unsupported, or partial prerequisites never
+  masquerade as complete intelligence. They produce the exact deterministic
+  partial projection with visible status/reason and zero model calls. Honest
+  zero-change output is also an exact host-owned projection rather than a
+  model-authored thesis.
+- Production persistence verifies the manifest-bound Radar bytes/checksums and
+  run identity, reaction receipt identity/completeness, and feedback snapshot
+  count/cutoff before release. The artifact path is immutable per run; retries
+  with changed input or a prior partial artifact require a new run ID.
+- The host-only generation receipt records prompt/schema/model versions, input
+  hash, token counts, estimated cost, latency, attempts, usage-recording state,
+  limits, and validation errors. It remains audit metadata rather than reader
+  prose.
+- Compatibility: the V1 Brief and Atlas remain unchanged and never consume the
+  shadow JSON. Shadow generation is explicit opt-in and failure-isolated. The
+  frozen `irx2_orchestration.v1` editorial stage remains disabled/non-required;
+  IRX-5 did not activate or alter that policy.
+- Verification: 67 focused IRX-5 tests, the 49-test required acceptance matrix,
+  and 149 extended compatibility tests passed. Focused compilation and
+  `git diff --check` passed. Ruff passed on IRX-5-owned files; pre-existing
+  `ai_report` Ruff findings were outside this slice and excluded.
+- Scope confirmation: no live or expensive LLM call, generated report run,
+  archive regeneration, cross-repository edit, Radar gate change, V2 renderer,
+  visualization component, or dogfood start was performed. IRX-8 is the next
+  implementation task.
 
 ## Existing-Work Reconciliation
 

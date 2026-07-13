@@ -148,8 +148,8 @@ behavior; it does not reopen the gate logic.
 | IRX-1 | Completed-week reporting semantics | `implemented_and_verified` | P0 | IRX-0 |
 | IRX-2 | Weekly run manifest and required Radar artifact contract | `implemented_and_verified` | P0 | IRX-1 |
 | IRX-3 | Reaction-to-ranking personalization and effect receipt | `implemented_and_verified` | P0 | IRX-1, IRX-2 |
-| IRX-4 | Canonical Idea Thread curation and merge/split lifecycle | `ready` | P0 | IRX-1, IRX-2, IRX-3 |
-| IRX-5 | Editorial Intelligence synthesis contract | `planned` | P0 | IRX-1 through IRX-4 |
+| IRX-4 | Canonical Idea Thread curation and merge/split lifecycle | `implemented_and_verified` | P0 | IRX-1, IRX-2, IRX-3 |
+| IRX-5 | Editorial Intelligence synthesis contract | `implemented_and_verified` | P0 | IRX-1 through IRX-4 |
 | IRX-6 | Weekly Intelligence Brief V2 | `planned` | P1 | IRX-2 through IRX-5, IRX-8 through IRX-10 |
 | IRX-7 | Knowledge Atlas V2 and Knowledge Audit Explorer separation | `planned` | P2 | IRX-4, IRX-5, IRX-8, IRX-11 |
 | IRX-8 | Static visualization component system | `planned` | P1 | IRX-4, IRX-5 |
@@ -655,7 +655,7 @@ gates, cross-repository code, and IRX-5+ work were unchanged.
 
 ### IRX-5 - Editorial Intelligence Synthesis Contract
 
-**Status:** `planned`. **Priority:** P0.
+**Status:** `implemented_and_verified` on 2026-07-13. **Priority:** P0.
 
 **Problem:** Deterministic selection exposes database records and repeats
 generic fallback actions. There is no bounded editorial layer that turns
@@ -716,6 +716,40 @@ selection/gates, emits HTML, mutates persistent state, or can weaken Radar.
 
 **Rollout implications:** Persist validated editorial JSON as a new artifact.
 Run shadow comparison before V2 renderers consume it; V1 renderers remain.
+
+**Implementation receipt:** IRX-5 adds a run-scoped, immutable
+`editorial-intelligence.v1.json` shadow artifact and a deterministic bounded
+input package over the existing IRX-1 period, IRX-4 canonical projection,
+eligible evidence, IRX-3 reaction receipt, confirmed feedback, explicit project
+permissions, and same-run Radar permission. The host performs at most one
+strong-model call, with an 80,000-character input cap, 6,000-token output cap,
+three-signal and two-project-action limits, and a planned cost ceiling recorded
+as metadata rather than used to weaken validation. The model emits only the
+strict narrative payload; the host validates Russian/plain copy, exact evidence
+closure, confidence ceilings, reaction/feedback/Radar text, generic or duplicate
+actions, markup absence, and every deterministic permission before attaching
+the final generation envelope.
+
+Production generation reloads the persisted weekly manifest, bound reaction
+snapshot, feedback cutoff/count, and Radar binding/artifact bytes with exact
+run/period identity, containment, schema, and checksum checks. Missing, stale,
+partial, mismatched, or tampered authority fails closed to an exact visibly
+partial deterministic artifact without a model call. A valid completed period
+with no changed eligible candidate instead uses the exact deterministic
+zero-change thesis and empty decision matrix. Complete artifacts are reusable
+only for the same model and input hash; paths are exclusively created and a
+partial or mismatched artifact requires a new `run_id`.
+
+The opt-in split-report integration runs only after both unchanged V1 artifacts
+have rendered. Shadow input, model, validation, import, and persistence failures
+are recorded by class in `editorial_intelligence_error` and cannot block Brief
+or Atlas. No renderer consumes editorial JSON yet, the frozen
+`irx2_orchestration.v1` editorial stage remains disabled/non-required, and no
+rollout or dogfood was started. The 67-test focused editorial matrix, the exact
+49-test required acceptance command, and 149 extended affected-surface tests
+passed; focused compilation, Ruff, and `git diff --check` also passed. No live
+LLM call, generated report mutation, cross-repository change, or Radar gate
+change was made.
 
 ### IRX-8 - Static Visualization Component System
 
@@ -1388,7 +1422,7 @@ Stop and ask the operator before any proposal or implementation that:
 ## 13. Unresolved Questions And Default Assumptions
 
 These questions are assigned to their owning tasks and do not reopen completed
-IRX-1 through IRX-4 semantics:
+IRX-1 through IRX-5 semantics:
 
 1. **V2 path naming:** use explicit versioned directories plus V1 aliases; IRX-14
    freezes exact paths after parallel-run evidence.
@@ -1405,8 +1439,8 @@ IRX-1 through IRX-4 semantics:
 5. **Graph relation vocabulary:** derive only validated relations such as
    supports, contradicts, prerequisite, and related-by-evidence; do not infer
    decorative edges merely to fill the graph.
-6. **Editorial model/cost budget:** use the existing strong-model routing with
-   one bounded call; IRX-5 records and evaluates the concrete token/cost ceiling.
+6. **Editorial model/cost budget:** IRX-5 freezes the existing strong-model
+   route, one bounded call, and audit-visible token/cost caps and receipt.
 7. **V1 Audit Explorer path:** preserve current links initially; IRX-7/IRX-14
    choose whether the old Atlas path becomes an alias or a separately named
    artifact after consumer inventory.
@@ -1468,5 +1502,6 @@ Report files changed, canonical identity/lifecycle/as-of semantics, compatibilit
 
 ## 15. Suggested Following Task
 
-IRX-4 is implemented and verified. IRX-5 is the next planned implementation
-scope; it and all later work remain unimplemented by this slice.
+IRX-1 through IRX-5 are implemented and verified. IRX-8 is the next planned
+implementation scope. IRX-8 and all later reader-surface, rollout, and dogfood
+work remain unimplemented by the IRX-5 slice.

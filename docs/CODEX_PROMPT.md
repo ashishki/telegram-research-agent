@@ -1,8 +1,8 @@
 # CODEX_PROMPT - Compact Session Handoff
 
-Version: 5.4
+Version: 5.5
 Date: 2026-07-13
-State: IRX-1 through IRX-4 `implemented_and_verified`; IRX-5 is the next
+State: IRX-1 through IRX-5 `implemented_and_verified`; IRX-8 is the next
 planned implementation task; dogfood is blocked until IRX-14
 
 ## Current Product Direction
@@ -33,7 +33,7 @@ docs/tasks.md
 Next implementation task:
 
 ```text
-IRX-5 - Editorial Intelligence Synthesis Contract
+IRX-8 - Static Visualization Component System
 ```
 
 ## W29 Product Correction
@@ -43,10 +43,11 @@ The default run analyzed the newly started W29, missed the valid W28 Radar
 artifact, did not expose reaction influence, repeated generic actions, rendered
 entity-fragmented threads, and provided no meaningful visual map. The current
 detailed Atlas becomes the Knowledge Audit Explorer foundation. IRX-1 fixed the
-shared completed-period semantics, IRX-2 added the manifest-bound package, and
-IRX-3 added bounded auditable reaction personalization. Canonical curation,
-editorial synthesis, and reader V2 surfaces remain planned, and dogfood has not
-started.
+shared completed-period semantics, IRX-2 added the manifest-bound package,
+IRX-3 added bounded auditable reaction personalization, IRX-4 added canonical
+curation, and IRX-5 added a strict run-bound editorial shadow artifact. Static
+visualization components and reader V2 surfaces remain planned, and dogfood has
+not started.
 
 ## Verified Baseline
 
@@ -79,6 +80,12 @@ started.
   period-end as-of resolution, stored IRX-3 canonical attribution, and bounded
   additive report/retrieval/Obsidian projections. Mutable compatibility threads
   remain raw audit provenance rather than canonical identity.
+- IRX-5 adds the separate opt-in `editorial_intelligence.v1` shadow artifact,
+  one strong-route synthesis call over a bounded deterministic package, strict
+  Russian/schema/evidence/confidence/reaction/confirmed-feedback/project/Radar
+  validation, exact deterministic partial and zero-change projections, an
+  immutable run path, and an audit-only model/token/cost/latency receipt. V1
+  renderers and the frozen IRX-2 stage policy remain unchanged.
 - Canonical intelligence sidecar contract `tra-intelligence-contract.v1` is now
   implemented locally for workbook/Brief/Atlas projections with sanitized eval
   fixtures.
@@ -286,7 +293,50 @@ Verification and compatibility:
 - no generated artifact, IRX-3 reaction semantic, global evidence score,
   explicit-feedback semantic, IRX-1 period rule, IRX-2 manifest/Radar binding,
   Radar gate, standing configuration, or cross-repository code changed;
-- IRX-5 and later work remain planned and were not implemented.
+- At the IRX-4 boundary, IRX-5 and later work remained planned and were not
+  implemented; the subsequent IRX-5 completion is recorded below.
+
+## IRX-5 Completion
+
+Status: `implemented_and_verified` on 2026-07-13.
+
+Implemented:
+
+- separate run-bound `editorial_intelligence.v1` shadow JSON with an exact
+  schema, at most three signals, bounded project-action references, explicit
+  partial status, and no direct rendering markup;
+- one strong synthesis-route call for a full eligible package, with zero calls
+  for deterministic preflight partials or exact complete cache hits;
+- bounded deterministic inputs tied to the exact run/period, canonical snapshot,
+  eligible evidence, reaction receipt, confirmed-feedback classifications,
+  project permissions, and same-run Radar authority; raw archive access,
+  model-owned ranking/gates, and persistent mutation are prohibited;
+- strict Russian string and plain-language validation, exact unpadded refs and
+  matrix coverage, evidence-derived confidence ceilings, per-field cautious
+  wording, exact reaction/feedback/Radar projections, and rejection of generic,
+  deployment, readiness, or unauthorized project narratives;
+- exact host-owned deterministic partial and zero-change projections that
+  cannot be relabelled complete, plus immutable per-run persistence and a
+  host-only prompt/schema/model/input-hash/token/cost/latency/attempt receipt;
+- production verification of persisted manifest/Radar identity and checksums,
+  reaction identity/completeness, and feedback snapshot count/cutoff before a
+  complete release.
+
+Verification and compatibility:
+
+- 67 focused IRX-5 tests, the 49-test required acceptance matrix, and 149
+  extended compatibility tests passed; focused compilation and
+  `git diff --check` passed;
+- Ruff passed on IRX-5-owned files; pre-existing `ai_report` Ruff findings were
+  excluded as outside this slice;
+- V1 Brief/Atlas generation and delivery remain unchanged and do not consume
+  editorial JSON. Shadow generation is explicit opt-in and failure-isolated;
+  the frozen disabled/non-required `irx2_orchestration.v1` editorial stage was
+  not activated or changed;
+- no live or expensive LLM call, generated report run, archive regeneration,
+  cross-repository code change, Radar gate change, visualization implementation,
+  V2 renderer, rollout, or dogfood start was performed;
+- IRX-8 is the next implementation task.
 
 ## PGI-001 Completion
 
@@ -655,8 +705,9 @@ Run:
 Report files changed, canonical identity/lifecycle/as-of semantics, compatibility behavior, exact test results, and confirmation that generated artifacts, IRX-3 reaction semantics, Radar gates, and cross-repo code were unchanged. Stop before IRX-5.
 ```
 
-IRX-4 is implemented and verified. IRX-5 is the next planned scope and was not
-implemented in this slice.
+This exact historical prompt stopped at the IRX-4 boundary as required. IRX-4
+is implemented and verified; the subsequent IRX-5 handoff is now closed by the
+completion record above. IRX-8 is the next planned scope.
 
 ## Historical PGI-007 Handoff
 

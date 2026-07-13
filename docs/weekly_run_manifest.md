@@ -1,8 +1,9 @@
 # Weekly Run Manifest Contract
 
 Version: `weekly_run_manifest.v1`  
-Status: IRX-2 through IRX-4 `implemented_and_verified`; canonical curation
-remains an additive registry and does not change the frozen IRX-2 stage policy
+Status: IRX-2 through IRX-5 `implemented_and_verified`; canonical curation and
+editorial synthesis remain additive/opt-in and do not change the frozen IRX-2
+stage policy
 Owner: `telegram-research-agent`
 
 The weekly run manifest is the identity and state spine for one intelligence
@@ -303,10 +304,12 @@ Required and enabled by default in this profile:
 - `weekly_brief`;
 - `knowledge_atlas`.
 
-Reserved for their owning later tasks and predeclared disabled/non-required:
+Predeclared disabled/non-required in this frozen profile:
 
-- `canonical_thread_curation` (IRX-4);
-- `editorial_intelligence` (IRX-5);
+- `canonical_thread_curation` (implemented by IRX-4 as an additive registry,
+  not activated as a manifest stage);
+- `editorial_intelligence` (implemented by IRX-5 as an opt-in post-V1 shadow,
+  not activated as a manifest stage);
 - `knowledge_audit_explorer` as a dedicated surface (IRX-7);
 - `reader_value_gates` (IRX-11).
 
@@ -489,11 +492,12 @@ resolve period
   -> deliver finalized artifacts
 ```
 
-Under `irx2_orchestration.v1`, future-owned curation/editorial/Audit
-Explorer/reader-gate steps in the target flow are recorded as predeclared
-disabled stages. The existing standalone commands remain available for
-diagnostics and historical regeneration. They do not independently claim to
-have produced a complete V2 package.
+Under `irx2_orchestration.v1`, curation, editorial, Audit Explorer, and
+reader-gate steps in the target flow are recorded as predeclared disabled
+stages. The additive IRX-4 registry and IRX-5 shadow artifact do not mutate this
+policy or their disabled stage records. The existing standalone commands remain
+available for diagnostics and historical regeneration. They do not
+independently claim to have produced a complete V2 package.
 
 ## Validation Requirements
 
@@ -551,9 +555,9 @@ Implemented on 2026-07-13 as an additive path beside the V1 commands:
   a concurrently replaced Frontier week row before it is bound;
 - manifest-aware Hermes/PI artifact selection that rejects failed, stale,
   mismatched, or tampered same-run inputs instead of falling back to adjacency;
-- visible partial/disabled behavior while curation, editorial synthesis, the
-  dedicated Audit Explorer, and reader-value gates remain disabled and owned by
-  their later IRX tasks.
+- visible partial/disabled behavior while the frozen profile keeps curation,
+  editorial synthesis, the dedicated Audit Explorer, and reader-value gates
+  disabled; later additive implementations do not implicitly activate them.
 
 Existing V1 commands and paths remain compatibility surfaces. No generated
 report was edited or committed, and no Radar evidence or context-only gate was
@@ -617,6 +621,49 @@ Implemented on 2026-07-13 without changing `weekly_run_manifest.v1`,
 
 No generated package, live pipeline, Radar artifact, evidence rule, or sibling
 repository was changed.
+
+## IRX-5 Editorial Shadow Binding
+
+Implemented on 2026-07-13 without changing `weekly_run_manifest.v1`,
+`irx2_orchestration.v1`, required-stage membership, terminal aggregation, or
+Radar gate behavior:
+
+- `editorial_intelligence` remains explicitly `enabled=false`,
+  `required=false`, and `status=disabled` in the frozen profile. IRX-5 does not
+  write an editorial stage transition, add the shadow path to a finalized
+  manifest, or claim that a V2 package was produced;
+- `generate_split_intelligence_reports(..., editorial_output_root=...)` is an
+  explicit opt-in compatibility hook. It renders both unchanged V1 artifacts
+  first and only then attempts one run-scoped shadow artifact. With no opt-in,
+  the editorial generator is not imported or called;
+- production editorial generation treats the persisted manifest as authority.
+  It reloads exact run/date/period/profile identity and verifies that paths stay
+  inside the run directory. For a rich current run it verifies the bound
+  reaction snapshot and effect receipt; the legacy no-eligible-reaction path
+  cannot create personalization. It also verifies a succeeded feedback stage
+  with exact cutoff/count and a succeeded Radar stage with binding/artifact
+  schemas, run/period parity, and SHA-256 checksums. An in-memory Radar binding
+  is accepted only as comparison material against those persisted bytes;
+- any missing, stale, partial, wrong-run, wrong-period, out-of-root, malformed,
+  or tampered manifest/Radar/reaction/feedback input fails closed. The release
+  policy forbids the model call and permits only a visibly partial exact
+  deterministic artifact; it never upgrades absence into a normal complete
+  result or weakens Radar permission;
+- the shadow file is exclusively created under its own `run_id`; a complete
+  cache hit requires the same validated input hash and requested model, while a
+  partial, mismatched, or malformed existing path is immutable and requires a
+  new run ID;
+- shadow import, input, model, validation, and persistence exceptions are
+  isolated after V1 rendering. Brief and Atlas summaries/paths still return,
+  `editorial_intelligence` is null, and the audit-only
+  `editorial_intelligence_error` records the exception class without exposing
+  message contents.
+
+The 67-test focused editorial matrix, exact 49-test required acceptance command,
+and 149 extended affected-surface tests passed. No live LLM call, generated
+report mutation, cross-repository change, or Radar gate change was made. Shadow
+comparison evidence, manifest-stage activation, V2 renderer consumption,
+delivery rollout, and dogfood remain deferred to their owning tasks.
 
 ## Stop Conditions
 

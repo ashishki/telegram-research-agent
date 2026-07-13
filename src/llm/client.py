@@ -5,6 +5,7 @@ import os
 import sqlite3
 import time
 from contextlib import closing
+from dataclasses import dataclass
 from typing import Any
 
 from anthropic import APIConnectionError, APIStatusError, APITimeoutError, Anthropic, RateLimitError
@@ -47,6 +48,18 @@ class LLMError(Exception):
 
 class LLMSchemaError(LLMError):
     pass
+
+
+@dataclass(frozen=True, slots=True)
+class LLMCompletionReceipt:
+    text: str
+    model: str
+    input_tokens: int
+    output_tokens: int
+    estimated_cost_usd: float
+    duration_ms: int
+    attempts: int
+    usage_recorded: bool
 
 
 def set_usage_db_path(path: str) -> None:
@@ -151,6 +164,22 @@ def complete(
     category: str = "unknown",
     model: str | None = None,
 ) -> str:
+    return complete_with_receipt(
+        prompt=prompt,
+        system=system,
+        max_tokens=max_tokens,
+        category=category,
+        model=model,
+    ).text
+
+
+def complete_with_receipt(
+    prompt: str,
+    system: str = "",
+    max_tokens: int = 2048,
+    category: str = "unknown",
+    model: str | None = None,
+) -> LLMCompletionReceipt:
     client = _get_client()
     selected_model = model or _get_model(category)
     attempt = 0
@@ -174,27 +203,43 @@ def complete(
             )
             text = _extract_text(response)
             duration_ms = int((time.time() - start_time) * 1000)
+            actual_model = str(getattr(response, "model", None) or selected_model)
             input_tokens = getattr(getattr(response, "usage", None), "input_tokens", 0)
             output_tokens = getattr(getattr(response, "usage", None), "output_tokens", 0)
             est_cost_usd = estimate_cost_usd(
-                model=selected_model,
+                model=actual_model,
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
             )
-            _record_usage(category, selected_model, input_tokens, output_tokens, duration_ms)
+            usage_recorded = _record_usage(
+                category,
+                actual_model,
+                input_tokens,
+                output_tokens,
+                duration_ms,
+            )
             LOGGER.debug(
                 "model=%s input_tokens=%s output_tokens=%s est_cost_usd=%.8f",
-                selected_model,
+                actual_model,
                 input_tokens,
                 output_tokens,
                 est_cost_usd,
             )
             LOGGER.debug(
                 "Anthropic completion response model=%s response_length=%s",
-                selected_model,
+                actual_model,
                 len(text),
             )
-            return text
+            return LLMCompletionReceipt(
+                text=text,
+                model=actual_model,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                estimated_cost_usd=est_cost_usd,
+                duration_ms=duration_ms,
+                attempts=attempt,
+                usage_recorded=usage_recorded,
+            )
         except Exception as exc:
             if attempt >= MAX_RETRIES or not _should_retry(exc):
                 LOGGER.exception("Anthropic completion failed after %s attempt(s)", attempt)
@@ -333,6 +378,22 @@ class LLMClient:
         model: str | None = None,
     ) -> str:
         return complete(prompt=prompt, system=system, max_tokens=max_tokens, category=category, model=model)
+
+    @staticmethod
+    def complete_with_receipt(
+        prompt: str,
+        system: str = "",
+        max_tokens: int = 2048,
+        category: str = "unknown",
+        model: str | None = None,
+    ) -> LLMCompletionReceipt:
+        return complete_with_receipt(
+            prompt=prompt,
+            system=system,
+            max_tokens=max_tokens,
+            category=category,
+            model=model,
+        )
 
     @staticmethod
     def complete_json(

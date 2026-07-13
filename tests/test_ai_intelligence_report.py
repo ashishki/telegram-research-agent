@@ -60,6 +60,7 @@ from output.ai_intelligence_report import (  # noqa: E402
     validate_ai_intelligence_html,
 )
 from output.ai_report_contract import _thread_deltas  # noqa: E402
+from output.editorial_intelligence import build_editorial_input_package  # noqa: E402
 from output.idea_threads import refresh_idea_threads  # noqa: E402
 from output.reporting_period import resolve_reporting_period  # noqa: E402
 import main  # noqa: E402
@@ -669,6 +670,23 @@ class TestAiIntelligenceReport(unittest.TestCase):
         self.assertNotEqual(
             at_boundary["canonical_thread_snapshot"]["fingerprint"],
             after_boundary["canonical_thread_snapshot"]["fingerprint"],
+        )
+        editorial_package = build_editorial_input_package(
+            at_boundary,
+            run_identity={
+                "run_id": "tra-weekly-2026-W28-editorial-boundary",
+                "reporting_week": "2026-W28",
+                "analysis_period_start": "2026-07-06T00:00:00Z",
+                "analysis_period_end": "2026-07-13T00:00:00Z",
+            },
+        )
+        self.assertEqual(
+            editorial_package["canonical_snapshot"]["fingerprint"],
+            at_boundary["canonical_thread_snapshot"]["fingerprint"],
+        )
+        self.assertNotIn(
+            "Corrected eval-gated agent releases",
+            json.dumps(editorial_package, ensure_ascii=False),
         )
 
     def test_primary_canonical_context_is_independently_capped_at_twelve(self):

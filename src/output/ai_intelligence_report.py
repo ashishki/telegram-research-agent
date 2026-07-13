@@ -969,6 +969,10 @@ def load_ai_intelligence_context(
         result = {
             **period_fields,
             "reaction_snapshot_at": reaction_snapshot_iso,
+            "feedback_snapshot_at": (
+                _iso_for_sql(feedback_snapshot) if feedback_snapshot is not None else None
+            ),
+            "feedback_snapshot_usable": bool(feedback_snapshot_usable),
             "threads": [],
             "compatibility_threads": [],
             "canonical_threads": canonical_threads,
@@ -1077,6 +1081,10 @@ def load_ai_intelligence_context(
     result = {
         **period_fields,
         "reaction_snapshot_at": reaction_snapshot_iso,
+        "feedback_snapshot_at": (
+            _iso_for_sql(feedback_snapshot) if feedback_snapshot is not None else None
+        ),
+        "feedback_snapshot_usable": bool(feedback_snapshot_usable),
         "threads": threads,
         "compatibility_threads": threads,
         "canonical_threads": canonical_threads,

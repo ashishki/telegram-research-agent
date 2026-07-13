@@ -5,6 +5,7 @@ import tempfile
 import time
 import types
 import unittest
+from dataclasses import FrozenInstanceError
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -76,6 +77,113 @@ class TestLLMClient(unittest.TestCase):
         self.assertEqual(row[1], "test")
         self.assertEqual(row[2], 123)
         self.assertEqual(row[3], 45)
+
+    def test_complete_with_receipt_returns_immutable_usage_metadata(self):
+        response = SimpleNamespace(
+            content=[SimpleNamespace(type="text", text="receipt text")],
+            usage=SimpleNamespace(input_tokens=125, output_tokens=25),
+        )
+        mock_client = SimpleNamespace(messages=SimpleNamespace(create=lambda **_: response))
+
+        with patch.dict(os.environ, {"AGENT_DB_PATH": self.db_path}, clear=False):
+            with patch.object(client, "_get_client", return_value=mock_client):
+                receipt = client.LLMClient.complete_with_receipt(
+                    prompt="hi",
+                    category="test",
+                    model="claude-haiku-4-5",
+                )
+
+        self.assertEqual(receipt.text, "receipt text")
+        self.assertEqual(receipt.model, "claude-haiku-4-5")
+        self.assertEqual(receipt.input_tokens, 125)
+        self.assertEqual(receipt.output_tokens, 25)
+        self.assertAlmostEqual(receipt.estimated_cost_usd, 0.0002)
+        self.assertGreaterEqual(receipt.duration_ms, 0)
+        self.assertEqual(receipt.attempts, 1)
+        self.assertTrue(receipt.usage_recorded)
+        with self.assertRaises(FrozenInstanceError):
+            receipt.text = "changed"
+
+    def test_complete_with_receipt_reports_successful_retry_attempt_count(self):
+        response = SimpleNamespace(
+            content=[SimpleNamespace(type="text", text="retried")],
+            usage=SimpleNamespace(input_tokens=10, output_tokens=5),
+        )
+        calls = 0
+
+        def create(**_kwargs):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise RuntimeError("temporary failure")
+            return response
+
+        mock_client = SimpleNamespace(messages=SimpleNamespace(create=create))
+        with patch.dict(os.environ, {"AGENT_DB_PATH": self.db_path}, clear=False):
+            with (
+                patch.object(client, "_get_client", return_value=mock_client),
+                patch.object(client, "_should_retry", return_value=True),
+                patch.object(client.time, "sleep"),
+            ):
+                receipt = client.complete_with_receipt(
+                    prompt="retry",
+                    category="test",
+                    model="claude-haiku-4-5",
+                )
+
+        self.assertEqual(receipt.text, "retried")
+        self.assertEqual(receipt.attempts, 2)
+        self.assertTrue(receipt.usage_recorded)
+
+    def test_complete_with_receipt_records_provider_reported_model(self):
+        response = SimpleNamespace(
+            model="provider-resolved-model",
+            content=[SimpleNamespace(type="text", text="resolved")],
+            usage=SimpleNamespace(input_tokens=10, output_tokens=5),
+        )
+        mock_client = SimpleNamespace(
+            messages=SimpleNamespace(create=lambda **_: response)
+        )
+
+        with patch.object(client, "_get_client", return_value=mock_client):
+            receipt = client.complete_with_receipt(
+                prompt="audit actual model",
+                category="test",
+                model="requested-model",
+            )
+
+        self.assertEqual(receipt.model, "provider-resolved-model")
+
+    def test_complete_preserves_string_result_via_receipt_api(self):
+        receipt = client.LLMCompletionReceipt(
+            text="exact string",
+            model="claude-haiku-4-5",
+            input_tokens=1,
+            output_tokens=2,
+            estimated_cost_usd=0.0,
+            duration_ms=3,
+            attempts=1,
+            usage_recorded=False,
+        )
+        with patch.object(
+            client, "complete_with_receipt", return_value=receipt
+        ) as complete_receipt:
+            result = client.complete(
+                prompt="hello",
+                system="system",
+                max_tokens=99,
+                category="test",
+                model="claude-haiku-4-5",
+            )
+
+        self.assertEqual(result, "exact string")
+        complete_receipt.assert_called_once_with(
+            prompt="hello",
+            system="system",
+            max_tokens=99,
+            category="test",
+            model="claude-haiku-4-5",
+        )
 
     def test_complete_records_llm_usage_row_with_set_usage_db_path(self):
         response = SimpleNamespace(

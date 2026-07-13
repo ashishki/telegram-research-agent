@@ -6,7 +6,7 @@ import sqlite3
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Mapping
+from typing import TYPE_CHECKING, Callable, Mapping
 
 from config.settings import PROJECT_ROOT, Settings
 from output.ai_intelligence_report import load_ai_intelligence_context
@@ -20,6 +20,10 @@ from output.weekly_intelligence_brief import (
     build_weekly_intelligence_brief_artifact,
     load_mvp_radar_summary,
 )
+
+if TYPE_CHECKING:
+    from llm.client import LLMCompletionReceipt
+    from output.editorial_intelligence import EditorialIntelligenceSummary
 
 
 OUTPUT_ROOT = PROJECT_ROOT / "data" / "output"
@@ -44,6 +48,8 @@ class SplitIntelligenceReportsSummary:
     run_status: str = ""
     partial: bool = False
     pipeline_profile: str = ""
+    editorial_intelligence: EditorialIntelligenceSummary | None = None
+    editorial_intelligence_error: str = ""
 
 
 def generate_split_intelligence_reports(
@@ -60,8 +66,14 @@ def generate_split_intelligence_reports(
     reaction_snapshot_at: datetime | str | None = None,
     reaction_snapshot_binding: Mapping[str, object] | None = None,
     reaction_snapshot: Mapping[str, object] | None = None,
+    feedback_snapshot_at: datetime | str | None = None,
     feedback_snapshot_usable: bool = True,
     run_identity: Mapping[str, object] | None = None,
+    editorial_output_root: str | Path | None = None,
+    editorial_radar_binding: Mapping[str, object] | None = None,
+    editorial_completion: Callable[..., LLMCompletionReceipt] | None = None,
+    editorial_model: str | None = None,
+    editorial_generated_at: datetime | str | None = None,
 ) -> SplitIntelligenceReportsSummary:
     resolved_period = _resolve_split_reporting_period(
         reporting_period=reporting_period,
@@ -83,6 +95,7 @@ def generate_split_intelligence_reports(
             week_label=clean_week,
             reporting_period=resolved_period,
             reaction_snapshot_at=reaction_snapshot_at,
+            feedback_snapshot_at=feedback_snapshot_at,
             reaction_snapshot_binding=(
                 dict(reaction_snapshot_binding)
                 if reaction_snapshot_binding is not None
@@ -125,6 +138,67 @@ def generate_split_intelligence_reports(
         },
         run_identity=run_identity,
     )
+    editorial_intelligence = None
+    editorial_intelligence_error = ""
+    if editorial_output_root is not None:
+        try:
+            from output.editorial_intelligence import (
+                generate_editorial_intelligence_artifact,
+            )
+
+            # A shadow-only reload binds mutable feedback reads to the run
+            # cutoff without changing the already-built V1 reader surfaces.
+            editorial_context = context
+            if feedback_snapshot_at is None:
+                with sqlite3.connect(settings.db_path) as connection:
+                    connection.row_factory = sqlite3.Row
+                    connection.execute("PRAGMA foreign_keys = ON;")
+                    editorial_context = load_ai_intelligence_context(
+                        connection,
+                        week_label=clean_week,
+                        reporting_period=resolved_period,
+                        reaction_snapshot_at=reaction_snapshot_at,
+                        feedback_snapshot_at=resolved_period.analysis_period_end,
+                        reaction_snapshot_binding=(
+                            dict(reaction_snapshot_binding)
+                            if reaction_snapshot_binding is not None
+                            else None
+                        ),
+                        reaction_snapshot=(
+                            dict(reaction_snapshot)
+                            if reaction_snapshot is not None
+                            else None
+                        ),
+                        feedback_snapshot_usable=feedback_snapshot_usable,
+                        threads_limit=max(1, int(threads_limit or 24)),
+                        atoms_limit=max(1, int(atoms_limit or 8)),
+                    )
+            editorial_identity = {
+                **period_metadata,
+                **(dict(run_identity) if isinstance(run_identity, Mapping) else {}),
+            }
+            feedback_context = editorial_context.get("feedback_context")
+            feedback_count = (
+                int(feedback_context.get("confirmed_event_count") or 0)
+                if isinstance(feedback_context, Mapping)
+                else 0
+            )
+            editorial_intelligence = generate_editorial_intelligence_artifact(
+                editorial_context,
+                run_identity=editorial_identity,
+                output_root=editorial_output_root,
+                radar_binding=editorial_radar_binding,
+                feedback_snapshot_count=feedback_count,
+                completion=editorial_completion,
+                model=editorial_model,
+                generated_at=editorial_generated_at,
+            )
+        except Exception as exc:  # Editorial shadow must never block V1 delivery.
+            editorial_intelligence_error = exc.__class__.__name__
+            LOGGER.warning(
+                "Editorial intelligence shadow failed without blocking V1 reports: %s",
+                editorial_intelligence_error,
+            )
     summary = SplitIntelligenceReportsSummary(
         week_label=clean_week,
         reporting_week=resolved_period.reporting_week,
@@ -140,6 +214,8 @@ def generate_split_intelligence_reports(
         pipeline_profile=str((run_identity or {}).get("pipeline_profile") or ""),
         knowledge_atlas=knowledge_atlas,
         weekly_brief=weekly_brief,
+        editorial_intelligence=editorial_intelligence,
+        editorial_intelligence_error=editorial_intelligence_error,
         notification_text="",
     )
     return SplitIntelligenceReportsSummary(
@@ -147,6 +223,8 @@ def generate_split_intelligence_reports(
             **asdict(summary),
             "knowledge_atlas": knowledge_atlas,
             "weekly_brief": weekly_brief,
+            "editorial_intelligence": editorial_intelligence,
+            "editorial_intelligence_error": editorial_intelligence_error,
             "notification_text": build_split_reports_notification(summary),
         }
     )
@@ -212,6 +290,8 @@ def deliver_split_intelligence_reports(
         run_status=summary.run_status,
         partial=summary.partial,
         pipeline_profile=summary.pipeline_profile,
+        editorial_intelligence=summary.editorial_intelligence,
+        editorial_intelligence_error=summary.editorial_intelligence_error,
     )
 
 

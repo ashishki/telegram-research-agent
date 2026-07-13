@@ -1,7 +1,8 @@
 # Intelligence Report V2 Product Contract
 
 Version: `tra-intelligence-contract.v2`  
-Status: planned reader contract; IRX-1 shared period foundation implemented
+Status: planned reader contract; IRX-1 through IRX-5 correctness foundation
+implemented and verified
 Queue: `IRX - Intelligence Report Experience And Editorial Quality`
 
 This contract defines the reader-facing behavior of Weekly Intelligence Brief
@@ -146,9 +147,12 @@ weak evidence to decision-grade evidence.
 
 ## Editorial Intelligence V1
 
-`editorial_intelligence.v1` is the only narrative input to the Brief V2
-renderer. It is produced after deterministic period, evidence, canonical-thread,
-reaction, project, and Radar selection. The strong model receives only the
+`editorial_intelligence.v1` is the target sole narrative input to the Brief V2
+renderer. IRX-5 currently persists it as an explicit opt-in shadow artifact;
+neither the V1 renderers nor any V2 renderer consumes it yet. Renderer
+consumption belongs to IRX-6 after its upstream dependencies pass. The artifact
+is produced after deterministic period, evidence, canonical-thread, reaction,
+project, feedback, and Radar selection. The strong model receives only the
 bounded selected package, not all Telegram posts or the whole audit database.
 
 The model may select and explain a weekly thesis, at most three signals,
@@ -219,19 +223,79 @@ Required output shape:
   },
   "visual_specs": [],
   "feedback_targets": [],
+  "generation_status": "complete",
+  "partial": false,
+  "fallback_reason": null,
   "generation_receipt": {
-    "prompt_version": "...",
-    "model": "...",
-    "input_hash": "..."
+    "schema_version": "editorial_intelligence_generation.v1",
+    "prompt_version": "editorial-intelligence-v1",
+    "editorial_schema_version": "editorial_intelligence.v1",
+    "requested_model": "<strong-model-route>",
+    "model": "<actual-receipt-model>",
+    "input_hash": "sha256:<64 lowercase hex characters>",
+    "generated_at": "2026-07-13T07:03:00Z",
+    "max_input_json_chars": 80000,
+    "max_tokens": 6000,
+    "planned_cost_ceiling_usd": 0.8,
+    "cost_ceiling_exceeded": false,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "estimated_cost_usd": 0.0,
+    "duration_ms": 0,
+    "attempts": 1,
+    "usage_recorded": false,
+    "completion_mode": "model",
+    "validation_errors": []
   }
 }
 ```
 
-The deterministic validator enforces item limits, allowed enums, Russian
-reader copy, resolvable evidence refs, project/Radar permissions, and exact run
-identity. Low evidence requires cautious language. Failure produces an
-explicitly partial deterministic fallback or fails the stage; fallback prose
-must not be presented as full editorial intelligence.
+The model-authored object ends at `feedback_targets`. The host alone adds
+`generation_status`, `partial`, `fallback_reason`, and the complete
+`generation_receipt`; the model cannot author or copy audit metadata. For a
+complete artifact, requested and actual model match, `completion_mode=model`,
+at least one attempt is recorded, and `validation_errors` is empty. A partial
+artifact uses `completion_mode=deterministic_fallback`, names a bounded fallback
+reason, and retains only bounded validation error codes/class names. The receipt
+records prompt/editorial schema versions, input hash, configured caps, planned
+cost ceiling and warning, tokens, measured cost, latency, attempts, and whether
+usage accounting was recorded.
+
+The deterministic validator and production boundary enforce all of the
+following:
+
+- the exact run ID, completed reporting period, canonical snapshot fingerprint,
+  persisted manifest identity, and immutable input hash;
+- at most three returned signals and two project actions, exact decision-matrix
+  coverage, strict enums and object keys, Russian/plain reader copy, no HTML/SVG
+  or other markup, and no generic or duplicate action;
+- source-observation closure and eligible non-`unsupported`, non-`context_only`
+  evidence for every source-grounded thesis, signal, and project implication;
+- per-reference confidence ceilings and cautious wording for low evidence;
+- exact preissued reaction reason, confirmed-feedback classification and reader
+  summary, project permission, and Radar ref/decision/reason. Merely loading
+  feedback is `unchanged`, reaction absence is unknown rather than negative,
+  and IRX-5 cannot turn current Radar state into build permission;
+- persisted weekly manifest, reaction snapshot/receipt, feedback cutoff/count,
+  Radar binding, and referenced Radar bytes are reloaded with exact identity,
+  containment, schema, status, and checksum verification. Caller-supplied Radar
+  data is comparison material, not authority.
+
+Missing, stale, partial, mismatched, or tampered authoritative input sets a
+deterministic release policy that forbids the model call and emits the exact
+partial fallback. Invalid JSON, provider error, receipt mismatch, or invalid
+model output produces the same visibly partial envelope. A completed period
+with no changed eligible candidate is not a failure: it uses the exact
+host-issued low-confidence zero-change thesis, no signals, and an empty matrix.
+An existing complete artifact is accepted only for the same validated package,
+requested model, and input hash; incomplete or conflicting run paths are
+immutable and require a new `run_id`.
+
+IRX-5 leaves all renderer behavior unchanged. The optional post-V1 shadow call
+is isolated so any shadow import, input, model, validation, or persistence
+exception leaves the already-created Brief and Atlas available and records only
+the exception class in the split summary. Shadow comparison, V2 consumption,
+reader rollout, and dogfood evidence remain future work.
 
 ## Weekly Intelligence Brief V2
 
