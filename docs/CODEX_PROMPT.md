@@ -1,9 +1,9 @@
 # CODEX_PROMPT - Compact Session Handoff
 
-Version: 5.9
+Version: 6.0
 Date: 2026-07-14
-State: IRX-1 through IRX-6 and IRX-8 through IRX-10
-`implemented_and_verified`; IRX-11 is the next planned implementation task;
+State: IRX-1 through IRX-6 and IRX-8 through IRX-11
+`implemented_and_verified`; IRX-7 is the next planned implementation task;
 dogfood is blocked until IRX-14
 
 ## Current Product Direction
@@ -34,7 +34,7 @@ docs/tasks.md
 Next implementation task:
 
 ```text
-IRX-11 - Reader-Value Quality Gates
+IRX-7 - Knowledge Atlas V2 And Knowledge Audit Explorer Separation
 ```
 
 ## W29 Product Correction
@@ -50,7 +50,8 @@ curation, IRX-5 added a strict run-bound editorial shadow artifact, IRX-8 added
 the shared deterministic offline visualization contract and fixture gallery,
 and IRX-9 added the exact evidence-bound Project Intelligence V2 shadow. IRX-10
 added the strict manifest-bound Radar reader, and IRX-6 added the opt-in Brief
-V2 preview. Atlas V2, delivery gates, and dogfood remain unstarted.
+V2 preview. IRX-11 added independent warn-only V1 and blocking V2 reader-value
+gates. Atlas V2, scheduled V2 delivery, and dogfood remain unstarted.
 
 ## Verified Baseline
 
@@ -114,6 +115,11 @@ V2 preview. Atlas V2, delivery gates, and dogfood remain unstarted.
   surface without model calls, reranking, V1 replacement, or delivery change.
   Strict source-byte, path, package, retrieval, and PI authority checks fail
   closed on forged, wrong-run, incomplete, hostile-JSON, or symlinked input.
+- IRX-11 adds the closed `report_quality.v2` evaluator with seven independent
+  dimensions and actionable findings rather than one gameable score. It checks
+  sidecars before rendered parity, rejects decorative/hidden/forged semantic
+  visuals, warns without blocking V1, and blocks invalid opt-in Brief V2
+  publication/loading while the frozen manifest stage stays disabled.
 - Canonical intelligence sidecar contract `tra-intelligence-contract.v1` is now
   implemented locally for workbook/Brief/Atlas projections with sanitized eval
   fixtures.
@@ -522,7 +528,49 @@ Verification and compatibility:
 - no live/expensive model run, production report generation, archive backfill,
   database migration, Radar score/gate change, sibling-repository edit, V1
   delivery switch, screenshot evidence, rollout, or dogfood claim was made.
-  IRX-11 is next; browser geometry/golden screenshots remain IRX-13 scope.
+  At that boundary IRX-11 was next; its completion is recorded below. Browser
+  geometry/golden screenshots remain IRX-13 scope.
+
+## IRX-11 Completion
+
+Status: `implemented_and_verified` on 2026-07-14.
+
+Implemented:
+
+- closed deterministic `report_quality.v2` evaluation and validation with
+  structural, evidence, editorial, personalization, visual,
+  project-usefulness, and Radar-completeness dimensions; findings contain
+  stable codes, affected items, bounded evidence, Russian reader impact, and
+  repair hints, with no aggregate score;
+- sidecar-first Brief checks for completed period/run/partial identity,
+  thesis/evidence, bounded distinct actions and defer decisions, reaction and
+  feedback receipts, concrete project actions, authoritative Radar, Russian
+  reader copy, visible length, blank metrics, and semantic visuals;
+- Atlas target checks for bounded canonical primary threads, duplicate
+  identities/content/backlog, evidence-maturity authority, Audit Explorer
+  separation, visual identity/distribution parity, and visible length;
+- exact IRX-8 DOM/marker/data-state parity. Decorative SVG, forged or hidden
+  markers, template/comment/disclosure laundering, supporting badges,
+  duplicate component kinds, external styles/scripts, wrong-run specs, boolean
+  counts, and non-string evidence cannot satisfy meaningful visual/evidence
+  gates;
+- V1 split evaluation in `warn_only_v1` with one bounded Russian warning and
+  unchanged two-document delivery. Brief V2 applies `blocking_v2` before
+  immutable publication and again during strict manifest-bound loading.
+
+Verification and compatibility:
+
+- sanitized W29 Brief/Atlas fixtures fail with actionable findings, while the
+  rich Brief V2 and 8-thread Atlas target fixtures pass all applicable
+  dimensions;
+- the exact task-card command passed 64 tests, the focused Brief V2/manifest
+  matrix passed 54 tests, and four extended compatibility/security shards
+  passed 282 tests; Ruff, focused compilation, fixture JSON validation, and
+  `git diff --check` passed;
+- frozen IRX-2 stage policy, V1 sidecars/checksums and scheduled selection,
+  IRX-3 reaction meaning, IRX-5 editorial authority, Radar gates, sibling code,
+  generated private artifacts, screenshots, rollout, and dogfood remained
+  unchanged. IRX-7 is next.
 
 ## PGI-001 Completion
 
@@ -892,9 +940,187 @@ Report files changed, canonical identity/lifecycle/as-of semantics, compatibilit
 ```
 
 This exact historical prompt stopped at the IRX-4 boundary as required. IRX-4
-is implemented and verified; the subsequent IRX-5, IRX-8, IRX-9, and IRX-10
-handoffs are now closed by the completion records above. IRX-11 is the next
-planned scope.
+is implemented and verified; the subsequent IRX-5, IRX-8, IRX-9, IRX-10,
+IRX-6, and IRX-11 handoffs are now closed by the completion records above.
+IRX-7 is the next planned scope.
+
+## Exact Next Codex Prompt - IRX-7
+
+```text
+You are Codex working in /srv/openclaw-you/workspace/telegram-research-agent.
+Mode: IMPLEMENTATION for IRX-7 only.
+
+Implement IRX-7, using these binding docs:
+  docs/intelligence_report_v2_roadmap.md
+  docs/intelligence_report_v2_contract.md
+  docs/weekly_run_manifest.md
+  docs/static_visualization_system.md
+  docs/reaction_personalization_contract.md
+
+Do not implement IRX-12, IRX-13, or IRX-14: no report-specific feedback
+redesign, screenshot/evaluation-suite consolidation, production alias or
+retention migration, scheduled-delivery switch, rollout, or dogfood start. Do
+not change IRX-11 gate meanings, IRX-5 editorial selection, IRX-4 canonical
+lifecycle semantics, IRX-3 reaction weights/meaning, global evidence scoring,
+Radar evidence logic, or Radar gates. Keep the frozen irx2_orchestration.v1
+stage policy unchanged: knowledge_audit_explorer and reader_value_gates remain
+disabled and non-required there.
+
+Before editing run:
+  git status
+  git branch
+  git log --oneline -20
+  git diff --stat
+
+Preserve pre-existing dirty changes. Do not edit or commit generated reports,
+private artifacts, sibling-repository changes, secrets, or .env files.
+
+Read the current Atlas/audit foundation, canonical registry and historical
+as-of projection, editorial/reaction contracts, shared visuals, reader-value
+gates, Brief V2 navigation, manifest/orchestration compatibility, retrieval,
+Obsidian, PI, and focused tests for:
+  src/output/knowledge_atlas_report.py
+  src/db/canonical_idea_threads.py
+  src/output/idea_thread_curator.py
+  src/output/editorial_intelligence.py
+  src/output/reaction_personalization.py
+  src/output/report_visuals.py
+  src/output/report_quality.py
+  src/output/reader_value_quality.py
+  src/output/weekly_intelligence_brief_v2.py
+  src/output/weekly_run_manifest.py
+  src/output/weekly_intelligence_orchestrator.py
+  src/output/split_intelligence_reports.py
+  src/output/intelligence_retrieval_items.py
+  src/output/obsidian_export.py
+  src/assistant/pi_facade.py
+  tests/test_canonical_idea_threads.py
+  tests/test_report_visuals.py
+  tests/test_report_quality.py
+  tests/test_split_intelligence_reports.py
+  tests/test_intelligence_retrieval_items.py
+  tests/test_obsidian_export.py
+  tests/test_pi_facade.py
+  tests/test_weekly_intelligence_brief_v2.py
+  tests/test_weekly_run_manifest.py
+  tests/test_weekly_intelligence_orchestrator.py
+
+Add a separate opt-in Knowledge Atlas V2 reader package and a clearly
+versioned Knowledge Audit Explorer compatibility surface. Prefer a dedicated
+Atlas V2 module and an additive Audit Explorer adapter/module over changing the
+meaning of the existing V1 artifact. Do not overwrite, delete, silently
+relabel, or switch scheduled delivery away from current V1 paths.
+
+Required behavior:
+
+1. Produce a closed split_ai_report.v2 Atlas sidecar with
+   surface=knowledge_atlas and exact manifest/run/reporting-period/as-of
+   identity. Include 8-12 primary canonical thread IDs, canonical reader
+   records, typed relations, an exact 12-week series, source contribution,
+   evidence maturity, operator interest, learning progression, a bounded study
+   backlog, shared visual specs, and Audit Explorer technical refs.
+2. Resolve canonical identity/lifecycle state as of analysis_period_end from
+   the durable IRX-4 registry. Preserve stable IDs/slugs, aliases, and
+   merge/split provenance. Never promote current raw/entity clusters into
+   canonical identity or infer a graph relation from vendor/entity overlap.
+3. Consume only validated run/period-bound upstream contracts. Reuse IRX-5
+   editorial output, IRX-3 reaction/confirmed-feedback provenance, IRX-8
+   visuals, and IRX-11 gates without a model call, hidden reranking, or changed
+   authority. Missing, stale, invalid, wrong-run, or incomplete sources must
+   produce honest partial/unavailable state or fail closed.
+4. Render deterministic standalone Russian HTML with no more than 1,500
+   initially visible words and 8-12 primary canonical threads. The first screen
+   answers what is growing, weakening/stale, attracting operator attention, and
+   lacking evidence. Full evidence, quotes, atoms, memberships, internal IDs,
+   raw enums, traces, and curator diagnostics stay collapsed or move to Audit
+   Explorer.
+5. Render the canonical graph, exact 12-week timeline, source-thread heatmap,
+   and evidence-maturity distribution with validated IRX-8 components when
+   data permits. Render bounded learning progression from validated fields.
+   Preserve honest available/empty/unavailable/stale semantics, accessible
+   non-color-only encoding, stable IDs, deterministic bytes, and visible
+   source/period limitations. Decorative/hidden/forged visuals cannot count.
+6. Require typed evidence-backed graph edges; distinguish timeline zero from
+   missing data and preserve merge/split history. Separate independent heatmap
+   support from repeated commentary. Derive maturity from authoritative
+   evidence basis; self-declared counts cannot grant high maturity.
+7. Keep reaction interest, evidence maturity, confirmed feedback, and learning
+   stage separate. Current reactions, decayed historical attention, and
+   confirmed feedback remain distinguishable. No feedback stays unknown,
+   removed reactions are not negative, and reaction alone never proves
+   understanding or a learning transition.
+8. Bound and explain the study backlog. Reject duplicate canonical items,
+   repeated titles/theses/actions, Fable/Claude-style entity fragmentation, and
+   near-identical backlog rows from one vendor cluster.
+9. Preserve current detailed Atlas behavior as Knowledge Audit Explorer. Keep
+   raw/canonical memberships, atoms, source quotes/links, stable deep links,
+   aliases, merge/split history, evidence inputs, diagnostics, and full tables.
+   Audit Explorer is clearly technical and is not subjected to the 1,500-word
+   reader Atlas budget.
+10. Add compatibility projections for retrieval, Hermes/PI, Obsidian, and
+    Brief navigation. Existing knowledge_atlas_thread_navigation.v1,
+    atlas_thread items, V1 summaries/paths, and stable refs keep working. V2
+    consumers may select only an explicit valid V2 artifact; invalid V2 never
+    becomes authoritative through legacy fallback.
+11. Apply IRX-11 blocking_v2 evaluation before immutable Atlas V2 publication
+    and again in its strict bound loader. A blocked artifact is not published
+    or returned. Keep V1 warn-only behavior unchanged and do not apply reader
+    Atlas limits to the technical Audit Explorer.
+12. Use bounded duplicate-free finite JSON, exact source-byte/checksum parity,
+    canonical run paths, no-follow/symlink-safe reads/publication, private
+    immutable files, atomic directory publication, deterministic HTML rebuild
+    comparison, and escaped HTML/SVG. Reject hostile JSON/path/URL input,
+    wrong-run aliases, neighboring packages, source swaps, and partial writes.
+13. Keep Atlas V2 and Audit Explorer opt-in and side by side. Do not activate
+    frozen manifest stages, change required/fatal/degrading flags, modify
+    scheduled document selection, finalize aliases/retention, or claim rollout.
+
+Add the smallest sanitized Atlas V2/Audit Explorer fixture and deterministic
+tests for 8/12/13 primary boundaries; stable canonical/as-of identity;
+duplicate nodes/content/backlog; false vendor-only relations; typed edges;
+12-week ordering and zero-vs-missing history; source/maturity authority;
+reaction versus feedback/learning semantics; honest visual states; Russian
+copy/word/disclosure/internal-ID limits; deterministic full parity; blocking
+generation/loading; preserved Audit Explorer detail/deep links; V1 delivery,
+retrieval, PI, Obsidian, and Brief compatibility; hostile, stale, wrong-run,
+source-swap, traversal, and symlink rejection.
+
+Do not create or claim IRX-13 browser geometry, desktop/mobile golden
+screenshots, or visual-regression baselines. Do not run live/expensive
+pipelines, full archive regeneration, database backfills, production
+migrations, or the full suite.
+
+Perform a deep adversarial review after the contract/renderer phase and a deep
+compatibility/security review after consumer integration. Fix all in-scope
+blockers before documentation or commit.
+
+Run the exact task-card matrix:
+  PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache \
+    python3 -m unittest tests.test_split_intelligence_reports \
+    tests.test_intelligence_retrieval_items tests.test_obsidian_export \
+    tests.test_pi_facade tests.test_report_quality
+
+Run the dedicated Atlas/upstream matrix:
+  PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache \
+    python3 -m unittest tests.test_knowledge_atlas_report_v2 \
+    tests.test_report_visuals tests.test_canonical_idea_threads \
+    tests.test_weekly_intelligence_brief_v2 tests.test_weekly_run_manifest \
+    tests.test_weekly_intelligence_orchestrator
+
+Also run focused Ruff, py_compile, fixture JSON validation, git diff --check,
+git diff --stat, and inspect git status for generated/unrelated artifacts.
+
+Update the IRX registry, implementation journal, roadmap completion receipt,
+and CODEX handoff with exact test counts. Commit IRX-7 separately and push the
+current branch.
+
+Report files changed, Atlas V2/Audit Explorer contracts, canonical/as-of and
+visual semantics, quality-gate behavior, compatibility/security, exact test
+results, commit/push, and confirmation that private artifacts, frozen IRX-2
+policy, V1 scheduled delivery, IRX-3 reaction semantics, IRX-5 editorial
+authority, Radar gates, cross-repo code, IRX-12/13/14, rollout, and dogfood were
+unchanged. Stop before IRX-12.
+```
 
 ## Historical PGI-007 Handoff
 

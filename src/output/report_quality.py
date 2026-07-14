@@ -13,6 +13,14 @@ from config.settings import PROJECT_ROOT
 SEVERITY_WARNING = "warning"
 SEVERITY_CRITICAL = "critical"
 
+REPORT_QUALITY_V2_SCHEMA_VERSION = "report_quality.v2"
+READER_VALUE_POLICY_VERSION = "reader_value_quality.v1"
+READER_VALUE_WARN_ONLY_V1 = "warn_only_v1"
+READER_VALUE_BLOCKING_V2 = "blocking_v2"
+READER_VALUE_POLICY_MODES = frozenset(
+    {READER_VALUE_WARN_ONLY_V1, READER_VALUE_BLOCKING_V2}
+)
+
 DEFAULT_OUTPUT_ROOT = PROJECT_ROOT / "data" / "output"
 DEFAULT_WORD_BUDGETS = {
     "research_brief": 1600,
@@ -83,6 +91,107 @@ class ReportQualityFinding:
             "message": self.message,
             "line_hint": self.line_hint,
         }
+
+
+class ReaderValueQualityError(ValueError):
+    """Raised when a blocking reader-value evaluation forbids publication."""
+
+    def __init__(self, report: Mapping[str, Any]) -> None:
+        self.report = dict(report)
+        summary = report.get("summary")
+        decision = (
+            str(summary.get("delivery_decision") or "block")
+            if isinstance(summary, Mapping)
+            else "block"
+        )
+        super().__init__(f"reader-value quality decision is {decision}")
+
+
+def evaluate_reader_report_quality(
+    sidecar: Mapping[str, Any],
+    rendered_html: str,
+    *,
+    policy_mode: str,
+    manifest: Mapping[str, Any] | None = None,
+    surface: str | None = None,
+) -> dict[str, Any]:
+    """Build one deterministic ``report_quality.v2`` reader evaluation.
+
+    The implementation is imported lazily so legacy report modules can retain
+    their lightweight V1 quality API and avoid a module-import cycle with the
+    opt-in Brief V2 renderer.
+    """
+
+    from output.reader_value_quality import evaluate_reader_report_quality as _evaluate
+
+    return _evaluate(
+        sidecar,
+        rendered_html,
+        policy_mode=policy_mode,
+        manifest=manifest,
+        surface=surface,
+    )
+
+
+def validate_reader_report_quality(report: Mapping[str, Any]) -> None:
+    """Validate the closed ``report_quality.v2`` result contract."""
+
+    from output.reader_value_quality import validate_reader_report_quality as _validate
+
+    _validate(report)
+
+
+def require_reader_report_quality(report: Mapping[str, Any]) -> None:
+    """Raise only when a blocking evaluation forbids the reader artifact."""
+
+    validate_reader_report_quality(report)
+    summary = report["summary"]
+    if (
+        report.get("policy_mode") == READER_VALUE_BLOCKING_V2
+        and isinstance(summary, Mapping)
+        and summary.get("delivery_decision") == "block"
+    ):
+        raise ReaderValueQualityError(report)
+
+
+def format_reader_quality_warning(
+    reports: list[Mapping[str, Any] | None],
+) -> str | None:
+    """Return one bounded reader-safe warning for warn-only V1 delivery."""
+
+    critical = 0
+    warning = 0
+    failed_surfaces: list[str] = []
+    surface_labels = {
+        "weekly_brief": "недельный бриф",
+        "knowledge_atlas": "карта знаний",
+    }
+    for report in reports:
+        if not isinstance(report, Mapping):
+            continue
+        summary = report.get("summary")
+        if not isinstance(summary, Mapping):
+            continue
+        critical += _reader_warning_count(summary.get("critical_count"))
+        warning += _reader_warning_count(summary.get("warning_count"))
+        if summary.get("overall_status") == "fail":
+            surface = surface_labels.get(str(report.get("surface") or ""), "отчёт")
+            if surface not in failed_surfaces:
+                failed_surfaces.append(surface)
+    if not critical and not warning:
+        return None
+    affected = ", ".join(failed_surfaces[:2]) or "читательские поверхности"
+    return (
+        "Проверка читательской ценности работает в режиме предупреждения для V1: "
+        f"критических замечаний {critical}, предупреждений {warning}; "
+        f"затронуто: {affected}. Доставка V1 не заблокирована."
+    )[:500]
+
+
+def _reader_warning_count(value: object) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        return 0
+    return min(max(value, 0), 10_000)
 
 
 def coerce_weekly_facts(facts: WeeklyReportFacts | Mapping[str, Any] | None) -> WeeklyReportFacts:

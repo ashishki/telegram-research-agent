@@ -523,6 +523,22 @@ class TestWeeklyRunManifest(unittest.TestCase):
             ],
         )
         self.assertEqual(manifest["stages"]["editorial_intelligence"]["status"], "disabled")
+        self.assertEqual(
+            manifest["stage_policy"]["reader_value_gates"],
+            {
+                "enabled": False,
+                "required": False,
+                "fatal": False,
+                "degrades_on_failure": False,
+            },
+        )
+        reader_gate = manifest["stages"]["reader_value_gates"]
+        self.assertEqual(reader_gate["status"], "disabled")
+        self.assertFalse(reader_gate["enabled"])
+        self.assertFalse(reader_gate["required"])
+        self.assertFalse(reader_gate["fatal"])
+        self.assertFalse(reader_gate["degrades_on_failure"])
+        self.assertIsNone(reader_gate["artifact_path"])
         validate_manifest(manifest)
 
     def test_legacy_reaction_success_without_optional_binding_remains_valid(self):

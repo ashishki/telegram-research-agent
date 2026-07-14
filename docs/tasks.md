@@ -1,6 +1,6 @@
 # Current Backlog
 
-Version: 3.6
+Version: 3.7
 Last updated: 2026-07-14
 State: canonical active backlog
 
@@ -46,16 +46,18 @@ below, but active implementation starts from the IRX task graph.
 | Static visualization component system | `implemented_and_verified`; shared offline `report_visuals.v1` library and sanitized fixture gallery, not activated in V1 renderers |
 | Project Intelligence V2 shadow | `implemented_and_verified`; separate opt-in `project_intelligence.v2` run artifact with exact project/thread/evidence authority and no V1 renderer activation |
 | Weekly Intelligence Brief V2 preview | `implemented_and_verified`; separate opt-in manifest-bound `split_ai_report.v2` package with V1 generation and delivery unchanged |
-| Report V2 contract and roadmap | `implementation_in_progress`; IRX-0 documentation plus IRX-1 through IRX-6 and IRX-8 through IRX-10 are implemented and verified |
+| Reader-value quality gates | `implemented_and_verified`; closed seven-dimension `report_quality.v2`, warn-only on V1 and blocking on opt-in V2 previews |
+| Report V2 contract and roadmap | `implementation_in_progress`; IRX-0 documentation plus IRX-1 through IRX-6 and IRX-8 through IRX-11 are implemented and verified |
 | Portfolio dogfood evidence | `blocked_on_IRX-14_start_gate` |
 
 ## Next Candidate Task
 
-`IRX-11 - Reader-Value Quality Gates`
+`IRX-7 - Knowledge Atlas V2 And Knowledge Audit Explorer Separation`
 
-Add independent structural/semantic reader-value gates over the completed Brief
-V2 and shared visual contracts without changing editorial selection, Radar
-authority, V1 delivery, or rollout state. Its task card is in
+Build a separate reader-facing visual Atlas V2 from canonical threads and the
+shared visual/quality contracts while preserving the detailed current Atlas as
+Knowledge Audit Explorer. Keep both surfaces opt-in and leave scheduled V1
+delivery unchanged. Its task card is in
 `docs/intelligence_report_v2_roadmap.md`.
 
 ## Dependency Graph
@@ -85,7 +87,7 @@ contract.
 | IRX-9 | P1 | `implemented_and_verified` | Evidence-backed, named, PR-sized project implications | IRX-4, IRX-5, IRX-8 |
 | IRX-10 | P1 | `implemented_and_verified` | Explain the bound candidate, evidence gaps, next validation, and kill criteria | IRX-2, IRX-5, IRX-8 |
 | IRX-6 | P1 | `implemented_and_verified` | Russian 5-7 minute Weekly Intelligence Brief V2 | IRX-1..IRX-5, IRX-8..IRX-10 |
-| IRX-11 | P1 | `planned` | Reader-value gates for period, editorial, personalization, visual, project, and Radar quality | IRX-6, IRX-8 |
+| IRX-11 | P1 | `implemented_and_verified` | Reader-value gates for period, editorial, personalization, visual, project, and Radar quality | IRX-6, IRX-8 |
 | IRX-7 | P2 | `planned` | Visual Knowledge Atlas V2 plus preserved Knowledge Audit Explorer | IRX-4, IRX-5, IRX-8, IRX-11 |
 | IRX-12 | P2 | `planned` | Report- and section-specific confirmation-gated learning loop | IRX-2, IRX-3, IRX-5, IRX-6, IRX-7, IRX-10 |
 | IRX-13 | P2 | `planned`; fixture scaffolding starts in IRX-1 | Sanitized golden fixtures, evaluation dataset, and desktop/mobile regression | IRX-1..IRX-12 |
@@ -449,7 +451,46 @@ rollout implications are in `docs/intelligence_report_v2_roadmap.md`.
 - Scope confirmation: no live or expensive model run, generated production
   report, archive backfill, database migration, Radar scoring/gate change,
   sibling-repository edit, delivery switch, screenshot evidence, rollout, or
-  dogfood claim was made. IRX-11 is the next task.
+  dogfood claim was made. At that boundary IRX-11 was next; its completion is
+  recorded below.
+
+### 2026-07-14 - IRX-11 Reader-Value Quality Gates
+
+- Status: `implemented_and_verified`.
+- Added the closed deterministic `report_quality.v2` evaluator and validator
+  with independent structural, evidence, editorial, personalization, visual,
+  project-usefulness, and Radar-completeness dimensions. Findings carry stable
+  codes, affected items, bounded evidence, Russian reader impact, and concrete
+  repair hints; no aggregate score can hide a critical dimension.
+- Evaluation is sidecar-first and checks rendered parity second. Brief gates
+  cover completed-period identity, thesis and evidence, bounded distinct
+  actions and defer decisions, reaction/feedback receipts, named PR-sized
+  project work, Radar authority, reader-safe Russian copy, visible length,
+  blank metrics, and semantic visuals. Atlas target gates cover bounded
+  canonical primary threads, duplicate content, evidence maturity authority,
+  raw-detail separation, visual identity/distribution parity, and length.
+- Semantic visual counts require exact deterministic IRX-8 component output,
+  initially visible DOM parity, honest data state, and distinct component
+  kinds. Decorative SVG, forged markers, hidden/template/comment/disclosure
+  laundering, external styles/scripts, supporting badges, duplicate kinds,
+  wrong-run specs, and forged boolean counts or non-string evidence cannot
+  satisfy the gate.
+- Default V1 split generation evaluates both current documents in
+  `warn_only_v1` mode and emits one bounded Russian warning without changing
+  document selection or blocking delivery. Opt-in Brief V2 uses
+  `blocking_v2` before immutable publication and again during strict
+  manifest-bound loading; blocked output is neither published nor returned.
+- Added sanitized W29 Brief/Atlas failure cases plus passing Brief V2 and Atlas
+  target-contract fixtures and adversarial parity/type tests. The exact
+  task-card matrix passed 64 tests, the focused Brief V2/manifest matrix passed
+  54 tests, and four extended compatibility/security shards passed 282 tests.
+  Ruff, focused compilation, fixture JSON validation, and `git diff --check`
+  passed.
+- Compatibility: frozen IRX-2 stage policy, V1 sidecars/checksums and scheduled
+  two-document delivery, IRX-5 editorial selection, IRX-3 reaction meaning,
+  Radar authority/gates, sibling-repository code, and generated private
+  artifacts remain unchanged. Atlas V2, screenshots, rollout, and dogfood stay
+  owned by IRX-7/13/14; IRX-7 is the next dependency-ready task.
 
 ## Existing-Work Reconciliation
 

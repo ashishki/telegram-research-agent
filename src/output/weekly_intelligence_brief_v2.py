@@ -689,10 +689,16 @@ def generate_weekly_intelligence_brief_v2_artifact(
         },
         compatibility_atlas_path=atlas_path,
     )
-    html_bytes = render_weekly_intelligence_brief_v2_html(
+    html_text = render_weekly_intelligence_brief_v2_html(
         sidecar,
         manifest=manifest,
-    ).encode("utf-8")
+    )
+    _require_reader_value_quality(
+        sidecar,
+        html_text,
+        manifest=manifest,
+    )
+    html_bytes = html_text.encode("utf-8")
     json_bytes = _canonical_json_bytes(sidecar)
     if (
         len(html_bytes) > MAX_HTML_BYTES
@@ -996,7 +1002,51 @@ def load_manifest_bound_weekly_intelligence_brief_v2(
         raise WeeklyIntelligenceBriefV2ArtifactError(
             "Brief V2 Radar dependency changed while loading"
         )
+    _require_reader_value_quality(
+        value,
+        expected_html.decode("utf-8"),
+        manifest=manifest,
+    )
     return value
+
+
+def _require_reader_value_quality(
+    sidecar: Mapping[str, object],
+    rendered_html: str,
+    *,
+    manifest: Mapping[str, object],
+) -> None:
+    """Fail closed for the opt-in V2 preview without changing its sidecar."""
+
+    from output.report_quality import (
+        READER_VALUE_BLOCKING_V2,
+        ReaderValueQualityError,
+        evaluate_reader_report_quality,
+        require_reader_report_quality,
+    )
+
+    report = evaluate_reader_report_quality(
+        sidecar,
+        rendered_html,
+        policy_mode=READER_VALUE_BLOCKING_V2,
+        manifest=manifest,
+        surface=BRIEF_V2_SURFACE,
+    )
+    try:
+        require_reader_report_quality(report)
+    except ReaderValueQualityError as exc:
+        codes = [
+            str(finding.get("code") or "reader_value.invalid")
+            for dimension in report.get("dimensions", [])
+            if isinstance(dimension, Mapping)
+            for finding in dimension.get("findings", [])
+            if isinstance(finding, Mapping)
+            and finding.get("severity") == "critical"
+        ]
+        raise WeeklyIntelligenceBriefV2ArtifactError(
+            "Brief V2 failed reader-value quality gates: "
+            + ", ".join(codes[:12])
+        ) from exc
 
 
 def find_manifest_bound_weekly_intelligence_brief_v2(
@@ -3843,7 +3893,7 @@ def _russian_or_placeholder(value: object, index: int, label: str) -> str:
 def _meaningful_visual_count(specs: Sequence[Mapping[str, object]]) -> int:
     return sum(
         render_report_visual(spec).render_status != "failed"
-        and spec.get("data_status") == "available"
+        and spec.get("data_status") in {"available", "empty"}
         for spec in specs
     )
 

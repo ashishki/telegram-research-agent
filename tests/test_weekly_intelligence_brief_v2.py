@@ -6,6 +6,7 @@ import stat
 import unittest
 from html.parser import HTMLParser
 from pathlib import Path
+from unittest.mock import patch
 
 from output.editorial_intelligence import (
     build_editorial_input_package,
@@ -18,6 +19,7 @@ from output.project_intelligence import (
     load_project_intelligence_artifact,
     project_editorial_permissions,
 )
+from output.report_quality import ReaderValueQualityError
 from output.weekly_intelligence_brief_v2 import (
     BRIEF_V2_DIRECTORY,
     BRIEF_V2_HTML_FILENAME,
@@ -329,6 +331,45 @@ class WeeklyIntelligenceBriefV2Tests(unittest.TestCase):
         self.assertLessEqual(metrics["visible_word_count"], 900)
         self.assertEqual(metrics["visual_component_count"], 4)
         self.assertGreaterEqual(metrics["meaningful_visual_count"], 3)
+
+    def test_reader_value_gate_blocks_before_publish_and_on_strict_load(self) -> None:
+        blocked = {"summary": {"delivery_decision": "block"}}
+        error = ReaderValueQualityError(blocked)
+        blocked_root = self.fixture.root / "quality-blocked-output"
+        target = blocked_root / BRIEF_V2_DIRECTORY / self.run_id
+
+        with patch(
+            "output.report_quality.require_reader_report_quality",
+            side_effect=error,
+        ):
+            with self.assertRaisesRegex(
+                WeeklyIntelligenceBriefV2ArtifactError,
+                "failed reader-value quality gates",
+            ):
+                generate_weekly_intelligence_brief_v2_artifact(
+                    manifest_path=self.manifest_path,
+                    editorial_artifact_path=self.editorial_path,
+                    editorial_input_package=self.package,
+                    project_intelligence_path=self.project_path,
+                    project_descriptors=self.project_descriptors,
+                    output_root=blocked_root,
+                    allowed_source_roots=(self.fixture.root,),
+                )
+        self.assertFalse(target.exists())
+
+        with patch(
+            "output.report_quality.require_reader_report_quality",
+            side_effect=error,
+        ):
+            with self.assertRaisesRegex(
+                WeeklyIntelligenceBriefV2ArtifactError,
+                "failed reader-value quality gates",
+            ):
+                load_manifest_bound_weekly_intelligence_brief_v2(
+                    self.summary.json_path,
+                    expected_manifest_path=self.manifest_path,
+                    allowed_source_roots=(self.fixture.root,),
+                )
 
     def test_html_is_russian_offline_responsive_and_hides_internal_copy(self) -> None:
         html = render_weekly_intelligence_brief_v2_html(

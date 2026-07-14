@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import os
 import sqlite3
@@ -18,6 +19,11 @@ from output.reporting_period import (
     ReportingPeriod,
     format_period_display_label,
     resolve_reporting_period,
+)
+from output.report_quality import (
+    READER_VALUE_WARN_ONLY_V1,
+    evaluate_reader_report_quality,
+    format_reader_quality_warning,
 )
 from output.weekly_intelligence_brief import (
     WeeklyIntelligenceBriefSummary,
@@ -60,6 +66,7 @@ class SplitIntelligenceReportsSummary:
     project_intelligence_error: str = ""
     editorial_intelligence: EditorialIntelligenceSummary | None = None
     editorial_intelligence_error: str = ""
+    reader_quality_reports: tuple[dict[str, object], ...] = ()
 
 
 def generate_split_intelligence_reports(
@@ -292,6 +299,10 @@ def generate_split_intelligence_reports(
                 "Editorial intelligence shadow failed without blocking V1 reports: %s",
                 editorial_intelligence_error,
             )
+    reader_quality_reports = _evaluate_v1_reader_quality(
+        weekly_brief=weekly_brief,
+        knowledge_atlas=knowledge_atlas,
+    )
     summary = SplitIntelligenceReportsSummary(
         week_label=clean_week,
         reporting_week=resolved_period.reporting_week,
@@ -311,6 +322,7 @@ def generate_split_intelligence_reports(
         project_intelligence_error=project_intelligence_error,
         editorial_intelligence=editorial_intelligence,
         editorial_intelligence_error=editorial_intelligence_error,
+        reader_quality_reports=reader_quality_reports,
         notification_text="",
     )
     return SplitIntelligenceReportsSummary(
@@ -329,10 +341,18 @@ def generate_split_intelligence_reports(
 
 def build_split_reports_notification(summary: SplitIntelligenceReportsSummary) -> str:
     period_label = _period_display_label(summary)
-    return (
+    notification = (
         f"Split AI intelligence reports {period_label} are ready.\n"
         f"Weekly Brief: {summary.weekly_brief.html_path}\n"
         f"Knowledge Atlas: {summary.knowledge_atlas.html_path}"
+    )
+    quality_warning = format_reader_quality_warning(
+        list(summary.reader_quality_reports)
+    )
+    return (
+        f"{notification}\n{quality_warning}"
+        if quality_warning is not None
+        else notification
     )
 
 
@@ -420,7 +440,35 @@ def deliver_split_intelligence_reports(
         project_intelligence_error=summary.project_intelligence_error,
         editorial_intelligence=summary.editorial_intelligence,
         editorial_intelligence_error=summary.editorial_intelligence_error,
+        reader_quality_reports=summary.reader_quality_reports,
     )
+
+
+def _evaluate_v1_reader_quality(
+    *,
+    weekly_brief: WeeklyIntelligenceBriefSummary,
+    knowledge_atlas: KnowledgeAtlasSummary,
+) -> tuple[dict[str, object], ...]:
+    reports: list[dict[str, object]] = []
+    for surface, artifact in (
+        ("weekly_brief", weekly_brief),
+        ("knowledge_atlas", knowledge_atlas),
+    ):
+        try:
+            sidecar = json.loads(Path(artifact.json_path).read_text(encoding="utf-8"))
+            rendered_html = Path(artifact.html_path).read_text(encoding="utf-8")
+        except (OSError, UnicodeError, TypeError, ValueError):
+            sidecar = {}
+            rendered_html = ""
+        reports.append(
+            evaluate_reader_report_quality(
+                sidecar,
+                rendered_html,
+                policy_mode=READER_VALUE_WARN_ONLY_V1,
+                surface=surface,
+            )
+        )
+    return tuple(reports)
 
 
 def _period_display_label(summary: SplitIntelligenceReportsSummary) -> str:

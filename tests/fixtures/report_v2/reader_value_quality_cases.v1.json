@@ -1,0 +1,168 @@
+{
+  "fixture_version": "reader_value_quality_cases.v1",
+  "w29_brief_failure": {
+    "sidecar": {
+      "schema_version": "split_ai_report.v1",
+      "artifact_type": "weekly_intelligence_brief",
+      "run_id": "fixture-w29-reader-failure",
+      "reporting_week": "2026-W29",
+      "week_label": "2026-W29",
+      "analysis_period_start": "2026-07-13T00:00:00Z",
+      "analysis_period_end": "2026-07-14T12:00:00Z",
+      "generated_at": "2026-07-14T12:00:00Z",
+      "period_mode": "partial_iso_week",
+      "run_status": "complete",
+      "partial": false,
+      "weekly_thesis": {},
+      "signals": [
+        {
+          "signal_id": "signal:generic-01",
+          "title": "Generic tool update",
+          "do_not_do": "",
+          "evidence_refs": []
+        },
+        {
+          "signal_id": "signal:generic-02",
+          "title": "Another tool update",
+          "do_not_do": "",
+          "evidence_refs": []
+        }
+      ],
+      "decision_matrix": {
+        "ignore": []
+      },
+      "actions": [
+        {
+          "title": "Проверить это"
+        },
+        {
+          "title": "Проверить это"
+        }
+      ],
+      "project_actions": [
+        {
+          "project_name": "",
+          "affected_component": "",
+          "suggested_change": "Посмотреть подробнее",
+          "risk": "",
+          "likely_files": [],
+          "acceptance_criteria": [],
+          "evidence_refs": []
+        }
+      ],
+      "mvp_radar": {
+        "reader_state": "missing"
+      },
+      "visual_specs": []
+    },
+    "html": "<!doctype html><html lang=\"en\"><body><h1>Weekly AI report</h1><p>signal:raw-reader-id is the main internal record for this week.</p><p>Проверить это</p><p>Проверить это</p><table><tr><th>Metric</th><td></td></tr></table><svg aria-label=\"decorative chart\"><circle cx=\"5\" cy=\"5\" r=\"4\"></circle></svg><section data-irx-visual=\"true\" data-component=\"decision_matrix\" data-visual-role=\"data\">Forged visual marker</section></body></html>"
+  },
+  "w29_atlas_failure": {
+    "sidecar": {
+      "schema_version": "split_ai_report.v1",
+      "artifact_type": "knowledge_atlas",
+      "run_id": "fixture-w29-atlas-failure",
+      "reporting_week": "2026-W29",
+      "week_label": "2026-W29",
+      "analysis_period_start": "2026-07-13T00:00:00Z",
+      "analysis_period_end": "2026-07-14T12:00:00Z",
+      "generated_at": "2026-07-14T12:00:00Z",
+      "period_mode": "partial_iso_week",
+      "run_status": "complete",
+      "partial": false,
+      "primary_thread_ids": [
+        "raw-01",
+        "raw-02",
+        "raw-03",
+        "raw-04",
+        "raw-05",
+        "raw-06",
+        "raw-07",
+        "raw-08",
+        "raw-09",
+        "raw-10",
+        "raw-11",
+        "raw-12",
+        "raw-13"
+      ],
+      "canonical_threads": [
+        {
+          "canonical_thread_id": "raw-01",
+          "title": "Claude tooling update",
+          "current_understanding": "The vendor announced another tool update.",
+          "maturity": "mature"
+        },
+        {
+          "canonical_thread_id": "raw-02",
+          "title": "Claude tooling update",
+          "current_understanding": "The vendor announced another tool update.",
+          "maturity": "mature"
+        }
+      ],
+      "thread_navigation": {
+        "threads": [
+          {
+            "slug": "claude"
+          },
+          {
+            "slug": "anthropic"
+          }
+        ]
+      },
+      "visual_specs": []
+    },
+    "html_prefix": "<!doctype html><html lang=\"en\"><body><h1>Knowledge dump</h1><p>thread:raw-01 and thread:raw-02 expose implementation identities.</p><table><tr><th>Metric</th><td></td></tr></table><svg aria-label=\"decorative map\"></svg><p>",
+    "html_suffix": "</p></body></html>",
+    "repeat_visible_word": "context",
+    "repeat_visible_word_count": 1501
+  },
+  "atlas_target_contract": {
+    "run_id": "weekly-2026-W27",
+    "reporting_week": "2026-W27",
+    "analysis_period_start": "2026-06-29T00:00:00Z",
+    "analysis_period_end": "2026-07-06T00:00:00Z",
+    "generated_at": "2026-07-06T12:00:00Z",
+    "threads": [
+      {
+        "canonical_thread_id": "thread/quality-gates",
+        "title_ru": "Детерминированные проверки выпусков",
+        "thesis": "Проверки отделяют корректную структуру от реальной читательской пользы."
+      },
+      {
+        "canonical_thread_id": "thread/evidence-boundaries",
+        "title_ru": "Границы происхождения доказательств",
+        "thesis": "Каждый вывод сохраняет проверяемую связь с ограниченным набором источников."
+      },
+      {
+        "canonical_thread_id": "thread/decision-map",
+        "title_ru": "Карта операторских решений",
+        "thesis": "Сравнительная карта ускоряет выбор действия и явного отказа от работы."
+      },
+      {
+        "canonical_thread_id": "thread/reaction-signal",
+        "title_ru": "Слабая персонализация по реакциям",
+        "thesis": "Реакции дают ограниченный сигнал интереса и не доказывают понимание."
+      },
+      {
+        "canonical_thread_id": "thread/project-actions",
+        "title_ru": "Проектные изменения малого размера",
+        "thesis": "Подтверждённое следствие превращается в ограниченное проверяемое изменение проекта."
+      },
+      {
+        "canonical_thread_id": "thread/external-demand",
+        "title_ru": "Внешнее подтверждение спроса",
+        "thesis": "Рыночный контекст остаётся отдельно от кандидат-специфического доказательства спроса."
+      },
+      {
+        "canonical_thread_id": "thread/operator-learning",
+        "title_ru": "Наблюдаемое обучение оператора",
+        "thesis": "Чтение не считается освоением без подтверждённого результата или проверки."
+      },
+      {
+        "canonical_thread_id": "thread/stable-identity",
+        "title_ru": "Устойчивые идентификаторы идей",
+        "thesis": "Каноническая история сохраняет смысл темы при слиянии и разделении исходных кластеров."
+      }
+    ]
+  }
+}

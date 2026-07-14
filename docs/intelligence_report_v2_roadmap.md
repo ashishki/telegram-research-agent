@@ -16,10 +16,10 @@ Product contracts:
 - `docs/static_visualization_system.md`.
 
 This roadmap turns the failed W29 reader experience into implementation-ready
-work. Weekly Brief V2 now exists as an additive preview, but the complete Report
-V2 package, delivery switch, and dogfood restart remain unfinished; the current
-W29 reports are not accepted as evidence. IRX-0 itself changed documentation
-only.
+work. Weekly Brief V2 and its independent reader-value gates now exist as
+additive previews, but Atlas V2, the complete Report V2 package, delivery
+switch, and dogfood restart remain unfinished; the current W29 reports are not
+accepted as evidence. IRX-0 itself changed documentation only.
 
 ## 1. Product Goal
 
@@ -156,7 +156,7 @@ behavior; it does not reopen the gate logic.
 | IRX-8 | Static visualization component system | `implemented_and_verified` | P1 | IRX-4, IRX-5 |
 | IRX-9 | Project Intelligence V2 | `implemented_and_verified` | P1 | IRX-4, IRX-5, IRX-8 |
 | IRX-10 | MVP Radar reader contract and context-only hardening | `implemented_and_verified` | P1 | IRX-2, IRX-5, IRX-8 |
-| IRX-11 | Reader-value quality gates | `planned` | P1 | IRX-6, IRX-8 and upstream contracts |
+| IRX-11 | Reader-value quality gates | `implemented_and_verified` | P1 | IRX-6, IRX-8 and upstream contracts |
 | IRX-12 | Report-specific feedback and learning loop | `planned` | P2 | IRX-2, IRX-3, IRX-5 through IRX-7, IRX-10 |
 | IRX-13 | Golden fixtures, evaluation dataset, and visual regression | `planned`; scaffolding begins after IRX-1 | P2 | incremental upstream fixtures; finalizes after IRX-6, IRX-7, IRX-11 |
 | IRX-14 | Rollout, backward compatibility, and dogfood restart | `blocked` | P2 | IRX-1 through IRX-13 |
@@ -1122,7 +1122,7 @@ IRX-13, while IRX-11 owns independent reader-value delivery gates.
 
 ### IRX-11 - Reader-Value Quality Gates
 
-**Status:** `planned`. **Priority:** P1.
+**Status:** `implemented_and_verified`. **Priority:** P1.
 
 **Problem:** Current gates validate HTML structure and evidence mechanics but
 allow a wrong-period, repetitive, English, nonvisual, nonpersonalized report to
@@ -1145,9 +1145,12 @@ arbitrary SVG counts.
 **Dependencies:** IRX-6 and IRX-8; uses contracts from IRX-1 through IRX-5,
 IRX-9, and IRX-10.
 
-**Likely files:** `src/output/report_quality.py`; report renderers;
-`tests/test_report_quality.py`; split report tests; new sanitized W29/V2 quality
-fixtures.
+**Likely files:** `src/output/report_quality.py`;
+`src/output/reader_value_quality.py`;
+`src/output/split_intelligence_reports.py`;
+`src/output/weekly_intelligence_brief_v2.py`;
+`tests/test_report_quality.py`; split/Brief/manifest tests; sanitized W29/V2
+quality fixtures.
 
 **Acceptance criteria:**
 
@@ -1178,6 +1181,46 @@ or turn subjective editorial preference into an unexplained hard failure.
 
 **Rollout implications:** Run in warn-only mode on V1, blocking mode on V2
 golden fixtures, then gate scheduled V2 delivery after threshold review.
+
+**IRX-11 completion receipt (2026-07-14):** Added a closed deterministic
+`report_quality.v2` contract with seven ordered independent dimensions,
+machine-readable actionable findings, strict aggregate validation, and no
+single quality score. The evaluator inspects the structured sidecar first and
+rendered HTML parity second; unexpected evaluator failures become an explicit
+critical finding rather than a silent pass.
+
+Brief checks cover exact completed-period/run/partial identity, standalone
+Russian HTML, thesis/evidence, bounded distinct actions, an explicit defer,
+reaction and confirmed-feedback receipts, named evidence-backed project work,
+authoritative same-run Radar, safe visible copy, blank metrics, visible length,
+and four semantic visual kinds. Atlas target checks cover 8–12 canonical
+primary threads, unique identities/titles/theses/backlog, evidence and maturity
+authority, raw-detail separation, graph/timeline/heatmap/maturity components,
+visual canonical/distribution parity, and the 1,500-word reader limit.
+
+Visual quality is derived from validated IRX-8 specs and exact component DOM,
+not SVG/tag counts. Initially hidden, template/comment/disclosure-laundered,
+forged, duplicated, wrong-run, supporting-only, externally restyled/scripted,
+or type-forged components do not count. Honest `available` and `empty` data
+components remain meaningful; unavailable/stale/decorative/supporting states
+do not.
+
+Current V1 Brief and Atlas are evaluated in `warn_only_v1` mode after their
+unchanged artifacts are built. The split notification receives one bounded
+Russian warning, while delivery still selects exactly the same two V1
+documents. Opt-in Brief V2 applies `blocking_v2` before immutable publication
+and again after strict manifest/source/HTML verification during loading. The
+frozen `reader_value_gates` manifest placeholder remains disabled,
+non-required, non-fatal, and non-degrading.
+
+Sanitized W29 failure fixtures now produce concrete critical findings, while
+the rich Brief V2 and 8-thread Atlas target fixtures pass all applicable
+dimensions. The exact task-card matrix passed 64 tests, the focused Brief
+V2/manifest matrix passed 54 tests, and four extended compatibility/security
+shards passed 282 tests. Ruff, focused compilation, fixture JSON validation,
+and `git diff --check` passed. No live/expensive run, production
+report, archive backfill, database migration, score/gate change, V1 delivery
+switch, sibling edit, screenshot, rollout, or dogfood evidence is claimed.
 
 ### IRX-7 - Knowledge Atlas V2 And Knowledge Audit Explorer Separation
 
@@ -1608,6 +1651,7 @@ Report files changed, canonical identity/lifecycle/as-of semantics, compatibilit
 
 ## 15. Suggested Following Task
 
-IRX-1 through IRX-6 and IRX-8 through IRX-10 are implemented and verified.
-IRX-11 is the next planned implementation scope. Atlas V2, report-specific
-learning, rollout, and dogfood remain unimplemented and gated by later tasks.
+IRX-1 through IRX-6 and IRX-8 through IRX-11 are implemented and verified.
+IRX-7 is the next planned implementation scope. Report-specific learning,
+golden visual regression, rollout, and dogfood remain unimplemented and gated
+by later tasks.

@@ -267,6 +267,21 @@ class TestSplitIntelligenceReports(unittest.TestCase):
             generate_v2.assert_not_called()
             self.assertIsNone(summary.editorial_intelligence)
             self.assertEqual(summary.editorial_intelligence_error, "")
+            self.assertEqual(len(summary.reader_quality_reports), 2)
+            self.assertTrue(
+                all(
+                    report["policy_mode"] == "warn_only_v1"
+                    and report["summary"]["delivery_decision"]
+                    == "allow_with_warnings"
+                    for report in summary.reader_quality_reports
+                )
+            )
+            self.assertIn("Доставка V1 не заблокирована", summary.notification_text)
+            self.assertIn("недельный бриф", summary.notification_text)
+            self.assertIn("карта знаний", summary.notification_text)
+            quality_warning = summary.notification_text.rsplit("\n", 1)[-1]
+            self.assertNotIn("weekly_brief", quality_warning)
+            self.assertNotIn("knowledge_atlas", quality_warning)
         finally:
             os.unlink(db_path)
 
@@ -759,6 +774,10 @@ class TestSplitIntelligenceReports(unittest.TestCase):
             self.assertEqual(delivered.delivered_message_ids, (10, 11, 12))
             self.assertIs(delivered.weekly_brief, summary.weekly_brief)
             self.assertIs(delivered.knowledge_atlas, summary.knowledge_atlas)
+            self.assertEqual(
+                delivered.reader_quality_reports,
+                summary.reader_quality_reports,
+            )
             send_text.assert_called_once_with(
                 chat_id="12345",
                 text=summary.notification_text,
