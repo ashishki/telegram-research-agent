@@ -759,7 +759,9 @@
         }
       ],
       "unchanged": [],
-      "requires_code_or_config": []
+      "code_config_required": [],
+      "rejected": [],
+      "pending": []
     }
   },
   "reaction_effect": {

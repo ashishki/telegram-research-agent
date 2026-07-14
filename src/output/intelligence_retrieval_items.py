@@ -1088,7 +1088,9 @@ def _items_from_weekly_brief_v2(
                         for field in (
                             "applied_changes",
                             "unchanged",
-                            "requires_code_or_config",
+                            "code_config_required",
+                            "rejected",
+                            "pending",
                         )
                         for row in _as_list(feedback.get(field))
                         if isinstance(row, Mapping)

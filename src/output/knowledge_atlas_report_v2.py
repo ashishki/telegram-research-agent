@@ -2379,7 +2379,7 @@ def _operator_interest_projection(
             "feedback_ref": str(item.get("feedback_ref") or ""),
             "reader_summary_ru": str(item.get("reader_summary_ru") or ""),
         }
-        for key in ("applied_changes", "unchanged", "requires_code_or_config")
+        for key in ("applied_changes", "unchanged", "code_config_required", "rejected", "pending")
         for item in _mapping_list(feedback.get(key))
         if str(item.get("feedback_ref") or "")
     ] if feedback_status != "unavailable" else []
@@ -5504,7 +5504,7 @@ def _feedback_count_for_thread(
     }
     confirmed_refs = {
         str(item.get("feedback_ref") or "")
-        for key in ("applied_changes", "unchanged", "requires_code_or_config")
+        for key in ("applied_changes", "unchanged", "code_config_required", "rejected", "pending")
         for item in _mapping_list(feedback.get(key))
         if str(item.get("feedback_ref") or "")
     }

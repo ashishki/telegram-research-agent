@@ -6,6 +6,7 @@ from typing import Any, Iterable, Mapping
 ACTION_STATUS_VALUES = {
     "read",
     "tried",
+    "action_completed",
     "applied_to_project",
     "deferred",
     "wrong_priority",
@@ -35,6 +36,11 @@ def build_action_status_projection(
             for event in matched_events
             if _clean_text(event.get("feedback_type"))
         )
+        classifications = _unique(
+            _clean_text(event.get("feedback_classification"))
+            for event in matched_events
+            if _clean_text(event.get("feedback_classification"))
+        )
         items.append(
             {
                 "action_id": action_id,
@@ -42,8 +48,9 @@ def build_action_status_projection(
                 "feedback_target_id": feedback_target_id,
                 "title": _clean_text(card.get("title")) or action_id,
                 "action_kind": _clean_text(card.get("action_kind")) or _clean_text(card.get("scope")) or None,
-                "status": _status_from_feedback_types(feedback_types),
+                "status": _status_from_feedback_types([*feedback_types, *classifications]),
                 "feedback_types": feedback_types,
+                "feedback_classifications": classifications,
                 "latest_feedback_at": _latest_value(event.get("created_at") for event in matched_events),
                 "source_refs": _unique(
                     _clean_text(event.get("source_url"))
@@ -76,17 +83,24 @@ def _matching_events(
         refs.add(feedback_target_id)
     result = []
     for event in events:
-        event_ref = _clean_text(event.get("target_ref"))
+        event_refs = {
+            _clean_text(event.get("target_ref")),
+            _clean_text(event.get("item_ref")),
+            _clean_text(event.get("originating_report_item_ref")),
+        }
+        event_refs.discard(None)
         event_type = _clean_text(event.get("target_type"))
-        if event_ref in refs:
+        if event_refs.intersection(refs):
             result.append(event)
             continue
-        if event_type == "action" and event_ref is None and action_id == "action-1":
+        if event_type == "action" and not event_refs and action_id == "action-1":
             result.append(event)
     return result
 
 
 def _status_from_feedback_types(feedback_types: list[str]) -> str:
+    if "action_completed" in feedback_types:
+        return "action_completed"
     if "applied_to_project" in feedback_types:
         return "applied_to_project"
     if "tried" in feedback_types:

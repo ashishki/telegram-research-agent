@@ -11,7 +11,7 @@ from typing import Mapping, Sequence
 from urllib.parse import urlparse
 
 from config.settings import PROJECT_ROOT, Settings
-from db.ai_report_feedback import summarize_ai_report_feedback
+from db.ai_report_feedback import empty_ai_report_feedback_summary, summarize_ai_report_feedback
 from db.frontier_analysis import fetch_frontier_analysis
 from output.idea_threads import _thread_terms as _idea_thread_terms
 from output.report_quality import (
@@ -880,42 +880,7 @@ def _feedback_context_for_report(
             before_week_label=week_label,
             created_before=feedback_snapshot,
         )
-    return {
-        "event_count": 0,
-        "counts_by_feedback": {},
-        "downranked_thread_slugs": [],
-        "downranked_atom_refs": [],
-        "downranked_target_refs": [],
-        "promoted_target_refs": [],
-        "missed_post_eval_examples": [],
-        "priority_eval_examples": [],
-        "feedback_eval_examples": [],
-        "feedback_completion": {
-            "completed": False,
-            "completed_count": 0,
-            "required_count": 4,
-            "missing": ["read_items", "action_outcome", "missed_or_no_missed", "trust_correction"],
-            "read_event_count": 0,
-            "action_event_count": 0,
-            "has_missed_or_no_missed": False,
-            "trust_correction_count": 0,
-        },
-        "feedback_changes": {
-            "status": "unknown",
-            "summary": "No prior feedback is available; personalization state is unknown.",
-            "items": ["No confirmed feedback has changed ranking yet; no-feedback is not a negative signal."],
-            "downranked": [],
-            "promoted": [],
-            "eval_example_count": 0,
-        },
-        "feedback_corrections": [],
-        "feedback_effect_traces": [],
-        "confirmed_event_count": 0,
-        "pending_draft_count": 0,
-        "confirmation_state": "confirmed_only",
-        "frontier_prompt_guidance": ["No prior feedback is available; state unknown personalization confidence."],
-        "recent_events": [],
-    }
+    return empty_ai_report_feedback_summary()
 
 
 def load_ai_intelligence_context(
@@ -1575,7 +1540,7 @@ def _personal_learning_loop(
         try_items.append(
             {
                 "title": f"{item['kind']}: {item['name']}",
-                "body": f"Try it against one current workflow and note whether it changes speed, quality, or review effort.",
+                "body": "Try it against one current workflow and note whether it changes speed, quality, or review effort.",
                 "source_count": item["count"],
                 "ranking_factors": [
                     _ranking_factor("term_kind", item["kind"], "medium"),
@@ -2091,6 +2056,14 @@ def _render_feedback_context(context: dict) -> str:
     if not change_items:
         change_items = ["No confirmed feedback has changed ranking yet; no-feedback is not a negative signal."]
     change_summary = changes.get("summary") or "No prior feedback is available; personalization state is unknown."
+    receipt = feedback.get("feedback_application_receipt") or {}
+    status_counts = receipt.get("counts_by_status") or {}
+    receipt_text = ", ".join(
+        f"{status.replace('_', ' ')}={count}"
+        for status, count in sorted(status_counts.items())
+    )
+    if not receipt_text:
+        receipt_text = "none"
     missed = feedback.get("missed_post_eval_examples") or []
     missed_text = ""
     if missed:
@@ -2100,6 +2073,7 @@ def _render_feedback_context(context: dict) -> str:
         "<h3>Personalization Context</h3>"
         "<ul>"
         f"<li>Prior report feedback: {_escape(count_text)}</li>"
+        f"<li>Application receipt: {_escape(receipt_text)}</li>"
         f"{missed_text}"
         "</ul>"
         "<h4>What Feedback Changed This Week</h4>"
@@ -2500,7 +2474,6 @@ def _period_metadata(context: dict, *, generated_at: str) -> dict[str, object]:
 
 
 def render_ai_intelligence_html(context: dict, *, generated_at: str | None = None) -> tuple[str, list[dict]]:
-    week_label = context["week_label"]
     actions = _learning_actions(context["threads"], context.get("feedback_context") or {})
     generated = generated_at or str(context.get("generated_at") or _utc_now_iso())
     report_title = _period_title(context, "AI Intelligence Report")

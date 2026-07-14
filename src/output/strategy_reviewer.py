@@ -492,6 +492,9 @@ def build_strategy_review(
         before_week_label=before_week_label,
     )
     counts = summary.get("counts_by_feedback") or {}
+    classification_counts = summary.get("counts_by_classification") or {}
+    application_receipt = summary.get("feedback_application_receipt") or {}
+    application_counts = application_receipt.get("counts_by_status") or {}
     has_feedback = int(summary.get("event_count") or 0) > 0
     observations = (
         list(reaction_pattern_observations)
@@ -524,9 +527,24 @@ def build_strategy_review(
         risks.append("No confirmed feedback is an unknown state, not a negative signal.")
     else:
         memory_only.append("Confirmed feedback is already stored in ai_report_feedback_events; no profile/config edit is required.")
+        if application_counts:
+            memory_only.append(
+                "Feedback application receipt separates applied, unchanged, code/config-required, rejected, and pending states."
+            )
+        if application_counts.get("pending"):
+            test_next_week.append("Check pending feedback items in the next report receipt before treating them as applied.")
+        if application_counts.get("rejected"):
+            risks.append("Rejected or retracted feedback remains append-only and must not silently mutate ranking.")
+        if application_counts.get("code_config_required"):
+            approval_required.append(
+                {
+                    "change_type": "code_or_config",
+                    "reason": "At least one confirmed feedback item requires explicit code/config approval before persistent behavior changes.",
+                }
+            )
         if counts.get("useful") or counts.get("tried") or counts.get("applied_to_project"):
             keep.append("Keep promoting try/build items that received useful, tried, or applied-to-project feedback.")
-        if counts.get("too_shallow"):
+        if counts.get("too_shallow") or classification_counts.get("too_shallow"):
             change.append("Increase source-depth checks for sections marked too_shallow.")
             approval_required.append(
                 {
@@ -568,7 +586,12 @@ def build_strategy_review(
         if counts.get("missed_important_post"):
             test_next_week.append("Turn missed important posts into eval examples and verify they appear in next workbook coverage.")
             memory_only.append("Missed-post feedback can remain memory-only until a human approves new eval/code changes.")
-        if counts.get("trust_too_high") or counts.get("trust_too_low") or counts.get("verify_first"):
+        if (
+            counts.get("trust_too_high")
+            or counts.get("trust_too_low")
+            or counts.get("verify_first")
+            or classification_counts.get("source_trust_correction")
+        ):
             change.append("Review source-trust calibration before changing trust thresholds.")
             approval_required.append(
                 {

@@ -191,11 +191,30 @@ class TestAiReportFeedback(unittest.TestCase):
             os.unlink(db_path)
 
         self.assertIsNotNone(table)
-        for column in ["week_label", "feedback_type", "target_type", "target_ref", "source_url", "notes"]:
+        for column in [
+            "week_label",
+            "report_run_id",
+            "report_surface",
+            "section_id",
+            "item_ref",
+            "feedback_type",
+            "feedback_classification",
+            "target_type",
+            "target_ref",
+            "source_url",
+            "notes",
+            "confirmation_state",
+            "application_status",
+            "application_reason",
+            "originating_report_item_ref",
+        ]:
             self.assertIn(column, columns)
         self.assertIn("idx_ai_report_feedback_week", indexes)
         self.assertIn("idx_ai_report_feedback_type", indexes)
         self.assertIn("idx_ai_report_feedback_target", indexes)
+        self.assertIn("idx_ai_report_feedback_surface", indexes)
+        self.assertIn("idx_ai_report_feedback_classification", indexes)
+        self.assertIn("idx_ai_report_feedback_application", indexes)
         self.assertIsNotNone(intake_table)
         for column in [
             "input_kind",
@@ -401,6 +420,133 @@ class TestAiReportFeedback(unittest.TestCase):
         self.assertEqual({event["feedback_type"] for event in confirmed_events}, {"useful", "missed_important_post"})
         self.assertEqual(confirmed_intake["status"], "confirmed")
         self.assertEqual({suggestion["suggestion_type"] for suggestion in result["suggestions"]}, {"config"})
+
+    def test_targeted_feedback_receipt_separates_irx12_application_states(self):
+        db_path = self._make_db()
+        try:
+            with sqlite3.connect(db_path) as connection:
+                connection.row_factory = sqlite3.Row
+                visual = record_ai_report_feedback(
+                    connection,
+                    week_label="2026-W27",
+                    report_run_id="run-2026-W27",
+                    report_path="data/output/weekly_intelligence_briefs_v2/brief.v2.json",
+                    feedback_type="confusing_visual",
+                    target_type="report_section",
+                    target_ref="visual:confidence",
+                    report_surface="visual",
+                    section_id="decision_matrix",
+                    item_ref="visual:confidence",
+                    feedback_classification="confusing_visual",
+                    notes="The confidence visual was confusing.",
+                    created_at="2026-07-01T10:00:00Z",
+                )
+                action = record_ai_report_feedback(
+                    connection,
+                    week_label="2026-W27",
+                    feedback_type="action_completed",
+                    target_type="action",
+                    target_ref="action-2",
+                    report_surface="project_action",
+                    section_id="project_actions",
+                    item_ref="action-2",
+                    application_status="applied",
+                    application_reason="Operator completed the report action.",
+                    originating_report_item_ref="action-2",
+                    created_at="2026-07-01T11:00:00Z",
+                )
+                rejected = record_ai_report_feedback(
+                    connection,
+                    week_label="2026-W27",
+                    feedback_type="retraction",
+                    target_type="feedback_event",
+                    target_ref=f"feedback_event:{action['id']}",
+                    feedback_classification="desired_report_change",
+                    application_status="rejected",
+                    application_reason="Operator retracted a previous feedback event.",
+                    created_at="2026-07-01T12:00:00Z",
+                )
+                summary = summarize_ai_report_feedback(connection, before_week_label="2026-W28")
+                visual_rows = fetch_ai_report_feedback(
+                    connection,
+                    report_surface="visual",
+                    application_status="code_config_required",
+                    limit=10,
+                )
+        finally:
+            os.unlink(db_path)
+
+        self.assertEqual(visual["feedback_classification"], "confusing_visual")
+        self.assertEqual(visual["application_status"], "code_config_required")
+        self.assertEqual(action["feedback_classification"], "action_completed")
+        self.assertEqual(action["originating_report_item_ref"], "action-2")
+        self.assertEqual(rejected["application_status"], "rejected")
+        self.assertEqual(visual_rows[0]["item_ref"], "visual:confidence")
+        receipt = summary["feedback_application_receipt"]
+        self.assertEqual(receipt["schema_version"], "ai_report_feedback_application_receipt.v1")
+        self.assertEqual(receipt["counts_by_status"]["applied"], 1)
+        self.assertEqual(receipt["counts_by_status"]["code_config_required"], 1)
+        self.assertEqual(receipt["counts_by_status"]["rejected"], 1)
+        self.assertEqual(receipt["applied"][0]["originating_report_item_ref"], "action-2")
+        self.assertEqual(receipt["code_config_required"][0]["report_surface"], "visual")
+        self.assertIn("confusing_visual", summary["counts_by_classification"])
+        self.assertIn("visual", summary["counts_by_surface"])
+        self.assertEqual(summary["targeted_feedback"][0]["section_id"], "project_actions")
+        trace_by_status = {
+            trace["application_status"]: trace for trace in summary["feedback_effect_traces"]
+        }
+        self.assertEqual(trace_by_status["code_config_required"]["report_surface"], "visual")
+
+    def test_targeted_feedback_intake_preserves_confirmation_gate(self):
+        db_path = self._make_db()
+        try:
+            with sqlite3.connect(db_path) as connection:
+                connection.row_factory = sqlite3.Row
+                intake = create_feedback_intake(
+                    connection,
+                    week_label="2026-W28",
+                    text=(
+                        "Atlas section=timeline item=thread:agents is too long. "
+                        "Radar decision useful item=candidate:1. "
+                        "Reaction effect missing item=reaction:42. "
+                        "Action completed item=action-2."
+                    ),
+                    input_kind="voice_transcript",
+                    llm_client=_BrokenStrategistLLM,
+                )
+                before = fetch_ai_report_feedback(connection, week_label="2026-W28", limit=10)
+                result = apply_confirmed_feedback_intake(connection, intake_id=int(intake["id"]))
+                after = fetch_ai_report_feedback(connection, week_label="2026-W28", limit=10)
+                summary = summarize_ai_report_feedback(connection, week_label="2026-W28")
+        finally:
+            os.unlink(db_path)
+
+        self.assertEqual(before, [])
+        self.assertIn("surface=knowledge_atlas", intake["confirmation_summary"])
+        self.assertIn("classification=too_long", intake["confirmation_summary"])
+        self.assertIn("application=code_config_required", intake["confirmation_summary"])
+        self.assertGreaterEqual(len(result["created_events"]), 4)
+        self.assertEqual({event["confirmation_state"] for event in after}, {"confirmed"})
+        classes = {event["feedback_classification"] for event in after}
+        self.assertTrue(
+            {
+                "too_long",
+                "radar_decision_useful",
+                "reaction_effect_missing",
+                "action_completed",
+            }.issubset(classes)
+        )
+        surfaces = {event["report_surface"] for event in after}
+        self.assertTrue(
+            {
+                "knowledge_atlas",
+                "mvp_radar",
+                "reaction_personalization",
+                "project_action",
+            }.issubset(surfaces)
+        )
+        self.assertEqual(summary["pending_draft_count"], 0)
+        self.assertEqual(summary["feedback_application_receipt"]["confirmation_state"], "confirmed_only")
 
     def test_feedback_intake_stores_strategist_draft_without_memory_write(self):
         db_path = self._make_db()

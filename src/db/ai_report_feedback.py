@@ -10,6 +10,15 @@ FEEDBACK_TYPES = {
     "tried",
     "applied_to_project",
     "too_shallow",
+    "too_long",
+    "confusing_visual",
+    "missing_visual",
+    "duplicate_content",
+    "action_completed",
+    "radar_decision_useful",
+    "reaction_effect_missing",
+    "source_trust_correction",
+    "desired_report_change",
     "missed_important_post",
     "no_missed_posts",
     "wrong_priority",
@@ -36,8 +45,67 @@ TARGET_TYPES = {
     "feedback_event",
     "operator_context",
 }
+REPORT_SURFACES = {
+    "weekly_brief",
+    "knowledge_atlas",
+    "mvp_radar",
+    "reaction_personalization",
+    "project_action",
+    "visual",
+    "audit_explorer",
+    "report_package",
+}
+REPORT_SURFACE_ALIASES = {
+    "brief": "weekly_brief",
+    "weekly": "weekly_brief",
+    "weekly_report": "weekly_brief",
+    "weekly_intelligence_brief": "weekly_brief",
+    "atlas": "knowledge_atlas",
+    "knowledge": "knowledge_atlas",
+    "knowledge_atlas_v2": "knowledge_atlas",
+    "radar": "mvp_radar",
+    "mvp": "mvp_radar",
+    "mvp_weekly": "mvp_radar",
+    "reaction": "reaction_personalization",
+    "reactions": "reaction_personalization",
+    "personalization": "reaction_personalization",
+    "project": "project_action",
+    "projects": "project_action",
+    "action": "project_action",
+    "actions": "project_action",
+    "visuals": "visual",
+    "chart": "visual",
+    "graph": "visual",
+    "audit": "audit_explorer",
+    "audit_explorer": "audit_explorer",
+    "package": "report_package",
+}
+FEEDBACK_CLASSIFICATIONS = {
+    "useful",
+    "wrong_priority",
+    "too_shallow",
+    "too_long",
+    "confusing_visual",
+    "missing_visual",
+    "duplicate_content",
+    "action_completed",
+    "applied_to_project",
+    "radar_decision_useful",
+    "reaction_effect_missing",
+    "source_trust_correction",
+    "desired_report_change",
+}
+APPLICATION_STATUSES = {
+    "applied",
+    "unchanged",
+    "code_config_required",
+    "rejected",
+    "pending",
+}
 INTAKE_INPUT_KINDS = {"text", "voice_transcript"}
 INTAKE_STATUSES = {"pending", "confirmed", "discarded"}
+CONFIRMATION_STATES = {"pending", "confirmed", "discarded"}
+APPLICATION_RECEIPT_SCHEMA_VERSION = "ai_report_feedback_application_receipt.v1"
 
 
 def _now_iso() -> str:
@@ -66,21 +134,255 @@ def _normalize_choice(value: str, allowed: set[str], field_name: str) -> str:
     return normalized
 
 
+def _clean_identifier(value: object | None, *, default: str, max_length: int = 160) -> str:
+    text = str(value or "").strip().replace(" ", "_").replace("-", "_")
+    return (text[:max_length] if text else default)
+
+
+def _feedback_classification(feedback_type: str, explicit: str | None = None) -> str:
+    if explicit:
+        return _normalize_choice(explicit, FEEDBACK_CLASSIFICATIONS, "feedback_classification")
+    normalized = _normalize_choice(feedback_type, FEEDBACK_TYPES, "feedback_type")
+    if normalized in FEEDBACK_CLASSIFICATIONS:
+        return normalized
+    if normalized in {"not_interested", "noise"}:
+        return "wrong_priority"
+    if normalized in {"tried"}:
+        return "action_completed"
+    if normalized in {"trust_too_high", "trust_too_low", "verify_first"}:
+        return "source_trust_correction"
+    if normalized in {"read", "no_missed_posts", "correction", "retraction", "accidental_feedback"}:
+        return "desired_report_change"
+    if normalized == "missed_important_post":
+        return "desired_report_change"
+    return "desired_report_change"
+
+
+def _report_surface(
+    *,
+    report_surface: str | None,
+    target_type: str,
+    target_ref: str | None,
+    report_path: str | None,
+    feedback_classification: str,
+) -> str:
+    if report_surface:
+        normalized = str(report_surface).strip().replace("-", "_").lower()
+        normalized = REPORT_SURFACE_ALIASES.get(normalized, normalized)
+        return _normalize_choice(normalized, REPORT_SURFACES, "report_surface")
+
+    path_text = str(report_path or "").lower()
+    target_text = f"{target_type} {target_ref or ''} {feedback_classification}".lower()
+    combined = f"{path_text} {target_text}"
+    if "atlas" in combined:
+        return "knowledge_atlas"
+    if "audit" in combined:
+        return "audit_explorer"
+    if "radar" in combined or "mvp" in combined:
+        return "mvp_radar"
+    if "reaction" in combined or "personalization" in combined:
+        return "reaction_personalization"
+    if target_type in {"action", "experiment"} or "project" in combined:
+        return "project_action"
+    if "visual" in combined or "chart" in combined or "graph" in combined:
+        return "visual"
+    return "weekly_brief"
+
+
+def _section_id(value: object | None, *, target_type: str, report_surface: str) -> str:
+    if value is not None and str(value).strip():
+        return _clean_identifier(value, default="report_section")
+    if target_type == "report":
+        return "report"
+    if report_surface == "visual":
+        return "visual"
+    if report_surface == "project_action":
+        return "project_actions"
+    if report_surface == "mvp_radar":
+        return "mvp_radar"
+    if report_surface == "reaction_personalization":
+        return "reaction_personalization"
+    if report_surface == "knowledge_atlas":
+        return "knowledge_atlas"
+    if report_surface == "audit_explorer":
+        return "audit_explorer"
+    return target_type
+
+
+def _item_ref(
+    value: object | None,
+    *,
+    target_ref: str | None,
+    source_url: str | None,
+    section_id: str,
+) -> str:
+    if value is not None and str(value).strip():
+        return str(value).strip()[:200]
+    if target_ref:
+        return str(target_ref).strip()[:200]
+    if source_url:
+        return str(source_url).strip()[:200]
+    return section_id or "report"
+
+
+def _originating_report_item_ref(
+    value: object | None,
+    *,
+    target_type: str,
+    item_ref: str,
+    feedback_classification: str,
+) -> str | None:
+    clean = _clean_optional(str(value)) if value is not None else None
+    if clean:
+        return clean[:200]
+    if target_type in {"action", "experiment"} or feedback_classification in {
+        "action_completed",
+        "applied_to_project",
+    }:
+        return item_ref
+    return None
+
+
+def _application_status(
+    *,
+    feedback_type: str,
+    feedback_classification: str,
+    explicit: str | None,
+) -> str:
+    if explicit:
+        return _normalize_choice(explicit, APPLICATION_STATUSES, "application_status")
+    normalized_type = _normalize_choice(feedback_type, FEEDBACK_TYPES, "feedback_type")
+    if normalized_type in {"retraction", "accidental_feedback"}:
+        return "rejected"
+    if feedback_classification in {
+        "too_shallow",
+        "too_long",
+        "confusing_visual",
+        "missing_visual",
+        "duplicate_content",
+        "reaction_effect_missing",
+        "source_trust_correction",
+    }:
+        return "code_config_required"
+    if feedback_classification in {
+        "useful",
+        "wrong_priority",
+        "action_completed",
+        "applied_to_project",
+        "radar_decision_useful",
+    }:
+        return "applied"
+    if normalized_type in {"missed_important_post"}:
+        return "pending"
+    return "unchanged"
+
+
+def _application_reason(
+    *,
+    feedback_classification: str,
+    application_status: str,
+    explicit: str | None,
+) -> str:
+    clean = _clean_optional(explicit)
+    if clean:
+        return clean[:500]
+    if application_status == "applied":
+        return f"Confirmed {feedback_classification} feedback is available to future report ranking/editorial context."
+    if application_status == "code_config_required":
+        return f"Confirmed {feedback_classification} feedback requires explicit code, prompt, config, or profile approval."
+    if application_status == "rejected":
+        return f"Confirmed {feedback_classification} feedback was recorded but not applied because it rejects or retracts a prior signal."
+    if application_status == "pending":
+        return f"Confirmed {feedback_classification} feedback is pending a later artifact or manual review."
+    return f"Confirmed {feedback_classification} feedback was preserved without changing this report."
+
+
+def _application_reader_summary_ru(feedback: dict) -> str:
+    classification = str(feedback.get("feedback_classification") or "desired_report_change")
+    status = str(feedback.get("application_status") or "unchanged")
+    surface = str(feedback.get("report_surface") or "weekly_brief")
+    section = str(feedback.get("section_id") or "report")
+    item = str(feedback.get("item_ref") or feedback.get("target_ref") or "report")
+    if status == "applied":
+        prefix = "Учтено"
+    elif status == "code_config_required":
+        prefix = "Нужна отдельная задача"
+    elif status == "rejected":
+        prefix = "Не применено"
+    elif status == "pending":
+        prefix = "Ожидает применения"
+    else:
+        prefix = "Оставлено без изменения"
+    return f"{prefix}: {surface}/{section}/{item} — {classification}."
+
+
 def _row_to_feedback(columns: list[str], row: sqlite3.Row | tuple) -> dict:
     values = dict(zip(columns, row))
+    feedback_type = values["feedback_type"]
+    target_type = values["target_type"]
+    target_ref = _clean_optional(values.get("target_ref"))
+    source_url = _clean_optional(values.get("source_url"))
+    feedback_classification = _feedback_classification(
+        feedback_type,
+        _clean_optional(values.get("feedback_classification")),
+    )
+    report_surface = _report_surface(
+        report_surface=_clean_optional(values.get("report_surface")),
+        target_type=target_type,
+        target_ref=target_ref,
+        report_path=_clean_optional(values.get("report_path")),
+        feedback_classification=feedback_classification,
+    )
+    section_id = _section_id(
+        values.get("section_id"),
+        target_type=target_type,
+        report_surface=report_surface,
+    )
+    item_ref = _item_ref(
+        values.get("item_ref"),
+        target_ref=target_ref,
+        source_url=source_url,
+        section_id=section_id,
+    )
+    application_status = _application_status(
+        feedback_type=feedback_type,
+        feedback_classification=feedback_classification,
+        explicit=_clean_optional(values.get("application_status")),
+    )
     feedback = {
         "id": int(values["id"]),
         "week_label": values["week_label"],
         "report_path": values["report_path"],
-        "feedback_type": values["feedback_type"],
-        "target_type": values["target_type"],
-        "target_ref": values["target_ref"],
-        "source_url": values["source_url"],
+        "report_run_id": values.get("report_run_id"),
+        "report_surface": report_surface,
+        "section_id": section_id,
+        "item_ref": item_ref,
+        "feedback_type": feedback_type,
+        "feedback_classification": feedback_classification,
+        "target_type": target_type,
+        "target_ref": target_ref,
+        "source_url": source_url,
         "notes": values["notes"],
+        "confirmation_state": _normalize_choice(
+            values.get("confirmation_state") or "confirmed",
+            CONFIRMATION_STATES,
+            "confirmation_state",
+        ),
+        "application_status": application_status,
+        "application_reason": _application_reason(
+            feedback_classification=feedback_classification,
+            application_status=application_status,
+            explicit=_clean_optional(values.get("application_reason")),
+        ),
+        "originating_report_item_ref": _originating_report_item_ref(
+            values.get("originating_report_item_ref"),
+            target_type=target_type,
+            item_ref=item_ref,
+            feedback_classification=feedback_classification,
+        ),
         "created_at": values["created_at"],
         "recorded_by": values["recorded_by"],
     }
-    feedback["confirmation_state"] = "confirmed"
     feedback["signal_strength"] = _feedback_signal_strength(feedback["feedback_type"])
     feedback["feedback_provenance"] = _feedback_provenance(feedback)
     feedback["effect_window"] = _feedback_effect_window(feedback)
@@ -89,15 +391,29 @@ def _row_to_feedback(columns: list[str], row: sqlite3.Row | tuple) -> dict:
 
 
 def _feedback_signal_strength(feedback_type: str) -> str:
-    if feedback_type in {"useful", "applied_to_project"}:
+    if feedback_type in {"useful", "applied_to_project", "radar_decision_useful"}:
         return "strong_positive"
-    if feedback_type in {"wrong_priority", "not_interested", "noise"}:
+    if feedback_type in {"wrong_priority", "not_interested", "noise", "duplicate_content"}:
         return "strong_negative"
-    if feedback_type in {"trust_too_high", "trust_too_low", "verify_first"}:
+    if feedback_type in {
+        "trust_too_high",
+        "trust_too_low",
+        "verify_first",
+        "source_trust_correction",
+    }:
         return "trust_calibration"
     if feedback_type in {"correction", "retraction", "accidental_feedback"}:
         return "correction"
-    if feedback_type in {"tried", "too_shallow", "missed_important_post"}:
+    if feedback_type in {
+        "tried",
+        "action_completed",
+        "too_shallow",
+        "too_long",
+        "confusing_visual",
+        "missing_visual",
+        "reaction_effect_missing",
+        "missed_important_post",
+    }:
         return "medium"
     if feedback_type in {"read", "no_missed_posts"}:
         return "weak_observation"
@@ -111,8 +427,12 @@ def _feedback_provenance(feedback: dict) -> dict:
         "recorded_by": feedback.get("recorded_by") or "operator",
         "created_at": feedback.get("created_at"),
         "report_path": feedback.get("report_path"),
+        "report_run_id": feedback.get("report_run_id"),
+        "report_surface": feedback.get("report_surface"),
+        "section_id": feedback.get("section_id"),
+        "item_ref": feedback.get("item_ref"),
         "source_url": feedback.get("source_url"),
-        "confirmation_state": "confirmed",
+        "confirmation_state": feedback.get("confirmation_state") or "confirmed",
     }
 
 
@@ -122,6 +442,7 @@ def _feedback_effect_window(feedback: dict) -> dict:
         "applies_from_week_label": _next_week_label(feedback.get("week_label")),
         "applies_to_future_artifacts_only": True,
         "does_not_rewrite_report_path": feedback.get("report_path"),
+        "application_status": feedback.get("application_status"),
         "created_at": feedback.get("created_at"),
     }
 
@@ -218,6 +539,15 @@ def record_ai_report_feedback(
     target_type: str = "report",
     target_ref: str | None = None,
     report_path: str | None = None,
+    report_run_id: str | None = None,
+    report_surface: str | None = None,
+    section_id: str | None = None,
+    item_ref: str | None = None,
+    feedback_classification: str | None = None,
+    confirmation_state: str = "confirmed",
+    application_status: str | None = None,
+    application_reason: str | None = None,
+    originating_report_item_ref: str | None = None,
     source_url: str | None = None,
     notes: str | None = None,
     created_at: str | None = None,
@@ -227,30 +557,90 @@ def record_ai_report_feedback(
     clean_week = _clean_required(week_label, "week_label")
     clean_feedback = _normalize_choice(feedback_type, FEEDBACK_TYPES, "feedback_type")
     clean_target = _normalize_choice(target_type, TARGET_TYPES, "target_type")
+    clean_target_ref = _clean_optional(target_ref)
+    clean_source_url = _clean_optional(source_url)
+    clean_classification = _feedback_classification(clean_feedback, feedback_classification)
+    clean_surface = _report_surface(
+        report_surface=report_surface,
+        target_type=clean_target,
+        target_ref=clean_target_ref,
+        report_path=report_path,
+        feedback_classification=clean_classification,
+    )
+    clean_section = _section_id(
+        section_id,
+        target_type=clean_target,
+        report_surface=clean_surface,
+    )
+    clean_item_ref = _item_ref(
+        item_ref,
+        target_ref=clean_target_ref,
+        source_url=clean_source_url,
+        section_id=clean_section,
+    )
+    clean_confirmation = _normalize_choice(
+        confirmation_state,
+        CONFIRMATION_STATES,
+        "confirmation_state",
+    )
+    clean_application = _application_status(
+        feedback_type=clean_feedback,
+        feedback_classification=clean_classification,
+        explicit=application_status,
+    )
+    clean_application_reason = _application_reason(
+        feedback_classification=clean_classification,
+        application_status=clean_application,
+        explicit=application_reason,
+    )
+    clean_originating_ref = _originating_report_item_ref(
+        originating_report_item_ref,
+        target_type=clean_target,
+        item_ref=clean_item_ref,
+        feedback_classification=clean_classification,
+    )
     timestamp = created_at or _now_iso()
     cursor = connection.execute(
         """
         INSERT INTO ai_report_feedback_events (
             week_label,
             report_path,
+            report_run_id,
+            report_surface,
+            section_id,
+            item_ref,
             feedback_type,
+            feedback_classification,
             target_type,
             target_ref,
             source_url,
             notes,
+            confirmation_state,
+            application_status,
+            application_reason,
+            originating_report_item_ref,
             created_at,
             recorded_by
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             clean_week,
             _clean_optional(report_path),
+            _clean_optional(report_run_id),
+            clean_surface,
+            clean_section,
+            clean_item_ref,
             clean_feedback,
+            clean_classification,
             clean_target,
-            _clean_optional(target_ref),
-            _clean_optional(source_url),
+            clean_target_ref,
+            clean_source_url,
             _clean_optional(notes),
+            clean_confirmation,
+            clean_application,
+            clean_application_reason,
+            clean_originating_ref,
             timestamp,
             _clean_optional(recorded_by) or "operator",
         ),
@@ -467,6 +857,9 @@ def fetch_ai_report_feedback(
     feedback_type: str | None = None,
     target_type: str | None = None,
     target_ref: str | None = None,
+    report_surface: str | None = None,
+    feedback_classification: str | None = None,
+    application_status: str | None = None,
     limit: int = 20,
 ) -> list[dict]:
     clauses: list[str] = []
@@ -486,6 +879,28 @@ def fetch_ai_report_feedback(
     if target_ref:
         clauses.append("target_ref = ?")
         params.append(str(target_ref).strip())
+    if report_surface:
+        clauses.append("report_surface = ?")
+        normalized_surface = str(report_surface).strip().replace("-", "_").lower()
+        params.append(
+            _normalize_choice(
+                REPORT_SURFACE_ALIASES.get(normalized_surface, normalized_surface),
+                REPORT_SURFACES,
+                "report_surface",
+            )
+        )
+    if feedback_classification:
+        clauses.append("feedback_classification = ?")
+        params.append(
+            _normalize_choice(
+                feedback_classification,
+                FEEDBACK_CLASSIFICATIONS,
+                "feedback_classification",
+            )
+        )
+    if application_status:
+        clauses.append("application_status = ?")
+        params.append(_normalize_choice(application_status, APPLICATION_STATUSES, "application_status"))
     where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     cursor = connection.execute(
         f"""
@@ -498,6 +913,10 @@ def fetch_ai_report_feedback(
         (*params, max(1, int(limit or 20))),
     )
     return _cursor_to_feedback(cursor)
+
+
+def empty_ai_report_feedback_summary() -> dict:
+    return _summarize_events([])
 
 
 def summarize_ai_report_feedback(
@@ -556,9 +975,18 @@ def _explicit_utc_iso(value: datetime | str, *, field_name: str) -> str:
 
 
 def _summarize_events(events: list[dict]) -> dict:
+    events = [event for event in events if event.get("confirmation_state") == "confirmed"]
     counts = Counter(event["feedback_type"] for event in events)
+    classification_counts = Counter(event["feedback_classification"] for event in events)
+    surface_counts = Counter(event["report_surface"] for event in events)
     downrank_feedback = {"not_interested", "noise", "wrong_priority"}
-    positive_feedback = {"useful", "tried", "applied_to_project"}
+    positive_feedback = {
+        "useful",
+        "tried",
+        "applied_to_project",
+        "action_completed",
+        "radar_decision_useful",
+    }
     downranked_threads = sorted(
         {
             str(event.get("target_ref") or "")
@@ -620,6 +1048,8 @@ def _summarize_events(events: list[dict]) -> dict:
     completion = _minimum_feedback_completion(events)
     corrections = _feedback_corrections(events)
     effect_traces = _feedback_effect_traces(events)
+    application_receipt = _feedback_application_receipt(events)
+    targeted_feedback = _targeted_feedback_summary(events)
     guidance = _frontier_prompt_guidance(
         counts=counts,
         downranked_threads=downranked_threads,
@@ -638,6 +1068,8 @@ def _summarize_events(events: list[dict]) -> dict:
     return {
         "event_count": len(events),
         "counts_by_feedback": dict(sorted(counts.items())),
+        "counts_by_classification": dict(sorted(classification_counts.items())),
+        "counts_by_surface": dict(sorted(surface_counts.items())),
         "downranked_thread_slugs": downranked_threads,
         "downranked_atom_refs": downranked_atoms,
         "downranked_target_refs": downranked_targets,
@@ -649,11 +1081,90 @@ def _summarize_events(events: list[dict]) -> dict:
         "feedback_changes": feedback_changes,
         "feedback_corrections": corrections,
         "feedback_effect_traces": effect_traces,
+        "feedback_application_receipt": application_receipt,
+        "targeted_feedback": targeted_feedback,
         "confirmed_event_count": len(events),
         "pending_draft_count": 0,
         "confirmation_state": "confirmed_only",
         "frontier_prompt_guidance": guidance,
         "recent_events": events[:10],
+    }
+
+
+def _targeted_feedback_summary(events: list[dict]) -> list[dict]:
+    grouped: dict[tuple[str, str, str], dict] = {}
+    for event in events:
+        key = (
+            str(event.get("report_surface") or "weekly_brief"),
+            str(event.get("section_id") or "report"),
+            str(event.get("item_ref") or "report"),
+        )
+        item = grouped.setdefault(
+            key,
+            {
+                "report_surface": key[0],
+                "section_id": key[1],
+                "item_ref": key[2],
+                "event_count": 0,
+                "classifications": [],
+                "application_statuses": [],
+                "feedback_refs": [],
+            },
+        )
+        item["event_count"] += 1
+        for field, value in (
+            ("classifications", event.get("feedback_classification")),
+            ("application_statuses", event.get("application_status")),
+            ("feedback_refs", f"feedback:{event.get('id')}"),
+        ):
+            if value and value not in item[field]:
+                item[field].append(value)
+    return sorted(
+        grouped.values(),
+        key=lambda item: (
+            item["report_surface"],
+            item["section_id"],
+            item["item_ref"],
+        ),
+    )[:20]
+
+
+def _feedback_application_receipt(events: list[dict]) -> dict:
+    buckets: dict[str, list[dict]] = {status: [] for status in sorted(APPLICATION_STATUSES)}
+    for event in events:
+        status = str(event.get("application_status") or "unchanged")
+        if status not in buckets:
+            status = "unchanged"
+        item = {
+            "feedback_ref": f"feedback:{event.get('id')}",
+            "event_id": int(event.get("id") or 0),
+            "week_label": event.get("week_label"),
+            "report_run_id": event.get("report_run_id"),
+            "report_surface": event.get("report_surface"),
+            "section_id": event.get("section_id"),
+            "item_ref": event.get("item_ref"),
+            "legacy_target": {
+                "target_type": event.get("target_type"),
+                "target_ref": event.get("target_ref"),
+            },
+            "feedback_type": event.get("feedback_type"),
+            "feedback_classification": event.get("feedback_classification"),
+            "application_status": status,
+            "application_reason": event.get("application_reason"),
+            "originating_report_item_ref": event.get("originating_report_item_ref"),
+            "reader_summary_ru": _application_reader_summary_ru(event),
+        }
+        buckets[status].append(item)
+    return {
+        "schema_version": APPLICATION_RECEIPT_SCHEMA_VERSION,
+        "confirmation_state": "confirmed_only",
+        "confirmed_events_considered": len(events),
+        "counts_by_status": {status: len(items) for status, items in sorted(buckets.items())},
+        "applied": buckets["applied"][:20],
+        "unchanged": buckets["unchanged"][:20],
+        "code_config_required": buckets["code_config_required"][:20],
+        "rejected": buckets["rejected"][:20],
+        "pending": buckets["pending"][:20],
     }
 
 
@@ -684,9 +1195,19 @@ def _feedback_effect_traces(events: list[dict]) -> list[dict]:
             {
                 "event_id": event.get("id"),
                 "feedback_type": event.get("feedback_type"),
+                "feedback_classification": event.get("feedback_classification"),
                 "target_type": event.get("target_type"),
                 "target_ref": event.get("target_ref"),
+                "report_run_id": event.get("report_run_id"),
+                "report_surface": event.get("report_surface"),
+                "section_id": event.get("section_id"),
+                "item_ref": event.get("item_ref"),
                 "signal_strength": event.get("signal_strength"),
+                "application_status": event.get("application_status"),
+                "application_reason": event.get("application_reason"),
+                "originating_report_item_ref": event.get("originating_report_item_ref"),
+                "reader_summary_ru": _application_reader_summary_ru(event),
+                "applied": event.get("application_status") == "applied",
                 "provenance": event.get("feedback_provenance") or {},
                 "effect_window": event.get("effect_window") or {},
             }
@@ -750,6 +1271,7 @@ def _minimum_feedback_completion(events: list[dict]) -> dict:
         if event.get("target_type") in {"action", "experiment"}
         and event.get("feedback_type") in {
             "tried",
+            "action_completed",
             "useful",
             "applied_to_project",
             "wrong_priority",
@@ -882,6 +1404,15 @@ def format_ai_report_feedback_summary(summary: dict) -> str:
         f"events={int(summary.get('event_count') or 0)} "
         f"counts={counts_text} missed_eval_examples={missed_count} eval_examples={eval_count} "
         f"completion={completion.get('completed_count', 0)}/{completion.get('required_count', 4)} "
+        f"application_statuses={_format_application_status_counts(summary)} "
         f"downranked_threads={','.join(downranked) if downranked else 'none'} "
         f"downranked_atoms={','.join(downranked_atoms) if downranked_atoms else 'none'}"
     )
+
+
+def _format_application_status_counts(summary: dict) -> str:
+    receipt = summary.get("feedback_application_receipt") or {}
+    counts = receipt.get("counts_by_status") or {}
+    if not counts:
+        return "none"
+    return ",".join(f"{status}={count}" for status, count in sorted(counts.items()))

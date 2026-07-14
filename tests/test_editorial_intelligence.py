@@ -273,7 +273,9 @@ def _feedback_effect(package: dict[str, object]) -> dict[str, object]:
         "confirmed_events_considered": permissions["confirmed_events_considered"],
         "applied_changes": [],
         "unchanged": [],
-        "requires_code_or_config": [],
+        "code_config_required": [],
+        "rejected": [],
+        "pending": [],
     }
     events = permissions["events"]
     assert isinstance(events, list)
@@ -700,7 +702,7 @@ class EditorialIntelligenceTests(unittest.TestCase):
         }
         self.assertEqual(classifications["feedback:101"], "applied_changes")
         self.assertEqual(classifications["feedback:102"], "unchanged")
-        self.assertEqual(classifications["feedback:103"], "requires_code_or_config")
+        self.assertEqual(classifications["feedback:103"], "code_config_required")
         self.assertTrue(permissions["loaded_is_not_applied"])
 
         payload = _valid_model_output(package, signal_count=1)

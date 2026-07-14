@@ -107,7 +107,9 @@ _FEEDBACK_FIELDS = {
     "confirmed_events_considered",
     "applied_changes",
     "unchanged",
-    "requires_code_or_config",
+    "code_config_required",
+    "rejected",
+    "pending",
 }
 _FEEDBACK_ITEM_FIELDS = {"feedback_ref", "reader_summary_ru"}
 _MVP_FIELDS = {"radar_ref", "reader_decision", "why", "what_would_change_it"}
@@ -1806,6 +1808,56 @@ def _feedback_permissions(
         partial_reasons.append("feedback_snapshot_unbound")
     elif feedback_snapshot_count is not None and confirmed != feedback_snapshot_count:
         partial_reasons.append("feedback_snapshot_count_mismatch")
+    receipt = _as_mapping(feedback.get("feedback_application_receipt"))
+    receipt_events: list[dict[str, object]] = []
+    receipt_bucket_map = {
+        "applied": "applied_changes",
+        "unchanged": "unchanged",
+        "code_config_required": "code_config_required",
+        "rejected": "rejected",
+        "pending": "pending",
+    }
+    for status, classification in receipt_bucket_map.items():
+        for item in _mapping_list(receipt.get(status)):
+            feedback_ref = str(item.get("feedback_ref") or "").strip()
+            if not feedback_ref:
+                continue
+            receipt_events.append(
+                {
+                    "feedback_ref": feedback_ref,
+                    "feedback_type": str(item.get("feedback_type") or "desired_report_change"),
+                    "feedback_classification": str(
+                        item.get("feedback_classification") or "desired_report_change"
+                    ),
+                    "target_type": str(_as_mapping(item.get("legacy_target")).get("target_type") or "report"),
+                    "target_ref": str(_as_mapping(item.get("legacy_target")).get("target_ref") or ""),
+                    "report_surface": str(item.get("report_surface") or "weekly_brief"),
+                    "section_id": str(item.get("section_id") or "report"),
+                    "item_ref": str(item.get("item_ref") or "report"),
+                    "application_status": status,
+                    "application_reason": str(item.get("application_reason") or ""),
+                    "originating_report_item_ref": str(item.get("originating_report_item_ref") or ""),
+                    "classification": classification,
+                    "reader_summary_ru": str(
+                        item.get("reader_summary_ru")
+                        or "Подтверждённая обратная связь рассмотрена детерминированным слоем."
+                    ),
+                }
+            )
+    if receipt_events:
+        if len(receipt_events) != min(confirmed, MAX_FEEDBACK_EVENTS):
+            partial_reasons.append("feedback_receipt_count_mismatch")
+        return (
+            {
+                "confirmed_events_available": confirmed,
+                "confirmed_events_considered": len(receipt_events[:MAX_FEEDBACK_EVENTS]),
+                "truncated": confirmed > len(receipt_events[:MAX_FEEDBACK_EVENTS]),
+                "events": receipt_events[:MAX_FEEDBACK_EVENTS],
+                "loaded_is_not_applied": True,
+                "classification_owner": "deterministic_host",
+            },
+            _unique_strings(partial_reasons),
+        )
     raw_traces = feedback.get("feedback_effect_traces")
     expected_trace_count = min(confirmed, MAX_FEEDBACK_EVENTS)
     if not isinstance(raw_traces, list):
@@ -1863,11 +1915,7 @@ def _feedback_permissions(
             "trust_too_low",
             "verify_first",
         }
-        classification = (
-            "applied_changes"
-            if applied
-            else ("requires_code_or_config" if requires_separate else "unchanged")
-        )
+        classification = "applied_changes" if applied else ("code_config_required" if requires_separate else "unchanged")
         reader_summary = {
             "applied_changes": (
                 "Событие явно изменило детерминированный выбор или редакционный "
@@ -1877,17 +1925,31 @@ def _feedback_permissions(
                 "Событие загружено и рассмотрено, но подтвержденного изменения "
                 "выбора в этом выпуске нет."
             ),
-            "requires_code_or_config": (
+            "code_config_required": (
                 "Событие требует отдельной задачи в коде или конфигурации и не "
                 "считается примененным в этом выпуске."
             ),
+            "rejected": "Событие рассмотрено, но не применено из-за отклонения или ретракции.",
+            "pending": "Событие подтверждено и ожидает отдельного применения в следующем артефакте.",
         }[classification]
         events.append(
             {
                 "feedback_ref": feedback_ref,
                 "feedback_type": feedback_type,
+                "feedback_classification": str(
+                    trace.get("feedback_classification") or "desired_report_change"
+                ),
                 "target_type": target_type,
                 "target_ref": target_ref,
+                "report_surface": str(trace.get("report_surface") or "weekly_brief"),
+                "section_id": str(trace.get("section_id") or "report"),
+                "item_ref": str(trace.get("item_ref") or target_ref or "report"),
+                "application_status": str(
+                    trace.get("application_status")
+                    or ("applied" if classification == "applied_changes" else classification)
+                ),
+                "application_reason": str(trace.get("application_reason") or ""),
+                "originating_report_item_ref": str(trace.get("originating_report_item_ref") or ""),
                 "classification": classification,
                 "reader_summary_ru": reader_summary,
             }
@@ -2258,7 +2320,7 @@ def _validate_feedback_effect(
         errors.append("feedback_effect confirmed event count mismatch")
     allowed_by_class: dict[str, set[str]] = {
         name: set()
-        for name in ("applied_changes", "unchanged", "requires_code_or_config")
+        for name in ("applied_changes", "unchanged", "code_config_required", "rejected", "pending")
     }
     expected_summaries: dict[str, str] = {}
     for item in _mapping_list(permissions.get("events")):
@@ -2270,7 +2332,7 @@ def _validate_feedback_effect(
                 item.get("reader_summary_ru") or ""
             )
     seen: set[str] = set()
-    for classification in ("applied_changes", "unchanged", "requires_code_or_config"):
+    for classification in ("applied_changes", "unchanged", "code_config_required", "rejected", "pending"):
         items = effect.get(classification)
         if not isinstance(items, list):
             errors.append(f"feedback_effect.{classification} must be a list")
@@ -2372,7 +2434,9 @@ def _deterministic_partial_fallback(
     feedback_lists: dict[str, list[dict[str, str]]] = {
         "applied_changes": [],
         "unchanged": [],
-        "requires_code_or_config": [],
+        "code_config_required": [],
+        "rejected": [],
+        "pending": [],
     }
     for event in _mapping_list(feedback_permissions.get("events")):
         classification = str(event.get("classification") or "unchanged")

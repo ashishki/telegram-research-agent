@@ -1433,7 +1433,7 @@ def _brief_personalization(
                 "feedback_effect",
                 ["missing"],
                 "Неизвестно, какие подтверждённые события обратной связи были учтены или оставлены без изменения.",
-                "Добавить детерминированный feedback effect receipt с applied, unchanged и requires-code состояниями.",
+                "Добавить детерминированный feedback effect receipt с applied, unchanged, code/config-required, rejected и pending состояниями.",
             ),
         )
 

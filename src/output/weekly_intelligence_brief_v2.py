@@ -2495,7 +2495,9 @@ def _render_feedback_effect(effect: Mapping[str, object]) -> str:
     for key, title in (
         ("applied_changes", "Учтено в выпуске"),
         ("unchanged", "Оставлено без изменения"),
-        ("requires_code_or_config", "Требует отдельной задачи"),
+        ("code_config_required", "Требует отдельной задачи"),
+        ("rejected", "Не применено"),
+        ("pending", "Ожидает применения"),
     ):
         rows = _mapping_list(effect.get(key))
         if rows:
@@ -3154,7 +3156,14 @@ def _validate_project_action(value: Mapping[str, object], path: str, errors: lis
 
 def _validate_feedback_effect(value: object, errors: list[str]) -> None:
     effect = _object(value, "feedback_effect", errors)
-    fields = {"confirmed_events_considered", "applied_changes", "unchanged", "requires_code_or_config"}
+    fields = {
+        "confirmed_events_considered",
+        "applied_changes",
+        "unchanged",
+        "code_config_required",
+        "rejected",
+        "pending",
+    }
     _exact_fields(effect, fields, "feedback_effect", errors)
     count = effect.get("confirmed_events_considered")
     if not isinstance(count, int) or isinstance(count, bool) or count < 0:

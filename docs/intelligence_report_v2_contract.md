@@ -293,7 +293,9 @@ Required output shape:
     "confirmed_events_considered": 0,
     "applied_changes": [],
     "unchanged": [],
-    "requires_code_or_config": []
+    "code_config_required": [],
+    "rejected": [],
+    "pending": []
   },
   "mvp_summary": {
     "radar_ref": "radar:...",

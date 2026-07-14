@@ -1,6 +1,6 @@
 # Current Backlog
 
-Version: 3.8
+Version: 3.9
 Last updated: 2026-07-14
 State: canonical active backlog
 
@@ -37,7 +37,7 @@ below, but active implementation starts from the IRX task graph.
 | Weekly AI visual report/workbook contract | `implemented_and_verified`, `legacy_surface` |
 | Weekly Brief + Knowledge Atlas split | `implemented_structurally`, `failed_W29_reader_value_audit`; PGI-003/004/005 plumbing is reusable but does not satisfy Report V2 |
 | Hermes/PI facade/tools/chat | `implemented_but_not_dogfooded`; PGI-003 artifact freshness awareness added |
-| Feedback intake/action status | `implemented_and_verified` for PGI-002 provenance/ranking slice |
+| Feedback intake/action status | `implemented_and_verified`; IRX-12 adds report/surface/section/item targeting, confirmation gates, and application receipts |
 | Weekly intelligence scorecard | `implemented_and_verified` for PGI-006 deterministic scorecard fixtures |
 | Strategy Reviewer | `implemented_and_verified` advisory-only |
 | Market/business Radar context | `implemented_and_verified` as `context_only` |
@@ -47,17 +47,17 @@ below, but active implementation starts from the IRX task graph.
 | Project Intelligence V2 shadow | `implemented_and_verified`; separate opt-in `project_intelligence.v2` run artifact with exact project/thread/evidence authority and no V1 renderer activation |
 | Weekly Intelligence Brief V2 preview | `implemented_and_verified`; separate opt-in manifest-bound `split_ai_report.v2` package with V1 generation and delivery unchanged |
 | Reader-value quality gates | `implemented_and_verified`; closed seven-dimension `report_quality.v2`, warn-only on V1 and blocking on opt-in V2 previews |
-| Report V2 contract and roadmap | `implementation_in_progress`; IRX-0 documentation plus IRX-1 through IRX-7 and IRX-8 through IRX-11 are implemented and verified |
+| Report V2 contract and roadmap | `implementation_in_progress`; IRX-0 documentation plus IRX-1 through IRX-7 and IRX-8 through IRX-12 are implemented and verified |
 | Portfolio dogfood evidence | `blocked_on_IRX-14_start_gate` |
 
 ## Next Candidate Task
 
-`IRX-12 - Report-Specific Feedback And Learning Loop`
+`IRX-13 - Golden Fixtures, Evaluation Dataset, And Visual Regression`
 
-Add report/section/item-targeted feedback and a confirmation-gated learning
-receipt over the completed IRX-6 Brief V2, IRX-7 Atlas V2/Audit Explorer,
-reaction, project, and Radar contracts. Keep persistent changes approval-gated
-and leave rollout/dogfood to later IRX tasks. Its task card is in
+Consolidate sanitized golden fixtures, evaluation dataset coverage, and
+desktop/mobile visual regression over the completed Brief V2, Atlas V2,
+Audit Explorer, Radar reader, project, personalization, quality, and IRX-12
+feedback receipt contracts. Keep rollout/dogfood to IRX-14. Its task card is in
 `docs/intelligence_report_v2_roadmap.md`.
 
 ## Dependency Graph
@@ -89,7 +89,7 @@ contract.
 | IRX-6 | P1 | `implemented_and_verified` | Russian 5-7 minute Weekly Intelligence Brief V2 | IRX-1..IRX-5, IRX-8..IRX-10 |
 | IRX-11 | P1 | `implemented_and_verified` | Reader-value gates for period, editorial, personalization, visual, project, and Radar quality | IRX-6, IRX-8 |
 | IRX-7 | P2 | `implemented_and_verified` | Visual Knowledge Atlas V2 plus preserved Knowledge Audit Explorer | IRX-4, IRX-5, IRX-8, IRX-11 |
-| IRX-12 | P2 | `planned` | Report- and section-specific confirmation-gated learning loop | IRX-2, IRX-3, IRX-5, IRX-6, IRX-7, IRX-10 |
+| IRX-12 | P2 | `implemented_and_verified` | Report- and section-specific confirmation-gated learning loop | IRX-2, IRX-3, IRX-5, IRX-6, IRX-7, IRX-10 |
 | IRX-13 | P2 | `planned`; fixture scaffolding starts in IRX-1 | Sanitized golden fixtures, evaluation dataset, and desktop/mobile regression | IRX-1..IRX-12 |
 | IRX-14 | P2 | `planned` | Versioned rollout, compatibility, and dogfood restart gate | IRX-1..IRX-13 |
 
@@ -538,6 +538,41 @@ rollout implications are in `docs/intelligence_report_v2_roadmap.md`.
   change, IRX-5 editorial-authority change, Radar gate change, sibling-repo
   edit, IRX-12/13/14 implementation, screenshot baseline, rollout, or dogfood
   claim was made. IRX-12 is the next dependency-ready task.
+
+### 2026-07-14 - IRX-12 Report-Specific Feedback And Learning Loop
+
+- Status: `implemented_and_verified`.
+- Added additive `ai_report_feedback_events` fields and migration adapters for
+  report run, report surface, section, item, controlled classification,
+  confirmation state, application status/reason, and originating report item.
+  Existing legacy `feedback_type`, `target_type`, `target_ref`, and rows are
+  preserved and adapted deterministically.
+- Extended text/voice feedback intake and the feedback strategist prompt so
+  Brief, Atlas, Radar, reaction personalization, project/action, and visual
+  feedback drafts carry surface/section/item targets, controlled
+  classifications, and proposed application states. Confirmation still gates
+  all memory writes; pending drafts never enter editorial context.
+- Added `ai_report_feedback_application_receipt.v1` summary output separating
+  `applied`, `unchanged`, `code_config_required`, `rejected`, and `pending`.
+  Editorial input and Brief/Atlas/retrieval/quality projections now state what
+  confirmed feedback changed, what stayed unchanged, what needs explicit
+  code/config work, and why rejected or pending feedback was not applied.
+- Linked completed action/project feedback through `item_ref` and
+  `originating_report_item_ref`, and updated Strategy Reviewer so persistent
+  profile/config/code/project changes remain advisory and approval-required.
+- Verification: exact IRX-12 task-card matrix passed 50 tests. Focused
+  feedback/Strategy/action tests passed 30 tests. Brief/Atlas/editorial/
+  retrieval/quality/contract/action compatibility passed 166 tests. Bot
+  handler/callback compatibility passed 35 tests. Focused Ruff, focused
+  `py_compile`, changed fixture JSON validation, `git diff --check`, and
+  `git diff --stat` passed.
+- Scope confirmation: no generated private artifacts, live/expensive runs,
+  full archive regeneration, production rollout, scheduled-delivery switch,
+  frozen IRX-2 stage-policy change, IRX-3 reaction semantic change, IRX-5
+  editorial-authority change, IRX-7 Atlas/Audit package semantic change,
+  IRX-10 Radar authority/gate change, IRX-11 gate-meaning change, sibling-repo
+  edit, IRX-13/14 implementation, screenshot baseline, rollout, or dogfood
+  claim was made. IRX-13 is the next dependency-ready task.
 
 ## Existing-Work Reconciliation
 

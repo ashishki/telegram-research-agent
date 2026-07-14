@@ -7,7 +7,11 @@ from typing import Any
 
 from assistant.feedback_prompts import FEEDBACK_STRATEGIST_SYSTEM_PROMPT, build_feedback_strategist_prompt
 from db.ai_report_feedback import (
+    APPLICATION_STATUSES,
     FEEDBACK_TYPES,
+    FEEDBACK_CLASSIFICATIONS,
+    REPORT_SURFACE_ALIASES,
+    REPORT_SURFACES,
     TARGET_TYPES,
     confirm_ai_report_feedback_intake,
     discard_ai_report_feedback_intake,
@@ -21,6 +25,9 @@ from llm.client import LLMClient
 
 URL_RE = re.compile(r"https?://[^\s<>)]+", re.IGNORECASE)
 TARGET_RE = re.compile(r"\b(?:target|ref|item|section)=([A-Za-z0-9_.:@/-]+)", re.IGNORECASE)
+SURFACE_RE = re.compile(r"\bsurface=([A-Za-z0-9_-]+)", re.IGNORECASE)
+SECTION_RE = re.compile(r"\bsection=([A-Za-z0-9_.:@/-]+)", re.IGNORECASE)
+ITEM_RE = re.compile(r"\bitem=([A-Za-z0-9_.:@/-]+)", re.IGNORECASE)
 WEEK_RE = re.compile(r"^\d{4}-W\d{2}$")
 CHANNEL_RE = re.compile(r"@[A-Za-z0-9_]+")
 FEEDBACK_STRATEGIST_CATEGORY = "feedback_intake_strategist"
@@ -31,6 +38,13 @@ class FeedbackProposal:
     feedback_type: str
     target_type: str
     target_ref: str | None = None
+    report_surface: str | None = None
+    section_id: str | None = None
+    item_ref: str | None = None
+    feedback_classification: str | None = None
+    application_status: str | None = None
+    application_reason: str | None = None
+    originating_report_item_ref: str | None = None
     source_url: str | None = None
     notes: str | None = None
 
@@ -39,6 +53,13 @@ class FeedbackProposal:
             "feedback_type": self.feedback_type,
             "target_type": self.target_type,
             "target_ref": self.target_ref,
+            "report_surface": self.report_surface,
+            "section_id": self.section_id,
+            "item_ref": self.item_ref,
+            "feedback_classification": self.feedback_classification,
+            "application_status": self.application_status,
+            "application_reason": self.application_reason,
+            "originating_report_item_ref": self.originating_report_item_ref,
             "source_url": self.source_url,
             "notes": self.notes,
         }
@@ -87,6 +108,130 @@ def _extract_target_ref(text: str) -> str | None:
     return None
 
 
+def _extract_surface(text: str, *, target_type: str, feedback_classification: str) -> str:
+    match = SURFACE_RE.search(text)
+    if match:
+        normalized = _normalize_surface(match.group(1))
+        if normalized:
+            return normalized
+    lowered = text.lower()
+    for token, surface in (
+        ("atlas", "knowledge_atlas"),
+        ("knowledge atlas", "knowledge_atlas"),
+        ("audit", "audit_explorer"),
+        ("radar", "mvp_radar"),
+        ("mvp", "mvp_radar"),
+        ("reaction", "reaction_personalization"),
+        ("personalization", "reaction_personalization"),
+        ("project", "project_action"),
+        ("action", "project_action"),
+        ("visual", "visual"),
+        ("chart", "visual"),
+        ("graph", "visual"),
+        ("brief", "weekly_brief"),
+    ):
+        if token in lowered:
+            return surface
+    if target_type in {"action", "experiment"} or feedback_classification in {
+        "action_completed",
+        "applied_to_project",
+    }:
+        return "project_action"
+    if feedback_classification == "radar_decision_useful":
+        return "mvp_radar"
+    if feedback_classification == "reaction_effect_missing":
+        return "reaction_personalization"
+    if feedback_classification in {"confusing_visual", "missing_visual"}:
+        return "visual"
+    return "weekly_brief"
+
+
+def _extract_section_id(text: str, *, target_type: str, report_surface: str) -> str:
+    match = SECTION_RE.search(text)
+    if match:
+        return _clean_identifier(match.group(1), default=target_type)
+    if report_surface == "project_action":
+        return "project_actions"
+    if report_surface == "mvp_radar":
+        return "mvp_radar"
+    if report_surface == "reaction_personalization":
+        return "reaction_personalization"
+    if report_surface == "knowledge_atlas":
+        return "knowledge_atlas"
+    if report_surface == "visual":
+        return "visuals"
+    return target_type if target_type != "report" else "report"
+
+
+def _extract_item_ref(text: str, *, target_ref: str | None, section_id: str) -> str:
+    match = ITEM_RE.search(text)
+    if match:
+        return _compact(match.group(1))[:200]
+    return (target_ref or section_id or "report")[:200]
+
+
+def _classification_for_feedback(feedback_type: str, lowered: str) -> str:
+    clean = _compact(feedback_type).replace("-", "_").lower()
+    if clean in FEEDBACK_CLASSIFICATIONS:
+        return clean
+    if "too long" in lowered or "too-long" in lowered:
+        return "too_long"
+    if "confusing visual" in lowered or "unclear visual" in lowered:
+        return "confusing_visual"
+    if "missing visual" in lowered or "needs visual" in lowered:
+        return "missing_visual"
+    if "duplicate" in lowered:
+        return "duplicate_content"
+    if "radar" in lowered and ("useful" in lowered or "helpful" in lowered):
+        return "radar_decision_useful"
+    if "reaction" in lowered and ("missing" in lowered or "did not affect" in lowered):
+        return "reaction_effect_missing"
+    if "trust" in lowered or "verify" in lowered:
+        return "source_trust_correction"
+    if clean in {"not_interested", "noise"}:
+        return "wrong_priority"
+    if clean == "tried":
+        return "action_completed"
+    return "desired_report_change"
+
+
+def _application_status_for_classification(feedback_classification: str, feedback_type: str) -> str:
+    if feedback_type in {"retraction", "accidental_feedback"}:
+        return "rejected"
+    if feedback_classification in {
+        "too_shallow",
+        "too_long",
+        "confusing_visual",
+        "missing_visual",
+        "duplicate_content",
+        "reaction_effect_missing",
+        "source_trust_correction",
+    }:
+        return "code_config_required"
+    if feedback_classification in {
+        "useful",
+        "wrong_priority",
+        "action_completed",
+        "applied_to_project",
+        "radar_decision_useful",
+    }:
+        return "applied"
+    if feedback_type == "missed_important_post":
+        return "pending"
+    return "unchanged"
+
+
+def _clean_identifier(value: object, *, default: str) -> str:
+    clean = _compact(str(value or "")).replace(" ", "_").replace("-", "_")
+    return clean[:160] or default
+
+
+def _normalize_surface(value: object) -> str | None:
+    clean = _compact(str(value or "")).replace("-", "_").lower()
+    clean = REPORT_SURFACE_ALIASES.get(clean, clean)
+    return clean if clean in REPORT_SURFACES else None
+
+
 def _extract_url(text: str) -> str | None:
     match = URL_RE.search(text)
     if not match:
@@ -101,11 +246,48 @@ def _proposal(
     text: str,
     target_ref: str | None = None,
     source_url: str | None = None,
+    report_surface: str | None = None,
+    section_id: str | None = None,
+    item_ref: str | None = None,
+    feedback_classification: str | None = None,
 ) -> FeedbackProposal:
+    clean_feedback = feedback_type.replace("-", "_")
+    clean_target = target_type.replace("-", "_")
+    lowered = text.lower()
+    clean_classification = feedback_classification or _classification_for_feedback(clean_feedback, lowered)
+    clean_surface = report_surface or _extract_surface(
+        text,
+        target_type=clean_target,
+        feedback_classification=clean_classification,
+    )
+    clean_target_ref = target_ref or _extract_target_ref(text)
+    clean_section = section_id or _extract_section_id(
+        text,
+        target_type=clean_target,
+        report_surface=clean_surface,
+    )
+    clean_item_ref = item_ref or _extract_item_ref(
+        text,
+        target_ref=clean_target_ref,
+        section_id=clean_section,
+    )
+    application_status = _application_status_for_classification(clean_classification, clean_feedback)
     return FeedbackProposal(
-        feedback_type=feedback_type,
-        target_type=target_type,
-        target_ref=target_ref or _extract_target_ref(text),
+        feedback_type=clean_feedback,
+        target_type=clean_target,
+        target_ref=clean_target_ref,
+        report_surface=clean_surface,
+        section_id=clean_section,
+        item_ref=clean_item_ref,
+        feedback_classification=clean_classification,
+        application_status=application_status,
+        application_reason=f"Draft classification {clean_classification} has proposed status {application_status}.",
+        originating_report_item_ref=(
+            clean_item_ref
+            if clean_target in {"action", "experiment"}
+            or clean_classification in {"action_completed", "applied_to_project"}
+            else None
+        ),
         source_url=source_url or _extract_url(text),
         notes=_compact(text)[:500],
     )
@@ -180,6 +362,53 @@ def _heuristic_parse_feedback_text(
             proposals.append(
                 _proposal(feedback_type="too_shallow", target_type="report_section", text=chunk).as_dict()
             )
+        if "too long" in lowered or "too-long" in lowered or "too verbose" in lowered:
+            proposals.append(
+                _proposal(
+                    feedback_type="too_long",
+                    target_type="report_section",
+                    text=chunk,
+                    feedback_classification="too_long",
+                ).as_dict()
+            )
+        if "confusing visual" in lowered or "unclear visual" in lowered or "visual is confusing" in lowered:
+            proposals.append(
+                _proposal(
+                    feedback_type="confusing_visual",
+                    target_type="report_section",
+                    text=chunk,
+                    report_surface="visual",
+                    feedback_classification="confusing_visual",
+                ).as_dict()
+            )
+        if "missing visual" in lowered or "needs visual" in lowered or "add a visual" in lowered:
+            proposals.append(
+                _proposal(
+                    feedback_type="missing_visual",
+                    target_type="report_section",
+                    text=chunk,
+                    report_surface="visual",
+                    feedback_classification="missing_visual",
+                ).as_dict()
+            )
+        if "duplicate content" in lowered or "duplicate section" in lowered or "repeated content" in lowered:
+            proposals.append(
+                _proposal(
+                    feedback_type="duplicate_content",
+                    target_type="report_section",
+                    text=chunk,
+                    feedback_classification="duplicate_content",
+                ).as_dict()
+            )
+        if "action completed" in lowered or "completed action" in lowered or "done action" in lowered:
+            proposals.append(
+                _proposal(
+                    feedback_type="action_completed",
+                    target_type="action",
+                    text=chunk,
+                    feedback_classification="action_completed",
+                ).as_dict()
+            )
         if "applied to project" in lowered or "applied-to-project" in lowered or "used in project" in lowered:
             proposals.append(
                 _proposal(feedback_type="applied_to_project", target_type="experiment", text=chunk).as_dict()
@@ -187,7 +416,21 @@ def _heuristic_parse_feedback_text(
         elif "tried" in lowered or "tested" in lowered or "ran this" in lowered:
             proposals.append(_proposal(feedback_type="tried", target_type="action", text=chunk).as_dict())
         if "useful" in lowered or "helpful" in lowered or "valuable" in lowered:
-            proposals.append(_proposal(feedback_type="useful", target_type="report_section", text=chunk).as_dict())
+            feedback_type = "radar_decision_useful" if "radar" in lowered else "useful"
+            target_type = "report" if feedback_type == "radar_decision_useful" else "report_section"
+            proposals.append(_proposal(feedback_type=feedback_type, target_type=target_type, text=chunk).as_dict())
+        if "reaction effect missing" in lowered or (
+            "reaction" in lowered and ("missing" in lowered or "did not affect" in lowered)
+        ):
+            proposals.append(
+                _proposal(
+                    feedback_type="reaction_effect_missing",
+                    target_type="report_section",
+                    text=chunk,
+                    report_surface="reaction_personalization",
+                    feedback_classification="reaction_effect_missing",
+                ).as_dict()
+            )
         if "trust too high" in lowered or "overtrusted" in lowered:
             proposals.append(
                 _proposal(feedback_type="trust_too_high", target_type="trust_correction", text=chunk).as_dict()
@@ -217,12 +460,32 @@ def _heuristic_parse_feedback_text(
         "transcript_text": _compact(transcript_text) or None,
         "proposals": _dedupe_dicts(
             proposals,
-            ("feedback_type", "target_type", "target_ref", "source_url", "notes"),
+            (
+                "feedback_type",
+                "target_type",
+                "target_ref",
+                "report_surface",
+                "section_id",
+                "item_ref",
+                "feedback_classification",
+                "source_url",
+                "notes",
+            ),
         ),
         "suggestions": _dedupe_dicts(suggestions, ("suggestion_type", "target_ref", "text")),
         "memory_events_proposed": _dedupe_dicts(
             proposals,
-            ("feedback_type", "target_type", "target_ref", "source_url", "notes"),
+            (
+                "feedback_type",
+                "target_type",
+                "target_ref",
+                "report_surface",
+                "section_id",
+                "item_ref",
+                "feedback_classification",
+                "source_url",
+                "notes",
+            ),
         ),
         "report_changes_suggested": [
             suggestion for suggestion in suggestions if suggestion.get("suggestion_type") != "codex_task"
@@ -323,17 +586,68 @@ def _normalize_memory_events(value: object) -> list[dict[str, Any]]:
         target_type = _normalize_allowed(item.get("target_type") or "report", TARGET_TYPES)
         if not feedback_type or not target_type:
             continue
+        feedback_classification = _normalize_allowed(
+            item.get("feedback_classification") or item.get("classification"),
+            FEEDBACK_CLASSIFICATIONS,
+        )
+        if not feedback_classification:
+            feedback_classification = _classification_for_feedback(feedback_type, str(item.get("notes") or "").lower())
+        report_surface = _normalize_surface(item.get("report_surface") or item.get("surface"))
+        if not report_surface:
+            report_surface = _extract_surface(
+                str(item.get("notes") or ""),
+                target_type=target_type,
+                feedback_classification=feedback_classification,
+            )
+        section_id = _clean_identifier(
+            item.get("section_id") or item.get("section") or target_type,
+            default=target_type,
+        )
+        target_ref = _compact(str(item.get("target_ref") or ""))[:120] or None
+        item_ref = _compact(str(item.get("item_ref") or item.get("item") or target_ref or section_id))[:200]
+        application_status = _normalize_allowed(item.get("application_status"), APPLICATION_STATUSES)
+        if not application_status:
+            application_status = _application_status_for_classification(feedback_classification, feedback_type)
         notes = _compact(str(item.get("notes") or ""))[:500] or None
         events.append(
             {
                 "feedback_type": feedback_type,
                 "target_type": target_type,
-                "target_ref": _compact(str(item.get("target_ref") or ""))[:120] or None,
+                "target_ref": target_ref,
+                "report_surface": report_surface,
+                "section_id": section_id,
+                "item_ref": item_ref,
+                "feedback_classification": feedback_classification,
+                "application_status": application_status,
+                "application_reason": _compact(str(item.get("application_reason") or ""))[:500]
+                or f"Strategist proposed {feedback_classification} with {application_status} status.",
+                "originating_report_item_ref": _compact(
+                    str(item.get("originating_report_item_ref") or "")
+                )[:200]
+                or (
+                    item_ref
+                    if target_type in {"action", "experiment"}
+                    or feedback_classification in {"action_completed", "applied_to_project"}
+                    else None
+                ),
                 "source_url": _clean_url(item.get("source_url")),
                 "notes": notes,
             }
         )
-    return _dedupe_dicts(events, ("feedback_type", "target_type", "target_ref", "source_url", "notes"))
+    return _dedupe_dicts(
+        events,
+        (
+            "feedback_type",
+            "target_type",
+            "target_ref",
+            "report_surface",
+            "section_id",
+            "item_ref",
+            "feedback_classification",
+            "source_url",
+            "notes",
+        ),
+    )
 
 
 def _normalize_text_suggestions(value: object, *, suggestion_type: str) -> list[dict[str, Any]]:
@@ -434,8 +748,17 @@ def format_feedback_confirmation(intake: dict[str, Any]) -> str:
         lines.append("Proposed memory writes:")
         for proposal in proposals:
             target = f"{proposal.get('target_type')}:{proposal.get('target_ref') or 'report'}"
+            scoped = (
+                f" surface={proposal.get('report_surface') or 'weekly_brief'}"
+                f" section={proposal.get('section_id') or 'report'}"
+                f" item={proposal.get('item_ref') or proposal.get('target_ref') or 'report'}"
+            )
+            classification = (
+                f" classification={proposal.get('feedback_classification') or 'desired_report_change'}"
+                f" application={proposal.get('application_status') or 'unchanged'}"
+            )
             source = f" source={proposal.get('source_url')}" if proposal.get("source_url") else ""
-            lines.append(f"- {proposal.get('feedback_type')} -> {target}{source}")
+            lines.append(f"- {proposal.get('feedback_type')} -> {target}{scoped}{classification}{source}")
     else:
         lines.append("Proposed memory writes: none")
 
@@ -524,6 +847,13 @@ def apply_confirmed_feedback_intake(
                     feedback_type=str(proposal.get("feedback_type") or ""),
                     target_type=str(proposal.get("target_type") or "report"),
                     target_ref=proposal.get("target_ref"),
+                    report_surface=proposal.get("report_surface"),
+                    section_id=proposal.get("section_id"),
+                    item_ref=proposal.get("item_ref"),
+                    feedback_classification=proposal.get("feedback_classification"),
+                    application_status=proposal.get("application_status"),
+                    application_reason=proposal.get("application_reason"),
+                    originating_report_item_ref=proposal.get("originating_report_item_ref"),
                     source_url=proposal.get("source_url"),
                     notes=proposal.get("notes"),
                     recorded_by=recorded_by,

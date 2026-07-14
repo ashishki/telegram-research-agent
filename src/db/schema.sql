@@ -452,6 +452,20 @@ CREATE TABLE IF NOT EXISTS ai_report_feedback_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     week_label TEXT NOT NULL CHECK(length(trim(week_label)) > 0),
     report_path TEXT,
+    report_run_id TEXT,
+    report_surface TEXT NOT NULL DEFAULT 'weekly_brief'
+        CHECK(report_surface IN (
+            'weekly_brief',
+            'knowledge_atlas',
+            'mvp_radar',
+            'reaction_personalization',
+            'project_action',
+            'visual',
+            'audit_explorer',
+            'report_package'
+        )),
+    section_id TEXT NOT NULL DEFAULT 'report' CHECK(length(trim(section_id)) > 0),
+    item_ref TEXT NOT NULL DEFAULT 'report' CHECK(length(trim(item_ref)) > 0),
     feedback_type TEXT NOT NULL
         CHECK(feedback_type IN (
             'read',
@@ -459,6 +473,15 @@ CREATE TABLE IF NOT EXISTS ai_report_feedback_events (
             'tried',
             'applied_to_project',
             'too_shallow',
+            'too_long',
+            'confusing_visual',
+            'missing_visual',
+            'duplicate_content',
+            'action_completed',
+            'radar_decision_useful',
+            'reaction_effect_missing',
+            'source_trust_correction',
+            'desired_report_change',
             'missed_important_post',
             'no_missed_posts',
             'wrong_priority',
@@ -470,6 +493,22 @@ CREATE TABLE IF NOT EXISTS ai_report_feedback_events (
             'correction',
             'retraction',
             'accidental_feedback'
+        )),
+    feedback_classification TEXT NOT NULL DEFAULT 'desired_report_change'
+        CHECK(feedback_classification IN (
+            'useful',
+            'wrong_priority',
+            'too_shallow',
+            'too_long',
+            'confusing_visual',
+            'missing_visual',
+            'duplicate_content',
+            'action_completed',
+            'applied_to_project',
+            'radar_decision_useful',
+            'reaction_effect_missing',
+            'source_trust_correction',
+            'desired_report_change'
         )),
     target_type TEXT NOT NULL DEFAULT 'report'
         CHECK(target_type IN (
@@ -489,9 +528,29 @@ CREATE TABLE IF NOT EXISTS ai_report_feedback_events (
     target_ref TEXT,
     source_url TEXT,
     notes TEXT,
+    confirmation_state TEXT NOT NULL DEFAULT 'confirmed'
+        CHECK(confirmation_state IN ('pending', 'confirmed', 'discarded')),
+    application_status TEXT NOT NULL DEFAULT 'unchanged'
+        CHECK(application_status IN (
+            'applied',
+            'unchanged',
+            'code_config_required',
+            'rejected',
+            'pending'
+        )),
+    application_reason TEXT NOT NULL DEFAULT 'Legacy feedback row preserved through additive IRX-12 fields.',
+    originating_report_item_ref TEXT,
     created_at TEXT NOT NULL,
     recorded_by TEXT NOT NULL DEFAULT 'operator'
 );
+CREATE INDEX IF NOT EXISTS idx_ai_report_feedback_week
+    ON ai_report_feedback_events(week_label);
+CREATE INDEX IF NOT EXISTS idx_ai_report_feedback_type
+    ON ai_report_feedback_events(feedback_type);
+CREATE INDEX IF NOT EXISTS idx_ai_report_feedback_target
+    ON ai_report_feedback_events(target_type, target_ref);
+CREATE INDEX IF NOT EXISTS idx_ai_report_feedback_created
+    ON ai_report_feedback_events(created_at);
 
 CREATE TABLE IF NOT EXISTS ai_report_feedback_intakes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

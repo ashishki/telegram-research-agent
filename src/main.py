@@ -444,11 +444,29 @@ def build_parser() -> argparse.ArgumentParser:
             "useful",
             "tried",
             "applied-to-project",
-            "applied_to_project",
-            "too-shallow",
-            "too_shallow",
-            "missed-important-post",
-            "missed_important_post",
+                "applied_to_project",
+                "too-shallow",
+                "too_shallow",
+                "too-long",
+                "too_long",
+                "confusing-visual",
+                "confusing_visual",
+                "missing-visual",
+                "missing_visual",
+                "duplicate-content",
+                "duplicate_content",
+                "action-completed",
+                "action_completed",
+                "radar-decision-useful",
+                "radar_decision_useful",
+                "reaction-effect-missing",
+                "reaction_effect_missing",
+                "source-trust-correction",
+                "source_trust_correction",
+                "desired-report-change",
+                "desired_report_change",
+                "missed-important-post",
+                "missed_important_post",
             "no-missed-posts",
             "no_missed_posts",
             "wrong-priority",
@@ -488,6 +506,77 @@ def build_parser() -> argparse.ArgumentParser:
         ],
     )
     ai_feedback_parser.add_argument("--target-ref", default=None)
+    ai_feedback_parser.add_argument("--report-run-id", default=None)
+    ai_feedback_parser.add_argument(
+        "--surface",
+        dest="report_surface",
+        default=None,
+        choices=[
+            "weekly-brief",
+            "weekly_brief",
+            "knowledge-atlas",
+            "knowledge_atlas",
+            "mvp-radar",
+            "mvp_radar",
+            "reaction-personalization",
+            "reaction_personalization",
+            "project-action",
+            "project_action",
+            "visual",
+            "audit-explorer",
+            "audit_explorer",
+            "report-package",
+            "report_package",
+        ],
+    )
+    ai_feedback_parser.add_argument("--section-id", default=None)
+    ai_feedback_parser.add_argument("--item-ref", default=None)
+    ai_feedback_parser.add_argument(
+        "--classification",
+        dest="feedback_classification",
+        default=None,
+        choices=[
+            "useful",
+            "wrong-priority",
+            "wrong_priority",
+            "too-shallow",
+            "too_shallow",
+            "too-long",
+            "too_long",
+            "confusing-visual",
+            "confusing_visual",
+            "missing-visual",
+            "missing_visual",
+            "duplicate-content",
+            "duplicate_content",
+            "action-completed",
+            "action_completed",
+            "applied-to-project",
+            "applied_to_project",
+            "radar-decision-useful",
+            "radar_decision_useful",
+            "reaction-effect-missing",
+            "reaction_effect_missing",
+            "source-trust-correction",
+            "source_trust_correction",
+            "desired-report-change",
+            "desired_report_change",
+        ],
+    )
+    ai_feedback_parser.add_argument(
+        "--application-status",
+        default=None,
+        choices=[
+            "applied",
+            "unchanged",
+            "code-config-required",
+            "code_config_required",
+            "rejected",
+            "pending",
+        ],
+    )
+    ai_feedback_parser.add_argument("--application-reason", default=None)
+    ai_feedback_parser.add_argument("--originating-report-item-ref", default=None)
     ai_feedback_parser.add_argument("--report-path", default=None)
     ai_feedback_parser.add_argument("--source-url", default=None)
     ai_feedback_parser.add_argument("--notes", default=None)
@@ -2361,6 +2450,14 @@ def handle_log_ai_report_feedback(args: argparse.Namespace) -> int:
                 target_type=args.target_type,
                 target_ref=args.target_ref,
                 report_path=args.report_path,
+                report_run_id=args.report_run_id,
+                report_surface=args.report_surface,
+                section_id=args.section_id,
+                item_ref=args.item_ref,
+                feedback_classification=args.feedback_classification,
+                application_status=args.application_status,
+                application_reason=args.application_reason,
+                originating_report_item_ref=args.originating_report_item_ref,
                 source_url=args.source_url,
                 notes=args.notes,
             )
@@ -2372,6 +2469,10 @@ def handle_log_ai_report_feedback(args: argparse.Namespace) -> int:
     lines = [
         f"Recorded AI report feedback id={feedback['id']} week={feedback['week_label']}",
         f"feedback={feedback['feedback_type']} target={feedback['target_type']}:{feedback.get('target_ref') or 'report'}",
+        (
+            f"scope={feedback.get('report_surface')}:{feedback.get('section_id')}:{feedback.get('item_ref')} "
+            f"classification={feedback.get('feedback_classification')} application={feedback.get('application_status')}"
+        ),
         f"recorded_at={feedback['created_at']}",
     ]
     if feedback.get("source_url"):
@@ -2485,6 +2586,12 @@ def _format_ai_report_feedback(row: dict) -> str:
             f"  week={row.get('week_label') or 'n/a'} feedback={row.get('feedback_type') or 'n/a'} "
             f"target={row.get('target_type') or 'n/a'}:{row.get('target_ref') or 'report'}"
         ),
+        (
+            f"  scope={row.get('report_surface') or 'n/a'}:{row.get('section_id') or 'n/a'}:"
+            f"{row.get('item_ref') or 'n/a'} classification={row.get('feedback_classification') or 'n/a'} "
+            f"application={row.get('application_status') or 'n/a'}"
+        ),
+        f"  application_reason={row.get('application_reason') or 'n/a'}",
         f"  report_path={row.get('report_path') or 'n/a'}",
         f"  source_url={row.get('source_url') or 'n/a'}",
         f"  recorded_at={row.get('created_at') or 'n/a'} recorded_by={row.get('recorded_by') or 'n/a'}",

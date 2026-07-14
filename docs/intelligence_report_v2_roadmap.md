@@ -158,7 +158,7 @@ behavior; it does not reopen the gate logic.
 | IRX-9 | Project Intelligence V2 | `implemented_and_verified` | P1 | IRX-4, IRX-5, IRX-8 |
 | IRX-10 | MVP Radar reader contract and context-only hardening | `implemented_and_verified` | P1 | IRX-2, IRX-5, IRX-8 |
 | IRX-11 | Reader-value quality gates | `implemented_and_verified` | P1 | IRX-6, IRX-8 and upstream contracts |
-| IRX-12 | Report-specific feedback and learning loop | `planned` | P2 | IRX-2, IRX-3, IRX-5 through IRX-7, IRX-10 |
+| IRX-12 | Report-specific feedback and learning loop | `implemented_and_verified` | P2 | IRX-2, IRX-3, IRX-5 through IRX-7, IRX-10 |
 | IRX-13 | Golden fixtures, evaluation dataset, and visual regression | `planned`; scaffolding begins after IRX-1 | P2 | incremental upstream fixtures; finalizes after IRX-6, IRX-7, IRX-11 |
 | IRX-14 | Rollout, backward compatibility, and dogfood restart | `blocked` | P2 | IRX-1 through IRX-13 |
 
@@ -1313,7 +1313,7 @@ in IRX-14.
 
 ### IRX-12 - Report-Specific Feedback And Learning Loop
 
-**Status:** `planned`. **Priority:** P2.
+**Status:** `implemented_and_verified`. **Priority:** P2.
 
 **Problem:** Feedback is not reliably targetable to Brief, Atlas, Radar,
 reaction personalization, project action, or visualization, and the next report
@@ -1372,8 +1372,26 @@ task.
 **Stop conditions:** Stop before bypassing confirmation or automatically
 changing profile, configuration, code, or standing preferences.
 
+**Completion receipt:** IRX-12 added additive feedback event fields and
+migration adapters for report run, surface, section, item, controlled
+classification, confirmation state, application status/reason, and originating
+report item while preserving legacy target IDs and rows. Voice/text intake and
+the feedback strategist now draft targeted Brief, Atlas, Radar, reaction,
+project/action, and visual feedback; confirmation remains the only memory-write
+path. `ai_report_feedback_application_receipt.v1` separates applied,
+unchanged, code/config-required, rejected, and pending states and feeds
+editorial, Brief V2, Atlas V2, retrieval, quality, action-status, CLI, and
+Strategy Reviewer surfaces. Exact matrix: 50 tests OK; focused
+feedback/Strategy/action: 30 tests OK; Brief/Atlas/editorial/retrieval/
+quality/contract/action compatibility: 166 tests OK; bot handlers/callbacks:
+35 tests OK; focused Ruff, `py_compile`, fixture JSON validation, `git diff
+--check`, and `git diff --stat` passed. No rollout, scheduled-delivery switch,
+dogfood, screenshots, generated private artifacts, sibling-repo edits, or
+IRX-13/14 work was claimed.
+
 **Rollout implications:** Add fields and adapters to existing feedback rows;
-preserve old target IDs. Start receipt-only before enabling new editorial use.
+preserve old target IDs. Start receipt-only before enabling any broader
+preference/profile/config mutation.
 
 ### IRX-13 - Golden Fixtures, Evaluation Dataset, And Visual Regression
 
@@ -1675,6 +1693,6 @@ Report files changed, canonical identity/lifecycle/as-of semantics, compatibilit
 
 ## 15. Suggested Following Task
 
-IRX-1 through IRX-7 and IRX-8 through IRX-11 are implemented and verified.
-IRX-12 is the next planned implementation scope. Golden visual regression,
-rollout, and dogfood remain unimplemented and gated by later tasks.
+IRX-1 through IRX-7 and IRX-8 through IRX-12 are implemented and verified.
+IRX-13 is the next planned implementation scope. Rollout and dogfood remain
+unimplemented and gated by IRX-14.

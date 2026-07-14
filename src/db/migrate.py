@@ -302,6 +302,340 @@ def _ensure_ai_report_feedback_contract_types(connection: sqlite3.Connection) ->
     )
 
 
+def _ensure_ai_report_feedback_irx12_fields(connection: sqlite3.Connection) -> None:
+    row = connection.execute(
+        """
+        SELECT sql
+        FROM sqlite_master
+        WHERE type = 'table' AND name = 'ai_report_feedback_events'
+        LIMIT 1
+        """
+    ).fetchone()
+    table_sql = str(row[0] if row else "")
+    columns = {
+        str(info[1])
+        for info in connection.execute("PRAGMA table_info(ai_report_feedback_events)").fetchall()
+    }
+    required_columns = {
+        "report_run_id",
+        "report_surface",
+        "section_id",
+        "item_ref",
+        "feedback_classification",
+        "confirmation_state",
+        "application_status",
+        "application_reason",
+        "originating_report_item_ref",
+    }
+    required_tokens = (
+        "'too_long'",
+        "'confusing_visual'",
+        "'missing_visual'",
+        "'duplicate_content'",
+        "'action_completed'",
+        "'radar_decision_useful'",
+        "'reaction_effect_missing'",
+        "'source_trust_correction'",
+        "'desired_report_change'",
+        "'code_config_required'",
+    )
+    if not table_sql:
+        return
+    if required_columns.issubset(columns) and all(token in table_sql for token in required_tokens):
+        _create_ai_report_feedback_irx12_indexes(connection)
+        return
+
+    LOGGER.info("Rebuilding ai_report_feedback_events for IRX-12 targeted feedback fields")
+
+    def expr(column: str, fallback: str) -> str:
+        return column if column in columns else fallback
+
+    report_surface_expr = expr(
+        "report_surface",
+        """
+        CASE
+            WHEN lower(coalesce(report_path, '') || ' ' || coalesce(target_ref, '')) LIKE '%atlas%' THEN 'knowledge_atlas'
+            WHEN lower(coalesce(report_path, '') || ' ' || coalesce(target_ref, '')) LIKE '%audit%' THEN 'audit_explorer'
+            WHEN lower(coalesce(report_path, '') || ' ' || coalesce(target_ref, '')) LIKE '%radar%' THEN 'mvp_radar'
+            WHEN lower(coalesce(report_path, '') || ' ' || coalesce(target_ref, '')) LIKE '%mvp%' THEN 'mvp_radar'
+            WHEN lower(coalesce(report_path, '') || ' ' || coalesce(target_ref, '')) LIKE '%reaction%' THEN 'reaction_personalization'
+            WHEN target_type IN ('action', 'experiment') THEN 'project_action'
+            WHEN lower(coalesce(report_path, '') || ' ' || coalesce(target_ref, '')) LIKE '%visual%' THEN 'visual'
+            ELSE 'weekly_brief'
+        END
+        """,
+    )
+    section_expr = expr(
+        "section_id",
+        "coalesce(nullif(target_type, ''), 'report')",
+    )
+    item_expr = expr(
+        "item_ref",
+        "coalesce(nullif(target_ref, ''), nullif(source_url, ''), nullif(target_type, ''), 'report')",
+    )
+    classification_expr = expr(
+        "feedback_classification",
+        """
+        CASE
+            WHEN feedback_type IN (
+                'useful',
+                'wrong_priority',
+                'too_shallow',
+                'too_long',
+                'confusing_visual',
+                'missing_visual',
+                'duplicate_content',
+                'action_completed',
+                'applied_to_project',
+                'radar_decision_useful',
+                'reaction_effect_missing',
+                'source_trust_correction',
+                'desired_report_change'
+            ) THEN feedback_type
+            WHEN feedback_type IN ('not_interested', 'noise') THEN 'wrong_priority'
+            WHEN feedback_type = 'tried' THEN 'action_completed'
+            WHEN feedback_type IN ('trust_too_high', 'trust_too_low', 'verify_first') THEN 'source_trust_correction'
+            ELSE 'desired_report_change'
+        END
+        """,
+    )
+    application_expr = expr(
+        "application_status",
+        """
+        CASE
+            WHEN feedback_type IN ('retraction', 'accidental_feedback') THEN 'rejected'
+            WHEN feedback_type IN (
+                'too_shallow',
+                'too_long',
+                'confusing_visual',
+                'missing_visual',
+                'duplicate_content',
+                'reaction_effect_missing',
+                'source_trust_correction',
+                'trust_too_high',
+                'trust_too_low',
+                'verify_first'
+            ) THEN 'code_config_required'
+            WHEN feedback_type IN (
+                'useful',
+                'wrong_priority',
+                'not_interested',
+                'noise',
+                'tried',
+                'action_completed',
+                'applied_to_project',
+                'radar_decision_useful'
+            ) THEN 'applied'
+            WHEN feedback_type = 'missed_important_post' THEN 'pending'
+            ELSE 'unchanged'
+        END
+        """,
+    )
+    reason_expr = expr(
+        "application_reason",
+        """
+        CASE
+            WHEN feedback_type IN (
+                'too_shallow',
+                'too_long',
+                'confusing_visual',
+                'missing_visual',
+                'duplicate_content',
+                'reaction_effect_missing',
+                'source_trust_correction',
+                'trust_too_high',
+                'trust_too_low',
+                'verify_first'
+            ) THEN 'Legacy feedback row requires explicit code/config approval before persistent changes.'
+            WHEN feedback_type = 'missed_important_post' THEN 'Legacy missed-post feedback is pending later artifact coverage.'
+            ELSE 'Legacy feedback row preserved through additive IRX-12 fields.'
+        END
+        """,
+    )
+    originating_expr = expr(
+        "originating_report_item_ref",
+        """
+        CASE
+            WHEN target_type IN ('action', 'experiment') THEN coalesce(nullif(target_ref, ''), 'project_actions')
+            WHEN feedback_type IN ('tried', 'action_completed', 'applied_to_project') THEN coalesce(nullif(target_ref, ''), 'project_actions')
+            ELSE NULL
+        END
+        """,
+    )
+
+    connection.executescript(
+        f"""
+        ALTER TABLE ai_report_feedback_events RENAME TO ai_report_feedback_events_old;
+        {_ai_report_feedback_events_create_sql()}
+        INSERT INTO ai_report_feedback_events (
+            id,
+            week_label,
+            report_path,
+            report_run_id,
+            report_surface,
+            section_id,
+            item_ref,
+            feedback_type,
+            feedback_classification,
+            target_type,
+            target_ref,
+            source_url,
+            notes,
+            confirmation_state,
+            application_status,
+            application_reason,
+            originating_report_item_ref,
+            created_at,
+            recorded_by
+        )
+        SELECT
+            id,
+            week_label,
+            report_path,
+            {expr("report_run_id", "NULL")},
+            {report_surface_expr},
+            {section_expr},
+            {item_expr},
+            feedback_type,
+            {classification_expr},
+            target_type,
+            target_ref,
+            source_url,
+            notes,
+            {expr("confirmation_state", "'confirmed'")},
+            {application_expr},
+            {reason_expr},
+            {originating_expr},
+            created_at,
+            recorded_by
+        FROM ai_report_feedback_events_old;
+        DROP TABLE ai_report_feedback_events_old;
+        """
+    )
+    _create_ai_report_feedback_irx12_indexes(connection)
+
+
+def _ai_report_feedback_events_create_sql() -> str:
+    return """
+        CREATE TABLE ai_report_feedback_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            week_label TEXT NOT NULL CHECK(length(trim(week_label)) > 0),
+            report_path TEXT,
+            report_run_id TEXT,
+            report_surface TEXT NOT NULL DEFAULT 'weekly_brief'
+                CHECK(report_surface IN (
+                    'weekly_brief',
+                    'knowledge_atlas',
+                    'mvp_radar',
+                    'reaction_personalization',
+                    'project_action',
+                    'visual',
+                    'audit_explorer',
+                    'report_package'
+                )),
+            section_id TEXT NOT NULL DEFAULT 'report' CHECK(length(trim(section_id)) > 0),
+            item_ref TEXT NOT NULL DEFAULT 'report' CHECK(length(trim(item_ref)) > 0),
+            feedback_type TEXT NOT NULL
+                CHECK(feedback_type IN (
+                    'read',
+                    'useful',
+                    'tried',
+                    'applied_to_project',
+                    'too_shallow',
+                    'too_long',
+                    'confusing_visual',
+                    'missing_visual',
+                    'duplicate_content',
+                    'action_completed',
+                    'radar_decision_useful',
+                    'reaction_effect_missing',
+                    'source_trust_correction',
+                    'desired_report_change',
+                    'missed_important_post',
+                    'no_missed_posts',
+                    'wrong_priority',
+                    'not_interested',
+                    'noise',
+                    'trust_too_high',
+                    'trust_too_low',
+                    'verify_first',
+                    'correction',
+                    'retraction',
+                    'accidental_feedback'
+                )),
+            feedback_classification TEXT NOT NULL DEFAULT 'desired_report_change'
+                CHECK(feedback_classification IN (
+                    'useful',
+                    'wrong_priority',
+                    'too_shallow',
+                    'too_long',
+                    'confusing_visual',
+                    'missing_visual',
+                    'duplicate_content',
+                    'action_completed',
+                    'applied_to_project',
+                    'radar_decision_useful',
+                    'reaction_effect_missing',
+                    'source_trust_correction',
+                    'desired_report_change'
+                )),
+            target_type TEXT NOT NULL DEFAULT 'report'
+                CHECK(target_type IN (
+                    'report',
+                    'report_section',
+                    'idea_thread',
+                    'knowledge_atom',
+                    'source_channel',
+                    'read_queue',
+                    'experiment',
+                    'action',
+                    'missed_post',
+                    'trust_correction',
+                    'feedback_event',
+                    'operator_context'
+                )),
+            target_ref TEXT,
+            source_url TEXT,
+            notes TEXT,
+            confirmation_state TEXT NOT NULL DEFAULT 'confirmed'
+                CHECK(confirmation_state IN ('pending', 'confirmed', 'discarded')),
+            application_status TEXT NOT NULL DEFAULT 'unchanged'
+                CHECK(application_status IN (
+                    'applied',
+                    'unchanged',
+                    'code_config_required',
+                    'rejected',
+                    'pending'
+                )),
+            application_reason TEXT NOT NULL DEFAULT 'Legacy feedback row preserved through additive IRX-12 fields.',
+            originating_report_item_ref TEXT,
+            created_at TEXT NOT NULL,
+            recorded_by TEXT NOT NULL DEFAULT 'operator'
+        );
+    """
+
+
+def _create_ai_report_feedback_irx12_indexes(connection: sqlite3.Connection) -> None:
+    connection.executescript(
+        """
+        CREATE INDEX IF NOT EXISTS idx_ai_report_feedback_week
+            ON ai_report_feedback_events(week_label);
+        CREATE INDEX IF NOT EXISTS idx_ai_report_feedback_type
+            ON ai_report_feedback_events(feedback_type);
+        CREATE INDEX IF NOT EXISTS idx_ai_report_feedback_target
+            ON ai_report_feedback_events(target_type, target_ref);
+        CREATE INDEX IF NOT EXISTS idx_ai_report_feedback_created
+            ON ai_report_feedback_events(created_at);
+        CREATE INDEX IF NOT EXISTS idx_ai_report_feedback_surface
+            ON ai_report_feedback_events(report_surface, section_id, item_ref);
+        CREATE INDEX IF NOT EXISTS idx_ai_report_feedback_classification
+            ON ai_report_feedback_events(feedback_classification);
+        CREATE INDEX IF NOT EXISTS idx_ai_report_feedback_application
+            ON ai_report_feedback_events(application_status);
+        """
+    )
+
+
 def _ensure_signal_feedback_operator_interest(connection: sqlite3.Connection) -> None:
     row = connection.execute(
         """
@@ -1032,6 +1366,7 @@ def run_migrations() -> Path:
         )
         _ensure_artifact_feedback_mvp_type(connection)
         _ensure_ai_report_feedback_contract_types(connection)
+        _ensure_ai_report_feedback_irx12_fields(connection)
         _ensure_signal_feedback_operator_interest(connection)
         connection.executescript(
             """

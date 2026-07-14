@@ -575,7 +575,9 @@ class WeeklyIntelligenceBriefV2Tests(unittest.TestCase):
                 "unchanged": [
                     {"reader_summary_ru": "Приоритет сигнала оставлен без изменения."}
                 ],
-                "requires_code_or_config": [],
+                "code_config_required": [],
+                "rejected": [],
+                "pending": [],
             }
         )
         self.assertIn("Рассмотрено подтверждённых событий: 2", feedback_html)

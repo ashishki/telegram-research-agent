@@ -234,6 +234,7 @@ def build_weekly_ai_report_contract(
             ),
             "feedback_completion": feedback_context.get("feedback_completion") or {},
             "feedback_used_summary": _feedback_used_summary(feedback_context),
+            "feedback_application_receipt": feedback_context.get("feedback_application_receipt") or {},
             "feedback_eval_example_count": len(_as_list(feedback_context.get("feedback_eval_examples"))),
             "frontier_prompt_guidance": _as_list(feedback_context.get("frontier_prompt_guidance")),
             "canonical_contract_version": INTELLIGENCE_CONTRACT_VERSION,
@@ -1043,6 +1044,7 @@ def _feedback_used_summary(feedback_context: Mapping[str, Any]) -> dict:
         return {
             "status": "no_feedback",
             "summary": changes.get("summary") or "Нет prior feedback: персонализация unknown, не negative.",
+            "application_receipt": feedback_context.get("feedback_application_receipt") or {},
             "downranked": [],
             "promoted": [],
             "eval_example_count": 0,
@@ -1062,6 +1064,7 @@ def _feedback_used_summary(feedback_context: Mapping[str, Any]) -> dict:
         "status": "feedback_used",
         "summary": changes.get("summary") or " ".join(parts),
         "counts_by_feedback": dict(counts),
+        "application_receipt": feedback_context.get("feedback_application_receipt") or {},
         "downranked": [*downranked_threads, *downranked_atoms, *downranked_targets],
         "promoted": promoted,
         "eval_example_count": len(eval_examples),

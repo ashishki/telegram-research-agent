@@ -1,9 +1,9 @@
 # CODEX_PROMPT - Compact Session Handoff
 
-Version: 6.1
+Version: 6.2
 Date: 2026-07-14
-State: IRX-1 through IRX-7 and IRX-8 through IRX-11
-`implemented_and_verified`; IRX-12 is the next planned implementation task;
+State: IRX-1 through IRX-7 and IRX-8 through IRX-12
+`implemented_and_verified`; IRX-13 is the next planned implementation task;
 dogfood is blocked until IRX-14
 
 ## Current Product Direction
@@ -34,7 +34,7 @@ docs/tasks.md
 Next implementation task:
 
 ```text
-IRX-12 - Report-Specific Feedback And Learning Loop
+IRX-13 - Golden Fixtures, Evaluation Dataset, And Visual Regression
 ```
 
 ## W29 Product Correction
@@ -52,8 +52,9 @@ and IRX-9 added the exact evidence-bound Project Intelligence V2 shadow. IRX-10
 added the strict manifest-bound Radar reader, and IRX-6 added the opt-in Brief
 V2 preview. IRX-11 added independent warn-only V1 and blocking V2 reader-value
 gates. IRX-7 added the opt-in Knowledge Atlas V2 and versioned Knowledge Audit
-Explorer split. Report-specific feedback, visual-regression consolidation,
-scheduled V2 delivery, rollout, and dogfood remain unstarted.
+Explorer split. IRX-12 added report-specific confirmation-gated feedback and
+application receipts. Visual-regression consolidation, scheduled V2 delivery,
+rollout, and dogfood remain unstarted.
 
 ## Verified Baseline
 
@@ -128,6 +129,11 @@ scheduled V2 delivery, rollout, and dogfood remain unstarted.
   visual specs and IRX-11 blocking gates, keeps Audit Explorer technical detail
   separate, and exposes explicit compatibility adapters for Brief navigation,
   retrieval, Obsidian, and Hermes/PI without changing V1 scheduled delivery.
+- IRX-12 adds additive report/surface/section/item feedback events, controlled
+  classifications, confirmation-gated text/voice intake, completed
+  action/project linkage, and `ai_report_feedback_application_receipt.v1`
+  across Brief, Atlas, editorial, retrieval, quality, action-status, CLI, and
+  Strategy Reviewer surfaces.
 - Canonical intelligence sidecar contract `tra-intelligence-contract.v1` is now
   implemented locally for workbook/Brief/Atlas projections with sanitized eval
   fixtures.
@@ -135,8 +141,9 @@ scheduled V2 delivery, rollout, and dogfood remain unstarted.
   bounded foundation. PGI-003 added artifact freshness awareness for Brief,
   Atlas, and Radar; product dogfood/evals remain incomplete.
 - Feedback intake/action-status helpers now include PGI-002 provenance,
-  correction/effect-window metadata, no-feedback unknown semantics, and
-  sidecar-backed ranking explanations for top action/read/try items.
+  correction/effect-window metadata, no-feedback unknown semantics,
+  sidecar-backed ranking explanations for top action/read/try items, and
+  IRX-12 application-status receipts.
 - PGI-006 adds deterministic `weekly-intelligence-scorecard.v1` scorecards over
   correctness, relevance, decisions/actions, learning, UX, Radar, and
   operations. Unknown/not-measured metrics stay explicit; false-confidence
@@ -616,6 +623,43 @@ Verification and compatibility:
   sibling code, screenshots, rollout, dogfood, and IRX-12/13/14 remained
   unchanged.
 
+## IRX-12 Completion
+
+Status: `implemented_and_verified` on 2026-07-14.
+
+Implemented:
+
+- additive `ai_report_feedback_events` fields and migration adapters for
+  report run, surface, section, item, controlled classification, confirmation
+  state, application status/reason, and originating report item while
+  preserving legacy target IDs and rows;
+- text/voice feedback intake plus strategist prompt normalization for Brief,
+  Atlas, Radar, reaction personalization, project/action, and visual targeted
+  drafts. Confirmation remains the only path that writes memory; unconfirmed
+  drafts do not enter editorial context;
+- `ai_report_feedback_application_receipt.v1` with applied, unchanged,
+  code/config-required, rejected, and pending buckets. Editorial, Brief V2,
+  Atlas V2, retrieval, reader-value quality, CLI, action-status, and Strategy
+  Reviewer surfaces consume or expose the receipt;
+- completed action/project feedback can link to `item_ref` and
+  `originating_report_item_ref`; Strategy Reviewer keeps persistent
+  profile/config/code/project changes explicit-approval-only.
+
+Verification and compatibility:
+
+- exact IRX-12 task-card matrix passed 50 tests;
+- focused feedback/Strategy/action tests passed 30 tests;
+- Brief/Atlas/editorial/retrieval/quality/contract/action compatibility passed
+  166 tests;
+- bot handler/callback compatibility passed 35 tests;
+- focused Ruff, focused `py_compile`, changed fixture JSON validation,
+  `git diff --check`, and `git diff --stat` passed;
+- generated private artifacts, live/expensive runs, full archive regeneration,
+  production rollout, V1 scheduled delivery, frozen IRX-2 stage policy, IRX-3
+  reaction semantics, IRX-5 editorial authority, IRX-7 Atlas/Audit package
+  semantics, IRX-10 Radar authority/gates, IRX-11 gate meanings, sibling code,
+  screenshots, dogfood, and IRX-13/14 remained unchanged.
+
 ## PGI-001 Completion
 
 Status: completed locally on 2026-07-10.
@@ -985,8 +1029,8 @@ Report files changed, canonical identity/lifecycle/as-of semantics, compatibilit
 
 This exact historical prompt stopped at the IRX-4 boundary as required. IRX-4
 is implemented and verified; the subsequent IRX-5, IRX-8, IRX-9, IRX-10,
-IRX-6, IRX-11, and IRX-7 handoffs are now closed by the completion records
-above. IRX-12 is the next planned scope.
+IRX-6, IRX-11, IRX-7, and IRX-12 handoffs are now closed by the completion
+records above. IRX-13 is the next planned scope.
 
 ## Executed Codex Prompt - IRX-7
 
@@ -1166,7 +1210,7 @@ authority, Radar gates, cross-repo code, IRX-12/13/14, rollout, and dogfood were
 unchanged. Stop before IRX-12.
 ```
 
-## Exact Next Codex Prompt - IRX-12
+## Executed Codex Prompt - IRX-12
 
 ```text
 You are Codex working in /srv/openclaw-you/workspace/telegram-research-agent.
@@ -1241,6 +1285,92 @@ git diff --check, git diff --stat, and inspect git status.
 Update the IRX registry, implementation journal, roadmap completion receipt,
 and CODEX handoff with exact test counts. Commit IRX-12 separately and push the
 current branch. Stop before IRX-13.
+```
+
+## Exact Next Codex Prompt - IRX-13
+
+```text
+You are Codex working in /srv/openclaw-you/workspace/telegram-research-agent.
+Mode: IMPLEMENTATION for IRX-13 only.
+
+Implement IRX-13, using these binding docs:
+  docs/intelligence_report_v2_roadmap.md
+  docs/intelligence_report_v2_contract.md
+  docs/weekly_run_manifest.md
+  docs/reaction_personalization_contract.md
+  docs/static_visualization_system.md
+  docs/tasks.md
+
+Start from the committed IRX-12 state. Do not implement IRX-14: no production
+alias/retention migration, scheduled-delivery switch, rollout, dogfood start,
+or live dogfood evidence claim. Do not change IRX-1 period semantics, IRX-2
+run manifest policy, IRX-3 reaction semantics, IRX-4 canonical lifecycle
+semantics, IRX-5 editorial authority, IRX-7 Atlas/Audit package semantics,
+IRX-10 Radar authority, IRX-11 gate meanings, IRX-12 feedback confirmation/
+application semantics, global evidence scoring, Radar gates, cross-repo code,
+secrets, generated private artifacts, or the frozen irx2_orchestration.v1
+stage policy.
+
+Before editing run:
+  git status
+  git branch
+  git log --oneline -20
+  git diff --stat
+
+Read the existing sanitized fixtures, report-quality gates, Brief/Atlas V2
+sidecars and renderers, reporting period tests, canonical/reaction/project/Radar
+adapters, retrieval/PI surfaces, and focused tests for:
+  tests/fixtures/
+  src/output/report_quality.py
+  src/output/reader_value_quality.py
+  src/output/weekly_intelligence_brief_v2.py
+  src/output/knowledge_atlas_report_v2.py
+  src/output/report_visuals.py
+  src/output/split_intelligence_reports.py
+  src/output/reporting_period.py
+  src/output/reaction_personalization.py
+  src/output/project_signal_diagnostics.py
+  tests/test_reporting_period.py
+  tests/test_report_quality.py
+  tests/test_split_intelligence_reports.py
+  tests/test_idea_threads.py
+  tests/test_reaction_sync.py
+  tests/test_project_signal_diagnostics.py
+
+Consolidate sanitized golden fixtures and deterministic evaluation coverage for
+the current Report V2 release candidate. Cover new-week Monday,
+Sunday/year-boundary, previous-week reactions, Fable/Claude duplication,
+missing and real investigate Radar, context-only market lens, concrete/no
+project implication, generic fallback, weak evidence, partial/empty period,
+confirmed-feedback application receipt, and desktop/mobile output. Keep private
+raw Telegram content and generated private reports out of committed fixtures.
+
+Prefer structured contract assertions and bounded semantic HTML checks over
+brittle full-HTML goldens. Add or document a stable desktop/mobile screenshot
+harness at 1440px and 375px only if it is deterministic in this repo; otherwise
+fail loudly with documented prerequisites rather than claiming visual evidence.
+Screenshot update procedure, viewport/browser/font stability, redaction, and
+review policy must be documented.
+
+Perform deep review after fixture/evaluation design and again after visual or
+HTML regression integration. Fix all in-scope blockers before documentation or
+commit.
+
+Run:
+  PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache \
+    python3 -m unittest tests.test_reporting_period tests.test_report_quality \
+    tests.test_split_intelligence_reports tests.test_idea_threads \
+    tests.test_reaction_sync tests.test_project_signal_diagnostics
+
+Also run the repository-documented Playwright desktop/mobile snapshot command
+added by IRX-13, or document why the harness cannot run locally without
+fabricating evidence. Run focused compatibility tests for every touched
+Brief/Atlas/retrieval/PI/fixture surface, focused Ruff, py_compile, fixture JSON
+validation, git diff --check, git diff --stat, and inspect git status.
+
+Update the IRX registry, implementation journal, roadmap completion receipt,
+and CODEX handoff with exact test counts and any screenshot-harness result.
+Commit IRX-13 separately and push the current branch. Stop before IRX-14.
 ```
 
 ## Historical PGI-007 Handoff

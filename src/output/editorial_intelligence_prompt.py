@@ -84,7 +84,9 @@ _MODEL_OUTPUT_SKELETON = """{
       {"feedback_ref": "<preclassified input ref>", "reader_summary_ru": "<Russian explanation>"}
     ],
     "unchanged": [],
-    "requires_code_or_config": []
+    "code_config_required": [],
+    "rejected": [],
+    "pending": []
   },
   "mvp_summary": {
     "radar_ref": "<copy eligible input Radar ref or empty string>",
@@ -133,8 +135,9 @@ Hard limits and permissions:
   not causation; copy each preissued reader_reason_ru exactly. Missing reactions mean
   unknown, not negative interest.
 - The host already classified every considered feedback event. Copy every preissued
-  feedback_ref exactly once into its preclassified applied_changes, unchanged, or
-  requires_code_or_config list and copy its preissued reader_summary_ru exactly.
+  feedback_ref exactly once into its preclassified applied_changes, unchanged,
+  code_config_required, rejected, or pending list and copy its preissued
+  reader_summary_ru exactly.
   Merely loaded or considered feedback is not an applied effect.
 - Copy deterministic Radar why and what_would_change_it reader text exactly; the model
   may not reinterpret absence, rejection, or investigate-only permission.
