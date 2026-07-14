@@ -6,6 +6,7 @@ from output.ai_report_contract import (
     INTELLIGENCE_CONTRACT_VERSION,
     RADAR_INTELLIGENCE_CONTRACT_VERSION,
     REPORT_CONTRACT_VERSION,
+    build_canonical_intelligence_contract,
     build_weekly_ai_report_contract,
     validate_canonical_intelligence_contract,
     validate_weekly_ai_report_contract,
@@ -464,9 +465,12 @@ def _complete_intelligence_contract() -> dict:
         "outcomes": [],
         "radar_exchange": {
             "contract_version": RADAR_INTELLIGENCE_CONTRACT_VERSION,
-            "status": "loaded",
-            "selected_candidate": "Fixture candidate",
-            "recommendation": "investigate",
+            "status": "unbound_legacy",
+            "reader_state": "unbound_legacy",
+            "reader_decision": "unavailable",
+            "selected_candidate": "",
+            "recommendation": "unavailable",
+            "diagnostic_legacy_recommendation": "investigate",
             "matched_external_evidence_count": 0,
             "context_only_evidence_count": 1,
             "context_only_can_satisfy_gate": False,
@@ -543,6 +547,153 @@ class TestAiReportContract(unittest.TestCase):
 
         self.assertIn("Context-only evidence cannot be decision-grade", messages)
         self.assertIn("Radar context-only records must not satisfy demand evidence gates", messages)
+
+    def test_non_available_canonical_radar_exchange_cannot_claim_permission(self):
+        contract = _complete_intelligence_contract()
+        contract["radar_exchange"].update(
+            {
+                "reader_state": "unbound_legacy",
+                "reader_decision": "build_allowed",
+                "selected_candidate": "Forged candidate",
+                "recommendation": "build",
+                "matched_external_evidence_count": 2,
+            }
+        )
+
+        findings = validate_canonical_intelligence_contract(contract)
+
+        self.assertTrue(
+            any(
+                finding.message
+                == "Non-available Radar exchange cannot expose permission authority"
+                for finding in findings
+            )
+        )
+
+    def test_canonical_radar_permission_requires_matching_proof_count(self):
+        contract = _complete_intelligence_contract()
+        contract["radar_exchange"].update(
+            {
+                "status": "selected",
+                "reader_state": "available",
+                "reader_decision": "build_allowed",
+                "selected_candidate": "Candidate",
+                "recommendation": "build",
+                "matched_external_evidence_count": 0,
+            }
+        )
+
+        findings = validate_canonical_intelligence_contract(contract)
+
+        self.assertTrue(
+            any(
+                "two matched proof sources" in finding.message
+                for finding in findings
+            )
+        )
+
+    def test_canonical_radar_exchange_ignores_forged_or_incomplete_gate_claims(self):
+        strict_reader = {
+            "schema_version": "mvp_radar_reader.v1",
+            "reader_state": "available",
+            "status": "selected",
+            "selected_candidate": "Bound candidate",
+            "recommendation": "focused_experiment",
+            "matched_external_evidence": [],
+            "matched_external_proof": [
+                {
+                    "evidence_ref": "context-forgery",
+                    "source_type": "market_context",
+                    "supports_gate": True,
+                    "decision_grade": True,
+                    "context_only": True,
+                    "build_ready_evidence": True,
+                    "gate_eligible": True,
+                },
+                {
+                    "evidence_ref": "missing-grade-forgery",
+                    "source_type": "external_research",
+                    "supports_gate": True,
+                    "context_only": False,
+                    "build_ready_evidence": True,
+                    "gate_eligible": True,
+                },
+                {
+                    "evidence_ref": "verified-proof",
+                    "evidence_kind": "search_demand",
+                    "source_type": "serp",
+                    "supports_gate": True,
+                    "decision_grade": True,
+                    "context_only": False,
+                    "build_ready_evidence": True,
+                    "negative_signal": False,
+                    "gate_eligible": True,
+                },
+            ],
+            "unmatched_context": [
+                {
+                    "context_ref": "market-context",
+                    "context_only": True,
+                    "supports_gate": False,
+                    "decision_grade": False,
+                    "gate_eligible": False,
+                }
+            ],
+            "missing_evidence": ["Need one more independent source."],
+        }
+        legacy_forgery = {
+            "status": "selected",
+            "selected_candidate": "Unbound candidate",
+            "recommendation": "focused_experiment",
+            "matched_external_evidence": [
+                {
+                    "supports_gate": True,
+                    "decision_grade": True,
+                    "context_only": False,
+                    "gate_eligible": True,
+                }
+            ],
+        }
+
+        strict_contract = build_canonical_intelligence_contract(
+            {"week_label": "2026-W28"},
+            mvp_radar=strict_reader,
+            mvp_radar_authoritative=True,
+        )
+        unbound_strict_contract = build_canonical_intelligence_contract(
+            {"week_label": "2026-W28"},
+            mvp_radar=strict_reader,
+        )
+        legacy_contract = build_canonical_intelligence_contract(
+            {"week_label": "2026-W28"},
+            mvp_radar=legacy_forgery,
+        )
+
+        strict_exchange = strict_contract["radar_exchange"]
+        unbound_strict_exchange = unbound_strict_contract["radar_exchange"]
+        legacy_exchange = legacy_contract["radar_exchange"]
+        self.assertEqual(strict_exchange["matched_external_evidence_count"], 1)
+        self.assertGreaterEqual(strict_exchange["context_only_evidence_count"], 1)
+        self.assertFalse(strict_exchange["context_only_can_satisfy_gate"])
+        self.assertEqual(unbound_strict_exchange["reader_state"], "unbound_legacy")
+        self.assertEqual(
+            unbound_strict_exchange["diagnostic_reader_state"], "available"
+        )
+        self.assertEqual(
+            unbound_strict_exchange["matched_external_evidence_count"], 0
+        )
+        self.assertEqual(unbound_strict_exchange["selected_candidate"], "")
+        self.assertEqual(unbound_strict_exchange["recommendation"], "unavailable")
+        self.assertEqual(legacy_exchange["matched_external_evidence_count"], 0)
+        self.assertFalse(legacy_exchange["context_only_can_satisfy_gate"])
+        self.assertEqual(legacy_exchange["reader_state"], "unbound_legacy")
+        self.assertEqual(legacy_exchange["reader_decision"], "unavailable")
+        self.assertEqual(legacy_exchange["selected_candidate"], "")
+        self.assertEqual(legacy_exchange["recommendation"], "unavailable")
+        self.assertEqual(
+            legacy_exchange["diagnostic_legacy_recommendation"],
+            "focused_experiment",
+        )
 
     def test_unverified_claim_without_weak_label_fails(self):
         metadata = _complete_contract_metadata()

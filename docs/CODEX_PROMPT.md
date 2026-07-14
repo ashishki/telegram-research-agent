@@ -1,9 +1,9 @@
 # CODEX_PROMPT - Compact Session Handoff
 
-Version: 5.7
+Version: 5.8
 Date: 2026-07-14
-State: IRX-1 through IRX-5, IRX-8, and IRX-9
-`implemented_and_verified`; IRX-10 is the next planned implementation task;
+State: IRX-1 through IRX-5 and IRX-8 through IRX-10
+`implemented_and_verified`; IRX-6 is the next planned implementation task;
 dogfood is blocked until IRX-14
 
 ## Current Product Direction
@@ -34,7 +34,7 @@ docs/tasks.md
 Next implementation task:
 
 ```text
-IRX-10 - MVP Radar Reader Contract And Context-Only Hardening
+IRX-6 - Weekly Intelligence Brief V2
 ```
 
 ## W29 Product Correction
@@ -100,6 +100,13 @@ Reader V2 surfaces remain planned, and dogfood has not started.
   weak/rejected/learning/existing states remain audit-only and an explicit
   Russian zero is valid. Its permissions may feed IRX-5 only after rebinding to
   the exact package and descriptors; V1 and retrieval projections are unchanged.
+- IRX-10 adds strict `mvp_radar_reader.v1` normalization over the immutable
+  same-run seed/raw/binding package. It preserves producer decisions while
+  separating KIR provenance, matched external proof, and unmatched context;
+  only exact manifest-bound `available` state can authorize a build or focused
+  experiment. Missing, invalid, disabled, wrong-run, and legacy states are
+  explicit and fail closed across Brief, visual, canonical, retrieval,
+  editorial, and Hermes/PI consumers.
 - Canonical intelligence sidecar contract `tra-intelligence-contract.v1` is now
   implemented locally for workbook/Brief/Atlas projections with sanitized eval
   fixtures.
@@ -428,8 +435,50 @@ Verification and compatibility:
   artifacts, and cross-repository code remain unchanged. No live/heavy pipeline,
   full suite, V2 reader activation, repository mutation, or dogfood run was
   performed;
-- IRX-10 is the next implementation task. Project reader rendering remains
-  owned by IRX-6.
+- The historical IRX-10 handoff is closed by the completion record below.
+  Project reader rendering remains owned by IRX-6.
+
+## IRX-10 Completion
+
+Status: `implemented_and_verified` on 2026-07-14.
+
+Implemented:
+
+- strict deterministic `mvp_radar_reader.v1` projection from the exact
+  `weekly_run_manifest.v1`, `radar_run_binding.v1`, raw producer JSON, and seed
+  export, including run/week/period/schema/status/path/checksum parity;
+- explicit `available`, `no_candidate`, `missing`, `invalid`, `disabled`, and
+  `unbound_legacy` states with candidate identity, source mix, matching KIR
+  provenance, matched external proof, unmatched context, evidence gaps,
+  producer reason, actual change condition, next validation, experiment, and
+  kill criteria;
+- fail-closed proof eligibility: context-only, market, Telegram, X, negative,
+  unsupported, malformed, or unbound input cannot satisfy gates. KIR freshness
+  uses the producer's any-fresh semantics and bound candidate seed counts;
+- manifest-required Brief consumption plus strict canonical exchange, visual,
+  retrieval, editorial, and Hermes/PI adapters. Legacy files remain readable
+  only as clearly labelled diagnostic context;
+- explicit authority handoff prevents self-declared strict markers in a Brief,
+  workbook, canonical exchange, or PI section from restoring candidate/proof
+  permission. Bounded shared loaders fail closed on oversized or hostile JSON;
+- exact Telegram-side stdout/raw producer-result parity and explicit seed
+  evidence roles. Evidence-backed sibling fixes add selected reader fields,
+  schema identity, and explicit no-evidence nulls without changing scoring or
+  gates.
+
+Verification and compatibility:
+
+- the required local command passed 47 tests and the exact sibling command
+  passed 16 tests. The final reader/authority matrix passed 80 tests, the
+  consumer matrix passed 108 tests, and the orchestrator/required overlap
+  matrix passed 66 tests. Ruff, focused compilation, and `git diff --check`
+  passed;
+- read-only malformed-input review exercised 4,172 public loader variants and
+  5,824 projection variants without an uncaught public-boundary exception after
+  the final validator fix;
+- no live acquisition, expensive model call, generated private artifact,
+  archive backfill, database migration, score/gate change, or dogfood result was
+  performed or claimed. IRX-6 is next.
 
 ## PGI-001 Completion
 
@@ -799,9 +848,9 @@ Report files changed, canonical identity/lifecycle/as-of semantics, compatibilit
 ```
 
 This exact historical prompt stopped at the IRX-4 boundary as required. IRX-4
-is implemented and verified; the subsequent IRX-5, IRX-8, and IRX-9 handoffs
-are now closed by the completion records above. IRX-10 is the next planned
-scope.
+is implemented and verified; the subsequent IRX-5, IRX-8, IRX-9, and IRX-10
+handoffs are now closed by the completion records above. IRX-6 is the next
+planned scope.
 
 ## Historical PGI-007 Handoff
 

@@ -1,6 +1,6 @@
 # Current Backlog
 
-Version: 3.4
+Version: 3.5
 Last updated: 2026-07-14
 State: canonical active backlog
 
@@ -50,12 +50,11 @@ below, but active implementation starts from the IRX task graph.
 
 ## Next Candidate Task
 
-`IRX-10 - MVP Radar Reader Contract And Context-Only Hardening`
+`IRX-6 - Weekly Intelligence Brief V2`
 
-Normalize the immutable same-run Radar binding into a bounded reader projection
-that explains the candidate, recommendation, evidence gaps, next validation,
-change condition, and kill criteria without changing Radar scoring or allowing
-context-only evidence to satisfy a gate. Its task card is in
+Assemble the Russian five-to-seven-minute decision Brief from the already
+validated period, editorial, reaction, canonical-thread, project, Radar-reader,
+and visual contracts. Its task card is in
 `docs/intelligence_report_v2_roadmap.md`.
 
 ## Dependency Graph
@@ -83,7 +82,7 @@ contract.
 | IRX-5 | P0 | `implemented_and_verified` | Produce schema-validated Russian editorial intelligence JSON from bounded cited inputs | IRX-1..IRX-4 |
 | IRX-8 | P1 | `implemented_and_verified` | Shared deterministic, offline static visualization components | IRX-4, IRX-5 |
 | IRX-9 | P1 | `implemented_and_verified` | Evidence-backed, named, PR-sized project implications | IRX-4, IRX-5, IRX-8 |
-| IRX-10 | P1 | `planned_reader_contract`; context exclusion and IRX-2 same-run binding implemented | Explain the bound candidate, evidence gaps, next validation, and kill criteria | IRX-2, IRX-5, IRX-8 |
+| IRX-10 | P1 | `implemented_and_verified` | Explain the bound candidate, evidence gaps, next validation, and kill criteria | IRX-2, IRX-5, IRX-8 |
 | IRX-6 | P1 | `planned` | Russian 5-7 minute Weekly Intelligence Brief V2 | IRX-1..IRX-5, IRX-8..IRX-10 |
 | IRX-11 | P1 | `planned` | Reader-value gates for period, editorial, personalization, visual, project, and Radar quality | IRX-6, IRX-8 |
 | IRX-7 | P2 | `planned` | Visual Knowledge Atlas V2 plus preserved Knowledge Audit Explorer | IRX-4, IRX-5, IRX-8, IRX-11 |
@@ -374,6 +373,49 @@ rollout implications are in `docs/intelligence_report_v2_roadmap.md`.
   bytes, IRX-5 model contract, reaction and feedback semantics, Radar gates,
   cross-repository code, and generated private artifacts remain unchanged.
   Reader rendering is deferred to IRX-6; IRX-10 is the next task.
+
+### 2026-07-14 - IRX-10 MVP Radar Reader Contract And Context-Only Hardening
+
+- Status: `implemented_and_verified`.
+- Added the deterministic `mvp_radar_reader.v1` projection over the immutable
+  `radar_run_binding.v1`, raw Radar JSON, and exact opportunity-seed export.
+  Candidate/run/week/period/schema/status/checksum parity is required before an
+  `available` or `no_candidate` state can reach a reader.
+- The projection separates matched external proof, matching KIR provenance,
+  and unmatched context. Market context, Telegram, X, negative signals,
+  unsupported source kinds, malformed booleans, unbound legacy files, and
+  wrong-run artifacts cannot grant build or focused-experiment authority.
+- Reader states are explicit: `available`, `no_candidate`, `missing`,
+  `invalid`, `disabled`, and `unbound_legacy`. Missing, invalid, wrong-period,
+  and legacy input stays partial/unavailable and cannot invent a candidate,
+  recommendation, evidence, or completion state.
+- Brief, canonical exchange, visual report, retrieval, editorial input, and
+  Hermes/PI consumers now use the strict projection or an explicitly
+  downgraded diagnostic adapter. Reader copy exposes the producer reason,
+  actual failed gate, next validation, KIR provenance, unmatched context, and
+  kill criteria without recomputing Radar scoring.
+- Consumer authority is explicit rather than inferred from self-declared
+  `schema_version`/`reader_state` markers. Public authoritative validation
+  requires the current succeeded manifest stage; standalone workbooks and
+  legacy sidecars keep candidate/recommendation data diagnostic-only.
+- Shared bounded loading rejects oversized bytes, invalid UTF-8, non-finite
+  numbers, excessive nesting, and oversized integers before malformed legacy
+  JSON can crash Brief, visual, retrieval, or PI paths.
+- Tightened stdout/raw-result parity in the Telegram-side Radar runner and made
+  opportunity seeds explicitly `candidate_evidence`, `context_only=false`, and
+  `build_ready_evidence=false`. The sibling producer now emits the fields the
+  reader contract already owned, an additive schema version, and explicit null
+  no-evidence fields; its evidence scoring and gates were not changed.
+- Verification: the required local matrix passed 47 tests; the exact sibling
+  matrix passed 16 tests; the final reader/authority matrix passed 80 tests,
+  the consumer matrix passed 108 tests, and the orchestrator/required overlap
+  matrix passed 66 tests. Ruff, focused compilation, and
+  `git diff --check` passed. Read-only malformed-input review exercised 4,172
+  loader and 5,824 projection variants without an uncaught public-boundary
+  exception after the final fix.
+- Scope confirmation: no live source acquisition, expensive model call,
+  generated private report, archive backfill, database migration, Radar score
+  change, or dogfood claim was made. IRX-6 is the next task.
 
 ## Existing-Work Reconciliation
 

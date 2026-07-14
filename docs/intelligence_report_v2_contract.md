@@ -1,7 +1,7 @@
 # Intelligence Report V2 Product Contract
 
 Version: `tra-intelligence-contract.v2`  
-Status: planned reader contract; IRX-1 through IRX-5 plus IRX-8 and IRX-9
+Status: planned reader contract; IRX-1 through IRX-5 plus IRX-8 through IRX-10
 foundations implemented and verified
 Queue: `IRX - Intelligence Report Experience And Editorial Quality`
 
@@ -198,6 +198,32 @@ package and loaded descriptors; empty context cannot grant authority. Project
 shadow failure produces zero editorial permissions and cannot block V1 or a
 separately requested editorial shadow. Project-only generation performs no LLM,
 network, database mutation, or repository change.
+
+## MVP Radar Reader V1
+
+`mvp_radar_reader.v1` is the sole deterministic Radar input authority for
+Report V2 consumers. It wraps the IRX-2 immutable handoff; it does not recompute
+candidate ranking, evidence scores, source gates, or recommendation semantics.
+
+The projection reloads and validates the exact `weekly_run_manifest.v1`,
+`radar_run_binding.v1`, raw producer JSON, and opportunity-seed export. It
+requires run, completed-week, half-open period, schema, status, path, selected
+candidate, seed, and SHA-256 parity. An authoritative projection additionally
+requires the current manifest Radar stage to be `succeeded`.
+
+Reader states are `available`, `no_candidate`, `missing`, `invalid`, `disabled`,
+and `unbound_legacy`. Only `available` can carry a selected candidate and a
+permission-shaped `reader_decision`; `no_candidate` is a successful empty Radar
+result, not an unavailable artifact. Every other state has
+`reader_decision=unavailable`. A legacy candidate or recommendation may be
+retained only in explicitly diagnostic fields.
+
+Matched external proof is distinct from matching KIR provenance and unmatched
+context. Market context, Telegram, X, negative signals, unsupported source
+types, stale KIR, unbound payloads, and self-declared reader markers cannot
+satisfy the build or focused-experiment gate. Canonical, retrieval, visual,
+editorial, Brief, and Hermes/PI adapters receive authority explicitly only
+after manifest validation; malformed or oversized JSON fails closed.
 
 ## Editorial Intelligence V1
 
@@ -492,6 +518,9 @@ wrong-run Radar makes the package partial. Intentionally disabled Radar says:
 > MVP Radar отключен для этого запуска. Решение по сборке не сформировано.
 
 No renderer or editorial model may translate `investigate` into build approval.
+The renderer consumes `mvp_radar_reader.v1`, not an embedded candidate or
+filename-adjacent legacy JSON. `available`/`no_candidate` require the current
+manifest; all unbound values are diagnostic-only.
 
 #### 8. Feedback Prompt
 

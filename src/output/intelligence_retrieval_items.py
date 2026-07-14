@@ -13,6 +13,14 @@ from config.settings import PROJECT_ROOT
 from db.ai_report_feedback import summarize_ai_report_feedback
 from db.idea_threads import fetch_idea_thread_atoms, fetch_idea_threads
 from db.knowledge_atoms import fetch_knowledge_atoms
+from output.mvp_radar_reader import (
+    MvpRadarReaderError,
+    adapt_legacy_mvp_radar_payload,
+    invalid_mvp_radar_projection,
+    load_bound_mvp_radar_reader,
+    load_unbound_mvp_radar_reader,
+)
+from output.weekly_run_manifest import load_manifest
 from output.strategy_reviewer import build_strategy_review
 from output.reaction_personalization import (
     ReactionPersonalizationError,
@@ -30,6 +38,7 @@ DEFAULT_MVP_OUTPUT_DIR = DEFAULT_OUTPUT_ROOT / "mvp_weekly"
 DEFAULT_RADAR_OUTPUT_DIR = PROJECT_ROOT.parent / "Demand-to-MVP-Radar" / "reports" / "mvp_of_week"
 WEEK_RE = re.compile(r"(?P<week>\d{4}-W\d{2})")
 TOKEN_RE = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_-]{1,}")
+MAX_RETRIEVAL_JSON_BYTES = 8_000_000
 
 
 @dataclass(frozen=True)
@@ -220,9 +229,8 @@ def load_mvp_radar_status(
         mvp_output_root=mvp_output_root,
         radar_output_root=radar_output_root,
     ):
-        payload = _read_json_dict(path)
-        if payload is not None:
-            return _normalize_mvp_payload(payload, path)
+        if path.exists():
+            return load_unbound_mvp_radar_reader(path, expected_week=clean_week)
     return None
 
 
@@ -281,8 +289,112 @@ def _items_from_workbook(workbook: Mapping[str, Any]) -> list[IntelligenceRetrie
     items.extend(_reaction_effect_items(workbook, week_label=week, generated_at=generated_at))
     mvp = workbook.get("mvp_radar") if isinstance(workbook.get("mvp_radar"), Mapping) else None
     if mvp:
-        items.append(_mvp_item(dict(mvp), week))
+        projection, authoritative = _workbook_mvp_projection(workbook, mvp, week)
+        items.append(
+            _mvp_item(
+                projection,
+                week,
+                authoritative=authoritative,
+            )
+        )
     return items
+
+
+def _workbook_mvp_projection(
+    workbook: Mapping[str, Any],
+    embedded: Mapping[str, Any],
+    week_label: str | None,
+) -> tuple[dict, bool]:
+    """Recover Radar authority only through the exact manifest-bound sidecar."""
+
+    source_paths = (
+        workbook.get("_artifact_paths")
+        if isinstance(workbook.get("_artifact_paths"), Mapping)
+        else {}
+    )
+    source_path = _clean_text(source_paths.get("json"))
+    manifest_ref = _clean_text(workbook.get("manifest_path"))
+    artifact_kind = _clean_text(workbook.get("_artifact_kind"))
+    stage_name = {
+        "weekly_intelligence_brief": "weekly_brief",
+        "knowledge_atlas": "knowledge_atlas",
+    }.get(artifact_kind)
+    try:
+        if not source_path or not manifest_ref or stage_name is None:
+            raise ValueError("workbook has no manifest-bound reader identity")
+        manifest_path = Path(manifest_ref)
+        if not manifest_path.is_absolute():
+            raise ValueError("workbook manifest path must be absolute")
+        if manifest_path.stat().st_size > MAX_RETRIEVAL_JSON_BYTES:
+            raise ValueError("weekly manifest exceeds the retrieval byte limit")
+        manifest_path = manifest_path.resolve(strict=True)
+        run_dir = manifest_path.parent
+        artifact_path = Path(source_path).resolve(strict=True)
+        if not artifact_path.is_relative_to(run_dir):
+            raise ValueError("workbook artifact escapes its weekly run")
+        manifest = load_manifest(
+            manifest_path,
+            path_base=run_dir,
+            allowed_roots=(run_dir,),
+            check_artifact_existence=True,
+        )
+        if manifest.get("run_status") not in {"complete", "partial"}:
+            raise ValueError("workbook manifest is not terminal")
+        stage = manifest["stages"][stage_name]
+        if stage.get("status") != "succeeded":
+            raise ValueError("workbook stage did not succeed")
+        expected_path = (run_dir / str(stage.get("json_path") or "")).resolve()
+        if artifact_path != expected_path:
+            raise ValueError("workbook is not the JSON bound by its manifest")
+        if workbook.get("run_id") != manifest.get("run_id"):
+            raise ValueError("workbook/manifest run identity mismatch")
+        expected_week = _clean_text(manifest.get("reporting_week"))
+        if week_label != expected_week:
+            raise ValueError("workbook/manifest reporting week mismatch")
+        projection = load_bound_mvp_radar_reader(
+            manifest,
+            path_base=run_dir,
+            allowed_roots=(run_dir,),
+        )
+        authoritative = (
+            projection.get("schema_version") == "mvp_radar_reader.v1"
+            and projection.get("reader_state") in {"available", "no_candidate"}
+        )
+        return projection, authoritative
+    except (
+        OSError,
+        UnicodeError,
+        TypeError,
+        ValueError,
+        RecursionError,
+        OverflowError,
+        RuntimeError,
+    ):
+        pass
+    try:
+        return (
+            adapt_legacy_mvp_radar_payload(
+                embedded,
+                source_path=source_path or None,
+                expected_week=week_label or "",
+            ),
+            False,
+        )
+    except (
+        MvpRadarReaderError,
+        TypeError,
+        ValueError,
+        RecursionError,
+        OverflowError,
+    ) as exc:
+        return (
+            invalid_mvp_radar_projection(
+                week_label or "",
+                source_path=source_path or None,
+                reason=f"MVP Radar workbook projection is invalid: {exc}",
+            ),
+            False,
+        )
 
 
 def _canonical_thread_registry_items(
@@ -1005,31 +1117,97 @@ def _project_learning_projection_items(
     return result
 
 
-def _mvp_item(payload: Mapping[str, Any], week_label: str | None) -> IntelligenceRetrievalItem:
-    candidate = (
+def _mvp_item(
+    payload: Mapping[str, Any],
+    week_label: str | None,
+    *,
+    authoritative: bool = False,
+) -> IntelligenceRetrievalItem:
+    raw_candidate = (
         _clean_text(payload.get("selected_candidate"))
         or _clean_text(payload.get("selected_title"))
         or "MVP Radar status"
     )
+    reader_state = _clean_text(payload.get("reader_state")) or "unbound_legacy"
+    strict_available = (
+        authoritative
+        and payload.get("schema_version") == "mvp_radar_reader.v1"
+        and reader_state == "available"
+    )
+    strict_no_candidate = (
+        authoritative
+        and payload.get("schema_version") == "mvp_radar_reader.v1"
+        and reader_state == "no_candidate"
+    )
+    candidate = (
+        raw_candidate
+        if strict_available
+        else (
+            "MVP Radar: кандидат не выбран"
+            if strict_no_candidate
+            else f"MVP Radar diagnostic — {raw_candidate}"
+        )
+    )
     source_path = _clean_text(payload.get("source_path"))
+    candidate_record = (
+        payload.get("candidate") if isinstance(payload.get("candidate"), Mapping) else {}
+    )
+    candidate_ref = _clean_text(candidate_record.get("candidate_id")) or _slug(
+        raw_candidate
+    )
+    recommendation = _clean_text(payload.get("recommendation")) or _clean_text(
+        payload.get("dossier_status")
+    )
+    reason = _clean_text(payload.get("decision_reason_ru"))
+    summary = (
+        recommendation
+        if strict_available
+        else reason or f"Radar reader state: {reader_state}; decision unavailable"
+    )
+    decision_text = (
+        _join_text(
+            payload.get("recommendation"),
+            payload.get("dossier_status"),
+            payload.get("reader_decision"),
+        )
+        if strict_available
+        else _join_text(
+            f"Reader state: {reader_state}; decision: unavailable.",
+            f"Diagnostic candidate: {raw_candidate}" if raw_candidate else "",
+            f"Diagnostic raw recommendation: {recommendation}" if recommendation else "",
+        )
+    )
     return IntelligenceRetrievalItem(
-        id=f"mvp_dossier:{week_label or 'unknown'}:{_slug(candidate)}",
+        id=f"mvp_dossier:{week_label or 'unknown'}:{_slug(candidate_ref)}",
         item_type="mvp_dossier",
         week_label=week_label,
         title=candidate,
-        summary=_clean_text(payload.get("recommendation")) or _clean_text(payload.get("dossier_status")) or None,
+        summary=summary or None,
         text=_join_text(
             candidate,
-            payload.get("recommendation"),
-            payload.get("dossier_status"),
+            decision_text,
             payload.get("decision"),
+            payload.get("decision_reason_ru"),
             " ".join(_string_values(payload.get("missing_evidence"))),
             " ".join(_string_values(payload.get("next_validation"))),
-            _json_text(payload.get("source_mix")),
+            payload.get("change_condition"),
+            " ".join(_string_values(payload.get("kill_criteria"))),
+            _json_text(payload.get("matched_kir_provenance"))
+            if strict_available
+            else "",
+            _json_text(payload.get("matched_external_proof"))
+            if strict_available
+            else "",
+            _json_text(payload.get("unmatched_context")),
+            _json_text(payload.get("source_mix")) if strict_available else "",
         ),
         source_refs=[source_path] if source_path else [],
         atom_ids=[],
-        status=_clean_text(payload.get("dossier_status")) or _clean_text(payload.get("recommendation")) or None,
+        status=(
+            _clean_text(payload.get("dossier_status")) or recommendation or None
+            if strict_available
+            else reader_state
+        ),
         created_at=None,
         updated_at=None,
     )
@@ -1420,79 +1598,6 @@ def _mvp_dirs(
     return mvp, radar
 
 
-def _normalize_mvp_payload(payload: Mapping[str, Any], path: Path) -> dict:
-    result = payload.get("result") if isinstance(payload.get("result"), Mapping) else {}
-    selected = payload.get("selected") if isinstance(payload.get("selected"), Mapping) else {}
-    source_mix = _first_dict(
-        result.get("selected_source_mix"),
-        selected.get("source_mix"),
-        payload.get("selected_source_mix"),
-    )
-    recommendation = _clean_text(
-        result.get("recommendation")
-        or selected.get("recommendation")
-        or payload.get("recommendation")
-    ) or None
-    dossier_status = _clean_text(
-        result.get("dossier_status")
-        or selected.get("dossier_status")
-        or payload.get("dossier_status")
-    ) or None
-    candidate = _clean_text(
-        result.get("selected_title")
-        or selected.get("title")
-        or payload.get("selected_title")
-        or payload.get("title")
-    ) or None
-    missing = _string_values(
-        selected.get("missing_evidence")
-        or result.get("missing_evidence")
-        or payload.get("missing_evidence")
-    )
-    next_validation = _string_values(
-        selected.get("next_validation")
-        or selected.get("next_step")
-        or result.get("next_validation")
-        or payload.get("next_validation")
-    )
-    kill = _string_values(
-        selected.get("kill_criteria")
-        or selected.get("kill_threshold")
-        or result.get("kill_criteria")
-        or payload.get("kill_criteria")
-    )
-    return {
-        "status": "loaded",
-        "source_path": str(path),
-        "selected_candidate": candidate,
-        "dossier_status": dossier_status,
-        "recommendation": recommendation,
-        "score": result.get("score") or selected.get("score") or payload.get("score"),
-        "source_mix": source_mix,
-        "missing_evidence": missing,
-        "next_validation": next_validation,
-        "kill_criteria": kill,
-        "validation_queries": _first_dict(selected.get("validation_queries"), payload.get("validation_queries"), result.get("validation_queries")),
-        "matched_external_evidence": _mapping_list(
-            selected.get("matched_external_evidence")
-            or payload.get("matched_external_evidence")
-            or result.get("matched_external_evidence")
-        ),
-        "missing_evidence_by_category": _first_dict(
-            selected.get("missing_evidence_by_category"),
-            payload.get("missing_evidence_by_category"),
-            result.get("missing_evidence_by_category"),
-        ),
-        "validation_adapter_status": _first_dict(payload.get("validation_adapter_status"), result.get("validation_adapter_status")),
-        "decision_context": _first_dict(payload.get("decision_context"), result.get("decision_context")),
-        "decision_change_action": _first_dict(
-            selected.get("decision_change_action"),
-            payload.get("decision_change_action"),
-            result.get("decision_change_action"),
-        ),
-    }
-
-
 def _public_item_dict(item: IntelligenceRetrievalItem, *, score: float | None) -> dict:
     return {
         "id": item.id,
@@ -1738,10 +1843,25 @@ def _read_json_dict(path: Path) -> dict | None:
     if not path.exists():
         return None
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+        if path.stat().st_size > MAX_RETRIEVAL_JSON_BYTES:
+            return None
+        payload = json.loads(
+            path.read_text(encoding="utf-8"),
+            parse_constant=_reject_json_constant,
+        )
+    except (
+        OSError,
+        UnicodeError,
+        ValueError,
+        RecursionError,
+        OverflowError,
+    ):
         return None
     return payload if isinstance(payload, dict) else None
+
+
+def _reject_json_constant(value: str) -> None:
+    raise ValueError(f"non-finite JSON constant is forbidden: {value}")
 
 
 def _week_from_path(path: Path) -> str | None:
@@ -1754,19 +1874,6 @@ def _mtime(path: Path) -> float:
         return path.stat().st_mtime
     except OSError:
         return 0.0
-
-
-def _first_dict(*values: object) -> dict:
-    for value in values:
-        if isinstance(value, Mapping):
-            return dict(value)
-    return {}
-
-
-def _mapping_list(value: object) -> list[dict]:
-    if not isinstance(value, (list, tuple)):
-        return []
-    return [dict(item) for item in value if isinstance(item, Mapping)]
 
 
 def _as_list(value: object) -> list:

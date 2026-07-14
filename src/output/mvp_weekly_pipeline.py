@@ -10,6 +10,7 @@ from delivery.telegraph import publish_article
 from bot.callbacks import build_artifact_feedback_markup
 from bot.telegram_delivery import send_document, send_text
 from config.settings import PROJECT_ROOT, Settings
+from output.ai_report_contract import RADAR_GATE_SOURCE_TYPES
 from output.opportunity_seed_export import export_opportunity_seeds
 from output.market_context_lens import summarize_market_context_lens
 from output.market_pain_intelligence import summarize_market_pain_pack
@@ -352,6 +353,22 @@ def _run_radar(
         raise RuntimeError(
             "Demand-to-MVP Radar JSON result.run_id does not match the requested run_id"
         )
+    for field in (
+        "status",
+        "selected_title",
+        "dossier_status",
+        "recommendation",
+        "score",
+        "selected_source_mix",
+        "validation_adapter_status",
+        "matched_external_evidence",
+        "missing_evidence_by_category",
+        "decision_change_action",
+    ):
+        if field not in payload or payload.get(field) != result_record.get(field):
+            raise RuntimeError(
+                f"Demand-to-MVP Radar stdout/JSON mismatch for {field}"
+            )
     return payload
 
 
@@ -519,7 +536,11 @@ def _validation_gate_notification(result: MvpWeeklyPipelineResult) -> str:
         matched_count = sum(
             1
             for item in (result.matched_external_evidence or [])
-            if bool(item.get("supports_gate")) and bool(item.get("decision_grade", True))
+            if item.get("supports_gate") is True
+            and item.get("decision_grade") is True
+            and item.get("context_only") is not True
+            and item.get("negative_signal") is False
+            and str(item.get("source_type") or "") in RADAR_GATE_SOURCE_TYPES
         )
     source_types = action.get("matched_external_source_types")
     if isinstance(source_types, list):

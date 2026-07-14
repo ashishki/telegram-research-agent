@@ -22,6 +22,10 @@ from output.ai_report_contract import (
     build_weekly_ai_report_contract,
     validate_weekly_ai_report_contract,
 )
+from output.mvp_radar_reader import (
+    load_unbound_mvp_radar_reader,
+    missing_mvp_radar_projection,
+)
 from output.report_quality import MATCHES_TRACE_RE, ReportQualityFinding, SEVERITY_CRITICAL
 from output.reporting_period import format_human_period_label, resolve_reporting_period
 
@@ -138,7 +142,6 @@ STRONG_SINGLE_PROJECT_TERMS = {
     "sqlite",
     "telethon",
 }
-BUILD_READY_MVP_RECOMMENDATIONS = {"build", "focused_experiment"}
 GENERIC_PROJECT_PHRASES = {
     "ai agents",
     "ai automation",
@@ -201,16 +204,6 @@ def _compact(value: object, limit: int = 180) -> str:
     return f"{text[: max(0, limit - 1)].rstrip()}..."
 
 
-def _as_list(value: object) -> list:
-    if isinstance(value, list):
-        return value
-    if isinstance(value, tuple):
-        return list(value)
-    if value in (None, "", {}):
-        return []
-    return [value]
-
-
 def _load_yaml(path: Path) -> dict:
     try:
         data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
@@ -242,114 +235,74 @@ def _load_mvp_radar_dossier(week_label: str, explicit_path: str | Path | None = 
     for path in _candidate_mvp_paths(week_label, explicit_path):
         if not path.exists():
             continue
-        try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            LOGGER.warning("Could not load MVP Radar JSON path=%s", path, exc_info=True)
-            continue
-        if isinstance(payload, dict):
-            return _normalize_mvp_radar_payload(payload, path)
-    return {
-        "status": "not_available",
-        "source_path": str(explicit_path) if explicit_path else None,
-        "selected_candidate": None,
-        "recommendation": None,
-        "decision": "do_not_build",
-        "source_mix": {},
-        "kir_evidence": {"status": "not_available"},
-        "external_evidence": {"status": "not_available"},
-        "missing_evidence": ["Run mvp-weekly or pass --mvp-radar-json to embed a candidate dossier."],
-        "next_validation": "Run the conservative MVP Radar pipeline before treating any opportunity as build-ready.",
-        "kill_criteria": ["Do not build from workbook context alone."],
-        "live_source_intelligence": {"status": "not_available", "policy": "context_only"},
-    }
-
-
-def _normalize_mvp_radar_payload(payload: dict, path: Path) -> dict:
-    result = payload.get("result") if isinstance(payload.get("result"), dict) else {}
-    selected = payload.get("selected") if isinstance(payload.get("selected"), dict) else {}
-    source_mix = {}
-    for candidate in (
-        result.get("selected_source_mix"),
-        selected.get("source_mix"),
-        payload.get("selected_source_mix"),
-    ):
-        if isinstance(candidate, dict):
-            source_mix = candidate
-            break
-    recommendation = str(
-        result.get("recommendation")
-        or selected.get("recommendation")
-        or payload.get("recommendation")
-        or ""
-    ).strip()
-    dossier_status = str(
-        result.get("dossier_status")
-        or selected.get("dossier_status")
-        or payload.get("dossier_status")
-        or ""
-    ).strip()
-    selected_candidate = str(
-        result.get("selected_title")
-        or selected.get("title")
-        or payload.get("selected_title")
-        or ""
-    ).strip() or None
-    missing = _as_list(selected.get("missing_evidence") or result.get("missing_evidence") or payload.get("missing_evidence"))
-    kill = _as_list(
-        selected.get("kill_criteria")
-        or selected.get("kill_threshold")
-        or result.get("kill_criteria")
-        or payload.get("kill_criteria")
+        return _visual_mvp_compat(
+            load_unbound_mvp_radar_reader(path, expected_week=week_label)
+        )
+    return _visual_mvp_compat(
+        missing_mvp_radar_projection(week_label, source_path=explicit_path)
     )
-    next_validation = str(
-        selected.get("next_validation")
-        or selected.get("next_step")
-        or result.get("next_validation")
-        or payload.get("next_validation")
-        or "Collect decision-grade non-Telegram evidence before building."
-    ).strip()
-    live = {}
-    source_counts = result.get("source_counts") if isinstance(result.get("source_counts"), dict) else {}
-    if isinstance(source_counts.get("live_intelligence"), dict):
-        live = source_counts.get("live_intelligence") or {}
-    elif isinstance(payload.get("live_intelligence"), dict):
-        live = payload.get("live_intelligence") or {}
-    build_ready = recommendation in BUILD_READY_MVP_RECOMMENDATIONS and dossier_status in BUILD_READY_MVP_RECOMMENDATIONS
+
+
+def _visual_mvp_compat(projection: dict) -> dict:
+    source_mix = projection.get("source_mix")
+    source_mix = source_mix if isinstance(source_mix, dict) else {}
+    kir = projection.get("matched_kir_provenance")
+    first_kir = kir[0] if isinstance(kir, list) and kir else {}
+    legacy_kir = (
+        source_mix
+        if projection.get("reader_state") == "unbound_legacy"
+        and source_mix.get("kir_source_kind") == "knowledge_thread"
+        else {}
+    )
+    proof = projection.get("matched_external_proof")
+    proof = proof if isinstance(proof, list) else []
+    reader_decision = projection.get("reader_decision")
+    if reader_decision == "build_allowed":
+        visible_decision = "build_allowed"
+    elif (
+        reader_decision == "investigate"
+        and projection.get("dossier_status") == "focused_experiment"
+    ):
+        visible_decision = "focused_experiment_allowed"
+    else:
+        visible_decision = "do_not_build"
     return {
-        "status": "loaded",
-        "source_path": str(path),
-        "selected_candidate": selected_candidate,
-        "dossier_status": dossier_status or None,
-        "recommendation": recommendation or None,
-        "score": result.get("score") or selected.get("score") or payload.get("score"),
-        "decision": "build_or_experiment" if build_ready else "do_not_build",
-        "source_mix": source_mix,
+        **projection,
+        "decision": visible_decision,
         "kir_evidence": {
-            "source_kind": source_mix.get("kir_source_kind"),
-            "thread_slug": source_mix.get("kir_thread_slug"),
-            "thread_title": source_mix.get("kir_thread_title"),
-            "thread_status": source_mix.get("kir_thread_status"),
-            "source_atom_count": source_mix.get("kir_source_atom_count"),
-            "source_url_count": source_mix.get("kir_source_url_count"),
+            "source_kind": "knowledge_thread" if first_kir else legacy_kir.get("kir_source_kind"),
+            "thread_slug": first_kir.get("thread_slug") or legacy_kir.get("kir_thread_slug"),
+            "thread_title": first_kir.get("thread_title") or legacy_kir.get("kir_thread_title"),
+            "thread_status": first_kir.get("thread_status") or legacy_kir.get("kir_thread_status"),
+            "source_atom_count": (
+                len(first_kir.get("source_atom_ids") or [])
+                if first_kir
+                else _bounded_nonnegative_int(legacy_kir.get("kir_source_atom_count"))
+            ),
+            "source_url_count": (
+                len(first_kir.get("source_urls") or [])
+                if first_kir
+                else _bounded_nonnegative_int(legacy_kir.get("kir_source_url_count"))
+            ),
             "gate_status": source_mix.get("kir_gate_status"),
             "gate_reasons": source_mix.get("kir_gate_reasons") or [],
         },
         "external_evidence": {
-            "selected_external_evidence_count": source_mix.get("selected_external_evidence_count"),
-            "decision_grade_external": bool(source_mix.get("decision_grade_external")),
+            "selected_external_evidence_count": len(proof),
+            "decision_grade_external": len(proof) >= 2,
             "source_mix_gate": source_mix.get("source_mix_gate"),
             "readiness": source_mix.get("readiness"),
         },
-        "missing_evidence": [str(item) for item in missing if str(item).strip()] or ["No missing-evidence list was present in Radar JSON."],
-        "next_validation": next_validation,
-        "kill_criteria": [str(item) for item in kill if str(item).strip()] or ["Kill if external demand evidence stays weak or source mix remains Telegram-only."],
         "live_source_intelligence": {
-            **live,
+            "status": "not_available",
             "policy": "context_only",
             "used_for_build_decision": False,
         },
     }
+
+
+def _bounded_nonnegative_int(value: object) -> int:
+    return value if isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 10_000 else 0
 
 
 def _tokenize(text: str) -> set[str]:
@@ -1469,13 +1422,28 @@ def _render_mvp_radar(dossier: dict) -> str:
         f"<li><b>{_escape(key)}</b>: {_escape(value)}</li>" for key, value in sorted(external.items())
     )
     live = dossier.get("live_source_intelligence") or {}
+    reader_state = str(dossier.get("reader_state") or "unbound_legacy")
+    candidate = str(dossier.get("selected_candidate") or "").strip()
+    if candidate:
+        heading = candidate
+    elif reader_state == "no_candidate":
+        heading = "Radar успешно завершён: кандидат не выбран"
+    elif reader_state == "disabled":
+        heading = "MVP Radar отключён"
+    else:
+        heading = "MVP Radar недоступен для этого запуска"
     decision = dossier.get("decision") or "do_not_build"
-    decision_text = "Do not build" if decision == "do_not_build" else "Build/experiment gate passed"
+    decision_text = {
+        "build_allowed": "Build gate passed",
+        "focused_experiment_allowed": "Focused experiment allowed; full build is blocked",
+        "do_not_build": "Do not build",
+    }.get(str(decision), "Do not build")
     return (
         '<p class="section-note">MVP Radar remains conservative: workbook context is not a build recommendation.</p>'
         '<article class="project-implication">'
         f'<p class="status-pill">{_escape(decision_text)}</p>'
-        f"<h3>{_escape(dossier.get('selected_candidate') or 'No selected MVP candidate')}</h3>"
+        f"<h3>{_escape(heading)}</h3>"
+        f"<p>{_escape(dossier.get('decision_reason_ru') or '')}</p>"
         f"<p><b>Status:</b> {_escape(dossier.get('dossier_status') or dossier.get('status') or 'unknown')} | "
         f"<b>Recommendation:</b> {_escape(dossier.get('recommendation') or 'none')} | "
         f"<b>Score:</b> {_escape(dossier.get('score') if dossier.get('score') is not None else 'n/a')}</p>"
@@ -1489,7 +1457,7 @@ def _render_mvp_radar(dossier: dict) -> str:
         "<h4>Missing evidence</h4>"
         f"<ul>{missing or '<li>No missing evidence supplied.</li>'}</ul>"
         "<h4>Kill criteria</h4>"
-        f"<ul>{kill or '<li>Kill if external validation remains weak.</li>'}</ul>"
+        f"<ul>{kill or '<li>Критерии остановки недоступны.</li>'}</ul>"
         f'<p class="muted">Live source intelligence: context-only; used_for_build_decision={_escape(live.get("used_for_build_decision", False))}. '
         f'JSON: {_escape(dossier.get("source_path") or "not available")}</p>'
         "</article>"

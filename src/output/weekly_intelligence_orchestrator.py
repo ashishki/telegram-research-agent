@@ -27,14 +27,14 @@ from output.ai_report_contract import RADAR_INTELLIGENCE_CONTRACT_VERSION
 from output.frontier_analysis import frontier_analysis_fingerprint, run_frontier_analysis
 from output.idea_threads import refresh_idea_threads
 from output.knowledge_atlas_report import build_knowledge_atlas_artifact
+from output.mvp_radar_reader import (
+    build_mvp_radar_reader_projection,
+    load_bound_mvp_radar_reader,
+)
 from output.mvp_weekly_pipeline import MvpWeeklyPipelineResult, run_mvp_weekly_pipeline
 from output.reporting_period import ReportingPeriod, resolve_reporting_period
 from output.reporting_period import register_reporting_period_sqlite
-from output.weekly_intelligence_brief import (
-    RADAR_DISABLED_DISCLOSURE_RU,
-    build_weekly_intelligence_brief_artifact,
-    load_mvp_radar_summary,
-)
+from output.weekly_intelligence_brief import build_weekly_intelligence_brief_artifact
 from output.weekly_run_manifest import (
     CANCELLED,
     FAILED,
@@ -84,7 +84,6 @@ class WeeklyIntelligenceRunResult:
 @dataclass(frozen=True)
 class _RadarStageResult:
     manifest_updates: dict[str, Any]
-    brief_json_path: Path
 
 
 def run_weekly_intelligence_v2(
@@ -154,7 +153,6 @@ def run_weekly_intelligence_v2(
     reaction_snapshot_at: str = manifest["generated_at"]
     reaction_snapshot_binding: dict[str, Any] | None = None
     reaction_snapshot_payload: dict[str, Any] | None = None
-    radar_brief_path: Path | None = None
 
     # Knowledge refresh is foundational.  A failure stops downstream work and
     # produces a failed manifest rather than a stale reader artifact.
@@ -355,7 +353,6 @@ def run_weekly_intelligence_v2(
                 with_live_source_index=with_live_source_index,
                 live_intelligence_path=live_intelligence_path,
             )
-            radar_brief_path = radar.brief_json_path
             manifest = persist(
                 succeed_stage(manifest, "radar", updates=radar.manifest_updates)
             )
@@ -380,8 +377,6 @@ def run_weekly_intelligence_v2(
             reaction_snapshot_at=reaction_snapshot_at,
             reaction_snapshot_binding=reaction_snapshot_binding,
             reaction_snapshot_payload=reaction_snapshot_payload,
-            radar_brief_path=radar_brief_path,
-            radar_enabled=radar_enabled,
             threads_limit=max(1, int(threads_limit or 1)),
             atoms_limit=max(1, int(atoms_limit or 1)),
         )
@@ -660,6 +655,19 @@ def _radar_stage(
         path_base=run_dir,
         allowed_roots=(run_dir,),
     )
+    seed_payload = json.loads(seed_path.read_text(encoding="utf-8"))
+    if not isinstance(seed_payload, list):
+        raise RuntimeError("Radar seed export must be a JSON array")
+    # Validate the complete producer/binding/seed contract before declaring
+    # the Radar stage succeeded.  This turns contradictory producer output
+    # into the existing non-fatal Radar failure/partial-package path.
+    build_mvp_radar_reader_projection(
+        manifest,
+        binding=binding,
+        radar_payload=raw_payload,
+        seed_payload=seed_payload,
+        _require_succeeded_stage=False,
+    )
     write_radar_run_binding(
         binding_path,
         binding,
@@ -705,7 +713,6 @@ def _radar_stage(
             "artifact_refs": {"binding_path": binding_relative.as_posix()},
             "checksums": checksums,
         },
-        brief_json_path=raw_path,
     )
 
 
@@ -795,8 +802,6 @@ def _render_reader_stages(
     reaction_snapshot_at: str,
     reaction_snapshot_binding: Mapping[str, Any] | None,
     reaction_snapshot_payload: Mapping[str, Any] | None,
-    radar_brief_path: Path | None,
-    radar_enabled: bool,
     threads_limit: int,
     atoms_limit: int,
 ) -> dict[str, Any]:
@@ -874,33 +879,15 @@ def _render_reader_stages(
             period=period,
         ),
     }
-    if radar_enabled and radar_brief_path is not None:
-        mvp_radar = load_mvp_radar_summary(period.reporting_week, radar_brief_path)
-    elif radar_enabled:
-        # Never allow the orchestrated path to rediscover an older week-named
-        # V1 or sibling artifact after this run's required Radar stage failed.
-        mvp_radar = {
-            "status": "not_available",
-            "selected_candidate": None,
-            "dossier_status": None,
-            "recommendation": "needs_more_evidence",
-            "source_mix": {},
-            "missing_evidence": ["Same-run MVP Radar JSON is unavailable."],
-            "next_validation": ["Retry MVP Radar in a new weekly run."],
-            "source_path": None,
-        }
-    else:
-        mvp_radar = {
-            "status": "intentionally_disabled",
-            "disabled": True,
-            "selected_candidate": None,
-            "dossier_status": None,
-            "recommendation": "needs_more_evidence",
-            "source_mix": {},
-            "missing_evidence": [RADAR_DISABLED_DISCLOSURE_RU],
-            "next_validation": [],
-            "source_path": None,
-        }
+    # IRX-10 readers never rediscover a week-named artifact.  The projection
+    # reloads manifest + binding + exact raw/seed bytes and fails closed when
+    # any identity, checksum, evidence lane, or recommendation is inconsistent.
+    mvp_radar = load_bound_mvp_radar_reader(
+        manifest,
+        path_base=run_dir,
+        allowed_roots=(run_dir,),
+    )
+    reader_degraded = bool(mvp_radar.get("partial"))
 
     brief_root = run_dir / "weekly_brief"
     atlas_root = run_dir / "knowledge_atlas"
@@ -935,6 +922,7 @@ def _render_reader_stages(
             mvp_radar=mvp_radar,
             related_artifacts={},
             run_identity=preliminary_identity,
+            run_manifest=manifest,
         )
     except Exception as exc:
         _remove_reader_artifacts(brief_html, brief_json)
@@ -958,6 +946,7 @@ def _render_reader_stages(
         brief_updates=brief_updates,
         atlas_updates=atlas_updates,
         atlas_succeeds=True,
+        brief_degraded=reader_degraded,
     )
     try:
         build_knowledge_atlas_artifact(
@@ -985,6 +974,7 @@ def _render_reader_stages(
         brief_updates=brief_updates,
         atlas_updates=atlas_updates,
         atlas_succeeds=atlas_rendered,
+        brief_degraded=reader_degraded,
     )
     try:
         build_weekly_intelligence_brief_artifact(
@@ -1001,6 +991,7 @@ def _render_reader_stages(
                 else {}
             ),
             run_identity=final_identity,
+            run_manifest=manifest,
         )
     except Exception as exc:
         _remove_reader_artifacts(brief_html, brief_json)
@@ -1039,6 +1030,7 @@ def _render_reader_stages(
         candidate,
         "weekly_brief",
         updates=final_brief_updates,
+        degraded=reader_degraded,
     )
     # Persist the mutually-referencing reader package as one state transition.
     # The manifest validator can now verify both final sidecars together.
@@ -1070,10 +1062,16 @@ def _predicted_reader_identity(
     brief_updates: Mapping[str, Any],
     atlas_updates: Mapping[str, Any],
     atlas_succeeds: bool,
+    brief_degraded: bool,
 ) -> dict[str, Any]:
     candidate = dict(manifest)
     if candidate["stages"]["weekly_brief"]["status"] != SUCCEEDED:
-        candidate = succeed_stage(candidate, "weekly_brief", updates=brief_updates)
+        candidate = succeed_stage(
+            candidate,
+            "weekly_brief",
+            updates=brief_updates,
+            degraded=brief_degraded,
+        )
     atlas_status = candidate["stages"]["knowledge_atlas"]["status"]
     if atlas_succeeds and atlas_status != SUCCEEDED:
         if atlas_status == "pending":

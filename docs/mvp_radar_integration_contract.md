@@ -1,9 +1,9 @@
 # MVP Radar Integration Contract
 
-Version: 1.0
-Last updated: 2026-07-13
-Status: supporting cross-repo evidence contract; IRX-2 same-run binding
-`implemented_and_verified`
+Version: 1.1
+Last updated: 2026-07-14
+Status: supporting cross-repo evidence contract; IRX-2 same-run binding and
+IRX-10 reader projection `implemented_and_verified`
 Contract version: `tra-radar-intelligence-contract.v1`
 
 IRX-2 added `weekly_run_manifest.v1` around this exchange. The evidence contract
@@ -117,6 +117,41 @@ paths and SHA-256 checksums, and the selected candidate/status projection.
 The selected candidate should repeat the key contract fields so a downstream
 consumer can read the selected object without chasing top-level JSON.
 
+## IRX-10 Reader Projection
+
+Telegram Research Agent translates the verified producer package into
+`mvp_radar_reader.v1`. This projection is not another scoring engine. It reloads
+the exact manifest, `radar_run_binding.v1`, raw Radar JSON, and opportunity-seed
+export, verifies identity and checksums, and preserves the producer decision in
+a bounded reader shape.
+
+Authoritative reader states are:
+
+- `available`: one selected candidate passed the complete binding and parity
+  checks;
+- `no_candidate`: the bound producer run succeeded and explicitly selected no
+  candidate.
+
+Non-authoritative states are `missing`, `invalid`, `disabled`, and
+`unbound_legacy`. An unbound legacy file may expose a candidate or raw
+recommendation only as labelled diagnostic context. It always has
+`reader_decision=unavailable` and cannot authorize a build or focused
+experiment.
+
+The reader projection includes candidate identity, producer dossier status and
+recommendation, `reader_decision`, source-mix state, matching KIR provenance,
+matched external proof, unmatched context, missing evidence, producer reason,
+decision-change condition, next validation, experiment, kill criteria, and
+artifact identity. `available` and `no_candidate` require a current manifest
+whose Radar stage is `succeeded`; self-declared schema/state markers are not
+authority.
+
+The loader is bounded before JSON parsing and fails closed on oversized files,
+invalid UTF-8, non-finite values, excessive nesting, oversized integers,
+malformed shapes, path escape, replay, or checksum mismatch. Brief, canonical
+exchange, retrieval, visual, editorial, and Hermes/PI consumers may recover
+permission-shaped fields only from this manifest-bound path.
+
 ## Required Rules
 
 - Market/business Telegram pack remains context-only.
@@ -142,9 +177,10 @@ consumer can read the selected object without chasing top-level JSON.
 - Cross-repo schema changes must be versioned and tested.
 - Sidecar JSON and rendered Markdown/HTML must not contradict each other.
 
-IRX-2 implemented only this identity and orchestration wrapper. Candidate
-evidence categories, source matching, recommendation semantics,
-`context_only` exclusion, and every existing Radar gate remain unchanged.
+IRX-2 implemented the identity and orchestration wrapper. IRX-10 added the
+strict reader projection and diagnostic adapter. Candidate evidence categories,
+source matching, recommendation semantics, `context_only` exclusion, and every
+existing Radar gate remain unchanged.
 
 ## Skill-Assisted Research Boundary
 
@@ -197,8 +233,10 @@ Legacy/V1 diagnostic paths may classify Radar state as:
 
 Legacy/V1 Brief and Hermes diagnostic behavior:
 
-- `current`: show Radar Gate Card normally.
-- `stale`: show candidate, but label stale and avoid new weekly decisions.
+- `current`: show available fields as diagnostic-only unless the current
+  manifest and binding are also present and valid.
+- `stale`: show a diagnostic candidate only when useful, label it stale, and
+  forbid new weekly decisions.
 - `missing`: show "Radar not available" and continue Brief/Atlas.
 - `invalid`: show contract error and do not summarize candidate as valid.
 
@@ -230,6 +268,7 @@ From `telegram-research-agent`:
 
 ```bash
 PYTHONPATH=src python3 -m pytest tests/test_split_intelligence_reports.py tests/test_mvp_weekly_pipeline.py tests/test_opportunity_seed_export.py
+PYTHONPATH=src python3 -m unittest tests.test_mvp_radar_reader tests.test_ai_report_contract tests.test_intelligence_retrieval_items tests.test_pi_facade
 ```
 
 From `Demand-to-MVP-Radar`:
@@ -252,6 +291,9 @@ cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
   existing-project overlap as a consumer projection, but it cannot satisfy Radar
   build/focused gates. Broad project overlap remains rejected unless backed by
   matched, source-specific evidence.
+- `IRX-10`: implemented and verified. The manifest-bound reader projection is
+  the only consumer authority; legacy JSON remains diagnostic-only. IRX-6 is
+  the next reader task.
 - `RADAR-PGI-001`: add Radar-side cross-link and fixture parity checks for this
   contract version without changing runtime gates.
 - `RADAR-PGI-003`: run a bounded weekly validation dogfood pass when fresh

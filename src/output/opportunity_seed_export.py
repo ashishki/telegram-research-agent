@@ -457,6 +457,9 @@ def _seed_from_row(
         "verification_needed": infer_verification_needed(surfaces),
         "anti_complexity_note": infer_anti_complexity_note(mvp_shape),
         "private": False,
+        "radar_role": "candidate_evidence",
+        "context_only": False,
+        "build_ready_evidence": False,
     }
 
 
@@ -503,6 +506,9 @@ def _seed_from_knowledge_thread(thread: dict) -> dict[str, object]:
         "knowledge_thread_status": thread.get("status"),
         "knowledge_atom_types": atom_types,
         "source_atom_ids": thread.get("source_atom_ids") or [],
+        "radar_role": "candidate_evidence",
+        "context_only": False,
+        "build_ready_evidence": False,
     }
 
 

@@ -44,7 +44,12 @@ from config.settings import Settings  # noqa: E402
 from db.frontier_analysis import upsert_frontier_analysis  # noqa: E402
 from db.knowledge_atoms import record_knowledge_atom  # noqa: E402
 from db.migrate import run_migrations  # noqa: E402
-from output.ai_visual_report import _escape, _project_links, generate_ai_visual_report  # noqa: E402
+from output.ai_visual_report import (  # noqa: E402
+    _escape,
+    _load_mvp_radar_dossier,
+    _project_links,
+    generate_ai_visual_report,
+)
 from output.idea_threads import refresh_idea_threads  # noqa: E402
 import main  # noqa: E402
 
@@ -418,7 +423,11 @@ process.exit(2);
         self.assertEqual(metadata["mvp_radar"]["status"], "loaded")
         self.assertEqual(metadata["mvp_radar"]["decision"], "do_not_build")
         self.assertEqual(metadata["mvp_radar"]["selected_candidate"], "LLM Guardrail Watchdog")
+        self.assertEqual(metadata["mvp_radar"]["reader_state"], "unbound_legacy")
+        self.assertEqual(metadata["mvp_radar"]["reader_decision"], "unavailable")
         self.assertEqual(metadata["mvp_radar"]["kir_evidence"]["thread_slug"], "eval-gates")
+        self.assertEqual(metadata["mvp_radar"]["matched_kir_provenance"], [])
+        self.assertEqual(metadata["mvp_radar"]["matched_external_proof"], [])
         self.assertFalse(metadata["mvp_radar"]["external_evidence"]["decision_grade_external"])
         self.assertFalse(metadata["mvp_radar"]["live_source_intelligence"]["used_for_build_decision"])
         self.assertEqual(metadata["report_contract"]["html_language"], "ru")
@@ -464,6 +473,65 @@ process.exit(2);
         self.assertTrue(metadata["feedback_targets"])
         self.assertIn("AI-интеллект", summary.notification_text)
         self.assertIn("Проектные лиды", summary.notification_text)
+
+    def test_visual_radar_states_do_not_invent_candidate_or_kill_criteria(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            missing_path = root / "missing-radar.json"
+            legacy_path = root / "legacy-radar.json"
+            wrong_week_path = root / "wrong-week-radar.json"
+            legacy_path.write_text(
+                json.dumps(
+                    {
+                        "reporting_week": "2026-W28",
+                        "result": {"status": "no_evidence"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            wrong_week_path.write_text(
+                json.dumps(
+                    {
+                        "reporting_week": "2026-W27",
+                        "result": {
+                            "status": "selected",
+                            "selected_title": "Candidate from another week",
+                        },
+                        "selected": {
+                            "kill_criteria": ["Foreign-week kill criterion"],
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            missing = _load_mvp_radar_dossier("2026-W28", missing_path)
+            legacy = _load_mvp_radar_dossier("2026-W28", legacy_path)
+            wrong_week = _load_mvp_radar_dossier("2026-W28", wrong_week_path)
+
+        self.assertEqual(missing["reader_state"], "missing")
+        self.assertTrue(missing["partial"])
+        self.assertIsNone(missing["selected_candidate"])
+        self.assertEqual(missing["kill_criteria"], [])
+
+        self.assertEqual(legacy["reader_state"], "unbound_legacy")
+        self.assertTrue(legacy["partial"])
+        self.assertEqual(legacy["reader_decision"], "unavailable")
+        self.assertIsNone(legacy["selected_candidate"])
+        self.assertEqual(legacy["kill_criteria"], [])
+
+        self.assertEqual(wrong_week["reader_state"], "invalid")
+        self.assertTrue(wrong_week["partial"])
+        self.assertIsNone(wrong_week["selected_candidate"])
+        self.assertEqual(wrong_week["kill_criteria"], [])
+        self.assertNotIn(
+            "Candidate from another week",
+            json.dumps(wrong_week, ensure_ascii=False),
+        )
+        self.assertNotIn(
+            "Foreign-week kill criterion",
+            json.dumps(wrong_week, ensure_ascii=False),
+        )
 
     def test_project_implications_ignore_generic_keyword_overlap(self):
         context = {
@@ -529,7 +597,7 @@ process.exit(2);
         stdout = io.StringIO()
         with tempfile.TemporaryDirectory() as output_dir, tempfile.TemporaryDirectory() as tool_dir:
             try:
-                settings = self._seed(db_path)
+                self._seed(db_path)
                 archify_root = self._fake_archify_root(Path(tool_dir))
                 with patch.dict(os.environ, {"AGENT_DB_PATH": db_path}, clear=False):
                     with patch("bot.telegram_delivery.send_document", return_value=123) as send_document:

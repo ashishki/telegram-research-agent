@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import output.weekly_intelligence_orchestrator as orchestrator_module
+from output.ai_report_contract import RADAR_INTELLIGENCE_CONTRACT_VERSION
 from output.mvp_weekly_pipeline import MvpWeeklyPipelineResult
 from output.frontier_analysis import frontier_analysis_fingerprint
 from output.reporting_period import resolve_reporting_period
@@ -72,14 +73,99 @@ class TestWeeklyIntelligenceOrchestrator(unittest.TestCase):
     def _radar(self, **overrides):
         def invoke(_settings, **kwargs):
             period = kwargs["reporting_period"]
+            period_fields = period.to_dict()
+            candidate_title = "Same-run Candidate"
+            source_mix = {
+                "readiness": "telegram_only",
+                "selected_external_evidence_count": 0,
+                "selected_external_source_types": [],
+                "decision_grade_external": False,
+                "selected_telegram_seed_evidence_count": 1,
+                "kir_required": True,
+                "kir_gate_status": "missing_kir_thread",
+                "kir_has_fresh_thread": False,
+                "kir_source_atom_count": 0,
+                "kir_source_url_count": 0,
+            }
+            missing_evidence = ["Need matched external demand evidence."]
+            missing_by_category = {
+                "external_corroboration": {
+                    "evidence_kind": "search_demand",
+                    "missing_evidence": missing_evidence,
+                    "next_intent": "search_demand",
+                    "next_query": '"same-run candidate" problem',
+                }
+            }
+            validation_queries = {
+                "schema_version": "radar_validation_evidence.v1",
+                "next_query": {
+                    "query": '"same-run candidate" problem',
+                    "intent": "search_demand",
+                },
+                "queries_by_intent": {
+                    "search_demand": [
+                        {
+                            "query": '"same-run candidate" problem',
+                            "intent": "search_demand",
+                            "source_types": ["serp"],
+                            "target_candidate": candidate_title,
+                        }
+                    ]
+                },
+            }
+            decision_change_action = {
+                "current_gate": "investigate",
+                "matched_external_evidence_count": 0,
+                "matched_external_source_types": [],
+                "market_context_role": "context_only_not_proof",
+                "context_only_results_rule": (
+                    "unmatched external research remains context only and is not proof"
+                ),
+                "missing_category": "external_corroboration",
+                "next_query": '"same-run candidate" problem',
+                "next_intent": "search_demand",
+                "next_validation_action": (
+                    "Run the bounded query and attach only candidate-matched evidence."
+                ),
+                "required_gate_change": (
+                    "two independent matched external source types"
+                ),
+            }
+            selected = {
+                "candidate_id": "candidate:same-run-candidate",
+                "title": candidate_title,
+                "dossier_status": "investigate",
+                "recommendation": "revisit_with_evidence_gap",
+                "confidence": "medium",
+                "score": 61,
+                "decision_reason": "source_mix_gate",
+                "source_mix": source_mix,
+                "matched_external_evidence": [],
+                "missing_evidence": missing_evidence,
+                "missing_evidence_by_category": missing_by_category,
+                "validation_queries": validation_queries,
+                "decision_change_action": decision_change_action,
+                "next_experiment": ["Validate the exact pain with five operators."],
+                "kill_criteria": [
+                    "Stop if no operator confirms the exact recurring pain."
+                ],
+            }
             seed_path = Path(kwargs["seed_output_path"])
             seed_path.parent.mkdir(parents=True, exist_ok=True)
             seed_path.write_text(
                 json.dumps(
                     [
                         {
-                            "title": "Bound candidate seed",
-                            **period.to_dict(),
+                            "upstream_id": "telegram:@fixture:1",
+                            "contract_version": RADAR_INTELLIGENCE_CONTRACT_VERSION,
+                            "captured_at": "2026-07-12T10:00:00Z",
+                            "title": candidate_title,
+                            "mvp_shape": candidate_title,
+                            "source_url": "https://t.me/fixture/1",
+                            "radar_role": "candidate_evidence",
+                            "context_only": False,
+                            "build_ready_evidence": False,
+                            **period_fields,
                         }
                     ]
                 ),
@@ -89,22 +175,46 @@ class TestWeeklyIntelligenceOrchestrator(unittest.TestCase):
             source_path.write_text(
                 json.dumps(
                     {
+                        "schema_version": "demand_mvp_radar.mvp_of_week.v1",
+                        **period_fields,
                         "result": {
                             "run_id": kwargs["radar_run_id"],
                             "status": "selected",
-                            "selected_title": "Same-run Candidate",
+                            "selected_title": candidate_title,
                             "dossier_status": "investigate",
                             "recommendation": "revisit_with_evidence_gap",
                             "score": 61,
-                            "selected_source_mix": {
-                                "decision_grade_external": False,
-                            },
+                            "selected_source_mix": source_mix,
+                            "matched_external_evidence": [],
+                            "missing_evidence_by_category": missing_by_category,
+                            "decision_change_action": decision_change_action,
                         },
-                        "selected": {
-                            "title": "Same-run Candidate",
-                            "dossier_status": "investigate",
-                            "recommendation": "revisit_with_evidence_gap",
-                            "missing_evidence": ["matched external demand"],
+                        "selected": selected,
+                        "matched_external_evidence": [],
+                        "missing_evidence_by_category": missing_by_category,
+                        "validation_queries": validation_queries,
+                        "decision_change_action": decision_change_action,
+                        "decision_context": {
+                            "market_context": {
+                                "status": "context_only",
+                                "record_count": 1,
+                                "records": [
+                                    {
+                                        "source_id": "market-context:fixture",
+                                        "source_title": "Adjacent market context",
+                                        "source_type": "market_context",
+                                        "source_url": "https://example.com/context",
+                                        "reason": "Not matched to the selected candidate.",
+                                        "radar_role": "context_only",
+                                        "context_only": True,
+                                        "build_ready_evidence": False,
+                                        "source_gate_satisfied": False,
+                                    }
+                                ],
+                                "context_only": True,
+                                "build_ready_evidence": False,
+                                "source_gate_satisfied": False,
+                            }
                         },
                     }
                 ),
@@ -117,10 +227,14 @@ class TestWeeklyIntelligenceOrchestrator(unittest.TestCase):
                 "radar_status": "selected",
                 "report_path": None,
                 "json_path": str(source_path),
-                "selected_title": "Same-run Candidate",
+                "selected_title": candidate_title,
                 "dossier_status": "investigate",
                 "recommendation": "revisit_with_evidence_gap",
                 "score": 61,
+                "selected_source_mix": source_mix,
+                "matched_external_evidence": [],
+                "missing_evidence_by_category": missing_by_category,
+                "decision_change_action": decision_change_action,
                 "radar_run_id": kwargs["radar_run_id"],
                 "live_intelligence_path": (
                     str(kwargs["live_intelligence_path"])
@@ -128,7 +242,7 @@ class TestWeeklyIntelligenceOrchestrator(unittest.TestCase):
                     else None
                 ),
                 "knowledge_thread_count": 0,
-                **period.to_dict(),
+                **period_fields,
             }
             values.update(overrides)
             return MvpWeeklyPipelineResult(**values)
@@ -339,12 +453,67 @@ class TestWeeklyIntelligenceOrchestrator(unittest.TestCase):
             self.assertEqual(payload["manifest_path"], result.manifest_path)
             self.assertEqual(payload["run_status"], "complete")
             self.assertEqual(payload["analysis_period_end"], "2026-07-13T00:00:00Z")
-        self.assertEqual(brief["mvp_radar"]["selected_candidate"], "Same-run Candidate")
-        self.assertEqual(brief["mvp_radar"]["status"], "selected")
+        radar_reader = brief["mvp_radar_reader"]
+        self.assertEqual(brief["mvp_radar"], radar_reader)
+        self.assertEqual(radar_reader["schema_version"], "mvp_radar_reader.v1")
+        self.assertEqual(radar_reader["reader_state"], "available")
+        self.assertEqual(radar_reader["candidate_state"], "selected")
+        self.assertFalse(radar_reader["partial"])
+        self.assertEqual(radar_reader["manifest_run_id"], result.run_id)
+        self.assertEqual(radar_reader["radar_run_id"], "irx2-test-run-radar")
+        self.assertEqual(radar_reader["reporting_week"], "2026-W28")
+        self.assertEqual(radar_reader["selected_candidate"], "Same-run Candidate")
+        self.assertEqual(
+            radar_reader["candidate"]["candidate_id"],
+            "candidate:same-run-candidate",
+        )
+        self.assertEqual(radar_reader["status"], "selected")
+        self.assertEqual(radar_reader["reader_decision"], "investigate")
+        self.assertEqual(radar_reader["matched_external_proof"], [])
+        self.assertEqual(radar_reader["matched_external_evidence"], [])
+        self.assertEqual(len(radar_reader["unmatched_context"]), 1)
+        self.assertTrue(radar_reader["unmatched_context"][0]["context_only"])
+        self.assertFalse(
+            radar_reader["unmatched_context"][0]["source_gate_satisfied"]
+        )
+        self.assertIn(
+            "Need matched external demand evidence.",
+            radar_reader["missing_evidence"],
+        )
+        self.assertEqual(
+            radar_reader["next_validation_query"]["query"],
+            '"same-run candidate" problem',
+        )
+        self.assertEqual(
+            radar_reader["kill_criteria"],
+            ["Stop if no operator confirms the exact recurring pain."],
+        )
+        self.assertFalse(
+            radar_reader["evidence_policy"]["context_only_can_satisfy_gate"]
+        )
+        self.assertEqual(brief["mvp_radar_gate"]["decision"], "do_not_build")
+        self.assertEqual(brief["mvp_radar_gate"]["matched_gate_evidence_count"], 0)
         binding_path = Path(result.manifest_path).parent / manifest["stages"]["radar"]["binding_path"]
         binding = json.loads(binding_path.read_text(encoding="utf-8"))
         self.assertEqual(binding["manifest_run_id"], result.run_id)
         self.assertEqual(binding["radar_run_id"], "irx2-test-run-radar")
+        self.assertEqual(
+            binding["selected_candidate"]["candidate_id"],
+            "candidate:same-run-candidate",
+        )
+        self.assertEqual(
+            radar_reader["artifact_ref"]["binding_path"],
+            manifest["stages"]["radar"]["binding_path"],
+        )
+        seed_path = (
+            Path(result.manifest_path).parent
+            / manifest["stages"]["radar"]["seed_export_path"]
+        )
+        seed = json.loads(seed_path.read_text(encoding="utf-8"))[0]
+        self.assertEqual(seed["radar_role"], "candidate_evidence")
+        self.assertFalse(seed["context_only"])
+        self.assertFalse(seed["build_ready_evidence"])
+        self.assertEqual(seed["reporting_week"], manifest["reporting_week"])
 
     def test_reaction_failure_is_partial_and_uses_pre_run_snapshot(self):
         with patch(
@@ -745,6 +914,14 @@ class TestWeeklyIntelligenceOrchestrator(unittest.TestCase):
         self.assertFalse(brief["mvp_radar"]["selected_candidate"])
         self.assertEqual(brief["mvp_radar"]["status"], "not_available")
         self.assertFalse(brief["mvp_radar"]["source_path"])
+        self.assertEqual(brief["mvp_radar"]["reader_state"], "missing")
+        self.assertEqual(
+            brief["mvp_radar"]["candidate_state"],
+            "unknown_due_to_unavailable_radar",
+        )
+        self.assertEqual(brief["mvp_radar"]["reader_decision"], "unavailable")
+        self.assertTrue(brief["mvp_radar"]["partial"])
+        self.assertNotEqual(brief["mvp_radar"]["candidate_state"], "no_candidate")
 
     def test_intentional_radar_disable_is_complete_but_reader_visible(self):
         with patch(
@@ -761,7 +938,14 @@ class TestWeeklyIntelligenceOrchestrator(unittest.TestCase):
         self.assertEqual(manifest["stages"]["radar"]["status"], "disabled")
         brief_json = json.loads(Path(result.weekly_brief_json_path).read_text(encoding="utf-8"))
         brief_html = Path(result.weekly_brief_html_path).read_text(encoding="utf-8")
-        self.assertTrue(brief_json["mvp_radar"]["disabled"])
+        self.assertEqual(brief_json["mvp_radar"]["reader_state"], "disabled")
+        self.assertEqual(
+            brief_json["mvp_radar"]["candidate_state"],
+            "intentionally_disabled",
+        )
+        self.assertEqual(brief_json["mvp_radar"]["reader_decision"], "unavailable")
+        self.assertFalse(brief_json["mvp_radar"]["partial"])
+        self.assertIsNone(brief_json["mvp_radar"]["selected_candidate"])
         self.assertEqual(brief_json["mvp_radar_gate"]["radar_artifact_status"], "disabled")
         self.assertEqual(brief_json["mvp_radar_gate"]["warning"], RADAR_DISABLED_DISCLOSURE_RU)
         self.assertIn(RADAR_DISABLED_DISCLOSURE_RU, brief_html)

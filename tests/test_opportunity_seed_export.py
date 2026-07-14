@@ -123,6 +123,9 @@ class TestOpportunitySeedExport(unittest.TestCase):
             self.assertEqual([seed["post_id"] for seed in seeds], ["1"])
             self.assertEqual(seeds[0]["reporting_week"], "2026-W28")
             self.assertEqual(seeds[0]["period_mode"], "completed_iso_week")
+            self.assertEqual(seeds[0]["radar_role"], "candidate_evidence")
+            self.assertFalse(seeds[0]["context_only"])
+            self.assertFalse(seeds[0]["build_ready_evidence"])
 
     def test_exports_demand_surface_seed_for_radar(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -207,6 +210,9 @@ class TestOpportunitySeedExport(unittest.TestCase):
             self.assertEqual(seeds[0]["mvp_shape"], "Telegram Channel SEO Site Generator")
             self.assertIn("creator_content_gap", seeds[0]["demand_surfaces"])
             self.assertEqual(seeds[0]["source_url"], "https://t.me/its_capitan/100")
+            self.assertEqual(seeds[0]["radar_role"], "candidate_evidence")
+            self.assertFalse(seeds[0]["context_only"])
+            self.assertFalse(seeds[0]["build_ready_evidence"])
 
     def test_exports_knowledge_thread_seed_for_radar(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -259,6 +265,9 @@ class TestOpportunitySeedExport(unittest.TestCase):
             self.assertIn("knowledge_thread_slug", seeds[0])
             self.assertEqual(seeds[0]["source_atom_ids"], [1])
             self.assertEqual(seeds[0]["source_url"], "https://t.me/market_ai/501")
+            self.assertEqual(seeds[0]["radar_role"], "candidate_evidence")
+            self.assertFalse(seeds[0]["context_only"])
+            self.assertFalse(seeds[0]["build_ready_evidence"])
 
     def test_bounded_hype_only_thread_remains_ineligible_for_radar_seed(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -443,6 +452,7 @@ class TestOpportunitySeedExport(unittest.TestCase):
             self.assertEqual(market_pack["raw_fallback_posts_scanned"], 1)
             self.assertTrue(market_pack["analyst_context"]["market_pains"])
             self.assertFalse(context_seed["build_ready_evidence"])
+            self.assertTrue(context_seed["context_only"])
             self.assertEqual(context_seed["radar_role"], "context_only")
             self.assertEqual(context_seed["evidence_strength"], "context_only_market_analyst_pack")
             self.assertIn("external demand validation", context_seed["verification_needed"][1])
@@ -525,6 +535,8 @@ class TestOpportunitySeedExport(unittest.TestCase):
             self.assertIn("Baseline:", context_seed["text"])
             self.assertIn("Weekly delta:", context_seed["text"])
             self.assertEqual(context_seed["radar_role"], "context_only")
+            self.assertTrue(context_seed["context_only"])
+            self.assertFalse(context_seed["build_ready_evidence"])
             self.assertTrue(Path(result.market_lens_path).exists())
             self.assertTrue(Path(result.market_baseline_path).exists())
             self.assertTrue(Path(result.market_delta_path).exists())

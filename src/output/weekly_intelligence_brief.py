@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 import os
 import sqlite3
@@ -14,6 +15,15 @@ from output.ai_report_contract import (
     INTELLIGENCE_CONTRACT_VERSION,
     RADAR_INTELLIGENCE_CONTRACT_VERSION,
     build_canonical_intelligence_contract,
+)
+from output.mvp_radar_reader import (
+    MVP_RADAR_READER_SCHEMA_VERSION,
+    MvpRadarReaderError,
+    adapt_legacy_mvp_radar_payload,
+    invalid_mvp_radar_projection,
+    load_unbound_mvp_radar_reader,
+    missing_mvp_radar_projection,
+    validate_mvp_radar_reader_projection,
 )
 from output.learning_layer import build_project_learning_projection
 from output.ai_intelligence_report import (
@@ -48,13 +58,6 @@ BRIEF_SECTIONS = (
     ("brief-mvp-radar", "MVP Radar", "mvp_radar"),
     ("brief-feedback", "Feedback Prompts", "feedback"),
 )
-NON_BUILD_READY_RECOMMENDATIONS = {
-    "revisit_with_evidence_gap",
-    "needs_more_evidence",
-    "needs_more_specific_scope",
-    "existing_project_context",
-    "reject",
-}
 RUN_IDENTITY_FIELDS = (
     "run_id",
     "manifest_path",
@@ -211,14 +214,20 @@ def build_weekly_intelligence_brief_artifact(
     mvp_radar: Mapping[str, object] | None = None,
     related_artifacts: dict | None = None,
     run_identity: Mapping[str, object] | None = None,
+    run_manifest: Mapping[str, object] | None = None,
 ) -> WeeklyIntelligenceBriefSummary:
     identity = _run_identity_fields(context, run_identity)
     artifact_context = {**context, **identity}
-    normalized_mvp = _normalize_mvp_radar(mvp_radar or {})
+    normalized_mvp = _normalize_mvp_radar(
+        mvp_radar or {},
+        expected_identity=artifact_context,
+        run_manifest=run_manifest,
+    )
     html_text, actions = render_weekly_intelligence_brief_html(
         artifact_context,
         generated_at=generated_at,
         mvp_radar=normalized_mvp,
+        run_manifest=run_manifest,
     )
     findings = validate_weekly_intelligence_brief_html(html_text)
     critical = [finding for finding in findings if finding.severity == SEVERITY_CRITICAL]
@@ -322,6 +331,7 @@ def render_weekly_intelligence_brief_html(
     *,
     generated_at: str | None = None,
     mvp_radar: Mapping[str, object] | None = None,
+    run_manifest: Mapping[str, object] | None = None,
 ) -> tuple[str, list[dict]]:
     week_label = str(context.get("week_label") or "")
     period_label = _human_period_label(context) or week_label
@@ -332,7 +342,11 @@ def render_weekly_intelligence_brief_html(
         or context.get("feedback_context")
         or {},
     )
-    normalized_mvp = _normalize_mvp_radar(mvp_radar or {})
+    normalized_mvp = _normalize_mvp_radar(
+        mvp_radar or {},
+        expected_identity=context,
+        run_manifest=run_manifest,
+    )
     run_status_notice = _render_run_status_notice(context)
     reaction_receipt = _render_reaction_effect_receipt(context, "weekly_brief")
     run_identity_metadata = _render_run_identity_metadata(context)
@@ -481,24 +495,8 @@ def load_mvp_radar_summary(week_label: str, explicit_path: str | Path | None = N
     for path in _candidate_mvp_paths(week_label, explicit_path):
         if not path.exists():
             continue
-        try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
-        if isinstance(payload, dict):
-            result = _normalize_mvp_radar(payload)
-            result["source_path"] = str(path)
-            return result
-    return {
-        "status": "not_available",
-        "selected_candidate": None,
-        "dossier_status": None,
-        "recommendation": "needs_more_evidence",
-        "source_mix": {},
-        "missing_evidence": ["MVP Radar JSON artifact was not available for this week."],
-        "next_validation": ["Run mvp-weekly after opportunity seed export."],
-        "source_path": str(explicit_path) if explicit_path else None,
-    }
+        return load_unbound_mvp_radar_reader(path, expected_week=week_label)
+    return missing_mvp_radar_projection(week_label, source_path=explicit_path)
 
 
 def build_weekly_intelligence_brief_notification(summary: WeeklyIntelligenceBriefSummary) -> str:
@@ -543,6 +541,10 @@ def _weekly_brief_metadata(
     intelligence_contract = build_canonical_intelligence_contract(
         context,
         mvp_radar=mvp_radar,
+        mvp_radar_authoritative=(
+            mvp_radar.get("schema_version") == MVP_RADAR_READER_SCHEMA_VERSION
+            and mvp_radar.get("reader_state") in {"available", "no_candidate"}
+        ),
         project_learning_projection=project_learning_projection,
     )
     decision_cockpit = _decision_cockpit(context, actions, mvp_radar)
@@ -586,6 +588,7 @@ def _weekly_brief_metadata(
         "decision_cockpit": decision_cockpit,
         "intelligence_contract": intelligence_contract,
         "mvp_radar": mvp_radar,
+        "mvp_radar_reader": mvp_radar,
         "mvp_radar_gate": decision_cockpit["mvp_radar_gate"],
         "feedback_context": context.get("feedback_context") or {},
         **(
@@ -1044,7 +1047,8 @@ def _render_project_learning_projection(projection: Mapping[str, object]) -> str
 
 
 def _render_mvp_radar(mvp_radar: Mapping[str, object]) -> str:
-    candidate = str(mvp_radar.get("selected_candidate") or "No candidate selected")
+    reader_state = str(mvp_radar.get("reader_state") or "unbound_legacy")
+    candidate = _mvp_reader_heading(mvp_radar)
     recommendation = str(mvp_radar.get("recommendation") or mvp_radar.get("dossier_status") or "needs_more_evidence")
     missing = "".join(f"<li>{_escape(item)}</li>" for item in _string_values(mvp_radar.get("missing_evidence"))[:5])
     summary = _mvp_validation_summary(mvp_radar)
@@ -1054,17 +1058,24 @@ def _render_mvp_radar(mvp_radar: Mapping[str, object]) -> str:
         missing_checklist = f'<ul class="missing-list">{missing or "<li>No missing evidence listed.</li>"}</ul>'
     source_path = str(mvp_radar.get("source_path") or "")
     radar_status = str(mvp_radar.get("status") or "")
-    disabled_disclosure = (
+    state_disclosure = (
         f'<p class="run-status radar-disabled"><strong>{_escape(RADAR_DISABLED_DISCLOSURE_RU)}</strong></p>'
-        if radar_status in {"disabled", "intentionally_disabled"} or bool(mvp_radar.get("disabled"))
-        else ""
+        if reader_state == "disabled"
+        else (
+            '<p class="run-status"><strong>'
+            + _escape(str(mvp_radar.get("decision_reason_ru") or summary["warning"]))
+            + "</strong></p>"
+            if reader_state in {"missing", "invalid", "unbound_legacy", "no_candidate"}
+            else ""
+        )
     )
     source_link = f'<p class="sources">{_link(source_path, "MVP Radar JSON")}</p>' if source_path and radar_status != "not_available" else ""
     return (
         '<article class="brief-card">'
-        f'{disabled_disclosure}'
+        f'{state_disclosure}'
         f'<h3>{_escape(candidate)}</h3>'
         f'<p><span class="tag">{_escape(recommendation)}</span> {_escape(decision)}</p>'
+        f'<p>{_escape(str(mvp_radar.get("decision_reason_ru") or ""))}</p>'
         f'{source_link}'
         "<h3>MVP Radar Gate Card</h3>"
         '<div class="mvp-gate-grid">'
@@ -1080,11 +1091,68 @@ def _render_mvp_radar(mvp_radar: Mapping[str, object]) -> str:
         '</div>'
         f'{_render_validation_query_pack(mvp_radar, summary)}'
         f'{_render_matched_evidence(mvp_radar)}'
+        f'{_render_kir_provenance(mvp_radar)}'
+        f'{_render_unmatched_context(mvp_radar)}'
         "<h3>Missing Evidence Checklist</h3>"
         f'{missing_checklist}'
         "<h3>What Would Change The Decision</h3>"
         f'{_render_decision_change_action(mvp_radar, summary)}'
+        f'{_render_kill_criteria(mvp_radar)}'
         "</article>"
+    )
+
+
+def _mvp_reader_heading(mvp_radar: Mapping[str, object]) -> str:
+    candidate = str(mvp_radar.get("selected_candidate") or "").strip()
+    state = str(mvp_radar.get("reader_state") or "")
+    if candidate:
+        return candidate
+    if state == "no_candidate":
+        return "Radar успешно завершён: кандидат не выбран"
+    if state == "disabled":
+        return "MVP Radar отключён"
+    return "MVP Radar недоступен для этого запуска"
+
+
+def _render_kir_provenance(mvp_radar: Mapping[str, object]) -> str:
+    records = _object_list(mvp_radar.get("matched_kir_provenance"))
+    if not records:
+        return "<h3>KIR Provenance</h3><p>Связанная KIR provenance не подтверждена.</p>"
+    items = []
+    for record in records[:4]:
+        title = str(record.get("thread_title") or record.get("thread_slug") or "KIR thread")
+        atoms = len(record.get("source_atom_ids") or [])
+        urls = len(record.get("source_urls") or [])
+        items.append(
+            f"<li><b>{_escape(title)}</b>: {_escape(str(atoms))} atom(s), "
+            f"{_escape(str(urls))} source URL(s); context_only=false.</li>"
+        )
+    return "<h3>KIR Provenance</h3><ul>" + "".join(items) + "</ul>"
+
+
+def _render_unmatched_context(mvp_radar: Mapping[str, object]) -> str:
+    records = _object_list(mvp_radar.get("unmatched_context"))
+    if not records:
+        return "<h3>Unmatched Context</h3><p>Контекстные записи не приложены.</p>"
+    items = []
+    for record in records[:5]:
+        title = str(record.get("title") or record.get("source_type") or "Context")
+        reason = str(record.get("reason") or "Не совпадает с выбранным кандидатом.")
+        items.append(
+            f"<li><b>{_escape(title)}</b>: {_escape(reason)} "
+            '<span class="muted">context_only; не является proof.</span></li>'
+        )
+    return "<h3>Unmatched Context</h3><ul>" + "".join(items) + "</ul>"
+
+
+def _render_kill_criteria(mvp_radar: Mapping[str, object]) -> str:
+    criteria = _string_values(mvp_radar.get("kill_criteria"))[:5]
+    if not criteria:
+        return "<h3>Kill Criteria</h3><p>Критерии остановки не предоставлены.</p>"
+    return (
+        "<h3>Kill Criteria</h3><ul>"
+        + "".join(f"<li>{_escape(item)}</li>" for item in criteria)
+        + "</ul>"
     )
 
 
@@ -1102,48 +1170,75 @@ def _render_feedback_prompts(context: dict) -> str:
     return "<ul>" + "".join(f"<li>{_escape(prompt)}</li>" for prompt in prompts) + "</ul>"
 
 
-def _normalize_mvp_radar(payload: Mapping[str, object]) -> dict:
-    result = payload.get("result") if isinstance(payload.get("result"), Mapping) else {}
-    selected = payload.get("selected") if isinstance(payload.get("selected"), Mapping) else {}
-    candidate = (
-        _clean_text(result.get("selected_title"))
-        or _clean_text(selected.get("title"))
-        or _clean_text(payload.get("selected_candidate"))
-        or _clean_text(payload.get("selected_title"))
+def _normalize_mvp_radar(
+    payload: Mapping[str, object],
+    *,
+    expected_identity: Mapping[str, object],
+    run_manifest: Mapping[str, object] | None,
+) -> dict:
+    expected_week = _clean_text(
+        expected_identity.get("reporting_week")
+        or expected_identity.get("week_label")
+        or payload.get("reporting_week")
+        or payload.get("week_label")
     )
-    recommendation = (
-        _clean_text(result.get("recommendation"))
-        or _clean_text(selected.get("recommendation"))
-        or _clean_text(payload.get("recommendation"))
-    )
-    dossier_status = (
-        _clean_text(result.get("dossier_status"))
-        or _clean_text(selected.get("dossier_status"))
-        or _clean_text(payload.get("dossier_status"))
-    )
-    return {
-        "status": (
-            _clean_text(payload.get("status"))
-            or _clean_text(result.get("status"))
-            or _clean_text(selected.get("status"))
-            or "loaded"
+    if payload.get("schema_version") == MVP_RADAR_READER_SCHEMA_VERSION:
+        try:
+            state = payload.get("reader_state")
+            if state in {"available", "no_candidate"}:
+                if run_manifest is None:
+                    raise MvpRadarReaderError(
+                        "authoritative Radar projection requires the current run manifest"
+                    )
+                validate_mvp_radar_reader_projection(
+                    payload,
+                    manifest=run_manifest,
+                )
+                _validate_mvp_consumer_identity(payload, expected_identity)
+            else:
+                validate_mvp_radar_reader_projection(payload)
+            return copy.deepcopy(dict(payload))
+        except (
+            MvpRadarReaderError,
+            TypeError,
+            ValueError,
+            RecursionError,
+            OverflowError,
+        ) as exc:
+            return invalid_mvp_radar_projection(
+                expected_week,
+                source_path=_clean_text(payload.get("source_path")) or None,
+                reason=f"MVP Radar reader projection не связан с этим выпуском: {exc}",
+            )
+    try:
+        return adapt_legacy_mvp_radar_payload(
+            payload,
+            source_path=_clean_text(payload.get("source_path")) or None,
+            expected_week=expected_week,
+        )
+    except MvpRadarReaderError as exc:
+        return invalid_mvp_radar_projection(
+            expected_week,
+            source_path=_clean_text(payload.get("source_path")) or None,
+            reason=f"MVP Radar JSON недействителен: {exc}",
+        )
+
+
+def _validate_mvp_consumer_identity(
+    projection: Mapping[str, object], expected: Mapping[str, object]
+) -> None:
+    parity = {
+        "manifest_run_id": _clean_text(expected.get("run_id")),
+        "reporting_week": _clean_text(
+            expected.get("reporting_week") or expected.get("week_label")
         ),
-        "disabled": bool(payload.get("disabled")),
-        "selected_candidate": candidate,
-        "dossier_status": dossier_status,
-        "recommendation": recommendation,
-        "score": result.get("score") or selected.get("score") or payload.get("score"),
-        "source_mix": _first_mapping(result.get("selected_source_mix"), selected.get("source_mix"), payload.get("source_mix")),
-        "missing_evidence": _string_values(selected.get("missing_evidence") or result.get("missing_evidence") or payload.get("missing_evidence")),
-        "next_validation": _string_values(selected.get("next_validation") or selected.get("next_step") or result.get("next_validation") or payload.get("next_validation")),
-        "validation_queries": _first_mapping(selected.get("validation_queries"), payload.get("validation_queries"), result.get("validation_queries")),
-        "matched_external_evidence": _object_list(selected.get("matched_external_evidence") or payload.get("matched_external_evidence") or result.get("matched_external_evidence")),
-        "missing_evidence_by_category": _first_mapping(selected.get("missing_evidence_by_category"), payload.get("missing_evidence_by_category"), result.get("missing_evidence_by_category")),
-        "validation_adapter_status": _first_mapping(payload.get("validation_adapter_status"), result.get("validation_adapter_status")),
-        "decision_context": _first_mapping(payload.get("decision_context"), result.get("decision_context")),
-        "decision_change_action": _first_mapping(selected.get("decision_change_action"), payload.get("decision_change_action"), result.get("decision_change_action")),
-        "source_path": _clean_text(payload.get("source_path")),
+        "analysis_period_start": _clean_text(expected.get("analysis_period_start")),
+        "analysis_period_end": _clean_text(expected.get("analysis_period_end")),
     }
+    if any(not value for value in parity.values()) or any(
+        projection.get(field) != value for field, value in parity.items()
+    ):
+        raise MvpRadarReaderError("Radar reader identity differs from the Brief run")
 
 
 def _candidate_mvp_paths(week_label: str, explicit_path: str | Path | None) -> list[Path]:
@@ -1226,12 +1321,17 @@ def _mvp_gate_card(mvp_radar: Mapping[str, object]) -> dict:
 
 
 def _mvp_validation_summary(mvp_radar: Mapping[str, object]) -> dict[str, object]:
+    reader_state = str(mvp_radar.get("reader_state") or "unbound_legacy")
     matches = _object_list(mvp_radar.get("matched_external_evidence"))
-    gate_matches = [
-        match
-        for match in matches
-        if bool(match.get("supports_gate")) and bool(match.get("decision_grade", True))
-    ]
+    gate_matches = (
+        [
+            match
+            for match in _object_list(mvp_radar.get("matched_external_proof"))
+            if _is_gate_eligible_match(match)
+        ]
+        if reader_state == "available"
+        else []
+    )
     source_types = sorted(
         {
             str(match.get("source_type") or "").strip()
@@ -1241,24 +1341,25 @@ def _mvp_validation_summary(mvp_radar: Mapping[str, object]) -> dict[str, object
     )
     decision_context = _first_mapping(mvp_radar.get("decision_context"))
     market_context = _first_mapping(decision_context.get("market_context"))
-    external_context = _first_mapping(decision_context.get("external_research_context"))
-    unmatched_count = _safe_int(external_context.get("record_count")) if external_context else 0
-    adapter_status = _adapter_status_summary(_first_mapping(mvp_radar.get("validation_adapter_status")))
+    unmatched_count = len(_object_list(mvp_radar.get("unmatched_context")))
+    adapter_status = "manifest_bound" if reader_state in {"available", "no_candidate"} else reader_state
     next_query = _next_validation_query(mvp_radar)
-    recommendation = str(mvp_radar.get("recommendation") or mvp_radar.get("dossier_status") or "needs_more_evidence")
-    radar_status = str(mvp_radar.get("status") or "").strip()
-    radar_disabled = radar_status in {"disabled", "intentionally_disabled"} or bool(
-        mvp_radar.get("disabled")
-    )
-    artifact_missing = radar_status in {"not_available", "missing"}
-    gate_allows_focus = (
-        bool(gate_matches)
-        and recommendation not in NON_BUILD_READY_RECOMMENDATIONS
-        and not artifact_missing
-        and not radar_disabled
-    )
-    decision = "focused_experiment_allowed" if gate_allows_focus else "do_not_build"
-    decision_label = "Focused experiment may be allowed." if gate_allows_focus else "Do not build yet."
+    reader_decision = str(mvp_radar.get("reader_decision") or "unavailable")
+    dossier_status = str(mvp_radar.get("dossier_status") or "")
+    source_mix = _first_mapping(mvp_radar.get("source_mix"))
+    proof_ready = len(gate_matches) >= 2 and len(source_types) >= 2
+    kir_ready = source_mix.get("kir_required") is not True or source_mix.get("kir_gate_status") == "passed"
+    radar_disabled = reader_state == "disabled"
+    artifact_missing = reader_state in {"missing", "invalid", "unbound_legacy"}
+    if reader_decision == "build_allowed" and proof_ready and kir_ready:
+        decision = "build_allowed"
+        decision_label = "Radar разрешил сборку в пределах указанного scope."
+    elif reader_decision == "investigate" and dossier_status == "focused_experiment" and proof_ready and kir_ready:
+        decision = "focused_experiment_allowed"
+        decision_label = "Radar разрешил только ограниченный проверочный эксперимент."
+    else:
+        decision = "do_not_build"
+        decision_label = "Сборка не разрешена."
     if gate_matches:
         context_note = "Matched decision-grade external evidence is allowed to affect Radar gates."
     elif unmatched_count:
@@ -1268,11 +1369,13 @@ def _mvp_validation_summary(mvp_radar: Mapping[str, object]) -> dict[str, object
     if radar_disabled:
         warning = RADAR_DISABLED_DISCLOSURE_RU
     elif artifact_missing:
-        warning = "MVP Radar artifact is missing; Brief/Atlas continue, but no build/focused decision is allowed."
-    elif not gate_matches:
-        warning = "Build/focused decisions require matched external evidence; market/business context stays context_only."
+        warning = str(mvp_radar.get("decision_reason_ru") or "MVP Radar недоступен; решение по сборке не сформировано.")
+    elif reader_state == "no_candidate":
+        warning = "Radar успешно завершён без выбранного кандидата; это не missing artifact."
+    elif reader_decision in {"investigate", "reject"} or decision == "do_not_build":
+        warning = str(mvp_radar.get("decision_reason_ru") or "Сборка не разрешена.")
     else:
-        warning = "Gate has matched external evidence; still verify candidate scope before action."
+        warning = "Решение подтверждено strict same-run Radar projection."
     return {
         "matched_gate_count": len(gate_matches),
         "matched_source_types": ", ".join(source_types) or "types: none",
@@ -1280,7 +1383,7 @@ def _mvp_validation_summary(mvp_radar: Mapping[str, object]) -> dict[str, object
         "matched_external_evidence_count": len(matches),
         "market_context_status": str(market_context.get("status") or "context_only"),
         "radar_artifact_status": (
-            "disabled" if radar_disabled else ("missing" if artifact_missing else "loaded")
+            "disabled" if radar_disabled else (reader_state if artifact_missing else "loaded")
         ),
         "decision": decision,
         "decision_label": decision_label,
@@ -1292,21 +1395,15 @@ def _mvp_validation_summary(mvp_radar: Mapping[str, object]) -> dict[str, object
     }
 
 
-def _adapter_status_summary(statuses: Mapping[str, object]) -> str:
-    if not statuses:
-        return "not reported"
-    parts = []
-    for name, details in list(statuses.items())[:4]:
-        detail_map = _first_mapping(details)
-        parts.append(f"{name}={detail_map.get('status') or 'unknown'}")
-    return "; ".join(parts) or "not reported"
-
-
-def _safe_int(value: object) -> int:
-    try:
-        return int(value or 0)
-    except (TypeError, ValueError):
-        return 0
+def _is_gate_eligible_match(match: Mapping[str, object]) -> bool:
+    return (
+        match.get("gate_eligible") is True
+        and match.get("supports_gate") is True
+        and match.get("decision_grade") is True
+        and match.get("context_only") is False
+        and match.get("build_ready_evidence") is True
+        and match.get("negative_signal") is False
+    )
 
 
 def _next_validation_query(mvp_radar: Mapping[str, object]) -> dict[str, object]:
@@ -1334,6 +1431,8 @@ def _next_validation_query(mvp_radar: Mapping[str, object]) -> dict[str, object]
                 "intent": str(detail_map.get("next_intent") or category),
                 "source": "missing_evidence_by_category",
             }
+    if mvp_radar.get("schema_version") == MVP_RADAR_READER_SCHEMA_VERSION:
+        return {}
     for item in _string_values(mvp_radar.get("next_validation")):
         return {"query": item, "intent": "operator_validation", "source": "legacy_next_validation"}
     return {}
@@ -1348,7 +1447,11 @@ def _render_validation_query_pack(mvp_radar: Mapping[str, object], summary: Mapp
         f'<p><b>Next repeatable search:</b> <code>{_escape(next_query)}</code> '
         f'<span class="muted">({ _escape(next_intent) })</span></p>'
         if next_query
-        else '<p><b>Next repeatable search:</b> Run Radar with fresh validation sources.</p>'
+        else (
+            f'<p><b>Next validation action:</b> {_escape(mvp_radar.get("next_validation") or "Не указано.")}</p>'
+            if mvp_radar.get("schema_version") == MVP_RADAR_READER_SCHEMA_VERSION
+            else '<p><b>Next repeatable search:</b> Run Radar with fresh validation sources.</p>'
+        )
     )
     items = []
     for intent in ("search_demand", "manual_workarounds", "reddit_forum_complaints", "wtp_signals"):
@@ -1377,7 +1480,7 @@ def _render_matched_evidence(mvp_radar: Mapping[str, object]) -> str:
         source = str(match.get("source_type") or "unknown")
         kind = str(match.get("evidence_kind") or "unknown")
         query = str(match.get("query") or "no query")
-        supports = "gating" if bool(match.get("supports_gate")) else "context only"
+        supports = "gate proof" if _is_gate_eligible_match(match) else "matched, but non-gating"
         url = str(match.get("source_url") or "")
         suffix = f" {_link(url, 'source')}" if url else ""
         items.append(
@@ -1407,15 +1510,24 @@ def _render_decision_change_action(
     summary: Mapping[str, object],
 ) -> str:
     action = _first_mapping(mvp_radar.get("decision_change_action"))
-    action_text = str(action.get("next_validation_action") or "").strip()
-    required = str(action.get("required_gate_change") or "").strip()
+    strict_reader = mvp_radar.get("schema_version") == MVP_RADAR_READER_SCHEMA_VERSION
+    action_text = str(
+        (mvp_radar.get("next_validation") if strict_reader else "")
+        or action.get("next_validation_action")
+        or ""
+    ).strip()
+    required = str(
+        (mvp_radar.get("change_condition") if strict_reader else "")
+        or action.get("required_gate_change")
+        or ""
+    ).strip()
     context_rule = str(action.get("context_only_results_rule") or "").strip()
     next_query = str(summary.get("next_query") or "")
-    if not action_text and next_query:
+    if not action_text and next_query and not strict_reader:
         action_text = f"Run `{next_query}` and attach only candidate-matched external evidence."
-    if not action_text:
+    if not action_text and not strict_reader:
         action_text = "Run the validation query pack and attach candidate-matched external evidence."
-    if not required:
+    if not required and not strict_reader:
         required = "Two independent matched decision-grade external source types before build/focused status."
     if not context_rule:
         context_rule = "Unmatched external research and market lens records remain context only."

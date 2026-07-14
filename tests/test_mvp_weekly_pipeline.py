@@ -534,16 +534,32 @@ class TestMvpWeeklyPipeline(unittest.TestCase):
             live_path = root / "live.json"
             live_path.write_text("{}", encoding="utf-8")
             json_path = root / "radar-result.json"
+            result_fields = {
+                "run_id": "mvp-weekly-live",
+                "status": "selected",
+                "selected_title": None,
+                "dossier_status": None,
+                "recommendation": None,
+                "score": None,
+                "selected_source_mix": {},
+                "validation_adapter_status": {},
+                "matched_external_evidence": [],
+                "missing_evidence_by_category": {},
+                "decision_change_action": None,
+            }
             json_path.write_text(
-                json.dumps({"result": {"run_id": "mvp-weekly-live"}}),
+                json.dumps(
+                    {
+                        "result": result_fields,
+                    }
+                ),
                 encoding="utf-8",
             )
             payload, mock_run = self._invoke_radar(
                 root,
                 stdout=json.dumps(
                     {
-                        "run_id": "mvp-weekly-live",
-                        "status": "selected",
+                        **result_fields,
                         "json_path": str(json_path),
                     }
                 ),
@@ -622,6 +638,44 @@ class TestMvpWeeklyPipeline(unittest.TestCase):
                     stdout=json.dumps(
                         {
                             "run_id": "mvp-weekly-identity",
+                            "json_path": str(json_path),
+                        }
+                    ),
+                )
+
+    def test_run_radar_rejects_stdout_raw_projection_mismatch(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            json_path = root / "projection-mismatch.json"
+            json_path.write_text(
+                json.dumps(
+                    {
+                        "result": {
+                            "run_id": "mvp-weekly-identity",
+                            "status": "selected",
+                            "selected_title": "Raw candidate",
+                            "dossier_status": "investigate",
+                            "recommendation": "revisit_with_evidence_gap",
+                            "score": 61,
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "stdout/JSON mismatch for selected_title",
+            ):
+                self._invoke_radar(
+                    root,
+                    stdout=json.dumps(
+                        {
+                            "run_id": "mvp-weekly-identity",
+                            "status": "selected",
+                            "selected_title": "Stdout candidate",
+                            "dossier_status": "investigate",
+                            "recommendation": "revisit_with_evidence_gap",
+                            "score": 61,
                             "json_path": str(json_path),
                         }
                     ),

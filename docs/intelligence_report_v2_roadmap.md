@@ -154,7 +154,7 @@ behavior; it does not reopen the gate logic.
 | IRX-7 | Knowledge Atlas V2 and Knowledge Audit Explorer separation | `planned` | P2 | IRX-4, IRX-5, IRX-8, IRX-11 |
 | IRX-8 | Static visualization component system | `implemented_and_verified` | P1 | IRX-4, IRX-5 |
 | IRX-9 | Project Intelligence V2 | `implemented_and_verified` | P1 | IRX-4, IRX-5, IRX-8 |
-| IRX-10 | MVP Radar reader contract and context-only hardening | `partially_implemented`; context-only gates and IRX-2 same-run binding verified, reader projection planned | P1 | IRX-2, IRX-5, IRX-8 |
+| IRX-10 | MVP Radar reader contract and context-only hardening | `implemented_and_verified` | P1 | IRX-2, IRX-5, IRX-8 |
 | IRX-11 | Reader-value quality gates | `planned` | P1 | IRX-6, IRX-8 and upstream contracts |
 | IRX-12 | Report-specific feedback and learning loop | `planned` | P2 | IRX-2, IRX-3, IRX-5 through IRX-7, IRX-10 |
 | IRX-13 | Golden fixtures, evaluation dataset, and visual regression | `planned`; scaffolding begins after IRX-1 | P2 | incremental upstream fixtures; finalizes after IRX-6, IRX-7, IRX-11 |
@@ -914,8 +914,7 @@ activation remains IRX-6.
 
 ### IRX-10 - MVP Radar Reader Contract And Context-Only Hardening
 
-**Status:** `partially_implemented`: context-only ranking exclusion and IRX-2
-same-run handoff are verified; the bounded reader contract is planned.
+**Status:** `implemented_and_verified` on 2026-07-14.
 **Priority:** P1.
 
 **Problem:** Radar correctly produced a W28 investigate dossier, but the Brief
@@ -980,6 +979,30 @@ code without evidence of a regression.
 
 **Rollout implications:** Add V2 reader projection around the stable Radar
 contract. Keep V1 Radar artifact readable through an adapter during migration.
+
+**Implementation receipt:** Added strict `mvp_radar_reader.v1` normalization of
+the exact manifest-bound seed/raw/binding package. It preserves producer
+candidate identity, status, source mix, KIR provenance, matched external proof,
+unmatched context, evidence gaps, reason, next validation, change condition,
+experiment, and kill criteria while recomputing only authority/parity—not Radar
+ranking. `available` and `no_candidate` require exact run/week/period/schema/
+artifact identity; missing, invalid, disabled, wrong-run, and legacy inputs are
+explicit fail-closed states. KIR freshness mirrors the producer's any-fresh
+semantics, and context-only, market, Telegram, X, negative, unsupported, or
+unbound records cannot enter gate proof. Brief, canonical exchange, visual,
+retrieval, editorial, and Hermes/PI consumers were hardened against replay and
+diagnostic recommendation leakage. The required local 47-test matrix and exact
+sibling 16-test matrix passed; extended focused matrices, Ruff, compilation,
+and diff checks passed. Malformed-input review covered 4,172 loader and 5,824
+projection variants. Sibling changes were limited to additive reader fields,
+schema identity, and explicit no-evidence nulls; scoring/gates did not change.
+No live/dogfood result is claimed.
+
+Final authority review additionally made the succeeded current manifest a
+public-validator requirement, removed trust in self-declared strict markers
+from canonical, retrieval, and PI paths, and centralized bounded hostile-JSON
+handling. The final reader/authority, consumer, and orchestrator overlap
+matrices passed 80, 108, and 66 tests respectively.
 
 ### IRX-6 - Weekly Intelligence Brief V2
 
@@ -1539,6 +1562,6 @@ Report files changed, canonical identity/lifecycle/as-of semantics, compatibilit
 
 ## 15. Suggested Following Task
 
-IRX-1 through IRX-5, IRX-8, and IRX-9 are implemented and verified. IRX-10 is
-the next planned implementation scope. Reader-surface activation, rollout, and
-dogfood remain unimplemented and gated by their later tasks.
+IRX-1 through IRX-5 and IRX-8 through IRX-10 are implemented and verified.
+IRX-6 is the next planned implementation scope. Reader-value gates, Atlas V2,
+rollout, and dogfood remain unimplemented and gated by their later tasks.

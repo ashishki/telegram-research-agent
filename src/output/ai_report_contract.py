@@ -19,6 +19,23 @@ from output.reporting_period import reporting_timestamp_sort_key
 REPORT_CONTRACT_VERSION = "weekly-ai-intelligence-v1"
 INTELLIGENCE_CONTRACT_VERSION = "tra-intelligence-contract.v1"
 RADAR_INTELLIGENCE_CONTRACT_VERSION = "tra-radar-intelligence-contract.v1"
+RADAR_GATE_SOURCE_TYPES = frozenset(
+    {
+        "crawl4ai",
+        "serp",
+        "github_public",
+        "stack_exchange",
+        "reddit",
+        "product_hunt",
+        "youtube",
+        "rss",
+        "hacker_news",
+        "store",
+        "reviews",
+        "forum",
+        "news",
+    }
+)
 
 ALLOWED_DECISION_VERDICTS = {"apply", "study", "watch", "ignore", "defer", "verify_first"}
 ALLOWED_ACTION_SCOPES = {"skill", "project", "infra", "reading", "experiment", "verification"}
@@ -304,6 +321,7 @@ def build_canonical_intelligence_contract(
     thread_deltas: list[dict] | None = None,
     decision_cards: list[dict] | None = None,
     mvp_radar: Mapping[str, Any] | None = None,
+    mvp_radar_authoritative: bool = False,
     project_learning_projection: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build the canonical sidecar projection over curated intelligence objects."""
@@ -361,7 +379,10 @@ def build_canonical_intelligence_contract(
         "outcomes": _as_list(learning_intelligence.get("outcomes")),
     }
     if mvp_radar is not None:
-        payload["radar_exchange"] = _canonical_radar_exchange(mvp_radar)
+        payload["radar_exchange"] = _canonical_radar_exchange(
+            mvp_radar,
+            authoritative=mvp_radar_authoritative,
+        )
     return payload
 
 
@@ -472,6 +493,97 @@ def validate_canonical_intelligence_contract(value: object) -> list[ReportQualit
             findings.append(_critical("Radar exchange contract version is missing or unsupported", "intelligence_contract.radar_exchange.contract_version"))
         if radar.get("context_only_can_satisfy_gate") is not False:
             findings.append(_critical("Radar context-only records must not satisfy demand evidence gates", "intelligence_contract.radar_exchange.context_only_can_satisfy_gate"))
+        reader_state = str(radar.get("reader_state") or "")
+        reader_decision = str(radar.get("reader_decision") or "")
+        allowed_states = {
+            "available",
+            "no_candidate",
+            "missing",
+            "invalid",
+            "disabled",
+            "unbound_legacy",
+        }
+        if reader_state not in allowed_states:
+            findings.append(
+                _critical(
+                    "Radar exchange reader state is missing or unsupported",
+                    "intelligence_contract.radar_exchange.reader_state",
+                )
+            )
+        matched_count = radar.get("matched_external_evidence_count")
+        if (
+            not isinstance(matched_count, int)
+            or isinstance(matched_count, bool)
+            or matched_count < 0
+        ):
+            findings.append(
+                _critical(
+                    "Radar exchange evidence count must be a non-negative integer",
+                    "intelligence_contract.radar_exchange.matched_external_evidence_count",
+                )
+            )
+            matched_count = 0
+        if reader_state == "available":
+            if reader_decision not in {"investigate", "reject", "build_allowed"}:
+                findings.append(
+                    _critical(
+                        "Available Radar exchange requires a bounded reader decision",
+                        "intelligence_contract.radar_exchange.reader_decision",
+                    )
+                )
+            if not str(radar.get("selected_candidate") or "").strip():
+                findings.append(
+                    _critical(
+                        "Available Radar exchange requires a selected candidate",
+                        "intelligence_contract.radar_exchange.selected_candidate",
+                    )
+                )
+            if str(radar.get("recommendation") or "") == "unavailable":
+                findings.append(
+                    _critical(
+                        "Available Radar exchange requires a reader recommendation",
+                        "intelligence_contract.radar_exchange.recommendation",
+                    )
+                )
+            recommendation = str(radar.get("recommendation") or "")
+            if (
+                reader_decision == "build_allowed"
+                and (recommendation != "build" or matched_count < 2)
+            ):
+                findings.append(
+                    _critical(
+                        "Radar build permission requires build recommendation and two matched proof sources",
+                        "intelligence_contract.radar_exchange.reader_decision",
+                    )
+                )
+            if recommendation == "build" and reader_decision != "build_allowed":
+                findings.append(
+                    _critical(
+                        "Radar build recommendation requires build_allowed reader decision",
+                        "intelligence_contract.radar_exchange.recommendation",
+                    )
+                )
+            if recommendation == "focused_experiment" and (
+                reader_decision != "investigate" or matched_count < 2
+            ):
+                findings.append(
+                    _critical(
+                        "Radar focused experiment requires investigate decision and two matched proof sources",
+                        "intelligence_contract.radar_exchange.recommendation",
+                    )
+                )
+        elif (
+            reader_decision != "unavailable"
+            or str(radar.get("selected_candidate") or "")
+            or str(radar.get("recommendation") or "") != "unavailable"
+            or matched_count != 0
+        ):
+            findings.append(
+                _critical(
+                    "Non-available Radar exchange cannot expose permission authority",
+                    "intelligence_contract.radar_exchange.reader_state",
+                )
+            )
     return findings
 
 
@@ -1729,23 +1841,74 @@ def _canonical_project_implications(project_intelligence: Mapping[str, Any]) -> 
     return result[:12]
 
 
-def _canonical_radar_exchange(mvp_radar: Mapping[str, Any]) -> dict[str, Any]:
+def _canonical_radar_exchange(
+    mvp_radar: Mapping[str, Any], *, authoritative: bool
+) -> dict[str, Any]:
     matches = [item for item in _as_list(mvp_radar.get("matched_external_evidence")) if isinstance(item, Mapping)]
+    raw_reader_state = str(mvp_radar.get("reader_state") or "unbound_legacy")
+    strict_projection = (
+        authoritative
+        and mvp_radar.get("schema_version") == "mvp_radar_reader.v1"
+        and raw_reader_state in {"available", "no_candidate"}
+    )
+    strict_reader = strict_projection and raw_reader_state == "available"
+    reader_state = raw_reader_state if strict_projection else "unbound_legacy"
+    reader_decision = (
+        str(mvp_radar.get("reader_decision") or "unavailable")
+        if strict_reader
+        else "unavailable"
+    )
+    raw_recommendation = str(
+        mvp_radar.get("recommendation") or mvp_radar.get("dossier_status") or ""
+    )
+    matched_gate = (
+        [
+            item
+            for item in _as_list(mvp_radar.get("matched_external_proof"))
+            if isinstance(item, Mapping)
+            and item.get("gate_eligible") is True
+            and item.get("supports_gate") is True
+            and item.get("decision_grade") is True
+            and item.get("context_only") is False
+            and item.get("build_ready_evidence") is True
+            and item.get("negative_signal") is False
+            and item.get("source_type") in RADAR_GATE_SOURCE_TYPES
+        ]
+        if strict_reader
+        else []
+    )
     context_only = [
         item
-        for item in matches
-        if item.get("context_only") is True or item.get("supports_gate") is False or str(item.get("radar_role") or "") == "context_only"
+        for item in _as_list(mvp_radar.get("unmatched_context"))
+        if isinstance(item, Mapping) and item.get("context_only") is True
     ]
-    matched_gate = [
+    context_only.extend(
+        item for item in matches if item.get("gate_eligible") is not True
+    )
+    context_only.extend(
         item
-        for item in matches
-        if bool(item.get("supports_gate")) and bool(item.get("decision_grade", True)) and item.get("context_only") is not True
-    ]
+        for item in _as_list(mvp_radar.get("matched_external_proof"))
+        if isinstance(item, Mapping) and item not in matched_gate
+    )
     return {
         "contract_version": RADAR_INTELLIGENCE_CONTRACT_VERSION,
-        "status": str(mvp_radar.get("status") or "unknown"),
-        "selected_candidate": str(mvp_radar.get("selected_candidate") or ""),
-        "recommendation": str(mvp_radar.get("recommendation") or mvp_radar.get("dossier_status") or ""),
+        "status": (
+            str(mvp_radar.get("status") or reader_state)
+            if strict_projection
+            else reader_state
+        ),
+        "reader_state": reader_state,
+        "diagnostic_reader_state": (
+            raw_reader_state if not strict_projection else ""
+        ),
+        "reader_decision": reader_decision,
+        "selected_candidate": (
+            str(mvp_radar.get("selected_candidate") or "") if strict_reader else ""
+        ),
+        "recommendation": raw_recommendation if strict_reader else "unavailable",
+        "diagnostic_legacy_recommendation": (
+            raw_recommendation if not strict_reader else ""
+        ),
         "matched_external_evidence_count": len(matched_gate),
         "context_only_evidence_count": len(context_only),
         "context_only_can_satisfy_gate": False,

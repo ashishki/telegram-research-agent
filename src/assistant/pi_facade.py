@@ -23,29 +23,26 @@ from output.intelligence_retrieval_items import (
     load_latest_workbook_json,
     load_mvp_radar_status,
 )
+from output.mvp_radar_reader import (
+    MvpRadarReaderError,
+    adapt_legacy_mvp_radar_payload,
+    invalid_mvp_radar_projection,
+    load_bound_mvp_radar_reader,
+)
 from assistant.semantic_retrieval import retrieval_decision_note, search_curated_semantic_items
 from output.strategy_reviewer import build_strategy_review
 from output.weekly_intelligence_brief import (
     RADAR_DISABLED_DISCLOSURE_RU,
-    load_mvp_radar_summary as load_bound_mvp_radar_summary,
 )
 from output.weekly_run_manifest import (
     WeeklyRunManifestError,
     load_manifest,
     validate_manifest,
-    validate_radar_run_binding,
     verify_file_checksum,
 )
 
 
 TOKEN_RE = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_-]{1,}")
-NON_BUILD_READY_RECOMMENDATIONS = {
-    "revisit_with_evidence_gap",
-    "needs_more_evidence",
-    "needs_more_specific_scope",
-    "existing_project_context",
-    "reject",
-}
 _INVALID_MANIFEST_MARKER = "_weekly_manifest_invalid"
 _UNCONTAINED_MANIFEST_MARKER = "_weekly_manifest_uncontained"
 _ISO_WEEK_SEARCH_RE = re.compile(r"(?<![0-9A-Z])([0-9]{4}-W(?:0[1-9]|[1-4][0-9]|5[0-3]))(?![0-9])")
@@ -154,7 +151,24 @@ class PersonalIntelligenceFacade:
                 "message": "Workbook JSON sidecar is missing.",
             }
         actual_week = _clean_text(workbook.get("week_label")) or week_label
-        mvp_payload = workbook.get("mvp_radar") if isinstance(workbook.get("mvp_radar"), Mapping) else None
+        embedded_mvp = workbook.get("mvp_radar") if isinstance(workbook.get("mvp_radar"), Mapping) else None
+        manifest_selection = self._select_weekly_manifest(actual_week)
+        mvp_authoritative = False
+        if manifest_selection is not None:
+            manifest, manifest_path = manifest_selection
+            stages = manifest.get("stages") if isinstance(manifest.get("stages"), Mapping) else {}
+            radar_stage = stages.get("radar")
+            if isinstance(radar_stage, Mapping) and radar_stage.get("status") == "disabled":
+                mvp_payload = {"reader_state": "disabled", "status": "intentionally_disabled"}
+            elif not manifest.get(_INVALID_MANIFEST_MARKER):
+                mvp_payload = self._load_manifest_radar_payload(
+                    manifest, manifest_path, str(actual_week or "")
+                )
+                mvp_authoritative = mvp_payload is not None
+            else:
+                mvp_payload = None
+        else:
+            mvp_payload = _downgrade_unbound_mvp_payload(embedded_mvp, actual_week)
         artifact_status = self.get_artifact_status(actual_week)
         return {
             "status": "ok",
@@ -166,7 +180,15 @@ class PersonalIntelligenceFacade:
             "strong_signals": _strong_signals(workbook),
             "actions": _action_cards(workbook),
             "project_actions": _project_actions(workbook),
-            "mvp_status": _mvp_status(mvp_payload, actual_week) if mvp_payload else None,
+            "mvp_status": (
+                _mvp_status(
+                    mvp_payload,
+                    actual_week,
+                    authoritative=mvp_authoritative,
+                )
+                if mvp_payload
+                else None
+            ),
             "mvp_radar_gate": _mvp_gate_status(mvp_payload),
             "artifact_paths": _artifact_paths(workbook),
             "artifact_status": artifact_status,
@@ -349,7 +371,7 @@ class PersonalIntelligenceFacade:
                 }
             radar_stage = manifest["stages"]["radar"]
             if radar_stage["status"] == "disabled":
-                gate = _mvp_gate_status({"status": "intentionally_disabled", "disabled": True})
+                gate = _mvp_gate_status({"reader_state": "disabled", "status": "intentionally_disabled"})
                 return {
                     "status": "disabled",
                     "week_label": clean_week,
@@ -394,7 +416,7 @@ class PersonalIntelligenceFacade:
                         "legacy artifacts were not substituted."
                     ),
                 }
-            normalized = _mvp_status(payload, clean_week)
+            normalized = _mvp_status(payload, clean_week, authoritative=True)
             return {
                 **normalized,
                 "mvp_radar_gate": _mvp_gate_status(payload),
@@ -405,6 +427,7 @@ class PersonalIntelligenceFacade:
             }
         workbook = self._load_workbook(clean_week)
         payload = workbook.get("mvp_radar") if isinstance(workbook, Mapping) and isinstance(workbook.get("mvp_radar"), Mapping) else None
+        payload = _downgrade_unbound_mvp_payload(payload, clean_week)
         if not payload or _clean_text(payload.get("status")) == "not_available":
             payload = load_mvp_radar_status(
                 clean_week,
@@ -935,51 +958,15 @@ class PersonalIntelligenceFacade:
             return None
         if checked.get("run_id") != manifest.get("run_id"):
             return None
-        stage = checked["stages"]["radar"]
-        if stage.get("status") != "succeeded":
-            return None
-        raw_path = _manifest_artifact_path(manifest_path, stage.get("artifact_path"))
-        binding_path = _manifest_artifact_path(manifest_path, stage.get("binding_path"))
-        seed_path = _manifest_artifact_path(manifest_path, stage.get("seed_export_path"))
-        if any(path is None or not path.is_file() for path in (raw_path, binding_path, seed_path)):
-            return None
-        assert raw_path is not None and binding_path is not None and seed_path is not None
-        try:
-            verify_file_checksum(raw_path, str(stage.get("artifact_sha256") or ""))
-            verify_file_checksum(binding_path, str(stage.get("binding_sha256") or ""))
-            verify_file_checksum(seed_path, str(stage.get("seed_export_sha256") or ""))
-        except WeeklyRunManifestError:
-            return None
-        binding = _read_json_metadata(binding_path)
-        try:
-            validate_radar_run_binding(
-                binding,
-                manifest=checked,
-                path_base=run_dir,
-                allowed_roots=(run_dir,),
-                verify_files=True,
-            )
-        except WeeklyRunManifestError:
-            return None
-        if binding.get("radar_run_id") != stage.get("radar_run_id"):
-            return None
-        refs = {
-            "radar_json_ref": (raw_path, stage.get("artifact_sha256")),
-            "seed_export_ref": (seed_path, stage.get("seed_export_sha256")),
-        }
-        for ref_name, (expected_path, expected_checksum) in refs.items():
-            ref = binding.get(ref_name)
-            if not isinstance(ref, Mapping):
-                return None
-            bound_path = _manifest_artifact_path(manifest_path, ref.get("path"))
-            if bound_path != expected_path or ref.get("sha256") != expected_checksum:
-                return None
-        raw = _read_json_metadata(raw_path)
-        result = raw.get("result") if isinstance(raw.get("result"), Mapping) else {}
-        if result.get("run_id") != stage.get("radar_run_id"):
-            return None
-        payload = load_bound_mvp_radar_summary(week_label, raw_path)
-        if payload.get("status") == "not_available":
+        payload = load_bound_mvp_radar_reader(
+            checked,
+            path_base=run_dir,
+            allowed_roots=(run_dir,),
+        )
+        if (
+            payload.get("reader_state") not in {"available", "no_candidate"}
+            or payload.get("reporting_week") != week_label
+        ):
             return None
         return payload
 
@@ -1121,7 +1108,7 @@ class PersonalIntelligenceFacade:
         )
         mvp_payload = radar_payload
         if mvp_radar["status"] == "disabled":
-            mvp_payload = {"status": "intentionally_disabled", "disabled": True}
+            mvp_payload = {"reader_state": "disabled", "status": "intentionally_disabled"}
         mvp_gate = _mvp_gate_status(mvp_payload)
         if mvp_radar["status"] not in {"missing", "failed", "disabled", "pending"} and mvp_gate["decision"] == "do_not_build":
             mvp_radar["warning"] = mvp_gate["warning"]
@@ -1539,24 +1526,113 @@ def _project_actions(workbook: Mapping[str, Any]) -> list:
     ]
 
 
-def _mvp_status(payload: Mapping[str, Any] | None, week_label: str | None) -> dict:
+def _mvp_status(
+    payload: Mapping[str, Any] | None,
+    week_label: str | None,
+    *,
+    authoritative: bool = False,
+) -> dict:
     payload = payload or {}
-    candidate = _clean_text(payload.get("selected_candidate") or payload.get("selected_title") or payload.get("title")) or None
-    matches = _object_list(payload.get("matched_external_evidence"))
+    raw_candidate = _clean_text(
+        payload.get("selected_candidate")
+        or payload.get("selected_title")
+        or payload.get("title")
+    ) or None
+    raw_dossier_status = _clean_text(payload.get("dossier_status")) or None
+    raw_recommendation = _clean_text(payload.get("recommendation")) or None
+    raw_reader_state = _clean_text(payload.get("reader_state")) or "unbound_legacy"
+    strict_available = (
+        authoritative
+        and payload.get("schema_version") == "mvp_radar_reader.v1"
+        and raw_reader_state == "available"
+    )
+    strict_no_candidate = (
+        authoritative
+        and payload.get("schema_version") == "mvp_radar_reader.v1"
+        and raw_reader_state == "no_candidate"
+    )
+    reader_state = (
+        raw_reader_state
+        if strict_available
+        or strict_no_candidate
+        or raw_reader_state not in {"available", "no_candidate"}
+        else "unbound_legacy"
+    )
+    proof = (
+        _object_list(payload.get("matched_external_proof"))
+        if strict_available
+        else []
+    )
     return {
-        "status": "ok",
+        "status": (
+            "ok"
+            if strict_available
+            else "no_candidate" if strict_no_candidate else reader_state
+        ),
         "week_label": week_label,
-        "candidate": candidate,
-        "dossier_status": _clean_text(payload.get("dossier_status")) or None,
-        "recommendation": _clean_text(payload.get("recommendation")) or None,
-        "source_mix": dict(payload.get("source_mix") or {}) if isinstance(payload.get("source_mix"), Mapping) else None,
+        "reader_state": reader_state,
+        "diagnostic_reader_state": (
+            raw_reader_state if reader_state != raw_reader_state else ""
+        ),
+        "reader_decision": (
+            _clean_text(payload.get("reader_decision")) or "unavailable"
+            if strict_available
+            else "unavailable"
+        ),
+        "candidate": raw_candidate if strict_available else None,
+        "dossier_status": raw_dossier_status if strict_available else None,
+        "recommendation": raw_recommendation if strict_available else None,
+        "diagnostic_legacy_candidate": (
+            raw_candidate if not strict_available and not strict_no_candidate else None
+        ),
+        "diagnostic_legacy_dossier_status": (
+            raw_dossier_status
+            if not strict_available and not strict_no_candidate
+            else None
+        ),
+        "diagnostic_legacy_recommendation": (
+            raw_recommendation
+            if not strict_available and not strict_no_candidate
+            else None
+        ),
+        "source_mix": (
+            dict(payload.get("source_mix") or {})
+            if strict_available and isinstance(payload.get("source_mix"), Mapping)
+            else None
+        ),
         "missing_evidence": _string_values(payload.get("missing_evidence")),
         "next_validation": _string_values(payload.get("next_validation")),
-        "matched_external_evidence_count": len(matches),
-        "matched_external_source_types": _matched_external_source_types(matches),
-        "market_context_status": _market_context_status(payload),
+        "matched_external_evidence_count": len(proof),
+        "matched_external_source_types": _matched_external_source_types(proof),
+        "diagnostic_external_evidence_count": (
+            len(_object_list(payload.get("matched_external_evidence")))
+            if not strict_available
+            else 0
+        ),
+        "market_context_status": (
+            _market_context_status(payload) if strict_available else "context_only"
+        ),
         "message": "",
     }
+
+
+def _downgrade_unbound_mvp_payload(
+    payload: Mapping[str, Any] | None, week_label: str | None
+) -> dict | None:
+    if not isinstance(payload, Mapping):
+        return None
+    expected_week = str(week_label or "")
+    try:
+        return adapt_legacy_mvp_radar_payload(
+            payload,
+            source_path=None,
+            expected_week=expected_week,
+        )
+    except MvpRadarReaderError as exc:
+        return invalid_mvp_radar_projection(
+            expected_week,
+            reason=f"MVP Radar JSON недействителен: {exc}",
+        )
 
 
 def _mvp_gate_status(payload: Mapping[str, Any] | None) -> dict:
@@ -1573,8 +1649,8 @@ def _mvp_gate_status(payload: Mapping[str, Any] | None) -> dict:
             "matched_external_evidence_required": True,
             "warning": "MVP Radar artifact is missing; do not infer build/focused permission.",
         }
-    radar_status = _clean_text(payload.get("status"))
-    if radar_status in {"disabled", "intentionally_disabled"} or bool(payload.get("disabled")):
+    reader_state = _clean_text(payload.get("reader_state")) or "unbound_legacy"
+    if reader_state == "disabled":
         return {
             "decision": "do_not_build",
             "decision_label": "Do not build yet.",
@@ -1588,32 +1664,71 @@ def _mvp_gate_status(payload: Mapping[str, Any] | None) -> dict:
             "warning": RADAR_DISABLED_DISCLOSURE_RU,
         }
     matches = _object_list(payload.get("matched_external_evidence"))
-    gate_matches = [
-        match
-        for match in matches
-        if bool(match.get("supports_gate")) and bool(match.get("decision_grade", True))
-    ]
-    recommendation = _clean_text(payload.get("recommendation") or payload.get("dossier_status")) or "needs_more_evidence"
-    artifact_status = "missing" if _clean_text(payload.get("status")) in {"missing", "not_available"} else "loaded"
-    allowed = bool(gate_matches) and recommendation not in NON_BUILD_READY_RECOMMENDATIONS and artifact_status != "missing"
-    if artifact_status == "missing":
-        warning = "MVP Radar artifact is missing; do not infer build/focused permission."
-    elif not gate_matches:
-        warning = "Build/focused decisions require matched external evidence; market/business context stays context_only."
+    strict_authority = (
+        payload.get("schema_version") == "mvp_radar_reader.v1"
+        and reader_state == "available"
+    )
+    gate_matches = (
+        [
+            match
+            for match in _object_list(payload.get("matched_external_proof"))
+            if _strict_mvp_gate_match(match)
+        ]
+        if strict_authority
+        else []
+    )
+    reader_decision = _clean_text(payload.get("reader_decision")) or "unavailable"
+    dossier_status = _clean_text(payload.get("dossier_status"))
+    source_types = _matched_external_source_types(gate_matches)
+    source_mix = payload.get("source_mix") if isinstance(payload.get("source_mix"), Mapping) else {}
+    proof_ready = len(gate_matches) >= 2 and len(source_types) >= 2
+    kir_ready = source_mix.get("kir_required") is not True or source_mix.get("kir_gate_status") == "passed"
+    artifact_status = "loaded" if reader_state in {"available", "no_candidate"} else reader_state
+    if reader_decision == "build_allowed" and proof_ready and kir_ready:
+        decision = "build_allowed"
+        decision_label = "Radar allows the bounded build decision."
+    elif (
+        reader_decision == "investigate"
+        and dossier_status == "focused_experiment"
+        and proof_ready
+        and kir_ready
+    ):
+        decision = "focused_experiment_allowed"
+        decision_label = "Radar allows only a focused validation experiment."
     else:
-        warning = "Matched external evidence exists; keep candidate scope and source fit explicit."
+        decision = "do_not_build"
+        decision_label = "Do not build yet."
+    if reader_state not in {"available", "no_candidate"}:
+        warning = _clean_text(payload.get("decision_reason_ru")) or (
+            "MVP Radar is not manifest-bound; do not infer build/focused permission."
+        )
+    else:
+        warning = _clean_text(payload.get("decision_reason_ru")) or (
+            "The strict same-run Radar projection controls this decision."
+        )
     return {
-        "decision": "focused_experiment_allowed" if allowed else "do_not_build",
-        "decision_label": "Focused experiment may be allowed." if allowed else "Do not build yet.",
+        "decision": decision,
+        "decision_label": decision_label,
         "radar_artifact_status": artifact_status,
         "matched_gate_evidence_count": len(gate_matches),
         "matched_external_evidence_count": len(matches),
-        "matched_external_source_types": _matched_external_source_types(gate_matches),
+        "matched_external_source_types": source_types,
         "market_context_status": _market_context_status(payload),
         "context_only_can_satisfy_gate": False,
         "matched_external_evidence_required": True,
         "warning": warning,
     }
+
+
+def _strict_mvp_gate_match(match: Mapping[str, Any]) -> bool:
+    return (
+        match.get("gate_eligible") is True
+        and match.get("supports_gate") is True
+        and match.get("decision_grade") is True
+        and match.get("context_only") is False
+        and match.get("build_ready_evidence") is True
+        and match.get("negative_signal") is False
+    )
 
 
 def _object_list(value: object) -> list[dict]:

@@ -24,6 +24,7 @@ from output.reporting_period import resolve_reporting_period
 from output.split_intelligence_reports import deliver_split_intelligence_reports, generate_split_intelligence_reports
 from output.weekly_intelligence_brief import (
     build_weekly_intelligence_brief_artifact,
+    load_mvp_radar_summary,
     render_weekly_intelligence_brief_html,
 )
 
@@ -679,13 +680,30 @@ class TestSplitIntelligenceReports(unittest.TestCase):
                 summary.knowledge_atlas.json_path,
             )
             self.assertEqual(brief_json["mvp_radar"]["selected_candidate"], "Agent Eval Gate Scanner")
+            self.assertEqual(brief_json["mvp_radar_reader"], brief_json["mvp_radar"])
+            self.assertEqual(
+                brief_json["mvp_radar"]["reader_state"],
+                "unbound_legacy",
+            )
+            self.assertEqual(
+                brief_json["mvp_radar"]["reader_decision"],
+                "unavailable",
+            )
+            self.assertTrue(brief_json["mvp_radar"]["partial"])
+            self.assertEqual(brief_json["mvp_radar"]["matched_external_proof"], [])
+            self.assertEqual(brief_json["mvp_radar"]["unmatched_context"], [])
+            self.assertFalse(
+                brief_json["mvp_radar"]["evidence_policy"][
+                    "unbound_legacy_can_authorize"
+                ]
+            )
             self.assertIn("Top Personal Changes", brief_html)
             self.assertIn("Evidence / Trust", brief_html)
             self.assertIn("What To Do", brief_html)
             self.assertIn("Ignore / Defer", brief_html)
             self.assertIn("Project Impact", brief_html)
             self.assertIn("Exact Feedback Targets", brief_html)
-            self.assertIn("Do not build yet.", brief_html)
+            self.assertIn("Сборка не разрешена.", brief_html)
             self.assertIn("MVP Radar Gate Card", brief_html)
             self.assertIn("Validation Query Pack", brief_html)
             self.assertIn("Matched Evidence By Source/Kind", brief_html)
@@ -744,13 +762,25 @@ class TestSplitIntelligenceReports(unittest.TestCase):
         self.assertEqual(brief_json["mvp_radar"]["status"], "not_available")
         self.assertEqual(brief_json["mvp_radar_gate"]["radar_artifact_status"], "missing")
         self.assertEqual(brief_json["mvp_radar_gate"]["decision"], "do_not_build")
-        self.assertIn("MVP Radar artifact is missing", brief_html)
-        self.assertIn("No candidate selected", brief_html)
+        self.assertEqual(brief_json["mvp_radar"]["reader_state"], "missing")
+        self.assertEqual(
+            brief_json["mvp_radar"]["candidate_state"],
+            "unknown_due_to_unavailable_radar",
+        )
+        self.assertEqual(brief_json["mvp_radar"]["reader_decision"], "unavailable")
+        self.assertTrue(brief_json["mvp_radar"]["partial"])
+        self.assertIsNone(brief_json["mvp_radar"]["candidate"])
+        self.assertNotEqual(brief_json["mvp_radar"]["candidate_state"], "no_candidate")
+        self.assertIn(
+            "MVP Radar JSON для запрошенного периода недоступен",
+            brief_html,
+        )
+        self.assertIn("MVP Radar недоступен для этого запуска", brief_html)
         self.assertNotIn("run_id", brief_json)
         self.assertTrue(summary.weekly_brief.html_path.endswith("2026-W28.weekly-brief.html"))
         self.assertTrue(summary.knowledge_atlas.html_path.endswith("2026-W28.knowledge-atlas.html"))
 
-    def test_orchestrated_sidecars_share_identity_snapshot_partial_banner_and_disabled_radar(self):
+    def test_orchestrated_sidecars_share_identity_snapshot_partial_banner_and_unbound_radar(self):
         db_path = self._make_db()
         settings = self._seed(db_path)
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -828,15 +858,55 @@ class TestSplitIntelligenceReports(unittest.TestCase):
             atlas_html,
         )
         self.assertIn(
-            "MVP Radar отключен для этого запуска. Решение по сборке не сформировано.",
+            "Несвязанный legacy-артефакт не даёт права на эксперимент или сборку.",
             brief_html,
         )
-        self.assertEqual(brief_json["mvp_radar_gate"]["radar_artifact_status"], "disabled")
+        self.assertEqual(
+            brief_json["mvp_radar_gate"]["radar_artifact_status"],
+            "unbound_legacy",
+        )
         self.assertEqual(
             brief_json["mvp_radar_gate"]["warning"],
-            "MVP Radar отключен для этого запуска. Решение по сборке не сформировано.",
+            "Несвязанный legacy-артефакт не даёт права на эксперимент или сборку.",
         )
+        self.assertEqual(brief_json["mvp_radar"]["reader_state"], "unbound_legacy")
+        self.assertEqual(brief_json["mvp_radar"]["reader_decision"], "unavailable")
+        self.assertTrue(brief_json["mvp_radar"]["partial"])
         self.assertEqual(leftovers, [])
+
+    def test_wrong_week_legacy_radar_is_explicitly_invalid_without_a_fictional_candidate(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            radar_path = Path(tmpdir) / "mvp-weekly-2026-W27.json"
+            radar_path.write_text(
+                json.dumps(
+                    {
+                        "reporting_week": "2026-W27",
+                        "result": {
+                            "status": "selected",
+                            "selected_title": "Stale Candidate",
+                            "dossier_status": "build",
+                            "recommendation": "build",
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            projection = load_mvp_radar_summary("2026-W28", radar_path)
+
+        self.assertEqual(projection["reader_state"], "invalid")
+        self.assertEqual(
+            projection["candidate_state"],
+            "unknown_due_to_unavailable_radar",
+        )
+        self.assertEqual(projection["reader_decision"], "unavailable")
+        self.assertEqual(projection["status"], "not_available")
+        self.assertTrue(projection["partial"])
+        self.assertIsNone(projection["candidate"])
+        self.assertIsNone(projection["selected_candidate"])
+        self.assertEqual(projection["matched_external_proof"], [])
+        self.assertIn("2026-W27", projection["partial_reasons"][0])
+        self.assertIn("2026-W28", projection["partial_reasons"][0])
 
     def test_resolved_period_rejects_conflicting_legacy_arguments(self):
         period = resolve_reporting_period(

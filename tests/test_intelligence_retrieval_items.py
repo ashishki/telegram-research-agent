@@ -13,6 +13,7 @@ from db.knowledge_atoms import record_knowledge_atom
 from db.migrate import run_migrations
 from output.ai_report_contract import INTELLIGENCE_CONTRACT_VERSION
 from output.intelligence_retrieval_items import (
+    _items_from_workbook,
     build_retrieval_items,
     search_retrieval_items,
 )
@@ -272,6 +273,201 @@ class TestIntelligenceRetrievalItems(unittest.TestCase):
         self.assertIn("project_intelligence", item_types)
         self.assertIn("learning_objective", item_types)
         self.assertIn("mvp_dossier", item_types)
+
+    def test_self_claimed_strict_reader_is_downgraded_without_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            json_path = self._write_workbook(root)
+            payload = json.loads(json_path.read_text(encoding="utf-8"))
+            payload["mvp_radar"] = {
+                "schema_version": "mvp_radar_reader.v1",
+                "reader_state": "available",
+                "status": "selected",
+                "selected_candidate": "Bound Reader Candidate",
+                "candidate": {
+                    "candidate_id": "candidate:radar-42",
+                    "title": "Bound Reader Candidate",
+                },
+                "dossier_status": "investigate",
+                "recommendation": "needs_more_evidence",
+                "reader_decision": "investigate",
+                "decision_reason_ru": "Сборка закрыта до независимой проверки спроса.",
+                "missing_evidence": ["Нужна независимая жалоба оператора."],
+                "change_condition": "Два независимых источника подтвердят одну боль.",
+                "next_validation": "Проверить запрос operator rollback pain.",
+                "kill_criteria": ["Закрыть кандидата, если боль не повторяется."],
+                "matched_kir_provenance": [
+                    {
+                        "seed_ref": "seed:kir-42",
+                        "thread_slug": "rollback-guardrails",
+                    }
+                ],
+                "matched_external_proof": [
+                    {
+                        "evidence_ref": "external:42",
+                        "source_type": "issue_tracker",
+                        "gate_eligible": True,
+                    }
+                ],
+                "unmatched_context": [
+                    {
+                        "context_ref": "context:market-42",
+                        "context_only": True,
+                    }
+                ],
+                "source_path": "/bound/run/radar-reader.json",
+            }
+            json_path.write_text(
+                json.dumps(payload, ensure_ascii=False),
+                encoding="utf-8",
+            )
+
+            items = build_retrieval_items(
+                self._settings(root),
+                week_label="2026-W28",
+                output_root=root,
+            )
+
+        radar = next(item for item in items if item.item_type == "mvp_dossier")
+        self.assertTrue(radar.id.startswith("mvp_dossier:2026-W28:candidate-legacy-"))
+        self.assertEqual(radar.status, "unbound_legacy")
+        self.assertIn("MVP Radar diagnostic", radar.title)
+        for marker in (
+            "Несвязанный legacy-артефакт не даёт права",
+            "Нужна независимая жалоба оператора.",
+            "Закрыть кандидата, если боль не повторяется.",
+            "Нужен валидный same-run Radar binding.",
+            "Повторить Radar в составе нового weekly run.",
+        ):
+            self.assertIn(marker, radar.text)
+        for untrusted_marker in (
+            "rollback-guardrails",
+            "external:42",
+            "context:market-42",
+        ):
+            self.assertNotIn(untrusted_marker, radar.text)
+        self.assertEqual(radar.source_refs, [str(json_path)])
+
+    def test_manifest_bound_workbook_recovers_strict_radar_projection(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp) / "run"
+            brief_dir = run_dir / "weekly_brief"
+            brief_dir.mkdir(parents=True)
+            manifest_path = run_dir / "manifest.json"
+            manifest_path.write_text("{}", encoding="utf-8")
+            sidecar_path = brief_dir / "2026-W28.weekly-brief.json"
+            sidecar_path.write_text("{}", encoding="utf-8")
+            manifest = {
+                "run_status": "complete",
+                "run_id": "retrieval-bound-run",
+                "reporting_week": "2026-W28",
+                "stages": {
+                    "weekly_brief": {
+                        "status": "succeeded",
+                        "json_path": "weekly_brief/2026-W28.weekly-brief.json",
+                    }
+                },
+            }
+            strict_projection = {
+                "schema_version": "mvp_radar_reader.v1",
+                "reader_state": "available",
+                "selected_candidate": "Manifest-bound candidate",
+                "candidate": {"candidate_id": "candidate:bound-retrieval"},
+                "dossier_status": "focused_experiment",
+                "recommendation": "focused_experiment",
+                "reader_decision": "investigate",
+                "decision_reason_ru": "Разрешён только узкий эксперимент.",
+                "matched_kir_provenance": [{"thread_slug": "bound-thread"}],
+                "matched_external_proof": [{"evidence_ref": "bound-proof"}],
+                "unmatched_context": [],
+                "source_mix": {"kir_gate_status": "passed"},
+                "source_path": "radar/result.json",
+            }
+            workbook = {
+                "week_label": "2026-W28",
+                "run_id": "retrieval-bound-run",
+                "manifest_path": str(manifest_path),
+                "_artifact_kind": "weekly_intelligence_brief",
+                "_artifact_paths": {"json": str(sidecar_path)},
+                "mvp_radar": {
+                    "schema_version": "mvp_radar_reader.v1",
+                    "reader_state": "available",
+                    "selected_candidate": "Embedded value is not trusted",
+                },
+            }
+
+            with (
+                patch(
+                    "output.intelligence_retrieval_items.load_manifest",
+                    return_value=manifest,
+                ) as load_manifest_mock,
+                patch(
+                    "output.intelligence_retrieval_items.load_bound_mvp_radar_reader",
+                    return_value=strict_projection,
+                ),
+            ):
+                items = _items_from_workbook(workbook)
+
+        radar = next(item for item in items if item.item_type == "mvp_dossier")
+        self.assertEqual(radar.title, "Manifest-bound candidate")
+        self.assertEqual(radar.status, "focused_experiment")
+        self.assertIn("bound-thread", radar.text)
+        self.assertIn("bound-proof", radar.text)
+        self.assertNotIn("Embedded value is not trusted", radar.text)
+        self.assertTrue(load_manifest_mock.call_args.kwargs["check_artifact_existence"])
+
+    def test_unbound_radar_build_claim_is_labeled_diagnostic_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            json_path = self._write_workbook(root)
+            payload = json.loads(json_path.read_text(encoding="utf-8"))
+            payload["mvp_radar"] = {
+                "status": "selected",
+                "selected_candidate": "Unbound forged candidate",
+                "dossier_status": "build",
+                "recommendation": "build",
+                "reader_decision": "build_allowed",
+            }
+            json_path.write_text(
+                json.dumps(payload, ensure_ascii=False),
+                encoding="utf-8",
+            )
+
+            items = build_retrieval_items(
+                self._settings(root),
+                week_label="2026-W28",
+                output_root=root,
+            )
+
+        radar = next(item for item in items if item.item_type == "mvp_dossier")
+        self.assertEqual(radar.status, "unbound_legacy")
+        self.assertIn("не даёт права", radar.summary)
+        self.assertIn("Diagnostic raw recommendation: build", radar.text)
+        self.assertIn("MVP Radar diagnostic", radar.title)
+
+    def test_malformed_workbook_json_is_bounded_and_skipped(self):
+        cases = {
+            "invalid_utf8": b"\xff\xfe",
+            "deep": ("[" * 1_500 + "0" + "]" * 1_500).encode(),
+            "huge_integer": ("{\"value\":" + "9" * 5_000 + "}").encode(),
+            "oversized": b" " * 8_000_001,
+        }
+        for label, content in cases.items():
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                visual_dir = root / "ai_visual_intelligence"
+                visual_dir.mkdir(parents=True)
+                (visual_dir / "2026-W28.visual.json").write_bytes(content)
+
+                items = build_retrieval_items(
+                    self._settings(root),
+                    week_label="2026-W28",
+                    output_root=root,
+                )
+
+                self.assertFalse(
+                    any(item.item_type == "mvp_dossier" for item in items)
+                )
 
     def test_reaction_effect_is_available_as_additive_audit_retrieval(self):
         receipt = {

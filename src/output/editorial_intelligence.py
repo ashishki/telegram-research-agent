@@ -28,6 +28,7 @@ from output.editorial_intelligence_prompt import (
     EDITORIAL_SCHEMA_VERSION,
     build_editorial_prompt,
 )
+from output.mvp_radar_reader import load_bound_mvp_radar_reader
 from output.reaction_personalization import (
     ReactionPersonalizationError,
     validate_reaction_effect,
@@ -1376,6 +1377,15 @@ def _load_persisted_run_inputs(
                 raise EditorialInputError(
                     f"persisted Radar binding/stage mismatch for {stage_field}"
                 )
+        reader = load_bound_mvp_radar_reader(
+            manifest,
+            path_base=run_dir,
+            allowed_roots=(run_dir,),
+        )
+        if reader.get("reader_state") not in {"available", "no_candidate"}:
+            raise EditorialInputError(
+                "persisted Radar bytes do not satisfy the reader contract"
+            )
     except (
         OSError,
         UnicodeError,
@@ -2001,8 +2011,10 @@ def _radar_permission_package(
     ):
         return _unavailable_radar_permission(), ["radar_result_not_complete"]
     candidate_payload = dict(candidate) if isinstance(candidate, Mapping) else None
-    expected_projection_status = "selected" if candidate_payload else "no_candidate"
-    if raw_projection_status != expected_projection_status:
+    expected_projection_statuses = (
+        {"selected"} if candidate_payload else {"no_candidate", "no_evidence"}
+    )
+    if raw_projection_status not in expected_projection_statuses:
         return _unavailable_radar_permission(), ["radar_result_inconsistent"]
     missing = []
     if candidate_payload:

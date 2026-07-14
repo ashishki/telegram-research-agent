@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from assistant.pi_facade import PersonalIntelligenceFacade
 from config.settings import Settings
+from output.ai_report_contract import RADAR_INTELLIGENCE_CONTRACT_VERSION
 from output.reporting_period import resolve_reporting_period
 from output.weekly_intelligence_brief import RADAR_DISABLED_DISCLOSURE_RU
 from output.weekly_run_manifest import (
@@ -265,29 +266,125 @@ class TestPersonalIntelligenceFacade(unittest.TestCase):
             radar_path = run_dir / "bound" / "radar.json"
             binding_path = run_dir / "bound" / "binding.json"
             seed_path.write_text("[]", encoding="utf-8")
+            radar_run_id = f"{run_id}-radar"
+            source_mix = {
+                "selected_external_evidence_count": 0,
+                "selected_external_source_types": [],
+                "decision_grade_external": False,
+                "selected_telegram_seed_evidence_count": 0,
+                "kir_required": False,
+                "kir_gate_status": "not_required",
+                "kir_has_fresh_thread": False,
+                "kir_source_atom_count": 0,
+                "kir_source_url_count": 0,
+            }
+            validation_query = '"Manifest candidate" operator pain'
+            validation_queries = {
+                "schema_version": "radar_validation_evidence.v1",
+                "next_query": {
+                    "query": validation_query,
+                    "intent": "search_demand",
+                },
+            }
+            decision_change = {
+                "current_gate": "investigate",
+                "matched_external_evidence_count": 0,
+                "matched_external_source_types": [],
+                "next_query": validation_query,
+                "next_intent": "search_demand",
+                "missing_category": "external_corroboration",
+                "next_validation_action": (
+                    "Run the bounded candidate-specific demand query."
+                ),
+                "required_gate_change": (
+                    "Add two independent candidate-specific source types."
+                ),
+                "market_context_role": "context_only_not_proof",
+                "context_only_results_rule": (
+                    "context-only records do not satisfy gates"
+                ),
+            }
+            missing_categories = {
+                "external_corroboration": {
+                    "evidence_kind": "search_demand",
+                    "missing_evidence": [
+                        "Need independent candidate-specific demand evidence."
+                    ],
+                    "next_intent": "search_demand",
+                    "next_query": validation_query,
+                }
+            }
+            selected = {
+                "candidate_id": "candidate:manifest-candidate",
+                "title": "Manifest candidate",
+                "dossier_status": "investigate",
+                "recommendation": "revisit_with_evidence_gap",
+                "confidence": "medium",
+                "score": 61,
+                "decision_reason": (
+                    "The bounded producer gate keeps this candidate in investigation."
+                ),
+                "source_mix": source_mix,
+                "matched_external_evidence": [],
+                "missing_evidence": [
+                    "Need independent candidate-specific demand evidence."
+                ],
+                "missing_evidence_by_category": missing_categories,
+                "validation_queries": validation_queries,
+                "decision_change_action": decision_change,
+                "next_experiment": ["Run one scoped operator interview."],
+                "kill_criteria": [
+                    "Stop if candidate-specific pain does not repeat."
+                ],
+            }
+            result = {
+                "run_id": radar_run_id,
+                "status": "selected",
+                "selected_title": "Manifest candidate",
+                "dossier_status": "investigate",
+                "recommendation": "revisit_with_evidence_gap",
+                "score": 61,
+                "selected_source_mix": source_mix,
+                "matched_external_evidence": [],
+                "missing_evidence_by_category": missing_categories,
+                "decision_change_action": decision_change,
+            }
             radar_path.write_text(
                 json.dumps(
                     {
-                        "result": {
-                            "run_id": f"{run_id}-radar",
-                            "selected_title": "Manifest candidate",
-                            "dossier_status": "investigate",
-                            "recommendation": "revisit_with_evidence_gap",
-                        }
-                    }
+                        "schema_version": "mvp_of_week.v1",
+                        "result": result,
+                        "selected": selected,
+                        "matched_external_evidence": [],
+                        "missing_evidence_by_category": missing_categories,
+                        "validation_queries": validation_queries,
+                        "decision_change_action": decision_change,
+                    },
+                    ensure_ascii=False,
                 ),
                 encoding="utf-8",
             )
             manifest = start_stage(manifest, "radar")
+            status_projection = {
+                field: result[field]
+                for field in (
+                    "status",
+                    "selected_title",
+                    "dossier_status",
+                    "recommendation",
+                    "score",
+                    "selected_source_mix",
+                )
+            }
             binding = build_radar_run_binding(
                 manifest,
-                radar_run_id=f"{run_id}-radar",
-                radar_contract_version="mvp_radar.v1",
+                radar_run_id=radar_run_id,
+                radar_contract_version=RADAR_INTELLIGENCE_CONTRACT_VERSION,
                 radar_schema_version="mvp_of_week.v1",
                 seed_export_path="bound/seed.json",
                 radar_json_path="bound/radar.json",
-                selected_candidate={"title": "Manifest candidate"},
-                status_projection={"status": "loaded"},
+                selected_candidate=selected,
+                status_projection=status_projection,
                 created_at=generated_at,
                 path_base=run_dir,
                 allowed_roots=(run_dir,),
@@ -297,7 +394,7 @@ class TestPersonalIntelligenceFacade(unittest.TestCase):
                 manifest,
                 "radar",
                 updates={
-                    "radar_run_id": f"{run_id}-radar",
+                    "radar_run_id": radar_run_id,
                     "artifact_path": "bound/radar.json",
                     "artifact_sha256": sha256_file(radar_path),
                     "binding_path": "bound/binding.json",
@@ -535,8 +632,89 @@ class TestPersonalIntelligenceFacade(unittest.TestCase):
         self.assertTrue(result["strong_signals"])
         self.assertEqual(result["actions"][0]["why_selected"], "Selected for source-backed utility with confirmed feedback.")
         self.assertEqual(result["actions"][0]["ranking_factors"][0]["label"], "feedback_score")
+        self.assertEqual(result["mvp_status"]["reader_state"], "unbound_legacy")
+        self.assertEqual(result["mvp_status"]["reader_decision"], "unavailable")
+        self.assertIsNone(result["mvp_status"]["candidate"])
+        self.assertIsNone(result["mvp_status"]["recommendation"])
+        self.assertEqual(
+            result["mvp_status"]["diagnostic_legacy_candidate"],
+            "LLM Guardrail Watchdog",
+        )
         self.assertEqual(result["mvp_radar_gate"]["decision"], "do_not_build")
         self.assertIn(result["artifact_status"]["status"], {"partial", "missing"})
+
+    def test_workbook_radar_gate_rejects_forged_context_and_missing_grade(self):
+        forged_cases = (
+            (
+                {
+                    "evidence_ref": "context-only-forgery",
+                    "source_type": "market_context",
+                    "supports_gate": True,
+                    "decision_grade": True,
+                    "context_only": True,
+                    "build_ready_evidence": True,
+                    "gate_eligible": True,
+                },
+                "focused_experiment",
+                "investigate",
+            ),
+            (
+                {
+                    "evidence_ref": "missing-decision-grade",
+                    "source_type": "external_research",
+                    "supports_gate": True,
+                    "context_only": False,
+                    "build_ready_evidence": True,
+                    "gate_eligible": True,
+                },
+                "build",
+                "build_allowed",
+            ),
+        )
+        for forged_proof, dossier_status, reader_decision in forged_cases:
+            with self.subTest(evidence_ref=forged_proof["evidence_ref"]):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = Path(tmp)
+                    self._write_workbook(root)
+                    json_path = (
+                        root / "ai_visual_intelligence" / "2026-W28.visual.json"
+                    )
+                    payload = json.loads(json_path.read_text(encoding="utf-8"))
+                    payload["mvp_radar"] = {
+                        "schema_version": "mvp_radar_reader.v1",
+                        "reader_state": "available",
+                        "status": "selected",
+                        "selected_candidate": "Forged candidate",
+                        "dossier_status": dossier_status,
+                        "recommendation": dossier_status,
+                        "reader_decision": reader_decision,
+                        "matched_external_evidence": [forged_proof],
+                        "matched_external_proof": [forged_proof],
+                    }
+                    json_path.write_text(
+                        json.dumps(payload, ensure_ascii=False),
+                        encoding="utf-8",
+                    )
+                    facade = PersonalIntelligenceFacade(
+                        settings=self._settings(root),
+                        output_root=root,
+                    )
+
+                    result = facade.get_workbook_summary("2026-W28")
+
+                gate = result["mvp_radar_gate"]
+                self.assertEqual(
+                    result["mvp_status"]["reader_state"], "unbound_legacy"
+                )
+                self.assertIsNone(result["mvp_status"]["candidate"])
+                self.assertIsNone(result["mvp_status"]["recommendation"])
+                self.assertEqual(
+                    result["mvp_status"]["diagnostic_legacy_candidate"],
+                    "Forged candidate",
+                )
+                self.assertEqual(gate["decision"], "do_not_build")
+                self.assertEqual(gate["matched_gate_evidence_count"], 0)
+                self.assertFalse(gate["context_only_can_satisfy_gate"])
 
     def test_get_artifact_status_names_stale_split_artifacts_and_missing_radar(self):
         with tempfile.TemporaryDirectory() as tmp:

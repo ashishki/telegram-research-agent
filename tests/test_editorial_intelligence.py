@@ -792,19 +792,22 @@ class EditorialIntelligenceTests(unittest.TestCase):
                     artifact["generation_receipt"]["validation_errors"]
                 )
 
-    def test_valid_no_candidate_radar_is_authoritative_not_failed(self) -> None:
-        binding = _radar_binding()
-        binding["selected_candidate"] = None
-        binding["status_projection"] = {"status": "no_candidate"}
+    def test_valid_no_candidate_or_no_evidence_radar_is_authoritative(self) -> None:
+        for status in ("no_candidate", "no_evidence"):
+            with self.subTest(status=status):
+                binding = _radar_binding()
+                binding["selected_candidate"] = None
+                binding["status_projection"] = {"status": status}
 
-        package = self._package(radar_binding=binding)
+                package = self._package(radar_binding=binding)
 
-        self.assertFalse(package["release_policy"]["requires_partial"])
-        self.assertEqual(
-            package["radar_permission"]["allowed_reader_decisions"],
-            ["unavailable"],
-        )
-        self.assertTrue(package["radar_permission"]["radar_ref"])
+                self.assertFalse(package["release_policy"]["requires_partial"])
+                self.assertEqual(
+                    package["radar_permission"]["allowed_reader_decisions"],
+                    ["unavailable"],
+                )
+                self.assertFalse(package["radar_permission"]["build_allowed"])
+                self.assertTrue(package["radar_permission"]["radar_ref"])
 
     def test_unresolved_source_evidence_never_becomes_a_signal(self) -> None:
         context = _context(thread_count=1)
@@ -1696,6 +1699,103 @@ class EditorialIntelligenceTests(unittest.TestCase):
 
         self.assertNotIn("reaction_receipt_integrity_invalid", neutral_reasons)
         self.assertIn("reaction_receipt_integrity_invalid", forged_reasons)
+
+    def test_persisted_radar_requires_conservative_bound_reader_state(self) -> None:
+        identity = _run_identity()
+        binding = _radar_binding()
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            manifest_path = run_dir / "manifest.json"
+            binding_path = run_dir / "radar" / "binding.json"
+            binding_path.parent.mkdir(parents=True)
+            binding_path.write_text(
+                json.dumps(binding, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            manifest = {
+                field: identity[field]
+                for field in (
+                    "run_id",
+                    "run_date",
+                    "generated_at",
+                    "reporting_week",
+                    "analysis_period_start",
+                    "analysis_period_end",
+                    "period_mode",
+                    "pipeline_profile",
+                )
+            }
+            manifest["stages"] = {
+                "reaction_sync": {
+                    "status": "succeeded",
+                    "snapshot_ref": f"reaction-snapshot:{RUN_ID}",
+                    "record_counts": {"personal_reaction_events_detected": 0},
+                },
+                "feedback_snapshot": {
+                    "status": "succeeded",
+                    "cutoff": PERIOD["analysis_period_end"],
+                    "confirmed_event_count": 3,
+                },
+                "radar": {
+                    "status": "succeeded",
+                    "binding_path": "radar/binding.json",
+                    "binding_sha256": "c" * 64,
+                    "seed_export_path": "radar/seeds.json",
+                    "seed_export_sha256": "a" * 64,
+                    "artifact_path": "radar/raw.json",
+                    "artifact_sha256": "b" * 64,
+                },
+            }
+            manifest_path.write_text(
+                json.dumps(manifest, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            bound_identity = {**identity, "manifest_path": str(manifest_path)}
+
+            results = {}
+            for reader_state in (
+                "available",
+                "no_candidate",
+                "missing",
+                "invalid",
+                "unbound_legacy",
+            ):
+                with (
+                    patch(
+                        "output.editorial_intelligence.load_manifest",
+                        return_value=manifest,
+                    ),
+                    patch(
+                        "output.editorial_intelligence.load_bound_reaction_snapshot",
+                        return_value={},
+                    ),
+                    patch(
+                        "output.editorial_intelligence.verify_file_checksum",
+                    ),
+                    patch(
+                        "output.editorial_intelligence.validate_radar_run_binding",
+                    ),
+                    patch(
+                        "output.editorial_intelligence.load_bound_mvp_radar_reader",
+                        return_value={"reader_state": reader_state},
+                    ),
+                ):
+                    results[reader_state] = _load_persisted_run_inputs(
+                        bound_identity,
+                        supplied_radar_binding=None,
+                        context=_context(),
+                    )
+
+        for reader_state in ("available", "no_candidate"):
+            authoritative, feedback_count, reasons = results[reader_state]
+            self.assertEqual(authoritative, binding)
+            self.assertEqual(feedback_count, 3)
+            self.assertNotIn("radar_binding_integrity_invalid", reasons)
+        for reader_state in ("missing", "invalid", "unbound_legacy"):
+            authoritative, feedback_count, reasons = results[reader_state]
+            self.assertIsNone(authoritative)
+            self.assertEqual(feedback_count, 3)
+            self.assertIn("radar_binding_integrity_invalid", reasons)
 
     def test_generator_persisted_input_failure_is_partial_without_model_call(self) -> None:
         calls = 0
