@@ -14,6 +14,7 @@ from db.ai_report_feedback import fetch_ai_report_feedback, summarize_ai_report_
 from db.idea_threads import fetch_idea_thread_atoms, fetch_idea_threads
 from output.action_status import build_action_status_projection, summarize_action_statuses
 from output.intelligence_retrieval_items import (
+    DEFAULT_OUTPUT_ROOT,
     DEFAULT_KNOWLEDGE_ATLAS_OUTPUT_DIR,
     DEFAULT_WEEKLY_BRIEF_OUTPUT_DIR,
     _dedupe_items,
@@ -22,6 +23,10 @@ from output.intelligence_retrieval_items import (
     find_latest_week_label,
     load_latest_workbook_json,
     load_mvp_radar_status,
+)
+from output.weekly_intelligence_brief_v2 import (
+    WeeklyIntelligenceBriefV2Error,
+    find_manifest_bound_weekly_intelligence_brief_v2,
 )
 from output.mvp_radar_reader import (
     MvpRadarReaderError,
@@ -37,7 +42,6 @@ from output.weekly_intelligence_brief import (
 from output.weekly_run_manifest import (
     WeeklyRunManifestError,
     load_manifest,
-    validate_manifest,
     verify_file_checksum,
 )
 
@@ -62,6 +66,7 @@ class PersonalIntelligenceFacade:
         mvp_output_root: str | Path | None = None,
         radar_output_root: str | Path | None = None,
         weekly_run_root: str | Path | None = None,
+        v2_source_roots: Iterable[str | Path] = (),
         now: datetime | None = None,
     ) -> None:
         base_settings = settings or load_settings()
@@ -87,6 +92,7 @@ class PersonalIntelligenceFacade:
                 else PROJECT_ROOT / "data" / "output" / "weekly_intelligence_runs"
             )
         )
+        self._v2_source_roots = tuple(Path(root) for root in v2_source_roots)
         self._now = now
 
     def get_current_week_label(self) -> dict:
@@ -674,6 +680,8 @@ class PersonalIntelligenceFacade:
                 ai_output_root=self._ai_output_root,
                 mvp_output_root=self._mvp_output_root,
                 radar_output_root=self._radar_output_root,
+                weekly_run_root=self._weekly_run_root,
+                v2_source_roots=self._v2_source_roots,
             )
         results = search_curated_semantic_items(items, query, filters=clean_filters, limit=limit)
         return {
@@ -744,7 +752,10 @@ class PersonalIntelligenceFacade:
                 resolved_path = lexical_path.resolve()
             except (OSError, RuntimeError):
                 resolved_path = lexical_path.absolute()
-            if resolved_path.parent.parent != weekly_run_root:
+            if (
+                lexical_path.absolute() != resolved_path
+                or resolved_path.parent.parent != weekly_run_root
+            ):
                 week_clues = _manifest_candidate_week_clues({}, lexical_path)
                 candidate_week = _majority_week_clue(week_clues)
                 if clean_week and candidate_week and clean_week != candidate_week:
@@ -766,23 +777,13 @@ class PersonalIntelligenceFacade:
                 )
                 continue
             path = resolved_path
-            parse_failed = False
             try:
-                loaded = json.loads(path.read_text(encoding="utf-8"))
-            except (OSError, UnicodeError, json.JSONDecodeError):
-                loaded = None
-                parse_failed = True
-            if isinstance(loaded, Mapping):
-                payload = dict(loaded)
-            else:
+                payload = load_manifest(path)
+            except (WeeklyRunManifestError, UnicodeError):
                 payload = {}
-                parse_failed = True
-            invalid_candidate = parse_failed
-            if not invalid_candidate:
-                try:
-                    validate_manifest(payload)
-                except (TypeError, ValueError):
-                    invalid_candidate = True
+                invalid_candidate = True
+            else:
+                invalid_candidate = False
             if invalid_candidate:
                 # Invalid identity cannot be trusted as a single filter key. Keep
                 # conflicting/unassignable candidates fail-closed for explicit reads.
@@ -989,12 +990,81 @@ class PersonalIntelligenceFacade:
                 artifact_type="knowledge_atlas",
             ),
         ]
-        return _dedupe_items(
+        items = [
             item
             for sidecar in sidecars
             if sidecar is not None
             for item in _items_from_workbook(sidecar)
-        )
+        ]
+        if (
+            manifest.get(_INVALID_MANIFEST_MARKER) is None
+            and manifest.get("run_status") in {"complete", "partial"}
+        ):
+            requested_output = self._output_root or DEFAULT_OUTPUT_ROOT
+            try:
+                output_base = requested_output.resolve()
+                v2_brief = find_manifest_bound_weekly_intelligence_brief_v2(
+                    output_root=requested_output,
+                    run_id=str(manifest.get("run_id") or ""),
+                    expected_manifest_path=manifest_path,
+                    allowed_source_roots=(
+                        output_base,
+                        manifest_path.parent.resolve(),
+                        *self._v2_source_roots,
+                    ),
+                )
+                period = (
+                    v2_brief.get("reporting_period")
+                    if isinstance(v2_brief, Mapping)
+                    and isinstance(v2_brief.get("reporting_period"), Mapping)
+                    else {}
+                )
+                paths = (
+                    v2_brief.get("artifact_paths")
+                    if isinstance(v2_brief, Mapping)
+                    and isinstance(v2_brief.get("artifact_paths"), Mapping)
+                    else {}
+                )
+                if (
+                    isinstance(v2_brief, Mapping)
+                    and v2_brief.get("run_id") == manifest.get("run_id")
+                    and period.get("reporting_week")
+                    == manifest.get("reporting_week")
+                    and paths
+                ):
+                    items = [
+                        item
+                        for item in items
+                        if item.item_type != "mvp_dossier"
+                    ]
+                    candidate = dict(v2_brief)
+                    candidate["_artifact_kind"] = "weekly_intelligence_brief_v2"
+                    candidate["_artifact_paths"] = {
+                        "json": str(paths.get("json") or ""),
+                        "html": str(paths.get("html") or ""),
+                        "source_catalog": str(
+                            paths.get("source_catalog") or ""
+                        ),
+                    }
+                    items.extend(
+                        _items_from_workbook(
+                            candidate,
+                            v2_expected_manifest_path=manifest_path,
+                            v2_allowed_source_roots=self._v2_source_roots,
+                        )
+                    )
+            except (
+                OSError,
+                UnicodeError,
+                TypeError,
+                ValueError,
+                RecursionError,
+                OverflowError,
+                RuntimeError,
+                WeeklyIntelligenceBriefV2Error,
+            ):
+                pass
+        return _dedupe_items(items)
 
     def _manifest_artifact_status(
         self,

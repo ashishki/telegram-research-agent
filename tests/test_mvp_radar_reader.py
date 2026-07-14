@@ -552,6 +552,46 @@ class TestMvpRadarReader(unittest.TestCase):
         self.assertEqual(binding_projection["reader_state"], "invalid")
         self.assertEqual(binding_projection["reader_decision"], "unavailable")
 
+    def test_bound_loader_rejects_duplicate_keys_and_float_overflow(self) -> None:
+        for poison in ("duplicate", "float-overflow"):
+            with self.subTest(poison=poison):
+                bundle = self._bound()
+                raw = json.dumps(
+                    bundle.payload,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                ).encode("utf-8")
+                if poison == "duplicate":
+                    raw = b'{"schema_version":"mvp_of_week.v1",' + raw[1:]
+                else:
+                    raw = raw[:-1] + b',"ignored_overflow":1e999}'
+                bundle.raw_path.write_bytes(raw)
+
+                binding = copy.deepcopy(bundle.binding)
+                binding["radar_json_ref"]["sha256"] = sha256_file(
+                    bundle.raw_path
+                )
+                bundle.binding_path.write_text(
+                    json.dumps(binding, ensure_ascii=False, sort_keys=True),
+                    encoding="utf-8",
+                )
+                manifest = copy.deepcopy(bundle.manifest)
+                manifest["stages"]["radar"]["artifact_sha256"] = sha256_file(
+                    bundle.raw_path
+                )
+                manifest["stages"]["radar"]["binding_sha256"] = sha256_file(
+                    bundle.binding_path
+                )
+
+                projection = load_bound_mvp_radar_reader(
+                    manifest,
+                    path_base=bundle.run_dir,
+                    allowed_roots=(bundle.run_dir,),
+                )
+
+                self.assertEqual(projection["reader_state"], "invalid")
+                self.assertEqual(projection["reader_decision"], "unavailable")
+
     def test_wrong_radar_run_or_reporting_week_is_rejected(self) -> None:
         bundle = self._bound()
         wrong_run = copy.deepcopy(bundle.payload)

@@ -1,8 +1,11 @@
+import copy
 import json
 import os
 import sqlite3
 import tempfile
 import unittest
+from dataclasses import replace
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -14,10 +17,18 @@ from db.migrate import run_migrations
 from output.ai_report_contract import INTELLIGENCE_CONTRACT_VERSION
 from output.intelligence_retrieval_items import (
     _items_from_workbook,
+    _mvp_item,
+    _select_weekly_v2_manifest,
     build_retrieval_items,
+    load_latest_workbook_json,
     search_retrieval_items,
 )
 from output.learning_layer import LEARNING_STAGES, PROJECT_LEARNING_PROJECTION_VERSION
+from output.weekly_intelligence_brief_v2 import (
+    BRIEF_V2_DIRECTORY,
+    generate_weekly_intelligence_brief_v2_artifact,
+)
+from output.weekly_run_manifest import create_manifest, sha256_file
 
 
 class TestIntelligenceRetrievalItems(unittest.TestCase):
@@ -331,7 +342,7 @@ class TestIntelligenceRetrievalItems(unittest.TestCase):
         radar = next(item for item in items if item.item_type == "mvp_dossier")
         self.assertTrue(radar.id.startswith("mvp_dossier:2026-W28:candidate-legacy-"))
         self.assertEqual(radar.status, "unbound_legacy")
-        self.assertIn("MVP Radar diagnostic", radar.title)
+        self.assertIn("Диагностика MVP Radar", radar.title)
         for marker in (
             "Несвязанный legacy-артефакт не даёт права",
             "Нужна независимая жалоба оператора.",
@@ -411,8 +422,9 @@ class TestIntelligenceRetrievalItems(unittest.TestCase):
         radar = next(item for item in items if item.item_type == "mvp_dossier")
         self.assertEqual(radar.title, "Manifest-bound candidate")
         self.assertEqual(radar.status, "focused_experiment")
-        self.assertIn("bound-thread", radar.text)
-        self.assertIn("bound-proof", radar.text)
+        self.assertNotIn("bound-thread", radar.text)
+        self.assertNotIn("bound-proof", radar.text)
+        self.assertIn("Связанных внешних доказательств: 1", radar.text)
         self.assertNotIn("Embedded value is not trusted", radar.text)
         self.assertTrue(load_manifest_mock.call_args.kwargs["check_artifact_existence"])
 
@@ -442,8 +454,28 @@ class TestIntelligenceRetrievalItems(unittest.TestCase):
         radar = next(item for item in items if item.item_type == "mvp_dossier")
         self.assertEqual(radar.status, "unbound_legacy")
         self.assertIn("не даёт права", radar.summary)
-        self.assertIn("Diagnostic raw recommendation: build", radar.text)
-        self.assertIn("MVP Radar diagnostic", radar.title)
+        self.assertNotIn("build", radar.text)
+        self.assertIn("Решение Radar недоступно", radar.text)
+        self.assertIn("Диагностика MVP Radar", radar.title)
+
+    def test_authoritative_no_candidate_has_no_diagnostic_or_raw_enum_copy(self):
+        radar = _mvp_item(
+            {
+                "schema_version": "mvp_radar_reader.v1",
+                "reader_state": "no_candidate",
+                "selected_candidate": None,
+                "decision_reason_ru": (
+                    "Проверка завершена, но ни один кандидат не прошёл отбор."
+                ),
+            },
+            "2026-W28",
+            authoritative=True,
+        )
+
+        self.assertEqual(radar.title, "MVP Radar: кандидат не выбран")
+        self.assertNotIn("diagnostic", radar.text.casefold())
+        self.assertNotIn("no_candidate", radar.text)
+        self.assertIn("кандидат для решения не выбран", radar.text)
 
     def test_malformed_workbook_json_is_bounded_and_skipped(self):
         cases = {
@@ -939,6 +971,454 @@ class TestIntelligenceRetrievalItems(unittest.TestCase):
             build_review.call_args.kwargs["weekly_run_root"],
             root / "weekly_intelligence_runs",
         )
+
+
+class TestWeeklyBriefV2Retrieval(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        from tests import test_weekly_intelligence_brief_v2 as support
+
+        cls.support = support.WeeklyIntelligenceBriefV2Tests
+        cls.support.setUpClass()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.support.tearDownClass()
+
+    def _settings(self) -> Settings:
+        return Settings(
+            db_path=str(self.support.fixture.root / "retrieval-missing.db"),
+            llm_api_key="",
+            model_provider="",
+            telegram_session_path="",
+        )
+
+    def test_strict_v2_projects_reader_items_without_replacing_v1_loader(self):
+        items = build_retrieval_items(
+            self._settings(),
+            week_label="2026-W28",
+            output_root=self.support.fixture.root,
+            weekly_run_root=self.support.manifest_path.parent.parent,
+        )
+        by_type: dict[str, list] = {}
+        for item in items:
+            by_type.setdefault(item.item_type, []).append(item)
+
+        self.assertEqual(len(by_type["weekly_thesis"]), 1)
+        self.assertEqual(len(by_type["brief_signal"]), 3)
+        self.assertEqual(len(by_type["brief_decision"]), 3)
+        self.assertEqual(len(by_type["brief_action"]), 2)
+        self.assertEqual(len(by_type["project_action"]), 1)
+        self.assertEqual(len(by_type["reaction_effect"]), 1)
+        self.assertEqual(len(by_type["confirmed_feedback_effect"]), 1)
+        self.assertEqual(len(by_type["feedback_target"]), 5)
+        self.assertEqual(len(by_type["mvp_dossier"]), 1)
+        radar = by_type["mvp_dossier"][0]
+        self.assertNotIn("diagnostic", radar.title.casefold())
+        self.assertEqual(radar.status, "investigate")
+        self.assertIn(self.support.summary.json_path, radar.source_refs or [])
+        for item in by_type["brief_signal"]:
+            self.assertIn(self.support.summary.json_path, item.source_refs or [])
+            self.assertIsNone(item.confidence)
+        reader_text = " ".join(item.text for item in items)
+        for internal in (
+            "project_action:",
+            "signal:",
+            "decision_grade",
+            "primary_action",
+            "KIR Knowledge Thread",
+            "bounded Radar run",
+        ):
+            self.assertNotIn(internal, reader_text)
+        v2_reader_text = " ".join(
+            item.text for item in items if item.id.startswith("brief_v2")
+        )
+        self.assertNotIn("medium", v2_reader_text)
+
+        self.assertIsNone(
+            load_latest_workbook_json(
+                self._settings(),
+                "2026-W28",
+                output_root=self.support.fixture.root,
+            )
+        )
+
+    def test_output_root_symlink_loop_fails_closed_without_legacy_radar_fallback(self):
+        loop = self.support.fixture.root / "retrieval-output-loop"
+        loop.symlink_to(loop, target_is_directory=True)
+
+        with patch(
+            "output.intelligence_retrieval_items.load_mvp_radar_status",
+            side_effect=AssertionError("legacy fallback must stay closed"),
+        ):
+            items = build_retrieval_items(
+                self._settings(),
+                week_label="2026-W28",
+                output_root=loop,
+                weekly_run_root=self.support.manifest_path.parent.parent,
+            )
+
+        self.assertFalse(any(item.item_type == "weekly_thesis" for item in items))
+        self.assertFalse(any(item.item_type == "mvp_dossier" for item in items))
+
+    def test_direct_or_mutated_v2_mapping_has_no_authority(self):
+        self.assertEqual(_items_from_workbook(self.support.sidecar), [])
+        forged = copy.deepcopy(self.support.sidecar)
+        forged["_artifact_kind"] = "weekly_intelligence_brief_v2"
+        forged["_artifact_paths"] = {
+            "json": self.support.summary.json_path,
+            "html": self.support.summary.html_path,
+            "source_catalog": self.support.summary.source_catalog_path,
+        }
+        forged["weekly_thesis"]["title"] = "Подменённый тезис"
+        self.assertEqual(_items_from_workbook(forged), [])
+
+    def test_external_trusted_roots_and_many_junk_dirs_keep_exact_v2_visible(self):
+        isolated = self.support.fixture.root / "isolated-v2-output"
+        v2_root = isolated / BRIEF_V2_DIRECTORY
+        v2_root.mkdir(parents=True)
+        for index in range(80):
+            (v2_root / f"000-junk-{index:03d}").mkdir()
+        summary = generate_weekly_intelligence_brief_v2_artifact(
+            manifest_path=self.support.manifest_path,
+            editorial_artifact_path=self.support.editorial_path,
+            editorial_input_package=self.support.package,
+            project_intelligence_path=self.support.project_path,
+            project_descriptors=self.support.project_descriptors,
+            output_root=isolated,
+            allowed_source_roots=(self.support.fixture.root,),
+        )
+
+        items = build_retrieval_items(
+            self._settings(),
+            week_label="2026-W28",
+            output_root=isolated,
+            weekly_run_root=self.support.manifest_path.parent.parent,
+            v2_source_roots=(self.support.fixture.root,),
+        )
+
+        self.assertTrue(any(item.item_type == "weekly_thesis" for item in items))
+        self.assertTrue(
+            any(summary.json_path in (item.source_refs or []) for item in items)
+        )
+
+    def test_symlink_loop_in_exact_v2_path_fails_closed_without_crashing(self):
+        isolated = self.support.fixture.root / "loop-v2-output"
+        v2_root = isolated / BRIEF_V2_DIRECTORY
+        v2_root.mkdir(parents=True)
+        loop = v2_root / self.support.run_id
+        loop.symlink_to(loop, target_is_directory=True)
+
+        with patch(
+            "output.intelligence_retrieval_items.load_mvp_radar_status",
+            side_effect=AssertionError("legacy fallback must stay closed"),
+        ):
+            items = build_retrieval_items(
+                self._settings(),
+                week_label="2026-W28",
+                output_root=isolated,
+                weekly_run_root=self.support.manifest_path.parent.parent,
+                v2_source_roots=(self.support.fixture.root,),
+            )
+
+        self.assertFalse(
+            any(item.item_type.startswith("brief_") for item in items)
+        )
+
+    def test_tampered_v2_is_omitted_without_legacy_radar_fallback(self):
+        path = Path(self.support.summary.json_path)
+        original = path.read_bytes()
+        try:
+            payload = json.loads(original)
+            payload["run_id"] = "tra-weekly-2026-W28-foreign-preview"
+            path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+            with patch(
+                "output.intelligence_retrieval_items.load_mvp_radar_status",
+                side_effect=AssertionError("legacy fallback must stay closed"),
+            ):
+                items = build_retrieval_items(
+                    self._settings(),
+                    week_label="2026-W28",
+                    output_root=self.support.fixture.root,
+                    weekly_run_root=self.support.manifest_path.parent.parent,
+                )
+            self.assertFalse(
+                any(item.item_type.startswith("brief_") for item in items)
+            )
+            self.assertFalse(
+                any(item.item_type == "mvp_dossier" for item in items)
+            )
+            self.assertFalse(
+                any(
+                    self.support.summary.json_path in (item.source_refs or [])
+                    for item in items
+                )
+            )
+        finally:
+            path.write_bytes(original)
+
+    def test_authoritative_v2_replaces_conventional_v1_radar_dossier(self):
+        conventional_root = self.support.fixture.root / "weekly_intelligence_briefs"
+        conventional_root.mkdir(exist_ok=True)
+        conventional = conventional_root / "2026-W28.weekly-brief.json"
+        conventional.write_bytes(
+            Path(self.support.run_result.weekly_brief_json_path).read_bytes()
+        )
+        try:
+            items = build_retrieval_items(
+                self._settings(),
+                week_label="2026-W28",
+                output_root=self.support.fixture.root,
+                weekly_run_root=self.support.manifest_path.parent.parent,
+            )
+        finally:
+            conventional.unlink()
+
+        dossiers = [item for item in items if item.item_type == "mvp_dossier"]
+        self.assertEqual(len(dossiers), 1)
+        self.assertNotIn("диагност", dossiers[0].title.casefold())
+        self.assertIn(
+            self.support.summary.json_path,
+            dossiers[0].source_refs or [],
+        )
+
+    def test_absent_opt_in_v2_preserves_conventional_v1_radar(self):
+        isolated = self.support.fixture.root / "no-v2-attempt-output"
+        conventional_root = isolated / "weekly_intelligence_briefs"
+        conventional_root.mkdir(parents=True)
+        (conventional_root / "2026-W28.weekly-brief.json").write_bytes(
+            Path(self.support.run_result.weekly_brief_json_path).read_bytes()
+        )
+
+        items = build_retrieval_items(
+            self._settings(),
+            week_label="2026-W28",
+            output_root=isolated,
+            weekly_run_root=self.support.manifest_path.parent.parent,
+        )
+
+        dossiers = [item for item in items if item.item_type == "mvp_dossier"]
+        self.assertEqual(len(dossiers), 1)
+        self.assertIn("Диагностика", dossiers[0].title)
+
+    def test_absent_v2_does_not_fallback_from_invalid_manifest_outputs(self):
+        isolated = self.support.fixture.root / "invalid-manifest-no-v2-output"
+        conventional_root = isolated / "weekly_intelligence_briefs"
+        conventional_root.mkdir(parents=True)
+        (conventional_root / "2026-W28.weekly-brief.json").write_bytes(
+            Path(self.support.run_result.weekly_brief_json_path).read_bytes()
+        )
+        manifest_path = self.support.manifest_path
+        manifest_original = manifest_path.read_bytes()
+        manifest = json.loads(manifest_original)
+        relative = manifest["stages"]["reaction_sync"]["artifact_refs"][
+            "snapshot_path"
+        ]
+        snapshot_path = manifest_path.parent / relative
+        snapshot_original = snapshot_path.read_bytes()
+        snapshot = json.loads(snapshot_original)
+        snapshot["run_id"] = "foreign-retrieval-reaction-run"
+        try:
+            snapshot_path.write_text(
+                json.dumps(snapshot, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            manifest["stages"]["reaction_sync"]["checksums"][
+                "snapshot_path"
+            ] = sha256_file(snapshot_path)
+            manifest_path.write_text(
+                json.dumps(manifest, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            with patch(
+                "output.intelligence_retrieval_items.load_mvp_radar_status",
+                side_effect=AssertionError("legacy fallback must stay closed"),
+            ):
+                items = build_retrieval_items(
+                    self._settings(),
+                    week_label="2026-W28",
+                    output_root=isolated,
+                    weekly_run_root=manifest_path.parent.parent,
+                )
+        finally:
+            snapshot_path.write_bytes(snapshot_original)
+            manifest_path.write_bytes(manifest_original)
+
+        self.assertFalse(any(item.item_type == "mvp_dossier" for item in items))
+
+    def test_incomplete_exact_v2_package_blocks_legacy_radar_fallback(self):
+        isolated = self.support.fixture.root / "incomplete-v2-output"
+        summary = generate_weekly_intelligence_brief_v2_artifact(
+            manifest_path=self.support.manifest_path,
+            editorial_artifact_path=self.support.editorial_path,
+            editorial_input_package=self.support.package,
+            project_intelligence_path=self.support.project_path,
+            project_descriptors=self.support.project_descriptors,
+            output_root=isolated,
+            allowed_source_roots=(self.support.fixture.root,),
+        )
+        Path(summary.json_path).unlink()
+
+        with patch(
+            "output.intelligence_retrieval_items.load_mvp_radar_status",
+            side_effect=AssertionError("legacy fallback must stay closed"),
+        ):
+            items = build_retrieval_items(
+                self._settings(),
+                week_label="2026-W28",
+                output_root=isolated,
+                weekly_run_root=self.support.manifest_path.parent.parent,
+                v2_source_roots=(self.support.fixture.root,),
+            )
+
+        self.assertFalse(any(item.item_type == "mvp_dossier" for item in items))
+        self.assertFalse(any(item.item_type == "weekly_thesis" for item in items))
+
+    def test_newer_running_manifest_blocks_older_v2_and_legacy_fallback(self):
+        run_root = self.support.manifest_path.parent.parent
+        manifest_path, _manifest = create_manifest(
+            run_root,
+            self.support.fixture.period,
+            run_id="zzzz-current-running-2026-W28",
+        )
+        try:
+            with patch(
+                "output.intelligence_retrieval_items.load_mvp_radar_status",
+                side_effect=AssertionError("legacy fallback must stay closed"),
+            ):
+                items = build_retrieval_items(
+                    self._settings(),
+                    week_label="2026-W28",
+                    output_root=self.support.fixture.root,
+                    weekly_run_root=run_root,
+                )
+        finally:
+            manifest_path.unlink()
+            manifest_path.parent.rmdir()
+
+        self.assertFalse(any(item.item_type == "weekly_thesis" for item in items))
+        self.assertFalse(any(item.item_type == "mvp_dossier" for item in items))
+
+    def test_authenticated_newer_manifest_recovers_from_old_invalid_candidate(self):
+        run_root = self.support.fixture.root / "selector-recovery-runs"
+        invalid_dir = run_root / "old-invalid-2026-W28"
+        invalid_dir.mkdir(parents=True)
+        invalid_path = invalid_dir / "manifest.json"
+        invalid_path.write_text(
+            '{"reporting_week":"2026-W28",broken',
+            encoding="utf-8",
+        )
+        future_period = replace(
+            self.support.fixture.period,
+            run_date=datetime(2099, 7, 14, tzinfo=timezone.utc).date(),
+            generated_at=datetime(2099, 7, 14, 8, 0, tzinfo=timezone.utc),
+            period_mode="explicit_iso_week",
+        )
+        current_path, _manifest = create_manifest(
+            run_root,
+            future_period,
+            run_id="authenticated-current-2026-W28",
+        )
+
+        selected = _select_weekly_v2_manifest(
+            "2026-W28",
+            weekly_run_root=run_root,
+        )
+
+        self.assertEqual(selected, current_path.resolve())
+
+    def test_uncontained_current_manifest_blocks_older_v2(self):
+        run_root = self.support.manifest_path.parent.parent
+        external_root = self.support.fixture.root / "external-current-runs"
+        external_manifest, _manifest = create_manifest(
+            external_root,
+            self.support.fixture.period,
+            run_id="zzzz-uncontained-2026-W28",
+        )
+        lexical_run = run_root / external_manifest.parent.name
+        lexical_run.symlink_to(external_manifest.parent, target_is_directory=True)
+        try:
+            with patch(
+                "output.intelligence_retrieval_items.load_mvp_radar_status",
+                side_effect=AssertionError("legacy fallback must stay closed"),
+            ):
+                items = build_retrieval_items(
+                    self._settings(),
+                    week_label="2026-W28",
+                    output_root=self.support.fixture.root,
+                    weekly_run_root=run_root,
+                )
+        finally:
+            lexical_run.unlink()
+
+        self.assertFalse(any(item.item_type == "weekly_thesis" for item in items))
+        self.assertFalse(any(item.item_type == "mvp_dossier" for item in items))
+
+    def test_invalid_current_manifest_and_dangling_v2_root_fail_closed(self):
+        run_root = self.support.manifest_path.parent.parent
+        invalid_dir = run_root / "zzzz-invalid-2026-W28"
+        invalid_dir.mkdir()
+        invalid_manifest = invalid_dir / "manifest.json"
+        invalid_manifest.write_text(
+            '{"schema_version":"weekly_run_manifest.v1",'
+            '"schema_version":"weekly_run_manifest.v1",'
+            '"reporting_week":"2026-W28"}',
+            encoding="utf-8",
+        )
+        try:
+            with patch(
+                "output.intelligence_retrieval_items.load_mvp_radar_status",
+                side_effect=AssertionError("legacy fallback must stay closed"),
+            ):
+                items = build_retrieval_items(
+                    self._settings(),
+                    week_label="2026-W28",
+                    output_root=self.support.fixture.root,
+                    weekly_run_root=run_root,
+                )
+        finally:
+            invalid_manifest.unlink()
+            invalid_dir.rmdir()
+        self.assertFalse(any(item.item_type == "weekly_thesis" for item in items))
+
+        dangling_output = self.support.fixture.root / "dangling-v2-output"
+        dangling_output.mkdir()
+        (dangling_output / BRIEF_V2_DIRECTORY).symlink_to(
+            dangling_output / "missing-target",
+            target_is_directory=True,
+        )
+        with patch(
+            "output.intelligence_retrieval_items.load_mvp_radar_status",
+            side_effect=AssertionError("legacy fallback must stay closed"),
+        ):
+            dangling_items = build_retrieval_items(
+                self._settings(),
+                week_label="2026-W28",
+                output_root=dangling_output,
+                weekly_run_root=run_root,
+            )
+        self.assertFalse(
+            any(item.item_type == "mvp_dossier" for item in dangling_items)
+        )
+
+    def test_output_root_with_symlinked_ancestor_fails_closed(self):
+        target = self.support.fixture.root / "retrieval-ancestor-target"
+        target.mkdir()
+        alias = self.support.fixture.root / "retrieval-ancestor-alias"
+        alias.symlink_to(target, target_is_directory=True)
+        with patch(
+            "output.intelligence_retrieval_items.load_mvp_radar_status",
+            side_effect=AssertionError("legacy fallback must stay closed"),
+        ):
+            items = build_retrieval_items(
+                self._settings(),
+                week_label="2026-W28",
+                output_root=alias / "nested",
+                weekly_run_root=self.support.manifest_path.parent.parent,
+            )
+
+        self.assertFalse(any(item.item_type == "mvp_dossier" for item in items))
+        self.assertFalse(any(item.item_type == "weekly_thesis" for item in items))
 
 
 if __name__ == "__main__":

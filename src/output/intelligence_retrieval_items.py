@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import json
+import math
+import os
 import re
 import sqlite3
-from dataclasses import dataclass
+import stat
+from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
@@ -20,7 +23,19 @@ from output.mvp_radar_reader import (
     load_bound_mvp_radar_reader,
     load_unbound_mvp_radar_reader,
 )
-from output.weekly_run_manifest import load_manifest
+from output.weekly_run_manifest import (
+    WeeklyRunManifestError,
+    load_manifest,
+    validate_manifest,
+)
+from output.weekly_intelligence_brief_v2 import (
+    BRIEF_V2_DIRECTORY,
+    BRIEF_V2_JSON_FILENAME,
+    BRIEF_V2_SCHEMA_VERSION,
+    WeeklyIntelligenceBriefV2Error,
+    _strict_check_manifest_json_sources,
+    load_manifest_bound_weekly_intelligence_brief_v2,
+)
 from output.strategy_reviewer import build_strategy_review
 from output.reaction_personalization import (
     ReactionPersonalizationError,
@@ -33,11 +48,13 @@ DEFAULT_VISUAL_OUTPUT_DIR = DEFAULT_OUTPUT_ROOT / "ai_visual_intelligence"
 DEFAULT_AI_OUTPUT_DIR = DEFAULT_OUTPUT_ROOT / "ai_intelligence"
 DEFAULT_KNOWLEDGE_ATLAS_OUTPUT_DIR = DEFAULT_OUTPUT_ROOT / "knowledge_atlas"
 DEFAULT_WEEKLY_BRIEF_OUTPUT_DIR = DEFAULT_OUTPUT_ROOT / "weekly_intelligence_briefs"
+DEFAULT_WEEKLY_BRIEF_V2_OUTPUT_DIR = DEFAULT_OUTPUT_ROOT / BRIEF_V2_DIRECTORY
 DEFAULT_WEEKLY_RUN_ROOT = DEFAULT_OUTPUT_ROOT / "weekly_intelligence_runs"
 DEFAULT_MVP_OUTPUT_DIR = DEFAULT_OUTPUT_ROOT / "mvp_weekly"
 DEFAULT_RADAR_OUTPUT_DIR = PROJECT_ROOT.parent / "Demand-to-MVP-Radar" / "reports" / "mvp_of_week"
 WEEK_RE = re.compile(r"(?P<week>\d{4}-W\d{2})")
 TOKEN_RE = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_-]{1,}")
+CYRILLIC_RE = re.compile(r"[А-Яа-яЁё]")
 MAX_RETRIEVAL_JSON_BYTES = 8_000_000
 
 
@@ -70,8 +87,11 @@ def build_retrieval_items(
     ai_output_root: str | Path | None = None,
     mvp_output_root: str | Path | None = None,
     radar_output_root: str | Path | None = None,
+    weekly_run_root: str | Path | None = None,
+    v2_source_roots: Iterable[str | Path] = (),
 ) -> list[IntelligenceRetrievalItem]:
     """Build a read-only projection over curated intelligence objects."""
+    trusted_v2_roots = tuple(v2_source_roots)
     clean_week = str(week_label).strip() if week_label else None
     workbook = load_latest_workbook_json(
         settings,
@@ -98,6 +118,22 @@ def build_retrieval_items(
         items.extend(_items_from_workbook(split_artifact))
         if json_path:
             loaded_artifact_paths.add(json_path)
+    v2_briefs, v2_authority_present = _load_weekly_brief_v2_sidecars(
+        clean_week,
+        output_root=output_root,
+        weekly_run_root=weekly_run_root,
+        allowed_source_roots=trusted_v2_roots,
+    )
+    if v2_authority_present:
+        items = [item for item in items if item.item_type != "mvp_dossier"]
+    for v2_brief, manifest_path in v2_briefs:
+        items.extend(
+            _items_from_workbook(
+                v2_brief,
+                v2_expected_manifest_path=manifest_path,
+                v2_allowed_source_roots=trusted_v2_roots,
+            )
+        )
 
     with _optional_readonly_connection(getattr(settings, "db_path", None)) as connection:
         if connection is not None:
@@ -118,7 +154,11 @@ def build_retrieval_items(
                 )
             )
 
-    if clean_week and not any(item.item_type == "mvp_dossier" for item in items):
+    if (
+        clean_week
+        and not v2_authority_present
+        and not any(item.item_type == "mvp_dossier" for item in items)
+    ):
         mvp = load_mvp_radar_status(
             clean_week,
             output_root=output_root,
@@ -265,7 +305,300 @@ def _load_split_sidecar_jsons(
     return artifacts
 
 
-def _items_from_workbook(workbook: Mapping[str, Any]) -> list[IntelligenceRetrievalItem]:
+def _load_weekly_brief_v2_sidecars(
+    week_label: str | None,
+    *,
+    output_root: str | Path | None,
+    weekly_run_root: str | Path | None,
+    allowed_source_roots: Iterable[str | Path],
+) -> tuple[list[tuple[dict[str, Any], Path]], bool]:
+    clean_week = str(week_label or "").strip()
+    if not clean_week:
+        return [], False
+    requested_output = (
+        Path(output_root).expanduser().absolute()
+        if output_root is not None
+        else DEFAULT_OUTPUT_ROOT.absolute()
+    )
+    try:
+        output_base = requested_output.resolve()
+    except (OSError, RuntimeError, ValueError):
+        return [], True
+    if requested_output != output_base:
+        return [], True
+    selected_run_root = (
+        Path(weekly_run_root).expanduser()
+        if weekly_run_root is not None
+        else output_base / "weekly_intelligence_runs"
+    )
+    manifest_path = _select_weekly_v2_manifest(
+        clean_week,
+        weekly_run_root=selected_run_root,
+    )
+    if manifest_path is None:
+        return [], False
+    try:
+        canonical_run_root = selected_run_root.resolve(strict=True)
+        lexical_manifest = manifest_path.expanduser().absolute()
+        resolved_manifest = lexical_manifest.resolve(strict=True)
+        if (
+            lexical_manifest != resolved_manifest
+            or resolved_manifest.parent.parent != canonical_run_root
+        ):
+            return [], True
+        strict_manifest, _raw = _read_retrieval_manifest(resolved_manifest)
+        manifest = strict_manifest
+        validate_manifest(
+            manifest,
+            path_base=resolved_manifest.parent,
+            allowed_roots=(resolved_manifest.parent,),
+            check_artifact_existence=False,
+        )
+        _strict_check_manifest_json_sources(manifest, resolved_manifest)
+        validate_manifest(
+            manifest,
+            path_base=resolved_manifest.parent,
+            allowed_roots=(resolved_manifest.parent,),
+            check_artifact_existence=True,
+        )
+        if manifest.get("run_status") not in {"complete", "partial"}:
+            return [], True
+        run_id = str(manifest.get("run_id") or "")
+        v2_root = output_base / BRIEF_V2_DIRECTORY
+        if v2_root.is_symlink():
+            return [], True
+        if not v2_root.exists():
+            return [], False
+        if not v2_root.is_dir():
+            return [], True
+        run_directory = v2_root / run_id
+        if run_directory.is_symlink():
+            return [], True
+        if not run_directory.exists():
+            return [], False
+        if not run_directory.is_dir():
+            return [], True
+        lexical_path = run_directory / BRIEF_V2_JSON_FILENAME
+        if lexical_path.is_symlink():
+            return [], True
+        if not lexical_path.is_file():
+            return [], True
+        roots = (
+            output_base,
+            resolved_manifest.parent,
+            *(Path(root) for root in allowed_source_roots),
+        )
+        payload = load_manifest_bound_weekly_intelligence_brief_v2(
+            lexical_path,
+            expected_manifest_path=resolved_manifest,
+            allowed_source_roots=roots,
+        )
+        period = payload.get("reporting_period")
+        paths = payload.get("artifact_paths")
+        if (
+            not isinstance(period, Mapping)
+            or period.get("reporting_week") != clean_week
+            or not isinstance(paths, Mapping)
+        ):
+            return [], True
+        result = dict(payload)
+        result["_artifact_kind"] = "weekly_intelligence_brief_v2"
+        result["_artifact_paths"] = {
+            "json": str(paths.get("json") or ""),
+            "html": str(paths.get("html") or ""),
+            "source_catalog": str(paths.get("source_catalog") or ""),
+        }
+        return [(result, resolved_manifest)], True
+    except (
+        OSError,
+        RuntimeError,
+        UnicodeError,
+        TypeError,
+        ValueError,
+        RecursionError,
+        OverflowError,
+        WeeklyIntelligenceBriefV2Error,
+    ):
+        return [], True
+
+
+def _select_weekly_v2_manifest(
+    week_label: str,
+    *,
+    weekly_run_root: Path,
+) -> Path | None:
+    try:
+        root = weekly_run_root.expanduser().resolve(strict=True)
+        candidates = list(root.glob("*/manifest.json"))
+    except (OSError, RuntimeError, ValueError):
+        return None
+    selected: tuple[tuple[int, str, str], Path] | None = None
+    for lexical_path in candidates:
+        try:
+            path = lexical_path.resolve(strict=True)
+            if lexical_path.absolute() != path or path.parent.parent != root:
+                try:
+                    raw = _read_retrieval_bytes(lexical_path)
+                except (OSError, ValueError):
+                    raw = b""
+                if (
+                    week_label in lexical_path.parent.name
+                    or week_label.encode("utf-8") in raw
+                ):
+                    invalid_path = lexical_path.absolute()
+                    key = (
+                        2**63 - 1,
+                        lexical_path.parent.name,
+                        str(invalid_path),
+                    )
+                    if selected is None or key > selected[0]:
+                        selected = (key, invalid_path)
+                continue
+            manifest, _raw = _read_retrieval_manifest(path)
+            if manifest.get("reporting_week") != week_label:
+                continue
+            key = (
+                _retrieval_manifest_generated_at_ns(manifest),
+                str(manifest.get("run_id") or ""),
+                str(path),
+            )
+            if selected is None or key > selected[0]:
+                selected = (key, path)
+        except (
+            OSError,
+            RuntimeError,
+            UnicodeError,
+            TypeError,
+            ValueError,
+            RecursionError,
+            OverflowError,
+            WeeklyRunManifestError,
+        ):
+            try:
+                raw = _read_retrieval_bytes(lexical_path)
+            except (OSError, ValueError):
+                raw = b""
+            if (
+                week_label in lexical_path.parent.name
+                or (
+                    len(raw) <= MAX_RETRIEVAL_JSON_BYTES
+                    and week_label.encode("utf-8") in raw
+                )
+            ):
+                invalid_path = lexical_path.absolute()
+                key = (
+                    _retrieval_manifest_filesystem_ns(lexical_path),
+                    lexical_path.parent.name,
+                    str(invalid_path),
+                )
+                if selected is None or key > selected[0]:
+                    selected = (key, invalid_path)
+    return selected[1] if selected is not None else None
+
+
+def _retrieval_manifest_generated_at_ns(manifest: Mapping[str, Any]) -> int:
+    value = str(manifest.get("generated_at") or "")
+    normalized = f"{value[:-1]}+00:00" if value.endswith("Z") else value
+    instant = datetime.fromisoformat(normalized).astimezone(timezone.utc)
+    delta = instant - datetime(1970, 1, 1, tzinfo=timezone.utc)
+    return (
+        (delta.days * 86_400 + delta.seconds) * 1_000_000
+        + delta.microseconds
+    ) * 1_000
+
+
+def _retrieval_manifest_filesystem_ns(path: Path) -> int:
+    try:
+        path_stat = path.stat()
+        parent_stat = path.parent.stat()
+    except OSError:
+        return 0
+    return max(
+        path_stat.st_mtime_ns,
+        path_stat.st_ctime_ns,
+        parent_stat.st_mtime_ns,
+        parent_stat.st_ctime_ns,
+    )
+
+
+def _read_retrieval_manifest(path: Path) -> tuple[dict[str, Any], bytes]:
+    raw = _read_retrieval_bytes(path)
+    try:
+        payload = json.loads(
+            raw.decode("utf-8"),
+            object_pairs_hook=_unique_retrieval_json_object,
+            parse_constant=_reject_retrieval_json_constant,
+            parse_float=_strict_retrieval_json_float,
+        )
+    except (
+        json.JSONDecodeError,
+        UnicodeError,
+        RecursionError,
+        OverflowError,
+        ValueError,
+    ) as exc:
+        raise WeeklyRunManifestError(f"invalid strict weekly manifest: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise WeeklyRunManifestError("weekly manifest root must be an object")
+    validate_manifest(payload)
+    return payload, raw
+
+
+def _read_retrieval_bytes(path: Path) -> bytes:
+    file_descriptor: int | None = None
+    try:
+        file_descriptor = os.open(
+            path,
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+        )
+        metadata = os.fstat(file_descriptor)
+        if not stat.S_ISREG(metadata.st_mode):
+            raise ValueError("weekly manifest candidate is not a regular file")
+        with os.fdopen(file_descriptor, "rb") as handle:
+            file_descriptor = None
+            raw = handle.read(MAX_RETRIEVAL_JSON_BYTES + 1)
+    finally:
+        if file_descriptor is not None:
+            os.close(file_descriptor)
+    if len(raw) > MAX_RETRIEVAL_JSON_BYTES:
+        raise ValueError("weekly manifest candidate exceeds byte limit")
+    return raw
+
+
+def _unique_retrieval_json_object(
+    pairs: list[tuple[str, object]],
+) -> dict[str, object]:
+    value: dict[str, object] = {}
+    for key, item in pairs:
+        if key in value:
+            raise ValueError(f"duplicate JSON key: {key}")
+        value[key] = item
+    return value
+
+
+def _reject_retrieval_json_constant(value: str) -> object:
+    raise ValueError(f"non-finite JSON constant: {value}")
+
+
+def _strict_retrieval_json_float(value: str) -> float:
+    parsed = float(value)
+    if not math.isfinite(parsed):
+        raise ValueError(f"non-finite JSON number: {value}")
+    return parsed
+
+
+def _items_from_workbook(
+    workbook: Mapping[str, Any],
+    *,
+    v2_expected_manifest_path: str | Path | None = None,
+    v2_allowed_source_roots: Iterable[str | Path] = (),
+) -> list[IntelligenceRetrievalItem]:
+    if workbook.get("schema_version") == BRIEF_V2_SCHEMA_VERSION:
+        return _items_from_weekly_brief_v2(
+            workbook,
+            expected_manifest_path=v2_expected_manifest_path,
+            allowed_source_roots=v2_allowed_source_roots,
+        )
     week = _clean_text(workbook.get("week_label")) or _artifact_week_label(workbook)
     generated_at = _clean_text(workbook.get("generated_at")) or None
     artifact_refs = _artifact_source_refs(workbook)
@@ -298,6 +631,396 @@ def _items_from_workbook(workbook: Mapping[str, Any]) -> list[IntelligenceRetrie
             )
         )
     return items
+
+
+def _items_from_weekly_brief_v2(
+    workbook: Mapping[str, Any],
+    *,
+    expected_manifest_path: str | Path | None,
+    allowed_source_roots: Iterable[str | Path],
+) -> list[IntelligenceRetrievalItem]:
+    metadata = (
+        workbook.get("_artifact_paths")
+        if isinstance(workbook.get("_artifact_paths"), Mapping)
+        else {}
+    )
+    if (
+        workbook.get("_artifact_kind") != "weekly_intelligence_brief_v2"
+        or expected_manifest_path is None
+    ):
+        return []
+    source_path = _clean_text(metadata.get("json"))
+    if not source_path or not Path(source_path).is_absolute():
+        return []
+    try:
+        path = Path(source_path).resolve(strict=True)
+        output_base = path.parent.parent.parent.resolve()
+        loaded = load_manifest_bound_weekly_intelligence_brief_v2(
+            path,
+            expected_manifest_path=expected_manifest_path,
+            allowed_source_roots=(
+                output_base,
+                Path(expected_manifest_path).resolve(strict=True).parent,
+                *(Path(root) for root in allowed_source_roots),
+            ),
+        )
+    except (
+        OSError,
+        UnicodeError,
+        TypeError,
+        ValueError,
+        RecursionError,
+        OverflowError,
+        RuntimeError,
+        WeeklyIntelligenceBriefV2Error,
+    ):
+        return []
+    supplied = {
+        key: copy_value
+        for key, copy_value in workbook.items()
+        if key not in {"_artifact_kind", "_artifact_paths"}
+    }
+    if supplied != loaded:
+        return []
+    artifact_paths = loaded.get("artifact_paths")
+    period = loaded.get("reporting_period")
+    if not isinstance(artifact_paths, Mapping) or not isinstance(period, Mapping):
+        return []
+    if (
+        str(path) != str(artifact_paths.get("json") or "")
+        or _clean_text(metadata.get("html"))
+        != _clean_text(artifact_paths.get("html"))
+        or _clean_text(metadata.get("source_catalog"))
+        != _clean_text(artifact_paths.get("source_catalog"))
+    ):
+        return []
+    run_id = _clean_text(loaded.get("run_id"))
+    week = _clean_text(period.get("reporting_week")) or None
+    generated_at = _clean_text(loaded.get("generated_at")) or None
+    if not run_id or not week:
+        return []
+    artifact_refs = _unique(
+        [
+            artifact_paths.get("json"),
+            artifact_paths.get("html"),
+            artifact_paths.get("source_catalog"),
+        ]
+    )
+    items: list[IntelligenceRetrievalItem] = []
+    thesis = loaded.get("weekly_thesis")
+    if isinstance(thesis, Mapping):
+        evidence_refs = _string_values(thesis.get("evidence_refs"))
+        items.append(
+            IntelligenceRetrievalItem(
+                id=f"brief_v2_thesis:{run_id}",
+                item_type="weekly_thesis",
+                week_label=week,
+                title=_clean_text(thesis.get("title")) or "Главный вывод недели",
+                summary=_clean_text(thesis.get("plain_language_summary")) or None,
+                text=_join_text(
+                    thesis.get("title"),
+                    thesis.get("plain_language_summary"),
+                    thesis.get("why_for_operator"),
+                    _reader_confidence_label(thesis.get("confidence")),
+                ),
+                source_refs=_unique([*artifact_refs, *evidence_refs]),
+                atom_ids=_atom_ids_from_refs(evidence_refs),
+                verification_status=_clean_text(thesis.get("confidence")) or None,
+                status=_clean_text(loaded.get("run_status")) or None,
+                created_at=generated_at,
+                updated_at=generated_at,
+            )
+        )
+
+    signals = [
+        item for item in _as_list(loaded.get("signals")) if isinstance(item, Mapping)
+    ][:3]
+    signal_by_ref = {
+        _clean_text(signal.get("signal_id")): signal
+        for signal in signals
+        if _clean_text(signal.get("signal_id"))
+    }
+    for index, signal in enumerate(signals, start=1):
+        signal_ref = _clean_text(signal.get("signal_id"))
+        evidence_refs = _string_values(signal.get("evidence_refs"))
+        evidence_summary = (
+            signal.get("evidence_summary")
+            if isinstance(signal.get("evidence_summary"), Mapping)
+            else {}
+        )
+        items.append(
+            IntelligenceRetrievalItem(
+                id=f"brief_v2_signal:{run_id}:{index}:{_slug(signal_ref)}",
+                item_type="brief_signal",
+                week_label=week,
+                title=_clean_text(signal.get("title")) or f"Сигнал {index}",
+                summary=_clean_text(signal.get("what_changed")) or None,
+                text=_join_text(
+                    signal.get("what_happened"),
+                    signal.get("plain_explanation"),
+                    signal.get("what_changed"),
+                    signal.get("why_for_operator"),
+                    _clean_text(
+                        (
+                            signal.get("reaction_effect")
+                            if isinstance(signal.get("reaction_effect"), Mapping)
+                            else {}
+                        ).get("reader_reason_ru")
+                    ),
+                    _clean_text(
+                        (
+                            signal.get("next_action")
+                            if isinstance(signal.get("next_action"), Mapping)
+                            else {}
+                        ).get("title")
+                    ),
+                    (
+                        signal.get("next_action")
+                        if isinstance(signal.get("next_action"), Mapping)
+                        else {}
+                    ).get("acceptance_criteria"),
+                    signal.get("do_not_do"),
+                    evidence_summary.get("confidence_reason_ru"),
+                ),
+                source_refs=_unique([*artifact_refs, *evidence_refs]),
+                atom_ids=_atom_ids_from_refs(evidence_refs),
+                evidence_tier=_clean_text(
+                    evidence_summary.get("evidence_maturity")
+                )
+                or None,
+                verification_status=_clean_text(signal.get("confidence")) or None,
+                status=_clean_text(signal.get("decision")) or None,
+                created_at=generated_at,
+                updated_at=generated_at,
+            )
+        )
+
+    matrix = loaded.get("decision_matrix")
+    if isinstance(matrix, Mapping):
+        for bucket in ("act", "study", "watch", "ignore"):
+            for index, row in enumerate(_as_list(matrix.get(bucket)), start=1):
+                if not isinstance(row, Mapping):
+                    continue
+                signal_ref = _clean_text(row.get("signal_ref"))
+                signal = signal_by_ref.get(signal_ref, {})
+                evidence_refs = _string_values(signal.get("evidence_refs"))
+                items.append(
+                    IntelligenceRetrievalItem(
+                        id=(
+                            f"brief_v2_decision:{run_id}:{bucket}:{index}:"
+                            f"{_slug(signal_ref)}"
+                        ),
+                        item_type="brief_decision",
+                        week_label=week,
+                        title=_clean_text(row.get("label_ru"))
+                        or f"Решение {index}",
+                        summary=_clean_text(signal.get("title")) or None,
+                        text=_join_text(
+                            row.get("label_ru"),
+                            signal.get("title"),
+                            signal.get("why_for_operator"),
+                        ),
+                        source_refs=_unique([*artifact_refs, *evidence_refs]),
+                        atom_ids=_atom_ids_from_refs(evidence_refs),
+                        evidence_tier=_clean_text(row.get("evidence_maturity"))
+                        or None,
+                        verification_status=_clean_text(row.get("confidence"))
+                        or None,
+                        status=bucket,
+                        created_at=generated_at,
+                        updated_at=generated_at,
+                    )
+                )
+
+    actions = loaded.get("actions")
+    if isinstance(actions, Mapping):
+        action_rows = []
+        if isinstance(actions.get("primary"), Mapping):
+            action_rows.append(actions["primary"])
+        action_rows.extend(
+            item
+            for item in _as_list(actions.get("secondary"))
+            if isinstance(item, Mapping)
+        )
+        for index, action in enumerate(action_rows, start=1):
+            signal_ref = _clean_text(action.get("signal_ref"))
+            signal = signal_by_ref.get(signal_ref, {})
+            evidence_refs = _string_values(signal.get("evidence_refs"))
+            items.append(
+                IntelligenceRetrievalItem(
+                    id=f"brief_v2_action:{run_id}:{index}:{_slug(signal_ref)}",
+                    item_type="brief_action",
+                    week_label=week,
+                    title=_clean_text(action.get("title")) or f"Действие {index}",
+                    summary=(
+                        "Основное действие"
+                        if action.get("role") == "primary"
+                        else "Дополнительное действие"
+                    ),
+                    text=_join_text(action.get("acceptance_criteria")),
+                    source_refs=_unique([*artifact_refs, *evidence_refs]),
+                    atom_ids=_atom_ids_from_refs(evidence_refs),
+                    status=_clean_text(action.get("role")) or None,
+                    created_at=generated_at,
+                    updated_at=generated_at,
+                )
+            )
+
+    for index, action in enumerate(
+        (
+            item
+            for item in _as_list(loaded.get("project_actions"))
+            if isinstance(item, Mapping)
+        ),
+        start=1,
+    ):
+        evidence_refs = _string_values(action.get("evidence_refs"))
+        items.append(
+            IntelligenceRetrievalItem(
+                id=f"brief_v2_project:{run_id}:{index}",
+                item_type="project_action",
+                week_label=week,
+                title=_clean_text(action.get("suggested_change"))
+                or f"Проектное действие {index}",
+                summary=_clean_text(action.get("why_this_project")) or None,
+                text=_join_text(
+                    action.get("project_name"),
+                    action.get("suggested_change"),
+                    action.get("why_this_project"),
+                    action.get("acceptance_criteria"),
+                    action.get("risk"),
+                ),
+                source_refs=_unique([*artifact_refs, *evidence_refs]),
+                atom_ids=_atom_ids_from_refs(evidence_refs),
+                project_name=_clean_text(action.get("project_name")) or None,
+                verification_status=_clean_text(action.get("confidence")) or None,
+                status="confirmed",
+                created_at=generated_at,
+                updated_at=generated_at,
+            )
+        )
+
+    reaction = loaded.get("reaction_effect")
+    if isinstance(reaction, Mapping):
+        reaction_refs = _unique(
+            [
+                *artifact_refs,
+                reaction.get("snapshot_ref"),
+                reaction.get("run_id"),
+            ]
+        )
+        items.append(
+            IntelligenceRetrievalItem(
+                id=f"brief_v2_reaction:{run_id}",
+                item_type="reaction_effect",
+                week_label=week,
+                title="Влияние личных реакций на бриф",
+                summary=_clean_text(reaction.get("reader_summary_ru")) or None,
+                text=_join_text(
+                    reaction.get("reader_summary_ru"),
+                    (
+                        "Обнаружено личных реакций: "
+                        + str(
+                            (
+                                reaction.get("counts")
+                                if isinstance(reaction.get("counts"), Mapping)
+                                else {}
+                            ).get("personal_reaction_events_detected")
+                            or 0
+                        )
+                    ),
+                ),
+                source_refs=reaction_refs,
+                status=_clean_text(reaction.get("status")) or None,
+                created_at=generated_at,
+                updated_at=generated_at,
+            )
+        )
+
+    feedback = loaded.get("feedback_effect")
+    if isinstance(feedback, Mapping):
+        items.append(
+            IntelligenceRetrievalItem(
+                id=f"brief_v2_feedback_effect:{run_id}",
+                item_type="confirmed_feedback_effect",
+                week_label=week,
+                title="Влияние подтверждённой обратной связи",
+                summary=(
+                    "Рассмотрено подтверждённых событий: "
+                    + str(feedback.get("confirmed_events_considered") or 0)
+                ),
+                text=_join_text(
+                    *[
+                        row.get("reader_summary_ru")
+                        for field in (
+                            "applied_changes",
+                            "unchanged",
+                            "requires_code_or_config",
+                        )
+                        for row in _as_list(feedback.get(field))
+                        if isinstance(row, Mapping)
+                    ]
+                ),
+                source_refs=artifact_refs,
+                status="confirmed_snapshot",
+                created_at=generated_at,
+                updated_at=generated_at,
+            )
+        )
+
+    for index, target in enumerate(
+        (
+            item
+            for item in _as_list(loaded.get("feedback_targets"))
+            if isinstance(item, Mapping)
+        ),
+        start=1,
+    ):
+        items.append(
+            IntelligenceRetrievalItem(
+                id=f"brief_v2_feedback_target:{run_id}:{index}",
+                item_type="feedback_target",
+                week_label=week,
+                title=_clean_text(target.get("prompt_ru"))
+                or f"Вопрос обратной связи {index}",
+                summary={
+                    "weekly_brief": "Выпуск целиком",
+                    "signal": "Сигнал выпуска",
+                    "project_action": "Проектное действие",
+                }.get(_clean_text(target.get("target_type")), "Выпуск целиком"),
+                text=_clean_text(target.get("prompt_ru")),
+                source_refs=artifact_refs,
+                status="available",
+                created_at=generated_at,
+                updated_at=generated_at,
+            )
+        )
+
+    radar = loaded.get("mvp_radar")
+    if isinstance(radar, Mapping):
+        radar_item = _mvp_item(radar, week, authoritative=True)
+        items.append(
+            replace(
+                radar_item,
+                source_refs=_unique(
+                    [*artifact_refs, *(radar_item.source_refs or [])]
+                ),
+                created_at=generated_at,
+                updated_at=generated_at,
+            )
+        )
+    return items
+
+
+def _atom_ids_from_refs(refs: Iterable[object]) -> list[int | str]:
+    result: list[int | str] = []
+    for raw in refs:
+        value = str(raw or "")
+        if not value.startswith("atom:"):
+            continue
+        atom_id = value.removeprefix("atom:")
+        result.append(int(atom_id) if atom_id.isdigit() else atom_id)
+    return _unique(result)
 
 
 def _workbook_mvp_projection(
@@ -1145,7 +1868,7 @@ def _mvp_item(
         else (
             "MVP Radar: кандидат не выбран"
             if strict_no_candidate
-            else f"MVP Radar diagnostic — {raw_candidate}"
+            else f"Диагностика MVP Radar — {raw_candidate}"
         )
     )
     source_path = _clean_text(payload.get("source_path"))
@@ -1159,22 +1882,31 @@ def _mvp_item(
         payload.get("dossier_status")
     )
     reason = _clean_text(payload.get("decision_reason_ru"))
+    strict_decision = _clean_text(payload.get("reader_decision"))
+    decision_label = {
+        "investigate": "Продолжить проверку кандидата.",
+        "reject": "Отклонить кандидата.",
+        "build_allowed": "Radar разрешил сборку.",
+    }.get(strict_decision, "Решение требует дополнительной проверки.")
     summary = (
-        recommendation
+        _reader_radar_text(reason, "Основание решения") or decision_label
         if strict_available
-        else reason or f"Radar reader state: {reader_state}; decision unavailable"
+        else (
+            reason or "Radar завершил проверку без выбора кандидата."
+            if strict_no_candidate
+            else reason or "Решение Radar недоступно."
+        )
     )
     decision_text = (
-        _join_text(
-            payload.get("recommendation"),
-            payload.get("dossier_status"),
-            payload.get("reader_decision"),
-        )
+        decision_label
         if strict_available
-        else _join_text(
-            f"Reader state: {reader_state}; decision: unavailable.",
-            f"Diagnostic candidate: {raw_candidate}" if raw_candidate else "",
-            f"Diagnostic raw recommendation: {recommendation}" if recommendation else "",
+        else (
+            "Radar успешно завершил запуск; кандидат для решения не выбран."
+            if strict_no_candidate
+            else _join_text(
+                "Решение Radar недоступно; показан только диагностический контекст.",
+                f"Диагностический кандидат: {raw_candidate}" if raw_candidate else "",
+            )
         )
     )
     return IntelligenceRetrievalItem(
@@ -1186,31 +1918,83 @@ def _mvp_item(
         text=_join_text(
             candidate,
             decision_text,
-            payload.get("decision"),
-            payload.get("decision_reason_ru"),
-            " ".join(_string_values(payload.get("missing_evidence"))),
-            " ".join(_string_values(payload.get("next_validation"))),
-            payload.get("change_condition"),
-            " ".join(_string_values(payload.get("kill_criteria"))),
-            _json_text(payload.get("matched_kir_provenance"))
-            if strict_available
-            else "",
-            _json_text(payload.get("matched_external_proof"))
-            if strict_available
-            else "",
-            _json_text(payload.get("unmatched_context")),
-            _json_text(payload.get("source_mix")) if strict_available else "",
+            _reader_radar_text(reason, "Основание решения"),
+            *[
+                _reader_radar_text(value, "Пробел доказательств")
+                for value in _string_values(payload.get("missing_evidence"))
+            ],
+            *[
+                _reader_radar_text(value, "Следующая проверка")
+                for value in _string_values(payload.get("next_validation"))
+            ],
+            _reader_radar_text(
+                payload.get("change_condition"),
+                "Условие изменения решения",
+            ),
+            *[
+                _reader_radar_text(value, "Критерий остановки")
+                for value in _string_values(payload.get("kill_criteria"))
+            ],
+            (
+                "Связанных внешних доказательств: "
+                + str(len(_as_list(payload.get("matched_external_proof"))))
+                if strict_available
+                else ""
+            ),
+            (
+                "Отделённых контекстных записей: "
+                + str(len(_as_list(payload.get("unmatched_context"))))
+            ),
         ),
         source_refs=[source_path] if source_path else [],
         atom_ids=[],
         status=(
             _clean_text(payload.get("dossier_status")) or recommendation or None
             if strict_available
+            else "no_candidate"
+            if strict_no_candidate
             else reader_state
         ),
         created_at=None,
         updated_at=None,
     )
+
+
+def _reader_radar_text(value: object, label: str) -> str:
+    text = _clean_text(value)
+    if not text:
+        return ""
+    if CYRILLIC_RE.search(text):
+        return (
+            text.replace(
+                "Добавить совпавший свежий KIR Knowledge Thread для кандидата.",
+                "Добавить свежую тему знаний, совпадающую с кандидатом.",
+            )
+            .replace(
+                "Обновить совпавший KIR Knowledge Thread свежими данными.",
+                "Обновить совпадающую тему знаний свежими данными.",
+            )
+            .replace(
+                "Обновить совпавшую KIR-провенанс и повторить тот же bounded Radar run.",
+                "Обновить происхождение совпадающей темы знаний и повторить тот же ограниченный запуск Radar.",
+            )
+            .replace("KIR Knowledge Thread", "тему знаний с проверяемым происхождением")
+            .replace("KIR-провенанс", "происхождение темы знаний")
+            .replace("KIR-тему", "тему знаний")
+            .replace("KIR", "внутренней темы знаний")
+            .replace("Knowledge Thread", "тему знаний")
+            .replace("bounded Radar run", "ограниченный запуск Radar")
+            .replace("manifest-bound", "связанное с манифестом")
+        )
+    return f"{label} сохранено в техническом аудите Radar."
+
+
+def _reader_confidence_label(value: object) -> str:
+    return {
+        "low": "Уверенность: низкая.",
+        "medium": "Уверенность: средняя.",
+        "high": "Уверенность: высокая.",
+    }.get(_clean_text(value), "")
 
 
 def _knowledge_atom_items(

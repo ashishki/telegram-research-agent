@@ -836,10 +836,11 @@ def _render_reaction_funnel(
     reason_html = ""
     if reasons:
         reason_html = (
-            "<h3>Почему часть событий не продолжила цепочку происхождения</h3>"
+            "<details><summary>Почему часть событий не продолжила цепочку "
+            f"происхождения: причин {len(reasons)}</summary>"
             '<ul class="irx-visual__list">'
             + "".join(f"<li>{_e(reason)}</li>" for reason in sorted(reasons))
-            + "</ul>"
+            + "</ul></details>"
         )
     extra_partial = spec["snapshot_status"] == "partial"
     extra = ()
@@ -863,8 +864,10 @@ def _render_reaction_funnel(
 
 
 _RADAR_DECISIONS = {"investigate", "reject", "build_allowed", "unavailable"}
+_RADAR_DOSSIER_STATUSES = {*_RADAR_DECISIONS, "focused_experiment"}
 _RADAR_DECISION_LABELS = {
     "investigate": "Продолжить проверку",
+    "focused_experiment": "Разрешён ограниченный проверочный эксперимент",
     "reject": "Отклонить кандидата",
     "build_allowed": "Сборка разрешена Radar",
     "unavailable": "Решение недоступно",
@@ -897,7 +900,11 @@ def _validate_radar_gate(spec: Mapping[str, object]) -> None:
     candidate = spec["candidate_name"]
     if candidate is not None:
         _expect_str(candidate, "candidate_name", max_length=180, allow_empty=True)
-    dossier = _expect_enum(spec["dossier_status"], _RADAR_DECISIONS, "dossier_status")
+    dossier = _expect_enum(
+        spec["dossier_status"],
+        _RADAR_DOSSIER_STATUSES,
+        "dossier_status",
+    )
     decision = _expect_enum(
         spec["reader_decision"], _RADAR_DECISIONS, "reader_decision"
     )
@@ -1183,6 +1190,11 @@ def _render_project_impact(
             f"<li>{_e(criterion)}</li>"
             for criterion in sorted(item["acceptance_criteria"])
         )
+        technical = (
+            "<details><summary>Техническая область изменения</summary>"
+            f"<p><strong>Компонент:</strong> {_e(item['affected_component'])}</p>"
+            f"<p><strong>Файлы:</strong> {files}</p></details>"
+        )
         rows.append(
             f'<tr data-actionable="{str(actionable).lower()}">'
             f'<td><span class="irx-visual__mobile-label">Проект</span>{_e(item["project_name"])}</td>'
@@ -1192,14 +1204,13 @@ def _render_project_impact(
             f"{_e(_PROJECT_STATUS_LABELS[str(item['status'])])}</span></td>"
             f'<td><span class="irx-visual__mobile-label">Изменение</span>'
             f"<strong>Сигнал:</strong> {_e(item['signal_label_ru'])}<br>"
-            f"{_e(item['suggested_change_ru'])}<br><strong>Компонент:</strong> "
-            f"{_e(item['affected_component'])}</td>"
+            f"{_e(item['suggested_change_ru'])}</td>"
             f'<td><span class="irx-visual__mobile-label">Детали</span>'
-            f"<strong>Файлы:</strong> {files}<br><strong>Оценка:</strong> {_e(item['effort'])}"
+            f"<strong>Оценка:</strong> {_e(item['effort'])}"
             f"<br><strong>Уверенность:</strong> {_e(_CONFIDENCE_LABELS[str(item['confidence'])])}"
             f"<br><strong>Связанных доказательств:</strong> {len(item['evidence_refs'])}"
             f"<br><strong>Риск:</strong> {_e(item['risk_ru'])}"
-            f"<br><strong>Критерии:</strong><ul>{criteria}</ul></td></tr>"
+            f"<br><strong>Критерии:</strong><ul>{criteria}</ul>{technical}</td></tr>"
         )
     confirmed_notice = (
         ""

@@ -698,6 +698,43 @@ class TestWeeklyRunManifest(unittest.TestCase):
             create_manifest(self.root, self.period, run_id="exclusive-run")
         self.assertEqual(load_manifest(path), first)
 
+    def test_manifest_loader_is_bounded_strict_and_does_not_follow_leaf_symlinks(self):
+        path, _manifest = create_manifest(
+            self.root,
+            self.period,
+            run_id="strict-loader-run",
+        )
+        original = path.read_bytes()
+        duplicate = original.replace(
+            b'  "schema_version": "weekly_run_manifest.v1",\n',
+            (
+                b'  "schema_version": "weekly_run_manifest.v1",\n'
+                b'  "schema_version": "weekly_run_manifest.v1",\n'
+            ),
+            1,
+        )
+        cases = {
+            "duplicate": duplicate,
+            "overflow": b'{"value":1e999}',
+            "non-finite": b'{"value":NaN}',
+            "deep": ("[" * 1_500 + "0" + "]" * 1_500).encode("utf-8"),
+        }
+        for name, content in cases.items():
+            with self.subTest(name=name):
+                path.write_bytes(content)
+                with self.assertRaisesRegex(WeeklyRunManifestError, "cannot load manifest"):
+                    load_manifest(path)
+        path.write_bytes(original)
+
+        with patch("output.weekly_run_manifest._MAX_BOUND_JSON_BYTES", 32):
+            with self.assertRaisesRegex(WeeklyRunManifestError, "exceeds 32 bytes"):
+                load_manifest(path)
+
+        alias = path.with_name("manifest-alias.json")
+        alias.symlink_to(path)
+        with self.assertRaisesRegex(WeeklyRunManifestError, "cannot load manifest"):
+            load_manifest(alias)
+
     def test_atomic_replace_failure_preserves_previous_valid_json(self):
         path, initial = create_manifest(self.root, self.period, run_id="atomic-run")
         candidate = start_stage(initial, "knowledge_refresh")

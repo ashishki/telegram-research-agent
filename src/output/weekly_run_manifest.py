@@ -11,8 +11,10 @@ import copy
 import hashlib
 import hmac
 import json
+import math
 import os
 import re
+import stat
 import tempfile
 import uuid
 from dataclasses import dataclass
@@ -29,6 +31,7 @@ RADAR_BINDING_SCHEMA_VERSION = "radar_run_binding.v1"
 REACTION_SNAPSHOT_SCHEMA_VERSION = "reaction_visibility_snapshot.v1"
 REACTION_SNAPSHOT_PATH = "reaction_sync/reaction-snapshot.json"
 REACTION_EFFECT_SCHEMA_VERSION = "reaction_personalization.v1"
+_MAX_BOUND_JSON_BYTES = 8_000_000
 
 PENDING = "pending"
 RUNNING = "running"
@@ -343,10 +346,7 @@ def load_manifest(
     """Load JSON and apply the complete deterministic manifest validator."""
 
     target = Path(path)
-    try:
-        payload = json.loads(target.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise WeeklyRunManifestError(f"cannot load manifest: {target}") from exc
+    payload = dict(_load_json_object(target, label="manifest"))
     validate_manifest(
         payload,
         path_base=path_base,
@@ -1392,9 +1392,13 @@ def _validate_reaction_snapshot_output(
         raise WeeklyRunManifestError(
             f"successful stage artifact does not exist: reaction_sync: {path}"
         )
-    if verify_file:
-        verify_file_checksum(resolved, checksum)
-    payload = dict(_load_json_object(resolved, label="reaction snapshot"))
+    payload = dict(
+        _load_json_object(
+            resolved,
+            label="reaction snapshot",
+            expected_sha256=checksum if verify_file else None,
+        )
+    )
     if payload.get("schema_version") != REACTION_SNAPSHOT_SCHEMA_VERSION:
         raise WeeklyRunManifestError("reaction snapshot schema_version mismatch")
     for field in (
@@ -1556,7 +1560,6 @@ def _validate_reaction_snapshot_output(
         )
     _ensure_json_value(payload, field="reaction snapshot")
     return payload
-    return payload
 
 
 def _validate_radar_stage_outputs(
@@ -1567,7 +1570,11 @@ def _validate_radar_stage_outputs(
 ) -> None:
     stage = manifest["stages"]["radar"]
     binding_path = _resolve_artifact_path(stage["binding_path"], path_base)
-    binding = _load_json_object(binding_path, label="Radar binding")
+    binding = _load_json_object(
+        binding_path,
+        label="Radar binding",
+        expected_sha256=stage["binding_sha256"],
+    )
     validate_radar_run_binding(
         binding,
         manifest=manifest,
@@ -1595,7 +1602,11 @@ def _validate_radar_stage_outputs(
             raise WeeklyRunManifestError("Radar artifact_refs.binding_path mismatch")
 
     raw_path = _resolve_artifact_path(stage["artifact_path"], path_base)
-    raw = _load_json_object(raw_path, label="Radar JSON")
+    raw = _load_json_object(
+        raw_path,
+        label="Radar JSON",
+        expected_sha256=stage["artifact_sha256"],
+    )
     raw_result = raw.get("result")
     if not isinstance(raw_result, Mapping):
         raise WeeklyRunManifestError("Radar JSON result must be an object")
@@ -1662,7 +1673,11 @@ def _validate_reader_sidecar_identities(
         if stage["status"] != SUCCEEDED:
             continue
         json_path = _resolve_artifact_path(stage["json_path"], path_base)
-        sidecar = _load_json_object(json_path, label=f"{stage_name} sidecar")
+        sidecar = _load_json_object(
+            json_path,
+            label=f"{stage_name} sidecar",
+            expected_sha256=stage["checksums"]["json_path"],
+        )
         if not isinstance(sidecar.get("partial"), bool):
             raise WeeklyRunManifestError(
                 f"{stage_name} sidecar identity mismatch: partial"
@@ -2095,14 +2110,89 @@ def _validate_reaction_effect_surface_refs(
         )
 
 
-def _load_json_object(path: Path, *, label: str) -> Mapping[str, Any]:
+def _load_json_object(
+    path: Path,
+    *,
+    label: str,
+    expected_sha256: str | None = None,
+) -> Mapping[str, Any]:
+    if expected_sha256 is not None and not _SHA256_RE.fullmatch(expected_sha256):
+        raise WeeklyRunManifestError(
+            f"{label} expected checksum must be lowercase SHA-256"
+        )
+    flags = os.O_RDONLY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+        descriptor = os.open(path, flags)
+        try:
+            metadata = os.fstat(descriptor)
+            if not stat.S_ISREG(metadata.st_mode):
+                raise WeeklyRunManifestError(f"{label} must be a regular file")
+            chunks: list[bytes] = []
+            remaining = _MAX_BOUND_JSON_BYTES + 1
+            while remaining:
+                chunk = os.read(descriptor, min(1024 * 1024, remaining))
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                remaining -= len(chunk)
+            data = b"".join(chunks)
+        finally:
+            os.close(descriptor)
+    except WeeklyRunManifestError:
+        raise
+    except OSError as exc:
+        raise WeeklyRunManifestError(f"cannot load {label}: {path}") from exc
+    if len(data) > _MAX_BOUND_JSON_BYTES:
+        raise WeeklyRunManifestError(
+            f"cannot load {label}: file exceeds {_MAX_BOUND_JSON_BYTES} bytes"
+        )
+    if expected_sha256 is not None:
+        actual_sha256 = hashlib.sha256(data).hexdigest()
+        if not hmac.compare_digest(actual_sha256, expected_sha256):
+            raise WeeklyRunManifestError(
+                f"artifact checksum mismatch: expected {expected_sha256}, "
+                f"got {actual_sha256}"
+            )
+    try:
+        payload = json.loads(
+            data.decode("utf-8"),
+            object_pairs_hook=_unique_json_object,
+            parse_constant=_reject_json_constant,
+            parse_float=_finite_json_float,
+        )
+    except (
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+        RecursionError,
+        OverflowError,
+        ValueError,
+    ) as exc:
         raise WeeklyRunManifestError(f"cannot load {label}: {path}") from exc
     if not isinstance(payload, Mapping):
         raise WeeklyRunManifestError(f"{label} must be an object")
     return payload
+
+
+def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    payload: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in payload:
+            raise ValueError(f"duplicate JSON key: {key}")
+        payload[key] = value
+    return payload
+
+
+def _reject_json_constant(value: str) -> Any:
+    raise ValueError(f"non-finite JSON constant: {value}")
+
+
+def _finite_json_float(value: str) -> float:
+    parsed = float(value)
+    if not math.isfinite(parsed):
+        raise ValueError(f"non-finite JSON number: {value}")
+    return parsed
 
 
 def _required_checksum(

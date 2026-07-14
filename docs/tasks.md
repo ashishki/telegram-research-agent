@@ -1,6 +1,6 @@
 # Current Backlog
 
-Version: 3.5
+Version: 3.6
 Last updated: 2026-07-14
 State: canonical active backlog
 
@@ -45,16 +45,17 @@ below, but active implementation starts from the IRX task graph.
 | Editorial intelligence shadow | `implemented_and_verified`; separate opt-in `editorial_intelligence.v1` run artifact, not consumed by V1 renderers |
 | Static visualization component system | `implemented_and_verified`; shared offline `report_visuals.v1` library and sanitized fixture gallery, not activated in V1 renderers |
 | Project Intelligence V2 shadow | `implemented_and_verified`; separate opt-in `project_intelligence.v2` run artifact with exact project/thread/evidence authority and no V1 renderer activation |
-| Report V2 contract and roadmap | `implementation_in_progress`; IRX-0 documentation plus IRX-1 period, IRX-2 run-manifest/Radar, IRX-3 reaction-personalization, IRX-4 canonical-thread lifecycle, IRX-5 editorial-synthesis semantics, IRX-8 shared visuals, and IRX-9 project actions are implemented and verified |
+| Weekly Intelligence Brief V2 preview | `implemented_and_verified`; separate opt-in manifest-bound `split_ai_report.v2` package with V1 generation and delivery unchanged |
+| Report V2 contract and roadmap | `implementation_in_progress`; IRX-0 documentation plus IRX-1 through IRX-6 and IRX-8 through IRX-10 are implemented and verified |
 | Portfolio dogfood evidence | `blocked_on_IRX-14_start_gate` |
 
 ## Next Candidate Task
 
-`IRX-6 - Weekly Intelligence Brief V2`
+`IRX-11 - Reader-Value Quality Gates`
 
-Assemble the Russian five-to-seven-minute decision Brief from the already
-validated period, editorial, reaction, canonical-thread, project, Radar-reader,
-and visual contracts. Its task card is in
+Add independent structural/semantic reader-value gates over the completed Brief
+V2 and shared visual contracts without changing editorial selection, Radar
+authority, V1 delivery, or rollout state. Its task card is in
 `docs/intelligence_report_v2_roadmap.md`.
 
 ## Dependency Graph
@@ -83,7 +84,7 @@ contract.
 | IRX-8 | P1 | `implemented_and_verified` | Shared deterministic, offline static visualization components | IRX-4, IRX-5 |
 | IRX-9 | P1 | `implemented_and_verified` | Evidence-backed, named, PR-sized project implications | IRX-4, IRX-5, IRX-8 |
 | IRX-10 | P1 | `implemented_and_verified` | Explain the bound candidate, evidence gaps, next validation, and kill criteria | IRX-2, IRX-5, IRX-8 |
-| IRX-6 | P1 | `planned` | Russian 5-7 minute Weekly Intelligence Brief V2 | IRX-1..IRX-5, IRX-8..IRX-10 |
+| IRX-6 | P1 | `implemented_and_verified` | Russian 5-7 minute Weekly Intelligence Brief V2 | IRX-1..IRX-5, IRX-8..IRX-10 |
 | IRX-11 | P1 | `planned` | Reader-value gates for period, editorial, personalization, visual, project, and Radar quality | IRX-6, IRX-8 |
 | IRX-7 | P2 | `planned` | Visual Knowledge Atlas V2 plus preserved Knowledge Audit Explorer | IRX-4, IRX-5, IRX-8, IRX-11 |
 | IRX-12 | P2 | `planned` | Report- and section-specific confirmation-gated learning loop | IRX-2, IRX-3, IRX-5, IRX-6, IRX-7, IRX-10 |
@@ -415,7 +416,40 @@ rollout implications are in `docs/intelligence_report_v2_roadmap.md`.
   exception after the final fix.
 - Scope confirmation: no live source acquisition, expensive model call,
   generated private report, archive backfill, database migration, Radar score
-  change, or dogfood claim was made. IRX-6 is the next task.
+  change, or dogfood claim was made. At that boundary IRX-6 was next; its
+  completion is recorded below.
+
+### 2026-07-14 - IRX-6 Weekly Intelligence Brief V2 Preview
+
+- Status: `implemented_and_verified`.
+- Added an opt-in deterministic `split_ai_report.v2` Brief package under the
+  separate immutable `weekly_intelligence_briefs_v2/<run_id>/` path. V1 Brief,
+  Atlas, default generation, and scheduled delivery remain unchanged.
+- The reader DTO consumes only the exact terminal manifest, host-ordered IRX-5
+  editorial artifact and input catalog, manifest-bound reaction receipt,
+  confirmed IRX-9 project permissions, strict IRX-10 Radar reader, and IRX-8
+  visual specs. The renderer has no model call or ranking authority.
+- The Russian five-to-seven-minute surface contains one thesis, a four-way
+  decision matrix, at most three signals, one primary and up to two secondary
+  actions, a defer decision, concrete-or-empty project actions, reaction and
+  confirmed-feedback effects, one canonical Radar dossier, five targeted
+  feedback prompts, and collapsed technical provenance. The rich sanitized
+  fixture renders 827 initially visible words and three meaningful available
+  visual kinds out of four components.
+- Generation, loading, retrieval, and PI require canonical run-scoped paths,
+  strict bounded duplicate-free finite JSON, exact checksum-bound source bytes,
+  run/period/source parity, private immutable output, and atomic publication.
+  Wrong-run, stale, invalid, incomplete, symlinked, forged, or neighbor packages
+  fail closed without restoring a legacy Radar recommendation.
+- Verification: the exact task-card command passed 95 tests; the primary
+  Brief/visual/V1 compatibility matrix passed 133 tests; the upstream
+  editorial/project/reaction/Radar/manifest/orchestrator overlap matrix passed
+  164 tests. Independent security and compatibility reviews found no blockers;
+  Ruff, focused compilation, and `git diff --check` passed.
+- Scope confirmation: no live or expensive model run, generated production
+  report, archive backfill, database migration, Radar scoring/gate change,
+  sibling-repository edit, delivery switch, screenshot evidence, rollout, or
+  dogfood claim was made. IRX-11 is the next task.
 
 ## Existing-Work Reconciliation
 

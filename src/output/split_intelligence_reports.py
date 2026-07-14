@@ -29,6 +29,9 @@ if TYPE_CHECKING:
     from llm.client import LLMCompletionReceipt
     from output.editorial_intelligence import EditorialIntelligenceSummary
     from output.project_intelligence import ProjectIntelligenceSummary
+    from output.weekly_intelligence_brief_v2 import (
+        WeeklyIntelligenceBriefV2Summary,
+    )
 
 
 OUTPUT_ROOT = PROJECT_ROOT / "data" / "output"
@@ -330,6 +333,33 @@ def build_split_reports_notification(summary: SplitIntelligenceReportsSummary) -
         f"Split AI intelligence reports {period_label} are ready.\n"
         f"Weekly Brief: {summary.weekly_brief.html_path}\n"
         f"Knowledge Atlas: {summary.knowledge_atlas.html_path}"
+    )
+
+
+def generate_split_weekly_brief_v2_preview(
+    *,
+    manifest_path: str | Path,
+    editorial_artifact_path: str | Path,
+    editorial_input_package: Mapping[str, object],
+    project_intelligence_path: str | Path,
+    project_descriptors: Sequence[Mapping[str, object]],
+    output_root: str | Path,
+    allowed_source_roots: Sequence[str | Path] = (),
+) -> WeeklyIntelligenceBriefV2Summary:
+    """Explicit opt-in IRX-6 preview; V1 generation and delivery stay primary."""
+
+    from output.weekly_intelligence_brief_v2 import (
+        generate_weekly_intelligence_brief_v2_artifact,
+    )
+
+    return generate_weekly_intelligence_brief_v2_artifact(
+        manifest_path=manifest_path,
+        editorial_artifact_path=editorial_artifact_path,
+        editorial_input_package=editorial_input_package,
+        project_intelligence_path=project_intelligence_path,
+        project_descriptors=project_descriptors,
+        output_root=output_root,
+        allowed_source_roots=allowed_source_roots,
     )
 
 

@@ -21,7 +21,11 @@ from output.knowledge_atlas_report import (
     render_knowledge_atlas_html,
 )
 from output.reporting_period import resolve_reporting_period
-from output.split_intelligence_reports import deliver_split_intelligence_reports, generate_split_intelligence_reports
+from output.split_intelligence_reports import (
+    deliver_split_intelligence_reports,
+    generate_split_intelligence_reports,
+    generate_split_weekly_brief_v2_preview,
+)
 from output.weekly_intelligence_brief import (
     build_weekly_intelligence_brief_artifact,
     load_mvp_radar_summary,
@@ -30,6 +34,29 @@ from output.weekly_intelligence_brief import (
 
 
 class TestSplitIntelligenceReports(unittest.TestCase):
+    def test_v2_preview_is_explicit_and_does_not_change_default_delivery(self):
+        sentinel = object()
+        with patch(
+            "output.weekly_intelligence_brief_v2.generate_weekly_intelligence_brief_v2_artifact",
+            return_value=sentinel,
+        ) as generate:
+            result = generate_split_weekly_brief_v2_preview(
+                manifest_path="/tmp/run/manifest.json",
+                editorial_artifact_path="/tmp/editorial.json",
+                editorial_input_package={"schema_version": "fixture"},
+                project_intelligence_path="/tmp/project.json",
+                project_descriptors=(),
+                output_root="/tmp/output",
+                allowed_source_roots=("/tmp",),
+            )
+
+        self.assertIs(result, sentinel)
+        generate.assert_called_once()
+        self.assertNotIn(
+            "weekly_brief_v2",
+            generate_split_intelligence_reports.__code__.co_varnames,
+        )
+
     def test_atlas_secondary_learning_projection_is_reaction_neutral(self):
         baseline_threads = [
             {
@@ -226,7 +253,9 @@ class TestSplitIntelligenceReports(unittest.TestCase):
             with tempfile.TemporaryDirectory() as tmpdir:
                 with patch(
                     "output.editorial_intelligence.generate_editorial_intelligence_artifact"
-                ) as generate_editorial:
+                ) as generate_editorial, patch(
+                    "output.weekly_intelligence_brief_v2.generate_weekly_intelligence_brief_v2_artifact"
+                ) as generate_v2:
                     summary = generate_split_intelligence_reports(
                         settings,
                         week_label="2026-W28",
@@ -235,6 +264,7 @@ class TestSplitIntelligenceReports(unittest.TestCase):
                     )
 
             generate_editorial.assert_not_called()
+            generate_v2.assert_not_called()
             self.assertIsNone(summary.editorial_intelligence)
             self.assertEqual(summary.editorial_intelligence_error, "")
         finally:

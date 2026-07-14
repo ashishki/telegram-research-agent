@@ -16,9 +16,10 @@ Product contracts:
 - `docs/static_visualization_system.md`.
 
 This roadmap turns the failed W29 reader experience into implementation-ready
-work. It does not claim that Report V2 is implemented or that the current W29
-reports are acceptable. Product code, scoring, prompts, database schemas,
-renderers, Radar gates, and generated reports are outside the scope of IRX-0.
+work. Weekly Brief V2 now exists as an additive preview, but the complete Report
+V2 package, delivery switch, and dogfood restart remain unfinished; the current
+W29 reports are not accepted as evidence. IRX-0 itself changed documentation
+only.
 
 ## 1. Product Goal
 
@@ -150,7 +151,7 @@ behavior; it does not reopen the gate logic.
 | IRX-3 | Reaction-to-ranking personalization and effect receipt | `implemented_and_verified` | P0 | IRX-1, IRX-2 |
 | IRX-4 | Canonical Idea Thread curation and merge/split lifecycle | `implemented_and_verified` | P0 | IRX-1, IRX-2, IRX-3 |
 | IRX-5 | Editorial Intelligence synthesis contract | `implemented_and_verified` | P0 | IRX-1 through IRX-4 |
-| IRX-6 | Weekly Intelligence Brief V2 | `planned` | P1 | IRX-2 through IRX-5, IRX-8 through IRX-10 |
+| IRX-6 | Weekly Intelligence Brief V2 | `implemented_and_verified` | P1 | IRX-2 through IRX-5, IRX-8 through IRX-10 |
 | IRX-7 | Knowledge Atlas V2 and Knowledge Audit Explorer separation | `planned` | P2 | IRX-4, IRX-5, IRX-8, IRX-11 |
 | IRX-8 | Static visualization component system | `implemented_and_verified` | P1 | IRX-4, IRX-5 |
 | IRX-9 | Project Intelligence V2 | `implemented_and_verified` | P1 | IRX-4, IRX-5, IRX-8 |
@@ -1006,7 +1007,7 @@ matrices passed 80, 108, and 66 tests respectively.
 
 ### IRX-6 - Weekly Intelligence Brief V2
 
-**Status:** `planned`. **Priority:** P1.
+**Status:** `implemented_and_verified`. **Priority:** P1.
 
 **Problem:** The W29 Brief has no weekly thesis, zero changed threads due to the
 wrong period, nine copies of one generic action, no concrete project, no Radar
@@ -1029,7 +1030,7 @@ and targeted feedback prompts.
 
 **Dependencies:** IRX-2 through IRX-5 and IRX-8 through IRX-10.
 
-**Likely files:** `src/output/weekly_intelligence_brief.py`;
+**Likely files:** `src/output/weekly_intelligence_brief_v2.py`;
 `src/output/split_intelligence_reports.py`; shared UI/visual modules;
 `src/output/intelligence_retrieval_items.py`;
 `tests/test_split_intelligence_reports.py`;
@@ -1073,6 +1074,51 @@ HTML, hide evidence gaps, or trade information value for decoration.
 **Rollout implications:** Write explicit V2 paths while retaining V1 Brief
 artifacts and retrieval adapters. Do not switch scheduled delivery until IRX-11
 passes on golden fixtures.
+
+**IRX-6 completion receipt (2026-07-14):** Added the deterministic, opt-in
+`split_ai_report.v2` Weekly Intelligence Brief preview under the separate
+immutable `weekly_intelligence_briefs_v2/<run_id>/` path. The renderer consumes
+the exact terminal manifest, strict IRX-5 editorial artifact and bounded input
+catalog, manifest-bound IRX-3 reaction receipt, IRX-9 project permissions,
+IRX-10 Radar reader, and IRX-8 visual specs. It never calls a model, ranks a
+signal, writes through a V1 path, or changes scheduled delivery.
+
+The closed sidecar contains one thesis, a host-order four-way decision matrix,
+up to three signals, one primary and up to two secondary actions, at most two
+confirmed project actions, original reaction and confirmed-feedback receipts,
+same-run Radar context, five targeted feedback prompts, four shared visual
+components, evidence refs, navigation states, and exact source/artifact
+descriptors. The rich sanitized fixture renders 827 initially visible words,
+three meaningful available visual kinds, explicit completed period, Berlin
+generation time, complete/partial state, reaction snapshot status, one defer
+decision, and collapsed technical details. Content outside 700–900 words is
+marked partial; content above 1,100 is rejected.
+
+Generation and loading require strict duplicate-free finite JSON, a
+caller-selected canonical `manifest.json`, exact run/period/source parity,
+canonical filenames, final dependency rechecks, and private `0600` files
+published through an atomic no-follow directory operation. The bound loader
+rebuilds the DTO from its exact sources and byte-compares deterministic HTML;
+forged mappings, manifest aliases, coordinated derived-field edits, source
+catalog edits, unsafe run IDs, symlink output escapes, incomplete packages,
+and legacy/neighbor Radar substitution fail closed.
+
+Retrieval and Hermes/PI use the exact selected manifest/run, support explicitly
+configured external trusted source roots, return one canonical Radar dossier,
+omit invalid V2 projections without legacy fallback, and retain all V1 summary
+and delivery behavior. Atlas V2 and Audit Explorer remain explicitly
+unavailable until IRX-7; only the checksum-bound compatible Atlas V1 link is
+exposed. Project paths, internal refs/enums, raw JSON keys, and unexplained
+English diagnostics are excluded from initial reader and retrieval copy.
+
+The 133-test primary IRX-6/visual/V1 compatibility matrix, exact 95-test task
+card command, and 164-test upstream editorial/project/reaction/Radar/manifest/
+orchestrator overlap matrix passed;
+Ruff, focused compilation, and `git diff --check` passed. No live model call,
+generated production report, archive backfill, database migration, Radar gate
+change, sibling-repository edit, rollout, screenshot, or dogfood evidence is
+claimed. Browser geometry and golden screenshot evidence remain owned by
+IRX-13, while IRX-11 owns independent reader-value delivery gates.
 
 ### IRX-11 - Reader-Value Quality Gates
 
@@ -1562,6 +1608,6 @@ Report files changed, canonical identity/lifecycle/as-of semantics, compatibilit
 
 ## 15. Suggested Following Task
 
-IRX-1 through IRX-5 and IRX-8 through IRX-10 are implemented and verified.
-IRX-6 is the next planned implementation scope. Reader-value gates, Atlas V2,
-rollout, and dogfood remain unimplemented and gated by their later tasks.
+IRX-1 through IRX-6 and IRX-8 through IRX-10 are implemented and verified.
+IRX-11 is the next planned implementation scope. Atlas V2, report-specific
+learning, rollout, and dogfood remain unimplemented and gated by later tasks.

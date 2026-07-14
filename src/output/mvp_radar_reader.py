@@ -13,7 +13,9 @@ import copy
 import hashlib
 import json
 import math
+import os
 import re
+import stat
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -31,7 +33,6 @@ from output.weekly_run_manifest import (
     WeeklyRunManifestError,
     validate_manifest,
     validate_radar_run_binding,
-    verify_file_checksum,
 )
 
 
@@ -208,14 +209,17 @@ def _load_bound_mvp_radar_reader(
         binding_sha256 = _required_text(
             radar_stage.get("binding_sha256"), "Radar binding checksum", 64
         )
-        verify_file_checksum(binding_path, binding_sha256)
-        binding = _load_json_object(binding_path, "Radar binding")
+        binding = _load_json_object(
+            binding_path,
+            "Radar binding",
+            expected_sha256=binding_sha256,
+        )
         validate_radar_run_binding(
             binding,
             manifest=manifest_map,
             path_base=base,
             allowed_roots=roots,
-            verify_files=True,
+            verify_files=False,
         )
         _validate_stage_binding_parity(radar_stage, binding)
 
@@ -223,8 +227,24 @@ def _load_bound_mvp_radar_reader(
         seed_ref = _mapping(binding.get("seed_export_ref"))
         raw_path = _bound_path(base, raw_ref.get("path"))
         seed_path = _bound_path(base, seed_ref.get("path"))
-        radar_payload = _load_json_object(raw_path, "Radar JSON")
-        seed_payload = _load_json_array(seed_path, "Radar seed export")
+        radar_payload = _load_json_object(
+            raw_path,
+            "Radar JSON",
+            expected_sha256=_required_text(
+                raw_ref.get("sha256"),
+                "Radar JSON checksum",
+                64,
+            ),
+        )
+        seed_payload = _load_json_array(
+            seed_path,
+            "Radar seed export",
+            expected_sha256=_required_text(
+                seed_ref.get("sha256"),
+                "Radar seed checksum",
+                64,
+            ),
+        )
         projection = build_mvp_radar_reader_projection(
             manifest_map,
             binding=binding,
@@ -2497,30 +2517,94 @@ def _bound_path(base: Path, value: object) -> Path:
     return path if path.is_absolute() else base / path
 
 
-def _load_json_object(path: Path, label: str) -> dict[str, Any]:
-    if path.stat().st_size > _MAX_BOUND_JSON_BYTES:
-        raise MvpRadarReaderError(f"{label} exceeds the bounded reader byte limit")
-    value = json.loads(
-        path.read_text(encoding="utf-8"), parse_constant=_reject_json_constant
+def _load_json_object(
+    path: Path,
+    label: str,
+    *,
+    expected_sha256: str | None = None,
+) -> dict[str, Any]:
+    value = _load_json_value(
+        path,
+        label,
+        expected_sha256=expected_sha256,
     )
     if not isinstance(value, dict):
         raise MvpRadarReaderError(f"{label} must be an object")
     return value
 
 
-def _load_json_array(path: Path, label: str) -> list[object]:
-    if path.stat().st_size > _MAX_BOUND_JSON_BYTES:
-        raise MvpRadarReaderError(f"{label} exceeds the bounded reader byte limit")
-    value = json.loads(
-        path.read_text(encoding="utf-8"), parse_constant=_reject_json_constant
+def _load_json_array(
+    path: Path,
+    label: str,
+    *,
+    expected_sha256: str | None = None,
+) -> list[object]:
+    value = _load_json_value(
+        path,
+        label,
+        expected_sha256=expected_sha256,
     )
     if not isinstance(value, list):
         raise MvpRadarReaderError(f"{label} must be an array")
     return value
 
 
+def _load_json_value(
+    path: Path,
+    label: str,
+    *,
+    expected_sha256: str | None,
+) -> object:
+    file_descriptor: int | None = None
+    try:
+        file_descriptor = os.open(
+            path,
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+        )
+        metadata = os.fstat(file_descriptor)
+        if not stat.S_ISREG(metadata.st_mode):
+            raise MvpRadarReaderError(f"{label} must be a regular file")
+        with os.fdopen(file_descriptor, "rb") as handle:
+            file_descriptor = None
+            data = handle.read(_MAX_BOUND_JSON_BYTES + 1)
+    finally:
+        if file_descriptor is not None:
+            os.close(file_descriptor)
+    if len(data) > _MAX_BOUND_JSON_BYTES:
+        raise MvpRadarReaderError(f"{label} exceeds the bounded reader byte limit")
+    actual_sha256 = hashlib.sha256(data).hexdigest()
+    if expected_sha256 is not None and actual_sha256 != expected_sha256:
+        raise MvpRadarReaderError(f"{label} checksum mismatch")
+    try:
+        text = data.decode("utf-8")
+        return json.loads(
+            text,
+            object_pairs_hook=_unique_json_object,
+            parse_constant=_reject_json_constant,
+            parse_float=_strict_json_float,
+        )
+    except (json.JSONDecodeError, UnicodeError, RecursionError, OverflowError) as exc:
+        raise MvpRadarReaderError(f"invalid {label}: {exc}") from exc
+
+
+def _unique_json_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    value: dict[str, object] = {}
+    for key, item in pairs:
+        if key in value:
+            raise MvpRadarReaderError(f"duplicate JSON key is forbidden: {key}")
+        value[key] = item
+    return value
+
+
 def _reject_json_constant(value: str) -> object:
     raise MvpRadarReaderError(f"non-finite JSON number is forbidden: {value}")
+
+
+def _strict_json_float(value: str) -> float:
+    parsed = float(value)
+    if not math.isfinite(parsed):
+        raise MvpRadarReaderError(f"non-finite JSON number is forbidden: {value}")
+    return parsed
 
 
 def _safe_reason(error: BaseException) -> str:

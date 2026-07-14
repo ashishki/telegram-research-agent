@@ -842,6 +842,10 @@ class ReportVisualContractTests(unittest.TestCase):
         rendered = render_report_visual(valid)
         self.assertEqual(rendered.render_status, "complete")
         self.assertIn("не является процентом конверсии", rendered.html)
+        self.assertIn(
+            "<details><summary>Почему часть событий не продолжила цепочку",
+            rendered.html,
+        )
 
         invalid = deepcopy(valid)
         invalid["stages"][0]["count"] = 3
@@ -894,6 +898,17 @@ class ReportVisualContractTests(unittest.TestCase):
         self.assertIn("Статус досье", result.html)
         self.assertIn("Решение для читателя", result.html)
 
+        focused = build_radar_gate()
+        focused["dossier_status"] = "focused_experiment"
+        focused["reader_decision"] = "investigate"
+        focused_result = render_report_visual(focused)
+        self.assertEqual(focused_result.render_status, "complete")
+        self.assertIn(
+            "Разрешён ограниченный проверочный эксперимент",
+            focused_result.html,
+        )
+        self.assertIn("Продолжить проверку", focused_result.html)
+
         dossier_projection = build_radar_gate()
         dossier_projection["reader_decision"] = "reject"
         changed_dossier = deepcopy(dossier_projection)
@@ -936,6 +951,10 @@ class ReportVisualContractTests(unittest.TestCase):
         self.assertIn("Наблюдать", result.html)
         self.assertIn("Проверяемый сигнал о происхождении решения", result.html)
         self.assertIn("Связанных доказательств", result.html)
+        self.assertIn(
+            "<details><summary>Техническая область изменения</summary>",
+            result.html,
+        )
 
         too_many = build_project_impact()
         too_many["items"].extend(

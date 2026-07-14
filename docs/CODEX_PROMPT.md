@@ -1,9 +1,9 @@
 # CODEX_PROMPT - Compact Session Handoff
 
-Version: 5.8
+Version: 5.9
 Date: 2026-07-14
-State: IRX-1 through IRX-5 and IRX-8 through IRX-10
-`implemented_and_verified`; IRX-6 is the next planned implementation task;
+State: IRX-1 through IRX-6 and IRX-8 through IRX-10
+`implemented_and_verified`; IRX-11 is the next planned implementation task;
 dogfood is blocked until IRX-14
 
 ## Current Product Direction
@@ -34,7 +34,7 @@ docs/tasks.md
 Next implementation task:
 
 ```text
-IRX-6 - Weekly Intelligence Brief V2
+IRX-11 - Reader-Value Quality Gates
 ```
 
 ## W29 Product Correction
@@ -48,8 +48,9 @@ shared completed-period semantics, IRX-2 added the manifest-bound package,
 IRX-3 added bounded auditable reaction personalization, IRX-4 added canonical
 curation, IRX-5 added a strict run-bound editorial shadow artifact, IRX-8 added
 the shared deterministic offline visualization contract and fixture gallery,
-and IRX-9 added the exact evidence-bound Project Intelligence V2 shadow.
-Reader V2 surfaces remain planned, and dogfood has not started.
+and IRX-9 added the exact evidence-bound Project Intelligence V2 shadow. IRX-10
+added the strict manifest-bound Radar reader, and IRX-6 added the opt-in Brief
+V2 preview. Atlas V2, delivery gates, and dogfood remain unstarted.
 
 ## Verified Baseline
 
@@ -107,6 +108,12 @@ Reader V2 surfaces remain planned, and dogfood has not started.
   experiment. Missing, invalid, disabled, wrong-run, and legacy states are
   explicit and fail closed across Brief, visual, canonical, retrieval,
   editorial, and Hermes/PI consumers.
+- IRX-6 adds the opt-in deterministic `split_ai_report.v2` Weekly Brief preview
+  under a separate immutable run path. It assembles exact editorial, reaction,
+  project, Radar, and shared-visual contracts into a bounded Russian decision
+  surface without model calls, reranking, V1 replacement, or delivery change.
+  Strict source-byte, path, package, retrieval, and PI authority checks fail
+  closed on forged, wrong-run, incomplete, hostile-JSON, or symlinked input.
 - Canonical intelligence sidecar contract `tra-intelligence-contract.v1` is now
   implemented locally for workbook/Brief/Atlas projections with sanitized eval
   fixtures.
@@ -436,7 +443,7 @@ Verification and compatibility:
   full suite, V2 reader activation, repository mutation, or dogfood run was
   performed;
 - The historical IRX-10 handoff is closed by the completion record below.
-  Project reader rendering remains owned by IRX-6.
+  Project reader rendering was owned by IRX-6 and is closed below.
 
 ## IRX-10 Completion
 
@@ -478,7 +485,44 @@ Verification and compatibility:
   the final validator fix;
 - no live acquisition, expensive model call, generated private artifact,
   archive backfill, database migration, score/gate change, or dogfood result was
-  performed or claimed. IRX-6 is next.
+  performed or claimed. The historical IRX-6 handoff is closed by the
+  completion record below.
+
+## IRX-6 Completion
+
+Status: `implemented_and_verified` on 2026-07-14.
+
+Implemented:
+
+- separate opt-in `split_ai_report.v2` preview package at
+  `weekly_intelligence_briefs_v2/<run_id>/`, with a closed source catalog,
+  immutable private HTML/JSON, and unchanged V1 generation and delivery;
+- deterministic Russian reader DTO over the exact terminal manifest, IRX-5
+  editorial order, IRX-3 reaction receipt, IRX-9 confirmed project actions,
+  IRX-10 Radar authority, and IRX-8 visuals. It contains one thesis, four-way
+  decisions, up to three signals, one primary plus up to two secondary actions,
+  one defer decision, targeted feedback, and collapsed technical provenance;
+- 827 initially visible words in the rich sanitized fixture, four visual
+  components with three meaningful available kinds, explicit completed period,
+  generation time, status/partial reasons, and no reader-visible internal IDs,
+  enums, paths, raw ranking traces, or fallback diagnostics;
+- bounded duplicate-free finite JSON, exact checksum-bound semantic reads,
+  canonical manifest/run/source/output identities, no-follow private atomic
+  publication, deterministic rebuild/HTML parity, and fail-closed retrieval/PI
+  authority for hostile, incomplete, wrong-run, neighbor, legacy, or symlinked
+  packages. Exactly one canonical Radar dossier is projected.
+
+Verification and compatibility:
+
+- the exact task-card command passed 95 tests, the primary Brief/visual/V1
+  compatibility matrix passed 133 tests, and the upstream editorial/project/
+  reaction/Radar/manifest/orchestrator overlap matrix passed 164 tests;
+- independent compatibility and security reviews found no blockers; Ruff,
+  focused compilation, and `git diff --check` passed;
+- no live/expensive model run, production report generation, archive backfill,
+  database migration, Radar score/gate change, sibling-repository edit, V1
+  delivery switch, screenshot evidence, rollout, or dogfood claim was made.
+  IRX-11 is next; browser geometry/golden screenshots remain IRX-13 scope.
 
 ## PGI-001 Completion
 
@@ -849,7 +893,7 @@ Report files changed, canonical identity/lifecycle/as-of semantics, compatibilit
 
 This exact historical prompt stopped at the IRX-4 boundary as required. IRX-4
 is implemented and verified; the subsequent IRX-5, IRX-8, IRX-9, and IRX-10
-handoffs are now closed by the completion records above. IRX-6 is the next
+handoffs are now closed by the completion records above. IRX-11 is the next
 planned scope.
 
 ## Historical PGI-007 Handoff

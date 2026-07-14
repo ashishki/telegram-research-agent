@@ -1068,6 +1068,7 @@ class TestPersonalIntelligenceFacade(unittest.TestCase):
             any(item.get("item_type") == "reaction_effect" for item in retrieval["items"])
         )
 
+
     def test_uncontained_manifest_symlink_is_invalid_and_blocks_fallback(self):
         with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as external:
             root = Path(tmp)
@@ -1345,6 +1346,220 @@ class TestPersonalIntelligenceFacade(unittest.TestCase):
             build_review.call_args.kwargs["weekly_run_root"],
             weekly_run_root,
         )
+
+
+class TestPersonalIntelligenceFacadeBriefV2(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        from tests import test_weekly_intelligence_brief_v2 as support
+
+        cls.support = support.WeeklyIntelligenceBriefV2Tests
+        cls.support.setUpClass()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.support.tearDownClass()
+
+    def _facade(self) -> PersonalIntelligenceFacade:
+        root = self.support.fixture.root
+        settings = Settings(
+            db_path=str(root / "pi-v2-missing.db"),
+            llm_api_key="",
+            model_provider="",
+            telegram_session_path="",
+        )
+        return PersonalIntelligenceFacade(
+            settings=settings,
+            output_root=root,
+            weekly_run_root=self.support.manifest_path.parent.parent,
+            now=datetime(2026, 7, 14, 8, 0, tzinfo=timezone.utc),
+        )
+
+    def test_manifest_search_adds_exact_v2_without_replacing_v1_summary(self):
+        facade = self._facade()
+        items = facade._manifest_retrieval_items(
+            self.support.manifest,
+            self.support.manifest_path,
+        )
+        self.assertTrue(any(item.item_type == "weekly_thesis" for item in items))
+        self.assertTrue(any(item.item_type == "brief_signal" for item in items))
+        self.assertTrue(any(item.item_type == "workbook_section" for item in items))
+        self.assertEqual(
+            sum(item.item_type == "mvp_dossier" for item in items),
+            1,
+        )
+
+        search = facade.search_intelligence_items(
+            "Проверяемость ограничивает безопасное применение сигналов",
+            filters={"week_label": "2026-W28"},
+            limit=5,
+        )
+        self.assertEqual(search["status"], "ok")
+        self.assertTrue(
+            any(item["item_type"] == "weekly_thesis" for item in search["items"])
+        )
+
+        summary = facade.get_workbook_summary("2026-W28")
+        self.assertEqual(summary["status"], "ok")
+        self.assertNotEqual(summary["artifact_type"], "split_ai_report.v2")
+        self.assertEqual(
+            summary["artifact_paths"]["json"],
+            self.support.run_result.weekly_brief_json_path,
+        )
+
+    def test_exact_v2_supports_explicit_external_trusted_source_roots(self):
+        from output.weekly_intelligence_brief_v2 import (
+            generate_weekly_intelligence_brief_v2_artifact,
+        )
+
+        root = self.support.fixture.root
+        isolated = root / "pi-isolated-v2"
+        summary = generate_weekly_intelligence_brief_v2_artifact(
+            manifest_path=self.support.manifest_path,
+            editorial_artifact_path=self.support.editorial_path,
+            editorial_input_package=self.support.package,
+            project_intelligence_path=self.support.project_path,
+            project_descriptors=self.support.project_descriptors,
+            output_root=isolated,
+            allowed_source_roots=(root,),
+        )
+        facade = PersonalIntelligenceFacade(
+            settings=Settings(
+                db_path=str(root / "pi-v2-external-missing.db"),
+                llm_api_key="",
+                model_provider="",
+                telegram_session_path="",
+            ),
+            output_root=isolated,
+            weekly_run_root=self.support.manifest_path.parent.parent,
+            v2_source_roots=(root,),
+            now=datetime(2026, 7, 14, 8, 0, tzinfo=timezone.utc),
+        )
+
+        items = facade._manifest_retrieval_items(
+            self.support.manifest,
+            self.support.manifest_path,
+        )
+
+        self.assertTrue(any(item.item_type == "weekly_thesis" for item in items))
+        self.assertTrue(
+            any(summary.json_path in (item.source_refs or []) for item in items)
+        )
+
+    def test_tampered_v2_is_omitted_while_manifest_v1_items_remain(self):
+        path = Path(self.support.summary.json_path)
+        original = path.read_bytes()
+        try:
+            payload = json.loads(original)
+            payload["weekly_thesis"]["title"] = "Подменённый тезис"
+            path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+            items = self._facade()._manifest_retrieval_items(
+                self.support.manifest,
+                self.support.manifest_path,
+            )
+            self.assertFalse(any(item.item_type == "weekly_thesis" for item in items))
+            self.assertTrue(any(item.item_type == "workbook_section" for item in items))
+            self.assertFalse(
+                any(
+                    self.support.summary.json_path in (item.source_refs or [])
+                    for item in items
+                )
+            )
+        finally:
+            path.write_bytes(original)
+
+    def test_symlinked_v2_root_cannot_launder_external_preview(self):
+        requested = self.support.fixture.root / "pi-symlinked-v2"
+        requested.mkdir()
+        (requested / "weekly_intelligence_briefs_v2").symlink_to(
+            self.support.fixture.root / "weekly_intelligence_briefs_v2",
+            target_is_directory=True,
+        )
+        facade = PersonalIntelligenceFacade(
+            settings=Settings(
+                db_path=str(requested / "missing.db"),
+                llm_api_key="",
+                model_provider="",
+                telegram_session_path="",
+            ),
+            output_root=requested,
+            weekly_run_root=self.support.manifest_path.parent.parent,
+            v2_source_roots=(self.support.fixture.root,),
+            now=datetime(2026, 7, 14, 8, 0, tzinfo=timezone.utc),
+        )
+
+        items = facade._manifest_retrieval_items(
+            self.support.manifest,
+            self.support.manifest_path,
+        )
+
+        self.assertFalse(any(item.item_type == "weekly_thesis" for item in items))
+        self.assertTrue(any(item.item_type == "workbook_section" for item in items))
+
+    def test_symlinked_output_ancestor_cannot_launder_external_preview(self):
+        from output.weekly_intelligence_brief_v2 import (
+            generate_weekly_intelligence_brief_v2_artifact,
+        )
+
+        root = self.support.fixture.root
+        target = root / "pi-ancestor-target"
+        canonical_output = target / "nested"
+        generate_weekly_intelligence_brief_v2_artifact(
+            manifest_path=self.support.manifest_path,
+            editorial_artifact_path=self.support.editorial_path,
+            editorial_input_package=self.support.package,
+            project_intelligence_path=self.support.project_path,
+            project_descriptors=self.support.project_descriptors,
+            output_root=canonical_output,
+            allowed_source_roots=(root,),
+        )
+        alias = root / "pi-ancestor-alias"
+        alias.symlink_to(target, target_is_directory=True)
+        facade = PersonalIntelligenceFacade(
+            settings=Settings(
+                db_path=str(root / "pi-ancestor-missing.db"),
+                llm_api_key="",
+                model_provider="",
+                telegram_session_path="",
+            ),
+            output_root=alias / "nested",
+            weekly_run_root=self.support.manifest_path.parent.parent,
+            v2_source_roots=(root,),
+            now=datetime(2026, 7, 14, 8, 0, tzinfo=timezone.utc),
+        )
+
+        items = facade._manifest_retrieval_items(
+            self.support.manifest,
+            self.support.manifest_path,
+        )
+
+        self.assertFalse(any(item.item_type == "weekly_thesis" for item in items))
+        self.assertTrue(any(item.item_type == "workbook_section" for item in items))
+
+    def test_output_root_symlink_loop_omits_v2_without_crashing_manifest_retrieval(self):
+        root = self.support.fixture.root
+        loop = root / "pi-output-loop"
+        loop.symlink_to(loop, target_is_directory=True)
+        facade = PersonalIntelligenceFacade(
+            settings=Settings(
+                db_path=str(root / "pi-loop-missing.db"),
+                llm_api_key="",
+                model_provider="",
+                telegram_session_path="",
+            ),
+            output_root=loop,
+            weekly_run_root=self.support.manifest_path.parent.parent,
+            v2_source_roots=(root,),
+            now=datetime(2026, 7, 14, 8, 0, tzinfo=timezone.utc),
+        )
+
+        items = facade._manifest_retrieval_items(
+            self.support.manifest,
+            self.support.manifest_path,
+        )
+
+        self.assertFalse(any(item.item_type == "weekly_thesis" for item in items))
+        self.assertTrue(any(item.item_type == "workbook_section" for item in items))
 
 
 if __name__ == "__main__":
