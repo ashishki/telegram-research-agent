@@ -466,6 +466,30 @@ class _ReaderHtmlAudit(HTMLParser):
         return len(_WORD_RE.findall(self.visible_text))
 
 
+def reader_visible_word_count(rendered_html: str) -> int:
+    """Return the IRX-11 initial-visible word count used by blocking gates."""
+
+    html = str(rendered_html or "")
+    if len(html) > _MAX_HTML_CHARS:
+        raise ReaderQualityContractError("rendered HTML exceeds reader audit limit")
+    hidden_css, unsupported_hidden_css, stylesheet_imports = _hidden_css_selectors(html)
+    if unsupported_hidden_css or stylesheet_imports:
+        raise ReaderQualityContractError(
+            "rendered HTML uses CSS visibility rules that cannot be counted safely"
+        )
+    audit = _ReaderHtmlAudit(
+        hidden_css_selectors=hidden_css,
+        unsupported_hidden_css=unsupported_hidden_css,
+        stylesheet_imports=stylesheet_imports,
+    )
+    try:
+        audit.feed(html)
+        audit.close()
+    except (RecursionError, ValueError) as exc:
+        raise ReaderQualityContractError("rendered HTML cannot be audited") from exc
+    return audit.visible_word_count
+
+
 def evaluate_reader_report_quality(
     sidecar: Mapping[str, Any],
     rendered_html: str,
@@ -1577,6 +1601,51 @@ def _atlas_findings(
                 "Сохранить его как Knowledge Audit Explorer и генерировать Atlas V2 рядом после IRX-7.",
             ),
         )
+    elif sidecar.get("preview_profile") == "knowledge_atlas_v2.opt_in.v1":
+        contract_valid = False
+        try:
+            from output.knowledge_atlas_report_v2 import (
+                render_knowledge_atlas_v2_html,
+                validate_knowledge_atlas_v2,
+            )
+
+            validate_knowledge_atlas_v2(sidecar)
+            contract_valid = True
+        except Exception as exc:
+            errors = getattr(exc, "errors", ())
+            evidence = [str(item)[:240] for item in list(errors)[:4]] or [
+                exc.__class__.__name__
+            ]
+            _add(
+                findings,
+                _finding(
+                    "structural_validity",
+                    "atlas.contract_invalid",
+                    SEVERITY_CRITICAL,
+                    "split_ai_report.v2",
+                    evidence,
+                    "Sidecar не соответствует закрытому Atlas V2 contract и не может считаться канонической reader-картой.",
+                    "Исправить детерминированную Atlas-проекцию и повторить contract/quality validation.",
+                ),
+            )
+        if contract_valid:
+            expected_html = render_knowledge_atlas_v2_html(sidecar)
+            if html != expected_html:
+                _add(
+                    findings,
+                    _finding(
+                        "structural_validity",
+                        "atlas.html_parity_mismatch",
+                        SEVERITY_CRITICAL,
+                        "rendered_html",
+                        [
+                            f"actual_characters={len(html)}",
+                            f"expected_characters={len(expected_html)}",
+                        ],
+                        "HTML не совпадает с детерминированной reader-проекцией этого Atlas sidecar.",
+                        "Перерендерить документ из неизменённого validated sidecar; не исправлять HTML вручную.",
+                    ),
+                )
     primary = _strings(
         sidecar.get("primary_thread_ids")
         if "primary_thread_ids" in sidecar

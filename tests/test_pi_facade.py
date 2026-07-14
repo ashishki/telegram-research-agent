@@ -1407,6 +1407,104 @@ class TestPersonalIntelligenceFacadeBriefV2(unittest.TestCase):
             self.support.run_result.weekly_brief_json_path,
         )
 
+    def test_atlas_v2_and_audit_descriptors_are_additive_to_v1_status(self):
+        facade = self._facade()
+        with tempfile.TemporaryDirectory() as tmp:
+            package = Path(tmp)
+            paths = {
+                "json": package / "knowledge-atlas.v2.json",
+                "html": package / "knowledge-atlas.v2.html",
+                "source_catalog": package / "knowledge-atlas-sources.v1.json",
+                "audit_json": package / "knowledge-audit-explorer.v1.json",
+                "audit_html": package / "knowledge-audit-explorer.v1.html",
+            }
+            for name, path in paths.items():
+                path.write_text(
+                    json.dumps({"generated_at": "2026-07-13T00:00:00Z"})
+                    if name.endswith("json")
+                    else "<!doctype html>",
+                    encoding="utf-8",
+                )
+            payload = {
+                "schema_version": "split_ai_report.v2",
+                "surface": "knowledge_atlas",
+                "run_id": self.support.manifest["run_id"],
+                "run_status": "complete",
+                "partial": False,
+                "artifact_paths": {
+                    "json": str(paths["json"]),
+                    "html": str(paths["html"]),
+                    "source_catalog": str(paths["source_catalog"]),
+                },
+                "technical_refs": {
+                    "audit_explorer_json_path": str(paths["audit_json"]),
+                    "audit_explorer_path": str(paths["audit_html"]),
+                },
+            }
+            with patch.object(
+                facade,
+                "_load_manifest_knowledge_atlas_v2",
+                return_value=payload,
+            ):
+                atlas, audit = facade._manifest_atlas_v2_descriptors(
+                    "2026-W28",
+                    self.support.manifest,
+                    self.support.manifest_path,
+                    current_week="2026-W29",
+                )
+
+        self.assertEqual(atlas["status"], "current")
+        self.assertEqual(atlas["schema_version"], "split_ai_report.v2")
+        self.assertEqual(atlas["surface"], "knowledge_atlas")
+        self.assertEqual(atlas["selection"], "explicit_manifest_run")
+        self.assertEqual(audit["status"], "current")
+        self.assertEqual(audit["schema_version"], "knowledge_audit_explorer.v1")
+
+    def test_atlas_v2_search_exposes_and_filters_explicit_descriptors(self):
+        from output.intelligence_retrieval_items import IntelligenceRetrievalItem
+
+        facade = self._facade()
+        item = IntelligenceRetrievalItem(
+            id="atlas_v2_thread:run-1:eval-gates",
+            item_type="atlas_v2_thread",
+            week_label="2026-W28",
+            title="Гейты качества агентов",
+            summary="Проверки становятся частью пути выпуска.",
+            text="Гейты качества агентов и проверяемый выпуск.",
+            schema_version="split_ai_report.v2",
+            surface="knowledge_atlas",
+            run_id="run-1",
+        )
+        with patch.object(
+            facade,
+            "_manifest_retrieval_items",
+            return_value=[item],
+        ):
+            result = facade.search_intelligence_items(
+                "гейты качества",
+                filters={
+                    "week_label": "2026-W28",
+                    "schema_version": "split_ai_report.v2",
+                    "surface": "knowledge_atlas",
+                    "run_id": "run-1",
+                },
+                limit=3,
+            )
+            rejected = facade.search_intelligence_items(
+                "гейты качества",
+                filters={
+                    "week_label": "2026-W28",
+                    "surface": "weekly_brief",
+                },
+                limit=3,
+            )
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["items"][0]["schema_version"], "split_ai_report.v2")
+        self.assertEqual(result["items"][0]["surface"], "knowledge_atlas")
+        self.assertEqual(result["items"][0]["run_id"], "run-1")
+        self.assertEqual(rejected["status"], "empty")
+
     def test_exact_v2_supports_explicit_external_trusted_source_roots(self):
         from output.weekly_intelligence_brief_v2 import (
             generate_weekly_intelligence_brief_v2_artifact,

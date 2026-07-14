@@ -24,6 +24,12 @@ from output.intelligence_retrieval_items import (
     load_latest_workbook_json,
     load_mvp_radar_status,
 )
+from output.knowledge_atlas_report_v2 import (
+    ATLAS_V2_SCHEMA_VERSION,
+    ATLAS_V2_SURFACE,
+    KnowledgeAtlasV2Error,
+    find_manifest_bound_knowledge_atlas_v2,
+)
 from output.weekly_intelligence_brief_v2 import (
     WeeklyIntelligenceBriefV2Error,
     find_manifest_bound_weekly_intelligence_brief_v2,
@@ -495,6 +501,18 @@ class PersonalIntelligenceFacade:
             json_path=atlas_json,
             html_path=atlas_html,
         )
+        knowledge_atlas_v2, knowledge_audit_explorer = _atlas_v2_descriptors(
+            week_label=clean_week,
+            current_week_label=current_week,
+            atlas=None,
+            run_id=None,
+            status="unavailable",
+            message=(
+                "Knowledge Atlas V2 and Audit Explorer require an explicit valid "
+                "weekly manifest/run selection."
+            ),
+            selection="explicit_manifest_run_required",
+        )
         mvp_radar = _artifact_descriptor(
             artifact_type="mvp_radar",
             display_name="MVP Radar",
@@ -517,6 +535,8 @@ class PersonalIntelligenceFacade:
             "current_week_label": current_week,
             "weekly_brief": weekly_brief,
             "knowledge_atlas": knowledge_atlas,
+            "knowledge_atlas_v2": knowledge_atlas_v2,
+            "knowledge_audit_explorer": knowledge_audit_explorer,
             "mvp_radar": mvp_radar,
             "mvp_radar_gate": mvp_gate,
             "artifact_paths": _artifact_status_paths(artifacts),
@@ -683,7 +703,36 @@ class PersonalIntelligenceFacade:
                 weekly_run_root=self._weekly_run_root,
                 v2_source_roots=self._v2_source_roots,
             )
+        for field in ("schema_version", "surface", "run_id"):
+            requested = clean_filters.get(field)
+            if requested in (None, "", [], ()):
+                continue
+            accepted = {
+                _clean_text(value).casefold()
+                for value in (
+                    requested
+                    if isinstance(requested, (list, tuple, set))
+                    else [requested]
+                )
+            }
+            items = [
+                item
+                for item in items
+                if _clean_text(getattr(item, field, None)).casefold() in accepted
+            ]
         results = search_curated_semantic_items(items, query, filters=clean_filters, limit=limit)
+        item_descriptors = {
+            item.id: {
+                "schema_version": item.schema_version,
+                "surface": item.surface,
+                "run_id": item.run_id,
+            }
+            for item in items
+        }
+        results = [
+            {**result, **item_descriptors.get(str(result.get("id") or ""), {})}
+            for result in results
+        ]
         return {
             "status": "ok" if results else "empty",
             "query": str(query or ""),
@@ -1064,7 +1113,104 @@ class PersonalIntelligenceFacade:
                 WeeklyIntelligenceBriefV2Error,
             ):
                 pass
+        try:
+            v2_atlas = self._load_manifest_knowledge_atlas_v2(
+                manifest,
+                manifest_path,
+            )
+            if v2_atlas is not None:
+                paths = v2_atlas.get("artifact_paths")
+                if isinstance(paths, Mapping):
+                    candidate = dict(v2_atlas)
+                    candidate["_artifact_kind"] = "knowledge_atlas_v2"
+                    candidate["_artifact_paths"] = {
+                        "json": str(paths.get("json") or ""),
+                        "html": str(paths.get("html") or ""),
+                        "source_catalog": str(
+                            paths.get("source_catalog") or ""
+                        ),
+                    }
+                    items.extend(
+                        _items_from_workbook(
+                            candidate,
+                            v2_expected_manifest_path=manifest_path,
+                            v2_allowed_source_roots=self._v2_source_roots,
+                        )
+                    )
+        except KnowledgeAtlasV2Error:
+            pass
         return _dedupe_items(items)
+
+    def _load_manifest_knowledge_atlas_v2(
+        self,
+        manifest: Mapping[str, Any],
+        manifest_path: Path,
+    ) -> dict[str, Any] | None:
+        """Load the opt-in Atlas only for the caller-selected terminal run."""
+
+        if (
+            manifest.get(_INVALID_MANIFEST_MARKER) is not None
+            or manifest.get("run_status") not in {"complete", "partial"}
+        ):
+            return None
+        payload = find_manifest_bound_knowledge_atlas_v2(
+            output_root=self._output_root or DEFAULT_OUTPUT_ROOT,
+            run_id=str(manifest.get("run_id") or ""),
+            expected_manifest_path=manifest_path,
+            allowed_source_roots=self._v2_source_roots,
+        )
+        if payload is None:
+            return None
+        period = payload.get("reporting_period")
+        if (
+            payload.get("schema_version") != ATLAS_V2_SCHEMA_VERSION
+            or payload.get("surface") != ATLAS_V2_SURFACE
+            or payload.get("run_id") != manifest.get("run_id")
+            or not isinstance(period, Mapping)
+            or period.get("reporting_week") != manifest.get("reporting_week")
+        ):
+            raise KnowledgeAtlasV2Error("Atlas V2 selected-run identity mismatch")
+        return dict(payload)
+
+    def _manifest_atlas_v2_descriptors(
+        self,
+        clean_week: str,
+        manifest: Mapping[str, Any],
+        manifest_path: Path,
+        *,
+        current_week: str,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        status = (
+            "pending"
+            if manifest.get("run_status") not in {"complete", "partial"}
+            else "missing"
+        )
+        message = (
+            "Knowledge Atlas V2 is not finalized for this run."
+            if status == "pending"
+            else "The opt-in Knowledge Atlas V2 package was not generated for this run."
+        )
+        try:
+            atlas = self._load_manifest_knowledge_atlas_v2(
+                manifest,
+                manifest_path,
+            )
+        except (KnowledgeAtlasV2Error, OSError, RuntimeError, ValueError):
+            atlas = None
+            status = "invalid"
+            message = (
+                "The exact-run Knowledge Atlas V2 package failed strict identity, "
+                "source, or byte-parity validation."
+            )
+        return _atlas_v2_descriptors(
+            week_label=clean_week,
+            current_week_label=current_week,
+            atlas=atlas,
+            run_id=str(manifest.get("run_id") or ""),
+            status=status,
+            message=message,
+            selection="explicit_manifest_run",
+        )
 
     def _manifest_artifact_status(
         self,
@@ -1183,6 +1329,14 @@ class PersonalIntelligenceFacade:
         if mvp_radar["status"] not in {"missing", "failed", "disabled", "pending"} and mvp_gate["decision"] == "do_not_build":
             mvp_radar["warning"] = mvp_gate["warning"]
         artifacts = [weekly_brief, knowledge_atlas, mvp_radar]
+        knowledge_atlas_v2, knowledge_audit_explorer = (
+            self._manifest_atlas_v2_descriptors(
+                clean_week,
+                manifest,
+                manifest_path,
+                current_week=current_week,
+            )
+        )
         identity = _manifest_identity(manifest, manifest_path)
         return {
             "status": "ok" if run_status == "complete" else run_status,
@@ -1192,9 +1346,13 @@ class PersonalIntelligenceFacade:
             "run_identity": identity,
             "weekly_brief": weekly_brief,
             "knowledge_atlas": knowledge_atlas,
+            "knowledge_atlas_v2": knowledge_atlas_v2,
+            "knowledge_audit_explorer": knowledge_audit_explorer,
             "mvp_radar": mvp_radar,
             "mvp_radar_gate": mvp_gate,
-            "artifact_paths": _artifact_status_paths(artifacts),
+            "artifact_paths": _artifact_status_paths(
+                [*artifacts, knowledge_atlas_v2, knowledge_audit_explorer]
+            ),
             "evidence_boundaries": _evidence_boundaries(mvp_gate),
             "message": _artifact_status_message(artifacts),
         }
@@ -1228,6 +1386,15 @@ class PersonalIntelligenceFacade:
             )
         ]
         weekly_brief, knowledge_atlas, mvp_radar = artifacts
+        knowledge_atlas_v2, knowledge_audit_explorer = _atlas_v2_descriptors(
+            week_label=clean_week,
+            current_week_label=current_week,
+            atlas=None,
+            run_id=str(manifest.get("_candidate_run_id") or ""),
+            status="invalid",
+            message=message,
+            selection="explicit_manifest_run",
+        )
         mvp_gate = _mvp_gate_status(None)
         identity = _manifest_identity(manifest, manifest_path)
         return {
@@ -1238,6 +1405,8 @@ class PersonalIntelligenceFacade:
             "run_identity": identity,
             "weekly_brief": weekly_brief,
             "knowledge_atlas": knowledge_atlas,
+            "knowledge_atlas_v2": knowledge_atlas_v2,
+            "knowledge_audit_explorer": knowledge_audit_explorer,
             "mvp_radar": mvp_radar,
             "mvp_radar_gate": mvp_gate,
             "artifact_paths": _artifact_status_paths(artifacts),
@@ -1870,6 +2039,78 @@ def _artifact_descriptor(
         },
         "message": message,
     }
+
+
+def _atlas_v2_descriptors(
+    *,
+    week_label: str,
+    current_week_label: str,
+    atlas: Mapping[str, Any] | None,
+    run_id: str | None,
+    status: str,
+    message: str,
+    selection: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    available = atlas is not None
+    paths = atlas["artifact_paths"] if available else {}
+    technical = atlas["technical_refs"] if available else {}
+    selected_run_id = str(atlas.get("run_id") or "") if available else run_id
+    common = {
+        "week_label": week_label,
+        "current_week_label": current_week_label,
+        "authoritative_status": "current" if available else status,
+        "authoritative_message": (
+            f"Strictly validated for finalized run {selected_run_id}."
+            if available
+            else message
+        ),
+    }
+    descriptors = []
+    for artifact_type, display_name, schema, surface, json_path, html_path in (
+        (
+            "knowledge_atlas_v2",
+            "Knowledge Atlas V2",
+            ATLAS_V2_SCHEMA_VERSION,
+            ATLAS_V2_SURFACE,
+            paths.get("json"),
+            paths.get("html"),
+        ),
+        (
+            "knowledge_audit_explorer",
+            "Knowledge Audit Explorer",
+            "knowledge_audit_explorer.v1",
+            "knowledge_audit_explorer",
+            technical.get("audit_explorer_json_path"),
+            technical.get("audit_explorer_path"),
+        ),
+    ):
+        descriptor = _artifact_descriptor(
+            artifact_type=artifact_type,
+            display_name=display_name,
+            json_path=Path(str(json_path)) if available else None,
+            html_path=Path(str(html_path)) if available else None,
+            **common,
+        )
+        descriptor.update(
+            {
+                "schema_version": schema,
+                "surface": surface,
+                "run_id": selected_run_id,
+                "selection": (
+                    "atlas_v2_compatibility_package"
+                    if available and surface == "knowledge_audit_explorer"
+                    else selection
+                ),
+            }
+        )
+        descriptors.append(descriptor)
+    if available:
+        descriptors[0].update(
+            run_status=str(atlas["run_status"]),
+            partial=bool(atlas["partial"]),
+            source_catalog_path=str(paths["source_catalog"]),
+        )
+    return descriptors[0], descriptors[1]
 
 
 def _manifest_candidate_week_clues(

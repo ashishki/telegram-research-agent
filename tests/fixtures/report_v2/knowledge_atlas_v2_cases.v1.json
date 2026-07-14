@@ -1,0 +1,1112 @@
+{
+  "fixture_version": "knowledge_atlas_v2_cases.v1",
+  "run_manifest_identity": {
+    "schema_version": "weekly_run_manifest.v1",
+    "pipeline_profile": "irx2_orchestration.v1",
+    "run_id": "weekly-2026-W27",
+    "manifest_path": "runs/weekly-2026-W27/manifest.json",
+    "run_date": "2026-07-06",
+    "generated_at": "2026-07-06T12:00:00Z",
+    "reporting_week": "2026-W27",
+    "week_label": "2026-W27",
+    "period_mode": "explicit_iso_week",
+    "analysis_period_start": "2026-06-29T00:00:00Z",
+    "analysis_period_end": "2026-07-06T00:00:00Z",
+    "run_status": "complete",
+    "partial": false
+  },
+  "reporting_period": {
+    "reporting_week": "2026-W27",
+    "analysis_period_start": "2026-06-29T00:00:00Z",
+    "analysis_period_end": "2026-07-06T00:00:00Z"
+  },
+  "canonical_threads": [
+    {
+      "canonical_thread_id": "ct_000000000000000000000001",
+      "canonical_thread_ref": "canonical_thread:deterministic-release-gates",
+      "stable_slug": "deterministic-release-gates",
+      "slug": "deterministic-release-gates",
+      "title": "Детерминированные проверки выпусков",
+      "title_ru": "Детерминированные проверки выпусков",
+      "title_en": "Deterministic release gates",
+      "thesis": "Проверки отделяют корректную структуру выпуска от доказанной читательской пользы.",
+      "summary": "Проверки отделяют корректную структуру выпуска от доказанной читательской пользы.",
+      "status": "active",
+      "as_of": "2026-07-06T00:00:00Z",
+      "first_seen_at": "2026-04-13T00:00:00Z",
+      "last_seen_at": "2026-07-02T09:00:00Z",
+      "current_version": 3,
+      "curator_version": "canonical-idea-thread-curator.v1",
+      "evidence_maturity": "primary_verified",
+      "operator_interest": 0.0,
+      "entities": [
+        "release gates"
+      ],
+      "atom_ids": [
+        7101
+      ],
+      "source_post_ids": [
+        27101
+      ],
+      "source_urls": [
+        "https://example.org/engineering/release-gates"
+      ],
+      "source_refs": [
+        "https://example.org/engineering/release-gates"
+      ],
+      "evidence_refs": [
+        "atom:7101"
+      ],
+      "evidence_summary": {
+        "independent_source_count": 1,
+        "external_source_count": 0,
+        "decision_grade_evidence_count": 0,
+        "evidence_refs": [
+          "atom:7101"
+        ]
+      },
+      "aliases": [
+        {
+          "alias_type": "raw_thread_slug",
+          "alias_value": "release-gate-updates"
+        },
+        {
+          "alias_type": "legacy_ref",
+          "alias_value": "idea_thread:release-safety-checks"
+        }
+      ],
+      "merged_from": [
+        "ct_000000000000000000000101"
+      ],
+      "merged_into": [],
+      "split_from": [],
+      "split_into": [],
+      "lineage": [
+        {
+          "relation_type": "merge",
+          "from_thread_id": "ct_000000000000000000000101",
+          "to_thread_id": "ct_000000000000000000000001",
+          "decision_id": "decision:merge-release-gates",
+          "event_at": "2026-06-15T00:00:00Z",
+          "reason": "Две истории описывали один тезис и одну доказательную линию."
+        }
+      ]
+    },
+    {
+      "canonical_thread_id": "ct_000000000000000000000002",
+      "canonical_thread_ref": "canonical_thread:evidence-provenance-boundaries",
+      "stable_slug": "evidence-provenance-boundaries",
+      "slug": "evidence-provenance-boundaries",
+      "title": "Границы происхождения доказательств",
+      "title_ru": "Границы происхождения доказательств",
+      "title_en": "Evidence provenance boundaries",
+      "thesis": "Каждый вывод сохраняет проверяемую связь с ограниченным набором источников.",
+      "summary": "Каждый вывод сохраняет проверяемую связь с ограниченным набором источников.",
+      "status": "active",
+      "as_of": "2026-07-06T00:00:00Z",
+      "first_seen_at": "2026-04-20T00:00:00Z",
+      "last_seen_at": "2026-07-01T10:00:00Z",
+      "current_version": 2,
+      "curator_version": "canonical-idea-thread-curator.v1",
+      "evidence_maturity": "repeated_signal",
+      "operator_interest": 0.0,
+      "entities": [
+        "source provenance"
+      ],
+      "atom_ids": [
+        7102
+      ],
+      "source_post_ids": [
+        27102
+      ],
+      "source_urls": [
+        "https://example.org/research/evidence-boundaries"
+      ],
+      "source_refs": [
+        "https://example.org/research/evidence-boundaries"
+      ],
+      "evidence_refs": [
+        "atom:7102"
+      ],
+      "evidence_summary": {
+        "independent_source_count": 1,
+        "external_source_count": 0,
+        "decision_grade_evidence_count": 0,
+        "evidence_refs": [
+          "atom:7102"
+        ]
+      },
+      "aliases": [
+        {
+          "alias_type": "raw_thread_slug",
+          "alias_value": "source-lineage-notes"
+        }
+      ],
+      "merged_from": [],
+      "merged_into": [],
+      "split_from": [],
+      "split_into": [],
+      "lineage": []
+    },
+    {
+      "canonical_thread_id": "ct_000000000000000000000003",
+      "canonical_thread_ref": "canonical_thread:operator-decision-map",
+      "stable_slug": "operator-decision-map",
+      "slug": "operator-decision-map",
+      "title": "Карта операторских решений",
+      "title_ru": "Карта операторских решений",
+      "title_en": "Operator decision map",
+      "thesis": "Сравнительная карта ускоряет выбор действия и явного отказа от работы.",
+      "summary": "Сравнительная карта ускоряет выбор действия и явного отказа от работы.",
+      "status": "active",
+      "as_of": "2026-07-06T00:00:00Z",
+      "first_seen_at": "2026-04-27T00:00:00Z",
+      "last_seen_at": "2026-06-30T08:00:00Z",
+      "current_version": 2,
+      "curator_version": "canonical-idea-thread-curator.v1",
+      "evidence_maturity": "repeated_signal",
+      "operator_interest": 0.0,
+      "entities": [
+        "Example Systems"
+      ],
+      "atom_ids": [
+        7103
+      ],
+      "source_post_ids": [
+        27103
+      ],
+      "source_urls": [
+        "https://example.org/vendor/decision-map"
+      ],
+      "source_refs": [
+        "https://example.org/vendor/decision-map"
+      ],
+      "evidence_refs": [
+        "atom:7103"
+      ],
+      "evidence_summary": {
+        "independent_source_count": 0,
+        "external_source_count": 0,
+        "decision_grade_evidence_count": 0,
+        "evidence_refs": [
+          "atom:7103"
+        ]
+      },
+      "aliases": [
+        {
+          "alias_type": "raw_thread_slug",
+          "alias_value": "vendor-decision-view"
+        }
+      ],
+      "merged_from": [],
+      "merged_into": [],
+      "split_from": [],
+      "split_into": [],
+      "lineage": []
+    },
+    {
+      "canonical_thread_id": "ct_000000000000000000000004",
+      "canonical_thread_ref": "canonical_thread:reaction-interest-is-weak",
+      "stable_slug": "reaction-interest-is-weak",
+      "slug": "reaction-interest-is-weak",
+      "title": "Слабая персонализация по реакциям",
+      "title_ru": "Слабая персонализация по реакциям",
+      "title_en": "Weak personalization from reactions",
+      "thesis": "Реакции дают ограниченный сигнал интереса и не доказывают понимание.",
+      "summary": "Реакции дают ограниченный сигнал интереса и не доказывают понимание.",
+      "status": "active",
+      "as_of": "2026-07-06T00:00:00Z",
+      "first_seen_at": "2026-05-04T00:00:00Z",
+      "last_seen_at": "2026-07-03T11:00:00Z",
+      "current_version": 4,
+      "curator_version": "canonical-idea-thread-curator.v1",
+      "evidence_maturity": "single_source",
+      "operator_interest": 0.25,
+      "entities": [
+        "Example Systems"
+      ],
+      "atom_ids": [
+        7104
+      ],
+      "source_post_ids": [
+        27104
+      ],
+      "source_urls": [
+        "https://t.me/public_ai_lab/7104"
+      ],
+      "source_refs": [
+        "https://t.me/public_ai_lab/7104"
+      ],
+      "evidence_refs": [
+        "atom:7104"
+      ],
+      "evidence_summary": {
+        "independent_source_count": 0,
+        "external_source_count": 0,
+        "decision_grade_evidence_count": 0,
+        "evidence_refs": [
+          "atom:7104"
+        ]
+      },
+      "aliases": [
+        {
+          "alias_type": "raw_thread_slug",
+          "alias_value": "reaction-ranking"
+        }
+      ],
+      "merged_from": [],
+      "merged_into": [],
+      "split_from": [],
+      "split_into": [],
+      "lineage": []
+    },
+    {
+      "canonical_thread_id": "ct_000000000000000000000005",
+      "canonical_thread_ref": "canonical_thread:small-project-changes",
+      "stable_slug": "small-project-changes",
+      "slug": "small-project-changes",
+      "title": "Проектные изменения малого размера",
+      "title_ru": "Проектные изменения малого размера",
+      "title_en": "Small project changes",
+      "thesis": "Подтверждённое следствие превращается в ограниченное проверяемое изменение проекта.",
+      "summary": "Подтверждённое следствие превращается в ограниченное проверяемое изменение проекта.",
+      "status": "active",
+      "as_of": "2026-07-06T00:00:00Z",
+      "first_seen_at": "2026-05-11T00:00:00Z",
+      "last_seen_at": "2026-07-04T12:00:00Z",
+      "current_version": 2,
+      "curator_version": "canonical-idea-thread-curator.v1",
+      "evidence_maturity": "repeated_signal",
+      "operator_interest": 0.0,
+      "entities": [
+        "project maintenance"
+      ],
+      "atom_ids": [
+        7105
+      ],
+      "source_post_ids": [
+        27105
+      ],
+      "source_urls": [
+        "https://example.org/projects/small-changes"
+      ],
+      "source_refs": [
+        "https://example.org/projects/small-changes"
+      ],
+      "evidence_refs": [
+        "atom:7105"
+      ],
+      "evidence_summary": {
+        "independent_source_count": 1,
+        "external_source_count": 0,
+        "decision_grade_evidence_count": 0,
+        "evidence_refs": [
+          "atom:7105"
+        ]
+      },
+      "aliases": [
+        {
+          "alias_type": "raw_thread_slug",
+          "alias_value": "bounded-project-actions"
+        }
+      ],
+      "merged_from": [],
+      "merged_into": [],
+      "split_from": [],
+      "split_into": [],
+      "lineage": []
+    },
+    {
+      "canonical_thread_id": "ct_000000000000000000000006",
+      "canonical_thread_ref": "canonical_thread:external-demand-evidence",
+      "stable_slug": "external-demand-evidence",
+      "slug": "external-demand-evidence",
+      "title": "Внешнее подтверждение спроса",
+      "title_ru": "Внешнее подтверждение спроса",
+      "title_en": "External demand evidence",
+      "thesis": "Рыночный контекст остаётся отдельно от доказательств, относящихся к конкретному кандидату.",
+      "summary": "Рыночный контекст остаётся отдельно от доказательств, относящихся к конкретному кандидату.",
+      "status": "stale",
+      "as_of": "2026-07-06T00:00:00Z",
+      "first_seen_at": "2026-05-18T00:00:00Z",
+      "last_seen_at": "2026-06-12T09:00:00Z",
+      "current_version": 2,
+      "curator_version": "canonical-idea-thread-curator.v1",
+      "evidence_maturity": "single_source",
+      "operator_interest": 0.0,
+      "entities": [
+        "external demand"
+      ],
+      "atom_ids": [
+        7106
+      ],
+      "source_post_ids": [
+        27106
+      ],
+      "source_urls": [
+        "https://example.org/market/external-demand"
+      ],
+      "source_refs": [
+        "https://example.org/market/external-demand"
+      ],
+      "evidence_refs": [
+        "atom:7106"
+      ],
+      "evidence_summary": {
+        "independent_source_count": 1,
+        "external_source_count": 1,
+        "decision_grade_evidence_count": 0,
+        "evidence_refs": [
+          "atom:7106"
+        ]
+      },
+      "aliases": [
+        {
+          "alias_type": "raw_thread_slug",
+          "alias_value": "market-demand-watch"
+        }
+      ],
+      "merged_from": [],
+      "merged_into": [],
+      "split_from": [],
+      "split_into": [],
+      "lineage": []
+    },
+    {
+      "canonical_thread_id": "ct_000000000000000000000007",
+      "canonical_thread_ref": "canonical_thread:observable-operator-learning",
+      "stable_slug": "observable-operator-learning",
+      "slug": "observable-operator-learning",
+      "title": "Наблюдаемое обучение оператора",
+      "title_ru": "Наблюдаемое обучение оператора",
+      "title_en": "Observable operator learning",
+      "thesis": "Чтение не считается освоением без отдельного подтверждённого результата или проверки.",
+      "summary": "Чтение не считается освоением без отдельного подтверждённого результата или проверки.",
+      "status": "active",
+      "as_of": "2026-07-06T00:00:00Z",
+      "first_seen_at": "2026-05-25T00:00:00Z",
+      "last_seen_at": "2026-07-05T07:00:00Z",
+      "current_version": 3,
+      "curator_version": "canonical-idea-thread-curator.v1",
+      "evidence_maturity": "primary_verified",
+      "operator_interest": 0.0,
+      "entities": [
+        "learning evidence"
+      ],
+      "atom_ids": [
+        7107
+      ],
+      "source_post_ids": [
+        27107
+      ],
+      "source_urls": [
+        "https://example.org/learning/read-events"
+      ],
+      "source_refs": [
+        "https://example.org/learning/read-events"
+      ],
+      "evidence_refs": [
+        "atom:7107"
+      ],
+      "evidence_summary": {
+        "independent_source_count": 1,
+        "external_source_count": 0,
+        "decision_grade_evidence_count": 0,
+        "evidence_refs": [
+          "atom:7107"
+        ]
+      },
+      "aliases": [
+        {
+          "alias_type": "raw_thread_slug",
+          "alias_value": "learning-event-ledger"
+        }
+      ],
+      "merged_from": [],
+      "merged_into": [],
+      "split_from": [],
+      "split_into": [],
+      "lineage": []
+    },
+    {
+      "canonical_thread_id": "ct_000000000000000000000008",
+      "canonical_thread_ref": "canonical_thread:stable-canonical-identity",
+      "stable_slug": "stable-canonical-identity",
+      "slug": "stable-canonical-identity",
+      "title": "Устойчивая каноническая идентичность",
+      "title_ru": "Устойчивая каноническая идентичность",
+      "title_en": "Stable canonical identity",
+      "thesis": "Каноническая история сохраняет смысл темы при слиянии и разделении исходных кластеров.",
+      "summary": "Каноническая история сохраняет смысл темы при слиянии и разделении исходных кластеров.",
+      "status": "active",
+      "as_of": "2026-07-06T00:00:00Z",
+      "first_seen_at": "2026-06-01T00:00:00Z",
+      "last_seen_at": "2026-07-05T13:00:00Z",
+      "current_version": 2,
+      "curator_version": "canonical-idea-thread-curator.v1",
+      "evidence_maturity": "repeated_signal",
+      "operator_interest": 0.0,
+      "entities": [
+        "canonical registry"
+      ],
+      "atom_ids": [
+        7108
+      ],
+      "source_post_ids": [
+        27108
+      ],
+      "source_urls": [
+        "https://example.org/registry/stable-identities"
+      ],
+      "source_refs": [
+        "https://example.org/registry/stable-identities"
+      ],
+      "evidence_refs": [
+        "atom:7108"
+      ],
+      "evidence_summary": {
+        "independent_source_count": 1,
+        "external_source_count": 0,
+        "decision_grade_evidence_count": 0,
+        "evidence_refs": [
+          "atom:7108"
+        ]
+      },
+      "aliases": [
+        {
+          "alias_type": "raw_thread_slug",
+          "alias_value": "thread-registry-history"
+        }
+      ],
+      "merged_from": [],
+      "merged_into": [],
+      "split_from": [
+        "ct_000000000000000000000108"
+      ],
+      "split_into": [],
+      "lineage": [
+        {
+          "relation_type": "split",
+          "from_thread_id": "ct_000000000000000000000108",
+          "to_thread_id": "ct_000000000000000000000008",
+          "decision_id": "decision:split-canonical-identity",
+          "event_at": "2026-06-22T00:00:00Z",
+          "reason": "Идентичность темы отделена от обсуждения конкретной реализации."
+        }
+      ]
+    }
+  ],
+  "thread_navigation": {
+    "schema_version": "knowledge_atlas_thread_navigation.v1",
+    "week_label": "2026-W27",
+    "thread_count": 8,
+    "source_atom_count": 8,
+    "threads": [
+      {
+        "id": "atlas-thread-release-gate-updates",
+        "slug": "release-gate-updates",
+        "title": "Release gate updates",
+        "status": "active",
+        "canonical_thread_id": "ct_000000000000000000000001",
+        "current_understanding": "Release gates require explicit source provenance before publication.",
+        "claims": [
+          "Release gates depend on traceable evidence provenance."
+        ],
+        "evidence_items": [
+          {
+            "atom_id": 7101,
+            "claim": "Release gates depend on traceable evidence provenance.",
+            "evidence_quote": "A release check must retain the source used for its decision.",
+            "source_urls": [
+              "https://example.org/engineering/release-gates"
+            ]
+          }
+        ],
+        "source_urls": [
+          "https://example.org/engineering/release-gates"
+        ],
+        "deep_link": "audit/knowledge-audit-explorer.v1.html#atlas-thread-release-gate-updates"
+      },
+      {
+        "id": "atlas-thread-source-lineage-notes",
+        "slug": "source-lineage-notes",
+        "title": "Source lineage notes",
+        "status": "active",
+        "canonical_thread_id": "ct_000000000000000000000002",
+        "current_understanding": "Evidence remains useful only while its source boundary is preserved.",
+        "claims": [
+          "A bounded source set keeps report conclusions auditable."
+        ],
+        "evidence_items": [
+          {
+            "atom_id": 7102,
+            "claim": "A bounded source set keeps report conclusions auditable.",
+            "evidence_quote": "The conclusion records exactly which source records were considered.",
+            "source_urls": [
+              "https://example.org/research/evidence-boundaries"
+            ]
+          }
+        ],
+        "source_urls": [
+          "https://example.org/research/evidence-boundaries"
+        ],
+        "deep_link": "audit/knowledge-audit-explorer.v1.html#atlas-thread-source-lineage-notes"
+      },
+      {
+        "id": "atlas-thread-vendor-decision-view",
+        "slug": "vendor-decision-view",
+        "title": "Vendor decision view",
+        "status": "active",
+        "canonical_thread_id": "ct_000000000000000000000003",
+        "current_understanding": "A decision map is useful when it includes an explicit defer option.",
+        "claims": [
+          "A visible defer choice reduces accidental action on weak evidence."
+        ],
+        "evidence_items": [
+          {
+            "atom_id": 7103,
+            "claim": "A visible defer choice reduces accidental action on weak evidence.",
+            "evidence_quote": "The map separates action, study, watch, and defer decisions.",
+            "source_urls": [
+              "https://example.org/vendor/decision-map"
+            ]
+          }
+        ],
+        "source_urls": [
+          "https://example.org/vendor/decision-map"
+        ],
+        "deep_link": "audit/knowledge-audit-explorer.v1.html#atlas-thread-vendor-decision-view"
+      },
+      {
+        "id": "atlas-thread-reaction-ranking",
+        "slug": "reaction-ranking",
+        "title": "Reaction ranking",
+        "status": "active",
+        "canonical_thread_id": "ct_000000000000000000000004",
+        "current_understanding": "A reaction indicates interest but cannot raise evidence maturity.",
+        "claims": [
+          "Reaction interest remains weaker than confirmed feedback."
+        ],
+        "evidence_items": [
+          {
+            "atom_id": 7104,
+            "claim": "Reaction interest remains weaker than confirmed feedback.",
+            "evidence_quote": "One mark can affect ordering but cannot prove understanding.",
+            "source_urls": [
+              "https://t.me/public_ai_lab/7104"
+            ]
+          }
+        ],
+        "source_urls": [
+          "https://t.me/public_ai_lab/7104"
+        ],
+        "deep_link": "audit/knowledge-audit-explorer.v1.html#atlas-thread-reaction-ranking"
+      },
+      {
+        "id": "atlas-thread-bounded-project-actions",
+        "slug": "bounded-project-actions",
+        "title": "Bounded project actions",
+        "status": "active",
+        "canonical_thread_id": "ct_000000000000000000000005",
+        "current_understanding": "Project changes should have a narrow scope and an observable acceptance check.",
+        "claims": [
+          "A small change is actionable only with an explicit acceptance criterion."
+        ],
+        "evidence_items": [
+          {
+            "atom_id": 7105,
+            "claim": "A small change is actionable only with an explicit acceptance criterion.",
+            "evidence_quote": "The proposal names one component, one risk, and one check.",
+            "source_urls": [
+              "https://example.org/projects/small-changes"
+            ]
+          }
+        ],
+        "source_urls": [
+          "https://example.org/projects/small-changes"
+        ],
+        "deep_link": "audit/knowledge-audit-explorer.v1.html#atlas-thread-bounded-project-actions"
+      },
+      {
+        "id": "atlas-thread-market-demand-watch",
+        "slug": "market-demand-watch",
+        "title": "Market demand watch",
+        "status": "stale",
+        "canonical_thread_id": "ct_000000000000000000000006",
+        "current_understanding": "General market interest does not complete candidate-specific demand checks.",
+        "claims": [
+          "External context must stay separate from candidate evidence."
+        ],
+        "evidence_items": [
+          {
+            "atom_id": 7106,
+            "claim": "External context must stay separate from candidate evidence.",
+            "evidence_quote": "A market mention provides context but does not verify this candidate.",
+            "source_urls": [
+              "https://example.org/market/external-demand"
+            ]
+          }
+        ],
+        "source_urls": [
+          "https://example.org/market/external-demand"
+        ],
+        "deep_link": "audit/knowledge-audit-explorer.v1.html#atlas-thread-market-demand-watch"
+      },
+      {
+        "id": "atlas-thread-learning-event-ledger",
+        "slug": "learning-event-ledger",
+        "title": "Learning event ledger",
+        "status": "active",
+        "canonical_thread_id": "ct_000000000000000000000007",
+        "current_understanding": "Reading is recorded separately from understanding, trial, and implementation.",
+        "claims": [
+          "Every learning transition needs its own observation."
+        ],
+        "evidence_items": [
+          {
+            "atom_id": 7107,
+            "claim": "Every learning transition needs its own observation.",
+            "evidence_quote": "The ledger records a read event without inferring comprehension.",
+            "source_urls": [
+              "https://example.org/learning/read-events"
+            ]
+          }
+        ],
+        "source_urls": [
+          "https://example.org/learning/read-events"
+        ],
+        "deep_link": "audit/knowledge-audit-explorer.v1.html#atlas-thread-learning-event-ledger"
+      },
+      {
+        "id": "atlas-thread-thread-registry-history",
+        "slug": "thread-registry-history",
+        "title": "Thread registry history",
+        "status": "active",
+        "canonical_thread_id": "ct_000000000000000000000008",
+        "current_understanding": "Stable canonical identity survives raw-cluster renames and lifecycle changes.",
+        "claims": [
+          "Merge and split provenance must remain queryable after curation."
+        ],
+        "evidence_items": [
+          {
+            "atom_id": 7108,
+            "claim": "Merge and split provenance must remain queryable after curation.",
+            "evidence_quote": "The registry keeps prior aliases and the split decision reference.",
+            "source_urls": [
+              "https://example.org/registry/stable-identities"
+            ]
+          }
+        ],
+        "source_urls": [
+          "https://example.org/registry/stable-identities"
+        ],
+        "deep_link": "audit/knowledge-audit-explorer.v1.html#atlas-thread-thread-registry-history"
+      }
+    ],
+    "bounded_context_note": "Atlas navigation is built from curated threads and bounded evidence, not a raw message mirror."
+  },
+  "editorial_intelligence": {
+    "schema_version": "editorial_intelligence.v1",
+    "run_id": "weekly-2026-W27",
+    "reporting_period": {
+      "reporting_week": "2026-W27",
+      "analysis_period_start": "2026-06-29T00:00:00Z",
+      "analysis_period_end": "2026-07-06T00:00:00Z"
+    },
+    "ordered_signal_ids": [
+      "signal:evidence-boundaries",
+      "signal:release-gates",
+      "signal:reaction-interest"
+    ],
+    "signals": [
+      {
+        "signal_id": "signal:evidence-boundaries",
+        "position": 1,
+        "canonical_thread_id": "ct_000000000000000000000002",
+        "decision": "act",
+        "title": "Сохранить границы происхождения доказательств",
+        "evidence_refs": [
+          "atom:7102"
+        ]
+      },
+      {
+        "signal_id": "signal:release-gates",
+        "position": 2,
+        "canonical_thread_id": "ct_000000000000000000000001",
+        "decision": "study",
+        "title": "Проверить детерминированный выпускной барьер",
+        "evidence_refs": [
+          "atom:7101"
+        ]
+      },
+      {
+        "signal_id": "signal:reaction-interest",
+        "position": 3,
+        "canonical_thread_id": "ct_000000000000000000000004",
+        "decision": "watch",
+        "title": "Наблюдать за слабым сигналом интереса",
+        "evidence_refs": [
+          "atom:7104"
+        ]
+      }
+    ],
+    "feedback_effect": {
+      "confirmed_events_considered": 1,
+      "applied_changes": [
+        {
+          "feedback_ref": "feedback:701",
+          "reader_summary_ru": "Подтверждённая обратная связь сохранила тему происхождения доказательств выше слабого сигнала реакции."
+        }
+      ],
+      "unchanged": [],
+      "requires_code_or_config": []
+    }
+  },
+  "reaction_effect": {
+    "schema_version": "reaction_personalization.v1",
+    "run_id": "weekly-2026-W27",
+    "surface": "knowledge_atlas",
+    "reporting_week": "2026-W27",
+    "analysis_period_start": "2026-06-29T00:00:00Z",
+    "analysis_period_end": "2026-07-06T00:00:00Z",
+    "snapshot_ref": "reaction-snapshot:fixture-w27-public",
+    "snapshot_status": "complete",
+    "status": "linked_no_selection_effect",
+    "counts": {
+      "personal_reaction_events_detected": 1,
+      "unique_reacted_posts": 1,
+      "posts_resolved": 1,
+      "eligible_period_posts": 1,
+      "unique_atoms_linked": 1,
+      "unique_canonical_threads_linked": 1,
+      "canonical_threads_boosted": 1,
+      "unique_compatibility_threads_linked": 1,
+      "compatibility_threads_boosted": 1,
+      "selected_items_linked": 1,
+      "selected_signals_influenced": 0,
+      "unconsumed_reaction_events": 0
+    },
+    "influenced_items": [],
+    "linked_only_items": [
+      {
+        "surface_item_ref": "thread:reaction-interest-is-weak",
+        "effect": "linked_only",
+        "boost_applied": true,
+        "rank_changed": false,
+        "selection_changed": false,
+        "linked_only": true,
+        "compatibility_thread_ref": "idea_thread:reaction-ranking",
+        "current_thread_ref": "idea_thread:reaction-ranking",
+        "canonical_thread_ref": "canonical_thread:reaction-interest-is-weak",
+        "thread_resolution_status": "canonical_membership_resolved",
+        "boost_role": "weak_implicit_interest",
+        "reacted_post_count": 1,
+        "reader_reason_ru": "Вы отметили один связанный пост за отчётный период.",
+        "reacted_post_refs": [
+          "reaction-post:111111111111111111111111"
+        ],
+        "source_refs": [
+          "telegram:@public_ai_lab"
+        ],
+        "evidence_refs": [
+          "atom:7104"
+        ]
+      }
+    ],
+    "eligible_thread_audit": [
+      {
+        "surface_item_ref": "thread:reaction-interest-is-weak",
+        "selected": true,
+        "counterfactual_effect": "linked_only",
+        "boost_applied": true,
+        "compatibility_thread_ref": "idea_thread:reaction-ranking",
+        "current_thread_ref": "idea_thread:reaction-ranking",
+        "canonical_thread_ref": "canonical_thread:reaction-interest-is-weak",
+        "thread_resolution_status": "canonical_membership_resolved",
+        "boost_role": "weak_implicit_interest",
+        "reacted_post_count": 1,
+        "reader_reason_ru": "Вы отметили один связанный пост за отчётный период.",
+        "reacted_post_refs": [
+          "reaction-post:111111111111111111111111"
+        ],
+        "source_refs": [
+          "telegram:@public_ai_lab"
+        ],
+        "evidence_refs": [
+          "atom:7104"
+        ]
+      }
+    ],
+    "unconsumed_by_reason": {},
+    "unconsumed": [],
+    "ranking_policy": {
+      "policy_version": "reaction-ranking.v1",
+      "strength": "weak",
+      "below_confirmed_feedback": true,
+      "can_change_evidence_gate": false
+    },
+    "reader_summary_ru": "Ваши отметки связаны с темами выпуска, но не изменили их место: они уже прошли по силе доказательств."
+  },
+  "timeline": {
+    "weeks": [
+      "2026-W16",
+      "2026-W17",
+      "2026-W18",
+      "2026-W19",
+      "2026-W20",
+      "2026-W21",
+      "2026-W22",
+      "2026-W23",
+      "2026-W24",
+      "2026-W25",
+      "2026-W26",
+      "2026-W27"
+    ],
+    "series": [
+      {
+        "canonical_thread_id": "ct_000000000000000000000001",
+        "title_ru": "Детерминированные проверки выпусков",
+        "momentum": [
+          0.2,
+          0.3,
+          0.4,
+          0.5,
+          0.6,
+          0,
+          null,
+          0.7,
+          0.8,
+          0.9,
+          1.0,
+          1.1
+        ],
+        "evidence_count": [
+          1,
+          1,
+          1,
+          2,
+          2,
+          2,
+          2,
+          2,
+          3,
+          3,
+          4,
+          4
+        ],
+        "events": [
+          {
+            "week": "2026-W25",
+            "type": "merge",
+            "label_ru": "Объединена дублирующая история выпускных проверок."
+          }
+        ]
+      }
+    ],
+    "data_note_ru": "Ноль означает измеренное отсутствие импульса; null означает отсутствующее наблюдение."
+  },
+  "thread_relations": {
+    "accepted": [
+      {
+        "source_thread_id": "ct_000000000000000000000001",
+        "target_thread_id": "ct_000000000000000000000002",
+        "relation": "depends_on",
+        "weight": 1,
+        "evidence_refs": [
+          "atom:7101"
+        ]
+      }
+    ],
+    "rejected": [
+      {
+        "source_thread_id": "ct_000000000000000000000003",
+        "target_thread_id": "ct_000000000000000000000004",
+        "candidate_relation": "supports",
+        "shared_entities": [
+          "Example Systems"
+        ],
+        "rejection_reason": "vendor_entity_overlap_only",
+        "evidence_refs": [],
+        "outcome": "rejected"
+      }
+    ]
+  },
+  "source_contributions": {
+    "schema_version": "knowledge_atlas_source_contributions.v1",
+    "run_id": "weekly-2026-W27",
+    "reporting_period": {
+      "reporting_week": "2026-W27",
+      "analysis_period_start": "2026-06-29T00:00:00Z",
+      "analysis_period_end": "2026-07-06T00:00:00Z"
+    },
+    "as_of": "2026-07-06T00:00:00Z",
+    "classification_status": "complete",
+    "sources": [
+      {
+        "source_id": "source/engineering-notes",
+        "label": "Public engineering notes",
+        "source_class": "primary",
+        "independence_group": "publisher/engineering-notes",
+        "classification_status": "available"
+      },
+      {
+        "source_id": "source/vendor-publication",
+        "label": "Public vendor publication",
+        "source_class": "vendor_primary",
+        "independence_group": "publisher/example-systems",
+        "classification_status": "available"
+      },
+      {
+        "source_id": "source/operator-ledger",
+        "label": "Sanitized operator ledger",
+        "source_class": "first_party_observation",
+        "independence_group": "operator/fixture",
+        "classification_status": "available"
+      },
+      {
+        "source_id": "source/external-observatory",
+        "label": "External public observatory",
+        "source_class": "external_analysis",
+        "independence_group": "publisher/external-observatory",
+        "classification_status": "available"
+      }
+    ],
+    "contributions": [
+      {
+        "source_id": "source/engineering-notes",
+        "canonical_thread_id": "ct_000000000000000000000001",
+        "mention_count": 1,
+        "independent_support_count": 1,
+        "decision_grade_evidence_count": 0,
+        "evidence_refs": [
+          "atom:7101"
+        ]
+      },
+      {
+        "source_id": "source/engineering-notes",
+        "canonical_thread_id": "ct_000000000000000000000002",
+        "mention_count": 1,
+        "independent_support_count": 1,
+        "decision_grade_evidence_count": 0,
+        "evidence_refs": [
+          "atom:7102"
+        ]
+      },
+      {
+        "source_id": "source/vendor-publication",
+        "canonical_thread_id": "ct_000000000000000000000003",
+        "mention_count": 1,
+        "independent_support_count": 0,
+        "decision_grade_evidence_count": 0,
+        "evidence_refs": [
+          "atom:7103"
+        ]
+      },
+      {
+        "source_id": "source/vendor-publication",
+        "canonical_thread_id": "ct_000000000000000000000004",
+        "mention_count": 1,
+        "independent_support_count": 0,
+        "decision_grade_evidence_count": 0,
+        "evidence_refs": [
+          "atom:7104"
+        ]
+      },
+      {
+        "source_id": "source/operator-ledger",
+        "canonical_thread_id": "ct_000000000000000000000005",
+        "mention_count": 1,
+        "independent_support_count": 1,
+        "decision_grade_evidence_count": 0,
+        "evidence_refs": [
+          "atom:7105"
+        ]
+      },
+      {
+        "source_id": "source/external-observatory",
+        "canonical_thread_id": "ct_000000000000000000000006",
+        "mention_count": 1,
+        "independent_support_count": 1,
+        "decision_grade_evidence_count": 0,
+        "evidence_refs": [
+          "atom:7106"
+        ]
+      },
+      {
+        "source_id": "source/operator-ledger",
+        "canonical_thread_id": "ct_000000000000000000000007",
+        "mention_count": 1,
+        "independent_support_count": 1,
+        "decision_grade_evidence_count": 0,
+        "evidence_refs": [
+          "atom:7107"
+        ]
+      },
+      {
+        "source_id": "source/engineering-notes",
+        "canonical_thread_id": "ct_000000000000000000000008",
+        "mention_count": 1,
+        "independent_support_count": 1,
+        "decision_grade_evidence_count": 0,
+        "evidence_refs": [
+          "atom:7108"
+        ]
+      }
+    ],
+    "limitation_ru": "Независимая поддержка учитывается только по валидированной классификации источников этого запуска."
+  },
+  "learning_observations": [
+    {
+      "stage": "marked",
+      "canonical_thread_id": "ct_000000000000000000000004",
+      "observed_at": "2026-07-03T11:05:00Z",
+      "confirmation_kind": "reaction",
+      "evidence_refs": [
+        "reaction-post:111111111111111111111111",
+        "atom:7104"
+      ]
+    },
+    {
+      "stage": "read",
+      "canonical_thread_id": "ct_000000000000000000000007",
+      "observed_at": "2026-07-05T07:30:00Z",
+      "confirmation_kind": "read_receipt",
+      "evidence_refs": [
+        "read-receipt:fixture-w27-01",
+        "atom:7107"
+      ]
+    }
+  ],
+  "study_backlog": {
+    "limit": 6,
+    "items": [
+      {
+        "backlog_id": "study:evidence-source-swap",
+        "canonical_thread_id": "ct_000000000000000000000002",
+        "title_ru": "Проверить устойчивость ссылок при замене источника",
+        "question_ru": "Сохраняется ли точная связь вывода с исходными байтами после замены соседнего файла?",
+        "next_action_ru": "Сравнить контрольную сумму связанного источника до и после одной изолированной замены.",
+        "source_cluster": "provenance-integrity",
+        "evidence_gap": "Нет отрицательной проверки замены источника."
+      },
+      {
+        "backlog_id": "study:demand-corroboration",
+        "canonical_thread_id": "ct_000000000000000000000006",
+        "title_ru": "Найти независимое подтверждение внешнего спроса",
+        "question_ru": "Повторяется ли наблюдаемый спрос вне одного публичного обзора?",
+        "next_action_ru": "Сопоставить тезис с отдельным публичным набором данных за тот же период.",
+        "source_cluster": "market-corroboration",
+        "evidence_gap": "Доступен только один внешний источник."
+      },
+      {
+        "backlog_id": "study:learning-boundary",
+        "canonical_thread_id": "ct_000000000000000000000007",
+        "title_ru": "Подтвердить границу между чтением и пониманием",
+        "question_ru": "Какое отдельное наблюдение подтвердит понимание без вывода из факта чтения?",
+        "next_action_ru": "Записать проверяемое объяснение тезиса и связать его с отдельным событием проверки понимания.",
+        "source_cluster": "learning-observation",
+        "evidence_gap": "Есть отметка чтения, но нет проверки понимания."
+      }
+    ]
+  }
+}

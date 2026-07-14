@@ -23,6 +23,7 @@ from output.knowledge_atlas_report import (
 from output.reporting_period import resolve_reporting_period
 from output.split_intelligence_reports import (
     deliver_split_intelligence_reports,
+    generate_split_knowledge_atlas_v2_preview,
     generate_split_intelligence_reports,
     generate_split_weekly_brief_v2_preview,
 )
@@ -34,6 +35,30 @@ from output.weekly_intelligence_brief import (
 
 
 class TestSplitIntelligenceReports(unittest.TestCase):
+    def test_atlas_v2_preview_is_explicit_and_does_not_change_default_delivery(self):
+        sentinel = object()
+        with patch(
+            "output.knowledge_atlas_report_v2.generate_knowledge_atlas_v2_package",
+            return_value=sentinel,
+        ) as generate:
+            result = generate_split_knowledge_atlas_v2_preview(
+                manifest_path="/tmp/run/manifest.json",
+                editorial_artifact_path="/tmp/editorial.json",
+                editorial_input_package={"schema_version": "fixture"},
+                output_root="/tmp/output",
+                allowed_source_roots=("/tmp",),
+                validated_relations=None,
+                historical_observations=None,
+                learning_events=None,
+            )
+
+        self.assertIs(result, sentinel)
+        generate.assert_called_once()
+        self.assertNotIn(
+            "knowledge_atlas_v2",
+            generate_split_intelligence_reports.__code__.co_varnames,
+        )
+
     def test_v2_preview_is_explicit_and_does_not_change_default_delivery(self):
         sentinel = object()
         with patch(

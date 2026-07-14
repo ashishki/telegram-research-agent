@@ -892,6 +892,102 @@ class TestIntelligenceRetrievalItems(unittest.TestCase):
         self.assertIn("https://t.me/ai_lab/101", results[0]["source_refs"])
         self.assertIn(101, results[0]["atom_ids"])
 
+    def test_atlas_v2_requires_exact_surface_and_strict_reload(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest_path = root / "weekly_intelligence_runs" / "run-1" / "manifest.json"
+            manifest_path.parent.mkdir(parents=True)
+            manifest_path.write_text("{}", encoding="utf-8")
+            package = root / "knowledge_atlases_v2" / "run-1"
+            package.mkdir(parents=True)
+            json_path = package / "knowledge-atlas.v2.json"
+            html_path = package / "knowledge-atlas.v2.html"
+            catalog_path = package / "knowledge-atlas-sources.v1.json"
+            for path in (json_path, html_path, catalog_path):
+                path.write_text("{}", encoding="utf-8")
+            sidecar = {
+                "schema_version": "split_ai_report.v2",
+                "surface": "knowledge_atlas",
+                "run_id": "run-1",
+                "generated_at": "2026-07-13T00:00:00Z",
+                "run_status": "complete",
+                "reporting_period": {"reporting_week": "2026-W28"},
+                "artifact_paths": {
+                    "json": str(json_path),
+                    "html": str(html_path),
+                    "source_catalog": str(catalog_path),
+                },
+                "technical_refs": {
+                    "audit_explorer_path": str(package / "knowledge-audit-explorer.v1.html"),
+                    "audit_explorer_json_path": str(package / "knowledge-audit-explorer.v1.json"),
+                },
+                "canonical_threads": [
+                    {
+                        "stable_slug": "eval-gates",
+                        "title_ru": "Гейты качества агентов",
+                        "thesis": "Проверки становятся частью пути выпуска.",
+                        "display_status": "growing",
+                        "evidence_maturity": "repeated_signal",
+                        "evidence_refs": ["atom:101", "https://t.me/ai_lab/101"],
+                        "audit_ref": "knowledge-audit-explorer.v1.html#atlas-thread-eval-gates",
+                        "operator_interest": {
+                            "current_reaction_count": 1,
+                            "confirmed_feedback_count": 0,
+                        },
+                    }
+                ],
+                "study_backlog": [
+                    {
+                        "title_ru": "Гейты качества агентов",
+                        "reason_ru": "Нужен второй независимый источник.",
+                        "next_step_ru": "Проверить первичный источник.",
+                        "priority": "medium",
+                        "evidence_refs": ["atom:101"],
+                        "audit_ref": "knowledge-audit-explorer.v1.html#atlas-thread-eval-gates",
+                    }
+                ],
+            }
+            candidate = {
+                **copy.deepcopy(sidecar),
+                "_artifact_kind": "knowledge_atlas_v2",
+                "_artifact_paths": dict(sidecar["artifact_paths"]),
+            }
+            with patch(
+                "output.intelligence_retrieval_items.load_manifest_bound_knowledge_atlas_v2",
+                return_value=copy.deepcopy(sidecar),
+            ) as strict_load:
+                items = _items_from_workbook(
+                    candidate,
+                    v2_expected_manifest_path=manifest_path,
+                )
+
+        self.assertEqual(
+            [item.item_type for item in items],
+            ["atlas_v2_thread", "atlas_v2_study"],
+        )
+        self.assertEqual(items[0].id, "atlas_v2_thread:run-1:eval-gates")
+        self.assertEqual(items[0].schema_version, "split_ai_report.v2")
+        self.assertEqual(items[0].surface, "knowledge_atlas")
+        self.assertEqual(items[0].run_id, "run-1")
+        self.assertIn(101, items[0].atom_ids or [])
+        strict_load.assert_called_once()
+
+    def test_unknown_shared_v2_surface_never_falls_back_to_v1_atlas_parser(self):
+        forged = {
+            "schema_version": "split_ai_report.v2",
+            "surface": "unknown_surface",
+            "thread_navigation": {
+                "threads": [
+                    {
+                        "slug": "forged",
+                        "title": "Forged legacy fallback",
+                    }
+                ]
+            },
+        }
+
+        self.assertEqual(_items_from_workbook(forged), [])
+
     def test_filters_apply_before_broad_search(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

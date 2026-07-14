@@ -34,6 +34,7 @@ from output.weekly_intelligence_brief import (
 if TYPE_CHECKING:
     from llm.client import LLMCompletionReceipt
     from output.editorial_intelligence import EditorialIntelligenceSummary
+    from output.knowledge_atlas_report_v2 import KnowledgeAtlasV2Summary
     from output.project_intelligence import ProjectIntelligenceSummary
     from output.weekly_intelligence_brief_v2 import (
         WeeklyIntelligenceBriefV2Summary,
@@ -380,6 +381,37 @@ def generate_split_weekly_brief_v2_preview(
         project_descriptors=project_descriptors,
         output_root=output_root,
         allowed_source_roots=allowed_source_roots,
+    )
+
+
+def generate_split_knowledge_atlas_v2_preview(
+    *,
+    manifest_path: str | Path,
+    editorial_artifact_path: str | Path,
+    editorial_input_package: Mapping[str, object],
+    output_root: str | Path,
+    allowed_source_roots: Sequence[str | Path] = (),
+    validated_relations: Mapping[str, object] | None = None,
+    historical_observations: Mapping[str, object] | None = None,
+    learning_events: Mapping[str, object] | None = None,
+    source_contributions: Mapping[str, object] | None = None,
+) -> KnowledgeAtlasV2Summary:
+    """Explicit opt-in IRX-7 preview; V1 generation and delivery stay primary."""
+
+    from output.knowledge_atlas_report_v2 import (
+        generate_knowledge_atlas_v2_package,
+    )
+
+    return generate_knowledge_atlas_v2_package(
+        manifest_path=manifest_path,
+        editorial_artifact_path=editorial_artifact_path,
+        editorial_input_package=editorial_input_package,
+        output_root=output_root,
+        allowed_source_roots=allowed_source_roots,
+        validated_relations=validated_relations,
+        historical_observations=historical_observations,
+        learning_events=learning_events,
+        source_contributions=source_contributions,
     )
 
 

@@ -1,9 +1,9 @@
 # CODEX_PROMPT - Compact Session Handoff
 
-Version: 6.0
+Version: 6.1
 Date: 2026-07-14
-State: IRX-1 through IRX-6 and IRX-8 through IRX-11
-`implemented_and_verified`; IRX-7 is the next planned implementation task;
+State: IRX-1 through IRX-7 and IRX-8 through IRX-11
+`implemented_and_verified`; IRX-12 is the next planned implementation task;
 dogfood is blocked until IRX-14
 
 ## Current Product Direction
@@ -34,7 +34,7 @@ docs/tasks.md
 Next implementation task:
 
 ```text
-IRX-7 - Knowledge Atlas V2 And Knowledge Audit Explorer Separation
+IRX-12 - Report-Specific Feedback And Learning Loop
 ```
 
 ## W29 Product Correction
@@ -51,7 +51,9 @@ the shared deterministic offline visualization contract and fixture gallery,
 and IRX-9 added the exact evidence-bound Project Intelligence V2 shadow. IRX-10
 added the strict manifest-bound Radar reader, and IRX-6 added the opt-in Brief
 V2 preview. IRX-11 added independent warn-only V1 and blocking V2 reader-value
-gates. Atlas V2, scheduled V2 delivery, and dogfood remain unstarted.
+gates. IRX-7 added the opt-in Knowledge Atlas V2 and versioned Knowledge Audit
+Explorer split. Report-specific feedback, visual-regression consolidation,
+scheduled V2 delivery, rollout, and dogfood remain unstarted.
 
 ## Verified Baseline
 
@@ -120,6 +122,12 @@ gates. Atlas V2, scheduled V2 delivery, and dogfood remain unstarted.
   sidecars before rendered parity, rejects decorative/hidden/forged semantic
   visuals, warns without blocking V1, and blocks invalid opt-in Brief V2
   publication/loading while the frozen manifest stage stays disabled.
+- IRX-7 adds the opt-in deterministic `split_ai_report.v2` Knowledge Atlas V2
+  package and versioned Knowledge Audit Explorer. Atlas V2 is manifest-bound to
+  V1 Brief/V1 Atlas/editorial/reaction/source-catalog bytes, uses exact IRX-8
+  visual specs and IRX-11 blocking gates, keeps Audit Explorer technical detail
+  separate, and exposes explicit compatibility adapters for Brief navigation,
+  retrieval, Obsidian, and Hermes/PI without changing V1 scheduled delivery.
 - Canonical intelligence sidecar contract `tra-intelligence-contract.v1` is now
   implemented locally for workbook/Brief/Atlas projections with sanitized eval
   fixtures.
@@ -570,7 +578,43 @@ Verification and compatibility:
 - frozen IRX-2 stage policy, V1 sidecars/checksums and scheduled selection,
   IRX-3 reaction meaning, IRX-5 editorial authority, Radar gates, sibling code,
   generated private artifacts, screenshots, rollout, and dogfood remained
-  unchanged. IRX-7 is next.
+  unchanged. At that boundary IRX-7 was next; it is now closed below.
+
+## IRX-7 Completion
+
+Status: `implemented_and_verified` on 2026-07-14.
+
+Implemented:
+
+- opt-in immutable `split_ai_report.v2` Knowledge Atlas V2 sidecar and HTML
+  with exact manifest/run/reporting-period/as-of identity, 8-12 canonical
+  primary threads, typed evidence-backed relations, exact 12-week timeline,
+  source-thread matrix, evidence maturity, separated operator interest,
+  learning progression, bounded study backlog, IRX-8 visual specs, and Audit
+  Explorer technical refs;
+- versioned Knowledge Audit Explorer adapter preserving raw/canonical
+  memberships, atoms, source quotes/links, aliases, merge/split lineage,
+  diagnostics, and stable deep links outside the 1,500-word reader Atlas budget;
+- strict shared package-security helpers, canonical no-follow/nonblocking reads,
+  private immutable files, exact five-file package checks, source re-read
+  closure, deterministic JSON/HTML parity, and hostile path/URL/JSON rejection;
+- Brief navigation, split preview, retrieval, Obsidian, and Hermes/PI
+  compatibility adapters that only consume an explicitly valid Atlas V2 package
+  and preserve V1 summaries/paths/thread refs;
+- IRX-11 `blocking_v2` gates before publication and during strict load, with
+  frozen V1 warn-only delivery unchanged.
+
+Verification and compatibility:
+
+- dedicated Atlas focused suite passed 18 tests;
+- exact consumer/quality task-card matrix passed 124 tests;
+- dedicated Atlas/upstream matrix passed 126 tests;
+- Ruff, focused `py_compile`, fixture JSON validation, `git diff --check`,
+  `git diff --stat`, and status inspection passed;
+- private/generated artifacts, frozen IRX-2 stage policy, V1 scheduled
+  delivery, IRX-3 reaction semantics, IRX-5 editorial authority, Radar gates,
+  sibling code, screenshots, rollout, dogfood, and IRX-12/13/14 remained
+  unchanged.
 
 ## PGI-001 Completion
 
@@ -941,10 +985,10 @@ Report files changed, canonical identity/lifecycle/as-of semantics, compatibilit
 
 This exact historical prompt stopped at the IRX-4 boundary as required. IRX-4
 is implemented and verified; the subsequent IRX-5, IRX-8, IRX-9, IRX-10,
-IRX-6, and IRX-11 handoffs are now closed by the completion records above.
-IRX-7 is the next planned scope.
+IRX-6, IRX-11, and IRX-7 handoffs are now closed by the completion records
+above. IRX-12 is the next planned scope.
 
-## Exact Next Codex Prompt - IRX-7
+## Executed Codex Prompt - IRX-7
 
 ```text
 You are Codex working in /srv/openclaw-you/workspace/telegram-research-agent.
@@ -1120,6 +1164,83 @@ results, commit/push, and confirmation that private artifacts, frozen IRX-2
 policy, V1 scheduled delivery, IRX-3 reaction semantics, IRX-5 editorial
 authority, Radar gates, cross-repo code, IRX-12/13/14, rollout, and dogfood were
 unchanged. Stop before IRX-12.
+```
+
+## Exact Next Codex Prompt - IRX-12
+
+```text
+You are Codex working in /srv/openclaw-you/workspace/telegram-research-agent.
+Mode: IMPLEMENTATION for IRX-12 only.
+
+Implement IRX-12, using these binding docs:
+  docs/intelligence_report_v2_roadmap.md
+  docs/intelligence_report_v2_contract.md
+  docs/weekly_run_manifest.md
+  docs/reaction_personalization_contract.md
+  docs/static_visualization_system.md
+  docs/tasks.md
+
+Start from the committed IRX-7 state. Do not implement IRX-13 or IRX-14: no
+golden screenshot/evaluation-suite consolidation, production alias/retention
+migration, scheduled-delivery switch, rollout, or dogfood start. Do not change
+IRX-3 reaction semantics, IRX-5 editorial authority, IRX-7 Atlas/Audit package
+semantics, IRX-10 Radar authority, IRX-11 gate meanings, global evidence
+scoring, Radar gates, cross-repo code, secrets, generated private artifacts, or
+the frozen irx2_orchestration.v1 stage policy.
+
+Before editing run:
+  git status
+  git branch
+  git log --oneline -20
+  git diff --stat
+
+Read the feedback/action-status/Strategy Reviewer surfaces, bot intake,
+Brief/Atlas V2 sidecars and quality gates, reaction/editorial contracts,
+Project/Radar adapters, and focused tests for:
+  src/db/ai_report_feedback.py
+  src/output/ai_report_feedback_intake.py
+  src/output/strategy_reviewer.py
+  src/output/action_status.py
+  src/output/split_intelligence_reports.py
+  src/output/weekly_intelligence_brief_v2.py
+  src/output/knowledge_atlas_report_v2.py
+  src/output/reader_value_quality.py
+  src/bot/handlers.py
+  src/bot/callbacks.py
+  tests/test_ai_report_feedback.py
+  tests/test_strategy_reviewer.py
+  tests/test_artifact_feedback.py
+  tests/test_split_intelligence_reports.py
+
+Add report-, surface-, section-, and item-targeted feedback/learning events for
+Brief, Atlas, Radar, reaction personalization, project actions, and visuals.
+Use a controlled classification vocabulary and confirmation gates. No feedback
+remains unknown; unconfirmed feedback must not enter editorial context.
+Persistent preference/profile/config/code changes remain explicit approval-only.
+Completed action/project status can be linked to the originating report item.
+
+Add an auditable application receipt that separates applied, unchanged,
+code/config-required, rejected, and pending states. Later reports must state
+what confirmed feedback changed, what stayed unchanged, what needs code/config
+work, and why anything was not applied. Preserve old target IDs and existing
+feedback rows through additive fields/adapters.
+
+Perform deep review after the contract/intake phase and again after report
+integration. Fix all in-scope blockers before documentation or commit.
+
+Run:
+  PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache \
+    python3 -m unittest tests.test_ai_report_feedback \
+    tests.test_strategy_reviewer tests.test_artifact_feedback \
+    tests.test_split_intelligence_reports
+
+Also run focused compatibility tests for any touched Brief/Atlas/retrieval/PI
+surfaces, focused Ruff, py_compile, fixture JSON validation if fixtures change,
+git diff --check, git diff --stat, and inspect git status.
+
+Update the IRX registry, implementation journal, roadmap completion receipt,
+and CODEX handoff with exact test counts. Commit IRX-12 separately and push the
+current branch. Stop before IRX-13.
 ```
 
 ## Historical PGI-007 Handoff

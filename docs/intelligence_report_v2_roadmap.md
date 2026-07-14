@@ -16,10 +16,11 @@ Product contracts:
 - `docs/static_visualization_system.md`.
 
 This roadmap turns the failed W29 reader experience into implementation-ready
-work. Weekly Brief V2 and its independent reader-value gates now exist as
-additive previews, but Atlas V2, the complete Report V2 package, delivery
-switch, and dogfood restart remain unfinished; the current W29 reports are not
-accepted as evidence. IRX-0 itself changed documentation only.
+work. Weekly Brief V2, Knowledge Atlas V2, Knowledge Audit Explorer separation,
+and independent reader-value gates now exist as additive previews, but the
+complete Report V2 package, delivery switch, visual-regression suite, and
+dogfood restart remain unfinished; the current W29 reports are not accepted as
+evidence. IRX-0 itself changed documentation only.
 
 ## 1. Product Goal
 
@@ -152,7 +153,7 @@ behavior; it does not reopen the gate logic.
 | IRX-4 | Canonical Idea Thread curation and merge/split lifecycle | `implemented_and_verified` | P0 | IRX-1, IRX-2, IRX-3 |
 | IRX-5 | Editorial Intelligence synthesis contract | `implemented_and_verified` | P0 | IRX-1 through IRX-4 |
 | IRX-6 | Weekly Intelligence Brief V2 | `implemented_and_verified` | P1 | IRX-2 through IRX-5, IRX-8 through IRX-10 |
-| IRX-7 | Knowledge Atlas V2 and Knowledge Audit Explorer separation | `planned` | P2 | IRX-4, IRX-5, IRX-8, IRX-11 |
+| IRX-7 | Knowledge Atlas V2 and Knowledge Audit Explorer separation | `implemented_and_verified` | P2 | IRX-4, IRX-5, IRX-8, IRX-11 |
 | IRX-8 | Static visualization component system | `implemented_and_verified` | P1 | IRX-4, IRX-5 |
 | IRX-9 | Project Intelligence V2 | `implemented_and_verified` | P1 | IRX-4, IRX-5, IRX-8 |
 | IRX-10 | MVP Radar reader contract and context-only hardening | `implemented_and_verified` | P1 | IRX-2, IRX-5, IRX-8 |
@@ -1224,7 +1225,7 @@ switch, sibling edit, screenshot, rollout, or dogfood evidence is claimed.
 
 ### IRX-7 - Knowledge Atlas V2 And Knowledge Audit Explorer Separation
 
-**Status:** `planned`. **Priority:** P2.
+**Status:** `implemented_and_verified`. **Priority:** P2.
 
 **Problem:** The current Atlas is a 5,000-plus-word evidence dump with entity
 clusters, repeated claims, internal identifiers, fully expanded evidence, and
@@ -1272,7 +1273,15 @@ PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache \
   python3 -m unittest tests.test_split_intelligence_reports \
   tests.test_intelligence_retrieval_items tests.test_obsidian_export \
   tests.test_pi_facade tests.test_report_quality
-# Run the IRX-13 Atlas/Audit Explorer desktop/mobile snapshots.
+PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache \
+  python3 -m unittest tests.test_knowledge_atlas_report_v2 \
+  tests.test_report_visuals tests.test_canonical_idea_threads \
+  tests.test_weekly_intelligence_brief_v2 tests.test_weekly_run_manifest \
+  tests.test_weekly_intelligence_orchestrator
+python3 -m ruff check <changed Python files>
+PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache python3 -m py_compile <changed Python files>
+python3 -m json.tool tests/fixtures/report_v2/knowledge_atlas_v2_cases.v1.json
+git diff --check
 ```
 
 **Failure states:** Audit details deleted, raw Telegram mirror remains primary,
@@ -1284,8 +1293,23 @@ the task.
 breaking retrieval/Obsidian without migration, or turning Atlas into another
 interactive database dump.
 
+**Completion receipt:** IRX-7 added an opt-in immutable Atlas V2 package,
+versioned Knowledge Audit Explorer, strict shared package-security helpers, and
+Brief/retrieval/PI/Obsidian compatibility adapters. The reader Atlas is bound
+to manifest/V1 Brief/V1 Atlas/editorial/reaction/source-catalog bytes, enforces
+exact visual specs and source refs, applies IRX-11 blocking gates before
+publication and load, and keeps V1 scheduled delivery unchanged. Dedicated
+Atlas focused verification passed 18 tests, the exact consumer/quality matrix
+passed 124 tests, and the dedicated Atlas/upstream matrix passed 126 tests.
+Ruff, focused compilation, fixture JSON validation, `git diff --check`,
+`git diff --stat`, and status inspection passed. No live/expensive run,
+generated private artifact, frozen IRX-2 policy change, V1 delivery switch,
+IRX-3 reaction semantic change, IRX-5 authority change, Radar gate change,
+sibling edit, screenshot baseline, rollout, or dogfood claim was made.
+
 **Rollout implications:** Generate Atlas V2 and Audit Explorer side by side;
-keep V1 path/aliases until consumers and operator links are migrated and tested.
+keep V1 path/aliases until consumers and operator links are migrated and tested
+in IRX-14.
 
 ### IRX-12 - Report-Specific Feedback And Learning Loop
 
@@ -1651,7 +1675,6 @@ Report files changed, canonical identity/lifecycle/as-of semantics, compatibilit
 
 ## 15. Suggested Following Task
 
-IRX-1 through IRX-6 and IRX-8 through IRX-11 are implemented and verified.
-IRX-7 is the next planned implementation scope. Report-specific learning,
-golden visual regression, rollout, and dogfood remain unimplemented and gated
-by later tasks.
+IRX-1 through IRX-7 and IRX-8 through IRX-11 are implemented and verified.
+IRX-12 is the next planned implementation scope. Golden visual regression,
+rollout, and dogfood remain unimplemented and gated by later tasks.

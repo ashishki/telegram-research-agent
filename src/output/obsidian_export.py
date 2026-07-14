@@ -5,6 +5,7 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Mapping, Sequence
 
 from config.settings import PROJECT_ROOT, Settings
 from db.ai_report_feedback import summarize_ai_report_feedback
@@ -46,6 +47,16 @@ class ObsidianExportSummary:
     project_watch_note_count: int
     feedback_summary_note_count: int
     strategy_review_note_count: int
+
+
+@dataclass(frozen=True)
+class KnowledgeAtlasV2ObsidianSummary:
+    run_id: str
+    week_label: str
+    vault_root: str
+    files_written: int
+    thread_count: int
+    atlas_note_path: str
 
 
 class ObsidianExportError(ValueError):
@@ -1307,6 +1318,199 @@ def _manifest(root: Path, week_label: str, files: list[Path], summary: dict) -> 
         **summary,
     }
     manifest_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def export_knowledge_atlas_v2_obsidian_projection(
+    *,
+    atlas_json_path: str | Path,
+    manifest_path: str | Path,
+    vault_path: str | Path | None = None,
+    namespace: str | None = None,
+    allowed_source_roots: Sequence[str | Path] = (),
+) -> KnowledgeAtlasV2ObsidianSummary:
+    """Opt in to a stable-ref Atlas V2 projection; default V1 export is unchanged."""
+
+    from output.knowledge_atlas_report_v2 import (
+        ATLAS_V2_SCHEMA_VERSION,
+        ATLAS_V2_SURFACE,
+        load_manifest_bound_knowledge_atlas_v2,
+    )
+
+    atlas = load_manifest_bound_knowledge_atlas_v2(
+        atlas_json_path,
+        expected_manifest_path=manifest_path,
+        allowed_source_roots=allowed_source_roots,
+    )
+    if (
+        atlas.get("schema_version") != ATLAS_V2_SCHEMA_VERSION
+        or atlas.get("surface") != ATLAS_V2_SURFACE
+    ):
+        raise ObsidianExportError("Atlas V2 schema/surface selection mismatch")
+    period = atlas.get("reporting_period")
+    paths = atlas.get("artifact_paths")
+    technical = atlas.get("technical_refs")
+    if not all(isinstance(item, Mapping) for item in (period, paths, technical)):
+        raise ObsidianExportError("Atlas V2 projection metadata is incomplete")
+    run_id = str(atlas.get("run_id") or "")
+    week_label = str(period.get("reporting_week") or "")
+    root = _vault_root(vault_path, namespace)
+    atlas_note_ref = f"15-knowledge-atlas-v2/{week_label}-knowledge-atlas-v2"
+    threads = [
+        item
+        for item in atlas.get("canonical_threads") or []
+        if isinstance(item, Mapping)
+    ]
+    thread_links = []
+    for thread in threads:
+        slug = str(thread["stable_slug"])
+        link = _wiki(
+            f"25-canonical-atlas-v2/{slug}",
+            str(thread["title_ru"]),
+        )
+        thread_links.append(
+            f"- {link} (`canonical_thread:{slug}`; "
+            f"{thread['display_status']}; {thread['evidence_maturity']})"
+        )
+    overview_sources = [
+        str(paths.get("json") or ""),
+        str(paths.get("html") or ""),
+        str(technical.get("audit_explorer_path") or ""),
+    ]
+    overview_body = "\n".join(
+        [
+            f"Backlinks: {_wiki('00-dashboard/index', 'Dashboard')}",
+            "",
+            f"- Run: `{run_id}`",
+            f"- Period: `{week_label}`; as of `{atlas.get('as_of')}`",
+            f"- State: `{atlas.get('run_status')}`",
+            "",
+            "## Canonical Threads",
+            *(thread_links or ["- No canonical Atlas threads are available."]),
+            "",
+            "## Compatibility",
+            "- This is an explicit Atlas V2 projection; the default V1 vault export remains unchanged.",
+            "- Full evidence and raw memberships stay in Knowledge Audit Explorer.",
+            "",
+            _source_refs(overview_sources),
+        ]
+    )
+    notes: list[tuple[Path, str]] = [
+        (
+            Path(f"{atlas_note_ref}.md"),
+            _note(
+                note_type="knowledge_atlas_v2",
+                title=f"Knowledge Atlas V2 {week_label}",
+                body=overview_body,
+                extra_frontmatter={
+                    "week_label": week_label,
+                    "run_id": run_id,
+                    "schema_version": ATLAS_V2_SCHEMA_VERSION,
+                    "surface": ATLAS_V2_SURFACE,
+                    "thread_count": len(threads),
+                },
+            ),
+        )
+    ]
+    package_dir = Path(str(paths["json"])).parent
+    for thread in threads:
+        slug = str(thread["stable_slug"])
+        audit_ref = _package_reference(
+            package_dir,
+            str(thread.get("audit_ref") or ""),
+        )
+        evidence_refs = [
+            str(item)
+            for item in thread.get("evidence_refs") or []
+            if str(item).strip()
+        ]
+        interest = (
+            thread.get("operator_interest")
+            if isinstance(thread.get("operator_interest"), Mapping)
+            else {}
+        )
+        body = "\n".join(
+            [
+                f"Backlinks: {_wiki(atlas_note_ref, f'Knowledge Atlas V2 {week_label}')}",
+                "",
+                str(thread.get("thesis") or ""),
+                "",
+                "## Stable Reference",
+                f"- `canonical_thread:{slug}`",
+                f"- Lifecycle: `{thread.get('lifecycle_status')}`",
+                f"- Reader state: `{thread.get('display_status')}`",
+                f"- Evidence maturity: `{thread.get('evidence_maturity')}`",
+                "",
+                "## Operator Context",
+                f"- Current confirmed reactions: {int(interest.get('current_reaction_count') or 0)}",
+                f"- Confirmed feedback events: {int(interest.get('confirmed_feedback_count') or 0)}",
+                "- Reactions, feedback, maturity, and learning remain separate signals.",
+                "",
+                "## Audit Explorer",
+                f"- {audit_ref}",
+                "",
+                _source_refs([*evidence_refs, audit_ref, str(paths["json"])]),
+            ]
+        )
+        notes.append(
+            (
+                Path("25-canonical-atlas-v2") / f"{slug}.md",
+                _note(
+                    note_type="canonical_atlas_v2_thread",
+                    title=str(thread["title_ru"]),
+                    body=body,
+                    extra_frontmatter={
+                        "week_label": week_label,
+                        "run_id": run_id,
+                        "canonical_thread_id": str(thread["canonical_thread_id"]),
+                        "canonical_thread_ref": f"canonical_thread:{slug}",
+                        "stable_slug": slug,
+                        "evidence_maturity": str(thread["evidence_maturity"]),
+                    },
+                ),
+            )
+        )
+
+    written: list[Path] = []
+    for relative_path, content in notes:
+        target = root / relative_path
+        _write_generated_note(target, content)
+        written.append(target)
+    manifest_file = root / "90-generated" / f"atlas-v2-export-manifest-{run_id}.json"
+    manifest_file.parent.mkdir(parents=True, exist_ok=True)
+    manifest_file.write_text(
+        json.dumps(
+            {
+                "schema_version": "knowledge_atlas_v2_obsidian_export.v1",
+                "run_id": run_id,
+                "week_label": week_label,
+                "source_schema_version": ATLAS_V2_SCHEMA_VERSION,
+                "source_surface": ATLAS_V2_SURFACE,
+                "source_json_path": str(paths["json"]),
+                "files": [str(path.relative_to(root)) for path in written],
+            },
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    return KnowledgeAtlasV2ObsidianSummary(
+        run_id=run_id,
+        week_label=week_label,
+        vault_root=str(root),
+        files_written=len(written),
+        thread_count=len(threads),
+        atlas_note_path=str(root / f"{atlas_note_ref}.md"),
+    )
+
+
+def _package_reference(package_dir: Path, value: str) -> str:
+    path_text, separator, fragment = str(value or "").partition("#")
+    if not path_text:
+        return str(package_dir)
+    candidate = Path(path_text)
+    resolved = candidate if candidate.is_absolute() else package_dir / candidate
+    return f"{resolved}#{fragment}" if separator else str(resolved)
 
 
 def export_obsidian_vault(

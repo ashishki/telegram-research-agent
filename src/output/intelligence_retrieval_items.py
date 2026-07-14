@@ -23,6 +23,13 @@ from output.mvp_radar_reader import (
     load_bound_mvp_radar_reader,
     load_unbound_mvp_radar_reader,
 )
+from output.knowledge_atlas_report_v2 import (
+    ATLAS_V2_SCHEMA_VERSION,
+    ATLAS_V2_SURFACE,
+    KnowledgeAtlasV2Error,
+    find_manifest_bound_knowledge_atlas_v2,
+    load_manifest_bound_knowledge_atlas_v2,
+)
 from output.weekly_run_manifest import (
     WeeklyRunManifestError,
     load_manifest,
@@ -32,6 +39,7 @@ from output.weekly_intelligence_brief_v2 import (
     BRIEF_V2_DIRECTORY,
     BRIEF_V2_JSON_FILENAME,
     BRIEF_V2_SCHEMA_VERSION,
+    BRIEF_V2_SURFACE,
     WeeklyIntelligenceBriefV2Error,
     _strict_check_manifest_json_sources,
     load_manifest_bound_weekly_intelligence_brief_v2,
@@ -40,6 +48,10 @@ from output.strategy_reviewer import build_strategy_review
 from output.reaction_personalization import (
     ReactionPersonalizationError,
     validate_reaction_effect,
+)
+from output.report_package_security import (
+    ReportPackageSecurityError,
+    read_strict_json_record,
 )
 
 
@@ -76,6 +88,9 @@ class IntelligenceRetrievalItem:
     status: str | None = None
     created_at: str | None = None
     updated_at: str | None = None
+    schema_version: str | None = None
+    surface: str | None = None
+    run_id: str | None = None
 
 
 def build_retrieval_items(
@@ -103,6 +118,22 @@ def build_retrieval_items(
     if workbook and not clean_week:
         clean_week = _clean_text(workbook.get("week_label")) or _artifact_week_label(workbook)
 
+    requested_output = (
+        Path(output_root).expanduser().absolute()
+        if output_root is not None
+        else DEFAULT_OUTPUT_ROOT.absolute()
+    )
+    selected_run_root = (
+        Path(weekly_run_root).expanduser()
+        if weekly_run_root is not None
+        else requested_output / "weekly_intelligence_runs"
+    )
+    selected_v2_manifest = (
+        _select_weekly_v2_manifest(clean_week, weekly_run_root=selected_run_root)
+        if clean_week
+        else None
+    )
+
     items: list[IntelligenceRetrievalItem] = []
     loaded_artifact_paths: set[str] = set()
     if workbook:
@@ -123,6 +154,7 @@ def build_retrieval_items(
         output_root=output_root,
         weekly_run_root=weekly_run_root,
         allowed_source_roots=trusted_v2_roots,
+        selected_manifest_path=selected_v2_manifest,
     )
     if v2_authority_present:
         items = [item for item in items if item.item_type != "mvp_dossier"]
@@ -130,6 +162,21 @@ def build_retrieval_items(
         items.extend(
             _items_from_workbook(
                 v2_brief,
+                v2_expected_manifest_path=manifest_path,
+                v2_allowed_source_roots=trusted_v2_roots,
+            )
+        )
+    v2_atlases, _v2_atlas_authority_present = _load_knowledge_atlas_v2_sidecars(
+        clean_week,
+        output_root=output_root,
+        weekly_run_root=weekly_run_root,
+        allowed_source_roots=trusted_v2_roots,
+        selected_manifest_path=selected_v2_manifest,
+    )
+    for v2_atlas, manifest_path in v2_atlases:
+        items.extend(
+            _items_from_workbook(
+                v2_atlas,
                 v2_expected_manifest_path=manifest_path,
                 v2_allowed_source_roots=trusted_v2_roots,
             )
@@ -311,6 +358,7 @@ def _load_weekly_brief_v2_sidecars(
     output_root: str | Path | None,
     weekly_run_root: str | Path | None,
     allowed_source_roots: Iterable[str | Path],
+    selected_manifest_path: Path | None = None,
 ) -> tuple[list[tuple[dict[str, Any], Path]], bool]:
     clean_week = str(week_label or "").strip()
     if not clean_week:
@@ -331,9 +379,8 @@ def _load_weekly_brief_v2_sidecars(
         if weekly_run_root is not None
         else output_base / "weekly_intelligence_runs"
     )
-    manifest_path = _select_weekly_v2_manifest(
-        clean_week,
-        weekly_run_root=selected_run_root,
+    manifest_path = selected_manifest_path or _select_weekly_v2_manifest(
+        clean_week, weekly_run_root=selected_run_root
     )
     if manifest_path is None:
         return [], False
@@ -418,6 +465,86 @@ def _load_weekly_brief_v2_sidecars(
         RecursionError,
         OverflowError,
         WeeklyIntelligenceBriefV2Error,
+    ):
+        return [], True
+
+
+def _load_knowledge_atlas_v2_sidecars(
+    week_label: str | None,
+    *,
+    output_root: str | Path | None,
+    weekly_run_root: str | Path | None,
+    allowed_source_roots: Iterable[str | Path],
+    selected_manifest_path: Path | None = None,
+) -> tuple[list[tuple[dict[str, Any], Path]], bool]:
+    """Load only the Atlas package bound to the explicitly selected manifest."""
+
+    clean_week = str(week_label or "").strip()
+    if not clean_week:
+        return [], False
+    requested_output = Path(output_root) if output_root is not None else DEFAULT_OUTPUT_ROOT
+    selected_run_root = (
+        Path(weekly_run_root).expanduser()
+        if weekly_run_root is not None
+        else requested_output / "weekly_intelligence_runs"
+    )
+    manifest_path = selected_manifest_path or _select_weekly_v2_manifest(
+        clean_week, weekly_run_root=selected_run_root
+    )
+    if manifest_path is None:
+        return [], False
+    try:
+        canonical_run_root = selected_run_root.resolve(strict=True)
+        lexical_manifest = manifest_path.expanduser().absolute()
+        resolved_manifest = lexical_manifest.resolve(strict=True)
+        if (
+            lexical_manifest != resolved_manifest
+            or resolved_manifest.parent.parent != canonical_run_root
+        ):
+            return [], True
+        manifest, _raw = _read_retrieval_manifest(resolved_manifest)
+        if (
+            manifest.get("run_status") not in {"complete", "partial"}
+            or manifest.get("reporting_week") != clean_week
+        ):
+            return [], True
+        payload = find_manifest_bound_knowledge_atlas_v2(
+            output_root=requested_output,
+            run_id=str(manifest.get("run_id") or ""),
+            expected_manifest_path=resolved_manifest,
+            allowed_source_roots=tuple(Path(root) for root in allowed_source_roots),
+        )
+        if payload is None:
+            return [], False
+        period = payload.get("reporting_period")
+        paths = payload.get("artifact_paths")
+        if (
+            payload.get("schema_version") != ATLAS_V2_SCHEMA_VERSION
+            or payload.get("surface") != ATLAS_V2_SURFACE
+            or payload.get("run_id") != manifest.get("run_id")
+            or not isinstance(period, Mapping)
+            or period.get("reporting_week") != clean_week
+            or not isinstance(paths, Mapping)
+        ):
+            return [], True
+        result = dict(payload)
+        result["_artifact_kind"] = "knowledge_atlas_v2"
+        result["_artifact_paths"] = {
+            "json": str(paths.get("json") or ""),
+            "html": str(paths.get("html") or ""),
+            "source_catalog": str(paths.get("source_catalog") or ""),
+        }
+        return [(result, resolved_manifest)], True
+    except (
+        OSError,
+        RuntimeError,
+        UnicodeError,
+        TypeError,
+        ValueError,
+        RecursionError,
+        OverflowError,
+        KnowledgeAtlasV2Error,
+        WeeklyRunManifestError,
     ):
         return [], True
 
@@ -594,11 +721,21 @@ def _items_from_workbook(
     v2_allowed_source_roots: Iterable[str | Path] = (),
 ) -> list[IntelligenceRetrievalItem]:
     if workbook.get("schema_version") == BRIEF_V2_SCHEMA_VERSION:
-        return _items_from_weekly_brief_v2(
-            workbook,
-            expected_manifest_path=v2_expected_manifest_path,
-            allowed_source_roots=v2_allowed_source_roots,
-        )
+        surface = workbook.get("surface")
+        if surface == BRIEF_V2_SURFACE:
+            return _items_from_weekly_brief_v2(
+                workbook,
+                expected_manifest_path=v2_expected_manifest_path,
+                allowed_source_roots=v2_allowed_source_roots,
+            )
+        if surface == ATLAS_V2_SURFACE:
+            return _items_from_knowledge_atlas_v2(
+                workbook,
+                expected_manifest_path=v2_expected_manifest_path,
+                allowed_source_roots=v2_allowed_source_roots,
+            )
+        # A shared schema version never grants legacy/V1 parsing authority.
+        return []
     week = _clean_text(workbook.get("week_label")) or _artifact_week_label(workbook)
     generated_at = _clean_text(workbook.get("generated_at")) or None
     artifact_refs = _artifact_source_refs(workbook)
@@ -682,17 +819,13 @@ def _items_from_weekly_brief_v2(
     }
     if supplied != loaded:
         return []
-    artifact_paths = loaded.get("artifact_paths")
-    period = loaded.get("reporting_period")
-    if not isinstance(artifact_paths, Mapping) or not isinstance(period, Mapping):
-        return []
-    if (
-        str(path) != str(artifact_paths.get("json") or "")
-        or _clean_text(metadata.get("html"))
-        != _clean_text(artifact_paths.get("html"))
-        or _clean_text(metadata.get("source_catalog"))
-        != _clean_text(artifact_paths.get("source_catalog"))
-    ):
+    artifact_paths = loaded["artifact_paths"]
+    period = loaded["reporting_period"]
+    expected_metadata = {
+        key: str(artifact_paths[key])
+        for key in ("json", "html", "source_catalog")
+    }
+    if metadata != expected_metadata or str(path) != expected_metadata["json"]:
         return []
     run_id = _clean_text(loaded.get("run_id"))
     week = _clean_text(period.get("reporting_week")) or None
@@ -1010,6 +1143,223 @@ def _items_from_weekly_brief_v2(
             )
         )
     return items
+
+
+def _items_from_knowledge_atlas_v2(
+    workbook: Mapping[str, Any],
+    *,
+    expected_manifest_path: str | Path | None,
+    allowed_source_roots: Iterable[str | Path],
+) -> list[IntelligenceRetrievalItem]:
+    """Project an exact strict Atlas V2 without changing V1 atlas_thread refs."""
+
+    metadata = (
+        workbook.get("_artifact_paths")
+        if isinstance(workbook.get("_artifact_paths"), Mapping)
+        else {}
+    )
+    if (
+        workbook.get("_artifact_kind") != "knowledge_atlas_v2"
+        or workbook.get("surface") != ATLAS_V2_SURFACE
+        or expected_manifest_path is None
+    ):
+        return []
+    source_path = _clean_text(metadata.get("json"))
+    if not source_path or not Path(source_path).is_absolute():
+        return []
+    try:
+        path = Path(source_path).resolve(strict=True)
+        output_base = path.parent.parent.parent.resolve(strict=True)
+        manifest_path = Path(expected_manifest_path).resolve(strict=True)
+        loaded = load_manifest_bound_knowledge_atlas_v2(
+            path,
+            expected_manifest_path=manifest_path,
+            allowed_source_roots=(
+                output_base,
+                manifest_path.parent,
+                *(Path(root) for root in allowed_source_roots),
+            ),
+        )
+    except (
+        OSError,
+        UnicodeError,
+        TypeError,
+        ValueError,
+        RecursionError,
+        OverflowError,
+        RuntimeError,
+        KnowledgeAtlasV2Error,
+    ):
+        return []
+    supplied = {
+        key: copy_value
+        for key, copy_value in workbook.items()
+        if key not in {"_artifact_kind", "_artifact_paths"}
+    }
+    if supplied != loaded:
+        return []
+    artifact_paths = loaded.get("artifact_paths")
+    period = loaded.get("reporting_period")
+    if not isinstance(artifact_paths, Mapping) or not isinstance(period, Mapping):
+        return []
+    if (
+        str(path) != str(artifact_paths.get("json") or "")
+        or _clean_text(metadata.get("html"))
+        != _clean_text(artifact_paths.get("html"))
+        or _clean_text(metadata.get("source_catalog"))
+        != _clean_text(artifact_paths.get("source_catalog"))
+    ):
+        return []
+    run_id = _clean_text(loaded.get("run_id"))
+    week = _clean_text(period.get("reporting_week")) or None
+    generated_at = _clean_text(loaded.get("generated_at")) or None
+    if not run_id or not week:
+        return []
+    technical = loaded["technical_refs"]
+    artifact_refs = _unique(
+        [
+            artifact_paths.get("json"),
+            artifact_paths.get("html"),
+            artifact_paths.get("source_catalog"),
+            technical.get("audit_explorer_path"),
+            technical.get("audit_explorer_json_path"),
+        ]
+    )
+    common = {
+        "schema_version": ATLAS_V2_SCHEMA_VERSION,
+        "surface": ATLAS_V2_SURFACE,
+        "run_id": run_id,
+    }
+    items: list[IntelligenceRetrievalItem] = []
+    for index, thread in enumerate(loaded["canonical_threads"], start=1):
+        slug = _clean_text(thread.get("stable_slug"))
+        title = _clean_text(thread.get("title_ru")) or f"Тема Atlas {index}"
+        evidence_refs = _string_values(thread.get("evidence_refs"))
+        audit_ref = _absolute_package_ref(path.parent, thread.get("audit_ref"))
+        interest = (
+            thread.get("operator_interest")
+            if isinstance(thread.get("operator_interest"), Mapping)
+            else {}
+        )
+        items.append(
+            IntelligenceRetrievalItem(
+                id=f"atlas_v2_thread:{run_id}:{_slug(slug or title)}",
+                item_type="atlas_v2_thread",
+                week_label=week,
+                title=title,
+                summary=_clean_text(thread.get("thesis")) or None,
+                text=_join_text(
+                    title,
+                    thread.get("thesis"),
+                    (
+                        "Подтверждённых реакций: "
+                        + str(interest.get("current_reaction_count") or 0)
+                    ),
+                    (
+                        "Подтверждённой обратной связи: "
+                        + str(interest.get("confirmed_feedback_count") or 0)
+                    ),
+                ),
+                source_refs=_unique(
+                    [*artifact_refs, *evidence_refs, audit_ref]
+                ),
+                atom_ids=_atom_ids_from_refs(evidence_refs),
+                thread_slug=slug or None,
+                evidence_tier=_clean_text(thread.get("evidence_maturity")) or None,
+                verification_status="manifest_bound_v2",
+                status=_clean_text(thread.get("display_status")) or None,
+                created_at=generated_at,
+                updated_at=generated_at,
+                **common,
+            )
+        )
+    for index, row in enumerate(loaded["study_backlog"], start=1):
+        evidence_refs = _string_values(row.get("evidence_refs"))
+        audit_ref = _absolute_package_ref(path.parent, row.get("audit_ref"))
+        items.append(
+            IntelligenceRetrievalItem(
+                id=f"atlas_v2_study:{run_id}:{index}",
+                item_type="atlas_v2_study",
+                week_label=week,
+                title=_clean_text(row.get("title_ru"))
+                or f"Тема для изучения {index}",
+                summary=_clean_text(row.get("reason_ru")) or None,
+                text=_join_text(row.get("reason_ru"), row.get("next_step_ru")),
+                source_refs=_unique(
+                    [*artifact_refs, *evidence_refs, audit_ref]
+                ),
+                atom_ids=_atom_ids_from_refs(evidence_refs),
+                evidence_tier="study_backlog",
+                verification_status="manifest_bound_v2",
+                status=_clean_text(row.get("priority")) or None,
+                created_at=generated_at,
+                updated_at=generated_at,
+                **common,
+            )
+        )
+    items.extend(
+        _atlas_v1_compatibility_items_from_v2(
+            loaded,
+            week_label=week,
+            generated_at=generated_at,
+        )
+    )
+    return items
+
+
+def _absolute_package_ref(package_dir: Path, value: object) -> str | None:
+    ref = _clean_text(value)
+    if not ref:
+        return None
+    path_text, separator, fragment = ref.partition("#")
+    candidate = Path(path_text)
+    if candidate.is_absolute() or "://" in path_text:
+        return ref
+    resolved = package_dir / candidate
+    return f"{resolved}#{fragment}" if separator else str(resolved)
+
+
+def _atlas_v1_compatibility_items_from_v2(
+    atlas: Mapping[str, Any],
+    *,
+    week_label: str,
+    generated_at: str | None,
+) -> list[IntelligenceRetrievalItem]:
+    """Retain stable atlas_thread IDs through the validated Audit Explorer."""
+
+    try:
+        technical = atlas["technical_refs"]
+        descriptor = atlas["source_artifacts"]["audit_explorer_json"]
+        audit_path = Path(str(technical.get("audit_explorer_json_path") or ""))
+        record = read_strict_json_record(
+            audit_path,
+            label="retrieval Audit Explorer",
+            maximum=MAX_RETRIEVAL_JSON_BYTES,
+            require_private=True,
+        )
+        if (
+            not isinstance(record.value, dict)
+            or record.sha256 != descriptor.get("sha256")
+            or record.size != descriptor.get("size")
+        ):
+            return []
+        audit = record.value
+    except (
+        OSError,
+        RuntimeError,
+        KeyError,
+        TypeError,
+        ValueError,
+        ReportPackageSecurityError,
+    ):
+        return []
+    paths = audit["artifact_paths"]
+    return _atlas_thread_items(
+        audit,
+        week_label=week_label,
+        generated_at=generated_at,
+        artifact_refs=_unique([paths.get("json"), paths.get("html")]),
+    )
 
 
 def _atom_ids_from_refs(refs: Iterable[object]) -> list[int | str]:
@@ -2397,11 +2747,23 @@ def _public_item_dict(item: IntelligenceRetrievalItem, *, score: float | None) -
         "score": score,
         "evidence_tier": item.evidence_tier,
         "verification_status": item.verification_status,
+        "schema_version": item.schema_version,
+        "surface": item.surface,
+        "run_id": item.run_id,
     }
 
 
 def _matches_filters(item: IntelligenceRetrievalItem, filters: Mapping[str, Any]) -> bool:
-    for key in ("week_label", "item_type", "project_name", "thread_slug", "status"):
+    for key in (
+        "week_label",
+        "item_type",
+        "project_name",
+        "thread_slug",
+        "status",
+        "schema_version",
+        "surface",
+        "run_id",
+    ):
         value = filters.get(key)
         if value in (None, "", [], ()):
             continue

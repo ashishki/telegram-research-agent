@@ -1,6 +1,6 @@
 # Current Backlog
 
-Version: 3.7
+Version: 3.8
 Last updated: 2026-07-14
 State: canonical active backlog
 
@@ -47,17 +47,17 @@ below, but active implementation starts from the IRX task graph.
 | Project Intelligence V2 shadow | `implemented_and_verified`; separate opt-in `project_intelligence.v2` run artifact with exact project/thread/evidence authority and no V1 renderer activation |
 | Weekly Intelligence Brief V2 preview | `implemented_and_verified`; separate opt-in manifest-bound `split_ai_report.v2` package with V1 generation and delivery unchanged |
 | Reader-value quality gates | `implemented_and_verified`; closed seven-dimension `report_quality.v2`, warn-only on V1 and blocking on opt-in V2 previews |
-| Report V2 contract and roadmap | `implementation_in_progress`; IRX-0 documentation plus IRX-1 through IRX-6 and IRX-8 through IRX-11 are implemented and verified |
+| Report V2 contract and roadmap | `implementation_in_progress`; IRX-0 documentation plus IRX-1 through IRX-7 and IRX-8 through IRX-11 are implemented and verified |
 | Portfolio dogfood evidence | `blocked_on_IRX-14_start_gate` |
 
 ## Next Candidate Task
 
-`IRX-7 - Knowledge Atlas V2 And Knowledge Audit Explorer Separation`
+`IRX-12 - Report-Specific Feedback And Learning Loop`
 
-Build a separate reader-facing visual Atlas V2 from canonical threads and the
-shared visual/quality contracts while preserving the detailed current Atlas as
-Knowledge Audit Explorer. Keep both surfaces opt-in and leave scheduled V1
-delivery unchanged. Its task card is in
+Add report/section/item-targeted feedback and a confirmation-gated learning
+receipt over the completed IRX-6 Brief V2, IRX-7 Atlas V2/Audit Explorer,
+reaction, project, and Radar contracts. Keep persistent changes approval-gated
+and leave rollout/dogfood to later IRX tasks. Its task card is in
 `docs/intelligence_report_v2_roadmap.md`.
 
 ## Dependency Graph
@@ -88,7 +88,7 @@ contract.
 | IRX-10 | P1 | `implemented_and_verified` | Explain the bound candidate, evidence gaps, next validation, and kill criteria | IRX-2, IRX-5, IRX-8 |
 | IRX-6 | P1 | `implemented_and_verified` | Russian 5-7 minute Weekly Intelligence Brief V2 | IRX-1..IRX-5, IRX-8..IRX-10 |
 | IRX-11 | P1 | `implemented_and_verified` | Reader-value gates for period, editorial, personalization, visual, project, and Radar quality | IRX-6, IRX-8 |
-| IRX-7 | P2 | `planned` | Visual Knowledge Atlas V2 plus preserved Knowledge Audit Explorer | IRX-4, IRX-5, IRX-8, IRX-11 |
+| IRX-7 | P2 | `implemented_and_verified` | Visual Knowledge Atlas V2 plus preserved Knowledge Audit Explorer | IRX-4, IRX-5, IRX-8, IRX-11 |
 | IRX-12 | P2 | `planned` | Report- and section-specific confirmation-gated learning loop | IRX-2, IRX-3, IRX-5, IRX-6, IRX-7, IRX-10 |
 | IRX-13 | P2 | `planned`; fixture scaffolding starts in IRX-1 | Sanitized golden fixtures, evaluation dataset, and desktop/mobile regression | IRX-1..IRX-12 |
 | IRX-14 | P2 | `planned` | Versioned rollout, compatibility, and dogfood restart gate | IRX-1..IRX-13 |
@@ -490,7 +490,54 @@ rollout implications are in `docs/intelligence_report_v2_roadmap.md`.
   two-document delivery, IRX-5 editorial selection, IRX-3 reaction meaning,
   Radar authority/gates, sibling-repository code, and generated private
   artifacts remain unchanged. Atlas V2, screenshots, rollout, and dogfood stay
-  owned by IRX-7/13/14; IRX-7 is the next dependency-ready task.
+  owned by IRX-7/13/14; at that boundary IRX-7 was the next dependency-ready
+  task.
+
+### 2026-07-14 - IRX-7 Knowledge Atlas V2 And Audit Explorer Separation
+
+- Status: `implemented_and_verified`.
+- Added the opt-in manifest-bound `split_ai_report.v2` Knowledge Atlas V2
+  package beside the existing V1 outputs. The reader sidecar is closed over
+  exact run/reporting-period/as-of identity, 8-12 canonical primary threads,
+  typed evidence-backed relations, a 12-week timeline, source contribution,
+  evidence maturity, separated operator-interest channels, learning
+  progression, study backlog, shared IRX-8 visual specs, technical refs, and
+  reader-visible metrics.
+- Preserved the detailed V1 Atlas as versioned Knowledge Audit Explorer with
+  raw/canonical memberships, atoms, source quotes/links, aliases, merge/split
+  lineage, diagnostics, and stable deep links. Audit Explorer is technical and
+  is not subject to the 1,500-word Atlas reader budget.
+- Generation and strict loading require terminal manifest identity,
+  manifest-bound V1 Brief and V1 Atlas sources, IRX-5 editorial authority,
+  Atlas-surface reaction interest, exact Brief/Atlas reaction common-funnel
+  parity, exact checksums/source bytes, canonical no-follow paths, private
+  immutable files, five expected package entries, deterministic HTML rebuild
+  parity, source re-read closure, and IRX-11 `blocking_v2` gates before
+  publication and during load.
+- Added compatibility projections for Brief navigation, split preview,
+  retrieval, Hermes/PI, and Obsidian. Existing V1 Atlas summaries, thread
+  navigation, `atlas_thread` items, and stable refs remain available; V2 is
+  consumed only through explicit valid package paths and never through legacy
+  fallback.
+- Added sanitized Atlas/Audit fixtures and focused tests for primary bounds,
+  canonical/as-of identity, duplicate identities/content/backlog, vendor-only
+  relations, typed edges, timeline zero-vs-missing semantics, maturity/source
+  authority, Brief-vs-Atlas reaction authority, feedback/learning separation,
+  honest visual states and exact visual source refs, Russian copy/word/internal
+  ID limits, deterministic cache parity, blocking generation/loading, Audit
+  deep links/detail preservation, strict package security, hostile URL/path/JSON
+  rejection, FIFO rejection, and V1/Brief/retrieval/PI/Obsidian compatibility.
+- Verification: dedicated Atlas focused suite passed 18 tests. The exact
+  task-card consumer/quality matrix passed 124 tests. The dedicated
+  Atlas/upstream matrix passed 126 tests. Ruff, focused `py_compile`, fixture
+  JSON validation, `git diff --check`, `git diff --stat`, and generated/unrelated
+  artifact status inspection passed.
+- Scope confirmation: no generated private artifacts, live/expensive runs, full
+  archive regeneration, database backfill, production migration, frozen IRX-2
+  stage-policy change, V1 scheduled-delivery switch, IRX-3 reaction semantics
+  change, IRX-5 editorial-authority change, Radar gate change, sibling-repo
+  edit, IRX-12/13/14 implementation, screenshot baseline, rollout, or dogfood
+  claim was made. IRX-12 is the next dependency-ready task.
 
 ## Existing-Work Reconciliation
 

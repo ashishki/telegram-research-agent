@@ -78,6 +78,8 @@ _OPAQUE_REF_SCHEMES = {
     "manifest",
     "radar",
     "reaction",
+    "reaction-post",
+    "read-receipt",
     "signal",
     "source",
     "thread",

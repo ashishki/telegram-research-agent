@@ -287,6 +287,8 @@ def build_weekly_intelligence_brief_v2(
     source_artifacts: Mapping[str, Mapping[str, object]],
     artifact_paths: Mapping[str, object],
     compatibility_atlas_path: str | Path | None = None,
+    atlas_v2_path: str | Path | None = None,
+    audit_explorer_path: str | Path | None = None,
 ) -> dict[str, object]:
     """Assemble one reader DTO from already-authorized same-run contracts."""
 
@@ -420,6 +422,9 @@ def build_weekly_intelligence_brief_v2(
         ]
     )
     navigation = _navigation(
+        run_id=run_id,
+        atlas_v2_path=atlas_v2_path,
+        audit_explorer_path=audit_explorer_path,
         compatibility_atlas_path=compatibility_atlas_path,
     )
     sources = _normalize_source_artifacts(source_artifacts)
@@ -554,6 +559,7 @@ def generate_weekly_intelligence_brief_v2_artifact(
     project_descriptors: Sequence[Mapping[str, object]],
     output_root: str | Path,
     allowed_source_roots: Sequence[str | Path] = (),
+    knowledge_atlas_v2_json_path: str | Path | None = None,
 ) -> WeeklyIntelligenceBriefV2Summary:
     """Create or exactly reuse one immutable, manifest-bound preview package."""
 
@@ -643,6 +649,11 @@ def generate_weekly_intelligence_brief_v2_artifact(
         manifest_file,
         stage_name="knowledge_atlas",
     )
+    atlas_v2_path, audit_explorer_path = _validated_atlas_navigation_paths(
+        knowledge_atlas_v2_json_path,
+        manifest_path=manifest_file,
+        allowed_source_roots=roots,
+    )
     output_dir = _safe_v2_output_directory(
         output_root,
         str(manifest["run_id"]),
@@ -688,6 +699,8 @@ def generate_weekly_intelligence_brief_v2_artifact(
             "source_catalog": str(source_catalog_path),
         },
         compatibility_atlas_path=atlas_path,
+        atlas_v2_path=atlas_v2_path,
+        audit_explorer_path=audit_explorer_path,
     )
     html_text = render_weekly_intelligence_brief_v2_html(
         sidecar,
@@ -932,6 +945,11 @@ def load_manifest_bound_weekly_intelligence_brief_v2(
         manifest_file,
         stage_name="knowledge_atlas",
     )
+    atlas_v2_path, audit_explorer_path = _validated_bound_navigation_paths(
+        value.get("navigation"),
+        manifest_path=manifest_file,
+        allowed_source_roots=roots,
+    )
     rebuilt = build_weekly_intelligence_brief_v2(
         manifest=manifest,
         manifest_path=manifest_file,
@@ -944,6 +962,8 @@ def load_manifest_bound_weekly_intelligence_brief_v2(
         source_artifacts=_mapping(value["source_artifacts"]),
         artifact_paths=paths,
         compatibility_atlas_path=compatibility_atlas_path,
+        atlas_v2_path=atlas_v2_path,
+        audit_explorer_path=audit_explorer_path,
     )
     if rebuilt != value:
         raise WeeklyIntelligenceBriefV2ArtifactError(
@@ -1597,8 +1617,18 @@ def _validate_weekly_intelligence_brief_v2(
         )
         if specs != expected_specs:
             errors.append("visual_specs differ from the deterministic projection")
-    _validate_navigation(value.get("navigation"), errors)
+    _validate_navigation(value.get("navigation"), str(run_id or ""), errors)
     _validate_technical_refs(value.get("technical_refs"), errors)
+    navigation_value = _mapping(value.get("navigation"))
+    technical_value = _mapping(value.get("technical_refs"))
+    if technical_value.get("audit_explorer_path") != _mapping(
+        navigation_value.get("audit_explorer")
+    ).get("path"):
+        errors.append("technical_refs.audit_explorer_path differs from navigation")
+    if technical_value.get("compatibility_atlas_path") != _mapping(
+        navigation_value.get("compatibility_atlas")
+    ).get("path"):
+        errors.append("technical_refs.compatibility_atlas_path differs from navigation")
     _validate_source_artifacts(value.get("source_artifacts"), errors)
     _validate_artifact_paths(value.get("artifact_paths"), errors)
     _validate_content_metrics(value.get("content_metrics"), specs, errors)
@@ -3143,7 +3173,7 @@ def _validate_feedback_target(value: Mapping[str, object], path: str, errors: li
     _russian_text(value.get("prompt_ru"), f"{path}.prompt_ru", errors, 200)
 
 
-def _validate_navigation(value: object, errors: list[str]) -> None:
+def _validate_navigation(value: object, run_id: str, errors: list[str]) -> None:
     navigation = _object(value, "navigation", errors)
     fields = {"atlas_v2", "audit_explorer", "compatibility_atlas"}
     _exact_fields(navigation, fields, "navigation", errors)
@@ -3158,6 +3188,26 @@ def _validate_navigation(value: object, errors: list[str]) -> None:
             errors.append(f"navigation.{field} path/status mismatch")
         if isinstance(path, str):
             _safe_path_text(path, f"navigation.{field}.path", errors)
+    atlas = _object(navigation.get("atlas_v2"), "navigation.atlas_v2", errors)
+    audit = _object(
+        navigation.get("audit_explorer"),
+        "navigation.audit_explorer",
+        errors,
+    )
+    if (atlas.get("status") == "available") != (
+        audit.get("status") == "available"
+    ):
+        errors.append("Atlas V2 and Audit Explorer navigation availability differs")
+    if atlas.get("status") == "available" and audit.get("status") == "available":
+        atlas_path = Path(str(atlas.get("path") or ""))
+        audit_path = Path(str(audit.get("path") or ""))
+        if (
+            atlas_path.name != "knowledge-atlas.v2.html"
+            or audit_path.name != "knowledge-audit-explorer.v1.html"
+            or atlas_path.parent != audit_path.parent
+            or atlas_path.parent.name != run_id
+        ):
+            errors.append("Atlas V2 navigation does not identify one exact-run package")
 
 
 def _validate_technical_refs(value: object, errors: list[str]) -> None:
@@ -3248,18 +3298,37 @@ def _validate_content_metrics(
 
 def _navigation(
     *,
+    run_id: str,
+    atlas_v2_path: str | Path | None,
+    audit_explorer_path: str | Path | None,
     compatibility_atlas_path: str | Path | None,
 ) -> dict[str, dict[str, object]]:
+    if (atlas_v2_path is None) != (audit_explorer_path is None):
+        raise WeeklyIntelligenceBriefV2ValidationError(
+            ["Atlas V2 and Audit Explorer navigation must be bound together"]
+        )
+    if atlas_v2_path is not None and Path(atlas_v2_path).parent != Path(
+        str(audit_explorer_path)
+    ).parent:
+        raise WeeklyIntelligenceBriefV2ValidationError(
+            ["Atlas V2 and Audit Explorer navigation must share one package"]
+        )
     return {
         "atlas_v2": _navigation_item(
-            None,
+            atlas_v2_path,
             available_label="Открыть Knowledge Atlas V2",
             unavailable_label="Knowledge Atlas V2 пока недоступен",
+            expected_name="knowledge-atlas.v2.html",
+            expected_parent=run_id,
+            fail_if_supplied=True,
         ),
         "audit_explorer": _navigation_item(
-            None,
+            audit_explorer_path,
             available_label="Открыть Knowledge Audit Explorer",
             unavailable_label="Knowledge Audit Explorer пока недоступен",
+            expected_name="knowledge-audit-explorer.v1.html",
+            expected_parent=run_id,
+            fail_if_supplied=True,
         ),
         "compatibility_atlas": _navigation_item(
             compatibility_atlas_path,
@@ -3274,20 +3343,93 @@ def _navigation_item(
     *,
     available_label: str,
     unavailable_label: str,
+    expected_name: str | None = None,
+    expected_parent: str | None = None,
+    fail_if_supplied: bool = False,
 ) -> dict[str, object]:
     resolved: str | None = None
     if path is not None and str(path).strip():
         try:
-            candidate = Path(path).resolve(strict=True)
-            if candidate.is_file():
+            lexical = Path(path).expanduser().absolute()
+            candidate = lexical.resolve(strict=True)
+            if (
+                lexical == candidate
+                and candidate.is_file()
+                and (expected_name is None or candidate.name == expected_name)
+                and (expected_parent is None or candidate.parent.name == expected_parent)
+            ):
                 resolved = str(candidate)
         except (OSError, RuntimeError, ValueError, TypeError):
             resolved = None
+        if resolved is None and fail_if_supplied:
+            raise WeeklyIntelligenceBriefV2ValidationError(
+                [f"explicit navigation path is invalid: {expected_name or 'artifact'}"]
+            )
     return {
         "status": "available" if resolved else "unavailable",
         "path": resolved,
         "label_ru": available_label if resolved else unavailable_label,
     }
+
+
+def _validated_atlas_navigation_paths(
+    atlas_json_path: str | Path | None,
+    *,
+    manifest_path: Path,
+    allowed_source_roots: Sequence[Path],
+) -> tuple[str | None, str | None]:
+    if atlas_json_path is None:
+        return None, None
+    try:
+        from output.knowledge_atlas_report_v2 import (
+            KnowledgeAtlasV2Error,
+            load_manifest_bound_knowledge_atlas_v2,
+        )
+
+        atlas = load_manifest_bound_knowledge_atlas_v2(
+            atlas_json_path,
+            expected_manifest_path=manifest_path,
+            allowed_source_roots=allowed_source_roots,
+        )
+        return (
+            str(_mapping(atlas["artifact_paths"])["html"]),
+            str(_mapping(atlas["technical_refs"])["audit_explorer_path"]),
+        )
+    except (KnowledgeAtlasV2Error, OSError, RuntimeError, ValueError) as exc:
+        raise WeeklyIntelligenceBriefV2ArtifactError(
+            "explicit Atlas V2 navigation failed strict bound loading"
+        ) from exc
+
+
+def _validated_bound_navigation_paths(
+    raw_navigation: object,
+    *,
+    manifest_path: Path,
+    allowed_source_roots: Sequence[Path],
+) -> tuple[str | None, str | None]:
+    navigation = _mapping(raw_navigation)
+    atlas_item = _mapping(navigation.get("atlas_v2"))
+    audit_item = _mapping(navigation.get("audit_explorer"))
+    atlas_available = atlas_item.get("status") == "available"
+    audit_available = audit_item.get("status") == "available"
+    if atlas_available != audit_available:
+        raise WeeklyIntelligenceBriefV2ArtifactError(
+            "Atlas V2 and Audit Explorer navigation binding is incomplete"
+        )
+    if not atlas_available:
+        return None, None
+    atlas_html = Path(str(atlas_item.get("path") or ""))
+    atlas_json = atlas_html.parent / "knowledge-atlas.v2.json"
+    expected_atlas, expected_audit = _validated_atlas_navigation_paths(
+        atlas_json,
+        manifest_path=manifest_path,
+        allowed_source_roots=allowed_source_roots,
+    )
+    if atlas_item.get("path") != expected_atlas or audit_item.get("path") != expected_audit:
+        raise WeeklyIntelligenceBriefV2ArtifactError(
+            "Brief V2 navigation differs from the strict Atlas V2 package"
+        )
+    return expected_atlas, expected_audit
 
 
 def _render_navigation_item(item: Mapping[str, object]) -> str:

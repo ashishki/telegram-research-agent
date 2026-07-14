@@ -49,12 +49,75 @@ from output.idea_threads import refresh_idea_threads  # noqa: E402
 from output.obsidian_export import (  # noqa: E402
     GENERATED_MARKER,
     ObsidianExportError,
+    export_knowledge_atlas_v2_obsidian_projection,
     export_obsidian_vault,
 )
 import main  # noqa: E402
 
 
 class TestObsidianExport(unittest.TestCase):
+    def test_atlas_v2_projection_is_explicit_and_preserves_stable_refs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            package = root / "output" / "knowledge_atlases_v2" / "run-1"
+            payload = {
+                "schema_version": "split_ai_report.v2",
+                "surface": "knowledge_atlas",
+                "run_id": "run-1",
+                "run_status": "complete",
+                "as_of": "2026-07-13T00:00:00Z",
+                "reporting_period": {"reporting_week": "2026-W28"},
+                "artifact_paths": {
+                    "json": str(package / "knowledge-atlas.v2.json"),
+                    "html": str(package / "knowledge-atlas.v2.html"),
+                    "source_catalog": str(package / "knowledge-atlas-sources.v1.json"),
+                },
+                "technical_refs": {
+                    "audit_explorer_path": str(package / "knowledge-audit-explorer.v1.html"),
+                },
+                "canonical_threads": [
+                    {
+                        "canonical_thread_id": "ct-eval-gates",
+                        "stable_slug": "eval-gates",
+                        "title_ru": "Гейты качества агентов",
+                        "thesis": "Проверки становятся частью пути выпуска.",
+                        "lifecycle_status": "active",
+                        "display_status": "growing",
+                        "evidence_maturity": "repeated_signal",
+                        "evidence_refs": ["atom:101", "https://t.me/ai_lab/101"],
+                        "audit_ref": "knowledge-audit-explorer.v1.html#atlas-thread-eval-gates",
+                        "operator_interest": {
+                            "current_reaction_count": 1,
+                            "confirmed_feedback_count": 0,
+                        },
+                    }
+                ],
+            }
+            with patch(
+                "output.knowledge_atlas_report_v2.load_manifest_bound_knowledge_atlas_v2",
+                return_value=payload,
+            ) as strict_load:
+                summary = export_knowledge_atlas_v2_obsidian_projection(
+                    atlas_json_path=package / "knowledge-atlas.v2.json",
+                    manifest_path=root / "run" / "manifest.json",
+                    vault_path=root / "vault",
+                    allowed_source_roots=(root,),
+                )
+            thread_note = (
+                root
+                / "vault"
+                / "25-canonical-atlas-v2"
+                / "eval-gates.md"
+            ).read_text(encoding="utf-8")
+            overview = Path(summary.atlas_note_path).read_text(encoding="utf-8")
+
+        self.assertEqual(summary.thread_count, 1)
+        self.assertEqual(summary.files_written, 2)
+        self.assertIn("canonical_thread:eval-gates", thread_note)
+        self.assertIn("knowledge-audit-explorer.v1.html#atlas-thread-eval-gates", thread_note)
+        self.assertIn("explicit Atlas V2 projection", overview)
+        strict_load.assert_called_once()
+
     def _make_db(self) -> str:
         tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
         tmp.close()
