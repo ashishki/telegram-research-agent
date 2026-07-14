@@ -159,7 +159,7 @@ behavior; it does not reopen the gate logic.
 | IRX-10 | MVP Radar reader contract and context-only hardening | `implemented_and_verified` | P1 | IRX-2, IRX-5, IRX-8 |
 | IRX-11 | Reader-value quality gates | `implemented_and_verified` | P1 | IRX-6, IRX-8 and upstream contracts |
 | IRX-12 | Report-specific feedback and learning loop | `implemented_and_verified` | P2 | IRX-2, IRX-3, IRX-5 through IRX-7, IRX-10 |
-| IRX-13 | Golden fixtures, evaluation dataset, and visual regression | `planned`; scaffolding begins after IRX-1 | P2 | incremental upstream fixtures; finalizes after IRX-6, IRX-7, IRX-11 |
+| IRX-13 | Golden fixtures, evaluation dataset, and visual regression | `implemented_and_verified` | P2 | IRX-1 through IRX-12 |
 | IRX-14 | Rollout, backward compatibility, and dogfood restart | `blocked` | P2 | IRX-1 through IRX-13 |
 
 ## 7. Priority And Dependency Order
@@ -1395,8 +1395,7 @@ preference/profile/config mutation.
 
 ### IRX-13 - Golden Fixtures, Evaluation Dataset, And Visual Regression
 
-**Status:** `planned`, with incremental fixture scaffolding required from
-IRX-1 onward. **Priority:** P2.
+**Status:** `implemented_and_verified`. **Priority:** P2.
 
 **Problem:** Current tests prove structural behavior but do not reproduce the
 W28/W29 product failures or protect period correctness, editorial usefulness,
@@ -1450,6 +1449,29 @@ task.
 
 **Stop conditions:** Stop before committing full private reports or accepting a
 snapshot update that hides an evidence/editorial regression.
+
+**Completion receipt:** IRX-13 added the consolidated sanitized
+`report_v2_regression_manifest.v1` release-candidate fixture registry under
+`tests/fixtures/intelligence_report_v2/`, with required coverage for new-week
+Monday, Sunday/year-boundary, previous-week reactions, Fable/Claude-style
+canonical duplication, missing/investigate Radar, context-only market lens,
+concrete and no-project implications, generic fallback, weak evidence,
+partial/empty period honesty, confirmed-feedback application receipts, W29
+failure patterns, and desktop/mobile output. The manifest records Report V2
+contract versions, IRX-11 evaluation dimensions, fixture refs, redaction
+provenance, structured assertions, and visual-regression policy. A focused
+validator and tests fail closed on missing coverage, private-data flags, bad
+fixture refs, missing contract refs, viewport drift, or unreviewed visual
+hashes. The Playwright screenshot harness and README document the exact
+1440x1000 and 375x1000 command plus prerequisite, browser/font, redaction,
+review, and update policy. Local Playwright execution exited with code 2
+because the Python Playwright package was not installed; no screenshot
+evidence or approved hashes were claimed. Focused fixture/quality tests passed
+35 tests; exact IRX-13 matrix passed 98 tests; Brief/Atlas/visual/project/
+feedback/Radar/retrieval compatibility passed 160 tests; focused Ruff,
+`py_compile`, fixture JSON validation, `git diff --check`, and
+`git diff --stat` passed. No rollout, scheduled-delivery switch, dogfood start,
+generated private artifact, sibling-repo edit, or IRX-14 work was claimed.
 
 **Rollout implications:** Fixtures accumulate from P0; final IRX-13 gate freezes
 the release candidate before dogfood begins.
@@ -1693,6 +1715,6 @@ Report files changed, canonical identity/lifecycle/as-of semantics, compatibilit
 
 ## 15. Suggested Following Task
 
-IRX-1 through IRX-7 and IRX-8 through IRX-12 are implemented and verified.
-IRX-13 is the next planned implementation scope. Rollout and dogfood remain
-unimplemented and gated by IRX-14.
+IRX-1 through IRX-7 and IRX-8 through IRX-13 are implemented and verified.
+IRX-14 is the next planned implementation scope. Rollout and dogfood remain
+unimplemented and gated by the IRX-14 start checklist.

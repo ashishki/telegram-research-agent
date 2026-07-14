@@ -1,0 +1,272 @@
+{
+  "schema_version": "report_v2_regression_manifest.v1",
+  "fixture_set_id": "irx13_report_v2_release_candidate",
+  "updated_at": "2026-07-15",
+  "expected_contracts": {
+    "split_ai_report": "split_ai_report.v2",
+    "report_quality": "report_quality.v2",
+    "reader_value_quality": "reader_value_quality.v1",
+    "report_visuals": "report_visuals.v1",
+    "feedback_receipt": "ai_report_feedback_application_receipt.v1",
+    "mvp_radar_reader": "mvp_radar_reader.v1"
+  },
+  "privacy": {
+    "raw_telegram_content": "excluded",
+    "generated_private_reports": "excluded",
+    "redaction_provenance": "synthetic_or_sanitized",
+    "notes": "Only synthetic/sanitized fixtures are referenced. Raw channel text and generated private reports are intentionally excluded."
+  },
+  "evaluation_dimensions": [
+    "structural_validity",
+    "evidence_validity",
+    "editorial_quality",
+    "personalization_quality",
+    "visual_quality",
+    "project_usefulness",
+    "radar_completeness"
+  ],
+  "scenarios": [
+    {
+      "id": "completed_week_monday_w29_regression",
+      "title": "Monday run resolves last completed week and reproduces W29 reader failure classes",
+      "coverage": [
+        "new_week_monday",
+        "w29_failure_pattern"
+      ],
+      "fixture_refs": [
+        {
+          "path": "tests/fixtures/report_v2/reader_value_quality_cases.v1.json",
+          "kind": "reader_value_quality"
+        }
+      ],
+      "structured_assertions": {
+        "period_mode": "completed_iso_week",
+        "generated_at": "2026-07-13T07:02:52Z",
+        "expected_reporting_week": "2026-W28",
+        "quality_failure_codes": [
+          "period.not_completed_week",
+          "brief.thesis_missing",
+          "brief.action_generic",
+          "radar.unavailable",
+          "visual.meaningful_count_low"
+        ]
+      },
+      "private_data": false
+    },
+    {
+      "id": "sunday_year_boundary_period",
+      "title": "Sunday and ISO year boundary completed-week resolver stays stable",
+      "coverage": [
+        "sunday_year_boundary"
+      ],
+      "fixture_refs": [],
+      "structured_assertions": {
+        "generated_at": "2021-01-04T08:00:00Z",
+        "expected_reporting_week": "2020-W53",
+        "expected_period_start": "2020-12-28T00:00:00Z",
+        "expected_period_end": "2021-01-04T00:00:00Z"
+      },
+      "private_data": false
+    },
+    {
+      "id": "previous_week_reactions",
+      "title": "Previous-week reaction eligibility remains visible but bounded",
+      "coverage": [
+        "previous_week_reactions"
+      ],
+      "fixture_refs": [
+        {
+          "path": "tests/fixtures/report_v2/knowledge_atlas_v2_cases.v1.json",
+          "kind": "atlas_v2"
+        }
+      ],
+      "structured_assertions": {
+        "reaction_snapshot_status": "complete",
+        "absence_semantics": "unknown_not_negative",
+        "reaction_influence": "bounded_receipt"
+      },
+      "private_data": false
+    },
+    {
+      "id": "fable_claude_canonical_duplication",
+      "title": "Fable/Claude-style vendor fragmentation is caught by canonical fixtures",
+      "coverage": [
+        "fable_claude_duplication"
+      ],
+      "fixture_refs": [
+        {
+          "path": "tests/fixtures/report_v2/knowledge_atlas_v2_cases.v1.json",
+          "kind": "atlas_v2"
+        }
+      ],
+      "structured_assertions": {
+        "duplicate_identity_expected": false,
+        "primary_thread_bounds": [
+          8,
+          12
+        ],
+        "canonical_identity_source": "irx4_registry"
+      },
+      "private_data": false
+    },
+    {
+      "id": "radar_missing_and_investigate",
+      "title": "Missing Radar fails closed while investigate Radar stays non-build",
+      "coverage": [
+        "missing_radar",
+        "investigate_radar",
+        "context_only_market_lens"
+      ],
+      "fixture_refs": [
+        {
+          "path": "tests/fixtures/intelligence_contract/context_only_radar_gate.json",
+          "kind": "radar_context_only"
+        },
+        {
+          "path": "tests/fixtures/report_v2/visual_components.v1.json",
+          "kind": "visual_radar_gate"
+        }
+      ],
+      "structured_assertions": {
+        "missing_reader_state": "unavailable",
+        "investigate_reader_decision": "investigate",
+        "context_only_build_allowed": false,
+        "market_lens_authority": "context_only"
+      },
+      "private_data": false
+    },
+    {
+      "id": "project_implication_concrete_and_none",
+      "title": "Project intelligence distinguishes concrete implications from valid zero-project periods",
+      "coverage": [
+        "concrete_project_implication",
+        "no_project_implication"
+      ],
+      "fixture_refs": [
+        {
+          "path": "tests/fixtures/report_v2/project_intelligence_v2_cases.v1.json",
+          "kind": "project_intelligence_v2"
+        }
+      ],
+      "structured_assertions": {
+        "max_project_actions": 2,
+        "zero_project_state": "valid_zero",
+        "descriptor_copy_required": true
+      },
+      "private_data": false
+    },
+    {
+      "id": "generic_fallback_and_weak_evidence",
+      "title": "Generic fallback and weak evidence remain explicit failures or partials",
+      "coverage": [
+        "generic_fallback",
+        "weak_evidence"
+      ],
+      "fixture_refs": [
+        {
+          "path": "tests/fixtures/report_v2/reader_value_quality_cases.v1.json",
+          "kind": "reader_value_quality"
+        }
+      ],
+      "structured_assertions": {
+        "generic_action_is_failure": true,
+        "weak_evidence_cannot_raise_confidence": true,
+        "quality_failure_codes": [
+          "brief.action_generic",
+          "project.action_not_specific",
+          "evidence.weak_or_missing"
+        ]
+      },
+      "private_data": false
+    },
+    {
+      "id": "partial_empty_period",
+      "title": "Partial and empty periods stay honest",
+      "coverage": [
+        "partial_period",
+        "empty_period"
+      ],
+      "fixture_refs": [
+        {
+          "path": "tests/fixtures/report_v2/reader_value_quality_cases.v1.json",
+          "kind": "reader_value_quality"
+        }
+      ],
+      "structured_assertions": {
+        "partial_requires_banner": true,
+        "empty_is_not_success": true,
+        "unknown_is_not_negative": true
+      },
+      "private_data": false
+    },
+    {
+      "id": "confirmed_feedback_application_receipt",
+      "title": "IRX-12 confirmed feedback receipt covers all application states",
+      "coverage": [
+        "confirmed_feedback_receipt"
+      ],
+      "fixture_refs": [
+        {
+          "path": "tests/fixtures/report_v2/knowledge_atlas_v2_cases.v1.json",
+          "kind": "atlas_v2"
+        }
+      ],
+      "structured_assertions": {
+        "required_statuses": [
+          "applied",
+          "unchanged",
+          "code_config_required",
+          "rejected",
+          "pending"
+        ],
+        "confirmation_state": "confirmed_only"
+      },
+      "private_data": false
+    },
+    {
+      "id": "desktop_mobile_visual_targets",
+      "title": "Desktop/mobile visual regression target is explicit and review-gated",
+      "coverage": [
+        "desktop_viewport",
+        "mobile_viewport"
+      ],
+      "fixture_refs": [
+        {
+          "path": "tests/fixtures/report_v2/visual_components.v1.html",
+          "kind": "visual_html"
+        }
+      ],
+      "structured_assertions": {
+        "viewports": [
+          "desktop_1440",
+          "mobile_375"
+        ],
+        "semantic_html_before_pixels": true,
+        "no_snapshot_without_review": true
+      },
+      "private_data": false
+    }
+  ],
+  "visual_regression": {
+    "command": "PYTHONPATH=src python3 scripts/report_v2_visual_snapshots.py --manifest tests/fixtures/intelligence_report_v2/irx13_fixture_manifest.v1.json --viewports 1440x1000 375x1000",
+    "baseline_status": "prerequisite_required",
+    "prerequisite": "Install the Python Playwright package and the Chromium browser in the local environment. This repository does not vendor browser binaries.",
+    "viewports": [
+      {
+        "id": "desktop_1440",
+        "width": 1440,
+        "height": 1000
+      },
+      {
+        "id": "mobile_375",
+        "width": 375,
+        "height": 1000
+      }
+    ],
+    "approved_snapshot_hashes": {},
+    "update_policy": "Only record or update snapshot hashes after structured fixture tests pass and human review confirms no evidence, editorial, responsive-layout, or redaction regression.",
+    "redaction_policy": "Only synthetic/sanitized HTML targets may be captured. Raw Telegram content and generated private reports must never be used as snapshot input.",
+    "font_policy": "Use Chromium with system-ui fallback only; browser and OS/font changes require hash review rather than silent baseline updates.",
+    "review_policy": "Snapshot hashes are evidence only when baseline_status is recorded and hashes are committed with the manifest after review."
+  }
+}

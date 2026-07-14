@@ -1,10 +1,10 @@
 # CODEX_PROMPT - Compact Session Handoff
 
-Version: 6.2
-Date: 2026-07-14
-State: IRX-1 through IRX-7 and IRX-8 through IRX-12
-`implemented_and_verified`; IRX-13 is the next planned implementation task;
-dogfood is blocked until IRX-14
+Version: 6.3
+Date: 2026-07-15
+State: IRX-1 through IRX-7 and IRX-8 through IRX-13
+`implemented_and_verified`; IRX-14 is the next planned implementation task;
+dogfood remains blocked until the IRX-14 start checklist passes
 
 ## Current Product Direction
 
@@ -34,7 +34,7 @@ docs/tasks.md
 Next implementation task:
 
 ```text
-IRX-13 - Golden Fixtures, Evaluation Dataset, And Visual Regression
+IRX-14 - Rollout, Backward Compatibility, And Dogfood Restart
 ```
 
 ## W29 Product Correction
@@ -53,7 +53,8 @@ added the strict manifest-bound Radar reader, and IRX-6 added the opt-in Brief
 V2 preview. IRX-11 added independent warn-only V1 and blocking V2 reader-value
 gates. IRX-7 added the opt-in Knowledge Atlas V2 and versioned Knowledge Audit
 Explorer split. IRX-12 added report-specific confirmation-gated feedback and
-application receipts. Visual-regression consolidation, scheduled V2 delivery,
+application receipts. IRX-13 added consolidated sanitized regression fixtures
+and a fail-loud desktop/mobile Playwright harness. Scheduled V2 delivery,
 rollout, and dogfood remain unstarted.
 
 ## Verified Baseline
@@ -134,6 +135,11 @@ rollout, and dogfood remain unstarted.
   action/project linkage, and `ai_report_feedback_application_receipt.v1`
   across Brief, Atlas, editorial, retrieval, quality, action-status, CLI, and
   Strategy Reviewer surfaces.
+- IRX-13 adds a sanitized `report_v2_regression_manifest.v1` release-candidate
+  fixture registry, closed validator, focused tests, and documented
+  desktop/mobile Playwright snapshot harness. The local environment lacked the
+  Python Playwright package, so no screenshot evidence or approved hashes were
+  claimed.
 - Canonical intelligence sidecar contract `tra-intelligence-contract.v1` is now
   implemented locally for workbook/Brief/Atlas projections with sanitized eval
   fixtures.
@@ -660,6 +666,47 @@ Verification and compatibility:
   semantics, IRX-10 Radar authority/gates, IRX-11 gate meanings, sibling code,
   screenshots, dogfood, and IRX-13/14 remained unchanged.
 
+## IRX-13 Completion
+
+Status: `implemented_and_verified` on 2026-07-15.
+
+Implemented:
+
+- consolidated sanitized `report_v2_regression_manifest.v1` release-candidate
+  fixture registry under `tests/fixtures/intelligence_report_v2/`, with
+  contract refs, IRX-11 evaluation dimensions, redaction provenance,
+  structured scenario assertions, fixture refs, and visual-regression policy;
+- coverage for new-week Monday, Sunday/year-boundary, previous-week reactions,
+  Fable/Claude-style canonical duplication, missing and investigate Radar,
+  context-only market lens, concrete/no project implications, generic fallback,
+  weak evidence, partial/empty period honesty, confirmed-feedback application
+  receipts, W29 failure patterns, and desktop/mobile output;
+- closed validator and focused tests for missing coverage, private-data flags,
+  missing contract refs, bad fixture refs, viewport drift, and unreviewed visual
+  hash claims;
+- documented Playwright desktop/mobile harness at 1440x1000 and 375x1000 with
+  explicit prerequisite failure behavior, browser/font stability, redaction,
+  review, and snapshot update policy.
+
+Verification and compatibility:
+
+- focused fixture/quality tests passed 35 tests;
+- exact IRX-13 task-card matrix passed 98 tests;
+- Brief/Atlas/visual/project/feedback/Radar/retrieval compatibility passed 160
+  tests;
+- focused Ruff, focused `py_compile`, changed fixture JSON validation,
+  `git diff --check`, and `git diff --stat` passed;
+- the documented snapshot command exited with code 2 because the Python
+  Playwright package was not installed locally. No screenshot evidence or
+  approved hashes were claimed;
+- generated private artifacts, live/expensive runs, full archive regeneration,
+  production alias/retention migration, scheduled delivery, rollout, dogfood,
+  frozen IRX-2 stage policy, IRX-1 period semantics, IRX-3 reaction semantics,
+  IRX-4 canonical lifecycle semantics, IRX-5 editorial authority, IRX-7
+  Atlas/Audit package semantics, IRX-10 Radar authority/gates, IRX-11 gate
+  meanings, IRX-12 feedback semantics, sibling code, and IRX-14 remained
+  unchanged.
+
 ## PGI-001 Completion
 
 Status: completed locally on 2026-07-10.
@@ -1029,8 +1076,8 @@ Report files changed, canonical identity/lifecycle/as-of semantics, compatibilit
 
 This exact historical prompt stopped at the IRX-4 boundary as required. IRX-4
 is implemented and verified; the subsequent IRX-5, IRX-8, IRX-9, IRX-10,
-IRX-6, IRX-11, IRX-7, and IRX-12 handoffs are now closed by the completion
-records above. IRX-13 is the next planned scope.
+IRX-6, IRX-11, IRX-7, IRX-12, and IRX-13 handoffs are now closed by the
+completion records above. IRX-14 is the next planned scope.
 
 ## Executed Codex Prompt - IRX-7
 
@@ -1287,7 +1334,7 @@ and CODEX handoff with exact test counts. Commit IRX-12 separately and push the
 current branch. Stop before IRX-13.
 ```
 
-## Exact Next Codex Prompt - IRX-13
+## Executed Codex Prompt - IRX-13
 
 ```text
 You are Codex working in /srv/openclaw-you/workspace/telegram-research-agent.
@@ -1371,6 +1418,74 @@ validation, git diff --check, git diff --stat, and inspect git status.
 Update the IRX registry, implementation journal, roadmap completion receipt,
 and CODEX handoff with exact test counts and any screenshot-harness result.
 Commit IRX-13 separately and push the current branch. Stop before IRX-14.
+```
+
+## Exact Next Codex Prompt - IRX-14
+
+```text
+You are Codex working in /srv/openclaw-you/workspace/telegram-research-agent.
+Mode: IMPLEMENTATION for IRX-14 only.
+
+Implement IRX-14, using these binding docs:
+  docs/intelligence_report_v2_roadmap.md
+  docs/intelligence_report_v2_contract.md
+  docs/weekly_run_manifest.md
+  docs/reaction_personalization_contract.md
+  docs/static_visualization_system.md
+  docs/tasks.md
+
+Start from the committed IRX-13 state. Do not fabricate dogfood scorecards,
+thresholds, weekly outcomes, live operator evidence, or screenshot evidence.
+Do not delete V1 artifacts or break V1 consumers. Do not change IRX-1 period
+semantics, IRX-2 run manifest policy, IRX-3 reaction semantics, IRX-4 canonical
+lifecycle semantics, IRX-5 editorial authority, IRX-7 Atlas/Audit package
+semantics, IRX-10 Radar authority, IRX-11 gate meanings, IRX-12 feedback
+confirmation/application semantics, IRX-13 fixture evidence semantics, global
+evidence scoring, Radar gates, cross-repo code, secrets, generated private
+artifacts, or the frozen irx2_orchestration.v1 stage policy.
+
+Before editing run:
+  git status
+  git branch
+  git log --oneline -20
+  git diff --stat
+
+Read the IRX-14 task card, current V1/V2 split report paths, manifest/package
+security helpers, retrieval/PI/Obsidian adapters, quality gates, feedback
+intake, CLI/orchestrator entrypoints, and the IRX-13 fixture harness.
+
+Implement the versioned rollout and compatibility gate for Report V2. V1
+artifacts must remain inspectable. V2 output paths and the operator command
+must be explicit. Hermes/PI, retrieval, and Obsidian must be able to identify
+V1/V2 freshness and run status during migration. Add a migration/start-gate
+receipt that compares period, Radar, reaction, editorial, project, visual, cost,
+quality, and feedback-readiness gates before any dogfood restart.
+
+Dogfood week 1 may start only if the checklist passes with real current
+evidence. If local prerequisites or private live artifacts are unavailable,
+implement and verify the gate and document the exact blocked evidence instead
+of claiming a dogfood start. Do not run an expensive or private live package
+unless it is explicitly required by the task scope, bounded, and safe in the
+current environment.
+
+Perform deep review after rollout/compatibility design and again after start
+gate integration. Fix all in-scope blockers before documentation or commit.
+
+Run:
+  PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache \
+    python3 -m unittest tests.test_split_intelligence_reports \
+    tests.test_intelligence_retrieval_items tests.test_pi_facade \
+    tests.test_obsidian_export tests.test_report_quality \
+    tests.test_ai_report_feedback
+
+Also run focused compatibility tests for every touched CLI/orchestrator/
+retrieval/PI/Obsidian/feedback/fixture surface, focused Ruff, py_compile,
+fixture JSON validation if fixtures change, git diff --check, git diff --stat,
+and inspect git status.
+
+Update the IRX registry, implementation journal, roadmap completion receipt,
+and CODEX handoff with exact test counts and any blocked live/dogfood evidence.
+Commit IRX-14 separately and push the current branch.
 ```
 
 ## Historical PGI-007 Handoff

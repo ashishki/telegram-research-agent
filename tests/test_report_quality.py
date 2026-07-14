@@ -25,6 +25,11 @@ from output.report_quality import (
     validate_weekly_artifact_paths,
     validate_weekly_artifacts,
 )
+from output.report_v2_regression_fixtures import (
+    REQUIRED_SCENARIO_COVERAGE,
+    REQUIRED_VIEWPORTS,
+    load_report_v2_regression_manifest,
+)
 from output.reader_value_quality import ReaderQualityContractError
 from output.report_visuals import render_report_visual, validate_report_visual
 
@@ -877,6 +882,41 @@ class TestReaderValueQuality(unittest.TestCase):
         self.assertNotIn("weekly_brief", warning or "")
         self.assertLessEqual(len(warning or ""), 500)
 
+
+class TestReportV2RegressionManifestInQualityMatrix(unittest.TestCase):
+    def test_irx13_manifest_locks_release_candidate_coverage(self):
+        manifest = load_report_v2_regression_manifest()
+
+        coverage = {
+            item
+            for scenario in manifest["scenarios"]
+            for item in scenario["coverage"]
+        }
+        self.assertTrue(REQUIRED_SCENARIO_COVERAGE.issubset(coverage))
+        self.assertEqual(
+            manifest["evaluation_dimensions"],
+            [
+                "structural_validity",
+                "evidence_validity",
+                "editorial_quality",
+                "personalization_quality",
+                "visual_quality",
+                "project_usefulness",
+                "radar_completeness",
+            ],
+        )
+
+    def test_irx13_visual_harness_policy_does_not_claim_unreviewed_pixels(self):
+        manifest = load_report_v2_regression_manifest()
+        visual = manifest["visual_regression"]
+
+        viewports = {item["id"]: item["width"] for item in visual["viewports"]}
+        self.assertTrue(REQUIRED_VIEWPORTS.issubset(viewports))
+        self.assertEqual(viewports["desktop_1440"], 1440)
+        self.assertEqual(viewports["mobile_375"], 375)
+        self.assertEqual(visual["baseline_status"], "prerequisite_required")
+        self.assertEqual(visual["approved_snapshot_hashes"], {})
+        self.assertIn("human review", visual["update_policy"])
 
 
 

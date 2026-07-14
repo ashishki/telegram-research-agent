@@ -1,7 +1,7 @@
 # Current Backlog
 
-Version: 3.9
-Last updated: 2026-07-14
+Version: 4.0
+Last updated: 2026-07-15
 State: canonical active backlog
 
 Canonical product-correction roadmap:
@@ -47,17 +47,16 @@ below, but active implementation starts from the IRX task graph.
 | Project Intelligence V2 shadow | `implemented_and_verified`; separate opt-in `project_intelligence.v2` run artifact with exact project/thread/evidence authority and no V1 renderer activation |
 | Weekly Intelligence Brief V2 preview | `implemented_and_verified`; separate opt-in manifest-bound `split_ai_report.v2` package with V1 generation and delivery unchanged |
 | Reader-value quality gates | `implemented_and_verified`; closed seven-dimension `report_quality.v2`, warn-only on V1 and blocking on opt-in V2 previews |
-| Report V2 contract and roadmap | `implementation_in_progress`; IRX-0 documentation plus IRX-1 through IRX-7 and IRX-8 through IRX-12 are implemented and verified |
+| Report V2 contract and roadmap | `implementation_in_progress`; IRX-0 documentation plus IRX-1 through IRX-7 and IRX-8 through IRX-13 are implemented and verified |
 | Portfolio dogfood evidence | `blocked_on_IRX-14_start_gate` |
 
 ## Next Candidate Task
 
-`IRX-13 - Golden Fixtures, Evaluation Dataset, And Visual Regression`
+`IRX-14 - Rollout, Backward Compatibility, And Dogfood Restart`
 
-Consolidate sanitized golden fixtures, evaluation dataset coverage, and
-desktop/mobile visual regression over the completed Brief V2, Atlas V2,
-Audit Explorer, Radar reader, project, personalization, quality, and IRX-12
-feedback receipt contracts. Keep rollout/dogfood to IRX-14. Its task card is in
+Define the versioned rollout and compatibility gate for the completed Report V2
+release candidate. Keep dogfood evidence honest: do not start or claim live
+dogfood until the IRX-14 checklist passes. Its task card is in
 `docs/intelligence_report_v2_roadmap.md`.
 
 ## Dependency Graph
@@ -90,7 +89,7 @@ contract.
 | IRX-11 | P1 | `implemented_and_verified` | Reader-value gates for period, editorial, personalization, visual, project, and Radar quality | IRX-6, IRX-8 |
 | IRX-7 | P2 | `implemented_and_verified` | Visual Knowledge Atlas V2 plus preserved Knowledge Audit Explorer | IRX-4, IRX-5, IRX-8, IRX-11 |
 | IRX-12 | P2 | `implemented_and_verified` | Report- and section-specific confirmation-gated learning loop | IRX-2, IRX-3, IRX-5, IRX-6, IRX-7, IRX-10 |
-| IRX-13 | P2 | `planned`; fixture scaffolding starts in IRX-1 | Sanitized golden fixtures, evaluation dataset, and desktop/mobile regression | IRX-1..IRX-12 |
+| IRX-13 | P2 | `implemented_and_verified` | Sanitized golden fixtures, evaluation dataset, and desktop/mobile regression | IRX-1..IRX-12 |
 | IRX-14 | P2 | `planned` | Versioned rollout, compatibility, and dogfood restart gate | IRX-1..IRX-13 |
 
 Full task cards, acceptance criteria, likely files, failure states, tests, and
@@ -573,6 +572,43 @@ rollout implications are in `docs/intelligence_report_v2_roadmap.md`.
   IRX-10 Radar authority/gate change, IRX-11 gate-meaning change, sibling-repo
   edit, IRX-13/14 implementation, screenshot baseline, rollout, or dogfood
   claim was made. IRX-13 is the next dependency-ready task.
+
+### 2026-07-15 - IRX-13 Golden Fixtures And Visual Regression Harness
+
+- Status: `implemented_and_verified`.
+- Added a consolidated sanitized `report_v2_regression_manifest.v1` fixture
+  registry under `tests/fixtures/intelligence_report_v2/` for the current
+  Report V2 release candidate. The manifest records contract versions,
+  seven IRX-11 evaluation dimensions, redaction provenance, structured
+  scenario expectations, fixture refs, and visual-regression policy.
+- Covered new-week Monday, Sunday/year-boundary, previous-week reactions,
+  Fable/Claude-style canonical duplication, missing and investigate Radar,
+  context-only market lens, concrete and no-project implications, generic
+  fallback, weak evidence, partial/empty period honesty, confirmed feedback
+  application receipts, W29 failure patterns, and desktop/mobile output.
+- Added `src/output/report_v2_regression_fixtures.py` validator and focused
+  tests so missing coverage, private-data flags, bad fixture refs, missing
+  contract refs, viewport drift, or unreviewed visual hashes fail closed.
+- Added `scripts/report_v2_visual_snapshots.py` and fixture README documenting
+  the exact 1440x1000 and 375x1000 Playwright command, prerequisite failure
+  behavior, browser/font stability, redaction, and snapshot review/update
+  policy. The local environment did not have the Playwright Python package, so
+  the harness exited explicitly with code 2 and no screenshot evidence or
+  hashes were claimed.
+- Verification: focused fixture/quality tests passed 35 tests. Exact IRX-13
+  task-card matrix passed 98 tests. Brief/Atlas/visual/project/feedback/Radar/
+  retrieval compatibility passed 160 tests. Focused Ruff, focused
+  `py_compile`, changed fixture JSON validation, `git diff --check`, and
+  `git diff --stat` passed.
+- Scope confirmation: no generated private artifacts, live/expensive runs,
+  full archive regeneration, production alias/retention migration,
+  scheduled-delivery switch, rollout, dogfood start, dogfood evidence claim,
+  frozen IRX-2 stage-policy change, IRX-1 period semantic change, IRX-3
+  reaction semantic change, IRX-4 canonical lifecycle semantic change, IRX-5
+  editorial-authority change, IRX-7 Atlas/Audit package semantic change,
+  IRX-10 Radar authority/gate change, IRX-11 gate-meaning change, IRX-12
+  feedback confirmation/application semantic change, sibling-repo edit, or
+  IRX-14 implementation was made. IRX-14 is the next dependency-ready task.
 
 ## Existing-Work Reconciliation
 
