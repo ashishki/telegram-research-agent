@@ -1,10 +1,10 @@
 # CODEX_PROMPT - Compact Session Handoff
 
-Version: 6.3
+Version: 6.4
 Date: 2026-07-15
-State: IRX-1 through IRX-7 and IRX-8 through IRX-13
-`implemented_and_verified`; IRX-14 is the next planned implementation task;
-dogfood remains blocked until the IRX-14 start checklist passes
+State: IRX-1 through IRX-14 `implemented_and_verified`; the active IRX
+implementation queue is closed. Dogfood remains `not_started` until
+`report-v2-rollout-gate` returns `eligible` on real current private artifacts.
 
 ## Current Product Direction
 
@@ -34,7 +34,7 @@ docs/tasks.md
 Next implementation task:
 
 ```text
-IRX-14 - Rollout, Backward Compatibility, And Dogfood Restart
+No remaining IRX implementation task.
 ```
 
 ## W29 Product Correction
@@ -54,8 +54,9 @@ V2 preview. IRX-11 added independent warn-only V1 and blocking V2 reader-value
 gates. IRX-7 added the opt-in Knowledge Atlas V2 and versioned Knowledge Audit
 Explorer split. IRX-12 added report-specific confirmation-gated feedback and
 application receipts. IRX-13 added consolidated sanitized regression fixtures
-and a fail-loud desktop/mobile Playwright harness. Scheduled V2 delivery,
-rollout, and dogfood remain unstarted.
+and a fail-loud desktop/mobile Playwright harness. IRX-14 added the explicit
+Report V2 rollout/start gate. Scheduled delivery switch and dogfood remain
+unstarted until the gate returns `eligible` on real current evidence.
 
 ## Verified Baseline
 
@@ -140,6 +141,11 @@ rollout, and dogfood remain unstarted.
   desktop/mobile Playwright snapshot harness. The local environment lacked the
   Python Playwright package, so no screenshot evidence or approved hashes were
   claimed.
+- IRX-14 adds read-only `report_v2_rollout_receipt.v1` and the explicit
+  `report-v2-rollout-gate` CLI. It preserves V1 inspectability, publishes V2
+  paths/operator commands, checks retrieval/PI/Obsidian/feedback/quality/cost/
+  visual/Radar readiness, and blocks dogfood with explicit evidence when real
+  current artifacts or prerequisites are missing.
 - Canonical intelligence sidecar contract `tra-intelligence-contract.v1` is now
   implemented locally for workbook/Brief/Atlas projections with sanitized eval
   fixtures.
@@ -707,6 +713,44 @@ Verification and compatibility:
   meanings, IRX-12 feedback semantics, sibling code, and IRX-14 remained
   unchanged.
 
+## IRX-14 Completion
+
+Status: `implemented_and_verified` on 2026-07-15.
+
+Implemented:
+
+- read-only `report_v2_rollout_receipt.v1` in
+  `src/output/report_v2_rollout.py`, publishing V1 compatibility aliases, V2
+  manifest/package paths, final rollout contract versions, operator commands,
+  dogfood policy, gates, and blocked evidence;
+- explicit `report-v2-rollout-gate` CLI command. It runs migrations, reads
+  existing artifacts, can write a JSON receipt, returns 0 only when dogfood
+  start is `eligible`, and returns 2 when the start gate blocks dogfood;
+- gate checks for period/run completeness, V1 inspectability, V2 Brief/Atlas
+  packages, retrieval/PI V2 descriptors, Obsidian Atlas V2 adapter source,
+  Radar reader state/context-only safety, reaction receipt, editorial stage,
+  project implication surface, semantic visuals plus reviewed desktop/mobile
+  hashes, cost/latency receipt, quality-gated V2 packages, feedback readiness,
+  and IRX-13 fixture registry readiness;
+- dogfood policy fields that preserve a feature freeze after a real start and
+  explicitly prohibit fabricated dogfood evidence.
+
+Verification and compatibility:
+
+- exact IRX-14 task-card matrix passed 143 tests;
+- focused rollout/CLI tests passed 9 tests;
+- focused rollout/CLI/regression-fixture/manifest/orchestrator compatibility
+  passed 60 tests;
+- focused Ruff and focused `py_compile` passed;
+- a real isolated CLI gate command against a temporary database and missing
+  output root returned exit code 2 with `dogfood_start_status=blocked` and
+  `dogfood_week_1.status=not_started`;
+- no generated private artifacts were committed, no live/expensive weekly
+  package was run, no dogfood scorecards, thresholds, weekly outcomes, live
+  operator evidence, or screenshot evidence were fabricated, no V1 artifact was
+  deleted, no scheduled-delivery switch was made, no production alias/retention
+  migration was made, and sibling code remained unchanged.
+
 ## PGI-001 Completion
 
 Status: completed locally on 2026-07-10.
@@ -1076,8 +1120,8 @@ Report files changed, canonical identity/lifecycle/as-of semantics, compatibilit
 
 This exact historical prompt stopped at the IRX-4 boundary as required. IRX-4
 is implemented and verified; the subsequent IRX-5, IRX-8, IRX-9, IRX-10,
-IRX-6, IRX-11, IRX-7, IRX-12, and IRX-13 handoffs are now closed by the
-completion records above. IRX-14 is the next planned scope.
+IRX-6, IRX-11, IRX-7, IRX-12, IRX-13, and IRX-14 handoffs are now closed by the
+completion records above.
 
 ## Executed Codex Prompt - IRX-7
 
@@ -1420,7 +1464,7 @@ and CODEX handoff with exact test counts and any screenshot-harness result.
 Commit IRX-13 separately and push the current branch. Stop before IRX-14.
 ```
 
-## Exact Next Codex Prompt - IRX-14
+## Executed Codex Prompt - IRX-14
 
 ```text
 You are Codex working in /srv/openclaw-you/workspace/telegram-research-agent.
@@ -1490,15 +1534,17 @@ Commit IRX-14 separately and push the current branch.
 
 ## Historical PGI-007 Handoff
 
-Status: superseded as the immediate next task and blocked by IRX-14.
+Status: superseded as the immediate next task and blocked by
+`report-v2-rollout-gate`.
 
 PGI-007 requires a four-week dogfood evidence series from operator/private
 weekly runs. Do not fabricate scorecards, thresholds, or outcomes. Generated
 private artifacts must remain ignored unless a sanitized sample is explicitly
 requested.
 
-Resume only after the IRX-14 Report V2 start gate passes. Do not fabricate
-scorecards or use the current W29 reports as Week 1 evidence.
+Resume only after `report-v2-rollout-gate` returns `eligible` on real current
+private artifacts. Do not fabricate scorecards or use the current W29 reports
+as Week 1 evidence.
 
 ## Non-Negotiable Rules
 

@@ -1,6 +1,6 @@
 # Current Backlog
 
-Version: 4.0
+Version: 4.1
 Last updated: 2026-07-15
 State: canonical active backlog
 
@@ -20,8 +20,9 @@ below, but active implementation starts from the IRX task graph.
 - `PGI-001` through `PGI-006` are implemented locally with focused
   verification. Their infrastructure is reusable, but W29 disproved the claim
   that the split reports are ready for reader-value dogfood.
-- `PGI-007` is superseded as the next gate by `IRX-14`; dogfood must not start
-  until the Report V2 start checklist passes.
+- `PGI-007` is superseded as the next gate by `report-v2-rollout-gate`;
+  dogfood must not start until that start checklist returns `eligible` on real
+  current operator evidence.
 - Do not run expensive LLM jobs, full archive backfills, migrations, or
   production config changes from backlog grooming.
 - Market/business context remains `context_only`.
@@ -47,17 +48,17 @@ below, but active implementation starts from the IRX task graph.
 | Project Intelligence V2 shadow | `implemented_and_verified`; separate opt-in `project_intelligence.v2` run artifact with exact project/thread/evidence authority and no V1 renderer activation |
 | Weekly Intelligence Brief V2 preview | `implemented_and_verified`; separate opt-in manifest-bound `split_ai_report.v2` package with V1 generation and delivery unchanged |
 | Reader-value quality gates | `implemented_and_verified`; closed seven-dimension `report_quality.v2`, warn-only on V1 and blocking on opt-in V2 previews |
-| Report V2 contract and roadmap | `implementation_in_progress`; IRX-0 documentation plus IRX-1 through IRX-7 and IRX-8 through IRX-13 are implemented and verified |
-| Portfolio dogfood evidence | `blocked_on_IRX-14_start_gate` |
+| Report V2 contract and roadmap | `implemented_and_verified`; IRX-0 documentation plus IRX-1 through IRX-14 are implemented and verified |
+| Portfolio dogfood evidence | `not_started`; blocked until `report-v2-rollout-gate` returns `eligible` on real current private artifacts |
 
 ## Next Candidate Task
 
-`IRX-14 - Rollout, Backward Compatibility, And Dogfood Restart`
+No remaining IRX implementation task.
 
-Define the versioned rollout and compatibility gate for the completed Report V2
-release candidate. Keep dogfood evidence honest: do not start or claim live
-dogfood until the IRX-14 checklist passes. Its task card is in
-`docs/intelligence_report_v2_roadmap.md`.
+The IRX implementation queue is closed through IRX-14. The next non-IRX action
+is operational: run `report-v2-rollout-gate` on a real current private weekly
+package and start dogfood only if it returns `eligible`. No live dogfood
+evidence is claimed in this backlog.
 
 ## Dependency Graph
 
@@ -67,10 +68,9 @@ P1: IRX-5 -> IRX-8 -> IRX-9 -> IRX-10 -> IRX-6 -> IRX-11
 P2: IRX-4/5/8/11 -> IRX-7 -> IRX-12 -> IRX-13 -> IRX-14
 ```
 
-`IRX-13` remains a P2 delivery task, but sanitized period fixtures should be
-introduced with IRX-1 and extended in every slice. IRX-8 precedes the Brief V2
-renderer because both reader surfaces need the same deterministic visual
-contract.
+`IRX-13` was the P2 fixture/evaluation task and is now closed. IRX-8 preceded
+the Brief V2 renderer because both reader surfaces need the same deterministic
+visual contract.
 
 ## IRX Queue
 
@@ -90,7 +90,7 @@ contract.
 | IRX-7 | P2 | `implemented_and_verified` | Visual Knowledge Atlas V2 plus preserved Knowledge Audit Explorer | IRX-4, IRX-5, IRX-8, IRX-11 |
 | IRX-12 | P2 | `implemented_and_verified` | Report- and section-specific confirmation-gated learning loop | IRX-2, IRX-3, IRX-5, IRX-6, IRX-7, IRX-10 |
 | IRX-13 | P2 | `implemented_and_verified` | Sanitized golden fixtures, evaluation dataset, and desktop/mobile regression | IRX-1..IRX-12 |
-| IRX-14 | P2 | `planned` | Versioned rollout, compatibility, and dogfood restart gate | IRX-1..IRX-13 |
+| IRX-14 | P2 | `implemented_and_verified` | Versioned rollout, compatibility, and dogfood restart gate | IRX-1..IRX-13 |
 
 Full task cards, acceptance criteria, likely files, failure states, tests, and
 rollout implications are in `docs/intelligence_report_v2_roadmap.md`.
@@ -608,7 +608,46 @@ rollout implications are in `docs/intelligence_report_v2_roadmap.md`.
   editorial-authority change, IRX-7 Atlas/Audit package semantic change,
   IRX-10 Radar authority/gate change, IRX-11 gate-meaning change, IRX-12
   feedback confirmation/application semantic change, sibling-repo edit, or
-  IRX-14 implementation was made. IRX-14 is the next dependency-ready task.
+  IRX-14 implementation was made. At that boundary IRX-14 was next; it is now
+  closed below.
+
+### 2026-07-15 - IRX-14 Rollout Compatibility And Dogfood Start Gate
+
+- Status: `implemented_and_verified`.
+- Added read-only `report_v2_rollout_receipt.v1` in
+  `src/output/report_v2_rollout.py`. The receipt publishes the operator
+  commands, V1 compatibility aliases, V2 manifest/package paths, final rollout
+  contract versions, dogfood policy, blocking gates, and blocked evidence.
+- Added explicit CLI command `report-v2-rollout-gate`. It runs migrations,
+  reads existing artifacts, writes an optional receipt, returns 0 only when the
+  start gate is `eligible`, and returns 2 when dogfood must remain blocked.
+- The start gate compares period/run status, V1 inspectability, V2 Brief/Atlas
+  package paths, retrieval/PI V2 descriptors, Obsidian Atlas V2 adapter source,
+  Radar reader state and context-only safety, reaction receipt, editorial
+  stage, project implication surface, visual semantics plus reviewed
+  desktop/mobile hashes, cost/latency receipt, quality-gated V2 packages,
+  feedback readiness, and the IRX-13 fixture registry.
+- Real local gate run used an isolated temporary database and missing output
+  root. It exited 2 with `dogfood_start_status=blocked`,
+  `dogfood_week_1.status=not_started`, and explicit blocked evidence for
+  missing current run artifacts, missing V2 packages, missing Radar/reaction/
+  editorial/project/quality evidence, missing reviewed visual hashes, and
+  missing cost receipt. No dogfood start or external evidence was claimed.
+- Verification: exact IRX-14 task-card matrix passed 143 tests. Focused
+  rollout/CLI tests passed 9 tests. Focused rollout/CLI/regression-fixture/
+  manifest/orchestrator compatibility passed 60 tests. Focused Ruff and
+  focused `py_compile` passed. The real isolated CLI gate command returned the
+  expected blocked exit code 2.
+- Scope confirmation: no generated private artifacts were committed, no
+  live/expensive weekly package was run, no dogfood scorecards, thresholds,
+  outcomes, live operator evidence, or screenshot evidence were fabricated, no
+  V1 artifacts were deleted, no scheduled-delivery switch was made, no
+  production alias/retention migration was made, no sibling repo was edited,
+  and IRX-1 period semantics, IRX-2 manifest policy, IRX-3 reaction semantics,
+  IRX-4 canonical lifecycle, IRX-5 editorial authority, IRX-7 Atlas/Audit
+  semantics, IRX-10 Radar authority/gates, IRX-11 gate meanings, IRX-12
+  feedback semantics, IRX-13 fixture evidence semantics, global evidence
+  scoring, and frozen `irx2_orchestration.v1` remain unchanged.
 
 ## Existing-Work Reconciliation
 
@@ -621,8 +660,9 @@ rollout implications are in `docs/intelligence_report_v2_roadmap.md`.
   contract concrete and evidence-backed.
 - `PGI-006` supplies scorecard plumbing; IRX-11 and IRX-13 add gates that make
   current W29 patterns fail.
-- `PGI-007` is not deleted. Its evidence-series intent resumes only through
-  IRX-14 after the start gate passes.
+- `PGI-007` is not deleted. Its evidence-series intent resumes only after
+  `report-v2-rollout-gate` returns `eligible` on real current private
+  artifacts.
 - Radar RVE/context-only exclusion is reused. IRX-2 added same-run binding;
   IRX-10 adds reader explanation without weakening gates.
 

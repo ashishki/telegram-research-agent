@@ -318,6 +318,28 @@ def build_parser() -> argparse.ArgumentParser:
     weekly_v2_parser.add_argument("--token", default=None)
     weekly_v2_parser.set_defaults(handler=handle_weekly_intelligence_v2)
 
+    rollout_gate_parser = subparsers.add_parser(
+        "report-v2-rollout-gate",
+        help="Inspect the Report V2 rollout/dogfood start gate without starting dogfood",
+    )
+    rollout_gate_parser.add_argument("--week", default=None)
+    rollout_gate_parser.add_argument(
+        "--output-root",
+        default=None,
+        help="Report output root (default: data/output)",
+    )
+    rollout_gate_parser.add_argument(
+        "--weekly-run-root",
+        default=None,
+        help="Weekly-run manifest root (default: <output-root>/weekly_intelligence_runs)",
+    )
+    rollout_gate_parser.add_argument("--vault-path", default=None)
+    rollout_gate_parser.add_argument("--namespace", default=None)
+    rollout_gate_parser.add_argument("--max-weekly-cost-usd", type=float, default=5.0)
+    rollout_gate_parser.add_argument("--output-path", default=None)
+    rollout_gate_parser.add_argument("--json", action="store_true")
+    rollout_gate_parser.set_defaults(handler=handle_report_v2_rollout_gate)
+
     channel_intel_report_parser = subparsers.add_parser(
         "channel-intelligence-report",
         help="Render an optional Markdown report from derived Channel Intelligence rows",
@@ -1154,6 +1176,53 @@ def handle_weekly_intelligence_v2(args: argparse.Namespace) -> int:
     if result.run_status in {"failed", "cancelled"}:
         return 1
     return 2 if result.run_status == "partial" else 0
+
+
+def handle_report_v2_rollout_gate(args: argparse.Namespace) -> int:
+    from output.report_v2_rollout import (
+        build_report_v2_rollout_receipt,
+        format_report_v2_rollout_receipt,
+        write_report_v2_rollout_receipt,
+    )
+
+    settings = load_settings()
+    try:
+        LOGGER.info("Starting step=run_migrations")
+        run_migrations()
+        LOGGER.info("Finished step=run_migrations")
+        LOGGER.info(
+            "Starting step=report_v2_rollout_gate week=%s output_root=%s",
+            args.week or "latest",
+            args.output_root or "default",
+        )
+        receipt = build_report_v2_rollout_receipt(
+            settings,
+            week_label=args.week,
+            output_root=args.output_root,
+            weekly_run_root=args.weekly_run_root,
+            vault_path=args.vault_path,
+            namespace=args.namespace,
+            max_weekly_cost_usd=max(0.0, float(args.max_weekly_cost_usd)),
+        )
+        if args.output_path:
+            write_report_v2_rollout_receipt(receipt, args.output_path)
+        LOGGER.info(
+            "Finished step=report_v2_rollout_gate status=%s blocking=%d",
+            receipt["dogfood_start_status"],
+            len(receipt["blocking_gates"]),
+        )
+    except Exception as exc:
+        LOGGER.exception("Report V2 rollout gate failed")
+        sys.stdout.write(f"Report V2 rollout gate failed: {exc}\n")
+        return 1
+
+    if args.json:
+        sys.stdout.write(json.dumps(receipt, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
+    else:
+        sys.stdout.write(format_report_v2_rollout_receipt(receipt))
+        if args.output_path:
+            sys.stdout.write(f"receipt_path={args.output_path}\n")
+    return 0 if receipt["dogfood_start_status"] == "eligible" else 2
 
 
 def handle_score(args: argparse.Namespace) -> int:

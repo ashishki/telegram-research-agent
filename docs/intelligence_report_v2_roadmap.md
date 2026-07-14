@@ -160,7 +160,7 @@ behavior; it does not reopen the gate logic.
 | IRX-11 | Reader-value quality gates | `implemented_and_verified` | P1 | IRX-6, IRX-8 and upstream contracts |
 | IRX-12 | Report-specific feedback and learning loop | `implemented_and_verified` | P2 | IRX-2, IRX-3, IRX-5 through IRX-7, IRX-10 |
 | IRX-13 | Golden fixtures, evaluation dataset, and visual regression | `implemented_and_verified` | P2 | IRX-1 through IRX-12 |
-| IRX-14 | Rollout, backward compatibility, and dogfood restart | `blocked` | P2 | IRX-1 through IRX-13 |
+| IRX-14 | Rollout, backward compatibility, and dogfood restart | `implemented_and_verified`; dogfood not started until gate returns eligible | P2 | IRX-1 through IRX-13 |
 
 ## 7. Priority And Dependency Order
 
@@ -1478,7 +1478,8 @@ the release candidate before dogfood begins.
 
 ### IRX-14 - Rollout, Backward Compatibility, And Dogfood Restart
 
-**Status:** `blocked` until IRX-1 through IRX-13 acceptance passes.
+**Status:** `implemented_and_verified`; dogfood is not started until
+`report-v2-rollout-gate` returns `eligible` on real current operator evidence.
 **Priority:** P2.
 
 **Problem:** The documented four-week dogfood would collect misleading evidence
@@ -1535,6 +1536,27 @@ task.
 **Stop conditions:** Do not delete old artifacts, break consumers without a
 migration, start dogfood before P0 correction, or add non-blocking features
 during the four-week run.
+
+**Completion receipt:** IRX-14 added the read-only
+`report_v2_rollout_receipt.v1` and CLI command `report-v2-rollout-gate`. The
+receipt publishes final rollout versions and paths for
+`tra-intelligence-contract.v2`, `split_ai_report.v2`, `editorial_intelligence.v1`,
+and `weekly_run_manifest.v1`; preserves V1 compatibility aliases; names the
+candidate operator command `weekly-intelligence-v2`; and records the dogfood
+policy that new feature work stops after a real start except blockers/friction
+fixes. The gate compares period/run status, V1 inspectability, V2 Brief/Atlas
+package paths, retrieval/PI V2 descriptors, Obsidian Atlas V2 adapter source,
+Radar reader state and context-only safety, reaction receipt, editorial stage,
+project implication surface, semantic visuals plus reviewed desktop/mobile
+hashes, cost/latency receipt, quality-gated V2 packages, feedback readiness,
+and IRX-13 fixture registry readiness. A real isolated local CLI run against a
+temporary DB and missing output root returned exit code 2 with
+`dogfood_start_status=blocked` and `dogfood_week_1.status=not_started`; no
+dogfood start, dogfood scorecard, live operator evidence, or screenshot
+evidence was claimed. Exact IRX-14 matrix passed 143 tests; focused
+rollout/CLI tests passed 9 tests; focused rollout/CLI/regression-fixture/
+manifest/orchestrator compatibility passed 60 tests; focused Ruff and
+`py_compile` passed.
 
 **Rollout implications:** This task owns the actual delivery switch and dogfood
 restart. Earlier tasks may produce V2 artifacts but may not declare the product
@@ -1715,6 +1737,7 @@ Report files changed, canonical identity/lifecycle/as-of semantics, compatibilit
 
 ## 15. Suggested Following Task
 
-IRX-1 through IRX-7 and IRX-8 through IRX-13 are implemented and verified.
-IRX-14 is the next planned implementation scope. Rollout and dogfood remain
-unimplemented and gated by the IRX-14 start checklist.
+IRX-1 through IRX-14 are implemented and verified. The IRX implementation queue
+is closed. Dogfood remains `not_started` until `report-v2-rollout-gate` returns
+`eligible` on real current private artifacts; no external dogfood evidence is
+claimed here.
