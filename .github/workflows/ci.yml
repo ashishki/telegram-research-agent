@@ -17,6 +17,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -29,3 +31,6 @@ jobs:
 
       - name: Run tests
         run: python -m pytest tests/ -q
+
+      - name: Verify public evidence boundary
+        run: PYTHONPATH=src python3 scripts/public_scorecard_demo.py --check
