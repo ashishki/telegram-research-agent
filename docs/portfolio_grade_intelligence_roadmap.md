@@ -1,8 +1,9 @@
 # Portfolio-Grade Personal Intelligence Roadmap
 
-Version: 1.0
-Last updated: 2026-07-13
-Status: canonical broader product roadmap; IRX is the active report correction
+Version: 1.1
+Last updated: 2026-07-15
+Status: canonical broader product roadmap; IRX implementation is closed through
+IRX-14 and dogfood is controlled by the rollout gate
 
 This is the canonical product, architecture, evaluation, and portfolio-readiness
 roadmap for `telegram-research-agent`. Other roadmap documents are component
@@ -11,11 +12,11 @@ records, historical implementation logs, or supporting specifications.
 ## W29 Product Correction
 
 The W29 Brief and Atlas passed the structural PGI checks but failed as
-information products. `docs/intelligence_report_v2_roadmap.md` is therefore the
-active implementation order. PGI-003 through PGI-006 remain reusable
-infrastructure records, not proof of Report V2 reader value. PGI-007 dogfood is
-held until IRX-14 confirms correct periods, same-run Radar, visible reaction
-effects, canonical threads, useful editorial actions, and reader-value gates.
+information products. `docs/intelligence_report_v2_roadmap.md` records the
+completed IRX-1 through IRX-14 correction sequence. PGI-003 through PGI-006
+remain reusable infrastructure records, not proof of Report V2 reader value.
+PGI-007 dogfood is held until `report-v2-rollout-gate` returns `eligible` on a
+real current private weekly package.
 
 ## 1. Executive Target
 
@@ -50,9 +51,8 @@ Thresholds are provisional until four stable weekly runs establish baselines.
 
 ## 2. Current Verified Baseline
 
-Repo audit source: local code/tests/docs/fixtures plus sibling Radar checkout,
-GitHub connector check for open PRs/issues, and recent git history on
-2026-07-10.
+Repo audit source: local code/tests/docs/fixtures plus sibling Radar checkout
+and recent git history through 2026-07-15.
 
 | Component | Status | Evidence |
 |---|---|---|
@@ -62,12 +62,13 @@ GitHub connector check for open PRs/issues, and recent git history on
 | Idea Thread storage and momentum | `implemented_and_verified` | `src/db/idea_threads.py`, `src/output/idea_threads.py`, `idea-threads` CLI, `tests/test_idea_threads.py` |
 | Frontier analysis | `implemented_but_not_dogfooded` | `src/output/frontier_analysis.py`, CLI path; fresh forced regeneration needs LLM credentials |
 | AI visual report / workbook contract | `implemented_and_verified`, `legacy surface` | `src/output/ai_visual_report.py`, `src/output/ai_report_contract.py`, `tests/test_ai_report_contract.py`; W28 committed fixture exists but represents old visual snapshot |
-| Weekly Intelligence Brief and Knowledge Atlas split | `implemented_locally` for PGI-003 through PGI-005 | `src/output/weekly_intelligence_brief.py`, `src/output/knowledge_atlas_report.py`, `src/output/split_intelligence_reports.py`, `tests/test_split_intelligence_reports.py`; Brief has first-screen cockpit/Radar gate plus Project/Learning projection section; Atlas has thread navigation plus Project/Learning projection section |
-| Canonical intelligence sidecar contract | `implemented_locally` | `tra-intelligence-contract.v1` in `src/output/ai_report_contract.py`; Brief/Atlas sidecars carry canonical SourceObservation/EvidenceItem/Claim plus additive ProjectImplication/LearningObjective projections and tests under `tests/fixtures/intelligence_contract/` |
+| Weekly Intelligence Brief and Knowledge Atlas split | `implemented_and_verified` with V1 compatibility and opt-in V2 previews | `src/output/weekly_intelligence_brief.py`, `src/output/knowledge_atlas_report.py`, `src/output/split_intelligence_reports.py`, `tests/test_split_intelligence_reports.py`, `tests/test_knowledge_atlas_report_v2.py`; V1 artifacts remain inspectable, while Brief V2 and Atlas V2 are manifest-bound opt-in surfaces |
+| Report V2 rollout gate | `implemented_and_verified`, dogfood `not_started` | `src/output/report_v2_rollout.py`, `report-v2-rollout-gate`, `tests/test_report_v2_rollout.py`; returns `eligible` only for a real current package with period/Radar/reaction/editorial/project/visual/cost/quality/feedback/fixture evidence |
+| Canonical intelligence sidecar contract | `implemented_and_verified` | `tra-intelligence-contract.v1` and additive V2 rollout contract paths; Brief/Atlas sidecars carry canonical SourceObservation/EvidenceItem/Claim plus additive ProjectImplication/LearningObjective projections and tests under `tests/fixtures/intelligence_contract/` |
 | Hermes / PI facade and bounded tools | `implemented_but_not_dogfooded` with PGI-003 artifact awareness | `src/assistant/pi_facade.py`, `pi_tools.py`, `pi_chat.py`, `pi_intent.py`, tests `test_pi_*`; read-only tools now expose current/stale/missing Brief, Atlas, and Radar state |
-| Feedback intake and action status | `partial` | `src/db/ai_report_feedback.py`, `src/output/action_status.py`, tests `test_ai_report_feedback.py`, `test_action_status.py`; provenance/effect timing and corrections need PGI work |
+| Feedback intake and action status | `implemented_and_verified` | `src/db/ai_report_feedback.py`, `src/output/action_status.py`, tests `test_ai_report_feedback.py`, `test_action_status.py`; IRX-12 adds report/surface/section/item targeting, confirmation gates, completed-action linkage, and feedback application receipts |
 | Strategy Reviewer | `implemented_and_verified` as advisory-only | `src/output/strategy_reviewer.py`, `tests/test_strategy_reviewer.py`; it must not mutate config/code/profile |
-| Project Intelligence | `implemented_locally`, `needs_dogfood` | `project-learning-projection.v1` exposes external signals, confirmed implications, weak watches, rejected overlaps, tiny PR ideas, stale decisions, research debt, and repeated themes without action |
+| Project Intelligence | `implemented_and_verified`, `needs_dogfood` | `project_intelligence.v2` and `project_action_permissions.v1` expose evidence-bound PR-sized implications while weak/rejected/learning/existing states remain audit-only |
 | Learning Intelligence | `implemented_locally`, `needs_dogfood` | `project-learning-projection.v1` distinguishes read, understood, explained, reproduced, implemented, tested, project-applied, measured, stale, and prerequisite_gap without counting passive reading as mastery |
 | Market/business lens for Radar | `implemented_and_verified` as `context_only` | `src/output/market_pain_intelligence.py`, `src/output/opportunity_seed_export.py`, `tests/test_opportunity_seed_export.py`, `tests/test_market_context_lens.py` |
 | MVP Radar RVE contract | `implemented_and_verified`, `needs_live_validation` | sibling repo has `validation_queries.py`, `validation_evidence.py`, SERP/Reddit/crawler/X adapters and tests; real weekly validation evidence still needs dogfood |
@@ -83,9 +84,8 @@ Evidence-based portfolio score today: **6.8/10**.
 
 Why not higher:
 
-- The system has substantial implementation evidence, but the product surfaces
-  are still split between historical workbook language and the target Brief /
-  Atlas / Hermes model.
+- The system has substantial implementation evidence, but the target Brief /
+  Atlas / Hermes workflow still lacks four stable real dogfood weeks.
 - Correctness exists as report contract checks, but the canonical domain model
   still conflates atoms, claims, source events, and evidence in places.
 - Personalization uses feedback and deterministic ranking, but explicit operator

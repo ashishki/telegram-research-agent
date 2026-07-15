@@ -1,17 +1,17 @@
 # Operator Workflow
 
-**Version:** 2.1
-**Last updated:** 2026-07-13
+**Version:** 2.2
+**Last updated:** 2026-07-15
 **Audience:** System owner (single user, personal use)
 **Role:** supporting operating guide. Canonical roadmap:
-`docs/intelligence_report_v2_roadmap.md` for the active report correction and
+`docs/intelligence_report_v2_roadmap.md` for the Report V2 correction record and
 `docs/portfolio_grade_intelligence_roadmap.md` for the broader product.
 
 ---
 
 ## Weekly Routine
 
-### Report V2 Transition Hold
+### Report V2 Rollout Hold
 
 The W29 audit found that the pre-IRX-1 split run analyzed the newly started week
 by default, can miss a separately generated Radar artifact, does not show a
@@ -20,17 +20,23 @@ The split artifacts remain available for diagnosis, but they are not an
 acceptable dogfood baseline. Do not begin dogfood or treat the Monday delivery
 as a completed Report V2 package.
 
-IRX-1 completed-week semantics are implemented and verified: the default report
-period is now the last fully completed ISO week and explicit completed history
-remains available. The target one-command workflow is owned by `IRX-2` and is
-not implemented yet. Until IRX-2 lands, verify the separately generated Radar
-artifact against the report period. Do not infer package completion from
-successful HTML creation.
+IRX-1 through IRX-14 are implemented and verified. The implementation queue is
+closed, but dogfood is still blocked until real current operator evidence passes
+the read-only start gate:
+
+```bash
+PYTHONPATH=src python3 src/main.py report-v2-rollout-gate --week <YYYY-WNN> --json
+```
+
+Exit code `0` means the current package is eligible to start Week 1. Exit code
+`2` means dogfood remains blocked and the JSON receipt lists the missing
+evidence. Do not infer package completion from successful HTML creation or from
+the legacy Monday timer alone.
 
 Legacy Research Brief / Implementation Ideas commands remain available, but
 they are not the target weekly product surface.
 
-### Monday Morning - Current Diagnostic Pipeline
+### Monday Morning - Current Diagnostic V1 Pipeline
 
 Schedule:
 - `telegram-ai-split-report.timer`: Monday 09:00 `Europe/Berlin`
@@ -58,6 +64,29 @@ The current timer may deliver:
 This is diagnostic behavior, not the V2 product contract. Weekly Brief V2 must
 be a 5-7 minute Russian operational read; Knowledge Atlas V2 must be a separate
 visual cumulative map. See `docs/intelligence_report_v2_contract.md`.
+
+### Report V2 Package And Start Gate
+
+Use the additive V2 command when preparing a candidate package:
+
+```bash
+PYTHONPATH=src python3 src/main.py weekly-intelligence-v2 \
+  --week <YYYY-WNN> \
+  --threads-limit 24 \
+  --atoms-limit 8
+PYTHONPATH=src python3 src/main.py report-v2-rollout-gate --week <YYYY-WNN> --json
+```
+
+The V2 command creates an immutable run directory and keeps V1 compatibility
+artifacts inspectable. The gate checks completed-period/run status, V1
+inspectability, V2 Brief/Atlas paths, retrieval/PI descriptors, Obsidian
+adapter readiness, same-run Radar, reaction receipt, editorial stage, project
+implications, semantic visuals plus reviewed desktop/mobile snapshots,
+cost/latency receipt, quality-gated packages, feedback readiness, and the
+IRX-13 fixture registry.
+
+If the gate is blocked, use the receipt as the fix list. Do not record dogfood
+metrics, scorecards, or portfolio evidence until the gate returns `eligible`.
 
 ### AI Knowledge Intelligence Run
 
@@ -99,7 +128,7 @@ The older Weekly AI Intelligence Workbook still exists for the richer visual
 single-file report and Archify diagram. Treat Telegram as delivery/feedback,
 not as the main reading surface.
 
-After the IRX-14 start gate passes, Monday:
+After `report-v2-rollout-gate` returns `eligible`, Monday:
 
 - open the Weekly Brief first;
 - check action/read/try prompts and MVP Radar status;
@@ -160,7 +189,7 @@ notification loop. The timer is intentionally disabled until the operator
 re-enables reminders. Create one with text or voice, or explicitly:
 
 ```text
-/remind завтра 18:00 дать feedback по Workbook
+/remind завтра 18:00 дать feedback по Brief/Atlas
 /reminders
 ```
 
@@ -170,7 +199,7 @@ outcome in SQLite; they do not change report scoring or code/config.
 
 ### Hermes / PI Assistant Dogfood Routine
 
-Hermes is the Telegram-facing concierge for the workbook workflow. It is a
+Hermes is the Telegram-facing concierge for the Brief/Atlas workflow. It is a
 bounded LLM chat and command router, not a source of truth. The Weekly
 Intelligence Brief is the first reading artifact, Knowledge Atlas carries
 longer-term context, and the visual Workbook remains available for diagrams
@@ -194,8 +223,8 @@ Hermes commands and chat:
 
 Dogfood Monday flow:
 
-1. Generate or locate the current Weekly Brief, Knowledge Atlas, and optional
-   visual Workbook.
+1. Generate or locate the current gate-eligible Weekly Brief V2, Knowledge
+   Atlas V2, and optional visual Workbook.
 2. Ask Hermes for `/weekly`.
 3. Read Weekly Brief actions/Radar first; open Atlas or visual Workbook only
    when context is needed.
@@ -204,7 +233,7 @@ Dogfood Monday flow:
 During-week flow:
 
 1. Ask plain-language questions directly in the bot, or use `/explain` for
-   narrower workbook signals.
+   narrower report signals.
 2. Use `/projects` when choosing project work.
 3. Use `/mvp` before treating any candidate as a build opportunity.
 4. React to original Telegram posts that were interesting for any reason.
@@ -236,7 +265,7 @@ Codex task selection rule:
 - never run a task that weakens evidence gates, makes Radar build from
   Telegram-only evidence, or turns Hermes into source of truth.
 
-After the IRX-14 start gate passes, track the weekly dogfood metrics from
+After `report-v2-rollout-gate` returns `eligible`, track the weekly dogfood metrics from
 `docs/dogfood_4_week_plan.md`, especially time to understand the week,
 confirmed feedback count, completed real actions, decisions changed, value
 score, and friction score.
@@ -280,14 +309,14 @@ deterministic ranking plus request-local SQLite FTS over those curated objects.
 It does not run raw Telegram firehose RAG, does not use vector search, and does
 not expose raw SQLite sessions.
 
-Next implementation queue:
+Current implementation queue:
 
-- IRX-1 completed-week semantics are implemented and focused-test verified.
-- Start `IRX-2 - Weekly Run Manifest And Required Radar Artifact Contract`
-  from `docs/tasks.md` with the exact prompt in `docs/CODEX_PROMPT.md`; do not
-  jump to personalization, curation, editorial synthesis, or renderer polish.
-- Do not start vector retrieval, raw Telegram RAG, or assistant mutation tools
-  before Atlas, evaluation, and dogfood evidence justify them.
+- IRX-1 through IRX-14 are implemented and verified; there is no remaining IRX
+  implementation task in `docs/tasks.md`.
+- The next step is operational, not a new feature: generate or locate a real
+  current private weekly package, then run `report-v2-rollout-gate`.
+- Do not start vector retrieval, raw Telegram RAG, assistant mutation tools, or
+  portfolio claims before the gate is eligible and dogfood evidence exists.
 - Obsidian remains a generated human navigation/audit projection, not runtime
   assistant memory.
 
@@ -442,16 +471,20 @@ python3 src/main.py frontier-analysis --week 2026-W28 --lookback-weeks 12 --mode
 # Generate the stakeholder-facing HTML report and optional Obsidian projection
 python3 src/main.py ai-visual-report --week 2026-W28 --skip-refresh
 python3 src/main.py ai-split-report --week 2026-W28 --skip-refresh
+python3 src/main.py weekly-intelligence-v2 --week 2026-W28 --threads-limit 24 --atoms-limit 8
+python3 src/main.py report-v2-rollout-gate --week 2026-W28 --json
 python3 src/main.py ai-visual-report --week 2026-W28 --skip-refresh --deliver
 python3 src/main.py ai-split-report --week 2026-W28 --skip-refresh --deliver
 python3 src/main.py obsidian-export --week 2026-W28
 ```
 
-Open the split outputs first when dogfooding format:
+Open the V2 package first only after the rollout gate is eligible. Use V1 split
+outputs as inspectable compatibility artifacts and diagnostics:
 
 ```text
 data/output/weekly_intelligence_briefs/<week>.weekly-brief.html
 data/output/knowledge_atlas/<week>.knowledge-atlas.html
+data/output/weekly_intelligence_runs/<run_id>/
 ```
 
 `mvp-weekly` is not Telegram-only idea generation. It exports Telegram seeds to

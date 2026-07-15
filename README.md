@@ -5,7 +5,7 @@ The repository is a secondary portfolio project: it demonstrates bounded
 ingestion, evidence-preserving analysis, and report contracts, but it is not a
 public service or a proven production system.
 
-Public evidence status as of 2026-07-13: **0/4 verified public dogfood weeks**.
+Public evidence status as of 2026-07-15: **0/4 verified public dogfood weeks**.
 No public artifact currently supports claims about operator value, changed
 decisions, time saved, or production reliability. The machine-readable status
 and blocked-claim ledger is
@@ -13,38 +13,34 @@ and blocked-claim ledger is
 A credential-free synthetic scorecard demo verifies only the deterministic
 contract; it is not a dogfood run.
 
-Report V2 product correction is active after the W29 reader-value audit. The
-legacy Research Brief / Implementation Ideas loop remains in the codebase, but
-the current direction is a private decision and learning workflow centered on
-the Weekly Intelligence Brief, Knowledge Atlas, bounded Hermes/PI assistant,
-Project Intelligence, Learning Intelligence, and a parallel MVP Radar
-validation track.
+Report V2 product correction is implemented through IRX-14 after the W29
+reader-value audit. The legacy Research Brief / Implementation Ideas loop
+remains in the codebase, but the current direction is a private decision and
+learning workflow centered on the Weekly Intelligence Brief V2, Knowledge Atlas
+V2, Knowledge Audit Explorer, bounded Hermes/PI assistant, Project
+Intelligence, Learning Intelligence, and a parallel MVP Radar validation track.
 
-Active Report V2 roadmap: `docs/intelligence_report_v2_roadmap.md`.
+Report V2 roadmap and implementation record:
+`docs/intelligence_report_v2_roadmap.md`.
 Broader product roadmap: `docs/portfolio_grade_intelligence_roadmap.md`.
-Canonical active backlog: `docs/tasks.md`.
-Current implementation gate:
-`IRX-3 - Reaction-To-Ranking Personalization And Effect Receipt`; IRX-1
-completed-week semantics and the additive IRX-2 manifest/same-run Radar
-orchestration are implemented and focused-test verified. `PGI-007` dogfood is
-superseded as the next action and remains blocked until the `IRX-14` start gate
-passes.
+Canonical current backlog: `docs/tasks.md`.
+Current implementation gate: no remaining IRX implementation task. The next
+action is operational: run `report-v2-rollout-gate` on a real current private
+weekly package and start dogfood only if it returns `eligible`.
 
-Current baseline: knowledge atoms, idea threads, canonical report contracts,
-split Brief / Atlas artifacts, Brief cockpit plumbing, Atlas audit navigation,
-durable Project/Learning Intelligence projections, weekly scorecard fixtures,
-Hermes/PI read-only foundation, artifact freshness awareness, feedback
-provenance helpers, Strategy Reviewer, and Radar RVE bridge exist in code with
-focused tests. The honest gap is four-week dogfood evidence and portfolio-ready
-evaluation proof from real operator runs. The W29 artifacts are technically
-valid but not reader-ready: they expose wrong-period, Radar-handoff,
-personalization, editorial, thread-curation, and visualization failures. The
-shared Report V2 period foundation and technical manifest package are
-implemented. Reaction personalization, canonical curation, editorial synthesis,
-and the reader V2 surfaces remain planned, and dogfood has not started. Raw
-Telegram firehose RAG, assistant
-mutations, full-year archive processing, and build-ready Radar decisions from
-context-only evidence remain out of scope.
+Current baseline: knowledge atoms, idea threads, completed-period semantics,
+weekly run manifests, same-run Radar binding, reaction receipts, canonical
+thread lifecycle, editorial intelligence, static visual components, Project
+Intelligence V2, MVP Radar reader contract, Weekly Intelligence Brief V2,
+reader-value gates, Knowledge Atlas V2, report-specific feedback receipts,
+regression fixtures, rollout receipts, Hermes/PI read-only foundation, Strategy
+Reviewer, and the Radar RVE bridge exist in code with focused tests. The honest
+gap is four-week dogfood evidence and portfolio-ready evaluation proof from
+real operator runs. Dogfood has not started because the rollout gate requires
+real current private artifacts, reviewed visual evidence, cost/latency receipts,
+quality-gated V2 packages, and other live prerequisites. Raw Telegram firehose
+RAG, assistant mutations, full-year archive processing, and build-ready Radar
+decisions from context-only evidence remain out of scope.
 
 ## Dogfood Stabilization Note
 
@@ -94,7 +90,8 @@ It is not a public bot, SaaS product, or generic summarizer.
 8. **Run Frontier Analysis** over compressed thread/atom context for the resolved reporting period (the last completed ISO week by default).
 9. **Generate weekly artifacts**:
    - `Weekly AI Intelligence Workbook` visual HTML report
-   - split `Knowledge Atlas` and `Weekly Intelligence Brief` HTML/JSON surfaces
+   - split V1 `Knowledge Atlas` and `Weekly Intelligence Brief` HTML/JSON surfaces
+   - opt-in V2 `Weekly Intelligence Brief` and `Knowledge Atlas` package
    - standalone `AI Intelligence` HTML report and JSON sidecar
    - generated Obsidian vault projection
    - legacy `Research Brief`, `Implementation Ideas`, `Study Plan`
@@ -136,8 +133,16 @@ It is not a public bot, SaaS product, or generic summarizer.
 - Stakeholder-facing Weekly AI Intelligence Workbook via `ai-visual-report`: Russian decision brief, strong signals, deep explanation cards, claim evidence cards with quote verification/evidence tiers, concept diagrams, project implementation suggestions, MVP Radar section, feedback prompts, JSON sidecar, and embedded Archify/local diagrams when available.
 - Split V1 HTML via `ai-split-report`: a detailed Atlas/audit surface and a
   short Brief shell. Both write distinct HTML/JSON sidecars and can be
-  delivered to Telegram, but the W29 audit found that they do not yet satisfy
-  the Report V2 reader contract.
+  delivered to Telegram. They remain inspectable compatibility artifacts rather
+  than the dogfood start signal.
+- Report V2 package via `weekly-intelligence-v2`: an immutable manifest-bound
+  package that preserves V1 compatibility while producing opt-in Brief V2 and
+  Atlas V2 artifacts from completed-period, Radar, reaction, editorial,
+  project, visual, quality, and feedback contracts.
+- Report V2 rollout gate via `report-v2-rollout-gate`: a read-only dogfood
+  start checklist. It returns success only when the real current private weekly
+  package is eligible; otherwise it returns a blocked receipt with explicit
+  missing evidence.
 - Project and Learning Intelligence projections: Brief/Atlas sidecars and HTML expose external project signals, confirmed implications, weak watches, rejected broad overlaps, tiny PR ideas, stale decisions, research debt, repeated themes without action, learning objectives, and learning stage counts without treating passive reading as mastery.
 - Strategy Reviewer via `strategy-reviewer`: advisory-only keep/change/demote/test-next-week suggestions and Codex-ready tasks from confirmed workbook feedback; it does not mutate source code, prompts, thresholds, profile, or projects.
 - HPI read-only foundation: `PersonalIntelligenceFacade`, curated retrieval items, transient SQLite FTS ranking, and bounded PI tools expose workbook, thread, action, MVP, feedback, marked-post, Strategy Reviewer, and action-status DTOs without raw DB sessions, vector search, or mutation methods.
@@ -178,6 +183,8 @@ python3 src/main.py frontier-analysis --week 2026-W28 --lookback-weeks 12 --mode
 python3 src/main.py ai-intelligence-report --week 2026-W28 --skip-refresh
 python3 src/main.py ai-visual-report --week 2026-W28 --skip-refresh --threads-limit 12 --atoms-limit 8
 python3 src/main.py ai-split-report --week 2026-W28 --skip-refresh --threads-limit 24 --atoms-limit 8
+python3 src/main.py weekly-intelligence-v2 --week 2026-W28 --threads-limit 24 --atoms-limit 8
+python3 src/main.py report-v2-rollout-gate --week 2026-W28 --json
 python3 src/main.py obsidian-export --week 2026-W28
 python3 src/main.py strategy-reviewer --week 2026-W28 --output-path data/output/reviews/2026-W28-strategy-review.json
 
@@ -193,16 +200,22 @@ python3 src/main.py ai-split-report --week 2026-W28 --skip-refresh --deliver
 The repository contains service definitions and runbooks for a diagnostic V1
 private deployment. These checked-in files do not verify that the services are
 currently active, reliable, or completing scheduled runs. Scheduled HTML
-success alone would not establish Report V2 readiness, and the four-week
-dogfood remains paused until IRX-14.
+success alone does not establish Report V2 readiness, and the four-week
+dogfood remains paused until `report-v2-rollout-gate` returns `eligible` on a
+real current private package.
 
 The intended single-user deployment baseline is:
 
-- `weekly-intelligence-v2` is the explicit additive IRX-2 package command. It
-  creates a new immutable run directory, binds same-run artifacts by identity
-  and checksum, and leaves the deployed V1 timer/commands intact. Inspect its
-  bounded options with
+- `weekly-intelligence-v2` is the explicit additive Report V2 package command.
+  It creates a new immutable run directory, binds same-run artifacts by identity
+  and checksum, emits opt-in V2 surfaces, and leaves the deployed V1
+  timer/commands intact. Inspect its bounded options with
   `PYTHONPATH=src python3 src/main.py weekly-intelligence-v2 --help`.
+
+- `report-v2-rollout-gate` is the read-only dogfood start gate. It checks the
+  current V1/V2 package, Radar, reaction, editorial, project, visual,
+  cost/latency, quality, feedback, and fixture evidence. Exit code `0` means
+  eligible; exit code `2` means dogfood must remain blocked.
 
 - `telegram-bot.service` runs Hermes command polling with restart-on-failure.
 - `telegram-ai-split-report.timer` is the only project weekly report timer. It
@@ -233,9 +246,10 @@ commands and a normal chat path: send plain text, `/chat <message>`,
 `/hermes <message>`, or `/ask <message>`. Plain text and voice transcripts are
 first classified as chat, feedback, or reminder. For chat, the LLM may plan
 calls only to the read-only PI tool catalog, then answer from curated
-workbook/atom/thread/action evidence. `/codex` prepares prompt text only.
-Hermes does not run Codex, does not mutate config/code/profile/project files,
-and does not replace the workbook as the primary reading surface.
+Brief/Atlas/workbook/atom/thread/action evidence. `/codex` prepares prompt text
+only. Hermes does not run Codex, does not mutate config/code/profile/project
+files, and does not replace the Weekly Brief / Knowledge Atlas as the primary
+reading surface.
 
 Voice input is supported when `OPENAI_API_KEY` is configured. The bot
 downloads the Telegram `.ogg` voice file to temporary storage, sends it to the
@@ -301,13 +315,13 @@ Start here:
 
 - [docs/README.md](docs/README.md) — documentation map
 - [docs/intelligence_report_v2_audit.md](docs/intelligence_report_v2_audit.md) — W29 current-state audit
-- [docs/intelligence_report_v2_roadmap.md](docs/intelligence_report_v2_roadmap.md) — active IRX-0..IRX-14 queue
+- [docs/intelligence_report_v2_roadmap.md](docs/intelligence_report_v2_roadmap.md) — closed IRX-0..IRX-14 implementation record and rollout gate
 - [docs/intelligence_report_v2_contract.md](docs/intelligence_report_v2_contract.md) — Brief V2, Atlas V2, and Audit Explorer product contract
 - [docs/weekly_run_manifest.md](docs/weekly_run_manifest.md) — completed-period and same-run artifact contract
 - [docs/reaction_personalization_contract.md](docs/reaction_personalization_contract.md) — reaction influence and effect receipt contract
 - [docs/static_visualization_system.md](docs/static_visualization_system.md) — offline visualization component contract
 - [docs/portfolio_grade_intelligence_roadmap.md](docs/portfolio_grade_intelligence_roadmap.md) — canonical product, architecture, evaluation, and portfolio roadmap
-- [docs/tasks.md](docs/tasks.md) — compact active IRX backlog and historical PGI record
+- [docs/tasks.md](docs/tasks.md) — compact current backlog, closed IRX queue, operational dogfood gate, and historical PGI record
 - [docs/intelligence_evaluation_framework.md](docs/intelligence_evaluation_framework.md) — evaluation layers and weekly scorecard
 - [docs/portfolio_evidence_plan.md](docs/portfolio_evidence_plan.md) — portfolio readiness gate and evidence plan
 - [docs/mvp_radar_integration_contract.md](docs/mvp_radar_integration_contract.md) — cross-repo Radar contract
@@ -316,7 +330,7 @@ Start here:
 - [docs/ai_knowledge_intelligence_roadmap.md](docs/ai_knowledge_intelligence_roadmap.md) — component/historical AI Knowledge Intelligence roadmap
 - [docs/ai_intelligence_workbook_roadmap.md](docs/ai_intelligence_workbook_roadmap.md) — historical KIR-Q0..KIR-Q13 workbook, feedback, Radar contract, Strategy Reviewer, and Obsidian projection roadmap
 - [docs/hermes_pi_assistant_roadmap.md](docs/hermes_pi_assistant_roadmap.md) — Hermes/PI component roadmap and implementation record
-- [docs/dogfood_4_week_plan.md](docs/dogfood_4_week_plan.md) — supporting dogfood protocol
+- [docs/dogfood_4_week_plan.md](docs/dogfood_4_week_plan.md) — supporting dogfood protocol, blocked until `report-v2-rollout-gate` returns `eligible`
 - [docs/release_notes.md](docs/release_notes.md) — operator-facing release notes for shipped changes
 - [docs/operator_workflow.md](docs/operator_workflow.md) — weekly operating workflow
 - [docs/architecture.md](docs/architecture.md) — current system shape
@@ -340,9 +354,10 @@ memory, Strategy Reviewer can produce advisory improvement tasks, bounded
 Obsidian notes can be regenerated, and Hermes/PI can read curated intelligence
 through read-only interfaces.
 
-The honest limitation is not missing plumbing; it is portfolio-grade
-correctness, personalization, dogfood proof, and presentation. Project and
-learning projections remain conservative evidence leads, not full
-project-priority or mastery claims. User value is not proven until the dogfood
-protocol produces real feedback, actions, decisions changed, experiments,
-learning outcomes, friction scores, scorecards, and false-confidence review.
+The honest limitation is no longer the IRX implementation queue; it is
+portfolio-grade dogfood proof from real operator weeks. Project and learning
+projections remain conservative evidence leads, not full project-priority or
+mastery claims. User value is not proven until the rollout gate passes on a
+real current package and the dogfood protocol produces feedback, actions,
+decisions changed, experiments, learning outcomes, friction scores, scorecards,
+and false-confidence review.

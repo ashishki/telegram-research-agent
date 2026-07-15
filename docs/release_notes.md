@@ -1,5 +1,24 @@
 # Release Notes
 
+## 2026-07-15
+
+### Report V2 Implementation Queue Closed
+
+- IRX-1 through IRX-14 are implemented and verified as additive Report V2
+  corrections: completed-period semantics, same-run manifests/Radar binding,
+  reaction receipts, canonical thread lifecycle, editorial intelligence,
+  shared visuals, Project Intelligence V2, Radar reader hardening, Brief V2,
+  reader-value gates, Atlas V2, report-specific feedback, regression fixtures,
+  and rollout receipts.
+- `weekly-intelligence-v2` is the explicit additive Report V2 package command.
+  It preserves V1 compatibility artifacts while producing manifest-bound V2
+  outputs.
+- `report-v2-rollout-gate` is the read-only dogfood start gate. It exits `0`
+  only when a real current private weekly package is eligible and exits `2`
+  with blocking evidence when dogfood must remain paused.
+- No dogfood, live operator value, screenshot approval, or portfolio evidence
+  is claimed by this release note.
+
 ## 2026-07-09
 
 ### Weekly Split HTML Delivery

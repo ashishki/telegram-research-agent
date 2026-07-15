@@ -1,7 +1,7 @@
 # Architecture
 
-**Version:** 6.2
-**Date:** 2026-07-10
+**Version:** 6.3
+**Date:** 2026-07-15
 **Status:** Supporting architecture reference. Canonical roadmap:
 `docs/portfolio_grade_intelligence_roadmap.md`.
 
@@ -23,7 +23,8 @@ Telegram ingestion
   -> deterministic scoring + project relevance
   -> explicit feedback + manual tags
   -> evidence recording (signal_evidence_items)
-  -> weekly outputs (Weekly Brief / Knowledge Atlas plus legacy brief / ideas / study)
+  -> weekly outputs (Report V2 Brief / Atlas plus V1 compatibility and legacy brief / ideas / study)
+  -> rollout gate (read-only dogfood start eligibility)
   -> operator usefulness log (weekly_usefulness_logs)
   -> decision journal (decision_journal)
 
@@ -42,6 +43,7 @@ What the system provides:
 - operator-authored weekly brief usefulness capture
 - dynamic per-channel preference with time decay blended into source scoring
 - project-aware outputs
+- manifest-bound Report V2 package and read-only rollout gate
 - rejection memory for weak implementation ideas
 - stricter implementation-idea selection: unique source usage, fewer stronger items, preference for current-project improvements
 - verbatim evidence layer: `signal_evidence_items` records curated post excerpts with provenance per week and project scope

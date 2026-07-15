@@ -1,7 +1,7 @@
 # Telegram Research Agent — System Specification
 
-**Version:** 3.2
-**Date:** 2026-07-10
+**Version:** 3.3
+**Date:** 2026-07-15
 **Status:** Supporting specification
 
 > Workflow note: `docs/spec.md` is not the canonical source of truth for
@@ -18,8 +18,11 @@ It is not a digest bot, not a summarizer, and not a generic Telegram LLM wrapper
 
 Its function: ingest posts from curated Telegram channels, score them deterministically, route only high-value items to appropriate LLM tiers, apply personal taste and project relevance filters, and produce a structured weekly review artifact that supports real decisions.
 
-**Current target output:** a Weekly Intelligence Brief plus Knowledge Atlas
-delivered via Telegram as HTML documents. The older readable weekly review
+**Current target output:** a manifest-bound Report V2 package with Weekly
+Intelligence Brief V2, Knowledge Atlas V2, and a preserved Knowledge Audit
+Explorer / V1 compatibility path. The current delivery switch and dogfood start
+are controlled by the read-only `report-v2-rollout-gate`; scheduled V1 HTML
+success alone is not readiness evidence. The older readable weekly review
 article remains a legacy/supporting artifact; see `docs/report_format.md` for
 its historical contract and `docs/portfolio_grade_intelligence_roadmap.md` for
 the current product model.
@@ -37,8 +40,8 @@ The system runs on a private VPS. LLM calls use the `anthropic` Python SDK with 
 
 Legacy phases (Phase 1-20 in the original numbering) are preserved as
 implementation history. The canonical roadmap is
-`docs/portfolio_grade_intelligence_roadmap.md`; the compact active backlog is
-in `docs/tasks.md`.
+`docs/portfolio_grade_intelligence_roadmap.md`; the compact current backlog and
+IRX completion record are in `docs/tasks.md`.
 
 ---
 

@@ -1,7 +1,7 @@
 # Documentation Map
 
-Version: 2.2
-Last updated: 2026-07-13
+Version: 2.3
+Last updated: 2026-07-15
 State: documentation index
 
 This directory keeps current operator and implementation guidance at the top
@@ -13,13 +13,13 @@ baseline examples live under `docs/archive/`.
 | File | Role |
 |---|---|
 | `intelligence_report_v2_audit.md` | W29 reader-value, period, reaction, Radar, thread, visualization, and quality-gate audit |
-| `intelligence_report_v2_roadmap.md` | Active IRX-0..IRX-14 Report V2 product-correction queue |
+| `intelligence_report_v2_roadmap.md` | Closed IRX-0..IRX-14 Report V2 implementation record, dependency graph, and rollout gate |
 | `intelligence_report_v2_contract.md` | Reader-facing Brief V2, Atlas V2, and Knowledge Audit Explorer product contract |
 | `weekly_run_manifest.md` | Completed-period and same-run artifact identity/state contract |
 | `reaction_personalization_contract.md` | Weak reaction personalization, mapping, receipt, and approval rules |
 | `static_visualization_system.md` | Deterministic offline visual component contracts for Brief and Atlas |
-| `portfolio_grade_intelligence_roadmap.md` | Broader product, architecture, evaluation, and portfolio-readiness roadmap; IRX supersedes its immediate dogfood order |
-| `tasks.md` | Compact active IRX backlog plus historical PGI records |
+| `portfolio_grade_intelligence_roadmap.md` | Broader product, architecture, evaluation, and portfolio-readiness roadmap; rollout gate controls dogfood start |
+| `tasks.md` | Compact current backlog: IRX closed through IRX-14, operational dogfood gate next, plus historical PGI records |
 | `intelligence_evaluation_framework.md` | Evaluation layers, annotation protocol, and weekly scorecard |
 | `portfolio_evidence_plan.md` | Portfolio readiness gate and evidence artifacts |
 | `mvp_radar_integration_contract.md` | Cross-repo contract with Demand-to-MVP Radar |
@@ -34,7 +34,7 @@ baseline examples live under `docs/archive/`.
 | `operator_workflow.md` | Weekly operator workflow for Brief, Atlas, Hermes, feedback, and Radar |
 | `mvp_weekly_radar.md` | Existing Radar bridge, market/business context sidecar, KIR/RVE gates, and credentials |
 | `mvp_skill_research_sources.md` | Locally installed Codex/Claude research skills for auxiliary MVP source discovery and gate-safe usage |
-| `dogfood_4_week_plan.md` | Supporting dogfood protocol, blocked until the IRX-14 start gate |
+| `dogfood_4_week_plan.md` | Supporting dogfood protocol, blocked until `report-v2-rollout-gate` returns `eligible` on real current private artifacts |
 | `report_format.md` | Legacy weekly artifact contracts and source-link requirements |
 | `curated_semantic_retrieval.md` | HPI-9-lite retrieval decision: curated deterministic+SQLite FTS; raw/vector RAG deferred |
 | `research_brief_receipt.md` | Research Brief receipt audit contract |

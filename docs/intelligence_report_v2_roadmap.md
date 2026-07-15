@@ -1,6 +1,7 @@
 # Intelligence Report V2 Roadmap
 
-Status: active product-correction roadmap
+Status: completed IRX product-correction implementation record; rollout gate
+controls dogfood start
 
 Queue: `IRX - Intelligence Report Experience And Editorial Quality`
 
@@ -15,12 +16,18 @@ Product contracts:
 - `docs/reaction_personalization_contract.md`;
 - `docs/static_visualization_system.md`.
 
-This roadmap turns the failed W29 reader experience into implementation-ready
-work. Weekly Brief V2, Knowledge Atlas V2, Knowledge Audit Explorer separation,
-and independent reader-value gates now exist as additive previews, but the
-complete Report V2 package, delivery switch, visual-regression suite, and
-dogfood restart remain unfinished; the current W29 reports are not accepted as
-evidence. IRX-0 itself changed documentation only.
+This roadmap turned the failed W29 reader experience into the IRX implementation
+queue. IRX-1 through IRX-14 are implemented and verified as additive
+corrections: completed-period semantics, same-run manifest/Radar binding,
+reaction receipts, canonical thread lifecycle, editorial intelligence, shared
+visuals, Project Intelligence V2, Radar reader hardening, Brief V2, quality
+gates, Atlas V2 / Knowledge Audit Explorer separation, report-specific
+feedback, regression fixtures, and the explicit rollout/start gate.
+
+Dogfood is still not started. The only current start condition is operational:
+run `report-v2-rollout-gate` against a real current private weekly package and
+start Week 1 only if the gate returns `eligible`. Historical W29 artifacts are
+not accepted as dogfood evidence.
 
 ## 1. Product Goal
 
@@ -133,7 +140,7 @@ implementation history or silently duplicate it.
 | `PGI-004` | Atlas thread navigation and retrieval item compatibility | preserve as Knowledge Audit Explorer foundation; IRX-7 creates a distinct reader-facing visual Atlas |
 | `PGI-005` | project and learning projection helpers | reuse diagnostics and additive projections; IRX-9 replaces generic visible implications with evidence-bound PR-sized actions |
 | `PGI-006` | deterministic weekly scorecard and structural checks | retain as baseline; IRX-11 adds reader-value, personalization, visual, and same-run quality dimensions |
-| `PGI-007` / `HPI-10` | planned dogfood and post-dogfood decision work | blocked and subsumed by IRX-14 start gates; do not begin the four-week run with known-bad reports |
+| `PGI-007` / `HPI-10` | planned dogfood and post-dogfood decision work | blocked and subsumed by the Report V2 rollout gate; do not begin the four-week run with known-bad reports |
 | `HPI-0..HPI-14` | Hermes/PI facade, bounded SQLite FTS retrieval, feedback strategist, workflow | preserve; add V2 readers/adapters rather than replace Hermes or introduce vector/raw RAG |
 | `RQ-*` | historical decision-first and quality lessons | keep as historical structural baseline; IRX-11 is the current reader-value gate contract |
 | `RVE-*` / `RADAR-PGI-*` | conservative dossier, source matching, external-evidence gates, context-only separation | preserve as Radar baseline; IRX-2 and IRX-10 bind the real artifact to the same run and translate it for readers |
@@ -164,7 +171,7 @@ behavior; it does not reopen the gate logic.
 
 ## 7. Priority And Dependency Order
 
-The delivery order is intentionally:
+The completed delivery order was intentionally:
 
 ### P0 - Correctness And Intelligence Foundation
 

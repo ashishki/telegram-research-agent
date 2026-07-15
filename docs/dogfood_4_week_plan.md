@@ -1,22 +1,29 @@
 # Four-Week Dogfood Plan
 
-Status: blocked pending IRX-14 Report V2 start gate
+Status: blocked until `report-v2-rollout-gate` returns `eligible`
 Created: 2026-07-08
-Last updated: 2026-07-13
+Last updated: 2026-07-15
 Owner: private single-user operator workflow
 
 Canonical roadmap: `docs/portfolio_grade_intelligence_roadmap.md`.
-Canonical active backlog: `docs/tasks.md`.
+Canonical current backlog: `docs/tasks.md`.
 
 ## W29 Correction
 
-Do not start Week 1 with the current W29 split artifacts. The reports passed
+Do not start Week 1 with the historical W29 split artifacts. The reports passed
 structural checks but failed reader value: wrong default period, missing
 same-run Radar, no visible reaction influence, generic repeated actions,
-fragmented threads, and no meaningful visual map. The active correction is
-`IRX-0..IRX-14` in `docs/intelligence_report_v2_roadmap.md`.
+fragmented threads, and no meaningful visual map. The corrective IRX queue is
+implemented through IRX-14 in `docs/intelligence_report_v2_roadmap.md`.
 
-Dogfood Week 1 may start only when all of the following are true:
+Dogfood Week 1 may start only when the read-only rollout gate returns
+`eligible` on a real current private weekly package:
+
+```bash
+PYTHONPATH=src python3 src/main.py report-v2-rollout-gate --week <YYYY-WNN> --json
+```
+
+The gate is the source of truth for the detailed checklist, including:
 
 - the completed-week period and human dates are visible;
 - the real same-run Radar result is included;
@@ -27,7 +34,9 @@ Dogfood Week 1 may start only when all of the following are true:
 - reader-value quality gates pass;
 - the report-specific voice feedback flow is verified.
 
-Until then, commands below are diagnostic smoke checks, not dogfood evidence.
+Until the command exits `0`, all commands below are diagnostic smoke checks, not
+dogfood evidence. Exit code `2` means the receipt is the fix list and Week 1 has
+not started.
 
 ## Purpose
 
@@ -94,6 +103,8 @@ PYTHONPATH=src python3 src/main.py idea-threads --weeks 12
 PYTHONPATH=src python3 src/main.py frontier-analysis --week "$WEEK" --lookback-weeks 12 --model strong
 PYTHONPATH=src python3 src/main.py mvp-weekly --no-deliver
 PYTHONPATH=src python3 src/main.py ai-split-report --week "$WEEK" --skip-refresh --threads-limit 24 --atoms-limit 8 --deliver
+PYTHONPATH=src python3 src/main.py weekly-intelligence-v2 --week "$WEEK" --threads-limit 24 --atoms-limit 8
+PYTHONPATH=src python3 src/main.py report-v2-rollout-gate --week "$WEEK" --json
 ```
 
 Telegram diagnostic checks after generation:
@@ -108,37 +119,50 @@ Telegram diagnostic checks after generation:
 Then test feedback, voice fallback/transcription, and one live reaction sync
 before treating week-1 metrics as valid.
 
-### Step 1 - Generate Workbook
+### Step 1 - Generate The Report V2 Candidate Package
 
 Run the normal AI Knowledge Intelligence path for the target week.
 
 Expected artifact:
 
-- Weekly AI Intelligence Workbook HTML;
-- JSON sidecar;
+- immutable `weekly-intelligence-v2` run directory;
+- V1 compatibility Brief/Atlas artifacts still inspectable;
+- Brief V2 and Atlas V2 package artifacts;
+- same-run MVP Radar reader state or explicit blocked state;
+- report-specific feedback readiness;
 - generated Obsidian projection if useful;
-- MVP Radar section or linked Radar dossier;
 - Strategy Reviewer note when feedback exists.
 
 Do not run heavy regeneration only for visual polish during dogfood.
 
-### Step 2 - Hermes Weekly Summary
+### Step 2 - Rollout Gate
+
+Run:
+
+```bash
+PYTHONPATH=src python3 src/main.py report-v2-rollout-gate --week "$WEEK" --json
+```
+
+If the gate is blocked, stop and fix the listed evidence gaps. Do not count the
+week as dogfood. If the gate is eligible, continue and record Week 1 metrics.
+
+### Step 3 - Hermes Weekly Summary
 
 Hermes should send a short summary:
 
 - three main conclusions;
 - one to three actions;
 - MVP Radar status;
-- workbook link/path;
+- Brief/Atlas package path or link;
 - feedback reminder.
 
 This should be a concierge message, not a second report.
 
-### Step 3 - Operator Reads Minimum Set
+### Step 4 - Operator Reads Minimum Set
 
 Read:
 
-- Decision Brief;
+- Weekly Intelligence Brief V2;
 - two Deep Explanation cards;
 - Project Actions;
 - MVP Radar section.
@@ -150,7 +174,7 @@ Optional:
 - Obsidian projection;
 - full appendix.
 
-### Step 4 - Complete One Real Action
+### Step 5 - Complete One Real Action
 
 Complete at least one:
 
@@ -163,7 +187,7 @@ Complete at least one:
 The action can be small. The important part is that the system changed what
 the operator did or decided.
 
-### Step 5 - Send Voice Feedback
+### Step 6 - Send Voice Feedback
 
 Use free-form voice feedback. Suggested prompt:
 
@@ -174,7 +198,7 @@ Use free-form voice feedback. Suggested prompt:
 The system should parse this into a proposal. Nothing is written until the
 operator confirms.
 
-### Step 6 - Confirm Parsed Feedback
+### Step 7 - Confirm Parsed Feedback
 
 Hermes should show:
 
@@ -187,7 +211,7 @@ No confirmed feedback means no confirmed feedback memory events. Pending
 feedback drafts may store the submitted text or transcript until the operator
 confirms or discards them.
 
-### Step 7 - Strategy Reviewer
+### Step 8 - Strategy Reviewer
 
 Run Strategy Reviewer after confirmed feedback or on demand.
 
@@ -202,7 +226,7 @@ Review:
 - Codex task suggestions;
 - risks / do not change.
 
-### Step 8 - Optional Codex Task
+### Step 9 - Optional Codex Task
 
 Run at most one Codex task per week unless a production bug blocks the system.
 
@@ -263,9 +287,11 @@ Use once per week:
 
 ```text
 Week:
-Workbook generated: yes/no
+Report V2 package generated: yes/no
+Rollout gate eligible: yes/no
+Gate receipt path:
 Hermes summary sent: yes/no
-Decision Brief read: yes/no
+Weekly Intelligence Brief V2 read: yes/no
 Deep Explanation cards read:
 Project Actions reviewed: yes/no
 MVP Radar reviewed: yes/no
@@ -285,7 +311,7 @@ What to simplify next week:
 
 Success requires:
 
-- at least four workbook runs;
+- at least four gate-eligible Report V2 package runs;
 - at least four feedback sessions;
 - at least 8-12 confirmed feedback events;
 - at least four real actions, experiments, project decisions, or explicit
@@ -300,7 +326,7 @@ Success requires:
 
 Treat these as product failures, not just implementation gaps:
 
-- operator stops opening the workbook;
+- operator stops opening the Weekly Intelligence Brief V2;
 - report is too long;
 - Hermes messages are too noisy;
 - feedback is too cumbersome;
@@ -317,7 +343,8 @@ Treat these as product failures, not just implementation gaps:
 If `friction_score_1_to_5` is 4 or 5 for two weeks:
 
 - reduce Hermes weekly message to three bullets and one action;
-- reduce workbook reading target to Decision Brief plus one explanation card;
+- reduce report reading target to Weekly Intelligence Brief V2 plus one
+  explanation card;
 - limit Codex suggestions to one per week;
 - hide low-confidence project actions unless explicitly requested;
 - suppress Obsidian projection sections that are not used;
@@ -329,7 +356,7 @@ If `user_value_score_1_to_5` is 1 or 2 for two weeks:
 
 - inspect wrong-priority and not-interested feedback first;
 - demote sources/threads only through explicit confirmed suggestions;
-- check whether the workbook is overexplaining weak evidence;
+- check whether the report package is overexplaining weak evidence;
 - verify that Project Actions are specific enough to active repos;
 - verify that MVP Radar is not crowding out study/project decisions.
 
@@ -353,7 +380,7 @@ Weeks covered:
 Decision:
 - continue HPI as-is
 - simplify Hermes/PI
-- focus only on workbook/feedback
+- focus only on Brief/Atlas/feedback
 - pause new features
 - add next implementation layer
 ```
@@ -363,8 +390,11 @@ Decision:
 Before week 1:
 
 - confirm current week label;
-- generate or locate the current workbook;
-- verify MVP Radar section/dossier is available;
+- generate or locate the current Report V2 package;
+- run `report-v2-rollout-gate --week <YYYY-WNN> --json`;
+- verify the gate returns `eligible`;
+- store the gate receipt path with the dogfood notes;
+- verify MVP Radar section/dossier is available through the package;
 - verify feedback intake works in text mode;
 - verify voice feedback transcription path or choose text fallback;
 - verify Strategy Reviewer can run on existing feedback;
