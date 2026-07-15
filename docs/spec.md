@@ -434,7 +434,8 @@ incremental_ingest.py
 └── On success: trigger generate_digest.py
 ```
 
-Triggered by: `telegram-ai-split-report.service` before weekly split HTML
+Triggered by: `telegram-ai-split-report.service` before the weekly Report V2
+package
 generation, or manually through `python3 src/main.py ingest`.
 
 ---
@@ -570,13 +571,13 @@ python3 src/main.py health-check
 |---|---|---|
 | `openclaw-you.service` | Service | OpenClaw runtime on host (not used for current LLM transport) |
 | `telegram-bot.service` | Service | Runs Hermes Telegram command polling |
-| `telegram-ai-split-report.service` | Service | Refreshes ingestion, generates Weekly Intelligence Brief and Knowledge Atlas HTML, and delivers both files to Telegram |
+| `telegram-ai-split-report.service` | Service | Refreshes ingestion, runs `weekly-intelligence-v2 --deliver`, and delivers manifest-bound Weekly Intelligence Brief and Knowledge Atlas HTML files to Telegram |
 
 ### Timers
 
 | Unit | Schedule | Triggers |
 |---|---|---|
-| `telegram-ai-split-report.timer` | Monday 09:00 Europe/Berlin | `telegram-ai-split-report.service` |
+| `telegram-ai-split-report.timer` | Monday 09:00 Asia/Tbilisi | `telegram-ai-split-report.service` |
 
 Legacy digest, ingest, MVP, cleanup, study reminder, and reminder timers are
 disabled in the current dogfood baseline unless explicitly re-enabled.

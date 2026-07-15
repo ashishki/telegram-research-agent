@@ -593,9 +593,10 @@ The VPS production baseline is configured for dogfood:
   enabled.
 - The current dogfood systemd schedule keeps only `telegram-bot.service` and
   `telegram-ai-split-report.timer` active for project operation. The weekly
-  split-report service refreshes ingestion, generates both HTML reports, and
-  delivers them to Telegram on Monday at 09:00 Europe/Berlin; legacy digest,
-  MVP, cleanup, study reminder, and reminder timers are disabled.
+  report service refreshes ingestion, runs `weekly-intelligence-v2 --deliver`,
+  and delivers the Brief/Atlas package to Telegram on Monday at 09:00
+  Asia/Tbilisi; legacy digest, MVP, cleanup, study reminder, and reminder
+  timers are disabled.
 - `scripts/healthcheck.sh` is the primary readiness check for DB/config/output
   ownership and weekly delivery state.
 - `ops-validate` distinguishes infrastructure readiness from live feedback

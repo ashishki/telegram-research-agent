@@ -16,6 +16,14 @@
 - `report-v2-rollout-gate` is the read-only dogfood start gate. It exits `0`
   only when a real current private weekly package is eligible and exits `2`
   with blocking evidence when dogfood must remain paused.
+- `telegram-ai-split-report.service` now runs
+  `weekly-intelligence-v2 --deliver --threads-limit 24 --atoms-limit 8`; the
+  timer runs Monday at 09:00 Asia/Tbilisi.
+- The weekly service writes a non-blocking post-run rollout receipt to
+  `data/output/report_v2_rollout_receipts/latest.json`.
+- The timer no longer uses catch-up activation on restart; reports should run
+  at the scheduled 09:00 Asia/Tbilisi window rather than immediately after a
+  timer restart.
 - No dogfood, live operator value, screenshot approval, or portfolio evidence
   is claimed by this release note.
 

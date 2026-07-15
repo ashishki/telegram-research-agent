@@ -1669,7 +1669,7 @@ IRX-1 through IRX-5 semantics:
 1. **V2 path naming:** use explicit versioned directories plus V1 aliases; IRX-14
    freezes exact paths after parallel-run evidence.
 2. **Reader display time zone:** store all boundaries in UTC and render
-   generated time in the configured operator zone (`Europe/Berlin` today);
+   generated time in the configured operator zone (`Asia/Tbilisi` today);
    analysis boundaries remain explicit UTC.
 3. **Reaction eligibility:** source-post time must be inside the half-open
    analysis period and current personal visibility must be attested by the

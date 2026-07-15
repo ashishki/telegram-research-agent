@@ -219,12 +219,14 @@ The intended single-user deployment baseline is:
 
 - `telegram-bot.service` runs Hermes command polling with restart-on-failure.
 - `telegram-ai-split-report.timer` is the only project weekly report timer. It
-  runs every Monday at 09:00 Europe/Berlin and triggers
+  runs every Monday at 09:00 Asia/Tbilisi and triggers
   `telegram-ai-split-report.service`.
 - `telegram-ai-split-report.service` refreshes Telegram ingestion first, then
-  runs `ai-split-report --deliver --threads-limit 24 --atoms-limit 8` so the
-  Weekly Intelligence Brief and Knowledge Atlas HTML files are delivered to
-  Telegram as documents.
+  runs `weekly-intelligence-v2 --deliver --threads-limit 24 --atoms-limit 8`
+  so the manifest-bound Weekly Intelligence Brief and Knowledge Atlas HTML
+  files are delivered to Telegram as documents. It then runs the rollout gate
+  as a non-blocking post-check and writes
+  `data/output/report_v2_rollout_receipts/latest.json`.
 - Legacy `telegram-ingest.timer`, `telegram-digest.timer`,
   `telegram-mvp-weekly.timer`, `telegram-cleanup.timer`,
   `telegram-study-reminder-*.timer`, `telegram-reminders.timer`, and

@@ -1,6 +1,6 @@
 # Validated: systemd-analyze verify (run manually before deploying)
 [Unit]
-Description=Telegram Research Agent - Weekly Split HTML Reports
+Description=Telegram Research Agent - Weekly Intelligence V2 Reports
 After=network.target
 
 [Service]
@@ -11,7 +11,8 @@ WorkingDirectory=/srv/openclaw-you/workspace/telegram-research-agent
 EnvironmentFile=/srv/openclaw-you/.env
 Environment=PYTHONPATH=/srv/openclaw-you/workspace/telegram-research-agent
 ExecStartPre=/srv/openclaw-you/venv/bin/python3 src/main.py ingest
-ExecStart=/srv/openclaw-you/venv/bin/python3 src/main.py ai-split-report --deliver --threads-limit 24 --atoms-limit 8
+ExecStart=/srv/openclaw-you/venv/bin/python3 src/main.py weekly-intelligence-v2 --deliver --threads-limit 24 --atoms-limit 8
+ExecStartPost=-/srv/openclaw-you/venv/bin/python3 src/main.py report-v2-rollout-gate --json --output-path data/output/report_v2_rollout_receipts/latest.json
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=telegram-ai-split-report

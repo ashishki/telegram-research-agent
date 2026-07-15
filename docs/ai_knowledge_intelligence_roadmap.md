@@ -1063,7 +1063,7 @@ Purpose: make sure the system reliably runs before product changes continue.
 Required work:
 
 - keep `telegram-ai-split-report.timer` active for the Monday 09:00
-  Europe/Berlin split HTML delivery window;
+  Asia/Tbilisi Report V2 delivery window;
 - add a health check that fails if the current-week Weekly Brief or Knowledge
   Atlas HTML output is missing after the scheduled run window;
 - add a guard against root-owned files under `data/output`;
