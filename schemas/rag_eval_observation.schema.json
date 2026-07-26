@@ -1,0 +1,211 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-workflow-playbook.local/schemas/rag_eval_observation.schema.json",
+  "title": "RAG Eval Observation",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "trial_id",
+    "condition_id",
+    "case_id",
+    "route_decision",
+    "retrieved_items",
+    "assembled_context",
+    "answer",
+    "citations",
+    "abstained",
+    "insufficient_evidence",
+    "harness_events",
+    "latency_ms",
+    "tokens",
+    "cost",
+    "errors",
+    "failure_stage"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "type": "string", "const": "playbook.rag_eval_observation.v1" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "trial_id": { "type": "string", "minLength": 1 },
+    "condition_id": { "type": "string", "minLength": 1 },
+    "case_id": { "type": "string", "minLength": 1 },
+    "route_decision": {
+      "type": "object",
+      "required": ["domain", "collection", "fallback_used", "no_route", "ambiguous"],
+      "additionalProperties": false,
+      "properties": {
+        "domain": { "type": ["string", "null"] },
+        "collection": { "type": ["string", "null"] },
+        "confidence": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "fallback_used": { "type": "boolean" },
+        "no_route": { "type": "boolean" },
+        "ambiguous": { "type": "boolean" },
+        "latency_ms": { "type": ["number", "null"], "minimum": 0 },
+        "cost_usd": { "type": ["number", "null"], "minimum": 0 }
+      }
+    },
+    "retrieved_items": { "type": "array", "items": { "$ref": "#/$defs/retrieved_item" } },
+    "assembled_context": {
+      "type": "object",
+      "required": ["items", "token_count", "truncated"],
+      "additionalProperties": false,
+      "properties": {
+        "items": { "type": "array", "items": { "$ref": "#/$defs/context_item" } },
+        "token_count": { "type": "integer", "minimum": 0 },
+        "truncated": { "type": "boolean" }
+      }
+    },
+    "answer": { "type": ["string", "null"] },
+    "answer_correct": { "type": ["boolean", "null"] },
+    "citations": { "type": "array", "items": { "$ref": "#/$defs/citation" } },
+    "abstained": { "type": "boolean" },
+    "insufficient_evidence": { "type": "boolean" },
+    "harness_events": {
+      "type": "object",
+      "required": [
+        "retrieval_calls",
+        "search_queries",
+        "search_query_refs",
+        "artifacts",
+        "returned_result_count",
+        "consumed_result_count",
+        "retries",
+        "termination_reason"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "retrieval_calls": { "type": "integer", "minimum": 0 },
+        "search_queries": { "type": "array", "items": { "type": "string" } },
+        "search_query_refs": { "type": "array", "items": { "$ref": "#/$defs/artifact_ref" } },
+        "artifacts": { "type": "array", "items": { "$ref": "#/$defs/harness_artifact" } },
+        "returned_result_count": { "type": "integer", "minimum": 0 },
+        "consumed_result_count": { "type": "integer", "minimum": 0 },
+        "retries": { "type": "integer", "minimum": 0 },
+        "termination_reason": { "type": "string", "enum": ["completed", "insufficient_evidence", "timeout", "max_iterations", "error", "premature_stop", "false_success"] }
+      }
+    },
+    "latency_ms": {
+      "type": "object",
+      "required": ["retrieval", "reranking", "generation", "e2e"],
+      "additionalProperties": false,
+      "properties": {
+        "retrieval": { "type": ["number", "null"], "minimum": 0 },
+        "reranking": { "type": ["number", "null"], "minimum": 0 },
+        "generation": { "type": ["number", "null"], "minimum": 0 },
+        "e2e": { "type": ["number", "null"], "minimum": 0 }
+      }
+    },
+    "tokens": {
+      "type": "object",
+      "required": ["input", "output"],
+      "additionalProperties": false,
+      "properties": {
+        "input": { "type": ["integer", "null"], "minimum": 0 },
+        "output": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "cost": {
+      "type": "object",
+      "required": ["total_usd"],
+      "additionalProperties": false,
+      "properties": {
+        "total_usd": { "type": ["number", "null"], "minimum": 0 }
+      }
+    },
+    "errors": { "type": "array", "items": { "type": "string" } },
+    "failure_stage": { "type": ["string", "null"], "enum": ["corpus_ingestion", "query_formulation", "routing", "retrieval_miss", "returned_not_opened", "opened_not_used", "premature_stop", "context_overflow_truncation", "generation_failure", "citation_failure", "acl_leak", "stale_evidence", "invalid_observation", null] },
+    "perturbation": {
+      "type": "object",
+      "required": ["scenario", "component_id", "component_kind", "answer_change_score", "expected_irrelevant"],
+      "additionalProperties": false,
+      "properties": {
+        "scenario": { "type": "string", "enum": ["required_evidence_deletion", "irrelevant_evidence_deletion", "distractor_injection", "node_deletion", "edge_deletion", "synonym_injection", "entity_dedup_ablation"] },
+        "component_id": { "type": "string", "minLength": 1 },
+        "component_kind": { "type": "string", "enum": ["doc", "chunk", "span", "node", "edge"] },
+        "answer_change_score": { "type": "number", "minimum": 0 },
+        "expected_irrelevant": { "type": "boolean" },
+        "human_relevance_label": { "type": ["number", "null"], "minimum": 0 },
+        "gold_attribution_label": { "type": ["number", "null"], "minimum": 0 },
+        "dedup_enabled": { "type": ["boolean", "null"] }
+      }
+    }
+  },
+  "$defs": {
+    "safe_path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$))(?!.*\\\\).+"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "artifact_ref": {
+      "type": "object",
+      "required": ["path", "sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "$ref": "#/$defs/safe_path" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "kind": { "type": "string" },
+        "id": { "type": "string" }
+      }
+    },
+    "retrieved_item": {
+      "type": "object",
+      "required": ["doc_id", "chunk_id", "span_id", "source_version", "rank", "source_timestamp", "fresh", "acl_scope", "acl_result", "consumed"],
+      "additionalProperties": false,
+      "properties": {
+        "doc_id": { "type": "string", "minLength": 1 },
+        "chunk_id": { "type": ["string", "null"] },
+        "span_id": { "type": ["string", "null"] },
+        "source_version": { "type": "string", "minLength": 1 },
+        "rank": { "type": "integer", "minimum": 1 },
+        "retrieval_score": { "type": ["number", "null"] },
+        "source_timestamp": { "type": ["string", "null"] },
+        "fresh": { "type": "boolean" },
+        "acl_scope": { "type": "array", "items": { "type": "string" } },
+        "acl_result": { "type": "string", "enum": ["allowed", "denied", "unknown"] },
+        "domain": { "type": ["string", "null"] },
+        "collection": { "type": ["string", "null"] },
+        "consumed": { "type": "boolean" }
+      }
+    },
+    "context_item": {
+      "type": "object",
+      "required": ["doc_id", "chunk_id", "span_id", "order", "token_count"],
+      "additionalProperties": false,
+      "properties": {
+        "doc_id": { "type": "string", "minLength": 1 },
+        "chunk_id": { "type": ["string", "null"] },
+        "span_id": { "type": ["string", "null"] },
+        "order": { "type": "integer", "minimum": 1 },
+        "token_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "citation": {
+      "type": "object",
+      "required": ["doc_id", "chunk_id", "span_id", "claim_id", "supports_claim"],
+      "additionalProperties": false,
+      "properties": {
+        "doc_id": { "type": "string", "minLength": 1 },
+        "chunk_id": { "type": ["string", "null"] },
+        "span_id": { "type": ["string", "null"] },
+        "claim_id": { "type": "string", "minLength": 1 },
+        "supports_claim": { "type": "boolean" }
+      }
+    },
+    "harness_artifact": {
+      "type": "object",
+      "required": ["path", "action", "success"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "$ref": "#/$defs/safe_path" },
+        "action": { "type": "string", "enum": ["created", "opened", "read", "failed_open", "failed_read"] },
+        "success": { "type": "boolean" },
+        "sha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] }
+      }
+    }
+  }
+}

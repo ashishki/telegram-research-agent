@@ -1,1351 +1,1330 @@
-# Current Backlog
+# Active Task Graph
 
-Version: 4.1
-Last updated: 2026-07-15
-State: canonical active backlog
-
-Canonical product-correction roadmap:
-`docs/intelligence_report_v2_roadmap.md`.
-
-This file is intentionally compact. Historical KIR/HPI/RVE/DFX detail remains
-in component roadmaps and git history. The PGI implementation record remains
-below, but active implementation starts from the IRX task graph.
+Status: proposed
+Last updated: 2026-07-26
+Playbook SHA: 5583eca96c4d2d480b5574ed78bea63e0b07ebf0
+Target repo baseline: ad8689fa25b89f77122c4cec7c7a6b9da3f500cf
 
 ## Operating Rules
 
-- One active product-correction queue: Intelligence Report Experience And
-  Editorial Quality (`IRX`).
-- PGI and KIR/HPI/RQ/RVE remain historical or component records; do not add
-  Report V2 work to those queues.
-- `PGI-001` through `PGI-006` are implemented locally with focused
-  verification. Their infrastructure is reusable, but W29 disproved the claim
-  that the split reports are ready for reader-value dogfood.
-- `PGI-007` is superseded as the next gate by `report-v2-rollout-gate`;
-  dogfood must not start until that start checklist returns `eligible` on real
-  current operator evidence.
-- Do not run expensive LLM jobs, full archive backfills, migrations, or
-  production config changes from backlog grooming.
-- Market/business context remains `context_only`.
-- No feedback means `unknown`, never negative.
-- Hermes is not source of truth and has no hidden mutation tools.
+- Product work now flows through PBR and PRM only.
+- Historical IRX work remains preserved in prior roadmaps and git history.
+- Do not add new product tasks to IRX.
+- Do not run live Telegram ingestion, reaction sync, Frontier, Radar, report
+  generation, full archive LLM backfill, embeddings, or external web research
+  jobs from backlog grooming.
+- Do not modify production database contents.
+- Candidate retrieval queries are not gold evidence until the human operator
+  approves expected evidence and citations.
+- Human approval is required before accepting the product pivot ADR, starting
+  dogfood, adopting a vector backend, approving external skills, or deleting
+  compatibility files.
+- Deep review is batched by milestone block. A task-level Critic-Required value
+  means the task must be covered by the next block review, not that a separate
+  deep-review agent must be run after every task.
+- Immediate deep review still blocks continuation for privacy egress, unsafe
+  writes, production data migration, vector backend adoption, external skill
+  approval, dogfood start, release claims, or deletion/archive of compatibility
+  files.
 
-## Current Verified Baseline
+## Current Baseline
 
-| Component | Status |
-|---|---|
-| Knowledge Atom storage/extraction | `implemented_and_verified` |
-| Idea Thread storage/momentum | `implemented_and_verified` |
-| Weekly AI visual report/workbook contract | `implemented_and_verified`, `legacy_surface` |
-| Weekly Brief + Knowledge Atlas split | `implemented_structurally`, `failed_W29_reader_value_audit`; PGI-003/004/005 plumbing is reusable but does not satisfy Report V2 |
-| Hermes/PI facade/tools/chat | `implemented_but_not_dogfooded`; PGI-003 artifact freshness awareness added |
-| Feedback intake/action status | `implemented_and_verified`; IRX-12 adds report/surface/section/item targeting, confirmation gates, and application receipts |
-| Weekly intelligence scorecard | `implemented_and_verified` for PGI-006 deterministic scorecard fixtures |
-| Strategy Reviewer | `implemented_and_verified` advisory-only |
-| Market/business Radar context | `implemented_and_verified` as `context_only` |
-| Radar RVE contract/adapters in sibling repo | `implemented_and_verified`, `needs_live_validation` |
-| Editorial intelligence shadow | `implemented_and_verified`; separate opt-in `editorial_intelligence.v1` run artifact, not consumed by V1 renderers |
-| Static visualization component system | `implemented_and_verified`; shared offline `report_visuals.v1` library and sanitized fixture gallery, not activated in V1 renderers |
-| Project Intelligence V2 shadow | `implemented_and_verified`; separate opt-in `project_intelligence.v2` run artifact with exact project/thread/evidence authority and no V1 renderer activation |
-| Weekly Intelligence Brief V2 preview | `implemented_and_verified`; separate opt-in manifest-bound `split_ai_report.v2` package with V1 generation and delivery unchanged |
-| Reader-value quality gates | `implemented_and_verified`; closed seven-dimension `report_quality.v2`, warn-only on V1 and blocking on opt-in V2 previews |
-| Report V2 contract and roadmap | `implemented_and_verified`; IRX-0 documentation plus IRX-1 through IRX-14 are implemented and verified |
-| Portfolio dogfood evidence | `not_started`; blocked until `report-v2-rollout-gate` returns `eligible` on real current private artifacts |
-
-## Next Candidate Task
-
-No remaining IRX implementation task.
-
-The IRX implementation queue is closed through IRX-14. The next non-IRX action
-is operational: run `report-v2-rollout-gate` on a real current private weekly
-package and start dogfood only if it returns `eligible`. No live dogfood
-evidence is claimed in this backlog.
+| Area | Status |
+| --- | --- |
+| Repository | Existing product, not greenfield; pre-retrofit commit ad8689fa25b89f77122c4cec7c7a6b9da3f500cf |
+| Playbook | Current checkout pinned at 5583eca96c4d2d480b5574ed78bea63e0b07ebf0 |
+| Product center | Pivot proposed from weekly report to Personal Telegram Research Memory + Grounded Assistant |
+| Full archive search | Planned; not implemented as assistant product surface |
+| Current SQLite FTS | Exists for posts in local schema; not yet hardened as persistent product retrieval contract |
+| PI assistant retrieval | Verified curated-only; raw Telegram archive intentionally excluded |
+| W29 reports | V1 Brief and Atlas rendered despite V2 preview code existing elsewhere |
+| W29 reactions | Seven personal reactions resolved to posts, zero atoms, zero themes, zero ranking effects |
+| Radar | W29 Radar stage failed and contaminated release status instead of only Radar card |
+| Dogfood | Not started for the new product |
 
 ## Dependency Graph
 
 ```text
-P0: IRX-0 -> IRX-1 -> IRX-2 -> IRX-3 -> IRX-4 -> IRX-5
-P1: IRX-5 -> IRX-8 -> IRX-9 -> IRX-10 -> IRX-6 -> IRX-11
-P2: IRX-4/5/8/11 -> IRX-7 -> IRX-12 -> IRX-13 -> IRX-14
+PBR-0 -> PBR-1 -> PBR-2 -> PBR-3 -> PBR-4 -> PBR-5
+PBR-3/PBR-5 -> PBR-6
+PBR-0/PBR-3 -> PBR-7
+PBR-2/PBR-3/PBR-4/PBR-5/PBR-6/PBR-7 -> PBR-8
+
+PBR-8 -> PRM-0 -> PRM-1 -> PRM-2 -> PRM-3 -> PRM-4
+PRM-3 -> PRM-5 -> PRM-6
+PRM-3/PRM-4/PRM-1 -> PRM-7 -> PRM-8 conditional
+PRM-4/PRM-5/PRM-7 -> PRM-9 -> PRM-10 -> PRM-11
+PRM-10 -> PRM-12 -> PRM-13 -> PRM-14
+PRM-5/PRM-12 -> PRM-15 -> PRM-16
+PRM-3/PRM-5/PRM-6/PRM-16 -> PRM-17
+PRM-10/PRM-11/PRM-12/PRM-16/PRM-17 -> PRM-18 -> PRM-19 -> PRM-20
 ```
 
-`IRX-13` was the P2 fixture/evaluation task and is now closed. IRX-8 preceded
-the Brief V2 renderer because both reader surfaces need the same deterministic
-visual contract.
-
-## IRX Queue
-
-| ID | Priority | Status | Summary | Direct dependencies |
-|---|---|---|---|---|
-| IRX-0 | P0 | `implemented_documentation_only` | W29 audit, Report V2 roadmap, and product contracts | none |
-| IRX-1 | P0 | `implemented_and_verified` | Separate generation time from the last completed ISO-week analysis period | IRX-0 |
-| IRX-2 | P0 | `implemented_and_verified` | One weekly run manifest and required same-run Radar artifact contract | IRX-1 |
-| IRX-3 | P0 | `implemented_and_verified` | Map reactions through posts/atoms and a thread-resolution interface into a weak boost/receipt; canonical attribution is supplied by IRX-4 | IRX-1, IRX-2 |
-| IRX-4 | P0 | `implemented_and_verified` | Curate stable idea-level threads with merge/split lifecycle, provenance, and historical as-of resolution | IRX-1, IRX-2, IRX-3 |
-| IRX-5 | P0 | `implemented_and_verified` | Produce schema-validated Russian editorial intelligence JSON from bounded cited inputs | IRX-1..IRX-4 |
-| IRX-8 | P1 | `implemented_and_verified` | Shared deterministic, offline static visualization components | IRX-4, IRX-5 |
-| IRX-9 | P1 | `implemented_and_verified` | Evidence-backed, named, PR-sized project implications | IRX-4, IRX-5, IRX-8 |
-| IRX-10 | P1 | `implemented_and_verified` | Explain the bound candidate, evidence gaps, next validation, and kill criteria | IRX-2, IRX-5, IRX-8 |
-| IRX-6 | P1 | `implemented_and_verified` | Russian 5-7 minute Weekly Intelligence Brief V2 | IRX-1..IRX-5, IRX-8..IRX-10 |
-| IRX-11 | P1 | `implemented_and_verified` | Reader-value gates for period, editorial, personalization, visual, project, and Radar quality | IRX-6, IRX-8 |
-| IRX-7 | P2 | `implemented_and_verified` | Visual Knowledge Atlas V2 plus preserved Knowledge Audit Explorer | IRX-4, IRX-5, IRX-8, IRX-11 |
-| IRX-12 | P2 | `implemented_and_verified` | Report- and section-specific confirmation-gated learning loop | IRX-2, IRX-3, IRX-5, IRX-6, IRX-7, IRX-10 |
-| IRX-13 | P2 | `implemented_and_verified` | Sanitized golden fixtures, evaluation dataset, and desktop/mobile regression | IRX-1..IRX-12 |
-| IRX-14 | P2 | `implemented_and_verified` | Versioned rollout, compatibility, and dogfood restart gate | IRX-1..IRX-13 |
-
-Full task cards, acceptance criteria, likely files, failure states, tests, and
-rollout implications are in `docs/intelligence_report_v2_roadmap.md`.
-
-## IRX Implementation Journal
-
-### 2026-07-13 - IRX-1 Completed-Week Reporting Semantics
-
-- Status: `implemented_and_verified`.
-- Added one immutable typed reporting-period resolver with exact UTC
-  `generated_at`, inclusive start, exclusive end, `reporting_week`, explicit
-  `period_mode`, and additive `week_label` compatibility.
-- Default weekly generation now resolves the last fully completed ISO week;
-  explicit completed history remains supported, rolling mode is separately
-  labelled, and current partial-week mode is diagnostic opt-in only.
-- Brief, Atlas, split context, Frontier, marked-post/reaction eligibility,
-  opportunity/Radar seed selection, live/market projections, and MVP weekly
-  plumbing share the same half-open boundaries.
-- Historical contexts exclude atoms and source posts after the period end and
-  recompute bounded thread aggregates instead of trusting only current
-  `last_seen_at` state.
-- Existing command names, filename conventions, V1 sidecar contracts,
-  `week_label`, scoring, prompts, feedback semantics, database schema, and Radar
-  gates remain compatible. Weekly default semantics intentionally changed;
-  period flags and sidecar fields are additive. No generated artifact files
-  were edited.
-- Required focused verification: 44 tests passed. Extended affected-surface
-  verification: 38 tests passed; feedback recheck: 14 tests passed.
-  `py_compile` and `git diff --check` passed. Heavy pipelines and the full suite
-  were intentionally not run.
-- Known boundary: destructive edits to an existing atom/thread cannot be
-  perfectly reconstructed without versioned history. That schema/curation work
-  is outside IRX-1.
-- Historical handoff: IRX-1 intentionally left manifest/orchestration and
-  same-run Radar binding to IRX-2; that handoff is now closed by the IRX-2
-  implementation below.
-
-### 2026-07-13 - IRX-2 Weekly Run Manifest And Same-Run Radar Binding
-
-- Status: `implemented_and_verified` with focused local and sibling Radar
-  suites; heavy/live pipelines and the full suite were intentionally not run.
-- Added `weekly_run_manifest.v1`, the frozen
-  `irx2_orchestration.v1` stage policy, immutable run-scoped directories,
-  validated atomic manifest transitions, deterministic complete/partial/failed
-  aggregation, and the explicit additive `weekly-intelligence-v2` command.
-- Required/enabled stages are knowledge refresh, reaction sync, feedback
-  snapshot, Frontier, Radar, Brief, and Atlas. Canonical curation, editorial
-  intelligence, the dedicated Audit Explorer, and reader-value gates are
-  predeclared disabled/non-required for their later IRX owners.
-- Radar input/output is bound through `radar_run_binding.v1` using separate
-  manifest/Radar run IDs, exact period identity, declared paths, and SHA-256
-  checksums. Missing, failed, malformed, wrong-period, or tampered Radar cannot
-  reuse an adjacent or prior candidate; intentional disablement is declared at
-  run creation and remains reader-visible.
-- Optional live intelligence is copied to immutable
-  `radar/live-intelligence.json`, full-period validated, and checksum-recorded
-  as the exact Radar dependency. Feedback snapshot, readers, and Frontier use
-  the same exclusive period-end cutoff; Frontier cache identity and content
-  fingerprint reject a stale or concurrently replaced row.
-- Brief/Atlas/Frontier snapshots carry the same immutable run and period
-  identity. Hermes/PI treats the newest manifest candidate as authority and
-  refuses invalid, failed, running, mismatched, missing, or tampered bound
-  artifacts rather than silently falling back to an older run, V1 artifact, or
-  mutable current state.
-- Existing V1 commands, week-named diagnostic paths, report contracts, period
-  semantics, scoring, prompts, feedback semantics, database schema, and Radar
-  evidence/context-only gates remain compatible. No generated report artifacts
-  were edited or committed, and no sibling Radar code was changed.
-- Retry behavior: terminal manifests are immutable. The public CLI creates a
-  new run and may record `supersedes_run_id`; it does not expose same-ID resume.
-  The core state machine permits retry transitions only while a manifest is
-  still unfinalized.
-- Historical handoff at IRX-2 completion: IRX-3 became the only next
-  implementation scope. IRX-2 itself did not add a reaction boost, canonical
-  curator, editorial LLM, V2 redesign, reader-value gates, or report-specific
-  feedback redesign; the IRX-3 handoff is now closed below.
-
-### 2026-07-13 - IRX-3 Reaction-To-Ranking Personalization
-
-- Status: `implemented_and_verified`; 145 core
-  reaction/report/feedback/Strategy/split/retrieval/PI tests and 45
-  manifest/orchestrator tests passed. `git diff --check` passed. Live/heavy
-  pipelines and the full suite were intentionally not run.
-- A rich current reaction snapshot is immutable and same-run bound by run,
-  period, path, checksum, coverage, observed posts, and event counts. Only a
-  complete verified snapshot can create fresh interest; incomplete, stale,
-  truncated, wrong-period, or tampered input fails closed. Legacy count-only
-  IRX-2 output remains supported only as explicitly unbound/unavailable: it
-  creates no fresh boost and does not require a rich receipt.
-  A complete reaction snapshot with an unattested confirmed-feedback stage gets
-  a distinct partial receipt and no boost.
-- Every operator-visible emoji is equal positive implicit-interest provenance,
-  deduplicated once per post. Aggregate reactions are ignored, removed/absent
-  reactions are unknown rather than negative, and source-post time must fall in
-  the exact IRX-1 half-open period; Monday can therefore consume an eligible
-  Sunday source post from the completed week.
-- Stored identity is the only lineage: Telegram channel/message -> raw post ->
-  normalized post -> bounded atom -> `idea_thread_atoms` -> current
-  compatibility thread. Opaque post/reaction/atom/source refs, full eligible
-  audit, bounded unconsumed reasons, and counterfactual effects are validated.
-  Current refs are explicitly not stable canonical identity.
-- The weak marker acts only after evidence, safety, period, freshness,
-  contradiction/supersession, and deduplication eligibility and below confirmed
-  explicit feedback. It can make at most one adjacent promotion among otherwise
-  equal eligible candidates; global scores, evidence confidence, feedback
-  semantics, and Radar gates are unchanged.
-- Brief and Atlas classify the same personalized order against their exact
-  four-action and twelve-thread selectors. Their additive
-  `reaction_personalization.v1` receipts use exact `thread:<slug>` surface refs
-  and must agree on run/period/snapshot/policy identity, pre-selection funnel,
-  non-selection attribution, and snapshot lineage. Each receipt agrees with its
-  own rendered totals; selector-dependent status, selected counts,
-  counterfactuals, and unconsumed results may differ.
-- Strategy Reviewer can only produce an unapproved advisory proposal after the
-  same pattern appears in at least three completed weeks and four distinct
-  reacted posts. IRX-3 never mutates profile, config, prompt, project, source
-  policy, or code.
-- Compatibility: standalone/V1 runs without a bound snapshot keep prior order
-  and contracts; legacy reaction-sync integer results and `marked_important`
-  alias remain readable; Brief/Atlas, split, retrieval, Hermes/PI, Obsidian, and
-  Strategy Reviewer additions are additive. No DB schema, LLM prompt, generated
-  artifact, sibling Radar code, or cross-repository gate changed.
-- Historical handoff: IRX-4 was the next implementation scope and had to add
-  the durable canonical registry while preserving IRX-3 post/atom provenance
-  and reaction semantics. That handoff is closed by the record below.
-
-### 2026-07-13 - IRX-4 Canonical Idea Thread Curation And Lifecycle
-
-- Status: `implemented_and_verified`. Added an additive canonical registry with
-  stable IDs/slugs, bilingual titles, thesis, lifecycle state, first/last seen,
-  curator version, raw aliases, atom/source provenance, append-only versions,
-  alias history, merge/split lineage, and auditable curator/operator decisions.
-  Raw Idea Threads and their memberships remain immutable audit provenance and
-  are never relabelled as canonical.
-- Deterministic create/update/merge/split/stale/operator-correction validation
-  rejects atom loss, ambiguous active ownership, duplicate active titles or
-  memberships, alias collisions, ancestry cycles, and slug churn. Each accepted
-  transition is atomic and incremental; candidate freshness/semantic checks and
-  the canonical write share one `BEGIN IMMEDIATE`, and rejected proposals remain
-  durable audit-only decisions. Merge/update participants are bound to the exact
-  candidate atom owners; nested payload overrides are rejected.
-- Deterministic Fable/Claude-style candidate generation treats entity/vendor
-  overlap as insufficient to merge and model-version difference as insufficient
-  to split. The bounded strong-model adapter can only return a proposal; stored
-  lifecycle mutation still requires the deterministic validator.
-- Historical lookup reads versioned canonical state, alias membership, atom
-  membership, and lineage as of the exclusive IRX-1
-  `analysis_period_end`; it does not reconstruct history from the current raw
-  cluster or current alias map. Typed alias history keeps W28 attribution stable
-  when the mutable raw thread gains W29 atoms and fails closed on split/terminal
-  ambiguity. Stable public refs use
-  `canonical_thread:<stable_slug>`, while canonical IDs remain separate.
-- The stored IRX-3 resolver fills nullable canonical attribution without
-  changing reaction eligibility, strength, evidence/feedback precedence,
-  ordering, counterfactuals, or receipt provenance. Brief/Atlas/Frontier,
-  Hermes/PI, retrieval, Obsidian, Strategy Reviewer, and report sidecars receive
-  bounded additive canonical projections; raw/V1 compatibility projections and
-  paths remain intact. Atlas primary canonical context is capped at 12.
-- Frontier cache identity includes the exact bounded canonical prompt snapshot,
-  so an in-period curator correction invalidates stale output. Retrieval and
-  Obsidian accept canonical aliases/refs while retaining raw thread records and
-  note paths. The IRX-2 manifest schema/stage policy and Radar binding are
-  unchanged.
-- Verification: the exact required compatibility command passed 83 tests in
-  60.753s; canonical persistence/curator tests passed 28 tests in 28.884s; an
-  extended affected-surface matrix passed 109 tests in 48.139s. Focused
-  `py_compile` and `git diff --check` passed. Live/expensive pipelines, archive
-  regeneration, and the full suite were intentionally not run.
-- Scope confirmation: no generated report artifact, IRX-3 reaction rule or
-  weight, global evidence score, explicit-feedback semantic, IRX-1 period rule,
-  IRX-2 run/Radar binding, Radar gate, standing configuration, or cross-repo
-  code was changed. IRX-5 and later work were not implemented.
-
-### 2026-07-13 - IRX-5 Editorial Intelligence Synthesis Contract
-
-- Status: `implemented_and_verified`.
-- Added a separate run-bound `editorial_intelligence.v1` shadow artifact. A
-  full eligible run makes one call through the strong synthesis route over one
-  bounded deterministic package; preflight-partial and cached runs make no
-  editorial model call. The model cannot read the raw archive, expand beyond
-  deterministic candidate/evidence permissions, render HTML/SVG, or mutate
-  persistent product state.
-- The package closes over the exact run/period and canonical snapshot, eligible
-  source observations/evidence/claims, at most eight preselected candidates,
-  validated reaction effects, confirmed-feedback classifications, explicit
-  project permissions, and the same-run Radar result. Output is capped at three
-  main signals and two project-action references.
-- Strict validation enforces the exact JSON schema, exact unpadded refs and
-  matrix coverage, Russian string fields, per-field cautious wording for low
-  evidence, evidence-derived confidence ceilings, reaction receipt parity,
-  loaded-versus-applied confirmed-feedback semantics, project/Radar authority,
-  bounded investigation-only actions, and rejection of invented readiness,
-  deployment, or persistent-mutation narratives.
-- Missing, malformed, mismatched, unsupported, or partial prerequisites never
-  masquerade as complete intelligence. They produce the exact deterministic
-  partial projection with visible status/reason and zero model calls. Honest
-  zero-change output is also an exact host-owned projection rather than a
-  model-authored thesis.
-- Production persistence verifies the manifest-bound Radar bytes/checksums and
-  run identity, reaction receipt identity/completeness, and feedback snapshot
-  count/cutoff before release. The artifact path is immutable per run; retries
-  with changed input or a prior partial artifact require a new run ID.
-- The host-only generation receipt records prompt/schema/model versions, input
-  hash, token counts, estimated cost, latency, attempts, usage-recording state,
-  limits, and validation errors. It remains audit metadata rather than reader
-  prose.
-- Compatibility: the V1 Brief and Atlas remain unchanged and never consume the
-  shadow JSON. Shadow generation is explicit opt-in and failure-isolated. The
-  frozen `irx2_orchestration.v1` editorial stage remains disabled/non-required;
-  IRX-5 did not activate or alter that policy.
-- Verification: 67 focused IRX-5 tests, the 49-test required acceptance matrix,
-  and 149 extended compatibility tests passed. Focused compilation and
-  `git diff --check` passed. Ruff passed on IRX-5-owned files; pre-existing
-  `ai_report` Ruff findings were outside this slice and excluded.
-- Scope confirmation: no live or expensive LLM call, generated report run,
-  archive regeneration, cross-repository edit, Radar gate change, V2 renderer,
-  visualization component, or dogfood start was performed. IRX-8 is the next
-  implementation task.
-
-### 2026-07-14 - IRX-8 Static Visualization Component System
-
-- Status: `implemented_and_verified`.
-- Added a stdlib-only shared `report_visuals.v1` renderer with exact closed
-  schemas for ten component kinds: decision matrix, reaction lineage, Radar
-  gate, project impact, knowledge graph, 12-week timeline, source/thread
-  heatmap, evidence maturity, learning progression, and evidence badge.
-- Every component is deterministic, standalone/offline, accessible, and
-  explicit about run/period identity, source count, visual role, render state,
-  and `available`/`empty`/`unavailable`/`stale` data state. Validation rejects
-  unknown fields, unsafe refs, non-finite or oversized numbers, false evidence
-  maturity, decision escalation, mislabeled periods, and host-label laundering.
-- Added responsive/print CSS, collision-safe namespaced DOM/SVG IDs, readable
-  graph audit paths, null-versus-zero time-series semantics, and nonblank local
-  failure rendering. A document with multiple malformed specs now retains
-  distinct accessible failed sections instead of crashing on fallback IDs.
-- Added a sanitized ten-schema JSON fixture pack and byte-exact standalone HTML
-  gallery under `tests/fixtures/report_v2/`. No scripts, network resources,
-  remote fonts, private identifiers, or generated production reports are used.
-- Verification: 23 focused tests and the combined 54-test visualization/V1
-  compatibility matrix passed. Ruff format/check, focused `py_compile`, and
-  `git diff --check` passed. Adversarial mutation review exercised 5,324
-  malformed component variants without an uncaught component-render exception.
-- Compatibility: V1 Brief/Atlas output, editorial JSON, IRX-2 orchestration,
-  project computation, Radar gates, cross-repository code, and private report
-  artifacts remain unchanged. Browser screenshot regression remains IRX-13;
-  no screenshot or dogfood evidence is claimed. The historical IRX-9 handoff is
-  now closed by the completion record below.
-
-### 2026-07-14 - IRX-9 Project Intelligence V2
-
-- Status: `implemented_and_verified`.
-- Added the pure, deterministic `project_intelligence.v2` shadow contract and
-  immutable `<output>/<run_id>/project/project-intelligence.v2.json` artifact.
-  It has no model, network, database, clock, environment, or repository-write
-  authority.
-- Added opt-in `project_action_permissions.v1` descriptors. A confirmed action
-  must name the configured project and repository and copy its host-owned
-  component, change, configured normalized repository-relative files, effort,
-  acceptance criteria, risk, and priority exactly.
-- Confirmation requires an exact configured canonical thread, the same bounded
-  IRX-5 signal, medium-or-higher signal ceiling, and one or more decision-grade,
-  non-context evidence refs owned by that signal. Broad/legacy keyword overlap
-  cannot create authority. Explicit weak, rejected, learning-only, and
-  existing-context diagnostics remain non-actionable audit records.
-- The reader projection returns no more than two distinct permission/signal
-  actions. A Russian `no_confirmed_implication` state is valid; accepted audit
-  input is bounded to 32 records without silent truncation. Stable action/audit
-  refs, exact schemas, safe text/paths/refs, period identity, immutable cache
-  bytes, and editorial permission closure fail closed.
-- Split generation can opt into the project shadow only after unchanged V1
-  Brief/Atlas construction. Project-only generation performs no LLM call;
-  project and editorial failures are isolated; non-empty IRX-5 permissions are
-  revalidated against the exact preliminary package and loaded descriptors.
-- Added a sanitized fixture covering concrete, weak, rejected, learning,
-  existing-context, and empty outcomes, plus focused pure and split tests. The
-  required IRX-9 matrix passed 41 tests and the extended affected V1/editorial/
-  retrieval compatibility matrix passed 140 tests. Mutation review exercised
-  2,650 malformed variants without an uncaught exception. Ruff format/check,
-  focused compilation, JSON validation, and `git diff --check` passed.
-  Live/heavy pipelines and the full suite were not run.
-- Compatibility: existing PGI-005 projection/retrieval keys, V1 Brief/Atlas
-  bytes, IRX-5 model contract, reaction and feedback semantics, Radar gates,
-  cross-repository code, and generated private artifacts remain unchanged.
-  Reader rendering is deferred to IRX-6; IRX-10 is the next task.
-
-### 2026-07-14 - IRX-10 MVP Radar Reader Contract And Context-Only Hardening
-
-- Status: `implemented_and_verified`.
-- Added the deterministic `mvp_radar_reader.v1` projection over the immutable
-  `radar_run_binding.v1`, raw Radar JSON, and exact opportunity-seed export.
-  Candidate/run/week/period/schema/status/checksum parity is required before an
-  `available` or `no_candidate` state can reach a reader.
-- The projection separates matched external proof, matching KIR provenance,
-  and unmatched context. Market context, Telegram, X, negative signals,
-  unsupported source kinds, malformed booleans, unbound legacy files, and
-  wrong-run artifacts cannot grant build or focused-experiment authority.
-- Reader states are explicit: `available`, `no_candidate`, `missing`,
-  `invalid`, `disabled`, and `unbound_legacy`. Missing, invalid, wrong-period,
-  and legacy input stays partial/unavailable and cannot invent a candidate,
-  recommendation, evidence, or completion state.
-- Brief, canonical exchange, visual report, retrieval, editorial input, and
-  Hermes/PI consumers now use the strict projection or an explicitly
-  downgraded diagnostic adapter. Reader copy exposes the producer reason,
-  actual failed gate, next validation, KIR provenance, unmatched context, and
-  kill criteria without recomputing Radar scoring.
-- Consumer authority is explicit rather than inferred from self-declared
-  `schema_version`/`reader_state` markers. Public authoritative validation
-  requires the current succeeded manifest stage; standalone workbooks and
-  legacy sidecars keep candidate/recommendation data diagnostic-only.
-- Shared bounded loading rejects oversized bytes, invalid UTF-8, non-finite
-  numbers, excessive nesting, and oversized integers before malformed legacy
-  JSON can crash Brief, visual, retrieval, or PI paths.
-- Tightened stdout/raw-result parity in the Telegram-side Radar runner and made
-  opportunity seeds explicitly `candidate_evidence`, `context_only=false`, and
-  `build_ready_evidence=false`. The sibling producer now emits the fields the
-  reader contract already owned, an additive schema version, and explicit null
-  no-evidence fields; its evidence scoring and gates were not changed.
-- Verification: the required local matrix passed 47 tests; the exact sibling
-  matrix passed 16 tests; the final reader/authority matrix passed 80 tests,
-  the consumer matrix passed 108 tests, and the orchestrator/required overlap
-  matrix passed 66 tests. Ruff, focused compilation, and
-  `git diff --check` passed. Read-only malformed-input review exercised 4,172
-  loader and 5,824 projection variants without an uncaught public-boundary
-  exception after the final fix.
-- Scope confirmation: no live source acquisition, expensive model call,
-  generated private report, archive backfill, database migration, Radar score
-  change, or dogfood claim was made. At that boundary IRX-6 was next; its
-  completion is recorded below.
-
-### 2026-07-14 - IRX-6 Weekly Intelligence Brief V2 Preview
-
-- Status: `implemented_and_verified`.
-- Added an opt-in deterministic `split_ai_report.v2` Brief package under the
-  separate immutable `weekly_intelligence_briefs_v2/<run_id>/` path. V1 Brief,
-  Atlas, default generation, and scheduled delivery remain unchanged.
-- The reader DTO consumes only the exact terminal manifest, host-ordered IRX-5
-  editorial artifact and input catalog, manifest-bound reaction receipt,
-  confirmed IRX-9 project permissions, strict IRX-10 Radar reader, and IRX-8
-  visual specs. The renderer has no model call or ranking authority.
-- The Russian five-to-seven-minute surface contains one thesis, a four-way
-  decision matrix, at most three signals, one primary and up to two secondary
-  actions, a defer decision, concrete-or-empty project actions, reaction and
-  confirmed-feedback effects, one canonical Radar dossier, five targeted
-  feedback prompts, and collapsed technical provenance. The rich sanitized
-  fixture renders 827 initially visible words and three meaningful available
-  visual kinds out of four components.
-- Generation, loading, retrieval, and PI require canonical run-scoped paths,
-  strict bounded duplicate-free finite JSON, exact checksum-bound source bytes,
-  run/period/source parity, private immutable output, and atomic publication.
-  Wrong-run, stale, invalid, incomplete, symlinked, forged, or neighbor packages
-  fail closed without restoring a legacy Radar recommendation.
-- Verification: the exact task-card command passed 95 tests; the primary
-  Brief/visual/V1 compatibility matrix passed 133 tests; the upstream
-  editorial/project/reaction/Radar/manifest/orchestrator overlap matrix passed
-  164 tests. Independent security and compatibility reviews found no blockers;
-  Ruff, focused compilation, and `git diff --check` passed.
-- Scope confirmation: no live or expensive model run, generated production
-  report, archive backfill, database migration, Radar scoring/gate change,
-  sibling-repository edit, delivery switch, screenshot evidence, rollout, or
-  dogfood claim was made. At that boundary IRX-11 was next; its completion is
-  recorded below.
-
-### 2026-07-14 - IRX-11 Reader-Value Quality Gates
-
-- Status: `implemented_and_verified`.
-- Added the closed deterministic `report_quality.v2` evaluator and validator
-  with independent structural, evidence, editorial, personalization, visual,
-  project-usefulness, and Radar-completeness dimensions. Findings carry stable
-  codes, affected items, bounded evidence, Russian reader impact, and concrete
-  repair hints; no aggregate score can hide a critical dimension.
-- Evaluation is sidecar-first and checks rendered parity second. Brief gates
-  cover completed-period identity, thesis and evidence, bounded distinct
-  actions and defer decisions, reaction/feedback receipts, named PR-sized
-  project work, Radar authority, reader-safe Russian copy, visible length,
-  blank metrics, and semantic visuals. Atlas target gates cover bounded
-  canonical primary threads, duplicate content, evidence maturity authority,
-  raw-detail separation, visual identity/distribution parity, and length.
-- Semantic visual counts require exact deterministic IRX-8 component output,
-  initially visible DOM parity, honest data state, and distinct component
-  kinds. Decorative SVG, forged markers, hidden/template/comment/disclosure
-  laundering, external styles/scripts, supporting badges, duplicate kinds,
-  wrong-run specs, and forged boolean counts or non-string evidence cannot
-  satisfy the gate.
-- Default V1 split generation evaluates both current documents in
-  `warn_only_v1` mode and emits one bounded Russian warning without changing
-  document selection or blocking delivery. Opt-in Brief V2 uses
-  `blocking_v2` before immutable publication and again during strict
-  manifest-bound loading; blocked output is neither published nor returned.
-- Added sanitized W29 Brief/Atlas failure cases plus passing Brief V2 and Atlas
-  target-contract fixtures and adversarial parity/type tests. The exact
-  task-card matrix passed 64 tests, the focused Brief V2/manifest matrix passed
-  54 tests, and four extended compatibility/security shards passed 282 tests.
-  Ruff, focused compilation, fixture JSON validation, and `git diff --check`
-  passed.
-- Compatibility: frozen IRX-2 stage policy, V1 sidecars/checksums and scheduled
-  two-document delivery, IRX-5 editorial selection, IRX-3 reaction meaning,
-  Radar authority/gates, sibling-repository code, and generated private
-  artifacts remain unchanged. Atlas V2, screenshots, rollout, and dogfood stay
-  owned by IRX-7/13/14; at that boundary IRX-7 was the next dependency-ready
-  task.
-
-### 2026-07-14 - IRX-7 Knowledge Atlas V2 And Audit Explorer Separation
-
-- Status: `implemented_and_verified`.
-- Added the opt-in manifest-bound `split_ai_report.v2` Knowledge Atlas V2
-  package beside the existing V1 outputs. The reader sidecar is closed over
-  exact run/reporting-period/as-of identity, 8-12 canonical primary threads,
-  typed evidence-backed relations, a 12-week timeline, source contribution,
-  evidence maturity, separated operator-interest channels, learning
-  progression, study backlog, shared IRX-8 visual specs, technical refs, and
-  reader-visible metrics.
-- Preserved the detailed V1 Atlas as versioned Knowledge Audit Explorer with
-  raw/canonical memberships, atoms, source quotes/links, aliases, merge/split
-  lineage, diagnostics, and stable deep links. Audit Explorer is technical and
-  is not subject to the 1,500-word Atlas reader budget.
-- Generation and strict loading require terminal manifest identity,
-  manifest-bound V1 Brief and V1 Atlas sources, IRX-5 editorial authority,
-  Atlas-surface reaction interest, exact Brief/Atlas reaction common-funnel
-  parity, exact checksums/source bytes, canonical no-follow paths, private
-  immutable files, five expected package entries, deterministic HTML rebuild
-  parity, source re-read closure, and IRX-11 `blocking_v2` gates before
-  publication and during load.
-- Added compatibility projections for Brief navigation, split preview,
-  retrieval, Hermes/PI, and Obsidian. Existing V1 Atlas summaries, thread
-  navigation, `atlas_thread` items, and stable refs remain available; V2 is
-  consumed only through explicit valid package paths and never through legacy
-  fallback.
-- Added sanitized Atlas/Audit fixtures and focused tests for primary bounds,
-  canonical/as-of identity, duplicate identities/content/backlog, vendor-only
-  relations, typed edges, timeline zero-vs-missing semantics, maturity/source
-  authority, Brief-vs-Atlas reaction authority, feedback/learning separation,
-  honest visual states and exact visual source refs, Russian copy/word/internal
-  ID limits, deterministic cache parity, blocking generation/loading, Audit
-  deep links/detail preservation, strict package security, hostile URL/path/JSON
-  rejection, FIFO rejection, and V1/Brief/retrieval/PI/Obsidian compatibility.
-- Verification: dedicated Atlas focused suite passed 18 tests. The exact
-  task-card consumer/quality matrix passed 124 tests. The dedicated
-  Atlas/upstream matrix passed 126 tests. Ruff, focused `py_compile`, fixture
-  JSON validation, `git diff --check`, `git diff --stat`, and generated/unrelated
-  artifact status inspection passed.
-- Scope confirmation: no generated private artifacts, live/expensive runs, full
-  archive regeneration, database backfill, production migration, frozen IRX-2
-  stage-policy change, V1 scheduled-delivery switch, IRX-3 reaction semantics
-  change, IRX-5 editorial-authority change, Radar gate change, sibling-repo
-  edit, IRX-12/13/14 implementation, screenshot baseline, rollout, or dogfood
-  claim was made. IRX-12 is the next dependency-ready task.
-
-### 2026-07-14 - IRX-12 Report-Specific Feedback And Learning Loop
-
-- Status: `implemented_and_verified`.
-- Added additive `ai_report_feedback_events` fields and migration adapters for
-  report run, report surface, section, item, controlled classification,
-  confirmation state, application status/reason, and originating report item.
-  Existing legacy `feedback_type`, `target_type`, `target_ref`, and rows are
-  preserved and adapted deterministically.
-- Extended text/voice feedback intake and the feedback strategist prompt so
-  Brief, Atlas, Radar, reaction personalization, project/action, and visual
-  feedback drafts carry surface/section/item targets, controlled
-  classifications, and proposed application states. Confirmation still gates
-  all memory writes; pending drafts never enter editorial context.
-- Added `ai_report_feedback_application_receipt.v1` summary output separating
-  `applied`, `unchanged`, `code_config_required`, `rejected`, and `pending`.
-  Editorial input and Brief/Atlas/retrieval/quality projections now state what
-  confirmed feedback changed, what stayed unchanged, what needs explicit
-  code/config work, and why rejected or pending feedback was not applied.
-- Linked completed action/project feedback through `item_ref` and
-  `originating_report_item_ref`, and updated Strategy Reviewer so persistent
-  profile/config/code/project changes remain advisory and approval-required.
-- Verification: exact IRX-12 task-card matrix passed 50 tests. Focused
-  feedback/Strategy/action tests passed 30 tests. Brief/Atlas/editorial/
-  retrieval/quality/contract/action compatibility passed 166 tests. Bot
-  handler/callback compatibility passed 35 tests. Focused Ruff, focused
-  `py_compile`, changed fixture JSON validation, `git diff --check`, and
-  `git diff --stat` passed.
-- Scope confirmation: no generated private artifacts, live/expensive runs,
-  full archive regeneration, production rollout, scheduled-delivery switch,
-  frozen IRX-2 stage-policy change, IRX-3 reaction semantic change, IRX-5
-  editorial-authority change, IRX-7 Atlas/Audit package semantic change,
-  IRX-10 Radar authority/gate change, IRX-11 gate-meaning change, sibling-repo
-  edit, IRX-13/14 implementation, screenshot baseline, rollout, or dogfood
-  claim was made. IRX-13 is the next dependency-ready task.
-
-### 2026-07-15 - IRX-13 Golden Fixtures And Visual Regression Harness
-
-- Status: `implemented_and_verified`.
-- Added a consolidated sanitized `report_v2_regression_manifest.v1` fixture
-  registry under `tests/fixtures/intelligence_report_v2/` for the current
-  Report V2 release candidate. The manifest records contract versions,
-  seven IRX-11 evaluation dimensions, redaction provenance, structured
-  scenario expectations, fixture refs, and visual-regression policy.
-- Covered new-week Monday, Sunday/year-boundary, previous-week reactions,
-  Fable/Claude-style canonical duplication, missing and investigate Radar,
-  context-only market lens, concrete and no-project implications, generic
-  fallback, weak evidence, partial/empty period honesty, confirmed feedback
-  application receipts, W29 failure patterns, and desktop/mobile output.
-- Added `src/output/report_v2_regression_fixtures.py` validator and focused
-  tests so missing coverage, private-data flags, bad fixture refs, missing
-  contract refs, viewport drift, or unreviewed visual hashes fail closed.
-- Added `scripts/report_v2_visual_snapshots.py` and fixture README documenting
-  the exact 1440x1000 and 375x1000 Playwright command, prerequisite failure
-  behavior, browser/font stability, redaction, and snapshot review/update
-  policy. The local environment did not have the Playwright Python package, so
-  the harness exited explicitly with code 2 and no screenshot evidence or
-  hashes were claimed.
-- Verification: focused fixture/quality tests passed 35 tests. Exact IRX-13
-  task-card matrix passed 98 tests. Brief/Atlas/visual/project/feedback/Radar/
-  retrieval compatibility passed 160 tests. Focused Ruff, focused
-  `py_compile`, changed fixture JSON validation, `git diff --check`, and
-  `git diff --stat` passed.
-- Scope confirmation: no generated private artifacts, live/expensive runs,
-  full archive regeneration, production alias/retention migration,
-  scheduled-delivery switch, rollout, dogfood start, dogfood evidence claim,
-  frozen IRX-2 stage-policy change, IRX-1 period semantic change, IRX-3
-  reaction semantic change, IRX-4 canonical lifecycle semantic change, IRX-5
-  editorial-authority change, IRX-7 Atlas/Audit package semantic change,
-  IRX-10 Radar authority/gate change, IRX-11 gate-meaning change, IRX-12
-  feedback confirmation/application semantic change, sibling-repo edit, or
-  IRX-14 implementation was made. At that boundary IRX-14 was next; it is now
-  closed below.
-
-### 2026-07-15 - IRX-14 Rollout Compatibility And Dogfood Start Gate
-
-- Status: `implemented_and_verified`.
-- Added read-only `report_v2_rollout_receipt.v1` in
-  `src/output/report_v2_rollout.py`. The receipt publishes the operator
-  commands, V1 compatibility aliases, V2 manifest/package paths, final rollout
-  contract versions, dogfood policy, blocking gates, and blocked evidence.
-- Added explicit CLI command `report-v2-rollout-gate`. It runs migrations,
-  reads existing artifacts, writes an optional receipt, returns 0 only when the
-  start gate is `eligible`, and returns 2 when dogfood must remain blocked.
-- The start gate compares period/run status, V1 inspectability, V2 Brief/Atlas
-  package paths, retrieval/PI V2 descriptors, Obsidian Atlas V2 adapter source,
-  Radar reader state and context-only safety, reaction receipt, editorial
-  stage, project implication surface, visual semantics plus reviewed
-  desktop/mobile hashes, cost/latency receipt, quality-gated V2 packages,
-  feedback readiness, and the IRX-13 fixture registry.
-- Real local gate run used an isolated temporary database and missing output
-  root. It exited 2 with `dogfood_start_status=blocked`,
-  `dogfood_week_1.status=not_started`, and explicit blocked evidence for
-  missing current run artifacts, missing V2 packages, missing Radar/reaction/
-  editorial/project/quality evidence, missing reviewed visual hashes, and
-  missing cost receipt. No dogfood start or external evidence was claimed.
-- Verification: exact IRX-14 task-card matrix passed 143 tests. Focused
-  rollout/CLI tests passed 9 tests. Focused rollout/CLI/regression-fixture/
-  manifest/orchestrator compatibility passed 60 tests. Focused Ruff and
-  focused `py_compile` passed. The real isolated CLI gate command returned the
-  expected blocked exit code 2.
-- Scope confirmation: no generated private artifacts were committed, no
-  live/expensive weekly package was run, no dogfood scorecards, thresholds,
-  outcomes, live operator evidence, or screenshot evidence were fabricated, no
-  V1 artifacts were deleted, no scheduled-delivery switch was made, no
-  production alias/retention migration was made, no sibling repo was edited,
-  and IRX-1 period semantics, IRX-2 manifest policy, IRX-3 reaction semantics,
-  IRX-4 canonical lifecycle, IRX-5 editorial authority, IRX-7 Atlas/Audit
-  semantics, IRX-10 Radar authority/gates, IRX-11 gate meanings, IRX-12
-  feedback semantics, IRX-13 fixture evidence semantics, global evidence
-  scoring, and frozen `irx2_orchestration.v1` remain unchanged.
-
-## Existing-Work Reconciliation
-
-- `PGI-003` is the structural Brief/Radar cockpit foundation; IRX-2, IRX-5,
-  IRX-6, and IRX-10 correct its period, orchestration, editorial, and reader
-  contracts.
-- `PGI-004` is thread navigation and becomes the Knowledge Audit Explorer
-  foundation; IRX-4 and IRX-7 add canonical curation and the reader Atlas.
-- `PGI-005` supplies project/learning projections; IRX-9 makes the reader action
-  contract concrete and evidence-backed.
-- `PGI-006` supplies scorecard plumbing; IRX-11 and IRX-13 add gates that make
-  current W29 patterns fail.
-- `PGI-007` is not deleted. Its evidence-series intent resumes only after
-  `report-v2-rollout-gate` returns `eligible` on real current private
-  artifacts.
-- Radar RVE/context-only exclusion is reused. IRX-2 added same-run binding;
-  IRX-10 adds reader explanation without weakening gates.
-
-## Historical PGI Task Cards
-
-### PGI-001 - Canonical Intelligence Contract And Eval Fixtures
-
-- Status: `completed_local`
-- Priority: P0
-- Owner: `telegram-research-agent`
-- Problem: report contracts exist, but Source Observation, Evidence Item,
-  Claim, Atom, Thread, Decision, Experiment, Outcome, and projection boundaries
-  are not yet one canonical tested contract.
-- User outcome: top Brief/Atlas/Hermes items can prove what source/evidence/
-  claim they rely on and can declare insufficient evidence.
-- Why now: correctness must precede deeper personalization.
-- Dependencies: docs baseline in `docs/portfolio_grade_intelligence_roadmap.md`.
-- Blocked by: none.
-- Files likely touched: `src/output/ai_report_contract.py`,
-  `src/output/weekly_intelligence_brief.py`,
-  `src/output/knowledge_atlas_report.py`,
-  `src/output/intelligence_retrieval_items.py`,
-  `tests/test_ai_report_contract.py`,
-  `tests/test_split_intelligence_reports.py`, new fixtures under
-  `tests/fixtures/intelligence_contract/`.
-- Schema impact: sidecar contract version bump or compatibility field; avoid DB
-  migrations in first slice unless the code proves they are unavoidable.
-- API/contract impact: define `tra-intelligence-contract.v1` and carry
-  `tra-radar-intelligence-contract.v1` where Radar exchange is present.
-- Migration impact: expected none.
-- Test plan: unit tests for contract shape, rendered/sidecar parity,
-  quote/provenance gates, temporal delta fixtures, insufficient-evidence cases.
-- Eval plan: layers 1-12 and 24 from
-  `docs/intelligence_evaluation_framework.md`.
-- Acceptance criteria:
-  - SourceObservation/EvidenceItem/Claim projections are explicit in JSON
-    sidecars or documented compatibility objects.
-  - Top claims cannot render as decision-grade without source refs and
-    verification state.
-  - Contradictory/negative/context-only evidence can be represented without
-    being hidden.
-  - Temporal delta fixtures distinguish momentum from evidence growth.
-  - Brief/Atlas/Hermes retrieval items can read the new contract or gracefully
-    handle older fixtures.
-  - Radar context-only records remain unable to satisfy demand evidence gates.
-- Verification commands:
-
-```bash
-PYTHONPATH=src python3 -m pytest tests/test_ai_report_contract.py tests/test_split_intelligence_reports.py tests/test_intelligence_retrieval_items.py tests/test_opportunity_seed_export.py
-```
-
-- Metrics: top-claim provenance coverage, verified quote coverage, unsupported
-  claim rate, contradiction visibility, sidecar/rendered parity.
-- Risks: over-designing classes before fixture pressure; breaking old W28
-  fixture readers; adding DB migration too early.
-- Stop conditions: any top claim can render without provenance; context-only
-  market data changes a recommendation; tests require live LLM calls.
-- Estimated size: L.
-- Portfolio evidence produced: domain model contract, correctness fixtures,
-  first eval baseline.
-- Radar impact: `producer`.
-- Completion notes:
-  - Added `tra-intelligence-contract.v1` as a canonical sidecar projection with
-    SourceObservation, EvidenceItem, Claim, KnowledgeAtom, IdeaThread, Decision,
-    Experiment, Outcome, and projection-boundary fields.
-  - Kept `weekly-ai-intelligence-v1` as the workbook compatibility contract.
-  - Weekly Brief and Knowledge Atlas sidecars now include
-    `contract_version`, `intelligence_contract`, and HTML meta tags for
-    sidecar/rendered parity.
-  - Brief Radar exchange and opportunity seeds carry
-    `tra-radar-intelligence-contract.v1`; market/business context remains
-    `context_only` and cannot satisfy Radar demand gates.
-  - Hermes/retrieval can read canonical claim/evidence items while older
-    fixtures continue through legacy workbook readers.
-  - Added sanitized fixtures under
-    `tests/fixtures/intelligence_contract/` for valid, unsupported, and
-    context-only Radar gate cases.
-  - Verification passed:
-    `PYTHONPATH=src python3 -m pytest tests/test_ai_report_contract.py tests/test_split_intelligence_reports.py tests/test_intelligence_retrieval_items.py tests/test_opportunity_seed_export.py`.
-  - Additional touched-surface verification passed:
-    `PYTHONPATH=src python3 -m pytest tests/test_ai_visual_report.py tests/test_pi_facade.py tests/test_pi_tools.py`.
-  - No DB migration, production config change, LLM run, or full archive backfill.
-
-### PGI-002 - Operator Context, Feedback Provenance And Explainable Ranking
-
-- Status: `completed_local`
-- Priority: P0
-- Owner: `telegram-research-agent`
-- Problem: feedback exists, but signal strength, provenance, effect timing,
-  corrections, and explicit operator context are incomplete.
-- User outcome: each top item explains why it was selected and which feedback
-  or context affected it.
-- Why now: personalization without provenance creates fragile trust.
-- Dependencies: `PGI-001`.
-- Blocked by: none after PGI-001 is reviewed; recommended as a separate
-  PR-sized slice because it can touch feedback provenance, ranking, sidecars,
-  and Hermes summaries.
-- Files likely touched: `src/db/ai_report_feedback.py`,
-  `src/output/personalize.py`, `src/output/ai_intelligence_report.py`,
-  `src/output/weekly_intelligence_brief.py`, `src/assistant/pi_facade.py`,
-  `tests/test_ai_report_feedback.py`, `tests/test_ai_intelligence_report.py`,
-  `tests/test_pi_facade.py`.
-- Schema impact: possible append-only feedback correction/provenance migration;
-  versioned operator context sidecar preferred for first slice.
-- API/contract impact: ranking factor fields in Brief/Atlas sidecars.
-- Migration impact: allowed only with tests and rollback note.
-- Test plan: no-feedback unknown, `verify_first` as calibration, correction
-  append-only, weak signals below explicit context, factor parity in HTML.
-- Eval plan: layers 14, 15, 22, 23.
-- Acceptance criteria:
-  - Feedback event has source/provenance/effect window.
-  - Confirmed feedback is distinguishable from pending drafts.
-  - Correction/retraction appends and does not rewrite prior events.
-  - Ranking factors are available per top item.
-  - HTML "why selected" copy is backed by sidecar data.
-- Verification commands:
-
-```bash
-PYTHONPATH=src python3 -m pytest tests/test_ai_report_feedback.py tests/test_ai_intelligence_report.py tests/test_pi_facade.py tests/test_action_status.py
-```
-
-- Metrics: personalization confidence, wrong-priority rate, feedback effect
-  trace completeness, correction count.
-- Risks: behavioral signals overpower explicit context; feedback timing is
-  misreported for already-generated artifacts.
-- Stop conditions: no-feedback downranks a topic; `read` is treated as strong
-  preference; Hermes can mutate context.
-- Estimated size: L.
-- Portfolio evidence produced: explainable personalization audit.
-- Radar impact: none.
-- Completion notes:
-  - Added confirmed feedback DTO fields for `confirmation_state`,
-    `signal_strength`, `feedback_provenance`, `effect_window`, and append-only
-    `correction` metadata.
-  - Added append-only correction/retraction/accidental-feedback event support
-    using `target_type=feedback_event`; prior events are not rewritten.
-  - Updated schema and idempotent migration rebuild for the expanded feedback
-    CHECK constraints; migration preservation is covered by a regression test.
-  - Pending intake drafts remain separate from confirmed memory events.
-  - `read` is a weak observation, not a promoted preference; no-feedback is
-    `unknown`, never negative.
-  - AI report and Weekly Brief sidecars now carry `ranking_factors` and
-    `why_selected` for actions/read/try items, and rendered HTML copies the
-    sidecar-backed "Why selected" explanation.
-  - PI/Hermes facade action summaries expose `ranking_factors` and
-    `why_selected` read-only; no mutation tools were added.
-  - Verification passed:
-    `PYTHONPATH=src python3 -m pytest tests/test_ai_report_feedback.py tests/test_ai_intelligence_report.py tests/test_pi_facade.py tests/test_action_status.py`.
-  - Additional touched-surface verification passed:
-    `PYTHONPATH=src python3 -m pytest tests/test_split_intelligence_reports.py tests/test_strategy_reviewer.py` and
-    `PYTHONPATH=src python3 -m pytest tests/test_pi_tools.py tests/test_pi_chat.py tests/test_intelligence_retrieval_items.py`.
-  - No production config change, expensive LLM run, or full archive backfill.
-
-### PGI-003 - Weekly Decision Cockpit, Hermes Awareness And Radar Gate
-
-- Status: `completed_local_structural`; W29 reader outcome failed and is
-  corrected by IRX-2, IRX-5, IRX-6, and IRX-10
-- Priority: P0
-- Owner: `telegram-research-agent`
-- Problem: Brief/Atlas split exists, but the Brief is not yet a complete
-  first-screen decision cockpit and Hermes can still be weak around current,
-  stale, or split artifacts.
-- User outcome: the operator can understand the week, Radar state, and next
-  actions in 3-5 minutes, then ask Hermes grounded follow-ups.
-- Why now: this is the main product surface and portfolio demo slice.
-- Dependencies: `PGI-001`, `PGI-002`.
-- Blocked by: none known; keep as a separate PR-sized slice.
-- Files likely touched: `src/output/weekly_intelligence_brief.py`,
-  `src/output/split_intelligence_reports.py`,
-  `src/output/intelligence_retrieval_items.py`, `src/assistant/pi_facade.py`,
-  `src/assistant/pi_chat.py`, `src/assistant/pi_tools.py`,
-  `tests/test_split_intelligence_reports.py`, `tests/test_pi_chat.py`,
-  `tests/test_pi_tools.py`.
-- Schema impact: Brief sidecar first-screen decision snapshot, artifact
-  freshness state, feedback refs, Radar gate contract version.
-- API/contract impact: Hermes answer provenance contract and Radar stale/missing
-  semantics.
-- Migration impact: none expected.
-- Test plan: Brief section ordering, bounded length, Radar Gate Card states,
-  Hermes current/stale/missing artifact answers, no raw Telegram RAG.
-- Eval plan: layers 16, 20, 21, 24, 25.
-- Acceptance criteria:
-  - First viewport contains decision snapshot, top 3 personal changes,
-    evidence/trust summary, what to do, ignore/defer, project impact, MVP Radar
-    gate, exact feedback targets.
-  - Brief remains short and does not become Atlas.
-  - Hermes names current Brief/Atlas artifacts and warns on stale/missing Radar.
-  - Hermes distinguishes facts, interpretation, model background, market
-    context, and matched external evidence.
-  - Missing Radar artifact does not break Brief/Atlas.
-- Verification commands:
-
-```bash
-PYTHONPATH=src python3 -m pytest tests/test_split_intelligence_reports.py tests/test_pi_chat.py tests/test_pi_tools.py tests/test_mvp_weekly_pipeline.py
-```
-
-- Metrics: time to understand, Brief first-screen task success, Hermes grounded
-  answer rate, Radar stale/missing incidents.
-- Risks: Brief grows too long; Hermes overstates evidence; Radar context looks
-  like proof in copy.
-- Stop conditions: market context treated as demand evidence; Hermes runs or
-  prepares hidden mutations; Brief hides evidence gaps.
-- Estimated size: L.
-- Portfolio evidence produced: decision cockpit and assistant quality slice.
-- Radar impact: `consumer`.
-- Completion notes:
-  - Weekly Brief JSON sidecars now include `decision_cockpit` and
-    `mvp_radar_gate` DTOs covering decision snapshot, top personal changes,
-    evidence/trust summary, what to do, ignore/defer, project impact, Radar
-    gate, and exact feedback targets.
-  - Weekly Brief HTML renders the same cockpit blocks in the first section and
-    keeps MVP detail in the Radar section.
-  - MVP Radar gate decisions now require matched decision-grade external
-    evidence before any focused/build allowance; market/business context remains
-    `context_only` and cannot satisfy the gate.
-  - Missing Radar artifacts do not break Brief/Atlas generation and render an
-    explicit missing-artifact warning.
-  - Hermes/PI facade now exposes read-only `get_artifact_status` with current,
-    stale, and missing states for Weekly Brief, Knowledge Atlas, and MVP Radar.
-  - Hermes chat planning/fallback can ask for artifact status, names current
-    Brief/Atlas artifacts, warns on stale/missing Radar, and keeps facts,
-    interpretation, model background, market context, and matched external
-    evidence distinct.
-  - Radar JSON retrieval normalization preserves validation queries, matched
-    external evidence, missing evidence categories, adapter status, decision
-    context, and decision-change actions.
-  - Verification passed:
-    `PYTHONPATH=src python3 -m pytest tests/test_split_intelligence_reports.py tests/test_pi_chat.py tests/test_pi_tools.py tests/test_mvp_weekly_pipeline.py`.
-  - Additional touched-surface verification passed:
-    `PYTHONPATH=src python3 -m pytest tests/test_pi_facade.py tests/test_intelligence_retrieval_items.py`.
-  - No production config change, expensive LLM run, full archive backfill,
-    hidden Hermes mutation tool, or Radar gate weakening.
-
-### PGI-004 - Atlas Thread Navigation (Historical Audit Explorer Foundation)
-
-- Status: `completed_local_structural`; reclassified by the W29 audit as the
-  Knowledge Audit Explorer foundation, not reader-facing Atlas V2
-- Priority: P1
-- Owner: `telegram-research-agent`
-- Problem: Atlas is a split artifact, but not yet a strong navigable cumulative
-  map of understanding.
-- User outcome: the operator can find a thread, see temporal evolution,
-  evidence, contradictions, source diversity, project links, decisions, and
-  open questions.
-- Why now: after the Brief is useful, Atlas must support deeper weekly review.
-- Dependencies: `PGI-001`, `PGI-003`.
-- Blocked by: none for the completed navigation slice.
-- Files likely touched: `src/output/knowledge_atlas_report.py`,
-  `src/output/split_intelligence_reports.py`,
-  `src/output/intelligence_retrieval_items.py`,
-  `tests/test_split_intelligence_reports.py`.
-- Schema impact: Atlas sidecar thread detail, evidence pane, contradiction view,
-  maturity, momentum vs evidence growth.
-- API/contract impact: Hermes retrieval items gain Atlas drill-down refs.
-- Migration impact: none expected.
-- Test plan: Atlas source-find/thread-understanding fixtures, bounded graph
-  rendering if any, no unbounded post mirror.
-- Eval plan: layers 7-12 and 26.
-- Acceptance criteria:
-  - Atlas has topic overview, thread timeline, current understanding, change
-    since previous period, claims, evidence, contradictions, source diversity,
-    maturity, momentum vs evidence, project connections, decisions, open
-    questions, study next, and original source links.
-  - Relationship graph is bounded and task-specific if used.
-  - Atlas does not become a long static HTML wall.
-- Verification commands:
-
-```bash
-PYTHONPATH=src python3 -m pytest tests/test_split_intelligence_reports.py tests/test_intelligence_retrieval_items.py
-```
-
-- Metrics: source-find task success, thread-understanding task success,
-  contradiction visibility.
-- Risks: decorative UI instead of information architecture; report size grows
-  without navigation value.
-- Stop conditions: Atlas mirrors raw Telegram firehose; visual graph hides
-  evidence rather than revealing it.
-- Estimated size: XL.
-- Portfolio evidence produced: Atlas v2 screenshot and usability scorecard.
-- Radar impact: none.
-- Completion notes:
-  - Added `thread_navigation` sidecar DTO
-    (`knowledge_atlas_thread_navigation.v1`) with thread detail cards,
-    evidence growth, maturity, momentum-vs-evidence data, timeline entries,
-    source diversity, project connections, decision projection, open questions,
-    study-next items, and original source links.
-  - Added rendered Atlas `Thread Navigation` section with thread index, thread
-    timeline, claims, contradictions, open questions, study-next, momentum vs
-    evidence, source diversity, project connections, decisions, evidence pane,
-    and original source links.
-  - Kept Atlas bounded to curated Idea Threads and Knowledge Atoms; no raw
-    Telegram mirror, full archive backfill, or decorative/unbounded graph.
-  - Added `atlas_thread` retrieval items so Hermes/search can drill into Atlas
-    threads with source refs, atom IDs, and thread slugs.
-  - Verification passed:
-    `PYTHONPATH=src python3 -m pytest tests/test_split_intelligence_reports.py tests/test_intelligence_retrieval_items.py`.
-  - Additional touched-surface verification passed:
-    `PYTHONPATH=src python3 -m pytest tests/test_ai_report_contract.py tests/test_pi_tools.py tests/test_pi_chat.py tests/test_pi_facade.py`.
-  - No DB migration, production config change, expensive LLM run, full archive
-    backfill, hidden Hermes mutation tool, or Radar gate behavior change.
-
-### PGI-005 - Project And Learning Intelligence Projections
-
-- Status: `completed_local`
-- Priority: P1
-- Owner: `telegram-research-agent`
-- Problem: project and learning implications exist only as partial sections,
-  not durable intelligence projections.
-- User outcome: the operator sees which signals affect active repos and which
-  skills moved from reading to implementation/tested outcomes.
-- Why now: portfolio evidence needs project changes and learning outcomes.
-- Dependencies: `PGI-001`, `PGI-002`.
-- Blocked by: missing Decision/Experiment/Outcome/LearningObjective contract.
-- Files likely touched: `src/output/project_relevance.py`,
-  `src/output/weekly_intelligence_brief.py`,
-  `src/output/knowledge_atlas_report.py`, `src/output/learning_layer.py`,
-  tests for project relevance and split reports.
-- Schema impact: ProjectImplication, Decision, Experiment, LearningObjective,
-  Outcome projection fields; avoid DB migrations until fixture shape is proven.
-- API/contract impact: Hermes read-only tools can expose project/learning state.
-- Migration impact: possible future migration, not required in first projection
-  slice.
-- Test plan: confirmed/watch/learning/rejected tiers, stale decision examples,
-  learning stage transitions.
-- Eval plan: layers 13, 18, 19.
-- Acceptance criteria:
-  - Project Intelligence shows external signals, confirmed implications, weak
-    watches, rejected overlaps, tiny PR ideas, stale decisions, research debt,
-    and repeated themes without action.
-  - Learning Intelligence distinguishes read, understood, explained,
-    reproduced, implemented, tested, project-applied, measured, stale, and
-    prerequisite gap.
-  - No broad keyword overlap becomes a confirmed project lead.
-- Verification commands:
-
-```bash
-PYTHONPATH=src python3 -m pytest tests/test_ai_report_contract.py tests/test_split_intelligence_reports.py tests/test_action_status.py
-```
-
-- Metrics: project changes made, learning outcomes, stale decisions reviewed.
-- Risks: learning dashboard becomes aspirational text; project cards become
-  generic backlog ideas.
-- Stop conditions: passive reading counted as mastery; no source refs for
-  confirmed project implications.
-- Estimated size: XL.
-- Portfolio evidence produced: project/learning intelligence sample.
-- Radar impact: `consumer` when existing-project overlap is displayed.
-- Completion notes (2026-07-10):
-  - Added additive `project-learning-projection.v1` DTO in
-    `src/output/learning_layer.py` with Project Intelligence and Learning
-    Intelligence projections.
-  - Weekly Brief and Knowledge Atlas sidecars/rendered HTML now expose
-    external signals, confirmed implications, weak watches, rejected overlaps,
-    tiny PR ideas, stale decisions, research debt, repeated themes without
-    action, and learning stage counts/objectives.
-  - Canonical sidecars now carry additive `project_implications` and
-    `learning_objectives` fields plus experiment/outcome projections derived
-    from source-backed actions/feedback state.
-  - Retrieval now emits `project_intelligence` and `learning_objective` items.
-  - Fixed review finding: broad-only `higher` project links are rejected and do
-    not become confirmed leads, weak watches, or tiny PR ideas.
-  - Fixed review finding: Weekly Brief rendered projection now includes
-    external signals and stale decisions, matching the sidecar.
-  - No DB migration, production config change, expensive LLM run, full archive
-    backfill, hidden Hermes mutation tool, or Radar gate behavior change.
-  - Verification passed:
-    `PYTHONPATH=src python3 -m pytest tests/test_ai_report_contract.py tests/test_split_intelligence_reports.py tests/test_action_status.py`.
-  - Additional touched-surface verification passed:
-    `PYTHONPATH=src python3 -m pytest tests/test_learning_layer.py tests/test_intelligence_retrieval_items.py`.
-  - Static verification passed: `python3 -m py_compile ...` for touched output
-    modules and `git diff --check`.
-
-### PGI-006 - Evaluation Harness And Weekly Scorecard
-
-- Status: `completed_local`
-- Priority: P1
-- Owner: `telegram-research-agent`
-- Problem: tests exist, but there is no unified intelligence evaluation harness
-  or weekly scorecard tied to product outcomes.
-- User outcome: the operator can tell whether the system improved correctness,
-  relevance, decisions, learning, UX, Radar honesty, and operations.
-- Why now: dogfood claims need measurement before portfolio hardening.
-- Dependencies: `PGI-001`; can begin after PR 1.
-- Blocked by: no stable contract fixtures.
-- Files likely touched: new eval scripts/tests, `docs/intelligence_evaluation_framework.md`,
-  possible `src/output/dogfood_review.py` extensions.
-- Schema impact: scorecard artifact schema; no DB migration required initially.
-- API/contract impact: scorecard JSON/Markdown artifact.
-- Migration impact: none.
-- Test plan: fixture eval command, scorecard schema validation, no private data
-  committed.
-- Eval plan: all layers in `docs/intelligence_evaluation_framework.md`.
-- Acceptance criteria:
-  - Weekly scorecard records correctness, relevance, decisions/actions,
-    learning, UX, Radar, and operations.
-  - Unknown metrics are explicit, not fabricated.
-  - False-confidence incidents can be recorded.
-  - Scorecard can run on sanitized fixtures without LLM calls.
-- Verification commands:
-
-```bash
-PYTHONPATH=src python3 -m pytest tests/test_dogfood_review.py tests/test_ai_report_contract.py
-```
-
-- Metrics: scorecard completeness, eval regression count, annotation cost.
-- Risks: vanity metrics; false precision before baseline.
-- Stop conditions: thresholds invented without data; private reports committed.
-- Estimated size: M.
-- Portfolio evidence produced: evaluation report foundation.
-- Radar impact: `consumer`.
-- Completion notes (2026-07-10):
-  - Added `weekly-intelligence-scorecard.v1` deterministic scorecard builder,
-    validator, Markdown/JSON writer, and file-based fixture loader in
-    `src/output/dogfood_review.py`.
-  - Scorecard records correctness, relevance, decisions/actions, learning, UX,
-    Radar, and operations dimensions without inventing unavailable metrics.
-  - Unknown and not-measured metrics are explicit in `unknown_metrics`; string
-    `unknown` values remain unknown, not measured.
-  - False-confidence incidents are first-class scorecard entries with severity,
-    description, source refs, and status.
-  - File-based builder runs on sanitized sidecar fixtures without LLM calls.
-  - No DB migration, production config change, expensive LLM run, full archive
-    backfill, hidden Hermes mutation tool, or Radar gate behavior change.
-  - Verification passed:
-    `PYTHONPATH=src python3 -m pytest tests/test_dogfood_review.py tests/test_ai_report_contract.py`.
-  - Static verification passed: `python3 -m py_compile src/output/dogfood_review.py`
-    and `git diff --check`.
-
-### PGI-007 - Four-Week Dogfood Evidence Series (Historical)
-
-- Status: `blocked_by_IRX-14`
-- Priority: P1
-- Owner: `operator`
-- Problem: user value is not proven by code or one artifact.
-- User outcome: four stable weeks of evidence that the system improves
-  decisions, actions, learning, and information overload.
-- Why now: required before portfolio readiness and post-dogfood product claims.
-- Dependencies: `PGI-003`, `PGI-006`.
-- Blocked by: IRX-14 Report V2 start gate, then four current operator dogfood
-  weeks or sanitized weekly scorecard inputs.
-- Files likely touched: dogfood scorecard docs/artifacts only; generated private
-  raw outputs must remain ignored.
-- Schema impact: none unless scorecard schema changes.
-- API/contract impact: none.
-- Migration impact: none.
-- Test plan: scorecard schema and privacy checks.
-- Eval plan: weekly scorecard plus manual review.
-- Acceptance criteria:
-  - Four weekly runs recorded.
-  - Decisions/actions/experiments/outcomes captured.
-  - At least one rejected/deferred recommendation example.
-  - Radar stale/missing/context-only honesty checked.
-  - Brief and Atlas timed usability tasks recorded.
-- Verification commands:
-
-```bash
-rg -n "Weekly Verified Decision Impact|false-confidence|context-only" docs
-PYTHONPATH=src python3 -m pytest tests/test_dogfood_review.py
-```
-
-- Metrics: Weekly Verified Decision Impact, time to understand, actions
-  completed, false-confidence incidents, friction.
-- Risks: dogfood artifacts leak private data; weekly run skipped but counted.
-- Stop conditions: IRX-14 gate not passed; no current valid Brief/Atlas;
-  generated private artifact would be committed; false-confidence incident
-  unaddressed.
-- Estimated size: XL over calendar time.
-- Portfolio evidence produced: product evidence gate.
-- Radar impact: `consumer`.
-
-### PGI-008 - Portfolio Demo And Case Study Hardening
-
-- Status: `planned`
-- Priority: P2
-- Owner: `telegram-research-agent`
-- Problem: the repo is not yet packaged as a reproducible, sanitized portfolio
-  demonstration.
-- User outcome: hiring managers can understand architecture, product value,
-  evaluation, and failure handling without private data.
-- Why now: only after product/eval evidence exists.
-- Dependencies: `PGI-006`, `PGI-007`.
-- Blocked by: missing dogfood evidence and sanitized fixture dataset.
-- Files likely touched: README, docs, sanitized fixtures, screenshots, diagrams.
-- Schema impact: none.
-- API/contract impact: none.
-- Migration impact: none.
-- Test plan: no-secret/private-data checks, demo command, link validation.
-- Eval plan: portfolio readiness gate in `docs/portfolio_evidence_plan.md`.
-- Acceptance criteria:
-  - sanitized demo dataset;
-  - reproducible local demo;
-  - architecture/domain/sequence diagrams;
-  - sample Brief and Atlas;
-  - evaluation report and failure cases;
-  - cost/latency report;
-  - 5-minute demo script and case study;
-  - public/private data boundary.
-- Verification commands:
-
-```bash
-git diff --check
-rg -n "TELEGRAM_BOT_TOKEN|OPENAI_API_KEY|LLM_API_KEY|private_operator" docs README.md
-```
-
-- Metrics: demo setup time, test pass status, portfolio gate status.
-- Risks: over-polishing before evidence; private data leakage.
-- Stop conditions: no four-week dogfood evidence; sample artifacts not
-  sanitized.
-- Estimated size: L.
-- Portfolio evidence produced: final portfolio package.
-- Radar impact: `consumer`.
-
-## Parallel Radar Track
-
-### RADAR-PGI-001 - Cross-Repo Contract Version Alignment
-
-- Status: `planned_parallel`
-- Priority: P0 parallel
-- Owner: `Demand-to-MVP-Radar`
-- Problem: RVE is implemented, but the new portfolio roadmap needs an explicit
-  shared contract version and cross-links in both repos.
-- User outcome: Telegram Brief/Hermes and Radar Candidate Dossier agree on
-  context-only, matched evidence, stale/missing artifact, and decision-change
-  semantics.
-- Why now: `PGI-001` needs stable producer/consumer fields.
-- Dependencies: docs-first contract in `docs/mvp_radar_integration_contract.md`.
-- Blocked by: none for docs; runtime fixture changes depend on `PGI-001`.
-- Files likely touched: sibling `docs/RADAR_VALIDATION_EVIDENCE.md`,
-  sibling `docs/tasks.md`, sibling README/CODEX docs if needed.
-- Schema impact: documentation-only unless code already lacks version field.
-- API/contract impact: `tra-radar-intelligence-contract.v1`.
-- Migration impact: none.
-- Test plan: docs contract search and existing Radar tests.
-- Eval plan: layer 24 Radar handoff.
-- Acceptance criteria:
-  - Both repos link to the same contract version.
-  - Market/business context is documented as context-only in both repos.
-  - Cross-repo ownership is explicit.
-- Verification commands:
-
-```bash
-rg -n "tra-radar-intelligence-contract.v1|context-only|matched external" docs /srv/openclaw-you/workspace/Demand-to-MVP-Radar/docs
-```
-
-- Metrics: contract parity findings.
-- Risks: docs imply Radar is product center.
-- Stop conditions: any doc says market context can satisfy build gates.
-- Estimated size: S.
-- Portfolio evidence produced: cross-repo architecture contract.
-- Radar impact: `cross-repo`.
-
-### RADAR-PGI-002 - Radar Dossier Fixture Parity
-
-- Status: `planned_parallel`
-- Priority: P1 parallel
-- Owner: `Demand-to-MVP-Radar`
-- Problem: Radar JSON/Markdown/Brief/Hermes parity must stay true as the Brief
-  consumes more structured fields.
-- User outcome: no contradiction between Radar rendered output and Telegram
-  Brief/Hermes summaries.
-- Why now: required for `PGI-003`.
-- Dependencies: `RADAR-PGI-001`, `PGI-001`.
-- Blocked by: shared fixture shape.
-- Files likely touched: sibling tests and fixtures, Telegram split report tests.
-- Schema impact: only if fixture exposes missing fields.
-- API/contract impact: selected candidate repeats key fields.
-- Migration impact: none.
-- Test plan: cross-repo fixture diff for JSON/Markdown/Brief fields.
-- Eval plan: layer 24.
-- Acceptance criteria:
-  - `dossier_status`, recommendation, confidence, missing evidence, matched
-    evidence, adapter status, decision-change action, and context-only markers
-    match across JSON/Markdown/Brief fixture.
-  - Missing/stale Radar artifact fixture is covered on Telegram side.
-- Verification commands:
-
-```bash
-cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
-.venv/bin/python -m pytest tests/test_mvp_of_week.py tests/test_mvp_report_quality.py tests/test_telegram_research_bridge.py
-cd /srv/openclaw-you/workspace/telegram-research-agent
-PYTHONPATH=src python3 -m pytest tests/test_split_intelligence_reports.py
-```
-
-- Metrics: parity failures, stale/missing incidents.
-- Risks: tests require private generated artifacts.
-- Stop conditions: fixture contains private source text; rendered output says
-  build while JSON says investigate/reject.
-- Estimated size: M.
-- Portfolio evidence produced: Radar honesty regression.
-- Radar impact: `cross-repo`.
-
-### RADAR-PGI-003 - Bounded Radar Validation Dogfood Run
-
-- Status: `blocked`
-- Priority: P1 parallel
-- Owner: `operator` plus both repos
-- Problem: RVE adapters are implemented, but live/cached validation outcomes
-  have not yet been proven in a weekly dogfood loop.
-- User outcome: Radar can honestly return build/investigate/reject based on
-  matched external evidence, or clearly show gaps.
-- Why now: required for portfolio claims about product validation.
-- Dependencies: `RADAR-PGI-002`, `PGI-006`.
-- Blocked by: fresh candidate artifact, credentials or cache fixtures, operator
-  time.
-- Files likely touched: docs scorecards and sanitized fixture notes only.
-- Schema impact: none expected.
-- API/contract impact: none expected.
-- Migration impact: none.
-- Test plan: existing Radar tests plus one bounded weekly review.
-- Eval plan: Radar scorecard group.
-- Acceptance criteria:
-  - At least one weekly candidate has validation query pack reviewed.
-  - Matched external evidence, missing evidence, adapter status, and decision
-    change action are recorded.
-  - No build-ready recommendation arises from context-only evidence.
-  - Missing credentials degrade visibly.
-- Verification commands:
-
-```bash
-cd /srv/openclaw-you/workspace/Demand-to-MVP-Radar
-.venv/bin/python -m pytest tests/test_mvp_of_week.py tests/test_mvp_report_quality.py
-```
-
-- Metrics: matched external evidence count, context-only misuse count,
-  decision changes after validation.
-- Risks: broad external search becomes idea mining; live credentials leak.
-- Stop conditions: no current candidate; run would require committing private
-  generated artifacts; external results are unmatched.
-- Estimated size: M plus calendar time.
-- Portfolio evidence produced: Radar decision honesty example.
-- Radar impact: `cross-repo`.
-
-## Historical Task Mapping
-
-| Existing task | Verified status | New phase | Keep / merge / archive / replace | Reason |
-|---|---|---|---|---|
-| KIR-Q0..KIR-Q13 | `implemented_and_verified` for workbook plumbing | Phase 0 baseline | archive | Workbook is no longer the main product surface |
-| KIR-Q-001..KIR-Q-007 | `implemented_and_verified` structural quality work | Phase 1 input | merge into `PGI-001` | Good contract foundation, not full domain model |
-| KIR-Q-008 | `partial`, standard loop noted, forced regeneration blocked by missing LLM key | Phase 6 | merge into `PGI-006`/`PGI-007` | Eval/dogfood task, not next code PR |
-| KIR-Q-009 | `planned` | Phase 1/6 | replace with `PGI-001` and `PGI-006` | Referee/thread audit needs canonical contract first |
-| HPI-0..HPI-14 and HPI-9-lite | `implemented_but_not_dogfooded` | Phase 4 baseline | archive as component record | Hermes/PI foundation exists; awareness/evals remain |
-| HPI-9 vector retrieval | `deferred` | none | keep deferred | Raw/vector RAG is not justified yet |
-| HPI-10 | `blocked` | Phase 6/7 | merge into `PGI-007`/`PGI-008` | Requires dogfood evidence |
-| RVE-0..RVE-7 | `implemented_and_verified`, `needs_live_validation` | Radar parallel | keep as Radar baseline | Code/tests exist in sibling repo |
-| RVE-8 | `planned` | Phase 6/Radar | merge into `RADAR-PGI-003` | Dogfood validation run |
-| DFX-0 | `planned` | Phase 4 | replace with `PGI-003` | Hermes artifact awareness belongs with cockpit PR |
-| DFX-1..DFX-4 | `planned` | Phase 2/3 | replace with `PGI-002` | Feedback/context/ranking consolidated |
-| DFX-5 | `planned` | Phase 5 | replace with `PGI-004` | Atlas v2 scope |
-| DFX-6 | `planned` | Phase 4 | replace with `PGI-003` | Weekly Brief decision UX |
-| DFX-7 | `planned` | Phase 2/4 | merge into `PGI-002`/`PGI-003` | Feedback flow plus Hermes explanation |
-| DFX-8 | `planned` | Phase 6 | replace with `PGI-006`/`PGI-007` | Dogfood/eval protocol |
-
-## Definition Of Done For Any PGI Task
-
-- Code changes are limited to the task scope.
-- Runtime behavior has tests or reproducible fixture verification.
-- Sidecar and rendered output cannot contradict each other.
-- Privacy boundary is respected; no generated private artifacts or secrets are
-  committed.
-- Documentation links are updated.
-- Verification commands pass or failures are reported with reason.
-- Stop conditions are checked explicitly.
-
-## IRX-4 Verification Record
-
-The completed IRX-4 slice used the exact focused matrix from
-`docs/CODEX_PROMPT.md`; expensive LLM jobs and the full suite were not run.
-
-```bash
-git diff --check
-PYTHONPATH=src PYTHONPYCACHEPREFIX=/tmp/telegram-research-pycache \
-  python3 -m unittest tests.test_idea_threads \
-  tests.test_ai_intelligence_report tests.test_frontier_analysis \
-  tests.test_intelligence_retrieval_items tests.test_obsidian_export \
-  tests.test_reaction_personalization
-```
-
-## Backlog Stop Conditions
-
-- A task would weaken evidence gates.
-- A task treats market/business context as demand proof.
-- A task makes Hermes a memory source or mutation actor.
-- A task requires raw Telegram firehose RAG by default.
-- A task requires full-year backfill without a bounded use case.
-- A task would commit private generated artifacts, raw exports, `.env`, or
-  secrets.
+## PBR Queue - Playbook Retrofit
+
+### PBR-0: Current Playbook Differential Audit
+
+Owner: codex
+Phase: PBR
+Type: project:governance
+Status: proposed
+Depends-On: none
+Risk-Level: medium
+Public-Tests-Required: not_required
+Critic-Required: conditional
+Holdout-Required: not_required
+Mutation-Required: not_required
+Property-Required: not_required
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Pin the exact target repository and Playbook state, compare copied Playbook surfaces against the current checkout, and classify missing, stale, duplicate, contradictory, or obsolete governance artifacts without changing product code.
+Acceptance-Criteria:
+  - id: AC-1; description: target and Playbook commit SHAs, branch names, git status, recent logs, diff stats, and tracked file inventory are recorded; verify: docs/playbook_retrofit_audit.md contains the exact pre-edit evidence summary.
+  - id: AC-2; description: each required Playbook artifact is classified as present, missing, stale, or conflicting; verify: docs/playbook_retrofit_audit.md includes the artifact matrix.
+  - id: AC-3; description: duplicate authority conflicts are named instead of silently resolved; verify: docs/playbook_retrofit_audit.md lists architecture, contract, assistant retrieval, and report-centered conflicts.
+Verification:
+  - python3 tools/playbook_validate.py --root . --check references
+Files:
+  - docs/playbook_retrofit_audit.md
+  - docs/EVIDENCE_INDEX.md
+Context-Refs:
+  - docs/product_pivot_current_state_audit.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0
+  max_model_calls: 0
+  max_tool_calls: n/a
+  max_retries: 0
+  approval_required_when: any external model or subagent review is requested
+Notes: |
+  This task is documentation-only and must not run product pipelines.
+
+### PBR-1: Project Brief And Evidence Plan
+
+Owner: codex
+Phase: PBR
+Type: project:governance
+Status: proposed
+Depends-On: PBR-0
+Risk-Level: high
+Public-Tests-Required: not_required
+Critic-Required: required
+Holdout-Required: conditional
+Mutation-Required: not_required
+Property-Required: not_required
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Complete the project brief from the actual operator failure, define adoption failure, first proof metric, evaluation dataset source, human review budget, cost and latency boundaries, and forbidden claims.
+Acceptance-Criteria:
+  - id: AC-1; description: Project Brief states the operator problem, current workaround, first proof metric, and adoption failure condition; verify: docs/PROJECT_BRIEF.md contains those sections.
+  - id: AC-2; description: human review budget and gold-query approval path are explicit; verify: docs/PROJECT_BRIEF.md and docs/RAG_DATA_READINESS.md both state that agent-generated queries are candidates only.
+  - id: AC-3; description: unsupported product claims are listed; verify: README.md and docs/CODEX_PROMPT.md do not claim full-archive RAG or dogfood success.
+Verification:
+  - python3 tools/playbook_validate.py --root . --check placeholders --check references
+Files:
+  - docs/PROJECT_BRIEF.md
+  - README.md
+  - docs/CODEX_PROMPT.md
+Context-Refs:
+  - docs/product_pivot_current_state_audit.md
+  - docs/final_acceptance_plan.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0
+  max_model_calls: 0
+  max_tool_calls: n/a
+  max_retries: 0
+  approval_required_when: any external model or subagent review is requested
+Notes: |
+  Human brief approval is required before product implementation starts.
+
+### PBR-2: Safe Standard Retrofit
+
+Owner: codex
+Phase: PBR
+Type: playbook:retrofit
+Status: proposed
+Depends-On: PBR-0, PBR-1
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: not_required
+Mutation-Required: not_required
+Property-Required: conditional
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Reconcile current Playbook validators, schemas, templates, verification contracts, and delivery execution model into the existing repository without force initialization, duplicated authority, or generated private artifacts.
+Acceptance-Criteria:
+  - id: AC-1; description: initializer help and dry-run behavior are recorded before any retrofit action; verify: docs/playbook_retrofit_audit.md records supported flags and duplicate-risk result.
+  - id: AC-2; description: current Playbook validators and schemas exist in the target repository; verify: test -f tools/playbook_validate.py && test -f schemas/task.schema.json.
+  - id: AC-3; description: project verification and delivery execution contracts validate against their schemas; test: python3 tools/playbook_validate.py --root . --check readiness --check delivery.
+Verification:
+  - python3 tools/playbook_validate.py --root . --check readiness --check delivery
+Files:
+  - tools/playbook_validate.py
+  - tools/verify_project.py
+  - tools/receipt_run.py
+  - schemas/task.schema.json
+  - templates/tasks_schema.md
+  - .playbook/project_verification.json
+  - .playbook/delivery_execution_model.json
+Context-Refs:
+  - docs/playbook_retrofit_audit.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0
+  max_model_calls: 0
+  max_tool_calls: n/a
+  max_retries: 0
+  approval_required_when: initializer would overwrite existing authoritative docs
+Notes: |
+  No initializer --force, no Claude hooks, and no external skill activation.
+
+### PBR-3: Product Pivot ADR And Implementation Contract
+
+Owner: codex
+Phase: PBR
+Type: project:governance
+Status: proposed
+Depends-On: PBR-1, PBR-2
+Risk-Level: high
+Public-Tests-Required: not_required
+Critic-Required: required
+Holdout-Required: conditional
+Mutation-Required: not_required
+Property-Required: not_required
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Supersede the report-centered contract through a proposed ADR and updated implementation contract that define archive memory, selective enrichment, assistant primacy, privacy boundaries, and human approval requirements.
+Acceptance-Criteria:
+  - id: AC-1; description: ADR records the old decision, new decision, W29 evidence, privacy implications, migration path, rollback path, and out-of-scope boundaries; verify: docs/adr/ADR-001-product-pivot-to-personal-research-memory.md contains Status proposed.
+  - id: AC-2; description: implementation contract no longer states that broad archive memory is rejected; verify: docs/IMPLEMENTATION_CONTRACT.md states full archive search is planned primary memory.
+  - id: AC-3; description: product RAG is distinguished from Playbook engineering continuity; verify: docs/IMPLEMENTATION_CONTRACT.md and docs/ARCHITECTURE.md define separate boundaries.
+Verification:
+  - python3 tools/playbook_validate.py --root . --check references --check placeholders
+Files:
+  - docs/adr/ADR-001-product-pivot-to-personal-research-memory.md
+  - docs/IMPLEMENTATION_CONTRACT.md
+  - docs/personal_research_memory_product_contract.md
+Context-Refs:
+  - docs/product_pivot_current_state_audit.md
+  - docs/PROJECT_BRIEF.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0
+  max_model_calls: 0
+  max_tool_calls: n/a
+  max_retries: 0
+  approval_required_when: human is asked to accept the ADR
+Notes: |
+  Do not mark the ADR accepted automatically.
+
+### PBR-4: Architecture, Capability Profiles, Harness, And Runtime Tier
+
+Owner: codex
+Phase: PBR
+Type: rag:data-readiness tool:schema agent:harness cost:architecture
+Status: proposed
+Depends-On: PBR-3
+Risk-Level: high
+Public-Tests-Required: conditional
+Critic-Required: required
+Holdout-Required: conditional
+Mutation-Required: not_required
+Property-Required: conditional
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Declare active capability profiles, minimum runtime tier, deterministic versus LLM-owned boundaries, assistant harness shape, and Hermes reuse decision for the pivot product.
+Acceptance-Criteria:
+  - id: AC-1; description: RAG, Tool-Use, Agentic, Planning, Compliance, Autonomous Workflow, and Cost profiles are explicitly declared with rationale; verify: docs/ARCHITECTURE.md contains the capability profile table.
+  - id: AC-2; description: runtime tier is T1 with bounded read-only assistant loop and no T3 dependency; verify: docs/ARCHITECTURE.md and docs/AGENT_HARNESS_DESIGN.md state the tier.
+  - id: AC-3; description: Hermes naming boundary classifies official Hermes Agent as pattern_only; verify: docs/ARCHITECTURE.md records the reuse decision.
+Verification:
+  - python3 tools/playbook_validate.py --root . --check references
+Files:
+  - docs/ARCHITECTURE.md
+  - docs/personal_research_memory_architecture.md
+  - docs/AGENT_HARNESS_DESIGN.md
+  - docs/agent_eval.md
+Context-Refs:
+  - docs/IMPLEMENTATION_CONTRACT.md
+  - docs/adr/ADR-001-product-pivot-to-personal-research-memory.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0
+  max_model_calls: 0
+  max_tool_calls: n/a
+  max_retries: 0
+  approval_required_when: any runtime dependency is proposed
+Notes: |
+  Agentic is ON only for bounded multi-tool assistant behavior; it is not approval for hidden mutation.
+
+### PBR-5: Delivery Execution Model And Review Policy
+
+Owner: codex
+Phase: PBR
+Type: project:governance
+Status: proposed
+Depends-On: PBR-4
+Risk-Level: medium
+Public-Tests-Required: conditional
+Critic-Required: required
+Holdout-Required: not_required
+Mutation-Required: not_required
+Property-Required: not_required
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Define Codex Direct bootstrap, split_orchestrated ongoing delivery, optional read-only review loops, Test Critic and privacy review triggers, human completion authority, and task evidence destinations.
+Acceptance-Criteria:
+  - id: AC-1; description: delivery execution JSON identifies Codex Direct bootstrap and split_orchestrated ongoing delivery; test: python3 tools/playbook_validate.py --root . --check delivery.
+  - id: AC-2; description: review policy blocks child agent commits, pushes, self-review, and completion authority; verify: docs/REVIEW_POLICY.md contains those prohibitions.
+  - id: AC-3; description: task evidence destinations are listed; verify: docs/REVIEW_POLICY.md and docs/EVIDENCE_INDEX.md name required evidence records.
+Verification:
+  - python3 tools/playbook_validate.py --root . --check delivery --check references
+Files:
+  - .playbook/delivery_execution_model.json
+  - docs/REVIEW_POLICY.md
+  - docs/EVIDENCE_INDEX.md
+  - AGENTS.md
+Context-Refs:
+  - docs/ARCHITECTURE.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0
+  max_model_calls: 0
+  max_tool_calls: n/a
+  max_retries: 0
+  approval_required_when: any child agent is granted write capability
+Notes: |
+  Human remains final completion authority.
+
+### PBR-6: Evaluation, Cost, Privacy, And Skill Governance
+
+Owner: codex
+Phase: PBR
+Type: rag:data-readiness rag:query rag:generation tool:schema agent:harness eval:gate cost:architecture skill:security
+Status: proposed
+Depends-On: PBR-3, PBR-5
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: required
+Mutation-Required: conditional
+Property-Required: conditional
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Create evaluation, cost, privacy, and external-skill governance contracts that prevent unsupported release claims and block untrusted data egress.
+Acceptance-Criteria:
+  - id: AC-1; description: retrieval, generation, tool, agent, cost, and privacy contracts exist and identify target metrics as proposed; verify: test -f docs/retrieval_eval.md && test -f docs/generation_eval.md && test -f docs/tool_eval.md && test -f docs/agent_eval.md.
+  - id: AC-2; description: candidate query set contains 50 unapproved cases and no gold label claim; verify: python3 -m json.tool is not required; use python to count evals/retrieval/query_set_candidate.jsonl rows and human_approved=false values.
+  - id: AC-3; description: external skills are inventoried as disabled, deferred, or rejected until trust records exist; verify: docs/playbook_retrofit_audit.md includes the external skill table.
+Verification:
+  - python3 tools/playbook_validate.py --root . --check references --check placeholders
+Files:
+  - docs/RAG_DATA_READINESS.md
+  - docs/retrieval_eval.md
+  - docs/generation_eval.md
+  - docs/tool_eval.md
+  - docs/agent_eval.md
+  - docs/COST_BUDGET.md
+  - docs/ai_cost_architecture.md
+  - docs/PRIVACY_THREAT_MODEL.md
+  - evals/retrieval/query_set_candidate.jsonl
+  - evals/retrieval/README.md
+Context-Refs:
+  - docs/final_acceptance_plan.md
+  - docs/playbook_retrofit_audit.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0
+  max_model_calls: 0
+  max_tool_calls: n/a
+  max_retries: 0
+  approval_required_when: any external skill, LLM judge, or embedding provider is proposed
+Notes: |
+  Candidate queries are not gold evidence.
+
+### PBR-7: Repo Hygiene And Archive Plan
+
+Owner: codex
+Phase: PBR
+Type: repo:hygiene
+Status: proposed
+Depends-On: PBR-0, PBR-3
+Risk-Level: medium
+Public-Tests-Required: conditional
+Critic-Required: conditional
+Holdout-Required: not_required
+Mutation-Required: not_required
+Property-Required: not_required
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Classify active, compatibility, legacy, generated, private, fixture, historical, oversized, duplicate, stale, and cleanup-candidate files without deleting or moving application files.
+Acceptance-Criteria:
+  - id: AC-1; description: hygiene plan includes active runtime, assistant/RAG, V1 compatibility, generated private artifacts, fixtures, duplicate docs, stale commands, systemd units, and CI/test baseline categories; verify: docs/repo_hygiene_and_archive_plan.md contains the inventory table.
+  - id: AC-2; description: every cleanup candidate lists path, callers, obsolescence reason, evidence needed, earliest milestone, and verification command; verify: docs/repo_hygiene_and_archive_plan.md contains the cleanup candidate table.
+  - id: AC-3; description: broad refactor is prohibited before PRM-4 and initial retrieval evaluation; verify: docs/repo_hygiene_and_archive_plan.md states the rule.
+Verification:
+  - python3 tools/playbook_validate.py --root . --check references
+Files:
+  - docs/repo_hygiene_and_archive_plan.md
+Context-Refs:
+  - docs/playbook_retrofit_audit.md
+  - docs/ARCHITECTURE.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0
+  max_model_calls: 0
+  max_tool_calls: n/a
+  max_retries: 0
+  approval_required_when: deletion, archive, or move is proposed
+Notes: |
+  Cleanup is planned only; broad refactor waits until PRM search value is proven.
+
+### PBR-8: Playbook Validation And Baseline
+
+Owner: codex
+Phase: PBR
+Type: eval:gate
+Status: proposed
+Depends-On: PBR-2, PBR-3, PBR-4, PBR-5, PBR-6, PBR-7
+Risk-Level: medium
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: conditional
+Mutation-Required: not_required
+Property-Required: conditional
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Run the Playbook validators, project verifier, diff checks, and repository baseline commands, then record exact warnings and failures without relabeling them as passes.
+Acceptance-Criteria:
+  - id: AC-1; description: Playbook validator command is run with tasks, placeholders, readiness, delivery, and references checks; verify: docs/EVIDENCE_INDEX.md records exact result after execution.
+  - id: AC-2; description: project verifier command is run or a precise environment blocker is recorded; verify: docs/EVIDENCE_INDEX.md records exact result after execution.
+  - id: AC-3; description: git diff check and diff stat are recorded; verify: final handoff includes exact command outcomes.
+Verification:
+  - python3 tools/playbook_validate.py --root . --check tasks --check placeholders --check readiness --check delivery --check references
+  - python3 tools/verify_project.py --root .
+  - git diff --check
+  - git diff --stat
+Files:
+  - docs/EVIDENCE_INDEX.md
+  - docs/CODEX_PROMPT.md
+Context-Refs:
+  - docs/REVIEW_POLICY.md
+  - docs/PROJECT_BRIEF.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0
+  max_model_calls: 0
+  max_tool_calls: n/a
+  max_retries: 0
+  approval_required_when: verifier would run live product pipelines
+Notes: |
+  This task produces an implementation-ready handoff only if validators do not report unresolved blockers.
+
+## PRM Queue - Personal Research Memory
+
+### PRM-0: Final Product And Acceptance Contract
+
+Owner: codex
+Phase: PRM
+Type: project:governance
+Status: planned
+Depends-On: PBR-8
+Risk-Level: high
+Public-Tests-Required: conditional
+Critic-Required: required
+Holdout-Required: conditional
+Mutation-Required: not_required
+Property-Required: not_required
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Freeze the Personal Research Memory v1 user experience, primary workflows, non-goals, final acceptance, and dogfood entry criteria before implementation starts.
+Acceptance-Criteria:
+  - id: AC-1; description: product contract lists exact, concept, case, comparison, project, timeline, reaction, life, no-answer, and external verification workflows; verify: docs/personal_research_memory_product_contract.md contains all ten workflows.
+  - id: AC-2; description: acceptance plan separates data readiness, retrieval, generation, end-to-end, and dogfood levels; verify: docs/final_acceptance_plan.md contains those sections.
+  - id: AC-3; description: non-goals prohibit vector-first, public SaaS, full archive LLM backfill, and automatic memory mutation; verify: docs/spec.md contains those non-goals.
+Verification:
+  - python3 tools/playbook_validate.py --root . --check references --check placeholders
+Files:
+  - docs/personal_research_memory_product_contract.md
+  - docs/final_acceptance_plan.md
+  - docs/spec.md
+Context-Refs:
+  - docs/PROJECT_BRIEF.md
+  - docs/IMPLEMENTATION_CONTRACT.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0
+  max_model_calls: 0
+  max_tool_calls: n/a
+  max_retries: 0
+  approval_required_when: acceptance thresholds are changed
+Notes: |
+  Human approval required before PRM-1 moves from planning to implementation.
+
+### PRM-1: Corpus Inventory, Data Readiness, And Gold Query Process
+
+Owner: codex
+Phase: PRM
+Type: rag:data-readiness
+Status: planned
+Depends-On: PRM-0
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: conditional
+Mutation-Required: not_required
+Property-Required: conditional
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Inventory configured channels and canonical storage sources, measure text and metadata readiness, duplicate and language cases, privacy retention boundaries, and establish the human-approved gold query process without mutating production data.
+Acceptance-Criteria:
+  - id: AC-1; description: read-only inventory reports counts for retained posts, indexable text, required metadata, empty or malformed rows, duplicates, repost candidates, date coverage, language coverage, and URL coverage; verify: generated PRM-1 evidence report contains all fields.
+  - id: AC-2; description: candidate query set remains unapproved and a separate human label workflow is documented; verify: evals/retrieval/query_set_candidate.jsonl rows have human_approved=false and docs/RAG_DATA_READINESS.md states the rule.
+  - id: AC-3; description: privacy review confirms no raw Telegram text was written into public fixtures or ordinary logs; verify: grep review over new eval fixtures plus privacy checklist entry.
+Verification:
+  - python3 tools/playbook_validate.py --root . --check tasks --check references
+  - read-only SQLite inspection script or command documented in task evidence
+Files:
+  - docs/RAG_DATA_READINESS.md
+  - docs/retrieval_eval.md
+  - evals/retrieval/query_set_candidate.jsonl
+  - evals/retrieval/README.md
+Context-Refs:
+  - docs/PRIVACY_THREAT_MODEL.md
+  - docs/final_acceptance_plan.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0
+  max_model_calls: 0
+  max_tool_calls: n/a
+  max_retries: 0
+  approval_required_when: any sampled post text would leave the local machine
+Notes: |
+  This is the first implementation task. It is read-only and must not run ingestion, backfill, or indexing.
+
+### PRM-2: Archive Document Identity, Chunking, And Dedupe Contract
+
+Owner: codex
+Phase: PRM
+Type: rag:ingestion
+Status: planned
+Depends-On: PRM-1
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: conditional
+Mutation-Required: conditional
+Property-Required: required
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Map existing raw_posts and posts rows into stable searchable document identities, define chunking only for long posts, preserve citations, define content hashes and repost clusters, and specify incremental update and rollback behavior.
+Acceptance-Criteria:
+  - id: AC-1; description: document identity contract names canonical body source, stable document ID fields, source URL, channel, message ID, date, language, content hash, and duplicate cluster fields; verify: architecture or RAG readiness doc contains the contract.
+  - id: AC-2; description: normal Telegram posts remain coherent and long-post chunking preserves exact post-level source links; verify: property tests or design examples cover normal and long post cases.
+  - id: AC-3; description: rollback procedure restores prior index state without deleting canonical archive rows; verify: docs/ROLLBACK_AND_REINDEX_PLAN.md is updated with archive document rollback.
+Verification:
+  - python3 -m pytest tests/ -q
+  - python3 tools/playbook_validate.py --root . --check references
+Files:
+  - src/
+  - tests/
+  - docs/RAG_DATA_READINESS.md
+  - docs/ROLLBACK_AND_REINDEX_PLAN.md
+Context-Refs:
+  - docs/personal_research_memory_architecture.md
+  - docs/PRIVACY_THREAT_MODEL.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0
+  max_model_calls: 0
+  max_tool_calls: n/a
+  max_retries: 0
+  approval_required_when: schema migration would touch production database contents
+Notes: |
+  Do not duplicate full post text into a second store unless measured constraints require an ADR.
+
+### PRM-3: Persistent Full-Archive FTS Search
+
+Owner: codex
+Phase: PRM
+Type: rag:query
+Status: planned
+Depends-On: PRM-2
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: conditional
+Mutation-Required: conditional
+Property-Required: required
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Expose every indexable retained post through a persistent SQLite FTS baseline with query, date, channel, language, reaction, and project filters, returning source URL, date, channel, snippet, and stable document identity without Knowledge Atom requirements.
+Acceptance-Criteria:
+  - id: AC-1; description: search returns retained posts that have no Knowledge Atom when their text matches the query; test: archive search regression test covers an atomless post.
+  - id: AC-2; description: result rows include source URL, date, channel, snippet, stable document identity, and optional reaction metadata; test: archive search result schema test checks required fields.
+  - id: AC-3; description: p95 local retrieval latency is measured on the approved baseline query subset; verify: retrieval eval report records latency and sample size.
+Verification:
+  - python3 -m pytest tests/ -q
+  - python3 tools/playbook_validate.py --root . --check tasks
+Files:
+  - src/
+  - tests/
+  - docs/retrieval_eval.md
+Context-Refs:
+  - docs/RAG_DATA_READINESS.md
+  - docs/retrieval_eval.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0
+  max_model_calls: 0
+  max_tool_calls: n/a
+  max_retries: 0
+  approval_required_when: non-FTS backend is proposed
+Notes: |
+  This is the first user-value implementation milestone.
+
+### PRM-4: Assistant Archive Search Vertical Slice
+
+Owner: codex
+Phase: PRM
+Type: rag:query tool:schema tool:call
+Status: planned
+Depends-On: PRM-3
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: conditional
+Mutation-Required: conditional
+Property-Required: required
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Add a read-only search_telegram_archive tool to the existing assistant path so exact and concept-like archive queries return grounded Telegram results and insufficient_evidence when the corpus support is weak.
+Acceptance-Criteria:
+  - id: AC-1; description: assistant tool catalog exposes search_telegram_archive with read-only schema and no mutation fields; test: assistant tool schema test checks allowlist.
+  - id: AC-2; description: exact search workflow returns a Telegram source link for a matching retained post; test: vertical slice integration test uses a sanitized fixture.
+  - id: AC-3; description: no-answer fixture returns insufficient_evidence and no fabricated citation; test: assistant answer contract test covers no-answer.
+Verification:
+  - python3 -m pytest tests/ -q
+  - python3 tools/playbook_validate.py --root . --check tasks
+Files:
+  - src/assistant/
+  - tests/
+  - docs/tool_eval.md
+  - docs/generation_eval.md
+Context-Refs:
+  - docs/AGENT_HARNESS_DESIGN.md
+  - docs/personal_research_memory_product_contract.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 1.00
+  max_model_calls: 10
+  max_tool_calls: 40
+  max_retries: 1
+  approval_required_when: model calls require private raw post text outside bounded retrieval context
+Notes: |
+  Produce a directly testable user interaction without broad router redesign.
+
+### PRM-5: Reaction Fast Lane
+
+Owner: codex
+Phase: PRM
+Type: rag:ingestion rag:query workflow:autonomous
+Status: planned
+Depends-On: PRM-3
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: conditional
+Mutation-Required: conditional
+Property-Required: required
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Ensure every detected personal reaction confirms archive source existence, makes the post searchable immediately, queues enrichment independently, attempts topic linkage, exposes search availability, and records a receipt for each stage.
+Acceptance-Criteria:
+  - id: AC-1; description: reacted posts remain searchable even when atom extraction fails; test: reaction fast-lane fixture has seven reactions, zero atoms, and seven searchable archive documents.
+  - id: AC-2; description: receipt records detected reactions, unique posts, indexed documents, enrichment attempts, successes, failures, topic links, ranking effects, and incomplete-stage reasons; test: receipt schema test checks required fields.
+  - id: AC-3; description: no reaction is interpreted as negative and emoji type remains audit metadata only; test: reaction semantics unit test covers absent and multiple emoji cases.
+Verification:
+  - python3 -m pytest tests/ -q
+  - python3 tools/playbook_validate.py --root . --check tasks
+Files:
+  - src/
+  - tests/
+  - docs/reaction_personalization_contract.md
+  - docs/RAG_DATA_READINESS.md
+Context-Refs:
+  - docs/product_pivot_current_state_audit.md
+  - docs/personal_research_memory_product_contract.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0.50
+  max_model_calls: 5
+  max_tool_calls: n/a
+  max_retries: 1
+  approval_required_when: reaction data would mutate permanent profile or preferences
+Notes: |
+  Do not accept seven reactions to zero searchable knowledge items as a completed state.
+
+### PRM-6: Selective Enrichment Pipeline V2
+
+Owner: codex
+Phase: PRM
+Type: rag:ingestion rag:generation
+Status: planned
+Depends-On: PRM-5
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: required
+Mutation-Required: conditional
+Property-Required: conditional
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Enrich priority posts with claims, cases, tools, practices, warnings, entities, and topic candidates while preserving source references, separating extraction failure from search availability, and enforcing cheap bounded batches without full archive backfill.
+Acceptance-Criteria:
+  - id: AC-1; description: enrichment queue priority order covers reactions, repeated search returns, cited answers, watch topics, active projects, repeated signals, and manual saves; test: priority ordering test covers all sources.
+  - id: AC-2; description: extraction failure leaves archive search result available and records failure reason; test: enrichment failure fixture remains searchable.
+  - id: AC-3; description: cost and retry caps stop a batch before exceeding approved task budget; test: cost cap test simulates retry exhaustion.
+Verification:
+  - python3 -m pytest tests/ -q
+Files:
+  - src/
+  - tests/
+  - docs/COST_BUDGET.md
+  - docs/ai_cost_architecture.md
+Context-Refs:
+  - docs/personal_research_memory_architecture.md
+  - docs/COST_BUDGET.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 5.00
+  max_model_calls: 200
+  max_tool_calls: n/a
+  max_retries: 1
+  approval_required_when: full archive backfill or higher-cost model is requested
+Notes: |
+  No full archive LLM backfill.
+
+### PRM-7: Retrieval Baseline Evaluation And Hybrid ADR
+
+Owner: codex
+Phase: PRM
+Type: rag:query eval:gate
+Status: planned
+Depends-On: PRM-1, PRM-3, PRM-4
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: required
+Mutation-Required: not_required
+Property-Required: required
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Run the human-approved gold query set against the FTS baseline, classify retrieval failures, decide whether embeddings or hybrid retrieval are justified, compare vector backend candidates, and record a human-approved ADR before vector implementation.
+Acceptance-Criteria:
+  - id: AC-1; description: evaluation uses only human-approved gold labels and reports which candidate queries remain unapproved; verify: retrieval eval output separates gold and candidate rows.
+  - id: AC-2; description: metrics include hit@10, MRR, citation precision, stale rejection, no-answer accuracy, duplicate top-10 rate, latency, and reacted-post searchability; verify: docs/retrieval_eval.md contains the metric table and result path.
+  - id: AC-3; description: vector backend ADR compares recall, latency, update complexity, privacy, backup, overhead, cost, and repository fit; verify: ADR exists only after evaluation evidence is attached.
+Verification:
+  - python3 -m pytest tests/ -q
+  - retrieval eval command documented in evidence report
+Files:
+  - evals/retrieval/
+  - docs/retrieval_eval.md
+  - docs/adr/
+Context-Refs:
+  - docs/retrieval_eval.md
+  - docs/RAG_DATA_READINESS.md
+  - docs/PRIVACY_THREAT_MODEL.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 2.00
+  max_model_calls: 0
+  max_tool_calls: n/a
+  max_retries: 1
+  approval_required_when: embeddings or external provider calls are proposed
+Notes: |
+  No vector backend implementation before this task demonstrates need.
+
+### PRM-8: Hybrid Retrieval And Reranking
+
+Owner: codex
+Phase: PRM
+Type: rag:query
+Status: conditional
+Depends-On: PRM-7
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: required
+Mutation-Required: conditional
+Property-Required: required
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Implement hybrid retrieval only when PRM-7 approves it, combining metadata filters, FTS, vector candidates, dedupe, freshness, diversity, reaction and project boosts, bounded reranking, index versioning, and rollback.
+Acceptance-Criteria:
+  - id: AC-1; description: task does not start unless the hybrid ADR is human-approved; verify: implementation evidence references accepted ADR status.
+  - id: AC-2; description: hybrid retrieval improves approved metrics against FTS baseline without reducing citation precision below target; test: retrieval eval comparison command reports both baseline and hybrid metrics.
+  - id: AC-3; description: corpus/index version, reindex command, rollback command, and backup path are recorded; verify: docs/ROLLBACK_AND_REINDEX_PLAN.md contains hybrid sections.
+Verification:
+  - python3 -m pytest tests/ -q
+  - retrieval eval comparison command documented in evidence report
+Files:
+  - src/
+  - tests/
+  - evals/retrieval/
+  - docs/ROLLBACK_AND_REINDEX_PLAN.md
+Context-Refs:
+  - docs/retrieval_eval.md
+  - docs/PRIVACY_THREAT_MODEL.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0 until human-approved hybrid budget is recorded
+  max_model_calls: 0 until human-approved hybrid budget is recorded
+  max_tool_calls: n/a
+  max_retries: 1
+  approval_required_when: embeddings provider, vector backend, or reranker changes
+Notes: |
+  SQLite archive remains canonical.
+
+### PRM-9: Assistant Intent Router And Bounded Tool Catalog
+
+Owner: codex
+Phase: PRM
+Type: tool:schema tool:call agent:harness agent:termination
+Status: planned
+Depends-On: PRM-4, PRM-5, PRM-7
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: required
+Mutation-Required: conditional
+Property-Required: required
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Route exact search, concept search, cases, comparison, news, project application, reaction recall, no-answer, and external verification through one conversational entrypoint with bounded read-only tools, trace records, and termination.
+Acceptance-Criteria:
+  - id: AC-1; description: tool catalog includes all minimum read-only tools and confirmation-gated proposal tools, with no automatic mutation tools; test: tool catalog allowlist test.
+  - id: AC-2; description: deterministic routing covers exact search, reaction recall, and no-answer when sufficient; test: router fixture tests for required intents.
+  - id: AC-3; description: tool traces record selected tool, arguments, result count, termination reason, and privacy boundary; test: assistant trace schema test.
+Verification:
+  - python3 -m pytest tests/ -q
+Files:
+  - src/assistant/
+  - tests/
+  - docs/AGENT_HARNESS_DESIGN.md
+  - docs/tool_eval.md
+Context-Refs:
+  - docs/AGENT_HARNESS_DESIGN.md
+  - docs/tool_eval.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 2.00
+  max_model_calls: 20
+  max_tool_calls: 120
+  max_retries: 1
+  approval_required_when: router adds hidden mutation or unbounded loop
+Notes: |
+  The user must not choose between Hermes, PI, Atlas, Radar, or separate search systems.
+
+### PRM-10: Grounded Answer Generation
+
+Owner: codex
+Phase: PRM
+Type: rag:generation
+Status: planned
+Depends-On: PRM-9, PRM-7
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: required
+Mutation-Required: conditional
+Property-Required: required
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Synthesize answers from retrieved evidence with exact Telegram citations, archive-versus-model distinction, freshness, contradictions, insufficient_evidence behavior, and separate retrieval and generation latency and cost telemetry.
+Acceptance-Criteria:
+  - id: AC-1; description: answers contain direct answer, archive support, source links, uncertainty, date boundary, model background, external verification needs, and optional next action; test: answer contract fixture test.
+  - id: AC-2; description: unsupported archive claims are rejected or labeled as model background; test: generation eval fixture with missing source support.
+  - id: AC-3; description: retrieval latency, generation latency, model calls, and cost are recorded separately without raw post text in logs; test: telemetry privacy test.
+Verification:
+  - python3 -m pytest tests/ -q
+Files:
+  - src/assistant/
+  - tests/
+  - docs/generation_eval.md
+  - docs/COST_BUDGET.md
+Context-Refs:
+  - docs/generation_eval.md
+  - docs/PRIVACY_THREAT_MODEL.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 3.00
+  max_model_calls: 30
+  max_tool_calls: 100
+  max_retries: 1
+  approval_required_when: prompt requires broad raw corpus context
+Notes: |
+  LLM judge output is advisory until calibrated against human labels.
+
+### PRM-11: On-Demand External Verification
+
+Owner: codex
+Phase: PRM
+Type: tool:schema tool:call
+Status: planned
+Depends-On: PRM-9, PRM-10
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: required
+Mutation-Required: conditional
+Property-Required: conditional
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Add explicit external verification flow for unstable or high-stakes claims, label Telegram evidence separately from external evidence, avoid automatic browsing for every internal query, and store only approved research notes.
+Acceptance-Criteria:
+  - id: AC-1; description: high-stakes categories trigger a request_external_verification path or a clear requirement label; test: routing fixture for pricing, legal, medical, financial, career-market, and visa questions.
+  - id: AC-2; description: answer sections separate archive evidence, external verification, and unknowns; test: external verification answer fixture.
+  - id: AC-3; description: external skill use is blocked unless an approved trust record exists; test: tool allowlist test rejects unapproved skill.
+Verification:
+  - python3 -m pytest tests/ -q
+Files:
+  - src/assistant/
+  - tests/
+  - docs/tool_eval.md
+  - docs/PRIVACY_THREAT_MODEL.md
+Context-Refs:
+  - docs/PRIVACY_THREAT_MODEL.md
+  - docs/playbook_retrofit_audit.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 2.00
+  max_model_calls: 20
+  max_tool_calls: 80
+  max_retries: 1
+  approval_required_when: external skill or broad web crawl is requested
+Notes: |
+  Telegram remains discovery context for unstable facts, not final truth.
+
+### PRM-12: Confirmation-Gated Save And Watch Flow
+
+Owner: codex
+Phase: PRM
+Type: tool:schema tool:call tool:unsafe
+Status: planned
+Depends-On: PRM-10
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: conditional
+Mutation-Required: required
+Property-Required: required
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Propose and confirm Knowledge Notes, Watch Topics, project links, decisions, actions, experiments, and feedback with append-only history, no automatic chat transcript memory, and clear edit, delete, and rollback semantics.
+Acceptance-Criteria:
+  - id: AC-1; description: proposal tools do not write until confirmation token or explicit approval is supplied; test: unsafe tool confirmation test.
+  - id: AC-2; description: session chat is not durable memory unless user approves a save proposal; test: transcript persistence test.
+  - id: AC-3; description: decision and experiment records are append-only and rollback leaves an audit trail; test: saved memory history test.
+Verification:
+  - python3 -m pytest tests/ -q
+Files:
+  - src/assistant/
+  - src/
+  - tests/
+  - docs/tool_eval.md
+Context-Refs:
+  - docs/personal_research_memory_product_contract.md
+  - docs/PRIVACY_THREAT_MODEL.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 2.00
+  max_model_calls: 20
+  max_tool_calls: 100
+  max_retries: 1
+  approval_required_when: write scope expands beyond confirmed proposal objects
+Notes: |
+  No profile edits or permanent preference changes from implicit reactions.
+
+### PRM-13: Query-Driven Knowledge Library And Topic Pages
+
+Owner: codex
+Phase: PRM
+Type: rag:generation
+Status: planned
+Depends-On: PRM-10, PRM-12
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: required
+Mutation-Required: conditional
+Property-Required: conditional
+Visual-Contract: required
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Build the Knowledge Library around query-driven or watched Topics, Research Notes, Cases, Tools, Practices, Projects, Decisions, and Experiments while keeping the old global Atlas as an internal Knowledge Audit Explorer.
+Acceptance-Criteria:
+  - id: AC-1; description: topic pages show current understanding, 30 and 90 day changes, claims, cases, tools, contradictions, project links, saved notes, open questions, and original sources; test: topic page fixture test.
+  - id: AC-2; description: global Atlas is labeled as internal audit/debug surface, not primary user product; verify: README and product docs use Knowledge Audit Explorer naming.
+  - id: AC-3; description: visual checks confirm no overlapping text on supported desktop and mobile fixtures; verify: Playwright or screenshot evidence attached when UI is changed.
+Verification:
+  - python3 -m pytest tests/ -q
+  - visual verification command documented when UI files change
+Files:
+  - src/
+  - tests/
+  - docs/personal_research_memory_product_contract.md
+Context-Refs:
+  - docs/personal_research_memory_architecture.md
+  - docs/final_acceptance_plan.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 3.00
+  max_model_calls: 30
+  max_tool_calls: 80
+  max_retries: 1
+  approval_required_when: full graph or large frontend application is proposed
+Notes: |
+  A graph is secondary and only for saved canonical topics.
+
+### PRM-14: Project Context And Decision Support
+
+Owner: codex
+Phase: PRM
+Type: rag:query rag:generation
+Status: planned
+Depends-On: PRM-10, PRM-13
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: required
+Mutation-Required: conditional
+Property-Required: conditional
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Combine project descriptors with archive retrieval and curated knowledge to provide concrete evidence-backed project suggestions, distinguishing direct implication, weak watch, learning relevance, and no match.
+Acceptance-Criteria:
+  - id: AC-1; description: project application answer cites archive evidence and names the project descriptor fields used; test: project context fixture for Eval-Ground-Truth-Lab.
+  - id: AC-2; description: weak keyword-only matches are labeled weak_watch or no_match instead of action recommendations; test: project relevance classifier fixture.
+  - id: AC-3; description: no automatic MVP build approval or code mutation is exposed; test: tool allowlist rejects project mutation commands.
+Verification:
+  - python3 -m pytest tests/ -q
+Files:
+  - src/assistant/
+  - tests/
+  - docs/tool_eval.md
+Context-Refs:
+  - docs/personal_research_memory_product_contract.md
+  - docs/generation_eval.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 2.00
+  max_model_calls: 20
+  max_tool_calls: 80
+  max_retries: 1
+  approval_required_when: project context writes are requested
+Notes: |
+  Demand-to-MVP-Radar remains a related project input, not source of truth for the memory product.
+
+### PRM-15: Learning-State Correction And Migration
+
+Owner: codex
+Phase: PRM
+Type: data:migration
+Status: planned
+Depends-On: PRM-5, PRM-12
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: conditional
+Mutation-Required: conditional
+Property-Required: required
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Replace false read inference with indexed, surfaced, opened, read, understood, explained, tried, applied, measured, rejected, and stale states while preserving legacy records and avoiding fabricated historical user actions.
+Acceptance-Criteria:
+  - id: AC-1; description: migration preserves existing records and maps old source URL or atom presence to indexed or surfaced only; test: migration fixture covers legacy records.
+  - id: AC-2; description: opened, read, understood, tried, applied, and measured require explicit evidence receipts; test: learning state transition test rejects inferred upgrades.
+  - id: AC-3; description: assistant and reports label no feedback as unknown; test: learning display fixture covers unknown state.
+Verification:
+  - python3 -m pytest tests/ -q
+Files:
+  - src/
+  - tests/
+  - docs/ROLLBACK_AND_REINDEX_PLAN.md
+Context-Refs:
+  - docs/product_pivot_current_state_audit.md
+  - docs/personal_research_memory_product_contract.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0.50
+  max_model_calls: 5
+  max_tool_calls: n/a
+  max_retries: 1
+  approval_required_when: migration touches production database contents
+Notes: |
+  Do not fabricate historical read, understood, applied, or measured states.
+
+### PRM-16: Weekly Brief V3 And Legacy Surface Demotion
+
+Owner: codex
+Phase: PRM
+Type: rag:generation
+Status: planned
+Depends-On: PRM-13, PRM-15
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: required
+Mutation-Required: conditional
+Property-Required: conditional
+Visual-Contract: required
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Derive Weekly Brief V3 from Watch Topics, reacted posts, questions, saved notes, active projects, repeated signals, experiments, and feedback while localizing Radar failure and demoting V1 Brief and Atlas surfaces.
+Acceptance-Criteria:
+  - id: AC-1; description: Brief contains one main change, one ACT item, one STUDY item, one WATCH or IGNORE item, reaction summary, concrete project connection or honest zero, optional Radar card, and feedback request; test: Brief V3 fixture test.
+  - id: AC-2; description: generic fallback action phrasing is absent from generated Brief fixtures; test: text regression test rejects generic fallback actions.
+  - id: AC-3; description: Radar failure changes only Radar card state and does not invalidate archive search, assistant answers, Knowledge Library, or non-Radar Brief sections; test: Radar failure fixture.
+Verification:
+  - python3 -m pytest tests/ -q
+  - visual verification command documented when renderer files change
+Files:
+  - src/output/
+  - tests/
+  - docs/report_format.md
+Context-Refs:
+  - docs/personal_research_memory_product_contract.md
+  - docs/final_acceptance_plan.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 3.00
+  max_model_calls: 40
+  max_tool_calls: 80
+  max_retries: 1
+  approval_required_when: report generation would process broad archive text through LLM
+Notes: |
+  Weekly Brief is secondary projection, not knowledge source.
+
+### PRM-17: Runtime, Autonomous Workflows, Observability, Cost, And Rollback
+
+Owner: codex
+Phase: PRM
+Type: workflow:autonomous cost:telemetry
+Status: planned
+Depends-On: PRM-3, PRM-5, PRM-6, PRM-16
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: conditional
+Mutation-Required: conditional
+Property-Required: required
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Define scheduled ingestion, indexing, enrichment, and brief routines as idempotent workflows with freshness, queue, retrieval, generation, tool-call, cost, no-answer, backup, reindex, and rollback telemetry that excludes private raw text from logs.
+Acceptance-Criteria:
+  - id: AC-1; description: workflow contract lists trigger, inputs, outputs, idempotency key, retry policy, fallback, receipt, and rollback for each scheduled routine; verify: docs/AUTONOMOUS_WORKFLOW_CONTRACT.md updated.
+  - id: AC-2; description: telemetry records index freshness, queue age, retrieval latency, generation latency, model cost, no-answer rate, and error class without raw post text; test: telemetry privacy fixture.
+  - id: AC-3; description: rollback and reindex commands are documented with dry-run or fixture validation; verify: docs/ROLLBACK_AND_REINDEX_PLAN.md updated.
+Verification:
+  - python3 -m pytest tests/ -q
+Files:
+  - src/
+  - tests/
+  - docs/AUTONOMOUS_WORKFLOW_CONTRACT.md
+  - docs/COST_BUDGET.md
+  - docs/ROLLBACK_AND_REINDEX_PLAN.md
+Context-Refs:
+  - docs/AUTONOMOUS_WORKFLOW_CONTRACT.md
+  - docs/COST_BUDGET.md
+  - docs/PRIVACY_THREAT_MODEL.md
+Cost-Budget: |
+  scope: workflow
+  max_cost_usd: 10.00 per week until dogfood budget is approved
+  max_model_calls: 500 per week
+  max_tool_calls: n/a
+  max_retries: 1 per job
+  approval_required_when: weekly cost exceeds budget or queue fan-out expands
+Notes: |
+  Scheduled jobs must be idempotent and recoverable.
+
+### PRM-18: End-To-End Evaluation And Security Review
+
+Owner: codex
+Phase: PRM
+Type: eval:gate
+Status: planned
+Depends-On: PRM-10, PRM-11, PRM-12, PRM-16, PRM-17
+Risk-Level: critical
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: required
+Mutation-Required: required
+Property-Required: required
+Visual-Contract: required
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Run data, retrieval, generation, tool, agent, privacy, cost, UI, and end-to-end evaluations, produce a release receipt, and block dogfood while stop-ship criteria remain.
+Acceptance-Criteria:
+  - id: AC-1; description: all ten end-to-end acceptance scenarios have pass, fail, or blocked status with evidence links; verify: final acceptance receipt contains scenario table.
+  - id: AC-2; description: Test Critic and privacy review findings are resolved or explicitly accepted by the human; verify: review receipt references approvals.
+  - id: AC-3; description: dogfood gate blocks on private-data leakage, unsupported claims, retrieval metric failure, unsafe writes, or cost budget breach; verify: gate output shows blocking reasons.
+Verification:
+  - python3 -m pytest tests/ -q
+  - evaluation and security review commands documented in release receipt
+Files:
+  - evals/
+  - tests/
+  - docs/final_acceptance_plan.md
+  - docs/PRIVACY_THREAT_MODEL.md
+Context-Refs:
+  - docs/final_acceptance_plan.md
+  - docs/REVIEW_POLICY.md
+Cost-Budget: |
+  scope: phase
+  max_cost_usd: 20.00
+  max_model_calls: 300
+  max_tool_calls: 500
+  max_retries: 1
+  approval_required_when: LLM judge, browser verification, or external model fan-out expands
+Notes: |
+  Do not start dogfood while stop-ship criteria remain.
+
+### PRM-19: Four-Week Operator Dogfood
+
+Owner: human
+Phase: PRM
+Type: eval:gate
+Status: planned
+Depends-On: PRM-18
+Risk-Level: high
+Public-Tests-Required: not_required
+Critic-Required: conditional
+Holdout-Required: required
+Mutation-Required: conditional
+Property-Required: not_required
+Visual-Contract: optional
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Run the actual product for four weeks and record real questions, useful answers, corrections, saved notes, watch topics, decisions, recovered reactions, time to useful answer, weekly cost, value score, friction score, and continuation decision.
+Acceptance-Criteria:
+  - id: AC-1; description: at least 30 real operator questions are recorded with privacy-safe metadata and usefulness labels; verify: dogfood receipt count and label coverage.
+  - id: AC-2; description: saved notes, watch topics, project or life decisions, rejected answers, and corrections are counted separately; verify: dogfood summary table.
+  - id: AC-3; description: continuation decision is based on value, friction, latency, cost, and user desire to keep using it; verify: human dogfood decision record.
+Verification:
+  - dogfood receipt review by human operator
+Files:
+  - docs/dogfood_4_week_plan.md
+  - docs/EVIDENCE_INDEX.md
+Context-Refs:
+  - docs/final_acceptance_plan.md
+  - docs/PRIVACY_THREAT_MODEL.md
+Cost-Budget: |
+  scope: phase
+  max_cost_usd: 0 until human-approved dogfood budget is recorded
+  max_model_calls: 0 until human-approved dogfood budget is recorded
+  max_tool_calls: n/a
+  max_retries: 1 per failed workflow
+  approval_required_when: weekly budget or provider egress changes
+Notes: |
+  Do not predefine success as the system ran.
+
+### PRM-20: Post-Dogfood Simplification, Cleanup, And Archive
+
+Owner: codex
+Phase: PRM
+Type: repo:hygiene
+Status: planned
+Depends-On: PRM-19
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: conditional
+Mutation-Required: conditional
+Property-Required: conditional
+Visual-Contract: optional
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Use real dogfood evidence to remove unused reports, commands, modules, docs, and abstractions, split oversized modules only where maintenance evidence justifies it, archive historical IRX surfaces safely, and make one primary product path visible.
+Acceptance-Criteria:
+  - id: AC-1; description: each delete, archive, or move candidate cites current callers, dogfood evidence, migration risk, and verification command; verify: cleanup plan rows are updated before edits.
+  - id: AC-2; description: final README has one primary operator workflow, one architecture link, one task handoff, and clear legacy labels; verify: README review.
+  - id: AC-3; description: generated private outputs remain ignored and no private report artifacts are added; verify: git status and ignore review.
+Verification:
+  - python3 -m pytest tests/ -q
+  - python3 tools/playbook_validate.py --root . --check tasks --check references
+  - git diff --check
+Files:
+  - README.md
+  - docs/repo_hygiene_and_archive_plan.md
+  - docs/archive/
+Context-Refs:
+  - docs/repo_hygiene_and_archive_plan.md
+  - docs/final_acceptance_plan.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 1.00
+  max_model_calls: 10
+  max_tool_calls: n/a
+  max_retries: 1
+  approval_required_when: deletion or archive affects compatibility surface
+Notes: |
+  Cleanup follows usage evidence; it is not a precondition for PRM-4.

@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-workflow-playbook.local/schemas/rag_eval_comparison.schema.json",
+  "title": "RAG Eval Comparison",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "comparison_id",
+    "status",
+    "generated_at",
+    "manifest_ref",
+    "baseline_result_ref",
+    "candidate_result_ref",
+    "compatible",
+    "compatibility_errors",
+    "changed_factors",
+    "metric_deltas",
+    "per_slice_deltas",
+    "regression_findings",
+    "stop_ship_findings",
+    "markdown_report_ref"
+  ],
+  "additionalProperties": false,
+  "not": {
+    "anyOf": [
+      { "required": ["release_ready"] },
+      { "required": ["accepted"] },
+      { "required": ["human_approved"] }
+    ]
+  },
+  "properties": {
+    "schema_version": { "type": "string", "const": "playbook.rag_eval_comparison.v1" },
+    "comparison_id": { "type": "string", "minLength": 1 },
+    "status": { "type": "string", "enum": ["pass", "fail", "invalid", "diagnostic"] },
+    "generated_at": { "type": "string", "minLength": 1 },
+    "manifest_ref": { "$ref": "#/$defs/artifact_ref" },
+    "baseline_result_ref": { "$ref": "#/$defs/artifact_ref" },
+    "candidate_result_ref": { "$ref": "#/$defs/artifact_ref" },
+    "compatible": { "type": "boolean" },
+    "compatibility_errors": { "type": "array", "items": { "type": "string" } },
+    "changed_factors": { "type": "array", "items": { "type": "string" } },
+    "metric_deltas": { "type": "array", "items": { "$ref": "#/$defs/metric_delta" } },
+    "per_slice_deltas": { "type": "array", "items": { "$ref": "#/$defs/slice_delta" } },
+    "regression_findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } },
+    "stop_ship_findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } },
+    "markdown_report_ref": { "$ref": "#/$defs/artifact_ref" }
+  },
+  "$defs": {
+    "safe_path": { "type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$))(?!.*\\\\).+" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "artifact_ref": { "type": "object", "required": ["path", "sha256"], "additionalProperties": false, "properties": { "path": { "$ref": "#/$defs/safe_path" }, "sha256": { "$ref": "#/$defs/sha256" }, "kind": { "type": "string" }, "id": { "type": "string" } } },
+    "metric_delta": { "type": "object", "required": ["metric_id", "direction", "baseline", "candidate", "absolute_delta", "relative_delta", "severity"], "additionalProperties": false, "properties": { "metric_id": { "type": "string" }, "direction": { "type": "string", "enum": ["higher_is_better", "lower_is_better"] }, "baseline": { "type": ["number", "null"] }, "candidate": { "type": ["number", "null"] }, "absolute_delta": { "type": ["number", "null"] }, "relative_delta": { "type": ["number", "null"] }, "severity": { "type": "string", "enum": ["none", "P1", "P0", "invalid"] }, "message": { "type": "string" } } },
+    "slice_delta": { "type": "object", "required": ["slice", "metric_id", "baseline", "candidate", "absolute_delta", "relative_delta", "severity"], "additionalProperties": false, "properties": { "slice": { "type": "string" }, "metric_id": { "type": "string" }, "baseline": { "type": ["number", "null"] }, "candidate": { "type": ["number", "null"] }, "absolute_delta": { "type": ["number", "null"] }, "relative_delta": { "type": ["number", "null"] }, "severity": { "type": "string", "enum": ["none", "P1", "P0", "invalid"] }, "message": { "type": "string" } } },
+    "finding": { "type": "object", "required": ["rule_id", "severity", "message"], "additionalProperties": false, "properties": { "rule_id": { "type": "string" }, "severity": { "type": "string", "enum": ["P0", "P1", "invalid"] }, "message": { "type": "string" }, "metric_id": { "type": ["string", "null"] }, "slice": { "type": ["string", "null"] } } }
+  }
+}

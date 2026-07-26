@@ -1,0 +1,64 @@
+{
+  "schema_version": "playbook.delivery_execution_model.v1",
+  "delivery_profile": "split_orchestrated",
+  "orchestrator": {
+    "kind": "main_codex_session_under_human_direction",
+    "authority": "select_one_task_and_coordinate_evidence",
+    "bootstrap_model": "codex_direct"
+  },
+  "implementer": {
+    "kind": "active_codex_session",
+    "may_write_code": true,
+    "scope": "one_approved_task_at_a_time"
+  },
+  "reviewer": {
+    "kind": "human_or_read_only_subagent_by_policy",
+    "required_when": [
+      "medium_or_higher_risk",
+      "RAG_retrieval_or_generation_semantics",
+      "tool_catalog_or_confirmation_boundary",
+      "privacy_or_data_egress_boundary",
+      "cost_or_runtime_boundary",
+      "product_release_claim"
+    ],
+    "may_commit": false
+  },
+  "verifier": {
+    "kind": "deterministic_project_verifier",
+    "binding_id": "project_verifier",
+    "argv": [
+      "{python}",
+      "tools/verify_project.py",
+      "--root",
+      "."
+    ],
+    "command": "python3 tools/verify_project.py --root ."
+  },
+  "completion_authority": {
+    "kind": "human",
+    "requires": [
+      "project_verification_passed_or_exception_recorded",
+      "risk_review_satisfied",
+      "task_acceptance_evidence_present"
+    ]
+  },
+  "cli_bindings": {
+    "codex_direct": "active_session_runs_repository_commands_directly",
+    "external_codex_exec": "optional_read_only_or_scoped_review_after_bootstrap_only",
+    "child_agent_commit_push": "forbidden"
+  },
+  "permission_profile": "single_operator_local_repo_no_child_completion_authority",
+  "budget": {
+    "model_call_budget": "docs/COST_BUDGET.md",
+    "spend_budget": "docs/COST_BUDGET.md",
+    "correction_budget": "per_task_default_2"
+  },
+  "independent_review_triggers": [
+    "RAG baseline or hybrid retrieval change",
+    "assistant tool-use or write-confirmation change",
+    "privacy threat model or data-egress change",
+    "scheduled workflow or rollback change",
+    "weekly report release claim",
+    "external skill trust decision"
+  ]
+}

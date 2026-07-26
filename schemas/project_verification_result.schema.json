@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-workflow-playbook.local/schemas/project_verification_result.schema.json",
+  "title": "ProjectVerificationResult",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "project_commit",
+    "started_at",
+    "finished_at",
+    "platform",
+    "python_executable",
+    "checks",
+    "configuration_errors",
+    "required_failures"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "playbook.project_verification_result.v1"
+    },
+    "project_commit": { "type": "string", "minLength": 1 },
+    "started_at": { "type": "string", "minLength": 1 },
+    "finished_at": { "type": "string", "minLength": 1 },
+    "platform": { "type": "string", "minLength": 1 },
+    "python_executable": { "type": "string", "minLength": 1 },
+    "configuration_errors": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "required_failures": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "checks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/check_result" }
+    }
+  },
+  "$defs": {
+    "artifact_ref": {
+      "type": "object",
+      "required": ["path", "sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "check_result": {
+      "type": "object",
+      "required": [
+        "id",
+        "argv",
+        "cwd",
+        "required",
+        "expected_exit_code",
+        "exit_code",
+        "passed",
+        "skipped",
+        "stdout_ref",
+        "stderr_ref"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "argv": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "cwd": { "type": "string", "minLength": 1 },
+        "required": { "type": "boolean" },
+        "expected_exit_code": { "type": "integer" },
+        "exit_code": {
+          "type": ["integer", "null"]
+        },
+        "passed": { "type": "boolean" },
+        "skipped": { "type": "boolean" },
+        "timed_out": { "type": "boolean" },
+        "stdout_ref": { "$ref": "#/$defs/artifact_ref" },
+        "stderr_ref": { "$ref": "#/$defs/artifact_ref" }
+      }
+    }
+  }
+}

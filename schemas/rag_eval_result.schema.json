@@ -1,0 +1,220 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-workflow-playbook.local/schemas/rag_eval_result.schema.json",
+  "title": "RAG Eval Result",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "result_id",
+    "status",
+    "generated_at",
+    "project_commit",
+    "dirty_state",
+    "config_fingerprint",
+    "manifest_ref",
+    "cases_ref",
+    "observations_ref",
+    "dataset_identity",
+    "corpus_identity",
+    "condition_id",
+    "scorer_identity",
+    "judge_identity",
+    "metrics",
+    "by_slice",
+    "sample_counts",
+    "per_trial_metrics",
+    "invalid_cases",
+    "failure_taxonomy",
+    "stop_ship_findings",
+    "latency_cost_rollups",
+    "external_scorer_outputs"
+  ],
+  "additionalProperties": false,
+  "not": {
+    "anyOf": [
+      { "required": ["release_ready"] },
+      { "required": ["accepted"] },
+      { "required": ["human_approved"] }
+    ]
+  },
+  "properties": {
+    "schema_version": { "type": "string", "const": "playbook.rag_eval_result.v1" },
+    "result_id": { "type": "string", "minLength": 1 },
+    "status": { "type": "string", "enum": ["pass", "fail", "invalid", "diagnostic"] },
+    "generated_at": { "type": "string", "minLength": 1 },
+    "project_commit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "dirty_state": { "type": "object", "required": ["policy", "entries"], "additionalProperties": false, "properties": { "policy": { "type": "string" }, "entries": { "type": "array", "items": { "type": "string" } } } },
+    "config_fingerprint": { "$ref": "#/$defs/sha256" },
+    "manifest_ref": { "$ref": "#/$defs/artifact_ref" },
+    "cases_ref": { "$ref": "#/$defs/artifact_ref" },
+    "observations_ref": { "$ref": "#/$defs/artifact_ref" },
+    "dataset_identity": { "type": "object", "required": ["dataset_id", "dataset_version", "dataset_sha256", "dataset_source"], "additionalProperties": false, "properties": { "dataset_id": { "type": "string" }, "dataset_version": { "type": "string" }, "dataset_sha256": { "$ref": "#/$defs/sha256" }, "dataset_source": { "type": "string" } } },
+    "corpus_identity": { "type": "object", "required": ["corpus_id", "corpus_version", "corpus_sha256"], "additionalProperties": false, "properties": { "corpus_id": { "type": "string" }, "corpus_version": { "type": "string" }, "corpus_sha256": { "$ref": "#/$defs/sha256" } } },
+    "condition_id": { "type": "string", "minLength": 1 },
+    "condition_identity": { "$ref": "#/$defs/condition" },
+    "scorer_identity": { "type": "object", "required": ["tool", "version"], "additionalProperties": false, "properties": { "tool": { "type": "string" }, "version": { "type": "string" } } },
+    "judge_identity": { "type": "object", "required": ["judge_status"], "additionalProperties": false, "properties": { "judge_status": { "type": "string" }, "judge_model": { "type": ["string", "null"] }, "calibration_ref": { "oneOf": [{ "$ref": "#/$defs/artifact_ref" }, { "type": "null" }] } } },
+    "metrics": { "type": "object", "additionalProperties": { "type": ["number", "string", "object", "array", "null"] } },
+    "by_slice": { "type": "object", "additionalProperties": { "type": "object", "additionalProperties": { "type": ["number", "string", "object", "array", "null"] } } },
+    "sample_counts": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } },
+    "per_trial_metrics": { "type": "array", "items": { "$ref": "#/$defs/per_trial_metric" } },
+    "invalid_cases": { "type": "array", "items": { "type": "object", "required": ["case_id", "reason"], "additionalProperties": false, "properties": { "case_id": { "type": "string" }, "reason": { "type": "string" } } } },
+    "failure_taxonomy": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } },
+    "stop_ship_findings": { "type": "array", "items": { "type": "object", "required": ["rule_id", "severity", "message"], "additionalProperties": false, "properties": { "rule_id": { "type": "string" }, "severity": { "type": "string", "enum": ["P0", "P1"] }, "message": { "type": "string" }, "case_id": { "type": ["string", "null"] } } } },
+    "latency_cost_rollups": { "type": "object", "additionalProperties": { "type": ["number", "string", "object", "array", "null"] } },
+    "external_scorer_outputs": { "type": "array", "items": { "$ref": "#/$defs/external_scorer_output" } }
+  },
+  "$defs": {
+    "safe_path": { "type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$))(?!.*\\\\).+" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "artifact_ref": { "type": "object", "required": ["path", "sha256"], "additionalProperties": false, "properties": { "path": { "$ref": "#/$defs/safe_path" }, "sha256": { "$ref": "#/$defs/sha256" }, "kind": { "type": "string" }, "id": { "type": "string" } } },
+    "per_trial_metric": {
+      "type": "object",
+      "required": ["case_id", "trial_id", "answer_correct", "failure_stage"],
+      "additionalProperties": false,
+      "properties": {
+        "case_id": { "type": "string" },
+        "trial_id": { "type": ["string", "null"] },
+        "answer_correct": { "type": ["boolean", "null"] },
+        "failure_stage": {
+          "type": ["string", "null"],
+          "enum": [
+            "corpus_ingestion",
+            "query_formulation",
+            "routing",
+            "retrieval_miss",
+            "returned_not_opened",
+            "opened_not_used",
+            "premature_stop",
+            "context_overflow_truncation",
+            "generation_failure",
+            "citation_failure",
+            "acl_leak",
+            "stale_evidence",
+            "invalid_observation",
+            null
+          ]
+        }
+      }
+    },
+    "condition": {
+      "type": "object",
+      "required": [
+        "condition_id",
+        "rag_shape",
+        "retrieval_strategy",
+        "retriever_version",
+        "chunking_version",
+        "embedding",
+        "index",
+        "reranker",
+        "top_k",
+        "candidate_k",
+        "filter_policy_version",
+        "router_taxonomy_version",
+        "router_version",
+        "graph_builder_version",
+        "entity_dedup_version",
+        "context_assembly_version",
+        "generator_model",
+        "generator_prompt_version",
+        "citation_contract_version",
+        "abstention_policy_version",
+        "harness",
+        "compatibility_fingerprint"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "condition_id": { "type": "string", "minLength": 1 },
+        "rag_shape": { "type": "string", "enum": ["fixed_pipeline", "agentic_search", "routed", "graph", "hybrid"] },
+        "retrieval_strategy": { "type": "string", "enum": ["lexical", "dense", "hybrid", "routed", "graph"] },
+        "retriever_version": { "type": "string", "minLength": 1 },
+        "chunking_version": { "type": "string", "minLength": 1 },
+        "embedding": { "$ref": "#/$defs/component_identity" },
+        "index": { "$ref": "#/$defs/component_identity" },
+        "reranker": { "$ref": "#/$defs/component_identity" },
+        "top_k": { "type": "integer", "minimum": 1 },
+        "candidate_k": { "type": "integer", "minimum": 1 },
+        "filter_policy_version": { "type": "string", "minLength": 1 },
+        "router_taxonomy_version": { "type": "string", "minLength": 1 },
+        "router_version": { "type": "string", "minLength": 1 },
+        "graph_builder_version": { "type": "string", "minLength": 1 },
+        "entity_dedup_version": { "type": "string", "minLength": 1 },
+        "context_assembly_version": { "type": "string", "minLength": 1 },
+        "generator_model": { "type": "string", "minLength": 1 },
+        "generator_prompt_version": { "type": "string", "minLength": 1 },
+        "citation_contract_version": { "type": "string", "minLength": 1 },
+        "abstention_policy_version": { "type": "string", "minLength": 1 },
+        "harness": {
+          "type": "object",
+          "required": [
+            "harness_type",
+            "harness_version",
+            "tool_registry_version",
+            "delivery_profile",
+            "context_policy_version",
+            "memory_policy_version",
+            "permission_policy_version",
+            "retry_policy",
+            "termination_policy",
+            "max_iterations",
+            "timeout_seconds"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "harness_type": { "type": "string", "enum": ["fixed_pipeline", "custom_agent", "provider_native_cli", "workflow_runner"] },
+            "harness_version": { "type": "string", "minLength": 1 },
+            "tool_registry_version": { "type": "string", "minLength": 1 },
+            "delivery_profile": { "type": "string", "enum": ["inline", "file", "progressive_disclosure"] },
+            "context_policy_version": { "type": "string", "minLength": 1 },
+            "memory_policy_version": { "type": "string", "minLength": 1 },
+            "permission_policy_version": { "type": "string", "minLength": 1 },
+            "retry_policy": { "type": "string", "minLength": 1 },
+            "termination_policy": { "type": "string", "minLength": 1 },
+            "max_iterations": { "type": "integer", "minimum": 1 },
+            "timeout_seconds": { "type": "number", "exclusiveMinimum": 0 }
+          }
+        },
+        "compatibility_fingerprint": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "component_identity": {
+      "type": "object",
+      "required": ["provider", "name", "version"],
+      "additionalProperties": false,
+      "properties": {
+        "provider": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 }
+      }
+    },
+    "external_scorer_output": {
+      "type": "object",
+      "required": [
+        "tool",
+        "version",
+        "model",
+        "prompt_version",
+        "rubric_version",
+        "dataset_id",
+        "timestamp",
+        "cost_usd",
+        "artifact_ref",
+        "status"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "tool": { "type": "string" },
+        "version": { "type": "string" },
+        "model": { "type": ["string", "null"] },
+        "prompt_version": { "type": ["string", "null"] },
+        "rubric_version": { "type": ["string", "null"] },
+        "dataset_id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "cost_usd": { "type": ["number", "null"], "minimum": 0 },
+        "artifact_ref": { "$ref": "#/$defs/artifact_ref" },
+        "status": { "type": "string", "enum": ["advisory", "calibrated", "invalid"] }
+      }
+    }
+  }
+}

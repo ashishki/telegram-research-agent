@@ -1,0 +1,15 @@
+{
+  "schema_version": "playbook.readiness_state.v1",
+  "mode": "standard",
+  "state": "bootstrap_ready",
+  "required_decision_policy": "mode_profile_risk_triggered",
+  "unresolved_decision_marker": "requires explicit human approval",
+  "implementation_ready_requires_no_scaffold_placeholders": true,
+  "release_ready_requires_current_verification": true,
+  "notes": [
+    "This retrofit is documentation and planning only.",
+    "The product pivot ADR is proposed, not accepted.",
+    "Implementation work is blocked until the human approves the brief, ADR, first proof metric, and gold-query process.",
+    "No full-archive assistant search or RAG release claim is verified yet."
+  ]
+}

@@ -121,13 +121,12 @@ change project status, replace ADRs/evals/findings, or drive runtime behavior.
 
 | Gap | Impact | Migration step |
 |-----|--------|----------------|
-| No playbook-style `docs/DECISION_LOG.md` | Decisions live across docs and archive | Add decision log only for future architecture/runtime changes |
-| No playbook-style `docs/EVIDENCE_INDEX.md` | Proof lookup depends on tests and memory docs | Add evidence index if recurring findings or eval baselines expand |
-| No ADR directory | Decision lineage is harder to traverse | Create ADRs only for new major memory/runtime changes |
+| Legacy cognition docs predate the Playbook retrofit | Some historical entries still describe the report-centered product | Treat docs/ARCHITECTURE.md, docs/IMPLEMENTATION_CONTRACT.md, and docs/tasks.md as current authority |
+| Optional cognition index is not generated in this planning session | Cold-start packets may require regeneration later | Generate only from approved repository facts and exclude raw Telegram exports |
 
 ## Generated Artifacts
 
 | Artifact | Path | Policy |
 |----------|------|--------|
-| Cognition index | `generated/cognition/index.json` | Optional generated artifact; exclude raw Telegram exports |
-| Context packets | `docs/context-packets/` | Commit only major review/regression packets |
+| Cognition index | generated/cognition/index.json | Optional generated artifact; exclude raw Telegram exports |
+| Context packets | docs/context-packets/ | Commit only major review/regression packets |

@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-workflow-playbook.local/schemas/release_readiness_result.schema.json",
+  "title": "ReleaseReadinessResult",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "root",
+    "checked_at",
+    "status",
+    "findings",
+    "summary"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "playbook.release_readiness_result.v1"
+    },
+    "root": { "type": "string", "minLength": 1 },
+    "checked_at": { "type": "string", "minLength": 1 },
+    "status": {
+      "type": "string",
+      "enum": ["release_ready", "blocked"]
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["severity", "path", "line", "check_id", "message"],
+        "additionalProperties": false,
+        "properties": {
+          "severity": { "type": "string", "enum": ["error", "warning"] },
+          "path": { "type": "string", "minLength": 1 },
+          "line": { "type": "integer", "minimum": 1 },
+          "check_id": { "type": "string", "minLength": 1 },
+          "message": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["errors", "warnings"],
+      "additionalProperties": false,
+      "properties": {
+        "errors": { "type": "integer", "minimum": 0 },
+        "warnings": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

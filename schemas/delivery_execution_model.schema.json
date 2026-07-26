@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-workflow-playbook.local/schemas/delivery_execution_model.schema.json",
+  "title": "DeliveryExecutionModel",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "delivery_profile",
+    "orchestrator",
+    "implementer",
+    "reviewer",
+    "verifier",
+    "completion_authority",
+    "cli_bindings",
+    "permission_profile",
+    "budget",
+    "independent_review_triggers"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "type": "string", "const": "playbook.delivery_execution_model.v1" },
+    "delivery_profile": {
+      "type": "string",
+      "enum": ["solo_verified", "split_orchestrated", "independent_review", "multi_candidate"]
+    },
+    "orchestrator": { "$ref": "#/$defs/role" },
+    "implementer": { "$ref": "#/$defs/role" },
+    "reviewer": { "$ref": "#/$defs/role" },
+    "verifier": { "$ref": "#/$defs/role" },
+    "completion_authority": { "$ref": "#/$defs/role" },
+    "cli_bindings": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "permission_profile": { "type": "string", "minLength": 1 },
+    "budget": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "independent_review_triggers": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "$defs": {
+    "role": {
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": {
+        "oneOf": [
+          { "type": "string" },
+          { "type": "boolean" },
+          { "type": "array", "items": { "type": "string" } }
+        ]
+      },
+      "properties": {
+        "kind": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

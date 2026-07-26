@@ -1,0 +1,71 @@
+{
+  "checks": [
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "tools/playbook_validate.py",
+        "--root",
+        ".",
+        "--check",
+        "tasks",
+        "--check",
+        "placeholders",
+        "--check",
+        "readiness",
+        "--check",
+        "delivery",
+        "--check",
+        "references"
+      ],
+      "cwd": ".",
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "id": "playbook_contract",
+      "passed": true,
+      "required": true,
+      "skipped": false,
+      "stderr_ref": {
+        "path": ".playbook-artifacts/project_verification/playbook_contract/stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_ref": {
+        "path": ".playbook-artifacts/project_verification/playbook_contract/stdout.txt",
+        "sha256": "be704b4420bcd2142c123f46eb22c4df5fc0fd99941bbd01ffd824862cac3e95"
+      },
+      "timed_out": false
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "-m",
+        "pytest",
+        "tests/",
+        "-q"
+      ],
+      "cwd": ".",
+      "exit_code": 1,
+      "expected_exit_code": 0,
+      "id": "project_tests",
+      "passed": false,
+      "required": true,
+      "skipped": false,
+      "stderr_ref": {
+        "path": ".playbook-artifacts/project_verification/project_tests/stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_ref": {
+        "path": ".playbook-artifacts/project_verification/project_tests/stdout.txt",
+        "sha256": "4cfb4772befa7c6eec5ec256904a736dcd9f858479e94da925cf69f54b35f17e"
+      },
+      "timed_out": false
+    }
+  ],
+  "configuration_errors": [],
+  "finished_at": "2026-07-26T11:58:01Z",
+  "platform": "Linux-5.15.0-170-generic-x86_64-with-glibc2.35",
+  "project_commit": "ad8689fa25b89f77122c4cec7c7a6b9da3f500cf",
+  "python_executable": "/usr/bin/python3",
+  "required_failures": 1,
+  "schema_version": "playbook.project_verification_result.v1",
+  "started_at": "2026-07-26T11:53:48Z"
+}

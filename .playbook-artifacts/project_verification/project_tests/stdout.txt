@@ -1,0 +1,42 @@
+..................................................................... [  7%]
+..................................................................... [ 14%]
+......................................... [ 18%]
+........................................................................ [ 26%]
+........................................................................ [ 33%]
+.................................................................... [ 40%]
+.............................................................................................................. [ 51%]
+.......................................................F...................................................... [ 63%]
+..................................................... [ 68%]
+.................................................................................................. [ 79%]
+........................................................................ [ 86%]
+................................................................. [ 93%]
+.................................................................                                                    [100%]
+=================================== FAILURES ===================================
+___ TestProductOps.test_ops_validation_passes_when_live_evidence_rows_exist ____
+
+self = <tests.test_product_ops.TestProductOps testMethod=test_ops_validation_passes_when_live_evidence_rows_exist>
+
+    def test_ops_validation_passes_when_live_evidence_rows_exist(self):
+        db_path = self._make_db()
+        try:
+            with sqlite3.connect(db_path) as connection:
+                connection.row_factory = sqlite3.Row
+                self._seed_ops_rows(connection)
+                results = validate_ops(connection, kind="all", days=14)
+        finally:
+            os.unlink(db_path)
+
+>       self.assertEqual([result["status"] for result in results], ["passed", "passed"])
+E       AssertionError: Lists differ: ['needs_live_event', 'needs_live_event'] != ['passed', 'passed']
+E
+E       First differing element 0:
+E       'needs_live_event'
+E       'passed'
+E
+E       - ['needs_live_event', 'needs_live_event']
+E       + ['passed', 'passed']
+
+tests/test_product_ops.py:186: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_product_ops.py::TestProductOps::test_ops_validation_passes_when_live_evidence_rows_exist
+1 failed, 963 passed, 281 subtests passed in 251.26s (0:04:11)

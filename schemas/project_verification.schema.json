@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-workflow-playbook.local/schemas/project_verification.schema.json",
+  "title": "ProjectVerification",
+  "type": "object",
+  "required": ["schema_version", "checks"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "playbook.project_verification.v1"
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/check" }
+    }
+  },
+  "$defs": {
+    "check": {
+      "type": "object",
+      "required": ["id", "argv"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+$"
+        },
+        "argv": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "cwd": {
+          "type": "string",
+          "minLength": 1,
+          "default": "."
+        },
+        "required": {
+          "type": "boolean",
+          "default": true
+        },
+        "expected_exit_code": {
+          "type": "integer",
+          "default": 0
+        },
+        "timeout_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "default": {}
+        },
+        "platforms": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "allow_shell": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  }
+}

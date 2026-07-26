@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-workflow-playbook.local/schemas/readiness_state.schema.json",
+  "title": "ReadinessState",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "mode",
+    "state",
+    "required_decision_policy",
+    "unresolved_decision_marker",
+    "implementation_ready_requires_no_scaffold_placeholders",
+    "release_ready_requires_current_verification"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "type": "string", "const": "playbook.readiness_state.v1" },
+    "mode": { "type": "string", "enum": ["lean-core", "standard", "strict"] },
+    "state": {
+      "type": "string",
+      "enum": ["scaffold", "bootstrap_ready", "implementation_ready", "release_candidate", "release_ready"]
+    },
+    "required_decision_policy": {
+      "type": "string",
+      "const": "mode_profile_risk_triggered"
+    },
+    "unresolved_decision_marker": { "type": "string", "minLength": 1 },
+    "implementation_ready_requires_no_scaffold_placeholders": { "type": "boolean" },
+    "release_ready_requires_current_verification": { "type": "boolean" },
+    "notes": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

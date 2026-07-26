@@ -1,5 +1,13 @@
 # Architecture
 
+Status: legacy report-era architecture reference.
+
+Canonical architecture after the 2026-07-26 product pivot is
+`docs/ARCHITECTURE.md`. This lowercase file is preserved for historical
+context and compatibility references until PBR-7 completes the documented
+migration. Do not treat this file as the active product architecture when it
+conflicts with `docs/ARCHITECTURE.md`.
+
 **Version:** 6.3
 **Date:** 2026-07-15
 **Status:** Supporting architecture reference. Canonical roadmap:

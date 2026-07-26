@@ -1,81 +1,151 @@
 # Implementation Contract
-_v3.0 · telegram-research-agent · change only with explicit architecture approval_
 
----
+Status: immutable after ADR approval; changes require a new ADR under
+`docs/adr/`.
+
+Version: 4.0-proposed
+
+Effective date: proposed 2026-07-26
+
+## Product Authority
+
+The proposed product center is Personal Telegram Research Memory + Grounded
+Assistant. Weekly reports are derived secondary projections. The report-centered
+v3 contract is superseded only after
+`docs/adr/ADR-001-product-pivot-to-personal-research-memory.md` is accepted by
+the human operator.
+
+Until acceptance, implementation tasks that change product direction require
+explicit human approval.
 
 ## Universal Rules
 
 ### SQL Safety
 
-- All SQLite queries parameterized.
-- Never interpolate values into SQL.
+- All SQLite queries are parameterized.
+- Never interpolate values into SQL strings.
+- Dynamic table or column names require an allowlist.
 
 ### Secrets And Credentials
 
-- No credentials in source control.
-- All secrets via environment variables.
-- Telegram session files never committed.
+- No credentials in source control, comments, fixtures, logs, or generated
+  public artifacts.
+- Telegram session files stay outside the repo.
+- Provider keys come from environment variables or documented secret paths.
 
-### LLM Calls
+### Private Telegram Data
 
-- All LLM calls go through `src/llm/client.py`.
-- LLMs may consume scoped context, not arbitrary corpus dumps.
-- New memory work must reduce prompt ambiguity, not hide logic inside prompts.
+- The Telegram corpus is private operator data.
+- No raw corpus dump may be sent to an LLM.
+- Retrieval context sent to a model must be bounded, source-cited, and
+  task-relevant.
+- Ordinary logs must not contain raw post text or chat transcript text.
+- Generated public fixtures must be sanitized and contain no private Telegram
+  content.
 
-### Memory Architecture Rules
+### Canonical Storage
 
-- Structured operational state remains canonical.
-- Summaries and snapshots are derived, bounded, and refreshable.
-- Verbatim evidence storage is selective and provenance-preserving.
-- Retrieval must narrow by project/topic/time/source before broad search.
-- Decision history must be explicit and inspectable.
-- No decorative memory abstractions such as wings, halls, rooms, diaries, or compression dialects.
-- No second generic memory engine unless the scoped SQLite design is proven insufficient.
+- Local SQLite `raw_posts` and `posts` remain the canonical archive where
+  possible.
+- Do not duplicate full post text into a second store unless an ADR records the
+  measured need, rollback path, and privacy boundary.
+- `posts_fts` or its successor is an index, not a second source of truth.
+- Knowledge Atoms, topics, notes, watch topics, decisions, and experiments are
+  curated/derived layers.
 
-### Product Contract
+### RAG And Retrieval
 
-- Output remains a weekly decision-support artifact.
-- Signal intelligence and decision support remain the product center.
-- Memory exists to improve continuity and evidence quality, not to become a separate product.
+- Basic archive search must not require a Knowledge Atom, topic, report, Atlas,
+  or curated retrieval item.
+- Full-archive FTS baseline comes before embeddings.
+- Do not install or select Qdrant, FAISS, sqlite-vec, Chroma, or a provider
+  vector store without PRM-7 evaluation and ADR approval.
+- External embedding APIs require explicit data-egress approval.
+- Assistant answers must support `insufficient_evidence` instead of filling
+  gaps from model background.
 
-### Bot Access
+### Assistant Tooling
 
-- Telegram bot responds only to the owner chat id.
+- The assistant has one user-facing entrypoint.
+- Read-only search and context tools may run without confirmation.
+- Writes are proposal-and-confirmation gated.
+- No assistant tool may edit code, profile, project config, provider config, or
+  permanent preferences automatically.
+- Child agents or subagents never commit, push, self-review, or grant
+  completion authority.
 
-### Error Handling
+### Reaction Semantics
 
-- Delivery and LLM failures degrade gracefully.
-- Missing memory context must fail safe and visibly, never silently invent facts.
+- Any visible personal reaction means positive implicit interest.
+- Emoji type is audit metadata only.
+- No reaction means unknown, never negative.
+- A reacted post must remain searchable even when enrichment fails.
+- A reaction may propose a preference only after repeated evidence and human
+  approval.
 
----
+### Learning State
 
-## Scope Discipline
+Do not infer user learning from source existence.
 
-- Do not skip from planning straight into broad implementation.
-- Do not combine schema design, retrieval redesign, and prompt rewrites in one patch set.
-- Every new memory or feedback layer must declare:
-  - source of truth
-  - refresh rule
-  - retrieval path
-  - debug surface
-- Every backlog item must have explicit success criteria and validation steps.
+Allowed states are:
 
----
+- indexed
+- surfaced
+- opened
+- read
+- understood
+- explained
+- tried
+- applied
+- measured
+- rejected
+- stale
+
+The additive migration must preserve legacy rows and must not fabricate higher
+states.
+
+### Cost
+
+- AI calls must use documented workload classes and budgets in
+  `docs/COST_BUDGET.md`.
+- Full archive LLM backfill is forbidden without a new human-approved ADR.
+- Enrichment batches must be bounded, cheap-model first, and retry-limited.
+
+### External Skills
+
+- External skills and community runtimes are untrusted until reviewed.
+- Skills may not inspect broad filesystem areas, secrets, or private Telegram
+  data without a trust record and explicit human approval.
+- During this planning retrofit all listed external skills are
+  project-disabled or pending trust tasks; none is approved.
+
+## Playbook Execution
+
+- Adoption mode: Standard.
+- Runtime tier: T1.
+- Bootstrap model: Codex Direct.
+- Ongoing delivery model: split_orchestrated.
+- Human remains final completion authority.
+- Optional `codex exec` subagents may be used only after bootstrap for isolated
+  read-only review, Test Critic, privacy review, scoped fixes, and doc sync.
 
 ## Mandatory Pre-Task Protocol
 
 1. Read `docs/tasks.md`.
-2. Read `docs/memory_architecture.md` if the task touches memory, retrieval, prompts, or weekly outputs.
-3. Verify which state is canonical versus derived before editing code.
-4. Add tests or fixtures for new retrieval, feedback, continuity, or delivery behavior.
-5. Do not add broad abstractions without a concrete caller.
-
----
+2. Read `docs/CODEX_PROMPT.md`.
+3. Read the context docs listed in the task block.
+4. Verify canonical versus derived data boundaries before editing code.
+5. Run the task-specific verification and record evidence.
+6. Do not claim product value, RAG availability, or dogfood success without the
+   relevant eval and human evidence.
 
 ## Governing Documents
 
 - `README.md`
-- `docs/architecture.md`
-- `docs/memory_architecture.md`
+- `docs/PROJECT_BRIEF.md`
+- `docs/ARCHITECTURE.md`
+- `docs/IMPLEMENTATION_CONTRACT.md`
+- `docs/personal_research_memory_product_contract.md`
 - `docs/tasks.md`
 - `docs/CODEX_PROMPT.md`
+- `.playbook/delivery_execution_model.json`

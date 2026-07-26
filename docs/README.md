@@ -1,82 +1,65 @@
-# Documentation Map
+# Documentation Index
 
-Version: 2.3
-Last updated: 2026-07-15
-State: documentation index
+Status: active
+Last updated: 2026-07-26
 
-This directory keeps current operator and implementation guidance at the top
-level. Historical reports, old roadmap snapshots, portfolio writeups, and
-baseline examples live under `docs/archive/`.
+## Current Product Direction
 
-## Canonical Docs
+- docs/PROJECT_BRIEF.md
+- docs/ARCHITECTURE.md
+- docs/IMPLEMENTATION_CONTRACT.md
+- docs/adr/ADR-001-product-pivot-to-personal-research-memory.md
+- docs/personal_research_memory_product_contract.md
+- docs/personal_research_memory_architecture.md
+- docs/personal_research_memory_roadmap.md
+- docs/final_acceptance_plan.md
 
-| File | Role |
-|---|---|
-| `intelligence_report_v2_audit.md` | W29 reader-value, period, reaction, Radar, thread, visualization, and quality-gate audit |
-| `intelligence_report_v2_roadmap.md` | Closed IRX-0..IRX-14 Report V2 implementation record, dependency graph, and rollout gate |
-| `intelligence_report_v2_contract.md` | Reader-facing Brief V2, Atlas V2, and Knowledge Audit Explorer product contract |
-| `weekly_run_manifest.md` | Completed-period and same-run artifact identity/state contract |
-| `reaction_personalization_contract.md` | Weak reaction personalization, mapping, receipt, and approval rules |
-| `static_visualization_system.md` | Deterministic offline visual component contracts for Brief and Atlas |
-| `portfolio_grade_intelligence_roadmap.md` | Broader product, architecture, evaluation, and portfolio-readiness roadmap; rollout gate controls dogfood start |
-| `tasks.md` | Compact current backlog: IRX closed through IRX-14, operational dogfood gate next, plus historical PGI records |
-| `intelligence_evaluation_framework.md` | Evaluation layers, annotation protocol, and weekly scorecard |
-| `portfolio_evidence_plan.md` | Portfolio readiness gate and evidence artifacts |
-| `mvp_radar_integration_contract.md` | Cross-repo contract with Demand-to-MVP Radar |
-| `operator_ai_systems_learning_roadmap.md` | 4-6 month AI Systems learning roadmap tied to PGI implementation tasks |
+## Playbook Governance
 
-## Supporting Architecture And Operations
+- docs/playbook_retrofit_audit.md
+- docs/tasks.md
+- docs/CODEX_PROMPT.md
+- docs/DECISION_LOG.md
+- docs/IMPLEMENTATION_JOURNAL.md
+- docs/EVIDENCE_INDEX.md
+- docs/REVIEW_POLICY.md
+- .playbook/project_verification.json
+- .playbook/delivery_execution_model.json
 
-| File | Role |
-|---|---|
-| `architecture.md` | Current system architecture and memory surfaces |
-| `spec.md` | Implementation-facing system specification and maintenance lanes |
-| `operator_workflow.md` | Weekly operator workflow for Brief, Atlas, Hermes, feedback, and Radar |
-| `mvp_weekly_radar.md` | Existing Radar bridge, market/business context sidecar, KIR/RVE gates, and credentials |
-| `mvp_skill_research_sources.md` | Locally installed Codex/Claude research skills for auxiliary MVP source discovery and gate-safe usage |
-| `dogfood_4_week_plan.md` | Supporting dogfood protocol, blocked until `report-v2-rollout-gate` returns `eligible` on real current private artifacts |
-| `report_format.md` | Legacy weekly artifact contracts and source-link requirements |
-| `curated_semantic_retrieval.md` | HPI-9-lite retrieval decision: curated deterministic+SQLite FTS; raw/vector RAG deferred |
-| `research_brief_receipt.md` | Research Brief receipt audit contract |
-| `telegram_channel_intelligence.md` | Channel Intelligence design and implemented local inspection/report surfaces |
-| `memory_architecture.md` | Memory model |
-| `memory_inspection.md` | Memory/debug inspection CLI |
-| `ops-security.md` | VPS, Telegram credential, and service security guidance |
-| `dev-cycle.md` | AI-assisted development workflow |
-| `IMPLEMENTATION_CONTRACT.md` | Engineering rules for future changes |
-| `COGNITION_MANIFEST.md` | Repo-local cognition map and source-of-truth rules |
-| `VPS_COGNITION_VAULT.md` | Shared VPS vault location and sync policy |
-| `CODEX_PROMPT.md` | Current compact session handoff |
-| `artifacts/README.md` | Versioned generated artifacts selected for review |
+## RAG, Assistant, Cost, Privacy, Operations
 
-## Historical Or Superseded Roadmaps
+- docs/RAG_DATA_READINESS.md
+- docs/retrieval_eval.md
+- docs/generation_eval.md
+- docs/tool_eval.md
+- docs/agent_eval.md
+- docs/AGENT_HARNESS_DESIGN.md
+- docs/COST_BUDGET.md
+- docs/ai_cost_architecture.md
+- docs/AUTONOMOUS_WORKFLOW_CONTRACT.md
+- docs/PRIVACY_THREAT_MODEL.md
+- docs/ROLLBACK_AND_REINDEX_PLAN.md
+- docs/repo_hygiene_and_archive_plan.md
 
-| File | Current role |
-|---|---|
-| `next_development_roadmap.md` | Superseded implementation record for receipt/source-trust/report-quality/Radar/cost work |
-| `report_quality_roadmap.md` | Historical implementation record for report-quality and Radar handoff tasks |
-| `ai_knowledge_intelligence_roadmap.md` | Component roadmap and historical KIR quality record |
-| `ai_intelligence_workbook_roadmap.md` | Superseded workbook roadmap and KIR-Q0..KIR-Q13 record |
-| `hermes_pi_assistant_roadmap.md` | Hermes/PI component roadmap and implementation record |
-| `PROJECT_PLAN.md` | Historical strategy snapshot; canonical strategy moved to portfolio roadmap |
-| `pathway_live_source_intelligence.md` | Historical/supporting Pathway live-source context plan |
+## Legacy And Compatibility Context
 
-## Prompt Docs
+These documents describe prior weekly-report, IRX, Radar, Atlas, or curated-only
+assistant work. They are preserved as history or compatibility context and are
+not the active product authority:
 
-`docs/prompts/` contains active LLM prompts used by the runtime pipeline and the
-development workflow. These are not archive material.
+- docs/architecture.md
+- docs/curated_semantic_retrieval.md
+- docs/hermes_pi_assistant_roadmap.md
+- docs/intelligence_report_v2_roadmap.md
+- docs/intelligence_report_v2_contract.md
+- docs/intelligence_report_v2_audit.md
+- docs/reaction_personalization_contract.md
+- docs/weekly_run_manifest.md
+- docs/archive/
 
-## Audit Docs
+## Evidence Rule
 
-`docs/audit/AUDIT_INDEX.md` is the active audit index. Historical audits are
-under `docs/archive/legacy_audit/` and `docs/archive/reviews/`.
-
-## Archive
-
-See `docs/archive/README.md` for archived material:
-
-- old baseline snapshots;
-- old roadmaps;
-- case study and demo walkthrough;
-- session reports;
-- legacy audit material.
+Candidate docs and tasks may define target behavior. They must not claim that
+full-archive RAG, assistant archive search, dogfood success, vector retrieval,
+or external skill approval exists until implementation and verification evidence
+is recorded.
