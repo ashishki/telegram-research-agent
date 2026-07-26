@@ -10,6 +10,11 @@ from typing import Any, Iterable, Iterator, Mapping
 from urllib.parse import quote
 
 from config.settings import PROJECT_ROOT, Settings, load_settings
+from db.archive_search import (
+    ArchiveSearchError,
+    ArchiveSearchFilters,
+    search_telegram_archive,
+)
 from db.ai_report_feedback import fetch_ai_report_feedback, summarize_ai_report_feedback
 from db.idea_threads import fetch_idea_thread_atoms, fetch_idea_threads
 from output.action_status import build_action_status_projection, summarize_action_statuses
@@ -740,6 +745,68 @@ class PersonalIntelligenceFacade:
             "retrieval_decision": retrieval_decision_note(),
             "items": results,
             "message": "Curated intelligence items matched deterministic+FTS search." if results else "No curated intelligence items matched.",
+        }
+
+    def search_telegram_archive(
+        self,
+        query: str,
+        filters: dict | None = None,
+        limit: int = 10,
+    ) -> dict:
+        clean_filters = dict(filters or {})
+        with self._readonly_connection() as connection:
+            if (
+                connection is None
+                or not _table_exists(connection, "posts")
+                or not _table_exists(connection, "raw_posts")
+                or not _table_exists(connection, "posts_fts")
+            ):
+                return {
+                    "status": "missing",
+                    "query": str(query or ""),
+                    "filters": clean_filters,
+                    "items": [],
+                    "retrieval_mode": "sqlite_fts_archive",
+                    "message": "Telegram archive search tables are unavailable.",
+                }
+            try:
+                results = search_telegram_archive(
+                    connection,
+                    str(query or ""),
+                    filters=ArchiveSearchFilters(
+                        channel_usernames=tuple(_string_values(clean_filters.get("channel_usernames") or clean_filters.get("channels"))),
+                        languages=tuple(_string_values(clean_filters.get("languages") or clean_filters.get("language"))),
+                        date_from=_clean_text(clean_filters.get("date_from")) or None,
+                        date_to=_clean_text(clean_filters.get("date_to")) or None,
+                        reacted_only=bool(clean_filters.get("reacted_only") or False),
+                        reactions=tuple(_string_values(clean_filters.get("reactions") or clean_filters.get("reaction"))),
+                        tags=tuple(_string_values(clean_filters.get("tags") or clean_filters.get("tag"))),
+                        project_names=tuple(_string_values(clean_filters.get("project_names") or clean_filters.get("project_name"))),
+                    ),
+                    limit=max(1, min(20, int(limit or 10))),
+                )
+            except (ArchiveSearchError, sqlite3.Error, ValueError) as exc:
+                return {
+                    "status": "invalid",
+                    "query": str(query or ""),
+                    "filters": clean_filters,
+                    "items": [],
+                    "retrieval_mode": "sqlite_fts_archive",
+                    "message": f"Telegram archive search failed: {type(exc).__name__}.",
+                }
+
+        items = [result.as_dict() for result in results]
+        return {
+            "status": "ok" if items else "insufficient_evidence",
+            "query": str(query or ""),
+            "filters": clean_filters,
+            "items": items,
+            "retrieval_mode": "sqlite_fts_archive",
+            "message": (
+                "Telegram archive posts matched SQLite FTS search."
+                if items
+                else "No retained Telegram archive evidence matched the query."
+            ),
         }
 
     def _current_week_label(self) -> str:

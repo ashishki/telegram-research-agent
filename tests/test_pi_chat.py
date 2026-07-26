@@ -1,6 +1,11 @@
+import json
 import unittest
 
-from assistant.pi_chat import answer_pi_chat
+from assistant.pi_chat import (
+    answer_pi_chat,
+    route_pi_intent,
+    validate_grounded_answer_contract,
+)
 
 
 class _FakeFacade:
@@ -48,6 +53,36 @@ class _FakeFacade:
                 }
             ],
             "message": "Curated intelligence items matched deterministic search.",
+        }
+
+    def search_telegram_archive(self, query, filters=None, limit=10):
+        return {
+            "status": "ok",
+            "query": query,
+            "filters": filters or {},
+            "retrieval_mode": "sqlite_fts_archive",
+            "items": [
+                {
+                    "archive_document_id": "tg:-1001:1001",
+                    "post_archive_document_id": "tg:-1001:1001",
+                    "post_id": 1,
+                    "raw_post_id": 100,
+                    "channel_username": "@source",
+                    "channel_id": -1001,
+                    "message_id": 1001,
+                    "posted_at": "2026-07-20T10:00:00Z",
+                    "source_url": "https://t.me/source/1001",
+                    "language": "ru",
+                    "snippet": "Agent review automation works over retained Telegram archive posts.",
+                    "content_hash": "sha256:fixture",
+                    "chunk_index": None,
+                    "chunk_count": 1,
+                    "reaction_count": 0,
+                    "tag_count": 0,
+                    "project_names": [],
+                }
+            ],
+            "message": "Telegram archive posts matched SQLite FTS search.",
         }
 
     def get_action_statuses(self, week_label=None):
@@ -101,6 +136,40 @@ class _NoAnswerLLM(_BrokenPlannerLLM):
         raise RuntimeError("answer unavailable")
 
 
+class _ArchiveSearchLLM(_FakeLLM):
+    @staticmethod
+    def complete_json(prompt, system="", category="unknown", model=None):
+        return {
+            "tool_calls": [
+                {"name": "search_telegram_archive", "arguments": {"query": "agent review", "limit": 3}},
+            ],
+            "reason": "Need original Telegram source evidence.",
+        }
+
+    @staticmethod
+    def complete(prompt, system="", max_tokens=2048, category="unknown", model=None):
+        assert "https://t.me/source/1001" in prompt
+        return "Нашёл пост в архиве: https://t.me/source/1001"
+
+
+class _EmptyArchiveFacade(_FakeFacade):
+    def search_telegram_archive(self, query, filters=None, limit=10):
+        return {
+            "status": "insufficient_evidence",
+            "query": query,
+            "filters": filters or {},
+            "retrieval_mode": "sqlite_fts_archive",
+            "items": [],
+            "message": "No retained Telegram archive evidence matched the query.",
+        }
+
+
+class _ArchiveNoAnswerLLM(_ArchiveSearchLLM):
+    @staticmethod
+    def complete(prompt, system="", max_tokens=2048, category="unknown", model=None):
+        raise RuntimeError("answer unavailable")
+
+
 class TestPIChat(unittest.TestCase):
     def test_answer_pi_chat_runs_llm_planned_read_only_tools(self):
         result = answer_pi_chat("Что с eval gates?", facade=_FakeFacade(), llm_client=_FakeLLM)
@@ -111,6 +180,13 @@ class TestPIChat(unittest.TestCase):
         self.assertIn("https://t.me/source/1", result["evidence"]["source_refs"])
         self.assertIn(101, result["evidence"]["atom_ids"])
         self.assertTrue(all(call["name"] != "run_codex" for call in result["tool_calls"]))
+        self.assertEqual(result["trace"]["schema_version"], "pi_assistant_trace.v1")
+        self.assertEqual(result["trace"]["termination_reason"], "answered_with_evidence")
+        self.assertFalse(result["trace"]["privacy_boundary"]["raw_telegram_text_egress"])
+        self.assertEqual(result["trace"]["tool_traces"][1]["result_count"], 1)
+        self.assertEqual(result["telemetry"]["schema_version"], "pi_answer_telemetry.v1")
+        self.assertEqual(result["telemetry"]["planning"]["model_calls"], 1)
+        self.assertEqual(result["telemetry"]["generation"]["model_calls"], 1)
 
     def test_answer_pi_chat_rejects_non_catalog_tool(self):
         class BadToolLLM(_FakeLLM):
@@ -122,6 +198,40 @@ class TestPIChat(unittest.TestCase):
 
         self.assertEqual(result["tool_results"][0]["status"], "rejected")
         self.assertIn("not in read-only PI catalog", result["tool_results"][0]["result"]["message"])
+
+    def test_answer_pi_chat_can_use_archive_search_with_source_link(self):
+        result = answer_pi_chat("Найди пост про agent review", facade=_FakeFacade(), llm_client=_ArchiveSearchLLM)
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["tool_calls"], [{"name": "search_telegram_archive", "arguments": {"query": "agent review", "limit": 3}}])
+        self.assertIn("https://t.me/source/1001", result["answer"])
+        self.assertIn("https://t.me/source/1001", result["evidence"]["source_refs"])
+        contract = validate_grounded_answer_contract(result["answer_contract"])
+        self.assertEqual(contract["archive_support"]["status"], "available")
+        self.assertEqual(contract["source_links"], ["https://t.me/source/1001"])
+        self.assertEqual(
+            contract["freshness_date_boundary"]["max_source_date"],
+            "2026-07-20T10:00:00Z",
+        )
+        self.assertFalse(contract["model_background"]["used"])
+        self.assertFalse(contract["external_verification"]["required"])
+
+    def test_answer_pi_chat_no_answer_does_not_fabricate_archive_citation(self):
+        result = answer_pi_chat("Найди пост которого нет", facade=_EmptyArchiveFacade(), llm_client=_ArchiveNoAnswerLLM)
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["tool_results"][0]["status"], "insufficient_evidence")
+        self.assertEqual(result["evidence"]["source_refs"], [])
+        self.assertIn("insufficient_evidence", result["answer"])
+        self.assertNotIn("https://t.me/source/1001", result["answer"])
+        self.assertEqual(result["trace"]["termination_reason"], "insufficient_evidence")
+        self.assertTrue(result["trace"]["insufficient_evidence"])
+        self.assertEqual(result["answer_contract"]["archive_support"]["status"], "insufficient_evidence")
+        self.assertTrue(result["answer_contract"]["insufficient_evidence"])
+        self.assertEqual(
+            result["answer_contract"]["model_background"]["label"],
+            "background_not_archive_supported",
+        )
 
     def test_answer_pi_chat_falls_back_when_planning_fails(self):
         result = answer_pi_chat("Что делать по проектам?", facade=_FakeFacade(), llm_client=_BrokenPlannerLLM)
@@ -144,6 +254,44 @@ class TestPIChat(unittest.TestCase):
 
         self.assertEqual(result["status"], "invalid")
         self.assertIn("Напиши вопрос", result["answer"])
+        self.assertEqual(result["trace"]["termination_reason"], "invalid_request")
+
+    def test_deterministic_router_covers_exact_reaction_and_no_answer(self):
+        exact = route_pi_intent("Найди пост про agent review")
+        self.assertEqual(exact["intent"], "exact_search")
+        self.assertEqual(exact["tool_calls"][0]["name"], "search_telegram_archive")
+
+        reaction = route_pi_intent("Найди отмеченный мной реакцией пост")
+        self.assertEqual(reaction["intent"], "reaction_recall")
+        self.assertEqual(
+            reaction["tool_calls"][0]["arguments"]["filters"],
+            {"reacted_only": True},
+        )
+
+        no_answer = route_pi_intent("Найди пост которого нет")
+        self.assertEqual(no_answer["intent"], "no_answer_probe")
+        self.assertEqual(no_answer["tool_calls"][0]["name"], "search_telegram_archive")
+
+    def test_external_verification_route_does_not_call_external_provider(self):
+        route = route_pi_intent("Проверь во внешних источниках свежую новость")
+
+        self.assertEqual(route["intent"], "external_verification")
+        self.assertEqual(route["tool_calls"][0]["name"], "request_external_verification")
+
+    def test_answer_telemetry_separates_retrieval_generation_and_excludes_raw_text(self):
+        result = answer_pi_chat("Найди пост про agent review", facade=_FakeFacade(), llm_client=_ArchiveSearchLLM)
+
+        telemetry = result["telemetry"]
+        self.assertIn("latency_ms", telemetry["retrieval"])
+        self.assertIn("latency_ms", telemetry["generation"])
+        self.assertEqual(telemetry["retrieval"]["tool_calls"], 1)
+        self.assertEqual(telemetry["retrieval"]["estimated_cost_usd"], 0.0)
+        self.assertEqual(telemetry["generation"]["estimated_cost_usd"], 0.0)
+        self.assertFalse(telemetry["privacy"]["raw_post_text_logged"])
+        self.assertNotIn(
+            "Agent review automation works",
+            json.dumps(telemetry, ensure_ascii=False),
+        )
 
 
 if __name__ == "__main__":

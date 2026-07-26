@@ -24,6 +24,31 @@ FORBIDDEN_TOOL_NAMES = {
 
 NO_EVIDENCE_REQUIRED_TOOLS = {"get_current_week_label"}
 
+MINIMUM_READ_ONLY_TOOLS = {
+    "get_current_week_label",
+    "get_weekly_summary",
+    "get_artifact_status",
+    "search_intelligence_items",
+    "search_telegram_archive",
+    "search_idea_threads",
+    "get_idea_thread",
+    "get_project_actions",
+    "get_mvp_radar_status",
+    "get_feedback_summary",
+    "list_marked_posts",
+    "get_strategy_reviewer_notes",
+    "request_external_verification",
+}
+
+CONFIRMATION_GATED_PROPOSAL_TOOLS = {
+    "propose_knowledge_note",
+    "propose_watch_topic",
+    "propose_project_link",
+    "propose_action",
+    "propose_experiment",
+    "propose_feedback",
+}
+
 
 @dataclass(frozen=True)
 class PITool:
@@ -32,6 +57,8 @@ class PITool:
     input_schema: dict[str, Any]
     handler: ToolHandler
     read_only: bool = True
+    requires_confirmation: bool = False
+    proposal_only: bool = False
     max_calls_per_turn: int = PI_TOOL_LOOP_MAX_CALLS
 
     def describe(self) -> dict:
@@ -39,6 +66,8 @@ class PITool:
             "name": self.name,
             "description": self.description,
             "read_only": self.read_only,
+            "requires_confirmation": self.requires_confirmation,
+            "proposal_only": self.proposal_only,
             "max_calls_per_turn": self.max_calls_per_turn,
             "input_schema": self.input_schema,
         }
@@ -107,6 +136,23 @@ def build_pi_tool_catalog() -> dict[str, PITool]:
                 limit=_limit(args.get("limit"), default=10),
             ),
         ),
+        "search_telegram_archive": PITool(
+            name="search_telegram_archive",
+            description=PI_TOOL_DESCRIPTIONS["search_telegram_archive"],
+            input_schema=_schema(
+                {
+                    "query": {"type": "string"},
+                    "filters": _archive_search_filters_schema(),
+                    "limit": {"type": ["integer", "null"], "minimum": 1, "maximum": 20},
+                },
+                required=["query"],
+            ),
+            handler=lambda facade, args: facade.search_telegram_archive(
+                _required_string(args.get("query"), "query"),
+                filters=_optional_mapping(args.get("filters")),
+                limit=_limit(args.get("limit"), default=10, maximum=20),
+            ),
+        ),
         "search_idea_threads": PITool(
             name="search_idea_threads",
             description=PI_TOOL_DESCRIPTIONS["search_idea_threads"],
@@ -172,6 +218,29 @@ def build_pi_tool_catalog() -> dict[str, PITool]:
             ),
             handler=lambda facade, args: facade.get_strategy_reviewer_notes(_optional_string(args.get("week_label"))),
         ),
+        "request_external_verification": PITool(
+            name="request_external_verification",
+            description=PI_TOOL_DESCRIPTIONS["request_external_verification"],
+            input_schema=_schema(
+                {
+                    "question": {"type": "string"},
+                    "reason": {"type": ["string", "null"]},
+                },
+                required=["question"],
+            ),
+            handler=lambda _facade, args: {
+                "status": "needs_external_verification",
+                "question": _required_string(args.get("question"), "question"),
+                "reason": _optional_string(args.get("reason")),
+                "message": "External verification is required; no external request was run.",
+            },
+        ),
+        "propose_knowledge_note": _proposal_tool("propose_knowledge_note", "knowledge_note"),
+        "propose_watch_topic": _proposal_tool("propose_watch_topic", "watch_topic"),
+        "propose_project_link": _proposal_tool("propose_project_link", "project_link"),
+        "propose_action": _proposal_tool("propose_action", "action"),
+        "propose_experiment": _proposal_tool("propose_experiment", "experiment"),
+        "propose_feedback": _proposal_tool("propose_feedback", "feedback"),
     }
     validate_pi_tool_catalog(catalog)
     return catalog
@@ -185,10 +254,23 @@ def list_pi_tools(catalog: Mapping[str, PITool] | None = None) -> list[dict]:
 def validate_pi_tool_catalog(catalog: Mapping[str, PITool]) -> dict:
     forbidden = sorted(FORBIDDEN_TOOL_NAMES.intersection(catalog))
     writable = sorted(name for name, tool in catalog.items() if not tool.read_only)
+    missing_read_only = sorted(MINIMUM_READ_ONLY_TOOLS.difference(catalog))
+    missing_proposals = sorted(CONFIRMATION_GATED_PROPOSAL_TOOLS.difference(catalog))
+    unsafe_proposals = sorted(
+        name
+        for name in CONFIRMATION_GATED_PROPOSAL_TOOLS.intersection(catalog)
+        if not catalog[name].requires_confirmation or not catalog[name].proposal_only
+    )
     if forbidden:
         raise ValueError(f"Forbidden mutation tools in PI catalog: {', '.join(forbidden)}")
     if writable:
         raise ValueError(f"PI catalog tools must be read-only: {', '.join(writable)}")
+    if missing_read_only:
+        raise ValueError(f"Missing minimum read-only PI tools: {', '.join(missing_read_only)}")
+    if missing_proposals:
+        raise ValueError(f"Missing confirmation-gated proposal tools: {', '.join(missing_proposals)}")
+    if unsafe_proposals:
+        raise ValueError(f"Proposal tools must be confirmation-gated: {', '.join(unsafe_proposals)}")
     return {
         "status": "ok",
         "tool_count": len(catalog),
@@ -231,6 +313,42 @@ def _handle_workbook_sections(facade: PersonalIntelligenceFacade, args: Mapping[
             "message": "Week label is unavailable.",
         }
     return facade.get_workbook_sections(week_label)
+
+
+def _proposal_tool(name: str, proposal_type: str) -> PITool:
+    return PITool(
+        name=name,
+        description=PI_TOOL_DESCRIPTIONS[name],
+        input_schema=_schema(
+            {
+                "title": {"type": "string"},
+                "rationale": {"type": ["string", "null"]},
+                "source_refs": {
+                    "type": ["array", "null"],
+                    "items": {"type": "string"},
+                },
+            },
+            required=["title"],
+        ),
+        handler=lambda _facade, args: _proposal_response(proposal_type, args),
+        read_only=True,
+        requires_confirmation=True,
+        proposal_only=True,
+    )
+
+
+def _proposal_response(proposal_type: str, args: Mapping[str, Any]) -> dict:
+    return {
+        "status": "needs_confirmation",
+        "proposal_type": proposal_type,
+        "proposal": {
+            "title": _required_string(args.get("title"), "title"),
+            "rationale": _optional_string(args.get("rationale")),
+            "source_refs": _string_list(args.get("source_refs")),
+        },
+        "persisted": False,
+        "message": "Proposal drafted only; human confirmation is required before persistence.",
+    }
 
 
 def _tool_response(tool_name: str, result: Mapping[str, Any]) -> dict:
@@ -312,6 +430,34 @@ def _schema(properties: Mapping[str, Any], required: list[str] | None = None) ->
         "type": "object",
         "properties": dict(properties),
         "required": list(required or []),
+        "additionalProperties": False,
+    }
+
+
+def _archive_search_filters_schema() -> dict:
+    string_or_array = {
+        "oneOf": [
+            {"type": "string"},
+            {"type": "array", "items": {"type": "string"}},
+        ]
+    }
+    return {
+        "type": ["object", "null"],
+        "properties": {
+            "channel_usernames": string_or_array,
+            "channels": string_or_array,
+            "languages": string_or_array,
+            "language": string_or_array,
+            "date_from": {"type": ["string", "null"]},
+            "date_to": {"type": ["string", "null"]},
+            "reacted_only": {"type": ["boolean", "null"]},
+            "reactions": string_or_array,
+            "reaction": string_or_array,
+            "tags": string_or_array,
+            "tag": string_or_array,
+            "project_names": string_or_array,
+            "project_name": string_or_array,
+        },
         "additionalProperties": False,
     }
 
