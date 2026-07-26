@@ -22,6 +22,37 @@ Status: draft
 - cost receipt per AI workflow;
 - monthly rollup via `tools/cost_rollup.py` when telemetry exists.
 
+## PRM-6 Selective Extraction Boundary
+
+`src/output/selective_enrichment.py` owns deterministic queue ordering and
+budget enforcement for `selective_extraction`. It does not call an LLM provider
+directly. A future approved runner must inject the extractor callable and
+remain inside the receipt contract.
+
+The planner deduplicates posts and ranks signals in this order:
+
+```text
+reaction -> repeated_search_return -> cited_answer -> watch_topic
+-> active_project -> repeated_signal -> manual_save
+```
+
+The batch receipt records:
+
+- queued posts and attempted posts;
+- model-call count;
+- estimated cost;
+- succeeded, failed, and budget-stopped posts;
+- archive search availability after failure;
+- per-item failure reason.
+
+Search availability is checked against retained archive rows and SQLite FTS, not
+Knowledge Atom presence. Therefore extraction failure cannot remove or hide an
+archive search result.
+
+Budget checks are performed before every attempt. A retry is skipped when it
+would exceed the cost or model-call cap; the receipt records the stop reason and
+excludes raw post text, source URLs, and provider payloads.
+
 ## Routing Maturity
 
 Current target: static routing by workload class. Dynamic routing/cascades are

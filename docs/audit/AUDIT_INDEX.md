@@ -26,3 +26,8 @@ Archived files include:
 - roadmap-v2 / roadmap-v3-era audit analysis
 
 These files remain preserved for human reference, but they are no longer part of the active AI-development contract.
+
+## Current-Cycle Reviews
+
+- `PRM_BLOCK_REVIEW_2026-07-26.md` - corrective PRM block review after missed
+  PRM-2, PRM-4, PRM-6, and PRM-7/PRM-8 review gates.

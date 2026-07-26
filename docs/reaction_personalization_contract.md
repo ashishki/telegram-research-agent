@@ -429,9 +429,55 @@ Reader-facing example:
   validates receipt presence and agreement. IRX-12 remains the stronger,
   confirmation-gated explicit feedback path.
 
+## PRM-5 Reaction Fast Lane
+
+PRM-5 adds a search-first receipt before downstream atom/thread ranking. It is
+read-only with respect to the corpus: it reads already materialized
+`reaction_sync_state`, normalized posts, `posts_fts`, atom links, topic links,
+and optional ranking receipts. It does not run live Telegram reaction sync,
+LLM extraction, report generation, embeddings, or database migration.
+
+Fast-lane lineage:
+
+```text
+stored personal reaction state
+  -> raw Telegram identity resolves to retained archive post
+  -> normalized post has a stable archive document
+  -> persistent SQLite FTS row exists
+  -> assistant archive search can expose the reacted post without atoms
+  -> atom, topic, and ranking gaps remain explicit incomplete-stage reasons
+```
+
+The receipt schema is `reaction_fast_lane.v1`. Required count fields are:
+
+- `personal_reaction_events_detected`;
+- `unique_reacted_posts`;
+- `posts_resolved`;
+- `archive_posts_indexed`;
+- `archive_documents_indexed`;
+- `searchable_archive_posts`;
+- `searchable_archive_documents`;
+- `enrichment_attempts`, `enrichment_successes`, `enrichment_failures`;
+- `topic_link_attempts`, `topic_link_successes`, `topic_link_failures`;
+- `topic_links`;
+- `ranking_effects`;
+- `post_level_interest_signals`.
+
+The receipt also records stage statuses for reaction detection, source
+resolution, archive index, enrichment, topic linkage, assistant search, and
+ranking; `search_availability.requires_knowledge_atoms` must be false. Raw post
+text, source URLs, emoji values, feedback labels, and generated report text are
+excluded from the receipt by contract.
+
+Semantics remain unchanged: absence of a personal reaction is `unknown`, never
+negative; any visible personal reaction is weak positive implicit interest; and
+multiple emoji on one post are audit metadata only and deduplicate to one
+post-level signal.
+
 ## Implementation Files And Compatibility Adapters
 
 - `src/ingestion/reaction_sync.py`
+- `src/db/reaction_fast_lane.py`
 - `src/output/reaction_personalization.py`
 - `src/output/ai_intelligence_report.py`
 - `src/output/weekly_intelligence_brief.py`
@@ -446,6 +492,7 @@ Reader-facing example:
 - `src/main.py`
 - focused reaction, report, manifest/orchestrator, Strategy Reviewer, retrieval,
   and PI tests
+- PRM-5 fast-lane fixture tests in `tests/test_reaction_fast_lane.py`
 
 ## Acceptance And Test Matrix
 
@@ -469,6 +516,10 @@ IRX-3 is accepted only when all of the following are demonstrated:
 - JSON and HTML contain the same effect totals;
 - reader copy is Russian and contains no raw IDs, enums, or ranking values;
 - sync failure produces a partial receipt and visible partial state;
+- reacted posts remain searchable even when atom extraction has not produced
+  Knowledge Atoms;
+- fast-lane receipts expose indexed archive documents, search availability,
+  enrichment/topic/ranking counts, and incomplete-stage reasons;
 - a repeated pattern below the three-week/four-post threshold creates no
   Strategy Reviewer proposal;
 - a qualifying repeated pattern creates an unapproved proposal only, and no
@@ -529,6 +580,44 @@ and the full suite were intentionally not run.
   as-of thread lineage. IRX-3 still does not claim that current compatibility
   threads are stable canonical threads: stored canonical resolution is
   separate and nullable, and raw refs/provenance remain present.
+
+## PRM-5 Implementation Receipt - 2026-07-26
+
+- `src/db/reaction_fast_lane.py` builds and validates `reaction_fast_lane.v1`
+  receipts from existing SQLite rows only. It performs SELECT-only inspection
+  over reaction state, archive posts, FTS, atom links, topic links, and optional
+  ranking receipts.
+- The fast lane counts archive post/index coverage independently from
+  Knowledge Atoms, so `7 reactions -> 0 atoms` is incomplete downstream
+  processing, not zero search availability.
+- `tests/test_reaction_fast_lane.py` covers the PRM-5 fixture with seven
+  synthetic reactions, zero atoms, seven searchable archive documents,
+  `reacted_only` assistant archive search, required receipt fields, and absent
+  or multiple emoji semantics.
+- Verification run:
+
+```text
+python3 -m pytest tests/test_reaction_fast_lane.py tests/test_archive_search.py tests/test_archive_documents.py -q
+18 passed in 0.18s
+```
+
+- Full-suite verification was run and matched the known repository baseline
+  failure:
+
+```text
+python3 -m pytest tests/ -q
+1 failed, 986 passed, 281 subtests passed in 284.41s
+FAILED tests/test_product_ops.py::TestProductOps::test_ops_validation_passes_when_live_evidence_rows_exist
+```
+
+- Playbook and whitespace verification:
+
+```text
+python3 tools/playbook_validate.py --root . --check tasks --check placeholders --check readiness --check delivery --check references
+playbook_validate: errors=0 warnings=0
+git diff --check
+<no output>
+```
 
 ## Stop Conditions
 

@@ -29,6 +29,45 @@ No tool may:
 - install or activate external skills;
 - send broad raw corpus text to a provider.
 
+## PRM-9 Implemented Tool Boundary
+
+`assistant.pi_tools.build_pi_tool_catalog` exposes one bounded catalog for the
+assistant entrypoint.
+
+Minimum read-only tools:
+
+- `get_current_week_label`;
+- `get_weekly_summary`;
+- `get_artifact_status`;
+- `search_intelligence_items`;
+- `search_telegram_archive`;
+- `search_idea_threads`;
+- `get_idea_thread`;
+- `get_project_actions`;
+- `get_mvp_radar_status`;
+- `get_feedback_summary`;
+- `list_marked_posts`;
+- `get_strategy_reviewer_notes`;
+- `request_external_verification`.
+
+Confirmation-gated proposal tools:
+
+- `propose_knowledge_note`;
+- `propose_watch_topic`;
+- `propose_project_link`;
+- `propose_action`;
+- `propose_experiment`;
+- `propose_feedback`.
+
+Proposal tools return `needs_confirmation`, `persisted=false`, and a proposed
+object only. They do not write to SQLite, files, profile, config, projects, or
+feedback tables.
+
+Deterministic intent routes cover exact archive search, concept search, case
+search, comparison, freshness/news, project application, reaction recall,
+no-answer probes, artifact status, Radar status, strategy notes, and external
+verification requests.
+
 ## Trace
 
 Each assistant turn records:
@@ -45,6 +84,22 @@ Each assistant turn records:
 - insufficient-evidence flag.
 
 Trace records must not include raw post text beyond bounded cited snippets.
+
+PRM-9 trace schema: `pi_assistant_trace.v1`.
+
+Each tool trace records:
+
+- selected tool name;
+- bounded arguments;
+- result count;
+- tool status;
+- evidence status;
+- privacy boundary.
+
+Turn-level trace records planner type, deterministic intent, termination
+reason, insufficient-evidence flag, and privacy boundary
+(`raw_telegram_text_egress=false`, `external_skill_used=false`,
+`write_performed=false`).
 
 ## Termination
 
