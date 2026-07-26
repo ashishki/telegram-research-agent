@@ -1,0 +1,547 @@
+{
+  "candidates": {
+    "diagnostics": {
+      "duplicate_top10_rate": 0.008,
+      "latency_ms_p95": 59.988,
+      "reacted_post_searchability": 0.956522,
+      "status": "diagnostic_only_not_gold"
+    },
+    "row_count": 50,
+    "rows": [
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-EXACT-001",
+        "category": "exact_known_item",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 66.942,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-EXACT-002",
+        "category": "exact_known_item",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 49.064,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-EXACT-003",
+        "category": "exact_known_item",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 27.838,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-EXACT-004",
+        "category": "exact_known_item",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 39.501,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-EXACT-005",
+        "category": "exact_known_item",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 36.756,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-EXACT-006",
+        "category": "exact_known_item",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 59.582,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-EXACT-007",
+        "category": "exact_known_item",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 48.127,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-EXACT-008",
+        "category": "exact_known_item",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 54.141,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-SEM-001",
+        "category": "semantic_topic",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 48.836,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-SEM-002",
+        "category": "semantic_topic",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 39.147,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-SEM-003",
+        "category": "semantic_topic",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 55.803,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-SEM-004",
+        "category": "semantic_topic",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 38.014,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-SEM-005",
+        "category": "semantic_topic",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 47.567,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-SEM-006",
+        "category": "semantic_topic",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 62.258,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-SEM-007",
+        "category": "semantic_topic",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 52.83,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-SEM-008",
+        "category": "semantic_topic",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 53.787,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-CASE-001",
+        "category": "case_study",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 42.714,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-CASE-002",
+        "category": "case_study",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 35.066,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-CASE-003",
+        "category": "case_study",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 42.394,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-CASE-004",
+        "category": "case_study",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 51.494,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-CASE-005",
+        "category": "case_study",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 42.535,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-CASE-006",
+        "category": "case_study",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 24.027,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-CASE-007",
+        "category": "case_study",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 35.843,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-CASE-008",
+        "category": "case_study",
+        "duplicate_top10_rate": 0.1,
+        "error_type": null,
+        "latency_ms": 31.173,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-COMP-001",
+        "category": "comparison",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 24.644,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-COMP-002",
+        "category": "comparison",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 37.507,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-COMP-003",
+        "category": "comparison",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 31.815,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-COMP-004",
+        "category": "comparison",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 45.729,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-COMP-005",
+        "category": "comparison",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 31.371,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-COMP-006",
+        "category": "comparison",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 20.763,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-FRESH-001",
+        "category": "freshness_news",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 44.853,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-FRESH-002",
+        "category": "freshness_news",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 47.279,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-FRESH-003",
+        "category": "freshness_news",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 43.816,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-FRESH-004",
+        "category": "freshness_news",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 41.261,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-FRESH-005",
+        "category": "freshness_news",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 48.978,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-FRESH-006",
+        "category": "freshness_news",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 45.164,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-APP-001",
+        "category": "project_life_application",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 47.795,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-APP-002",
+        "category": "project_life_application",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 38.548,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-APP-003",
+        "category": "project_life_application",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 41.521,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-APP-004",
+        "category": "project_life_application",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 47.279,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-APP-005",
+        "category": "project_life_application",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 59.988,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-APP-006",
+        "category": "project_life_application",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 70.725,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-DIST-001",
+        "category": "distractor",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 42.143,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-DIST-002",
+        "category": "distractor",
+        "duplicate_top10_rate": 0.1,
+        "error_type": null,
+        "latency_ms": 43.671,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-DIST-003",
+        "category": "distractor",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 41.517,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-DIST-004",
+        "category": "distractor",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 14.599,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-NOANS-001",
+        "category": "no_answer",
+        "duplicate_top10_rate": 0.1,
+        "error_type": null,
+        "latency_ms": 42.643,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-NOANS-002",
+        "category": "no_answer",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 52.9,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-NOANS-003",
+        "category": "no_answer",
+        "duplicate_top10_rate": 0.1,
+        "error_type": null,
+        "latency_ms": 36.425,
+        "result_count": 10
+      },
+      {
+        "approval_status": "candidate_unapproved",
+        "case_id": "CAND-NOANS-004",
+        "category": "no_answer",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 41.569,
+        "result_count": 10
+      }
+    ]
+  },
+  "dataset": {
+    "candidate_row_count": 50,
+    "candidate_unapproved_case_ids": [
+      "CAND-EXACT-001",
+      "CAND-EXACT-002",
+      "CAND-EXACT-003",
+      "CAND-EXACT-004",
+      "CAND-EXACT-005",
+      "CAND-EXACT-006",
+      "CAND-EXACT-007",
+      "CAND-EXACT-008",
+      "CAND-SEM-001",
+      "CAND-SEM-002",
+      "CAND-SEM-003",
+      "CAND-SEM-004",
+      "CAND-SEM-005",
+      "CAND-SEM-006",
+      "CAND-SEM-007",
+      "CAND-SEM-008",
+      "CAND-CASE-001",
+      "CAND-CASE-002",
+      "CAND-CASE-003",
+      "CAND-CASE-004",
+      "CAND-CASE-005",
+      "CAND-CASE-006",
+      "CAND-CASE-007",
+      "CAND-CASE-008",
+      "CAND-COMP-001",
+      "CAND-COMP-002",
+      "CAND-COMP-003",
+      "CAND-COMP-004",
+      "CAND-COMP-005",
+      "CAND-COMP-006",
+      "CAND-FRESH-001",
+      "CAND-FRESH-002",
+      "CAND-FRESH-003",
+      "CAND-FRESH-004",
+      "CAND-FRESH-005",
+      "CAND-FRESH-006",
+      "CAND-APP-001",
+      "CAND-APP-002",
+      "CAND-APP-003",
+      "CAND-APP-004",
+      "CAND-APP-005",
+      "CAND-APP-006",
+      "CAND-DIST-001",
+      "CAND-DIST-002",
+      "CAND-DIST-003",
+      "CAND-DIST-004",
+      "CAND-NOANS-001",
+      "CAND-NOANS-002",
+      "CAND-NOANS-003",
+      "CAND-NOANS-004"
+    ],
+    "gold_row_count": 0,
+    "row_count": 50
+  },
+  "gold": {
+    "metrics": {
+      "citation_precision": null,
+      "duplicate_top10_rate": null,
+      "hit_at_10": null,
+      "latency_ms_p95": 0.0,
+      "mrr": null,
+      "no_answer_accuracy": null,
+      "reacted_post_searchability": 0.956522,
+      "stale_rejection": null,
+      "status": "not_scored_no_human_approved_gold"
+    },
+    "row_count": 0,
+    "rows": []
+  },
+  "privacy": {
+    "queries_included": false,
+    "raw_telegram_text_printed": false,
+    "snippets_included": false,
+    "source_urls_included": false
+  },
+  "schema_version": "archive_retrieval_eval.v1",
+  "vector_backend_gate": {
+    "embeddings_run": false,
+    "status": "blocked_no_human_approved_gold",
+    "vector_backend_adopted": false
+  }
+}
