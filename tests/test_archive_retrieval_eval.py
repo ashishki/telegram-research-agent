@@ -2,6 +2,7 @@ import sqlite3
 import unittest
 
 from db.archive_retrieval_eval import (
+    ArchiveRetrievalEvalError,
     METRIC_FIELDS,
     evaluate_archive_retrieval,
     validate_archive_retrieval_eval_report,
@@ -220,6 +221,44 @@ class TestArchiveRetrievalEval(unittest.TestCase):
         self.assertEqual(report["gold"]["metrics"]["no_answer_accuracy"], 1.0)
         self.assertEqual(report["gold"]["metrics"]["stale_rejection"], 1.0)
         self.assertEqual(report["privacy"]["raw_telegram_text_printed"], False)
+
+    def test_human_approved_case_requires_scoreable_gold_labels(self):
+        _seed_post(self.connection, post_id=1, content="Epsilon retrieval baseline source.")
+
+        with self.assertRaisesRegex(ArchiveRetrievalEvalError, "has no expected relevance"):
+            evaluate_archive_retrieval(
+                self.connection,
+                [
+                    {
+                        "case_id": "GOLD-UNLABELED",
+                        "category": "exact_known_item",
+                        "language": "en",
+                        "query": "epsilon retrieval",
+                        "human_approved": True,
+                    }
+                ],
+            )
+
+    def test_no_answer_gold_search_error_scores_as_failure(self):
+        _seed_post(self.connection, post_id=1, content="Zeta retrieval baseline source.")
+        self.connection.execute("DROP TABLE posts_fts")
+
+        report = evaluate_archive_retrieval(
+            self.connection,
+            [
+                {
+                    "case_id": "GOLD-NOANSWER-ERROR",
+                    "category": "no_answer",
+                    "language": "en",
+                    "query": "zeta retrieval",
+                    "human_approved": True,
+                    "expected_no_answer": True,
+                }
+            ],
+        )
+
+        self.assertEqual(report["gold"]["metrics"]["no_answer_accuracy"], 0.0)
+        self.assertEqual(report["gold"]["rows"][0]["error_type"], "OperationalError")
 
 
 if __name__ == "__main__":

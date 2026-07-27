@@ -44,7 +44,12 @@ def evaluate_archive_retrieval(
         case_id = _required_string(case, "case_id")
         category = str(case.get("category") or "unknown").strip() or "unknown"
         query = _required_string(case, "query")
-        is_gold = case.get("human_approved") is True
+        is_human_approved = case.get("human_approved") is True
+        is_gold = is_human_approved and _is_scoreable_gold_case(case)
+        if is_human_approved and not is_gold:
+            raise ArchiveRetrievalEvalError(
+                f"{case_id} is human_approved but has no expected relevance, stale/forbidden, or no-answer labels"
+            )
         started = time.perf_counter()
         error_type: str | None = None
         results: list[ArchiveSearchResult] = []
@@ -66,7 +71,7 @@ def evaluate_archive_retrieval(
         }
         if is_gold:
             gold_latencies.append(latency_ms)
-            scores = _score_gold_case(case, results)
+            scores = _score_gold_case(case, results, search_error=error_type is not None)
             gold_scores.append(scores)
             gold_rows.append({**row, "scores": scores})
         else:
@@ -147,6 +152,8 @@ def validate_archive_retrieval_eval_report(report: Mapping[str, object]) -> dict
 def _score_gold_case(
     case: Mapping[str, object],
     results: Sequence[ArchiveSearchResult],
+    *,
+    search_error: bool = False,
 ) -> dict[str, float | None]:
     expected_no_answer = case.get("expected_no_answer") is True
     first_rank = _first_relevant_rank(case, results)
@@ -155,8 +162,16 @@ def _score_gold_case(
         "hit_at_10": None if expected_no_answer or not labeled_relevance else (1.0 if first_rank is not None else 0.0),
         "mrr": None if expected_no_answer or not labeled_relevance else (1.0 / first_rank if first_rank else 0.0),
         "citation_precision": None if expected_no_answer or not labeled_relevance else _citation_precision(case, results),
-        "stale_rejection": _stale_rejection(case, results),
-        "no_answer_accuracy": 1.0 if expected_no_answer and not results else 0.0 if expected_no_answer else None,
+        "stale_rejection": _stale_rejection(case, results, search_error=search_error),
+        "no_answer_accuracy": (
+            0.0
+            if expected_no_answer and search_error
+            else 1.0
+            if expected_no_answer and not results
+            else 0.0
+            if expected_no_answer
+            else None
+        ),
         "duplicate_top10_rate": _duplicate_top10_rate(results),
     }
 
@@ -230,9 +245,33 @@ def _has_expected_relevance(case: Mapping[str, object]) -> bool:
     )
 
 
+def _has_stale_or_forbidden_labels(case: Mapping[str, object]) -> bool:
+    return any(
+        _string_list(case.get(field))
+        for field in (
+            "forbidden_archive_document_ids",
+            "stale_archive_document_ids",
+            "forbidden_post_ids",
+            "stale_post_ids",
+            "forbidden_source_urls",
+            "stale_source_urls",
+        )
+    )
+
+
+def _is_scoreable_gold_case(case: Mapping[str, object]) -> bool:
+    return (
+        case.get("expected_no_answer") is True
+        or _has_expected_relevance(case)
+        or _has_stale_or_forbidden_labels(case)
+    )
+
+
 def _stale_rejection(
     case: Mapping[str, object],
     results: Sequence[ArchiveSearchResult],
+    *,
+    search_error: bool = False,
 ) -> float | None:
     forbidden_document_ids = set(
         _string_list(case.get("forbidden_archive_document_ids") or case.get("stale_archive_document_ids"))
@@ -245,6 +284,8 @@ def _stale_rejection(
     forbidden_urls = set(_string_list(case.get("forbidden_source_urls") or case.get("stale_source_urls")))
     if not forbidden_document_ids and not forbidden_post_ids and not forbidden_urls:
         return None
+    if search_error:
+        return 0.0
     for result in results[:10]:
         if result.archive_document_id in forbidden_document_ids:
             return 0.0

@@ -38,16 +38,21 @@ def answer_pi_chat(
     catalog = build_pi_tool_catalog()
     deterministic_route = route_pi_intent(clean_question)
     planning_started = time.perf_counter()
-    plan = _plan_tool_calls(
-        clean_question,
-        catalog=catalog,
-        llm_client=llm_client,
-        deterministic_route=deterministic_route,
-    )
+    if _route_requires_deterministic_tools(deterministic_route):
+        plan = _deterministic_plan(deterministic_route, reason="Privacy/eval-critical route bypasses LLM planning.")
+    else:
+        plan = _plan_tool_calls(
+            clean_question,
+            catalog=catalog,
+            llm_client=llm_client,
+            deterministic_route=deterministic_route,
+        )
     planning_latency_ms = _elapsed_ms(planning_started)
     tool_calls = _normalize_tool_calls(plan.get("tool_calls") if isinstance(plan, Mapping) else None)
     planner = str(plan.get("planner") or "llm") if isinstance(plan, Mapping) else "llm"
     planning_model_calls = 1 if isinstance(plan, Mapping) and plan.get("model_call_attempted") is True else 0
+    planning_cost_usd = _optional_float(plan.get("estimated_cost_usd") if isinstance(plan, Mapping) else None)
+    planning_cost_source = str(plan.get("cost_source") or "unavailable") if isinstance(plan, Mapping) else "unavailable"
 
     if not tool_calls:
         tool_calls = list(deterministic_route["tool_calls"])
@@ -82,18 +87,21 @@ def answer_pi_chat(
     retrieval_latency_ms = _elapsed_ms(retrieval_started)
     evidence = _collect_chat_evidence(executed_calls)
     generation_started = time.perf_counter()
-    answer = _synthesize_answer(
+    generation = _synthesize_answer(
         clean_question,
         executed_calls=executed_calls,
         evidence=evidence,
         llm_client=llm_client,
     )
+    answer = str(generation["answer"])
     generation_latency_ms = _elapsed_ms(generation_started)
+    bounded_snippet_provider_egress = bool(generation["model_call_attempted"]) and _has_archive_snippet_context(executed_calls)
     trace = _build_assistant_trace(
         route=deterministic_route,
         planner=planner,
         executed_calls=executed_calls,
         evidence=evidence,
+        bounded_snippet_provider_egress=bounded_snippet_provider_egress,
     )
     answer_contract = _build_answer_contract(
         answer,
@@ -106,8 +114,13 @@ def answer_pi_chat(
         retrieval_latency_ms=retrieval_latency_ms,
         generation_latency_ms=generation_latency_ms,
         planning_model_calls=planning_model_calls,
-        generation_model_calls=1,
+        generation_model_calls=1 if generation["model_call_attempted"] else 0,
+        planning_cost_usd=planning_cost_usd,
+        generation_cost_usd=_optional_float(generation.get("estimated_cost_usd")),
+        planning_cost_source=planning_cost_source,
+        generation_cost_source=str(generation.get("cost_source") or "unavailable"),
         tool_call_count=len(executed_calls),
+        bounded_snippet_provider_egress=bounded_snippet_provider_egress,
     )
     return {
         "status": "ok" if executed_calls else "empty",
@@ -156,28 +169,32 @@ def _plan_tool_calls(
         f"Available tools:\n{json.dumps(tool_descriptions, ensure_ascii=False)}"
     )
     try:
-        planned = llm_client.complete_json(
+        planned, usage = _complete_json_with_usage(
+            llm_client,
             prompt=prompt,
             system=PI_ASSISTANT_SYSTEM_PROMPT,
             category="pi_chat",
         )
     except Exception:
-        return {
-            "tool_calls": list(deterministic_route["tool_calls"]),
-            "reason": "LLM planning unavailable; deterministic fallback.",
-            "planner": "deterministic",
-            "model_call_attempted": True,
-        }
+        return _deterministic_plan(
+            deterministic_route,
+            reason="LLM planning unavailable; deterministic fallback.",
+            model_call_attempted=True,
+            cost_source="unavailable_error",
+        )
     if isinstance(planned, dict):
         planned.setdefault("planner", "llm")
         planned["model_call_attempted"] = True
+        planned["estimated_cost_usd"] = usage["estimated_cost_usd"]
+        planned["cost_source"] = usage["cost_source"]
         return planned
-    return {
-        "tool_calls": list(deterministic_route["tool_calls"]),
-        "reason": "LLM plan was not an object.",
-        "planner": "deterministic",
-        "model_call_attempted": True,
-    }
+    return _deterministic_plan(
+        deterministic_route,
+        reason="LLM plan was not an object.",
+        model_call_attempted=True,
+        estimated_cost_usd=usage["estimated_cost_usd"],
+        cost_source=usage["cost_source"],
+    )
 
 
 def _synthesize_answer(
@@ -186,7 +203,7 @@ def _synthesize_answer(
     executed_calls: list[dict],
     evidence: dict,
     llm_client: type[LLMClient],
-) -> str:
+) -> dict[str, object]:
     compact_calls = _truncate_text(json.dumps(executed_calls, ensure_ascii=False, indent=2), MAX_FINAL_CONTEXT_CHARS)
     prompt = (
         "Answer the operator's Telegram message as Hermes.\n\n"
@@ -206,15 +223,97 @@ def _synthesize_answer(
         f"Collected evidence:\n{json.dumps(evidence, ensure_ascii=False)}"
     )
     try:
-        answer = llm_client.complete(
+        answer, usage = _complete_text_with_usage(
+            llm_client,
             prompt=prompt,
             system=PI_ASSISTANT_SYSTEM_PROMPT,
             max_tokens=900,
             category="pi_chat",
-        ).strip()
+        )
     except Exception:
-        return _fallback_answer(question, executed_calls=executed_calls, evidence=evidence)
-    return answer or _fallback_answer(question, executed_calls=executed_calls, evidence=evidence)
+        return {
+            "answer": _fallback_answer(question, executed_calls=executed_calls, evidence=evidence),
+            "model_call_attempted": True,
+            "estimated_cost_usd": 0.0,
+            "cost_source": "unavailable_error",
+        }
+    return {
+        "answer": answer or _fallback_answer(question, executed_calls=executed_calls, evidence=evidence),
+        "model_call_attempted": True,
+        "estimated_cost_usd": usage["estimated_cost_usd"],
+        "cost_source": usage["cost_source"],
+    }
+
+
+def _complete_json_with_usage(
+    llm_client: type[LLMClient],
+    *,
+    prompt: str,
+    system: str,
+    category: str,
+) -> tuple[Any, dict[str, object]]:
+    receipt_fn = getattr(llm_client, "complete_with_receipt", None)
+    if callable(receipt_fn):
+        receipt = receipt_fn(prompt=prompt, system=system, category=category)
+        return json.loads(_strip_code_fence(str(receipt.text))), {
+            "estimated_cost_usd": round(float(receipt.estimated_cost_usd), 8),
+            "cost_source": "llm_completion_receipt",
+        }
+    planned = llm_client.complete_json(prompt=prompt, system=system, category=category)
+    return planned, {
+        "estimated_cost_usd": 0.0,
+        "cost_source": "fake_or_unmetered_no_receipt",
+    }
+
+
+def _complete_text_with_usage(
+    llm_client: type[LLMClient],
+    *,
+    prompt: str,
+    system: str,
+    max_tokens: int,
+    category: str,
+) -> tuple[str, dict[str, object]]:
+    receipt_fn = getattr(llm_client, "complete_with_receipt", None)
+    if callable(receipt_fn):
+        receipt = receipt_fn(prompt=prompt, system=system, max_tokens=max_tokens, category=category)
+        return str(receipt.text).strip(), {
+            "estimated_cost_usd": round(float(receipt.estimated_cost_usd), 8),
+            "cost_source": "llm_completion_receipt",
+        }
+    return llm_client.complete(prompt=prompt, system=system, max_tokens=max_tokens, category=category).strip(), {
+        "estimated_cost_usd": 0.0,
+        "cost_source": "fake_or_unmetered_no_receipt",
+    }
+
+
+def _strip_code_fence(text: str) -> str:
+    clean = text.strip()
+    if clean.startswith("```"):
+        lines = clean.splitlines()
+        lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        clean = "\n".join(lines).strip()
+    return clean
+
+
+def _deterministic_plan(
+    deterministic_route: Mapping[str, Any],
+    *,
+    reason: str,
+    model_call_attempted: bool = False,
+    estimated_cost_usd: float | None = 0.0,
+    cost_source: str = "not_applicable",
+) -> dict[str, object]:
+    return {
+        "tool_calls": list(deterministic_route["tool_calls"]),
+        "reason": reason,
+        "planner": "deterministic",
+        "model_call_attempted": model_call_attempted,
+        "estimated_cost_usd": estimated_cost_usd,
+        "cost_source": cost_source,
+    }
 
 
 def _fallback_tool_calls(question: str) -> list[dict]:
@@ -305,6 +404,14 @@ def route_pi_intent(question: str) -> dict[str, object]:
         "intent": intent,
         "tool_calls": calls[:PI_TOOL_LOOP_MAX_CALLS],
         "privacy_boundary": "bounded_read_only_no_raw_corpus",
+    }
+
+
+def _route_requires_deterministic_tools(route: Mapping[str, Any]) -> bool:
+    return str(route.get("intent") or "") in {
+        "exact_search",
+        "reaction_recall",
+        "no_answer_probe",
     }
 
 
@@ -469,29 +576,39 @@ def _build_answer_telemetry(
     generation_latency_ms: float,
     planning_model_calls: int,
     generation_model_calls: int,
+    planning_cost_usd: float | None,
+    generation_cost_usd: float | None,
+    planning_cost_source: str,
+    generation_cost_source: str,
     tool_call_count: int,
+    bounded_snippet_provider_egress: bool,
 ) -> dict[str, object]:
     return {
         "schema_version": "pi_answer_telemetry.v1",
         "planning": {
             "latency_ms": planning_latency_ms,
             "model_calls": planning_model_calls,
-            "estimated_cost_usd": 0.0,
+            "estimated_cost_usd": planning_cost_usd,
+            "cost_source": planning_cost_source,
         },
         "retrieval": {
             "latency_ms": retrieval_latency_ms,
             "tool_calls": tool_call_count,
             "estimated_cost_usd": 0.0,
+            "cost_source": "local_read_only_tools",
         },
         "generation": {
             "latency_ms": generation_latency_ms,
             "model_calls": generation_model_calls,
-            "estimated_cost_usd": 0.0,
+            "estimated_cost_usd": generation_cost_usd,
+            "cost_source": generation_cost_source,
         },
         "privacy": {
             "raw_post_text_logged": False,
             "raw_tool_payload_logged": False,
             "provider_payload_logged": False,
+            "raw_telegram_corpus_egress": False,
+            "bounded_telegram_snippet_provider_egress": bounded_snippet_provider_egress,
         },
     }
 
@@ -516,6 +633,23 @@ def _collect_source_dates(executed_calls: list[dict]) -> list[str]:
     return _unique(dates)
 
 
+def _has_archive_snippet_context(executed_calls: list[dict]) -> bool:
+    def visit(item: Any) -> bool:
+        if isinstance(item, Mapping):
+            snippet = item.get("snippet")
+            if isinstance(snippet, str) and snippet.strip():
+                return True
+            return any(visit(value) for value in item.values())
+        if isinstance(item, list):
+            return any(visit(child) for child in item)
+        return False
+
+    for call in executed_calls:
+        if call.get("name") == "search_telegram_archive" and visit(call.get("result")):
+            return True
+    return False
+
+
 def _first_answer_line(answer: str) -> str:
     for line in str(answer or "").splitlines():
         clean = line.strip()
@@ -528,12 +662,22 @@ def _elapsed_ms(started: float) -> float:
     return round((time.perf_counter() - started) * 1000, 3)
 
 
+def _optional_float(value: object) -> float | None:
+    if value is None:
+        return None
+    try:
+        return round(float(value), 8)
+    except (TypeError, ValueError):
+        return None
+
+
 def _build_assistant_trace(
     *,
     route: Mapping[str, Any],
     planner: str,
     executed_calls: list[dict],
     evidence: dict,
+    bounded_snippet_provider_egress: bool,
 ) -> dict[str, object]:
     termination_reason = _termination_reason(executed_calls, evidence)
     return {
@@ -555,7 +699,9 @@ def _build_assistant_trace(
         "insufficient_evidence": termination_reason
         in {"insufficient_evidence", "needs_external_verification"},
         "privacy_boundary": {
-            "raw_telegram_text_egress": False,
+            "raw_telegram_text_egress": bounded_snippet_provider_egress,
+            "raw_telegram_corpus_egress": False,
+            "bounded_telegram_snippet_provider_egress": bounded_snippet_provider_egress,
             "external_skill_used": False,
             "write_performed": False,
             "bounded_read_only_tools": True,
@@ -573,6 +719,8 @@ def _empty_trace(*, termination_reason: str) -> dict[str, object]:
         "insufficient_evidence": False,
         "privacy_boundary": {
             "raw_telegram_text_egress": False,
+            "raw_telegram_corpus_egress": False,
+            "bounded_telegram_snippet_provider_egress": False,
             "external_skill_used": False,
             "write_performed": False,
             "bounded_read_only_tools": True,

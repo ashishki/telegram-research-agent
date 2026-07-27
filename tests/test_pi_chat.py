@@ -152,6 +152,17 @@ class _ArchiveSearchLLM(_FakeLLM):
         return "Нашёл пост в архиве: https://t.me/source/1001"
 
 
+class _WrongArchivePlannerLLM(_ArchiveSearchLLM):
+    @staticmethod
+    def complete_json(prompt, system="", category="unknown", model=None):
+        return {
+            "tool_calls": [
+                {"name": "get_weekly_summary", "arguments": {"week_label": "2026-W28"}},
+            ],
+            "reason": "Wrong planner route for a deterministic archive query.",
+        }
+
+
 class _EmptyArchiveFacade(_FakeFacade):
     def search_telegram_archive(self, query, filters=None, limit=10):
         return {
@@ -203,9 +214,22 @@ class TestPIChat(unittest.TestCase):
         result = answer_pi_chat("Найди пост про agent review", facade=_FakeFacade(), llm_client=_ArchiveSearchLLM)
 
         self.assertEqual(result["status"], "ok")
-        self.assertEqual(result["tool_calls"], [{"name": "search_telegram_archive", "arguments": {"query": "agent review", "limit": 3}}])
+        self.assertEqual(
+            result["tool_calls"],
+            [
+                {
+                    "name": "search_telegram_archive",
+                    "arguments": {"query": "Найди пост про agent review", "limit": 5},
+                }
+            ],
+        )
+        self.assertEqual(result["trace"]["planner"], "deterministic")
+        self.assertEqual(result["telemetry"]["planning"]["model_calls"], 0)
         self.assertIn("https://t.me/source/1001", result["answer"])
         self.assertIn("https://t.me/source/1001", result["evidence"]["source_refs"])
+        self.assertTrue(result["trace"]["privacy_boundary"]["raw_telegram_text_egress"])
+        self.assertFalse(result["trace"]["privacy_boundary"]["raw_telegram_corpus_egress"])
+        self.assertTrue(result["trace"]["privacy_boundary"]["bounded_telegram_snippet_provider_egress"])
         contract = validate_grounded_answer_contract(result["answer_contract"])
         self.assertEqual(contract["archive_support"]["status"], "available")
         self.assertEqual(contract["source_links"], ["https://t.me/source/1001"])
@@ -215,6 +239,13 @@ class TestPIChat(unittest.TestCase):
         )
         self.assertFalse(contract["model_background"]["used"])
         self.assertFalse(contract["external_verification"]["required"])
+
+    def test_deterministic_archive_route_ignores_wrong_llm_plan(self):
+        result = answer_pi_chat("Найди пост про agent review", facade=_FakeFacade(), llm_client=_WrongArchivePlannerLLM)
+
+        self.assertEqual(result["trace"]["planner"], "deterministic")
+        self.assertEqual([call["name"] for call in result["tool_calls"]], ["search_telegram_archive"])
+        self.assertEqual(result["telemetry"]["planning"]["model_calls"], 0)
 
     def test_answer_pi_chat_no_answer_does_not_fabricate_archive_citation(self):
         result = answer_pi_chat("Найди пост которого нет", facade=_EmptyArchiveFacade(), llm_client=_ArchiveNoAnswerLLM)
@@ -287,6 +318,9 @@ class TestPIChat(unittest.TestCase):
         self.assertEqual(telemetry["retrieval"]["tool_calls"], 1)
         self.assertEqual(telemetry["retrieval"]["estimated_cost_usd"], 0.0)
         self.assertEqual(telemetry["generation"]["estimated_cost_usd"], 0.0)
+        self.assertEqual(telemetry["generation"]["cost_source"], "fake_or_unmetered_no_receipt")
+        self.assertTrue(telemetry["privacy"]["bounded_telegram_snippet_provider_egress"])
+        self.assertFalse(telemetry["privacy"]["raw_telegram_corpus_egress"])
         self.assertFalse(telemetry["privacy"]["raw_post_text_logged"])
         self.assertNotIn(
             "Agent review automation works",
