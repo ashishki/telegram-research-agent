@@ -12,10 +12,12 @@ status, feedback summaries, Strategy Reviewer notes, and bounded retained
 Telegram archive search when the operator asks for original Telegram posts.
 Curated search may use deterministic ranking plus transient SQLite FTS over
 curated objects. Archive search may use persistent SQLite FTS over retained
-posts with bounded snippets and source links. Do not use raw Telegram firehose
-dumps, vector memory, or external skills. Do not mutate code, config, profiles,
-projects, feedback, or database state. If evidence is missing, say that evidence
-is insufficient instead of filling gaps from model knowledge.
+posts with bounded snippets and source links. High-stakes, unstable, or current
+external claims require an explicit external verification request; do not treat
+Telegram archive evidence as final external truth. Do not use raw Telegram
+firehose dumps, vector memory, or external skills. Do not mutate code, config,
+profiles, projects, feedback, or database state. If evidence is missing, say
+that evidence is insufficient instead of filling gaps from model knowledge.
 """.strip()
 
 PI_TOOL_DESCRIPTIONS = {
@@ -33,7 +35,7 @@ PI_TOOL_DESCRIPTIONS = {
     "get_feedback_summary": "Return AI workbook feedback summary.",
     "list_marked_posts": "Return operator-marked posts; no reaction is unknown, not negative.",
     "get_strategy_reviewer_notes": "Return structured Strategy Reviewer advisory notes and Codex task suggestions.",
-    "request_external_verification": "Return a bounded request for external verification; does not call external sources.",
+    "request_external_verification": "Return a bounded external verification requirement; does not call external sources, use external skills, or persist notes.",
     "propose_knowledge_note": "Draft a Knowledge Note proposal that requires human confirmation before persistence.",
     "propose_watch_topic": "Draft a Watch Topic proposal that requires human confirmation before persistence.",
     "propose_project_link": "Draft a project-link proposal that requires human confirmation before persistence.",

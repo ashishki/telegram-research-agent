@@ -1,15 +1,16 @@
 # Codex Handoff
 
 Status: active
-Last updated: 2026-07-26
+Last updated: 2026-07-27
 
 ## Product Direction
 
 The repository is being retrofitted from a weekly-report-centered Telegram
 intelligence system into Personal Telegram Research Memory + Grounded Assistant.
 HEAD contains corrective PRM implementation slices through PRM-7 and PRM-9
-through PRM-10, including bounded SQLite FTS archive search and an assistant
-vertical slice. PRM-8 and PRM-11 through PRM-20 are not implemented.
+through PRM-11, including bounded SQLite FTS archive search, a grounded
+assistant vertical slice, and deterministic external-verification requirement
+routing. PRM-8 and PRM-12 through PRM-20 are not implemented.
 
 ## Operating Rules
 
@@ -37,5 +38,5 @@ vertical slice. PRM-8 and PRM-11 through PRM-20 are not implemented.
 
 ## Current Next Task
 
-Corrective PRM deep-review evidence and test-tier repair before continuing at
-the next policy-allowed PRM boundary.
+Continue at PRM-12. Do not start PRM-13 until PRM-12 is completed or explicitly
+deferred and the PRM-9 through PRM-12 block deep review is recorded.

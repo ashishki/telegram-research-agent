@@ -152,6 +152,24 @@ class _ArchiveSearchLLM(_FakeLLM):
         return "Нашёл пост в архиве: https://t.me/source/1001"
 
 
+class _ExternalVerificationLLM(_FakeLLM):
+    @staticmethod
+    def complete_json(prompt, system="", category="unknown", model=None):
+        raise AssertionError("External verification routes must bypass LLM planning.")
+
+    @staticmethod
+    def complete(prompt, system="", max_tokens=2048, category="unknown", model=None):
+        assert "external_evidence" in prompt
+        assert "not_run_unapproved" in prompt
+        return "\n".join(
+            [
+                "Archive evidence: no Telegram archive evidence was collected for this verification request.",
+                "External verification: required and not run.",
+                "Unknowns: current external truth; independent source corroboration; Telegram archive support.",
+            ]
+        )
+
+
 class _WrongArchivePlannerLLM(_ArchiveSearchLLM):
     @staticmethod
     def complete_json(prompt, system="", category="unknown", model=None):
@@ -308,6 +326,60 @@ class TestPIChat(unittest.TestCase):
 
         self.assertEqual(route["intent"], "external_verification")
         self.assertEqual(route["tool_calls"][0]["name"], "request_external_verification")
+        self.assertEqual(route["tool_calls"][0]["arguments"]["category"], "explicit_external_verification")
+
+    def test_high_stakes_categories_require_external_verification(self):
+        cases = {
+            "pricing": "What is the OpenAI pricing for this model?",
+            "legal": "Is this contract clause legal?",
+            "medical": "What medical treatment is recommended here?",
+            "financial": "Should I invest in this stock?",
+            "career_market": "What is the job market for AI engineers?",
+            "visa": "What visa rule applies to this case?",
+        }
+
+        for expected_category, question in cases.items():
+            with self.subTest(expected_category=expected_category):
+                route = route_pi_intent(question)
+                tool_names = [call["name"] for call in route["tool_calls"]]
+
+                self.assertEqual(route["intent"], "external_verification")
+                self.assertEqual(tool_names, ["request_external_verification"])
+                self.assertEqual(route["tool_calls"][0]["arguments"]["category"], expected_category)
+
+    def test_external_verification_terms_do_not_overmatch_internal_questions(self):
+        openclaw = route_pi_intent("Что известно про openclaw из архива?")
+        project_now = route_pi_intent("What should I do now about project actions?")
+
+        self.assertEqual(openclaw["intent"], "exact_search")
+        self.assertEqual(project_now["intent"], "project_application")
+
+    def test_external_verification_answer_separates_evidence_and_unknowns(self):
+        result = answer_pi_chat(
+            "What is the current price for this product?",
+            facade=_FakeFacade(),
+            llm_client=_ExternalVerificationLLM,
+        )
+
+        self.assertEqual(result["trace"]["planner"], "deterministic")
+        self.assertEqual([call["name"] for call in result["tool_calls"]], ["request_external_verification"])
+        self.assertEqual(result["trace"]["termination_reason"], "needs_external_verification")
+        self.assertFalse(result["trace"]["privacy_boundary"]["external_skill_used"])
+        self.assertFalse(result["trace"]["privacy_boundary"]["raw_telegram_corpus_egress"])
+        self.assertFalse(result["trace"]["privacy_boundary"]["bounded_telegram_snippet_provider_egress"])
+
+        contract = validate_grounded_answer_contract(result["answer_contract"])
+        self.assertEqual(contract["archive_support"]["status"], "insufficient_evidence")
+        self.assertEqual(contract["external_verification"]["status"], "required_not_run")
+        self.assertEqual(contract["external_verification"]["category"], "pricing")
+        self.assertEqual(contract["external_verification"]["external_source_links"], [])
+        self.assertIn("current external truth", contract["unknowns"])
+        self.assertIn("Telegram archive support", contract["unknowns"])
+        self.assertEqual(
+            contract["evidence_sections"]["archive_evidence"]["source_links"],
+            [],
+        )
+        self.assertEqual(contract["evidence_sections"]["external_evidence"]["status"], "required_not_run")
 
     def test_answer_telemetry_separates_retrieval_generation_and_excludes_raw_text(self):
         result = answer_pi_chat("Найди пост про agent review", facade=_FakeFacade(), llm_client=_ArchiveSearchLLM)

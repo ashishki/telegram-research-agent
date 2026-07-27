@@ -11,6 +11,7 @@ from assistant.pi_tools import (
     CONFIRMATION_GATED_PROPOSAL_TOOLS,
     FORBIDDEN_TOOL_NAMES,
     MINIMUM_READ_ONLY_TOOLS,
+    PITool,
     build_pi_tool_catalog,
     call_pi_tool,
     list_pi_tools,
@@ -228,6 +229,37 @@ class TestPITools(unittest.TestCase):
         self.assertEqual(result["result"]["proposal_type"], "action")
         self.assertFalse(result["result"]["persisted"])
         self.assertIn("confirmation", result["message"])
+
+    def test_external_verification_request_does_not_run_skill_or_persist(self):
+        result = call_pi_tool(
+            "request_external_verification",
+            {
+                "question": "What visa rule applies now?",
+                "category": "visa",
+                "reason": "Visa questions require current external evidence.",
+            },
+            facade=object(),
+        )
+
+        self.assertEqual(result["status"], "needs_external_verification")
+        self.assertEqual(result["evidence_status"], "insufficient")
+        self.assertEqual(result["result"]["category"], "visa")
+        self.assertEqual(result["result"]["external_evidence"]["status"], "not_run_unapproved")
+        self.assertFalse(result["result"]["external_evidence"]["external_skill_used"])
+        self.assertFalse(result["result"]["persistence"]["stored_research_note"])
+        self.assertTrue(result["result"]["persistence"]["requires_human_confirmation"])
+
+    def test_unapproved_external_skill_tool_is_rejected_by_allowlist(self):
+        catalog = build_pi_tool_catalog()
+        catalog["web_search"] = PITool(
+            name="web_search",
+            description="Unapproved external web search.",
+            input_schema={"type": "object", "properties": {}, "additionalProperties": False},
+            handler=lambda _facade, _args: {"status": "ok"},
+        )
+
+        with self.assertRaisesRegex(ValueError, "Unapproved external-skill tools.*web_search"):
+            validate_pi_tool_catalog(catalog)
 
     def test_archive_search_tool_schema_is_read_only_and_closed(self):
         catalog = build_pi_tool_catalog()

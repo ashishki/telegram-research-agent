@@ -1,6 +1,7 @@
 # Privacy Threat Model
 
 Status: draft
+Last updated: 2026-07-27
 
 ## Assets
 
@@ -21,6 +22,7 @@ Status: draft
 | generated private artifacts committed | `data/output/**` ignored; review diff before commit |
 | embedding provider egress | explicit human approval and ADR before external embeddings |
 | external skill reads private data | skills disabled until trust record and approval |
+| unstable/high-stakes claim answered from stale Telegram evidence | deterministic external-verification requirement; Telegram evidence is discovery context only |
 | chat transcript becomes memory silently | session context is not durable memory |
 | source URL loses provenance | archive document identity preserves Telegram link |
 | deletion cannot be honored | retention/deletion path required before dogfood |
@@ -41,6 +43,20 @@ corpus egress:
 - `bounded_telegram_snippet_provider_egress=true` when cited snippets are sent
   to answer generation;
 - `raw_telegram_corpus_egress=false` for all approved PRM assistant paths.
+
+## External Verification Rule
+
+Pricing, legal, medical, financial, career-market, visa, freshness, news, and
+explicit external-verification questions must produce a local verification
+requirement unless approved external evidence is already available.
+
+The PRM-11 assistant path does not call external sources. It records:
+
+- Telegram/archive evidence as discovery context only;
+- external evidence as `not_run_unapproved`;
+- no automatic Telegram archive snippet collection for verification-only routes;
+- `external_skill_used=false`;
+- no stored research note until human confirmation.
 
 ## Confirmation Rule
 

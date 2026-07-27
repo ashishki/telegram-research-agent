@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 from typing import Any, Mapping
 
@@ -13,6 +14,137 @@ from llm.client import LLMClient
 
 MAX_TOOL_RESULT_CHARS = 8000
 MAX_FINAL_CONTEXT_CHARS = 24000
+
+EXPLICIT_EXTERNAL_VERIFICATION_TERMS = (
+    "external",
+    "externally",
+    "verify outside",
+    "проверь в интернете",
+    "внешн",
+)
+
+FRESHNESS_VERIFICATION_TERMS = (
+    "fresh",
+    "freshness",
+    "latest",
+    "news",
+    "recent",
+    "today",
+    "сегодня",
+    "свеж",
+    "новост",
+)
+
+HIGH_STAKES_VERIFICATION_TERMS = (
+    (
+        "pricing",
+        (
+            "pricing",
+            "price",
+            "prices",
+            "тариф",
+            "тарифы",
+            "стоимость",
+            "цена",
+            "цены",
+        ),
+    ),
+    (
+        "legal",
+        (
+            "legal",
+            "law",
+            "lawsuit",
+            "compliance",
+            "юрид",
+            "закон",
+            "регуляц",
+            "договор",
+        ),
+    ),
+    (
+        "medical",
+        (
+            "medical",
+            "health",
+            "doctor",
+            "treatment",
+            "diagnosis",
+            "medicine",
+            "медиц",
+            "здоров",
+            "врач",
+            "лечение",
+            "диагноз",
+        ),
+    ),
+    (
+        "financial",
+        (
+            "financial",
+            "finance",
+            "investment",
+            "investing",
+            "invest",
+            "stock",
+            "stocks",
+            "tax",
+            "crypto",
+            "loan",
+            "финанс",
+            "инвест",
+            "биржа",
+            "ценные бумаги",
+            "налог",
+            "крипто",
+            "кредит",
+        ),
+    ),
+    (
+        "career_market",
+        (
+            "career",
+            "job market",
+            "hiring",
+            "salary",
+            "compensation",
+            "рынок труда",
+            "ваканс",
+            "зарплат",
+            "карьер",
+        ),
+    ),
+    (
+        "visa",
+        (
+            "visa",
+            "visas",
+            "immigration",
+            "residency",
+            "виза",
+            "иммиграц",
+            "вид на жительство",
+        ),
+    ),
+)
+
+STEM_EXTERNAL_VERIFICATION_TERMS = frozenset(
+    {
+        "внешн",
+        "свеж",
+        "новост",
+        "юрид",
+        "регуляц",
+        "медиц",
+        "здоров",
+        "финанс",
+        "инвест",
+        "иммиграц",
+        "ваканс",
+        "зарплат",
+        "карьер",
+    }
+)
 
 
 def answer_pi_chat(
@@ -213,6 +345,7 @@ def _synthesize_answer(
         "- Use only the provided read-only tool results for source-grounded claims.\n"
         "- If evidence is missing, say what is missing instead of guessing.\n"
         "- Distinguish source-backed facts, interpretation, model background, market/business context, and matched external evidence.\n"
+        "- When external verification is required, keep separate sections for archive evidence, external verification, and unknowns.\n"
         "- Market/business context is context_only and cannot satisfy MVP Radar gates.\n"
         "- Missing or stale Radar never permits build/focused decisions.\n"
         "- Do not claim you changed code/config/profile/projects or ran Codex.\n"
@@ -324,17 +457,10 @@ def route_pi_intent(question: str) -> dict[str, object]:
     lowered = question.casefold()
     calls: list[dict[str, object]]
     intent = "general_memory"
-    if any(term in lowered for term in ("external", "externally", "внешн", "проверь в интернете", "verify outside")):
+    verification_need = _external_verification_need(question)
+    if verification_need:
         intent = "external_verification"
-        calls = [
-            {
-                "name": "request_external_verification",
-                "arguments": {
-                    "question": question,
-                    "reason": "archive evidence may be insufficient or time-sensitive",
-                },
-            }
-        ]
+        calls = _external_verification_calls(question, verification_need)
     elif any(term in lowered for term in ("реакц", "reacted", "reaction", "marked by me", "отмеченн")):
         intent = "reaction_recall"
         calls = [
@@ -359,18 +485,6 @@ def route_pi_intent(question: str) -> dict[str, object]:
         calls = [
             {"name": "search_telegram_archive", "arguments": {"query": question, "limit": 8}},
             {"name": "search_intelligence_items", "arguments": {"query": question, "limit": 8}},
-        ]
-    elif any(term in lowered for term in ("новост", "fresh", "latest", "сегодня", "recent")):
-        intent = "news_or_freshness"
-        calls = [
-            {"name": "search_telegram_archive", "arguments": {"query": question, "limit": 8}},
-            {
-                "name": "request_external_verification",
-                "arguments": {
-                    "question": question,
-                    "reason": "freshness claims may require external verification",
-                },
-            },
         ]
     elif any(term in lowered for term in ("проект", "project", "примен", "apply", "life")):
         intent = "project_application"
@@ -410,9 +524,66 @@ def route_pi_intent(question: str) -> dict[str, object]:
 def _route_requires_deterministic_tools(route: Mapping[str, Any]) -> bool:
     return str(route.get("intent") or "") in {
         "exact_search",
+        "external_verification",
         "reaction_recall",
         "no_answer_probe",
     }
+
+
+def _external_verification_need(question: str) -> dict[str, object] | None:
+    lowered = question.casefold()
+    if _matches_external_terms(lowered, EXPLICIT_EXTERNAL_VERIFICATION_TERMS):
+        return {
+            "category": "explicit_external_verification",
+            "reason": "The operator explicitly requested external verification.",
+            "include_archive_search": False,
+        }
+    if _matches_external_terms(lowered, FRESHNESS_VERIFICATION_TERMS):
+        return {
+            "category": "freshness",
+            "reason": "The question depends on fresh or unstable facts.",
+            "include_archive_search": False,
+        }
+    for category, terms in HIGH_STAKES_VERIFICATION_TERMS:
+        if _matches_external_terms(lowered, terms):
+            return {
+                "category": category,
+                "reason": f"The question is in a high-stakes {category} category.",
+                "include_archive_search": False,
+            }
+    return None
+
+
+def _external_verification_calls(question: str, verification_need: Mapping[str, object]) -> list[dict[str, object]]:
+    category = str(verification_need.get("category") or "unstable_or_high_stakes_claim")
+    reason = str(verification_need.get("reason") or "External verification is required.")
+    calls: list[dict[str, object]] = []
+    if verification_need.get("include_archive_search"):
+        calls.append({"name": "search_telegram_archive", "arguments": {"query": question, "limit": 5}})
+    calls.append(
+        {
+            "name": "request_external_verification",
+            "arguments": {
+                "question": question,
+                "category": category,
+                "reason": reason,
+            },
+        }
+    )
+    return calls
+
+
+def _matches_external_terms(lowered: str, terms: tuple[str, ...]) -> bool:
+    return any(_matches_external_term(lowered, term) for term in terms)
+
+
+def _matches_external_term(lowered: str, term: str) -> bool:
+    clean_term = term.casefold().strip()
+    if not clean_term:
+        return False
+    if " " in clean_term or clean_term in STEM_EXTERNAL_VERIFICATION_TERMS:
+        return clean_term in lowered
+    return re.search(rf"(?<!\w){re.escape(clean_term)}(?!\w)", lowered) is not None
 
 
 def _normalize_tool_calls(raw_calls: Any) -> list[dict]:
@@ -474,6 +645,17 @@ def _collect_chat_evidence(executed_calls: list[dict]) -> dict:
 
 def _fallback_answer(question: str, *, executed_calls: list[dict], evidence: dict) -> str:
     del question
+    if any(call.get("status") == "needs_external_verification" for call in executed_calls):
+        refs = [str(ref) for ref in evidence.get("source_refs") or [] if str(ref).strip()]
+        unknowns = _contract_unknowns(executed_calls, external_required=True, source_links=refs)
+        lines = [
+            "Archive evidence: "
+            + (", ".join(refs[:5]) if refs else "No Telegram archive evidence was returned."),
+            "External verification: required; no external source was called and no note was stored.",
+            "Unknowns: " + "; ".join(unknowns),
+        ]
+        return "\n".join(lines)
+
     lines = ["Hermes checked the curated PI tools."]
     for call in executed_calls[:4]:
         result = call.get("result") or {}
@@ -504,6 +686,8 @@ def validate_grounded_answer_contract(contract: Mapping[str, Any]) -> dict[str, 
         "freshness_date_boundary",
         "model_background",
         "external_verification",
+        "unknowns",
+        "evidence_sections",
         "optional_next_action",
         "insufficient_evidence",
     }
@@ -518,6 +702,12 @@ def validate_grounded_answer_contract(contract: Mapping[str, Any]) -> dict[str, 
         raise ValueError("grounded answer archive_support must be an object")
     if not isinstance(contract.get("model_background"), Mapping):
         raise ValueError("grounded answer model_background must be an object")
+    if not isinstance(contract.get("external_verification"), Mapping):
+        raise ValueError("grounded answer external_verification must be an object")
+    if not isinstance(contract.get("unknowns"), list):
+        raise ValueError("grounded answer unknowns must be a list")
+    if not isinstance(contract.get("evidence_sections"), Mapping):
+        raise ValueError("grounded answer evidence_sections must be an object")
     return dict(contract)
 
 
@@ -532,7 +722,28 @@ def _build_answer_contract(
     source_dates = _collect_source_dates(executed_calls)
     termination_reason = str(trace.get("termination_reason") or "")
     insufficient = bool(trace.get("insufficient_evidence")) or not source_links
-    external_required = termination_reason == "needs_external_verification"
+    external_requests = _collect_external_verification_requests(executed_calls)
+    external_required = termination_reason == "needs_external_verification" or bool(external_requests)
+    external_categories = _unique(
+        [str(request.get("category")) for request in external_requests if str(request.get("category") or "").strip()]
+    )
+    external_reasons = _unique(
+        [str(request.get("reason")) for request in external_requests if str(request.get("reason") or "").strip()]
+    )
+    external_source_links = _collect_external_source_links(external_requests)
+    unknowns = _contract_unknowns(
+        executed_calls,
+        external_required=external_required,
+        source_links=source_links,
+    )
+    external_status = (
+        "verified"
+        if external_source_links
+        else "required_not_run"
+        if external_required
+        else "not_required"
+    )
+    model_background_used = bool(not source_links and answer.strip() and not external_required)
     contract = {
         "schema_version": "grounded_answer_contract.v1",
         "direct_answer": _first_answer_line(answer),
@@ -552,12 +763,29 @@ def _build_answer_contract(
             "source_date_count": len(source_dates),
         },
         "model_background": {
-            "used": bool(not source_links and answer.strip()),
-            "label": "background_not_archive_supported" if not source_links and answer.strip() else "not_used",
+            "used": model_background_used,
+            "label": "background_not_archive_supported" if model_background_used else "not_used",
         },
         "external_verification": {
             "required": external_required,
-            "reason": "fresh_or_external_claim" if external_required else None,
+            "status": external_status,
+            "category": external_categories[0] if external_categories else None,
+            "reason": external_reasons[0] if external_reasons else ("fresh_or_external_claim" if external_required else None),
+            "external_source_links": external_source_links,
+            "approved_trust_record": False,
+        },
+        "unknowns": unknowns,
+        "evidence_sections": {
+            "archive_evidence": {
+                "status": "available" if source_links else "insufficient_evidence",
+                "source_links": source_links[:10],
+            },
+            "external_evidence": {
+                "status": external_status,
+                "source_links": external_source_links,
+                "external_skill_used": False,
+            },
+            "unknowns": unknowns,
         },
         "optional_next_action": (
             "Approve external verification before treating this as current fact."
@@ -631,6 +859,46 @@ def _collect_source_dates(executed_calls: list[dict]) -> list[str]:
     for call in executed_calls:
         visit(call.get("result"))
     return _unique(dates)
+
+
+def _collect_external_verification_requests(executed_calls: list[dict]) -> list[dict]:
+    requests: list[dict] = []
+    for call in executed_calls:
+        if call.get("name") != "request_external_verification":
+            continue
+        result = call.get("result")
+        if not isinstance(result, Mapping):
+            continue
+        payload = result.get("result")
+        if isinstance(payload, Mapping):
+            requests.append(dict(payload))
+    return requests
+
+
+def _collect_external_source_links(external_requests: list[dict]) -> list[str]:
+    refs: list[str] = []
+    for request in external_requests:
+        external_evidence = request.get("external_evidence")
+        if not isinstance(external_evidence, Mapping):
+            continue
+        refs.extend(str(ref) for ref in external_evidence.get("source_refs") or [] if str(ref).strip())
+    return _unique(refs)[:10]
+
+
+def _contract_unknowns(
+    executed_calls: list[dict],
+    *,
+    external_required: bool,
+    source_links: list[str],
+) -> list[str]:
+    unknowns: list[str] = []
+    if external_required:
+        unknowns.extend(["current external truth", "independent source corroboration"])
+    if not source_links:
+        unknowns.append("Telegram archive support")
+    if any(call.get("status") in {"missing", "invalid", "rejected"} for call in executed_calls):
+        unknowns.append("complete local tool result")
+    return _unique(unknowns)
 
 
 def _has_archive_snippet_context(executed_calls: list[dict]) -> bool:

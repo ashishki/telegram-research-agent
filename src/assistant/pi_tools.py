@@ -22,6 +22,20 @@ FORBIDDEN_TOOL_NAMES = {
     "execute_sql",
 }
 
+UNAPPROVED_EXTERNAL_SKILL_TOOL_NAMES = {
+    "browser_search",
+    "crawl4ai_search",
+    "external_web_search",
+    "reddit_search",
+    "scrape_url",
+    "search_web",
+    "telegram_channel_parse",
+    "web_search",
+    "x_search",
+}
+
+APPROVED_EXTERNAL_SKILL_TOOL_NAMES: frozenset[str] = frozenset()
+
 NO_EVIDENCE_REQUIRED_TOOLS = {"get_current_week_label"}
 
 MINIMUM_READ_ONLY_TOOLS = {
@@ -224,16 +238,12 @@ def build_pi_tool_catalog() -> dict[str, PITool]:
             input_schema=_schema(
                 {
                     "question": {"type": "string"},
+                    "category": {"type": ["string", "null"]},
                     "reason": {"type": ["string", "null"]},
                 },
                 required=["question"],
             ),
-            handler=lambda _facade, args: {
-                "status": "needs_external_verification",
-                "question": _required_string(args.get("question"), "question"),
-                "reason": _optional_string(args.get("reason")),
-                "message": "External verification is required; no external request was run.",
-            },
+            handler=lambda _facade, args: _external_verification_request(args),
         ),
         "propose_knowledge_note": _proposal_tool("propose_knowledge_note", "knowledge_note"),
         "propose_watch_topic": _proposal_tool("propose_watch_topic", "watch_topic"),
@@ -253,6 +263,9 @@ def list_pi_tools(catalog: Mapping[str, PITool] | None = None) -> list[dict]:
 
 def validate_pi_tool_catalog(catalog: Mapping[str, PITool]) -> dict:
     forbidden = sorted(FORBIDDEN_TOOL_NAMES.intersection(catalog))
+    unapproved_external = sorted(
+        UNAPPROVED_EXTERNAL_SKILL_TOOL_NAMES.intersection(catalog).difference(APPROVED_EXTERNAL_SKILL_TOOL_NAMES)
+    )
     writable = sorted(name for name, tool in catalog.items() if not tool.read_only)
     missing_read_only = sorted(MINIMUM_READ_ONLY_TOOLS.difference(catalog))
     missing_proposals = sorted(CONFIRMATION_GATED_PROPOSAL_TOOLS.difference(catalog))
@@ -263,6 +276,8 @@ def validate_pi_tool_catalog(catalog: Mapping[str, PITool]) -> dict:
     )
     if forbidden:
         raise ValueError(f"Forbidden mutation tools in PI catalog: {', '.join(forbidden)}")
+    if unapproved_external:
+        raise ValueError(f"Unapproved external-skill tools in PI catalog: {', '.join(unapproved_external)}")
     if writable:
         raise ValueError(f"PI catalog tools must be read-only: {', '.join(writable)}")
     if missing_read_only:
@@ -348,6 +363,44 @@ def _proposal_response(proposal_type: str, args: Mapping[str, Any]) -> dict:
         },
         "persisted": False,
         "message": "Proposal drafted only; human confirmation is required before persistence.",
+    }
+
+
+def _external_verification_request(args: Mapping[str, Any]) -> dict:
+    question = _required_string(args.get("question"), "question")
+    category = _optional_string(args.get("category")) or "unstable_or_high_stakes_claim"
+    reason = _optional_string(args.get("reason")) or "The answer needs current or high-stakes evidence outside Telegram."
+    return {
+        "status": "needs_external_verification",
+        "question": question,
+        "category": category,
+        "reason": reason,
+        "telegram_evidence": {
+            "role": "discovery_context_only",
+            "status": "not_collected_by_this_tool",
+            "source_refs": [],
+        },
+        "external_evidence": {
+            "status": "not_run_unapproved",
+            "source_refs": [],
+            "external_skill_used": False,
+            "approved_trust_record": False,
+            "trust_record_required": True,
+        },
+        "unknowns": [
+            "current external truth",
+            "independent source corroboration",
+        ],
+        "persistence": {
+            "stored_research_note": False,
+            "requires_human_confirmation": True,
+        },
+        "privacy_boundary": {
+            "raw_telegram_corpus_egress": False,
+            "external_skill_used": False,
+            "write_performed": False,
+        },
+        "message": "External verification is required; no external request was run and no note was stored.",
     }
 
 

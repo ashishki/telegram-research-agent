@@ -181,12 +181,79 @@ git diff --check
 <no output>
 ```
 
+## PRM-11 Continuation Evidence
+
+Scope:
+
+- Implemented PRM-11 on-demand external verification requirement path.
+- High-stakes categories `pricing`, `legal`, `medical`, `financial`,
+  `career_market`, and `visa`, plus freshness/news/current or explicit external
+  verification prompts, route deterministically through
+  `request_external_verification`.
+- `request_external_verification` is local only: no browser/web call, no
+  external skill use, no automatic Telegram archive snippet collection, no
+  persisted research note, and no profile/project/config mutation.
+- Grounded answer contracts now expose separate archive evidence, external
+  evidence, and unknowns sections for verification-required answers.
+- Tool catalog validation rejects unapproved external-skill tool names while
+  approved external skill allowlist remains empty.
+
+Changed files:
+
+- `src/assistant/pi_chat.py`
+- `src/assistant/pi_tools.py`
+- `src/assistant/pi_prompts.py`
+- `tests/test_pi_chat.py`
+- `tests/test_pi_tools.py`
+- `AGENTS.md`
+- `docs/CODEX_PROMPT.md`
+- `docs/TEST_STRATEGY.md`
+- `docs/tool_eval.md`
+- `docs/PRIVACY_THREAT_MODEL.md`
+- `docs/audit/PRM_DEEP_REVIEW_CONSOLIDATED_2026-07-27.md`
+
+Verification:
+
+```text
+PYTHONPATH=src python3 -m pytest tests/test_pi_tools.py tests/test_pi_chat.py -q
+28 passed, 6 subtests passed in 2.06s
+```
+
+```text
+python3 tools/test_tiers.py focused-prm
+54 passed, 6 subtests passed in 1.85s
+```
+
+```text
+python3 tools/test_tiers.py fast-contract
+107 passed, 6 subtests passed in 50.27s
+```
+
+```text
+python3 tools/playbook_validate.py --root . --check tasks --check placeholders --check readiness --check delivery --check references
+playbook_validate: errors=0 warnings=0
+```
+
+```text
+git diff --check
+<no output>
+```
+
+Boundary evidence:
+
+- No live Telegram ingestion, reaction sync, LLM extraction, Frontier, Radar,
+  report generation, full archive indexing, embeddings, external web research,
+  external skill execution, or production database migration was run.
+- No raw Telegram text was written to docs or fixtures.
+- No external-verification evidence is approved or stored; the implemented path
+  records a requirement only.
+
 ## Open Boundaries
 
 - Candidate retrieval queries remain unapproved and must not be treated as gold
   evidence.
 - PRM-8 vector/hybrid retrieval remains blocked.
-- PRM-11 through PRM-12 remain unclosed; the PRM-9 through PRM-12 block review
+- PRM-12 remains unclosed; the PRM-9 through PRM-12 block review
   is not complete.
 - No production database migration, live ingestion, embeddings, external skill,
   dogfood start, release claim, or compatibility-file archive/delete/move was

@@ -1,7 +1,7 @@
 # Tool Evaluation Plan
 
-Status: draft; PRM-4 archive search tool vertical slice recorded; PRM-9 routing and trace evidence recorded
-Last updated: 2026-07-26
+Status: draft; PRM-4 archive search tool vertical slice recorded; PRM-9 routing and trace evidence recorded; PRM-11 external verification requirement path recorded
+Last updated: 2026-07-27
 
 ## Tool Classes
 
@@ -136,6 +136,44 @@ Result:
 python3 -m pytest tests/ -q
 1 failed, 995 passed, 281 subtests passed in 241.48s
 FAILED tests/test_product_ops.py::TestProductOps::test_ops_validation_passes_when_live_evidence_rows_exist
+```
+
+## PRM-11 External Verification Evidence
+
+Implementation:
+
+- High-stakes or unstable questions now route deterministically through
+  `request_external_verification`, so LLM planning cannot skip the requirement.
+- Covered high-stakes routing categories are `pricing`, `legal`, `medical`,
+  `financial`, `career_market`, and `visa`; freshness/news/current questions
+  also require verification.
+- The local `request_external_verification` tool returns a requirement DTO only.
+  It does not browse, call external skills, automatically collect Telegram
+  archive snippets, persist research notes, mutate profile/project state, or
+  store chat transcript memory.
+- Verification responses separate `telegram_evidence`,
+  `external_evidence(status=not_run_unapproved)`, `unknowns`, `persistence`,
+  and `privacy_boundary`.
+- The grounded answer contract now exposes `evidence_sections` with separate
+  `archive_evidence`, `external_evidence`, and `unknowns` sections.
+- Tool catalog validation rejects unapproved external-skill tool names such as
+  `web_search`; `APPROVED_EXTERNAL_SKILL_TOOL_NAMES` is empty until a human
+  approval and trust record exist.
+
+Verification command:
+
+```bash
+PYTHONPATH=src python3 -m pytest tests/test_pi_tools.py tests/test_pi_chat.py -q
+python3 tools/test_tiers.py focused-prm
+python3 tools/test_tiers.py fast-contract
+```
+
+Result:
+
+```text
+28 passed, 6 subtests passed in 2.06s
+54 passed, 6 subtests passed in 1.85s
+107 passed, 6 subtests passed in 50.27s
 ```
 
 ## Stop-Ship Cases
