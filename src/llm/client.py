@@ -4,7 +4,7 @@ import mimetypes
 import os
 import sqlite3
 import time
-from contextlib import closing
+from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from typing import Any
 
@@ -40,6 +40,7 @@ CATEGORY_MODEL_MAP: dict[str, str] = {
     "test":              "claude-haiku-4-5",
 }
 _usage_db_path: str = ""
+_usage_recording_suppressed = 0
 
 
 class LLMError(Exception):
@@ -67,7 +68,19 @@ def set_usage_db_path(path: str) -> None:
     _usage_db_path = path
 
 
+@contextmanager
+def suppress_usage_recording():
+    global _usage_recording_suppressed
+    _usage_recording_suppressed += 1
+    try:
+        yield
+    finally:
+        _usage_recording_suppressed = max(0, _usage_recording_suppressed - 1)
+
+
 def _resolve_usage_db_path() -> str:
+    if _usage_recording_suppressed:
+        return ""
     return _usage_db_path or os.environ.get("AGENT_DB_PATH", "").strip()
 
 

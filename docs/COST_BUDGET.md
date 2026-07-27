@@ -96,11 +96,13 @@ the PRM-10 fixture path, estimated costs remain `0.0` with
 `cost_source=fake_or_unmetered_no_receipt` because no live provider call is
 made. The live `LLMClient` path uses completion receipts for generation cost.
 Bounded Telegram snippet provider context is recorded separately from broad raw
-corpus egress.
+corpus egress. PI chat suppresses `llm_usage` database writes during read-only
+planning/generation; response telemetry remains the cost receipt for these
+turns.
 
 Verification:
 
 ```text
-python3 -m pytest tests/test_pi_chat.py tests/test_pi_tools.py tests/test_archive_search.py tests/test_archive_documents.py -q
-37 passed in 1.75s
+PYTHONPATH=src python3 -m pytest tests/test_pi_tools.py tests/test_pi_chat.py -q
+39 passed, 6 subtests passed in 14.25s
 ```

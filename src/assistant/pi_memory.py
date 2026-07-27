@@ -85,11 +85,39 @@ def confirm_memory_proposal(db_path: str | Path, args: Mapping[str, Any]) -> dic
     confirmed_by = _optional_string(args.get("confirmed_by")) or "operator"
     memory_id = proposal.get("target_memory_id") or _memory_id(proposal)
     event_type = MEMORY_OPERATIONS[str(proposal["operation"])]
+    proposal_id = _proposal_id(proposal)
     token_hash = _token_hash(supplied_token)
     db_file = Path(db_path)
-    db_file.parent.mkdir(parents=True, exist_ok=True)
+    if not db_file.exists():
+        return _not_persisted(
+            "schema_missing",
+            "personal_memory_events schema is not initialized; run canonical migrations before confirmed saves.",
+        )
     with sqlite3.connect(db_file) as connection:
-        _ensure_schema(connection)
+        if not _schema_ready(connection):
+            return _not_persisted(
+                "schema_missing",
+                "personal_memory_events schema is not initialized; run canonical migrations before confirmed saves.",
+            )
+        existing = _existing_confirmation(connection, proposal_id, token_hash)
+        if existing:
+            return {
+                "status": "already_confirmed",
+                "persisted": True,
+                "write_performed": False,
+                "memory_id": str(existing["memory_id"]),
+                "event_id": int(existing["id"]),
+                "event_type": str(existing["event_type"]),
+                "object_type": str(existing["object_type"]),
+                "operation": proposal["operation"],
+                "append_only": True,
+                "rollback_of_event_id": existing["rollback_of_event_id"],
+                "confirmation_receipt": json.loads(str(existing["confirmation_receipt_json"])),
+                "message": "Proposal was already confirmed; no new memory event was appended.",
+            }
+        invalid_target = _invalid_target_reason(connection, proposal)
+        if invalid_target:
+            return _not_persisted("invalid_target", invalid_target)
         cursor = connection.execute(
             """
             INSERT INTO personal_memory_events (
@@ -119,7 +147,7 @@ def confirm_memory_proposal(db_path: str | Path, args: Mapping[str, Any]) -> dic
                 proposal.get("rationale"),
                 json.dumps(proposal["source_refs"], ensure_ascii=False),
                 json.dumps(proposal["metadata"], ensure_ascii=False, sort_keys=True),
-                _proposal_id(proposal),
+                proposal_id,
                 proposal.get("target_event_id") if event_type == "rolled_back" else None,
                 timestamp,
                 confirmed_by,
@@ -127,7 +155,7 @@ def confirm_memory_proposal(db_path: str | Path, args: Mapping[str, Any]) -> dic
                 json.dumps(
                     {
                         "schema_version": MEMORY_EVENT_SCHEMA_VERSION,
-                        "proposal_id": _proposal_id(proposal),
+                        "proposal_id": proposal_id,
                         "operation": proposal["operation"],
                         "confirmed_at": timestamp,
                         "confirmed_by": confirmed_by,
@@ -154,13 +182,97 @@ def confirm_memory_proposal(db_path: str | Path, args: Mapping[str, Any]) -> dic
         "rollback_of_event_id": proposal.get("target_event_id") if event_type == "rolled_back" else None,
         "confirmation_receipt": {
             "schema_version": MEMORY_EVENT_SCHEMA_VERSION,
-            "proposal_id": _proposal_id(proposal),
+            "proposal_id": proposal_id,
             "confirmed_at": timestamp,
             "confirmed_by": confirmed_by,
             "confirmation_token_hash": token_hash,
         },
         "message": "Confirmed memory proposal persisted as an append-only event.",
     }
+
+
+def _not_persisted(status: str, message: str) -> dict[str, object]:
+    return {
+        "status": status,
+        "persisted": False,
+        "write_performed": False,
+        "message": message,
+    }
+
+
+def _schema_ready(connection: sqlite3.Connection) -> bool:
+    required_columns = {
+        "id",
+        "memory_id",
+        "object_type",
+        "event_type",
+        "title",
+        "body",
+        "rationale",
+        "source_refs_json",
+        "metadata_json",
+        "proposal_id",
+        "rollback_of_event_id",
+        "created_at",
+        "created_by",
+        "confirmation_token_hash",
+        "confirmation_receipt_json",
+    }
+    columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(personal_memory_events)").fetchall()}
+    return required_columns.issubset(columns)
+
+
+def _existing_confirmation(connection: sqlite3.Connection, proposal_id: str, token_hash: str) -> sqlite3.Row | None:
+    connection.row_factory = sqlite3.Row
+    return connection.execute(
+        """
+        SELECT *
+        FROM personal_memory_events
+        WHERE proposal_id = ? AND confirmation_token_hash = ?
+        ORDER BY id
+        LIMIT 1
+        """,
+        (proposal_id, token_hash),
+    ).fetchone()
+
+
+def _invalid_target_reason(connection: sqlite3.Connection, proposal: Mapping[str, Any]) -> str | None:
+    operation = str(proposal["operation"])
+    if operation == "create":
+        return None
+    target_memory_id = str(proposal.get("target_memory_id") or "")
+    object_type = str(proposal["object_type"])
+    target = connection.execute(
+        """
+        SELECT id, object_type
+        FROM personal_memory_events
+        WHERE memory_id = ?
+        ORDER BY id DESC
+        LIMIT 1
+        """,
+        (target_memory_id,),
+    ).fetchone()
+    if target is None:
+        return "target_memory_id does not exist; edit, delete, and rollback require an existing memory object."
+    if str(target["object_type"]) != object_type:
+        return "target_memory_id belongs to a different memory object_type."
+    if operation != "rollback":
+        return None
+    target_event_id = proposal.get("target_event_id")
+    rollback_target = connection.execute(
+        """
+        SELECT id, memory_id, object_type
+        FROM personal_memory_events
+        WHERE id = ?
+        LIMIT 1
+        """,
+        (target_event_id,),
+    ).fetchone()
+    if rollback_target is None:
+        return "target_event_id does not exist; rollback requires an existing memory event."
+    if str(rollback_target["memory_id"]) != target_memory_id or str(rollback_target["object_type"]) != object_type:
+        return "target_event_id does not belong to the requested target_memory_id and object_type."
+    return None
 
 
 def normalize_memory_proposal(raw: Mapping[str, Any]) -> dict:
@@ -192,53 +304,6 @@ def confirmation_token_for_proposal(proposal: Mapping[str, Any]) -> str:
     secret = os.environ.get("PI_SAVE_CONFIRMATION_SECRET", "local-prm12-confirmation-v1")
     digest = hashlib.sha256(f"{secret}:{_canonical_json(normalized)}".encode("utf-8")).hexdigest()
     return f"{CONFIRMATION_TOKEN_PREFIX}{digest[:20]}"
-
-
-def _ensure_schema(connection: sqlite3.Connection) -> None:
-    connection.executescript(
-        """
-        CREATE TABLE IF NOT EXISTS personal_memory_events (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            memory_id TEXT NOT NULL CHECK(length(trim(memory_id)) > 0),
-            object_type TEXT NOT NULL CHECK(object_type IN (
-                'knowledge_note',
-                'watch_topic',
-                'project_link',
-                'decision',
-                'action',
-                'experiment',
-                'feedback'
-            )),
-            event_type TEXT NOT NULL CHECK(event_type IN (
-                'created',
-                'edited',
-                'deleted',
-                'rolled_back'
-            )),
-            title TEXT NOT NULL CHECK(length(trim(title)) > 0),
-            body TEXT,
-            rationale TEXT,
-            source_refs_json TEXT NOT NULL
-                CHECK(json_valid(source_refs_json) AND json_type(source_refs_json) = 'array'),
-            metadata_json TEXT NOT NULL
-                CHECK(json_valid(metadata_json) AND json_type(metadata_json) = 'object'),
-            proposal_id TEXT NOT NULL CHECK(length(trim(proposal_id)) > 0),
-            rollback_of_event_id INTEGER,
-            created_at TEXT NOT NULL,
-            created_by TEXT NOT NULL,
-            confirmation_token_hash TEXT NOT NULL CHECK(length(trim(confirmation_token_hash)) > 0),
-            confirmation_receipt_json TEXT NOT NULL
-                CHECK(json_valid(confirmation_receipt_json)
-                      AND json_type(confirmation_receipt_json) = 'object')
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_personal_memory_events_memory
-        ON personal_memory_events(memory_id, id);
-
-        CREATE INDEX IF NOT EXISTS idx_personal_memory_events_type_created
-        ON personal_memory_events(object_type, created_at);
-        """
-    )
 
 
 def _proposal_id(proposal: Mapping[str, Any]) -> str:

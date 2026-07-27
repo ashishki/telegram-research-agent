@@ -14,7 +14,7 @@ Last updated: 2026-07-27
 - Implemented slices in HEAD: PRM-1 through PRM-7 plus PRM-9 through PRM-12
 - Blocked/not implemented slices: PRM-8 and PRM-13 through PRM-20
 - Next safe work: PRM-13 only if the human operator wants to proceed beyond the
-  recorded PRM-9 through PRM-12 block review gate
+  recorded PRM-9 through PRM-12 corrective deep-review gate
 
 ## Product Direction
 

@@ -50,11 +50,17 @@ Minimum read-only tools:
 - `get_strategy_reviewer_notes`;
 - `request_external_verification`.
 
+Additional local read-only helpers:
+
+- `get_workbook_sections`;
+- `get_action_statuses`.
+
 Confirmation-gated proposal tools:
 
 - `propose_knowledge_note`;
 - `propose_watch_topic`;
 - `propose_project_link`;
+- `propose_decision`;
 - `propose_action`;
 - `propose_experiment`;
 - `propose_feedback`.
@@ -62,6 +68,22 @@ Confirmation-gated proposal tools:
 Proposal tools return `needs_confirmation`, `persisted=false`, and a proposed
 object only. They do not write to SQLite, files, profile, config, projects, or
 feedback tables.
+
+Confirmed write tool:
+
+- `confirm_save_proposal`.
+
+`confirm_save_proposal` is the only writable PI tool. It requires an explicit
+facade, the exact proposal object, and the matching confirmation token. It
+requires the canonical `personal_memory_events` schema to already exist through
+normal migrations; the tool handler does not create tables lazily. Replaying the
+same proposal/token returns the existing event and does not append a duplicate.
+Edit, delete, and rollback confirmations validate that their target memory or
+event exists before writing.
+
+The catalog is an explicit allowlist. Known external-skill tool names remain
+unapproved unless a trust record is approved, and unknown tool names are rejected
+before handler execution.
 
 Deterministic intent routes cover exact archive search, concept search, case
 search, comparison, freshness/news, project application, reaction recall,
@@ -100,7 +122,16 @@ Turn-level trace records planner type, deterministic intent, termination
 reason, insufficient-evidence flag, and privacy boundary
 (`raw_telegram_text_egress` for bounded snippet provider context,
 `raw_telegram_corpus_egress=false`, `external_skill_used=false`,
-`write_performed=false`).
+`write_performed=false` unless a confirmed write succeeds). PI chat suppresses
+content-free `llm_usage` database writes during read-only planning/generation;
+cost remains in response telemetry.
+
+Tool trace privacy labels:
+
+- `bounded_read_only_no_raw_corpus`;
+- `proposal_only_no_write`;
+- `confirmation_gated_write_no_write`;
+- `confirmation_gated_write`.
 
 ## Termination
 
@@ -110,6 +141,7 @@ Allowed terminal states:
 - insufficient_evidence;
 - needs_external_verification;
 - needs_confirmation;
+- confirmed_write;
 - tool_error_degraded;
 - invalid_request.
 

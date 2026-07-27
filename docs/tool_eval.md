@@ -164,8 +164,9 @@ Implementation:
   and `privacy_boundary`.
 - The grounded answer contract now exposes `evidence_sections` with separate
   `archive_evidence`, `external_evidence`, and `unknowns` sections.
-- Tool catalog validation rejects unapproved external-skill tool names such as
-  `web_search`; `APPROVED_EXTERNAL_SKILL_TOOL_NAMES` is empty until a human
+- Tool catalog validation is an explicit allowlist. It rejects unapproved
+  external-skill tool names such as `web_search` and unknown tool names before
+  handler execution; `APPROVED_EXTERNAL_SKILL_TOOL_NAMES` is empty until a human
   approval and trust record exist.
 
 Verification command:
@@ -179,9 +180,9 @@ python3 tools/test_tiers.py fast-contract
 Result:
 
 ```text
-28 passed, 6 subtests passed in 2.06s
-54 passed, 6 subtests passed in 1.85s
-107 passed, 6 subtests passed in 50.27s
+39 passed, 6 subtests passed in 14.25s
+65 passed, 6 subtests passed in 12.74s
+118 passed, 6 subtests passed in 58.27s
 ```
 
 ## PRM-12 Confirmation-Gated Save/Watch Evidence
@@ -197,8 +198,12 @@ Implementation:
 - `confirm_save_proposal` is the only confirmation-gated write tool. It is
   `read_only=false`, `requires_confirmation=true`, and rejects calls without an
   explicit facade or valid confirmation token.
-- Confirmed writes append rows to `personal_memory_events`; edit, delete, and
-  rollback are modelled as new events, not destructive updates.
+- Confirmed writes require the canonical `personal_memory_events` schema from
+  migrations; the tool handler does not create tables lazily.
+- Confirmed writes append rows to `personal_memory_events`; replay of the same
+  proposal/token returns the existing event without appending a duplicate.
+- Edit, delete, and rollback are modelled as new events, not destructive
+  updates, and their target memory/event ids are validated before writing.
 - Chat save requests draft proposals only. Session chat text and transcripts do
   not create durable memory rows unless the user supplies the exact proposal and
   confirmation token.
@@ -216,9 +221,9 @@ python3 tools/test_tiers.py fast-contract
 Result:
 
 ```text
-33 passed, 6 subtests passed in 2.19s
-59 passed, 6 subtests passed in 2.09s
-112 passed, 6 subtests passed in 47.21s
+39 passed, 6 subtests passed in 14.25s
+65 passed, 6 subtests passed in 12.74s
+118 passed, 6 subtests passed in 58.27s
 ```
 
 ## Stop-Ship Cases

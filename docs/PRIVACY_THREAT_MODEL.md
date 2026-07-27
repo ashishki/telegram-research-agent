@@ -25,6 +25,7 @@ Last updated: 2026-07-27
 | unstable/high-stakes claim answered from stale Telegram evidence | deterministic external-verification requirement; Telegram evidence is discovery context only |
 | chat transcript becomes memory silently | session context is not durable memory |
 | hidden memory write from assistant tool loop | proposal plus exact confirmation token required; write trace records `write_performed` |
+| read-only assistant turn mutates production DB telemetry | PI chat suppresses `llm_usage` database writes during planning/generation |
 | source URL loses provenance | archive document identity preserves Telegram link |
 | deletion cannot be honored | retention/deletion path required before dogfood |
 
@@ -70,7 +71,13 @@ PRM-12 confirmation semantics:
 - proposal tools are read-only and return `persisted=false`;
 - `confirm_save_proposal` is the only confirmed memory-write tool;
 - confirmation requires the exact proposal object and confirmation token;
+- confirmed memory writes require the migrated canonical `personal_memory_events`
+  schema and do not create tables lazily;
 - confirmed memory writes append events to `personal_memory_events`;
+- replaying the same proposal/token returns the existing event without a new
+  write;
+- edit, delete, and rollback confirmations validate their targets before
+  writing;
 - edit, delete, and rollback are represented as new audit events, not
   destructive updates to prior events;
 - ordinary chat text and voice transcripts are not durable memory.

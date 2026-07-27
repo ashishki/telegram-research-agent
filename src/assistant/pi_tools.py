@@ -40,6 +40,11 @@ APPROVED_EXTERNAL_SKILL_TOOL_NAMES: frozenset[str] = frozenset()
 
 NO_EVIDENCE_REQUIRED_TOOLS = {"get_current_week_label"}
 
+OPTIONAL_READ_ONLY_TOOLS = {
+    "get_workbook_sections",
+    "get_action_statuses",
+}
+
 MINIMUM_READ_ONLY_TOOLS = {
     "get_current_week_label",
     "get_weekly_summary",
@@ -69,6 +74,13 @@ CONFIRMATION_GATED_PROPOSAL_TOOLS = {
 CONFIRMATION_GATED_WRITE_TOOLS = {
     "confirm_save_proposal",
 }
+
+ALLOWED_PI_TOOL_NAMES = (
+    MINIMUM_READ_ONLY_TOOLS
+    | OPTIONAL_READ_ONLY_TOOLS
+    | CONFIRMATION_GATED_PROPOSAL_TOOLS
+    | CONFIRMATION_GATED_WRITE_TOOLS
+)
 
 
 @dataclass(frozen=True)
@@ -299,6 +311,8 @@ def validate_pi_tool_catalog(catalog: Mapping[str, PITool]) -> dict:
     unapproved_external = sorted(
         UNAPPROVED_EXTERNAL_SKILL_TOOL_NAMES.intersection(catalog).difference(APPROVED_EXTERNAL_SKILL_TOOL_NAMES)
     )
+    known_external = UNAPPROVED_EXTERNAL_SKILL_TOOL_NAMES | APPROVED_EXTERNAL_SKILL_TOOL_NAMES
+    unknown = sorted(set(catalog).difference(ALLOWED_PI_TOOL_NAMES | known_external))
     writable = sorted(name for name, tool in catalog.items() if not tool.read_only)
     missing_read_only = sorted(MINIMUM_READ_ONLY_TOOLS.difference(catalog))
     missing_proposals = sorted(CONFIRMATION_GATED_PROPOSAL_TOOLS.difference(catalog))
@@ -318,6 +332,8 @@ def validate_pi_tool_catalog(catalog: Mapping[str, PITool]) -> dict:
         raise ValueError(f"Forbidden mutation tools in PI catalog: {', '.join(forbidden)}")
     if unapproved_external:
         raise ValueError(f"Unapproved external-skill tools in PI catalog: {', '.join(unapproved_external)}")
+    if unknown:
+        raise ValueError(f"Unknown PI tools are not in the explicit allowlist: {', '.join(unknown)}")
     if unsafe_writes:
         raise ValueError(f"Writable PI tools must be confirmation-gated: {', '.join(unsafe_writes)}")
     if missing_read_only:
@@ -346,6 +362,16 @@ def call_pi_tool(
     catalog: Mapping[str, PITool] | None = None,
 ) -> dict:
     tools = catalog or build_pi_tool_catalog()
+    try:
+        validate_pi_tool_catalog(tools)
+    except ValueError as exc:
+        return _tool_response(
+            str(name or "").strip(),
+            {
+                "status": "rejected",
+                "message": str(exc),
+            },
+        )
     clean_name = str(name or "").strip()
     tool = tools.get(clean_name)
     if tool is None:

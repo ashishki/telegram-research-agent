@@ -40,4 +40,4 @@ through PRM-20 are not implemented.
 ## Current Next Task
 
 Continue at PRM-13 only if the human operator wants to proceed beyond the
-recorded PRM-9 through PRM-12 block review gate.
+recorded PRM-9 through PRM-12 corrective deep-review gate.

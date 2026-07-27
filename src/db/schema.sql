@@ -577,6 +577,48 @@ CREATE INDEX IF NOT EXISTS idx_ai_report_feedback_intake_status
 CREATE INDEX IF NOT EXISTS idx_ai_report_feedback_intake_created
     ON ai_report_feedback_intakes(created_at);
 
+CREATE TABLE IF NOT EXISTS personal_memory_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    memory_id TEXT NOT NULL CHECK(length(trim(memory_id)) > 0),
+    object_type TEXT NOT NULL CHECK(object_type IN (
+        'knowledge_note',
+        'watch_topic',
+        'project_link',
+        'decision',
+        'action',
+        'experiment',
+        'feedback'
+    )),
+    event_type TEXT NOT NULL CHECK(event_type IN (
+        'created',
+        'edited',
+        'deleted',
+        'rolled_back'
+    )),
+    title TEXT NOT NULL CHECK(length(trim(title)) > 0),
+    body TEXT,
+    rationale TEXT,
+    source_refs_json TEXT NOT NULL
+        CHECK(json_valid(source_refs_json) AND json_type(source_refs_json) = 'array'),
+    metadata_json TEXT NOT NULL
+        CHECK(json_valid(metadata_json) AND json_type(metadata_json) = 'object'),
+    proposal_id TEXT NOT NULL CHECK(length(trim(proposal_id)) > 0),
+    rollback_of_event_id INTEGER,
+    created_at TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    confirmation_token_hash TEXT NOT NULL CHECK(length(trim(confirmation_token_hash)) > 0),
+    confirmation_receipt_json TEXT NOT NULL
+        CHECK(json_valid(confirmation_receipt_json)
+              AND json_type(confirmation_receipt_json) = 'object'),
+    UNIQUE(proposal_id, confirmation_token_hash),
+    FOREIGN KEY(rollback_of_event_id)
+        REFERENCES personal_memory_events(id) ON DELETE RESTRICT
+);
+CREATE INDEX IF NOT EXISTS idx_personal_memory_events_memory
+    ON personal_memory_events(memory_id, id);
+CREATE INDEX IF NOT EXISTS idx_personal_memory_events_type_created
+    ON personal_memory_events(object_type, created_at);
+
 CREATE TABLE IF NOT EXISTS projects (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,

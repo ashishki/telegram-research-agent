@@ -34,9 +34,9 @@ Target repo baseline: ad8689fa25b89f77122c4cec7c7a6b9da3f500cf
 | Repository | Existing product, not greenfield; pre-retrofit commit ad8689fa25b89f77122c4cec7c7a6b9da3f500cf |
 | Playbook | Current checkout pinned at 5583eca96c4d2d480b5574ed78bea63e0b07ebf0 |
 | Product center | Pivot proposed from weekly report to Personal Telegram Research Memory + Grounded Assistant |
-| Full archive search | Planned; not implemented as assistant product surface |
-| Current SQLite FTS | Exists for posts in local schema; not yet hardened as persistent product retrieval contract |
-| PI assistant retrieval | Verified curated-only; raw Telegram archive intentionally excluded |
+| Full archive search | Bounded SQLite FTS archive search is implemented as the local assistant retrieval slice; vector/hybrid retrieval remains blocked |
+| Current SQLite FTS | Hardened as the persistent baseline for bounded archive search; not replaced by embeddings/vector storage |
+| PI assistant retrieval | Uses bounded curated and SQLite FTS archive tools; broad raw corpus provider egress remains forbidden |
 | W29 reports | V1 Brief and Atlas rendered despite V2 preview code existing elsewhere |
 | W29 reactions | Seven personal reactions resolved to posts, zero atoms, zero themes, zero ranking effects |
 | Radar | W29 Radar stage failed and contaminated release status instead of only Radar card |
@@ -447,7 +447,7 @@ Notes: |
 Owner: codex
 Phase: PRM
 Type: project:governance
-Status: planned
+Status: implemented
 Depends-On: PBR-8
 Risk-Level: high
 Public-Tests-Required: conditional
@@ -488,7 +488,7 @@ Notes: |
 Owner: codex
 Phase: PRM
 Type: rag:data-readiness
-Status: planned
+Status: implemented
 Depends-On: PRM-0
 Risk-Level: high
 Public-Tests-Required: required
@@ -531,7 +531,7 @@ Notes: |
 Owner: codex
 Phase: PRM
 Type: rag:ingestion
-Status: planned
+Status: implemented
 Depends-On: PRM-1
 Risk-Level: high
 Public-Tests-Required: required
@@ -574,7 +574,7 @@ Notes: |
 Owner: codex
 Phase: PRM
 Type: rag:query
-Status: planned
+Status: implemented
 Depends-On: PRM-2
 Risk-Level: high
 Public-Tests-Required: required
@@ -616,7 +616,7 @@ Notes: |
 Owner: codex
 Phase: PRM
 Type: rag:query tool:schema tool:call
-Status: planned
+Status: implemented
 Depends-On: PRM-3
 Risk-Level: high
 Public-Tests-Required: required
@@ -659,7 +659,7 @@ Notes: |
 Owner: codex
 Phase: PRM
 Type: rag:ingestion rag:query workflow:autonomous
-Status: planned
+Status: implemented
 Depends-On: PRM-3
 Risk-Level: high
 Public-Tests-Required: required
@@ -702,7 +702,7 @@ Notes: |
 Owner: codex
 Phase: PRM
 Type: rag:ingestion rag:generation
-Status: planned
+Status: implemented
 Depends-On: PRM-5
 Risk-Level: high
 Public-Tests-Required: required
@@ -744,7 +744,7 @@ Notes: |
 Owner: codex
 Phase: PRM
 Type: rag:query eval:gate
-Status: planned
+Status: implemented
 Depends-On: PRM-1, PRM-3, PRM-4
 Risk-Level: high
 Public-Tests-Required: required
@@ -787,7 +787,7 @@ Notes: |
 Owner: codex
 Phase: PRM
 Type: rag:query
-Status: conditional
+Status: blocked
 Depends-On: PRM-7
 Risk-Level: high
 Public-Tests-Required: required
@@ -830,7 +830,7 @@ Notes: |
 Owner: codex
 Phase: PRM
 Type: tool:schema tool:call agent:harness agent:termination
-Status: planned
+Status: implemented
 Depends-On: PRM-4, PRM-5, PRM-7
 Risk-Level: high
 Public-Tests-Required: required
@@ -872,7 +872,7 @@ Notes: |
 Owner: codex
 Phase: PRM
 Type: rag:generation
-Status: planned
+Status: implemented
 Depends-On: PRM-9, PRM-7
 Risk-Level: high
 Public-Tests-Required: required
@@ -914,7 +914,7 @@ Notes: |
 Owner: codex
 Phase: PRM
 Type: tool:schema tool:call
-Status: planned
+Status: implemented
 Depends-On: PRM-9, PRM-10
 Risk-Level: high
 Public-Tests-Required: required
@@ -956,7 +956,7 @@ Notes: |
 Owner: codex
 Phase: PRM
 Type: tool:schema tool:call tool:unsafe
-Status: planned
+Status: implemented
 Depends-On: PRM-10
 Risk-Level: high
 Public-Tests-Required: required

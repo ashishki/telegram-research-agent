@@ -98,6 +98,36 @@ def _verify_canonical_idea_thread_schema(connection: sqlite3.Connection) -> None
             )
 
 
+def _verify_personal_memory_schema(connection: sqlite3.Connection) -> None:
+    required_columns = {
+        "id",
+        "memory_id",
+        "object_type",
+        "event_type",
+        "title",
+        "body",
+        "rationale",
+        "source_refs_json",
+        "metadata_json",
+        "proposal_id",
+        "rollback_of_event_id",
+        "created_at",
+        "created_by",
+        "confirmation_token_hash",
+        "confirmation_receipt_json",
+    }
+    columns = {
+        str(row[1])
+        for row in connection.execute("PRAGMA table_info(personal_memory_events)").fetchall()
+    }
+    missing = sorted(required_columns - columns)
+    if missing:
+        raise RuntimeError(
+            "incompatible partial personal_memory_events schema; missing columns: "
+            + ", ".join(missing)
+        )
+
+
 def get_db_path() -> Path:
     raw_path = os.environ.get("AGENT_DB_PATH", DEFAULT_DB_PATH)
     path = Path(raw_path)
@@ -795,6 +825,7 @@ def run_migrations() -> Path:
         connection.execute("PRAGMA journal_mode = WAL;")
         connection.executescript(schema_sql)
         _verify_canonical_idea_thread_schema(connection)
+        _verify_personal_memory_schema(connection)
         connection.executescript(
             """
             CREATE TABLE IF NOT EXISTS reaction_sync_state (

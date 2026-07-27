@@ -36,3 +36,6 @@ These files remain preserved for human reference, but they are no longer part of
 - `PRM_BLOCK_REVIEW_2026-07-27_PRM9_12.md` - PRM-9 through PRM-12 assistant
   router, grounded answer, external verification, and confirmation-gated write
   block review receipt.
+- `PRM_DEEP_REVIEW_PRM9_12_2026-07-27.md` - PRM-9 through PRM-12 corrective
+  deep review with meta/process, architecture/privacy, and code/tests reviewer
+  findings and repair evidence before PRM-13.

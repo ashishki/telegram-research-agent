@@ -1,4 +1,5 @@
 import json
+import os
 import sqlite3
 import tempfile
 import unittest
@@ -142,6 +143,19 @@ class TestPITools(unittest.TestCase):
             return [dict(row) for row in cursor.fetchall()]
         finally:
             connection.close()
+
+    def _migrate_db(self, db_path: Path) -> None:
+        from db.migrate import run_migrations
+
+        previous = os.environ.get("AGENT_DB_PATH")
+        os.environ["AGENT_DB_PATH"] = str(db_path)
+        try:
+            run_migrations()
+        finally:
+            if previous is None:
+                os.environ.pop("AGENT_DB_PATH", None)
+            else:
+                os.environ["AGENT_DB_PATH"] = previous
 
     def _write_archive_db(self, db_path: Path, *, matching: bool = True) -> None:
         connection = sqlite3.connect(db_path)
@@ -309,6 +323,16 @@ class TestPITools(unittest.TestCase):
             self.assertFalse(invalid["result"]["persisted"])
             self.assertFalse(db_path.exists())
 
+            schema_missing = call_pi_tool(
+                "confirm_save_proposal",
+                {"proposal": proposal, "confirmation_token": proposal_result["result"]["confirmation"]["token"]},
+                facade=self._facade_with_db(Path(tmp), db_path),
+            )
+
+            self.assertEqual(schema_missing["status"], "schema_missing")
+            self.assertFalse(schema_missing["result"]["write_performed"])
+            self.assertFalse(db_path.exists())
+
     def test_confirm_save_proposal_persists_after_valid_confirmation(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -323,6 +347,7 @@ class TestPITools(unittest.TestCase):
                 },
                 facade=self._facade_with_db(root, db_path),
             )
+            self._migrate_db(db_path)
             confirmed = call_pi_tool(
                 "confirm_save_proposal",
                 {
@@ -349,6 +374,7 @@ class TestPITools(unittest.TestCase):
             root = Path(tmp)
             db_path = root / "memory.db"
             facade = self._facade_with_db(root, db_path)
+            self._migrate_db(db_path)
             create_result = call_pi_tool(
                 "propose_experiment",
                 {"title": "Try retrieval eval", "body": "Run the focused tier before changing retrieval."},
@@ -452,6 +478,100 @@ class TestPITools(unittest.TestCase):
             self.assertEqual(events[-1]["object_type"], "decision")
             self.assertEqual(events[-1]["event_type"], "created")
 
+    def test_confirm_save_replay_does_not_append_duplicate_event(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            db_path = root / "memory.db"
+            facade = self._facade_with_db(root, db_path)
+            proposal_result = call_pi_tool(
+                "propose_decision",
+                {"title": "Keep external skills disabled", "rationale": "No trust record is approved."},
+                facade=facade,
+            )
+            args = {
+                "proposal": proposal_result["result"]["proposal"],
+                "confirmation_token": proposal_result["result"]["confirmation"]["token"],
+                "confirmed_at": "2026-07-27T10:00:00Z",
+            }
+
+            self._migrate_db(db_path)
+            first = call_pi_tool("confirm_save_proposal", args, facade=facade)
+            replay = call_pi_tool("confirm_save_proposal", args, facade=facade)
+
+            self.assertEqual(first["status"], "ok")
+            self.assertEqual(replay["status"], "already_confirmed")
+            self.assertFalse(replay["result"]["write_performed"])
+            events = self._memory_events(db_path)
+            self.assertEqual(len(events), 1)
+            self.assertEqual(replay["result"]["event_id"], first["result"]["event_id"])
+
+    def test_confirm_save_rejects_missing_targets_without_writing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            db_path = root / "memory.db"
+            facade = self._facade_with_db(root, db_path)
+            self._migrate_db(db_path)
+
+            edit_result = call_pi_tool(
+                "propose_decision",
+                {
+                    "operation": "edit",
+                    "target_memory_id": "mem_missing",
+                    "title": "Missing decision",
+                    "body": "This target does not exist.",
+                },
+                facade=facade,
+            )
+            rejected_edit = call_pi_tool(
+                "confirm_save_proposal",
+                {
+                    "proposal": edit_result["result"]["proposal"],
+                    "confirmation_token": edit_result["result"]["confirmation"]["token"],
+                },
+                facade=facade,
+            )
+
+            self.assertEqual(rejected_edit["status"], "invalid_target")
+            self.assertFalse(rejected_edit["result"]["write_performed"])
+            self.assertEqual(self._memory_events(db_path), [])
+
+            create_result = call_pi_tool(
+                "propose_decision",
+                {"title": "Existing decision", "rationale": "Create a valid target."},
+                facade=facade,
+            )
+            created = call_pi_tool(
+                "confirm_save_proposal",
+                {
+                    "proposal": create_result["result"]["proposal"],
+                    "confirmation_token": create_result["result"]["confirmation"]["token"],
+                },
+                facade=facade,
+            )
+            rollback_result = call_pi_tool(
+                "propose_decision",
+                {
+                    "operation": "rollback",
+                    "target_memory_id": created["result"]["memory_id"],
+                    "target_event_id": 9999,
+                    "title": "Existing decision",
+                    "rationale": "Bad rollback target.",
+                },
+                facade=facade,
+            )
+            rejected_rollback = call_pi_tool(
+                "confirm_save_proposal",
+                {
+                    "proposal": rollback_result["result"]["proposal"],
+                    "confirmation_token": rollback_result["result"]["confirmation"]["token"],
+                },
+                facade=facade,
+            )
+
+            self.assertEqual(rejected_rollback["status"], "invalid_target")
+            self.assertFalse(rejected_rollback["result"]["write_performed"])
+            self.assertEqual(len(self._memory_events(db_path)), 1)
+
     def test_external_verification_request_does_not_run_skill_or_persist(self):
         result = call_pi_tool(
             "request_external_verification",
@@ -482,6 +602,24 @@ class TestPITools(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "Unapproved external-skill tools.*web_search"):
             validate_pi_tool_catalog(catalog)
+
+    def test_custom_catalog_rejects_unlisted_tool_before_execution(self):
+        catalog = build_pi_tool_catalog()
+
+        def fail_if_called(_facade, _args):
+            raise AssertionError("unlisted tool handler must not execute")
+
+        catalog["google_search"] = PITool(
+            name="google_search",
+            description="Unapproved external search.",
+            input_schema={"type": "object", "properties": {}, "additionalProperties": False},
+            handler=fail_if_called,
+        )
+
+        result = call_pi_tool("google_search", {"query": "private"}, facade=object(), catalog=catalog)
+
+        self.assertEqual(result["status"], "rejected")
+        self.assertIn("explicit allowlist", result["message"])
 
     def test_archive_search_tool_schema_is_read_only_and_closed(self):
         catalog = build_pi_tool_catalog()

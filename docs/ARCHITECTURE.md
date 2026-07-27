@@ -118,25 +118,35 @@ Hermes, PI, Atlas, Radar, or separate search systems.
 
 Minimum read-only tools:
 
+- `get_current_week_label`
+- `get_weekly_summary`
+- `get_artifact_status`
+- `get_workbook_sections`
+- `get_action_statuses`
+- `search_intelligence_items`
 - `search_telegram_archive`
-- `search_curated_knowledge`
-- `search_reacted_posts`
-- `get_topic_page`
-- `get_project_context`
-- `get_saved_knowledge_notes`
-- `get_watch_topics`
-- `get_recent_changes`
-- `get_radar_status`
+- `search_idea_threads`
+- `get_idea_thread`
+- `get_project_actions`
+- `get_mvp_radar_status`
+- `get_feedback_summary`
+- `list_marked_posts`
+- `get_strategy_reviewer_notes`
 - `request_external_verification`
 
 Confirmation-gated proposal tools:
 
-- `propose_save_knowledge_note`
+- `propose_knowledge_note`
 - `propose_watch_topic`
 - `propose_project_link`
+- `propose_decision`
 - `propose_action`
 - `propose_experiment`
 - `propose_feedback`
+
+Confirmation-gated write tool:
+
+- `confirm_save_proposal`
 
 Forbidden automatic mutation:
 
@@ -145,6 +155,11 @@ Forbidden automatic mutation:
 - permanent preference changes;
 - database mutation outside confirmed save flows;
 - external purchase, outreach, or product-build approval.
+
+PI chat suppresses content-free `llm_usage` database writes during read-only
+assistant turns. Confirmed memory writes require the canonical
+`personal_memory_events` schema to already exist through migrations; the tool
+handler does not create production tables lazily.
 
 ## RAG Strategy
 

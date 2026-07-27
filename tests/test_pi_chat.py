@@ -1,4 +1,6 @@
 import json
+import os
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
@@ -9,7 +11,9 @@ from assistant.pi_chat import (
     validate_grounded_answer_contract,
 )
 from assistant.pi_facade import PersonalIntelligenceFacade
+from assistant.pi_tools import call_pi_tool
 from config.settings import Settings
+from llm.client import set_usage_db_path
 
 
 class _FakeFacade:
@@ -226,7 +230,65 @@ class _ArchiveNoAnswerLLM(_ArchiveSearchLLM):
         raise RuntimeError("answer unavailable")
 
 
+class _HallucinatedNoAnswerLLM(_ArchiveSearchLLM):
+    @staticmethod
+    def complete(prompt, system="", max_tokens=2048, category="unknown", model=None):
+        return "Нашёл пост в архиве: https://t.me/source/1001"
+
+
+class _Receipt:
+    def __init__(self, text: str, *, usage_recorded: bool):
+        self.text = text
+        self.model = "claude-haiku-4-5"
+        self.input_tokens = 10
+        self.output_tokens = 5
+        self.estimated_cost_usd = 0.00001
+        self.duration_ms = 1
+        self.attempts = 1
+        self.usage_recorded = usage_recorded
+
+
+class _UsageRecordingReceiptLLM:
+    @staticmethod
+    def complete_with_receipt(**kwargs):
+        from llm import client as llm_client_module
+
+        usage_recorded = llm_client_module._record_usage(
+            str(kwargs.get("category") or "unknown"),
+            "claude-haiku-4-5",
+            10,
+            5,
+            1,
+        )
+        if "max_tokens" in kwargs:
+            return _Receipt("Eval gates matter this week. Source: https://t.me/source/1.", usage_recorded=usage_recorded)
+        return _Receipt(
+            json.dumps(
+                {
+                    "tool_calls": [
+                        {"name": "search_intelligence_items", "arguments": {"query": "eval gates", "limit": 3}}
+                    ],
+                    "reason": "Need curated evidence.",
+                }
+            ),
+            usage_recorded=usage_recorded,
+        )
+
+
 class TestPIChat(unittest.TestCase):
+    def _migrate_db(self, db_path: Path) -> None:
+        from db.migrate import run_migrations
+
+        previous = os.environ.get("AGENT_DB_PATH")
+        os.environ["AGENT_DB_PATH"] = str(db_path)
+        try:
+            run_migrations()
+        finally:
+            if previous is None:
+                os.environ.pop("AGENT_DB_PATH", None)
+            else:
+                os.environ["AGENT_DB_PATH"] = previous
+
     def test_answer_pi_chat_runs_llm_planned_read_only_tools(self):
         result = answer_pi_chat("Что с eval gates?", facade=_FakeFacade(), llm_client=_FakeLLM)
 
@@ -308,6 +370,14 @@ class TestPIChat(unittest.TestCase):
             result["answer_contract"]["model_background"]["label"],
             "background_not_archive_supported",
         )
+
+    def test_answer_pi_chat_replaces_hallucinated_no_answer_generation(self):
+        result = answer_pi_chat("Найди пост которого нет", facade=_EmptyArchiveFacade(), llm_client=_HallucinatedNoAnswerLLM)
+
+        self.assertEqual(result["trace"]["termination_reason"], "insufficient_evidence")
+        self.assertIn("Evidence is missing or insufficient", result["answer"])
+        self.assertNotIn("https://t.me/source/1001", result["answer"])
+        self.assertEqual(result["answer_contract"]["archive_support"]["status"], "insufficient_evidence")
 
     def test_answer_pi_chat_falls_back_when_planning_fails(self):
         result = answer_pi_chat("Что делать по проектам?", facade=_FakeFacade(), llm_client=_BrokenPlannerLLM)
@@ -431,8 +501,58 @@ class TestPIChat(unittest.TestCase):
             self.assertEqual(result["tool_calls"][0]["name"], "propose_knowledge_note")
             self.assertEqual(result["tool_results"][0]["status"], "needs_confirmation")
             self.assertFalse(result["tool_results"][0]["result"]["result"]["persisted"])
+            self.assertEqual(result["trace"]["termination_reason"], "needs_confirmation")
+            self.assertEqual(result["trace"]["tool_traces"][0]["privacy_boundary"], "proposal_only_no_write")
             self.assertFalse(result["trace"]["privacy_boundary"]["write_performed"])
             self.assertFalse(db_path.exists())
+
+    def test_confirmed_save_trace_marks_confirmation_gated_write(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            db_path = root / "memory.db"
+            self._migrate_db(db_path)
+            facade = PersonalIntelligenceFacade(
+                settings=Settings(
+                    db_path=str(db_path),
+                    llm_api_key="",
+                    model_provider="",
+                    telegram_session_path="",
+                ),
+                output_root=root,
+            )
+            proposal_result = call_pi_tool(
+                "propose_decision",
+                {"title": "Record explicit confirmation", "rationale": "Trace writes must be visible."},
+                facade=facade,
+            )
+
+            class ConfirmSaveLLM(_FakeLLM):
+                @staticmethod
+                def complete_json(prompt, system="", category="unknown", model=None):
+                    return {
+                        "tool_calls": [
+                            {
+                                "name": "confirm_save_proposal",
+                                "arguments": {
+                                    "proposal": proposal_result["result"]["proposal"],
+                                    "confirmation_token": proposal_result["result"]["confirmation"]["token"],
+                                    "confirmed_at": "2026-07-27T10:00:00Z",
+                                },
+                            }
+                        ],
+                        "reason": "Operator supplied the exact proposal and token.",
+                    }
+
+                @staticmethod
+                def complete(prompt, system="", max_tokens=2048, category="unknown", model=None):
+                    return "Confirmed memory proposal persisted."
+
+            result = answer_pi_chat("Confirm this saved decision", facade=facade, llm_client=ConfirmSaveLLM)
+
+            self.assertEqual(result["tool_results"][0]["status"], "ok")
+            self.assertEqual(result["trace"]["termination_reason"], "confirmed_write")
+            self.assertTrue(result["trace"]["privacy_boundary"]["write_performed"])
+            self.assertEqual(result["trace"]["tool_traces"][0]["privacy_boundary"], "confirmation_gated_write")
 
     def test_answer_telemetry_separates_retrieval_generation_and_excludes_raw_text(self):
         result = answer_pi_chat("Найди пост про agent review", facade=_FakeFacade(), llm_client=_ArchiveSearchLLM)
@@ -451,6 +571,39 @@ class TestPIChat(unittest.TestCase):
             "Agent review automation works",
             json.dumps(telemetry, ensure_ascii=False),
         )
+
+    def test_pi_chat_suppresses_llm_usage_database_writes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "usage.db"
+            with sqlite3.connect(db_path) as connection:
+                connection.execute(
+                    """
+                    CREATE TABLE llm_usage (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        called_at TEXT NOT NULL,
+                        model TEXT NOT NULL,
+                        task_type TEXT,
+                        input_tokens INTEGER NOT NULL DEFAULT 0,
+                        output_tokens INTEGER NOT NULL DEFAULT 0,
+                        est_cost_usd REAL NOT NULL DEFAULT 0.0,
+                        category TEXT,
+                        cost_usd REAL NOT NULL DEFAULT 0.0,
+                        duration_ms INTEGER NOT NULL DEFAULT 0
+                    )
+                    """
+                )
+            set_usage_db_path(str(db_path))
+            try:
+                result = answer_pi_chat("Что с eval gates?", facade=_FakeFacade(), llm_client=_UsageRecordingReceiptLLM)
+            finally:
+                set_usage_db_path("")
+
+            with sqlite3.connect(db_path) as connection:
+                usage_count = connection.execute("SELECT COUNT(*) FROM llm_usage").fetchone()[0]
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(usage_count, 0)
+        self.assertFalse(result["telemetry"]["privacy"]["llm_usage_db_write_performed"])
 
 
 if __name__ == "__main__":

@@ -37,12 +37,20 @@ Recorded on 2026-07-27.
 
 ```text
 python3 tools/test_tiers.py focused-prm
-59 passed, 6 subtests passed in 2.09s
+65 passed, 6 subtests passed in 12.74s
 ```
 
 ```text
 python3 tools/test_tiers.py fast-contract
-112 passed, 6 subtests passed in 47.21s
+118 passed, 6 subtests passed in 58.27s
+```
+
+```text
+python3 tools/verify_project.py --root .
+PASS: playbook_contract exit=0
+FAIL: project_tests exit=1
+FAILED tests/test_product_ops.py::TestProductOps::test_ops_validation_passes_when_live_evidence_rows_exist
+1 failed, 1018 passed, 287 subtests passed in 310.27s (0:05:10)
 ```
 
 ```text

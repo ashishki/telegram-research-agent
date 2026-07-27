@@ -9,7 +9,7 @@ from assistant.pi_facade import PersonalIntelligenceFacade
 from assistant.pi_prompts import PI_ASSISTANT_SYSTEM_PROMPT, PI_TOOL_LOOP_MAX_CALLS
 from assistant.pi_tools import build_pi_tool_catalog, call_pi_tool
 from config.settings import Settings
-from llm.client import LLMClient
+from llm.client import LLMClient, suppress_usage_recording
 
 
 MAX_TOOL_RESULT_CHARS = 8000
@@ -235,6 +235,7 @@ def answer_pi_chat(
         evidence=evidence,
         bounded_snippet_provider_egress=bounded_snippet_provider_egress,
     )
+    answer = _enforce_grounding(answer, executed_calls=executed_calls, evidence=evidence, trace=trace)
     answer_contract = _build_answer_contract(
         answer,
         executed_calls=executed_calls,
@@ -393,12 +394,14 @@ def _complete_json_with_usage(
 ) -> tuple[Any, dict[str, object]]:
     receipt_fn = getattr(llm_client, "complete_with_receipt", None)
     if callable(receipt_fn):
-        receipt = receipt_fn(prompt=prompt, system=system, category=category)
+        with suppress_usage_recording():
+            receipt = receipt_fn(prompt=prompt, system=system, category=category)
         return json.loads(_strip_code_fence(str(receipt.text))), {
             "estimated_cost_usd": round(float(receipt.estimated_cost_usd), 8),
             "cost_source": "llm_completion_receipt",
         }
-    planned = llm_client.complete_json(prompt=prompt, system=system, category=category)
+    with suppress_usage_recording():
+        planned = llm_client.complete_json(prompt=prompt, system=system, category=category)
     return planned, {
         "estimated_cost_usd": 0.0,
         "cost_source": "fake_or_unmetered_no_receipt",
@@ -415,12 +418,15 @@ def _complete_text_with_usage(
 ) -> tuple[str, dict[str, object]]:
     receipt_fn = getattr(llm_client, "complete_with_receipt", None)
     if callable(receipt_fn):
-        receipt = receipt_fn(prompt=prompt, system=system, max_tokens=max_tokens, category=category)
+        with suppress_usage_recording():
+            receipt = receipt_fn(prompt=prompt, system=system, max_tokens=max_tokens, category=category)
         return str(receipt.text).strip(), {
             "estimated_cost_usd": round(float(receipt.estimated_cost_usd), 8),
             "cost_source": "llm_completion_receipt",
         }
-    return llm_client.complete(prompt=prompt, system=system, max_tokens=max_tokens, category=category).strip(), {
+    with suppress_usage_recording():
+        answer = llm_client.complete(prompt=prompt, system=system, max_tokens=max_tokens, category=category).strip()
+    return answer, {
         "estimated_cost_usd": 0.0,
         "cost_source": "fake_or_unmetered_no_receipt",
     }
@@ -682,6 +688,21 @@ def _fallback_answer(question: str, *, executed_calls: list[dict], evidence: dic
     return "\n".join(lines)
 
 
+def _enforce_grounding(answer: str, *, executed_calls: list[dict], evidence: dict, trace: Mapping[str, Any]) -> str:
+    if str(trace.get("termination_reason") or "") != "insufficient_evidence":
+        return str(answer or "")
+    if _has_grounding_evidence(evidence):
+        return str(answer or "")
+    return _fallback_answer("", executed_calls=executed_calls, evidence=evidence)
+
+
+def _has_grounding_evidence(evidence: Mapping[str, Any]) -> bool:
+    if any(evidence.get(key) for key in ("source_refs", "atom_ids", "thread_slugs")):
+        return True
+    artifact_paths = evidence.get("artifact_paths")
+    return isinstance(artifact_paths, Mapping) and bool(artifact_paths)
+
+
 def validate_grounded_answer_contract(contract: Mapping[str, Any]) -> dict[str, object]:
     required_fields = {
         "schema_version",
@@ -841,6 +862,7 @@ def _build_answer_telemetry(
             "raw_post_text_logged": False,
             "raw_tool_payload_logged": False,
             "provider_payload_logged": False,
+            "llm_usage_db_write_performed": False,
             "raw_telegram_corpus_egress": False,
             "bounded_telegram_snippet_provider_egress": bounded_snippet_provider_egress,
         },
@@ -966,7 +988,7 @@ def _build_assistant_trace(
                 "status": call.get("status"),
                 "evidence_status": call.get("evidence_status"),
                 "result_count": _trace_result_count(call),
-                "privacy_boundary": "bounded_read_only_no_raw_corpus",
+                "privacy_boundary": _tool_trace_privacy_boundary(call),
             }
             for call in executed_calls
         ],
@@ -1013,6 +1035,8 @@ def _termination_reason(executed_calls: list[dict], evidence: dict) -> str:
         return "needs_external_verification"
     if _write_performed(executed_calls):
         return "confirmed_write"
+    if "needs_confirmation" in statuses:
+        return "needs_confirmation"
     if statuses.intersection({"rejected", "missing", "invalid"}):
         return "tool_error_degraded"
     if any(evidence.get(key) for key in ("source_refs", "atom_ids", "thread_slugs", "artifact_paths")):
@@ -1048,13 +1072,27 @@ def _trace_result_count(call: Mapping[str, Any]) -> int:
 
 def _write_performed(executed_calls: list[dict]) -> bool:
     for call in executed_calls:
-        result = call.get("result")
-        if not isinstance(result, Mapping):
-            continue
-        payload = result.get("result")
-        if isinstance(payload, Mapping) and payload.get("persisted") is True and payload.get("write_performed") is True:
+        if _call_write_performed(call):
             return True
     return False
+
+
+def _call_write_performed(call: Mapping[str, Any]) -> bool:
+    result = call.get("result")
+    if not isinstance(result, Mapping):
+        return False
+    payload = result.get("result")
+    return isinstance(payload, Mapping) and payload.get("persisted") is True and payload.get("write_performed") is True
+
+
+def _tool_trace_privacy_boundary(call: Mapping[str, Any]) -> str:
+    if _call_write_performed(call):
+        return "confirmation_gated_write"
+    if call.get("name") == "confirm_save_proposal":
+        return "confirmation_gated_write_no_write"
+    if call.get("status") == "needs_confirmation":
+        return "proposal_only_no_write"
+    return "bounded_read_only_no_raw_corpus"
 
 
 def _truncate_text(text: str, limit: int) -> str:

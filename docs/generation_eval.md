@@ -64,9 +64,13 @@ Implementation:
 - Unsupported answers without archive source links are labelled
   `model_background.label=background_not_archive_supported` and
   `archive_support.status=insufficient_evidence`.
+- If a generation step returns archive claims when the trace is
+  `insufficient_evidence` and no grounding evidence exists, the assistant
+  replaces the model text with deterministic insufficient-evidence fallback.
 - Telemetry privacy flags assert that raw post text, raw tool payloads, and
   provider payloads were not logged. Bounded snippet provider context is
-  recorded separately from broad raw corpus egress.
+  recorded separately from broad raw corpus egress. PI chat suppresses
+  `llm_usage` database writes during read-only planning/generation.
 
 Verification command:
 
@@ -77,10 +81,12 @@ python3 -m pytest tests/test_pi_chat.py tests/test_pi_tools.py tests/test_archiv
 Result:
 
 ```text
-37 passed in 1.75s
-python3 -m pytest tests/ -q
-1 failed, 996 passed, 281 subtests passed in 248.15s
-FAILED tests/test_product_ops.py::TestProductOps::test_ops_validation_passes_when_live_evidence_rows_exist
+PYTHONPATH=src python3 -m pytest tests/test_pi_tools.py tests/test_pi_chat.py -q
+39 passed, 6 subtests passed in 14.25s
+python3 tools/test_tiers.py focused-prm
+65 passed, 6 subtests passed in 12.74s
+python3 tools/test_tiers.py fast-contract
+118 passed, 6 subtests passed in 58.27s
 ```
 
 ## Metrics

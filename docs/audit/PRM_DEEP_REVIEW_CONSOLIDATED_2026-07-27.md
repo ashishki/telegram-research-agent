@@ -321,8 +321,9 @@ Boundary evidence:
 - Candidate retrieval queries remain unapproved and must not be treated as gold
   evidence.
 - PRM-8 vector/hybrid retrieval remains blocked.
-- PRM-9 through PRM-12 block review is not complete; do not start PRM-13 before
-  it is recorded.
+- PRM-9 through PRM-12 block review was completed by the corrective deep review
+  recorded in `docs/audit/PRM_DEEP_REVIEW_PRM9_12_2026-07-27.md`. PRM-13
+  remains unstarted and should proceed only by human direction beyond that gate.
 - No production database migration, live ingestion, embeddings, external skill,
   dogfood start, release claim, or compatibility-file archive/delete/move was
   performed.
