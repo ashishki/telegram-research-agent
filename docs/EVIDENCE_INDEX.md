@@ -1,7 +1,7 @@
 # Evidence Index
 
 Status: active
-Last updated: 2026-07-26
+Last updated: 2026-07-27
 
 ## Repository State
 
@@ -29,6 +29,8 @@ Last updated: 2026-07-26
 | Privacy threat model | docs/PRIVACY_THREAT_MODEL.md |
 | Cost budget | docs/COST_BUDGET.md |
 | Rollback and reindex plan | docs/ROLLBACK_AND_REINDEX_PLAN.md |
+| Test strategy and tiers | docs/TEST_STRATEGY.md |
+| PRM deep-review corrective log | docs/audit/PRM_DEEP_REVIEW_CONSOLIDATED_2026-07-27.md |
 
 ## W29 Artifact Evidence
 
@@ -58,7 +60,19 @@ Verified facts recorded in docs/product_pivot_current_state_audit.md include:
 
 Remaining test failure:
 
-- tests/test_product_ops.py::TestProductOps::test_ops_validation_passes_when_live_evidence_rows_exist expected both ops validation checks to pass, but both returned needs_live_event. The fixture seeds evidence at 2026-07-08T10:00:00Z and calls validate_ops with days=14. On the current date, 2026-07-26, those rows are outside the 14-day validation window. No runtime code or test fixture was changed in this planning session.
+- tests/test_product_ops.py::TestProductOps::test_ops_validation_passes_when_live_evidence_rows_exist expected both ops validation checks to pass, but both returned needs_live_event. The fixture seeds evidence at 2026-07-08T10:00:00Z and calls validate_ops with days=14. On the current date, 2026-07-27, those rows are outside the 14-day validation window. This corrective change set did not alter product ops validation.
 
-Untracked Playbook and planning artifacts are intentionally left in the worktree
-for review before any commit.
+## PRM Corrective Review Evidence - 2026-07-27
+
+| Command | Result |
+| --- | --- |
+| codex -a never -C /tmp/prm-review-repo.7UcDnW exec -s read-only -m gpt-5.5 -c model_reasoning_effort='high' -o /tmp/prm_meta_review.md | PACKET_REVIEW_RESULT: ISSUES_FOUND |
+| codex -a never -C /tmp/prm-review-repo.7UcDnW exec -s read-only -m gpt-5.5 -c model_reasoning_effort='high' -o /tmp/prm_arch_review.md | PACKET_REVIEW_RESULT: ISSUES_FOUND |
+| codex -a never -C /tmp/prm-review-repo.7UcDnW exec -s read-only -m gpt-5.5 -c model_reasoning_effort='high' -o /tmp/prm_code_review.md | PACKET_REVIEW_RESULT: ISSUES_FOUND |
+| PYTHONPATH=src python3 -m pytest tests/test_archive_retrieval_eval.py tests/test_pi_chat.py -q | 16 passed in 1.47s |
+| PYTHONPATH=src python3 -m pytest tests/test_test_tiers.py -q | 3 passed in 0.06s |
+| python3 tools/test_tiers.py focused-prm | 49 passed in 2.36s |
+| python3 tools/test_tiers.py fast-contract | 102 passed in 28.36s |
+| python3 tools/test_tiers.py ops-date-sensitive | 1 failed, 3 passed in 3.86s; known failure: tests/test_product_ops.py::TestProductOps::test_ops_validation_passes_when_live_evidence_rows_exist |
+| python3 tools/playbook_validate.py --root . --check tasks --check placeholders --check readiness --check delivery --check references | playbook_validate: errors=0 warnings=0 |
+| git diff --check | pass, no output |

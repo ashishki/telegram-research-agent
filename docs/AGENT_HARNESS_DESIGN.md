@@ -98,7 +98,8 @@ Each tool trace records:
 
 Turn-level trace records planner type, deterministic intent, termination
 reason, insufficient-evidence flag, and privacy boundary
-(`raw_telegram_text_egress=false`, `external_skill_used=false`,
+(`raw_telegram_text_egress` for bounded snippet provider context,
+`raw_telegram_corpus_egress=false`, `external_skill_used=false`,
 `write_performed=false`).
 
 ## Termination

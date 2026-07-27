@@ -7,7 +7,9 @@ Last updated: 2026-07-26
 
 The repository is being retrofitted from a weekly-report-centered Telegram
 intelligence system into Personal Telegram Research Memory + Grounded Assistant.
-The assistant and full-archive search are planned, not implemented.
+HEAD contains corrective PRM implementation slices through PRM-7 and PRM-9
+through PRM-10, including bounded SQLite FTS archive search and an assistant
+vertical slice. PRM-8 and PRM-11 through PRM-20 are not implemented.
 
 ## Operating Rules
 
@@ -35,4 +37,5 @@ The assistant and full-archive search are planned, not implemented.
 
 ## Current Next Task
 
-PRM-1 - Corpus Inventory, Data Readiness, And Gold Query Process.
+Corrective PRM deep-review evidence and test-tier repair before continuing at
+the next policy-allowed PRM boundary.

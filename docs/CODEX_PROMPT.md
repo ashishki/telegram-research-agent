@@ -9,9 +9,11 @@ Last updated: 2026-07-26
 - Target branch: master
 - AI Workflow Playbook commit used: 5583eca96c4d2d480b5574ed78bea63e0b07ebf0
 - Adoption mode: Standard
-- Current phase: Playbook retrofit complete pending human approval and validator review
-- Next ready task after approval: PRM-1 - Corpus Inventory, Data Readiness, And Gold Query Process
-- Second implementation task after PRM-1: PRM-2 - Archive Document Identity, Chunking, And Dedupe Contract
+- Current phase: PRM corrective review/evidence repair after missed block-review gates
+- Implemented slices in HEAD: PRM-1 through PRM-7 plus PRM-9 through PRM-10
+- Blocked/not implemented slices: PRM-8 and PRM-11 through PRM-20
+- Next safe work: complete corrective review evidence, then continue only at the
+  next policy-allowed PRM boundary
 
 ## Product Direction
 
@@ -22,7 +24,9 @@ report as the product center. Full archive search is the primary planned value.
 Knowledge Atoms, topics, reports, and Atlas-like surfaces become selective or
 secondary projections.
 
-Do not claim the full-archive assistant exists yet.
+Do not claim dogfood, release readiness, vector adoption, gold-query approval,
+or external-verification readiness. HEAD contains a bounded SQLite FTS archive
+search and assistant vertical slice, but the full product is not released.
 
 ## Active Profiles
 
@@ -64,6 +68,13 @@ Run these before claiming a planning or implementation handoff is clean:
 - git diff --check
 - git diff --stat
 
+Test tier helper:
+
+- python3 tools/test_tiers.py --list
+- python3 tools/test_tiers.py focused-prm
+- python3 tools/test_tiers.py fast-contract
+- python3 tools/test_tiers.py ops-date-sensitive
+
 Do not run live Telegram ingestion, reaction sync, LLM extraction, Frontier,
 Radar, report generation, full archive indexing, embeddings, or web research
 jobs from this handoff.
@@ -73,8 +84,9 @@ jobs from this handoff.
 - Product pivot ADR remains proposed and needs human approval.
 - Candidate retrieval queries are not gold evidence until the operator approves
   labels and expected citations.
-- Full-archive search, assistant archive tool, Reaction Fast Lane, Knowledge
-  Library, and Brief V3 are planned, not implemented.
+- PRM-8 vector/hybrid retrieval remains blocked.
+- PRM-11 through PRM-20, Knowledge Library, Brief V3, dogfood, and release
+  readiness are planned, not implemented.
 - External skills are project-disabled until trust records are approved.
 - Legacy report-centered docs remain as historical/compatibility surfaces and
   need a safe archive/migration pass in PBR-7 or PRM-20.

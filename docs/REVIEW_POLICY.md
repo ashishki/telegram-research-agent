@@ -101,3 +101,20 @@ Each task must record:
 
 Warnings remain warnings. Fixture-only validation must not be described as live
 operator validation.
+
+## Test Tiers
+
+Use `docs/TEST_STRATEGY.md` and `tools/test_tiers.py` to choose the smallest
+appropriate deterministic test tier:
+
+- `focused-prm` for narrow PRM RAG/assistant changes;
+- `fast-contract` for shared contract, router, telemetry, and privacy-boundary
+  changes;
+- `ops-date-sensitive` for product ops validation and known date-window
+  failures;
+- `full` for complete pytest coverage;
+- `block-review` before closing a deep-review block.
+
+Known failures must be isolated and named exactly. Do not delete, archive, move,
+or weaken tests merely because the full suite is large or one ops check is
+date-sensitive.

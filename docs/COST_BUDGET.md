@@ -87,14 +87,16 @@ Implemented contract: `pi_answer_telemetry.v1`.
 
 Each assistant answer separates:
 
-- planning latency, model calls, and estimated cost;
+- planning latency, model calls, estimated cost, and cost source;
 - retrieval latency, tool calls, and estimated cost;
-- generation latency, model calls, and estimated cost.
+- generation latency, model calls, estimated cost, and cost source.
 
 Telemetry excludes raw post text, raw tool payloads, and provider payloads. In
-the PRM-10 fixture path, estimated costs remain `0.0` because no live provider
-call is made; fake LLM calls are counted separately for planning and generation
-contract coverage.
+the PRM-10 fixture path, estimated costs remain `0.0` with
+`cost_source=fake_or_unmetered_no_receipt` because no live provider call is
+made. The live `LLMClient` path uses completion receipts for generation cost.
+Bounded Telegram snippet provider context is recorded separately from broad raw
+corpus egress.
 
 Verification:
 

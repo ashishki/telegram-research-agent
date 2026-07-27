@@ -59,12 +59,14 @@ Implementation:
   external verification need, optional next action, and
   `insufficient_evidence`.
 - `pi_answer_telemetry.v1` separates planning, retrieval, and generation
-  latency/cost/model-call fields.
+  latency/cost/model-call fields, including whether costs came from a live
+  completion receipt or a fake/unmetered test client.
 - Unsupported answers without archive source links are labelled
   `model_background.label=background_not_archive_supported` and
   `archive_support.status=insufficient_evidence`.
 - Telemetry privacy flags assert that raw post text, raw tool payloads, and
-  provider payloads were not logged.
+  provider payloads were not logged. Bounded snippet provider context is
+  recorded separately from broad raw corpus egress.
 
 Verification command:
 

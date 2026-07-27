@@ -110,12 +110,18 @@ Trace privacy boundary:
 
 ```json
 {
-  "raw_telegram_text_egress": false,
+  "raw_telegram_text_egress": true,
+  "raw_telegram_corpus_egress": false,
+  "bounded_telegram_snippet_provider_egress": true,
   "external_skill_used": false,
   "write_performed": false,
   "bounded_read_only_tools": true
 }
 ```
+
+`raw_telegram_text_egress=true` is limited to bounded cited snippets passed to
+the answer-generation provider. Broad raw corpus egress remains forbidden and
+is represented separately as `raw_telegram_corpus_egress=false`.
 
 Verification command:
 

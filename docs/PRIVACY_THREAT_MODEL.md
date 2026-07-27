@@ -35,6 +35,13 @@ Telegram evidence sent to a model must be:
 - excluded from ordinary logs;
 - covered by the cost/privacy budget.
 
+Trace fields must distinguish this allowed bounded context from forbidden broad
+corpus egress:
+
+- `bounded_telegram_snippet_provider_egress=true` when cited snippets are sent
+  to answer generation;
+- `raw_telegram_corpus_egress=false` for all approved PRM assistant paths.
+
 ## Confirmation Rule
 
 No saved Knowledge Note, Watch Topic, project link, decision, experiment,

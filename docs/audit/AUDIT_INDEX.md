@@ -31,3 +31,5 @@ These files remain preserved for human reference, but they are no longer part of
 
 - `PRM_BLOCK_REVIEW_2026-07-26.md` - corrective PRM block review after missed
   PRM-2, PRM-4, PRM-6, and PRM-7/PRM-8 review gates.
+- `PRM_DEEP_REVIEW_CONSOLIDATED_2026-07-27.md` - meta/architecture/code
+  Codex subagent review consolidation and corrective test-tier evidence.
