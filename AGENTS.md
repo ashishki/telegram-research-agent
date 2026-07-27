@@ -39,4 +39,5 @@ through PRM-20 are not implemented.
 
 ## Current Next Task
 
-Record the PRM-9 through PRM-12 block deep review before starting PRM-13.
+Continue at PRM-13 only if the human operator wants to proceed beyond the
+recorded PRM-9 through PRM-12 block review gate.
