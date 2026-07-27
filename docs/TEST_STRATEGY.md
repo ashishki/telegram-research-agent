@@ -37,13 +37,23 @@ Recorded on 2026-07-27.
 
 ```text
 python3 tools/test_tiers.py focused-prm
-65 passed, 6 subtests passed in 12.74s
+70 passed, 6 subtests passed in 12.21s
 ```
 
 ```text
 python3 tools/test_tiers.py fast-contract
-118 passed, 6 subtests passed in 58.27s
+123 passed, 6 subtests passed in 48.08s
 ```
+
+PRM-13 targeted visual/layout smoke:
+
+```text
+PYTHONPATH=src python3 -m pytest tests/test_knowledge_library.py tests/test_test_tiers.py -q
+8 passed in 7.15s
+```
+
+The full verifier receipt below is the most recent PRM-9 through PRM-12
+block-review gate. It was not rerun for the standalone PRM-13 slice.
 
 ```text
 python3 tools/verify_project.py --root .

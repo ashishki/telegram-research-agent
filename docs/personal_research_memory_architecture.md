@@ -117,3 +117,8 @@ The answer context assembly must:
 
 Reports and library pages are generated views over archive and curated layers.
 They do not become source of truth.
+
+Knowledge Library topic pages are deterministic projections over bounded topic
+evidence supplied by archive search, selective enrichment, and confirmed memory
+events. The old global Atlas remains a Knowledge Audit Explorer for
+compatibility/debug inspection rather than the primary user surface.

@@ -9,12 +9,12 @@ Last updated: 2026-07-27
 - Target branch: master
 - AI Workflow Playbook commit used: 5583eca96c4d2d480b5574ed78bea63e0b07ebf0
 - Adoption mode: Standard
-- Current phase: PRM-9 through PRM-12 implementation block after corrective
-  review/evidence repair
-- Implemented slices in HEAD: PRM-1 through PRM-7 plus PRM-9 through PRM-12
-- Blocked/not implemented slices: PRM-8 and PRM-13 through PRM-20
-- Next safe work: PRM-13 only if the human operator wants to proceed beyond the
-  recorded PRM-9 through PRM-12 corrective deep-review gate
+- Current phase: PRM-13 through PRM-17 implementation block
+- Implemented slices in HEAD: PRM-1 through PRM-7 plus PRM-9 through PRM-13
+- Blocked/not implemented slices: PRM-8 and PRM-14 through PRM-20
+- Next safe work: PRM-14 only if the human operator wants to proceed within the
+  open PRM-13 through PRM-17 block. The next batched deep-review gate is before
+  PRM-18 unless a stop-ship boundary requires immediate review earlier.
 
 ## Product Direction
 
@@ -28,9 +28,9 @@ secondary projections.
 Do not claim dogfood, release readiness, vector adoption, gold-query approval,
 external-source execution, or approved external-verification evidence. HEAD
 contains a bounded SQLite FTS archive search, assistant vertical slice, grounded
-answer contract, local external-verification requirement path, and
-confirmation-gated saved memory proposal flow, but the full product is not
-released.
+answer contract, local external-verification requirement path,
+confirmation-gated saved memory proposal flow, and deterministic Knowledge
+Library topic-page renderer, but the full product is not released.
 
 ## Active Profiles
 
@@ -89,8 +89,8 @@ jobs from this handoff.
 - Candidate retrieval queries are not gold evidence until the operator approves
   labels and expected citations.
 - PRM-8 vector/hybrid retrieval remains blocked.
-- PRM-13 through PRM-20, Knowledge Library, Brief V3, dogfood, and release
-  readiness are planned, not implemented.
+- PRM-14 through PRM-20, Brief V3, dogfood, and release readiness are planned,
+  not implemented.
 - External skills are project-disabled until trust records are approved.
 - Legacy report-centered docs remain as historical/compatibility surfaces and
   need a safe archive/migration pass in PBR-7 or PRM-20.

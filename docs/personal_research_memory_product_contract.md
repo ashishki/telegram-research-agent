@@ -105,6 +105,19 @@ Primary saved-knowledge surfaces:
 The old detailed Atlas is renamed product-wise to Knowledge Audit Explorer and
 is an internal/debug surface.
 
+PRM-13 implementation contract:
+
+- topic pages may be created from a user query or confirmed Watch Topic;
+- the page DTO includes current understanding, 30-day changes, 90-day changes,
+  claims, cases, tools, practices, contradictions, project links, saved notes,
+  decisions, experiments, open questions, and original sources;
+- source references remain explicit and bounded to caller-supplied archive or
+  confirmed memory evidence;
+- the renderer emits static self-contained HTML with no script, external CSS,
+  remote assets, live retrieval, provider calls, or database writes;
+- Knowledge Audit Explorer remains available only as an internal/debug view and
+  is not the primary saved-knowledge product surface.
+
 ## Weekly Brief V3
 
 Weekly Brief is secondary. It is derived from watch-topic changes, reactions,

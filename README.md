@@ -8,19 +8,21 @@ implementation history, but it is no longer the product center.
 
 ## Current Status
 
-Planning retrofit only. As of this repository state, the system does **not**
-yet provide full-archive assistant search, hybrid RAG, Knowledge Library topic
-pages, confirmation-gated Knowledge Notes, or a proven dogfood result.
+Retrofit slices are implemented through PRM-13. The system now has bounded
+SQLite FTS archive search for the assistant path, grounded answer contracts,
+confirmation-gated saved-memory proposals, and deterministic Knowledge Library
+topic-page rendering. It still does **not** provide hybrid/vector RAG, live
+external verification evidence, a proven dogfood result, or release readiness.
 
-Verified baseline before this retrofit:
+Historical baseline inspected before the retrofit:
 
 - target repo commit inspected:
   `ad8689fa25b89f77122c4cec7c7a6b9da3f500cf`
 - Playbook commit used:
   `5583eca96c4d2d480b5574ed78bea63e0b07ebf0`
 - local SQLite has `raw_posts`, `posts`, and `posts_fts`
-- PI Assistant search is curated-only and explicitly excludes raw Telegram
-  archive retrieval
+- PI Assistant search was curated-only and explicitly excluded raw Telegram
+  archive retrieval at that baseline
 - W29 delivered Brief/Atlas artifacts use `split_ai_report.v1`
 - W29 detected 7 personal reacted posts, but 0 linked atoms, 0 linked topics,
   and 0 ranking effects
@@ -51,26 +53,30 @@ and `insufficient_evidence` when the archive does not support the answer.
 - Read-only Hermes/PI facade over curated intelligence items.
 - Reaction snapshot and receipt infrastructure.
 - Report V2 rollout gate and historical IRX task record.
+- Bounded full-archive SQLite FTS assistant retrieval.
+- Grounded assistant answer contracts with insufficient-evidence boundaries.
+- External-verification requirement routing without live browsing.
+- Confirmation-gated Knowledge Note, Watch Topic, project link, decision,
+  action, experiment, and feedback proposals.
+- Deterministic Knowledge Library topic-page DTO and static HTML renderer.
 
 ## Planned, Not Yet Implemented
 
-- Persistent full-archive FTS assistant search as the first value milestone.
-- Reaction fast lane where reacted posts are searchable even when enrichment
-  fails.
-- Selective enrichment into cases, tools, practices, warnings, claims, topics,
-  notes, watch topics, decisions, and experiments.
-- Retrieval evaluation over a human-approved gold query set.
+- Human-approved gold query labels and accepted retrieval thresholds.
 - Hybrid/vector retrieval only after FTS baseline failures justify it.
-- Knowledge Library topic pages as the primary saved-knowledge experience.
+- Project context and decision support.
+- Learning migration and spaced repetition.
 - Weekly Brief V3 as a secondary projection from actual usage.
+- Dogfood, release readiness, and public value evidence.
 
 ## Unsupported Claims
 
 Do not claim:
 
 - full Telegram archive RAG exists;
-- the assistant can search every retained post;
-- vector retrieval is selected or installed;
+- vector or hybrid retrieval is selected or installed;
+- live external verification was performed;
+- Knowledge Library topic pages were dogfooded on private production data;
 - W29 proved user value;
 - four-week dogfood has started;
 - public/portfolio value is proven.

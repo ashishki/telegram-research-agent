@@ -39,3 +39,6 @@ These files remain preserved for human reference, but they are no longer part of
 - `PRM_DEEP_REVIEW_PRM9_12_2026-07-27.md` - PRM-9 through PRM-12 corrective
   deep review with meta/process, architecture/privacy, and code/tests reviewer
   findings and repair evidence before PRM-13.
+- `PRM13_KNOWLEDGE_LIBRARY_2026-07-27.md` - PRM-13 Knowledge Library
+  topic-page implementation receipt, fixture visual/layout evidence, and
+  continuation boundary for the PRM-13 through PRM-17 block.

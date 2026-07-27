@@ -70,6 +70,9 @@ LLM judge output is advisory until calibrated against human labels.
 8. Save a Knowledge Note after confirmation.
 9. Create a Watch Topic after confirmation.
 10. Show a useful secondary Weekly Brief based on actual usage.
+11. Open a Knowledge Library topic page that shows current understanding,
+    30/90-day changes, saved memory, contradictions, open questions, and
+    original sources without requiring the old global Atlas.
 
 ## F. Dogfood Success
 
