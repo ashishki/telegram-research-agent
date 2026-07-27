@@ -11,10 +11,10 @@ Last updated: 2026-07-27
 - Adoption mode: Standard
 - Current phase: PRM-9 through PRM-12 implementation block after corrective
   review/evidence repair
-- Implemented slices in HEAD: PRM-1 through PRM-7 plus PRM-9 through PRM-11
-- Blocked/not implemented slices: PRM-8 and PRM-12 through PRM-20
-- Next safe work: continue at PRM-12, then record the PRM-9 through PRM-12
-  block deep review before PRM-13
+- Implemented slices in HEAD: PRM-1 through PRM-7 plus PRM-9 through PRM-12
+- Blocked/not implemented slices: PRM-8 and PRM-13 through PRM-20
+- Next safe work: record the PRM-9 through PRM-12 block deep review before
+  PRM-13
 
 ## Product Direction
 
@@ -28,8 +28,9 @@ secondary projections.
 Do not claim dogfood, release readiness, vector adoption, gold-query approval,
 external-source execution, or approved external-verification evidence. HEAD
 contains a bounded SQLite FTS archive search, assistant vertical slice, grounded
-answer contract, and local external-verification requirement path, but the full
-product is not released.
+answer contract, local external-verification requirement path, and
+confirmation-gated saved memory proposal flow, but the full product is not
+released.
 
 ## Active Profiles
 
@@ -88,7 +89,7 @@ jobs from this handoff.
 - Candidate retrieval queries are not gold evidence until the operator approves
   labels and expected citations.
 - PRM-8 vector/hybrid retrieval remains blocked.
-- PRM-12 through PRM-20, Knowledge Library, Brief V3, dogfood, and release
+- PRM-13 through PRM-20, Knowledge Library, Brief V3, dogfood, and release
   readiness are planned, not implemented.
 - External skills are project-disabled until trust records are approved.
 - Legacy report-centered docs remain as historical/compatibility surfaces and

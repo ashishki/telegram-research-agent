@@ -1,6 +1,6 @@
 # Tool Evaluation Plan
 
-Status: draft; PRM-4 archive search tool vertical slice recorded; PRM-9 routing and trace evidence recorded; PRM-11 external verification requirement path recorded
+Status: draft; PRM-4 archive search tool vertical slice recorded; PRM-9 routing and trace evidence recorded; PRM-11 external verification requirement path recorded; PRM-12 confirmation-gated save/watch flow recorded
 Last updated: 2026-07-27
 
 ## Tool Classes
@@ -22,15 +22,22 @@ Confirmation-gated proposal tools:
 - propose Knowledge Note;
 - propose Watch Topic;
 - propose project link;
+- propose decision;
 - propose action;
 - propose experiment;
 - propose feedback.
+
+Confirmation-gated write tools:
+
+- `confirm_save_proposal`: persist an approved proposal only when the exact
+  proposal object and confirmation token are supplied.
 
 ## Evaluation Checks
 
 - tool schema rejects unexpected fields;
 - read-only tools do not mutate SQLite or files;
 - proposal tools do not write until confirmation;
+- confirmed writes append events instead of updating or deleting prior events;
 - trace records tool name, arguments class, latency, result count, evidence
   status, and termination reason;
 - unsafe/mutation tool names remain blocked;
@@ -103,7 +110,8 @@ Required tool groups:
 | Group | Tools |
 | --- | --- |
 | Read-only minimum | `get_current_week_label`, `get_weekly_summary`, `get_artifact_status`, `search_intelligence_items`, `search_telegram_archive`, `search_idea_threads`, `get_idea_thread`, `get_project_actions`, `get_mvp_radar_status`, `get_feedback_summary`, `list_marked_posts`, `get_strategy_reviewer_notes`, `request_external_verification` |
-| Confirmation-gated proposals | `propose_knowledge_note`, `propose_watch_topic`, `propose_project_link`, `propose_action`, `propose_experiment`, `propose_feedback` |
+| Confirmation-gated proposals | `propose_knowledge_note`, `propose_watch_topic`, `propose_project_link`, `propose_decision`, `propose_action`, `propose_experiment`, `propose_feedback` |
+| Confirmation-gated writes | `confirm_save_proposal` |
 | Forbidden automatic mutation | `edit_code`, `run_codex`, `edit_config`, `mutate_profile`, `mutate_projects`, `write_feedback`, `record_feedback`, `confirm_feedback`, `mutate_db`, `execute_sql` |
 
 Trace privacy boundary:
@@ -176,9 +184,48 @@ Result:
 107 passed, 6 subtests passed in 50.27s
 ```
 
+## PRM-12 Confirmation-Gated Save/Watch Evidence
+
+Implementation:
+
+- Proposal tools now produce `pi_memory_proposal.v1` objects with
+  `confirmation.token`; they remain `read_only=true`, `proposal_only=true`,
+  `persisted=false`, and `write_performed=false`.
+- `propose_decision` was added so Knowledge Notes, Watch Topics, project links,
+  decisions, actions, experiments, and feedback all have explicit proposal
+  tools.
+- `confirm_save_proposal` is the only confirmation-gated write tool. It is
+  `read_only=false`, `requires_confirmation=true`, and rejects calls without an
+  explicit facade or valid confirmation token.
+- Confirmed writes append rows to `personal_memory_events`; edit, delete, and
+  rollback are modelled as new events, not destructive updates.
+- Chat save requests draft proposals only. Session chat text and transcripts do
+  not create durable memory rows unless the user supplies the exact proposal and
+  confirmation token.
+- Fixture tests use temporary SQLite databases only. No production database
+  contents were modified.
+
+Verification command:
+
+```bash
+PYTHONPATH=src python3 -m pytest tests/test_pi_tools.py tests/test_pi_chat.py -q
+python3 tools/test_tiers.py focused-prm
+python3 tools/test_tiers.py fast-contract
+```
+
+Result:
+
+```text
+33 passed, 6 subtests passed in 2.19s
+59 passed, 6 subtests passed in 2.09s
+112 passed, 6 subtests passed in 47.21s
+```
+
 ## Stop-Ship Cases
 
 - automatic profile/config/project mutation;
+- confirmed write without exact proposal and confirmation token;
+- destructive edit/delete/rollback that mutates prior memory events;
 - assistant runs code edits or Codex;
 - raw corpus text in ordinary logs;
 - external skill reads secrets without trust approval;

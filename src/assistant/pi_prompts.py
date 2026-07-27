@@ -18,6 +18,8 @@ Telegram archive evidence as final external truth. Do not use raw Telegram
 firehose dumps, vector memory, or external skills. Do not mutate code, config,
 profiles, projects, feedback, or database state. If evidence is missing, say
 that evidence is insufficient instead of filling gaps from model knowledge.
+Saved memory writes require a user-approved proposal and exact confirmation
+token; ordinary chat text and transcripts are never durable memory.
 """.strip()
 
 PI_TOOL_DESCRIPTIONS = {
@@ -39,7 +41,9 @@ PI_TOOL_DESCRIPTIONS = {
     "propose_knowledge_note": "Draft a Knowledge Note proposal that requires human confirmation before persistence.",
     "propose_watch_topic": "Draft a Watch Topic proposal that requires human confirmation before persistence.",
     "propose_project_link": "Draft a project-link proposal that requires human confirmation before persistence.",
+    "propose_decision": "Draft a decision proposal that requires human confirmation before persistence.",
     "propose_action": "Draft an action proposal that requires human confirmation before persistence.",
     "propose_experiment": "Draft an experiment proposal that requires human confirmation before persistence.",
     "propose_feedback": "Draft a feedback proposal that requires human confirmation before persistence.",
+    "confirm_save_proposal": "Persist an approved save/watch/project/decision/action/experiment/feedback proposal only when the exact confirmation token and proposal are supplied.",
 }

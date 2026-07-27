@@ -24,6 +24,7 @@ Last updated: 2026-07-27
 | external skill reads private data | skills disabled until trust record and approval |
 | unstable/high-stakes claim answered from stale Telegram evidence | deterministic external-verification requirement; Telegram evidence is discovery context only |
 | chat transcript becomes memory silently | session context is not durable memory |
+| hidden memory write from assistant tool loop | proposal plus exact confirmation token required; write trace records `write_performed` |
 | source URL loses provenance | archive document identity preserves Telegram link |
 | deletion cannot be honored | retention/deletion path required before dogfood |
 
@@ -63,3 +64,13 @@ The PRM-11 assistant path does not call external sources. It records:
 No saved Knowledge Note, Watch Topic, project link, decision, experiment,
 preference, profile/config edit, or external side effect is durable without
 explicit human confirmation.
+
+PRM-12 confirmation semantics:
+
+- proposal tools are read-only and return `persisted=false`;
+- `confirm_save_proposal` is the only confirmed memory-write tool;
+- confirmation requires the exact proposal object and confirmation token;
+- confirmed memory writes append events to `personal_memory_events`;
+- edit, delete, and rollback are represented as new audit events, not
+  destructive updates to prior events;
+- ordinary chat text and voice transcripts are not durable memory.

@@ -9,6 +9,7 @@ from assistant.pi_facade import PersonalIntelligenceFacade
 from assistant.pi_prompts import PI_TOOL_LOOP_MAX_CALLS
 from assistant.pi_tools import (
     CONFIRMATION_GATED_PROPOSAL_TOOLS,
+    CONFIRMATION_GATED_WRITE_TOOLS,
     FORBIDDEN_TOOL_NAMES,
     MINIMUM_READ_ONLY_TOOLS,
     PITool,
@@ -127,6 +128,21 @@ class TestPITools(unittest.TestCase):
             output_root=root,
         )
 
+    def _memory_events(self, db_path: Path) -> list[dict]:
+        connection = sqlite3.connect(db_path)
+        connection.row_factory = sqlite3.Row
+        try:
+            cursor = connection.execute(
+                """
+                SELECT *
+                FROM personal_memory_events
+                ORDER BY id
+                """
+            )
+            return [dict(row) for row in cursor.fetchall()]
+        finally:
+            connection.close()
+
     def _write_archive_db(self, db_path: Path, *, matching: bool = True) -> None:
         connection = sqlite3.connect(db_path)
         try:
@@ -197,13 +213,20 @@ class TestPITools(unittest.TestCase):
         self.assertLessEqual(validation["max_calls_per_turn"], 4)
         self.assertEqual(PI_TOOL_LOOP_MAX_CALLS, validation["max_calls_per_turn"])
         self.assertFalse(FORBIDDEN_TOOL_NAMES.intersection(catalog))
-        self.assertTrue(all(tool.read_only for tool in catalog.values()))
+        self.assertFalse(catalog["confirm_save_proposal"].read_only)
+        self.assertTrue(
+            all(tool.read_only for name, tool in catalog.items() if name not in CONFIRMATION_GATED_WRITE_TOOLS)
+        )
         self.assertTrue(MINIMUM_READ_ONLY_TOOLS.issubset(catalog))
         self.assertTrue(CONFIRMATION_GATED_PROPOSAL_TOOLS.issubset(catalog))
+        self.assertTrue(CONFIRMATION_GATED_WRITE_TOOLS.issubset(catalog))
         self.assertTrue(
             all(catalog[name].requires_confirmation for name in CONFIRMATION_GATED_PROPOSAL_TOOLS)
         )
         self.assertTrue(all(catalog[name].proposal_only for name in CONFIRMATION_GATED_PROPOSAL_TOOLS))
+        self.assertTrue(catalog["confirm_save_proposal"].requires_confirmation)
+        self.assertFalse(catalog["confirm_save_proposal"].proposal_only)
+        self.assertEqual(validation["confirmation_gated_write_tool_count"], 1)
 
     def test_public_tool_descriptors_are_serializable_without_handlers(self):
         descriptors = list_pi_tools()
@@ -213,9 +236,15 @@ class TestPITools(unittest.TestCase):
         self.assertIn("get_artifact_status", {item["name"] for item in descriptors})
         self.assertIn("search_telegram_archive", {item["name"] for item in descriptors})
         self.assertIn("request_external_verification", {item["name"] for item in descriptors})
+        self.assertIn("propose_decision", {item["name"] for item in descriptors})
         self.assertIn("propose_action", {item["name"] for item in descriptors})
+        self.assertIn("confirm_save_proposal", {item["name"] for item in descriptors})
         self.assertTrue(all("handler" not in item for item in descriptors))
-        self.assertTrue(all(item["read_only"] is True for item in descriptors))
+        descriptor_by_name = {item["name"]: item for item in descriptors}
+        self.assertFalse(descriptor_by_name["confirm_save_proposal"]["read_only"])
+        self.assertTrue(
+            all(item["read_only"] is True for item in descriptors if item["name"] != "confirm_save_proposal")
+        )
 
     def test_proposal_tool_is_confirmation_gated_and_does_not_persist(self):
         result = call_pi_tool(
@@ -227,8 +256,201 @@ class TestPITools(unittest.TestCase):
         self.assertEqual(result["status"], "needs_confirmation")
         self.assertTrue(result["read_only"])
         self.assertEqual(result["result"]["proposal_type"], "action")
+        self.assertEqual(result["result"]["proposal"]["object_type"], "action")
+        self.assertEqual(result["result"]["proposal"]["operation"], "create")
         self.assertFalse(result["result"]["persisted"])
+        self.assertFalse(result["result"]["write_performed"])
+        self.assertTrue(result["result"]["confirmation"]["token"].startswith("confirm-"))
         self.assertIn("confirmation", result["message"])
+
+    def test_proposal_tool_does_not_create_database_before_confirmation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "memory.db"
+            result = call_pi_tool(
+                "propose_knowledge_note",
+                {
+                    "title": "Eval gate note",
+                    "body": "Remember to inspect eval gates before release.",
+                    "source_refs": ["https://t.me/source/1001"],
+                },
+                facade=self._facade_with_db(Path(tmp), db_path),
+            )
+
+            self.assertEqual(result["status"], "needs_confirmation")
+            self.assertFalse(result["result"]["persisted"])
+            self.assertFalse(db_path.exists())
+
+    def test_confirm_save_requires_explicit_facade_and_valid_token(self):
+        proposal_result = call_pi_tool(
+            "propose_watch_topic",
+            {"title": "Watch eval agents", "rationale": "Track agent evaluation."},
+            facade=object(),
+        )
+        proposal = proposal_result["result"]["proposal"]
+
+        without_facade = call_pi_tool(
+            "confirm_save_proposal",
+            {"proposal": proposal, "confirmation_token": proposal_result["result"]["confirmation"]["token"]},
+        )
+
+        self.assertEqual(without_facade["status"], "invalid")
+        self.assertFalse(without_facade["read_only"])
+        self.assertIn("Explicit facade", without_facade["message"])
+
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "memory.db"
+            invalid = call_pi_tool(
+                "confirm_save_proposal",
+                {"proposal": proposal, "confirmation_token": "confirm-wrong"},
+                facade=self._facade_with_db(Path(tmp), db_path),
+            )
+
+            self.assertEqual(invalid["status"], "confirmation_required")
+            self.assertFalse(invalid["result"]["persisted"])
+            self.assertFalse(db_path.exists())
+
+    def test_confirm_save_proposal_persists_after_valid_confirmation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            db_path = root / "memory.db"
+            proposal_result = call_pi_tool(
+                "propose_knowledge_note",
+                {
+                    "title": "Eval gate note",
+                    "body": "Remember to inspect eval gates before release.",
+                    "source_refs": ["https://t.me/source/1001"],
+                    "metadata": {"topic": "eval"},
+                },
+                facade=self._facade_with_db(root, db_path),
+            )
+            confirmed = call_pi_tool(
+                "confirm_save_proposal",
+                {
+                    "proposal": proposal_result["result"]["proposal"],
+                    "confirmation_token": proposal_result["result"]["confirmation"]["token"],
+                    "confirmed_at": "2026-07-27T10:00:00Z",
+                },
+                facade=self._facade_with_db(root, db_path),
+            )
+
+            self.assertEqual(confirmed["status"], "ok")
+            self.assertFalse(confirmed["read_only"])
+            self.assertTrue(confirmed["requires_confirmation"])
+            self.assertTrue(confirmed["result"]["persisted"])
+            self.assertTrue(confirmed["result"]["append_only"])
+            events = self._memory_events(db_path)
+            self.assertEqual(len(events), 1)
+            self.assertEqual(events[0]["event_type"], "created")
+            self.assertEqual(events[0]["object_type"], "knowledge_note")
+            self.assertEqual(json.loads(events[0]["source_refs_json"]), ["https://t.me/source/1001"])
+
+    def test_decision_and_experiment_history_is_append_only_with_rollback_audit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            db_path = root / "memory.db"
+            facade = self._facade_with_db(root, db_path)
+            create_result = call_pi_tool(
+                "propose_experiment",
+                {"title": "Try retrieval eval", "body": "Run the focused tier before changing retrieval."},
+                facade=facade,
+            )
+            create_confirmed = call_pi_tool(
+                "confirm_save_proposal",
+                {
+                    "proposal": create_result["result"]["proposal"],
+                    "confirmation_token": create_result["result"]["confirmation"]["token"],
+                    "confirmed_at": "2026-07-27T10:00:00Z",
+                },
+                facade=facade,
+            )
+            memory_id = create_confirmed["result"]["memory_id"]
+            edit_result = call_pi_tool(
+                "propose_experiment",
+                {
+                    "operation": "edit",
+                    "target_memory_id": memory_id,
+                    "title": "Try retrieval eval",
+                    "body": "Run focused and fast-contract tiers before retrieval changes.",
+                },
+                facade=facade,
+            )
+            edit_confirmed = call_pi_tool(
+                "confirm_save_proposal",
+                {
+                    "proposal": edit_result["result"]["proposal"],
+                    "confirmation_token": edit_result["result"]["confirmation"]["token"],
+                    "confirmed_at": "2026-07-27T10:05:00Z",
+                },
+                facade=facade,
+            )
+            rollback_result = call_pi_tool(
+                "propose_experiment",
+                {
+                    "operation": "rollback",
+                    "target_memory_id": memory_id,
+                    "target_event_id": edit_confirmed["result"]["event_id"],
+                    "title": "Try retrieval eval",
+                    "rationale": "Rollback the edited wording.",
+                },
+                facade=facade,
+            )
+            rollback_confirmed = call_pi_tool(
+                "confirm_save_proposal",
+                {
+                    "proposal": rollback_result["result"]["proposal"],
+                    "confirmation_token": rollback_result["result"]["confirmation"]["token"],
+                    "confirmed_at": "2026-07-27T10:10:00Z",
+                },
+                facade=facade,
+            )
+
+            self.assertEqual(rollback_confirmed["status"], "ok")
+            events = self._memory_events(db_path)
+            self.assertEqual([event["event_type"] for event in events], ["created", "edited", "rolled_back"])
+            self.assertEqual({event["memory_id"] for event in events}, {memory_id})
+            self.assertEqual(events[2]["rollback_of_event_id"], edit_confirmed["result"]["event_id"])
+
+            delete_result = call_pi_tool(
+                "propose_experiment",
+                {
+                    "operation": "delete",
+                    "target_memory_id": memory_id,
+                    "title": "Try retrieval eval",
+                    "rationale": "Delete without removing audit history.",
+                },
+                facade=facade,
+            )
+            delete_confirmed = call_pi_tool(
+                "confirm_save_proposal",
+                {
+                    "proposal": delete_result["result"]["proposal"],
+                    "confirmation_token": delete_result["result"]["confirmation"]["token"],
+                    "confirmed_at": "2026-07-27T10:12:00Z",
+                },
+                facade=facade,
+            )
+            self.assertEqual(delete_confirmed["status"], "ok")
+            events = self._memory_events(db_path)
+            self.assertEqual([event["event_type"] for event in events], ["created", "edited", "rolled_back", "deleted"])
+
+            decision_result = call_pi_tool(
+                "propose_decision",
+                {"title": "Defer vector retrieval", "rationale": "PRM-8 has no approved ADR."},
+                facade=facade,
+            )
+            decision_confirmed = call_pi_tool(
+                "confirm_save_proposal",
+                {
+                    "proposal": decision_result["result"]["proposal"],
+                    "confirmation_token": decision_result["result"]["confirmation"]["token"],
+                    "confirmed_at": "2026-07-27T10:15:00Z",
+                },
+                facade=facade,
+            )
+            events = self._memory_events(db_path)
+            self.assertEqual(decision_confirmed["result"]["object_type"], "decision")
+            self.assertEqual(events[-1]["object_type"], "decision")
+            self.assertEqual(events[-1]["event_type"], "created")
 
     def test_external_verification_request_does_not_run_skill_or_persist(self):
         result = call_pi_tool(

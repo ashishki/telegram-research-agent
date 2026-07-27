@@ -248,13 +248,81 @@ Boundary evidence:
 - No external-verification evidence is approved or stored; the implemented path
   records a requirement only.
 
+## PRM-12 Continuation Evidence
+
+Scope:
+
+- Implemented PRM-12 confirmation-gated save/watch flow.
+- Added `pi_memory_proposal.v1` proposal objects and exact confirmation tokens
+  for Knowledge Notes, Watch Topics, project links, decisions, actions,
+  experiments, and feedback.
+- Added `propose_decision`; all proposal tools remain read-only and return
+  `persisted=false` until confirmation.
+- Added `confirm_save_proposal` as the only confirmation-gated write tool. It
+  requires an explicit facade and exact proposal/token pair before persistence.
+- Confirmed saves append `personal_memory_events` rows. Edit, delete, and
+  rollback are represented as new audit events, not destructive updates.
+- Chat save requests draft proposals only; session chat text is not durable
+  memory without explicit confirmation.
+
+Changed files:
+
+- `src/assistant/pi_memory.py`
+- `src/assistant/pi_chat.py`
+- `src/assistant/pi_tools.py`
+- `src/assistant/pi_prompts.py`
+- `tests/test_pi_chat.py`
+- `tests/test_pi_tools.py`
+- `AGENTS.md`
+- `docs/CODEX_PROMPT.md`
+- `docs/TEST_STRATEGY.md`
+- `docs/tool_eval.md`
+- `docs/PRIVACY_THREAT_MODEL.md`
+- `docs/audit/PRM_DEEP_REVIEW_CONSOLIDATED_2026-07-27.md`
+
+Verification:
+
+```text
+PYTHONPATH=src python3 -m pytest tests/test_pi_tools.py tests/test_pi_chat.py -q
+33 passed, 6 subtests passed in 2.19s
+```
+
+```text
+python3 tools/test_tiers.py focused-prm
+59 passed, 6 subtests passed in 2.09s
+```
+
+```text
+python3 tools/test_tiers.py fast-contract
+112 passed, 6 subtests passed in 47.21s
+```
+
+```text
+python3 tools/playbook_validate.py --root . --check tasks --check placeholders --check readiness --check delivery --check references
+playbook_validate: errors=0 warnings=0
+```
+
+```text
+git diff --check
+<no output>
+```
+
+Boundary evidence:
+
+- Fixture tests used temporary SQLite databases only.
+- No production database contents were modified.
+- No live Telegram ingestion, reaction sync, LLM extraction, Frontier, Radar,
+  report generation, full archive indexing, embeddings, external web research,
+  external skill execution, or production database migration was run.
+- No raw Telegram text was written to docs or fixtures.
+
 ## Open Boundaries
 
 - Candidate retrieval queries remain unapproved and must not be treated as gold
   evidence.
 - PRM-8 vector/hybrid retrieval remains blocked.
-- PRM-12 remains unclosed; the PRM-9 through PRM-12 block review
-  is not complete.
+- PRM-9 through PRM-12 block review is not complete; do not start PRM-13 before
+  it is recorded.
 - No production database migration, live ingestion, embeddings, external skill,
   dogfood start, release claim, or compatibility-file archive/delete/move was
   performed.

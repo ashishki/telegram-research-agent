@@ -8,9 +8,10 @@ Last updated: 2026-07-27
 The repository is being retrofitted from a weekly-report-centered Telegram
 intelligence system into Personal Telegram Research Memory + Grounded Assistant.
 HEAD contains corrective PRM implementation slices through PRM-7 and PRM-9
-through PRM-11, including bounded SQLite FTS archive search, a grounded
-assistant vertical slice, and deterministic external-verification requirement
-routing. PRM-8 and PRM-12 through PRM-20 are not implemented.
+through PRM-12, including bounded SQLite FTS archive search, a grounded
+assistant vertical slice, deterministic external-verification requirement
+routing, and confirmation-gated saved memory proposals. PRM-8 and PRM-13
+through PRM-20 are not implemented.
 
 ## Operating Rules
 
@@ -38,5 +39,4 @@ routing. PRM-8 and PRM-12 through PRM-20 are not implemented.
 
 ## Current Next Task
 
-Continue at PRM-12. Do not start PRM-13 until PRM-12 is completed or explicitly
-deferred and the PRM-9 through PRM-12 block deep review is recorded.
+Record the PRM-9 through PRM-12 block deep review before starting PRM-13.

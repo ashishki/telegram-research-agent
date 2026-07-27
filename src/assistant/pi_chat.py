@@ -278,6 +278,9 @@ def _plan_tool_calls(
         {
             "name": name,
             "description": tool.description,
+            "read_only": tool.read_only,
+            "requires_confirmation": tool.requires_confirmation,
+            "proposal_only": tool.proposal_only,
             "input_schema": tool.input_schema,
         }
         for name, tool in catalog.items()
@@ -296,6 +299,8 @@ def _plan_tool_calls(
         "- Prefer get_mvp_radar_status for MVP/product opportunity questions.\n"
         "- Prefer get_strategy_reviewer_notes for improvement/Codex/process questions.\n"
         "- Prefer get_action_statuses or get_project_actions for what-to-do questions.\n"
+        "- Use proposal tools to draft saves, watch topics, project links, decisions, actions, experiments, or feedback.\n"
+        "- Use confirm_save_proposal only when the user supplied the exact proposal object and confirmation_token.\n"
         "- Never request mutation/code/config/Codex execution tools.\n\n"
         f"Question: {question}\n\n"
         f"Available tools:\n{json.dumps(tool_descriptions, ensure_ascii=False)}"
@@ -349,6 +354,7 @@ def _synthesize_answer(
         "- Market/business context is context_only and cannot satisfy MVP Radar gates.\n"
         "- Missing or stale Radar never permits build/focused decisions.\n"
         "- Do not claim you changed code/config/profile/projects or ran Codex.\n"
+        "- Do not claim you saved memory unless a confirmed write tool returned persisted=true.\n"
         "- If the operator asks for feedback/voice, explain the confirmation flow.\n"
         "- Include source refs, atom ids, thread slugs, or artifact paths when useful.\n\n"
         f"Question:\n{question}\n\n"
@@ -948,6 +954,7 @@ def _build_assistant_trace(
     bounded_snippet_provider_egress: bool,
 ) -> dict[str, object]:
     termination_reason = _termination_reason(executed_calls, evidence)
+    write_performed = _write_performed(executed_calls)
     return {
         "schema_version": "pi_assistant_trace.v1",
         "intent": route.get("intent") or "unknown",
@@ -971,8 +978,9 @@ def _build_assistant_trace(
             "raw_telegram_corpus_egress": False,
             "bounded_telegram_snippet_provider_egress": bounded_snippet_provider_egress,
             "external_skill_used": False,
-            "write_performed": False,
-            "bounded_read_only_tools": True,
+            "write_performed": write_performed,
+            "confirmation_gated_write": write_performed,
+            "bounded_read_only_tools": not write_performed,
         },
     }
 
@@ -991,6 +999,7 @@ def _empty_trace(*, termination_reason: str) -> dict[str, object]:
             "bounded_telegram_snippet_provider_egress": False,
             "external_skill_used": False,
             "write_performed": False,
+            "confirmation_gated_write": False,
             "bounded_read_only_tools": True,
         },
     }
@@ -1002,6 +1011,8 @@ def _termination_reason(executed_calls: list[dict], evidence: dict) -> str:
     statuses = {str(call.get("status") or "") for call in executed_calls}
     if "needs_external_verification" in statuses:
         return "needs_external_verification"
+    if _write_performed(executed_calls):
+        return "confirmed_write"
     if statuses.intersection({"rejected", "missing", "invalid"}):
         return "tool_error_degraded"
     if any(evidence.get(key) for key in ("source_refs", "atom_ids", "thread_slugs", "artifact_paths")):
@@ -1033,6 +1044,17 @@ def _trace_result_count(call: Mapping[str, Any]) -> int:
             if isinstance(value, list):
                 return len(value)
     return 0
+
+
+def _write_performed(executed_calls: list[dict]) -> bool:
+    for call in executed_calls:
+        result = call.get("result")
+        if not isinstance(result, Mapping):
+            continue
+        payload = result.get("result")
+        if isinstance(payload, Mapping) and payload.get("persisted") is True and payload.get("write_performed") is True:
+            return True
+    return False
 
 
 def _truncate_text(text: str, limit: int) -> str:

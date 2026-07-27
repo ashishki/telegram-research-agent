@@ -37,12 +37,12 @@ Recorded on 2026-07-27.
 
 ```text
 python3 tools/test_tiers.py focused-prm
-54 passed, 6 subtests passed in 1.85s
+59 passed, 6 subtests passed in 2.09s
 ```
 
 ```text
 python3 tools/test_tiers.py fast-contract
-107 passed, 6 subtests passed in 50.27s
+112 passed, 6 subtests passed in 47.21s
 ```
 
 ```text

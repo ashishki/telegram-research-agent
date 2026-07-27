@@ -1,11 +1,15 @@
 import json
+import tempfile
 import unittest
+from pathlib import Path
 
 from assistant.pi_chat import (
     answer_pi_chat,
     route_pi_intent,
     validate_grounded_answer_contract,
 )
+from assistant.pi_facade import PersonalIntelligenceFacade
+from config.settings import Settings
 
 
 class _FakeFacade:
@@ -168,6 +172,29 @@ class _ExternalVerificationLLM(_FakeLLM):
                 "Unknowns: current external truth; independent source corroboration; Telegram archive support.",
             ]
         )
+
+
+class _SaveProposalLLM(_FakeLLM):
+    @staticmethod
+    def complete_json(prompt, system="", category="unknown", model=None):
+        return {
+            "tool_calls": [
+                {
+                    "name": "propose_knowledge_note",
+                    "arguments": {
+                        "title": "Save only after confirmation",
+                        "body": "Chat text must not become durable memory automatically.",
+                    },
+                }
+            ],
+            "reason": "Draft a proposal only.",
+        }
+
+    @staticmethod
+    def complete(prompt, system="", max_tokens=2048, category="unknown", model=None):
+        assert "needs_confirmation" in prompt
+        assert "confirm_save_proposal" in prompt
+        return "I drafted a save proposal. It is not stored until you confirm it."
 
 
 class _WrongArchivePlannerLLM(_ArchiveSearchLLM):
@@ -380,6 +407,32 @@ class TestPIChat(unittest.TestCase):
             [],
         )
         self.assertEqual(contract["evidence_sections"]["external_evidence"]["status"], "required_not_run")
+
+    def test_chat_save_request_drafts_proposal_without_persisting_transcript(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            db_path = root / "memory.db"
+            facade = PersonalIntelligenceFacade(
+                settings=Settings(
+                    db_path=str(db_path),
+                    llm_api_key="",
+                    model_provider="",
+                    telegram_session_path="",
+                ),
+                output_root=root,
+            )
+            result = answer_pi_chat(
+                "Save this as a note: chat text must not become durable memory.",
+                facade=facade,
+                llm_client=_SaveProposalLLM,
+            )
+
+            self.assertEqual(result["status"], "ok")
+            self.assertEqual(result["tool_calls"][0]["name"], "propose_knowledge_note")
+            self.assertEqual(result["tool_results"][0]["status"], "needs_confirmation")
+            self.assertFalse(result["tool_results"][0]["result"]["result"]["persisted"])
+            self.assertFalse(result["trace"]["privacy_boundary"]["write_performed"])
+            self.assertFalse(db_path.exists())
 
     def test_answer_telemetry_separates_retrieval_generation_and_excludes_raw_text(self):
         result = answer_pi_chat("Найди пост про agent review", facade=_FakeFacade(), llm_client=_ArchiveSearchLLM)

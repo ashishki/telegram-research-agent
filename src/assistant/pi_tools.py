@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Callable, Mapping
 
 from assistant.pi_facade import PersonalIntelligenceFacade
+from assistant.pi_memory import build_memory_proposal, confirm_memory_proposal
 from assistant.pi_prompts import PI_TOOL_DESCRIPTIONS, PI_TOOL_LOOP_MAX_CALLS
 
 
@@ -58,9 +60,14 @@ CONFIRMATION_GATED_PROPOSAL_TOOLS = {
     "propose_knowledge_note",
     "propose_watch_topic",
     "propose_project_link",
+    "propose_decision",
     "propose_action",
     "propose_experiment",
     "propose_feedback",
+}
+
+CONFIRMATION_GATED_WRITE_TOOLS = {
+    "confirm_save_proposal",
 }
 
 
@@ -97,8 +104,17 @@ class PITool:
                     "status": "invalid",
                     "message": str(exc),
                 },
+                read_only=self.read_only,
+                requires_confirmation=self.requires_confirmation,
+                proposal_only=self.proposal_only,
             )
-        return _tool_response(self.name, result)
+        return _tool_response(
+            self.name,
+            result,
+            read_only=self.read_only,
+            requires_confirmation=self.requires_confirmation,
+            proposal_only=self.proposal_only,
+        )
 
 
 def build_pi_tool_catalog() -> dict[str, PITool]:
@@ -248,9 +264,26 @@ def build_pi_tool_catalog() -> dict[str, PITool]:
         "propose_knowledge_note": _proposal_tool("propose_knowledge_note", "knowledge_note"),
         "propose_watch_topic": _proposal_tool("propose_watch_topic", "watch_topic"),
         "propose_project_link": _proposal_tool("propose_project_link", "project_link"),
+        "propose_decision": _proposal_tool("propose_decision", "decision"),
         "propose_action": _proposal_tool("propose_action", "action"),
         "propose_experiment": _proposal_tool("propose_experiment", "experiment"),
         "propose_feedback": _proposal_tool("propose_feedback", "feedback"),
+        "confirm_save_proposal": PITool(
+            name="confirm_save_proposal",
+            description=PI_TOOL_DESCRIPTIONS["confirm_save_proposal"],
+            input_schema=_schema(
+                {
+                    "proposal": _memory_proposal_schema(),
+                    "confirmation_token": {"type": "string"},
+                    "confirmed_by": {"type": ["string", "null"]},
+                    "confirmed_at": {"type": ["string", "null"]},
+                },
+                required=["proposal", "confirmation_token"],
+            ),
+            handler=lambda facade, args: confirm_memory_proposal(_facade_db_path(facade), args),
+            read_only=False,
+            requires_confirmation=True,
+        ),
     }
     validate_pi_tool_catalog(catalog)
     return catalog
@@ -269,28 +302,39 @@ def validate_pi_tool_catalog(catalog: Mapping[str, PITool]) -> dict:
     writable = sorted(name for name, tool in catalog.items() if not tool.read_only)
     missing_read_only = sorted(MINIMUM_READ_ONLY_TOOLS.difference(catalog))
     missing_proposals = sorted(CONFIRMATION_GATED_PROPOSAL_TOOLS.difference(catalog))
+    missing_writes = sorted(CONFIRMATION_GATED_WRITE_TOOLS.difference(catalog))
     unsafe_proposals = sorted(
         name
         for name in CONFIRMATION_GATED_PROPOSAL_TOOLS.intersection(catalog)
         if not catalog[name].requires_confirmation or not catalog[name].proposal_only
     )
+    unsafe_writes = sorted(
+        name
+        for name, tool in catalog.items()
+        if not tool.read_only
+        and (name not in CONFIRMATION_GATED_WRITE_TOOLS or not tool.requires_confirmation or tool.proposal_only)
+    )
     if forbidden:
         raise ValueError(f"Forbidden mutation tools in PI catalog: {', '.join(forbidden)}")
     if unapproved_external:
         raise ValueError(f"Unapproved external-skill tools in PI catalog: {', '.join(unapproved_external)}")
-    if writable:
-        raise ValueError(f"PI catalog tools must be read-only: {', '.join(writable)}")
+    if unsafe_writes:
+        raise ValueError(f"Writable PI tools must be confirmation-gated: {', '.join(unsafe_writes)}")
     if missing_read_only:
         raise ValueError(f"Missing minimum read-only PI tools: {', '.join(missing_read_only)}")
     if missing_proposals:
         raise ValueError(f"Missing confirmation-gated proposal tools: {', '.join(missing_proposals)}")
+    if missing_writes:
+        raise ValueError(f"Missing confirmation-gated write tools: {', '.join(missing_writes)}")
     if unsafe_proposals:
         raise ValueError(f"Proposal tools must be confirmation-gated: {', '.join(unsafe_proposals)}")
     return {
         "status": "ok",
         "tool_count": len(catalog),
         "max_calls_per_turn": PI_TOOL_LOOP_MAX_CALLS,
-        "message": "PI tool catalog is read-only.",
+        "read_only_tool_count": len(catalog) - len(writable),
+        "confirmation_gated_write_tool_count": len(writable),
+        "message": "PI tool catalog is bounded; writes require explicit confirmation.",
     }
 
 
@@ -311,6 +355,17 @@ def call_pi_tool(
                 "status": "missing",
                 "message": f"Unknown read-only PI tool: {clean_name}",
             },
+        )
+    if not tool.read_only and facade is None:
+        return _tool_response(
+            clean_name,
+            {
+                "status": "invalid",
+                "message": "Explicit facade is required for confirmed writes.",
+            },
+            read_only=tool.read_only,
+            requires_confirmation=tool.requires_confirmation,
+            proposal_only=tool.proposal_only,
         )
     return tool.call(facade or PersonalIntelligenceFacade(), arguments)
 
@@ -337,33 +392,27 @@ def _proposal_tool(name: str, proposal_type: str) -> PITool:
         input_schema=_schema(
             {
                 "title": {"type": "string"},
+                "operation": {
+                    "type": ["string", "null"],
+                    "enum": ["create", "edit", "delete", "rollback", None],
+                },
+                "target_memory_id": {"type": ["string", "null"]},
+                "target_event_id": {"type": ["integer", "null"]},
+                "body": {"type": ["string", "null"]},
                 "rationale": {"type": ["string", "null"]},
                 "source_refs": {
                     "type": ["array", "null"],
                     "items": {"type": "string"},
                 },
+                "metadata": {"type": ["object", "null"]},
             },
             required=["title"],
         ),
-        handler=lambda _facade, args: _proposal_response(proposal_type, args),
+        handler=lambda _facade, args: build_memory_proposal(proposal_type, args),
         read_only=True,
         requires_confirmation=True,
         proposal_only=True,
     )
-
-
-def _proposal_response(proposal_type: str, args: Mapping[str, Any]) -> dict:
-    return {
-        "status": "needs_confirmation",
-        "proposal_type": proposal_type,
-        "proposal": {
-            "title": _required_string(args.get("title"), "title"),
-            "rationale": _optional_string(args.get("rationale")),
-            "source_refs": _string_list(args.get("source_refs")),
-        },
-        "persisted": False,
-        "message": "Proposal drafted only; human confirmation is required before persistence.",
-    }
 
 
 def _external_verification_request(args: Mapping[str, Any]) -> dict:
@@ -404,7 +453,14 @@ def _external_verification_request(args: Mapping[str, Any]) -> dict:
     }
 
 
-def _tool_response(tool_name: str, result: Mapping[str, Any]) -> dict:
+def _tool_response(
+    tool_name: str,
+    result: Mapping[str, Any],
+    *,
+    read_only: bool = True,
+    requires_confirmation: bool = False,
+    proposal_only: bool = False,
+) -> dict:
     normalized = dict(result)
     status = str(normalized.get("status") or "ok")
     evidence = _collect_evidence(normalized)
@@ -417,7 +473,9 @@ def _tool_response(tool_name: str, result: Mapping[str, Any]) -> dict:
     return {
         "status": status,
         "tool_name": tool_name,
-        "read_only": True,
+        "read_only": read_only,
+        "requires_confirmation": requires_confirmation,
+        "proposal_only": proposal_only,
         "evidence_status": evidence_status,
         "evidence": evidence,
         "result": normalized,
@@ -513,6 +571,51 @@ def _archive_search_filters_schema() -> dict:
         },
         "additionalProperties": False,
     }
+
+
+def _memory_proposal_schema() -> dict:
+    return {
+        "type": "object",
+        "properties": {
+            "schema_version": {"type": ["string", "null"]},
+            "object_type": {
+                "type": "string",
+                "enum": [
+                    "knowledge_note",
+                    "watch_topic",
+                    "project_link",
+                    "decision",
+                    "action",
+                    "experiment",
+                    "feedback",
+                ],
+            },
+            "operation": {
+                "type": "string",
+                "enum": ["create", "edit", "delete", "rollback"],
+            },
+            "target_memory_id": {"type": ["string", "null"]},
+            "target_event_id": {"type": ["integer", "null"]},
+            "title": {"type": "string"},
+            "body": {"type": ["string", "null"]},
+            "rationale": {"type": ["string", "null"]},
+            "source_refs": {
+                "type": "array",
+                "items": {"type": "string"},
+            },
+            "metadata": {"type": "object"},
+        },
+        "required": ["object_type", "operation", "title"],
+        "additionalProperties": False,
+    }
+
+
+def _facade_db_path(facade: PersonalIntelligenceFacade) -> Path:
+    settings = getattr(facade, "_settings", None)
+    db_path = getattr(settings, "db_path", None)
+    if not db_path:
+        raise ValueError("facade db_path is required for confirmed writes")
+    return Path(db_path)
 
 
 def _optional_mapping(value: Any) -> dict | None:
