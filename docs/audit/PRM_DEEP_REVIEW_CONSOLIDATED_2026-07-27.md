@@ -155,6 +155,20 @@ The ops failure is the known date-sensitive live-evidence-window fixture. It was
 not fixed in this corrective work because the operator explicitly excluded it
 from scope.
 
+```text
+python3 tools/verify_project.py --root .
+PASS: playbook_contract exit=0
+FAIL: project_tests exit=1
+verify_project: required_failures=1 result=/srv/openclaw-you/workspace/telegram-research-agent/.playbook-artifacts/project_verification.json
+```
+
+Project verifier test summary:
+
+```text
+1 failed, 1002 passed, 281 subtests passed in 324.77s (0:05:24)
+FAILED tests/test_product_ops.py::TestProductOps::test_ops_validation_passes_when_live_evidence_rows_exist
+```
+
 ## Final Verification
 
 ```text

@@ -74,5 +74,6 @@ Remaining test failure:
 | python3 tools/test_tiers.py focused-prm | 49 passed in 2.36s |
 | python3 tools/test_tiers.py fast-contract | 102 passed in 28.36s |
 | python3 tools/test_tiers.py ops-date-sensitive | 1 failed, 3 passed in 3.86s; known failure: tests/test_product_ops.py::TestProductOps::test_ops_validation_passes_when_live_evidence_rows_exist |
+| python3 tools/verify_project.py --root . | fail, required_failures=1; project_tests: 1 failed, 1002 passed, 281 subtests passed in 324.77s; known failure: tests/test_product_ops.py::TestProductOps::test_ops_validation_passes_when_live_evidence_rows_exist |
 | python3 tools/playbook_validate.py --root . --check tasks --check placeholders --check readiness --check delivery --check references | playbook_validate: errors=0 warnings=0 |
 | git diff --check | pass, no output |
