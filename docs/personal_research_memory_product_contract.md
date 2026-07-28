@@ -2,7 +2,7 @@
 
 Status: proposed
 
-Last updated: 2026-07-26
+Last updated: 2026-07-28
 
 ## North Star
 
@@ -43,6 +43,23 @@ Generate reports only as a secondary projection.
 | Life/career context | Answer career-market questions with Telegram as discovery context, not final truth. |
 | No-answer | Return `insufficient_evidence` when the archive is weak. |
 | External verification | Separate Telegram archive, external verification, and unknowns. |
+
+## Project Application
+
+PRM-14 implementation contract:
+
+- project context answers use active project descriptors from bounded local
+  descriptor files;
+- the assistant combines descriptor fields, bounded Telegram archive retrieval,
+  and curated knowledge evidence;
+- answers label relevance as `direct_implication`, `weak_watch`,
+  `learning_relevance`, or `no_match`;
+- direct implications must cite archive/source evidence and name descriptor
+  fields used;
+- weak keyword-only matches and learning-only relevance do not produce project
+  action recommendations;
+- no assistant tool may approve MVP builds, mutate code, or mutate project
+  descriptors.
 
 ## Answer Contract
 

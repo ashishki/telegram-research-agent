@@ -18,6 +18,7 @@ PRM_TESTS = (
     "tests/test_archive_search.py",
     "tests/test_pi_tools.py",
     "tests/test_pi_chat.py",
+    "tests/test_project_context.py",
     "tests/test_reaction_fast_lane.py",
     "tests/test_selective_enrichment.py",
     "tests/test_archive_retrieval_eval.py",

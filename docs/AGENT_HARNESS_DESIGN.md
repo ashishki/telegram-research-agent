@@ -44,6 +44,7 @@ Minimum read-only tools:
 - `search_idea_threads`;
 - `get_idea_thread`;
 - `get_project_actions`;
+- `analyze_project_context`;
 - `get_mvp_radar_status`;
 - `get_feedback_summary`;
 - `list_marked_posts`;

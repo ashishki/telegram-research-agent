@@ -1,7 +1,7 @@
 # Tool Evaluation Plan
 
-Status: draft; PRM-4 archive search tool vertical slice recorded; PRM-9 routing and trace evidence recorded; PRM-11 external verification requirement path recorded; PRM-12 confirmation-gated save/watch flow recorded
-Last updated: 2026-07-27
+Status: draft; PRM-4 archive search tool vertical slice recorded; PRM-9 routing and trace evidence recorded; PRM-11 external verification requirement path recorded; PRM-12 confirmation-gated save/watch flow recorded; PRM-14 project context support recorded
+Last updated: 2026-07-28
 
 ## Tool Classes
 
@@ -13,6 +13,7 @@ Read-only tools:
 - search curated knowledge;
 - list reactions;
 - get topic/project/saved context;
+- analyze project context;
 - get recent changes;
 - get Radar status;
 - request external verification.
@@ -109,7 +110,7 @@ Required tool groups:
 
 | Group | Tools |
 | --- | --- |
-| Read-only minimum | `get_current_week_label`, `get_weekly_summary`, `get_artifact_status`, `search_intelligence_items`, `search_telegram_archive`, `search_idea_threads`, `get_idea_thread`, `get_project_actions`, `get_mvp_radar_status`, `get_feedback_summary`, `list_marked_posts`, `get_strategy_reviewer_notes`, `request_external_verification` |
+| Read-only minimum | `get_current_week_label`, `get_weekly_summary`, `get_artifact_status`, `search_intelligence_items`, `search_telegram_archive`, `search_idea_threads`, `get_idea_thread`, `get_project_actions`, `analyze_project_context`, `get_mvp_radar_status`, `get_feedback_summary`, `list_marked_posts`, `get_strategy_reviewer_notes`, `request_external_verification` |
 | Confirmation-gated proposals | `propose_knowledge_note`, `propose_watch_topic`, `propose_project_link`, `propose_decision`, `propose_action`, `propose_experiment`, `propose_feedback` |
 | Confirmation-gated writes | `confirm_save_proposal` |
 | Forbidden automatic mutation | `edit_code`, `run_codex`, `edit_config`, `mutate_profile`, `mutate_projects`, `write_feedback`, `record_feedback`, `confirm_feedback`, `mutate_db`, `execute_sql` |
@@ -224,6 +225,43 @@ Result:
 39 passed, 6 subtests passed in 14.25s
 65 passed, 6 subtests passed in 12.74s
 118 passed, 6 subtests passed in 58.27s
+```
+
+## PRM-14 Project Context Evidence
+
+Implementation:
+
+- `analyze_project_context` was added to the bounded PI tool catalog as a
+  read-only tool.
+- The tool loads active project descriptors from local descriptor files, runs
+  bounded SQLite FTS archive retrieval and curated intelligence search, and
+  returns `project_context_decision_support.v1`.
+- The DTO labels each answer as `direct_implication`, `weak_watch`,
+  `learning_relevance`, or `no_match`.
+- Direct implications include archive/source refs, descriptor fields used, and
+  read-only candidate next steps.
+- Weak keyword-only and learning-only matches return watch/study guidance and no
+  project action recommendation.
+- `approve_mvp_build`, `approve_project_build`, `build_mvp`,
+  `mutate_project_context`, `mutate_projects`, `edit_code`, and `run_codex`
+  remain forbidden by the explicit allowlist.
+- Project-context chat routes bypass LLM planning and use deterministic answer
+  rendering from the DTO.
+
+Verification command:
+
+```bash
+PYTHONPATH=src python3 -m pytest tests/test_project_context.py tests/test_pi_tools.py tests/test_pi_chat.py -q
+python3 tools/test_tiers.py focused-prm
+python3 tools/test_tiers.py fast-contract
+```
+
+Result:
+
+```text
+47 passed, 6 subtests passed in 5.59s
+78 passed, 6 subtests passed in 11.38s
+131 passed, 6 subtests passed in 33.79s
 ```
 
 ## Stop-Ship Cases

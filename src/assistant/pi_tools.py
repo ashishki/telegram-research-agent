@@ -12,9 +12,13 @@ from assistant.pi_prompts import PI_TOOL_DESCRIPTIONS, PI_TOOL_LOOP_MAX_CALLS
 ToolHandler = Callable[[PersonalIntelligenceFacade, Mapping[str, Any]], dict]
 
 FORBIDDEN_TOOL_NAMES = {
+    "approve_mvp_build",
+    "approve_project_build",
+    "build_mvp",
     "edit_code",
     "run_codex",
     "edit_config",
+    "mutate_project_context",
     "mutate_profile",
     "mutate_projects",
     "write_feedback",
@@ -54,6 +58,7 @@ MINIMUM_READ_ONLY_TOOLS = {
     "search_idea_threads",
     "get_idea_thread",
     "get_project_actions",
+    "analyze_project_context",
     "get_mvp_radar_status",
     "get_feedback_summary",
     "list_marked_posts",
@@ -223,6 +228,25 @@ def build_pi_tool_catalog() -> dict[str, PITool]:
             description=PI_TOOL_DESCRIPTIONS["get_project_actions"],
             input_schema=_schema({"week_label": {"type": ["string", "null"]}}),
             handler=lambda facade, args: facade.get_project_actions(_optional_string(args.get("week_label"))),
+        ),
+        "analyze_project_context": PITool(
+            name="analyze_project_context",
+            description=PI_TOOL_DESCRIPTIONS["analyze_project_context"],
+            input_schema=_schema(
+                {
+                    "query": {"type": "string"},
+                    "project_name": {"type": ["string", "null"]},
+                    "week_label": {"type": ["string", "null"]},
+                    "limit": {"type": ["integer", "null"], "minimum": 1, "maximum": 10},
+                },
+                required=["query"],
+            ),
+            handler=lambda facade, args: facade.analyze_project_context(
+                _required_string(args.get("query"), "query"),
+                project_name=_optional_string(args.get("project_name")),
+                week_label=_optional_string(args.get("week_label")),
+                limit=_limit(args.get("limit"), default=5, maximum=10),
+            ),
         ),
         "get_mvp_radar_status": PITool(
             name="get_mvp_radar_status",

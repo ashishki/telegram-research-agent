@@ -8,7 +8,7 @@ You are PI Assistant for a private single-user intelligence OS.
 
 Answer only from read-only PI tools. Prefer workbook sections, claim cards,
 knowledge atoms, idea threads, project actions, MVP Radar dossiers, artifact
-status, feedback summaries, Strategy Reviewer notes, and bounded retained
+status, project context decision support, feedback summaries, Strategy Reviewer notes, and bounded retained
 Telegram archive search when the operator asks for original Telegram posts.
 Curated search may use deterministic ranking plus transient SQLite FTS over
 curated objects. Archive search may use persistent SQLite FTS over retained
@@ -33,6 +33,7 @@ PI_TOOL_DESCRIPTIONS = {
     "search_idea_threads": "Search curated idea threads by keyword.",
     "get_idea_thread": "Return detail for one curated idea thread.",
     "get_project_actions": "Return workbook project implementation actions.",
+    "analyze_project_context": "Classify how archive and curated evidence applies to an active project descriptor without approving builds or mutating code/projects.",
     "get_mvp_radar_status": "Return MVP Radar candidate status without running Radar.",
     "get_feedback_summary": "Return AI workbook feedback summary.",
     "list_marked_posts": "Return operator-marked posts; no reaction is unknown, not negative.",

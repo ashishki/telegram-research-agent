@@ -11,6 +11,7 @@ from assistant.pi_chat import (
     validate_grounded_answer_contract,
 )
 from assistant.pi_facade import PersonalIntelligenceFacade
+from assistant.project_context import build_project_context_decision_support
 from assistant.pi_tools import call_pi_tool
 from config.settings import Settings
 from llm.client import set_usage_db_path
@@ -109,6 +110,48 @@ class _FakeFacade:
             "message": "Project actions loaded.",
         }
 
+    def analyze_project_context(self, query, project_name=None, week_label=None, limit=5):
+        return build_project_context_decision_support(
+            query=query,
+            project_descriptor={
+                "name": "Eval-Ground-Truth-Lab",
+                "repo": "ashishki/Eval-Ground-Truth-Lab",
+                "description": "Evaluation lab for coding-agent ground truth and evidence-backed acceptance.",
+                "focus": "gold labels, holdout sets, citation correctness, replayable fixtures",
+                "keywords": [
+                    "ground truth",
+                    "gold labels",
+                    "holdout sets",
+                    "citation correctness",
+                    "replayable fixtures",
+                    "eval",
+                ],
+            },
+            archive_result={
+                "status": "ok",
+                "items": [
+                    {
+                        "archive_document_id": "tg:-1001:1001",
+                        "posted_at": "2026-07-20T10:00:00Z",
+                        "source_url": "https://t.me/source/1001",
+                        "snippet": "Coding-agent evals need ground truth labels, citation correctness checks, and holdout sets.",
+                    }
+                ],
+            },
+            curated_result={
+                "status": "ok",
+                "items": [
+                    {
+                        "id": "claim-1",
+                        "item_type": "claim_card",
+                        "summary": "Evidence-backed acceptance fixtures help judge calibration.",
+                        "source_refs": ["https://t.me/source/1002"],
+                        "atom_ids": [101],
+                    }
+                ],
+            },
+        )
+
 
 class _FakeLLM:
     @staticmethod
@@ -199,6 +242,16 @@ class _SaveProposalLLM(_FakeLLM):
         assert "needs_confirmation" in prompt
         assert "confirm_save_proposal" in prompt
         return "I drafted a save proposal. It is not stored until you confirm it."
+
+
+class _ProjectContextLLM(_FakeLLM):
+    @staticmethod
+    def complete_json(prompt, system="", category="unknown", model=None):
+        raise AssertionError("Project context routes must bypass LLM planning.")
+
+    @staticmethod
+    def complete(prompt, system="", max_tokens=2048, category="unknown", model=None):
+        raise AssertionError("Project context answer is deterministic.")
 
 
 class _WrongArchivePlannerLLM(_ArchiveSearchLLM):
@@ -380,7 +433,7 @@ class TestPIChat(unittest.TestCase):
         self.assertEqual(result["answer_contract"]["archive_support"]["status"], "insufficient_evidence")
 
     def test_answer_pi_chat_falls_back_when_planning_fails(self):
-        result = answer_pi_chat("Что делать по проектам?", facade=_FakeFacade(), llm_client=_BrokenPlannerLLM)
+        result = answer_pi_chat("Что делать с eval gates?", facade=_FakeFacade(), llm_client=_BrokenPlannerLLM)
 
         self.assertEqual(result["status"], "ok")
         self.assertTrue(result["tool_calls"])
@@ -450,6 +503,31 @@ class TestPIChat(unittest.TestCase):
 
         self.assertEqual(openclaw["intent"], "exact_search")
         self.assertEqual(project_now["intent"], "project_application")
+
+    def test_project_application_answer_uses_project_context_support(self):
+        result = answer_pi_chat(
+            "What applies to Eval-Ground-Truth-Lab project?",
+            facade=_FakeFacade(),
+            llm_client=_ProjectContextLLM,
+        )
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["trace"]["planner"], "deterministic")
+        self.assertEqual(result["telemetry"]["planning"]["model_calls"], 0)
+        self.assertEqual(result["telemetry"]["generation"]["model_calls"], 0)
+        self.assertEqual(result["telemetry"]["generation"]["cost_source"], "deterministic_project_context")
+        self.assertEqual([call["name"] for call in result["tool_calls"]], ["analyze_project_context"])
+        self.assertIn("Eval-Ground-Truth-Lab -> direct_implication", result["answer"])
+        self.assertIn("Descriptor fields used:", result["answer"])
+        self.assertIn("https://t.me/source/1001", result["answer"])
+        self.assertIn("no MVP build approval", result["answer"])
+        self.assertFalse(result["trace"]["privacy_boundary"]["write_performed"])
+        self.assertFalse(result["trace"]["privacy_boundary"]["raw_telegram_corpus_egress"])
+        self.assertFalse(result["trace"]["privacy_boundary"]["bounded_telegram_snippet_provider_egress"])
+
+        contract = validate_grounded_answer_contract(result["answer_contract"])
+        self.assertEqual(contract["archive_support"]["status"], "available")
+        self.assertIn("https://t.me/source/1001", contract["source_links"])
 
     def test_external_verification_answer_separates_evidence_and_unknowns(self):
         result = answer_pi_chat(

@@ -1,7 +1,7 @@
 # Generation Evaluation Plan
 
-Status: draft; PRM-4 no-answer vertical slice recorded; PRM-10 grounded answer contract recorded
-Last updated: 2026-07-26
+Status: draft; PRM-4 no-answer vertical slice recorded; PRM-10 grounded answer contract recorded; PRM-14 project-context answer evidence recorded
+Last updated: 2026-07-28
 
 ## Scope
 
@@ -103,3 +103,30 @@ python3 tools/test_tiers.py fast-contract
 - cost per useful answer.
 
 LLM judge is advisory until calibrated.
+
+## PRM-14 Project Context Answer Evidence
+
+Implementation:
+
+- Project-application chat routes call `analyze_project_context`
+  deterministically.
+- Final project-context answers are rendered from
+  `project_context_decision_support.v1`; they do not need an LLM generation
+  call.
+- Answers name the active project, relevance label, descriptor fields used,
+  source refs, suggestion/watch guidance, unknowns, and the mutation boundary.
+- Weak keyword-only, learning-only, and no-match labels do not produce action
+  recommendations.
+- The grounded answer contract still records archive support and source links
+  from the DTO evidence.
+
+Verification:
+
+```text
+PYTHONPATH=src python3 -m pytest tests/test_project_context.py tests/test_pi_tools.py tests/test_pi_chat.py -q
+47 passed, 6 subtests passed in 5.59s
+python3 tools/test_tiers.py focused-prm
+78 passed, 6 subtests passed in 11.38s
+python3 tools/test_tiers.py fast-contract
+131 passed, 6 subtests passed in 33.79s
+```

@@ -42,3 +42,6 @@ These files remain preserved for human reference, but they are no longer part of
 - `PRM13_KNOWLEDGE_LIBRARY_2026-07-27.md` - PRM-13 Knowledge Library
   topic-page implementation receipt, fixture visual/layout evidence, and
   continuation boundary for the PRM-13 through PRM-17 block.
+- `PRM14_PROJECT_CONTEXT_2026-07-28.md` - PRM-14 project context and
+  decision-support implementation receipt, deterministic relevance evidence,
+  and continuation boundary for the PRM-13 through PRM-17 block.

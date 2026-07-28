@@ -6,6 +6,7 @@ import time
 from typing import Any, Mapping
 
 from assistant.pi_facade import PersonalIntelligenceFacade
+from assistant.project_context import render_project_context_answer
 from assistant.pi_prompts import PI_ASSISTANT_SYSTEM_PROMPT, PI_TOOL_LOOP_MAX_CALLS
 from assistant.pi_tools import build_pi_tool_catalog, call_pi_tool
 from config.settings import Settings
@@ -298,6 +299,7 @@ def _plan_tool_calls(
         "- Prefer search_telegram_archive when the operator asks to find original Telegram posts, archive evidence, source links, reacted posts, or channel/date-filtered posts.\n"
         "- Prefer search_intelligence_items for specific questions.\n"
         "- Prefer get_mvp_radar_status for MVP/product opportunity questions.\n"
+        "- Prefer analyze_project_context for applying archive evidence to active projects.\n"
         "- Prefer get_strategy_reviewer_notes for improvement/Codex/process questions.\n"
         "- Prefer get_action_statuses or get_project_actions for what-to-do questions.\n"
         "- Use proposal tools to draft saves, watch topics, project links, decisions, actions, experiments, or feedback.\n"
@@ -342,6 +344,14 @@ def _synthesize_answer(
     evidence: dict,
     llm_client: type[LLMClient],
 ) -> dict[str, object]:
+    project_context = _first_project_context_payload(executed_calls)
+    if project_context is not None:
+        return {
+            "answer": render_project_context_answer(project_context),
+            "model_call_attempted": False,
+            "estimated_cost_usd": 0.0,
+            "cost_source": "deterministic_project_context",
+        }
     compact_calls = _truncate_text(json.dumps(executed_calls, ensure_ascii=False, indent=2), MAX_FINAL_CONTEXT_CHARS)
     prompt = (
         "Answer the operator's Telegram message as Hermes.\n\n"
@@ -501,9 +511,7 @@ def route_pi_intent(question: str) -> dict[str, object]:
     elif any(term in lowered for term in ("проект", "project", "примен", "apply", "life")):
         intent = "project_application"
         calls = [
-            {"name": "get_project_actions", "arguments": {}},
-            {"name": "search_telegram_archive", "arguments": {"query": question, "limit": 5}},
-            {"name": "search_intelligence_items", "arguments": {"query": question, "limit": 5}},
+            {"name": "analyze_project_context", "arguments": {"query": question, "limit": 5}},
         ]
     elif any(term in lowered for term in ("найди", "find", "архив", "archive", "telegram", "телеграм", "пост", "source", "ссылк")):
         intent = "exact_search"
@@ -539,6 +547,7 @@ def _route_requires_deterministic_tools(route: Mapping[str, Any]) -> bool:
         "external_verification",
         "reaction_recall",
         "no_answer_probe",
+        "project_application",
     }
 
 
@@ -657,6 +666,9 @@ def _collect_chat_evidence(executed_calls: list[dict]) -> dict:
 
 def _fallback_answer(question: str, *, executed_calls: list[dict], evidence: dict) -> str:
     del question
+    project_context = _first_project_context_payload(executed_calls)
+    if project_context is not None:
+        return render_project_context_answer(project_context)
     if any(call.get("status") == "needs_external_verification" for call in executed_calls):
         refs = [str(ref) for ref in evidence.get("source_refs") or [] if str(ref).strip()]
         unknowns = _contract_unknowns(executed_calls, external_required=True, source_links=refs)
@@ -1063,11 +1075,25 @@ def _trace_result_count(call: Mapping[str, Any]) -> int:
             "claim_cards",
             "actions",
             "observed_personal_posts",
+            "project_suggestions",
         ):
             value = candidate.get(key)
             if isinstance(value, list):
                 return len(value)
     return 0
+
+
+def _first_project_context_payload(executed_calls: list[dict]) -> dict[str, Any] | None:
+    for call in executed_calls:
+        if call.get("name") != "analyze_project_context":
+            continue
+        result = call.get("result")
+        if not isinstance(result, Mapping):
+            continue
+        payload = result.get("result")
+        if isinstance(payload, Mapping):
+            return dict(payload)
+    return None
 
 
 def _write_performed(executed_calls: list[dict]) -> bool:

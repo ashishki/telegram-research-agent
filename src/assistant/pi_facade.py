@@ -46,6 +46,12 @@ from output.mvp_radar_reader import (
     load_bound_mvp_radar_reader,
 )
 from assistant.semantic_retrieval import retrieval_decision_note, search_curated_semantic_items
+from assistant.project_context import (
+    build_project_context_decision_support,
+    load_project_descriptors,
+    project_context_search_query,
+    select_project_descriptor,
+)
 from output.strategy_reviewer import build_strategy_review
 from output.weekly_intelligence_brief import (
     RADAR_DISABLED_DISCLOSURE_RU,
@@ -77,6 +83,7 @@ class PersonalIntelligenceFacade:
         mvp_output_root: str | Path | None = None,
         radar_output_root: str | Path | None = None,
         weekly_run_root: str | Path | None = None,
+        project_descriptors_path: str | Path | None = None,
         v2_source_roots: Iterable[str | Path] = (),
         now: datetime | None = None,
     ) -> None:
@@ -102,6 +109,11 @@ class PersonalIntelligenceFacade:
                 if self._output_root is not None
                 else PROJECT_ROOT / "data" / "output" / "weekly_intelligence_runs"
             )
+        )
+        self._project_descriptors_path = (
+            Path(project_descriptors_path)
+            if project_descriptors_path is not None
+            else PROJECT_ROOT / "src" / "config" / "projects.yaml"
         )
         self._v2_source_roots = tuple(Path(root) for root in v2_source_roots)
         self._now = now
@@ -808,6 +820,108 @@ class PersonalIntelligenceFacade:
                 else "No retained Telegram archive evidence matched the query."
             ),
         }
+
+    def analyze_project_context(
+        self,
+        query: str,
+        project_name: str | None = None,
+        week_label: str | None = None,
+        limit: int = 5,
+    ) -> dict:
+        clean_query = str(query or "").strip()
+        if not clean_query:
+            return {
+                "schema_version": "project_context_decision_support.v1",
+                "status": "invalid",
+                "query": "",
+                "project_name": project_name,
+                "relevance_label": "no_match",
+                "descriptor_fields_used": [],
+                "archive_evidence": {"status": "empty", "source_refs": [], "items": []},
+                "curated_knowledge": {"status": "empty", "source_refs": [], "items": []},
+                "project_suggestions": [],
+                "decision_support": {
+                    "automatic_mvp_build_approval": False,
+                    "code_mutation_exposed": False,
+                    "project_mutation_exposed": False,
+                    "write_performed": False,
+                    "requires_human_confirmation_for_saves": True,
+                },
+                "source_refs": [],
+                "unknowns": ["project query"],
+                "message": "Project context query is required.",
+            }
+        try:
+            descriptors = load_project_descriptors(self._project_descriptors_path)
+        except ValueError as exc:
+            return {
+                "schema_version": "project_context_decision_support.v1",
+                "status": "invalid",
+                "query": clean_query,
+                "project_name": project_name,
+                "relevance_label": "no_match",
+                "descriptor_fields_used": [],
+                "archive_evidence": {"status": "empty", "source_refs": [], "items": []},
+                "curated_knowledge": {"status": "empty", "source_refs": [], "items": []},
+                "project_suggestions": [],
+                "decision_support": {
+                    "automatic_mvp_build_approval": False,
+                    "code_mutation_exposed": False,
+                    "project_mutation_exposed": False,
+                    "write_performed": False,
+                    "requires_human_confirmation_for_saves": True,
+                },
+                "source_refs": [],
+                "unknowns": ["valid project descriptor"],
+                "message": f"Project descriptors could not be loaded: {type(exc).__name__}.",
+            }
+        descriptor = select_project_descriptor(project_name, clean_query, descriptors)
+        if descriptor is None:
+            return {
+                "schema_version": "project_context_decision_support.v1",
+                "status": "missing",
+                "query": clean_query,
+                "project_name": project_name,
+                "relevance_label": "no_match",
+                "descriptor_fields_used": [],
+                "archive_evidence": {"status": "empty", "source_refs": [], "items": []},
+                "curated_knowledge": {"status": "empty", "source_refs": [], "items": []},
+                "project_suggestions": [],
+                "decision_support": {
+                    "automatic_mvp_build_approval": False,
+                    "code_mutation_exposed": False,
+                    "project_mutation_exposed": False,
+                    "write_performed": False,
+                    "requires_human_confirmation_for_saves": True,
+                },
+                "source_refs": [],
+                "unknowns": ["matching project descriptor"],
+                "message": "No matching active project descriptor was found.",
+            }
+
+        bounded_limit = max(1, min(10, int(limit or 5)))
+        retrieval_query = project_context_search_query(clean_query, descriptor)
+        archive = self.search_telegram_archive(retrieval_query, limit=bounded_limit)
+        curated_filters = {"week_label": week_label} if week_label else {}
+        curated = self.search_intelligence_items(
+            retrieval_query,
+            filters=curated_filters,
+            limit=bounded_limit,
+        )
+        result = build_project_context_decision_support(
+            query=clean_query,
+            project_descriptor=descriptor,
+            archive_result=archive,
+            curated_result=curated,
+        )
+        result["descriptor_source"] = str(self._project_descriptors_path)
+        result["retrieval"] = {
+            "mode": "bounded_archive_and_curated_project_context",
+            "query": retrieval_query,
+            "week_label": week_label,
+            "limit": bounded_limit,
+        }
+        return result
 
     def _current_week_label(self) -> str:
         current = self._now or datetime.now(timezone.utc)

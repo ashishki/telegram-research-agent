@@ -115,6 +115,36 @@ class TestPITools(unittest.TestCase):
             encoding="utf-8",
         )
 
+    def _write_project_descriptors(self, root: Path) -> Path:
+        path = root / "projects.yaml"
+        path.write_text(
+            json.dumps(
+                {
+                    "projects": [
+                        {
+                            "name": "Eval-Ground-Truth-Lab",
+                            "repo": "ashishki/Eval-Ground-Truth-Lab",
+                            "description": "Evaluation lab for coding-agent ground truth and evidence-backed acceptance.",
+                            "focus": "gold labels, holdout sets, citation correctness, replayable fixtures",
+                            "keywords": [
+                                "ground truth",
+                                "gold labels",
+                                "holdout sets",
+                                "citation correctness",
+                                "replayable fixtures",
+                                "eval",
+                            ],
+                            "exclude_keywords": ["production mvp"],
+                        }
+                    ]
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        return path
+
     def _facade(self, root: Path) -> PersonalIntelligenceFacade:
         return PersonalIntelligenceFacade(settings=self._settings(root), output_root=root)
 
@@ -127,6 +157,23 @@ class TestPITools(unittest.TestCase):
                 telegram_session_path="",
             ),
             output_root=root,
+        )
+
+    def _facade_with_db_and_projects(
+        self,
+        root: Path,
+        db_path: Path,
+        projects_path: Path,
+    ) -> PersonalIntelligenceFacade:
+        return PersonalIntelligenceFacade(
+            settings=Settings(
+                db_path=str(db_path),
+                llm_api_key="",
+                model_provider="",
+                telegram_session_path="",
+            ),
+            output_root=root,
+            project_descriptors_path=projects_path,
         )
 
     def _memory_events(self, db_path: Path) -> list[dict]:
@@ -157,10 +204,10 @@ class TestPITools(unittest.TestCase):
             else:
                 os.environ["AGENT_DB_PATH"] = previous
 
-    def _write_archive_db(self, db_path: Path, *, matching: bool = True) -> None:
+    def _write_archive_db(self, db_path: Path, *, matching: bool = True, content: str | None = None) -> None:
         connection = sqlite3.connect(db_path)
         try:
-            content = (
+            content = content or (
                 "Agent review automation works over retained Telegram archive posts."
                 if matching
                 else "Unrelated retained post about weekly planning."
@@ -249,6 +296,7 @@ class TestPITools(unittest.TestCase):
         self.assertIn("get_weekly_summary", {item["name"] for item in descriptors})
         self.assertIn("get_artifact_status", {item["name"] for item in descriptors})
         self.assertIn("search_telegram_archive", {item["name"] for item in descriptors})
+        self.assertIn("analyze_project_context", {item["name"] for item in descriptors})
         self.assertIn("request_external_verification", {item["name"] for item in descriptors})
         self.assertIn("propose_decision", {item["name"] for item in descriptors})
         self.assertIn("propose_action", {item["name"] for item in descriptors})
@@ -603,6 +651,19 @@ class TestPITools(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Unapproved external-skill tools.*web_search"):
             validate_pi_tool_catalog(catalog)
 
+    def test_project_mutation_tools_are_rejected_by_allowlist(self):
+        catalog = build_pi_tool_catalog()
+        catalog["approve_mvp_build"] = PITool(
+            name="approve_mvp_build",
+            description="Unsafe build approval.",
+            input_schema={"type": "object", "properties": {}, "additionalProperties": False},
+            handler=lambda _facade, _args: {"status": "ok"},
+            read_only=False,
+        )
+
+        with self.assertRaisesRegex(ValueError, "Forbidden mutation tools.*approve_mvp_build"):
+            validate_pi_tool_catalog(catalog)
+
     def test_custom_catalog_rejects_unlisted_tool_before_execution(self):
         catalog = build_pi_tool_catalog()
 
@@ -630,6 +691,17 @@ class TestPITools(unittest.TestCase):
         self.assertEqual(tool.input_schema["properties"]["filters"]["additionalProperties"], False)
         serialized = json.dumps(tool.input_schema)
         for forbidden in ("write", "confirm", "mutate", "execute_sql", "db_path"):
+            self.assertNotIn(forbidden, serialized)
+
+    def test_project_context_tool_schema_is_read_only_and_closed(self):
+        catalog = build_pi_tool_catalog()
+        tool = catalog["analyze_project_context"]
+
+        self.assertTrue(tool.read_only)
+        self.assertFalse(tool.requires_confirmation)
+        self.assertEqual(tool.input_schema["additionalProperties"], False)
+        serialized = json.dumps(tool.input_schema)
+        for forbidden in ("write", "confirm", "mutate", "execute_sql", "db_path", "approve"):
             self.assertNotIn(forbidden, serialized)
 
     def test_weekly_summary_tool_returns_evidence_wrapper(self):
@@ -719,6 +791,42 @@ class TestPITools(unittest.TestCase):
         self.assertEqual(result["result"]["items"][0]["archive_document_id"], "tg:-1001:1001")
         self.assertEqual(result["result"]["items"][0]["source_url"], "https://t.me/source/1001")
         self.assertEqual(result["evidence"]["atom_ids"], [])
+
+    def test_project_context_tool_combines_descriptor_archive_and_curated_knowledge(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            db_path = root / "archive.db"
+            projects_path = self._write_project_descriptors(root)
+            self._write_workbook(root)
+            self._write_archive_db(
+                db_path,
+                content=(
+                    "Coding-agent evals need ground truth labels, citation correctness checks, "
+                    "and holdout sets before release."
+                ),
+            )
+            result = call_pi_tool(
+                "analyze_project_context",
+                {
+                    "query": "What applies to Eval-Ground-Truth-Lab?",
+                    "project_name": "Eval-Ground-Truth-Lab",
+                    "limit": 3,
+                },
+                facade=self._facade_with_db_and_projects(root, db_path, projects_path),
+            )
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["evidence_status"], "available")
+        payload = result["result"]
+        self.assertEqual(payload["schema_version"], "project_context_decision_support.v1")
+        self.assertEqual(payload["project_name"], "Eval-Ground-Truth-Lab")
+        self.assertEqual(payload["relevance_label"], "direct_implication")
+        self.assertIn("keywords", payload["descriptor_fields_used"])
+        self.assertIn("https://t.me/source/1001", payload["archive_evidence"]["source_refs"])
+        self.assertTrue(payload["project_suggestions"])
+        self.assertFalse(payload["decision_support"]["automatic_mvp_build_approval"])
+        self.assertFalse(payload["decision_support"]["code_mutation_exposed"])
+        self.assertFalse(payload["decision_support"]["project_mutation_exposed"])
 
     def test_archive_search_tool_no_answer_has_insufficient_evidence(self):
         with tempfile.TemporaryDirectory() as tmp:
