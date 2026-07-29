@@ -131,6 +131,15 @@ PYTHONPATH=src python3 src/main.py memory ask "какие есть подтве�
 This returns a local evidence brief. It does not perform LLM synthesis over
 archive snippets.
 
+Next safe development block before PRM-19:
+
+- PRM-18A defines the operator-facing LLM chat contract and explicit
+  provider-egress switch.
+- PRM-18B implements a CLI chat harness over the existing PI chat/RAG path with
+  fake-provider tests by default.
+- PRM-18C aligns Telegram `prm-assistant` UX and start/stop runbook without
+  installing, enabling, or starting the service.
+
 Implemented `prm-assistant` runtime mode:
 
 - one service, disabled by default until dogfood approval;
@@ -162,12 +171,14 @@ Implemented `prm-assistant` runtime mode:
 5. Convert MVP Radar into a bounded decision evidence card inside the assistant
    and Weekly Brief V3, with external-evidence separation and no auto-build
    approval.
-6. Define PRM-19 dogfood metadata before collecting any dogfood evidence:
+6. Complete or explicitly defer PRM-18A through PRM-18C before PRM-19 so the
+   operator has one understandable chat workflow and privacy contract.
+7. Define PRM-19 dogfood metadata before collecting any dogfood evidence:
    at least 30 real questions, usefulness labels, corrections, saved notes,
    watch topics, decisions, time to useful answer, cost, value, and friction.
-7. Run PRM-19 only after human dogfood-start approval and accepted or cleared
+8. Run PRM-19 only after human dogfood-start approval and accepted or cleared
    PRM-18 blockers.
-8. Run PRM-20 cleanup only after real dogfood evidence justifies what to keep,
+9. Run PRM-20 cleanup only after real dogfood evidence justifies what to keep,
    demote, archive, or remove.
 
 ## Runtime Commands

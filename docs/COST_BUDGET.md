@@ -20,8 +20,32 @@ Status: draft budget requiring human approval before implementation
 | PRM-6 selective enrichment batch | $5/batch | 100 | larger batch or full-archive expansion |
 | PRM-7 retrieval eval | $2/run | 20 | LLM judge or embeddings |
 | PRM-10 answer generation eval | $5/run | 50 | judge becomes blocking |
+| PRM-18A LLM chat UX contract | $0 | 0 | any provider call |
+| PRM-18B LLM-backed memory chat CLI implementation | $0 for implementation/tests | 0 for implementation/tests | real provider call with private snippets |
+| PRM-18C Telegram PRM assistant UX parity | $0 for implementation/tests | 0 for implementation/tests | starting service or real provider call |
 
 Monthly planning ceiling before dogfood: $25 unless the human approves more.
+
+## PRM-18A..PRM-18C LLM Chat UX Budget
+
+The next ChatGPT-like UX block must be implemented with fake LLM clients and
+fixture databases by default. Real provider calls with private Telegram
+snippets are allowed only after explicit human approval for bounded snippet
+provider egress.
+
+Budget controls before approval:
+
+| Control | Value |
+| --- | ---: |
+| Implementation/test model calls | 0 |
+| Implementation/test provider cost | $0 |
+| External skill calls | 0 |
+| Runtime/service starts | 0 |
+| Approval trigger | any real provider call, external skill call, or service start |
+
+The user-visible chat response must include an explicit privacy/cost line with
+model call count, estimated cost, and whether bounded Telegram snippets were
+sent to the provider.
 
 ## PRM-17 Runtime Workflow Budget
 

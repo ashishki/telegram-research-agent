@@ -39,6 +39,28 @@ This command is a local product preview, not PRM-19 dogfood evidence. The
 Telegram `prm-assistant` service and LLM-backed `/chat` remain behind explicit
 dogfood-start/privacy approval.
 
+## Next PRM Chat UX Block
+
+The next development block is PRM-18A through PRM-18C:
+
+- `PRM-18A`: document the ChatGPT-like operator contract and privacy switch;
+- `PRM-18B`: implement `memory chat` and/or `memory ask --llm-approved` over
+  the existing PI chat/RAG harness;
+- `PRM-18C`: align Telegram `prm-assistant` output and write the start/stop
+  runbook without starting the service.
+
+Target behavior:
+
+```bash
+PYTHONPATH=src python3 src/main.py memory chat --allow-provider-egress
+PYTHONPATH=src python3 src/main.py memory ask --llm-approved --allow-provider-egress "что говорит моя база?"
+```
+
+The LLM-backed mode must show sources, unknowns, archive-support status, cost
+estimate, and a privacy line that states whether bounded Telegram snippets were
+sent to the provider. Without the explicit provider-egress switch, the product
+must stay local-only or refuse with clear copy.
+
 ## Weekly Routine
 
 ### Report V2 Rollout Hold

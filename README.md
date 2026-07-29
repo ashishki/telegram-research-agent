@@ -99,6 +99,14 @@ This local command searches bounded PRM memory and SQLite Telegram archive
 indexes, returns source links/snippets, and does not call LLMs, external
 search, Telegram services, startup migrations, generation jobs, or write tools.
 
+Next planned UX block:
+
+- `PRM-18A`: define the LLM chat privacy/UX contract;
+- `PRM-18B`: implement `memory chat` and/or `memory ask --llm-approved` over
+  the existing PI chat/RAG harness;
+- `PRM-18C`: align Telegram `prm-assistant` with the same answer/citation and
+  privacy format without starting dogfood.
+
 Planned approved assistant workflow:
 
 1. Ask Hermes a natural-language question.

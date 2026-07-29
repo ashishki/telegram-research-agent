@@ -36,6 +36,7 @@ Last updated: 2026-07-29
 | PRM runtime freeze receipt | docs/audit/PRM_RUNTIME_FREEZE_2026-07-29.md |
 | PRM safe assistant runtime receipt | docs/audit/PRM_SAFE_ASSISTANT_RUNTIME_2026-07-29.md |
 | PRM local memory ask receipt | docs/audit/PRM_LOCAL_MEMORY_ASK_2026-07-29.md |
+| PRM LLM chat UX task block receipt | docs/audit/PRM_LLM_CHAT_UX_TASKS_2026-07-29.md |
 | PRM-18 sanitized gate JSON | evals/prm18_release_gate_receipt_2026-07-29.json |
 
 ## W29 Artifact Evidence
@@ -210,6 +211,33 @@ python3 tools/test_tiers.py fast-contract
 ```
 
 Pre-push checks:
+
+```text
+python3 tools/playbook_validate.py --root . --check tasks --check placeholders --check readiness --check delivery --check references
+playbook_validate: errors=0 warnings=0
+```
+
+```text
+git diff --check
+pass, no output
+```
+
+No live Telegram ingestion, reaction sync, Radar, Frontier, report generation,
+full archive indexing, embeddings, external web research jobs, LLM calls,
+systemd starts, startup migrations, or production database writes were
+performed.
+
+## LLM Chat UX Task Block Evidence - 2026-07-29
+
+| Check | Result |
+| --- | --- |
+| next task | PRM-18A Operator LLM Chat UX Contract |
+| task block | PRM-18A -> PRM-18B -> PRM-18C before PRM-19 |
+| dogfood state | still blocked; not started |
+| provider egress | not approved by default |
+| implementation boundary | fake LLM clients and fixture DBs until explicit approval |
+
+Validation:
 
 ```text
 python3 tools/playbook_validate.py --root . --check tasks --check placeholders --check readiness --check delivery --check references

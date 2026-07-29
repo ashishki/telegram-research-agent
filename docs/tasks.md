@@ -40,6 +40,7 @@ Target repo baseline: ad8689fa25b89f77122c4cec7c7a6b9da3f500cf
 | Knowledge Library | Deterministic PRM-13 topic-page DTO and static HTML renderer implemented for bounded supplied topic evidence; not dogfooded or released |
 | Project context support | Deterministic PRM-14 assistant tool combines active project descriptors, bounded archive retrieval, and curated knowledge into direct_implication, weak_watch, learning_relevance, or no_match labels without build/code/project mutation approval |
 | Local operator UX | `memory ask` gives a local-only evidence brief over bounded archive/curated/project context with no LLM calls, external search, startup migrations, service starts, or writes |
+| LLM chat UX | Proposed PRM-18A..PRM-18C pre-dogfood block: explicit provider-egress approval, ChatGPT-like CLI harness over existing PI chat/RAG, and Telegram UX parity without starting dogfood |
 | Learning state | PRM-15 fixture-only migration/projection maps legacy source presence to indexed/surfaced only and requires explicit receipts for opened/read/understood/explained/tried/applied/measured |
 | Weekly Brief V3 | PRM-16 deterministic secondary projection and static HTML renderer implemented for bounded supplied context; V1 Brief and Atlas are demoted to compatibility/internal surfaces |
 | Runtime workflows | PRM-17 deterministic workflow registry and privacy-safe aggregate telemetry receipt implemented; scheduled runtime activation is not approved |
@@ -49,7 +50,7 @@ Target repo baseline: ad8689fa25b89f77122c4cec7c7a6b9da3f500cf
 | W29 reports | V1 Brief and Atlas rendered despite V2 preview code existing elsewhere |
 | W29 reactions | Seven personal reactions resolved to posts, zero atoms, zero themes, zero ranking effects |
 | Radar | Historical W29 Radar stage failed; PRM-16 V3 fixtures localize Radar failure to the Radar card |
-| Dogfood | Not started for the new product; PRM-19 is blocked until PRM-18 blockers are accepted or cleared and explicit human dogfood-start approval is recorded |
+| Dogfood | Not started for the new product; PRM-19 is blocked until PRM-18A..PRM-18C are completed or explicitly deferred, PRM-18 blockers are accepted or cleared, and explicit human dogfood-start approval is recorded |
 
 ## Dependency Graph
 
@@ -66,7 +67,8 @@ PRM-4/PRM-5/PRM-7 -> PRM-9 -> PRM-10 -> PRM-11
 PRM-10 -> PRM-12 -> PRM-13 -> PRM-14
 PRM-5/PRM-12 -> PRM-15 -> PRM-16
 PRM-3/PRM-5/PRM-6/PRM-16 -> PRM-17
-PRM-10/PRM-11/PRM-12/PRM-16/PRM-17 -> PRM-18 -> PRM-19 -> PRM-20
+PRM-10/PRM-11/PRM-12/PRM-16/PRM-17 -> PRM-18
+PRM-18 -> PRM-18A -> PRM-18B -> PRM-18C -> PRM-19 -> PRM-20
 ```
 
 ## PBR Queue - Playbook Retrofit
@@ -1263,13 +1265,187 @@ Notes: |
   release readiness while stop-ship criteria, missing final acceptance evidence,
   and missing human dogfood-start approval remain.
 
+### PRM-18A: Operator LLM Chat UX Contract
+
+Owner: codex
+Phase: PRM
+Type: product:ux
+Status: proposed
+Depends-On: PRM-18
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: conditional
+Holdout-Required: not_required
+Mutation-Required: not_required
+Property-Required: conditional
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Define the operator-facing ChatGPT-like PRM chat workflow over the existing
+  PI chat/RAG harness, including explicit provider-egress approval, citation
+  display, answer-contract display, privacy flags, local-only fallback, and no
+  hidden durable writes.
+Acceptance-Criteria:
+  - id: AC-1; description: docs define the exact one-shot and interactive commands, default local-only behavior, explicit LLM/provider-egress switch, and user-visible privacy line; verify: docs/operator_workflow.md and README.md contain the command examples.
+  - id: AC-2; description: privacy docs distinguish local `memory ask` from LLM-backed chat where bounded Telegram snippets may be sent to the provider; verify: docs/PRIVACY_THREAT_MODEL.md and docs/COST_BUDGET.md contain the distinction.
+  - id: AC-3; description: dogfood remains blocked and runtime/service start is not implied by the chat UX contract; verify: docs/PRODUCT_OPERATING_MODEL.md states PRM-19 remains blocked.
+Verification:
+  - python3 tools/playbook_validate.py --root . --check tasks --check placeholders --check readiness --check delivery --check references
+  - git diff --check
+Files:
+  - README.md
+  - docs/operator_workflow.md
+  - docs/PRODUCT_OPERATING_MODEL.md
+  - docs/PRIVACY_THREAT_MODEL.md
+  - docs/COST_BUDGET.md
+  - docs/tasks.md
+Context-Refs:
+  - docs/operator_workflow.md
+  - docs/PRODUCT_OPERATING_MODEL.md
+  - docs/PRIVACY_THREAT_MODEL.md
+  - docs/COST_BUDGET.md
+  - src/assistant/pi_chat.py
+  - src/assistant/local_memory_ask.py
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0
+  max_model_calls: 0
+  max_tool_calls: n/a
+  max_retries: 0
+  approval_required_when: any real provider call, raw/bounded Telegram snippet provider egress, or external skill is requested
+Notes: |
+  This is a contract/docs task. It should not call providers or run Telegram
+  services. The expected next implementation command names are `memory chat`
+  and/or `memory ask --llm-approved`, with an explicit
+  `--allow-provider-egress` style switch before private archive snippets can be
+  sent to an LLM.
+
+### PRM-18B: LLM-Backed Memory Chat CLI
+
+Owner: codex
+Phase: PRM
+Type: product:implementation
+Status: proposed
+Depends-On: PRM-18A
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: conditional
+Holdout-Required: conditional
+Mutation-Required: conditional
+Property-Required: required
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Implement a user-facing CLI chat harness that feels like a compact ChatGPT
+  over personal Telegram memory while reusing the existing `answer_pi_chat`
+  tool loop, grounded answer contract, archive search, curated retrieval,
+  project context, external-verification requirement, and confirmation-gated
+  proposal flow.
+Acceptance-Criteria:
+  - id: AC-1; description: one-shot LLM mode requires an explicit provider-egress approval switch and otherwise exits or falls back to local `memory ask` with clear copy; test: CLI tests cover both approved and unapproved paths with fake LLM clients.
+  - id: AC-2; description: interactive mode supports repeated questions, prints answer, source links, archive-support status, unknowns, privacy flags, and cost/model-call estimate without logging raw Telegram text; test: harness tests assert answer contract and privacy fields.
+  - id: AC-3; description: no direct writes occur from chat except existing confirmation-gated `confirm_save_proposal`, and proposal confirmations require exact proposal/token; test: PI chat/tool tests cover write gating and local chat tests assert write_performed=false by default.
+Verification:
+  - PYTHONPATH=src python3 -m pytest tests/test_local_memory_ask.py tests/test_pi_chat.py tests/test_cli.py -q
+  - python3 tools/test_tiers.py focused-prm
+  - python3 tools/test_tiers.py fast-contract
+  - python3 tools/playbook_validate.py --root . --check tasks --check placeholders --check readiness --check delivery --check references
+  - git diff --check
+Files:
+  - src/main.py
+  - src/assistant/pi_chat.py
+  - src/assistant/local_memory_ask.py
+  - src/assistant/pi_tools.py
+  - tests/test_cli.py
+  - tests/test_pi_chat.py
+  - tests/test_local_memory_ask.py
+  - docs/operator_workflow.md
+  - docs/EVIDENCE_INDEX.md
+Context-Refs:
+  - src/assistant/pi_chat.py
+  - src/assistant/pi_tools.py
+  - src/assistant/local_memory_ask.py
+  - docs/PRIVACY_THREAT_MODEL.md
+  - docs/COST_BUDGET.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0 for implementation and tests
+  max_model_calls: 0 for implementation and tests
+  max_tool_calls: n/a
+  max_retries: 1
+  approval_required_when: running the new chat against real private archive snippets with a real provider, increasing tool-call fan-out, or adding external-skill calls
+Notes: |
+  Use fake LLM clients and fixture databases for tests. Do not run live provider
+  calls against production private archive snippets during implementation.
+
+### PRM-18C: Telegram PRM Assistant UX Parity And Start Runbook
+
+Owner: codex
+Phase: PRM
+Type: product:runtime
+Status: proposed
+Depends-On: PRM-18B
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: conditional
+Holdout-Required: not_required
+Mutation-Required: conditional
+Property-Required: required
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Align the safe Telegram `prm-assistant` experience with the CLI chat contract
+  so the operator sees the same citations, unknowns, privacy boundary, and
+  confirmation-gated save behavior, while keeping the service disabled until
+  explicit PRM-19 dogfood-start approval.
+Acceptance-Criteria:
+  - id: AC-1; description: Telegram start/help commands explain local-only mode, explicit LLM/provider-egress mode, safe commands, blocked legacy commands, and dogfood-not-started status; test: bot handler tests assert the help copy hides legacy generators and states the boundary.
+  - id: AC-2; description: Telegram chat command output includes answer, sources, archive-support/unknowns, and privacy line without exposing raw tool payloads; test: handler tests use fake PI chat response and assert formatted output.
+  - id: AC-3; description: runtime runbook explains install/start/stop/status commands, rollback to disabled state, and approval prerequisites without enabling or starting the service; verify: docs/operator_workflow.md and docs/PRODUCT_OPERATING_MODEL.md updated.
+Verification:
+  - PYTHONPATH=src python3 -m pytest tests/test_handlers.py tests/test_callbacks.py tests/test_cli.py -q
+  - systemd-analyze verify systemd/telegram-prm-assistant.service
+  - python3 tools/test_tiers.py fast-contract
+  - python3 tools/playbook_validate.py --root . --check tasks --check placeholders --check readiness --check delivery --check references
+  - git diff --check
+Files:
+  - src/bot/handlers.py
+  - src/bot/bot.py
+  - src/main.py
+  - systemd/telegram-prm-assistant.service
+  - tests/test_handlers.py
+  - tests/test_callbacks.py
+  - tests/test_cli.py
+  - docs/operator_workflow.md
+  - docs/PRODUCT_OPERATING_MODEL.md
+  - docs/EVIDENCE_INDEX.md
+Context-Refs:
+  - docs/PRODUCT_OPERATING_MODEL.md
+  - docs/AUTONOMOUS_WORKFLOW_CONTRACT.md
+  - docs/PRIVACY_THREAT_MODEL.md
+  - docs/audit/PRM_SAFE_ASSISTANT_RUNTIME_2026-07-29.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0 for implementation and tests
+  max_model_calls: 0 for implementation and tests
+  max_tool_calls: n/a
+  max_retries: 1
+  approval_required_when: starting/enabling systemd runtime, running real provider calls with private snippets, or recording dogfood evidence
+Notes: |
+  Do not start or enable `telegram-prm-assistant.service`. This task prepares
+  the operator UX and runbook only. PRM-19 remains blocked until explicit human
+  dogfood-start approval and accepted or cleared PRM-18 blockers.
+
 ### PRM-19: Four-Week Operator Dogfood
 
 Owner: human
 Phase: PRM
 Type: eval:gate
 Status: blocked
-Depends-On: PRM-18
+Depends-On: PRM-18C
 Risk-Level: high
 Public-Tests-Required: not_required
 Critic-Required: conditional

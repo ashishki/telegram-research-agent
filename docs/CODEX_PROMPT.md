@@ -12,12 +12,16 @@ Last updated: 2026-07-29
 - Current phase: PRM-18 release/dogfood gate is implemented and blocks dogfood
   start while final acceptance evidence and human approval are missing; legacy
   live runtime is frozen; safe `prm-assistant` runtime is implemented but not
-  installed, enabled, started, or dogfood evidence
+  installed, enabled, started, or dogfood evidence; PRM-18A is the next safe
+  task in the pre-dogfood LLM chat UX block
 - Implemented slices in HEAD: PRM-1 through PRM-7 plus PRM-9 through PRM-18
+- Proposed next slices: PRM-18A through PRM-18C for LLM chat UX contract, CLI
+  chat implementation, and Telegram assistant UX parity
 - Blocked/not implemented slices: PRM-8, PRM-19, and PRM-20
-- Next safe work: PRM-19 only after explicit human dogfood-start approval and
-  accepted or cleared PRM-18 blockers; PRM-20 only after real dogfood evidence
-  and explicit compatibility archive/delete/move approval.
+- Next safe work: PRM-18A. PRM-19 only after PRM-18A..PRM-18C are completed or
+  explicitly deferred, explicit human dogfood-start approval exists, and PRM-18
+  blockers are accepted or cleared; PRM-20 only after real dogfood evidence and
+  explicit compatibility archive/delete/move approval.
 
 ## Product Direction
 
@@ -49,7 +53,9 @@ future operator entrypoint: ordinary text and voice transcript dispatch to
 `/chat`, legacy callbacks are disabled, and generation/write commands are
 blocked. It does not run automatic startup migrations. The full product is not
 released. For immediate local use, `memory ask` provides a no-LLM local
-evidence brief over bounded archive/curated/project context.
+evidence brief over bounded archive/curated/project context. The next UX block
+must make LLM-backed memory chat explicit and usable without hiding provider
+egress, cost, unknowns, citations, or write boundaries.
 
 ## Active Profiles
 
@@ -109,8 +115,11 @@ jobs from this handoff.
   labels and expected citations.
 - PRM-8 vector/hybrid retrieval remains blocked.
 - PRM-18 release/dogfood gate is implemented and currently blocked.
-- PRM-19 dogfood cannot start until explicit human dogfood approval is recorded
-  and PRM-18 blockers are accepted or cleared.
+- PRM-18A through PRM-18C are the next safe implementation block; do not skip
+  directly to PRM-19 unless the human explicitly defers this block.
+- PRM-19 dogfood cannot start until explicit human dogfood approval is recorded,
+  PRM-18A..PRM-18C are completed or explicitly deferred, and PRM-18 blockers
+  are accepted or cleared.
 - PRM-20 cleanup/archive cannot start until PRM-19 dogfood evidence exists and
   compatibility archive/delete/move approval is explicit.
 - Legacy runtime is frozen: do not restart `telegram-bot.service` or

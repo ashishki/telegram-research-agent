@@ -24,6 +24,7 @@ Last updated: 2026-07-29
 | external skill reads private data | skills disabled until trust record and approval |
 | unstable/high-stakes claim answered from stale Telegram evidence | deterministic external-verification requirement; Telegram evidence is discovery context only |
 | local operator question leaks raw snippets to provider | `memory ask` is local-only: no LLM calls, no external search, no bounded snippet provider egress |
+| LLM chat hides provider egress from the operator | PRM-18A..PRM-18C must require an explicit provider-egress switch and print privacy flags in every LLM-backed answer |
 | chat transcript becomes memory silently | session context is not durable memory |
 | hidden memory write from assistant tool loop | proposal plus exact confirmation token required; write trace records `write_performed` |
 | read-only assistant turn mutates production DB telemetry | PI chat suppresses `llm_usage` database writes during planning/generation |
@@ -48,6 +49,11 @@ corpus egress:
 - `bounded_telegram_snippet_provider_egress=true` when cited snippets are sent
   to answer generation;
 - `raw_telegram_corpus_egress=false` for all approved PRM assistant paths.
+
+The local `memory ask` command is the no-egress default. Planned LLM-backed
+`memory chat` or `memory ask --llm-approved` modes must not send private archive
+snippets to a provider unless the operator passes an explicit provider-egress
+approval switch for that run.
 
 ## External Verification Rule
 
