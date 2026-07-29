@@ -51,7 +51,7 @@ PRM-17 targeted workflow telemetry/privacy fixture:
 
 ```text
 PYTHONPATH=src python3 -m pytest tests/test_workflow_telemetry.py -q
-4 passed in 0.08s
+4 passed in 0.07s
 ```
 
 ```text
@@ -61,12 +61,12 @@ PYTHONPATH=src python3 -m pytest tests/test_project_context.py tests/test_pi_too
 
 ```text
 python3 tools/test_tiers.py focused-prm
-94 passed, 6 subtests passed in 18.26s
+94 passed, 6 subtests passed in 16.84s
 ```
 
 ```text
 python3 tools/test_tiers.py fast-contract
-147 passed, 6 subtests passed in 42.58s
+147 passed, 6 subtests passed in 38.99s
 ```
 
 PRM-13 targeted visual/layout smoke:
@@ -84,7 +84,7 @@ python3 tools/verify_project.py --root .
 PASS: playbook_contract exit=0
 FAIL: project_tests exit=1
 FAILED tests/test_product_ops.py::TestProductOps::test_ops_validation_passes_when_live_evidence_rows_exist
-1 failed, 1044 passed, 287 subtests passed in 311.87s (0:05:11)
+1 failed, 1044 passed, 287 subtests passed in 361.04s (0:06:01)
 ```
 
 ```text

@@ -16,7 +16,8 @@ project context and decision-support routing, PRM-15 corrected learning-state
 projection/migration semantics, and PRM-16 deterministic Weekly Brief V3
 projection with legacy Brief/Atlas demotion semantics. HEAD also contains
 PRM-17 deterministic runtime workflow contracts and privacy-safe aggregate
-telemetry receipts. PRM-8 and PRM-18 through PRM-20 are not implemented.
+telemetry receipts. The PRM-13 through PRM-17 batched deep review is recorded.
+PRM-8 and PRM-18 through PRM-20 are not implemented.
 
 ## Operating Rules
 
@@ -44,6 +45,6 @@ telemetry receipts. PRM-8 and PRM-18 through PRM-20 are not implemented.
 
 ## Current Next Task
 
-Stop for the PRM-13 through PRM-17 batched deep-review gate before starting
-PRM-18, unless the human operator explicitly redirects. Immediate review is
-still required earlier for any stop-ship boundary.
+The PRM-13 through PRM-17 batched deep-review gate is recorded. Continue at
+PRM-18 only if the human operator explicitly wants to proceed beyond the review
+gate. Immediate review is still required earlier for any stop-ship boundary.

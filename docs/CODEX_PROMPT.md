@@ -10,11 +10,12 @@ Last updated: 2026-07-29
 - AI Workflow Playbook commit used: 5583eca96c4d2d480b5574ed78bea63e0b07ebf0
 - Adoption mode: Standard
 - Current phase: PRM-13 through PRM-17 implementation block is implemented and
-  awaiting batched deep review
+  batched deep review is recorded
 - Implemented slices in HEAD: PRM-1 through PRM-7 plus PRM-9 through PRM-17
 - Blocked/not implemented slices: PRM-8 and PRM-18 through PRM-20
-- Next safe work: PRM-13 through PRM-17 batched deep review before any PRM-18
-  implementation, unless a stop-ship boundary requires immediate review earlier.
+- Next safe work: PRM-18 only if the human operator explicitly proceeds beyond
+  the recorded PRM-13 through PRM-17 review gate, unless a stop-ship boundary
+  requires immediate review earlier.
 
 ## Product Direction
 
@@ -106,7 +107,7 @@ jobs from this handoff.
   tests/test_product_ops.py::TestProductOps::test_ops_validation_passes_when_live_evidence_rows_exist.
   The fixture seeds 2026-07-08 live evidence and now falls outside the 14-day
   validation window. The post-PRM-17 block-gate verifier on 2026-07-29 recorded:
-  `1 failed, 1044 passed, 287 subtests passed in 311.87s (0:05:11)`.
+  `1 failed, 1044 passed, 287 subtests passed in 361.04s (0:06:01)`.
 
 ## Canonical Docs
 

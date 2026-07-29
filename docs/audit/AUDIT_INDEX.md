@@ -54,3 +54,6 @@ These files remain preserved for human reference, but they are no longer part of
 - `PRM17_RUNTIME_WORKFLOWS_2026-07-29.md` - PRM-17 autonomous workflow
   contract, privacy-safe aggregate telemetry, cost/rollback evidence, and stop
   boundary for the PRM-13 through PRM-17 deep-review gate before PRM-18.
+- `PRM_DEEP_REVIEW_PRM13_17_2026-07-29.md` - PRM-13 through PRM-17 batched
+  deep review, telemetry budget-validation repair, verifier receipt, and
+  release boundary before PRM-18.
