@@ -154,6 +154,22 @@ Target shape:
 
 Radar failure degrades only the Radar card.
 
+PRM-16 implementation contract:
+
+- `output.weekly_brief_v3.build_weekly_brief_v3` derives the V3 DTO from
+  bounded caller-supplied context only;
+- the DTO contains `main_change`, `act_item`, `study_item`,
+  `watch_ignore_item`, `reaction_summary`, `project_connection`, optional
+  `radar_card`, `feedback_request`, source refs, dependency status, privacy
+  boundary flags, and legacy-surface demotion metadata;
+- generic fallback action phrasing is rejected by deterministic validation;
+- Radar failure is localized to `radar_card` and `dependency_status.radar` and
+  does not invalidate archive search, assistant answers, Knowledge Library, or
+  non-Radar sections;
+- the renderer emits static self-contained HTML with no script, remote assets,
+  live retrieval, provider calls, Radar run, report generation, or database
+  writes.
+
 ## Learning State
 
 PRM-15 implementation contract:

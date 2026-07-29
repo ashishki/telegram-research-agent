@@ -1,9 +1,10 @@
 # Weekly Review Artifact — Format Specification
 
-**Version:** 3.2
+**Version:** 3.3
 **Status:** Implemented baseline; Decision Brief, quality gates, artifact
 feedback buttons, and evidence/source-mix summary implemented; additional
-report-quality improvements pending
+report-quality improvements pending; Weekly Brief V3 deterministic projection
+implemented as a secondary PRM surface
 
 ---
 
@@ -190,6 +191,55 @@ The report is informed by:
 - Telegram message hard limit: 4096 chars — notification should stay short
 - Telegraph article limit: ~65 KB — full review must fit
 - Source links must be real `t.me` deep links, not channel root links
+
+---
+
+## Weekly Brief V3 Secondary Artifact
+
+Weekly Brief V3 is a secondary projection, not a source of durable knowledge and
+not a live report-generation job. The PRM-16 implementation builds a bounded DTO
+from caller-supplied Watch Topics, reacted posts, questions, saved notes, active
+projects, repeated signals, experiments, feedback, and an optional Radar
+snapshot.
+
+Required reader-facing fields:
+
+- one main change;
+- one `ACT` item;
+- one `STUDY` item;
+- one `WATCH` or `IGNORE` item;
+- one reaction/feedback summary;
+- one concrete project connection or honest zero;
+- optional Radar card;
+- one feedback request.
+
+Evidence and failure behavior:
+
+- available action, study, watch/ignore, project, reaction, main-change, and
+  Radar sections must keep explicit source refs unless the section is marked as
+  unavailable, absent, or insufficient evidence;
+- generic fallback actions such as "review sources" or "do more research" are
+  rejected by the V3 text guard;
+- Radar failure changes only the Radar card state and dependency status. Archive
+  search, assistant answers, Knowledge Library, and non-Radar Brief sections
+  remain independently valid when their supplied evidence is valid;
+- V1 Brief remains a compatibility artifact and Knowledge Atlas remains an
+  internal audit/debug surface. Knowledge Library topic pages are the primary
+  saved-knowledge surface.
+
+Renderer contract:
+
+- static self-contained HTML;
+- no script, external CSS, remote assets, live retrieval, provider calls, report
+  generation, Radar run, or database writes;
+- visual smoke is covered by:
+
+```bash
+PYTHONPATH=src python3 -m pytest tests/test_weekly_brief_v3.py -q
+```
+
+The test includes desktop `1440x1000` and mobile `375x1000` WeasyPrint layout
+smoke when WeasyPrint is available.
 
 ---
 

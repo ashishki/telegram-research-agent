@@ -74,6 +74,10 @@ LLM judge output is advisory until calibrated against human labels.
     30/90-day changes, saved memory, contradictions, open questions, and
     original sources without requiring the old global Atlas.
 
+PRM-16 implements the deterministic Weekly Brief V3 DTO and static renderer for
+scenario 10 shape and failure isolation. Final acceptance still requires actual
+usage evidence before claiming dogfood or release readiness.
+
 ## F. Dogfood Success
 
 Over four weeks record:

@@ -40,6 +40,13 @@ PYTHONPATH=src python3 -m pytest tests/test_learning_layer.py tests/test_ai_repo
 85 passed, 7 subtests passed in 23.65s
 ```
 
+PRM-16 targeted DTO/visual smoke:
+
+```text
+PYTHONPATH=src python3 -m pytest tests/test_weekly_brief_v3.py -q
+6 passed in 2.77s
+```
+
 ```text
 PYTHONPATH=src python3 -m pytest tests/test_project_context.py tests/test_pi_tools.py tests/test_pi_chat.py -q
 47 passed, 6 subtests passed in 5.59s
@@ -47,12 +54,12 @@ PYTHONPATH=src python3 -m pytest tests/test_project_context.py tests/test_pi_too
 
 ```text
 python3 tools/test_tiers.py focused-prm
-84 passed, 6 subtests passed in 16.34s
+90 passed, 6 subtests passed in 15.46s
 ```
 
 ```text
 python3 tools/test_tiers.py fast-contract
-137 passed, 6 subtests passed in 53.59s
+143 passed, 6 subtests passed in 46.50s
 ```
 
 PRM-13 targeted visual/layout smoke:

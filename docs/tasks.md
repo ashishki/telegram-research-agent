@@ -40,9 +40,10 @@ Target repo baseline: ad8689fa25b89f77122c4cec7c7a6b9da3f500cf
 | Knowledge Library | Deterministic PRM-13 topic-page DTO and static HTML renderer implemented for bounded supplied topic evidence; not dogfooded or released |
 | Project context support | Deterministic PRM-14 assistant tool combines active project descriptors, bounded archive retrieval, and curated knowledge into direct_implication, weak_watch, learning_relevance, or no_match labels without build/code/project mutation approval |
 | Learning state | PRM-15 fixture-only migration/projection maps legacy source presence to indexed/surfaced only and requires explicit receipts for opened/read/understood/explained/tried/applied/measured |
+| Weekly Brief V3 | PRM-16 deterministic secondary projection and static HTML renderer implemented for bounded supplied context; V1 Brief and Atlas are demoted to compatibility/internal surfaces |
 | W29 reports | V1 Brief and Atlas rendered despite V2 preview code existing elsewhere |
 | W29 reactions | Seven personal reactions resolved to posts, zero atoms, zero themes, zero ranking effects |
-| Radar | W29 Radar stage failed and contaminated release status instead of only Radar card |
+| Radar | Historical W29 Radar stage failed; PRM-16 V3 fixtures localize Radar failure to the Radar card |
 | Dogfood | Not started for the new product |
 
 ## Dependency Graph
@@ -1125,7 +1126,7 @@ Notes: |
 Owner: codex
 Phase: PRM
 Type: rag:generation
-Status: planned
+Status: implemented
 Depends-On: PRM-13, PRM-15
 Risk-Level: high
 Public-Tests-Required: required
