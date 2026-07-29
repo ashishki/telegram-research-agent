@@ -390,11 +390,20 @@ def validate_workflow_telemetry_receipt(receipt: Mapping[str, Any]) -> dict[str,
     budget = receipt.get("budget")
     if not isinstance(budget, Mapping):
         errors.append("budget must be an object")
-    elif bool(budget.get("approval_required")) and not (
-        float(budget.get("weekly_cost_usd", 0.0)) > float(budget.get("weekly_cost_limit_usd", 0.0))
-        or int(budget.get("weekly_model_calls", 0)) > int(budget.get("weekly_model_call_limit", 0))
-    ):
-        errors.append("budget.approval_required must correspond to a budget breach")
+    else:
+        budget_number_fields = ("weekly_cost_usd", "weekly_cost_limit_usd")
+        for field in budget_number_fields:
+            if not _is_finite_number(budget.get(field)) or float(budget.get(field, 0.0)) < 0:
+                errors.append(f"budget.{field} must be a non-negative number")
+        budget_int_fields = ("weekly_model_calls", "weekly_model_call_limit")
+        for field in budget_int_fields:
+            if not _is_nonnegative_int(budget.get(field)):
+                errors.append(f"budget.{field} must be a non-negative integer")
+        if not errors and bool(budget.get("approval_required")) and not (
+            float(budget["weekly_cost_usd"]) > float(budget["weekly_cost_limit_usd"])
+            or int(budget["weekly_model_calls"]) > int(budget["weekly_model_call_limit"])
+        ):
+            errors.append("budget.approval_required must correspond to a budget breach")
 
     privacy = receipt.get("privacy")
     if not isinstance(privacy, Mapping):

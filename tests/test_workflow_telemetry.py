@@ -135,6 +135,15 @@ class WorkflowTelemetryTests(unittest.TestCase):
         with self.assertRaisesRegex(WorkflowTelemetryValidationError, "forbidden raw payload keys"):
             validate_workflow_telemetry_receipt(unsafe)
 
+        malformed_budget = dict(receipt)
+        malformed_budget["budget"] = dict(receipt["budget"])
+        malformed_budget["budget"]["weekly_cost_usd"] = "not-a-number"
+        with self.assertRaisesRegex(
+            WorkflowTelemetryValidationError,
+            "budget.weekly_cost_usd must be a non-negative number",
+        ):
+            validate_workflow_telemetry_receipt(malformed_budget)
+
         with self.assertRaisesRegex(WorkflowTelemetryValidationError, "private text leaked"):
             assert_no_private_telemetry_text(receipt, ["archive_indexing"])
 
