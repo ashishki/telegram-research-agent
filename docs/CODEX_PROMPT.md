@@ -9,13 +9,13 @@ Last updated: 2026-07-29
 - Target branch: master
 - AI Workflow Playbook commit used: 5583eca96c4d2d480b5574ed78bea63e0b07ebf0
 - Adoption mode: Standard
-- Current phase: PRM-13 through PRM-17 implementation block is implemented and
-  batched deep review is recorded
-- Implemented slices in HEAD: PRM-1 through PRM-7 plus PRM-9 through PRM-17
-- Blocked/not implemented slices: PRM-8 and PRM-18 through PRM-20
-- Next safe work: PRM-18 only if the human operator explicitly proceeds beyond
-  the recorded PRM-13 through PRM-17 review gate, unless a stop-ship boundary
-  requires immediate review earlier.
+- Current phase: PRM-18 release/dogfood gate is implemented and blocks dogfood
+  start while final acceptance evidence and human approval are missing
+- Implemented slices in HEAD: PRM-1 through PRM-7 plus PRM-9 through PRM-18
+- Blocked/not implemented slices: PRM-8, PRM-19, and PRM-20
+- Next safe work: PRM-19 only after explicit human dogfood-start approval and
+  accepted or cleared PRM-18 blockers; PRM-20 only after real dogfood evidence
+  and explicit compatibility archive/delete/move approval.
 
 ## Product Direction
 
@@ -39,7 +39,9 @@ requires explicit receipts. PRM-16 adds a bounded Weekly Brief V3 projection and
 static renderer that localizes Radar failure to the Radar card while demoting
 V1 Brief and Atlas to compatibility/internal surfaces. PRM-17 adds deterministic
 workflow contracts and privacy-safe aggregate telemetry receipts for future
-runtime activation. The full product is not released.
+runtime activation. PRM-18 adds a deterministic release/dogfood gate receipt;
+the current receipt is blocked and does not start dogfood or claim release
+readiness. The full product is not released.
 
 ## Active Profiles
 
@@ -98,16 +100,19 @@ jobs from this handoff.
 - Candidate retrieval queries are not gold evidence until the operator approves
   labels and expected citations.
 - PRM-8 vector/hybrid retrieval remains blocked.
-- PRM-18 through PRM-20, dogfood, and release readiness are planned, not
-  implemented.
+- PRM-18 release/dogfood gate is implemented and currently blocked.
+- PRM-19 dogfood cannot start until explicit human dogfood approval is recorded
+  and PRM-18 blockers are accepted or cleared.
+- PRM-20 cleanup/archive cannot start until PRM-19 dogfood evidence exists and
+  compatibility archive/delete/move approval is explicit.
 - External skills are project-disabled until trust records are approved.
 - Legacy report-centered docs remain as historical/compatibility surfaces and
   need a safe archive/migration pass in PBR-7 or PRM-20.
 - The configured full pytest baseline currently has one known failure:
   tests/test_product_ops.py::TestProductOps::test_ops_validation_passes_when_live_evidence_rows_exist.
   The fixture seeds 2026-07-08 live evidence and now falls outside the 14-day
-  validation window. The post-PRM-17 block-gate verifier on 2026-07-29 recorded:
-  `1 failed, 1044 passed, 287 subtests passed in 361.04s (0:06:01)`.
+  validation window. The PRM-18 verifier on 2026-07-29 recorded:
+  `1 failed, 1049 passed, 287 subtests passed in 412.02s (0:06:52)`.
 
 ## Canonical Docs
 

@@ -57,3 +57,6 @@ These files remain preserved for human reference, but they are no longer part of
 - `PRM_DEEP_REVIEW_PRM13_17_2026-07-29.md` - PRM-13 through PRM-17 batched
   deep review, telemetry budget-validation repair, verifier receipt, and
   release boundary before PRM-18.
+- `PRM18_RELEASE_GATE_2026-07-29.md` - PRM-18 deterministic release/dogfood
+  gate receipt, stop-ship blockers, privacy boundary, verifier evidence, and
+  PRM-19/PRM-20 continuation blockers.

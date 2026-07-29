@@ -1,12 +1,33 @@
 # Four-Week Dogfood Plan
 
-Status: blocked until `report-v2-rollout-gate` returns `eligible`
+Status: blocked until the PRM-18 release/dogfood gate is eligible and human
+dogfood-start approval is recorded
 Created: 2026-07-08
-Last updated: 2026-07-15
+Last updated: 2026-07-29
 Owner: private single-user operator workflow
 
 Canonical roadmap: `docs/portfolio_grade_intelligence_roadmap.md`.
 Canonical current backlog: `docs/tasks.md`.
+
+## PRM Current Boundary
+
+The active product direction is Personal Telegram Research Memory + Grounded
+Assistant, not Report V2 rollout. PRM-18 records the current release/dogfood
+gate in `evals/prm18_release_gate_receipt_2026-07-29.json`; that receipt is
+blocked and does not start dogfood.
+
+PRM-19 Week 1 may start only after:
+
+- the PRM-18 gate is eligible or the human operator explicitly accepts the
+  remaining blockers;
+- human dogfood-start approval is recorded;
+- a privacy-safe place exists for weekly dogfood metadata;
+- no raw Telegram text or generated private reports are committed.
+
+The historical Report V2 checklist below remains compatibility context for old
+weekly-report dogfood. It is not sufficient evidence for PRM-19 unless the
+human operator explicitly chooses to use it as part of the new product dogfood
+and records that decision.
 
 ## W29 Correction
 

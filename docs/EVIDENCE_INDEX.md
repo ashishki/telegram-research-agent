@@ -1,7 +1,7 @@
 # Evidence Index
 
 Status: active
-Last updated: 2026-07-27
+Last updated: 2026-07-29
 
 ## Repository State
 
@@ -31,6 +31,8 @@ Last updated: 2026-07-27
 | Rollback and reindex plan | docs/ROLLBACK_AND_REINDEX_PLAN.md |
 | Test strategy and tiers | docs/TEST_STRATEGY.md |
 | PRM deep-review corrective log | docs/audit/PRM_DEEP_REVIEW_CONSOLIDATED_2026-07-27.md |
+| PRM-18 release gate receipt | docs/audit/PRM18_RELEASE_GATE_2026-07-29.md |
+| PRM-18 sanitized gate JSON | evals/prm18_release_gate_receipt_2026-07-29.json |
 
 ## W29 Artifact Evidence
 
@@ -77,3 +79,22 @@ Remaining test failure:
 | python3 tools/verify_project.py --root . | fail, required_failures=1; project_tests: 1 failed, 1002 passed, 281 subtests passed in 324.77s; known failure: tests/test_product_ops.py::TestProductOps::test_ops_validation_passes_when_live_evidence_rows_exist |
 | python3 tools/playbook_validate.py --root . --check tasks --check placeholders --check readiness --check delivery --check references | playbook_validate: errors=0 warnings=0 |
 | git diff --check | pass, no output |
+
+## PRM-18 Release Gate Evidence - 2026-07-29
+
+| Command | Result |
+| --- | --- |
+| PYTHONPATH=src python3 -m pytest tests/test_prm_release_gate.py -q | 5 passed in 0.08s |
+| python3 tools/test_tiers.py focused-prm | 99 passed, 6 subtests passed in 23.17s |
+| python3 tools/test_tiers.py fast-contract | 152 passed, 6 subtests passed in 43.24s |
+| python3 tools/verify_project.py --root . | fail, required_failures=1; project_tests: 1 failed, 1049 passed, 287 subtests passed in 412.02s (0:06:52); known failure: tests/test_product_ops.py::TestProductOps::test_ops_validation_passes_when_live_evidence_rows_exist |
+
+PRM-18 release gate summary:
+
+- receipt schema `prm_release_gate.v1`;
+- dogfood gate `blocked`;
+- release claimed `false`;
+- dogfood started `false`;
+- acceptance scenarios: 0 passed, 0 failed, 11 blocked;
+- active stop-ship blockers: unsupported claims and retrieval metric failure;
+- human dogfood-start approval is missing.

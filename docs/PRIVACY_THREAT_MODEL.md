@@ -27,6 +27,7 @@ Last updated: 2026-07-29
 | hidden memory write from assistant tool loop | proposal plus exact confirmation token required; write trace records `write_performed` |
 | read-only assistant turn mutates production DB telemetry | PI chat suppresses `llm_usage` database writes during planning/generation |
 | autonomous workflow telemetry leaks raw private text | PRM-17 telemetry records aggregate metrics and redacted field names only |
+| release or dogfood gate receipt leaks raw private text | PRM-18 receipt schema rejects raw payload keys and requires privacy flags to remain false |
 | source URL loses provenance | archive document identity preserves Telegram link |
 | deletion cannot be honored | retention/deletion path required before dogfood |
 
@@ -82,3 +83,23 @@ PRM-12 confirmation semantics:
 - edit, delete, and rollback are represented as new audit events, not
   destructive updates to prior events;
 - ordinary chat text and voice transcripts are not durable memory.
+
+## Release Gate Receipt Rule
+
+PRM-18 release receipts are privacy-safe evidence indexes. They may cite local
+docs, tests, and sanitized eval receipts, but must not include Telegram raw
+text, provider payloads, prompts, completions, generated private reports, or
+production database mutations.
+
+The current implementation enforces this in `evals/prm_release_gate.py` by:
+
+- rejecting forbidden raw payload keys such as `raw_post_text`,
+  `telegram_text`, `provider_payload`, `prompt`, and `completion`;
+- requiring every committed receipt to keep raw egress, external skill use,
+  provider payload logging, production DB mutation, and private report commit
+  flags set to `false`;
+- keeping `dogfood_started=false` and `release_claimed=false` for PRM-18.
+
+The committed PRM-18 receipt,
+`evals/prm18_release_gate_receipt_2026-07-29.json`, blocks dogfood start until
+explicit human approval and accepted or cleared stop-ship criteria exist.

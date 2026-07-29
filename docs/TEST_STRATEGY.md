@@ -54,6 +54,13 @@ PYTHONPATH=src python3 -m pytest tests/test_workflow_telemetry.py -q
 4 passed in 0.07s
 ```
 
+PRM-18 targeted release/dogfood gate:
+
+```text
+PYTHONPATH=src python3 -m pytest tests/test_prm_release_gate.py -q
+5 passed in 0.08s
+```
+
 ```text
 PYTHONPATH=src python3 -m pytest tests/test_project_context.py tests/test_pi_tools.py tests/test_pi_chat.py -q
 47 passed, 6 subtests passed in 5.59s
@@ -61,12 +68,12 @@ PYTHONPATH=src python3 -m pytest tests/test_project_context.py tests/test_pi_too
 
 ```text
 python3 tools/test_tiers.py focused-prm
-94 passed, 6 subtests passed in 16.84s
+99 passed, 6 subtests passed in 23.17s
 ```
 
 ```text
 python3 tools/test_tiers.py fast-contract
-147 passed, 6 subtests passed in 38.99s
+152 passed, 6 subtests passed in 43.24s
 ```
 
 PRM-13 targeted visual/layout smoke:
@@ -76,15 +83,14 @@ PYTHONPATH=src python3 -m pytest tests/test_knowledge_library.py tests/test_test
 8 passed in 7.15s
 ```
 
-The full verifier receipt below is the post-PRM-17 block-gate readiness run for
-the PRM-13 through PRM-17 deep-review handoff.
+The full verifier receipt below is the PRM-18 release-gate readiness run.
 
 ```text
 python3 tools/verify_project.py --root .
 PASS: playbook_contract exit=0
 FAIL: project_tests exit=1
 FAILED tests/test_product_ops.py::TestProductOps::test_ops_validation_passes_when_live_evidence_rows_exist
-1 failed, 1044 passed, 287 subtests passed in 361.04s (0:06:01)
+1 failed, 1049 passed, 287 subtests passed in 412.02s (0:06:52)
 ```
 
 ```text

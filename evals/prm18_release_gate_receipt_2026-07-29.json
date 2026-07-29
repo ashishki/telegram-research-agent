@@ -1,0 +1,218 @@
+{
+  "schema_version": "prm_release_gate.v1",
+  "artifact_type": "prm_release_gate",
+  "generated_at": "2026-07-29T12:00:00Z",
+  "project_commit": "",
+  "acceptance_scenarios": [
+    {
+      "id": "e2e_01_known_reacted_post",
+      "title": "Find a known reacted post.",
+      "status": "blocked",
+      "evidence_refs": ["docs/final_acceptance_plan.md", "evals/retrieval/README.md"],
+      "notes": "Candidate retrieval queries are not human-approved gold labels."
+    },
+    {
+      "id": "e2e_02_semantic_topic_multi_month",
+      "title": "Answer a semantic topic question over multiple months.",
+      "status": "blocked",
+      "evidence_refs": ["docs/final_acceptance_plan.md", "evals/retrieval/README.md"],
+      "notes": "No human-approved expected citations."
+    },
+    {
+      "id": "e2e_03_compare_cases",
+      "title": "Find and compare several cases.",
+      "status": "blocked",
+      "evidence_refs": ["docs/final_acceptance_plan.md", "evals/retrieval/README.md"],
+      "notes": "No human-approved case labels."
+    },
+    {
+      "id": "e2e_04_project_application",
+      "title": "Apply archive evidence to one active project.",
+      "status": "blocked",
+      "evidence_refs": ["tests/test_project_context.py", "docs/final_acceptance_plan.md"],
+      "notes": "Deterministic project-context fixture exists; live operator outcome is not recorded."
+    },
+    {
+      "id": "e2e_05_freshness_boundary",
+      "title": "Answer a freshness/news question with clear date boundaries.",
+      "status": "blocked",
+      "evidence_refs": ["tests/test_pi_chat.py", "docs/final_acceptance_plan.md"],
+      "notes": "Deterministic boundary fixtures exist; live freshness evaluation is not complete."
+    },
+    {
+      "id": "e2e_06_external_verification",
+      "title": "Trigger external verification without blending evidence classes.",
+      "status": "blocked",
+      "evidence_refs": ["tests/test_pi_chat.py", "docs/PRIVACY_THREAT_MODEL.md"],
+      "notes": "Local requirement path exists; no approved external evidence execution."
+    },
+    {
+      "id": "e2e_07_no_answer_for_gap",
+      "title": "Return insufficient evidence for a corpus gap.",
+      "status": "blocked",
+      "evidence_refs": ["tests/test_pi_chat.py", "docs/final_acceptance_plan.md"],
+      "notes": "Deterministic fixtures exist; human-approved no-answer holdout is missing."
+    },
+    {
+      "id": "e2e_08_save_knowledge_note",
+      "title": "Save a Knowledge Note after confirmation.",
+      "status": "blocked",
+      "evidence_refs": ["tests/test_pi_chat.py", "docs/PRIVACY_THREAT_MODEL.md"],
+      "notes": "Confirmation-gated fixture exists; live durable memory save is not claimed."
+    },
+    {
+      "id": "e2e_09_create_watch_topic",
+      "title": "Create a Watch Topic after confirmation.",
+      "status": "blocked",
+      "evidence_refs": ["tests/test_pi_chat.py", "docs/PRIVACY_THREAT_MODEL.md"],
+      "notes": "Confirmation semantics exist; live watch-topic creation is not claimed."
+    },
+    {
+      "id": "e2e_10_weekly_brief_v3",
+      "title": "Show a useful secondary Weekly Brief based on actual usage.",
+      "status": "blocked",
+      "evidence_refs": ["tests/test_weekly_brief_v3.py", "docs/final_acceptance_plan.md"],
+      "notes": "Static V3 fixture exists; actual usage evidence is missing."
+    },
+    {
+      "id": "e2e_11_knowledge_library_topic",
+      "title": "Open a Knowledge Library topic page with changes, memory, contradictions, questions, and sources.",
+      "status": "blocked",
+      "evidence_refs": ["tests/test_knowledge_library.py", "docs/final_acceptance_plan.md"],
+      "notes": "Static topic-page fixture exists; live operator acceptance is missing."
+    }
+  ],
+  "evaluations": {
+    "data": {
+      "status": "blocked",
+      "evidence_refs": ["docs/RAG_DATA_READINESS.md", "docs/final_acceptance_plan.md"],
+      "notes": "Final 99% retained-text readiness target is not approved."
+    },
+    "retrieval": {
+      "status": "blocked",
+      "evidence_refs": ["docs/retrieval_eval.md", "evals/retrieval/README.md"],
+      "notes": "Retrieval candidates are not human-approved gold labels."
+    },
+    "generation": {
+      "status": "blocked",
+      "evidence_refs": ["docs/generation_eval.md", "docs/final_acceptance_plan.md"],
+      "notes": "Unsupported-claim rate and judge calibration are not approved."
+    },
+    "tool": {
+      "status": "passed",
+      "evidence_refs": ["tests/test_pi_tools.py", "tests/test_pi_chat.py"],
+      "notes": "Read-only tool catalog and confirmation-gated writes have deterministic tests."
+    },
+    "agent": {
+      "status": "passed",
+      "evidence_refs": ["tests/test_pi_chat.py", "docs/AGENT_HARNESS_DESIGN.md"],
+      "notes": "Assistant loop boundaries have deterministic tests; not dogfood evidence."
+    },
+    "privacy": {
+      "status": "passed",
+      "evidence_refs": ["docs/PRIVACY_THREAT_MODEL.md", "tests/test_workflow_telemetry.py"],
+      "notes": "No raw text egress or production DB mutation was performed in PRM-18."
+    },
+    "cost": {
+      "status": "passed",
+      "evidence_refs": ["docs/COST_BUDGET.md", "tests/test_workflow_telemetry.py"],
+      "notes": "Deterministic budget receipts reject malformed cost fields."
+    },
+    "ui": {
+      "status": "blocked",
+      "evidence_refs": ["tests/test_knowledge_library.py", "tests/test_weekly_brief_v3.py"],
+      "notes": "Static renderer smoke exists; browser screenshot approval is not recorded."
+    },
+    "end_to_end": {
+      "status": "blocked",
+      "evidence_refs": ["docs/final_acceptance_plan.md"],
+      "notes": "No real end-to-end dogfood run is recorded."
+    }
+  },
+  "review_findings": [
+    {
+      "id": "prm13-17-review",
+      "area": "block_review",
+      "status": "resolved",
+      "evidence_refs": ["docs/audit/PRM_DEEP_REVIEW_PRM13_17_2026-07-29.md"],
+      "notes": "Telemetry budget validation finding was fixed before PRM-18."
+    },
+    {
+      "id": "human-dogfood-approval",
+      "area": "completion_authority",
+      "status": "blocked",
+      "evidence_refs": ["docs/REVIEW_POLICY.md", "docs/final_acceptance_plan.md"],
+      "notes": "Human approval is required before dogfood start."
+    }
+  ],
+  "stop_ship": {
+    "private_data_leakage": {
+      "triggered": false,
+      "evidence_refs": ["docs/PRIVACY_THREAT_MODEL.md"],
+      "notes": "No raw text egress was performed."
+    },
+    "unsupported_claims": {
+      "triggered": true,
+      "evidence_refs": ["docs/generation_eval.md", "docs/final_acceptance_plan.md"],
+      "notes": "Unsupported-claim rate is not approved for release."
+    },
+    "retrieval_metric_failure": {
+      "triggered": true,
+      "evidence_refs": ["docs/retrieval_eval.md", "evals/retrieval/README.md"],
+      "notes": "Retrieval targets are not passed on human-approved gold labels."
+    },
+    "unsafe_writes": {
+      "triggered": false,
+      "evidence_refs": ["docs/PRIVACY_THREAT_MODEL.md", "tests/test_pi_chat.py"],
+      "notes": "Write paths remain confirmation-gated in deterministic tests."
+    },
+    "cost_budget_breach": {
+      "triggered": false,
+      "evidence_refs": ["docs/COST_BUDGET.md", "tests/test_workflow_telemetry.py"],
+      "notes": "No live model budget was spent for PRM-18."
+    }
+  },
+  "dogfood_gate": {
+    "status": "blocked",
+    "blocking_reasons": [
+      "scenario_not_passed:e2e_01_known_reacted_post",
+      "scenario_not_passed:e2e_02_semantic_topic_multi_month",
+      "scenario_not_passed:e2e_03_compare_cases",
+      "scenario_not_passed:e2e_04_project_application",
+      "scenario_not_passed:e2e_05_freshness_boundary",
+      "scenario_not_passed:e2e_06_external_verification",
+      "scenario_not_passed:e2e_07_no_answer_for_gap",
+      "scenario_not_passed:e2e_08_save_knowledge_note",
+      "scenario_not_passed:e2e_09_create_watch_topic",
+      "scenario_not_passed:e2e_10_weekly_brief_v3",
+      "scenario_not_passed:e2e_11_knowledge_library_topic",
+      "evaluation_not_passed:data",
+      "evaluation_not_passed:retrieval",
+      "evaluation_not_passed:generation",
+      "evaluation_not_passed:ui",
+      "evaluation_not_passed:end_to_end",
+      "review_unresolved:human-dogfood-approval",
+      "stop_ship:unsupported_claims",
+      "stop_ship:retrieval_metric_failure",
+      "missing_human_dogfood_start_approval"
+    ],
+    "human_approval_ref": "",
+    "dogfood_started": false,
+    "release_claimed": false
+  },
+  "privacy": {
+    "raw_telegram_text_egress": false,
+    "external_skill_used": false,
+    "provider_payload_logged": false,
+    "production_db_mutation": false,
+    "generated_private_report_committed": false
+  },
+  "verification_commands": [
+    "PYTHONPATH=src python3 -m pytest tests/test_prm_release_gate.py -q",
+    "python3 tools/test_tiers.py focused-prm",
+    "python3 tools/test_tiers.py fast-contract",
+    "PYTHONPATH=src python3 -m pytest tests/ -q",
+    "python3 tools/playbook_validate.py --root . --check tasks --check placeholders --check readiness --check delivery --check references",
+    "git diff --check"
+  ]
+}

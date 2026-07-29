@@ -99,3 +99,29 @@ and reduced manual work.
 
 PRM-17 adds deterministic workflow contracts and aggregate telemetry receipts
 for future runtime activation, but does not start dogfood or scheduled jobs.
+
+## G. PRM-18 Release Gate Receipt
+
+PRM-18 adds a deterministic release/dogfood gate receipt:
+
+- schema: `prm_release_gate.v1`;
+- code: `evals/prm_release_gate.py`;
+- current sanitized receipt:
+  `evals/prm18_release_gate_receipt_2026-07-29.json`.
+
+Current gate status:
+
+- dogfood: `blocked`;
+- release claimed: `false`;
+- dogfood started: `false`;
+- acceptance scenarios: 0 passed, 0 failed, 11 blocked;
+- blocked evaluation areas: data, retrieval, generation, UI, and end-to-end;
+- passed deterministic contract areas: tool, agent, privacy, and cost;
+- active stop-ship blockers: unsupported claims and retrieval metric failure;
+- human dogfood-start approval: missing.
+
+The release gate is an evidence classifier, not a dogfood run. It does not run
+live Telegram ingestion, reaction sync, LLM judges, browser automation,
+external verification, report generation, full archive indexing, embeddings, or
+external web research. PRM-19 cannot start until the human operator explicitly
+approves dogfood start and accepts or clears the PRM-18 blockers.

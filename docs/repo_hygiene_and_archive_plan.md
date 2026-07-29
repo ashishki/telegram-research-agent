@@ -1,6 +1,7 @@
 # Repo Hygiene And Archive Plan
 
-Status: draft; cleanup is blocked until PRM-4 and initial retrieval eval
+Status: draft; cleanup/archive work is blocked until PRM-19 dogfood evidence and
+explicit human compatibility-file approval exist
 
 ## Inventory
 
@@ -8,7 +9,7 @@ Status: draft; cleanup is blocked until PRM-4 and initial retrieval eval
 | --- | --- | --- |
 | active runtime modules | `src/ingestion`, `src/processing`, `src/db`, `src/main.py` | preserve |
 | active assistant/RAG modules | `src/assistant`, `src/output/intelligence_retrieval_items.py`, `src/assistant/semantic_retrieval.py` | reusable but curated-only |
-| V1 compatibility modules | `src/output/weekly_intelligence_brief.py`, `src/output/knowledge_atlas_report.py`, split report paths | keep until PRM-16 |
+| V1 compatibility modules | `src/output/weekly_intelligence_brief.py`, `src/output/knowledge_atlas_report.py`, split report paths | keep after PRM-16 until PRM-20 has dogfood evidence and explicit archive/delete/move approval |
 | IRX V2 modules | `src/output/weekly_intelligence_brief_v2.py`, `src/output/knowledge_atlas_report_v2.py`, `src/output/report_v2_rollout.py` | historical/reusable |
 | legacy report generators | digest, recommendations, study plan, visual report modules | classify after dogfood |
 | generated private artifacts | `data/output/**` | ignored; do not commit new private outputs |
@@ -35,3 +36,6 @@ Status: draft; cleanup is blocked until PRM-4 and initial retrieval eval
 - Split oversized modules only when usage evidence shows maintenance pain.
 - Generated private outputs remain ignored.
 - Final user path must become visible within five minutes after PRM-20.
+- PRM-20 is blocked until PRM-19 real dogfood evidence exists.
+- Deletion, archive, or move of compatibility files requires explicit human
+  approval even if a cleanup row lists the path as a candidate.

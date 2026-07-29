@@ -42,11 +42,12 @@ Target repo baseline: ad8689fa25b89f77122c4cec7c7a6b9da3f500cf
 | Learning state | PRM-15 fixture-only migration/projection maps legacy source presence to indexed/surfaced only and requires explicit receipts for opened/read/understood/explained/tried/applied/measured |
 | Weekly Brief V3 | PRM-16 deterministic secondary projection and static HTML renderer implemented for bounded supplied context; V1 Brief and Atlas are demoted to compatibility/internal surfaces |
 | Runtime workflows | PRM-17 deterministic workflow registry and privacy-safe aggregate telemetry receipt implemented; scheduled runtime activation is not approved |
+| Release gate | PRM-18 deterministic release/dogfood gate implemented; current sanitized receipt blocks dogfood because final acceptance evidence, gold retrieval labels, and explicit human dogfood approval are missing |
 | PRM-13..17 review gate | Batched deep review recorded; one telemetry budget-validation finding fixed before PRM-18 |
 | W29 reports | V1 Brief and Atlas rendered despite V2 preview code existing elsewhere |
 | W29 reactions | Seven personal reactions resolved to posts, zero atoms, zero themes, zero ranking effects |
 | Radar | Historical W29 Radar stage failed; PRM-16 V3 fixtures localize Radar failure to the Radar card |
-| Dogfood | Not started for the new product |
+| Dogfood | Not started for the new product; PRM-19 is blocked until PRM-18 blockers are accepted or cleared and explicit human dogfood-start approval is recorded |
 
 ## Dependency Graph
 
@@ -1214,7 +1215,7 @@ Notes: |
 Owner: codex
 Phase: PRM
 Type: eval:gate
-Status: planned
+Status: implemented
 Depends-On: PRM-10, PRM-11, PRM-12, PRM-16, PRM-17
 Risk-Level: critical
 Public-Tests-Required: required
@@ -1228,15 +1229,20 @@ Correction-Budget: 2
 Objective: |
   Run data, retrieval, generation, tool, agent, privacy, cost, UI, and end-to-end evaluations, produce a release receipt, and block dogfood while stop-ship criteria remain.
 Acceptance-Criteria:
-  - id: AC-1; description: all ten end-to-end acceptance scenarios have pass, fail, or blocked status with evidence links; verify: final acceptance receipt contains scenario table.
+  - id: AC-1; description: all eleven end-to-end acceptance scenarios have pass, fail, or blocked status with evidence links; verify: final acceptance receipt contains scenario table.
   - id: AC-2; description: Test Critic and privacy review findings are resolved or explicitly accepted by the human; verify: review receipt references approvals.
   - id: AC-3; description: dogfood gate blocks on private-data leakage, unsupported claims, retrieval metric failure, unsafe writes, or cost budget breach; verify: gate output shows blocking reasons.
 Verification:
-  - python3 -m pytest tests/ -q
+  - PYTHONPATH=src python3 -m pytest tests/test_prm_release_gate.py -q
+  - python3 tools/test_tiers.py focused-prm
+  - python3 tools/test_tiers.py fast-contract
+  - python3 tools/verify_project.py --root .
   - evaluation and security review commands documented in release receipt
 Files:
-  - evals/
-  - tests/
+  - evals/prm_release_gate.py
+  - evals/prm18_release_gate_receipt_2026-07-29.json
+  - tests/test_prm_release_gate.py
+  - tools/test_tiers.py
   - docs/final_acceptance_plan.md
   - docs/PRIVACY_THREAT_MODEL.md
 Context-Refs:
@@ -1250,14 +1256,17 @@ Cost-Budget: |
   max_retries: 1
   approval_required_when: LLM judge, browser verification, or external model fan-out expands
 Notes: |
-  Do not start dogfood while stop-ship criteria remain.
+  Implemented as deterministic release-gate aggregation and validation. The
+  current PRM-18 receipt blocks dogfood; it does not run dogfood or claim
+  release readiness while stop-ship criteria, missing final acceptance evidence,
+  and missing human dogfood-start approval remain.
 
 ### PRM-19: Four-Week Operator Dogfood
 
 Owner: human
 Phase: PRM
 Type: eval:gate
-Status: planned
+Status: blocked
 Depends-On: PRM-18
 Risk-Level: high
 Public-Tests-Required: not_required
@@ -1290,14 +1299,16 @@ Cost-Budget: |
   max_retries: 1 per failed workflow
   approval_required_when: weekly budget or provider egress changes
 Notes: |
-  Do not predefine success as the system ran.
+  Do not predefine success as the system ran. PRM-19 is currently blocked by
+  the PRM-18 release gate and cannot start until the human operator explicitly
+  approves dogfood start and accepts or clears the recorded blockers.
 
 ### PRM-20: Post-Dogfood Simplification, Cleanup, And Archive
 
 Owner: codex
 Phase: PRM
 Type: repo:hygiene
-Status: planned
+Status: blocked
 Depends-On: PRM-19
 Risk-Level: high
 Public-Tests-Required: required
@@ -1333,4 +1344,6 @@ Cost-Budget: |
   max_retries: 1
   approval_required_when: deletion or archive affects compatibility surface
 Notes: |
-  Cleanup follows usage evidence; it is not a precondition for PRM-4.
+  Cleanup follows usage evidence; it is not a precondition for PRM-4. PRM-20 is
+  currently blocked by missing PRM-19 dogfood evidence and requires explicit
+  human approval before compatibility files are archived, deleted, or moved.
