@@ -76,15 +76,15 @@ PYTHONPATH=src python3 -m pytest tests/test_knowledge_library.py tests/test_test
 8 passed in 7.15s
 ```
 
-The full verifier receipt below is the most recent PRM-9 through PRM-12
-block-review gate. It was not rerun for the standalone PRM-13 slice.
+The full verifier receipt below is the post-PRM-17 block-gate readiness run for
+the PRM-13 through PRM-17 deep-review handoff.
 
 ```text
 python3 tools/verify_project.py --root .
 PASS: playbook_contract exit=0
 FAIL: project_tests exit=1
 FAILED tests/test_product_ops.py::TestProductOps::test_ops_validation_passes_when_live_evidence_rows_exist
-1 failed, 1018 passed, 287 subtests passed in 310.27s (0:05:10)
+1 failed, 1044 passed, 287 subtests passed in 311.87s (0:05:11)
 ```
 
 ```text

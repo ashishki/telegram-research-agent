@@ -105,7 +105,8 @@ jobs from this handoff.
 - The configured full pytest baseline currently has one known failure:
   tests/test_product_ops.py::TestProductOps::test_ops_validation_passes_when_live_evidence_rows_exist.
   The fixture seeds 2026-07-08 live evidence and now falls outside the 14-day
-  validation window on 2026-07-26.
+  validation window. The post-PRM-17 block-gate verifier on 2026-07-29 recorded:
+  `1 failed, 1044 passed, 287 subtests passed in 311.87s (0:05:11)`.
 
 ## Canonical Docs
 

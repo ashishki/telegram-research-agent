@@ -64,6 +64,25 @@ python3 tools/test_tiers.py fast-contract
 147 passed, 6 subtests passed in 42.58s
 ```
 
+Post-commit block/full verifier for the PRM-13 through PRM-17 deep-review
+handoff:
+
+```text
+python3 tools/verify_project.py --root .
+project_commit=1f9a63986628d26fe28b5193edb4b81542c7f1eb
+PASS: playbook_contract exit=0
+FAIL: project_tests exit=1
+required_failures=1
+FAILED tests/test_product_ops.py::TestProductOps::test_ops_validation_passes_when_live_evidence_rows_exist
+1 failed, 1044 passed, 287 subtests passed in 311.87s (0:05:11)
+```
+
+Known failure detail:
+
+```text
+E       AssertionError: Lists differ: ['needs_live_event', 'needs_live_event'] != ['passed', 'passed']
+```
+
 Final pre-push checks:
 
 ```text
