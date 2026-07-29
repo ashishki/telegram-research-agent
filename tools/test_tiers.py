@@ -39,6 +39,9 @@ FAST_CONTRACT_TESTS = (
     "tests/test_semantic_retrieval.py",
     "tests/test_week_bounds.py",
     "tests/test_pi_intent.py",
+    "tests/test_cli.py",
+    "tests/test_handlers.py",
+    "tests/test_callbacks.py",
     *PRM_TESTS,
 )
 

@@ -61,6 +61,13 @@ PYTHONPATH=src python3 -m pytest tests/test_prm_release_gate.py -q
 5 passed in 0.08s
 ```
 
+Safe PRM assistant runtime boundary:
+
+```text
+PYTHONPATH=src python3 -m pytest tests/test_cli.py tests/test_handlers.py tests/test_callbacks.py -q
+52 passed, 3 subtests passed in 18.79s
+```
+
 ```text
 PYTHONPATH=src python3 -m pytest tests/test_project_context.py tests/test_pi_tools.py tests/test_pi_chat.py -q
 47 passed, 6 subtests passed in 5.59s
@@ -73,7 +80,7 @@ python3 tools/test_tiers.py focused-prm
 
 ```text
 python3 tools/test_tiers.py fast-contract
-152 passed, 6 subtests passed in 43.24s
+204 passed, 9 subtests passed in 59.91s
 ```
 
 PRM-13 targeted visual/layout smoke:
@@ -107,7 +114,8 @@ do not hide it by deleting the test or weakening the assertion.
 
 - Use `focused-prm` before committing narrow PRM RAG/assistant changes.
 - Use `fast-contract` before committing shared contract, router, telemetry, or
-  privacy-boundary changes.
+  privacy-boundary changes. It includes the Telegram bot handler/callback
+  boundary tests for safe PRM runtime mode.
 - Use `ops-date-sensitive` when changing product ops validation or when a block
   review needs an explicit known-failure receipt.
 - Use `full` or `block-review` before closing a deep-review block, with known

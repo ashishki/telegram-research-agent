@@ -18,6 +18,10 @@ Do not restart those units as PRM dogfood. Future runtime activation should use
 a dedicated PRM assistant mode that exposes only approved read-only and
 confirmation-gated tools.
 
+The dedicated mode now exists as `src/main.py prm-assistant` and the repo unit
+template `systemd/telegram-prm-assistant.service`. It is not installed, enabled,
+started, or approved as dogfood.
+
 ## Implementation Boundary
 
 PRM-17 implements the contract registry and telemetry receipt sanitizer in
@@ -95,3 +99,17 @@ PYTHONPATH=src python3 -m pytest tests/test_workflow_telemetry.py -q
 - weekly report generation;
 - full archive indexing changes;
 - embeddings.
+
+## PRM Assistant Runtime Boundary
+
+The safe Telegram runtime dispatches ordinary text and voice transcripts as
+`/chat` questions. It blocks the legacy `/message` and `/voice` intent router,
+legacy inline callbacks, direct reminder/tag/feedback writes, and generation
+commands such as `/run_digest` and `/run_mvp_weekly`.
+
+The safe runtime does not run automatic startup migrations. Production DB
+migration remains a separate approved maintenance action.
+
+Starting `systemd/telegram-prm-assistant.service` is a runtime activation event.
+It requires explicit dogfood-start approval and accepted or cleared PRM-18
+blockers.

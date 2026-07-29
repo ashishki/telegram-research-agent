@@ -15,6 +15,7 @@ from output.signal_report import PROFILE_YAML_PATH as _PROFILE_YAML_PATH
 from ingestion.bootstrap_ingest import run_bootstrap
 from ingestion.incremental_ingest import run_incremental
 from bot.bot import run_bot
+from bot.handlers import BOT_RUNTIME_PRM_ASSISTANT
 from llm.client import set_usage_db_path
 from output.generate_digest import run_digest
 from output.delivery_health import build_weekly_delivery_health, format_weekly_delivery_health
@@ -403,6 +404,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     bot_parser = subparsers.add_parser("bot", help="Start Telegram bot interface (long-polling)")
     bot_parser.set_defaults(handler=handle_bot)
+
+    prm_assistant_parser = subparsers.add_parser(
+        "prm-assistant",
+        help="Start PRM-safe Telegram assistant (long-polling; no legacy generation/write commands)",
+    )
+    prm_assistant_parser.set_defaults(handler=handle_prm_assistant)
 
     tune_parser = subparsers.add_parser(
         "tune-suggestions",
@@ -1789,6 +1796,19 @@ def handle_bot(_: argparse.Namespace) -> int:
         LOGGER.info("Finished step=run_bot")
     except Exception:
         LOGGER.exception("Bot runtime failed")
+        return 1
+    return 0
+
+
+def handle_prm_assistant(_: argparse.Namespace) -> int:
+    settings = load_settings()
+    try:
+        LOGGER.info("Skipping automatic migrations for PRM assistant runtime")
+        LOGGER.info("Starting step=run_bot runtime_mode=%s", BOT_RUNTIME_PRM_ASSISTANT)
+        run_bot(settings, runtime_mode=BOT_RUNTIME_PRM_ASSISTANT)
+        LOGGER.info("Finished step=run_bot runtime_mode=%s", BOT_RUNTIME_PRM_ASSISTANT)
+    except Exception:
+        LOGGER.exception("PRM assistant runtime failed")
         return 1
     return 0
 

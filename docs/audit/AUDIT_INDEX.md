@@ -63,3 +63,7 @@ These files remain preserved for human reference, but they are no longer part of
 - `PRM_RUNTIME_FREEZE_2026-07-29.md` - runtime freeze receipt after PRM-18:
   old Report V2 timer and live bot stopped/disabled, post-freeze systemd/cron
   checks, and historical W30 artifact boundary.
+- `PRM_SAFE_ASSISTANT_RUNTIME_2026-07-29.md` - safe `prm-assistant` runtime
+  receipt: CLI entrypoint and repo unit template implemented, legacy generation
+  and direct-write bot surfaces blocked, callbacks disabled, and activation
+  still gated by explicit PRM-19 dogfood-start approval.

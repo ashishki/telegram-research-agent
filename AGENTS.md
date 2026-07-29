@@ -25,7 +25,10 @@ evidence, and PRM-20 requires PRM-19 evidence plus explicit compatibility
 archive/delete/move approval. The old live Telegram bot and Report V2 weekly
 timer were stopped and disabled on 2026-07-29; see
 `docs/PRODUCT_OPERATING_MODEL.md` and
-`docs/audit/PRM_RUNTIME_FREEZE_2026-07-29.md`.
+`docs/audit/PRM_RUNTIME_FREEZE_2026-07-29.md`. A dedicated safe
+`prm-assistant` runtime entrypoint and repo unit template exist, but they are
+not installed, enabled, started, or dogfood evidence; the safe entrypoint does
+not run automatic startup migrations.
 
 ## Operating Rules
 
@@ -58,3 +61,4 @@ until the human operator explicitly approves dogfood start and accepts or clears
 the PRM-18 blockers. Do not start PRM-20 cleanup/archive work until PRM-19
 dogfood evidence exists and the human operator approves any compatibility
 archive/delete/move. Do not restart legacy bot/report timers as PRM dogfood.
+Do not start `prm-assistant` as dogfood without the same explicit approval.

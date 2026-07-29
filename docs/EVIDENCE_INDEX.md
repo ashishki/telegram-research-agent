@@ -34,6 +34,7 @@ Last updated: 2026-07-29
 | PRM deep-review corrective log | docs/audit/PRM_DEEP_REVIEW_CONSOLIDATED_2026-07-27.md |
 | PRM-18 release gate receipt | docs/audit/PRM18_RELEASE_GATE_2026-07-29.md |
 | PRM runtime freeze receipt | docs/audit/PRM_RUNTIME_FREEZE_2026-07-29.md |
+| PRM safe assistant runtime receipt | docs/audit/PRM_SAFE_ASSISTANT_RUNTIME_2026-07-29.md |
 | PRM-18 sanitized gate JSON | evals/prm18_release_gate_receipt_2026-07-29.json |
 
 ## W29 Artifact Evidence
@@ -116,3 +117,54 @@ PRM-18 release gate summary:
 Historical W30 generated outputs remain under `data/output/` as private
 artifacts. They were not read for content, committed, deleted, moved, archived,
 or promoted to PRM dogfood evidence.
+
+## Safe Assistant Runtime Evidence - 2026-07-29
+
+| Check | Result |
+| --- | --- |
+| CLI entrypoint | `src/main.py prm-assistant` implemented |
+| repo unit template | `systemd/telegram-prm-assistant.service` added |
+| legacy bot compatibility | `src/main.py bot` still uses legacy runtime mode |
+| ordinary text in safe mode | dispatches to chat command, not legacy message router |
+| voice transcript in safe mode | dispatches to chat command, not legacy voice router |
+| legacy callbacks in safe mode | disabled before DB write helpers run |
+| legacy generation/write commands in safe mode | blocked by allowlist |
+| safe runtime migrations | no automatic startup migration |
+| activation state | not installed, not enabled, not started, not dogfood |
+
+Targeted verification:
+
+```text
+PYTHONPATH=src python3 -m pytest tests/test_cli.py tests/test_handlers.py tests/test_callbacks.py -q
+52 passed, 3 subtests passed in 18.79s
+```
+
+Shared router/privacy tier:
+
+```text
+python3 tools/test_tiers.py fast-contract
+204 passed, 9 subtests passed in 59.91s
+```
+
+Unit template verification:
+
+```text
+systemd-analyze verify systemd/telegram-prm-assistant.service
+exit=0; unrelated host warning: /lib/systemd/system/snapd.service unknown RestartMode key
+```
+
+Pre-push checks:
+
+```text
+python3 tools/playbook_validate.py --root . --check tasks --check placeholders --check readiness --check delivery --check references
+playbook_validate: errors=0 warnings=0
+```
+
+```text
+git diff --check
+pass, no output
+```
+
+No live Telegram ingestion, reaction sync, Radar, Frontier, report generation,
+full archive indexing, embeddings, external web research jobs, systemd starts,
+or production database writes were performed.

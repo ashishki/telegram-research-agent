@@ -8,7 +8,13 @@ from urllib import parse, request
 from config.settings import Settings
 
 from .callbacks import record_callback
-from .handlers import dispatch_command, send_message
+from .handlers import (
+    BOT_RUNTIME_LEGACY,
+    BOT_RUNTIME_PRM_ASSISTANT,
+    dispatch_command,
+    normalize_bot_runtime_mode,
+    send_message,
+)
 from .voice import VoiceTranscriptionUnavailable, transcribe_telegram_voice
 
 
@@ -123,7 +129,51 @@ def _extract_voice_file_id(message: dict[str, Any]) -> str:
     return str(voice.get("file_id") or "").strip()
 
 
-def run_bot(settings: Settings) -> None:
+def _dispatch_bot_command(chat_id: str, text: str, settings: Settings, *, runtime_mode: str) -> None:
+    if runtime_mode == BOT_RUNTIME_LEGACY:
+        dispatch_command(chat_id=chat_id, text=text, settings=settings)
+        return
+    dispatch_command(chat_id=chat_id, text=text, settings=settings, runtime_mode=runtime_mode)
+
+
+def _operator_text_command(text: str, *, runtime_mode: str) -> str:
+    if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
+        return f"/chat {text}"
+    return f"/message {text}"
+
+
+def _voice_text_command(text: str, *, runtime_mode: str) -> str:
+    if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
+        return f"/chat {text}"
+    return f"/voice {text}"
+
+
+def _voice_received_message(*, runtime_mode: str) -> str:
+    if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
+        return "Принял голосовое. Распознаю и передам как вопрос в PRM assistant."
+    return "Принял голосовое. Распознаю и пойму: вопрос, фидбек или напоминание."
+
+
+def _voice_unavailable_message(*, runtime_mode: str) -> str:
+    if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
+        return (
+            "Голосовое распознавание пока не настроено: нужен OPENAI_API_KEY. "
+            "Пока отправь текстом обычное сообщение или /chat <вопрос>."
+        )
+    return (
+        "Голосовое распознавание пока не настроено: нужен OPENAI_API_KEY. "
+        "Пока отправь текстом обычное сообщение, /chat <вопрос> или /feedback <фидбек>."
+    )
+
+
+def _voice_failed_message(*, runtime_mode: str) -> str:
+    if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
+        return "Не смог распознать голосовое. Отправь текстом обычное сообщение или /chat <вопрос>."
+    return "Не смог распознать голосовое. Отправь текстом обычное сообщение, /chat <вопрос> или /feedback <фидбек>."
+
+
+def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_LEGACY) -> None:
+    runtime_mode = normalize_bot_runtime_mode(runtime_mode)
     token, owner_chat_id = _load_bot_env()
     if not token or not owner_chat_id:
         LOGGER.error("Bot startup failed because TELEGRAM_BOT_TOKEN or TELEGRAM_OWNER_CHAT_ID is not set")
@@ -133,7 +183,7 @@ def run_bot(settings: Settings) -> None:
     _install_signal_handlers(state)
 
     offset: int | None = None
-    LOGGER.info("Telegram bot polling started owner_chat_id=%s", owner_chat_id)
+    LOGGER.info("Telegram bot polling started owner_chat_id=%s runtime_mode=%s", owner_chat_id, runtime_mode)
 
     while True:
         try:
@@ -159,11 +209,15 @@ def run_bot(settings: Settings) -> None:
                             LOGGER.warning("Failed to answer unauthorized callback", exc_info=True)
                     continue
                 data = str(callback_query.get("data") or "")
-                try:
-                    answer = record_callback(settings, data)
-                except Exception:
-                    LOGGER.warning("Callback handling failed data=%s", data, exc_info=True)
-                    answer = "Не смог записать решение"
+                if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
+                    answer = "PRM safe mode: legacy callbacks are disabled."
+                    LOGGER.info("Blocked legacy callback in PRM safe mode data=%s", data)
+                else:
+                    try:
+                        answer = record_callback(settings, data)
+                    except Exception:
+                        LOGGER.warning("Callback handling failed data=%s", data, exc_info=True)
+                        answer = "Не смог записать решение"
                 if callback_query_id:
                     try:
                         _telegram_answer_callback(token, callback_query_id, answer)
@@ -187,7 +241,7 @@ def run_bot(settings: Settings) -> None:
                     command_name,
                     len(text),
                 )
-                dispatch_command(chat_id=chat_id, text=text, settings=settings)
+                _dispatch_bot_command(chat_id=chat_id, text=text, settings=settings, runtime_mode=runtime_mode)
                 continue
             if text:
                 LOGGER.info(
@@ -195,13 +249,15 @@ def run_bot(settings: Settings) -> None:
                     chat_id,
                     len(text),
                 )
-                dispatch_command(chat_id=chat_id, text=f"/message {text}", settings=settings)
+                command_text = _operator_text_command(text, runtime_mode=runtime_mode)
+                _dispatch_bot_command(chat_id=chat_id, text=command_text, settings=settings, runtime_mode=runtime_mode)
                 continue
 
             voice_feedback_text = _extract_voice_feedback_text(message)
             if voice_feedback_text:
                 LOGGER.info("Dispatching transcribed voice operator message chat_id=%s", chat_id)
-                dispatch_command(chat_id=chat_id, text=f"/voice {voice_feedback_text}", settings=settings)
+                command_text = _voice_text_command(voice_feedback_text, runtime_mode=runtime_mode)
+                _dispatch_bot_command(chat_id=chat_id, text=command_text, settings=settings, runtime_mode=runtime_mode)
                 continue
 
             if message.get("voice"):
@@ -209,36 +265,24 @@ def run_bot(settings: Settings) -> None:
                 send_message(
                     token,
                     chat_id,
-                    "Принял голосовое. Распознаю и пойму: вопрос, фидбек или напоминание.",
+                    _voice_received_message(runtime_mode=runtime_mode),
                     parse_mode=None,
                 )
                 try:
                     transcript = transcribe_telegram_voice(token=token, file_id=file_id)
                 except VoiceTranscriptionUnavailable:
                     LOGGER.warning("Voice transcription is unavailable because OPENAI_API_KEY is not configured")
-                    send_message(
-                        token,
-                        chat_id,
-                        (
-                            "Голосовое распознавание пока не настроено: нужен OPENAI_API_KEY. "
-                            "Пока отправь текстом обычное сообщение, /chat <вопрос> или /feedback <фидбек>."
-                        ),
-                        parse_mode=None,
-                    )
+                    send_message(token, chat_id, _voice_unavailable_message(runtime_mode=runtime_mode), parse_mode=None)
                     continue
                 except Exception:
                     LOGGER.warning("Voice transcription failed chat_id=%s", chat_id, exc_info=True)
-                    send_message(
-                        token,
-                        chat_id,
-                        "Не смог распознать голосовое. Отправь текстом обычное сообщение, /chat <вопрос> или /feedback <фидбек>.",
-                        parse_mode=None,
-                    )
+                    send_message(token, chat_id, _voice_failed_message(runtime_mode=runtime_mode), parse_mode=None)
                     continue
                 LOGGER.info("Voice transcription succeeded chat_id=%s chars=%d", chat_id, len(transcript))
-                dispatch_command(chat_id=chat_id, text=f"/voice {transcript}", settings=settings)
+                command_text = _voice_text_command(transcript, runtime_mode=runtime_mode)
+                _dispatch_bot_command(chat_id=chat_id, text=command_text, settings=settings, runtime_mode=runtime_mode)
 
         if state.stop_requested:
             break
 
-    LOGGER.info("Telegram bot polling stopped cleanly")
+    LOGGER.info("Telegram bot polling stopped cleanly runtime_mode=%s", runtime_mode)

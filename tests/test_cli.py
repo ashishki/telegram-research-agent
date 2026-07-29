@@ -2,7 +2,13 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from main import build_parser, handle_report_v2_rollout_gate, handle_weekly_intelligence_v2
+from main import (
+    BOT_RUNTIME_PRM_ASSISTANT,
+    build_parser,
+    handle_prm_assistant,
+    handle_report_v2_rollout_gate,
+    handle_weekly_intelligence_v2,
+)
 
 
 class TestCli(unittest.TestCase):
@@ -102,6 +108,23 @@ class TestCli(unittest.TestCase):
             return_value=receipt,
         ):
             self.assertEqual(handle_report_v2_rollout_gate(args), 2)
+
+    def test_prm_assistant_parser_is_explicit(self):
+        args = build_parser().parse_args(["prm-assistant"])
+
+        self.assertIs(args.handler, handle_prm_assistant)
+
+    def test_prm_assistant_skips_startup_migrations_and_uses_safe_mode(self):
+        args = build_parser().parse_args(["prm-assistant"])
+        settings = SimpleNamespace(db_path="/tmp/agent.db")
+
+        with patch("main.load_settings", return_value=settings), patch("main.run_migrations") as migrations_mock, patch(
+            "main.run_bot"
+        ) as run_bot_mock:
+            self.assertEqual(handle_prm_assistant(args), 0)
+
+        migrations_mock.assert_not_called()
+        run_bot_mock.assert_called_once_with(settings, runtime_mode=BOT_RUNTIME_PRM_ASSISTANT)
 
 
 if __name__ == "__main__":

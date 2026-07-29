@@ -198,6 +198,130 @@ class TestHandlers(unittest.TestCase):
         self.assertEqual(mock_send_message.call_count, 1)
         self.assertEqual(mock_send_message.call_args_list[0].args[2], "Hermes answer from curated PI tools.")
 
+    def test_prm_safe_start_help_hides_legacy_generation_commands(self):
+        settings = Settings(
+            db_path=":memory:",
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+
+        with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+            with patch.object(handlers, "send_message") as mock_send_message:
+                handlers.dispatch_command(
+                    chat_id="42",
+                    text="/start",
+                    settings=settings,
+                    runtime_mode=handlers.BOT_RUNTIME_PRM_ASSISTANT,
+                )
+
+        message = mock_send_message.call_args.args[2]
+        self.assertIn("PRM safe assistant", message)
+        self.assertIn("/chat <question>", message)
+        self.assertIn("MVP Radar is a decision-evidence card only", message)
+        self.assertNotIn("/run_digest", message)
+        self.assertNotIn("/run_mvp_weekly", message)
+        self.assertNotIn("/feedback_confirm", message)
+
+    def test_prm_safe_command_allowlist_blocks_legacy_generators(self):
+        settings = Settings(
+            db_path=":memory:",
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+
+        with patch.object(handlers, "run_digest") as mock_run_digest:
+            with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                with patch.object(handlers, "send_message") as mock_send_message:
+                    handlers.dispatch_command(
+                        chat_id="42",
+                        text="/run_digest force",
+                        settings=settings,
+                        runtime_mode=handlers.BOT_RUNTIME_PRM_ASSISTANT,
+                    )
+
+        mock_run_digest.assert_not_called()
+        message = mock_send_message.call_args.args[2]
+        self.assertIn("PRM safe mode blocked", message)
+        self.assertIn("/run_digest", message)
+        self.assertIn("No generation", message)
+
+    def test_prm_safe_blocks_operator_message_write_router(self):
+        settings = Settings(
+            db_path=":memory:",
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+
+        with patch.object(handlers, "classify_operator_message") as classify_mock:
+            with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                with patch.object(handlers, "send_message") as mock_send_message:
+                    handlers.dispatch_command(
+                        chat_id="42",
+                        text="/message напомни завтра проверить workbook",
+                        settings=settings,
+                        runtime_mode=handlers.BOT_RUNTIME_PRM_ASSISTANT,
+                    )
+
+        classify_mock.assert_not_called()
+        message = mock_send_message.call_args.args[2]
+        self.assertIn("PRM safe mode blocked", message)
+        self.assertIn("/message", message)
+
+    def test_prm_safe_blocks_direct_feedback_confirmation(self):
+        settings = Settings(
+            db_path=":memory:",
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+
+        with patch.object(handlers, "apply_confirmed_feedback_intake") as confirm_mock:
+            with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                with patch.object(handlers, "send_message") as mock_send_message:
+                    handlers.dispatch_command(
+                        chat_id="42",
+                        text="/feedback_confirm 1",
+                        settings=settings,
+                        runtime_mode=handlers.BOT_RUNTIME_PRM_ASSISTANT,
+                    )
+
+        confirm_mock.assert_not_called()
+        message = mock_send_message.call_args.args[2]
+        self.assertIn("PRM safe mode blocked", message)
+        self.assertIn("/feedback_confirm", message)
+
+    def test_prm_safe_command_allowlist_allows_chat(self):
+        settings = Settings(
+            db_path=":memory:",
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+        pi_chat_result = {
+            "status": "ok",
+            "answer": "Safe PRM answer.",
+            "tool_calls": [],
+            "tool_results": [],
+            "evidence": {},
+            "message": "ok",
+        }
+
+        with patch.object(handlers, "answer_pi_chat", return_value=pi_chat_result) as mock_chat:
+            with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                with patch.object(handlers, "send_message") as mock_send_message:
+                    handlers.dispatch_command(
+                        chat_id="42",
+                        text="/chat what changed?",
+                        settings=settings,
+                        runtime_mode=handlers.BOT_RUNTIME_PRM_ASSISTANT,
+                    )
+
+        mock_chat.assert_called_once_with("what changed?", settings=settings)
+        self.assertEqual(mock_send_message.call_args.args[2], "Safe PRM answer.")
+
     def test_handle_ask_delegates_to_pi_chat_not_raw_telegram_answer(self):
         settings = Settings(
             db_path=":memory:",

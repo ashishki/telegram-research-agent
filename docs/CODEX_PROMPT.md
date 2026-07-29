@@ -11,7 +11,8 @@ Last updated: 2026-07-29
 - Adoption mode: Standard
 - Current phase: PRM-18 release/dogfood gate is implemented and blocks dogfood
   start while final acceptance evidence and human approval are missing; legacy
-  live runtime is frozen
+  live runtime is frozen; safe `prm-assistant` runtime is implemented but not
+  installed, enabled, started, or dogfood evidence
 - Implemented slices in HEAD: PRM-1 through PRM-7 plus PRM-9 through PRM-18
 - Blocked/not implemented slices: PRM-8, PRM-19, and PRM-20
 - Next safe work: PRM-19 only after explicit human dogfood-start approval and
@@ -43,7 +44,11 @@ workflow contracts and privacy-safe aggregate telemetry receipts for future
 runtime activation. PRM-18 adds a deterministic release/dogfood gate receipt;
 the current receipt is blocked and does not start dogfood or claim release
 readiness. On 2026-07-29 the old live Telegram bot and Report V2 weekly timer
-were stopped and disabled. The full product is not released.
+were stopped and disabled. A dedicated `prm-assistant` mode now exists for the
+future operator entrypoint: ordinary text and voice transcript dispatch to
+`/chat`, legacy callbacks are disabled, and generation/write commands are
+blocked. It does not run automatic startup migrations. The full product is not
+released.
 
 ## Active Profiles
 
@@ -109,6 +114,9 @@ jobs from this handoff.
   compatibility archive/delete/move approval is explicit.
 - Legacy runtime is frozen: do not restart `telegram-bot.service` or
   `telegram-ai-split-report.timer` as PRM dogfood.
+- Safe runtime is not dogfood yet: do not start `src/main.py prm-assistant` or
+  `systemd/telegram-prm-assistant.service` without explicit dogfood-start
+  approval and accepted or cleared PRM-18 blockers.
 - External skills are project-disabled until trust records are approved.
 - Legacy report-centered docs remain as historical/compatibility surfaces and
   need a safe archive/migration pass in PBR-7 or PRM-20.

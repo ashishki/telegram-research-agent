@@ -33,6 +33,27 @@ from output.operator_reminders import (
 
 
 LOGGER = logging.getLogger(__name__)
+BOT_RUNTIME_LEGACY = "legacy"
+BOT_RUNTIME_PRM_ASSISTANT = "prm_assistant"
+BOT_RUNTIME_MODES = frozenset({BOT_RUNTIME_LEGACY, BOT_RUNTIME_PRM_ASSISTANT})
+PRM_SAFE_COMMANDS = frozenset(
+    {
+        "/start",
+        "/help",
+        "/weekly",
+        "/actions",
+        "/explain",
+        "/projects",
+        "/mvp",
+        "/strategy",
+        "/codex",
+        "/chat",
+        "/hermes",
+        "/ask",
+        "/costs",
+        "/status",
+    }
+)
 QUESTION_WORD_RE = re.compile(r"[^\W_]+", re.UNICODE)
 TELEGRAM_POST_URL_RE = re.compile(r"^https?://t\.me/([A-Za-z0-9_]+)/(\d+)(?:\?.*)?$", re.IGNORECASE)
 MARKDOWN_V2_SPECIAL_CHARS = r"_*[]()~`>#+-=|{}.!"
@@ -271,6 +292,42 @@ def handle_start(chat_id: str, args: str, settings: Settings) -> None:
         "Ручные команды остаются запасным вариантом: /weekly, /actions, /mvp, /strategy, /remind.",
         "",
         "Границы: read-only PI tools, curated intelligence, без raw Telegram RAG, без Codex/config/code mutations.",
+    ]
+    send_message(_get_bot_token(), chat_id, "\n".join(lines), parse_mode=None)
+
+
+def handle_prm_start(chat_id: str, args: str, settings: Settings) -> None:
+    del args, settings
+    lines = [
+        "PRM safe assistant",
+        "",
+        "Use /chat <question> or send a normal message.",
+        "Read-only orientation: /weekly, /actions, /mvp, /strategy, /projects, /costs, /status.",
+        "MVP Radar is a decision-evidence card only; Telegram-only evidence cannot approve build.",
+        "",
+        "Blocked in this mode: ingestion, reaction sync, report generation, Radar generation,",
+        "direct feedback/tag/reminder writes, legacy callbacks, Codex/config/code mutation,",
+        "and dogfood/release claims.",
+        "Memory saves must go through explicit confirmed PRM proposals inside /chat.",
+    ]
+    send_message(_get_bot_token(), chat_id, "\n".join(lines), parse_mode=None)
+
+
+def normalize_bot_runtime_mode(runtime_mode: str | None) -> str:
+    mode = str(runtime_mode or BOT_RUNTIME_LEGACY).strip()
+    if mode in BOT_RUNTIME_MODES:
+        return mode
+    return BOT_RUNTIME_LEGACY
+
+
+def _send_prm_safe_blocked(chat_id: str, command: str) -> None:
+    shown_command = command or "unknown"
+    lines = [
+        "PRM safe mode blocked this legacy command.",
+        f"Command: {shown_command}",
+        "",
+        "Use /chat for grounded questions or /weekly /actions /mvp /strategy for read-only orientation.",
+        "No generation, ingestion, Radar, direct feedback/tag/reminder write, or report delivery was run.",
     ]
     send_message(_get_bot_token(), chat_id, "\n".join(lines), parse_mode=None)
 
@@ -1199,9 +1256,24 @@ HANDLERS: dict[str, Callable[[str, str, Settings], None]] = {
 }
 
 
-def dispatch_command(chat_id: str, text: str, settings: Settings) -> None:
+def dispatch_command(
+    chat_id: str,
+    text: str,
+    settings: Settings,
+    *,
+    runtime_mode: str = BOT_RUNTIME_LEGACY,
+) -> None:
     command, _, args = text.strip().partition(" ")
     command = command.split("@", maxsplit=1)[0]
+    mode = normalize_bot_runtime_mode(runtime_mode)
+    if mode == BOT_RUNTIME_PRM_ASSISTANT:
+        if command in {"/start", "/help"}:
+            handle_prm_start(chat_id, args, settings)
+            return
+        if command not in PRM_SAFE_COMMANDS:
+            _send_prm_safe_blocked(chat_id, command)
+            return
+
     handler = HANDLERS.get(command)
     if handler is None:
         send_message(
