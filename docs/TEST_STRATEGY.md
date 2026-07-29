@@ -68,6 +68,13 @@ PYTHONPATH=src python3 -m pytest tests/test_cli.py tests/test_handlers.py tests/
 52 passed, 3 subtests passed in 18.79s
 ```
 
+Local PRM memory ask:
+
+```text
+PYTHONPATH=src python3 -m pytest tests/test_local_memory_ask.py tests/test_cli.py -q
+13 passed, 3 subtests passed in 4.95s
+```
+
 ```text
 PYTHONPATH=src python3 -m pytest tests/test_project_context.py tests/test_pi_tools.py tests/test_pi_chat.py -q
 47 passed, 6 subtests passed in 5.59s
@@ -75,12 +82,12 @@ PYTHONPATH=src python3 -m pytest tests/test_project_context.py tests/test_pi_too
 
 ```text
 python3 tools/test_tiers.py focused-prm
-99 passed, 6 subtests passed in 23.17s
+102 passed, 6 subtests passed in 14.58s
 ```
 
 ```text
 python3 tools/test_tiers.py fast-contract
-204 passed, 9 subtests passed in 59.91s
+209 passed, 9 subtests passed in 52.30s
 ```
 
 PRM-13 targeted visual/layout smoke:

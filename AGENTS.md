@@ -28,7 +28,9 @@ timer were stopped and disabled on 2026-07-29; see
 `docs/audit/PRM_RUNTIME_FREEZE_2026-07-29.md`. A dedicated safe
 `prm-assistant` runtime entrypoint and repo unit template exist, but they are
 not installed, enabled, started, or dogfood evidence; the safe entrypoint does
-not run automatic startup migrations.
+not run automatic startup migrations. A local user-facing `memory ask` command
+exists for immediate local evidence questions without LLM calls, external
+search, service starts, migrations, or writes.
 
 ## Operating Rules
 

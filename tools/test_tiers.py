@@ -18,6 +18,7 @@ PRM_TESTS = (
     "tests/test_archive_search.py",
     "tests/test_pi_tools.py",
     "tests/test_pi_chat.py",
+    "tests/test_local_memory_ask.py",
     "tests/test_project_context.py",
     "tests/test_learning_layer.py",
     "tests/test_weekly_brief_v3.py",

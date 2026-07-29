@@ -617,6 +617,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     memory_sub = memory_parser.add_subparsers(dest="memory_command", required=True)
 
+    ask_parser = memory_sub.add_parser(
+        "ask",
+        help="Ask local PRM memory without LLM, external search, or writes",
+    )
+    ask_parser.add_argument("question", nargs="+")
+    ask_parser.add_argument("--week", default=None)
+    ask_parser.add_argument("--project", default=None)
+    ask_parser.add_argument("--limit", type=int, default=5)
+    ask_parser.add_argument("--json", action="store_true")
+    ask_parser.set_defaults(handler=handle_memory_ask)
+
     ie_parser = memory_sub.add_parser("inspect-evidence")
     ie_parser.add_argument("--project", default=None)
     ie_parser.add_argument("--week", default=None)
@@ -2687,6 +2698,30 @@ def _format_ai_report_feedback(row: dict) -> str:
         f"  notes={row.get('notes') or 'n/a'}",
     ]
     return "\n".join(lines)
+
+
+def handle_memory_ask(args: argparse.Namespace) -> int:
+    from assistant.local_memory_ask import answer_local_memory_question, render_local_memory_answer
+
+    settings = load_settings()
+    question = " ".join(args.question).strip()
+    try:
+        payload = answer_local_memory_question(
+            question,
+            settings=settings,
+            week_label=args.week,
+            project_name=args.project,
+            limit=args.limit,
+        )
+    except Exception as exc:
+        sys.stdout.write(f"Error asking local memory: {exc}\n")
+        return 1
+
+    if args.json:
+        sys.stdout.write(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
+        return 0
+    sys.stdout.write(render_local_memory_answer(payload) + "\n")
+    return 0
 
 
 def handle_memory_inspect_ai_report_feedback(args: argparse.Namespace) -> int:

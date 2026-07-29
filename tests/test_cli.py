@@ -1,3 +1,5 @@
+from contextlib import redirect_stdout
+from io import StringIO
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -5,6 +7,7 @@ from unittest.mock import patch
 from main import (
     BOT_RUNTIME_PRM_ASSISTANT,
     build_parser,
+    handle_memory_ask,
     handle_prm_assistant,
     handle_report_v2_rollout_gate,
     handle_weekly_intelligence_v2,
@@ -125,6 +128,46 @@ class TestCli(unittest.TestCase):
 
         migrations_mock.assert_not_called()
         run_bot_mock.assert_called_once_with(settings, runtime_mode=BOT_RUNTIME_PRM_ASSISTANT)
+
+    def test_memory_ask_parser_is_user_facing(self):
+        args = build_parser().parse_args(["memory", "ask", "что", "есть", "по", "eval", "--limit", "3"])
+
+        self.assertEqual(args.question, ["что", "есть", "по", "eval"])
+        self.assertEqual(args.limit, 3)
+        self.assertIs(args.handler, handle_memory_ask)
+
+    def test_memory_ask_handler_skips_migrations_and_renders_answer(self):
+        args = build_parser().parse_args(["memory", "ask", "что", "есть", "по", "eval"])
+        settings = SimpleNamespace(db_path="/tmp/agent.db")
+        payload = {
+            "schema_version": "local_memory_answer.v1",
+            "status": "ok",
+            "question": "что есть по eval",
+            "mode": "local_only",
+            "answer": "Evidence answer",
+            "privacy": {"model_calls": 0},
+        }
+
+        with patch("main.load_settings", return_value=settings), patch("main.run_migrations") as migrations_mock, patch(
+            "assistant.local_memory_ask.answer_local_memory_question",
+            return_value=payload,
+        ) as ask_mock, patch(
+            "assistant.local_memory_ask.render_local_memory_answer",
+            return_value="rendered answer",
+        ):
+            output = StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(handle_memory_ask(args), 0)
+
+        migrations_mock.assert_not_called()
+        ask_mock.assert_called_once_with(
+            "что есть по eval",
+            settings=settings,
+            week_label=None,
+            project_name=None,
+            limit=5,
+        )
+        self.assertEqual(output.getvalue(), "rendered answer\n")
 
 
 if __name__ == "__main__":

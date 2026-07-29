@@ -67,3 +67,6 @@ These files remain preserved for human reference, but they are no longer part of
   receipt: CLI entrypoint and repo unit template implemented, legacy generation
   and direct-write bot surfaces blocked, callbacks disabled, and activation
   still gated by explicit PRM-19 dogfood-start approval.
+- `PRM_LOCAL_MEMORY_ASK_2026-07-29.md` - local user-facing `memory ask`
+  receipt: bounded archive/curated/project evidence answers without LLM calls,
+  external search, Telegram service startup, startup migrations, or writes.

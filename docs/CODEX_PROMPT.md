@@ -48,7 +48,8 @@ were stopped and disabled. A dedicated `prm-assistant` mode now exists for the
 future operator entrypoint: ordinary text and voice transcript dispatch to
 `/chat`, legacy callbacks are disabled, and generation/write commands are
 blocked. It does not run automatic startup migrations. The full product is not
-released.
+released. For immediate local use, `memory ask` provides a no-LLM local
+evidence brief over bounded archive/curated/project context.
 
 ## Active Profiles
 

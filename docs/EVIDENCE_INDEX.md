@@ -35,6 +35,7 @@ Last updated: 2026-07-29
 | PRM-18 release gate receipt | docs/audit/PRM18_RELEASE_GATE_2026-07-29.md |
 | PRM runtime freeze receipt | docs/audit/PRM_RUNTIME_FREEZE_2026-07-29.md |
 | PRM safe assistant runtime receipt | docs/audit/PRM_SAFE_ASSISTANT_RUNTIME_2026-07-29.md |
+| PRM local memory ask receipt | docs/audit/PRM_LOCAL_MEMORY_ASK_2026-07-29.md |
 | PRM-18 sanitized gate JSON | evals/prm18_release_gate_receipt_2026-07-29.json |
 
 ## W29 Artifact Evidence
@@ -168,3 +169,59 @@ pass, no output
 No live Telegram ingestion, reaction sync, Radar, Frontier, report generation,
 full archive indexing, embeddings, external web research jobs, systemd starts,
 or production database writes were performed.
+
+## Local Memory Ask Evidence - 2026-07-29
+
+| Check | Result |
+| --- | --- |
+| user-facing command | `src/main.py memory ask "<question>"` implemented |
+| scope controls | `--project`, `--week`, `--limit`, `--json` |
+| default mode | local-only evidence brief |
+| model calls | none |
+| external search | none |
+| startup migrations | none |
+| writes | none |
+| raw Telegram corpus egress | none |
+
+Targeted verification:
+
+```text
+PYTHONPATH=src python3 -m pytest tests/test_local_memory_ask.py tests/test_cli.py -q
+13 passed, 3 subtests passed in 4.95s
+```
+
+CLI help smoke:
+
+```text
+PYTHONPATH=src python3 src/main.py memory ask --help
+exit=0; help displayed memory ask options; retrieval was not run
+```
+
+PRM and shared contract tiers:
+
+```text
+python3 tools/test_tiers.py focused-prm
+102 passed, 6 subtests passed in 14.58s
+```
+
+```text
+python3 tools/test_tiers.py fast-contract
+209 passed, 9 subtests passed in 52.30s
+```
+
+Pre-push checks:
+
+```text
+python3 tools/playbook_validate.py --root . --check tasks --check placeholders --check readiness --check delivery --check references
+playbook_validate: errors=0 warnings=0
+```
+
+```text
+git diff --check
+pass, no output
+```
+
+No live Telegram ingestion, reaction sync, Radar, Frontier, report generation,
+full archive indexing, embeddings, external web research jobs, LLM calls,
+systemd starts, startup migrations, or production database writes were
+performed.

@@ -23,6 +23,7 @@ Last updated: 2026-07-29
 | embedding provider egress | explicit human approval and ADR before external embeddings |
 | external skill reads private data | skills disabled until trust record and approval |
 | unstable/high-stakes claim answered from stale Telegram evidence | deterministic external-verification requirement; Telegram evidence is discovery context only |
+| local operator question leaks raw snippets to provider | `memory ask` is local-only: no LLM calls, no external search, no bounded snippet provider egress |
 | chat transcript becomes memory silently | session context is not durable memory |
 | hidden memory write from assistant tool loop | proposal plus exact confirmation token required; write trace records `write_performed` |
 | read-only assistant turn mutates production DB telemetry | PI chat suppresses `llm_usage` database writes during planning/generation |

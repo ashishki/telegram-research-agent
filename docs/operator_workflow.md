@@ -1,13 +1,43 @@
 # Operator Workflow
 
-**Version:** 2.2
-**Last updated:** 2026-07-15
+**Version:** 2.3
+**Last updated:** 2026-07-29
 **Audience:** System owner (single user, personal use)
 **Role:** supporting operating guide. Canonical roadmap:
 `docs/intelligence_report_v2_roadmap.md` for the Report V2 correction record and
 `docs/portfolio_grade_intelligence_roadmap.md` for the broader product.
 
 ---
+
+## Current PRM Local Use
+
+Use this when you want to ask the product a normal question now, without
+starting Telegram dogfood or sending Telegram snippets to an external model:
+
+```bash
+PYTHONPATH=src python3 src/main.py memory ask "какие есть практики по eval gates?"
+PYTHONPATH=src python3 src/main.py memory ask --project telegram-research-agent "как эта идея применима к проекту?"
+PYTHONPATH=src python3 src/main.py memory ask --week 2026-W29 "что в памяти подтверждает эту идею?"
+```
+
+What this does:
+
+- searches local PRM memory and bounded SQLite Telegram archive search;
+- returns source links, bounded snippets, and curated knowledge signals;
+- answers project-fit questions through the PRM project context classifier;
+- flags fresh/high-stakes/current questions as needing external verification;
+- does not call an LLM, run external search, start Telegram services, run
+  migrations, generate reports, or write memory.
+
+Use `--json` when you want the machine-readable receipt:
+
+```bash
+PYTHONPATH=src python3 src/main.py memory ask --json "найди подтверждения по agent evals"
+```
+
+This command is a local product preview, not PRM-19 dogfood evidence. The
+Telegram `prm-assistant` service and LLM-backed `/chat` remain behind explicit
+dogfood-start/privacy approval.
 
 ## Weekly Routine
 

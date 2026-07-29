@@ -91,6 +91,9 @@ Allowed without a separate runtime approval:
 
 - read docs and receipts;
 - run deterministic tests and validators;
+- ask local PRM memory with `PYTHONPATH=src python3 src/main.py memory ask
+  "<question>"`; this is local-only and does not call LLMs, external search,
+  Telegram services, startup migrations, generation jobs, or write tools;
 - inspect process/systemd state;
 - inspect artifact names, mtimes, sizes, and manifests when needed without
   committing private generated content;
@@ -118,6 +121,15 @@ PYTHONPATH=src python3 src/main.py prm-assistant
 
 Do not run this as dogfood until PRM-18 blockers are accepted or cleared and
 the human operator explicitly approves dogfood start.
+
+For immediate local use, prefer:
+
+```bash
+PYTHONPATH=src python3 src/main.py memory ask "какие есть подтверждения по моей идее?"
+```
+
+This returns a local evidence brief. It does not perform LLM synthesis over
+archive snippets.
 
 Implemented `prm-assistant` runtime mode:
 

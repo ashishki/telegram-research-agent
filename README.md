@@ -88,7 +88,18 @@ synthetic evidence; it is not a dogfood run.
 
 ## Primary Operator Workflow
 
-Planned v1 workflow:
+Current local preview:
+
+```bash
+PYTHONPATH=src python3 src/main.py memory ask "какие есть практики по eval gates?"
+PYTHONPATH=src python3 src/main.py memory ask --project telegram-research-agent "как эта идея применима к проекту?"
+```
+
+This local command searches bounded PRM memory and SQLite Telegram archive
+indexes, returns source links/snippets, and does not call LLMs, external
+search, Telegram services, startup migrations, generation jobs, or write tools.
+
+Planned approved assistant workflow:
 
 1. Ask Hermes a natural-language question.
 2. Hermes searches the Telegram archive and, when useful, curated knowledge.
