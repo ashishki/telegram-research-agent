@@ -30,8 +30,10 @@ Last updated: 2026-07-29
 | Cost budget | docs/COST_BUDGET.md |
 | Rollback and reindex plan | docs/ROLLBACK_AND_REINDEX_PLAN.md |
 | Test strategy and tiers | docs/TEST_STRATEGY.md |
+| Product operating model | docs/PRODUCT_OPERATING_MODEL.md |
 | PRM deep-review corrective log | docs/audit/PRM_DEEP_REVIEW_CONSOLIDATED_2026-07-27.md |
 | PRM-18 release gate receipt | docs/audit/PRM18_RELEASE_GATE_2026-07-29.md |
+| PRM runtime freeze receipt | docs/audit/PRM_RUNTIME_FREEZE_2026-07-29.md |
 | PRM-18 sanitized gate JSON | evals/prm18_release_gate_receipt_2026-07-29.json |
 
 ## W29 Artifact Evidence
@@ -98,3 +100,19 @@ PRM-18 release gate summary:
 - acceptance scenarios: 0 passed, 0 failed, 11 blocked;
 - active stop-ship blockers: unsupported claims and retrieval metric failure;
 - human dogfood-start approval is missing.
+
+## Runtime Freeze Evidence - 2026-07-29
+
+| Check | Result |
+| --- | --- |
+| `telegram-ai-split-report.timer` | stopped and disabled |
+| `telegram-ai-split-report.service` | inactive after `reset-failed`; unit file remains disabled |
+| `telegram-bot.service` | stopped and disabled |
+| running Telegram Research Agent services | none found |
+| active Telegram Research Agent timers | none found |
+| `oc_you` crontab | no crontab |
+| system cron project jobs | none found |
+
+Historical W30 generated outputs remain under `data/output/` as private
+artifacts. They were not read for content, committed, deleted, moved, archived,
+or promoted to PRM dogfood evidence.

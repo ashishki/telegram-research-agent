@@ -20,6 +20,10 @@ confirmation.
 Weekly reports become secondary projections over usage, watch topics,
 reactions, saved notes, projects, and experiments.
 
+Runtime state note: as of 2026-07-29 the legacy Telegram bot and Report V2
+weekly timer are stopped and disabled. See `docs/PRODUCT_OPERATING_MODEL.md`
+for the active operating model and consolidation plan.
+
 ## Target Flow
 
 ```text
@@ -222,3 +226,9 @@ Scheduled jobs are ingestion, FTS/index freshness, selective enrichment queue,
 reaction fast lane, and secondary weekly projection. Jobs must be idempotent,
 receipt-producing, and rollback-aware. Radar failure degrades only the Radar
 projection.
+
+Those jobs are target workflows, not active dogfood runtime. A future runtime
+activation must use the PRM-17 workflow registry and explicit human approval.
+MVP Radar remains a secondary decision-evidence projection: it must not approve
+build/release decisions from Telegram-only evidence and must not drive the
+primary product workflow.

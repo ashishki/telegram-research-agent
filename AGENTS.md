@@ -22,7 +22,10 @@ dogfood because final acceptance evidence, gold retrieval labels, and explicit
 human dogfood approval are missing. PRM-8 remains blocked. PRM-19 and PRM-20
 are not started; PRM-19 requires real four-week operator dogfood approval and
 evidence, and PRM-20 requires PRM-19 evidence plus explicit compatibility
-archive/delete/move approval.
+archive/delete/move approval. The old live Telegram bot and Report V2 weekly
+timer were stopped and disabled on 2026-07-29; see
+`docs/PRODUCT_OPERATING_MODEL.md` and
+`docs/audit/PRM_RUNTIME_FREEZE_2026-07-29.md`.
 
 ## Operating Rules
 
@@ -54,4 +57,4 @@ PRM-18 is implemented as a blocking release gate. Do not start PRM-19 dogfood
 until the human operator explicitly approves dogfood start and accepts or clears
 the PRM-18 blockers. Do not start PRM-20 cleanup/archive work until PRM-19
 dogfood evidence exists and the human operator approves any compatibility
-archive/delete/move.
+archive/delete/move. Do not restart legacy bot/report timers as PRM dogfood.

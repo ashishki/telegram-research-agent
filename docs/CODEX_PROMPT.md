@@ -10,7 +10,8 @@ Last updated: 2026-07-29
 - AI Workflow Playbook commit used: 5583eca96c4d2d480b5574ed78bea63e0b07ebf0
 - Adoption mode: Standard
 - Current phase: PRM-18 release/dogfood gate is implemented and blocks dogfood
-  start while final acceptance evidence and human approval are missing
+  start while final acceptance evidence and human approval are missing; legacy
+  live runtime is frozen
 - Implemented slices in HEAD: PRM-1 through PRM-7 plus PRM-9 through PRM-18
 - Blocked/not implemented slices: PRM-8, PRM-19, and PRM-20
 - Next safe work: PRM-19 only after explicit human dogfood-start approval and
@@ -41,7 +42,8 @@ V1 Brief and Atlas to compatibility/internal surfaces. PRM-17 adds deterministic
 workflow contracts and privacy-safe aggregate telemetry receipts for future
 runtime activation. PRM-18 adds a deterministic release/dogfood gate receipt;
 the current receipt is blocked and does not start dogfood or claim release
-readiness. The full product is not released.
+readiness. On 2026-07-29 the old live Telegram bot and Report V2 weekly timer
+were stopped and disabled. The full product is not released.
 
 ## Active Profiles
 
@@ -105,6 +107,8 @@ jobs from this handoff.
   and PRM-18 blockers are accepted or cleared.
 - PRM-20 cleanup/archive cannot start until PRM-19 dogfood evidence exists and
   compatibility archive/delete/move approval is explicit.
+- Legacy runtime is frozen: do not restart `telegram-bot.service` or
+  `telegram-ai-split-report.timer` as PRM dogfood.
 - External skills are project-disabled until trust records are approved.
 - Legacy report-centered docs remain as historical/compatibility surfaces and
   need a safe archive/migration pass in PBR-7 or PRM-20.

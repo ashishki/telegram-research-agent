@@ -60,3 +60,6 @@ These files remain preserved for human reference, but they are no longer part of
 - `PRM18_RELEASE_GATE_2026-07-29.md` - PRM-18 deterministic release/dogfood
   gate receipt, stop-ship blockers, privacy boundary, verifier evidence, and
   PRM-19/PRM-20 continuation blockers.
+- `PRM_RUNTIME_FREEZE_2026-07-29.md` - runtime freeze receipt after PRM-18:
+  old Report V2 timer and live bot stopped/disabled, post-freeze systemd/cron
+  checks, and historical W30 artifact boundary.

@@ -4,6 +4,20 @@ Status: PRM-17 deterministic contract implemented; runtime activation still
 requires human approval
 Last updated: 2026-07-29
 
+## Current Runtime State
+
+As of 2026-07-29, no Telegram Research Agent workflow is active in systemd.
+The legacy live bot and Report V2 weekly timer were stopped and disabled after
+PRM-18 confirmed that dogfood is blocked:
+
+- `telegram-bot.service`: disabled, inactive;
+- `telegram-ai-split-report.timer`: disabled, inactive;
+- `telegram-ai-split-report.service`: disabled, inactive.
+
+Do not restart those units as PRM dogfood. Future runtime activation should use
+a dedicated PRM assistant mode that exposes only approved read-only and
+confirmation-gated tools.
+
 ## Implementation Boundary
 
 PRM-17 implements the contract registry and telemetry receipt sanitizer in

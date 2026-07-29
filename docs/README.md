@@ -1,7 +1,7 @@
 # Documentation Index
 
 Status: active
-Last updated: 2026-07-26
+Last updated: 2026-07-29
 
 ## Current Product Direction
 
@@ -12,6 +12,7 @@ Last updated: 2026-07-26
 - docs/personal_research_memory_product_contract.md
 - docs/personal_research_memory_architecture.md
 - docs/personal_research_memory_roadmap.md
+- docs/PRODUCT_OPERATING_MODEL.md
 - docs/final_acceptance_plan.md
 
 ## Playbook Governance
@@ -40,6 +41,14 @@ Last updated: 2026-07-26
 - docs/PRIVACY_THREAT_MODEL.md
 - docs/ROLLBACK_AND_REINDEX_PLAN.md
 - docs/repo_hygiene_and_archive_plan.md
+
+## Current Runtime Boundary
+
+- docs/PRODUCT_OPERATING_MODEL.md
+- docs/audit/PRM_RUNTIME_FREEZE_2026-07-29.md
+
+The live Telegram bot and old weekly Report V2 timer are stopped and disabled.
+PRM dogfood has not started.
 
 ## Legacy And Compatibility Context
 
