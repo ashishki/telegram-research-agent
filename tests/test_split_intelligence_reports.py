@@ -698,16 +698,17 @@ class TestSplitIntelligenceReports(unittest.TestCase):
             self.assertEqual(
                 set(brief_json["project_learning_projection"]["learning_intelligence"]["allowed_stages"]),
                 {
+                    "indexed",
+                    "surfaced",
+                    "opened",
                     "read",
                     "understood",
                     "explained",
-                    "reproduced",
-                    "implemented",
-                    "tested",
-                    "project-applied",
+                    "tried",
+                    "applied",
                     "measured",
+                    "rejected",
                     "stale",
-                    "prerequisite_gap",
                 },
             )
             self.assertEqual(

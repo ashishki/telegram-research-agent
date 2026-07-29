@@ -2,7 +2,7 @@
 
 Status: proposed
 
-Last updated: 2026-07-28
+Last updated: 2026-07-29
 
 ## North Star
 
@@ -153,6 +153,22 @@ Target shape:
 - one feedback request.
 
 Radar failure degrades only the Radar card.
+
+## Learning State
+
+PRM-15 implementation contract:
+
+- canonical learning states are `indexed`, `surfaced`, `opened`, `read`,
+  `understood`, `explained`, `tried`, `applied`, `measured`, `rejected`, and
+  `stale`;
+- legacy source URL or Knowledge Atom presence maps only to `indexed` or
+  `surfaced`;
+- `opened`, `read`, `understood`, `explained`, `tried`, `applied`, and
+  `measured` require explicit feedback, progress receipt, outcome evidence, or
+  measured/test evidence;
+- no feedback is shown as `unknown`;
+- report and assistant projections must not infer mastery, application, or
+  measured outcome from passive exposure.
 
 ## Non-Goals
 

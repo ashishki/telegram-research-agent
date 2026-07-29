@@ -45,3 +45,6 @@ These files remain preserved for human reference, but they are no longer part of
 - `PRM14_PROJECT_CONTEXT_2026-07-28.md` - PRM-14 project context and
   decision-support implementation receipt, deterministic relevance evidence,
   and continuation boundary for the PRM-13 through PRM-17 block.
+- `PRM15_LEARNING_STATE_2026-07-29.md` - PRM-15 learning-state correction and
+  fixture-only migration evidence, explicit receipt requirements, and
+  continuation boundary for the PRM-13 through PRM-17 block.

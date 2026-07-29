@@ -1,7 +1,7 @@
 # Rollback And Reindex Plan
 
-Status: draft; PRM-2 archive document rollback recorded
-Last updated: 2026-07-26
+Status: draft; PRM-2 archive document rollback recorded; PRM-15 learning-state migration rollback recorded
+Last updated: 2026-07-29
 
 ## Archive Search
 
@@ -114,3 +114,51 @@ If PRM-7 approves vector/hybrid retrieval:
 
 Weekly Brief and Knowledge Library pages are derived. Regenerate or discard
 them without changing canonical archive records.
+
+## Learning-State Migration
+
+PRM-15 corrects learning-state semantics in code and fixture tests only. No
+production database migration was executed.
+
+Canonical PRM-15 states:
+
+- `indexed`
+- `surfaced`
+- `opened`
+- `read`
+- `understood`
+- `explained`
+- `tried`
+- `applied`
+- `measured`
+- `rejected`
+- `stale`
+
+Migration rule:
+
+- legacy source URL or atom presence maps only to `indexed` or `surfaced`;
+- `opened`, `read`, `understood`, `explained`, `tried`, `applied`, and
+  `measured` require explicit feedback, progress receipts, outcome evidence, or
+  measured/test evidence;
+- no feedback is displayed as `unknown`, not negative and not completion;
+- legacy `reproduced`, `implemented`, `tested`, and `project-applied` aliases
+  are normalized to `tried`, `applied`, `measured`, and `applied` only when
+  explicit evidence exists.
+
+Fixture validation command:
+
+```bash
+PYTHONPATH=src python3 -m pytest tests/test_learning_layer.py tests/test_ai_report_contract.py tests/test_intelligence_retrieval_items.py tests/test_split_intelligence_reports.py tests/test_dogfood_review.py -q
+```
+
+Rollback:
+
+1. Do not rewrite or delete existing learning, feedback, archive, atom, or
+   report rows to roll back PRM-15 behavior.
+2. Revert the code projection/migration helper if labels are wrong.
+3. If a future approved production migration writes canonical learning-state
+   rows, take a SQLite backup first, record aggregate row counts by state before
+   and after, and preserve the original legacy state in an audit column.
+4. Rollback from a future persisted migration must restore the previous backup
+   or append compensating audit rows; it must not infer read/applied/measured
+   states from source presence.

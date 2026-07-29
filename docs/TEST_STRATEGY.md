@@ -1,7 +1,7 @@
 # Test Strategy
 
 Status: active
-Last updated: 2026-07-28
+Last updated: 2026-07-29
 
 ## Purpose
 
@@ -33,7 +33,12 @@ python3 tools/test_tiers.py block-review --print-only
 
 ## Current Results
 
-Recorded on 2026-07-28.
+Recorded on 2026-07-29.
+
+```text
+PYTHONPATH=src python3 -m pytest tests/test_learning_layer.py tests/test_ai_report_contract.py tests/test_intelligence_retrieval_items.py tests/test_split_intelligence_reports.py tests/test_dogfood_review.py -q
+85 passed, 7 subtests passed in 23.65s
+```
 
 ```text
 PYTHONPATH=src python3 -m pytest tests/test_project_context.py tests/test_pi_tools.py tests/test_pi_chat.py -q
@@ -42,12 +47,12 @@ PYTHONPATH=src python3 -m pytest tests/test_project_context.py tests/test_pi_too
 
 ```text
 python3 tools/test_tiers.py focused-prm
-78 passed, 6 subtests passed in 11.38s
+84 passed, 6 subtests passed in 16.34s
 ```
 
 ```text
 python3 tools/test_tiers.py fast-contract
-131 passed, 6 subtests passed in 33.79s
+137 passed, 6 subtests passed in 53.59s
 ```
 
 PRM-13 targeted visual/layout smoke:

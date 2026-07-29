@@ -6,17 +6,35 @@ from output.project_relevance import _tokenize
 
 PROJECT_LEARNING_PROJECTION_VERSION = "project-learning-projection.v1"
 LEARNING_STAGES = (
+    "indexed",
+    "surfaced",
+    "opened",
     "read",
     "understood",
     "explained",
-    "reproduced",
-    "implemented",
-    "tested",
-    "project-applied",
+    "tried",
+    "applied",
     "measured",
+    "rejected",
     "stale",
-    "prerequisite_gap",
 )
+EXPLICIT_EVIDENCE_LEARNING_STAGES = (
+    "opened",
+    "read",
+    "understood",
+    "explained",
+    "tried",
+    "applied",
+    "measured",
+)
+LEGACY_LEARNING_STAGE_ALIASES = {
+    "reproduced": "tried",
+    "implemented": "applied",
+    "tested": "measured",
+    "project-applied": "applied",
+    "project_applied": "applied",
+    "prerequisite_gap": "indexed",
+}
 
 _BROAD_PROJECT_TERMS = {
     "ai",
@@ -64,6 +82,46 @@ def extract_learning_gaps(posts: list[dict], projects: list[dict]) -> list[dict]
     return gaps[:5]
 
 
+def migrate_legacy_learning_records(records: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Map legacy learning rows without fabricating user progress.
+
+    Source URLs, atom IDs, or historical stage labels preserve the row but only
+    become indexed/surfaced unless an explicit progress receipt is present.
+    """
+
+    migrated: list[dict[str, Any]] = []
+    for index, record in enumerate(records, start=1):
+        if not isinstance(record, Mapping):
+            continue
+        item = dict(record)
+        legacy_stage = _clean_text(record.get("learning_state") or record.get("learning_stage") or record.get("stage"))
+        state = _stage_from_action(record)
+        item["legacy_learning_state"] = legacy_stage
+        item["learning_state"] = state
+        item["migration_policy"] = "legacy_source_presence_maps_to_indexed_or_surfaced_only"
+        item["state_evidence"] = _stage_evidence_for_action(record)
+        item["feedback_state"] = learning_feedback_display(record)
+        item.setdefault("migration_row", index)
+        migrated.append(item)
+    return migrated
+
+
+def learning_feedback_display(value: Mapping[str, Any] | None) -> str:
+    if not isinstance(value, Mapping):
+        return "unknown"
+    if _feedback_types(value):
+        return "observed"
+    if _string_values(value.get("feedback_receipts") or value.get("learning_evidence_receipts")):
+        return "observed"
+    event_count = value.get("event_count")
+    if event_count is not None:
+        try:
+            return "observed" if int(event_count or 0) > 0 else "unknown"
+        except (TypeError, ValueError):
+            return "unknown"
+    return "unknown"
+
+
 def build_project_learning_projection(
     context: Mapping[str, Any],
     *,
@@ -86,7 +144,9 @@ def build_project_learning_projection(
             "broad_overlap": "rejected_not_confirmed",
             "market_business_context": "context_only",
             "no_feedback_semantics": "unknown",
-            "passive_reading": "not_mastery",
+            "legacy_source_presence": "indexed_or_surfaced_only",
+            "explicit_progress_receipts": list(EXPLICIT_EVIDENCE_LEARNING_STAGES),
+            "passive_reading": "not_inferred",
         },
         "project_intelligence": project_intelligence,
         "learning_intelligence": learning_intelligence,
@@ -138,7 +198,8 @@ def _learning_intelligence(
         "objectives": objectives,
         "experiments": _experiment_projections(actions),
         "outcomes": _outcome_projections(actions),
-        "feedback_state": "unknown" if int(feedback.get("event_count") or 0) <= 0 else "observed",
+        "feedback_state": learning_feedback_display(feedback),
+        "no_feedback_label": "unknown" if learning_feedback_display(feedback) == "unknown" else "observed",
         "mastery_policy": "read is source exposure, not mastery; higher stages require feedback, outcome evidence, or test evidence",
     }
 
@@ -351,13 +412,18 @@ def _source_learning_objectives(context: Mapping[str, Any]) -> list[dict]:
         atom_id = _safe_int(atom.get("id"))
         source_refs = _string_values(atom.get("source_urls"))
         stale = _clean_text(atom.get("staleness_status")) == "stale"
+        stage = "stale" if stale else ("surfaced" if source_refs else "indexed")
         objectives.append(
             {
                 "id": f"learning-objective:atom:{atom_id or len(objectives) + 1}",
                 "topic": _clean_text(atom.get("claim")) or _clean_text(atom.get("summary")) or "Source-backed topic",
-                "stage": "stale" if stale else ("read" if source_refs else "prerequisite_gap"),
+                "stage": stage,
                 "target_stage": _target_stage_for_atom(atom),
-                "stage_evidence": "source atom with source refs" if source_refs else "missing source refs",
+                "stage_evidence": (
+                    "source surfaced with source refs; read is not inferred"
+                    if source_refs
+                    else "source atom indexed without source refs; read is not inferred"
+                ),
                 "source_atom_ids": [atom_id] if atom_id else [],
                 "source_refs": source_refs,
                 "feedback_state": "unknown",
@@ -396,9 +462,9 @@ def _project_learning_objectives(project_intelligence: Mapping[str, Any]) -> lis
             {
                 "id": f"learning-objective:project:{_clean_text(idea.get('id')) or len(objectives) + 1}",
                 "topic": _clean_text(idea.get("title")) or "Project application",
-                "stage": "prerequisite_gap",
-                "target_stage": "project-applied",
-                "stage_evidence": "project idea exists, but no implementation/test feedback is recorded",
+                "stage": "surfaced",
+                "target_stage": "applied",
+                "stage_evidence": "project idea was surfaced, but no application feedback is recorded",
                 "source_atom_ids": _int_values(idea.get("source_atom_ids")),
                 "source_refs": _string_values(idea.get("source_refs")),
                 "feedback_state": "unknown",
@@ -451,33 +517,99 @@ def _outcome_projections(actions: list[Mapping[str, Any]]) -> list[dict]:
 
 
 def _stage_from_action(action: Mapping[str, Any]) -> str:
-    explicit = _clean_text(action.get("learning_stage") or action.get("stage"))
-    if explicit in LEARNING_STAGES and (explicit in {"read", "prerequisite_gap"} or _has_completion_evidence(action)):
+    explicit = _canonical_learning_stage(action.get("learning_stage") or action.get("stage"))
+    if explicit in LEARNING_STAGES and (
+        explicit in {"indexed", "surfaced", "stale", "rejected"}
+        or _has_explicit_learning_evidence(action, explicit)
+    ):
         return explicit
     if _clean_text(action.get("staleness_status")) == "stale" or bool(action.get("stale")):
         return "stale"
     feedback_types = _feedback_types(action)
+    if any(kind in feedback_types for kind in {"rejected", "wrong_priority", "not_interested"}):
+        return "rejected"
     if "measured" in feedback_types:
         return "measured"
-    if "applied_to_project" in feedback_types or "project-applied" in feedback_types:
-        return "project-applied"
-    if "tested" in feedback_types:
-        return "tested"
-    if "implemented" in feedback_types:
-        return "implemented"
+    if "applied_to_project" in feedback_types or "project-applied" in feedback_types or "applied" in feedback_types:
+        return "applied"
+    if "tested" in feedback_types or "implemented" in feedback_types:
+        return "measured" if "tested" in feedback_types else "applied"
     if "reproduced" in feedback_types or "tried" in feedback_types:
-        return "reproduced"
+        return "tried"
     if "explained" in feedback_types:
         return "explained"
     if "understood" in feedback_types or "useful" in feedback_types:
         return "understood"
     if "read" in feedback_types:
         return "read"
-    if not _string_values(action.get("source_urls") or action.get("source_refs")) and not _int_values(
-        action.get("source_atom_ids") or action.get("evidence_atom_ids")
-    ):
-        return "prerequisite_gap"
-    return "read"
+    if "opened" in feedback_types:
+        return "opened"
+    return "surfaced" if _is_surfaced_action(action) else "indexed"
+
+
+def _canonical_learning_stage(value: object) -> str | None:
+    clean = (_clean_text(value) or "").replace("_", "-")
+    if not clean:
+        return None
+    return LEGACY_LEARNING_STAGE_ALIASES.get(clean, clean)
+
+
+def _has_explicit_learning_evidence(action: Mapping[str, Any], stage: str) -> bool:
+    if stage in {"indexed", "surfaced", "stale", "rejected"}:
+        return True
+    if _receipt_supports_stage(action, stage):
+        return True
+    feedback_types = {_canonical_learning_stage(item) or item for item in _feedback_types(action)}
+    if stage == "opened":
+        return "opened" in feedback_types or bool(_clean_text(action.get("opened_at")))
+    if stage == "read":
+        return "read" in feedback_types or bool(_clean_text(action.get("read_at")))
+    if stage == "understood":
+        return bool(feedback_types.intersection({"understood", "useful"})) or bool(_clean_text(action.get("understood_at")))
+    if stage == "explained":
+        return "explained" in feedback_types or bool(_clean_text(action.get("explained_at")))
+    if stage == "tried":
+        return bool(feedback_types.intersection({"tried", "reproduced"})) or bool(_clean_text(action.get("tried_at")))
+    if stage == "applied":
+        return bool(feedback_types.intersection({"applied", "applied-to-project", "project-applied", "implemented"})) or bool(
+            _clean_text(action.get("applied_at") or action.get("completed_at"))
+        )
+    if stage == "measured":
+        return bool(feedback_types.intersection({"measured", "tested"})) or bool(
+            _string_values(action.get("outcome_evidence")) or _clean_text(action.get("measured_at") or action.get("test_result"))
+        )
+    return False
+
+
+def _receipt_supports_stage(action: Mapping[str, Any], stage: str) -> bool:
+    for receipt in _learning_receipts(action):
+        if not isinstance(receipt, Mapping):
+            continue
+        receipt_stage = _canonical_learning_stage(
+            receipt.get("state") or receipt.get("stage") or receipt.get("learning_state")
+        )
+        receipt_id = _clean_text(receipt.get("receipt_id") or receipt.get("id") or receipt.get("recorded_at"))
+        if receipt_stage == stage and receipt_id:
+            return True
+    return False
+
+
+def _learning_receipts(action: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    value = action.get("learning_evidence_receipts") or action.get("evidence_receipts") or []
+    if isinstance(value, Mapping):
+        return [value]
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, Mapping)]
+    return []
+
+
+def _is_surfaced_action(action: Mapping[str, Any]) -> bool:
+    return bool(
+        _clean_text(action.get("surfaced_at") or action.get("surface_id") or action.get("report_item_id"))
+        or _clean_text(action.get("title"))
+        or _string_values(action.get("source_urls") or action.get("source_refs"))
+        or _int_values(action.get("source_atom_ids") or action.get("evidence_atom_ids"))
+    )
 
 
 def _target_stage_for_action(action: Mapping[str, Any]) -> str:
@@ -488,22 +620,22 @@ def _target_stage_for_action(action: Mapping[str, Any]) -> str:
     if "measure" in text or "metric" in text:
         return "measured"
     if "test" in text or "pytest" in text or "benchmark" in text:
-        return "tested"
+        return "measured"
     if "project" in text or "repo" in text:
-        return "project-applied"
+        return "applied"
     if "implement" in text or "patch" in text or "code" in text:
-        return "implemented"
+        return "applied"
     if "explain" in text or "note" in text:
         return "explained"
     if "try" in text or "reproduce" in text:
-        return "reproduced"
+        return "tried"
     return "understood"
 
 
 def _target_stage_for_atom(atom: Mapping[str, Any]) -> str:
     atom_type = _clean_text(atom.get("atom_type")) or ""
     if atom_type in {"engineering_practice", "tool_capability"}:
-        return "implemented"
+        return "applied"
     if atom_type in {"market_signal", "business_signal", "opportunity_signal"}:
         return "understood"
     return "explained"
@@ -515,21 +647,22 @@ def _stage_evidence_for_action(action: Mapping[str, Any]) -> str:
         return f"feedback: {', '.join(feedback_types)}"
     if _has_completion_evidence(action):
         return "completion evidence recorded"
-    return "no confirmed feedback or outcome evidence"
+    return "no feedback or progress receipt; state remains indexed/surfaced"
 
 
 def _stage_definitions() -> dict[str, str]:
     return {
-        "read": "source was read or queued with source refs; this is not mastery",
+        "indexed": "source or item is in memory/search; no user exposure is claimed",
+        "surfaced": "source or item was shown in a product surface; opened/read is not inferred",
+        "opened": "operator explicitly opened the source or item",
+        "read": "operator explicitly reported reading the source or item",
         "understood": "operator feedback or notes show the idea was understood",
         "explained": "operator produced a reusable explanation or note",
-        "reproduced": "operator tried or reproduced the behavior",
-        "implemented": "operator implemented the idea in code or workflow",
-        "tested": "implementation or claim has test evidence",
-        "project-applied": "idea was applied to an active project with source/outcome refs",
-        "measured": "outcome has measured result or metric",
+        "tried": "operator tried or reproduced the behavior",
+        "applied": "idea was applied to an active project or workflow with evidence",
+        "measured": "outcome has test evidence, measured result, or metric",
+        "rejected": "operator explicitly rejected or demoted the item",
         "stale": "objective needs refresh before use",
-        "prerequisite_gap": "missing source, feedback, implementation, or test evidence",
     }
 
 

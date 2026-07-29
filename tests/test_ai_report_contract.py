@@ -895,12 +895,13 @@ class TestAiReportContract(unittest.TestCase):
 
         self.assertEqual(set(learning["allowed_stages"]), set(LEARNING_STAGES))
         self.assertEqual(set(learning["stage_counts"]), set(LEARNING_STAGES))
-        self.assertIn("read", {item["stage"] for item in learning["objectives"]})
-        self.assertIn("prerequisite_gap", {item["stage"] for item in learning["objectives"]})
+        self.assertIn("surfaced", {item["stage"] for item in learning["objectives"]})
+        self.assertNotIn("read", {item["stage"] for item in learning["objectives"]})
         self.assertTrue(
             all(item["mastery_claim"] != "claimed_from_reading_only" for item in learning["objectives"])
         )
         self.assertEqual(learning["feedback_state"], "unknown")
+        self.assertEqual(learning["no_feedback_label"], "unknown")
 
     def test_project_diagnostic_explains_zero_leads_without_broad_match_noise(self):
         contract = build_weekly_ai_report_contract(

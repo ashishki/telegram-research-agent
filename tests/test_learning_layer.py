@@ -1,6 +1,12 @@
 import unittest
 
-from output.learning_layer import LEARNING_STAGES, build_project_learning_projection, extract_learning_gaps
+from output.learning_layer import (
+    LEARNING_STAGES,
+    build_project_learning_projection,
+    extract_learning_gaps,
+    learning_feedback_display,
+    migrate_legacy_learning_records,
+)
 
 
 class TestLearningLayer(unittest.TestCase):
@@ -91,10 +97,78 @@ class TestLearningLayer(unittest.TestCase):
         self.assertEqual(project["external_signals"][0]["context_policy"], "context_only")
         self.assertEqual(set(learning["allowed_stages"]), set(LEARNING_STAGES))
         stages = {item["id"]: item["stage"] for item in learning["objectives"]}
-        self.assertEqual(stages["learning-objective:action:action-1"], "prerequisite_gap")
+        self.assertEqual(stages["learning-objective:atom:1"], "surfaced")
+        self.assertEqual(stages["learning-objective:action:action-1"], "surfaced")
         self.assertEqual(stages["learning-objective:action:action-2"], "measured")
         self.assertEqual(learning["feedback_state"], "unknown")
+        self.assertEqual(learning["no_feedback_label"], "unknown")
         self.assertTrue(project["rejected_overlaps"])
+
+    def test_legacy_source_presence_maps_to_indexed_or_surfaced_only(self):
+        rows = migrate_legacy_learning_records(
+            [
+                {
+                    "id": "legacy-source-url",
+                    "stage": "read",
+                    "source_url": "https://t.me/source/1",
+                },
+                {
+                    "id": "legacy-surfaced",
+                    "learning_stage": "read",
+                    "source_atom_ids": [101],
+                    "surface_id": "brief:item:1",
+                },
+                {
+                    "id": "explicit-read",
+                    "learning_stage": "read",
+                    "source_refs": ["https://t.me/source/2"],
+                    "learning_evidence_receipts": [
+                        {"stage": "read", "receipt_id": "feedback:read:1"}
+                    ],
+                },
+            ]
+        )
+
+        by_id = {item["id"]: item for item in rows}
+        self.assertEqual(by_id["legacy-source-url"]["learning_state"], "indexed")
+        self.assertEqual(by_id["legacy-surfaced"]["learning_state"], "surfaced")
+        self.assertEqual(by_id["explicit-read"]["learning_state"], "read")
+        self.assertEqual(
+            by_id["legacy-source-url"]["migration_policy"],
+            "legacy_source_presence_maps_to_indexed_or_surfaced_only",
+        )
+
+    def test_progress_states_require_explicit_evidence_receipts(self):
+        rows = migrate_legacy_learning_records(
+            [
+                {
+                    "id": "fabricated-applied",
+                    "stage": "implemented",
+                    "source_refs": ["https://t.me/source/1"],
+                },
+                {
+                    "id": "explicit-applied",
+                    "stage": "implemented",
+                    "source_refs": ["https://t.me/source/1"],
+                    "feedback_types": ["applied_to_project"],
+                },
+                {
+                    "id": "explicit-measured",
+                    "stage": "tested",
+                    "outcome_evidence": ["metric improved"],
+                },
+            ]
+        )
+
+        by_id = {item["id"]: item for item in rows}
+        self.assertEqual(by_id["fabricated-applied"]["learning_state"], "surfaced")
+        self.assertEqual(by_id["explicit-applied"]["learning_state"], "applied")
+        self.assertEqual(by_id["explicit-measured"]["learning_state"], "measured")
+
+    def test_no_feedback_display_is_unknown(self):
+        self.assertEqual(learning_feedback_display({}), "unknown")
+        self.assertEqual(learning_feedback_display({"event_count": 0}), "unknown")
+        self.assertEqual(learning_feedback_display({"feedback_types": ["read"]}), "observed")
 
 
 if __name__ == "__main__":
