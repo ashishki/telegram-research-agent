@@ -23,6 +23,46 @@ Status: draft budget requiring human approval before implementation
 
 Monthly planning ceiling before dogfood: $25 unless the human approves more.
 
+## PRM-17 Runtime Workflow Budget
+
+Implemented telemetry schema: `workflow_telemetry_receipt.v1`.
+
+Runtime workflow activation is still not approved. PRM-17 only defines the
+contract and sanitizer used by future scheduled ingestion, indexing, enrichment,
+projection, backup, dry-run reindex, and rollback routines.
+
+Default workflow ceiling before dogfood approval:
+
+| Control | Value |
+| --- | ---: |
+| Max weekly workflow cost | $10.00 |
+| Max weekly workflow model calls | 500 |
+| Max retries per job | 1 |
+| Approval trigger | weekly cost or model calls exceed the ceiling |
+
+Required aggregate telemetry:
+
+- index freshness seconds;
+- queue age seconds;
+- retrieval latency milliseconds;
+- generation latency milliseconds;
+- model cost USD;
+- model calls;
+- tool calls;
+- no-answer count and rate;
+- error class.
+
+The telemetry receipt excludes raw post text, provider payloads, prompts,
+completions, and raw Telegram corpus egress. If a caller passes raw fields to the
+fixture builder, only the redacted field names appear in the receipt.
+
+Verification:
+
+```text
+PYTHONPATH=src python3 -m pytest tests/test_workflow_telemetry.py -q
+4 passed in 0.08s
+```
+
 ## PRM-6 Selective Enrichment Enforcement
 
 Implemented contract: `selective_enrichment_batch.v1`.

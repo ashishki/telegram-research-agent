@@ -1,7 +1,7 @@
 # Privacy Threat Model
 
 Status: draft
-Last updated: 2026-07-27
+Last updated: 2026-07-29
 
 ## Assets
 
@@ -26,6 +26,7 @@ Last updated: 2026-07-27
 | chat transcript becomes memory silently | session context is not durable memory |
 | hidden memory write from assistant tool loop | proposal plus exact confirmation token required; write trace records `write_performed` |
 | read-only assistant turn mutates production DB telemetry | PI chat suppresses `llm_usage` database writes during planning/generation |
+| autonomous workflow telemetry leaks raw private text | PRM-17 telemetry records aggregate metrics and redacted field names only |
 | source URL loses provenance | archive document identity preserves Telegram link |
 | deletion cannot be honored | retention/deletion path required before dogfood |
 

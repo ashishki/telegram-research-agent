@@ -96,3 +96,6 @@ Over four weeks record:
 
 Success is not "the system ran." Success requires evidence of useful answers
 and reduced manual work.
+
+PRM-17 adds deterministic workflow contracts and aggregate telemetry receipts
+for future runtime activation, but does not start dogfood or scheduled jobs.

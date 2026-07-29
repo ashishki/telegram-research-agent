@@ -1,6 +1,6 @@
 # Rollback And Reindex Plan
 
-Status: draft; PRM-2 archive document rollback recorded; PRM-15 learning-state migration rollback recorded
+Status: draft; PRM-2 archive document rollback recorded; PRM-15 learning-state migration rollback recorded; PRM-17 workflow rollback/dry-run contract recorded
 Last updated: 2026-07-29
 
 ## Archive Search
@@ -114,6 +114,59 @@ If PRM-7 approves vector/hybrid retrieval:
 
 Weekly Brief and Knowledge Library pages are derived. Regenerate or discard
 them without changing canonical archive records.
+
+PRM-16 and PRM-17 add explicit projection/runtime rollback rules:
+
+- Weekly Brief V3 artifacts are derived from bounded supplied context and may be
+  discarded or regenerated without changing archive or memory rows.
+- Knowledge Library topic pages are derived and may be discarded or regenerated
+  without changing confirmed memory events or archive rows.
+- A failed Radar, Brief, or Library projection must degrade only that surface or
+  card when archive search and assistant receipts remain valid.
+
+## Runtime Workflow Rollback And Dry-Run Validation
+
+PRM-17 defines workflow rollback contracts in
+`src/processing/workflow_telemetry.py` and
+`docs/AUTONOMOUS_WORKFLOW_CONTRACT.md`. Runtime activation remains unapproved.
+
+Rollback/reindex safety rules:
+
+1. Stop scheduled jobs before any approved maintenance that can mutate
+   ingestion, reaction sync, enrichment, report generation, or index state.
+2. Take and verify a `backup_snapshot` receipt before any production migration,
+   reindex, or rollback.
+3. Run `rollback_reindex_dry_run` first and record only aggregate counts,
+   checksum refs, error class, and approval requirement.
+4. Preserve canonical `raw_posts`, `posts`, confirmed memory events, reactions,
+   and feedback rows.
+5. Rebuild only derived FTS/projection state from canonical rows.
+6. Record index freshness, queue age, retrieval/generation latency, cost,
+   no-answer rate, and error class without raw post text.
+7. Stop immediately for human review if dry-run counts diverge, backup
+   verification fails, or a production write would be required.
+
+Fixture validation command:
+
+```bash
+PYTHONPATH=src python3 -m pytest tests/test_workflow_telemetry.py -q
+```
+
+Dry-run aggregate checks for approved maintenance windows only:
+
+```sql
+SELECT COUNT(*) FROM raw_posts;
+SELECT COUNT(*) FROM posts;
+SELECT COUNT(*) FROM posts_fts;
+SELECT COUNT(*)
+FROM posts p
+LEFT JOIN posts_fts f ON f.rowid = p.id
+WHERE f.rowid IS NULL;
+```
+
+The SQL above reads or rebuilds derived state only when explicitly approved for
+the current maintenance task. It must not be run as a production mutation from a
+planning or fixture-only PRM task.
 
 ## Learning-State Migration
 

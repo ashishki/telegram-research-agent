@@ -47,6 +47,13 @@ PYTHONPATH=src python3 -m pytest tests/test_weekly_brief_v3.py -q
 6 passed in 2.77s
 ```
 
+PRM-17 targeted workflow telemetry/privacy fixture:
+
+```text
+PYTHONPATH=src python3 -m pytest tests/test_workflow_telemetry.py -q
+4 passed in 0.08s
+```
+
 ```text
 PYTHONPATH=src python3 -m pytest tests/test_project_context.py tests/test_pi_tools.py tests/test_pi_chat.py -q
 47 passed, 6 subtests passed in 5.59s
@@ -54,12 +61,12 @@ PYTHONPATH=src python3 -m pytest tests/test_project_context.py tests/test_pi_too
 
 ```text
 python3 tools/test_tiers.py focused-prm
-90 passed, 6 subtests passed in 15.46s
+94 passed, 6 subtests passed in 18.26s
 ```
 
 ```text
 python3 tools/test_tiers.py fast-contract
-143 passed, 6 subtests passed in 46.50s
+147 passed, 6 subtests passed in 42.58s
 ```
 
 PRM-13 targeted visual/layout smoke:

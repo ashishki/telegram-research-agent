@@ -51,3 +51,6 @@ These files remain preserved for human reference, but they are no longer part of
 - `PRM16_WEEKLY_BRIEF_V3_2026-07-29.md` - PRM-16 Weekly Brief V3 deterministic
   projection, generic fallback guard, Radar-failure localization, static visual
   receipt, and continuation boundary for the PRM-13 through PRM-17 block.
+- `PRM17_RUNTIME_WORKFLOWS_2026-07-29.md` - PRM-17 autonomous workflow
+  contract, privacy-safe aggregate telemetry, cost/rollback evidence, and stop
+  boundary for the PRM-13 through PRM-17 deep-review gate before PRM-18.

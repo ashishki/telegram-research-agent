@@ -21,6 +21,7 @@ PRM_TESTS = (
     "tests/test_project_context.py",
     "tests/test_learning_layer.py",
     "tests/test_weekly_brief_v3.py",
+    "tests/test_workflow_telemetry.py",
     "tests/test_reaction_fast_lane.py",
     "tests/test_selective_enrichment.py",
     "tests/test_archive_retrieval_eval.py",
