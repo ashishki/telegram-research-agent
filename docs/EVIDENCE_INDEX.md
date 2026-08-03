@@ -326,6 +326,35 @@ full archive indexing, embeddings, external web research jobs, live LLM
 provider calls, systemd starts/enables, startup migrations, production database
 writes, or compatibility deletes/archives were performed.
 
+## Research Session Assistant Contract Evidence - 2026-08-03
+
+| Check | Result |
+| --- | --- |
+| completed task | PRM-21 Project-Aware Research Session Contract |
+| contract | docs/personal_research_memory_product_contract.md |
+| task graph | docs/tasks.md |
+| future implementation | PRM-22 linked-source layer and PRM-23 bounded planner recorded as future work |
+| RAG boundary | RAG is necessary but not sufficient; SQLite FTS remains baseline and PRM-8 vector/hybrid adoption remains blocked |
+| dogfood boundary | not current PRM-19 evidence; no `memory research` command implemented |
+| live operations | none |
+
+Verification:
+
+```text
+python3 tools/playbook_validate.py --root . --check tasks --check placeholders --check readiness --check delivery --check references
+playbook_validate: errors=0 warnings=0
+```
+
+```text
+git diff --check
+pass, no output
+```
+
+No live Telegram ingestion, reaction sync, Radar, Frontier, report generation,
+full archive indexing, embeddings, external web research jobs, live LLM
+provider calls, systemd starts/enables, startup migrations, production database
+writes, or compatibility deletes/archives were performed.
+
 ## PRM-18A..18C Deep Review Evidence - 2026-08-03
 
 | Check | Result |

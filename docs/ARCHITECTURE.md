@@ -43,6 +43,29 @@ Telegram channels
   -> secondary Weekly Brief and Knowledge Library projections
 ```
 
+## Research Session Target
+
+The desired polished assistant is a project-aware research session, specified
+in `docs/personal_research_memory_product_contract.md` and scheduled in
+`docs/tasks.md` as PRM-21 through PRM-23. That target adds a future layer above
+the current `memory ask` preview:
+
+```text
+Question
+  -> project/context interpretation
+  -> Telegram archive retrieval
+  -> approved linked-source fetch/cache
+  -> approach comparison and contradiction check
+  -> grounded synthesis with deeper-reading path
+  -> optional confirmation-gated memory proposal
+```
+
+This requires RAG, but RAG is not enough by itself. The system also needs
+linked-source research, project-context routing, bounded planning, synthesis,
+and evals. SQLite FTS remains the baseline retrieval backend; vector or hybrid
+retrieval is still a PRM-8 conditional decision that requires measured FTS
+failure and human-approved backend adoption.
+
 ## Problem Fit And Adoption Reality
 
 | Question | Answer |

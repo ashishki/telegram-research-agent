@@ -117,6 +117,37 @@ PRM-18B/PRM-18C implementation status:
   snippets;
 - implementation/test evidence used fake clients and fixture DBs only.
 
+## Future Research Session Assistant
+
+The target polished assistant is specified in
+`docs/personal_research_memory_product_contract.md` and scheduled in
+`docs/tasks.md` as PRM-21 through PRM-23. It is not implemented yet and must not
+be counted as PRM-19 dogfood evidence.
+
+The future user-facing shape is a `memory research` style workflow:
+
+```bash
+PYTHONPATH=src python3 src/main.py memory research \
+  --project telegram-research-agent \
+  "покажи свежие практики по RAG и что из этого применимо к проекту"
+```
+
+Expected behavior:
+
+- search the local Telegram archive and curated memory;
+- identify relevant links inside selected posts;
+- fetch or parse linked sources only after explicit approval;
+- compare approaches, tradeoffs, and contradictions;
+- infer project relevance as direct, weak, learning, no-match, or ambiguous;
+- return a concise explanation and deeper-reading path;
+- keep Telegram archive evidence, linked-source evidence, model background,
+  and unknowns separate;
+- propose memory/project/action saves as drafts only.
+
+RAG is required for this target, but RAG is not the whole product. Vector or
+hybrid retrieval remains conditional and must not be adopted until eval evidence
+shows the SQLite FTS baseline fails important user questions.
+
 ## Weekly Routine
 
 ### Report V2 Rollout Hold

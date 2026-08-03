@@ -159,6 +159,19 @@ external-verification needs, write status, and an explicit privacy/cost line.
 Without the explicit provider-egress switch, the product must stay local-only or
 refuse before sending bounded Telegram snippets to a provider.
 
+Future polished assistant target:
+
+- specified in `docs/personal_research_memory_product_contract.md` and
+  scheduled in `docs/tasks.md`;
+- PRM-21 records the contract; PRM-22 and PRM-23 remain future implementation
+  tasks and are not present in the current runtime;
+- expected to add archive search plus approved linked-source research,
+  project-context routing, approach comparison, LLM synthesis, and
+  deeper-reading paths;
+- not PRM-19 evidence until implemented and explicitly dogfooded;
+- not an approval to start web research, provider egress, services, dogfood, or
+  vector/backend adoption.
+
 Implemented `prm-assistant` runtime mode:
 
 - one service, disabled by default until dogfood approval;

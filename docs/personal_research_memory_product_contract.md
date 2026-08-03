@@ -44,6 +44,74 @@ Generate reports only as a secondary projection.
 | No-answer | Return `insufficient_evidence` when the archive is weak. |
 | External verification | Separate Telegram archive, external verification, and unknowns. |
 
+## Research Session Assistant Target
+
+The polished assistant target is a future capability, not a current dogfood
+claim. For full research sessions, the assistant must search the large Telegram
+archive, inspect approved linked sources, compare approaches, infer project
+context, explain the result clearly, and recommend where to look next.
+
+Example target question:
+
+```text
+покажи свежие практики по RAG и что из этого применимо к моему проекту
+```
+
+The answer should include:
+
+- a direct, concise answer;
+- what the local Telegram archive says;
+- which linked sources were read and what they add;
+- approach comparisons, tradeoffs, and contradictions;
+- likely project context and confidence;
+- what to apply, watch, ignore, or study next;
+- a short deeper-reading path with source links;
+- unknowns and freshness limits;
+- a privacy/cost receipt.
+
+RAG is necessary for this workflow, but it is only one layer. It retrieves
+relevant Telegram posts, preserves exact Telegram links, supports metadata
+filters, finds conceptually related posts, dedupes repeats, and assembles
+bounded citation-safe context. RAG alone does not read linked sources, compare
+approaches across archive and web evidence, recognize active project context,
+decide what is current versus stale, produce a polished answer, or measure
+usefulness.
+
+Required research-session capability stack:
+
+1. Archive retrieval over all retained local Telegram posts, curated memory,
+   reactions, watch topics, and project descriptors.
+2. Selective enrichment for reacted posts, repeated search hits, cited answers,
+   watch topics, project matches, repeated signals, and manual saves.
+3. Linked-source research that extracts URLs from selected posts, classifies
+   source type, fetches or parses sources only after explicit approval, caches
+   privacy-safe text/metadata, and keeps linked evidence separate.
+4. Project context routing with `direct_implication`, `weak_watch`,
+   `learning_relevance`, `no_match`, and `ambiguous_project` labels.
+5. Bounded planning with deterministic limits for tool calls, retries, source
+   count, prompt size, cost, and timeout.
+6. Grounded synthesis over bounded cited snippets and approved linked-source
+   excerpts.
+7. Confirmation-gated Knowledge Note, Watch Topic, project link, decision,
+   action, or experiment proposals.
+8. Evaluation through human-approved gold retrieval labels, citation precision,
+   unsupported-claim checks, freshness/no-answer checks, useful-answer labels,
+   cost per useful answer, and friction score.
+
+Research-session answers must separate evidence classes:
+
+| Evidence class | Meaning | Response handling |
+| --- | --- | --- |
+| `telegram_archive` | Local retained Telegram post evidence | Cite Telegram URL, date, channel, bounded snippet |
+| `curated_memory` | Confirmed notes, topics, decisions, project links | Cite memory ID or local artifact |
+| `linked_source` | Approved fetched source linked from a post | Cite URL and retrieval timestamp |
+| `model_background` | Model knowledge not grounded in retrieved sources | Label clearly; do not use as proof |
+| `unknown` | Missing, stale, conflicting, or unverified evidence | State the gap and next verification step |
+
+SQLite FTS remains the baseline. Vector or hybrid retrieval remains conditional
+through PRM-8 and must not be adopted before human-approved evidence shows that
+the FTS baseline fails important retrieval scenarios.
+
 ## Project Application
 
 PRM-14 implementation contract:

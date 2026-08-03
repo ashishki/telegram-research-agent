@@ -15,8 +15,8 @@ confirmation-gated saved-memory proposals, deterministic Knowledge Library
 topic-page rendering, deterministic project/weekly projections, safe runtime
 contracts, a gated CLI/Telegram chat surface, a recorded PRM-18A..18C deep
 review, and a blocked release gate. It still does **not** provide hybrid/vector
-RAG, live external verification evidence, a proven dogfood result, or release
-readiness.
+RAG, live external verification evidence, the polished archive-plus-linked-source
+research assistant, a proven dogfood result, or release readiness.
 
 Historical baseline inspected before the retrofit:
 
@@ -68,11 +68,16 @@ and `insufficient_evidence` when the archive does not support the answer.
 - Weekly Brief V3 deterministic secondary projection.
 - Gated LLM-backed `memory ask`/`memory chat` CLI and Telegram chat parity,
   with the safe runtime still disabled.
+- Documented project-aware research-session assistant target, with
+  implementation not yet built.
 
 ## Planned, Not Yet Implemented
 
 - Human-approved gold query labels and accepted retrieval thresholds.
 - Hybrid/vector retrieval only after FTS baseline failures justify it.
+- Project-aware `memory research` sessions that search the archive, inspect
+  approved linked sources, compare approaches, infer project context, and return
+  a deeper-reading path.
 - Real learning dogfood and spaced-repetition outcome evidence.
 - Dogfood, release readiness, and public value evidence.
 
@@ -84,6 +89,7 @@ Do not claim:
 - vector or hybrid retrieval is selected or installed;
 - live external verification was performed;
 - Knowledge Library topic pages were dogfooded on private production data;
+- the polished project-aware research-session assistant exists;
 - W29 proved user value;
 - four-week dogfood has started;
 - public/portfolio value is proven.

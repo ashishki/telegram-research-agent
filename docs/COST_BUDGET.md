@@ -189,3 +189,32 @@ Verification:
 PYTHONPATH=src python3 -m pytest tests/test_pi_tools.py tests/test_pi_chat.py -q
 39 passed, 6 subtests passed in 14.25s
 ```
+
+## PRM-21..PRM-23 Research Session Assistant Budget
+
+The project-aware research-session assistant is specified as a future capability
+in `docs/personal_research_memory_product_contract.md` and scheduled in
+`docs/tasks.md`.
+
+Default budget before approval:
+
+| Control | Value |
+| --- | ---: |
+| Contract/docs cost | $0 |
+| Implementation/test provider calls | 0 |
+| Implementation/test external web calls | 0 |
+| Implementation/test service starts | 0 |
+| Fixture/fake-client tests | allowed |
+| Live linked-source fetch | approval required |
+| Real provider synthesis over private snippets | approval required |
+| Vector/backend adoption | approval required through PRM-8 ADR |
+
+If the operator later approves a bounded research-session dogfood, approval
+must name:
+
+- total budget in USD;
+- max provider calls;
+- max linked-source fetches;
+- whether bounded Telegram snippets may leave the machine;
+- whether linked-source excerpts may be cached durably;
+- whether Telegram `prm-assistant` service start is allowed.

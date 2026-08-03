@@ -22,7 +22,9 @@ dogfood because final acceptance evidence, gold retrieval labels, and explicit
 human dogfood approval are missing. PRM-18A Operator LLM Chat UX Contract,
 PRM-18B LLM-backed memory chat CLI, and PRM-18C Telegram `prm-assistant` UX
 parity/runbook are implemented; the PRM-18A through PRM-18C batched deep review
-is recorded. PRM-8 remains blocked. PRM-19 and PRM-20 are not started; PRM-19
+is recorded. The polished project-aware research-session assistant target is
+documented by PRM-21, but PRM-22 and PRM-23 implementation is not done and is
+not dogfood evidence. PRM-8 remains blocked. PRM-19 and PRM-20 are not started; PRM-19
 requires explicit human dogfood-start approval plus accepted or cleared PRM-18
 blockers and real four-week operator dogfood evidence, and PRM-20 requires
 PRM-19 evidence plus explicit compatibility archive/delete/move approval. The old live
@@ -70,3 +72,7 @@ Do not restart legacy bot/report timers as PRM dogfood. Do not start
 `prm-assistant` as dogfood without the same explicit approval. The
 PRM-18A..PRM-18C deep review boundary is recorded at
 `docs/audit/PRM_DEEP_REVIEW_PRM18A_18C_2026-08-03.md`.
+PRM-21 records the future polished-assistant contract. PRM-22..PRM-23 are
+proposed implementation tasks; do not treat them as dogfood evidence or as
+approval for web research, provider egress, service start, or vector/backend
+adoption.
