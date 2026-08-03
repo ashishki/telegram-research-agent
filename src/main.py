@@ -626,7 +626,29 @@ def build_parser() -> argparse.ArgumentParser:
     ask_parser.add_argument("--project", default=None)
     ask_parser.add_argument("--limit", type=int, default=5)
     ask_parser.add_argument("--json", action="store_true")
+    ask_parser.add_argument(
+        "--llm-approved",
+        action="store_true",
+        help="Use LLM-backed PI chat synthesis; requires --allow-provider-egress",
+    )
+    ask_parser.add_argument(
+        "--allow-provider-egress",
+        action="store_true",
+        help="Approve bounded cited Telegram snippet provider egress for this run",
+    )
     ask_parser.set_defaults(handler=handle_memory_ask)
+
+    chat_parser = memory_sub.add_parser(
+        "chat",
+        help="Interactive LLM-backed PRM memory chat; requires explicit provider-egress approval",
+    )
+    chat_parser.add_argument(
+        "--allow-provider-egress",
+        action="store_true",
+        help="Approve bounded cited Telegram snippet provider egress for this session",
+    )
+    chat_parser.add_argument("--json", action="store_true", help="Print privacy-safe JSON receipts per turn")
+    chat_parser.set_defaults(handler=handle_memory_chat)
 
     ie_parser = memory_sub.add_parser("inspect-evidence")
     ie_parser.add_argument("--project", default=None)
@@ -2703,8 +2725,30 @@ def _format_ai_report_feedback(row: dict) -> str:
 def handle_memory_ask(args: argparse.Namespace) -> int:
     from assistant.local_memory_ask import answer_local_memory_question, render_local_memory_answer
 
-    settings = load_settings()
     question = " ".join(args.question).strip()
+    if getattr(args, "llm_approved", False):
+        if not getattr(args, "allow_provider_egress", False):
+            from assistant.prm_chat_display import provider_egress_required_message
+
+            sys.stdout.write(provider_egress_required_message() + "\n")
+            return 2
+        from assistant.pi_chat import answer_pi_chat
+        from assistant.prm_chat_display import build_prm_chat_receipt, render_prm_chat_answer
+
+        settings = load_settings()
+        try:
+            payload = answer_pi_chat(question, settings=settings)
+        except Exception as exc:
+            sys.stdout.write(f"Error asking PRM chat: {exc}\n")
+            return 1
+        if args.json:
+            receipt = build_prm_chat_receipt(payload, mode="llm-approved")
+            sys.stdout.write(json.dumps(receipt, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
+            return 0
+        sys.stdout.write(render_prm_chat_answer(payload, mode="llm-approved") + "\n")
+        return 0
+
+    settings = load_settings()
     try:
         payload = answer_local_memory_question(
             question,
@@ -2721,6 +2765,52 @@ def handle_memory_ask(args: argparse.Namespace) -> int:
         sys.stdout.write(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
         return 0
     sys.stdout.write(render_local_memory_answer(payload) + "\n")
+    return 0
+
+
+def handle_memory_chat(args: argparse.Namespace) -> int:
+    if not getattr(args, "allow_provider_egress", False):
+        from assistant.prm_chat_display import provider_egress_required_message
+
+        sys.stdout.write(provider_egress_required_message() + "\n")
+        return 2
+
+    from assistant.pi_chat import answer_pi_chat
+    from assistant.prm_chat_display import (
+        INTERACTIVE_EXIT_COMMANDS,
+        build_prm_chat_receipt,
+        render_prm_chat_answer,
+    )
+
+    settings = load_settings()
+    input_stream = sys.stdin
+    output_stream = sys.stdout
+    output_stream.write(
+        "PRM Chat interactive. Type /exit to quit. "
+        "Privacy mode=llm-approved; provider egress is approved for bounded cited snippets only.\n"
+    )
+    while True:
+        if input_stream.isatty():
+            output_stream.write("> ")
+            output_stream.flush()
+        line = input_stream.readline()
+        if not line:
+            break
+        question = line.strip()
+        if not question:
+            continue
+        if question.casefold() in INTERACTIVE_EXIT_COMMANDS:
+            break
+        try:
+            payload = answer_pi_chat(question, settings=settings)
+        except Exception as exc:
+            output_stream.write(f"Error asking PRM chat: {exc}\n")
+            return 1
+        if args.json:
+            receipt = build_prm_chat_receipt(payload, mode="llm-approved")
+            output_stream.write(json.dumps(receipt, ensure_ascii=False, sort_keys=True) + "\n")
+        else:
+            output_stream.write(render_prm_chat_answer(payload, mode="llm-approved") + "\n")
     return 0
 
 

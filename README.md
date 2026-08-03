@@ -8,11 +8,15 @@ implementation history, but it is no longer the product center.
 
 ## Current Status
 
-Retrofit slices are implemented through PRM-13. The system now has bounded
-SQLite FTS archive search for the assistant path, grounded answer contracts,
-confirmation-gated saved-memory proposals, and deterministic Knowledge Library
-topic-page rendering. It still does **not** provide hybrid/vector RAG, live
-external verification evidence, a proven dogfood result, or release readiness.
+Retrofit slices are implemented through the PRM release/dogfood gate and the
+PRM-18A through PRM-18C LLM chat UX block. The system now has bounded SQLite FTS
+archive search for the assistant path, grounded answer contracts,
+confirmation-gated saved-memory proposals, deterministic Knowledge Library
+topic-page rendering, deterministic project/weekly projections, safe runtime
+contracts, a gated CLI/Telegram chat surface, a recorded PRM-18A..18C deep
+review, and a blocked release gate. It still does **not** provide hybrid/vector
+RAG, live external verification evidence, a proven dogfood result, or release
+readiness.
 
 Historical baseline inspected before the retrofit:
 
@@ -59,14 +63,17 @@ and `insufficient_evidence` when the archive does not support the answer.
 - Confirmation-gated Knowledge Note, Watch Topic, project link, decision,
   action, experiment, and feedback proposals.
 - Deterministic Knowledge Library topic-page DTO and static HTML renderer.
+- Deterministic project context decision support and learning-state projection
+  semantics.
+- Weekly Brief V3 deterministic secondary projection.
+- Gated LLM-backed `memory ask`/`memory chat` CLI and Telegram chat parity,
+  with the safe runtime still disabled.
 
 ## Planned, Not Yet Implemented
 
 - Human-approved gold query labels and accepted retrieval thresholds.
 - Hybrid/vector retrieval only after FTS baseline failures justify it.
-- Project context and decision support.
-- Learning migration and spaced repetition.
-- Weekly Brief V3 as a secondary projection from actual usage.
+- Real learning dogfood and spaced-repetition outcome evidence.
 - Dogfood, release readiness, and public value evidence.
 
 ## Unsupported Claims
@@ -99,15 +106,34 @@ This local command searches bounded PRM memory and SQLite Telegram archive
 indexes, returns source links/snippets, and does not call LLMs, external
 search, Telegram services, startup migrations, generation jobs, or write tools.
 
-Next planned UX block:
+LLM chat UX contract:
 
-- `PRM-18A`: define the LLM chat privacy/UX contract;
-- `PRM-18B`: implement `memory chat` and/or `memory ask --llm-approved` over
+- `PRM-18A`: defines the LLM chat privacy/UX contract;
+- `PRM-18B`: implemented `memory chat` and `memory ask --llm-approved` over
   the existing PI chat/RAG harness;
-- `PRM-18C`: align Telegram `prm-assistant` with the same answer/citation and
+- `PRM-18C`: aligned Telegram `prm-assistant` with the same answer/citation and
   privacy format without starting dogfood.
 
-Planned approved assistant workflow:
+Contracted local and approved chat commands:
+
+```bash
+PYTHONPATH=src python3 src/main.py memory ask "какие есть практики по eval gates?"
+PYTHONPATH=src python3 src/main.py memory ask --json "найди подтверждения по agent evals"
+PYTHONPATH=src python3 src/main.py memory ask --llm-approved --allow-provider-egress "что говорит моя база?"
+PYTHONPATH=src python3 src/main.py memory chat --allow-provider-egress
+```
+
+The local-only commands never call a model. The LLM-backed commands are
+available, but must refuse unless the operator passes the explicit
+provider-egress switch. Approved LLM answers show answer, sources,
+archive-support status, unknowns/external verification needs, write status, and
+a privacy/cost line:
+
+```text
+Privacy: mode=<local-only|llm-approved>; model_calls=<n>; estimated_cost_usd=<usd>; bounded_telegram_snippet_provider_egress=<true|false>; raw_telegram_corpus_egress=false; durable_writes=false
+```
+
+Approved assistant workflow after PRM-18B/PRM-18C and explicit dogfood start:
 
 1. Ask Hermes a natural-language question.
 2. Hermes searches the Telegram archive and, when useful, curated knowledge.

@@ -1,7 +1,7 @@
 # Product Operating Model
 
 Status: active handoff
-Last updated: 2026-07-29
+Last updated: 2026-08-03
 
 ## Current Truth
 
@@ -131,14 +131,33 @@ PYTHONPATH=src python3 src/main.py memory ask "какие есть подтве�
 This returns a local evidence brief. It does not perform LLM synthesis over
 archive snippets.
 
-Next safe development block before PRM-19:
+Completed pre-PRM-19 UX block:
 
-- PRM-18A defines the operator-facing LLM chat contract and explicit
-  provider-egress switch.
-- PRM-18B implements a CLI chat harness over the existing PI chat/RAG path with
-  fake-provider tests by default.
-- PRM-18C aligns Telegram `prm-assistant` UX and start/stop runbook without
-  installing, enabling, or starting the service.
+- PRM-18A implemented the operator-facing LLM chat contract and explicit
+  provider-egress switch as a docs-only contract; it does not approve provider
+  calls, service starts, dogfood, or production DB writes.
+- PRM-18B implemented a CLI chat harness over the existing PI chat/RAG path
+  with fake-provider tests by default.
+- PRM-18C aligned Telegram `prm-assistant` UX and the start/stop runbook
+  without installing, enabling, or starting the service.
+- The deep review boundary for this block is recorded at
+  `docs/audit/PRM_DEEP_REVIEW_PRM18A_18C_2026-08-03.md`.
+
+PRM-18A contracted command surfaces:
+
+- current local-only evidence: `PYTHONPATH=src python3 src/main.py memory ask "<question>"`;
+- current local-only receipt: `PYTHONPATH=src python3 src/main.py memory ask --json "<question>"`;
+- PRM-18B one-shot command:
+  `PYTHONPATH=src python3 src/main.py memory ask --llm-approved --allow-provider-egress "<question>"`;
+- PRM-18B interactive command:
+  `PYTHONPATH=src python3 src/main.py memory chat --allow-provider-egress`;
+- PRM-18C Telegram parity command: `/chat <question>` or ordinary text inside
+  the disabled `prm-assistant` runtime.
+
+Any LLM-backed surface must print sources, archive-support status, unknowns or
+external-verification needs, write status, and an explicit privacy/cost line.
+Without the explicit provider-egress switch, the product must stay local-only or
+refuse before sending bounded Telegram snippets to a provider.
 
 Implemented `prm-assistant` runtime mode:
 
@@ -171,8 +190,8 @@ Implemented `prm-assistant` runtime mode:
 5. Convert MVP Radar into a bounded decision evidence card inside the assistant
    and Weekly Brief V3, with external-evidence separation and no auto-build
    approval.
-6. Complete or explicitly defer PRM-18A through PRM-18C before PRM-19 so the
-   operator has one understandable chat workflow and privacy contract.
+6. Keep PRM-18A through PRM-18C as the pre-dogfood chat workflow and privacy
+   contract baseline.
 7. Define PRM-19 dogfood metadata before collecting any dogfood evidence:
    at least 30 real questions, usefulness labels, corrections, saved notes,
    watch topics, decisions, time to useful answer, cost, value, and friction.
@@ -200,3 +219,26 @@ report timer includes live ingestion and weekly report generation.
 The safe assistant unit template is `systemd/telegram-prm-assistant.service`.
 Installing or starting it is a dogfood-start action and requires the same
 explicit approval as PRM-19.
+
+Future approved activation runbook:
+
+```bash
+systemd-analyze verify systemd/telegram-prm-assistant.service
+sudo install -m 0644 systemd/telegram-prm-assistant.service /etc/systemd/system/telegram-prm-assistant.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now telegram-prm-assistant.service
+systemctl status telegram-prm-assistant.service --no-pager
+journalctl -u telegram-prm-assistant.service -n 100 --no-pager
+```
+
+Rollback to disabled:
+
+```bash
+sudo systemctl stop telegram-prm-assistant.service
+sudo systemctl disable telegram-prm-assistant.service
+sudo rm -f /etc/systemd/system/telegram-prm-assistant.service
+sudo systemctl daemon-reload
+```
+
+Do not run the activation commands until PRM-19 dogfood-start approval is
+explicitly recorded and PRM-18 blockers are accepted or cleared.

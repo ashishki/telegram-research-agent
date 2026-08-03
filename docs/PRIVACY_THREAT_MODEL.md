@@ -1,7 +1,7 @@
 # Privacy Threat Model
 
 Status: draft
-Last updated: 2026-07-29
+Last updated: 2026-08-03
 
 ## Assets
 
@@ -54,6 +54,21 @@ The local `memory ask` command is the no-egress default. Planned LLM-backed
 `memory chat` or `memory ask --llm-approved` modes must not send private archive
 snippets to a provider unless the operator passes an explicit provider-egress
 approval switch for that run.
+
+## PRM-18A Chat Mode Split
+
+| Mode | Command surface | Provider egress | Required user-visible line |
+| --- | --- | --- | --- |
+| Local evidence brief | `memory ask "<question>"` and `memory ask --json "<question>"` | none; model calls `0` | `mode=local-only`, `bounded_telegram_snippet_provider_egress=false`, `raw_telegram_corpus_egress=false`, `durable_writes=false` |
+| LLM-backed one-shot | `memory ask --llm-approved --allow-provider-egress "<question>"` | bounded cited snippets only after explicit switch | `mode=llm-approved`, model calls/cost estimate, bounded-snippet egress flag, raw corpus egress false, durable writes false |
+| LLM-backed interactive CLI | `memory chat --allow-provider-egress` | bounded cited snippets only after explicit switch | same as LLM-backed one-shot for every answer |
+| Telegram PRM assistant | `/chat <question>` or ordinary text in `prm-assistant` mode | same LLM contract after PRM-18C and approved runtime start | same as LLM-backed CLI; service start remains separate approval |
+
+The provider may receive only the retrieved snippets required for the cited
+answer. It must not receive broad archive dumps, full database exports, uncited
+raw Telegram corpus, provider payload logs, or durable chat transcript writes.
+If the operator omits the egress switch, LLM-backed surfaces must remain
+local-only or refuse before provider invocation.
 
 ## External Verification Rule
 

@@ -10,6 +10,7 @@ from assistant.pi_chat import (
     route_pi_intent,
     validate_grounded_answer_contract,
 )
+from assistant.prm_chat_display import build_prm_chat_receipt, render_prm_chat_answer
 from assistant.pi_facade import PersonalIntelligenceFacade
 from assistant.project_context import build_project_context_decision_support
 from assistant.pi_tools import call_pi_tool
@@ -400,6 +401,32 @@ class TestPIChat(unittest.TestCase):
         self.assertFalse(contract["model_background"]["used"])
         self.assertFalse(contract["external_verification"]["required"])
 
+    def test_prm_chat_display_shows_contract_without_raw_tool_payload(self):
+        result = answer_pi_chat("Найди пост про agent review", facade=_FakeFacade(), llm_client=_ArchiveSearchLLM)
+
+        rendered = render_prm_chat_answer(result, mode="llm-approved")
+        self.assertIn("PRM Chat", rendered)
+        self.assertIn("Нашёл пост в архиве", rendered)
+        self.assertIn("Sources\n- https://t.me/source/1001", rendered)
+        self.assertIn("Archive support: status=supported; source_count=1", rendered)
+        self.assertIn("Unknowns: none", rendered)
+        self.assertIn(
+            "Privacy: mode=llm-approved; model_calls=1; estimated_cost_usd=0; "
+            "bounded_telegram_snippet_provider_egress=true; raw_telegram_corpus_egress=false; "
+            "durable_writes=false",
+            rendered,
+        )
+        self.assertNotIn("Agent review automation works over retained Telegram archive posts", rendered)
+
+        receipt = build_prm_chat_receipt(result, mode="llm-approved")
+        self.assertEqual(receipt["schema_version"], "prm_chat_display.v1")
+        self.assertEqual(receipt["archive_support"]["status"], "supported")
+        self.assertTrue(receipt["privacy"]["bounded_telegram_snippet_provider_egress"])
+        self.assertNotIn(
+            "Agent review automation works over retained Telegram archive posts",
+            json.dumps(receipt, ensure_ascii=False),
+        )
+
     def test_deterministic_archive_route_ignores_wrong_llm_plan(self):
         result = answer_pi_chat("Найди пост про agent review", facade=_FakeFacade(), llm_client=_WrongArchivePlannerLLM)
 
@@ -583,6 +610,9 @@ class TestPIChat(unittest.TestCase):
             self.assertEqual(result["trace"]["tool_traces"][0]["privacy_boundary"], "proposal_only_no_write")
             self.assertFalse(result["trace"]["privacy_boundary"]["write_performed"])
             self.assertFalse(db_path.exists())
+            rendered = render_prm_chat_answer(result, mode="llm-approved")
+            self.assertIn("pending_confirmation=true", rendered)
+            self.assertIn("durable_writes=false", rendered)
 
     def test_confirmed_save_trace_marks_confirmation_gated_write(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -1,6 +1,6 @@
 # Cost Budget
 
-Status: draft budget requiring human approval before implementation
+Status: active PRM budget requiring human approval before live provider use
 
 ## Principles
 
@@ -46,6 +46,25 @@ Budget controls before approval:
 The user-visible chat response must include an explicit privacy/cost line with
 model call count, estimated cost, and whether bounded Telegram snippets were
 sent to the provider.
+
+PRM-18A contracts this line for every local or LLM-backed chat answer:
+
+```text
+Privacy: mode=<local-only|llm-approved>; model_calls=<n>; estimated_cost_usd=<usd>; bounded_telegram_snippet_provider_egress=<true|false>; raw_telegram_corpus_egress=false; durable_writes=false
+```
+
+Required budget behavior:
+
+- current `memory ask` answers show `model_calls=0`, `estimated_cost_usd=0`,
+  and no provider egress;
+- PRM-18B/PRM-18C implementation and tests use fake clients and fixture
+  databases, so implementation cost remains `$0`;
+- a real provider call with private snippets requires explicit human approval
+  for that run and the `--allow-provider-egress`-style switch;
+- approved runtime calls must derive `estimated_cost_usd` from provider usage
+  receipts or a documented local estimator when the provider does not return
+  cost directly;
+- hidden retry fan-out is not allowed before dogfood approval.
 
 ## PRM-17 Runtime Workflow Budget
 

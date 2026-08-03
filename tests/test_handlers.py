@@ -36,6 +36,60 @@ from output.mvp_weekly_pipeline import MvpWeeklyPipelineResult  # noqa: E402
 import bot.handlers as handlers  # noqa: E402
 
 
+def _fake_prm_chat_payload(answer: str = "Hermes answer from curated PI tools.") -> dict:
+    return {
+        "status": "ok",
+        "answer": answer,
+        "tool_calls": [{"name": "search_intelligence_items", "arguments": {"query": "eval"}}],
+        "tool_results": [
+            {
+                "name": "search_telegram_archive",
+                "result": {
+                    "result": {
+                        "items": [
+                            {
+                                "source_url": "https://t.me/source/1",
+                                "snippet": "RAW PRIVATE TOOL PAYLOAD",
+                            }
+                        ]
+                    }
+                },
+            }
+        ],
+        "evidence": {"source_refs": ["https://t.me/source/1"], "atom_ids": [101]},
+        "answer_contract": {
+            "source_links": ["https://t.me/source/1"],
+            "archive_support": {"status": "available", "source_count": 1},
+            "unknowns": ["independent source corroboration"],
+            "external_verification": {
+                "required": False,
+                "status": "not_required",
+                "category": None,
+                "reason": None,
+                "external_source_links": [],
+            },
+        },
+        "trace": {
+            "termination_reason": "answered_with_evidence",
+            "privacy_boundary": {
+                "write_performed": False,
+                "confirmation_gated_write": False,
+                "bounded_telegram_snippet_provider_egress": True,
+                "raw_telegram_corpus_egress": False,
+            },
+        },
+        "telemetry": {
+            "planning": {"model_calls": 1, "estimated_cost_usd": 0.00001},
+            "generation": {"model_calls": 1, "estimated_cost_usd": 0.00002},
+            "privacy": {
+                "bounded_telegram_snippet_provider_egress": True,
+                "raw_telegram_corpus_egress": False,
+            },
+        },
+        "message": "ok",
+    }
+
+
 class TestHandlers(unittest.TestCase):
     def test_send_message_does_not_escape_plain_text_when_parse_mode_is_none(self):
         with patch.object(handlers, "_send_text_internal") as mock_send:
@@ -180,14 +234,7 @@ class TestHandlers(unittest.TestCase):
             model_provider="anthropic",
             telegram_session_path="",
         )
-        pi_chat_result = {
-            "status": "ok",
-            "answer": "Hermes answer from curated PI tools.",
-            "tool_calls": [{"name": "search_intelligence_items", "arguments": {"query": "eval"}}],
-            "tool_results": [],
-            "evidence": {"source_refs": ["https://t.me/source/1"]},
-            "message": "ok",
-        }
+        pi_chat_result = _fake_prm_chat_payload()
 
         with patch.object(handlers, "answer_pi_chat", return_value=pi_chat_result) as mock_chat:
             with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
@@ -196,7 +243,14 @@ class TestHandlers(unittest.TestCase):
 
         mock_chat.assert_called_once_with("что с eval gates?", settings=settings)
         self.assertEqual(mock_send_message.call_count, 1)
-        self.assertEqual(mock_send_message.call_args_list[0].args[2], "Hermes answer from curated PI tools.")
+        message = mock_send_message.call_args_list[0].args[2]
+        self.assertIn("PRM Chat", message)
+        self.assertIn("Hermes answer from curated PI tools.", message)
+        self.assertIn("Sources\n- https://t.me/source/1", message)
+        self.assertIn("Archive support: status=supported; source_count=1", message)
+        self.assertIn("Unknowns\n- independent source corroboration", message)
+        self.assertIn("Privacy: mode=llm-approved", message)
+        self.assertNotIn("RAW PRIVATE TOOL PAYLOAD", message)
 
     def test_prm_safe_start_help_hides_legacy_generation_commands(self):
         settings = Settings(
@@ -217,8 +271,12 @@ class TestHandlers(unittest.TestCase):
 
         message = mock_send_message.call_args.args[2]
         self.assertIn("PRM safe assistant", message)
+        self.assertIn("Dogfood status: not started", message)
         self.assertIn("/chat <question>", message)
+        self.assertIn("bounded cited snippets may go to the provider", message)
+        self.assertIn("Safe read-only commands", message)
         self.assertIn("MVP Radar is a decision-evidence card only", message)
+        self.assertIn("Every /chat answer shows sources", message)
         self.assertNotIn("/run_digest", message)
         self.assertNotIn("/run_mvp_weekly", message)
         self.assertNotIn("/feedback_confirm", message)
@@ -300,14 +358,7 @@ class TestHandlers(unittest.TestCase):
             model_provider="anthropic",
             telegram_session_path="",
         )
-        pi_chat_result = {
-            "status": "ok",
-            "answer": "Safe PRM answer.",
-            "tool_calls": [],
-            "tool_results": [],
-            "evidence": {},
-            "message": "ok",
-        }
+        pi_chat_result = _fake_prm_chat_payload(answer="Safe PRM answer.")
 
         with patch.object(handlers, "answer_pi_chat", return_value=pi_chat_result) as mock_chat:
             with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
@@ -320,7 +371,10 @@ class TestHandlers(unittest.TestCase):
                     )
 
         mock_chat.assert_called_once_with("what changed?", settings=settings)
-        self.assertEqual(mock_send_message.call_args.args[2], "Safe PRM answer.")
+        message = mock_send_message.call_args.args[2]
+        self.assertIn("Safe PRM answer.", message)
+        self.assertIn("Archive support: status=supported", message)
+        self.assertIn("Privacy: mode=llm-approved", message)
 
     def test_handle_ask_delegates_to_pi_chat_not_raw_telegram_answer(self):
         settings = Settings(

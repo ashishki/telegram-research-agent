@@ -100,6 +100,12 @@ class TestLocalMemoryAsk(unittest.TestCase):
         self.assertIn("PRM Memory", rendered)
         self.assertIn("no LLM, no external search, no writes", rendered)
         self.assertIn("raw_corpus_egress=False", rendered)
+        self.assertIn(
+            "Privacy: mode=local-only; model_calls=0; estimated_cost_usd=0; "
+            "bounded_telegram_snippet_provider_egress=false; raw_telegram_corpus_egress=false; "
+            "durable_writes=false",
+            rendered,
+        )
 
     def test_local_memory_ask_project_scope_uses_project_context(self):
         result = answer_local_memory_question(

@@ -1,7 +1,7 @@
 # Codex Handoff
 
 Status: active
-Last updated: 2026-07-29
+Last updated: 2026-08-03
 
 ## Product Direction
 
@@ -19,13 +19,14 @@ PRM-17 deterministic runtime workflow contracts and privacy-safe aggregate
 telemetry receipts. The PRM-13 through PRM-17 batched deep review is recorded.
 PRM-18 deterministic release/dogfood gate is implemented and currently blocks
 dogfood because final acceptance evidence, gold retrieval labels, and explicit
-human dogfood approval are missing. PRM-18A through PRM-18C are proposed as the
-next safe pre-dogfood UX block for explicit LLM chat/provider-egress contract,
-CLI chat implementation, and Telegram `prm-assistant` UX parity. PRM-8 remains
-blocked. PRM-19 and PRM-20 are not started; PRM-19 requires PRM-18A..PRM-18C to
-be completed or explicitly deferred plus real four-week operator dogfood
-approval and evidence, and PRM-20 requires PRM-19 evidence plus explicit
-compatibility archive/delete/move approval. The old live Telegram bot and
+human dogfood approval are missing. PRM-18A Operator LLM Chat UX Contract,
+PRM-18B LLM-backed memory chat CLI, and PRM-18C Telegram `prm-assistant` UX
+parity/runbook are implemented; the PRM-18A through PRM-18C batched deep review
+is recorded. PRM-8 remains blocked. PRM-19 and PRM-20 are not started; PRM-19
+requires explicit human dogfood-start approval plus accepted or cleared PRM-18
+blockers and real four-week operator dogfood evidence, and PRM-20 requires
+PRM-19 evidence plus explicit compatibility archive/delete/move approval. The old live
+Telegram bot and
 Report V2 weekly timer were stopped and disabled on 2026-07-29; see
 `docs/PRODUCT_OPERATING_MODEL.md` and
 `docs/audit/PRM_RUNTIME_FREEZE_2026-07-29.md`. A dedicated safe
@@ -61,10 +62,11 @@ search, service starts, migrations, or writes.
 
 ## Current Next Task
 
-Continue at PRM-18A: Operator LLM Chat UX Contract. Do not start PRM-19 dogfood
-until PRM-18A through PRM-18C are completed or explicitly deferred, the human
-operator explicitly approves dogfood start, and the PRM-18 blockers are accepted
-or cleared. Do not start PRM-20 cleanup/archive work until PRM-19 dogfood
-evidence exists and the human operator approves any compatibility
-archive/delete/move. Do not restart legacy bot/report timers as PRM dogfood. Do
-not start `prm-assistant` as dogfood without the same explicit approval.
+Stop before PRM-19. Do not start PRM-19 dogfood until the human operator
+explicitly approves dogfood start and the PRM-18 blockers are accepted or
+cleared. Do not start PRM-20 cleanup/archive work until PRM-19 dogfood evidence
+exists and the human operator approves any compatibility archive/delete/move.
+Do not restart legacy bot/report timers as PRM dogfood. Do not start
+`prm-assistant` as dogfood without the same explicit approval. The
+PRM-18A..PRM-18C deep review boundary is recorded at
+`docs/audit/PRM_DEEP_REVIEW_PRM18A_18C_2026-08-03.md`.

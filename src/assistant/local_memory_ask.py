@@ -157,6 +157,18 @@ def render_local_memory_answer(payload: Mapping[str, Any]) -> str:
                 write_performed=bool(privacy.get("write_performed")),
                 raw_telegram_corpus_egress=bool(privacy.get("raw_telegram_corpus_egress")),
             ),
+            (
+                "Privacy: mode=local-only; model_calls={model_calls}; estimated_cost_usd=0; "
+                "bounded_telegram_snippet_provider_egress={bounded_telegram_snippet_provider_egress}; "
+                "raw_telegram_corpus_egress={raw_telegram_corpus_egress}; durable_writes={durable_writes}"
+            ).format(
+                model_calls=privacy.get("model_calls", 0),
+                bounded_telegram_snippet_provider_egress=_bool_text(
+                    privacy.get("bounded_telegram_snippet_provider_egress")
+                ),
+                raw_telegram_corpus_egress=_bool_text(privacy.get("raw_telegram_corpus_egress")),
+                durable_writes=_bool_text(privacy.get("write_performed")),
+            ),
         ]
     )
     return "\n".join(lines).rstrip()
@@ -384,3 +396,7 @@ def _unique(values: list[Any]) -> list[Any]:
         seen.add(key)
         unique.append(value)
     return unique
+
+
+def _bool_text(value: object) -> str:
+    return "true" if bool(value) else "false"

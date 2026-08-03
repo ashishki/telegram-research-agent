@@ -7,11 +7,54 @@ from unittest.mock import patch
 from main import (
     BOT_RUNTIME_PRM_ASSISTANT,
     build_parser,
+    handle_memory_chat,
     handle_memory_ask,
     handle_prm_assistant,
     handle_report_v2_rollout_gate,
     handle_weekly_intelligence_v2,
 )
+
+
+def _fake_prm_chat_payload() -> dict:
+    return {
+        "status": "ok",
+        "answer": "Grounded PRM answer.",
+        "evidence": {
+            "source_refs": ["https://t.me/source/1"],
+            "atom_ids": [101],
+            "thread_slugs": [],
+            "artifact_paths": {},
+        },
+        "answer_contract": {
+            "source_links": ["https://t.me/source/1"],
+            "archive_support": {"status": "available", "source_count": 1},
+            "unknowns": ["market freshness"],
+            "external_verification": {
+                "required": False,
+                "status": "not_required",
+                "category": None,
+                "reason": None,
+                "external_source_links": [],
+            },
+        },
+        "trace": {
+            "termination_reason": "answered_with_evidence",
+            "privacy_boundary": {
+                "write_performed": False,
+                "confirmation_gated_write": False,
+                "bounded_telegram_snippet_provider_egress": True,
+                "raw_telegram_corpus_egress": False,
+            },
+        },
+        "telemetry": {
+            "planning": {"model_calls": 1, "estimated_cost_usd": 0.00001},
+            "generation": {"model_calls": 1, "estimated_cost_usd": 0.00002},
+            "privacy": {
+                "bounded_telegram_snippet_provider_egress": True,
+                "raw_telegram_corpus_egress": False,
+            },
+        },
+    }
 
 
 class TestCli(unittest.TestCase):
@@ -135,6 +178,78 @@ class TestCli(unittest.TestCase):
         self.assertEqual(args.question, ["что", "есть", "по", "eval"])
         self.assertEqual(args.limit, 3)
         self.assertIs(args.handler, handle_memory_ask)
+
+    def test_memory_ask_llm_requires_provider_egress_before_pi_chat(self):
+        args = build_parser().parse_args(["memory", "ask", "--llm-approved", "что", "есть", "по", "eval"])
+
+        with patch("main.load_settings") as settings_mock, patch("assistant.pi_chat.answer_pi_chat") as chat_mock:
+            output = StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(handle_memory_ask(args), 2)
+
+        settings_mock.assert_not_called()
+        chat_mock.assert_not_called()
+        self.assertIn("--allow-provider-egress", output.getvalue())
+        self.assertIn("No provider call was made", output.getvalue())
+
+    def test_memory_ask_llm_approved_renders_privacy_safe_contract(self):
+        args = build_parser().parse_args(
+            ["memory", "ask", "--llm-approved", "--allow-provider-egress", "что", "есть", "по", "eval"]
+        )
+        settings = SimpleNamespace(db_path="/tmp/agent.db")
+
+        with patch("main.load_settings", return_value=settings), patch(
+            "assistant.pi_chat.answer_pi_chat",
+            return_value=_fake_prm_chat_payload(),
+        ) as chat_mock:
+            output = StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(handle_memory_ask(args), 0)
+
+        chat_mock.assert_called_once_with("что есть по eval", settings=settings)
+        rendered = output.getvalue()
+        self.assertIn("PRM Chat", rendered)
+        self.assertIn("Grounded PRM answer.", rendered)
+        self.assertIn("Sources\n- https://t.me/source/1", rendered)
+        self.assertIn("Archive support: status=supported; source_count=1", rendered)
+        self.assertIn("Unknowns\n- market freshness", rendered)
+        self.assertIn(
+            "Privacy: mode=llm-approved; model_calls=2; estimated_cost_usd=0.00003000; "
+            "bounded_telegram_snippet_provider_egress=true; raw_telegram_corpus_egress=false; "
+            "durable_writes=false",
+            rendered,
+        )
+
+    def test_memory_chat_parser_and_unapproved_refusal(self):
+        args = build_parser().parse_args(["memory", "chat"])
+
+        self.assertIs(args.handler, handle_memory_chat)
+        with patch("main.load_settings") as settings_mock, patch("assistant.pi_chat.answer_pi_chat") as chat_mock:
+            output = StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(handle_memory_chat(args), 2)
+
+        settings_mock.assert_not_called()
+        chat_mock.assert_not_called()
+        self.assertIn("--allow-provider-egress", output.getvalue())
+
+    def test_memory_chat_interactive_runs_repeated_questions_with_fake_chat(self):
+        args = build_parser().parse_args(["memory", "chat", "--allow-provider-egress"])
+        settings = SimpleNamespace(db_path="/tmp/agent.db")
+
+        with patch("main.load_settings", return_value=settings), patch(
+            "assistant.pi_chat.answer_pi_chat",
+            return_value=_fake_prm_chat_payload(),
+        ) as chat_mock, patch("sys.stdin", StringIO("first question\n\n/exit\n")):
+            output = StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(handle_memory_chat(args), 0)
+
+        chat_mock.assert_called_once_with("first question", settings=settings)
+        rendered = output.getvalue()
+        self.assertIn("PRM Chat interactive", rendered)
+        self.assertIn("Grounded PRM answer.", rendered)
+        self.assertIn("Privacy: mode=llm-approved", rendered)
 
     def test_memory_ask_handler_skips_migrations_and_renders_answer(self):
         args = build_parser().parse_args(["memory", "ask", "что", "есть", "по", "eval"])

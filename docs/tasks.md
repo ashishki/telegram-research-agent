@@ -1,7 +1,7 @@
 # Active Task Graph
 
 Status: proposed
-Last updated: 2026-07-29
+Last updated: 2026-08-03
 Playbook SHA: 5583eca96c4d2d480b5574ed78bea63e0b07ebf0
 Target repo baseline: ad8689fa25b89f77122c4cec7c7a6b9da3f500cf
 
@@ -40,17 +40,18 @@ Target repo baseline: ad8689fa25b89f77122c4cec7c7a6b9da3f500cf
 | Knowledge Library | Deterministic PRM-13 topic-page DTO and static HTML renderer implemented for bounded supplied topic evidence; not dogfooded or released |
 | Project context support | Deterministic PRM-14 assistant tool combines active project descriptors, bounded archive retrieval, and curated knowledge into direct_implication, weak_watch, learning_relevance, or no_match labels without build/code/project mutation approval |
 | Local operator UX | `memory ask` gives a local-only evidence brief over bounded archive/curated/project context with no LLM calls, external search, startup migrations, service starts, or writes |
-| LLM chat UX | Proposed PRM-18A..PRM-18C pre-dogfood block: explicit provider-egress approval, ChatGPT-like CLI harness over existing PI chat/RAG, and Telegram UX parity without starting dogfood |
+| LLM chat UX | PRM-18A contract, PRM-18B CLI harness, and PRM-18C Telegram UX/runbook implemented with explicit provider-egress approval and no dogfood/service start |
 | Learning state | PRM-15 fixture-only migration/projection maps legacy source presence to indexed/surfaced only and requires explicit receipts for opened/read/understood/explained/tried/applied/measured |
 | Weekly Brief V3 | PRM-16 deterministic secondary projection and static HTML renderer implemented for bounded supplied context; V1 Brief and Atlas are demoted to compatibility/internal surfaces |
 | Runtime workflows | PRM-17 deterministic workflow registry and privacy-safe aggregate telemetry receipt implemented; scheduled runtime activation is not approved |
 | Release gate | PRM-18 deterministic release/dogfood gate implemented; current sanitized receipt blocks dogfood because final acceptance evidence, gold retrieval labels, and explicit human dogfood approval are missing |
 | Runtime deployment | Legacy `telegram-bot.service` and `telegram-ai-split-report.timer` stopped and disabled on 2026-07-29; safe `prm-assistant` entrypoint and repo unit template implemented but not installed/enabled/started and without automatic startup migrations; no Telegram Research Agent service or timer is active |
 | PRM-13..17 review gate | Batched deep review recorded; one telemetry budget-validation finding fixed before PRM-18 |
+| PRM-18A..18C review gate | Batched deep review recorded on 2026-08-03; no unresolved stop-ship finding in this block, residual provider/runtime risks remain gated before PRM-19 |
 | W29 reports | V1 Brief and Atlas rendered despite V2 preview code existing elsewhere |
 | W29 reactions | Seven personal reactions resolved to posts, zero atoms, zero themes, zero ranking effects |
 | Radar | Historical W29 Radar stage failed; PRM-16 V3 fixtures localize Radar failure to the Radar card |
-| Dogfood | Not started for the new product; PRM-19 is blocked until PRM-18A..PRM-18C are completed or explicitly deferred, PRM-18 blockers are accepted or cleared, and explicit human dogfood-start approval is recorded |
+| Dogfood | Not started for the new product; PRM-19 remains blocked until PRM-18 blockers are accepted or cleared and explicit human dogfood-start approval is recorded |
 
 ## Dependency Graph
 
@@ -1270,7 +1271,7 @@ Notes: |
 Owner: codex
 Phase: PRM
 Type: product:ux
-Status: proposed
+Status: implemented
 Depends-On: PRM-18
 Risk-Level: high
 Public-Tests-Required: required
@@ -1315,18 +1316,27 @@ Cost-Budget: |
   max_retries: 0
   approval_required_when: any real provider call, raw/bounded Telegram snippet provider egress, or external skill is requested
 Notes: |
-  This is a contract/docs task. It should not call providers or run Telegram
-  services. The expected next implementation command names are `memory chat`
-  and/or `memory ask --llm-approved`, with an explicit
-  `--allow-provider-egress` style switch before private archive snippets can be
-  sent to an LLM.
+  Implemented as a contract/docs task. It did not call providers, run external
+  search, start Telegram services, run migrations, or write production DB state.
+  The implementation command names are `memory chat` and
+  `memory ask --llm-approved`, with an explicit `--allow-provider-egress` style
+  switch before private archive snippets can be sent to an LLM.
+
+  Contracted answer display requires answer, sources, archive-support status,
+  unknowns or external-verification needs, write status, and the privacy/cost
+  line:
+
+  `Privacy: mode=<local-only|llm-approved>; model_calls=<n>; estimated_cost_usd=<usd>; bounded_telegram_snippet_provider_egress=<true|false>; raw_telegram_corpus_egress=false; durable_writes=false`
+
+  PRM-18A is part of the PRM-18A..PRM-18C batched deep review boundary,
+  recorded at `docs/audit/PRM_DEEP_REVIEW_PRM18A_18C_2026-08-03.md`.
 
 ### PRM-18B: LLM-Backed Memory Chat CLI
 
 Owner: codex
 Phase: PRM
 Type: product:implementation
-Status: proposed
+Status: implemented
 Depends-On: PRM-18A
 Risk-Level: high
 Public-Tests-Required: required
@@ -1377,15 +1387,28 @@ Cost-Budget: |
   max_retries: 1
   approval_required_when: running the new chat against real private archive snippets with a real provider, increasing tool-call fan-out, or adding external-skill calls
 Notes: |
-  Use fake LLM clients and fixture databases for tests. Do not run live provider
-  calls against production private archive snippets during implementation.
+  Implemented on 2026-08-03 as a gated CLI wrapper over the existing PI chat
+  path. `memory ask --llm-approved` refuses before PI chat execution with exit
+  code 2 unless `--allow-provider-egress` is present;
+  `memory chat --allow-provider-egress` runs repeated stdin/stdout turns until
+  exit/quit commands, `:q`, or EOF.
+
+  CLI answers render a privacy-safe `prm_chat_display.v1` receipt with answer,
+  sources, archive-support status, external-verification status, unknowns,
+  write status, model calls, estimated cost, bounded-snippet egress, raw corpus
+  egress, and durable-write flags. Local-only `memory ask` now prints the same
+  privacy/cost line with `mode=local-only`.
+
+  Implementation and tests used fake LLM clients and fixture databases. No live
+  provider calls, external search, Telegram services, migrations, or production
+  database writes were run.
 
 ### PRM-18C: Telegram PRM Assistant UX Parity And Start Runbook
 
 Owner: codex
 Phase: PRM
 Type: product:runtime
-Status: proposed
+Status: implemented
 Depends-On: PRM-18B
 Risk-Level: high
 Public-Tests-Required: required
@@ -1435,9 +1458,17 @@ Cost-Budget: |
   max_retries: 1
   approval_required_when: starting/enabling systemd runtime, running real provider calls with private snippets, or recording dogfood evidence
 Notes: |
-  Do not start or enable `telegram-prm-assistant.service`. This task prepares
-  the operator UX and runbook only. PRM-19 remains blocked until explicit human
-  dogfood-start approval and accepted or cleared PRM-18 blockers.
+  Implemented on 2026-08-03. Telegram safe-mode start and help now state
+  local-only CLI mode, approved LLM/provider-egress mode, safe read-only
+  commands, blocked legacy generation/write commands, and dogfood-not-started
+  status. Telegram chat, Hermes, ask aliases, ordinary text, and voice
+  transcript dispatch use the same privacy-safe PRM chat renderer as the CLI.
+
+  The operator runbook documents preflight inspection, install/start/status,
+  stop/disable, and rollback-to-disabled commands while preserving the hard
+  gate: the service was not installed, enabled, started, or treated as dogfood.
+  PRM-19 remains blocked until explicit human dogfood-start approval and
+  accepted or cleared PRM-18 blockers.
 
 ### PRM-19: Four-Week Operator Dogfood
 

@@ -1,7 +1,7 @@
 # Evidence Index
 
 Status: active
-Last updated: 2026-07-29
+Last updated: 2026-08-03
 
 ## Repository State
 
@@ -228,13 +228,132 @@ full archive indexing, embeddings, external web research jobs, LLM calls,
 systemd starts, startup migrations, or production database writes were
 performed.
 
-## LLM Chat UX Task Block Evidence - 2026-07-29
+## LLM Chat CLI Evidence - 2026-08-03
 
 | Check | Result |
 | --- | --- |
-| next task | PRM-18A Operator LLM Chat UX Contract |
-| task block | PRM-18A -> PRM-18B -> PRM-18C before PRM-19 |
+| completed task | PRM-18B LLM-Backed Memory Chat CLI |
+| one-shot approved command | `src/main.py memory ask --llm-approved --allow-provider-egress "<question>"` implemented |
+| one-shot missing approval | refuses with exit code `2` before PI chat/provider execution |
+| interactive command | `src/main.py memory chat --allow-provider-egress` implemented |
+| display contract | `prm_chat_display.v1`, no raw PI tool payload dump |
+| local-only privacy line | `memory ask` prints `mode=local-only` privacy/cost line |
+| model/provider behavior in tests | fake clients only; no live provider calls |
+| writes | no direct chat writes except existing exact-token `confirm_save_proposal` path |
+
+Targeted verification:
+
+```text
+PYTHONPATH=src python3 -m pytest tests/test_local_memory_ask.py tests/test_pi_chat.py tests/test_cli.py -q
+37 passed, 9 subtests passed in 9.10s
+```
+
+PRM tier:
+
+```text
+python3 tools/test_tiers.py focused-prm
+103 passed, 6 subtests passed in 24.45s
+```
+
+Shared contract tier:
+
+```text
+python3 tools/test_tiers.py fast-contract
+214 passed, 9 subtests passed in 178.11s (0:02:58)
+```
+
+Pre-push checks:
+
+```text
+python3 tools/playbook_validate.py --root . --check tasks --check placeholders --check readiness --check delivery --check references
+playbook_validate: errors=0 warnings=0
+```
+
+```text
+git diff --check
+pass, no output
+```
+
+No live Telegram ingestion, reaction sync, Radar, Frontier, report generation,
+full archive indexing, embeddings, external web research jobs, live LLM
+provider calls, systemd starts/enables, startup migrations, production database
+writes, or compatibility deletes/archives were performed.
+
+## Telegram PRM Assistant UX Evidence - 2026-08-03
+
+| Check | Result |
+| --- | --- |
+| completed task | PRM-18C Telegram PRM Assistant UX Parity And Start Runbook |
+| safe-mode start/help | states local-only CLI mode, approved LLM/provider-egress mode, safe read-only commands, blocked legacy commands, and dogfood-not-started status |
+| Telegram chat output | uses shared PRM chat renderer with answer, sources, archive support, unknowns, write status, and privacy/cost line |
+| raw tool payload exposure | handler tests assert fake raw tool snippet is not sent |
+| runbook | docs/operator_workflow.md and docs/PRODUCT_OPERATING_MODEL.md document preflight, install/start/status, stop/disable, and rollback |
+| service activation | not installed, enabled, started, or treated as dogfood |
+
+Targeted verification:
+
+```text
+PYTHONPATH=src python3 -m pytest tests/test_handlers.py tests/test_callbacks.py tests/test_cli.py -q
+58 passed, 3 subtests passed in 50.50s
+```
+
+Unit template verification:
+
+```text
+systemd-analyze verify systemd/telegram-prm-assistant.service
+exit=0; unrelated host warning: /lib/systemd/system/snapd.service unknown RestartMode key
+```
+
+Shared contract tier and pre-push checks:
+
+```text
+python3 tools/test_tiers.py fast-contract
+214 passed, 9 subtests passed in 178.11s (0:02:58)
+```
+
+```text
+python3 tools/playbook_validate.py --root . --check tasks --check placeholders --check readiness --check delivery --check references
+playbook_validate: errors=0 warnings=0
+```
+
+```text
+git diff --check
+pass, no output
+```
+
+No live Telegram ingestion, reaction sync, Radar, Frontier, report generation,
+full archive indexing, embeddings, external web research jobs, live LLM
+provider calls, systemd starts/enables, startup migrations, production database
+writes, or compatibility deletes/archives were performed.
+
+## PRM-18A..18C Deep Review Evidence - 2026-08-03
+
+| Check | Result |
+| --- | --- |
+| review receipt | docs/audit/PRM_DEEP_REVIEW_PRM18A_18C_2026-08-03.md |
+| unresolved stop-ship findings | none in PRM-18A..PRM-18C block |
+| repaired finding | documentation overclaim about missing-approval refusal boundary was corrected to PI chat/provider execution |
+| residual risks | real provider behavior and Telegram runtime activation remain gated; no dogfood or release claim |
+| PRM-19 state | blocked until explicit human dogfood-start approval and accepted or cleared PRM-18 blockers |
+
+Boundary evidence:
+
+```text
+No live Telegram ingestion, reaction sync, Radar, Frontier, report generation,
+full archive indexing, embeddings, external web research, external skill
+execution, production database migration, dogfood start, release claim, or
+compatibility-file archive/delete/move was performed.
+```
+
+## LLM Chat UX Task Block Setup Evidence - 2026-07-29
+
+| Check | Result |
+| --- | --- |
+| setup task | PRM-18A Operator LLM Chat UX Contract |
+| setup-time next task | PRM-18B LLM-Backed Memory Chat CLI |
+| task block | PRM-18B -> PRM-18C before PRM-19; completed evidence recorded above |
 | architecture prompt | docs/prompts/prm_architecture_research_agent.md |
+| deep review boundary | batched after PRM-18C and before PRM-19 unless a stop-ship boundary is touched |
 | dogfood state | still blocked; not started |
 | provider egress | not approved by default |
 | implementation boundary | fake LLM clients and fixture DBs until explicit approval |

@@ -1,7 +1,7 @@
 # Operator Workflow
 
-**Version:** 2.3
-**Last updated:** 2026-07-29
+**Version:** 2.5
+**Last updated:** 2026-08-03
 **Audience:** System owner (single user, personal use)
 **Role:** supporting operating guide. Canonical roadmap:
 `docs/intelligence_report_v2_roadmap.md` for the Report V2 correction record and
@@ -39,27 +39,83 @@ This command is a local product preview, not PRM-19 dogfood evidence. The
 Telegram `prm-assistant` service and LLM-backed `/chat` remain behind explicit
 dogfood-start/privacy approval.
 
-## Next PRM Chat UX Block
+## PRM-18 LLM Chat UX Block
 
-The next development block is PRM-18A through PRM-18C:
+PRM-18A defined the operator-facing contract. PRM-18B and PRM-18C implemented
+the CLI and Telegram UX parity without starting Telegram dogfood, installing or
+starting `prm-assistant`, running external search, or authorizing default
+snippet egress.
 
-- `PRM-18A`: document the ChatGPT-like operator contract and privacy switch;
-- `PRM-18B`: implement `memory chat` and/or `memory ask --llm-approved` over
+The PRM-18A through PRM-18C block is implemented:
+
+- `PRM-18A`: documented the ChatGPT-like operator contract and privacy switch;
+- `PRM-18B`: implemented `memory chat` and `memory ask --llm-approved` over
   the existing PI chat/RAG harness;
-- `PRM-18C`: align Telegram `prm-assistant` output and write the start/stop
+- `PRM-18C`: aligned Telegram `prm-assistant` output and wrote the start/stop
   runbook without starting the service.
 
-Target behavior:
+Contracted command surfaces:
+
+| Surface | Command | Current state | Provider egress |
+| --- | --- | --- | --- |
+| Local evidence brief | `PYTHONPATH=src python3 src/main.py memory ask "<question>"` | available now | none |
+| Local evidence JSON | `PYTHONPATH=src python3 src/main.py memory ask --json "<question>"` | available now | none |
+| One-shot LLM synthesis | `PYTHONPATH=src python3 src/main.py memory ask --llm-approved --allow-provider-egress "<question>"` | implemented in PRM-18B | bounded cited snippets only after explicit switch |
+| Interactive LLM chat | `PYTHONPATH=src python3 src/main.py memory chat --allow-provider-egress` | implemented in PRM-18B | bounded cited snippets only after explicit switch |
+| Telegram assistant chat | `/chat <question>` or ordinary text in `prm-assistant` mode | PRM-18C parity implemented; service remains disabled | same answer/privacy contract after approved runtime start |
+
+The LLM-backed commands are intentionally explicit:
 
 ```bash
 PYTHONPATH=src python3 src/main.py memory chat --allow-provider-egress
 PYTHONPATH=src python3 src/main.py memory ask --llm-approved --allow-provider-egress "что говорит моя база?"
 ```
 
-The LLM-backed mode must show sources, unknowns, archive-support status, cost
-estimate, and a privacy line that states whether bounded Telegram snippets were
-sent to the provider. Without the explicit provider-egress switch, the product
-must stay local-only or refuse with clear copy.
+Without `--allow-provider-egress`, the product must either stay on the local
+`memory ask` path or refuse with clear copy such as:
+
+```text
+LLM chat requires --allow-provider-egress before bounded Telegram snippets can
+be sent to a provider. Re-run with that switch or use local memory ask.
+```
+
+Every LLM-backed answer must show:
+
+- answer;
+- sources with Telegram links or curated memory IDs where available;
+- archive support status: `supported`, `partial`, `not_found`, or
+  `verification_required`;
+- unknowns and external-verification needs;
+- privacy/cost line;
+- write status.
+
+The privacy/cost line must use explicit fields:
+
+```text
+Privacy: mode=<local-only|llm-approved>; model_calls=<n>; estimated_cost_usd=<usd>; bounded_telegram_snippet_provider_egress=<true|false>; raw_telegram_corpus_egress=false; durable_writes=false
+```
+
+For current local-only `memory ask`, this resolves to:
+
+```text
+Privacy: mode=local-only; model_calls=0; estimated_cost_usd=0; bounded_telegram_snippet_provider_egress=false; raw_telegram_corpus_egress=false; durable_writes=false
+```
+
+LLM chat may propose a Knowledge Note, Watch Topic, project link, decision,
+action, or experiment, but proposals are drafts only. Durable memory writes
+remain behind the existing exact confirmation-token flow.
+
+PRM-18B/PRM-18C implementation status:
+
+- `memory ask --llm-approved` refuses with exit code `2` unless
+  `--allow-provider-egress` is also present;
+- `memory chat --allow-provider-egress` runs an interactive stdin/stdout loop
+  until exit/quit commands, `:q`, or EOF;
+- CLI and Telegram `/chat` both render answer, sources, archive support,
+  external-verification status, unknowns, write status, and the privacy line;
+- display receipts exclude raw PI tool payloads and do not log raw Telegram
+  snippets;
+- implementation/test evidence used fake clients and fixture DBs only.
 
 ## Weekly Routine
 
@@ -343,12 +399,14 @@ PYTHONPATH=src python3 src/main.py ops-validate
 
 Expected interpretation:
 
-- `telegram-bot.service` should be `active`; it powers Hermes command polling.
-- `telegram-ai-split-report.timer` should be `active` and `enabled`; it is the
-  current weekly Report V2 schedule and should trigger Monday at 09:00
-  Asia/Tbilisi.
-- Legacy digest, ingest, MVP, cleanup, study reminder, and reminder timers
-  should remain disabled unless there is an explicit schedule change.
+- as of the 2026-07-29 runtime freeze, `telegram-bot.service` and
+  `telegram-ai-split-report.timer` should remain stopped and disabled for PRM
+  dogfood;
+- if historical compatibility services are active, treat that as legacy
+  deployment state only, not PRM dogfood evidence;
+- do not restart legacy bot/report timers to satisfy the PRM chat contract;
+- legacy digest, ingest, MVP, cleanup, study reminder, and reminder timers
+  should remain disabled unless there is an explicit schedule change;
 - `healthcheck.sh` should end with `Healthcheck OK`.
 - `ops-validate` may return `needs_live_event` until a real Telegram reaction
   or inline callback is observed in production.
@@ -365,6 +423,63 @@ Strategy Reviewer projections. PI search applies filters first, then uses
 deterministic ranking plus request-local SQLite FTS over those curated objects.
 It does not run raw Telegram firehose RAG, does not use vector search, and does
 not expose raw SQLite sessions.
+
+### PRM Assistant Runtime Runbook
+
+This runbook is for future approved PRM-19 dogfood only. Do not install, enable,
+or start `telegram-prm-assistant.service` until all prerequisites are recorded:
+
+- PRM-18B and PRM-18C completed or explicitly deferred;
+- batched PRM-18A..PRM-18C review accepted, with stop-ship findings cleared or
+  explicitly accepted by the human operator;
+- PRM-18 release/dogfood blockers accepted or cleared;
+- explicit human PRM-19 dogfood-start approval;
+- any required production schema migration separately approved.
+
+Preflight inspection that does not start the service:
+
+```bash
+systemd-analyze verify systemd/telegram-prm-assistant.service
+systemctl status telegram-prm-assistant.service --no-pager
+systemctl is-enabled telegram-prm-assistant.service
+```
+
+Install and start only after the approval prerequisites above:
+
+```bash
+sudo install -m 0644 systemd/telegram-prm-assistant.service /etc/systemd/system/telegram-prm-assistant.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now telegram-prm-assistant.service
+```
+
+Operational status checks after an approved start:
+
+```bash
+systemctl status telegram-prm-assistant.service --no-pager
+journalctl -u telegram-prm-assistant.service -n 100 --no-pager
+```
+
+Stop and disable:
+
+```bash
+sudo systemctl stop telegram-prm-assistant.service
+sudo systemctl disable telegram-prm-assistant.service
+```
+
+Rollback to the disabled repo-template state:
+
+```bash
+sudo systemctl stop telegram-prm-assistant.service
+sudo systemctl disable telegram-prm-assistant.service
+sudo rm -f /etc/systemd/system/telegram-prm-assistant.service
+sudo systemctl daemon-reload
+systemctl is-active telegram-prm-assistant.service
+systemctl is-enabled telegram-prm-assistant.service
+```
+
+Expected rollback result: inactive or not-found for active state, disabled or
+not-found for enabled state. Rollback does not modify production database
+contents and does not restart legacy bot/report timers.
 
 Current implementation queue:
 

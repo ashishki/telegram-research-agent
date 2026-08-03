@@ -10,6 +10,7 @@ from urllib import error
 from assistant.pi_chat import answer_pi_chat
 from assistant.pi_facade import PersonalIntelligenceFacade
 from assistant.pi_intent import classify_operator_message
+from assistant.prm_chat_display import render_prm_chat_answer
 from assistant.pi_tools import call_pi_tool
 from bot.telegram_delivery import _send_text_internal, send_document, send_report_preview, send_text
 from config.settings import PROJECT_ROOT, Settings
@@ -301,14 +302,19 @@ def handle_prm_start(chat_id: str, args: str, settings: Settings) -> None:
     lines = [
         "PRM safe assistant",
         "",
-        "Use /chat <question> or send a normal message.",
-        "Read-only orientation: /weekly, /actions, /mvp, /strategy, /projects, /costs, /status.",
+        "Dogfood status: not started. Service start requires explicit PRM-19 approval.",
+        "Use /chat <question> or send a normal message after approved runtime start.",
+        "Chat mode is LLM-approved only after runtime approval; bounded cited snippets may go to the provider.",
+        "Local-only CLI remains: memory ask <question>.",
+        "",
+        "Safe read-only commands: /weekly, /actions, /mvp, /strategy, /projects, /costs, /status.",
         "MVP Radar is a decision-evidence card only; Telegram-only evidence cannot approve build.",
         "",
         "Blocked in this mode: ingestion, reaction sync, report generation, Radar generation,",
         "direct feedback/tag/reminder writes, legacy callbacks, Codex/config/code mutation,",
         "and dogfood/release claims.",
         "Memory saves must go through explicit confirmed PRM proposals inside /chat.",
+        "Every /chat answer shows sources, archive support, unknowns, write status, and Privacy.",
     ]
     send_message(_get_bot_token(), chat_id, "\n".join(lines), parse_mode=None)
 
@@ -777,7 +783,7 @@ def handle_chat(chat_id: str, args: str, settings: Settings) -> None:
         send_message(_get_bot_token(), chat_id, "Напиши вопрос после /chat или просто отправь обычное сообщение.", parse_mode=None)
         return
     result = answer_pi_chat(question, settings=settings)
-    send_message(_get_bot_token(), chat_id, result["answer"], parse_mode=None)
+    send_message(_get_bot_token(), chat_id, render_prm_chat_answer(result, mode="llm-approved"), parse_mode=None)
 
 
 def handle_remind(chat_id: str, args: str, settings: Settings) -> None:

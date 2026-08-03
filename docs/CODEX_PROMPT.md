@@ -1,7 +1,7 @@
 # Codex Session Handoff
 
 Status: active
-Last updated: 2026-07-29
+Last updated: 2026-08-03
 
 ## Repository State
 
@@ -12,18 +12,15 @@ Last updated: 2026-07-29
 - Current phase: PRM-18 release/dogfood gate is implemented and blocks dogfood
   start while final acceptance evidence and human approval are missing; legacy
   live runtime is frozen; safe `prm-assistant` runtime is implemented but not
-  installed, enabled, started, or dogfood evidence; PRM-18A is the next safe
-  task in the pre-dogfood LLM chat UX block
-- Implemented slices in HEAD: PRM-1 through PRM-7 plus PRM-9 through PRM-18
-- Proposed next slices: PRM-18A through PRM-18C for LLM chat UX contract, CLI
-  chat implementation, and Telegram assistant UX parity
+  installed, enabled, started, or dogfood evidence; PRM-18A through PRM-18C are
+  implemented and their batched deep review is recorded.
+- Implemented slices in HEAD: PRM-1 through PRM-7 plus PRM-9 through PRM-18C
+- Proposed next slices: none inside the allowed PRM-18B..PRM-18C block
 - Blocked/not implemented slices: PRM-8, PRM-19, and PRM-20
-- Next safe work: PRM-18A. PRM-19 only after PRM-18A..PRM-18C are completed or
-  explicitly deferred, explicit human dogfood-start approval exists, and PRM-18
-  blockers are accepted or cleared; PRM-20 only after real dogfood evidence and
-  explicit compatibility archive/delete/move approval.
-- Optional pre-implementation architecture research prompt:
-  docs/prompts/prm_architecture_research_agent.md
+- Next safe work: stop before PRM-19. PRM-19 only after explicit human
+  dogfood-start approval exists and PRM-18 blockers are accepted or cleared;
+  PRM-20 only after real dogfood evidence and explicit compatibility
+  archive/delete/move approval.
 
 ## Product Direction
 
@@ -55,9 +52,10 @@ future operator entrypoint: ordinary text and voice transcript dispatch to
 `/chat`, legacy callbacks are disabled, and generation/write commands are
 blocked. It does not run automatic startup migrations. The full product is not
 released. For immediate local use, `memory ask` provides a no-LLM local
-evidence brief over bounded archive/curated/project context. The next UX block
-must make LLM-backed memory chat explicit and usable without hiding provider
-egress, cost, unknowns, citations, or write boundaries.
+evidence brief over bounded archive/curated/project context. LLM-backed
+`memory ask --llm-approved` and `memory chat --allow-provider-egress` now exist
+behind the explicit provider-egress switch; Telegram chat uses the same display
+contract, while runtime start remains blocked.
 
 ## Active Profiles
 
@@ -84,11 +82,12 @@ not a dependency and should not be introduced for T1 work.
 - Verifier: deterministic tests, evals, CI, Playbook validators.
 - Completion authority: human.
 - Child agents must not commit, push, self-review, or approve completion.
-- Deep review is batched by implementation block. Do not spawn a separate
-  deep-review subagent after every task unless the task touches a stop-ship
-  boundary such as privacy egress, unsafe writes, vector backend adoption,
-  production data migration, external skill approval, dogfood start, or file
-  deletion/archive.
+- Deep review is batched by implementation block. For the PRM LLM chat block,
+  the PRM-18A through PRM-18C review is recorded before PRM-19. Do not spawn a
+  separate deep-review subagent after every task unless the task touches a
+  stop-ship boundary such as live provider egress, unsafe writes, vector backend
+  adoption, production data migration, external skill approval, service start,
+  dogfood start, release claim, or file deletion/archive.
 
 ## Verification Commands
 
@@ -117,11 +116,10 @@ jobs from this handoff.
   labels and expected citations.
 - PRM-8 vector/hybrid retrieval remains blocked.
 - PRM-18 release/dogfood gate is implemented and currently blocked.
-- PRM-18A through PRM-18C are the next safe implementation block; do not skip
-  directly to PRM-19 unless the human explicitly defers this block.
+- PRM-18A through PRM-18C are implemented and the batched deep review is
+  recorded at `docs/audit/PRM_DEEP_REVIEW_PRM18A_18C_2026-08-03.md`.
 - PRM-19 dogfood cannot start until explicit human dogfood approval is recorded,
-  PRM-18A..PRM-18C are completed or explicitly deferred, and PRM-18 blockers
-  are accepted or cleared.
+  and PRM-18 blockers are accepted or cleared.
 - PRM-20 cleanup/archive cannot start until PRM-19 dogfood evidence exists and
   compatibility archive/delete/move approval is explicit.
 - Legacy runtime is frozen: do not restart `telegram-bot.service` or
