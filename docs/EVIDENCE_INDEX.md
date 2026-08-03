@@ -37,6 +37,7 @@ Last updated: 2026-07-29
 | PRM safe assistant runtime receipt | docs/audit/PRM_SAFE_ASSISTANT_RUNTIME_2026-07-29.md |
 | PRM local memory ask receipt | docs/audit/PRM_LOCAL_MEMORY_ASK_2026-07-29.md |
 | PRM LLM chat UX task block receipt | docs/audit/PRM_LLM_CHAT_UX_TASKS_2026-07-29.md |
+| PRM architecture research prompt | docs/prompts/prm_architecture_research_agent.md |
 | PRM-18 sanitized gate JSON | evals/prm18_release_gate_receipt_2026-07-29.json |
 
 ## W29 Artifact Evidence
@@ -233,6 +234,7 @@ performed.
 | --- | --- |
 | next task | PRM-18A Operator LLM Chat UX Contract |
 | task block | PRM-18A -> PRM-18B -> PRM-18C before PRM-19 |
+| architecture prompt | docs/prompts/prm_architecture_research_agent.md |
 | dogfood state | still blocked; not started |
 | provider egress | not approved by default |
 | implementation boundary | fake LLM clients and fixture DBs until explicit approval |

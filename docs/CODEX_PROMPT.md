@@ -22,6 +22,8 @@ Last updated: 2026-07-29
   explicitly deferred, explicit human dogfood-start approval exists, and PRM-18
   blockers are accepted or cleared; PRM-20 only after real dogfood evidence and
   explicit compatibility archive/delete/move approval.
+- Optional pre-implementation architecture research prompt:
+  docs/prompts/prm_architecture_research_agent.md
 
 ## Product Direction
 

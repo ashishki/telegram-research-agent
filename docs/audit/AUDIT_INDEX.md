@@ -72,4 +72,6 @@ These files remain preserved for human reference, but they are no longer part of
   external search, Telegram service startup, startup migrations, or writes.
 - `PRM_LLM_CHAT_UX_TASKS_2026-07-29.md` - proposed PRM-18A through PRM-18C
   task-block receipt for explicit LLM chat UX, CLI harness, and Telegram
-  assistant parity before PRM-19 dogfood.
+  assistant parity before PRM-19 dogfood; references
+  `docs/prompts/prm_architecture_research_agent.md` for optional architecture
+  research before implementation.

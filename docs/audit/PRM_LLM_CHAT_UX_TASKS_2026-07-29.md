@@ -55,6 +55,9 @@ Start at `PRM-18A`. Read:
 - `src/assistant/local_memory_ask.py`;
 - `src/main.py`.
 
+If the next session should first do architecture research instead of direct
+implementation, use `docs/prompts/prm_architecture_research_agent.md`.
+
 Do not run real provider calls with private Telegram snippets while implementing
 the block. Use fake LLM clients and fixture databases for tests.
 
@@ -63,6 +66,11 @@ the block. Use fake LLM clients and fixture databases for tests.
 ```text
 python3 tools/playbook_validate.py --root . --check tasks --check placeholders --check readiness --check delivery --check references
 playbook_validate: errors=0 warnings=0
+```
+
+```text
+docs/prompts/prm_architecture_research_agent.md
+created as optional local-research prompt for architecture decision before PRM-18A
 ```
 
 ```text
