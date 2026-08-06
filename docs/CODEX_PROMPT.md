@@ -14,15 +14,16 @@ Last updated: 2026-08-03
   live runtime is frozen; safe `prm-assistant` runtime is implemented but not
   installed, enabled, started, or dogfood evidence; PRM-18A through PRM-18C are
   implemented and their batched deep review is recorded. PRM-21 documentation
-  records the future project-aware research-session assistant target.
+  records the future project-aware research-session assistant target, PRM-22
+  implements its fixture-first linked-source resolver/cache layer, and PRM-23
+  implements a bounded fixture-first `memory research` planner/CLI.
 - Implemented slices in HEAD: PRM-1 through PRM-7 plus PRM-9 through PRM-18C,
-  and PRM-21 docs-only research-session contract
-- Proposed next slices: PRM-22 through PRM-23 implement the future
-  project-aware research-session assistant; they are not current dogfood
-  evidence and do not approve web research, provider egress, or vector/backend
-  adoption.
-- Blocked/not implemented slices: PRM-8, PRM-19, PRM-20, and PRM-22 through
-  PRM-23 implementation
+  PRM-21 docs-only research-session contract, PRM-22 fixture-first
+  linked-source resolver/cache, and PRM-23 fixture-first memory research
+  planner/CLI
+- Proposed next slice: none before gated work; PRM-19 and PRM-20 remain
+  blocked, and PRM-8 vector/hybrid retrieval remains blocked.
+- Blocked/not implemented slices: PRM-8, PRM-19, and PRM-20
 - Next safe work: stop before PRM-19. PRM-19 only after explicit human
   dogfood-start approval exists and PRM-18 blockers are accepted or cleared;
   PRM-20 only after real dogfood evidence and explicit compatibility
@@ -64,8 +65,11 @@ behind the explicit provider-egress switch; Telegram chat uses the same display
 contract, while runtime start remains blocked.
 The polished archive-plus-linked-source project-aware research assistant target
 is specified in `docs/personal_research_memory_product_contract.md` and
-scheduled in `docs/tasks.md`; PRM-22 and PRM-23 implementation is not done and
-must not be claimed as dogfood evidence.
+scheduled in `docs/tasks.md`; PRM-22 and PRM-23 are implemented fixture-first
+only. They must not be claimed as dogfood evidence, live external-source
+execution, provider-egress approval, service start approval, durable
+production-cache approval, production DB write approval, or vector/backend
+approval.
 
 ## Active Profiles
 
@@ -132,10 +136,11 @@ jobs from this handoff.
   and PRM-18 blockers are accepted or cleared.
 - PRM-20 cleanup/archive cannot start until PRM-19 dogfood evidence exists and
   compatibility archive/delete/move approval is explicit.
-- PRM-21 records the future research-session assistant contract. PRM-22 through
-  PRM-23 are proposed implementation tasks; they must use fixtures/fake clients
-  by default and cannot run live web research, provider egress, service start,
-  or vector/backend adoption without explicit approval.
+- PRM-21 records the future research-session assistant contract. PRM-22 and
+  PRM-23 are implemented fixture-first only. Neither task can be treated as
+  dogfood evidence or as approval for live web research, provider egress,
+  service start, durable production cache writes, production DB writes, or
+  vector/backend adoption without explicit approval.
 - Legacy runtime is frozen: do not restart `telegram-bot.service` or
   `telegram-ai-split-report.timer` as PRM dogfood.
 - Safe runtime is not dogfood yet: do not start `src/main.py prm-assistant` or
@@ -144,11 +149,11 @@ jobs from this handoff.
 - External skills are project-disabled until trust records are approved.
 - Legacy report-centered docs remain as historical/compatibility surfaces and
   need a safe archive/migration pass in PBR-7 or PRM-20.
-- The configured full pytest baseline currently has one known failure:
-  tests/test_product_ops.py::TestProductOps::test_ops_validation_passes_when_live_evidence_rows_exist.
-  The fixture seeds 2026-07-08 live evidence and now falls outside the 14-day
-  validation window. The PRM-18 verifier on 2026-07-29 recorded:
-  `1 failed, 1049 passed, 287 subtests passed in 412.02s (0:06:52)`.
+- Current full verifier is green after PRM-23 local fixture work:
+  `python3 tools/verify_project.py --root .` passed on 2026-08-03 with
+  `1083 passed, 291 subtests passed in 465.66s (0:07:45)`. The former
+  date-window fixture drift in product ops and source-trust tests is corrected
+  with relative fixture timestamps.
 
 ## Canonical Docs
 

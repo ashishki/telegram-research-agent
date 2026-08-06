@@ -279,6 +279,51 @@ full archive indexing, embeddings, external web research jobs, live LLM
 provider calls, systemd starts/enables, startup migrations, production database
 writes, or compatibility deletes/archives were performed.
 
+## Linked Source Research Layer Evidence - 2026-08-03
+
+| Check | Result |
+| --- | --- |
+| completed task | PRM-22 Linked Source Research Layer |
+| implementation | `src/assistant/linked_sources.py` fixture-first resolver/cache |
+| focused tests | `tests/test_linked_sources.py` covers extraction/classification, sanitized cache records, and approval refusal paths |
+| test tier | `tools/test_tiers.py focused-prm` includes linked-source coverage |
+| dogfood boundary | not PRM-19 evidence; no service start or runtime dogfood |
+| live operations | none; no live HTTP fetch, external skill, provider call, embeddings/vector backend, production DB write, migration, or durable production cache write |
+
+Verification:
+
+```text
+PYTHONPATH=src python3 -m pytest tests/test_linked_sources.py -q
+3 passed in 1.50s
+```
+
+```text
+python3 tools/test_tiers.py focused-prm
+106 passed, 6 subtests passed in 24.43s
+```
+
+```text
+python3 tools/test_tiers.py ops-date-sensitive
+4 passed in 5.05s
+```
+
+```text
+python3 tools/verify_project.py --root .
+PASS: playbook_contract exit=0
+PASS: project_tests exit=0
+1083 passed, 291 subtests passed in 465.66s (0:07:45)
+```
+
+```text
+python3 tools/playbook_validate.py --root . --check tasks --check placeholders --check readiness --check delivery --check references
+playbook_validate: errors=0 warnings=0
+```
+
+```text
+git diff --check
+pass, no output
+```
+
 ## Telegram PRM Assistant UX Evidence - 2026-08-03
 
 | Check | Result |
@@ -333,9 +378,9 @@ writes, or compatibility deletes/archives were performed.
 | completed task | PRM-21 Project-Aware Research Session Contract |
 | contract | docs/personal_research_memory_product_contract.md |
 | task graph | docs/tasks.md |
-| future implementation | PRM-22 linked-source layer and PRM-23 bounded planner recorded as future work |
+| implementation boundary | PRM-22 fixture-first linked-source resolver/cache and PRM-23 bounded fixture-first `memory research` planner/CLI are implemented |
 | RAG boundary | RAG is necessary but not sufficient; SQLite FTS remains baseline and PRM-8 vector/hybrid adoption remains blocked |
-| dogfood boundary | not current PRM-19 evidence; no `memory research` command implemented |
+| dogfood boundary | not current PRM-19 evidence; `memory research` is local fixture-first and not dogfood/runtime evidence |
 | live operations | none |
 
 Verification:
@@ -354,6 +399,63 @@ No live Telegram ingestion, reaction sync, Radar, Frontier, report generation,
 full archive indexing, embeddings, external web research jobs, live LLM
 provider calls, systemd starts/enables, startup migrations, production database
 writes, or compatibility deletes/archives were performed.
+
+## Bounded Memory Research Planner Evidence - 2026-08-03
+
+| Check | Result |
+| --- | --- |
+| completed task | PRM-23 Bounded Memory Research Planner |
+| implementation | `src/assistant/memory_research.py` deterministic local planner and `src/main.py memory research` CLI |
+| focused tests | `tests/test_memory_research.py` covers polished answer shape, budget/open-browsing refusal, all project labels including `ambiguous_project`, and confirmation-gated drafts |
+| CLI tests | `tests/test_cli.py` covers parser/handler wiring, no startup migrations, and refusal exit code |
+| test tier | `tools/test_tiers.py focused-prm` includes memory-research coverage |
+| dogfood boundary | not PRM-19 evidence; no Telegram service start or runtime dogfood |
+| live operations | none; no live HTTP fetch, external skill, provider call, embeddings/vector backend, migration, production DB write, durable production cache write, or compatibility archive/delete/move |
+
+Verification:
+
+```text
+PYTHONPATH=src python3 -m pytest tests/test_memory_research.py -q
+7 passed, 4 subtests passed in 2.91s
+```
+
+```text
+PYTHONPATH=src python3 -m pytest tests/test_cli.py -q
+17 passed, 3 subtests passed in 5.29s
+```
+
+```text
+python3 tools/test_tiers.py focused-prm
+113 passed, 10 subtests passed in 36.62s
+```
+
+```text
+python3 tools/verify_project.py --root .
+PASS: playbook_contract exit=0
+PASS: project_tests exit=0
+1083 passed, 291 subtests passed in 465.66s (0:07:45)
+```
+
+## Deterministic Archive Query Planner Evidence - 2026-08-06
+
+| Check | Result |
+| --- | --- |
+| implementation | `memory research` archive search now plans up to 4 deterministic short SQLite FTS variants per user question |
+| receipt visibility | the archive tool receipt records `query_variants`, attempted queries, raw item counts, and locally accepted item counts |
+| project boundary | `--project` is treated as a project-context hint, not a hard archive FTS filter |
+| acceptance filter | multi-term variants require local snippet/source confirmation before an item is admitted as archive evidence |
+| before eval | 30 imitated natural user questions through the previous full-question archive path produced 0/30 archive-hit questions; 20 manual short rewrites produced 18/20 direct FTS hits |
+| after eval | the deterministic planner plus acceptance filter produced accepted archive evidence for 15/30 imitated questions |
+| interpretation | SQLite FTS is usable for anchored terms, but natural product questions still miss linked-source, freshness, provider-egress, MVP-radar, and some project-specific requests |
+| RAG boundary | this is evidence for a future retrieval layer evaluation; it is not vector/backend adoption approval |
+| live operations | none; no live HTTP fetch, external skill, provider call, embeddings/vector backend, migration, production DB write, dogfood start, or compatibility archive/delete/move |
+
+Focused verification:
+
+```text
+PYTHONPATH=src python3 -m pytest tests/test_memory_research.py -q
+7 passed, 4 subtests passed in 2.91s
+```
 
 ## PRM-18A..18C Deep Review Evidence - 2026-08-03
 

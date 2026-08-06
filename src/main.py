@@ -650,6 +650,23 @@ def build_parser() -> argparse.ArgumentParser:
     chat_parser.add_argument("--json", action="store_true", help="Print privacy-safe JSON receipts per turn")
     chat_parser.set_defaults(handler=handle_memory_chat)
 
+    research_parser = memory_sub.add_parser(
+        "research",
+        help="Run bounded local PRM research over archive, linked-source cache, and project context",
+    )
+    research_parser.add_argument("question", nargs="+")
+    research_parser.add_argument("--week", default=None)
+    research_parser.add_argument("--project", default=None)
+    research_parser.add_argument("--limit", type=int, default=5)
+    research_parser.add_argument("--max-tool-calls", type=int, default=4)
+    research_parser.add_argument("--max-archive-sources", type=int, default=5)
+    research_parser.add_argument("--max-linked-sources", type=int, default=3)
+    research_parser.add_argument("--max-retries", type=int, default=0)
+    research_parser.add_argument("--timeout-seconds", type=int, default=30)
+    research_parser.add_argument("--max-prompt-chars", type=int, default=8000)
+    research_parser.add_argument("--json", action="store_true")
+    research_parser.set_defaults(handler=handle_memory_research)
+
     ie_parser = memory_sub.add_parser("inspect-evidence")
     ie_parser.add_argument("--project", default=None)
     ie_parser.add_argument("--week", default=None)
@@ -2811,6 +2828,51 @@ def handle_memory_chat(args: argparse.Namespace) -> int:
             output_stream.write(json.dumps(receipt, ensure_ascii=False, sort_keys=True) + "\n")
         else:
             output_stream.write(render_prm_chat_answer(payload, mode="llm-approved") + "\n")
+    return 0
+
+
+def handle_memory_research(args: argparse.Namespace) -> int:
+    from assistant.memory_research import (
+        MemoryResearchBudget,
+        answer_memory_research,
+        render_memory_research_answer,
+    )
+
+    question = " ".join(args.question).strip()
+    settings = load_settings()
+    budget = MemoryResearchBudget(
+        max_tool_calls=args.max_tool_calls,
+        max_archive_sources=args.max_archive_sources,
+        max_linked_sources=args.max_linked_sources,
+        max_retries=args.max_retries,
+        timeout_seconds=args.timeout_seconds,
+        max_prompt_chars=args.max_prompt_chars,
+        max_model_calls=0,
+        max_cost_usd=0.0,
+        allow_open_browsing=False,
+        allow_provider_egress=False,
+    )
+    try:
+        payload = answer_memory_research(
+            question,
+            settings=settings,
+            week_label=args.week,
+            project_name=args.project,
+            limit=args.limit,
+            budget=budget,
+        )
+    except Exception as exc:
+        sys.stdout.write(f"Error running local memory research: {exc}\n")
+        return 1
+
+    if args.json:
+        sys.stdout.write(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
+    else:
+        sys.stdout.write(render_memory_research_answer(payload) + "\n")
+    if payload.get("status") == "invalid":
+        return 1
+    if payload.get("status") == "refused":
+        return 2
     return 0
 
 

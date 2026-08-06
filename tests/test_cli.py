@@ -9,6 +9,7 @@ from main import (
     build_parser,
     handle_memory_chat,
     handle_memory_ask,
+    handle_memory_research,
     handle_prm_assistant,
     handle_report_v2_rollout_gate,
     handle_weekly_intelligence_v2,
@@ -250,6 +251,91 @@ class TestCli(unittest.TestCase):
         self.assertIn("PRM Chat interactive", rendered)
         self.assertIn("Grounded PRM answer.", rendered)
         self.assertIn("Privacy: mode=llm-approved", rendered)
+
+    def test_memory_research_parser_is_local_and_bounded(self):
+        args = build_parser().parse_args(
+            [
+                "memory",
+                "research",
+                "--project",
+                "Eval-Ground-Truth-Lab",
+                "--max-tool-calls",
+                "4",
+                "--max-linked-sources",
+                "2",
+                "что",
+                "есть",
+                "по",
+                "eval",
+            ]
+        )
+
+        self.assertEqual(args.question, ["что", "есть", "по", "eval"])
+        self.assertEqual(args.project, "Eval-Ground-Truth-Lab")
+        self.assertEqual(args.max_tool_calls, 4)
+        self.assertEqual(args.max_linked_sources, 2)
+        self.assertIs(args.handler, handle_memory_research)
+
+    def test_memory_research_handler_skips_migrations_and_renders_answer(self):
+        args = build_parser().parse_args(["memory", "research", "что", "есть", "по", "eval"])
+        settings = SimpleNamespace(db_path="/tmp/agent.db")
+        payload = {
+            "schema_version": "memory_research_answer.v1",
+            "status": "ok",
+            "question": "что есть по eval",
+            "answer": "rendered research body",
+            "privacy": {"model_calls": 0},
+            "receipt": {"budget": {}, "tool_calls_used": 0},
+        }
+
+        with patch("main.load_settings", return_value=settings), patch("main.run_migrations") as migrations_mock, patch(
+            "assistant.memory_research.answer_memory_research",
+            return_value=payload,
+        ) as research_mock, patch(
+            "assistant.memory_research.render_memory_research_answer",
+            return_value="rendered research",
+        ):
+            output = StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(handle_memory_research(args), 0)
+
+        migrations_mock.assert_not_called()
+        research_mock.assert_called_once()
+        call_kwargs = research_mock.call_args.kwargs
+        self.assertEqual(research_mock.call_args.args[0], "что есть по eval")
+        self.assertIs(call_kwargs["settings"], settings)
+        self.assertEqual(call_kwargs["week_label"], None)
+        self.assertEqual(call_kwargs["project_name"], None)
+        self.assertEqual(call_kwargs["limit"], 5)
+        self.assertEqual(call_kwargs["budget"].max_model_calls, 0)
+        self.assertFalse(call_kwargs["budget"].allow_open_browsing)
+        self.assertFalse(call_kwargs["budget"].allow_provider_egress)
+        self.assertEqual(output.getvalue(), "rendered research\n")
+
+    def test_memory_research_handler_returns_refusal_code(self):
+        args = build_parser().parse_args(["memory", "research", "browse", "web"])
+        settings = SimpleNamespace(db_path="/tmp/agent.db")
+        payload = {
+            "schema_version": "memory_research_answer.v1",
+            "status": "refused",
+            "question": "browse web",
+            "message": "Open-ended browsing is not approved.",
+            "receipt": {"privacy": {"model_calls": 0}},
+            "privacy": {"model_calls": 0},
+        }
+
+        with patch("main.load_settings", return_value=settings), patch(
+            "assistant.memory_research.answer_memory_research",
+            return_value=payload,
+        ), patch(
+            "assistant.memory_research.render_memory_research_answer",
+            return_value="refused",
+        ):
+            output = StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(handle_memory_research(args), 2)
+
+        self.assertEqual(output.getvalue(), "refused\n")
 
     def test_memory_ask_handler_skips_migrations_and_renders_answer(self):
         args = build_parser().parse_args(["memory", "ask", "что", "есть", "по", "eval"])

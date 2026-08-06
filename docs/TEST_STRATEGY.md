@@ -97,7 +97,8 @@ PYTHONPATH=src python3 -m pytest tests/test_knowledge_library.py tests/test_test
 8 passed in 7.15s
 ```
 
-The full verifier receipt below is the PRM-18 release-gate readiness run.
+The full verifier receipt below is the historical PRM-18 release-gate readiness
+run.
 
 ```text
 python3 tools/verify_project.py --root .
@@ -113,9 +114,24 @@ python3 tools/test_tiers.py ops-date-sensitive
 FAILED tests/test_product_ops.py::TestProductOps::test_ops_validation_passes_when_live_evidence_rows_exist
 ```
 
-The `ops-date-sensitive` failure is the known live-evidence-window fixture
-failure. It is intentionally isolated from `focused-prm` and `fast-contract`;
-do not hide it by deleting the test or weakening the assertion.
+The former `ops-date-sensitive` failure was live-evidence-window fixture drift.
+As of PRM-22 local verification on 2026-08-03, product ops and source-trust
+fixture timestamps are relative and the current verifier is green:
+
+```text
+python3 tools/verify_project.py --root .
+PASS: playbook_contract exit=0
+PASS: project_tests exit=0
+1083 passed, 291 subtests passed in 465.66s (0:07:45)
+```
+
+```text
+python3 tools/test_tiers.py ops-date-sensitive
+4 passed in 5.05s
+```
+
+Do not hide future date-sensitive failures by deleting tests or weakening
+assertions; fix fixtures to express their intended freshness window.
 
 ## Policy
 

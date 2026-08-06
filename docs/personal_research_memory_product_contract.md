@@ -46,10 +46,15 @@ Generate reports only as a secondary projection.
 
 ## Research Session Assistant Target
 
-The polished assistant target is a future capability, not a current dogfood
-claim. For full research sessions, the assistant must search the large Telegram
-archive, inspect approved linked sources, compare approaches, infer project
-context, explain the result clearly, and recommend where to look next.
+The polished assistant target is implemented only as a fixture-first local
+slice, not a current dogfood claim. For full research sessions, the assistant
+must search the large Telegram archive, inspect approved linked sources,
+compare approaches, infer project context, explain the result clearly, and
+recommend where to look next. The current PRM-23 `memory research` path uses
+bounded local archive/curated/project context, PRM-22 linked-source cache/fake
+fetcher evidence, deterministic synthesis, and confirmation-gated drafts; it
+does not approve live web research, provider egress, service start, production
+writes, dogfood, release claims, or vector/backend adoption.
 
 Example target question:
 

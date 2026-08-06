@@ -68,16 +68,17 @@ and `insufficient_evidence` when the archive does not support the answer.
 - Weekly Brief V3 deterministic secondary projection.
 - Gated LLM-backed `memory ask`/`memory chat` CLI and Telegram chat parity,
   with the safe runtime still disabled.
-- Documented project-aware research-session assistant target, with
-  implementation not yet built.
+- Fixture-first project-aware `memory research` sessions that combine archive
+  retrieval, linked-source cache/fake fetcher evidence, project routing,
+  approach comparison, deeper-reading paths, and confirmation-gated draft
+  proposals without live web/provider/runtime approval.
 
 ## Planned, Not Yet Implemented
 
 - Human-approved gold query labels and accepted retrieval thresholds.
 - Hybrid/vector retrieval only after FTS baseline failures justify it.
-- Project-aware `memory research` sessions that search the archive, inspect
-  approved linked sources, compare approaches, infer project context, and return
-  a deeper-reading path.
+- Live/provider-backed project-aware research sessions beyond the local
+  fixture-first `memory research` slice.
 - Real learning dogfood and spaced-repetition outcome evidence.
 - Dogfood, release readiness, and public value evidence.
 

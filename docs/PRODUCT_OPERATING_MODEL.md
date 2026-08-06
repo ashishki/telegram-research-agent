@@ -163,13 +163,15 @@ Future polished assistant target:
 
 - specified in `docs/personal_research_memory_product_contract.md` and
   scheduled in `docs/tasks.md`;
-- PRM-21 records the contract; PRM-22 and PRM-23 remain future implementation
-  tasks and are not present in the current runtime;
+- PRM-21 records the contract; PRM-22 implements a fixture-first linked-source
+  resolver/cache layer, and PRM-23 implements a bounded fixture-first
+  `memory research` planner/CLI;
 - expected to add archive search plus approved linked-source research,
   project-context routing, approach comparison, LLM synthesis, and
   deeper-reading paths;
 - not PRM-19 evidence until implemented and explicitly dogfooded;
-- not an approval to start web research, provider egress, services, dogfood, or
+- not an approval to start live web research, provider egress, services,
+  dogfood, production DB writes, durable production cache writes, or
   vector/backend adoption.
 
 Implemented `prm-assistant` runtime mode:

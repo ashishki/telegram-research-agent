@@ -31,6 +31,8 @@ Last updated: 2026-08-03
 | autonomous workflow telemetry leaks raw private text | PRM-17 telemetry records aggregate metrics and redacted field names only |
 | release or dogfood gate receipt leaks raw private text | PRM-18 receipt schema rejects raw payload keys and requires privacy flags to remain false |
 | source URL loses provenance | archive document identity preserves Telegram link |
+| linked-source cache leaks raw provider payloads or private post text | PRM-22 cache records store source URL, normalized title, content hash, bounded excerpt, status, and redacted failure reason only |
+| linked-source resolver crawls live web by default | PRM-22 uses fixture/fake fetchers by default and refuses live HTTP, external skills, and provider summarization without explicit approval/budget switches |
 | deletion cannot be honored | retention/deletion path required before dogfood |
 
 ## Provider Egress Rule
@@ -83,6 +85,31 @@ The PRM-11 assistant path does not call external sources. It records:
 - no automatic Telegram archive snippet collection for verification-only routes;
 - `external_skill_used=false`;
 - no stored research note until human confirmation.
+
+## Linked Source Research Rule
+
+PRM-22 implements linked-source extraction and cache receipts as a fixture-first
+assistant layer. The default resolver may extract URLs from selected Telegram
+evidence and classify article, docs, GitHub, paper, video, product, and unknown
+source types, but it does not crawl live links by default.
+
+Linked-source cache receipts may contain:
+
+- source URL and normalized URL;
+- source type;
+- fetched-at timestamp from the fake or approved fetcher;
+- normalized title;
+- content hash and hash algorithm;
+- bounded text excerpt;
+- extraction status;
+- redacted failure reason;
+- Telegram evidence refs, not Telegram raw text.
+
+They must not contain raw Telegram post text, raw provider payloads, prompts,
+completions, secrets, or full failure payloads. Live HTTP fetches, external
+skills, provider summarization, and durable cache writes over private
+production inputs remain refused unless the operator records explicit approval,
+budget, and any required trust record for that run.
 
 ## Confirmation Rule
 

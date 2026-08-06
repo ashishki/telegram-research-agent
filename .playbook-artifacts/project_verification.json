@@ -43,10 +43,10 @@
         "-q"
       ],
       "cwd": ".",
-      "exit_code": 1,
+      "exit_code": 0,
       "expected_exit_code": 0,
       "id": "project_tests",
-      "passed": false,
+      "passed": true,
       "required": true,
       "skipped": false,
       "stderr_ref": {
@@ -55,17 +55,17 @@
       },
       "stdout_ref": {
         "path": ".playbook-artifacts/project_verification/project_tests/stdout.txt",
-        "sha256": "0a4e606a6aba387bfc9c09f9e97ecfa550574469b46f37b6a29c7913862a0f23"
+        "sha256": "7961f32f3b864333c001cce008d5b80d2efe316c1a0109992853a8e8bc459acb"
       },
       "timed_out": false
     }
   ],
   "configuration_errors": [],
-  "finished_at": "2026-07-29T07:22:22Z",
+  "finished_at": "2026-08-03T15:23:52Z",
   "platform": "Linux-5.15.0-170-generic-x86_64-with-glibc2.35",
-  "project_commit": "8201636c204846c3e82fda3a213a2d1b3560c727",
+  "project_commit": "159aede7341610fdb5ad28fd930f487f31f14b68",
   "python_executable": "/usr/bin/python3",
-  "required_failures": 1,
+  "required_failures": 0,
   "schema_version": "playbook.project_verification_result.v1",
-  "started_at": "2026-07-29T07:15:28Z"
+  "started_at": "2026-08-03T15:16:05Z"
 }

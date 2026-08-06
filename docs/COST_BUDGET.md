@@ -23,6 +23,8 @@ Status: active PRM budget requiring human approval before live provider use
 | PRM-18A LLM chat UX contract | $0 | 0 | any provider call |
 | PRM-18B LLM-backed memory chat CLI implementation | $0 for implementation/tests | 0 for implementation/tests | real provider call with private snippets |
 | PRM-18C Telegram PRM assistant UX parity | $0 for implementation/tests | 0 for implementation/tests | starting service or real provider call |
+| PRM-22 linked-source resolver implementation | $0 for implementation/tests | 0 for implementation/tests | live HTTP fetch, external skill, provider summarization, or durable production cache write |
+| PRM-23 memory research planner implementation | $0 for implementation/tests | 0 for implementation/tests | live linked-source fetch, provider synthesis, service start, dogfood start, production write, or vector/backend adoption |
 
 Monthly planning ceiling before dogfood: $25 unless the human approves more.
 
@@ -194,7 +196,10 @@ PYTHONPATH=src python3 -m pytest tests/test_pi_tools.py tests/test_pi_chat.py -q
 
 The project-aware research-session assistant is specified as a future capability
 in `docs/personal_research_memory_product_contract.md` and scheduled in
-`docs/tasks.md`.
+`docs/tasks.md`. PRM-22 now implements only the fixture-first linked-source
+resolver/cache layer. PRM-23 now implements the bounded fixture-first
+`memory research` planner/CLI with deterministic synthesis; runtime dogfood and
+live/provider-backed research remain unapproved.
 
 Default budget before approval:
 
@@ -208,6 +213,21 @@ Default budget before approval:
 | Live linked-source fetch | approval required |
 | Real provider synthesis over private snippets | approval required |
 | Vector/backend adoption | approval required through PRM-8 ADR |
+
+PRM-22 implementation receipts must report `model_calls=0`,
+`estimated_cost_usd=0`, `external_skill_used=false`, and
+`provider_summarization_used=false` for fixture/fake-client runs. A fetcher that
+requires live HTTP, an external skill, or provider summarization must be refused
+unless approval switches also include a nonzero budget or fetch/call cap and an
+approval reference.
+
+PRM-23 implementation receipts must report `model_calls=0`,
+`estimated_cost_usd=0`, `bounded_telegram_snippet_provider_egress=false`,
+`raw_telegram_corpus_egress=false`, `external_skill_used=false`, and
+`durable_writes=false`. The planner refuses open-ended browsing, provider
+egress, nonzero model/cost budgets, oversized tool/source/retry/prompt/timeout
+limits, and keeps all memory/project/action proposals as confirmation-gated
+drafts.
 
 If the operator later approves a bounded research-session dogfood, approval
 must name:

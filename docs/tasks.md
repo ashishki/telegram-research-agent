@@ -41,7 +41,7 @@ Target repo baseline: ad8689fa25b89f77122c4cec7c7a6b9da3f500cf
 | Project context support | Deterministic PRM-14 assistant tool combines active project descriptors, bounded archive retrieval, and curated knowledge into direct_implication, weak_watch, learning_relevance, or no_match labels without build/code/project mutation approval |
 | Local operator UX | `memory ask` gives a local-only evidence brief over bounded archive/curated/project context with no LLM calls, external search, startup migrations, service starts, or writes |
 | LLM chat UX | PRM-18A contract, PRM-18B CLI harness, and PRM-18C Telegram UX/runbook implemented with explicit provider-egress approval and no dogfood/service start |
-| Research session assistant | Polished project-aware archive-plus-linked-source assistant target is documented by PRM-21; PRM-22..PRM-23 implementation remains future work and is not dogfood evidence or a vector/backend adoption claim |
+| Research session assistant | Polished project-aware archive-plus-linked-source assistant target is documented by PRM-21; PRM-22 fixture-first linked-source resolver/cache and PRM-23 bounded `memory research` planner are implemented; neither is dogfood evidence or a vector/backend adoption claim |
 | Learning state | PRM-15 fixture-only migration/projection maps legacy source presence to indexed/surfaced only and requires explicit receipts for opened/read/understood/explained/tried/applied/measured |
 | Weekly Brief V3 | PRM-16 deterministic secondary projection and static HTML renderer implemented for bounded supplied context; V1 Brief and Atlas are demoted to compatibility/internal surfaces |
 | Runtime workflows | PRM-17 deterministic workflow registry and privacy-safe aggregate telemetry receipt implemented; scheduled runtime activation is not approved |
@@ -52,7 +52,7 @@ Target repo baseline: ad8689fa25b89f77122c4cec7c7a6b9da3f500cf
 | W29 reports | V1 Brief and Atlas rendered despite V2 preview code existing elsewhere |
 | W29 reactions | Seven personal reactions resolved to posts, zero atoms, zero themes, zero ranking effects |
 | Radar | Historical W29 Radar stage failed; PRM-16 V3 fixtures localize Radar failure to the Radar card |
-| Dogfood | Not started for the new product; PRM-19 remains blocked until PRM-18 blockers are accepted or cleared and explicit human dogfood-start approval is recorded; PRM-22..PRM-23 are future capability tasks and must not be counted as current dogfood evidence |
+| Dogfood | Not started for the new product; PRM-19 remains blocked until PRM-18 blockers are accepted or cleared and explicit human dogfood-start approval is recorded; PRM-22 and PRM-23 fixture capabilities must not be counted as current dogfood evidence |
 
 ## Dependency Graph
 
@@ -1585,7 +1585,7 @@ Objective: |
 Acceptance-Criteria:
   - id: AC-1; description: contract states that RAG is necessary but not sufficient, and separates archive retrieval, linked-source research, project routing, bounded planning, synthesis, confirmation-gated memory, and evals; verify: docs/personal_research_memory_product_contract.md has the capability stack.
   - id: AC-2; description: evidence classes separate Telegram archive, curated memory, linked external evidence, model background, and unknowns; verify: docs/personal_research_memory_product_contract.md contains an evidence class table.
-  - id: AC-3; description: task graph records PRM-22..PRM-23 as future capability implementation work, not current dogfood evidence or vector/backend approval; verify: docs/tasks.md and docs/ARCHITECTURE.md state the boundary.
+  - id: AC-3; description: task graph records PRM-22..PRM-23 as capability implementation work, not current dogfood evidence or vector/backend approval; verify: docs/tasks.md and docs/ARCHITECTURE.md state the boundary.
 Verification:
   - python3 tools/playbook_validate.py --root . --check tasks --check references
   - git diff --check
@@ -1611,15 +1611,15 @@ Cost-Budget: |
 Notes: |
   Implemented on 2026-08-03 as documentation/backlog grooming. It records the
   polished assistant product bar and PRM-22..PRM-23 implementation tasks. It
-  does not implement `memory research`, run web research, start dogfood,
-  approve provider egress, or unblock PRM-8 vector/hybrid retrieval.
+  does not implement PRM-23 planner behavior by itself, run web research, start
+  dogfood, approve provider egress, or unblock PRM-8 vector/hybrid retrieval.
 
 ### PRM-22: Linked Source Research Layer
 
 Owner: codex
 Phase: PRM
 Type: tool:research
-Status: proposed
+Status: implemented
 Depends-On: PRM-21
 Risk-Level: high
 Public-Tests-Required: required
@@ -1640,12 +1640,12 @@ Acceptance-Criteria:
   - id: AC-2; description: linked-source cache stores fetched-at time, source URL, normalized title, content hash, extraction status, and redacted failure reason without raw provider payload logs; test: receipt/cache tests inspect sanitized fields.
   - id: AC-3; description: live HTTP fetch, external skills, and provider summarization refuse unless explicit approval/budget switches are present; test: refusal-path tests pass.
 Verification:
-  - focused linked-source tests documented by implementation task
+  - PYTHONPATH=src python3 -m pytest tests/test_linked_sources.py -q
   - python3 tools/playbook_validate.py --root . --check tasks --check references
   - git diff --check
 Files:
-  - src/
-  - tests/
+  - src/assistant/linked_sources.py
+  - tests/test_linked_sources.py
   - docs/PRIVACY_THREAT_MODEL.md
   - docs/COST_BUDGET.md
 Context-Refs:
@@ -1660,16 +1660,19 @@ Cost-Budget: |
   max_retries: 1 per approved fetch workflow
   approval_required_when: live HTTP fetch, external skill use, provider call, or durable cache write over private production inputs is proposed
 Notes: |
-  PRM-22 may be implemented with fixtures/local fake fetchers first. It must not
-  crawl live links or use external skills during implementation without
-  explicit approval.
+  Implemented on 2026-08-03 as a fixture-first resolver/cache layer. It
+  extracts and classifies linked source URLs, uses injected fake fetchers in
+  tests, emits sanitized cache/receipt records, and refuses live HTTP fetch,
+  external skills, or provider summarization unless explicit approval and
+  budget switches are present. It does not run live web research, start
+  dogfood, approve provider egress, or adopt a vector/backend.
 
 ### PRM-23: Bounded Memory Research Planner
 
 Owner: codex
 Phase: PRM
 Type: assistant:workflow
-Status: proposed
+Status: implemented
 Depends-On: PRM-21, PRM-22
 Risk-Level: high
 Public-Tests-Required: required
@@ -1691,13 +1694,16 @@ Acceptance-Criteria:
   - id: AC-3; description: project routing reports direct_implication, weak_watch, learning_relevance, no_match, or ambiguous_project without mutating project descriptors; test: project-routing tests pass.
   - id: AC-4; description: all save/watch/project/action proposals remain drafts until explicit confirmation token; test: confirmation-gate regression tests pass.
 Verification:
-  - focused memory-research tests documented by implementation task
+  - PYTHONPATH=src python3 -m pytest tests/test_memory_research.py -q
+  - PYTHONPATH=src python3 -m pytest tests/test_cli.py -q
   - python3 tools/test_tiers.py focused-prm
   - python3 tools/playbook_validate.py --root . --check tasks --check references
   - git diff --check
 Files:
-  - src/
-  - tests/
+  - src/assistant/memory_research.py
+  - src/main.py
+  - tests/test_memory_research.py
+  - tests/test_cli.py
   - docs/operator_workflow.md
   - docs/EVIDENCE_INDEX.md
 Context-Refs:
@@ -1714,6 +1720,12 @@ Cost-Budget: |
   max_retries: 1 per approved runtime workflow
   approval_required_when: real provider egress, live linked-source fetch, service start, dogfood start, or vector/backend adoption is proposed
 Notes: |
-  PRM-23 is the first task that can make the polished assistant user story
-  real. It still does not approve production dogfood, Telegram service start,
-  live external research, or release claims by itself.
+  Implemented on 2026-08-03 as a fixture-first local research planner and
+  `memory research` CLI. It uses bounded archive/curated/project context,
+  deterministic SQLite FTS query decomposition with local acceptance filtering,
+  PRM-22 linked-source cache/fake fetcher paths, deterministic synthesis,
+  privacy/cost receipts, and confirmation-gated draft proposals. `--project`
+  is a project-context hint, not a hard archive FTS filter. It still does not
+  approve production dogfood, Telegram service start, live external research,
+  provider egress, durable production writes/cache, vector/backend adoption, or
+  release claims by itself.

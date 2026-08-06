@@ -28,6 +28,8 @@ PRM_TESTS = (
     "tests/test_selective_enrichment.py",
     "tests/test_archive_retrieval_eval.py",
     "tests/test_knowledge_library.py",
+    "tests/test_linked_sources.py",
+    "tests/test_memory_research.py",
 )
 
 FAST_CONTRACT_TESTS = (

@@ -47,13 +47,14 @@ Telegram channels
 
 The desired polished assistant is a project-aware research session, specified
 in `docs/personal_research_memory_product_contract.md` and scheduled in
-`docs/tasks.md` as PRM-21 through PRM-23. That target adds a future layer above
-the current `memory ask` preview:
+`docs/tasks.md` as PRM-21 through PRM-23. PRM-22 provides the fixture-first
+linked-source resolver/cache layer. PRM-23 provides the bounded fixture-first
+`memory research` planner/CLI above the current `memory ask` preview:
 
 ```text
 Question
   -> project/context interpretation
-  -> Telegram archive retrieval
+  -> Telegram archive retrieval with deterministic SQLite FTS query variants
   -> approved linked-source fetch/cache
   -> approach comparison and contradiction check
   -> grounded synthesis with deeper-reading path
@@ -65,6 +66,13 @@ linked-source research, project-context routing, bounded planning, synthesis,
 and evals. SQLite FTS remains the baseline retrieval backend; vector or hybrid
 retrieval is still a PRM-8 conditional decision that requires measured FTS
 failure and human-approved backend adoption.
+
+The current PRM-23 planner uses deterministic synthesis and fake/fixture linked
+source paths only. The archive layer performs bounded query decomposition and
+acceptance filtering over the existing SQLite FTS backend; it is not approval
+for live web research, provider egress, service start, production DB writes,
+durable linked-source cache writes over private production inputs, dogfood, or
+vector/backend adoption.
 
 ## Problem Fit And Adoption Reality
 

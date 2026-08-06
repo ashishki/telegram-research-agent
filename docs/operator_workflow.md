@@ -117,14 +117,16 @@ PRM-18B/PRM-18C implementation status:
   snippets;
 - implementation/test evidence used fake clients and fixture DBs only.
 
-## Future Research Session Assistant
+## Local Research Session Assistant
 
 The target polished assistant is specified in
 `docs/personal_research_memory_product_contract.md` and scheduled in
-`docs/tasks.md` as PRM-21 through PRM-23. It is not implemented yet and must not
-be counted as PRM-19 dogfood evidence.
+`docs/tasks.md` as PRM-21 through PRM-23. PRM-22 and PRM-23 are implemented
+fixture-first only and must not be counted as PRM-19 dogfood evidence.
 
-The future user-facing shape is a `memory research` style workflow:
+Use `memory research` when you want the local project-aware research-session
+shape without live web research, provider calls, service starts, migrations, or
+writes:
 
 ```bash
 PYTHONPATH=src python3 src/main.py memory research \
@@ -132,17 +134,34 @@ PYTHONPATH=src python3 src/main.py memory research \
   "покажи свежие практики по RAG и что из этого применимо к проекту"
 ```
 
-Expected behavior:
+Current behavior:
 
-- search the local Telegram archive and curated memory;
+- search the local Telegram archive with deterministic short query variants
+  over SQLite FTS, then search curated memory;
+- keep `--project` as a project-context hint rather than a hard archive FTS
+  filter, so atomless posts are still retrievable;
 - identify relevant links inside selected posts;
-- fetch or parse linked sources only after explicit approval;
-- compare approaches, tradeoffs, and contradictions;
-- infer project relevance as direct, weak, learning, no-match, or ambiguous;
+- use approved/fake linked-source cache paths only; no live HTTP fetch is run by
+  default;
+- compare approaches, tradeoffs, and linked-source gaps;
+- infer project relevance as `direct_implication`, `weak_watch`,
+  `learning_relevance`, `no_match`, or `ambiguous_project`;
 - return a concise explanation and deeper-reading path;
-- keep Telegram archive evidence, linked-source evidence, model background,
-  and unknowns separate;
-- propose memory/project/action saves as drafts only.
+- keep Telegram archive evidence, linked-source evidence, curated memory,
+  project fit, and unknowns separate;
+- propose memory/project/action saves as drafts only with confirmation tokens;
+- print a privacy/cost receipt with `model_calls=0`,
+  `estimated_cost_usd=0`, no provider egress, no live linked-source fetch, and
+  no durable writes. The JSON receipt includes attempted `query_variants` and
+  per-variant accepted item counts for retrieval debugging.
+
+Machine-readable receipt:
+
+```bash
+PYTHONPATH=src python3 src/main.py memory research --json \
+  --project telegram-research-agent \
+  "что из этого применимо к проекту?"
+```
 
 RAG is required for this target, but RAG is not the whole product. Vector or
 hybrid retrieval remains conditional and must not be adopted until eval evidence
