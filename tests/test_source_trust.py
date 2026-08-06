@@ -6,6 +6,7 @@ import tempfile
 import types
 import unittest
 from contextlib import redirect_stdout
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 
@@ -42,6 +43,10 @@ from output.source_trust import explain_source_downrank, format_source_downrank_
 import main  # noqa: E402
 
 
+def _days_ago_iso(days: int) -> str:
+    return (datetime.now(timezone.utc) - timedelta(days=days)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
 class TestSourceTrust(unittest.TestCase):
     def _make_db(self) -> str:
         tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
@@ -51,6 +56,11 @@ class TestSourceTrust(unittest.TestCase):
         return tmp.name
 
     def _seed_source_rows(self, connection: sqlite3.Connection) -> None:
+        post_one_at = _days_ago_iso(5)
+        post_two_at = _days_ago_iso(4)
+        tag_at = _days_ago_iso(3)
+        feedback_at = _days_ago_iso(2)
+        observation_at = _days_ago_iso(1)
         connection.executemany(
             """
             INSERT INTO raw_posts (
@@ -59,8 +69,8 @@ class TestSourceTrust(unittest.TestCase):
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
-                (1, "noisy_source", 1, 101, "2026-07-01T10:00:00Z", "noise", "{}", "2026-07-01T10:01:00Z", ""),
-                (2, "noisy_source", 1, 102, "2026-07-02T10:00:00Z", "noise", "{}", "2026-07-02T10:01:00Z", "https://t.me/noisy_source/102"),
+                (1, "noisy_source", 1, 101, post_one_at, "noise", "{}", post_one_at, ""),
+                (2, "noisy_source", 1, 102, post_two_at, "noise", "{}", post_two_at, "https://t.me/noisy_source/102"),
             ],
         )
         connection.executemany(
@@ -71,8 +81,8 @@ class TestSourceTrust(unittest.TestCase):
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
-                (1, 1, "noisy_source", "noise", "2026-07-01T10:00:00Z", "2026-07-01T10:01:00Z", "noise", 0.0),
-                (2, 2, "noisy_source", "noise", "2026-07-02T10:00:00Z", "2026-07-02T10:01:00Z", "noise", 0.0),
+                (1, 1, "noisy_source", "noise", post_one_at, post_one_at, "noise", 0.0),
+                (2, 2, "noisy_source", "noise", post_two_at, post_two_at, "noise", 0.0),
             ],
         )
         connection.execute(
@@ -80,14 +90,14 @@ class TestSourceTrust(unittest.TestCase):
             INSERT INTO user_post_tags (post_id, tag, note, recorded_at)
             VALUES (?, ?, ?, ?)
             """,
-            (1, "low_signal", "bad", "2026-07-03T10:00:00Z"),
+            (1, "low_signal", "bad", tag_at),
         )
         connection.execute(
             """
             INSERT INTO signal_feedback (post_id, feedback, recorded_at)
             VALUES (?, ?, ?)
             """,
-            (1, "skipped", "2026-07-04T10:00:00Z"),
+            (1, "skipped", feedback_at),
         )
         connection.execute(
             """
@@ -103,7 +113,7 @@ class TestSourceTrust(unittest.TestCase):
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            ("noisy_source", "2026-W27", 2, 1, 1, "{}", "2026-07-05T10:00:00Z", "2026-07-05T10:00:00Z"),
+            ("noisy_source", "2026-W27", 2, 1, 1, "{}", observation_at, observation_at),
         )
         connection.commit()
 

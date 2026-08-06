@@ -7,6 +7,7 @@ import tempfile
 import types
 import unittest
 from contextlib import redirect_stdout
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 
@@ -42,6 +43,10 @@ from db.migrate import run_migrations  # noqa: E402
 from output.ops_validation import validate_ops  # noqa: E402
 from output.product_split import evaluate_product_split_gate  # noqa: E402
 import main  # noqa: E402
+
+
+def _days_ago_iso(days: int) -> str:
+    return (datetime.now(timezone.utc) - timedelta(days=days)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 class TestProductOps(unittest.TestCase):
@@ -125,6 +130,7 @@ class TestProductOps(unittest.TestCase):
         connection.commit()
 
     def _seed_ops_rows(self, connection: sqlite3.Connection) -> None:
+        recent_timestamp = _days_ago_iso(1)
         connection.execute(
             """
             INSERT INTO reaction_sync_state (
@@ -132,7 +138,7 @@ class TestProductOps(unittest.TestCase):
             )
             VALUES (?, ?, ?, ?, ?, ?)
             """,
-            ("telegram_reaction", "source_a", 101, "🔥", "tag:strong", "2026-07-08T10:00:00Z"),
+            ("telegram_reaction", "source_a", 101, "🔥", "tag:strong", recent_timestamp),
         )
         connection.execute(
             """
@@ -141,7 +147,7 @@ class TestProductOps(unittest.TestCase):
             )
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            ("insight", "insight_triage_id", "7", "acted_on", "button", "telegram_button", "2026-07-08T10:00:00Z"),
+            ("insight", "insight_triage_id", "7", "acted_on", "button", "telegram_button", recent_timestamp),
         )
         connection.commit()
 
