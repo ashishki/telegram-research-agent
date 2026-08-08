@@ -1,7 +1,7 @@
 # Active Task Graph
 
 Status: proposed
-Last updated: 2026-08-03
+Last updated: 2026-08-08
 Playbook SHA: 5583eca96c4d2d480b5574ed78bea63e0b07ebf0
 Target repo baseline: ad8689fa25b89f77122c4cec7c7a6b9da3f500cf
 
@@ -34,14 +34,14 @@ Target repo baseline: ad8689fa25b89f77122c4cec7c7a6b9da3f500cf
 | Repository | Existing product, not greenfield; pre-retrofit commit ad8689fa25b89f77122c4cec7c7a6b9da3f500cf |
 | Playbook | Current checkout pinned at 5583eca96c4d2d480b5574ed78bea63e0b07ebf0 |
 | Product center | Pivot proposed from weekly report to Personal Telegram Research Memory + Grounded Assistant |
-| Full archive search | Bounded SQLite FTS archive search is implemented as the local assistant retrieval slice; vector/hybrid retrieval remains blocked |
+| Full archive search | Bounded SQLite FTS archive search is implemented as the local assistant retrieval slice; full product RAG now requires PRM-24..PRM-28 before dogfood |
 | Current SQLite FTS | Hardened as the persistent baseline for bounded archive search; not replaced by embeddings/vector storage |
 | PI assistant retrieval | Uses bounded curated and SQLite FTS archive tools; broad raw corpus provider egress remains forbidden |
 | Knowledge Library | Deterministic PRM-13 topic-page DTO and static HTML renderer implemented for bounded supplied topic evidence; not dogfooded or released |
 | Project context support | Deterministic PRM-14 assistant tool combines active project descriptors, bounded archive retrieval, and curated knowledge into direct_implication, weak_watch, learning_relevance, or no_match labels without build/code/project mutation approval |
 | Local operator UX | `memory ask` gives a local-only evidence brief over bounded archive/curated/project context with no LLM calls, external search, startup migrations, service starts, or writes |
 | LLM chat UX | PRM-18A contract, PRM-18B CLI harness, and PRM-18C Telegram UX/runbook implemented with explicit provider-egress approval and no dogfood/service start |
-| Research session assistant | Polished project-aware archive-plus-linked-source assistant target is documented by PRM-21; PRM-22 fixture-first linked-source resolver/cache and PRM-23 bounded `memory research` planner are implemented; neither is dogfood evidence or a vector/backend adoption claim |
+| Research session assistant | Polished project-aware archive-plus-linked-source assistant target is documented by PRM-21; PRM-22 fixture-first linked-source resolver/cache and PRM-23 bounded `memory research` planner are implemented; PRM-24..PRM-28 now formalize the required full RAG path before dogfood |
 | Learning state | PRM-15 fixture-only migration/projection maps legacy source presence to indexed/surfaced only and requires explicit receipts for opened/read/understood/explained/tried/applied/measured |
 | Weekly Brief V3 | PRM-16 deterministic secondary projection and static HTML renderer implemented for bounded supplied context; V1 Brief and Atlas are demoted to compatibility/internal surfaces |
 | Runtime workflows | PRM-17 deterministic workflow registry and privacy-safe aggregate telemetry receipt implemented; scheduled runtime activation is not approved |
@@ -52,7 +52,7 @@ Target repo baseline: ad8689fa25b89f77122c4cec7c7a6b9da3f500cf
 | W29 reports | V1 Brief and Atlas rendered despite V2 preview code existing elsewhere |
 | W29 reactions | Seven personal reactions resolved to posts, zero atoms, zero themes, zero ranking effects |
 | Radar | Historical W29 Radar stage failed; PRM-16 V3 fixtures localize Radar failure to the Radar card |
-| Dogfood | Not started for the new product; PRM-19 remains blocked until PRM-18 blockers are accepted or cleared and explicit human dogfood-start approval is recorded; PRM-22 and PRM-23 fixture capabilities must not be counted as current dogfood evidence |
+| Dogfood | Not started for the new product; PRM-19 remains blocked until PRM-18 blockers are accepted or cleared, PRM-24..PRM-28 RAG gates are complete or explicitly waived by the human operator, and explicit human dogfood-start approval is recorded |
 
 ## Dependency Graph
 
@@ -70,10 +70,13 @@ PRM-10 -> PRM-12 -> PRM-13 -> PRM-14
 PRM-5/PRM-12 -> PRM-15 -> PRM-16
 PRM-3/PRM-5/PRM-6/PRM-16 -> PRM-17
 PRM-10/PRM-11/PRM-12/PRM-16/PRM-17 -> PRM-18
-PRM-18 -> PRM-18A -> PRM-18B -> PRM-18C -> PRM-19 -> PRM-20
+PRM-18 -> PRM-18A -> PRM-18B -> PRM-18C
 PRM-18C -> PRM-21 -> PRM-22 -> PRM-23
-PRM-21 findings may feed PRM-8 conditional backend adoption, but do not
-approve vector/hybrid retrieval by themselves.
+PRM-23 -> PRM-24 -> PRM-25 -> PRM-26 -> PRM-27 conditional -> PRM-28
+PRM-28 -> PRM-19 -> PRM-20
+PRM-24..PRM-28 formalize the required full product RAG path. PRM-26 refines
+the older PRM-8 hybrid/vector backend gate; PRM-27 must not start until the
+human operator accepts the backend ADR, privacy budget, and rollback plan.
 ```
 
 ## PBR Queue - Playbook Retrofit
@@ -1480,7 +1483,7 @@ Owner: human
 Phase: PRM
 Type: eval:gate
 Status: blocked
-Depends-On: PRM-18C
+Depends-On: PRM-18C, PRM-28
 Risk-Level: high
 Public-Tests-Required: not_required
 Critic-Required: conditional
@@ -1513,8 +1516,9 @@ Cost-Budget: |
   approval_required_when: weekly budget or provider egress changes
 Notes: |
   Do not predefine success as the system ran. PRM-19 is currently blocked by
-  the PRM-18 release gate and cannot start until the human operator explicitly
-  approves dogfood start and accepts or clears the recorded blockers.
+  the PRM-18 release gate and the full product RAG gate. It cannot start until
+  PRM-28 passes or the human operator explicitly waives the RAG gate, explicitly
+  approves dogfood start, and accepts or clears the recorded blockers.
 
 ### PRM-20: Post-Dogfood Simplification, Cleanup, And Archive
 
@@ -1729,3 +1733,275 @@ Notes: |
   approve production dogfood, Telegram service start, live external research,
   provider egress, durable production writes/cache, vector/backend adoption, or
   release claims by itself.
+
+### PRM-24: Product RAG Gold Eval Set
+
+Owner: human+codex
+Phase: PRM
+Type: eval:dataset eval:gate rag:query
+Status: in_progress
+Depends-On: PRM-23
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: required
+Mutation-Required: not_required
+Property-Required: required
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Convert the operator's real product questions into a human-approved RAG gold
+  eval set that covers archive recall, semantic phrasing, project fit,
+  linked-source needs, freshness needs, and no-answer behavior before any
+  vector/backend adoption.
+Acceptance-Criteria:
+  - id: AC-1; description: at least 50 privacy-safe eval rows are recorded across archive recall, project-aware research, linked-source/freshness, no-answer, and decision-support cases; verify: eval set summary reports category coverage.
+  - id: AC-2; description: every gold row has human-approved expected source IDs or an explicit no-answer expectation; test: eval schema validation rejects unlabeled or self-invented gold rows.
+  - id: AC-3; description: baseline SQLite FTS/query-planner metrics are reported separately from candidate-only diagnostics; test: retrieval eval command separates gold, holdout, and candidate rows.
+  - id: AC-4; description: acceptance thresholds are recorded for recall@5, recall@10, citation precision, no-answer accuracy, stale rejection, duplicate rejection, and latency; verify: docs/retrieval_eval.md has the threshold table.
+Verification:
+  - PYTHONPATH=src python3 -m pytest tests/test_product_rag_eval.py tests/test_archive_retrieval_eval.py tests/test_memory_research.py -q
+  - PYTHONPATH=src python3 tools/product_rag_eval_manifest.py --root . --json evals/retrieval/product_rag_eval_manifest.json
+  - python3 tools/playbook_validate.py --root . --check tasks --check references
+  - git diff --check
+Files:
+  - evals/retrieval/
+  - src/db/product_rag_eval.py
+  - tools/product_rag_eval_manifest.py
+  - tests/test_product_rag_eval.py
+  - docs/retrieval_eval.md
+  - docs/RAG_DATA_READINESS.md
+  - docs/EVIDENCE_INDEX.md
+Context-Refs:
+  - docs/retrieval_eval.md
+  - docs/RAG_DATA_READINESS.md
+  - docs/personal_research_memory_product_contract.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0 for dataset/schema work
+  max_model_calls: 0 for dataset/schema work
+  max_tool_calls: n/a
+  max_retries: 0
+  approval_required_when: private raw Telegram text would be copied into eval rows or an LLM judge is proposed
+Notes: |
+  Started on 2026-08-08 as a safe scaffold. Product RAG candidate rows,
+  proposed thresholds, an empty gold-label file, a privacy-safe manifest tool,
+  and focused validation tests exist. Human operator approval is still required
+  before any row counts as gold evidence. This task does not run embeddings,
+  provider calls, live web research, migrations, production writes, or dogfood.
+
+### PRM-25: Citation-Safe RAG Context Pack
+
+Owner: codex
+Phase: PRM
+Type: rag:context assistant:contract tool:call
+Status: proposed
+Depends-On: PRM-24
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: required
+Mutation-Required: conditional
+Property-Required: required
+Visual-Contract: optional
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Build a deterministic context-pack layer that merges archive, curated memory,
+  linked-source cache, project descriptors, freshness requirements, and
+  unknowns into a bounded citation-safe payload for local and LLM-backed RAG
+  answers.
+Acceptance-Criteria:
+  - id: AC-1; description: context packs contain source refs, source class, snippet/excerpt budget, retrieval query variant, freshness status, project label, and no-answer threshold fields; test: schema fixture tests pass.
+  - id: AC-2; description: context assembly refuses to include uncited claims or raw corpus dumps and records every excluded candidate reason; test: privacy and no-answer regression tests pass.
+  - id: AC-3; description: local `memory research` can render the context pack without LLM/provider calls; test: CLI/render tests pass with fake clients.
+  - id: AC-4; description: the context pack supports later hybrid/vector candidates without changing answer-rendering contracts; test: fixture with synthetic semantic candidate preserves citations and dedupe.
+Verification:
+  - PYTHONPATH=src python3 -m pytest tests/test_memory_research.py tests/test_cli.py -q
+  - python3 tools/test_tiers.py focused-prm
+  - python3 tools/playbook_validate.py --root . --check tasks --check references
+  - git diff --check
+Files:
+  - src/assistant/
+  - tests/
+  - docs/personal_research_memory_product_contract.md
+  - docs/PRIVACY_THREAT_MODEL.md
+  - docs/EVIDENCE_INDEX.md
+Context-Refs:
+  - docs/personal_research_memory_product_contract.md
+  - docs/PRIVACY_THREAT_MODEL.md
+  - docs/generation_eval.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0 for implementation/tests with fake clients
+  max_model_calls: 0 for implementation/tests with fake clients
+  max_tool_calls: n/a
+  max_retries: 1
+  approval_required_when: provider synthesis, live linked-source fetch, or raw corpus egress is proposed
+Notes: |
+  This is the safe pre-vector RAG substrate. It may use SQLite FTS and fixtures,
+  but it must not adopt embeddings or a vector backend.
+
+### PRM-26: Hybrid Retrieval ADR And Privacy Budget
+
+Owner: human+codex
+Phase: PRM
+Type: rag:architecture eval:gate privacy:approval
+Status: proposed
+Depends-On: PRM-24, PRM-25
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: required
+Mutation-Required: not_required
+Property-Required: required
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Decide, from gold eval evidence, whether full product RAG requires a hybrid
+  retrieval backend, which embedding model/backend is acceptable, what privacy
+  and cost budget applies, and how rollback/reindexing will work.
+Acceptance-Criteria:
+  - id: AC-1; description: ADR compares SQLite FTS planner, local embeddings, external embeddings, sqlite-vss/Chroma/Postgres pgvector, and no-vector alternatives against recall, precision, latency, update complexity, privacy, cost, backup, and rollback; verify: ADR decision matrix exists.
+  - id: AC-2; description: measured FTS failures from PRM-24 are mapped to retrieval mechanisms that could plausibly fix them; verify: failure-to-mechanism table exists.
+  - id: AC-3; description: explicit human approval is recorded before any embedding provider, vector database, production index, or migration work can start; verify: ADR status is accepted and cites approval.
+  - id: AC-4; description: cost/privacy budget names provider, model, max rows, max tokens/chars, persistence boundary, and redaction/logging rules; verify: docs/COST_BUDGET.md and docs/PRIVACY_THREAT_MODEL.md are updated.
+Verification:
+  - python3 tools/playbook_validate.py --root . --check tasks --check references
+  - git diff --check
+Files:
+  - docs/adr/
+  - docs/retrieval_eval.md
+  - docs/COST_BUDGET.md
+  - docs/PRIVACY_THREAT_MODEL.md
+  - docs/ROLLBACK_AND_REINDEX_PLAN.md
+  - docs/EVIDENCE_INDEX.md
+Context-Refs:
+  - docs/retrieval_eval.md
+  - docs/RAG_DATA_READINESS.md
+  - docs/ROLLBACK_AND_REINDEX_PLAN.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0 until approval is recorded
+  max_model_calls: 0 until approval is recorded
+  max_tool_calls: n/a
+  max_retries: 0
+  approval_required_when: any embedding run, vector backend adoption, production migration, or provider egress is proposed
+Notes: |
+  This task refines the older PRM-8 blocked gate for the product RAG path. It
+  is documentation/eval/approval work only unless the human operator explicitly
+  approves a backend.
+
+### PRM-27: Hybrid Retrieval Implementation
+
+Owner: codex
+Phase: PRM
+Type: rag:query rag:index eval:comparison
+Status: blocked
+Depends-On: PRM-26
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: required
+Mutation-Required: conditional
+Property-Required: required
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Implement the approved hybrid retrieval backend and index workflow, compare
+  it against the SQLite FTS baseline on the gold eval set, and expose it through
+  the existing citation-safe context pack with rollback and privacy receipts.
+Acceptance-Criteria:
+  - id: AC-1; description: task does not start until PRM-26 has an accepted ADR, human approval, and budget receipt; verify: implementation evidence cites those artifacts.
+  - id: AC-2; description: indexing is incremental, versioned, rollback-aware, and never mutates canonical raw_posts/posts rows; test: index/rollback tests pass against fixtures.
+  - id: AC-3; description: hybrid retrieval improves approved recall metrics without reducing citation precision or no-answer accuracy below threshold; test: eval comparison report passes.
+  - id: AC-4; description: assistant context pack shows whether each source came from FTS, semantic/vector, linked-source cache, curated memory, or reranking; test: context provenance tests pass.
+Verification:
+  - PYTHONPATH=src python3 -m pytest tests/ -q
+  - retrieval eval comparison command documented in docs/EVIDENCE_INDEX.md
+  - python3 tools/playbook_validate.py --root . --check tasks --check references
+  - git diff --check
+Files:
+  - src/
+  - tests/
+  - evals/retrieval/
+  - docs/retrieval_eval.md
+  - docs/ROLLBACK_AND_REINDEX_PLAN.md
+  - docs/EVIDENCE_INDEX.md
+Context-Refs:
+  - docs/adr/
+  - docs/retrieval_eval.md
+  - docs/PRIVACY_THREAT_MODEL.md
+  - docs/ROLLBACK_AND_REINDEX_PLAN.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: as approved in PRM-26
+  max_model_calls: as approved in PRM-26
+  max_tool_calls: n/a
+  max_retries: 1
+  approval_required_when: backend choice, embedding model, index persistence, or provider budget changes
+Notes: |
+  Blocked until PRM-26 is accepted. Do not run embeddings, create a vector
+  backend, write production indexes, or perform migrations from this task
+  description alone.
+
+### PRM-28: Product RAG Chat And Acceptance Gate
+
+Owner: codex
+Phase: PRM
+Type: assistant:workflow eval:gate product:ux
+Status: blocked
+Depends-On: PRM-25, PRM-27
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: required
+Mutation-Required: conditional
+Property-Required: required
+Visual-Contract: optional
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Wire the approved RAG context pack into the local and LLM-backed chat
+  experience, pass the product RAG eval gate, and make the operator-facing
+  answer path fast, cited, no-answer aware, project-aware, and confirmation
+  gated before dogfood starts.
+Acceptance-Criteria:
+  - id: AC-1; description: `memory ask`, `memory research`, and approved `memory chat` share the same retrieval/context pack provenance and privacy/cost receipt; test: CLI parity tests pass with fake LLM clients.
+  - id: AC-2; description: LLM synthesis is a thin layer over cited context and cannot invent uncited claims, durable writes, or project actions; test: generation contract and refusal tests pass.
+  - id: AC-3; description: cold-start UX is fast enough for chat use and avoids unrelated heavy imports on help/chat paths; test: CLI startup regression test has a recorded threshold.
+  - id: AC-4; description: product eval passes recall, citation precision, no-answer accuracy, latency, and operator-readability thresholds on gold and holdout sets; verify: final eval report is recorded.
+  - id: AC-5; description: PRM-19 dogfood remains blocked unless this task passes or the human operator explicitly waives the RAG gate; verify: dogfood gate receipt includes PRM-28 status.
+Verification:
+  - PYTHONPATH=src python3 -m pytest tests/test_cli.py tests/test_memory_research.py tests/test_pi_chat.py -q
+  - python3 tools/test_tiers.py focused-prm
+  - retrieval/generation eval commands documented in docs/EVIDENCE_INDEX.md
+  - python3 tools/playbook_validate.py --root . --check tasks --check references
+  - git diff --check
+Files:
+  - src/assistant/
+  - src/main.py
+  - tests/
+  - docs/operator_workflow.md
+  - docs/final_acceptance_plan.md
+  - docs/EVIDENCE_INDEX.md
+Context-Refs:
+  - docs/generation_eval.md
+  - docs/tool_eval.md
+  - docs/agent_eval.md
+  - docs/final_acceptance_plan.md
+  - docs/PRIVACY_THREAT_MODEL.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0 for fake-client implementation/tests
+  max_model_calls: 0 for fake-client implementation/tests
+  max_tool_calls: bounded by assistant tool catalog
+  max_retries: 1
+  approval_required_when: real provider egress, service start, dogfood start, live linked-source fetch, or production write is proposed
+Notes: |
+  This is the full product RAG readiness gate before PRM-19. It does not start
+  Telegram runtime dogfood by itself and does not approve provider egress beyond
+  explicit command-line/runtime switches.

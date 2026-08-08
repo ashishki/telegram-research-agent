@@ -1,7 +1,7 @@
 # Retrieval Evaluation Plan
 
-Status: draft; PRM-3 FTS baseline implemented; PRM-7 baseline gate recorded
-Last updated: 2026-07-26
+Status: draft; PRM-3 FTS baseline implemented; PRM-7 baseline gate recorded; PRM-24 product RAG eval scaffold recorded
+Last updated: 2026-08-08
 
 ## Baseline
 
@@ -123,6 +123,66 @@ rows from human-approved gold rows in their output.
 | duplicate top-10 result rate | Scored for gold rows when present | Diagnostic only |
 | p95 local retrieval latency | Scored for the run | Diagnostic only |
 | reacted-post search availability after sync | Aggregate fast-lane diagnostic | Aggregate fast-lane diagnostic |
+
+## PRM-24 Product RAG Eval Scaffold
+
+PRM-24 adds a product-level RAG eval layer before any vector/backend adoption.
+It is intentionally split into candidate questions, human-approved gold labels,
+thresholds, and a privacy-safe manifest.
+
+Files:
+
+| File | Purpose |
+| --- | --- |
+| `evals/retrieval/product_rag_candidate.jsonl` | 50 candidate product questions; not gold evidence |
+| `evals/retrieval/product_rag_gold_labels.jsonl` | empty until the human operator approves labels |
+| `evals/retrieval/product_rag_thresholds.json` | proposed RAG acceptance thresholds |
+| `evals/retrieval/product_rag_eval_manifest.json` | generated privacy-safe coverage/gate manifest |
+
+Candidate category distribution:
+
+| Category | Count |
+| --- | ---: |
+| `archive_recall` | 10 |
+| `semantic_phrasing` | 10 |
+| `project_fit` | 8 |
+| `linked_source_freshness` | 8 |
+| `no_answer` | 7 |
+| `decision_support` | 7 |
+
+Proposed acceptance thresholds:
+
+| Metric | Direction | Threshold |
+| --- | --- | ---: |
+| `recall_at_5` | >= | 0.70 |
+| `recall_at_10` | >= | 0.85 |
+| `citation_precision` | >= | 0.90 |
+| `no_answer_accuracy` | >= | 0.90 |
+| `stale_rejection` | >= | 0.85 |
+| `duplicate_top10_rate` | <= | 0.15 |
+| `latency_ms_p95` | <= | 1500 ms |
+
+Manifest command:
+
+```bash
+PYTHONPATH=src python3 tools/product_rag_eval_manifest.py --root . --json evals/retrieval/product_rag_eval_manifest.json
+```
+
+Current PRM-24 manifest result:
+
+```text
+product_rag_eval_manifest: cases=50 gold_labels=0 output=evals/retrieval/product_rag_eval_manifest.json
+```
+
+Boundary:
+
+- `gold_labels.status=blocked_no_human_approved_gold`;
+- no candidate row has `human_approved=true`;
+- no candidate row contains expected source labels;
+- the manifest omits query text, source URLs, snippets, raw Telegram text, and
+  provider payloads;
+- `vector_backend_gate.vector_backend_adopted=false`;
+- `vector_backend_gate.embeddings_run=false`.
 
 PRM-7 result path:
 

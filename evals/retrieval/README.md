@@ -1,7 +1,7 @@
 # Retrieval Evaluation Candidates
 
 Status: candidate
-Last updated: 2026-07-26
+Last updated: 2026-08-08
 
 This directory contains candidate retrieval queries for Personal Telegram
 Research Memory. The cases are not gold evidence.
@@ -28,3 +28,26 @@ Planned distribution:
 - 4 no-answer candidates
 
 Human-approved gold labels should be created in a separate file after PRM-1.
+
+## PRM-24 Product RAG Eval Files
+
+- `product_rag_candidate.jsonl`: 50 product RAG candidate questions across
+  archive recall, semantic phrasing, project fit, linked-source/freshness,
+  no-answer, and decision-support categories. All rows are
+  `human_approved=false` and contain no expected labels.
+- `product_rag_gold_labels.jsonl`: intentionally empty until the human
+  operator approves expected source IDs/URLs or explicit no-answer labels.
+- `product_rag_thresholds.json`: proposed acceptance thresholds for recall,
+  citation precision, no-answer accuracy, stale rejection, duplicate rate, and
+  p95 latency.
+- `product_rag_eval_manifest.json`: privacy-safe manifest generated from the
+  files above. It contains counts and gate status, not query text, source URLs,
+  snippets, provider payloads, or raw Telegram text.
+
+Validation:
+
+```bash
+PYTHONPATH=src python3 tools/product_rag_eval_manifest.py \
+  --root . \
+  --json evals/retrieval/product_rag_eval_manifest.json
+```

@@ -21,11 +21,13 @@ Last updated: 2026-08-03
   PRM-21 docs-only research-session contract, PRM-22 fixture-first
   linked-source resolver/cache, and PRM-23 fixture-first memory research
   planner/CLI
-- Proposed next slice: none before gated work; PRM-19 and PRM-20 remain
-  blocked, and PRM-8 vector/hybrid retrieval remains blocked.
-- Blocked/not implemented slices: PRM-8, PRM-19, and PRM-20
-- Next safe work: stop before PRM-19. PRM-19 only after explicit human
-  dogfood-start approval exists and PRM-18 blockers are accepted or cleared;
+- Proposed next slice: PRM-24 Product RAG Gold Eval Set. PRM-24 is
+  privacy-safe local eval/dataset work only.
+- Blocked/not implemented slices: PRM-8, PRM-19, PRM-20, PRM-27, and PRM-28
+  remain blocked until their gates are satisfied.
+- Next safe work: PRM-24. Stop before PRM-19. PRM-19 only after PRM-28 passes
+  or the human operator explicitly waives the RAG gate, explicit human
+  dogfood-start approval exists, and PRM-18 blockers are accepted or cleared;
   PRM-20 only after real dogfood evidence and explicit compatibility
   archive/delete/move approval.
 
@@ -70,6 +72,11 @@ only. They must not be claimed as dogfood evidence, live external-source
 execution, provider-egress approval, service start approval, durable
 production-cache approval, production DB write approval, or vector/backend
 approval.
+Full product RAG is now formalized as PRM-24 through PRM-28 before dogfood:
+gold eval set, citation-safe context pack, hybrid/vector ADR and privacy budget,
+approved retrieval implementation, and product chat acceptance gate. This does
+not approve embeddings, vector backend adoption, provider egress, migrations,
+or production writes by itself.
 
 ## Active Profiles
 
@@ -129,6 +136,7 @@ jobs from this handoff.
 - Candidate retrieval queries are not gold evidence until the operator approves
   labels and expected citations.
 - PRM-8 vector/hybrid retrieval remains blocked.
+- PRM-24 is the next safe RAG task; PRM-27/PRM-28 remain gated.
 - PRM-18 release/dogfood gate is implemented and currently blocked.
 - PRM-18A through PRM-18C are implemented and the batched deep review is
   recorded at `docs/audit/PRM_DEEP_REVIEW_PRM18A_18C_2026-08-03.md`.
@@ -141,6 +149,10 @@ jobs from this handoff.
   dogfood evidence or as approval for live web research, provider egress,
   service start, durable production cache writes, production DB writes, or
   vector/backend adoption without explicit approval.
+- PRM-24 through PRM-28 are the required full product RAG path before dogfood
+  unless the human operator explicitly waives the RAG gate. Do not start PRM-27
+  hybrid retrieval implementation without an accepted PRM-26 ADR and explicit
+  backend/privacy/cost approval.
 - Legacy runtime is frozen: do not restart `telegram-bot.service` or
   `telegram-ai-split-report.timer` as PRM dogfood.
 - Safe runtime is not dogfood yet: do not start `src/main.py prm-assistant` or

@@ -1,0 +1,56 @@
+{
+  "dataset": {
+    "candidate_case_count": 50,
+    "case_count": 50,
+    "category_counts": {
+      "archive_recall": 10,
+      "decision_support": 7,
+      "linked_source_freshness": 8,
+      "no_answer": 7,
+      "project_fit": 8,
+      "semantic_phrasing": 10
+    },
+    "gold_label_count": 0,
+    "missing_required_categories": [],
+    "required_categories": [
+      "archive_recall",
+      "semantic_phrasing",
+      "project_fit",
+      "linked_source_freshness",
+      "no_answer",
+      "decision_support"
+    ]
+  },
+  "gold_labels": {
+    "case_ids": [],
+    "count": 0,
+    "status": "blocked_no_human_approved_gold"
+  },
+  "privacy": {
+    "provider_payloads_included": false,
+    "queries_included": false,
+    "raw_telegram_text_included": false,
+    "source_urls_included": false
+  },
+  "schema_version": "product_rag_eval_manifest.v1",
+  "thresholds": {
+    "lower_bounds": {
+      "citation_precision": 0.9,
+      "no_answer_accuracy": 0.9,
+      "recall_at_10": 0.85,
+      "recall_at_5": 0.7,
+      "stale_rejection": 0.85
+    },
+    "schema_version": "product_rag_thresholds.v1",
+    "status": "proposed_pending_human_approval",
+    "upper_bounds": {
+      "duplicate_top10_rate": 0.15,
+      "latency_ms_p95": 1500.0
+    }
+  },
+  "vector_backend_gate": {
+    "embeddings_run": false,
+    "status": "blocked_no_human_approved_gold",
+    "vector_backend_adopted": false
+  }
+}

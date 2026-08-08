@@ -457,6 +457,38 @@ PYTHONPATH=src python3 -m pytest tests/test_memory_research.py -q
 7 passed, 4 subtests passed in 2.91s
 ```
 
+## Product RAG Eval Scaffold Evidence - 2026-08-08
+
+| Check | Result |
+| --- | --- |
+| task | PRM-24 Product RAG Gold Eval Set scaffold |
+| candidate file | `evals/retrieval/product_rag_candidate.jsonl` |
+| candidate rows | 50 |
+| category coverage | archive_recall=10, semantic_phrasing=10, project_fit=8, linked_source_freshness=8, no_answer=7, decision_support=7 |
+| gold label file | `evals/retrieval/product_rag_gold_labels.jsonl` intentionally empty |
+| gold labels | 0; blocked until human-approved expected source IDs/URLs or explicit no-answer labels are supplied |
+| thresholds | `evals/retrieval/product_rag_thresholds.json` records proposed recall/citation/no-answer/stale/duplicate/latency thresholds |
+| manifest | `evals/retrieval/product_rag_eval_manifest.json` contains counts and gate state, not queries, source URLs, snippets, raw Telegram text, or provider payloads |
+| vector boundary | `vector_backend_adopted=false`; `embeddings_run=false` |
+| live operations | none; no live HTTP fetch, external skill, provider call, embeddings/vector backend, migration, production DB write, dogfood start, or compatibility archive/delete/move |
+
+Verification:
+
+```text
+PYTHONPATH=src python3 -m pytest tests/test_product_rag_eval.py tests/test_archive_retrieval_eval.py tests/test_memory_research.py -q
+16 passed in 7.49s
+```
+
+```text
+PYTHONPATH=src python3 tools/product_rag_eval_manifest.py --root . --json evals/retrieval/product_rag_eval_manifest.json
+product_rag_eval_manifest: cases=50 gold_labels=0 output=evals/retrieval/product_rag_eval_manifest.json
+```
+
+```text
+python3 tools/test_tiers.py focused-prm
+117 passed in 35.57s
+```
+
 ## PRM-18A..18C Deep Review Evidence - 2026-08-03
 
 | Check | Result |

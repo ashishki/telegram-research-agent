@@ -199,15 +199,26 @@ handler does not create production tables lazily.
 
 ## RAG Strategy
 
+Full product RAG is required before operator dogfood. The required path is
+formalized as PRM-24 through PRM-28: gold eval set, citation-safe context pack,
+hybrid/vector ADR and privacy budget, approved retrieval implementation, and
+product chat acceptance gate. This does not by itself approve embeddings,
+provider egress, production migrations, or a vector backend; those remain gated
+by the ADR, eval result, and explicit human approval.
+
 Implementation order:
 
 1. inventory existing FTS/schema/search behavior;
 2. create candidate and human-approved gold queries;
 3. establish persistent full-archive FTS baseline;
 4. measure retrieval failures;
-5. compare embedding/hybrid alternatives only after measured failures;
-6. select vector backend through ADR and eval result;
-7. implement hybrid retrieval only when approved metrics improve.
+5. build a citation-safe context pack over archive, curated, linked-source,
+   project, freshness, and unknown evidence;
+6. compare embedding/hybrid alternatives only after measured failures;
+7. select vector backend through ADR and eval result;
+8. implement hybrid retrieval only when approved metrics improve;
+9. gate local and LLM-backed chat on recall, citation precision, no-answer
+   accuracy, latency, and privacy receipts.
 
 Candidate hybrid shape, if later justified:
 

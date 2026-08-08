@@ -1,0 +1,15 @@
+{
+  "schema_version": "product_rag_thresholds.v1",
+  "status": "proposed_pending_human_approval",
+  "lower_bounds": {
+    "recall_at_5": 0.7,
+    "recall_at_10": 0.85,
+    "citation_precision": 0.9,
+    "no_answer_accuracy": 0.9,
+    "stale_rejection": 0.85
+  },
+  "upper_bounds": {
+    "duplicate_top10_rate": 0.15,
+    "latency_ms_p95": 1500
+  }
+}

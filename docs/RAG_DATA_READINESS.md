@@ -1,7 +1,7 @@
 # RAG Data Readiness
 
-Status: PRM-1 empirical evidence recorded; PRM-2 document contract recorded; PRM-5 reaction fast-lane evidence recorded
-Last updated: 2026-07-26
+Status: PRM-1 empirical evidence recorded; PRM-2 document contract recorded; PRM-5 reaction fast-lane evidence recorded; PRM-24 product RAG eval scaffold recorded
+Last updated: 2026-08-08
 
 ## PRM-1 Boundary
 
@@ -413,6 +413,34 @@ separate future label file:
 Agent-generated candidates must remain `candidate_unapproved` and must not be
 used as pass/fail gold evidence. Gold labels must reference IDs and source URLs,
 not copied full post bodies.
+
+## PRM-24 Product RAG Eval Scaffold
+
+`evals/retrieval/product_rag_candidate.jsonl` contains 50 product RAG candidate
+questions for the pre-dogfood RAG gate:
+
+| Category | Count |
+| --- | ---: |
+| `archive_recall` | 10 |
+| `semantic_phrasing` | 10 |
+| `project_fit` | 8 |
+| `linked_source_freshness` | 8 |
+| `no_answer` | 7 |
+| `decision_support` | 7 |
+
+The candidate file contains no expected source IDs, no expected source URLs, no
+copied snippets, and no raw Telegram text. `product_rag_gold_labels.jsonl` is
+intentionally empty until the human operator approves labels. The generated
+`product_rag_eval_manifest.json` records coverage, thresholds, and gate status
+without query text or source URLs.
+
+Current gate status:
+
+```text
+gold_labels.status=blocked_no_human_approved_gold
+vector_backend_adopted=false
+embeddings_run=false
+```
 
 ## Exact Commands And Results
 

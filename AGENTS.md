@@ -1,7 +1,7 @@
 # Codex Handoff
 
 Status: active
-Last updated: 2026-08-03
+Last updated: 2026-08-08
 
 ## Product Direction
 
@@ -26,10 +26,14 @@ is recorded. The polished project-aware research-session assistant target is
 documented by PRM-21. PRM-22 implements a fixture-first linked-source
 resolver/cache, and PRM-23 implements a bounded fixture-first `memory research`
 planner/CLI with no live fetch, provider call, service start, dogfood evidence,
-durable production write/cache, or vector/backend approval. PRM-8 remains
-blocked. PRM-19 and PRM-20 are not started; PRM-19
-requires explicit human dogfood-start approval plus accepted or cleared PRM-18
-blockers and real four-week operator dogfood evidence, and PRM-20 requires
+durable production write/cache, or vector/backend approval. PRM-24 through
+PRM-28 now formalize the required full product RAG path before dogfood: gold
+eval set, citation-safe context pack, hybrid/vector ADR and privacy budget,
+approved retrieval implementation, and product chat acceptance gate. PRM-8
+remains blocked until that approval path is satisfied. PRM-19 and PRM-20 are
+not started; PRM-19 requires PRM-28 completion or an explicit human RAG-gate
+waiver, explicit human dogfood-start approval, accepted or cleared PRM-18
+blockers, and real four-week operator dogfood evidence, and PRM-20 requires
 PRM-19 evidence plus explicit compatibility archive/delete/move approval. The old live
 Telegram bot and
 Report V2 weekly timer were stopped and disabled on 2026-07-29; see
@@ -67,8 +71,10 @@ search, service starts, migrations, or writes.
 
 ## Current Next Task
 
-Stop before PRM-19. Do not start PRM-19 dogfood until the human operator
-explicitly approves dogfood start and the PRM-18 blockers are accepted or
+PRM-24 is the next safe task: create the product RAG gold eval set and
+thresholds using privacy-safe local evidence only. Do not start PRM-19 dogfood
+until PRM-28 passes or the human operator explicitly waives the RAG gate,
+explicitly approves dogfood start, and the PRM-18 blockers are accepted or
 cleared. Do not start PRM-20 cleanup/archive work until PRM-19 dogfood evidence
 exists and the human operator approves any compatibility archive/delete/move.
 Do not restart legacy bot/report timers as PRM dogfood. Do not start
@@ -78,4 +84,6 @@ PRM-18A..PRM-18C deep review boundary is recorded at
 PRM-21 records the future polished-assistant contract. PRM-22 and PRM-23 are
 implemented fixture-first only; do not treat them as dogfood evidence or as
 approval for web research, provider egress, service start, durable production
-cache writes, production DB writes, or vector/backend adoption.
+cache writes, production DB writes, or vector/backend adoption. PRM-27 hybrid
+retrieval implementation and PRM-28 product RAG chat gate remain blocked until
+the earlier RAG eval/ADR/privacy gates are satisfied.
