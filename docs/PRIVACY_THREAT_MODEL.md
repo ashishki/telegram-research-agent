@@ -33,6 +33,7 @@ Last updated: 2026-08-03
 | source URL loses provenance | archive document identity preserves Telegram link |
 | linked-source cache leaks raw provider payloads or private post text | PRM-22 cache records store source URL, normalized title, content hash, bounded excerpt, status, and redacted failure reason only |
 | linked-source resolver crawls live web by default | PRM-22 uses fixture/fake fetchers by default and refuses live HTTP, external skills, and provider summarization without explicit approval/budget switches |
+| answer context contains uncited claims or a raw corpus dump | PRM-25 context pack admits only cited bounded excerpts; it excludes raw fields and records safe exclusion reasons |
 | deletion cannot be honored | retention/deletion path required before dogfood |
 
 ## Provider Egress Rule
@@ -110,6 +111,16 @@ completions, secrets, or full failure payloads. Live HTTP fetches, external
 skills, provider summarization, and durable cache writes over private
 production inputs remain refused unless the operator records explicit approval,
 budget, and any required trust record for that run.
+
+## Citation-Safe Context Pack Rule
+
+PRM-25 `rag_context_pack.v1` is local and fixture-first. It may contain only
+bounded excerpts with a stable citation reference from Telegram archive,
+curated memory, linked-source cache, or a synthetic test candidate. It records
+source class, query variant, freshness status, and project label. It refuses
+raw-corpus fields, provider payloads, uncited candidates, duplicate citations,
+and over-budget sources; reasons contain no copied source text. It performs no
+provider egress, live fetching, embeddings, vector lookup, migration, or write.
 
 ## Confirmation Rule
 

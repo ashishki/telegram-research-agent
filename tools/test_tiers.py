@@ -28,6 +28,7 @@ PRM_TESTS = (
     "tests/test_selective_enrichment.py",
     "tests/test_archive_retrieval_eval.py",
     "tests/test_product_rag_eval.py",
+    "tests/test_rag_context_pack.py",
     "tests/test_knowledge_library.py",
     "tests/test_linked_sources.py",
     "tests/test_memory_research.py",

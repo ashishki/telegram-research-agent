@@ -82,6 +82,15 @@ approaches across archive and web evidence, recognize active project context,
 decide what is current versus stale, produce a polished answer, or measure
 usefulness.
 
+PRM-25 context-pack contract: the local answer path assembles a bounded
+`rag_context_pack.v1` before rendering. Every included item has a stable
+citation reference, evidence class, bounded excerpt, retrieval-query variant,
+freshness status, and project label. Candidates with raw-corpus fields, no
+citation, duplicate citation, missing excerpt, or over-budget source count are
+excluded with a reason. An empty pack requires no-answer handling. Synthetic
+semantic candidates are fixture-only inputs; they do not run embeddings or
+authorize a vector backend.
+
 Required research-session capability stack:
 
 1. Archive retrieval over all retained local Telegram posts, curated memory,

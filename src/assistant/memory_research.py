@@ -13,6 +13,7 @@ from assistant.linked_sources import (
 )
 from assistant.pi_facade import PersonalIntelligenceFacade
 from assistant.pi_memory import build_memory_proposal
+from assistant.rag_context_pack import build_rag_context_pack, render_rag_context_pack
 from config.settings import Settings
 
 
@@ -275,6 +276,13 @@ def answer_memory_research(
     linked_evidence = _linked_evidence(linked_result, max_items=active_budget.max_linked_sources)
     curated_evidence = _curated_evidence(curated_result, max_items=bounded_limit)
     project_fit = _project_fit(project_context)
+    context_pack = build_rag_context_pack(
+        archive_evidence=archive_evidence,
+        curated_memory=curated_evidence,
+        linked_source_evidence=linked_evidence,
+        project_fit=project_fit,
+        max_sources=active_budget.max_archive_sources + active_budget.max_linked_sources,
+    )
     comparison = _approach_comparison(archive_evidence, linked_evidence, curated_evidence)
     next_steps = _next_steps(project_fit, archive_evidence, linked_evidence)
     deeper_reading = _deeper_reading(linked_evidence, archive_evidence, curated_evidence)
@@ -320,6 +328,7 @@ def answer_memory_research(
         "linked_source_evidence": linked_evidence,
         "approach_comparison": comparison,
         "project_fit": project_fit,
+        "context_pack": context_pack,
         "next_steps": next_steps,
         "deeper_reading_path": deeper_reading,
         "unknowns": unknowns,
@@ -332,6 +341,7 @@ def answer_memory_research(
             linked_evidence=linked_evidence,
             comparison=comparison,
             project_fit=project_fit,
+            context_pack=context_pack,
             next_steps=next_steps,
             deeper_reading=deeper_reading,
             unknowns=unknowns,
@@ -387,6 +397,7 @@ def render_memory_research_answer_body(
     linked_evidence: Mapping[str, Any],
     comparison: Sequence[Mapping[str, Any]],
     project_fit: Mapping[str, Any],
+    context_pack: Mapping[str, Any],
     next_steps: Mapping[str, Sequence[str]],
     deeper_reading: Sequence[Mapping[str, Any]],
     unknowns: Sequence[str],
@@ -447,6 +458,8 @@ def render_memory_research_answer_body(
     )
     if project_fit.get("guidance"):
         lines.append(f"Guidance: {_short(project_fit['guidance'], 260)}")
+
+    lines.extend(["", render_rag_context_pack(context_pack)])
 
     lines.extend(["", "Apply / Watch / Ignore / Study Next"])
     for key in ("apply", "watch", "ignore", "study"):

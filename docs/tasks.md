@@ -1796,7 +1796,7 @@ Notes: |
 Owner: codex
 Phase: PRM
 Type: rag:context assistant:contract tool:call
-Status: proposed
+Status: in_progress
 Depends-On: PRM-24
 Risk-Level: high
 Public-Tests-Required: required
@@ -1842,6 +1842,10 @@ Cost-Budget: |
 Notes: |
   This is the safe pre-vector RAG substrate. It may use SQLite FTS and fixtures,
   but it must not adopt embeddings or a vector backend.
+  Implemented on 2026-08-08 as a fixture-only context-pack substrate. It
+  excludes uncited/raw candidates, records exclusion reasons, keeps excerpts
+  bounded, and is rendered by local `memory research`. PRM-24 remains blocked
+  until the human operator supplies approved gold labels.
 
 ### PRM-26: Hybrid Retrieval ADR And Privacy Budget
 

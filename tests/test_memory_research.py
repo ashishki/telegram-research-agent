@@ -133,6 +133,8 @@ class TestMemoryResearch(unittest.TestCase):
         self.assertFalse(result["privacy"]["bounded_telegram_snippet_provider_egress"])
         self.assertFalse(result["privacy"]["external_skill_used"])
         self.assertFalse(result["privacy"]["durable_writes"])
+        self.assertEqual(result["context_pack"]["status"], "ready")
+        self.assertFalse(result["context_pack"]["privacy"]["provider_egress"])
 
         proposals = result["draft_proposals"]
         self.assertGreaterEqual(len(proposals), 2)
@@ -148,6 +150,7 @@ class TestMemoryResearch(unittest.TestCase):
         self.assertIn("Linked Source Evidence", rendered)
         self.assertIn("Approach Comparison", rendered)
         self.assertIn("Project Fit", rendered)
+        self.assertIn("Citation-Safe Context Pack", rendered)
         self.assertIn("Deeper Reading", rendered)
         self.assertIn("Draft Proposals", rendered)
         self.assertIn("Privacy: mode=local-research; model_calls=0; estimated_cost_usd=0", rendered)

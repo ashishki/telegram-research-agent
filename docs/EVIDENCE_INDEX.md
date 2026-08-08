@@ -489,6 +489,17 @@ python3 tools/test_tiers.py focused-prm
 117 passed in 35.57s
 ```
 
+## PRM-25 Citation-Safe Context Pack Evidence - 2026-08-08
+
+| Check | Result |
+| --- | --- |
+| task | PRM-25 fixture-only context-pack substrate |
+| contract | `rag_context_pack.v1` requires stable citations, bounded excerpts, source class, query variant, freshness status, and project label |
+| exclusions | uncited, raw-corpus, duplicate, missing-excerpt, invalid, and over-budget candidates are excluded with privacy-safe reasons |
+| local rendering | `memory research` renders the pack without a provider call, live fetch, migration, or write |
+| semantic boundary | synthetic semantic candidates are fixture inputs only; no embeddings/vector lookup runs |
+| PRM-24 gate | still blocked: no human-approved gold labels were added |
+
 ## PRM-18A..18C Deep Review Evidence - 2026-08-03
 
 | Check | Result |
