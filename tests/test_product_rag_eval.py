@@ -113,14 +113,22 @@ class TestProductRagEval(unittest.TestCase):
         with self.assertRaisesRegex(ProductRagEvalError, "expected source IDs/URLs"):
             build_product_rag_eval_manifest(
                 _cases(),
-                labels=[{"case_id": "PRAG-ARCH-001", "human_approved": True}],
+                labels=[{"case_id": "PRAG-ARCH-001", "human_approved": True, "human_approval_ref": "operator-labels-2026-08-08"}],
+                thresholds=_thresholds(),
+                min_rows=6,
+            )
+
+        with self.assertRaisesRegex(ProductRagEvalError, "human_approval_ref"):
+            build_product_rag_eval_manifest(
+                _cases(),
+                labels=[{"case_id": "PRAG-NOANS-001", "human_approved": True, "expected_no_answer": True}],
                 thresholds=_thresholds(),
                 min_rows=6,
             )
 
         manifest = build_product_rag_eval_manifest(
             _cases(),
-            labels=[{"case_id": "PRAG-NOANS-001", "human_approved": True, "expected_no_answer": True}],
+            labels=[{"case_id": "PRAG-NOANS-001", "human_approved": True, "human_approval_ref": "operator-labels-2026-08-08", "expected_no_answer": True}],
             thresholds=_thresholds(),
             min_rows=6,
         )

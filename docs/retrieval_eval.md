@@ -99,6 +99,7 @@ Gold labels must live outside `query_set_candidate.jsonl` in a separate
 human-approved label file created after PRM-1. Each approved case must include:
 
 - `case_id` matching the candidate row;
+- `human_approval_ref` pointing to the operator-provided approval record;
 - stable archive document IDs or Telegram source URLs;
 - expected relevant/ranking behavior;
 - freshness expectation when time matters;
@@ -183,6 +184,8 @@ Boundary:
   provider payloads;
 - `vector_backend_gate.vector_backend_adopted=false`;
 - `vector_backend_gate.embeddings_run=false`.
+
+To supply labels, use [the operator labeling runbook](PRODUCT_RAG_LABELING_RUNBOOK.md).
 
 PRM-7 result path:
 

@@ -218,12 +218,14 @@ def _validate_labels(labels: Sequence[Mapping[str, Any]], *, case_ids: set[str])
         seen.add(case_id)
         if label.get("human_approved") is not True:
             raise ProductRagEvalError(f"{case_id} gold label must have human_approved=true")
+        if not _required_string(label, "human_approval_ref"):
+            raise ProductRagEvalError(f"{case_id} gold label must include human_approval_ref")
         raw_keys = sorted(_RAW_TEXT_FIELDS.intersection(label.keys()))
         if raw_keys:
             raise ProductRagEvalError(f"{case_id} gold label contains raw text fields: {', '.join(raw_keys)}")
         if not _has_scoreable_gold_label(label):
             raise ProductRagEvalError(f"{case_id} gold label must include expected source IDs/URLs or expected_no_answer=true")
-        normalized.append({"case_id": case_id})
+        normalized.append({"case_id": case_id, "human_approval_ref": _required_string(label, "human_approval_ref")})
     return normalized
 
 
