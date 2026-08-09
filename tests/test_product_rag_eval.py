@@ -5,6 +5,7 @@ from pathlib import Path
 from db.product_rag_eval import (
     ProductRagEvalError,
     build_product_rag_eval_manifest,
+    build_product_rag_simulation_receipt,
     validate_product_rag_thresholds,
 )
 
@@ -81,6 +82,20 @@ def _cases():
 
 
 class TestProductRagEval(unittest.TestCase):
+    def test_simulation_receipt_is_explicitly_non_gating(self):
+        receipt = build_product_rag_simulation_receipt([
+            {"case_id": "PRAG-NOANS-001", "draft_status": "needs_operator_confirmation", "human_approved": False, "suggested_outcome": "expected_no_answer"},
+            {"case_id": "PRAG-NOANS-004", "draft_status": "needs_operator_confirmation", "human_approved": False, "suggested_outcome": "external_verification_required"},
+        ])
+        self.assertEqual(receipt["status"], "non_gating_simulation_operator_confirmation_required")
+        self.assertEqual(receipt["gold_labels"]["count"], 0)
+        self.assertFalse(receipt["vector_backend_gate"]["embeddings_run"])
+
+        with self.assertRaisesRegex(ProductRagEvalError, "human_approved=false"):
+            build_product_rag_simulation_receipt([
+                {"case_id": "PRAG-NOANS-001", "draft_status": "needs_operator_confirmation", "human_approved": True, "suggested_outcome": "expected_no_answer"},
+            ])
+
     def test_prepared_drafts_are_not_gold_labels(self):
         draft_path = Path(__file__).resolve().parents[1] / "evals/retrieval/product_rag_gold_label_drafts.jsonl"
         drafts = [json.loads(line) for line in draft_path.read_text(encoding="utf-8").splitlines() if line.strip()]

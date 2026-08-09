@@ -1,0 +1,35 @@
+{
+  "drafts": {
+    "case_ids": [
+      "PRAG-NOANS-001",
+      "PRAG-NOANS-002",
+      "PRAG-NOANS-003",
+      "PRAG-NOANS-004",
+      "PRAG-NOANS-005",
+      "PRAG-NOANS-006",
+      "PRAG-NOANS-007"
+    ],
+    "count": 7,
+    "outcome_counts": {
+      "expected_no_answer": 6,
+      "external_verification_required": 1
+    }
+  },
+  "gold_labels": {
+    "count": 0,
+    "status": "not_used_by_simulation"
+  },
+  "privacy": {
+    "provider_payloads_included": false,
+    "queries_included": false,
+    "raw_telegram_text_included": false,
+    "source_urls_included": false
+  },
+  "schema_version": "product_rag_simulation_receipt.v1",
+  "status": "non_gating_simulation_operator_confirmation_required",
+  "vector_backend_gate": {
+    "embeddings_run": false,
+    "status": "blocked_non_gating_simulation",
+    "vector_backend_adopted": false
+  }
+}

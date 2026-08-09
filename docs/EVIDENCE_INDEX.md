@@ -460,6 +460,16 @@ PASS: project_tests exit=0
 | gate impact | none; the manifest/scorer reads only `product_rag_gold_labels.jsonl`, which remains empty |
 | boundary | no live archive read, external research, provider egress, embeddings, migrations, production writes, service start, or dogfood |
 
+## PRM-24 Non-Gating Draft Simulation - 2026-08-09
+
+| Check | Result |
+| --- | --- |
+| receipt | `evals/retrieval/product_rag_simulation_manifest.json` |
+| scenario coverage | 7 drafts: 6 proposed no-answer outcomes and 1 external-verification-required outcome |
+| gold metrics | not scored; `gold_labels.count=0` and `gold_labels.status=not_used_by_simulation` |
+| gate | `blocked_non_gating_simulation`; vector backend and embeddings remain false |
+| privacy | receipt contains case IDs/counts only; no queries, source URLs, raw Telegram text, or provider payloads |
+
 Focused verification:
 
 ```text

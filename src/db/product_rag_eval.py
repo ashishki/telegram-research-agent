@@ -5,6 +5,7 @@ from typing import Any, Mapping, Sequence
 
 PRODUCT_RAG_EVAL_SCHEMA_VERSION = "product_rag_eval_manifest.v1"
 PRODUCT_RAG_THRESHOLDS_SCHEMA_VERSION = "product_rag_thresholds.v1"
+PRODUCT_RAG_SIMULATION_SCHEMA_VERSION = "product_rag_simulation_receipt.v1"
 
 REQUIRED_PRODUCT_RAG_CATEGORIES: tuple[str, ...] = (
     "archive_recall",
@@ -59,6 +60,43 @@ _RAW_TEXT_FIELDS = {
 
 class ProductRagEvalError(ValueError):
     """Raised when product RAG eval metadata is malformed."""
+
+
+def build_product_rag_simulation_receipt(drafts: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """Summarize operator-review drafts without treating them as gold labels."""
+    allowed_outcomes = {"expected_no_answer", "external_verification_required"}
+    counts = {outcome: 0 for outcome in sorted(allowed_outcomes)}
+    case_ids: list[str] = []
+    seen: set[str] = set()
+    for index, draft in enumerate(drafts, start=1):
+        if not isinstance(draft, Mapping):
+            raise ProductRagEvalError(f"simulation draft {index} must be an object")
+        case_id = _required_string(draft, "case_id")
+        if case_id in seen:
+            raise ProductRagEvalError(f"duplicate simulation draft case_id: {case_id}")
+        seen.add(case_id)
+        if draft.get("human_approved") is not False:
+            raise ProductRagEvalError(f"{case_id} simulation draft must have human_approved=false")
+        if "human_approval_ref" in draft:
+            raise ProductRagEvalError(f"{case_id} simulation draft must not include human_approval_ref")
+        if str(draft.get("draft_status") or "") != "needs_operator_confirmation":
+            raise ProductRagEvalError(f"{case_id} simulation draft status is invalid")
+        outcome = _required_string(draft, "suggested_outcome")
+        if outcome not in allowed_outcomes:
+            raise ProductRagEvalError(f"{case_id} simulation draft outcome is invalid")
+        raw_keys = sorted(_RAW_TEXT_FIELDS.intersection(draft.keys()))
+        if raw_keys:
+            raise ProductRagEvalError(f"{case_id} simulation draft contains raw text fields: {', '.join(raw_keys)}")
+        counts[outcome] += 1
+        case_ids.append(case_id)
+    return {
+        "schema_version": PRODUCT_RAG_SIMULATION_SCHEMA_VERSION,
+        "status": "non_gating_simulation_operator_confirmation_required",
+        "drafts": {"count": len(case_ids), "case_ids": case_ids, "outcome_counts": counts},
+        "gold_labels": {"count": 0, "status": "not_used_by_simulation"},
+        "vector_backend_gate": {"status": "blocked_non_gating_simulation", "vector_backend_adopted": False, "embeddings_run": False},
+        "privacy": {"raw_telegram_text_included": False, "queries_included": False, "source_urls_included": False, "provider_payloads_included": False},
+    }
 
 
 def build_product_rag_eval_manifest(

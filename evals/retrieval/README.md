@@ -54,3 +54,9 @@ PYTHONPATH=src python3 tools/product_rag_eval_manifest.py \
   --root . \
   --json evals/retrieval/product_rag_eval_manifest.json
 ```
+
+Non-gating draft simulation:
+
+```bash
+PYTHONPATH=src python3 tools/product_rag_simulation_manifest.py --root . --json evals/retrieval/product_rag_simulation_manifest.json
+```

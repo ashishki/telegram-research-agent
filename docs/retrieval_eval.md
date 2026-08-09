@@ -185,6 +185,10 @@ Boundary:
 - `vector_backend_gate.vector_backend_adopted=false`;
 - `vector_backend_gate.embeddings_run=false`.
 
+The optional draft simulation receipt is expressly non-gating: it checks that
+prepared drafts remain unapproved and reports scenario coverage, but it does
+not score retrieval, count labels as gold, or permit PRM-26 work.
+
 To supply labels, use [the operator labeling runbook](PRODUCT_RAG_LABELING_RUNBOOK.md).
 
 PRM-7 result path:
