@@ -1,4 +1,6 @@
+import json
 import unittest
+from pathlib import Path
 
 from db.product_rag_eval import (
     ProductRagEvalError,
@@ -79,6 +81,14 @@ def _cases():
 
 
 class TestProductRagEval(unittest.TestCase):
+    def test_prepared_drafts_are_not_gold_labels(self):
+        draft_path = Path(__file__).resolve().parents[1] / "evals/retrieval/product_rag_gold_label_drafts.jsonl"
+        drafts = [json.loads(line) for line in draft_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+        self.assertEqual(len(drafts), 7)
+        self.assertTrue(all(row["human_approved"] is False for row in drafts))
+        self.assertTrue(all(row["draft_status"] == "needs_operator_confirmation" for row in drafts))
+
     def test_manifest_accepts_privacy_safe_candidates_and_empty_gold_labels(self):
         manifest = build_product_rag_eval_manifest(_cases(), thresholds=_thresholds(), min_rows=6)
 

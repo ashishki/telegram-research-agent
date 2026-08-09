@@ -450,6 +450,16 @@ PASS: project_tests exit=0
 | RAG boundary | this is evidence for a future retrieval layer evaluation; it is not vector/backend adoption approval |
 | live operations | none; no live HTTP fetch, external skill, provider call, embeddings/vector backend, migration, production DB write, dogfood start, or compatibility archive/delete/move |
 
+## PRM-24 Prepared Gold-Label Drafts - 2026-08-09
+
+| Check | Result |
+| --- | --- |
+| draft file | `evals/retrieval/product_rag_gold_label_drafts.jsonl` |
+| contents | 7 proposed no-answer/external-verification outcomes for operator review |
+| approval state | every draft has `human_approved=false`; no `human_approval_ref` is present |
+| gate impact | none; the manifest/scorer reads only `product_rag_gold_labels.jsonl`, which remains empty |
+| boundary | no live archive read, external research, provider egress, embeddings, migrations, production writes, service start, or dogfood |
+
 Focused verification:
 
 ```text

@@ -37,6 +37,9 @@ Human-approved gold labels should be created in a separate file after PRM-1.
   `human_approved=false` and contain no expected labels.
 - `product_rag_gold_labels.jsonl`: intentionally empty until the human
   operator approves expected source IDs/URLs or explicit no-answer labels.
+- `product_rag_gold_label_drafts.jsonl`: seven non-gold, operator-review
+  suggestions for the no-answer/external-verification cases. It is never read
+  by the manifest or retrieval scorer.
 - `product_rag_thresholds.json`: proposed acceptance thresholds for recall,
   citation precision, no-answer accuracy, stale rejection, duplicate rate, and
   p95 latency.

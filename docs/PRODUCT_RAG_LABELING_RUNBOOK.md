@@ -33,3 +33,11 @@ PYTHONPATH=src python3 tools/product_rag_eval_manifest.py --root . --json evals/
 The label file stays intentionally empty until that input exists. This runbook
 does not approve embeddings, vector adoption, provider egress, migrations,
 production writes, service start, or dogfood.
+
+## Prepared Drafts
+
+`evals/retrieval/product_rag_gold_label_drafts.jsonl` contains seven proposed
+negative-control outcomes. These are review aids only: every row remains
+`human_approved=false`, has no `human_approval_ref`, is not read by the
+manifest/scorer, and must be copied into the gold label file only after you
+explicitly confirm the outcome and supply the approval reference.
