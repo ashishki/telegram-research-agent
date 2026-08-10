@@ -486,6 +486,24 @@ PYTHONPATH=src python3 -m pytest tests/test_memory_research.py -q
 7 passed, 4 subtests passed in 2.91s
 ```
 
+## Private AI Transformation Source Packet UX - 2026-08-10
+
+| Check | Result |
+| --- | --- |
+| command | `memory ai-transformation-source-packet --allow-live-fetch --days 92` |
+| purpose | private Markdown/JSON packet for editor workflows over top liked Telegram channels |
+| source selection | read-only `reaction_sync_state` top channels plus read-only local archive rows |
+| live source mode | optional explicit public Telegram web-preview fetch; no Telegram session or service start |
+| output boundary | generated artifacts are under the ignored private output tree and are not committed |
+| PRM boundary | not product RAG gold labels, not dogfood, not PRM-27/vector approval, and not a production ingestion path |
+| side effects | no production DB write, migration, Telegram service start, provider egress, embeddings, vector backend, archive/delete/move, or compatibility cleanup |
+
+Focused verification:
+
+```text
+PYTHONPATH=src python3 -m pytest tests/test_ai_transformation_source_packet.py tests/test_cli.py -q
+```
+
 ## Product RAG Eval Scaffold Evidence - 2026-08-08
 
 | Check | Result |

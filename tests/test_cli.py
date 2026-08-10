@@ -9,6 +9,7 @@ from main import (
     build_parser,
     handle_memory_chat,
     handle_memory_ask,
+    handle_memory_ai_transformation_source_packet,
     handle_memory_research,
     handle_memory_status,
     handle_prm_assistant,
@@ -192,6 +193,54 @@ class TestCli(unittest.TestCase):
         self.assertEqual(args.question, ["что", "есть", "по", "eval"])
         self.assertEqual(args.limit, 3)
         self.assertIs(args.handler, handle_memory_ask)
+
+    def test_memory_ai_transformation_source_packet_parser_is_explicit(self):
+        args = build_parser().parse_args(
+            [
+                "memory",
+                "ai-transformation-source-packet",
+                "--days",
+                "92",
+                "--top-channels",
+                "3",
+                "--allow-live-fetch",
+                "--json",
+            ]
+        )
+
+        self.assertEqual(args.days, 92)
+        self.assertEqual(args.top_channels, 3)
+        self.assertTrue(args.allow_live_fetch)
+        self.assertTrue(args.json)
+        self.assertIs(args.handler, handle_memory_ai_transformation_source_packet)
+
+    def test_memory_ai_transformation_source_packet_handler_reports_private_outputs(self):
+        args = build_parser().parse_args(["memory", "ai-transformation-source-packet"])
+        payload = {
+            "status": "ok",
+            "outputs": {
+                "markdown_path": "/tmp/packet.md",
+                "json_path": "/tmp/packet.json",
+            },
+            "source_counts": {
+                "local_archive_posts": 2,
+                "live_preview_posts": 0,
+                "relevant_posts": 1,
+            },
+        }
+
+        with patch("main.load_settings", return_value=SimpleNamespace(db_path="/tmp/agent.db")), patch(
+            "output.ai_transformation_source_packet.build_ai_transformation_source_packet",
+            return_value=payload,
+        ) as build_mock:
+            output = StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(handle_memory_ai_transformation_source_packet(args), 0)
+
+        build_mock.assert_called_once()
+        self.assertFalse(build_mock.call_args.kwargs["fetch_live"])
+        self.assertIn("Markdown: /tmp/packet.md", output.getvalue())
+        self.assertIn("provider_egress=false", output.getvalue())
 
     def test_memory_ask_llm_requires_provider_egress_before_pi_chat(self):
         args = build_parser().parse_args(["memory", "ask", "--llm-approved", "что", "есть", "по", "eval"])

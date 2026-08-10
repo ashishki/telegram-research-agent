@@ -674,6 +674,23 @@ def build_parser() -> argparse.ArgumentParser:
     research_parser.add_argument("--json", action="store_true")
     research_parser.set_defaults(handler=handle_memory_research)
 
+    ai_transform_parser = memory_sub.add_parser(
+        "ai-transformation-source-packet",
+        help="Build a private editor source packet from top liked Telegram channels",
+    )
+    ai_transform_parser.add_argument("--days", type=int, default=92)
+    ai_transform_parser.add_argument("--top-channels", type=int, default=8)
+    ai_transform_parser.add_argument("--max-live-pages", type=int, default=8)
+    ai_transform_parser.add_argument("--max-posts", type=int, default=120)
+    ai_transform_parser.add_argument("--output-root", default=None)
+    ai_transform_parser.add_argument(
+        "--allow-live-fetch",
+        action="store_true",
+        help="Approve read-only public t.me/s fetch for selected channels",
+    )
+    ai_transform_parser.add_argument("--json", action="store_true")
+    ai_transform_parser.set_defaults(handler=handle_memory_ai_transformation_source_packet)
+
     ie_parser = memory_sub.add_parser("inspect-evidence")
     ie_parser.add_argument("--project", default=None)
     ie_parser.add_argument("--week", default=None)
@@ -2801,10 +2818,16 @@ def handle_memory_status(args: argparse.Namespace) -> int:
             {"command": "memory ask <question>", "purpose": "local cited evidence brief", "provider_egress": False},
             {"command": "memory research <question>", "purpose": "bounded local research session", "provider_egress": False},
             {"command": "memory inspect-evidence", "purpose": "inspect local evidence metadata", "provider_egress": False},
+            {
+                "command": "memory ai-transformation-source-packet --allow-live-fetch",
+                "purpose": "private public-preview Telegram source packet for editor workflows",
+                "provider_egress": False,
+            },
         ],
         "requires_explicit_approval": [
             "human-approved PRM-24 gold labels before PRM-26",
             "provider egress switch for LLM-backed ask/chat",
+            "live public Telegram preview fetch flag for fresh editor source packets",
             "accepted PRM-26 ADR before embeddings or vector backend",
             "dogfood-start approval after PRM-28 and PRM-18 blockers",
         ],
@@ -2919,6 +2942,46 @@ def handle_memory_research(args: argparse.Namespace) -> int:
     if payload.get("status") == "refused":
         return 2
     return 0
+
+
+def handle_memory_ai_transformation_source_packet(args: argparse.Namespace) -> int:
+    from output.ai_transformation_source_packet import build_ai_transformation_source_packet
+
+    settings = load_settings()
+    try:
+        payload = build_ai_transformation_source_packet(
+            db_path=settings.db_path,
+            days=args.days,
+            top_channels=args.top_channels,
+            max_live_pages=args.max_live_pages,
+            fetch_live=bool(args.allow_live_fetch),
+            output_root=args.output_root,
+            max_posts_in_markdown=args.max_posts,
+        )
+    except Exception as exc:
+        sys.stdout.write(f"Error building AI transformation source packet: {exc}\n")
+        return 1
+
+    if args.json:
+        sys.stdout.write(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
+    else:
+        outputs = payload.get("outputs") or {}
+        counts = payload.get("source_counts") or {}
+        lines = [
+            "AI transformation source packet",
+            f"Status: {payload.get('status')}",
+            f"Markdown: {outputs.get('markdown_path')}",
+            f"JSON: {outputs.get('json_path')}",
+            (
+                "Counts: "
+                f"local={counts.get('local_archive_posts', 0)} "
+                f"live={counts.get('live_preview_posts', 0)} "
+                f"relevant={counts.get('relevant_posts', 0)}"
+            ),
+            "Privacy: production_db_write=false; telegram_service_start=false; provider_egress=false; embeddings=false",
+        ]
+        sys.stdout.write("\n".join(lines) + "\n")
+    return 0 if payload.get("status") == "ok" else 2
 
 
 def handle_memory_inspect_ai_report_feedback(args: argparse.Namespace) -> int:

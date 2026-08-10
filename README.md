@@ -107,11 +107,17 @@ Current local preview:
 ```bash
 PYTHONPATH=src python3 src/main.py memory ask "какие есть практики по eval gates?"
 PYTHONPATH=src python3 src/main.py memory ask --project telegram-research-agent "как эта идея применима к проекту?"
+PYTHONPATH=src python3 src/main.py memory ai-transformation-source-packet --allow-live-fetch --days 92
 ```
 
 This local command searches bounded PRM memory and SQLite Telegram archive
 indexes, returns source links/snippets, and does not call LLMs, external
 search, Telegram services, startup migrations, generation jobs, or write tools.
+The AI transformation source-packet command is a separate private editor
+workflow: it reads local reaction/channel evidence read-only, optionally fetches
+public `t.me/s` previews, and writes ignored Markdown/JSON under `data/output/**`
+without production DB writes, Telegram services, provider egress, embeddings, or
+dogfood evidence.
 
 LLM chat UX contract:
 
