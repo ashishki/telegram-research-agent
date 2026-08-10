@@ -21,11 +21,14 @@ Last updated: 2026-08-03
   PRM-21 docs-only research-session contract, PRM-22 fixture-first
   linked-source resolver/cache, and PRM-23 fixture-first memory research
   planner/CLI
-- Proposed next slice: PRM-24 Product RAG Gold Eval Set. PRM-24 is
-  privacy-safe local eval/dataset work only.
+- Current safe slice: PRM-24 Product RAG Gold Eval Set. PRM-24 is
+  privacy-safe local eval/dataset work only; seven generated no-answer drafts
+  were operator-approved as gold labels on 2026-08-10, while the full 50-row
+  gold-set acceptance criterion remains incomplete.
 - Blocked/not implemented slices: PRM-8, PRM-19, PRM-20, PRM-27, and PRM-28
   remain blocked until their gates are satisfied.
-- Next safe work: PRM-24. Stop before PRM-19. PRM-19 only after PRM-28 passes
+- Next safe work: continue PRM-24 or safe PRM-26 scaffolding without backend
+  adoption. Stop before PRM-19. PRM-19 only after PRM-28 passes
   or the human operator explicitly waives the RAG gate, explicit human
   dogfood-start approval exists, and PRM-18 blockers are accepted or cleared;
   PRM-20 only after real dogfood evidence and explicit compatibility
@@ -40,8 +43,9 @@ report as the product center. Full archive search is the primary planned value.
 Knowledge Atoms, topics, reports, and Atlas-like surfaces become selective or
 secondary projections.
 
-Do not claim dogfood, release readiness, vector adoption, gold-query approval,
-external-source execution, or approved external-verification evidence. HEAD
+Do not claim dogfood, release readiness, vector adoption, full gold-query
+coverage approval, external-source execution, or approved external-verification
+evidence. HEAD
 contains a bounded SQLite FTS archive search, assistant vertical slice, grounded
 answer contract, local external-verification requirement path,
 confirmation-gated saved memory proposal flow, and deterministic Knowledge
@@ -134,7 +138,8 @@ jobs from this handoff.
 
 - Product pivot ADR remains proposed and needs human approval.
 - Candidate retrieval queries are not gold evidence until the operator approves
-  labels and expected citations.
+  labels and expected citations; seven PRM-24 no-answer labels are now approved,
+  but the full 50-row product RAG gold set is still incomplete.
 - PRM-8 vector/hybrid retrieval remains blocked.
 - PRM-24 is the next safe RAG task; PRM-27/PRM-28 remain gated.
 - PRM-18 release/dogfood gate is implemented and currently blocked.

@@ -10,7 +10,7 @@
       "project_fit": 8,
       "semantic_phrasing": 10
     },
-    "gold_label_count": 0,
+    "gold_label_count": 7,
     "missing_required_categories": [],
     "required_categories": [
       "archive_recall",
@@ -22,9 +22,17 @@
     ]
   },
   "gold_labels": {
-    "case_ids": [],
-    "count": 0,
-    "status": "blocked_no_human_approved_gold"
+    "case_ids": [
+      "PRAG-NOANS-001",
+      "PRAG-NOANS-002",
+      "PRAG-NOANS-003",
+      "PRAG-NOANS-004",
+      "PRAG-NOANS-005",
+      "PRAG-NOANS-006",
+      "PRAG-NOANS-007"
+    ],
+    "count": 7,
+    "status": "human_approved_gold_labels_present"
   },
   "privacy": {
     "provider_payloads_included": false,
@@ -50,7 +58,7 @@
   },
   "vector_backend_gate": {
     "embeddings_run": false,
-    "status": "blocked_no_human_approved_gold",
+    "status": "requires_human_approved_adr_before_vector_adoption",
     "vector_backend_adopted": false
   }
 }

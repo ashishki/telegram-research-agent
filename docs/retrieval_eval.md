@@ -136,7 +136,7 @@ Files:
 | File | Purpose |
 | --- | --- |
 | `evals/retrieval/product_rag_candidate.jsonl` | 50 candidate product questions; not gold evidence |
-| `evals/retrieval/product_rag_gold_labels.jsonl` | empty until the human operator approves labels |
+| `evals/retrieval/product_rag_gold_labels.jsonl` | seven human-approved no-answer seed labels; full 50-row gold set remains incomplete |
 | `evals/retrieval/product_rag_thresholds.json` | proposed RAG acceptance thresholds |
 | `evals/retrieval/product_rag_eval_manifest.json` | generated privacy-safe coverage/gate manifest |
 
@@ -172,22 +172,26 @@ PYTHONPATH=src python3 tools/product_rag_eval_manifest.py --root . --json evals/
 Current PRM-24 manifest result:
 
 ```text
-product_rag_eval_manifest: cases=50 gold_labels=0 output=evals/retrieval/product_rag_eval_manifest.json
+product_rag_eval_manifest: cases=50 gold_labels=7 output=evals/retrieval/product_rag_eval_manifest.json
 ```
 
 Boundary:
 
-- `gold_labels.status=blocked_no_human_approved_gold`;
+- `gold_labels.status=human_approved_gold_labels_present`;
+- current approved labels cover only the seven `no_answer` rows promoted by
+  operator approval `operator-approval-2026-08-10-generated-drafts-as-gold`;
 - no candidate row has `human_approved=true`;
 - no candidate row contains expected source labels;
 - the manifest omits query text, source URLs, snippets, raw Telegram text, and
   provider payloads;
+- PRM-24 AC-1 still needs either a 50-row approved gold set across all product
+  categories or an explicit operator waiver/change to that acceptance criterion;
 - `vector_backend_gate.vector_backend_adopted=false`;
 - `vector_backend_gate.embeddings_run=false`.
 
-The optional draft simulation receipt is expressly non-gating: it checks that
-prepared drafts remain unapproved and reports scenario coverage, but it does
-not score retrieval, count labels as gold, or permit PRM-26 work.
+The optional draft simulation receipt remains historical non-gating evidence:
+it checked that prepared drafts were unapproved before the operator promoted
+the seven no-answer drafts to gold labels on 2026-08-10.
 
 To supply labels, use [the operator labeling runbook](PRODUCT_RAG_LABELING_RUNBOOK.md).
 
@@ -310,12 +314,10 @@ Gold metrics are present but intentionally unscored:
 | `latency_ms_p95` | `0.0` |
 | `reacted_post_searchability` | `0.956522` |
 
-The vector gate remains closed with
-`vector_backend_gate.status=blocked_no_human_approved_gold`.
-
-The gold `latency_ms_p95` is `0.0` because there are no human-approved gold
-rows. Candidate latency remains diagnostic-only and is not used as gold
-pass/fail evidence.
+This section is historical PRM-7 evidence. The vector gate was closed with
+`vector_backend_gate.status=blocked_no_human_approved_gold` at that time.
+Current PRM-24 now has seven no-answer seed labels, but still lacks measured
+recall/citation failures across the full product categories.
 
 Verification:
 
@@ -352,5 +354,5 @@ docs/adr/ADR-002-vector-backend-gate.md
 ```
 
 ADR-002 is `proposed_not_accepted` and makes a negative decision for now: no
-vector backend is adopted because there are no human-approved gold labels or
-measured recall failures.
+vector backend is adopted because there is still no full approved product gold
+set or measured recall/citation failure evidence that justifies vector work.

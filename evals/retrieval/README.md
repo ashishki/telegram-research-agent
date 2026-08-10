@@ -35,8 +35,9 @@ Human-approved gold labels should be created in a separate file after PRM-1.
   archive recall, semantic phrasing, project fit, linked-source/freshness,
   no-answer, and decision-support categories. All rows are
   `human_approved=false` and contain no expected labels.
-- `product_rag_gold_labels.jsonl`: intentionally empty until the human
-  operator approves expected source IDs/URLs or explicit no-answer labels.
+- `product_rag_gold_labels.jsonl`: contains seven human-approved no-answer
+  seed labels promoted from generated drafts by operator approval on
+  2026-08-10. It still does not cover all 50 product RAG rows.
 - `product_rag_gold_label_drafts.jsonl`: seven non-gold, operator-review
   suggestions for the no-answer/external-verification cases. It is never read
   by the manifest or retrieval scorer.

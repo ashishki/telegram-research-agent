@@ -18,8 +18,9 @@ projection with legacy Brief/Atlas demotion semantics. HEAD also contains
 PRM-17 deterministic runtime workflow contracts and privacy-safe aggregate
 telemetry receipts. The PRM-13 through PRM-17 batched deep review is recorded.
 PRM-18 deterministic release/dogfood gate is implemented and currently blocks
-dogfood because final acceptance evidence, gold retrieval labels, and explicit
-human dogfood approval are missing. PRM-18A Operator LLM Chat UX Contract,
+dogfood because final acceptance evidence, full product RAG gold/acceptance
+evidence, and explicit human dogfood approval are missing. PRM-18A Operator LLM
+Chat UX Contract,
 PRM-18B LLM-backed memory chat CLI, and PRM-18C Telegram `prm-assistant` UX
 parity/runbook are implemented; the PRM-18A through PRM-18C batched deep review
 is recorded. The polished project-aware research-session assistant target is
@@ -71,8 +72,11 @@ search, service starts, migrations, or writes.
 
 ## Current Next Task
 
-PRM-24 is the next safe task: create the product RAG gold eval set and
-thresholds using privacy-safe local evidence only. Do not start PRM-19 dogfood
+PRM-24 is the next safe task: complete the product RAG gold eval set and
+thresholds using privacy-safe local evidence only. Seven generated no-answer
+drafts were operator-approved as gold labels on 2026-08-10, but the full
+50-row gold-set acceptance criterion remains incomplete unless explicitly
+waived or changed by the operator. Do not start PRM-19 dogfood
 until PRM-28 passes or the human operator explicitly waives the RAG gate,
 explicitly approves dogfood start, and the PRM-18 blockers are accepted or
 cleared. Do not start PRM-20 cleanup/archive work until PRM-19 dogfood evidence

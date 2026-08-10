@@ -45,7 +45,7 @@ Target repo baseline: ad8689fa25b89f77122c4cec7c7a6b9da3f500cf
 | Learning state | PRM-15 fixture-only migration/projection maps legacy source presence to indexed/surfaced only and requires explicit receipts for opened/read/understood/explained/tried/applied/measured |
 | Weekly Brief V3 | PRM-16 deterministic secondary projection and static HTML renderer implemented for bounded supplied context; V1 Brief and Atlas are demoted to compatibility/internal surfaces |
 | Runtime workflows | PRM-17 deterministic workflow registry and privacy-safe aggregate telemetry receipt implemented; scheduled runtime activation is not approved |
-| Release gate | PRM-18 deterministic release/dogfood gate implemented; current sanitized receipt blocks dogfood because final acceptance evidence, gold retrieval labels, and explicit human dogfood approval are missing |
+| Release gate | PRM-18 deterministic release/dogfood gate implemented; current sanitized receipt blocks dogfood because final acceptance evidence, full product RAG gold/acceptance evidence, and explicit human dogfood approval are missing |
 | Runtime deployment | Legacy `telegram-bot.service` and `telegram-ai-split-report.timer` stopped and disabled on 2026-07-29; safe `prm-assistant` entrypoint and repo unit template implemented but not installed/enabled/started and without automatic startup migrations; no Telegram Research Agent service or timer is active |
 | PRM-13..17 review gate | Batched deep review recorded; one telemetry budget-validation finding fixed before PRM-18 |
 | PRM-18A..18C review gate | Batched deep review recorded on 2026-08-03; no unresolved stop-ship finding in this block, residual provider/runtime risks remain gated before PRM-19 |
@@ -1786,9 +1786,12 @@ Cost-Budget: |
   approval_required_when: private raw Telegram text would be copied into eval rows or an LLM judge is proposed
 Notes: |
   Started on 2026-08-08 as a safe scaffold. Product RAG candidate rows,
-  proposed thresholds, an empty gold-label file, a privacy-safe manifest tool,
-  and focused validation tests exist. Human operator approval is still required
-  before any row counts as gold evidence. This task does not run embeddings,
+  proposed thresholds, a privacy-safe manifest tool, and focused validation
+  tests exist. On 2026-08-10 the human operator approved the seven generated
+  no-answer drafts as gold labels under
+  `operator-approval-2026-08-10-generated-drafts-as-gold`; AC-1 remains
+  incomplete until all 50 rows are approved or the operator explicitly changes
+  or waives that acceptance criterion. This task does not run embeddings,
   provider calls, live web research, migrations, production writes, or dogfood.
 
 ### PRM-25: Citation-Safe RAG Context Pack
@@ -1844,8 +1847,9 @@ Notes: |
   but it must not adopt embeddings or a vector backend.
   Implemented on 2026-08-08 as a fixture-only context-pack substrate. It
   excludes uncited/raw candidates, records exclusion reasons, keeps excerpts
-  bounded, and is rendered by local `memory research`. PRM-24 remains blocked
-  until the human operator supplies approved gold labels.
+  bounded, and is rendered by local `memory research`. PRM-24 now has seven
+  approved no-answer seed labels, but its full 50-row gold-set gate remains
+  incomplete.
 
 ### PRM-26: Hybrid Retrieval ADR And Privacy Budget
 

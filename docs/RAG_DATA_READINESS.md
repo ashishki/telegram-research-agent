@@ -429,15 +429,17 @@ questions for the pre-dogfood RAG gate:
 | `decision_support` | 7 |
 
 The candidate file contains no expected source IDs, no expected source URLs, no
-copied snippets, and no raw Telegram text. `product_rag_gold_labels.jsonl` is
-intentionally empty until the human operator approves labels. The generated
-`product_rag_eval_manifest.json` records coverage, thresholds, and gate status
-without query text or source URLs.
+copied snippets, and no raw Telegram text. `product_rag_gold_labels.jsonl`
+currently contains seven operator-approved no-answer labels promoted from the
+generated draft set on 2026-08-10. It still does not cover all 50 product RAG
+rows or all categories. The generated `product_rag_eval_manifest.json` records
+coverage, thresholds, and gate status without query text or source URLs.
 
 Current gate status:
 
 ```text
-gold_labels.status=blocked_no_human_approved_gold
+gold_labels.status=human_approved_gold_labels_present
+gold_labels.count=7
 vector_backend_adopted=false
 embeddings_run=false
 ```

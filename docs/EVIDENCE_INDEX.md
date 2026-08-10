@@ -470,6 +470,32 @@ PASS: project_tests exit=0
 | gate | `blocked_non_gating_simulation`; vector backend and embeddings remain false |
 | privacy | receipt contains case IDs/counts only; no queries, source URLs, raw Telegram text, or provider payloads |
 
+## PRM-24 Operator-Approved No-Answer Gold Seed - 2026-08-10
+
+| Check | Result |
+| --- | --- |
+| approval ref | `operator-approval-2026-08-10-generated-drafts-as-gold` |
+| source drafts | `evals/retrieval/product_rag_gold_label_drafts.jsonl` |
+| gold label file | `evals/retrieval/product_rag_gold_labels.jsonl` |
+| approved labels | 7 no-answer labels, including one external-verification-required no-answer case |
+| manifest | `evals/retrieval/product_rag_eval_manifest.json` now reports `gold_labels.count=7` |
+| remaining PRM-24 gap | AC-1 still needs 50 approved rows across product RAG categories, or an explicit operator waiver/change to that criterion |
+| vector boundary | vector backend and embeddings remain false; PRM-26/PRM-27 still require separate backend/privacy/cost approval |
+| side effects | no raw Telegram text, source URLs, provider payloads, embeddings, migrations, production writes, service start, dogfood, or compatibility archive/delete/move |
+
+Focused verification:
+
+```text
+PYTHONPATH=src python3 -m pytest tests/test_product_rag_eval.py tests/test_archive_retrieval_eval.py tests/test_memory_research.py -q
+19 passed in 3.01s
+PYTHONPATH=src python3 tools/product_rag_eval_manifest.py --root . --json evals/retrieval/product_rag_eval_manifest.json
+product_rag_eval_manifest: cases=50 gold_labels=7 output=evals/retrieval/product_rag_eval_manifest.json
+python3 tools/playbook_validate.py --root . --check tasks --check references
+playbook_validate: errors=0 warnings=0
+git diff --check
+ok
+```
+
 ## Local PRM Status UX - 2026-08-10
 
 | Check | Result |
@@ -512,8 +538,8 @@ PYTHONPATH=src python3 -m pytest tests/test_ai_transformation_source_packet.py t
 | candidate file | `evals/retrieval/product_rag_candidate.jsonl` |
 | candidate rows | 50 |
 | category coverage | archive_recall=10, semantic_phrasing=10, project_fit=8, linked_source_freshness=8, no_answer=7, decision_support=7 |
-| gold label file | `evals/retrieval/product_rag_gold_labels.jsonl` intentionally empty |
-| gold labels | 0; blocked until human-approved expected source IDs/URLs or explicit no-answer labels are supplied |
+| gold label file | `evals/retrieval/product_rag_gold_labels.jsonl` contains seven approved no-answer seed labels |
+| gold labels | 7; full PRM-24 AC-1 remains incomplete until 50 approved rows or explicit waiver/change |
 | thresholds | `evals/retrieval/product_rag_thresholds.json` records proposed recall/citation/no-answer/stale/duplicate/latency thresholds |
 | manifest | `evals/retrieval/product_rag_eval_manifest.json` contains counts and gate state, not queries, source URLs, snippets, raw Telegram text, or provider payloads |
 | vector boundary | `vector_backend_adopted=false`; `embeddings_run=false` |
@@ -528,7 +554,7 @@ PYTHONPATH=src python3 -m pytest tests/test_product_rag_eval.py tests/test_archi
 
 ```text
 PYTHONPATH=src python3 tools/product_rag_eval_manifest.py --root . --json evals/retrieval/product_rag_eval_manifest.json
-product_rag_eval_manifest: cases=50 gold_labels=0 output=evals/retrieval/product_rag_eval_manifest.json
+product_rag_eval_manifest: cases=50 gold_labels=7 output=evals/retrieval/product_rag_eval_manifest.json
 ```
 
 ```text
@@ -545,7 +571,7 @@ python3 tools/test_tiers.py focused-prm
 | exclusions | uncited, raw-corpus, duplicate, missing-excerpt, invalid, and over-budget candidates are excluded with privacy-safe reasons |
 | local rendering | `memory research` renders the pack without a provider call, live fetch, migration, or write |
 | semantic boundary | synthetic semantic candidates are fixture inputs only; no embeddings/vector lookup runs |
-| PRM-24 gate | still blocked: no human-approved gold labels were added |
+| PRM-24 gate | no longer blocked by zero labels; still incomplete until 50 approved rows or explicit waiver/change |
 
 ## PRM-18A..18C Deep Review Evidence - 2026-08-03
 

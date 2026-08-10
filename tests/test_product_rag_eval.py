@@ -104,6 +104,25 @@ class TestProductRagEval(unittest.TestCase):
         self.assertTrue(all(row["human_approved"] is False for row in drafts))
         self.assertTrue(all(row["draft_status"] == "needs_operator_confirmation" for row in drafts))
 
+    def test_approved_generated_drafts_are_materialized_as_no_answer_gold_labels(self):
+        root = Path(__file__).resolve().parents[1]
+        cases = [json.loads(line) for line in (root / "evals/retrieval/product_rag_candidate.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+        labels = [json.loads(line) for line in (root / "evals/retrieval/product_rag_gold_labels.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+        thresholds = json.loads((root / "evals/retrieval/product_rag_thresholds.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(len(labels), 7)
+        self.assertEqual({row["case_id"] for row in labels}, {f"PRAG-NOANS-00{index}" for index in range(1, 8)})
+        self.assertTrue(all(row["human_approved"] is True for row in labels))
+        self.assertTrue(all(row["expected_no_answer"] is True for row in labels))
+        self.assertTrue(all(row["human_approval_ref"] == "operator-approval-2026-08-10-generated-drafts-as-gold" for row in labels))
+        self.assertTrue(all(row["label_source"] == "evals/retrieval/product_rag_gold_label_drafts.jsonl" for row in labels))
+        self.assertTrue(next(row for row in labels if row["case_id"] == "PRAG-NOANS-004")["external_verification_required"])
+
+        manifest = build_product_rag_eval_manifest(cases, labels=labels, thresholds=thresholds)
+        self.assertEqual(manifest["gold_labels"]["count"], 7)
+        self.assertEqual(manifest["gold_labels"]["status"], "human_approved_gold_labels_present")
+        self.assertEqual(manifest["vector_backend_gate"]["status"], "requires_human_approved_adr_before_vector_adoption")
+
     def test_manifest_accepts_privacy_safe_candidates_and_empty_gold_labels(self):
         manifest = build_product_rag_eval_manifest(_cases(), thresholds=_thresholds(), min_rows=6)
 
