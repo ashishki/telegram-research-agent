@@ -470,6 +470,15 @@ PASS: project_tests exit=0
 | gate | `blocked_non_gating_simulation`; vector backend and embeddings remain false |
 | privacy | receipt contains case IDs/counts only; no queries, source URLs, raw Telegram text, or provider payloads |
 
+## Local PRM Status UX - 2026-08-10
+
+| Check | Result |
+| --- | --- |
+| command | `memory status` and `memory status --json` provide an entrypoint without database operations; normal CLI startup may print configured path/provider metadata |
+| available local surfaces | `memory ask`, `memory research`, and evidence inspection |
+| visible gates | human gold labels, provider egress, PRM-26 backend ADR, and dogfood approval remain explicit |
+| side effects | no DB read/write, migration, service start, provider egress, external research, or embeddings |
+
 Focused verification:
 
 ```text

@@ -10,6 +10,7 @@ from main import (
     handle_memory_chat,
     handle_memory_ask,
     handle_memory_research,
+    handle_memory_status,
     handle_prm_assistant,
     handle_report_v2_rollout_gate,
     handle_weekly_intelligence_v2,
@@ -59,6 +60,18 @@ def _fake_prm_chat_payload() -> dict:
 
 
 class TestCli(unittest.TestCase):
+    def test_memory_status_is_static_and_does_not_load_settings(self):
+        args = build_parser().parse_args(["memory", "status", "--json"])
+        self.assertIs(args.handler, handle_memory_status)
+        output = StringIO()
+        with patch("main.load_settings") as settings_mock, redirect_stdout(output):
+            self.assertEqual(handle_memory_status(args), 0)
+        settings_mock.assert_not_called()
+        payload = __import__("json").loads(output.getvalue())
+        self.assertEqual(payload["status"], "local_mode_available_gated_product_path")
+        self.assertFalse(payload["not_performed"]["database_read"])
+        self.assertFalse(payload["not_performed"]["embeddings_run"])
+
     def test_bootstrap_accepts_days_window(self):
         args = build_parser().parse_args(["bootstrap", "--days", "84"])
 

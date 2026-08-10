@@ -617,6 +617,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     memory_sub = memory_parser.add_subparsers(dest="memory_command", required=True)
 
+    status_parser = memory_sub.add_parser(
+        "status",
+        help="Show safe local PRM commands and gates without reading or changing memory",
+    )
+    status_parser.add_argument("--json", action="store_true")
+    status_parser.set_defaults(handler=handle_memory_status)
+
     ask_parser = memory_sub.add_parser(
         "ask",
         help="Ask local PRM memory without LLM, external search, or writes",
@@ -2782,6 +2789,44 @@ def handle_memory_ask(args: argparse.Namespace) -> int:
         sys.stdout.write(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
         return 0
     sys.stdout.write(render_local_memory_answer(payload) + "\n")
+    return 0
+
+
+def handle_memory_status(args: argparse.Namespace) -> int:
+    """Render static operator guidance without loading settings or touching the DB."""
+    payload = {
+        "schema_version": "prm_local_status.v1",
+        "status": "local_mode_available_gated_product_path",
+        "available_now": [
+            {"command": "memory ask <question>", "purpose": "local cited evidence brief", "provider_egress": False},
+            {"command": "memory research <question>", "purpose": "bounded local research session", "provider_egress": False},
+            {"command": "memory inspect-evidence", "purpose": "inspect local evidence metadata", "provider_egress": False},
+        ],
+        "requires_explicit_approval": [
+            "human-approved PRM-24 gold labels before PRM-26",
+            "provider egress switch for LLM-backed ask/chat",
+            "accepted PRM-26 ADR before embeddings or vector backend",
+            "dogfood-start approval after PRM-28 and PRM-18 blockers",
+        ],
+        "not_performed": {
+            "database_read": False,
+            "database_write": False,
+            "migration": False,
+            "service_start": False,
+            "provider_egress": False,
+            "external_research": False,
+            "embeddings_run": False,
+        },
+    }
+    if getattr(args, "json", False):
+        sys.stdout.write(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
+        return 0
+    lines = ["PRM Local Status", "Available now (local-only):"]
+    lines.extend(f"- {item['command']}: {item['purpose']}" for item in payload["available_now"])
+    lines.extend(["", "Still gated:"])
+    lines.extend(f"- {item}" for item in payload["requires_explicit_approval"])
+    lines.append("No database read/write, migration, service start, provider egress, external research, or embeddings occurred.")
+    sys.stdout.write("\n".join(lines) + "\n")
     return 0
 
 

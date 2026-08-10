@@ -11,6 +11,18 @@
 
 ## Current PRM Local Use
 
+Start with a no-side-effect capability check:
+
+```bash
+PYTHONPATH=src python3 src/main.py memory status
+PYTHONPATH=src python3 src/main.py memory status --json
+```
+
+It performs no database operation or other product side effect. It lists local
+commands you can use now and the separate approvals still required for provider
+chat, vector work, and dogfood. The normal CLI startup banner may still report
+the configured local path/provider.
+
 Use this when you want to ask the product a normal question now, without
 starting Telegram dogfood or sending Telegram snippets to an external model:
 
