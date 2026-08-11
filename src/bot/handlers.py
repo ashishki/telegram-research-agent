@@ -1,10 +1,11 @@
+import json
 import logging
 import os
 import re
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Callable, Mapping
+from typing import Any, Callable, Mapping
 from urllib import error
 
 from assistant.pi_chat import answer_pi_chat
@@ -22,7 +23,7 @@ from assistant.rag_answer_gate import assess_rag_answer_gate
 from bot.telegram_delivery import _send_text_internal, send_document, send_report_preview, send_text
 from config.settings import PROJECT_ROOT, Settings
 from db.migrate import record_feedback, record_post_tag
-from llm.client import LLMClient
+from llm.client import LLMClient, suppress_usage_recording
 from output.generate_digest import _compute_week_label, run_digest
 from output.generate_insight import generate_insight
 from output.generate_study_plan import generate_study_plan, mark_study_complete
@@ -196,6 +197,11 @@ def _telegram_auto_llm_router_allowed() -> bool:
     return value in {"1", "true", "yes", "approved"} and _telegram_provider_egress_allowed()
 
 
+def _telegram_rag_llm_synthesis_allowed() -> bool:
+    value = os.environ.get("PRM_TELEGRAM_RAG_LLM_SYNTHESIS", "").strip().casefold()
+    return value in {"1", "true", "yes", "approved"} and _telegram_provider_egress_allowed()
+
+
 def _telegram_hybrid_retrieval_allowed() -> bool:
     value = os.environ.get("PRM_ARCHIVE_HYBRID_RETRIEVAL", "").strip().casefold()
     return value in {"1", "true", "yes", "approved"}
@@ -243,6 +249,14 @@ def _route_auto_message(chat_id: str, text: str, *, input_kind: str = "text") ->
     confidence = _safe_confidence(result.get("confidence"))
     if mode not in {"research", "brief", "chat"} or confidence < 0.45:
         return {**fallback, "router": "deterministic_after_low_confidence_llm", "model_call_attempted": True}
+    if mode == "chat" and not _llm_chat_route_allowed(clean):
+        return {
+            **fallback,
+            "router": "deterministic_after_llm_chat_guard",
+            "model_call_attempted": True,
+            "llm_rejected_mode": "chat",
+            "llm_reason": str(result.get("reason") or "").strip(),
+        }
     return {
         "mode": mode,
         "confidence": confidence,
@@ -302,7 +316,10 @@ def _looks_like_editor_brief_request(lowered: str) -> bool:
         for marker in (
             "тезис",
             "опорн",
-            "пост",
+            "для пост",
+            "пост для",
+            "пост в соц",
+            "материал для",
             "соцсет",
             "редактор",
             "бриф",
@@ -312,6 +329,28 @@ def _looks_like_editor_brief_request(lowered: str) -> bool:
             "draft inputs",
             "углы",
             "angles",
+        )
+    )
+
+
+def _llm_chat_route_allowed(text: str) -> bool:
+    lowered = _clean_operator_text(text).casefold()
+    if _contains_research_anchor(lowered) or _looks_like_editor_brief_request(lowered):
+        return False
+    return any(
+        marker in lowered
+        for marker in (
+            "перепиши",
+            "переформулируй",
+            "сократи",
+            "сделай короче",
+            "сделай проще",
+            "улучши текст",
+            "rewrite",
+            "rephrase",
+            "shorten",
+            "make this clearer",
+            "make it simpler",
         )
     )
 
@@ -558,10 +597,11 @@ def handle_prm_start(chat_id: str, args: str, settings: Settings) -> None:
     lines = [
         "PRM safe assistant",
         "",
-        "Dogfood status: not started. Service start requires explicit PRM-19 approval.",
+        "Dogfood status: not started. Current runtime is manual testing only.",
         "Send a normal message; auto mode chooses research, editor brief, or gated LLM chat.",
-        "Local research and editor brief modes are default: no LLM, provider egress, live web, embeddings, or writes.",
+        "Research/brief first run local hybrid RAG. If approved, Telegram can add LLM synthesis over bounded cited snippets.",
         "LLM auto-routing/chat require PRM_TELEGRAM_AUTO_LLM_ROUTER=1 and PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1.",
+        "RAG LLM synthesis additionally requires PRM_TELEGRAM_RAG_LLM_SYNTHESIS=1.",
         "Local-only CLI remains: memory ask <question>.",
         "",
         "Manual fallback commands: /research, /brief, /weekly, /actions, /mvp, /strategy, /projects, /costs, /status.",
@@ -1018,6 +1058,14 @@ def handle_auto(chat_id: str, args: str, settings: Settings) -> None:
         return
     route = _route_auto_message(chat_id, question)
     mode = str(route.get("mode") or "research")
+    LOGGER.info(
+        "PRM auto route selected chat_id=%s mode=%s router=%s confidence=%.2f model_call_attempted=%s",
+        chat_id,
+        mode,
+        route.get("router") or "unknown",
+        _safe_confidence(route.get("confidence")),
+        bool(route.get("model_call_attempted")),
+    )
     if mode == "brief":
         handle_research_brief(chat_id, question, settings)
         return
@@ -1056,7 +1104,9 @@ def handle_research(chat_id: str, args: str, settings: Settings) -> None:
         return
     result = _with_dialog_context(result, dialog)
     _remember_research_dialog(chat_id, str(dialog["effective_question"]), mode="research")
-    _send_research_text(chat_id, render_memory_research_answer(result), token=_get_bot_token())
+    local_text = render_memory_research_answer(result)
+    response_text = _render_telegram_research_response(result, local_text=local_text, mode="research")
+    _send_research_text(chat_id, response_text, token=_get_bot_token())
 
 
 def handle_research_brief(chat_id: str, args: str, settings: Settings) -> None:
@@ -1086,7 +1136,9 @@ def handle_research_brief(chat_id: str, args: str, settings: Settings) -> None:
         return
     result = _with_dialog_context(result, dialog)
     _remember_research_dialog(chat_id, str(dialog["effective_question"]), mode="brief")
-    _send_research_text(chat_id, render_memory_research_brief(result), token=_get_bot_token())
+    local_text = render_memory_research_brief(result)
+    response_text = _render_telegram_research_response(result, local_text=local_text, mode="brief")
+    _send_research_text(chat_id, response_text, token=_get_bot_token())
 
 
 def _with_dialog_context(result: Mapping[str, object], dialog: Mapping[str, object]) -> dict:
@@ -1099,6 +1151,152 @@ def _with_dialog_context(result: Mapping[str, object], dialog: Mapping[str, obje
             "effective_question": str(dialog.get("effective_question") or ""),
         }
     return payload
+
+
+def _render_telegram_research_response(payload: Mapping[str, Any], *, local_text: str, mode: str) -> str:
+    """Optionally synthesize a Telegram RAG answer after local retrieval has run."""
+
+    if not _telegram_rag_llm_synthesis_allowed():
+        return local_text
+    if _telegram_rag_source_count(payload) <= 0:
+        return local_text
+    try:
+        return _synthesize_telegram_rag_answer(payload, mode=mode)
+    except Exception:
+        LOGGER.warning("Telegram RAG LLM synthesis failed mode=%s", mode, exc_info=True)
+        return (
+            local_text.rstrip()
+            + "\n\nLLM synthesis: unavailable; shown local RAG fallback. "
+            "No additional provider answer was used."
+        )
+
+
+def _telegram_rag_source_count(payload: Mapping[str, Any]) -> int:
+    archive = _safe_mapping(payload.get("archive_evidence"))
+    linked = _safe_mapping(payload.get("linked_source_evidence"))
+    return len(_safe_mapping_list(archive.get("items"))) + len(_safe_mapping_list(linked.get("items")))
+
+
+def _synthesize_telegram_rag_answer(payload: Mapping[str, Any], *, mode: str) -> str:
+    context = _telegram_rag_synthesis_context(payload, mode=mode)
+    question = str(context.get("question") or "")
+    ru = _looks_russian(question)
+    title = "PRM Editor Brief" if mode == "brief" else "PRM Research"
+    if ru and mode == "brief":
+        title = "PRM редакторский бриф"
+    prompt = (
+        "You are the Telegram UX layer for a private Personal Research Memory assistant.\n"
+        "The local RAG step has already run. Rewrite the bounded context into a useful Telegram answer.\n\n"
+        "Hard rules:\n"
+        "- Use only the bounded_context JSON below for source-grounded claims.\n"
+        "- Do not use general model background as evidence.\n"
+        "- Do not invent source links, channels, dates, companies, ROI, hiring, layoffs, or current facts.\n"
+        "- If the context says external verification is required, state that clearly.\n"
+        "- Keep the answer compact enough for Telegram: roughly 900-1600 characters.\n"
+        "- Same language as the user.\n"
+        "- Include source references as short bullets using the provided source_url when present.\n"
+        "- Do not include raw JSON or internal field names.\n\n"
+        f"Preferred title: {title}\n"
+        "Recommended structure for research: title, Короткий ответ/Short answer, Что видно по источникам, Источники, Ограничения.\n"
+        "Recommended structure for editor brief: title, Позиция/Position, Опорные тезисы, Углы, Источники, Ограничения.\n\n"
+        f"bounded_context:\n{json.dumps(context, ensure_ascii=False, indent=2)}"
+    )
+    with suppress_usage_recording():
+        receipt = LLMClient.complete_with_receipt(
+            prompt=prompt,
+            system="You produce concise, source-grounded Telegram answers from bounded private RAG context.",
+            max_tokens=900,
+            category="pi_chat",
+        )
+    answer = str(receipt.text or "").strip()
+    if not answer:
+        raise RuntimeError("empty_llm_synthesis")
+    footer = (
+        "Privacy: mode=telegram-rag-llm; "
+        "model_calls=1; "
+        f"estimated_cost_usd={float(receipt.estimated_cost_usd):.8f}; "
+        "bounded_telegram_snippet_provider_egress=true; "
+        "raw_telegram_corpus_egress=false; "
+        "durable_writes=false"
+    )
+    return (answer.rstrip() + "\n\n" + footer).rstrip()
+
+
+def _telegram_rag_synthesis_context(payload: Mapping[str, Any], *, mode: str) -> dict[str, Any]:
+    archive = _safe_mapping(payload.get("archive_evidence"))
+    linked = _safe_mapping(payload.get("linked_source_evidence"))
+    answer_gate = _safe_mapping(payload.get("answer_gate"))
+    next_steps = _safe_mapping(payload.get("next_steps"))
+    project_fit = _safe_mapping(payload.get("project_fit"))
+    privacy = _safe_mapping(payload.get("privacy"))
+    archive_items = [
+        {
+            "date": str(item.get("posted_at") or "")[:10],
+            "channel": item.get("channel_username"),
+            "snippet": _format_post_snippet(str(item.get("snippet") or item.get("content") or ""), limit=260),
+            "source_url": item.get("source_url") or item.get("telegram_url") or item.get("message_url"),
+            "retrieval_mode": item.get("retrieval_mode"),
+        }
+        for item in _safe_mapping_list(archive.get("items"))[:5]
+    ]
+    linked_items = [
+        {
+            "title": item.get("normalized_title") or item.get("source_type"),
+            "url": item.get("source_url") or item.get("normalized_url"),
+            "excerpt": _format_post_snippet(str(item.get("text_excerpt") or ""), limit=220),
+            "status": item.get("extraction_status"),
+        }
+        for item in _safe_mapping_list(linked.get("items"))[:3]
+    ]
+    return {
+        "schema_version": "telegram_rag_llm_synthesis_context.v1",
+        "mode": mode,
+        "question": str(payload.get("question") or ""),
+        "local_direct_answer": str(payload.get("direct_answer") or ""),
+        "answer_status": payload.get("status"),
+        "answer_gate": {
+            "allow_answer": answer_gate.get("allow_answer"),
+            "external_verification_required": answer_gate.get("external_verification_required"),
+            "current_claim_allowed": answer_gate.get("current_claim_allowed"),
+            "reason": answer_gate.get("reason"),
+        },
+        "archive": {
+            "status": archive.get("status"),
+            "retrieval_mode": archive.get("retrieval_mode"),
+            "sources": archive_items,
+        },
+        "linked_sources": linked_items,
+        "project_fit": {
+            "project_name": project_fit.get("project_name"),
+            "relevance_label": project_fit.get("relevance_label"),
+            "guidance": project_fit.get("guidance"),
+        },
+        "next_steps": {
+            key: [str(item) for item in next_steps.get(key) or [] if str(item).strip()][:3]
+            for key in ("apply", "watch", "ignore", "study")
+        },
+        "unknowns": [str(item) for item in payload.get("unknowns") or [] if str(item).strip()][:6],
+        "privacy": {
+            "local_retrieval_model_calls": privacy.get("model_calls"),
+            "local_retrieval_provider_egress": privacy.get("provider_egress"),
+            "raw_corpus_egress": False,
+            "durable_writes": False,
+        },
+    }
+
+
+def _safe_mapping(value: Any) -> dict[str, Any]:
+    return dict(value) if isinstance(value, Mapping) else {}
+
+
+def _safe_mapping_list(value: Any) -> list[Mapping[str, Any]]:
+    if not isinstance(value, list | tuple):
+        return []
+    return [item for item in value if isinstance(item, Mapping)]
+
+
+def _looks_russian(text: str) -> bool:
+    return bool(re.search(r"[А-Яа-яЁё]", str(text or "")))
 
 
 def handle_operator_message(chat_id: str, args: str, settings: Settings) -> None:

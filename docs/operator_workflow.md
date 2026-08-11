@@ -57,6 +57,11 @@ mode for that chat. Manual research and brief commands remain fallback controls.
 The current host `.env` enables both `PRM_TELEGRAM_AUTO_LLM_ROUTER=1` and
 `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`, so `/chat` and model-based auto routing
 may send bounded cited context to the configured provider during manual tests.
+It also enables `PRM_TELEGRAM_RAG_LLM_SYNTHESIS=1`, so `/research`, `/brief`,
+and ordinary auto-routed research/brief first run local hybrid RAG and then may
+ask the model to rewrite only that bounded context into a cleaner Telegram
+answer. This avoids the old failure mode where an archive question could be
+routed to a generic PI chat without useful archive evidence.
 
 ## PRM-18 LLM Chat UX Block
 
@@ -82,9 +87,9 @@ Contracted command surfaces:
 | Local evidence JSON | `PYTHONPATH=src python3 src/main.py memory ask --json "<question>"` | available now | none |
 | One-shot LLM synthesis | `PYTHONPATH=src python3 src/main.py memory ask --llm-approved --allow-provider-egress "<question>"` | implemented in PRM-18B | bounded cited snippets only after explicit switch |
 | Interactive LLM chat | `PYTHONPATH=src python3 src/main.py memory chat --allow-provider-egress` | implemented in PRM-18B | bounded cited snippets only after explicit switch |
-| Telegram auto route | ordinary text or voice transcript in `prm-assistant` mode | active for manual test; chooses local research/local brief by default and may choose LLM chat when router/provider flags allow | bounded cited snippets only if LLM route is selected |
-| Telegram local research | `/research <question>` fallback in `prm-assistant` mode | active for manual test | none |
-| Telegram editor brief | `/brief <question>` fallback in `prm-assistant` mode | active for manual test | none |
+| Telegram auto route | ordinary text or voice transcript in `prm-assistant` mode | active for manual test; chooses local research/local brief by default and may choose LLM chat only for explicit rewrite/generation | bounded cited snippets after local RAG when synthesis is enabled, or bounded chat context if chat is selected |
+| Telegram local research | `/research <question>` fallback in `prm-assistant` mode | active for manual test; runs local hybrid RAG before optional LLM synthesis | bounded cited snippets only when `PRM_TELEGRAM_RAG_LLM_SYNTHESIS=1` |
+| Telegram editor brief | `/brief <question>` fallback in `prm-assistant` mode | active for manual test; runs local hybrid RAG before optional LLM synthesis | bounded cited snippets only when `PRM_TELEGRAM_RAG_LLM_SYNTHESIS=1` |
 | Telegram assistant chat | `/chat <question>` in `prm-assistant` mode | active for manual test; runtime requires `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1` | bounded cited snippets only after explicit provider-egress approval |
 
 The LLM-backed commands are intentionally explicit:
@@ -101,6 +106,9 @@ with "No provider call was made". Without
 and does not call a model for route selection. In the current manual runtime
 test both flags are enabled, so send a normal message first and use manual
 research or brief commands only when you want to override the auto decision.
+Archive/research questions are guarded from falling through to generic chat:
+even if the router proposes `chat`, questions about posts, archive evidence,
+AI transformation, companies, Telegram, RAG, or vectors stay on the RAG path.
 
 Without `--allow-provider-egress`, the product must either stay on the local
 `memory ask` path or refuse with clear copy such as:
@@ -553,7 +561,7 @@ raw SQLite sessions.
 The current runtime state is manual operator testing, not PRM-19 dogfood. As of
 2026-08-11 18:27 CEST, `telegram-prm-assistant.service` is installed, enabled,
 and running with PRM hybrid retrieval, local vector sidecar, Telegram auto LLM
-router, and provider-egress flags configured in the host `.env`. The service
+router, RAG LLM synthesis, and provider-egress flags configured in the host `.env`. The service
 still skips automatic startup migrations. Production schema migrations remain a
 separate backup-and-approval operation.
 

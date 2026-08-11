@@ -675,7 +675,7 @@ This receipt is diagnostic evidence only. It is not PRM-19 dogfood evidence.
 | dialog context | short follow-up questions can use the previous in-process question and mode for the same chat; no durable database write is performed |
 | query planning | AI-transformation editorial questions get deterministic archive query hints for implementation success, ROI/productivity, failure/no-growth, and hiring/layoff angles |
 | answer gate | archive-scoped recent-post questions no longer trigger current-fact refusal, but current-price/current-stock questions still require external verification |
-| provider boundary | local research and local brief use `MemoryResearchBudget(max_model_calls=0, allow_provider_egress=false, allow_open_browsing=false)` |
+| provider boundary | local research and local brief retrieval use `MemoryResearchBudget(max_model_calls=0, allow_provider_egress=false, allow_open_browsing=false)`; later Telegram-only synthesis may send selected bounded RAG context when explicitly enabled |
 | LLM Telegram gate | Telegram chat, Hermes, and ask commands refuse by default unless `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1` is set before runtime startup; ordinary-text LLM auto-routing additionally requires `PRM_TELEGRAM_AUTO_LLM_ROUTER=1` |
 | task-time runtime boundary | service was not installed, enabled, started, or treated as dogfood during this UX-routing implementation |
 | simulation | local handler simulation: AI-transformation question routed to research; short "а почему?" kept prior research mode; source-packet/post wording routed to brief; current Nvidia price question used the deterministic hard local gate and started with the freshness boundary |
@@ -699,10 +699,22 @@ testing; see
 | startup migration behavior | automatic migrations skipped |
 | vector sidecar | `data/vector/archive_vector.sqlite`, gitignored, local deterministic hashing |
 | hybrid eval | 50 generated seed cases; hit@10=1.0, MRR=1.0, citation_precision=1.0, duplicate_top10_rate=0.004, latency_ms_p95=59.077 |
-| Telegram flags | `PRM_ARCHIVE_HYBRID_RETRIEVAL=approved`; `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`; `PRM_TELEGRAM_AUTO_LLM_ROUTER=1` |
+| Telegram flags | `PRM_ARCHIVE_HYBRID_RETRIEVAL=approved`; `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`; `PRM_TELEGRAM_AUTO_LLM_ROUTER=1`; `PRM_TELEGRAM_RAG_LLM_SYNTHESIS=1` |
 | delivery check | short Telegram service-check message sent; no private source text and no LLM provider call |
 | privacy boundary | no live Telegram ingestion, reaction sync, live web research, external embeddings, hosted vector service, production DB migration, canonical DB write, private report commit, dogfood start, or release claim |
 | dogfood boundary | not PRM-19 evidence; user manual testing and feedback still required before dogfood can be recorded |
+
+## Telegram Manual-Test UX Repair - 2026-08-11
+
+| Check | Result |
+| --- | --- |
+| trigger | first operator manual Telegram question produced a low-value answer |
+| root cause | ordinary auto path could reach generic PI chat for archive/source questions and route logging did not show selected mode |
+| route repair | archive/source questions are guarded from generic chat fallback; "what was in my posts" stays research, not editor brief |
+| synthesis repair | Telegram research/brief now run local hybrid RAG first, then optional bounded LLM synthesis when `PRM_TELEGRAM_RAG_LLM_SYNTHESIS=1` and provider egress are enabled |
+| privacy | selected bounded snippets/context may egress to provider; raw corpus egress=false; usage DB recording suppressed; durable_writes=false |
+| validation | `PYTHONPATH=src python3 -m pytest tests/test_handlers.py -q` -> 44 passed |
+| dogfood boundary | not PRM-19 evidence; manual testing continues |
 
 ## Local PRM Status UX - 2026-08-10
 

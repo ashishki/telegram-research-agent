@@ -20,6 +20,7 @@ PRM_TESTS = (
     "tests/test_pi_tools.py",
     "tests/test_pi_facade_archive_vector.py",
     "tests/test_pi_chat.py",
+    "tests/test_handlers.py",
     "tests/test_local_memory_ask.py",
     "tests/test_project_context.py",
     "tests/test_learning_layer.py",
@@ -47,7 +48,6 @@ FAST_CONTRACT_TESTS = (
     "tests/test_week_bounds.py",
     "tests/test_pi_intent.py",
     "tests/test_cli.py",
-    "tests/test_handlers.py",
     "tests/test_callbacks.py",
     *PRM_TESTS,
 )

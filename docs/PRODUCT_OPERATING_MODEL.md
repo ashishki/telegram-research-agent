@@ -147,8 +147,9 @@ For immediate local use, prefer:
 PYTHONPATH=src python3 src/main.py memory ask "какие есть подтверждения по моей идее?"
 ```
 
-This returns a local evidence brief. It does not perform LLM synthesis over
-archive snippets.
+This returns a local evidence brief. It does not perform Telegram RAG LLM
+synthesis over archive snippets; that synthesis exists only inside the
+separately approved manual Telegram runtime.
 
 Completed pre-PRM-19 UX block:
 
@@ -157,8 +158,8 @@ Completed pre-PRM-19 UX block:
   calls, service starts, dogfood, or production DB writes.
 - PRM-18B implemented a CLI chat harness over the existing PI chat/RAG path
   with fake-provider tests by default.
-- PRM-18C aligned Telegram `prm-assistant` UX and the start/stop runbook
-  without installing, enabling, or starting the service.
+- PRM-18C aligned Telegram `prm-assistant` UX and the start/stop runbook; the
+  service was later installed, enabled, and started for manual testing only.
 - The deep review boundary for this block is recorded at
   `docs/audit/PRM_DEEP_REVIEW_PRM18A_18C_2026-08-03.md`.
 
@@ -170,13 +171,13 @@ PRM-18A contracted command surfaces:
   `PYTHONPATH=src python3 src/main.py memory ask --llm-approved --allow-provider-egress "<question>"`;
 - PRM-18B interactive command:
   `PYTHONPATH=src python3 src/main.py memory chat --allow-provider-egress`;
-- Telegram auto route after approved runtime start: ordinary text or voice
-  transcript inside the disabled `prm-assistant` runtime chooses local research
-  or local editor brief by default;
-- Telegram manual local research fallback after approved runtime start:
+- Telegram auto route in the current manual runtime: ordinary text or voice
+  transcript chooses local research or local editor brief by default, then can
+  add bounded LLM synthesis after local RAG when explicitly enabled;
+- Telegram manual local research fallback in the current manual runtime:
   `/research <question>`;
-- Telegram manual editor brief fallback after approved runtime start:
-  `/brief <question>` for local-only source-backed theses;
+- Telegram manual editor brief fallback in the current manual runtime:
+  `/brief <question>` for source-backed theses;
 - PRM-18C Telegram LLM parity command after separate provider-egress approval:
   `/chat <question>` with `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`.
 
@@ -215,6 +216,13 @@ Implemented `prm-assistant` runtime mode:
   `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`; `/chat` remains the separate
   LLM-backed fallback command and requires provider-egress approval before use
   with private snippets;
+- Telegram research/brief can add bounded LLM synthesis after local hybrid RAG
+  when `PRM_TELEGRAM_RAG_LLM_SYNTHESIS=1` is also enabled; the provider receives
+  only selected bounded snippets/context, not the raw corpus, and usage
+  recording is suppressed to avoid production DB writes;
+- auto-routing guards archive/source questions from generic chat fallback, so
+  questions about posts, archive evidence, AI transformation, companies,
+  Telegram, RAG, or vectors stay on the RAG path;
 - read-only tools enabled by default;
 - proposal tools return drafts only;
 - `confirm_save_proposal` is the only durable memory write;

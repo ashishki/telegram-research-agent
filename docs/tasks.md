@@ -1489,6 +1489,11 @@ Notes: |
   vector/backend work, production migrations, and dogfood remain gated.
   A later 2026-08-11 operator instruction enabled the local vector/RAG/LLM/
   Telegram stack for manual testing only.
+  A same-day repair prevents archive/source questions from falling through to
+  generic chat and adds Telegram-only bounded LLM synthesis after local hybrid
+  RAG when `PRM_TELEGRAM_RAG_LLM_SYNTHESIS=1` is set. This sends only selected
+  bounded snippets/context to the provider, suppresses usage DB recording, and
+  leaves PRM-19 dogfood unstarted.
 
   The operator runbook documents preflight inspection, install/start/status,
   stop/disable, and rollback-to-disabled commands while preserving the hard

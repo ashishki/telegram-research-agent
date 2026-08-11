@@ -106,6 +106,7 @@ PRM_ARCHIVE_HYBRID_RETRIEVAL=approved
 PRM_ARCHIVE_VECTOR_INDEX_PATH=/srv/openclaw-you/workspace/telegram-research-agent/data/vector/archive_vector.sqlite
 PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1
 PRM_TELEGRAM_AUTO_LLM_ROUTER=1
+PRM_TELEGRAM_RAG_LLM_SYNTHESIS=1
 ```
 
 Secret values such as Telegram tokens, chat IDs, and LLM API keys are not
@@ -144,4 +145,29 @@ Not performed:
 During manual Telegram tests, `/chat` or LLM auto-routing may send bounded cited
 context snippets to the configured provider because
 `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1` and `PRM_TELEGRAM_AUTO_LLM_ROUTER=1` are
-enabled.
+enabled. `/research`, `/brief`, and auto-routed research/brief additionally may
+send selected bounded RAG snippets/context for Telegram answer synthesis because
+`PRM_TELEGRAM_RAG_LLM_SYNTHESIS=1` is enabled.
+
+## Manual-Test UX Repair - 2026-08-11
+
+The first operator manual question produced a low-value answer. The observed
+service logs showed the ordinary-message path reached LLM execution, but the
+runtime did not expose enough route/retrieval detail. The repair:
+
+- logs the selected PRM auto route without logging message text;
+- prevents archive/source questions from being routed to generic chat;
+- narrows the editor-brief heuristic so "what was in my posts" stays research
+  instead of brief;
+- makes Telegram research/brief run local hybrid RAG first, then optionally
+  synthesize the bounded RAG context with the configured LLM;
+- suppresses LLM usage DB recording for this Telegram synthesis to avoid
+  production database writes;
+- preserves local RAG fallback if the provider call fails.
+
+Focused validation:
+
+```text
+PYTHONPATH=src python3 -m pytest tests/test_handlers.py -q
+44 passed
+```

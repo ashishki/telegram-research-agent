@@ -1,26 +1,27 @@
 # Autonomous Workflow Contract
 
-Status: PRM-17 deterministic contract implemented; runtime activation still
-requires human approval
-Last updated: 2026-07-29
+Status: PRM-17 deterministic contract implemented; manual PRM assistant runtime
+active, dogfood not started
+Last updated: 2026-08-11
 
 ## Current Runtime State
 
-As of 2026-07-29, no Telegram Research Agent workflow is active in systemd.
-The legacy live bot and Report V2 weekly timer were stopped and disabled after
-PRM-18 confirmed that dogfood is blocked:
+As of 2026-07-29, no legacy Telegram Research Agent workflow is active in
+systemd. The legacy live bot and Report V2 weekly timer were stopped and
+disabled after PRM-18 confirmed that dogfood is blocked:
 
 - `telegram-bot.service`: disabled, inactive;
 - `telegram-ai-split-report.timer`: disabled, inactive;
 - `telegram-ai-split-report.service`: disabled, inactive.
 
-Do not restart those units as PRM dogfood. Future runtime activation should use
-a dedicated PRM assistant mode that exposes only approved read-only and
-confirmation-gated tools.
+Do not restart those units as PRM dogfood. Runtime activation uses the dedicated
+PRM assistant mode that exposes only approved read-only and confirmation-gated
+tools.
 
 The dedicated mode now exists as `src/main.py prm-assistant` and the repo unit
-template `systemd/telegram-prm-assistant.service`. It is not installed, enabled,
-started, or approved as dogfood.
+template `systemd/telegram-prm-assistant.service`. As of 2026-08-11 it is
+installed, enabled, and running for manual operator testing only. It is not
+approved as PRM-19 dogfood evidence.
 
 ## Implementation Boundary
 
@@ -106,13 +107,17 @@ The safe Telegram runtime dispatches ordinary text and voice transcripts through
 `/auto`. By default this chooses local-only research or local-only editor brief
 rendering; LLM auto-routing and auto chat require both
 `PRM_TELEGRAM_AUTO_LLM_ROUTER=1` and
-`PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`. It blocks the legacy `/message` and
-`/voice` intent router, legacy inline callbacks, direct reminder/tag/feedback
-writes, and generation commands such as `/run_digest` and `/run_mvp_weekly`.
+`PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`. Telegram research/brief can add bounded
+LLM synthesis after local hybrid RAG when
+`PRM_TELEGRAM_RAG_LLM_SYNTHESIS=1` is enabled. Archive/source questions are
+guarded from generic chat fallback. It blocks the legacy `/message` and `/voice`
+intent router, legacy inline callbacks, direct reminder/tag/feedback writes,
+and generation commands such as `/run_digest` and `/run_mvp_weekly`.
 
 The safe runtime does not run automatic startup migrations. Production DB
 migration remains a separate approved maintenance action.
 
 Starting `systemd/telegram-prm-assistant.service` is a runtime activation event.
-It requires explicit dogfood-start approval and accepted or cleared PRM-18
+The current activation is manual testing only. Recording PRM-19 dogfood evidence
+still requires explicit dogfood-start approval and accepted or cleared PRM-18
 blockers.

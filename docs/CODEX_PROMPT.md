@@ -88,6 +88,10 @@ running for manual operator testing only: ordinary text and voice transcripts di
 choose LLM chat only when both `PRM_TELEGRAM_AUTO_LLM_ROUTER=1` and
 `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1` are explicitly enabled. Manual
 `/research`, `/brief`, and separately gated `/chat` remain fallback commands.
+Telegram research/brief can add bounded LLM synthesis only after local hybrid
+RAG has run when `PRM_TELEGRAM_RAG_LLM_SYNTHESIS=1` is also set; the provider
+receives only bounded cited snippets/context, not the raw corpus, and usage
+recording is suppressed to avoid production DB writes.
 Legacy callbacks are disabled, and
 generation/write commands are blocked. It does not run automatic startup
 migrations. The full product is not released. For immediate local use,

@@ -90,6 +90,40 @@ def _fake_prm_chat_payload(answer: str = "Hermes answer from curated PI tools.")
     }
 
 
+def _fake_research_payload(question: str = "что у меня было про AI transformation?") -> dict:
+    return {
+        "status": "ok",
+        "question": question,
+        "direct_answer": "По локальному архиву найдено 2 источника про AI transformation.",
+        "archive_evidence": {
+            "status": "ok",
+            "retrieval_mode": "hybrid_local_vector_archive_query_planner",
+            "items": [
+                {
+                    "posted_at": "2026-08-01T12:00:00Z",
+                    "channel_username": "@ai_channel",
+                    "snippet": "AI transformation pilots often fail to show measurable ROI.",
+                    "source_url": "https://t.me/ai_channel/101",
+                    "retrieval_mode": "sqlite_fts_archive",
+                }
+            ],
+            "source_refs": ["https://t.me/ai_channel/101"],
+        },
+        "linked_source_evidence": {"items": []},
+        "project_fit": {"relevance_label": "no_match"},
+        "answer_gate": {
+            "allow_answer": True,
+            "external_verification_required": False,
+            "current_claim_allowed": True,
+            "reason": "answerable",
+        },
+        "next_steps": {"apply": [], "watch": ["Keep as source-backed editorial angle."], "ignore": [], "study": []},
+        "unknowns": ["current external truth"],
+        "privacy": {"model_calls": 0, "provider_egress": False},
+        "receipt": {"budget": {"max_tool_calls": 4, "max_archive_sources": 5}, "tool_calls_used": 4},
+    }
+
+
 class TestHandlers(unittest.TestCase):
     def setUp(self):
         handlers._RESEARCH_DIALOG_STATE.clear()
@@ -473,6 +507,46 @@ class TestHandlers(unittest.TestCase):
         self.assertTrue(budget.allow_vector_retrieval)
         self.assertEqual(budget.vector_index_path, "/tmp/archive-vector.sqlite")
 
+    def test_handle_research_can_send_llm_synthesis_after_local_rag(self):
+        settings = Settings(
+            db_path=":memory:",
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+        payload = _fake_research_payload()
+        receipt = types.SimpleNamespace(
+            text="PRM Research\n\nКороткий ответ\nAI pilots need ROI proof.\n\nИсточники\n- https://t.me/ai_channel/101",
+            estimated_cost_usd=0.00004,
+        )
+
+        with patch.dict(
+            os.environ,
+            {"PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS": "1", "PRM_TELEGRAM_RAG_LLM_SYNTHESIS": "1"},
+            clear=False,
+        ):
+            with patch.object(handlers, "answer_memory_research", return_value=payload) as research_mock:
+                with patch.object(handlers, "render_memory_research_answer", return_value="LOCAL RAG FALLBACK") as render_mock:
+                    with patch.object(handlers.LLMClient, "complete_with_receipt", return_value=receipt) as llm_mock:
+                        with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                            with patch.object(handlers, "send_message") as mock_send_message:
+                                handlers.handle_research(
+                                    chat_id="42",
+                                    args="что у меня было про AI transformation?",
+                                    settings=settings,
+                                )
+
+        research_mock.assert_called_once()
+        render_mock.assert_called_once_with(payload)
+        llm_mock.assert_called_once()
+        prompt = llm_mock.call_args.kwargs["prompt"]
+        self.assertIn("AI transformation pilots", prompt)
+        message = mock_send_message.call_args.args[2]
+        self.assertIn("PRM Research", message)
+        self.assertIn("AI pilots need ROI proof", message)
+        self.assertIn("Privacy: mode=telegram-rag-llm", message)
+        self.assertIn("bounded_telegram_snippet_provider_egress=true", message)
+
     def test_handle_research_uses_volatile_dialog_context_for_short_followups(self):
         settings = Settings(
             db_path=":memory:",
@@ -664,6 +738,41 @@ class TestHandlers(unittest.TestCase):
         chat_mock.assert_not_called()
         research_mock.assert_called_once()
         self.assertIn("PRM редакторский бриф", mock_send_message.call_args.args[2])
+
+    def test_handle_auto_rejects_llm_chat_for_archive_question(self):
+        settings = Settings(
+            db_path=":memory:",
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+        payload = {"status": "ok", "question": "research"}
+
+        with patch.dict(
+            os.environ,
+            {"PRM_TELEGRAM_AUTO_LLM_ROUTER": "1", "PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS": "1"},
+            clear=False,
+        ):
+            with patch.object(
+                handlers.LLMClient,
+                "complete_json",
+                return_value={"mode": "chat", "confidence": 0.96, "reason": "bad route"},
+            ) as llm_mock:
+                with patch.object(handlers, "answer_pi_chat") as chat_mock:
+                    with patch.object(handlers, "answer_memory_research", return_value=payload) as research_mock:
+                        with patch.object(handlers, "render_memory_research_answer", return_value="PRM Research"):
+                            with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                                with patch.object(handlers, "send_message") as mock_send_message:
+                                    handlers.handle_auto(
+                                        chat_id="42",
+                                        args="что у меня было в постах про AI transformation компаний?",
+                                        settings=settings,
+                                    )
+
+        llm_mock.assert_called_once()
+        chat_mock.assert_not_called()
+        research_mock.assert_called_once()
+        self.assertIn("PRM Research", mock_send_message.call_args.args[2])
 
     def test_handle_auto_keeps_generation_local_without_auto_llm_router_flag(self):
         settings = Settings(

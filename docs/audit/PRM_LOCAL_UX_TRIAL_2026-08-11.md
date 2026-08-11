@@ -141,10 +141,15 @@ Safe UX polish implemented after this trial:
     deterministic local routing by default and optional LLM route selection only
     when both `PRM_TELEGRAM_AUTO_LLM_ROUTER=1` and
     `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1` are set.
+12. After the first manual Telegram test produced a low-value answer, added a
+    guard so archive/source questions stay on RAG instead of generic chat and
+    added optional Telegram RAG LLM synthesis after local hybrid retrieval when
+    `PRM_TELEGRAM_RAG_LLM_SYNTHESIS=1` is set.
 
 Remaining known UX gaps:
 
-- deterministic synthesis is still shallower than an LLM-backed editor;
+- LLM-backed Telegram synthesis still needs more manual testing for answer
+  usefulness and visual compactness;
 - curated memory relevance/deduplication still needs deeper scoring;
 - multi-turn context is volatile/in-process only and is not durable product
   memory;

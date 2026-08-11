@@ -79,7 +79,11 @@ ordinary text and voice transcripts through
 `/auto`: deterministic safe routing chooses local research or local editor
 briefs by default, while LLM auto-routing and auto chat require both
 `PRM_TELEGRAM_AUTO_LLM_ROUTER=1` and
-`PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`. Manual `/research <question>`,
+`PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`. Telegram research/brief can add
+bounded LLM synthesis only after local hybrid RAG has run when
+`PRM_TELEGRAM_RAG_LLM_SYNTHESIS=1` is also set; the synthesis receives bounded
+cited snippets, not the raw corpus, and usage recording is suppressed to avoid
+production DB writes. Manual `/research <question>`,
 `/brief <question>`, and separately gated `/chat` remain fallback commands.
 A local user-facing `memory ask` command exists for immediate local evidence
 questions without LLM calls, external search, service starts, migrations, or
