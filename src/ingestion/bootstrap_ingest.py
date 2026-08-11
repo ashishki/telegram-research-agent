@@ -127,7 +127,15 @@ def _message_exists(cursor: sqlite3.Cursor, channel_id: int, message_id: int) ->
     return row is not None
 
 
-async def _ingest_channel(client, connection: sqlite3.Connection, channel: dict, cutoff_date: datetime) -> dict:
+async def _ingest_channel(
+    client,
+    connection: sqlite3.Connection,
+    channel: dict,
+    cutoff_date: datetime,
+    *,
+    analyze_media: bool = True,
+    append_events_enabled: bool = True,
+) -> dict:
     channel_username = channel["username"]
 
     while True:
@@ -152,7 +160,7 @@ async def _ingest_channel(client, connection: sqlite3.Connection, channel: dict,
                     channel_skipped += 1
                     continue
 
-                if row["media_type"] == "photo" and len((row["text"] or "").strip()) < 20:
+                if analyze_media and row["media_type"] == "photo" and len((row["text"] or "").strip()) < 20:
                     try:
                         photo_bytes = await client.download_media(message, bytes)
                         if photo_bytes:
@@ -168,15 +176,16 @@ async def _ingest_channel(client, connection: sqlite3.Connection, channel: dict,
                 source_events.append(telegram_source_event_from_row(row))
 
             connection.commit()
-            try:
-                append_source_events(source_events)
-            except Exception:
-                LOGGER.warning(
-                    "Source event append failed channel=%s events=%d",
-                    channel_username,
-                    len(source_events),
-                    exc_info=True,
-                )
+            if append_events_enabled:
+                try:
+                    append_source_events(source_events)
+                except Exception:
+                    LOGGER.warning(
+                        "Source event append failed channel=%s events=%d",
+                        channel_username,
+                        len(source_events),
+                        exc_info=True,
+                    )
             LOGGER.info(
                 "Bootstrap channel=%s inserted=%d skipped=%d",
                 channel_username,
@@ -208,7 +217,13 @@ def _cutoff_date_for_days(days: int) -> datetime:
     return datetime.now(timezone.utc) - timedelta(days=days)
 
 
-async def run_bootstrap(settings: Settings, *, days: int = DEFAULT_BOOTSTRAP_DAYS) -> dict:
+async def run_bootstrap(
+    settings: Settings,
+    *,
+    days: int = DEFAULT_BOOTSTRAP_DAYS,
+    analyze_media: bool = True,
+    append_events_enabled: bool = True,
+) -> dict:
     channels = _load_active_channels()
     cutoff_date = _cutoff_date_for_days(days)
     totals = {"inserted": 0, "skipped": 0, "errors": 0}
@@ -223,7 +238,14 @@ async def run_bootstrap(settings: Settings, *, days: int = DEFAULT_BOOTSTRAP_DAY
             connection.execute("PRAGMA journal_mode = WAL;")
 
             for channel in channels:
-                result = await _ingest_channel(client, connection, channel, cutoff_date)
+                result = await _ingest_channel(
+                    client,
+                    connection,
+                    channel,
+                    cutoff_date,
+                    analyze_media=analyze_media,
+                    append_events_enabled=append_events_enabled,
+                )
                 totals["inserted"] += result["inserted"]
                 totals["skipped"] += result["skipped"]
                 totals["errors"] += result["errors"]

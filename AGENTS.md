@@ -90,6 +90,17 @@ technical metrics/cost/tool-call/debug footer. Manual `/research <question>`,
 A local user-facing `memory ask` command exists for immediate local evidence
 questions without LLM calls, external search, service starts, migrations, or
 writes.
+On 2026-08-12 a bounded manual PRM archive refresh was added and run after
+operator instruction. `memory refresh-archive --days 21
+--confirm-canonical-write` refreshed the canonical local Telegram archive from
+3,709 to 4,166 rows, advanced max `posts.posted_at` to
+2026-08-11T21:47:37+00:00, rebuilt the approved local gitignored vector
+sidecar, and is recorded at
+`docs/audit/PRM_MANUAL_ARCHIVE_REFRESH_2026-08-12.md`. This was a canonical
+local DB write for manual testing only, not PRM-19 dogfood evidence. The command
+avoids legacy services/timers, migrations, reaction sync, media download,
+vision LLM, provider egress, source-event writes, report generation, dogfood
+start, and release claims.
 
 ## Operating Rules
 
@@ -127,7 +138,8 @@ This approves only the local gitignored sidecar, hybrid retrieval flags, and
 manual `prm-assistant` runtime activation for user testing. It does not approve
 external embeddings, hosted vector services, live research, production
 migrations, canonical DB writes, compatibility cleanup, PRM-19 dogfood, or
-release claims. The
+release claims, except for the bounded 2026-08-12 manual archive refresh
+explicitly recorded above. The
 post-PRM28 PRM-18 receipt has deterministic local
 stop-ship blockers clear, but it remains blocked on explicit dogfood-start
 approval. Do not start PRM-19 dogfood until the human operator explicitly

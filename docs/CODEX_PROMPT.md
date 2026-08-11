@@ -105,6 +105,17 @@ LLM-backed `memory ask --llm-approved` and
 provider-egress switch; Telegram `/chat` remains a separate LLM-backed command,
 requires `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`, and the currently running
 Telegram runtime remains manual-test state, not dogfood.
+On 2026-08-12 a bounded manual PRM archive refresh was added and run after
+operator instruction. `memory refresh-archive --days 21
+--confirm-canonical-write` refreshed the canonical local Telegram archive from
+3,709 to 4,166 rows, advanced max `posts.posted_at` to
+2026-08-11T21:47:37+00:00, rebuilt the approved local gitignored vector
+sidecar, and is recorded at
+`docs/audit/PRM_MANUAL_ARCHIVE_REFRESH_2026-08-12.md`. This was a canonical
+local DB write for manual testing only, not PRM-19 dogfood evidence. The command
+avoids legacy services/timers, migrations, reaction sync, media download,
+vision LLM, provider egress, source-event writes, report generation, dogfood
+start, and release claims.
 The polished archive-plus-linked-source project-aware research assistant target
 is specified in `docs/personal_research_memory_product_contract.md` and
 scheduled in `docs/tasks.md`; PRM-22 and PRM-23 are implemented fixture-first

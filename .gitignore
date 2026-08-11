@@ -1,6 +1,7 @@
 data/agent.db
 data/agent.db-wal
 data/agent.db-shm
+data/backups/
 data/events/
 # Generated intelligence outputs are private operational artifacts by default.
 data/output/**

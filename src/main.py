@@ -70,6 +70,38 @@ def _open_readonly_sqlite(db_path: object) -> sqlite3.Connection:
     return sqlite3.connect(uri, uri=True)
 
 
+def _archive_db_counts(db_path: object) -> dict[str, object]:
+    raw_path = str(db_path or "").strip()
+    with sqlite3.connect(raw_path) as connection:
+        return {
+            "raw_posts": int(connection.execute("SELECT COUNT(*) FROM raw_posts").fetchone()[0] or 0),
+            "posts": int(connection.execute("SELECT COUNT(*) FROM posts").fetchone()[0] or 0),
+            "posts_fts": int(connection.execute("SELECT COUNT(*) FROM posts_fts").fetchone()[0] or 0),
+            "max_posted_at": str(connection.execute("SELECT MAX(posted_at) FROM posts").fetchone()[0] or ""),
+        }
+
+
+def _backup_sqlite_db(db_path: object, *, label: str) -> Path:
+    source_path = Path(str(db_path or "")).resolve()
+    if not source_path.is_file():
+        raise FileNotFoundError(f"database not found: {source_path}")
+    backup_root = PROJECT_ROOT / "data" / "backups"
+    backup_root.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    backup_path = backup_root / f"{source_path.stem}-{label}-{timestamp}.db"
+    with sqlite3.connect(str(source_path)) as source, sqlite3.connect(str(backup_path)) as target:
+        source.backup(target)
+    return backup_path
+
+
+def _repo_relative_path(path: Path | str) -> str:
+    resolved = Path(path).resolve()
+    try:
+        return str(resolved.relative_to(PROJECT_ROOT))
+    except ValueError:
+        return str(resolved)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Telegram Research Agent CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -728,6 +760,21 @@ def build_parser() -> argparse.ArgumentParser:
     vector_search_parser.add_argument("--limit", type=int, default=5)
     vector_search_parser.add_argument("--json", action="store_true")
     vector_search_parser.set_defaults(handler=handle_memory_vector_search)
+
+    refresh_archive_parser = memory_sub.add_parser(
+        "refresh-archive",
+        help="Bounded manual Telegram archive refresh for PRM testing; writes canonical archive after explicit confirmation",
+    )
+    refresh_archive_parser.add_argument("--days", type=_positive_int, default=21)
+    refresh_archive_parser.add_argument(
+        "--confirm-canonical-write",
+        action="store_true",
+        help="Required: confirms canonical raw_posts/posts writes for this bounded manual refresh",
+    )
+    refresh_archive_parser.add_argument("--vector-index-path", default=None)
+    refresh_archive_parser.add_argument("--skip-vector-index", action="store_true")
+    refresh_archive_parser.add_argument("--json", action="store_true")
+    refresh_archive_parser.set_defaults(handler=handle_memory_refresh_archive)
 
     ai_transform_parser = memory_sub.add_parser(
         "ai-transformation-source-packet",
@@ -3037,6 +3084,113 @@ def handle_memory_vector_index(args: argparse.Namespace) -> int:
         f"updated={payload.get('updated')} skipped={payload.get('skipped')} deleted={payload.get('deleted')}\n"
     )
     return 0
+
+
+def handle_memory_refresh_archive(args: argparse.Namespace) -> int:
+    """Bounded manual archive refresh for PRM testing.
+
+    This deliberately avoids the legacy ingest command because that path runs
+    migrations, optional reaction sync, clustering, topic detection, and scoring.
+    """
+    from db.archive_vector import build_archive_vector_index
+
+    if not bool(getattr(args, "confirm_canonical_write", False)):
+        message = (
+            "Refused: memory refresh-archive writes canonical raw_posts/posts. "
+            "Re-run with --confirm-canonical-write for this bounded manual refresh."
+        )
+        if getattr(args, "json", False):
+            sys.stdout.write(json.dumps({"status": "refused", "reason": "canonical_write_confirmation_required"}, sort_keys=True) + "\n")
+        else:
+            sys.stdout.write(message + "\n")
+        return 2
+
+    settings = load_settings()
+    days = max(1, int(getattr(args, "days", 21) or 21))
+    before_counts = _archive_db_counts(settings.db_path)
+    try:
+        backup_path = _backup_sqlite_db(settings.db_path, label=f"prm-refresh-{days}d")
+        bootstrap_summary = asyncio.run(
+            run_bootstrap(
+                settings,
+                days=days,
+                analyze_media=False,
+                append_events_enabled=False,
+            )
+        )
+        normalization_summary = run_normalization(settings)
+        after_counts = _archive_db_counts(settings.db_path)
+        vector_payload: dict[str, object] = {"status": "skipped"}
+        if not bool(getattr(args, "skip_vector_index", False)):
+            index_path = _archive_vector_index_path(getattr(args, "vector_index_path", None))
+            with _open_readonly_sqlite(settings.db_path) as connection:
+                connection.row_factory = sqlite3.Row
+                vector_payload = build_archive_vector_index(
+                    connection,
+                    index_path=index_path,
+                    limit=0,
+                    force=True,
+                )
+    except Exception as exc:
+        sys.stdout.write(f"Error refreshing PRM archive: {exc}\n")
+        return 1
+
+    payload = {
+        "schema_version": "prm_manual_archive_refresh_receipt.v1",
+        "status": (
+            "ok"
+            if int(bootstrap_summary.get("errors") or 0) == 0
+            and int(normalization_summary.get("errors") or 0) == 0
+            and str(vector_payload.get("status") or "ok") in {"ok", "skipped"}
+            else "partial"
+        ),
+        "days": days,
+        "backup_path": _repo_relative_path(backup_path),
+        "before": before_counts,
+        "after": after_counts,
+        "inserted_raw_posts": int(bootstrap_summary.get("inserted") or 0),
+        "skipped_raw_posts": int(bootstrap_summary.get("skipped") or 0),
+        "ingest_errors": int(bootstrap_summary.get("errors") or 0),
+        "normalized_posts": int(normalization_summary.get("processed") or 0),
+        "normalization_errors": int(normalization_summary.get("errors") or 0),
+        "vector_index": {
+            "status": vector_payload.get("status"),
+            "source_rows_scanned": vector_payload.get("source_rows_scanned"),
+            "inserted": vector_payload.get("inserted"),
+            "updated": vector_payload.get("updated"),
+            "deleted": vector_payload.get("deleted"),
+            "index_path": _repo_relative_path(str(vector_payload.get("index_path") or _archive_vector_index_path(getattr(args, "vector_index_path", None)))),
+        },
+        "privacy": {
+            "live_telegram_ingestion": True,
+            "reaction_sync": False,
+            "migrations_run": False,
+            "media_download": False,
+            "vision_llm": False,
+            "provider_egress": False,
+            "source_events_written": False,
+            "canonical_db_write": True,
+            "local_vector_sidecar_write": not bool(getattr(args, "skip_vector_index", False)),
+            "dogfood_evidence": False,
+            "release_claim": False,
+        },
+    }
+    if getattr(args, "json", False):
+        sys.stdout.write(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
+    else:
+        sys.stdout.write(
+            "PRM manual archive refresh\n"
+            f"status={payload['status']} days={days} backup={payload['backup_path']}\n"
+            f"raw_posts: {before_counts['raw_posts']} -> {after_counts['raw_posts']} "
+            f"(inserted={payload['inserted_raw_posts']} skipped={payload['skipped_raw_posts']} errors={payload['ingest_errors']})\n"
+            f"posts: {before_counts['posts']} -> {after_counts['posts']} "
+            f"(normalized={payload['normalized_posts']} errors={payload['normalization_errors']})\n"
+            f"max_posted_at: {before_counts['max_posted_at']} -> {after_counts['max_posted_at']}\n"
+            f"vector_index: status={payload['vector_index']['status']} rows={payload['vector_index']['source_rows_scanned']}\n"
+            "privacy: migrations=false reactions=false media_download=false vision_llm=false provider_egress=false "
+            "canonical_db_write=true dogfood_evidence=false\n"
+        )
+    return 0 if payload["status"] == "ok" else 1
 
 
 def handle_memory_vector_search(args: argparse.Namespace) -> int:

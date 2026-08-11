@@ -36,6 +36,7 @@ Last updated: 2026-08-11
 | PRM-18 post-PRM28 release gate receipt | docs/audit/PRM18_RELEASE_GATE_POST_PRM28_2026-08-11.md |
 | PRM local UX trial receipt | docs/audit/PRM_LOCAL_UX_TRIAL_2026-08-11.md |
 | PRM manual Telegram assistant activation receipt | docs/audit/PRM_MANUAL_TELEGRAM_ASSISTANT_ACTIVATION_2026-08-11.md |
+| PRM manual archive refresh receipt | docs/audit/PRM_MANUAL_ARCHIVE_REFRESH_2026-08-12.md |
 | PRM runtime freeze receipt | docs/audit/PRM_RUNTIME_FREEZE_2026-07-29.md |
 | PRM safe assistant runtime receipt | docs/audit/PRM_SAFE_ASSISTANT_RUNTIME_2026-07-29.md |
 | PRM local memory ask receipt | docs/audit/PRM_LOCAL_MEMORY_ASK_2026-07-29.md |
@@ -716,6 +717,22 @@ testing; see
 | recency repair | questions such as "Что было интересного по моделям за последние две недели?" now parse strict date windows, pass `date_from`/`date_to` to archive/hybrid retrieval, reject stale candidates after retrieval, skip undated curated memory for strict windows, and say no fresh local posts instead of answering from older context |
 | privacy | selected bounded snippets/context may egress to provider; raw corpus egress=false; usage DB recording suppressed; durable_writes=false |
 | validation | latest repair: `PYTHONPATH=src python3 -m pytest tests/test_memory_research.py tests/test_handlers.py -q` -> 66 passed; `python3 tools/test_tiers.py focused-prm` -> 199 passed; playbook validator errors=0 warnings=0; `git diff --check` clean |
+| dogfood boundary | not PRM-19 evidence; manual testing continues |
+
+## PRM Manual Archive Refresh - 2026-08-12
+
+| Check | Result |
+| --- | --- |
+| receipt | `docs/audit/PRM_MANUAL_ARCHIVE_REFRESH_2026-08-12.md` |
+| trigger | operator instructed to refresh the archive after freshness-scoped RAG correctly reported no local posts in the requested window |
+| command | `memory refresh-archive --days 21 --confirm-canonical-write --json` |
+| canonical archive write | raw_posts/posts/posts_fts updated from 3709 to 4166 rows |
+| freshness | max `posts.posted_at` advanced from 2026-07-26T22:40:28+00:00 to 2026-08-11T21:47:37+00:00 |
+| safety | no legacy service/timer restart, migrations, reaction sync, media download, vision LLM, provider egress, source-event write, live web research, external embeddings, hosted vector service, report generation, dogfood start, or release claim |
+| vector sidecar | approved local gitignored vector sidecar rebuilt at `data/vector/archive_vector.sqlite` |
+| backup | SQLite backup created under gitignored `data/backups/` before writing |
+| smoke | `memory research --hybrid --limit 4 "Что было интересного по моделям за последние две недели?"` found fresh local Telegram citations inside the strict date window |
+| validation | py_compile for changed modules passed; `PYTHONPATH=src python3 -m pytest tests/test_cli.py tests/test_ingestion.py tests/test_memory_research.py tests/test_handlers.py -q` -> 97 passed; `python3 tools/test_tiers.py focused-prm` -> 199 passed; playbook validator errors=0 warnings=0; `git diff --check` clean |
 | dogfood boundary | not PRM-19 evidence; manual testing continues |
 
 ## Local PRM Status UX - 2026-08-10

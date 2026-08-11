@@ -231,6 +231,12 @@ Implemented `prm-assistant` runtime mode:
   local vector sidecar, stale candidates are rejected after retrieval, and the
   user-facing answer must say when no local posts exist in that window instead
   of using older related posts as evidence;
+- manual archive freshness for PRM testing uses `memory refresh-archive
+  --days N --confirm-canonical-write`; this bounded command writes the
+  canonical local archive and rebuilds the approved local vector sidecar, but
+  deliberately avoids legacy services/timers, migrations, reaction sync, media
+  download, vision LLM, provider egress, source-event writes, report
+  generation, dogfood evidence, and release claims;
 - auto-routing guards archive/source questions from generic chat fallback, so
   questions about posts, archive evidence, AI transformation, companies,
   Telegram, RAG, or vectors stay on the RAG path;

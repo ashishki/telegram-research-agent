@@ -2,7 +2,7 @@ from contextlib import redirect_stdout
 from io import StringIO
 import unittest
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from main import (
     BOT_RUNTIME_PRM_ASSISTANT,
@@ -11,6 +11,7 @@ from main import (
     handle_memory_ask,
     handle_memory_ai_transformation_source_packet,
     handle_memory_research,
+    handle_memory_refresh_archive,
     handle_memory_status,
     handle_memory_vector_index,
     handle_memory_vector_search,
@@ -374,6 +375,84 @@ class TestCli(unittest.TestCase):
         self.assertTrue(search_args.json)
         self.assertEqual(search_args.query, ["AI", "ROI"])
         self.assertIs(search_args.handler, handle_memory_vector_search)
+
+    def test_memory_refresh_archive_parser_requires_explicit_write_flag(self):
+        args = build_parser().parse_args(
+            [
+                "memory",
+                "refresh-archive",
+                "--days",
+                "21",
+                "--confirm-canonical-write",
+                "--skip-vector-index",
+                "--json",
+            ]
+        )
+
+        self.assertEqual(args.days, 21)
+        self.assertTrue(args.confirm_canonical_write)
+        self.assertTrue(args.skip_vector_index)
+        self.assertTrue(args.json)
+        self.assertIs(args.handler, handle_memory_refresh_archive)
+
+    def test_memory_refresh_archive_refuses_without_confirmation(self):
+        args = build_parser().parse_args(["memory", "refresh-archive", "--days", "21"])
+
+        with patch("main.load_settings") as settings_mock, patch("main.run_bootstrap") as bootstrap_mock:
+            output = StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(handle_memory_refresh_archive(args), 2)
+
+        settings_mock.assert_not_called()
+        bootstrap_mock.assert_not_called()
+        self.assertIn("Refused", output.getvalue())
+        self.assertIn("--confirm-canonical-write", output.getvalue())
+
+    def test_memory_refresh_archive_uses_bounded_no_migration_no_media_path(self):
+        args = build_parser().parse_args(
+            [
+                "memory",
+                "refresh-archive",
+                "--days",
+                "21",
+                "--confirm-canonical-write",
+                "--skip-vector-index",
+            ]
+        )
+        settings = SimpleNamespace(db_path="/tmp/agent.db")
+        counts_before = {"raw_posts": 10, "posts": 10, "posts_fts": 10, "max_posted_at": "2026-07-26T00:00:00Z"}
+        counts_after = {"raw_posts": 12, "posts": 12, "posts_fts": 12, "max_posted_at": "2026-08-11T00:00:00Z"}
+
+        with patch("main.load_settings", return_value=settings), patch("main.run_migrations") as migrations_mock, patch(
+            "main._archive_db_counts",
+            side_effect=[counts_before, counts_after],
+        ), patch(
+            "main._backup_sqlite_db",
+            return_value=__import__("pathlib").Path("/srv/openclaw-you/workspace/telegram-research-agent/data/backups/test.db"),
+        ) as backup_mock, patch(
+            "main.run_bootstrap",
+            new_callable=AsyncMock,
+            return_value={"inserted": 2, "skipped": 3, "errors": 0},
+        ) as bootstrap_mock, patch(
+            "main.run_normalization",
+            return_value={"processed": 2, "skipped": 0, "errors": 0},
+        ) as normalize_mock:
+            output = StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(handle_memory_refresh_archive(args), 0)
+
+        migrations_mock.assert_not_called()
+        backup_mock.assert_called_once_with(settings.db_path, label="prm-refresh-21d")
+        bootstrap_mock.assert_called_once()
+        self.assertEqual(bootstrap_mock.call_args.args[0], settings)
+        self.assertEqual(bootstrap_mock.call_args.kwargs["days"], 21)
+        self.assertFalse(bootstrap_mock.call_args.kwargs["analyze_media"])
+        self.assertFalse(bootstrap_mock.call_args.kwargs["append_events_enabled"])
+        normalize_mock.assert_called_once_with(settings)
+        rendered = output.getvalue()
+        self.assertIn("PRM manual archive refresh", rendered)
+        self.assertIn("migrations=false", rendered)
+        self.assertIn("vision_llm=false", rendered)
 
     def test_memory_research_handler_skips_migrations_and_renders_answer(self):
         args = build_parser().parse_args(["memory", "research", "что", "есть", "по", "eval"])

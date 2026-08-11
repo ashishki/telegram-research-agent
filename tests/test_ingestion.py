@@ -143,6 +143,83 @@ class TestBootstrapIngestion(unittest.TestCase):
             analyze_photo.assert_not_called()
             append_source_events.assert_called_once_with([])
 
+    def test_ingest_channel_can_skip_media_analysis_and_source_events_for_prm_refresh(self):
+        class FakeClient:
+            def __init__(self, message):
+                self.message = message
+                self.download_calls = 0
+
+            async def get_entity(self, channel_username):
+                return channel_username
+
+            def iter_messages(self, entity, offset_date, reverse):
+                async def _messages():
+                    yield self.message
+
+                return _messages()
+
+            async def download_media(self, message, output_type):
+                self.download_calls += 1
+                raise AssertionError("PRM refresh must not download media")
+
+        with sqlite3.connect(":memory:") as connection:
+            connection.execute(
+                """
+                CREATE TABLE raw_posts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    channel_username TEXT NOT NULL,
+                    channel_id INTEGER NOT NULL,
+                    message_id INTEGER NOT NULL,
+                    posted_at TEXT NOT NULL,
+                    text TEXT,
+                    media_type TEXT,
+                    media_caption TEXT,
+                    forward_from TEXT,
+                    view_count INTEGER,
+                    message_url TEXT,
+                    raw_json TEXT NOT NULL,
+                    ingested_at TEXT NOT NULL,
+                    image_description TEXT,
+                    UNIQUE(channel_id, message_id)
+                )
+                """
+            )
+            message = SimpleNamespace(
+                id=56,
+                peer_id=SimpleNamespace(channel_id=1234),
+                date=datetime.now(timezone.utc) - timedelta(days=1),
+                message="",
+                photo=True,
+                video=False,
+                document=False,
+                fwd_from=None,
+                views=10,
+            )
+            client = FakeClient(message)
+
+            with patch("ingestion.bootstrap_ingest.analyze_photo") as analyze_photo, patch(
+                "ingestion.bootstrap_ingest.append_source_events"
+            ) as append_source_events:
+                result = asyncio.run(
+                    _ingest_channel(
+                        client,
+                        connection,
+                        {"username": "@testchan"},
+                        datetime.now(timezone.utc) - timedelta(days=21),
+                        analyze_media=False,
+                        append_events_enabled=False,
+                    )
+                )
+
+            self.assertEqual(result, {"inserted": 1, "skipped": 0, "errors": 0})
+            self.assertEqual(client.download_calls, 0)
+            analyze_photo.assert_not_called()
+            append_source_events.assert_not_called()
+            row = connection.execute(
+                "SELECT media_type, image_description FROM raw_posts WHERE message_id = 56"
+            ).fetchone()
+            self.assertEqual(row, ("photo", None))
+
 
 if __name__ == "__main__":
     unittest.main()
