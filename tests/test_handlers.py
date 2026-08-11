@@ -479,6 +479,8 @@ class TestHandlers(unittest.TestCase):
         render_mock.assert_called_once_with(payload)
         message = mock_send_message.call_args.args[2]
         self.assertIn("PRM Research", message)
+        self.assertNotIn("Privacy:", message)
+        self.assertNotIn("model_calls", message)
 
     def test_handle_research_can_use_approved_local_hybrid_vector_retrieval(self):
         settings = Settings(
@@ -507,6 +509,29 @@ class TestHandlers(unittest.TestCase):
         self.assertTrue(budget.allow_vector_retrieval)
         self.assertEqual(budget.vector_index_path, "/tmp/archive-vector.sqlite")
 
+    def test_telegram_report_strips_technical_metrics_from_local_fallback(self):
+        text = "\n".join(
+            [
+                "PRM Research",
+                "Короткий ответ",
+                "Есть источники по теме.",
+                "Лимиты: tool_calls=4/4; sources<=5; debug=false",
+                "Privacy: mode=local-research; model_calls=0; estimated_cost_usd=0; durable_writes=false",
+                "Источники",
+                "- https://t.me/ai_channel/101",
+            ]
+        )
+
+        cleaned = handlers._telegram_report_without_technical_metrics(text)
+
+        self.assertIn("PRM Research", cleaned)
+        self.assertIn("Есть источники по теме.", cleaned)
+        self.assertIn("Источники", cleaned)
+        self.assertNotIn("Лимиты", cleaned)
+        self.assertNotIn("Privacy:", cleaned)
+        self.assertNotIn("model_calls", cleaned)
+        self.assertNotIn("tool_calls", cleaned)
+
     def test_handle_research_can_send_llm_synthesis_after_local_rag(self):
         settings = Settings(
             db_path=":memory:",
@@ -516,7 +541,13 @@ class TestHandlers(unittest.TestCase):
         )
         payload = _fake_research_payload()
         receipt = types.SimpleNamespace(
-            text="PRM Research\n\nКороткий ответ\nAI pilots need ROI proof.\n\nИсточники\n- https://t.me/ai_channel/101",
+            text=(
+                "PRM Research: AI transformation\n\n"
+                "Короткий вывод\nAI pilots need ROI proof, not adoption theater.\n\n"
+                "Что видно по источникам\n- pilots often fail to show measurable ROI.\n\n"
+                "Источники\n- https://t.me/ai_channel/101\n\n"
+                "Границы\nЛокальный архив, без live web."
+            ),
             estimated_cost_usd=0.00004,
         )
 
@@ -541,11 +572,19 @@ class TestHandlers(unittest.TestCase):
         llm_mock.assert_called_once()
         prompt = llm_mock.call_args.kwargs["prompt"]
         self.assertIn("AI transformation pilots", prompt)
+        self.assertIn("polished, ready-to-read Telegram report", prompt)
+        self.assertIn("Group related sources by topic", prompt)
+        self.assertIn("Use a clean visual layout", prompt)
+        self.assertIn("Do not show technical metrics", prompt)
         message = mock_send_message.call_args.args[2]
         self.assertIn("PRM Research", message)
         self.assertIn("AI pilots need ROI proof", message)
-        self.assertIn("Privacy: mode=telegram-rag-llm", message)
-        self.assertIn("bounded_telegram_snippet_provider_egress=true", message)
+        self.assertIn("Что видно по источникам", message)
+        self.assertIn("Границы", message)
+        self.assertNotIn("Privacy:", message)
+        self.assertNotIn("model_calls", message)
+        self.assertNotIn("estimated_cost", message)
+        self.assertNotIn("bounded_telegram_snippet_provider_egress", message)
 
     def test_handle_research_uses_volatile_dialog_context_for_short_followups(self):
         settings = Settings(
@@ -584,7 +623,7 @@ class TestHandlers(unittest.TestCase):
 
         with patch.object(handlers, "answer_pi_chat") as chat_mock:
             with patch.object(handlers, "answer_memory_research", return_value=payload) as research_mock:
-                with patch.object(handlers, "render_memory_research_brief", return_value="PRM редакторский бриф\nmodel_calls=0") as render_mock:
+                with patch.object(handlers, "render_memory_research_brief", return_value="PRM редакторский бриф\nmodel_calls=0\nPrivacy: mode=local-research") as render_mock:
                     with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
                         with patch.object(handlers, "send_message") as mock_send_message:
                             handlers.handle_research_brief(
@@ -603,7 +642,8 @@ class TestHandlers(unittest.TestCase):
         render_mock.assert_called_once()
         message = mock_send_message.call_args.args[2]
         self.assertIn("PRM редакторский бриф", message)
-        self.assertIn("model_calls=0", message)
+        self.assertNotIn("model_calls=0", message)
+        self.assertNotIn("Privacy:", message)
 
     def test_prm_safe_command_allowlist_allows_research(self):
         settings = Settings(

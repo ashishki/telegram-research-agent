@@ -1156,18 +1156,18 @@ def _with_dialog_context(result: Mapping[str, object], dialog: Mapping[str, obje
 def _render_telegram_research_response(payload: Mapping[str, Any], *, local_text: str, mode: str) -> str:
     """Optionally synthesize a Telegram RAG answer after local retrieval has run."""
 
+    clean_local_text = _telegram_report_without_technical_metrics(local_text)
     if not _telegram_rag_llm_synthesis_allowed():
-        return local_text
+        return clean_local_text
     if _telegram_rag_source_count(payload) <= 0:
-        return local_text
+        return clean_local_text
     try:
         return _synthesize_telegram_rag_answer(payload, mode=mode)
     except Exception:
         LOGGER.warning("Telegram RAG LLM synthesis failed mode=%s", mode, exc_info=True)
         return (
-            local_text.rstrip()
-            + "\n\nLLM synthesis: unavailable; shown local RAG fallback. "
-            "No additional provider answer was used."
+            clean_local_text.rstrip()
+            + "\n\nПолированный отчёт временно недоступен; показываю локальный отчёт по найденным источникам."
         )
 
 
@@ -1186,19 +1186,34 @@ def _synthesize_telegram_rag_answer(payload: Mapping[str, Any], *, mode: str) ->
         title = "PRM редакторский бриф"
     prompt = (
         "You are the Telegram UX layer for a private Personal Research Memory assistant.\n"
-        "The local RAG step has already run. Rewrite the bounded context into a useful Telegram answer.\n\n"
+        "The local RAG step has already run. Turn the bounded context into a polished, ready-to-read Telegram report.\n\n"
         "Hard rules:\n"
         "- Use only the bounded_context JSON below for source-grounded claims.\n"
         "- Do not use general model background as evidence.\n"
         "- Do not invent source links, channels, dates, companies, ROI, hiring, layoffs, or current facts.\n"
         "- If the context says external verification is required, state that clearly.\n"
-        "- Keep the answer compact enough for Telegram: roughly 900-1600 characters.\n"
+        "- Keep the answer compact enough for Telegram: roughly 1200-2200 characters.\n"
         "- Same language as the user.\n"
         "- Include source references as short bullets using the provided source_url when present.\n"
-        "- Do not include raw JSON or internal field names.\n\n"
+        "- Do not include raw JSON or internal field names.\n"
+        "- Use a clean visual layout: short headings, blank lines, and bullets. No tables and no code blocks.\n"
+        "- Do not show technical metrics: no model_calls, cost, estimated_cost_usd, tool_calls, retrieval_mode, privacy footer, debug hints, budgets, or vector/backend internals.\n"
+        "- The user wants a packaged report, not an audit receipt.\n\n"
         f"Preferred title: {title}\n"
-        "Recommended structure for research: title, Короткий ответ/Short answer, Что видно по источникам, Источники, Ограничения.\n"
-        "Recommended structure for editor brief: title, Позиция/Position, Опорные тезисы, Углы, Источники, Ограничения.\n\n"
+        "Recommended structure for research:\n"
+        "1. Title line with the topic.\n"
+        "2. One-paragraph executive summary.\n"
+        "3. Two to four thematic blocks with short readable headings. Group related sources by topic when multiple topics are present.\n"
+        "4. What this means / how to use it.\n"
+        "5. Sources.\n"
+        "6. Boundaries: local archive only, no live web verification, no writes.\n\n"
+        "Recommended structure for editor brief:\n"
+        "1. Title line with the editorial topic.\n"
+        "2. Position.\n"
+        "3. Source-backed theses grouped by topic.\n"
+        "4. Angles for a post.\n"
+        "5. Sources.\n"
+        "6. Boundaries: local archive only, no live web verification, no writes.\n\n"
         f"bounded_context:\n{json.dumps(context, ensure_ascii=False, indent=2)}"
     )
     with suppress_usage_recording():
@@ -1211,15 +1226,7 @@ def _synthesize_telegram_rag_answer(payload: Mapping[str, Any], *, mode: str) ->
     answer = str(receipt.text or "").strip()
     if not answer:
         raise RuntimeError("empty_llm_synthesis")
-    footer = (
-        "Privacy: mode=telegram-rag-llm; "
-        "model_calls=1; "
-        f"estimated_cost_usd={float(receipt.estimated_cost_usd):.8f}; "
-        "bounded_telegram_snippet_provider_egress=true; "
-        "raw_telegram_corpus_egress=false; "
-        "durable_writes=false"
-    )
-    return (answer.rstrip() + "\n\n" + footer).rstrip()
+    return _ensure_telegram_report_boundary(_telegram_report_without_technical_metrics(answer), ru=ru)
 
 
 def _telegram_rag_synthesis_context(payload: Mapping[str, Any], *, mode: str) -> dict[str, Any]:
@@ -1297,6 +1304,70 @@ def _safe_mapping_list(value: Any) -> list[Mapping[str, Any]]:
 
 def _looks_russian(text: str) -> bool:
     return bool(re.search(r"[А-Яа-яЁё]", str(text or "")))
+
+
+def _telegram_report_without_technical_metrics(text: str) -> str:
+    lines: list[str] = []
+    previous_blank = False
+    for raw_line in str(text or "").splitlines():
+        line = raw_line.rstrip()
+        if _is_telegram_technical_line(line):
+            continue
+        blank = not line.strip()
+        if blank and previous_blank:
+            continue
+        lines.append(line)
+        previous_blank = blank
+    return "\n".join(lines).strip()
+
+
+def _is_telegram_technical_line(line: str) -> bool:
+    lowered = line.strip().casefold()
+    if not lowered:
+        return False
+    prefixes = (
+        "privacy:",
+        "mode:",
+        "режим:",
+        "limits:",
+        "лимиты:",
+        "planner limits:",
+        "details:",
+        "подробности:",
+        "llm synthesis:",
+    )
+    if lowered.startswith(prefixes):
+        return True
+    technical_markers = (
+        "model_calls",
+        "estimated_cost",
+        "tool_calls=",
+        "sources<=",
+        "debug=",
+        "bounded_telegram_snippet_provider_egress",
+        "raw_telegram_corpus_egress",
+        "linked_source_live_fetch",
+        "vector_backend_used",
+        "external_skill_used",
+        "durable_writes",
+        "retrieval_mode",
+        "max_tool_calls",
+        "max_archive_sources",
+    )
+    return any(marker in lowered for marker in technical_markers)
+
+
+def _ensure_telegram_report_boundary(text: str, *, ru: bool) -> str:
+    clean = _telegram_report_without_technical_metrics(text)
+    lowered = clean.casefold()
+    if "границ" in lowered or "ограничен" in lowered or "boundar" in lowered or "limits" in lowered:
+        return clean
+    boundary = (
+        "Границы: отчёт собран по локальному архиву; live web не запускался; память и база не менялись."
+        if ru
+        else "Boundaries: local archive report; no live web verification; no memory/database writes."
+    )
+    return (clean.rstrip() + "\n\n" + boundary).rstrip()
 
 
 def handle_operator_message(chat_id: str, args: str, settings: Settings) -> None:

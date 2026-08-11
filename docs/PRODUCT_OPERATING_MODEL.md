@@ -181,8 +181,12 @@ PRM-18A contracted command surfaces:
 - PRM-18C Telegram LLM parity command after separate provider-egress approval:
   `/chat <question>` with `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`.
 
-Any LLM-backed surface must print sources, archive-support status, unknowns or
-external-verification needs, write status, and an explicit privacy/cost line.
+CLI/`/chat` LLM-backed surfaces must print sources, archive-support status,
+unknowns or external-verification needs, write status, and an explicit
+privacy/cost line. Telegram `/research`, `/brief`, and auto-routed
+research/brief are report views: they should show a packaged topical report,
+sources, and plain-language boundaries, but hide technical metrics such as
+model calls, cost, tool counts, budgets, retrieval modes, and debug hints.
 Without the explicit provider-egress switch, the product must stay local-only or
 refuse before sending bounded Telegram snippets to a provider.
 
@@ -220,6 +224,8 @@ Implemented `prm-assistant` runtime mode:
   when `PRM_TELEGRAM_RAG_LLM_SYNTHESIS=1` is also enabled; the provider receives
   only selected bounded snippets/context, not the raw corpus, and usage
   recording is suppressed to avoid production DB writes;
+- Telegram research/brief responses are packaged topic reports and do not show
+  technical metrics in the user-visible message;
 - auto-routing guards archive/source questions from generic chat fallback, so
   questions about posts, archive evidence, AI transformation, companies,
   Telegram, RAG, or vectors stay on the RAG path;

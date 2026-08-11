@@ -712,8 +712,9 @@ testing; see
 | root cause | ordinary auto path could reach generic PI chat for archive/source questions and route logging did not show selected mode |
 | route repair | archive/source questions are guarded from generic chat fallback; "what was in my posts" stays research, not editor brief |
 | synthesis repair | Telegram research/brief now run local hybrid RAG first, then optional bounded LLM synthesis when `PRM_TELEGRAM_RAG_LLM_SYNTHESIS=1` and provider egress are enabled |
+| presentation repair | Telegram research/brief render packaged topic reports and strip visible technical metrics/cost/tool-call/debug footers from the user message |
 | privacy | selected bounded snippets/context may egress to provider; raw corpus egress=false; usage DB recording suppressed; durable_writes=false |
-| validation | `PYTHONPATH=src python3 -m pytest tests/test_handlers.py -q` -> 44 passed |
+| validation | `PYTHONPATH=src python3 -m pytest tests/test_handlers.py -q` -> 44 passed after routing/synthesis repair; follow-up presentation tests cover metric stripping |
 | dogfood boundary | not PRM-19 evidence; manual testing continues |
 
 ## Local PRM Status UX - 2026-08-10

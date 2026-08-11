@@ -83,7 +83,9 @@ briefs by default, while LLM auto-routing and auto chat require both
 bounded LLM synthesis only after local hybrid RAG has run when
 `PRM_TELEGRAM_RAG_LLM_SYNTHESIS=1` is also set; the synthesis receives bounded
 cited snippets, not the raw corpus, and usage recording is suppressed to avoid
-production DB writes. Manual `/research <question>`,
+production DB writes. Telegram research/brief messages are report views:
+topical sections, sources, and plain-language boundaries, but no visible
+technical metrics/cost/tool-call/debug footer. Manual `/research <question>`,
 `/brief <question>`, and separately gated `/chat` remain fallback commands.
 A local user-facing `memory ask` command exists for immediate local evidence
 questions without LLM calls, external search, service starts, migrations, or

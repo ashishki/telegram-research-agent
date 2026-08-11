@@ -60,8 +60,11 @@ may send bounded cited context to the configured provider during manual tests.
 It also enables `PRM_TELEGRAM_RAG_LLM_SYNTHESIS=1`, so `/research`, `/brief`,
 and ordinary auto-routed research/brief first run local hybrid RAG and then may
 ask the model to rewrite only that bounded context into a cleaner Telegram
-answer. This avoids the old failure mode where an archive question could be
-routed to a generic PI chat without useful archive evidence.
+report. The Telegram report view hides technical metrics such as model calls,
+cost, tool-call counts, budgets, retrieval modes, and debug hints; it keeps the
+answer, topical sections, sources, and plain-language boundaries. This avoids
+the old failure mode where an archive question could be routed to a generic PI
+chat without useful archive evidence.
 
 ## PRM-18 LLM Chat UX Block
 
@@ -118,7 +121,7 @@ LLM chat requires --allow-provider-egress before bounded Telegram snippets can
 be sent to a provider. Re-run with that switch or use local memory ask.
 ```
 
-Every LLM-backed answer must show:
+Every CLI/`/chat` LLM-backed answer must show:
 
 - answer;
 - sources with Telegram links or curated memory IDs where available;
@@ -140,6 +143,10 @@ For current local-only `memory ask`, this resolves to:
 Privacy: mode=local-only; model_calls=0; estimated_cost_usd=0; bounded_telegram_snippet_provider_egress=false; raw_telegram_corpus_egress=false; durable_writes=false
 ```
 
+Telegram `/research`, `/brief`, and auto-routed research/brief are different:
+they are operator-facing report views. They must not show technical metrics in
+the user message. Internal receipts and logs still carry the audit data.
+
 LLM chat may propose a Knowledge Note, Watch Topic, project link, decision,
 action, or experiment, but proposals are drafts only. Durable memory writes
 remain behind the existing exact confirmation-token flow.
@@ -152,6 +159,8 @@ PRM-18B/PRM-18C implementation status:
   until exit/quit commands, `:q`, or EOF;
 - CLI and Telegram `/chat` both render answer, sources, archive support,
   external-verification status, unknowns, write status, and the privacy line;
+- Telegram `/research`, `/brief`, and auto-routed research/brief render a
+  packaged topic report without technical metrics in the message;
 - display receipts exclude raw PI tool payloads and do not log raw Telegram
   snippets;
 - implementation/test evidence used fake clients and fixture DBs only.

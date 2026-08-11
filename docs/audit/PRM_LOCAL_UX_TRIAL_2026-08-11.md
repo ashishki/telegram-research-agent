@@ -145,11 +145,14 @@ Safe UX polish implemented after this trial:
     guard so archive/source questions stay on RAG instead of generic chat and
     added optional Telegram RAG LLM synthesis after local hybrid retrieval when
     `PRM_TELEGRAM_RAG_LLM_SYNTHESIS=1` is set.
+13. After the next manual UX feedback, changed Telegram research/brief
+    presentation to packaged topic reports and stripped visible technical
+    metrics/cost/tool-call/debug footers from user messages.
 
 Remaining known UX gaps:
 
-- LLM-backed Telegram synthesis still needs more manual testing for answer
-  usefulness and visual compactness;
+- LLM-backed Telegram synthesis still needs more manual testing for report
+  usefulness, source grouping, and visual compactness;
 - curated memory relevance/deduplication still needs deeper scoring;
 - multi-turn context is volatile/in-process only and is not durable product
   memory;

@@ -161,6 +161,10 @@ runtime did not expose enough route/retrieval detail. The repair:
   instead of brief;
 - makes Telegram research/brief run local hybrid RAG first, then optionally
   synthesize the bounded RAG context with the configured LLM;
+- renders Telegram research/brief as packaged topic reports with clean headings,
+  grouped topical blocks, sources, and plain-language boundaries;
+- strips visible technical metrics/cost/tool-call/debug/privacy-footers from
+  Telegram research/brief user messages;
 - suppresses LLM usage DB recording for this Telegram synthesis to avoid
   production database writes;
 - preserves local RAG fallback if the provider call fails.

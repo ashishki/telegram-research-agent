@@ -1493,7 +1493,9 @@ Notes: |
   generic chat and adds Telegram-only bounded LLM synthesis after local hybrid
   RAG when `PRM_TELEGRAM_RAG_LLM_SYNTHESIS=1` is set. This sends only selected
   bounded snippets/context to the provider, suppresses usage DB recording, and
-  leaves PRM-19 dogfood unstarted.
+  leaves PRM-19 dogfood unstarted. A follow-up presentation repair makes
+  Telegram research/brief render packaged topic reports and strips visible
+  technical metrics/cost/tool-call/debug footers from the user message.
 
   The operator runbook documents preflight inspection, install/start/status,
   stop/disable, and rollback-to-disabled commands while preserving the hard
