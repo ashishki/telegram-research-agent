@@ -1,7 +1,7 @@
 # Retrieval Evaluation Plan
 
-Status: draft; PRM-3 FTS baseline implemented; PRM-7 baseline gate recorded; PRM-24 product RAG eval scaffold recorded
-Last updated: 2026-08-08
+Status: draft; PRM-3 FTS baseline implemented; PRM-7 baseline gate recorded; PRM-24 product RAG eval set recorded
+Last updated: 2026-08-11
 
 ## Baseline
 
@@ -125,20 +125,23 @@ rows from human-approved gold rows in their output.
 | p95 local retrieval latency | Scored for the run | Diagnostic only |
 | reacted-post search availability after sync | Aggregate fast-lane diagnostic | Aggregate fast-lane diagnostic |
 
-## PRM-24 Product RAG Eval Scaffold
+## PRM-24 Product RAG Eval Set
 
 PRM-24 adds a product-level RAG eval layer before any vector/backend adoption.
 It is intentionally split into candidate questions, human-approved gold labels,
-thresholds, and a privacy-safe manifest.
+thresholds, a derived scoreable gold-cases view, a baseline report, and a
+privacy-safe manifest.
 
 Files:
 
 | File | Purpose |
 | --- | --- |
 | `evals/retrieval/product_rag_candidate.jsonl` | 50 candidate product questions; not gold evidence |
-| `evals/retrieval/product_rag_gold_labels.jsonl` | seven human-approved no-answer seed labels; full 50-row gold set remains incomplete |
+| `evals/retrieval/product_rag_gold_labels.jsonl` | 50 operator-approved generated seed gold labels; no raw text or source URLs |
+| `evals/retrieval/product_rag_gold_cases.jsonl` | derived scoreable view that merges candidate queries with approved labels for eval only |
 | `evals/retrieval/product_rag_thresholds.json` | proposed RAG acceptance thresholds |
 | `evals/retrieval/product_rag_eval_manifest.json` | generated privacy-safe coverage/gate manifest |
+| `evals/retrieval/product_rag_fts_baseline_report.json` | privacy-safe SQLite FTS/query-planner baseline report |
 
 Candidate category distribution:
 
@@ -172,28 +175,58 @@ PYTHONPATH=src python3 tools/product_rag_eval_manifest.py --root . --json evals/
 Current PRM-24 manifest result:
 
 ```text
-product_rag_eval_manifest: cases=50 gold_labels=7 output=evals/retrieval/product_rag_eval_manifest.json
+product_rag_eval_manifest: cases=50 gold_labels=50 output=evals/retrieval/product_rag_eval_manifest.json
+```
+
+Gold-label materialization and scoring commands:
+
+```bash
+PYTHONPATH=src python3 tools/product_rag_seed_gold_labels.py --root . --db data/agent.db --jsonl evals/retrieval/product_rag_gold_labels.jsonl
+PYTHONPATH=src python3 tools/product_rag_gold_cases.py --root . --jsonl evals/retrieval/product_rag_gold_cases.jsonl
+PYTHONPATH=src python3 tools/archive_retrieval_eval.py --root . --db data/agent.db --cases evals/retrieval/product_rag_gold_cases.jsonl --limit 10 --json evals/retrieval/product_rag_fts_baseline_report.json
+```
+
+Current PRM-24 baseline result:
+
+```text
+archive_retrieval_eval: rows=50 gold=50 candidates=0 output=evals/retrieval/product_rag_fts_baseline_report.json
 ```
 
 Boundary:
 
 - `gold_labels.status=human_approved_gold_labels_present`;
-- current approved labels cover only the seven `no_answer` rows promoted by
-  operator approval `operator-approval-2026-08-10-generated-drafts-as-gold`;
-- no candidate row has `human_approved=true`;
-- no candidate row contains expected source labels;
+- `gold_labels.coverage_status=full_coverage`;
+- current approved labels cover all 50 PRM-24 rows under operator approval
+  `operator-approval-2026-08-11-all-50-generated-gold`;
+- label quality is explicitly
+  `operator_approved_generated_seed_not_independent_human_review`;
+- the candidate file remains `human_approved=false` and label-free; the
+  derived gold-cases file is the scorer input;
 - the manifest omits query text, source URLs, snippets, raw Telegram text, and
   provider payloads;
-- PRM-24 AC-1 still needs either a 50-row approved gold set across all product
-  categories or an explicit operator waiver/change to that acceptance criterion;
 - `vector_backend_gate.vector_backend_adopted=false`;
 - `vector_backend_gate.embeddings_run=false`.
 
+Baseline metrics:
+
+| Metric | Value | Interpretation |
+| --- | ---: | --- |
+| `hit_at_10` | 1.0 | generated source labels are recovered by the deterministic planner |
+| `mrr` | 1.0 | generated source labels are first-rank under the seed method |
+| `citation_precision` | 1.0 | generated seed source labels match returned citations |
+| `no_answer_accuracy` | 0.0 | raw FTS returns related evidence for no-answer/control questions; answer-level refusal still needs PRM-28 gating |
+| `stale_rejection` | null | no stale/forbidden document labels were approved in this generated seed set |
+| `duplicate_top10_rate` | 0.004 | below proposed duplicate threshold |
+| `latency_ms_p95` | 46.912 ms | below proposed local latency threshold |
+| `reacted_post_searchability` | 0.967742 | aggregate local archive diagnostic |
+
 The optional draft simulation receipt remains historical non-gating evidence:
 it checked that prepared drafts were unapproved before the operator promoted
-the seven no-answer drafts to gold labels on 2026-08-10.
+the seven no-answer drafts to gold labels on 2026-08-10. It is superseded for
+coverage by the 2026-08-11 50-row generated seed label set.
 
-To supply labels, use [the operator labeling runbook](PRODUCT_RAG_LABELING_RUNBOOK.md).
+For future independent review, use
+[the operator labeling runbook](PRODUCT_RAG_LABELING_RUNBOOK.md).
 
 PRM-7 result path:
 
@@ -316,8 +349,9 @@ Gold metrics are present but intentionally unscored:
 
 This section is historical PRM-7 evidence. The vector gate was closed with
 `vector_backend_gate.status=blocked_no_human_approved_gold` at that time.
-Current PRM-24 now has seven no-answer seed labels, but still lacks measured
-recall/citation failures across the full product categories.
+Current PRM-24 now has a full generated seed gold set and baseline report, but
+still lacks independent human-reviewed labels and PRM-28 product chat
+acceptance evidence.
 
 Verification:
 

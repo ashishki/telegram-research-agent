@@ -1,7 +1,7 @@
 # Codex Session Handoff
 
 Status: active
-Last updated: 2026-08-03
+Last updated: 2026-08-11
 
 ## Repository State
 
@@ -10,7 +10,8 @@ Last updated: 2026-08-03
 - AI Workflow Playbook commit used: 5583eca96c4d2d480b5574ed78bea63e0b07ebf0
 - Adoption mode: Standard
 - Current phase: PRM-18 release/dogfood gate is implemented and blocks dogfood
-  start while final acceptance evidence and human approval are missing; legacy
+  start while final acceptance/product RAG chat acceptance evidence and human
+  approval are missing; legacy
   live runtime is frozen; safe `prm-assistant` runtime is implemented but not
   installed, enabled, started, or dogfood evidence; PRM-18A through PRM-18C are
   implemented and their batched deep review is recorded. PRM-21 documentation
@@ -21,14 +22,16 @@ Last updated: 2026-08-03
   PRM-21 docs-only research-session contract, PRM-22 fixture-first
   linked-source resolver/cache, and PRM-23 fixture-first memory research
   planner/CLI
-- Current safe slice: PRM-24 Product RAG Gold Eval Set. PRM-24 is
-  privacy-safe local eval/dataset work only; seven generated no-answer drafts
-  were operator-approved as gold labels on 2026-08-10, while the full 50-row
-  gold-set acceptance criterion remains incomplete.
+- Current safe slice: PRM-26 Hybrid Retrieval ADR And Privacy Budget. PRM-24
+  now has a 50-row operator-approved generated seed gold set and SQLite FTS
+  baseline report under
+  `operator-approval-2026-08-11-all-50-generated-gold`; this is generated seed
+  evidence, not independent human review and not approval for vector/backend
+  work.
 - Blocked/not implemented slices: PRM-8, PRM-19, PRM-20, PRM-27, and PRM-28
   remain blocked until their gates are satisfied.
-- Next safe work: continue PRM-24 or safe PRM-26 scaffolding without backend
-  adoption. Stop before PRM-19. PRM-19 only after PRM-28 passes
+- Next safe work: PRM-26 documentation/eval-gate work only, without backend
+  adoption. Stop before PRM-27/PRM-19. PRM-19 only after PRM-28 passes
   or the human operator explicitly waives the RAG gate, explicit human
   dogfood-start approval exists, and PRM-18 blockers are accepted or cleared;
   PRM-20 only after real dogfood evidence and explicit compatibility
@@ -43,9 +46,9 @@ report as the product center. Full archive search is the primary planned value.
 Knowledge Atoms, topics, reports, and Atlas-like surfaces become selective or
 secondary projections.
 
-Do not claim dogfood, release readiness, vector adoption, full gold-query
-coverage approval, external-source execution, or approved external-verification
-evidence. HEAD
+Do not claim dogfood, release readiness, vector adoption, independent
+human-reviewed gold labels, external-source execution, or approved
+external-verification evidence. HEAD
 contains a bounded SQLite FTS archive search, assistant vertical slice, grounded
 answer contract, local external-verification requirement path,
 confirmation-gated saved memory proposal flow, and deterministic Knowledge
@@ -137,11 +140,11 @@ jobs from this handoff.
 ## Known Blockers
 
 - Product pivot ADR remains proposed and needs human approval.
-- Candidate retrieval queries are not gold evidence until the operator approves
-  labels and expected citations; seven PRM-24 no-answer labels are now approved,
-  but the full 50-row product RAG gold set is still incomplete.
+- PRM-24 candidate retrieval queries became a 50-row operator-approved
+  generated seed gold set on 2026-08-11. Do not overclaim this as independent
+  human review or PRM-28 product acceptance.
 - PRM-8 vector/hybrid retrieval remains blocked.
-- PRM-24 is the next safe RAG task; PRM-27/PRM-28 remain gated.
+- PRM-26 is the next safe RAG task; PRM-27/PRM-28 remain gated.
 - PRM-18 release/dogfood gate is implemented and currently blocked.
 - PRM-18A through PRM-18C are implemented and the batched deep review is
   recorded at `docs/audit/PRM_DEEP_REVIEW_PRM18A_18C_2026-08-03.md`.

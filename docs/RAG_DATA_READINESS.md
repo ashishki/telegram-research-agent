@@ -1,7 +1,7 @@
 # RAG Data Readiness
 
-Status: PRM-1 empirical evidence recorded; PRM-2 document contract recorded; PRM-5 reaction fast-lane evidence recorded; PRM-24 product RAG eval scaffold recorded
-Last updated: 2026-08-08
+Status: PRM-1 empirical evidence recorded; PRM-2 document contract recorded; PRM-5 reaction fast-lane evidence recorded; PRM-24 product RAG eval set recorded
+Last updated: 2026-08-11
 
 ## PRM-1 Boundary
 
@@ -411,10 +411,11 @@ separate future label file:
 - privacy/sanitization status.
 
 Agent-generated candidates must remain `candidate_unapproved` and must not be
-used as pass/fail gold evidence. Gold labels must reference IDs and source URLs,
-not copied full post bodies.
+used as pass/fail gold evidence unless the operator explicitly approves a
+generated seed-label run. Gold labels must reference IDs and optional source
+URLs, not copied full post bodies.
 
-## PRM-24 Product RAG Eval Scaffold
+## PRM-24 Product RAG Eval Set
 
 `evals/retrieval/product_rag_candidate.jsonl` contains 50 product RAG candidate
 questions for the pre-dogfood RAG gate:
@@ -429,20 +430,34 @@ questions for the pre-dogfood RAG gate:
 | `decision_support` | 7 |
 
 The candidate file contains no expected source IDs, no expected source URLs, no
-copied snippets, and no raw Telegram text. `product_rag_gold_labels.jsonl`
-currently contains seven operator-approved no-answer labels promoted from the
-generated draft set on 2026-08-10. It still does not cover all 50 product RAG
-rows or all categories. The generated `product_rag_eval_manifest.json` records
-coverage, thresholds, and gate status without query text or source URLs.
+copied snippets, and no raw Telegram text. On 2026-08-11 the operator approved
+Codex creating all 50 generated seed gold labels under
+`operator-approval-2026-08-11-all-50-generated-gold`. The committed label file
+contains 43 source-labelled rows using stable local archive document/post IDs
+and 7 explicit no-answer rows; it contains no source URLs and no raw Telegram
+text. The generated `product_rag_eval_manifest.json` records coverage,
+thresholds, and gate status without query text or source URLs.
+
+Baseline SQLite FTS/query-planner evidence is recorded in
+`evals/retrieval/product_rag_fts_baseline_report.json`. It is privacy-safe and
+contains counts/metrics only. Current metrics: hit@10=1.0,
+citation_precision=1.0, latency p95=46.912 ms, duplicate_top10_rate=0.004,
+no_answer_accuracy=0.0, stale_rejection=null.
 
 Current gate status:
 
 ```text
 gold_labels.status=human_approved_gold_labels_present
-gold_labels.count=7
+gold_labels.coverage_status=full_coverage
+gold_labels.count=50
 vector_backend_adopted=false
 embeddings_run=false
 ```
+
+This completes PRM-24 coverage/eval scaffolding as operator-approved generated
+seed evidence. It does not approve embeddings, vector backend adoption,
+provider egress, live web research, migrations, production writes, service
+start, PRM-27, PRM-28, or dogfood.
 
 ## Exact Commands And Results
 

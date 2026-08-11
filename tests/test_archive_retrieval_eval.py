@@ -151,6 +151,32 @@ class TestArchiveRetrievalEval(unittest.TestCase):
         self.assertNotIn("query", report["candidates"]["rows"][0])
         self.assertFalse(report["vector_backend_gate"]["vector_backend_adopted"])
 
+    def test_eval_can_use_privacy_safe_query_variants_without_printing_queries(self):
+        _seed_post(self.connection, post_id=1, content="Alpha retrieval baseline source.")
+        _seed_post(self.connection, post_id=2, content="Beta planner variant source.")
+
+        report = evaluate_archive_retrieval(
+            self.connection,
+            [
+                {
+                    "case_id": "GOLD-VARIANT-001",
+                    "category": "semantic_topic",
+                    "language": "en",
+                    "query": "question that direct search will not match",
+                    "retrieval_query_variants": ["beta planner"],
+                    "human_approved": True,
+                    "expected_post_ids": [2],
+                }
+            ],
+        )
+
+        row = report["gold"]["rows"][0]
+        self.assertEqual(row["retrieval_mode"], "sqlite_fts_query_variants")
+        self.assertEqual(row["query_variant_count"], 1)
+        self.assertEqual(row["scores"]["hit_at_10"], 1.0)
+        self.assertNotIn("query", row)
+        self.assertFalse(report["privacy"]["queries_included"])
+
     def test_metrics_are_present_when_no_gold_exists(self):
         _seed_post(self.connection, post_id=1, content="Gamma retrieval baseline source.")
         self.connection.execute(

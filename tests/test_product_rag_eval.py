@@ -6,6 +6,7 @@ from db.product_rag_eval import (
     ProductRagEvalError,
     build_product_rag_eval_manifest,
     build_product_rag_simulation_receipt,
+    merge_product_rag_gold_cases,
     validate_product_rag_thresholds,
 )
 
@@ -104,23 +105,32 @@ class TestProductRagEval(unittest.TestCase):
         self.assertTrue(all(row["human_approved"] is False for row in drafts))
         self.assertTrue(all(row["draft_status"] == "needs_operator_confirmation" for row in drafts))
 
-    def test_approved_generated_drafts_are_materialized_as_no_answer_gold_labels(self):
+    def test_operator_approved_generated_gold_labels_cover_all_product_rows(self):
         root = Path(__file__).resolve().parents[1]
         cases = [json.loads(line) for line in (root / "evals/retrieval/product_rag_candidate.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
         labels = [json.loads(line) for line in (root / "evals/retrieval/product_rag_gold_labels.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
         thresholds = json.loads((root / "evals/retrieval/product_rag_thresholds.json").read_text(encoding="utf-8"))
 
-        self.assertEqual(len(labels), 7)
-        self.assertEqual({row["case_id"] for row in labels}, {f"PRAG-NOANS-00{index}" for index in range(1, 8)})
+        self.assertEqual(len(labels), 50)
+        self.assertEqual({row["case_id"] for row in labels}, {row["case_id"] for row in cases})
         self.assertTrue(all(row["human_approved"] is True for row in labels))
-        self.assertTrue(all(row["expected_no_answer"] is True for row in labels))
-        self.assertTrue(all(row["human_approval_ref"] == "operator-approval-2026-08-10-generated-drafts-as-gold" for row in labels))
-        self.assertTrue(all(row["label_source"] == "evals/retrieval/product_rag_gold_label_drafts.jsonl" for row in labels))
+        self.assertTrue(all(row["human_approval_ref"] == "operator-approval-2026-08-11-all-50-generated-gold" for row in labels))
+        self.assertTrue(all(row["label_source"] == "local_sqlite_fts_query_planner" for row in labels))
+        self.assertTrue(all(row["raw_telegram_text_included"] is False for row in labels))
+        no_answer_labels = [row for row in labels if row["case_id"].startswith("PRAG-NOANS-")]
+        evidence_labels = [row for row in labels if not row["case_id"].startswith("PRAG-NOANS-")]
+        self.assertEqual(len(no_answer_labels), 7)
+        self.assertTrue(all(row["expected_no_answer"] is True for row in no_answer_labels))
+        self.assertTrue(all("expected_archive_document_ids" not in row for row in no_answer_labels))
+        self.assertEqual(len(evidence_labels), 43)
+        self.assertTrue(all(row["expected_archive_document_ids"] for row in evidence_labels))
+        self.assertTrue(all(row["retrieval_query_variants"] for row in evidence_labels))
         self.assertTrue(next(row for row in labels if row["case_id"] == "PRAG-NOANS-004")["external_verification_required"])
 
         manifest = build_product_rag_eval_manifest(cases, labels=labels, thresholds=thresholds)
-        self.assertEqual(manifest["gold_labels"]["count"], 7)
+        self.assertEqual(manifest["gold_labels"]["count"], 50)
         self.assertEqual(manifest["gold_labels"]["status"], "human_approved_gold_labels_present")
+        self.assertEqual(manifest["gold_labels"]["coverage_status"], "full_coverage")
         self.assertEqual(manifest["vector_backend_gate"]["status"], "requires_human_approved_adr_before_vector_adoption")
 
     def test_manifest_accepts_privacy_safe_candidates_and_empty_gold_labels(self):
@@ -130,6 +140,7 @@ class TestProductRagEval(unittest.TestCase):
         self.assertEqual(manifest["dataset"]["case_count"], 6)
         self.assertEqual(manifest["gold_labels"]["count"], 0)
         self.assertEqual(manifest["gold_labels"]["status"], "blocked_no_human_approved_gold")
+        self.assertEqual(manifest["gold_labels"]["coverage_status"], "no_coverage")
         self.assertFalse(manifest["privacy"]["queries_included"])
         self.assertFalse(manifest["vector_backend_gate"]["vector_backend_adopted"])
 
@@ -178,7 +189,26 @@ class TestProductRagEval(unittest.TestCase):
         )
 
         self.assertEqual(manifest["gold_labels"]["count"], 1)
+        self.assertEqual(manifest["gold_labels"]["coverage_status"], "partial_coverage")
         self.assertEqual(manifest["vector_backend_gate"]["status"], "requires_human_approved_adr_before_vector_adoption")
+
+    def test_gold_cases_merge_requires_approved_labels_and_keeps_candidate_file_label_free(self):
+        cases = _cases()
+        labels = [
+            {"case_id": case["case_id"], "human_approved": True, "human_approval_ref": "operator-labels-2026-08-11", "expected_post_ids": [index]}
+            for index, case in enumerate(cases, start=1)
+        ]
+
+        merged = merge_product_rag_gold_cases(cases, labels, min_rows=6)
+
+        self.assertEqual(len(merged), 6)
+        self.assertTrue(all(row["human_approved"] is True for row in merged))
+        self.assertEqual(merged[0]["validation_status"], "human_approved_gold")
+        self.assertEqual(merged[0]["query"], cases[0]["query"])
+        self.assertNotIn("snippet", merged[0])
+
+        with self.assertRaisesRegex(ProductRagEvalError, "missing gold labels"):
+            merge_product_rag_gold_cases(cases, labels[:-1], min_rows=6)
 
     def test_thresholds_require_recall_citation_no_answer_stale_duplicate_and_latency(self):
         thresholds = _thresholds()

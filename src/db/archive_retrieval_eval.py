@@ -44,6 +44,7 @@ def evaluate_archive_retrieval(
         case_id = _required_string(case, "case_id")
         category = str(case.get("category") or "unknown").strip() or "unknown"
         query = _required_string(case, "query")
+        retrieval_queries = _retrieval_queries(case, query)
         is_human_approved = case.get("human_approved") is True
         is_gold = is_human_approved and _is_scoreable_gold_case(case)
         if is_human_approved and not is_gold:
@@ -53,10 +54,18 @@ def evaluate_archive_retrieval(
         started = time.perf_counter()
         error_type: str | None = None
         results: list[ArchiveSearchResult] = []
+        errors: list[str] = []
         try:
-            results = search_telegram_archive(connection, query, limit=clean_limit)
+            results = _search_retrieval_queries(
+                connection,
+                retrieval_queries,
+                limit=clean_limit,
+                errors=errors,
+            )
         except (ArchiveSearchError, sqlite3.Error) as exc:
             error_type = type(exc).__name__
+        if error_type is None and errors and not results:
+            error_type = errors[0]
         latency_ms = round((time.perf_counter() - started) * 1000, 3)
         duplicate_rate = _duplicate_top10_rate(results)
 
@@ -64,6 +73,12 @@ def evaluate_archive_retrieval(
             "case_id": case_id,
             "category": category,
             "approval_status": "gold" if is_gold else "candidate_unapproved",
+            "retrieval_mode": (
+                "sqlite_fts_query_variants"
+                if len(retrieval_queries) > 1 or retrieval_queries[0] != query
+                else "sqlite_fts_direct"
+            ),
+            "query_variant_count": len(retrieval_queries),
             "result_count": len(results),
             "latency_ms": latency_ms,
             "duplicate_top10_rate": duplicate_rate,
@@ -123,6 +138,36 @@ def evaluate_archive_retrieval(
             "queries_included": False,
         },
     }
+
+
+def _retrieval_queries(case: Mapping[str, object], query: str) -> list[str]:
+    configured = _string_list(case.get("retrieval_query_variants") or case.get("query_variants"))
+    return _unique_strings(configured or [query])
+
+
+def _search_retrieval_queries(
+    connection: sqlite3.Connection,
+    queries: Sequence[str],
+    *,
+    limit: int,
+    errors: list[str],
+) -> list[ArchiveSearchResult]:
+    results: list[ArchiveSearchResult] = []
+    seen: set[str] = set()
+    for query in queries:
+        try:
+            matches = search_telegram_archive(connection, query, limit=limit)
+        except (ArchiveSearchError, sqlite3.Error) as exc:
+            errors.append(type(exc).__name__)
+            continue
+        for match in matches:
+            if match.archive_document_id in seen:
+                continue
+            seen.add(match.archive_document_id)
+            results.append(match)
+            if len(results) >= limit:
+                return results
+    return results
 
 
 def validate_archive_retrieval_eval_report(report: Mapping[str, object]) -> dict[str, object]:
@@ -352,6 +397,18 @@ def _string_list(value: object) -> list[str]:
         return [str(item).strip() for item in value if str(item).strip()]  # type: ignore[arg-type]
     except TypeError:
         return [str(value).strip()]
+
+
+def _unique_strings(values: Sequence[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for value in values:
+        clean = str(value or "").strip()
+        if not clean or clean in seen:
+            continue
+        seen.add(clean)
+        result.append(clean)
+    return result
 
 
 def _nonnegative_int(value: object, field: str) -> int:

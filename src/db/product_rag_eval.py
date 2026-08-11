@@ -136,6 +136,13 @@ def build_product_rag_eval_manifest(
                     if not normalized_labels
                     else "human_approved_gold_labels_present"
                 ),
+                "coverage_status": (
+                    "full_coverage"
+                    if len(normalized_labels) >= len(normalized_cases)
+                    else "partial_coverage"
+                    if normalized_labels
+                    else "no_coverage"
+                ),
                 "count": len(normalized_labels),
                 "case_ids": [label["case_id"] for label in normalized_labels],
             },
@@ -157,6 +164,53 @@ def build_product_rag_eval_manifest(
             },
         }
     )
+
+
+def merge_product_rag_gold_cases(
+    cases: Sequence[Mapping[str, Any]],
+    labels: Sequence[Mapping[str, Any]],
+    *,
+    min_rows: int = 50,
+    require_all_labels: bool = True,
+) -> list[dict[str, Any]]:
+    """Merge unapproved product candidate queries with approved scoreable labels.
+
+    The committed candidate file intentionally stays unapproved and label-free.
+    Retrieval scorers need query text and expected labels in the same JSONL row,
+    so this helper builds that derived scoreable view without copying raw
+    Telegram evidence text.
+    """
+    normalized_cases = _validate_cases(cases, min_rows=max(1, int(min_rows or 50)))
+    case_ids = {case["case_id"] for case in normalized_cases}
+    _validate_labels(labels, case_ids=case_ids)
+    labels_by_case_id = {str(label["case_id"]): dict(label) for label in labels}
+
+    missing = sorted(case_ids.difference(labels_by_case_id))
+    if require_all_labels and missing:
+        raise ProductRagEvalError("missing gold labels for case_ids: " + ", ".join(missing))
+
+    merged: list[dict[str, Any]] = []
+    for case in cases:
+        case_id = str(case["case_id"])
+        label = labels_by_case_id.get(case_id)
+        if label is None:
+            continue
+        _reject_raw_text_fields(case, case_id, "candidate row")
+        _reject_raw_text_fields(label, case_id, "gold label")
+        row = {
+            "case_id": case_id,
+            "category": _required_string(case, "category"),
+            "language": _required_string(case, "language"),
+            "query": _required_string(case, "query"),
+            "validation_status": "human_approved_gold",
+            "human_approved": True,
+        }
+        for key, value in label.items():
+            if key in {"case_id", "human_approved"}:
+                continue
+            row[key] = value
+        merged.append(row)
+    return merged
 
 
 def validate_product_rag_eval_manifest(report: Mapping[str, Any]) -> dict[str, Any]:
@@ -258,13 +312,17 @@ def _validate_labels(labels: Sequence[Mapping[str, Any]], *, case_ids: set[str])
             raise ProductRagEvalError(f"{case_id} gold label must have human_approved=true")
         if not _required_string(label, "human_approval_ref"):
             raise ProductRagEvalError(f"{case_id} gold label must include human_approval_ref")
-        raw_keys = sorted(_RAW_TEXT_FIELDS.intersection(label.keys()))
-        if raw_keys:
-            raise ProductRagEvalError(f"{case_id} gold label contains raw text fields: {', '.join(raw_keys)}")
+        _reject_raw_text_fields(label, case_id, "gold label")
         if not _has_scoreable_gold_label(label):
             raise ProductRagEvalError(f"{case_id} gold label must include expected source IDs/URLs or expected_no_answer=true")
         normalized.append({"case_id": case_id, "human_approval_ref": _required_string(label, "human_approval_ref")})
     return normalized
+
+
+def _reject_raw_text_fields(row: Mapping[str, Any], case_id: str, row_name: str) -> None:
+    raw_keys = sorted(_RAW_TEXT_FIELDS.intersection(row.keys()))
+    if raw_keys:
+        raise ProductRagEvalError(f"{case_id} {row_name} contains raw text fields: {', '.join(raw_keys)}")
 
 
 def _has_scoreable_gold_label(label: Mapping[str, Any]) -> bool:

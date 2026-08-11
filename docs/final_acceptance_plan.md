@@ -26,7 +26,9 @@ Create 50 candidate queries:
 - 4 no-answer.
 
 Agent-drafted queries remain candidates until human-approved. No automatically
-invented query may be labelled gold evidence.
+invented query may be labelled gold evidence without explicit operator
+approval. PRM-24 records one such approved generated seed-label run:
+`operator-approval-2026-08-11-all-50-generated-gold`.
 
 ## C. Retrieval Metrics
 
@@ -41,7 +43,10 @@ Draft targets:
 - p95 local retrieval latency <= 1.5 seconds;
 - 100% of detected reacted posts searchable after the same sync run.
 
-These thresholds are not passed yet.
+These thresholds are not passed yet. PRM-24 generated seed baseline evidence
+passes source-label hit/citation/latency thresholds, but no-answer accuracy is
+0.0 and stale rejection is unmeasured; PRM-28 product chat acceptance remains
+blocked.
 
 ## D. Generation Metrics
 

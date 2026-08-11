@@ -54,8 +54,9 @@ Playbook SHA: `5583eca96c4d2d480b5574ed78bea63e0b07ebf0`
 - **First proof metric:** Known-item hit@10 and citation precision on a
   human-approved subset of the 50-query retrieval set.
 - **Evaluation dataset source:** Candidate queries drafted in
-  `evals/retrieval/query_set_candidate.jsonl`; gold labels require human
-  approval and source IDs.
+  `evals/retrieval/query_set_candidate.jsonl` and PRM-24 product RAG
+  candidates in `evals/retrieval/product_rag_candidate.jsonl`; gold labels
+  require human approval and source IDs or explicit no-answer expectations.
 - **Minimum eval set size for v1:** 50 candidate queries; a meaningful
   human-approved subset before PRM-3 completion.
 - **Known failure slices:** exact phrase, semantic topic, cases, comparison,

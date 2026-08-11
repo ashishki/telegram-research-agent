@@ -30,6 +30,7 @@ Last updated: 2026-08-03
 | read-only assistant turn mutates production DB telemetry | PI chat suppresses `llm_usage` database writes during planning/generation |
 | autonomous workflow telemetry leaks raw private text | PRM-17 telemetry records aggregate metrics and redacted field names only |
 | release or dogfood gate receipt leaks raw private text | PRM-18 receipt schema rejects raw payload keys and requires privacy flags to remain false |
+| generated retrieval eval labels leak raw Telegram text | PRM-24 labels use stable archive document/post IDs or no-answer flags; no raw post bodies, snippets, source URLs, provider payloads, or prompts are included |
 | source URL loses provenance | archive document identity preserves Telegram link |
 | linked-source cache leaks raw provider payloads or private post text | PRM-22 cache records store source URL, normalized title, content hash, bounded excerpt, status, and redacted failure reason only |
 | linked-source resolver crawls live web by default | PRM-22 uses fixture/fake fetchers by default and refuses live HTTP, external skills, and provider summarization without explicit approval/budget switches |

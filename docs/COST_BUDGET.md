@@ -25,6 +25,7 @@ Status: active PRM budget requiring human approval before live provider use
 | PRM-18C Telegram PRM assistant UX parity | $0 for implementation/tests | 0 for implementation/tests | starting service or real provider call |
 | PRM-22 linked-source resolver implementation | $0 for implementation/tests | 0 for implementation/tests | live HTTP fetch, external skill, provider summarization, or durable production cache write |
 | PRM-23 memory research planner implementation | $0 for implementation/tests | 0 for implementation/tests | live linked-source fetch, provider synthesis, service start, dogfood start, production write, or vector/backend adoption |
+| PRM-24 generated seed gold labels and FTS baseline | $0 | 0 | raw Telegram text copied into eval rows, provider judge, embeddings, vector backend, live research, or production write |
 
 Monthly planning ceiling before dogfood: $25 unless the human approves more.
 

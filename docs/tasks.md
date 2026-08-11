@@ -1,7 +1,7 @@
 # Active Task Graph
 
 Status: proposed
-Last updated: 2026-08-08
+Last updated: 2026-08-11
 Playbook SHA: 5583eca96c4d2d480b5574ed78bea63e0b07ebf0
 Target repo baseline: ad8689fa25b89f77122c4cec7c7a6b9da3f500cf
 
@@ -45,7 +45,7 @@ Target repo baseline: ad8689fa25b89f77122c4cec7c7a6b9da3f500cf
 | Learning state | PRM-15 fixture-only migration/projection maps legacy source presence to indexed/surfaced only and requires explicit receipts for opened/read/understood/explained/tried/applied/measured |
 | Weekly Brief V3 | PRM-16 deterministic secondary projection and static HTML renderer implemented for bounded supplied context; V1 Brief and Atlas are demoted to compatibility/internal surfaces |
 | Runtime workflows | PRM-17 deterministic workflow registry and privacy-safe aggregate telemetry receipt implemented; scheduled runtime activation is not approved |
-| Release gate | PRM-18 deterministic release/dogfood gate implemented; current sanitized receipt blocks dogfood because final acceptance evidence, full product RAG gold/acceptance evidence, and explicit human dogfood approval are missing |
+| Release gate | PRM-18 deterministic release/dogfood gate implemented; current sanitized receipt blocks dogfood because final acceptance/product RAG chat acceptance evidence and explicit human dogfood approval are missing |
 | Runtime deployment | Legacy `telegram-bot.service` and `telegram-ai-split-report.timer` stopped and disabled on 2026-07-29; safe `prm-assistant` entrypoint and repo unit template implemented but not installed/enabled/started and without automatic startup migrations; no Telegram Research Agent service or timer is active |
 | PRM-13..17 review gate | Batched deep review recorded; one telemetry budget-validation finding fixed before PRM-18 |
 | PRM-18A..18C review gate | Batched deep review recorded on 2026-08-03; no unresolved stop-ship finding in this block, residual provider/runtime risks remain gated before PRM-19 |
@@ -1739,7 +1739,7 @@ Notes: |
 Owner: human+codex
 Phase: PRM
 Type: eval:dataset eval:gate rag:query
-Status: in_progress
+Status: implemented
 Depends-On: PRM-23
 Risk-Level: high
 Public-Tests-Required: required
@@ -1762,14 +1762,21 @@ Acceptance-Criteria:
   - id: AC-4; description: acceptance thresholds are recorded for recall@5, recall@10, citation precision, no-answer accuracy, stale rejection, duplicate rejection, and latency; verify: docs/retrieval_eval.md has the threshold table.
 Verification:
   - PYTHONPATH=src python3 -m pytest tests/test_product_rag_eval.py tests/test_archive_retrieval_eval.py tests/test_memory_research.py -q
+  - PYTHONPATH=src python3 tools/product_rag_seed_gold_labels.py --root . --db data/agent.db --jsonl evals/retrieval/product_rag_gold_labels.jsonl
+  - PYTHONPATH=src python3 tools/product_rag_gold_cases.py --root . --jsonl evals/retrieval/product_rag_gold_cases.jsonl
   - PYTHONPATH=src python3 tools/product_rag_eval_manifest.py --root . --json evals/retrieval/product_rag_eval_manifest.json
+  - PYTHONPATH=src python3 tools/archive_retrieval_eval.py --root . --db data/agent.db --cases evals/retrieval/product_rag_gold_cases.jsonl --limit 10 --json evals/retrieval/product_rag_fts_baseline_report.json
   - python3 tools/playbook_validate.py --root . --check tasks --check references
   - git diff --check
 Files:
   - evals/retrieval/
   - src/db/product_rag_eval.py
   - tools/product_rag_eval_manifest.py
+  - tools/product_rag_gold_cases.py
+  - tools/product_rag_seed_gold_labels.py
+  - tools/archive_retrieval_eval.py
   - tests/test_product_rag_eval.py
+  - tests/test_archive_retrieval_eval.py
   - docs/retrieval_eval.md
   - docs/RAG_DATA_READINESS.md
   - docs/EVIDENCE_INDEX.md
@@ -1787,19 +1794,25 @@ Cost-Budget: |
 Notes: |
   Started on 2026-08-08 as a safe scaffold. Product RAG candidate rows,
   proposed thresholds, a privacy-safe manifest tool, and focused validation
-  tests exist. On 2026-08-10 the human operator approved the seven generated
-  no-answer drafts as gold labels under
-  `operator-approval-2026-08-10-generated-drafts-as-gold`; AC-1 remains
-  incomplete until all 50 rows are approved or the operator explicitly changes
-  or waives that acceptance criterion. This task does not run embeddings,
-  provider calls, live web research, migrations, production writes, or dogfood.
+  tests exist. On 2026-08-11 the human operator instructed Codex to create all
+  50 generated seed gold labels under
+  `operator-approval-2026-08-11-all-50-generated-gold`; the committed labels
+  contain stable local archive document/post IDs or explicit no-answer
+  expectations, not raw Telegram text or source URLs. Baseline SQLite
+  FTS/query-planner evidence is recorded in
+  `evals/retrieval/product_rag_fts_baseline_report.json`: hit@10=1.0,
+  citation_precision=1.0, p95 latency=46.912 ms, no_answer_accuracy=0.0, and
+  stale_rejection=null on this generated seed set. This completes PRM-24
+  coverage/eval scaffolding but does not approve embeddings, vector backend
+  adoption, provider calls, live web research, migrations, production writes,
+  service start, PRM-27, PRM-28, or dogfood.
 
 ### PRM-25: Citation-Safe RAG Context Pack
 
 Owner: codex
 Phase: PRM
 Type: rag:context assistant:contract tool:call
-Status: in_progress
+Status: implemented
 Depends-On: PRM-24
 Risk-Level: high
 Public-Tests-Required: required
@@ -1847,9 +1860,9 @@ Notes: |
   but it must not adopt embeddings or a vector backend.
   Implemented on 2026-08-08 as a fixture-only context-pack substrate. It
   excludes uncited/raw candidates, records exclusion reasons, keeps excerpts
-  bounded, and is rendered by local `memory research`. PRM-24 now has seven
-  approved no-answer seed labels, but its full 50-row gold-set gate remains
-  incomplete.
+  bounded, and is rendered by local `memory research`. PRM-24 now has 50
+  operator-approved generated seed gold labels; PRM-26 remains the next safe
+  ADR/privacy-budget gate before any vector/backend work.
 
 ### PRM-26: Hybrid Retrieval ADR And Privacy Budget
 
