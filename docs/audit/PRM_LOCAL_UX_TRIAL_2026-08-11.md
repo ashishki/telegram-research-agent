@@ -38,6 +38,13 @@ PYTHONPATH=src python3 src/main.py memory ask --limit 4 "<question>"
 | `memory research` | 4 | 4.4k-5.6k chars, 57-66 lines | 12-15 lines over 140 chars per answer; many English static labels |
 | `memory ask` | 2 | 0.6k-3.1k chars, 11-27 lines | shorter and clearer, but can expose absolute local artifact paths |
 
+Post-polish spot-check on three representative `memory research --limit 4`
+queries:
+
+| Surface | Cases | Output size | Visual notes |
+| --- | ---: | --- | --- |
+| `memory research` compact default | 3 | 1.56k-1.72k chars, 29-30 lines | 3-5 lines over 140 chars; `Citation-Safe Context Pack` hidden unless `--debug`; current-fact case had no drafts |
+
 Shared safety observations:
 
 - local mode kept `model_calls=0`;
@@ -103,23 +110,38 @@ The accepted no-vector RAG path is technically usable for local archive
 discovery and gated current-fact refusal, but the default user-facing experience
 is not yet "pleasant" or fully comfortable for daily use.
 
-Recommended safe UX polish before treating this as a preferred operator
-workflow:
+Safe UX polish implemented after this trial:
 
-1. Add a compact default reading view for `memory research`.
-2. Move context-pack/provenance detail behind a debug flag.
-3. Localize headings based on the query language.
-4. Make freshness/no-answer status the first line when current facts are asked.
-5. Redact or relativize absolute local paths.
-6. Improve curated memory relevance/deduplication.
-7. Route repository/project questions to repo docs and gate receipts before
-   Telegram archive evidence.
+1. Added a compact default reading view for `memory research`.
+2. Moved context-pack/provenance detail behind `memory research --debug`.
+3. Localized the default Russian-language headings and common next-step labels.
+4. Made freshness/current-fact limitations the first line for current-fact
+   questions.
+5. Redacted/relativized local repository paths in `memory ask` rendered source
+   refs.
+6. Added a narrow repo-context cue for explicit `telegram-research-agent`
+   project questions so repo docs and gate receipts are shown before Telegram
+   archive background.
+7. Blocked draft proposals for current-fact freshness-boundary answers.
 
-Until those changes exist, prefer `memory ask` for quick local checks and use
-`memory research --limit 3` as an audit/research view, not as the final polished
-assistant UX.
+Remaining known UX gaps:
+
+- deterministic synthesis is still shallow compared with an LLM-backed answer;
+- curated memory relevance/deduplication still needs deeper scoring;
+- the operational startup banner is emitted on stderr in direct terminal use;
+- live/current linked-source verification remains gated and was not run.
 
 ## Validation
+
+```text
+PYTHONPATH=src python3 -m pytest tests/test_memory_research.py tests/test_local_memory_ask.py tests/test_cli.py -q
+35 passed in 4.41s
+```
+
+```text
+python3 tools/test_tiers.py focused-prm
+134 passed in 22.88s
+```
 
 ```text
 python3 tools/playbook_validate.py --root . --check tasks --check references

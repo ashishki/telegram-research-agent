@@ -43,10 +43,12 @@ citation-safe context pack,
 hybrid/vector ADR and privacy budget, approved retrieval implementation, and
 product chat acceptance gate. A post-PRM28 local UX trial is recorded at
 `docs/audit/PRM_LOCAL_UX_TRIAL_2026-08-11.md`: no-vector RAG is technically
-usable for local archive discovery, but the default `memory research` reading
-experience remains audit-oriented and needs compact view, localization,
-freshness-first refusal, path redaction, curated-memory dedupe, and stronger
-repo/project routing before it should be called pleasant daily UX. PRM-8
+usable for local archive discovery. A follow-up safe UX polish adds compact
+default `memory research` rendering, `--debug` audit rendering, Russian heading
+localization, freshness-first current-fact boundaries, local path redaction,
+narrow repo-context cues, and no drafts for current-fact freshness-boundary
+answers. Remaining UX gaps are deterministic synthesis depth and curated-memory
+relevance/deduplication. PRM-8
 remains blocked until that approval path is satisfied. PRM-19 and PRM-20 are
 not started; PRM-19 requires explicit human dogfood-start approval before it
 can start and real four-week operator dogfood evidence before it can complete.

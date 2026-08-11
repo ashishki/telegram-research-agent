@@ -618,8 +618,11 @@ git diff --check
 | surfaces | `memory research --limit 4`; `memory ask --limit 4` |
 | safety | no provider egress, live web research, Telegram service start, embeddings/vector backend, migrations, production writes, dogfood, or release claim |
 | positive finding | no-vector RAG is usable for local archive discovery and `memory ask` handles current-fact refusal clearly |
-| UX finding | `memory research` is audit-friendly but not yet pleasant daily UX: verbose, mixed English/Russian labels, long lines, noisy context pack, weak project routing, and occasional misleading freshness ordering |
-| recommendation | add compact default view, debug-only context pack, localized labels, freshness-first refusal, path redaction, curated-memory dedupe, and repo-doc routing for project questions |
+| UX finding | initial trial found `memory research` audit-friendly but too verbose for daily use |
+| implemented polish | compact default view, `--debug` full audit view, localized Russian headings/common next steps, freshness-first current-fact boundary, path redaction for `memory ask`, narrow repo-context cue, and no drafts for current-fact freshness-boundary answers |
+| post-polish spot-check | three representative `memory research --limit 4` queries rendered at 1.56k-1.72k chars / 29-30 lines, with debug context pack hidden by default and no drafts in the current-fact case |
+| validation | `PYTHONPATH=src python3 -m pytest tests/test_memory_research.py tests/test_local_memory_ask.py tests/test_cli.py -q` -> 35 passed in 4.41s; `python3 tools/test_tiers.py focused-prm` -> 134 passed in 22.88s; `python3 tools/playbook_validate.py --root . --check tasks --check references` -> errors=0 warnings=0; `git diff --check` -> no output |
+| remaining gap | deterministic synthesis and curated-memory relevance are still shallow compared with a polished LLM-backed answer; live/current verification remains gated |
 
 This receipt is diagnostic evidence only. It is not PRM-19 dogfood evidence.
 

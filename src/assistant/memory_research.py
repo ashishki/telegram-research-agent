@@ -290,6 +290,7 @@ def answer_memory_research(
     deeper_reading = _deeper_reading(linked_evidence, archive_evidence, curated_evidence)
     unknowns = _unknowns(archive_evidence, linked_evidence, project_fit, linked_result)
     unknowns = _unique([*unknowns, *_answer_gate_unknowns(answer_gate)])
+    repo_project_context = _repo_project_context(clean_question, project_name=project_name)
     direct_answer = _direct_answer(
         question=clean_question,
         archive_evidence=archive_evidence,
@@ -304,6 +305,7 @@ def answer_memory_research(
             *linked_evidence["source_refs"],
             *curated_evidence["source_refs"],
             *project_fit.get("source_refs", []),
+            *_strings(repo_project_context.get("source_refs")),
         ]
     )
     drafts = (
@@ -314,7 +316,7 @@ def answer_memory_research(
             source_refs=source_refs,
             unknowns=unknowns,
         )
-        if bool(answer_gate.get("allow_answer"))
+        if _drafts_allowed(answer_gate)
         else []
     )
     status = _answer_status(answer_gate, archive_evidence=archive_evidence, linked_evidence=linked_evidence, curated_evidence=curated_evidence)
@@ -338,6 +340,7 @@ def answer_memory_research(
         "linked_source_evidence": linked_evidence,
         "approach_comparison": comparison,
         "project_fit": project_fit,
+        "repo_project_context": repo_project_context,
         "context_pack": context_pack,
         "answer_gate": answer_gate,
         "next_steps": next_steps,
@@ -361,12 +364,23 @@ def answer_memory_research(
     }
 
 
-def render_memory_research_answer(payload: Mapping[str, Any]) -> str:
+def render_memory_research_answer(payload: Mapping[str, Any], *, debug: bool = False) -> str:
     if payload.get("status") == "invalid":
         return str(payload.get("message") or "Question is empty.")
     if payload.get("status") == "refused":
         receipt = _mapping(payload.get("receipt"))
         privacy = _mapping(receipt.get("privacy"))
+        question = str(payload.get("question") or "")
+        if _is_russian(question):
+            return "\n".join(
+                [
+                    "PRM Research",
+                    f"Вопрос: {question}",
+                    "Статус: отказано",
+                    str(payload.get("message") or "Research request refused by policy."),
+                    _privacy_line(privacy),
+                ]
+            ).rstrip()
         return "\n".join(
             [
                 "PRM Research",
@@ -376,6 +390,9 @@ def render_memory_research_answer(payload: Mapping[str, Any]) -> str:
                 _privacy_line(privacy),
             ]
         ).rstrip()
+
+    if not debug:
+        return _render_memory_research_compact(payload)
 
     body = str(payload.get("answer") or "").strip()
     privacy = _mapping(payload.get("privacy"))
@@ -399,6 +416,252 @@ def render_memory_research_answer(payload: Mapping[str, Any]) -> str:
         _privacy_line(privacy),
     ]
     return "\n".join(lines).rstrip()
+
+
+def _render_memory_research_compact(payload: Mapping[str, Any]) -> str:
+    question = str(payload.get("question") or "")
+    ru = _is_russian(question)
+    labels = _compact_labels(ru)
+    privacy = _mapping(payload.get("privacy"))
+    receipt = _mapping(payload.get("receipt"))
+    budget = _mapping(receipt.get("budget"))
+    answer_gate = _mapping(payload.get("answer_gate"))
+    archive_evidence = _mapping(payload.get("archive_evidence"))
+    linked_evidence = _mapping(payload.get("linked_source_evidence"))
+    project_fit = _mapping(payload.get("project_fit"))
+    repo_context = _mapping(payload.get("repo_project_context"))
+    next_steps = _mapping(payload.get("next_steps"))
+    unknowns = [str(item) for item in payload.get("unknowns") or [] if str(item).strip()]
+    drafts = [item for item in payload.get("draft_proposals") or [] if isinstance(item, Mapping)]
+
+    lines = [
+        "PRM Research",
+        f"{labels['question']}: {question}",
+        labels["mode"],
+        "",
+        labels["answer"],
+        _compact_answer(payload, ru=ru),
+    ]
+
+    if repo_context.get("status") == "matched":
+        lines.extend(["", labels["repo_context"]])
+        summary = repo_context.get("summary_ru") if ru else repo_context.get("summary")
+        lines.append(_short(str(summary or repo_context.get("summary") or ""), 260))
+        refs = _strings(repo_context.get("source_refs"))
+        if refs:
+            lines.append(f"{labels['repo_refs']}: " + ", ".join(refs[:4]))
+
+    source_lines = _compact_source_lines(archive_evidence, linked_evidence, ru=ru, max_items=3)
+    if source_lines:
+        lines.extend(["", labels["sources"], *source_lines])
+
+    action_lines = _compact_action_lines(next_steps, ru=ru)
+    if action_lines:
+        lines.extend(["", labels["next"], *action_lines])
+
+    if unknowns:
+        lines.extend(["", labels["unknowns"]])
+        lines.extend(f"- {_short(_localize_unknown(item) if ru else item, 140)}" for item in unknowns[:5])
+
+    if drafts:
+        lines.extend(["", labels["drafts"]])
+        lines.append(
+            labels["draft_summary"].format(
+                count=len(drafts),
+                persisted=str(any(bool(item.get("persisted")) for item in drafts)).lower(),
+            )
+        )
+
+    lines.extend(
+        [
+            "",
+            (
+                f"{labels['limits']}: "
+                f"tool_calls={receipt.get('tool_calls_used', 0)}/{budget.get('max_tool_calls', 0)}; "
+                f"sources<={budget.get('max_archive_sources', 0)}; "
+                f"debug={'false'}"
+            ),
+            labels["debug_hint"],
+            _privacy_line(privacy),
+        ]
+    )
+    return "\n".join(line.rstrip() for line in lines if line is not None).rstrip()
+
+
+def _compact_labels(ru: bool) -> dict[str, str]:
+    if ru:
+        return {
+            "question": "Вопрос",
+            "mode": "Режим: local-research; без LLM, live web и записей.",
+            "answer": "Короткий ответ",
+            "repo_context": "Контекст проекта",
+            "repo_refs": "Опорные документы",
+            "sources": "Источники",
+            "next": "Что делать дальше",
+            "unknowns": "Ограничения",
+            "drafts": "Черновики",
+            "draft_summary": "- подготовлено черновиков: {count}; сохранено={persisted}; запись только через подтверждение",
+            "limits": "Лимиты",
+            "debug_hint": "Подробности: добавь --debug, чтобы увидеть context pack, approach comparison и draft details.",
+        }
+    return {
+        "question": "Question",
+        "mode": "Mode: local-research; no LLM, no live web, no writes.",
+        "answer": "Short answer",
+        "repo_context": "Project context",
+        "repo_refs": "Evidence docs",
+        "sources": "Sources",
+        "next": "Next steps",
+        "unknowns": "Limits / unknowns",
+        "drafts": "Drafts",
+        "draft_summary": "- draft proposals: {count}; persisted={persisted}; writes require confirmation",
+        "limits": "Limits",
+        "debug_hint": "Details: add --debug to show context pack, approach comparison, and draft details.",
+    }
+
+
+def _compact_answer(payload: Mapping[str, Any], *, ru: bool) -> str:
+    answer_gate = _mapping(payload.get("answer_gate"))
+    archive_evidence = _mapping(payload.get("archive_evidence"))
+    linked_evidence = _mapping(payload.get("linked_source_evidence"))
+    project_fit = _mapping(payload.get("project_fit"))
+    repo_context = _mapping(payload.get("repo_project_context"))
+    archive_items = [item for item in archive_evidence.get("items") or [] if isinstance(item, Mapping)]
+    linked_items = [item for item in linked_evidence.get("items") or [] if isinstance(item, Mapping)]
+    source_count = len(archive_items) + len(linked_items)
+    project_label = str(project_fit.get("relevance_label") or "no_match")
+    if bool(answer_gate.get("external_verification_required")) and not bool(answer_gate.get("current_claim_allowed", True)):
+        return (
+            "Сначала ограничение: текущий факт нельзя подтвердить локально. Архив ниже — только контекст; внешняя проверка не запускалась."
+            if ru
+            else "First constraint: this current fact cannot be verified locally. Archive evidence below is context only; no external verification was run."
+        )
+    if not bool(answer_gate.get("allow_answer", True)):
+        return (
+            "Недостаточно локальных цитируемых доказательств. Я не буду превращать похожие посты в утверждение."
+            if ru
+            else "Insufficient cited local evidence. I will not turn related posts into a claim."
+        )
+    if repo_context.get("status") == "matched":
+        return (
+            "Это вопрос о самом проекте. Сначала смотри документы репозитория и gate receipts; Telegram-архив ниже — только фон."
+            if ru
+            else "This is a question about the repository itself. Use repo/gate evidence first; Telegram archive evidence below is background."
+        )
+    if source_count:
+        first = archive_items[0] if archive_items else linked_items[0]
+        snippet = _short(first.get("snippet") or first.get("content") or first.get("text_excerpt") or "", 150)
+        if ru:
+            return (
+                f"Нашёл локальные источники: {source_count}. Главный первый сигнал: {snippet} "
+                f"Маршрут проекта: {_localized_project_label(project_label)}."
+            )
+        return f"Found {source_count} local source(s). First strong signal: {snippet} Project routing: {project_label}."
+    return (
+        "Локальных источников не найдено. Я не буду додумывать ответ."
+        if ru
+        else "No local sources matched. I will not guess beyond available data."
+    )
+
+
+def _compact_source_lines(
+    archive_evidence: Mapping[str, Any],
+    linked_evidence: Mapping[str, Any],
+    *,
+    ru: bool,
+    max_items: int,
+) -> list[str]:
+    lines: list[str] = []
+    archive_items = [item for item in archive_evidence.get("items") or [] if isinstance(item, Mapping)]
+    linked_items = [item for item in linked_evidence.get("items") or [] if isinstance(item, Mapping)]
+    for item in archive_items[:max_items]:
+        date = str(item.get("posted_at") or "")[:10] or ("дата неизвестна" if ru else "date unknown")
+        channel = item.get("channel_username") or ("источник" if ru else "source")
+        snippet = _short(item.get("snippet") or item.get("content") or "", 120)
+        lines.append(f"- {date} {channel}: {snippet}")
+        if item.get("source_url"):
+            lines.append(f"  ↳ {item['source_url']}")
+    remaining = max_items - len(archive_items[:max_items])
+    if remaining > 0:
+        for item in linked_items[:remaining]:
+            title = item.get("normalized_title") or item.get("source_type") or ("linked source" if not ru else "связанный источник")
+            url = item.get("source_url") or item.get("normalized_url") or ""
+            lines.append(f"- {title}: {url}")
+    if not lines:
+        lines.append("- локальных источников нет" if ru else "- no local sources")
+    return lines
+
+
+def _compact_action_lines(next_steps: Mapping[str, Any], *, ru: bool) -> list[str]:
+    names = (
+        (("apply", "применить"), ("watch", "наблюдать"), ("study", "изучить"), ("ignore", "игнорировать"))
+        if ru
+        else (("apply", "apply"), ("watch", "watch"), ("study", "study"), ("ignore", "ignore"))
+    )
+    lines: list[str] = []
+    for key, label in names:
+        values = [str(item) for item in next_steps.get(key) or [] if str(item).strip()]
+        if values:
+            value = _localize_next_step(values[0]) if ru else values[0]
+            lines.append(f"- {label}: {_short(value, 170)}")
+    return lines
+
+
+def _localized_project_label(label: str) -> str:
+    return {
+        "direct_implication": "прямое применение",
+        "weak_watch": "наблюдать",
+        "learning_relevance": "фон для изучения",
+        "no_match": "нет привязки",
+        "ambiguous_project": "нужно выбрать проект",
+    }.get(label, label or "нет привязки")
+
+
+def _localize_next_step(value: str) -> str:
+    translations = {
+        "Fetch or approve linked-source reading later if live freshness matters.": (
+            "если нужна актуальность, отдельно разрешить linked-source/live-проверку."
+        ),
+        "Do not apply this to active project work from the current evidence.": (
+            "не применять к активному проекту из текущих доказательств."
+        ),
+        "Read the linked source or archive thread as background before creating a project action.": (
+            "читать как фон; не превращать в проектное действие без проверки и подтверждения."
+        ),
+        "Draft one bounded project action from the cited evidence; require confirmation before saving.": (
+            "сформулировать одно ограниченное действие из цитируемых источников; сохранить только после подтверждения."
+        ),
+        "Run an explicitly approved external verification step before making current claims.": (
+            "перед текущими утверждениями отдельно разрешить внешнюю проверку."
+        ),
+        "Do not answer or save a memory from related-but-insufficient evidence.": (
+            "не отвечать и не сохранять память из похожих, но недостаточных доказательств."
+        ),
+        "Resolve the target project before applying the research.": "сначала выбрать целевой проект.",
+        "Keep this as a watch signal until repeated archive or linked-source evidence appears.": (
+            "оставить как watch-сигнал до повторных архивных или linked-source доказательств."
+        ),
+        "Add a sharper archive query or approved gold retrieval label.": (
+            "сформулировать более точный архивный запрос или добавить approved retrieval label."
+        ),
+    }
+    return translations.get(value, value)
+
+
+def _localize_unknown(value: str) -> str:
+    translations = {
+        "approved linked-source text": "утверждённый текст связанных источников",
+        "live external freshness": "живая внешняя проверка актуальности",
+        "matching project descriptor": "подходящее описание проекта",
+        "external verification before current claims": "внешняя проверка перед текущими утверждениями",
+        "current-claim freshness": "актуальность текущего утверждения",
+        "direct project implication": "прямое влияние на проект",
+        "local Telegram archive support": "поддержка в локальном Telegram-архиве",
+        "sufficient cited proof for the requested claim": "достаточное цитируемое доказательство для запрошенного утверждения",
+        "active project context": "контекст активного проекта",
+        "target project selection": "выбор целевого проекта",
+    }
+    return translations.get(value, value)
 
 
 def render_memory_research_answer_body(
@@ -1170,6 +1433,44 @@ def _unknowns(
     return _unique(unknowns)[:8]
 
 
+def _repo_project_context(question: str, *, project_name: str | None) -> dict[str, Any]:
+    lowered = _clean_text(" ".join([question, project_name or ""])).casefold()
+    if not _contains_any(
+        lowered,
+        (
+            "telegram research agent",
+            "telegram-research-agent",
+            "этот проект",
+            "этого проекта",
+            "репозитор",
+            "repo",
+            "repository",
+            "дальше по проекту",
+        ),
+    ):
+        return {"status": "not_applicable", "source_refs": []}
+    return {
+        "status": "matched",
+        "project_name": "telegram-research-agent",
+        "summary": (
+            "Current repo gate: PRM-28 no-vector RAG evidence is recorded; PRM-19 dogfood must not start "
+            "without explicit dogfood-start approval. For project-next-step questions, repo docs and gate receipts "
+            "should take precedence over Telegram archive background."
+        ),
+        "summary_ru": (
+            "Текущий gate проекта: PRM-28 no-vector RAG evidence записан; PRM-19 dogfood нельзя начинать "
+            "без явного dogfood-start approval. Для вопросов о следующих шагах сначала используй repo docs "
+            "и gate receipts, а Telegram-архив считай только фоном."
+        ),
+        "source_refs": [
+            "docs/tasks.md",
+            "docs/CODEX_PROMPT.md",
+            "evals/prm18_release_gate_receipt_2026-08-11_post_prm28.json",
+            "docs/audit/PRM_LOCAL_UX_TRIAL_2026-08-11.md",
+        ],
+    }
+
+
 def _direct_answer(
     *,
     question: str,
@@ -1237,6 +1538,14 @@ def _answer_gate_unknowns(answer_gate: Mapping[str, Any]) -> list[str]:
     if not bool(answer_gate.get("current_claim_allowed", True)):
         unknowns.append("current-claim freshness")
     return unknowns
+
+
+def _drafts_allowed(answer_gate: Mapping[str, Any]) -> bool:
+    if not bool(answer_gate.get("allow_answer")):
+        return False
+    if bool(answer_gate.get("external_verification_required")) and not bool(answer_gate.get("current_claim_allowed", True)):
+        return False
+    return True
 
 
 def _draft_proposals(
@@ -1509,6 +1818,10 @@ def _strings(value: Any) -> list[str]:
 
 def _clean_text(value: Any) -> str:
     return " ".join(str(value or "").split())
+
+
+def _is_russian(value: str) -> bool:
+    return bool(re.search(r"[А-Яа-яЁё]", value or ""))
 
 
 def _short(value: Any, limit: int = 220) -> str:

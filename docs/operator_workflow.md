@@ -148,6 +148,9 @@ PYTHONPATH=src python3 src/main.py memory research \
 
 Current behavior:
 
+- render a compact answer-first default view in the terminal;
+- use `--debug` when you need the older full audit view with context pack,
+  approach comparison, deeper reading, and draft details;
 - search the local Telegram archive with deterministic short query variants
   over SQLite FTS, then search curated memory;
 - keep `--project` as a project-context hint rather than a hard archive FTS
@@ -158,7 +161,8 @@ Current behavior:
 - compare approaches, tradeoffs, and linked-source gaps;
 - infer project relevance as `direct_implication`, `weak_watch`,
   `learning_relevance`, `no_match`, or `ambiguous_project`;
-- return a concise explanation and deeper-reading path;
+- return a concise explanation by default and keep deeper-reading/debug detail
+  behind `--debug` or `--json`;
 - keep Telegram archive evidence, linked-source evidence, curated memory,
   project fit, and unknowns separate;
 - propose memory/project/action saves as drafts only with confirmation tokens;
@@ -171,6 +175,14 @@ Machine-readable receipt:
 
 ```bash
 PYTHONPATH=src python3 src/main.py memory research --json \
+  --project telegram-research-agent \
+  "что из этого применимо к проекту?"
+```
+
+Debug/audit rendering:
+
+```bash
+PYTHONPATH=src python3 src/main.py memory research --debug \
   --project telegram-research-agent \
   "что из этого применимо к проекту?"
 ```

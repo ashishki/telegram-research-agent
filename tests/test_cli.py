@@ -325,6 +325,7 @@ class TestCli(unittest.TestCase):
                 "4",
                 "--max-linked-sources",
                 "2",
+                "--debug",
                 "что",
                 "есть",
                 "по",
@@ -336,6 +337,7 @@ class TestCli(unittest.TestCase):
         self.assertEqual(args.project, "Eval-Ground-Truth-Lab")
         self.assertEqual(args.max_tool_calls, 4)
         self.assertEqual(args.max_linked_sources, 2)
+        self.assertTrue(args.debug)
         self.assertIs(args.handler, handle_memory_research)
 
     def test_memory_research_handler_skips_migrations_and_renders_answer(self):

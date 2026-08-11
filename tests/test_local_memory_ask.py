@@ -77,6 +77,15 @@ class _FakeFacade:
         )
 
 
+class _PathFacade(_FakeFacade):
+    def search_intelligence_items(self, query, filters=None, limit=10):
+        result = super().search_intelligence_items(query, filters=filters, limit=limit)
+        result["items"][0]["source_refs"] = [
+            "/srv/openclaw-you/workspace/telegram-research-agent/data/output/private/weekly.json"
+        ]
+        return result
+
+
 class TestLocalMemoryAsk(unittest.TestCase):
     def test_local_memory_ask_returns_evidence_without_model_or_writes(self):
         result = answer_local_memory_question(
@@ -130,6 +139,16 @@ class TestLocalMemoryAsk(unittest.TestCase):
         self.assertIn("External verification is required", result["answer"])
         self.assertIn("No external request was run", result["answer"])
         self.assertFalse(result["privacy"]["external_skill_used"])
+
+    def test_local_memory_ask_renders_repo_paths_as_relative_refs(self):
+        result = answer_local_memory_question(
+            "Какие практики есть по eval gates?",
+            facade=_PathFacade(),
+            limit=3,
+        )
+
+        self.assertIn("data/output/private/weekly.json", result["answer"])
+        self.assertNotIn("/srv/openclaw-you/workspace/telegram-research-agent", result["answer"])
 
 
 if __name__ == "__main__":

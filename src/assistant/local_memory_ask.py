@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any, Mapping
 
 from assistant.pi_chat import route_pi_intent
@@ -241,7 +242,7 @@ def _render_answer_body(tool_results: list[dict], *, evidence: Mapping[str, Any]
             lines.append(f"- {title}: {_short(summary, 220)}")
             refs = _source_refs(item)
             if refs:
-                lines.append(f"  sources: {', '.join(refs[:3])}")
+                lines.append(f"  sources: {', '.join(_display_ref(ref) for ref in refs[:3])}")
 
     archive = _archive_items(tool_results)
     if archive:
@@ -262,7 +263,7 @@ def _render_answer_body(tool_results: list[dict], *, evidence: Mapping[str, Any]
             lines.append("")
         lines.append("Artifacts")
         for key, path in list(artifacts.items())[:5]:
-            lines.append(f"- {key}: {path}")
+            lines.append(f"- {key}: {_display_ref(path)}")
 
     if not lines:
         lines.append("No local evidence matched. I will not guess beyond available data.")
@@ -314,6 +315,16 @@ def _collect_evidence(tool_results: list[dict]) -> dict:
         "thread_slugs": _unique(thread_slugs)[:10],
         "artifact_paths": artifact_paths,
     }
+
+
+def _display_ref(value: object) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    root_text = str(Path(__file__).resolve().parents[2])
+    if text.startswith(root_text + "/"):
+        return text[len(root_text) + 1 :]
+    return text
 
 
 def _first_project_context(tool_results: list[dict]) -> dict | None:

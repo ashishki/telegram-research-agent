@@ -672,6 +672,11 @@ def build_parser() -> argparse.ArgumentParser:
     research_parser.add_argument("--timeout-seconds", type=int, default=30)
     research_parser.add_argument("--max-prompt-chars", type=int, default=8000)
     research_parser.add_argument("--json", action="store_true")
+    research_parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Render full audit details including context pack, approach comparison, and draft proposal details",
+    )
     research_parser.set_defaults(handler=handle_memory_research)
 
     ai_transform_parser = memory_sub.add_parser(
@@ -2936,7 +2941,7 @@ def handle_memory_research(args: argparse.Namespace) -> int:
     if args.json:
         sys.stdout.write(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
     else:
-        sys.stdout.write(render_memory_research_answer(payload) + "\n")
+        sys.stdout.write(render_memory_research_answer(payload, debug=bool(getattr(args, "debug", False))) + "\n")
     if payload.get("status") == "invalid":
         return 1
     if payload.get("status") == "refused":

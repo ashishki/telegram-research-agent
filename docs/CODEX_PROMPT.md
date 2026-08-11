@@ -34,8 +34,11 @@ Last updated: 2026-08-11
   the no-vector answer gate. The current post-PRM28 PRM-18 receipt is
   `evals/prm18_release_gate_receipt_2026-08-11_post_prm28.json`. A local UX
   trial is recorded at `docs/audit/PRM_LOCAL_UX_TRIAL_2026-08-11.md`: RAG is
-  technically usable, but `memory research` is still audit-oriented rather than
-  pleasant daily UX.
+  technically usable. A follow-up safe UX polish adds compact default
+  `memory research` rendering, `--debug` audit rendering, Russian heading
+  localization, freshness-first current-fact boundaries, local path redaction,
+  narrow repo-context cues, and no drafts for current-fact freshness-boundary
+  answers.
 - Blocked/not implemented slices: PRM-8, PRM-19, PRM-20, and PRM-27
   remain blocked until their gates are satisfied.
 - Next safe work: none under current hard stops. Stop before PRM-27/PRM-19.
@@ -154,10 +157,10 @@ jobs from this handoff.
 - PRM-8 vector/hybrid retrieval remains blocked.
 - PRM-26 accepted the no-vector path and PRM-28 implemented the no-vector
   answer gate; PRM-27 remains gated behind a future successor vector ADR.
-- Post-PRM28 local UX trial found that `memory research` needs compact default
-  rendering, localized labels, freshness-first refusal, path redaction,
-  curated-memory dedupe, and stronger repo/project routing before it should be
-  considered pleasant daily operator UX.
+- Post-PRM28 local UX polish improved `memory research` default rendering,
+  localization, current-fact boundaries, path redaction, and narrow repo-context
+  cues. Remaining UX gaps are deterministic synthesis depth and curated-memory
+  relevance/deduplication.
 - PRM-18 release/dogfood gate is implemented. The current post-PRM28 receipt
   clears deterministic local stop-ship blockers and remains blocked on missing
   dogfood-start approval.

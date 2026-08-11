@@ -164,15 +164,23 @@ class TestMemoryResearch(unittest.TestCase):
 
         rendered = render_memory_research_answer(result)
         self.assertIn("PRM Research", rendered)
-        self.assertIn("Direct Answer", rendered)
-        self.assertIn("Telegram Archive Evidence", rendered)
-        self.assertIn("Linked Source Evidence", rendered)
-        self.assertIn("Approach Comparison", rendered)
-        self.assertIn("Project Fit", rendered)
-        self.assertIn("Citation-Safe Context Pack", rendered)
-        self.assertIn("Deeper Reading", rendered)
-        self.assertIn("Draft Proposals", rendered)
+        self.assertIn("Short answer", rendered)
+        self.assertIn("Sources", rendered)
+        self.assertIn("Next steps", rendered)
+        self.assertIn("Details: add --debug", rendered)
+        self.assertNotIn("Citation-Safe Context Pack", rendered)
+        self.assertNotIn("Approach Comparison", rendered)
         self.assertIn("Privacy: mode=local-research; model_calls=0; estimated_cost_usd=0", rendered)
+
+        debug_rendered = render_memory_research_answer(result, debug=True)
+        self.assertIn("Direct Answer", debug_rendered)
+        self.assertIn("Telegram Archive Evidence", debug_rendered)
+        self.assertIn("Linked Source Evidence", debug_rendered)
+        self.assertIn("Approach Comparison", debug_rendered)
+        self.assertIn("Project Fit", debug_rendered)
+        self.assertIn("Citation-Safe Context Pack", debug_rendered)
+        self.assertIn("Deeper Reading", debug_rendered)
+        self.assertIn("Draft Proposals", debug_rendered)
 
     def test_memory_research_rewrites_natural_rag_question_to_short_archive_query(self):
         facade = _SelectiveArchiveFacade()
@@ -192,6 +200,38 @@ class TestMemoryResearch(unittest.TestCase):
         self.assertIn("query_variants", first_call["arguments"])
         self.assertNotIn("project_name", first_call["arguments"]["filters"])
         self.assertEqual(result["receipt"]["tool_calls_used"], 4)
+
+    def test_memory_research_compact_render_localizes_russian_and_prioritizes_freshness(self):
+        result = answer_memory_research(
+            "какая текущая цена акций Nvidia сегодня?",
+            facade=_FakeFacade(),
+        )
+
+        rendered = render_memory_research_answer(result)
+
+        self.assertIn("Вопрос: какая текущая цена акций Nvidia сегодня?", rendered)
+        self.assertIn("Короткий ответ", rendered)
+        self.assertIn("Сначала ограничение", rendered)
+        self.assertIn("Источники", rendered)
+        self.assertEqual(result["draft_proposals"], [])
+        self.assertNotIn("Черновики", rendered)
+        self.assertNotIn("Direct Answer", rendered)
+        self.assertNotIn("Citation-Safe Context Pack", rendered)
+
+    def test_memory_research_compact_render_routes_repo_questions_to_repo_context_first(self):
+        result = answer_memory_research(
+            "что мне делать дальше по telegram research agent?",
+            facade=_FakeFacade(project_label="learning_relevance"),
+        )
+
+        self.assertEqual(result["repo_project_context"]["status"], "matched")
+        self.assertIn("docs/tasks.md", result["repo_project_context"]["source_refs"])
+
+        rendered = render_memory_research_answer(result)
+
+        self.assertIn("Контекст проекта", rendered)
+        self.assertIn("документы репозитория", rendered)
+        self.assertIn("docs/tasks.md", rendered)
 
     def test_memory_research_blocks_unsupported_project_state_claim_despite_related_hits(self):
         result = answer_memory_research(
@@ -233,7 +273,7 @@ class TestMemoryResearch(unittest.TestCase):
         self.assertEqual(result["receipt"]["refusal_reason"], "open_ended_browsing_refused")
         self.assertEqual(result["receipt"]["tool_calls_used"], 0)
         self.assertEqual(facade.calls, [])
-        self.assertIn("Status: refused", render_memory_research_answer(result))
+        self.assertIn("Статус: отказано", render_memory_research_answer(result))
 
     def test_memory_research_refuses_provider_budget_switches(self):
         result = answer_memory_research(
