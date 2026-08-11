@@ -51,6 +51,8 @@ This command is a local product preview, not PRM-19 dogfood evidence. The
 Telegram `prm-assistant` runtime remains disabled until explicit dogfood-start
 approval. When that runtime is approved for a manual smoke test, ordinary text
 and `/research <question>` use the same local-only compact research path; the
+runtime keeps a volatile in-memory last-research question per chat for short
+follow-ups. Use `/brief <question>` for source-backed post/editor theses. The
 LLM-backed `/chat` command remains behind separate provider-egress approval.
 
 ## PRM-18 LLM Chat UX Block
@@ -77,6 +79,7 @@ Contracted command surfaces:
 | One-shot LLM synthesis | `PYTHONPATH=src python3 src/main.py memory ask --llm-approved --allow-provider-egress "<question>"` | implemented in PRM-18B | bounded cited snippets only after explicit switch |
 | Interactive LLM chat | `PYTHONPATH=src python3 src/main.py memory chat --allow-provider-egress` | implemented in PRM-18B | bounded cited snippets only after explicit switch |
 | Telegram local research | `/research <question>` or ordinary text in `prm-assistant` mode | implemented; runtime remains disabled until explicit start approval | none |
+| Telegram editor brief | `/brief <question>` in `prm-assistant` mode | implemented; runtime remains disabled until explicit start approval | none |
 | Telegram assistant chat | `/chat <question>` in `prm-assistant` mode | PRM-18C parity implemented; service remains disabled; runtime requires `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1` | bounded cited snippets only after explicit provider-egress approval |
 
 The LLM-backed commands are intentionally explicit:
@@ -89,7 +92,8 @@ PYTHONPATH=src python3 src/main.py memory ask --llm-approved --allow-provider-eg
 Telegram `/chat` is also gated at runtime. Without
 `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`, `/chat`, `/hermes`, and `/ask` refuse
 with "No provider call was made". Use `/research` or ordinary text for the
-local-only Telegram smoke test.
+local-only Telegram smoke test. Use `/brief` when the expected output is a
+source-backed editor brief rather than a conversational answer.
 
 Without `--allow-provider-egress`, the product must either stay on the local
 `memory ask` path or refuse with clear copy such as:

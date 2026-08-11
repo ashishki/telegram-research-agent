@@ -4,14 +4,19 @@ import re
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Mapping
 from urllib import error
 
 from assistant.pi_chat import answer_pi_chat
 from assistant.pi_facade import PersonalIntelligenceFacade
 from assistant.pi_intent import classify_operator_message
 from assistant.prm_chat_display import render_prm_chat_answer
-from assistant.memory_research import MemoryResearchBudget, answer_memory_research, render_memory_research_answer
+from assistant.memory_research import (
+    MemoryResearchBudget,
+    answer_memory_research,
+    render_memory_research_answer,
+    render_memory_research_brief,
+)
 from assistant.pi_tools import call_pi_tool
 from bot.telegram_delivery import _send_text_internal, send_document, send_report_preview, send_text
 from config.settings import PROJECT_ROOT, Settings
@@ -53,6 +58,7 @@ PRM_SAFE_COMMANDS = frozenset(
         "/hermes",
         "/ask",
         "/research",
+        "/brief",
         "/costs",
         "/status",
     }
@@ -72,6 +78,7 @@ COMMAND_DOCS: dict[str, tuple[str, str]] = {
     "/chat <message>": ("handle_chat", "Ask Hermes; LLM may call bounded read-only PI tools"),
     "/hermes <message>": ("handle_chat", "Ask Hermes; alias for /chat"),
     "/research <question>": ("handle_research", "Run local-only compact PRM research over archive/context pack"),
+    "/brief <question>": ("handle_research_brief", "Run local-only editor brief with source-backed points"),
     "/remind <when> <task>": ("handle_remind", "Create a daily-check-in reminder"),
     "/reminders": ("handle_reminders", "List pending reminders"),
     "/remind_cancel <id>": ("handle_remind_cancel", "Cancel a pending reminder"),
@@ -112,6 +119,8 @@ TAG_ALIASES = {
     "later": "read_later",
     "read_later": "read_later",
 }
+_RESEARCH_DIALOG_STATE: dict[str, str] = {}
+_MAX_RESEARCH_DIALOGS = 100
 
 
 def _get_bot_token() -> str:
@@ -175,6 +184,95 @@ def _send_telegram_provider_egress_required(chat_id: str) -> None:
         "No provider call was made.",
     ]
     send_message(_get_bot_token(), chat_id, "\n".join(lines), parse_mode=None)
+
+
+def _resolve_research_dialog_question(chat_id: str, question: str) -> dict[str, str | bool]:
+    clean_question = _clean_operator_text(question)
+    previous = _RESEARCH_DIALOG_STATE.get(str(chat_id), "")
+    if previous and _is_research_followup(clean_question):
+        effective = _clean_operator_text(f"{previous}. Уточнение: {clean_question}")
+        return {
+            "used": True,
+            "question": clean_question,
+            "previous_question": previous,
+            "effective_question": effective,
+        }
+    return {
+        "used": False,
+        "question": clean_question,
+        "previous_question": previous,
+        "effective_question": clean_question,
+    }
+
+
+def _remember_research_dialog(chat_id: str, effective_question: str) -> None:
+    key = str(chat_id)
+    if len(_RESEARCH_DIALOG_STATE) >= _MAX_RESEARCH_DIALOGS and key not in _RESEARCH_DIALOG_STATE:
+        oldest_key = next(iter(_RESEARCH_DIALOG_STATE))
+        _RESEARCH_DIALOG_STATE.pop(oldest_key, None)
+    _RESEARCH_DIALOG_STATE[key] = _clean_operator_text(effective_question)[:500]
+
+
+def _is_research_followup(question: str) -> bool:
+    clean = _clean_operator_text(question)
+    lowered = clean.casefold()
+    if not clean:
+        return False
+    if len(clean) > 90:
+        return False
+    if _contains_research_anchor(lowered):
+        return False
+    followup_markers = (
+        "а почему",
+        "почему",
+        "а где",
+        "а кто",
+        "а что",
+        "что еще",
+        "что ещё",
+        "и где",
+        "и кто",
+        "сравни",
+        "разверни",
+        "подробнее",
+        "поясни",
+        "дальше",
+        "why",
+        "and why",
+        "what else",
+        "compare",
+        "expand",
+    )
+    if any(lowered.startswith(marker) for marker in followup_markers):
+        return True
+    token_count = len(re.findall(r"[0-9A-Za-zА-Яа-яЁё]+", lowered))
+    return token_count <= 4 and lowered.endswith("?")
+
+
+def _contains_research_anchor(lowered: str) -> bool:
+    anchors = (
+        "ai",
+        "ии",
+        "rag",
+        "раг",
+        "telegram",
+        "телеграм",
+        "компан",
+        "трансформац",
+        "внедрен",
+        "архив",
+        "пост",
+        "цена",
+        "nvidia",
+        "eval",
+        "vector",
+        "вектор",
+    )
+    return any(anchor in lowered for anchor in anchors)
+
+
+def _clean_operator_text(value: object) -> str:
+    return " ".join(str(value or "").split())
 
 
 def _format_post_snippet(text: str | None, limit: int = 150) -> str:
@@ -322,11 +420,12 @@ def handle_prm_start(chat_id: str, args: str, settings: Settings) -> None:
         "",
         "Dogfood status: not started. Service start requires explicit PRM-19 approval.",
         "Use /research <question> or send a normal message after approved runtime start.",
+        "Use /brief <question> when you want source-backed theses for a post.",
         "Research mode is local-only: no LLM, provider egress, live web, embeddings, or writes.",
         "Use /chat only for a separately approved LLM-backed test; bounded cited snippets may go to the provider.",
         "Local-only CLI remains: memory ask <question>.",
         "",
-        "Safe read-only commands: /research, /weekly, /actions, /mvp, /strategy, /projects, /costs, /status.",
+        "Safe read-only commands: /research, /brief, /weekly, /actions, /mvp, /strategy, /projects, /costs, /status.",
         "MVP Radar is a decision-evidence card only; Telegram-only evidence cannot approve build.",
         "",
         "Blocked in this mode: ingestion, reaction sync, report generation, Radar generation,",
@@ -351,7 +450,7 @@ def _send_prm_safe_blocked(chat_id: str, command: str) -> None:
         "PRM safe mode blocked this legacy command.",
         f"Command: {shown_command}",
         "",
-        "Use /research for local-only grounded questions or /weekly /actions /mvp /strategy for read-only orientation.",
+        "Use /research for local-only grounded questions, /brief for source-backed theses, or /weekly /actions /mvp /strategy for read-only orientation.",
         "No generation, ingestion, Radar, direct feedback/tag/reminder write, or report delivery was run.",
     ]
     send_message(_get_bot_token(), chat_id, "\n".join(lines), parse_mode=None)
@@ -778,6 +877,7 @@ def handle_research(chat_id: str, args: str, settings: Settings) -> None:
     if not question:
         send_message(_get_bot_token(), chat_id, "Напиши вопрос после /research или просто отправь обычное сообщение.", parse_mode=None)
         return
+    dialog = _resolve_research_dialog_question(chat_id, question)
     budget = MemoryResearchBudget(
         max_tool_calls=4,
         max_archive_sources=5,
@@ -791,11 +891,53 @@ def handle_research(chat_id: str, args: str, settings: Settings) -> None:
         allow_provider_egress=False,
     )
     try:
-        result = answer_memory_research(question, settings=settings, limit=4, budget=budget)
+        result = answer_memory_research(str(dialog["effective_question"]), settings=settings, limit=4, budget=budget)
     except Exception as exc:
         send_message(_get_bot_token(), chat_id, f"Не смог выполнить local research: {exc}", parse_mode=None)
         return
+    result = _with_dialog_context(result, dialog)
+    _remember_research_dialog(chat_id, str(dialog["effective_question"]))
     _send_research_text(chat_id, render_memory_research_answer(result), token=_get_bot_token())
+
+
+def handle_research_brief(chat_id: str, args: str, settings: Settings) -> None:
+    question = args.strip()
+    if not question:
+        send_message(_get_bot_token(), chat_id, "Напиши вопрос после /brief.", parse_mode=None)
+        return
+    dialog = _resolve_research_dialog_question(chat_id, question)
+    budget = MemoryResearchBudget(
+        max_tool_calls=4,
+        max_archive_sources=5,
+        max_linked_sources=3,
+        max_retries=0,
+        timeout_seconds=30,
+        max_prompt_chars=8000,
+        max_model_calls=0,
+        max_cost_usd=0.0,
+        allow_open_browsing=False,
+        allow_provider_egress=False,
+    )
+    try:
+        result = answer_memory_research(str(dialog["effective_question"]), settings=settings, limit=5, budget=budget)
+    except Exception as exc:
+        send_message(_get_bot_token(), chat_id, f"Не смог собрать local brief: {exc}", parse_mode=None)
+        return
+    result = _with_dialog_context(result, dialog)
+    _remember_research_dialog(chat_id, str(dialog["effective_question"]))
+    _send_research_text(chat_id, render_memory_research_brief(result), token=_get_bot_token())
+
+
+def _with_dialog_context(result: Mapping[str, object], dialog: Mapping[str, object]) -> dict:
+    payload = dict(result)
+    if bool(dialog.get("used")):
+        payload["question"] = str(dialog.get("question") or payload.get("question") or "")
+        payload["dialog_context"] = {
+            "used": True,
+            "previous_question": str(dialog.get("previous_question") or ""),
+            "effective_question": str(dialog.get("effective_question") or ""),
+        }
+    return payload
 
 
 def handle_operator_message(chat_id: str, args: str, settings: Settings) -> None:
@@ -1312,6 +1454,7 @@ HANDLERS: dict[str, Callable[[str, str, Settings], None]] = {
     "/chat": handle_chat,
     "/hermes": handle_chat,
     "/research": handle_research,
+    "/brief": handle_research_brief,
     "/remind": handle_remind,
     "/reminders": handle_reminders,
     "/remind_cancel": handle_remind_cancel,

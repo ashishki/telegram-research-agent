@@ -170,6 +170,8 @@ PRM-18A contracted command surfaces:
 - Telegram local research command after approved runtime start:
   `/research <question>` or ordinary text inside the disabled `prm-assistant`
   runtime;
+- Telegram editor brief command after approved runtime start:
+  `/brief <question>` for local-only source-backed theses;
 - PRM-18C Telegram LLM parity command after separate provider-egress approval:
   `/chat <question>` with `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`.
 
@@ -198,6 +200,9 @@ Implemented `prm-assistant` runtime mode:
 - one service, disabled by default until dogfood approval;
 - no automatic timers;
 - `/research` or ordinary message for local-only grounded questions;
+- `/brief` for local-only source-backed editor/social-post theses;
+- short follow-ups can use the last in-process research question for that
+  chat; this dialog context is volatile and is not written to the database;
 - `/chat` remains the separate LLM-backed command and requires separate
   provider-egress approval plus `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1` before
   use with private snippets;

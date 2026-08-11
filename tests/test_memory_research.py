@@ -2,8 +2,10 @@ import unittest
 
 from assistant.memory_research import (
     MemoryResearchBudget,
+    _archive_query_variants,
     answer_memory_research,
     render_memory_research_answer,
+    render_memory_research_brief,
 )
 
 
@@ -120,6 +122,28 @@ class _RelatedOnlyProjectStateFacade(_FakeFacade):
         }
 
 
+class _AITransformationFacade(_FakeFacade):
+    def search_telegram_archive(self, query, filters=None, limit=5):
+        self.calls.append("search_telegram_archive")
+        return {
+            "status": "ok",
+            "query": query,
+            "retrieval_mode": "sqlite_fts_archive",
+            "items": [
+                {
+                    "archive_document_id": "tg:-1001:4001",
+                    "posted_at": "2026-05-06T09:00:00Z",
+                    "channel_username": "@redmad",
+                    "source_url": "https://t.me/redmad/4001",
+                    "snippet": (
+                        "Только 1% компаний считает своё внедрение ИИ по-настоящему успешным; "
+                        "пилоты есть, но реальный эффект и финансовая выгода требуют процесса."
+                    ),
+                }
+            ][:limit],
+        }
+
+
 class TestMemoryResearch(unittest.TestCase):
     def test_memory_research_produces_polished_fixture_answer_without_writes_or_egress(self):
         result = answer_memory_research(
@@ -200,6 +224,72 @@ class TestMemoryResearch(unittest.TestCase):
         self.assertIn("query_variants", first_call["arguments"])
         self.assertNotIn("project_name", first_call["arguments"]["filters"])
         self.assertEqual(result["receipt"]["tool_calls_used"], 4)
+
+    def test_memory_research_adds_ai_transformation_editorial_query_variants(self):
+        variants = _archive_query_variants(
+            "собери опорные тезисы для поста: AI трансформация компаний, где эффект есть, где нет",
+            project_name=None,
+            max_variants=4,
+        )
+
+        self.assertIn("внедрение ИИ компании успешным", variants)
+        self.assertIn("AI transformation companies ROI productivity", variants)
+        self.assertNotEqual(variants[0], "AI собери опорные тезисы поста")
+
+    def test_memory_research_archive_scoped_recent_posts_are_not_current_fact_refusal(self):
+        result = answer_memory_research(
+            "что из постов за последние месяцы говорит что AI трансформация не дала прироста и почему?",
+            facade=_AITransformationFacade(),
+        )
+
+        self.assertEqual(result["status"], "ok")
+        self.assertFalse(result["answer_gate"]["external_verification_required"])
+        rendered = render_memory_research_answer(result)
+        self.assertIn("разрыв между AI-пилотами", rendered)
+        self.assertNotIn("Сначала ограничение", rendered)
+
+    def test_memory_research_archive_context_does_not_override_current_price_boundary(self):
+        result = answer_memory_research(
+            "какая текущая цена акций Nvidia сегодня и что об этом говорит мой архив?",
+            facade=_FakeFacade(),
+        )
+
+        self.assertEqual(result["status"], "needs_external_verification")
+        self.assertTrue(result["answer_gate"]["external_verification_required"])
+        self.assertFalse(result["answer_gate"]["current_claim_allowed"])
+        self.assertIn("Сначала ограничение", render_memory_research_answer(result))
+
+    def test_memory_research_dialog_context_keeps_topic_summary_for_short_followups(self):
+        original = "что у меня было про AI transformation компаний, где есть эффект, а где нет?"
+        result = answer_memory_research(original, facade=_AITransformationFacade())
+        result = {
+            **result,
+            "question": "а почему?",
+            "dialog_context": {
+                "used": True,
+                "previous_question": original,
+                "effective_question": f"{original}. Уточнение: а почему?",
+            },
+        }
+
+        rendered = render_memory_research_answer(result)
+
+        self.assertIn("Контекст диалога", rendered)
+        self.assertIn("разрыв между AI-пилотами", rendered)
+
+    def test_memory_research_brief_renders_source_backed_editor_points(self):
+        result = answer_memory_research(
+            "собери опорные тезисы для поста: AI трансформация компаний, где эффект есть, где нет",
+            facade=_AITransformationFacade(),
+        )
+
+        rendered = render_memory_research_brief(result)
+
+        self.assertIn("PRM редакторский бриф", rendered)
+        self.assertIn("Опорные тезисы", rendered)
+        self.assertIn("Углы для поста", rendered)
+        self.assertIn("пилоты vs результат", rendered)
+        self.assertIn("Privacy: mode=local-research; model_calls=0", rendered)
 
     def test_memory_research_compact_render_localizes_russian_and_prioritizes_freshness(self):
         result = answer_memory_research(

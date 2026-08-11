@@ -1478,8 +1478,11 @@ Notes: |
   and started with `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`.
   Post-PRM28 local UX routing now sends ordinary text, voice transcripts, and
   explicit `/research <question>` in `prm-assistant` mode through the
-  local-only compact `memory research` renderer, with model calls, provider
-  egress, open browsing, writes, service start, and dogfood all still gated.
+  local-only compact `memory research` renderer, adds `/brief <question>` for
+  local-only source-backed editor theses, keeps volatile in-process follow-up
+  context per chat, and improves deterministic AI-transformation archive query
+  hints. Model calls, provider egress, open browsing, writes, service start,
+  and dogfood remain gated.
 
   The operator runbook documents preflight inspection, install/start/status,
   stop/disable, and rollback-to-disabled commands while preserving the hard

@@ -47,8 +47,11 @@ usable for local archive discovery. A follow-up safe UX polish adds compact
 default `memory research` rendering, `--debug` audit rendering, Russian heading
 localization, freshness-first current-fact boundaries, local path redaction,
 narrow repo-context cues, and no drafts for current-fact freshness-boundary
-answers. Remaining UX gaps are deterministic synthesis depth and curated-memory
-relevance/deduplication. PRM-8
+answers. A subsequent safe Telegram UX polish adds local-only `/brief`
+source-backed editor briefs, volatile per-chat follow-up context for
+`/research`, deterministic AI-transformation query hints, and a corrected
+archive-scoped-vs-current-price answer gate. Remaining UX gaps are deeper
+multi-turn product memory and curated-memory relevance/deduplication. PRM-8
 remains blocked until that approval path is satisfied. PRM-19 and PRM-20 are
 not started; PRM-19 requires explicit human dogfood-start approval before it
 can start and real four-week operator dogfood evidence before it can complete.
@@ -62,8 +65,10 @@ Report V2 weekly timer were stopped and disabled on 2026-07-29; see
 not installed, enabled, started, or dogfood evidence; the safe entrypoint does
 not run automatic startup migrations. After the local UX polish, the future
 `prm-assistant` runtime routes ordinary text and `/research <question>` to the
-local-only compact `memory research` path; `/chat` remains a separate
-LLM-backed command that requires provider-egress approval and
+local-only compact `memory research` path, with `/brief <question>` for
+source-backed editor/social-post theses and volatile in-process follow-up
+context. `/chat` remains a separate LLM-backed command that requires
+provider-egress approval and
 `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`. A local user-facing `memory ask` command
 exists for immediate local evidence questions without LLM calls, external
 search, service starts, migrations, or writes.

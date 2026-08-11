@@ -51,6 +51,28 @@ _EXTERNAL_VERIFICATION_MARKERS = (
     "док",
 )
 
+_ARCHIVE_SCOPE_MARKERS = (
+    "archive",
+    "telegram archive",
+    "retained archive",
+    "my archive",
+    "local archive",
+    "posts",
+    "post archive",
+    "в архиве",
+    "мой архив",
+    "моем архиве",
+    "моём архиве",
+    "из архива",
+    "по архиву",
+    "из постов",
+    "в постах",
+    "посты",
+    "постах",
+    "что у меня было",
+    "что говорит архив",
+)
+
 _PROJECT_STATE_MARKERS = (
     "approved",
     "deployed",
@@ -196,9 +218,12 @@ def _requires_project_state_proof(question: str) -> bool:
 
 def _requires_current_answer(question: str) -> bool:
     lowered = question.casefold()
-    if _contains_any(lowered, ("точные текущие цены", "current prices", "pricing today")):
+    if _contains_any(lowered, ("точные текущие цены", "текущая цена", "current prices", "current price", "pricing today")):
         return True
-    if _contains_any(lowered, ("сегодня", "today")) and _contains_any(lowered, ("цены", "стоим", "купить", "price", "pricing", "buy")):
+    if _contains_any(lowered, ("сегодня", "today")) and _contains_any(
+        lowered,
+        ("цены", "цена", "стоим", "акций", "акции", "price", "pricing", "stock", "buy", "купить"),
+    ):
         return True
     return False
 
@@ -207,7 +232,13 @@ def _requires_external_verification(question: str) -> bool:
     lowered = question.casefold()
     if _requires_current_answer(question):
         return True
+    if _is_archive_scoped_question(lowered):
+        return _contains_any(lowered, _EXTERNAL_VERIFICATION_MARKERS)
     return _contains_any(lowered, _CURRENT_MARKERS) or _contains_any(lowered, _EXTERNAL_VERIFICATION_MARKERS)
+
+
+def _is_archive_scoped_question(lowered_question: str) -> bool:
+    return _contains_any(lowered_question, _ARCHIVE_SCOPE_MARKERS)
 
 
 def _contains_any(value: str, needles: tuple[str, ...]) -> bool:

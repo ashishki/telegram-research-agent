@@ -91,6 +91,9 @@ def _fake_prm_chat_payload(answer: str = "Hermes answer from curated PI tools.")
 
 
 class TestHandlers(unittest.TestCase):
+    def setUp(self):
+        handlers._RESEARCH_DIALOG_STATE.clear()
+
     def test_send_message_does_not_escape_plain_text_when_parse_mode_is_none(self):
         with patch.object(handlers, "_send_text_internal") as mock_send:
             handlers.send_message("bot-token", "42", "1. Открой weekly HTML Workbook.", parse_mode=None)
@@ -235,6 +238,7 @@ class TestHandlers(unittest.TestCase):
             "/chat",
             "/hermes",
             "/research",
+            "/brief",
         ]:
             self.assertIn(command, handlers.HANDLERS)
 
@@ -305,6 +309,7 @@ class TestHandlers(unittest.TestCase):
         self.assertIn("PRM safe assistant", message)
         self.assertIn("Dogfood status: not started", message)
         self.assertIn("/research <question>", message)
+        self.assertIn("/brief <question>", message)
         self.assertIn("Research mode is local-only", message)
         self.assertIn("/chat only for a separately approved LLM-backed test", message)
         self.assertIn("Safe read-only commands", message)
@@ -438,6 +443,62 @@ class TestHandlers(unittest.TestCase):
         render_mock.assert_called_once_with(payload)
         message = mock_send_message.call_args.args[2]
         self.assertIn("PRM Research", message)
+
+    def test_handle_research_uses_volatile_dialog_context_for_short_followups(self):
+        settings = Settings(
+            db_path=":memory:",
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+        handlers._RESEARCH_DIALOG_STATE.clear()
+        payload = {"status": "ok", "question": "placeholder", "privacy": {"model_calls": 0}}
+
+        with patch.object(handlers, "answer_memory_research", return_value=payload) as research_mock:
+            with patch.object(handlers, "render_memory_research_answer", return_value="PRM Research") as render_mock:
+                with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                    with patch.object(handlers, "send_message"):
+                        handlers.handle_research(chat_id="42", args="AI transformation компаний: где эффект?", settings=settings)
+                        handlers.handle_research(chat_id="42", args="а почему?", settings=settings)
+
+        self.assertEqual(research_mock.call_count, 2)
+        second_question = research_mock.call_args_list[1].args[0]
+        self.assertIn("AI transformation компаний", second_question)
+        self.assertIn("Уточнение: а почему?", second_question)
+        second_payload = render_mock.call_args_list[1].args[0]
+        self.assertEqual(second_payload["question"], "а почему?")
+        self.assertTrue(second_payload["dialog_context"]["used"])
+        self.assertIn("AI transformation компаний", second_payload["dialog_context"]["previous_question"])
+
+    def test_handle_research_brief_uses_local_memory_research_without_pi_chat(self):
+        settings = Settings(
+            db_path=":memory:",
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+        payload = {"status": "ok", "question": "brief", "privacy": {"model_calls": 0}}
+
+        with patch.object(handlers, "answer_pi_chat") as chat_mock:
+            with patch.object(handlers, "answer_memory_research", return_value=payload) as research_mock:
+                with patch.object(handlers, "render_memory_research_brief", return_value="PRM редакторский бриф\nmodel_calls=0") as render_mock:
+                    with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                        with patch.object(handlers, "send_message") as mock_send_message:
+                            handlers.handle_research_brief(
+                                chat_id="42",
+                                args="собери тезисы про AI transformation",
+                                settings=settings,
+                            )
+
+        chat_mock.assert_not_called()
+        research_mock.assert_called_once()
+        budget = research_mock.call_args.kwargs["budget"]
+        self.assertEqual(budget.max_model_calls, 0)
+        self.assertFalse(budget.allow_provider_egress)
+        self.assertFalse(budget.allow_open_browsing)
+        render_mock.assert_called_once()
+        message = mock_send_message.call_args.args[2]
+        self.assertIn("PRM редакторский бриф", message)
         self.assertIn("model_calls=0", message)
 
     def test_prm_safe_command_allowlist_allows_research(self):
@@ -465,6 +526,31 @@ class TestHandlers(unittest.TestCase):
         research_mock.assert_called_once()
         message = mock_send_message.call_args.args[2]
         self.assertIn("PRM Research", message)
+
+    def test_prm_safe_command_allowlist_allows_brief(self):
+        settings = Settings(
+            db_path=":memory:",
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+        payload = {"status": "ok", "question": "brief"}
+
+        with patch.object(handlers, "answer_memory_research", return_value=payload) as research_mock:
+            with patch.object(handlers, "answer_pi_chat") as chat_mock:
+                with patch.object(handlers, "render_memory_research_brief", return_value="PRM редакторский бриф"):
+                    with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                        with patch.object(handlers, "send_message") as mock_send_message:
+                            handlers.dispatch_command(
+                                chat_id="42",
+                                text="/brief AI transformation тезисы",
+                                settings=settings,
+                                runtime_mode=handlers.BOT_RUNTIME_PRM_ASSISTANT,
+                            )
+
+        chat_mock.assert_not_called()
+        research_mock.assert_called_once()
+        self.assertIn("PRM редакторский бриф", mock_send_message.call_args.args[2])
 
     def test_handle_ask_delegates_to_pi_chat_not_raw_telegram_answer(self):
         settings = Settings(

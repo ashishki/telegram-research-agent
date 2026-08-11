@@ -123,15 +123,39 @@ Safe UX polish implemented after this trial:
    project questions so repo docs and gate receipts are shown before Telegram
    archive background.
 7. Blocked draft proposals for current-fact freshness-boundary answers.
+8. Added local-only Telegram `/brief` editor briefs and volatile per-chat
+   `/research` follow-up context for short replies such as "а почему?".
+9. Added deterministic AI-transformation query hints for implementation
+   success, ROI/productivity, failure/no-growth, and hiring/layoff angles.
+10. Corrected the answer gate so archive-scoped recent-post questions can be
+    answered from local archive context while current-price/current-stock
+    questions still require external verification.
 
 Remaining known UX gaps:
 
-- deterministic synthesis is still shallow compared with an LLM-backed answer;
+- deterministic synthesis is still shallower than an LLM-backed editor;
 - curated memory relevance/deduplication still needs deeper scoring;
+- multi-turn context is volatile/in-process only and is not durable product
+  memory;
 - the operational startup banner is emitted on stderr in direct terminal use;
 - live/current linked-source verification remains gated and was not run.
 
 ## Validation
+
+```text
+PYTHONPATH=src python3 -m pytest tests/test_memory_research.py tests/test_rag_context_pack.py tests/test_handlers.py tests/test_callbacks.py tests/test_product_rag_eval.py tests/test_archive_retrieval_eval.py -q
+86 passed in 28.34s
+```
+
+```text
+python3 tools/test_tiers.py focused-prm
+139 passed in 24.78s
+```
+
+```text
+PYTHONPATH=src python3 -m pytest tests/test_memory_research.py tests/test_rag_context_pack.py tests/test_handlers.py tests/test_callbacks.py -q
+71 passed in 24.79s
+```
 
 ```text
 PYTHONPATH=src python3 -m pytest tests/test_memory_research.py tests/test_local_memory_ask.py tests/test_cli.py -q

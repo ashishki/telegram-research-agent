@@ -178,6 +178,19 @@ _PROJECT_QUERY_HINTS = {
     "gdev agent": ("game support triage eval pipeline",),
     "telegram research agent": ("telegram research memory RAG", "personal research memory"),
 }
+_AI_TRANSFORMATION_BASE_VARIANTS = (
+    "внедрение ИИ компании успешным",
+    "AI transformation companies ROI productivity",
+    "ИИ бизнес процессы финансовая выгода",
+)
+_AI_TRANSFORMATION_FAILURE_VARIANTS = (
+    "1% компаний внедрение ИИ успешным",
+    "AI complexity productivity неуспешно",
+)
+_AI_TRANSFORMATION_HIRING_VARIANTS = (
+    "AI layoffs hiring companies",
+    "ИИ увольнения найм компании",
+)
 
 
 @dataclass(frozen=True)
@@ -418,6 +431,75 @@ def render_memory_research_answer(payload: Mapping[str, Any], *, debug: bool = F
     return "\n".join(lines).rstrip()
 
 
+def render_memory_research_brief(payload: Mapping[str, Any]) -> str:
+    """Render a compact local-only source brief for editor/social-post drafting."""
+    if payload.get("status") in {"invalid", "refused"}:
+        return render_memory_research_answer(payload)
+    question = str(payload.get("question") or "")
+    ru = _is_russian(question)
+    privacy = _mapping(payload.get("privacy"))
+    receipt = _mapping(payload.get("receipt"))
+    budget = _mapping(receipt.get("budget"))
+    archive_evidence = _mapping(payload.get("archive_evidence"))
+    linked_evidence = _mapping(payload.get("linked_source_evidence"))
+    unknowns = [str(item) for item in payload.get("unknowns") or [] if str(item).strip()]
+    archive_items = [item for item in archive_evidence.get("items") or [] if isinstance(item, Mapping)]
+    title = "PRM Editor Brief" if not ru else "PRM редакторский бриф"
+    lines = [
+        title,
+        f"{'Вопрос' if ru else 'Question'}: {question}",
+        (
+            "Режим: local-only source brief; без LLM, live web и записей."
+            if ru
+            else "Mode: local-only source brief; no LLM, no live web, no writes."
+        ),
+    ]
+    dialog_context = _mapping(payload.get("dialog_context"))
+    if dialog_context.get("used"):
+        previous = _short(dialog_context.get("previous_question"), 180)
+        if previous:
+            previous_label = "предыдущий вопрос" if ru else "previous"
+            lines.extend(["", "Контекст диалога" if ru else "Dialog context", f"- {previous_label}: {previous}"])
+
+    lines.extend(["", "Позиция" if ru else "Position"])
+    lines.append(_compact_answer(payload, ru=ru))
+
+    lines.extend(["", "Опорные тезисы" if ru else "Source-backed points"])
+    if archive_items:
+        for index, item in enumerate(archive_items[:5], start=1):
+            date = str(item.get("posted_at") or "")[:10] or ("дата неизвестна" if ru else "date unknown")
+            channel = item.get("channel_username") or ("источник" if ru else "source")
+            snippet = _short(item.get("snippet") or item.get("content") or "", 180)
+            lines.append(f"{index}. {date} {channel}: {snippet}")
+    else:
+        lines.append("- локальных источников нет; не превращай это в тезис без нового запроса." if ru else "- no local sources; do not turn this into a thesis without another query.")
+
+    angle_lines = _brief_angle_lines(payload, ru=ru)
+    if angle_lines:
+        lines.extend(["", "Углы для поста" if ru else "Editorial angles", *angle_lines])
+
+    source_lines = _compact_source_lines(archive_evidence, linked_evidence, ru=ru, max_items=5)
+    if source_lines:
+        lines.extend(["", "Ссылки" if ru else "Links", *source_lines])
+
+    if unknowns:
+        lines.extend(["", "Ограничения" if ru else "Limits"])
+        lines.extend(f"- {_short(_localize_unknown(item) if ru else item, 140)}" for item in unknowns[:5])
+
+    lines.extend(
+        [
+            "",
+            (
+                f"{'Лимиты' if ru else 'Limits'}: "
+                f"tool_calls={receipt.get('tool_calls_used', 0)}/{budget.get('max_tool_calls', 0)}; "
+                f"sources<={budget.get('max_archive_sources', 0)}"
+            ),
+            _privacy_line(privacy),
+        ]
+    )
+    return "\n".join(line.rstrip() for line in lines if line is not None).rstrip()
+
+
 def _render_memory_research_compact(payload: Mapping[str, Any]) -> str:
     question = str(payload.get("question") or "")
     ru = _is_russian(question)
@@ -430,6 +512,7 @@ def _render_memory_research_compact(payload: Mapping[str, Any]) -> str:
     linked_evidence = _mapping(payload.get("linked_source_evidence"))
     project_fit = _mapping(payload.get("project_fit"))
     repo_context = _mapping(payload.get("repo_project_context"))
+    dialog_context = _mapping(payload.get("dialog_context"))
     next_steps = _mapping(payload.get("next_steps"))
     unknowns = [str(item) for item in payload.get("unknowns") or [] if str(item).strip()]
     drafts = [item for item in payload.get("draft_proposals") or [] if isinstance(item, Mapping)]
@@ -442,6 +525,11 @@ def _render_memory_research_compact(payload: Mapping[str, Any]) -> str:
         labels["answer"],
         _compact_answer(payload, ru=ru),
     ]
+
+    if dialog_context.get("used"):
+        previous = _short(dialog_context.get("previous_question"), 180)
+        if previous:
+            lines.extend(["", labels["dialog_context"], f"- {labels['dialog_previous']}: {previous}"])
 
     if repo_context.get("status") == "matched":
         lines.extend(["", labels["repo_context"]])
@@ -488,12 +576,46 @@ def _render_memory_research_compact(payload: Mapping[str, Any]) -> str:
     return "\n".join(line.rstrip() for line in lines if line is not None).rstrip()
 
 
+def _brief_angle_lines(payload: Mapping[str, Any], *, ru: bool) -> list[str]:
+    question = str(payload.get("question") or "")
+    dialog_context = _mapping(payload.get("dialog_context"))
+    intent_question = str(dialog_context.get("effective_question") or question)
+    archive_evidence = _mapping(payload.get("archive_evidence"))
+    archive_items = [item for item in archive_evidence.get("items") or [] if isinstance(item, Mapping)]
+    haystack = _clean_text(
+        " ".join(str(item.get("snippet") or item.get("content") or "") for item in archive_items)
+    ).casefold()
+    if not _is_ai_transformation_question(intent_question.casefold()):
+        return []
+    asks_hiring = _contains_any(intent_question.casefold(), ("увольн", "наним", "hiring", "layoff", "layoffs", "jobs", "найм"))
+    lines: list[str] = []
+    if ru:
+        lines.append("- пилоты vs результат: отделить факт внедрения AI от доказанного прироста/ROI")
+        if _contains_any(haystack, ("1%", "неуспеш", "пилот", "сложность")):
+            lines.append("- почему не получилось: сложность процессов и разрыв между демо/пилотом и операционным эффектом")
+        if _contains_any(haystack, ("эффект", "финансов", "выгод", "успеш")):
+            lines.append("- где есть прирост: искать конкретный процесс, метрику и контекст рынка, а не общий AI-лейбл")
+        if asks_hiring:
+            lines.append("- найм/увольнения: не писать как текущий список компаний без отдельной внешней проверки")
+        return lines
+    lines.append("- pilots vs results: separate AI adoption from proven ROI/productivity")
+    if _contains_any(haystack, ("1%", "unsuccess", "pilot", "complexity")):
+        lines.append("- why it fails: process complexity and the gap between demo/pilot and operating effect")
+    if _contains_any(haystack, ("effect", "financial", "benefit", "successful")):
+        lines.append("- where growth exists: look for a concrete process, metric, and market context")
+    if asks_hiring:
+        lines.append("- hiring/layoffs: do not present a current company list without separate verification")
+    return lines
+
+
 def _compact_labels(ru: bool) -> dict[str, str]:
     if ru:
         return {
             "question": "Вопрос",
             "mode": "Режим: local-research; без LLM, live web и записей.",
             "answer": "Короткий ответ",
+            "dialog_context": "Контекст диалога",
+            "dialog_previous": "предыдущий вопрос",
             "repo_context": "Контекст проекта",
             "repo_refs": "Опорные документы",
             "sources": "Источники",
@@ -508,6 +630,8 @@ def _compact_labels(ru: bool) -> dict[str, str]:
         "question": "Question",
         "mode": "Mode: local-research; no LLM, no live web, no writes.",
         "answer": "Short answer",
+        "dialog_context": "Dialog context",
+        "dialog_previous": "previous question",
         "repo_context": "Project context",
         "repo_refs": "Evidence docs",
         "sources": "Sources",
@@ -521,6 +645,9 @@ def _compact_labels(ru: bool) -> dict[str, str]:
 
 
 def _compact_answer(payload: Mapping[str, Any], *, ru: bool) -> str:
+    question = str(payload.get("question") or "")
+    dialog_context = _mapping(payload.get("dialog_context"))
+    intent_question = str(dialog_context.get("effective_question") or question)
     answer_gate = _mapping(payload.get("answer_gate"))
     archive_evidence = _mapping(payload.get("archive_evidence"))
     linked_evidence = _mapping(payload.get("linked_source_evidence"))
@@ -548,6 +675,15 @@ def _compact_answer(payload: Mapping[str, Any], *, ru: bool) -> str:
             if ru
             else "This is a question about the repository itself. Use repo/gate evidence first; Telegram archive evidence below is background."
         )
+    if _is_ai_transformation_question(intent_question.casefold()) and source_count:
+        return _ai_transformation_compact_answer(
+            question=intent_question,
+            archive_items=archive_items,
+            linked_items=linked_items,
+            source_count=source_count,
+            project_label=project_label,
+            ru=ru,
+        )
     if source_count:
         first = archive_items[0] if archive_items else linked_items[0]
         snippet = _short(first.get("snippet") or first.get("content") or first.get("text_excerpt") or "", 150)
@@ -562,6 +698,53 @@ def _compact_answer(payload: Mapping[str, Any], *, ru: bool) -> str:
         if ru
         else "No local sources matched. I will not guess beyond available data."
     )
+
+
+def _ai_transformation_compact_answer(
+    *,
+    question: str,
+    archive_items: Sequence[Mapping[str, Any]],
+    linked_items: Sequence[Mapping[str, Any]],
+    source_count: int,
+    project_label: str,
+    ru: bool,
+) -> str:
+    haystack = _clean_text(
+        " ".join(
+            str(item.get("snippet") or item.get("content") or item.get("text_excerpt") or "")
+            for item in [*archive_items, *linked_items]
+        )
+    ).casefold()
+    asks_hiring = _contains_any(question.casefold(), ("увольн", "наним", "hiring", "layoff", "layoffs", "jobs", "найм"))
+    failure_signal = _contains_any(
+        haystack,
+        ("1%", "неуспеш", "сложность", "пилот", "не дала", "нет прироста", "roi", "productivity"),
+    )
+    effect_signal = _contains_any(haystack, ("успеш", "эффект", "финансов", "выгод", "бизнес-процесс", "productivity"))
+    hiring_signal = _contains_any(haystack, ("увольн", "наним", "hiring", "layoff", "jobs", "рабоч"))
+    if ru:
+        parts = [f"По локальному архиву найдено {source_count} источн."]
+        if failure_signal:
+            parts.append("Сильный угол: разрыв между AI-пилотами и реальным масштабируемым успехом.")
+        if effect_signal:
+            parts.append("Отдельно есть линия про эффект/финансовую выгоду, но её нужно отделять от хайпа внедрения.")
+        if asks_hiring and not hiring_signal:
+            parts.append("Про найм/увольнения локальная поддержка слабая: нужен отдельный запрос или внешняя проверка.")
+        elif hiring_signal:
+            parts.append("Есть локальные сигналы про рынок труда, но это архивный контекст, не текущий список компаний.")
+        parts.append(f"Маршрут проекта: {_localized_project_label(project_label)}.")
+        return " ".join(parts)
+    parts = [f"Found {source_count} local source(s)."]
+    if failure_signal:
+        parts.append("Strong angle: the gap between AI pilots and scalable business success.")
+    if effect_signal:
+        parts.append("There are effect/financial-benefit signals, but separate them from adoption hype.")
+    if asks_hiring and not hiring_signal:
+        parts.append("Hiring/layoff support is weak locally; use a sharper query or approved external verification.")
+    elif hiring_signal:
+        parts.append("Labor-market signals are archive context, not a current company list.")
+    parts.append(f"Project routing: {project_label}.")
+    return " ".join(parts)
 
 
 def _compact_source_lines(
@@ -868,6 +1051,7 @@ def _archive_query_variants(
     candidates: list[str] = []
     domain_specific = False
 
+    candidates.extend(_ai_transformation_query_variants(lowered))
     if _contains_any(lowered, ("lead response", "sla", "лид", "заявк")):
         candidates.append("lead response SLA no answer")
         domain_specific = True
@@ -920,6 +1104,63 @@ def _archive_query_variants(
     if not variants and clean_query:
         variants = [clean_query]
     return variants[: max(1, min(_MAX_ARCHIVE_QUERY_VARIANTS, int(max_variants or _MAX_ARCHIVE_QUERY_VARIANTS)))]
+
+
+def _ai_transformation_query_variants(lowered_query: str) -> list[str]:
+    if not _is_ai_transformation_question(lowered_query):
+        return []
+    variants = list(_AI_TRANSFORMATION_BASE_VARIANTS)
+    if _contains_any(
+        lowered_query,
+        (
+            "не получилось",
+            "не дала",
+            "не дало",
+            "нет прироста",
+            "провал",
+            "почему нет",
+            "roi",
+            "productivity",
+            "прирост",
+            "успешн",
+            "неуспешн",
+        ),
+    ):
+        variants = [*_AI_TRANSFORMATION_FAILURE_VARIANTS, *variants]
+    if _contains_any(
+        lowered_query,
+        (
+            "увольн",
+            "наним",
+            "hiring",
+            "layoff",
+            "layoffs",
+            "найм",
+            "рабоч",
+            "jobs",
+        ),
+    ):
+        variants = [*_AI_TRANSFORMATION_HIRING_VARIANTS, *variants]
+    return _unique_strings(variants)
+
+
+def _is_ai_transformation_question(lowered_query: str) -> bool:
+    has_ai = _contains_any(lowered_query, ("ai", "ии", "artificial intelligence"))
+    has_company_scope = _contains_any(
+        lowered_query,
+        (
+            "transformation",
+            "трансформац",
+            "внедрен",
+            "компан",
+            "бизнес",
+            "roi",
+            "productivity",
+            "эффект",
+            "прирост",
+        ),
+    )
+    return has_ai and has_company_scope
 
 
 def _project_query_variants(project_name: str | None) -> list[str]:
