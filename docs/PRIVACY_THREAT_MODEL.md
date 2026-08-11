@@ -194,6 +194,8 @@ The current implementation enforces this in `evals/prm_release_gate.py` by:
   flags set to `false`;
 - keeping `dogfood_started=false` and `release_claimed=false` for PRM-18.
 
-The committed PRM-18 receipt,
-`evals/prm18_release_gate_receipt_2026-07-29.json`, blocks dogfood start until
-explicit human approval and accepted or cleared stop-ship criteria exist.
+The historical PRM-18 receipt is
+`evals/prm18_release_gate_receipt_2026-07-29.json`. The current post-PRM28
+receipt is `evals/prm18_release_gate_receipt_2026-08-11_post_prm28.json`: it
+records the no-vector RAG gate as covered by deterministic local evidence while
+keeping dogfood blocked until explicit human dogfood-start approval exists.

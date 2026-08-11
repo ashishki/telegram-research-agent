@@ -178,6 +178,25 @@ class PRMReleaseGateTests(unittest.TestCase):
         self.assertIn("missing_human_dogfood_start_approval", validated["dogfood_gate"]["blocking_reasons"])
         self.assertIn("stop_ship:unsupported_claims", validated["dogfood_gate"]["blocking_reasons"])
 
+    def test_committed_post_prm28_receipt_closes_rag_blocker_but_blocks_dogfood(self) -> None:
+        receipt_path = _REPO_ROOT / "evals" / "prm18_release_gate_receipt_2026-08-11_post_prm28.json"
+        with receipt_path.open(encoding="utf-8") as file:
+            receipt = json.load(file)
+
+        validated = validate_prm_release_gate_receipt(receipt)
+
+        self.assertEqual(validated["dogfood_gate"]["status"], "blocked")
+        self.assertFalse(validated["dogfood_gate"]["dogfood_started"])
+        self.assertFalse(validated["dogfood_gate"]["release_claimed"])
+        self.assertTrue(all(row["status"] == "passed" for row in validated["acceptance_scenarios"]))
+        self.assertTrue(all(value["status"] == "passed" for value in validated["evaluations"].values()))
+        self.assertFalse(any(value["triggered"] for value in validated["stop_ship"].values()))
+        self.assertIn("review_unresolved:human-dogfood-approval", validated["dogfood_gate"]["blocking_reasons"])
+        self.assertIn("missing_human_dogfood_start_approval", validated["dogfood_gate"]["blocking_reasons"])
+        self.assertNotIn("stop_ship:retrieval_metric_failure", validated["dogfood_gate"]["blocking_reasons"])
+        self.assertNotIn("stop_ship:unsupported_claims", validated["dogfood_gate"]["blocking_reasons"])
+        self.assertIn("dogfood=blocked", summarize_prm_release_gate(validated))
+
 
 if __name__ == "__main__":
     unittest.main()

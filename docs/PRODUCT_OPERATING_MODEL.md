@@ -1,16 +1,19 @@
 # Product Operating Model
 
 Status: active handoff
-Last updated: 2026-08-03
+Last updated: 2026-08-11
 
 ## Current Truth
 
-The product is not dogfood-ready yet.
+The product is not dogfood-started yet.
 
-PRM-18 implemented a deterministic release/dogfood gate and the current gate is
-blocked. Dogfood has not started, release readiness is not claimed, and the
-runtime has been frozen to prevent old weekly-report automation from producing
-new evidence that could be mistaken for PRM dogfood.
+PRM-18 implemented a deterministic release/dogfood gate. After PRM-24, PRM-26,
+and PRM-28, the current post-PRM28 receipt records deterministic local product
+RAG readiness for the accepted no-vector path, but the dogfood gate is still
+blocked because explicit PRM-19 dogfood-start approval is not recorded. Dogfood
+has not started, release readiness is not claimed, and the runtime remains
+frozen to prevent old weekly-report automation from producing new evidence that
+could be mistaken for PRM dogfood.
 
 Runtime freeze recorded on 2026-07-29:
 
@@ -87,6 +90,19 @@ print(summarize_prm_release_gate(validate_prm_release_gate_receipt(receipt)))
 PY
 ```
 
+For the current post-PRM28 gate, inspect:
+
+```bash
+PYTHONPATH=src python3 - <<'PY'
+import json
+from pathlib import Path
+from evals.prm_release_gate import summarize_prm_release_gate, validate_prm_release_gate_receipt
+
+receipt = json.loads(Path("evals/prm18_release_gate_receipt_2026-08-11_post_prm28.json").read_text(encoding="utf-8"))
+print(summarize_prm_release_gate(validate_prm_release_gate_receipt(receipt)))
+PY
+```
+
 Allowed without a separate runtime approval:
 
 - read docs and receipts;
@@ -119,8 +135,8 @@ The explicit safe entrypoint is:
 PYTHONPATH=src python3 src/main.py prm-assistant
 ```
 
-Do not run this as dogfood until PRM-18 blockers are accepted or cleared and
-the human operator explicitly approves dogfood start.
+Do not run this as dogfood until the human operator explicitly approves
+dogfood start.
 
 For immediate local use, prefer:
 
@@ -210,8 +226,9 @@ Implemented `prm-assistant` runtime mode:
 7. Define PRM-19 dogfood metadata before collecting any dogfood evidence:
    at least 30 real questions, usefulness labels, corrections, saved notes,
    watch topics, decisions, time to useful answer, cost, value, and friction.
-8. Run PRM-19 only after human dogfood-start approval and accepted or cleared
-   PRM-18 blockers.
+8. Run PRM-19 only after human dogfood-start approval. The current post-PRM28
+   PRM-18 receipt has deterministic local stop-ship blockers cleared, but the
+   explicit dogfood-start approval blocker remains.
 9. Run PRM-20 cleanup only after real dogfood evidence justifies what to keep,
    demote, archive, or remove.
 
@@ -256,4 +273,4 @@ sudo systemctl daemon-reload
 ```
 
 Do not run the activation commands until PRM-19 dogfood-start approval is
-explicitly recorded and PRM-18 blockers are accepted or cleared.
+explicitly recorded.

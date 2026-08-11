@@ -1,5 +1,5 @@
 {
-  "as_of": "2026-07-15",
+  "as_of": "2026-08-11",
   "blocked_claims": [
     {
       "claim": "four consecutive public dogfood weeks completed",
@@ -28,7 +28,7 @@
     "verified_public_weeks": []
   },
   "next_evidence_gate": {
-    "blocker": "Requires real operator runs plus privacy review; repository fixtures cannot satisfy this gate.",
+    "blocker": "Requires explicit PRM-19 dogfood-start approval, real operator runs, and privacy review; repository fixtures and deterministic RAG receipts cannot satisfy this gate.",
     "required_artifacts": [
       "four consecutive privacy-reviewed real-run scorecards",
       "source-bound decision or action receipts when an outcome is claimed",
@@ -63,6 +63,23 @@
         "credential_free_scorecard_contract"
       ],
       "verification_command": "PYTHONPATH=src python3 scripts/public_scorecard_demo.py --check"
+    },
+    {
+      "does_not_support": [
+        "dogfood_week",
+        "operator_outcome",
+        "production_reliability",
+        "user_or_design_partner_validation"
+      ],
+      "id": "prm18-post-prm28-release-gate-v1",
+      "kind": "sanitized_deterministic_gate_receipt",
+      "path": "evals/prm18_release_gate_receipt_2026-08-11_post_prm28.json",
+      "sha256": "c55dc2159c0880363ab91d911047c9a0b10d77e40908dab7bf87a61692938cde",
+      "supports": [
+        "deterministic_no_vector_rag_readiness_gate",
+        "dogfood_start_still_blocked"
+      ],
+      "verification_command": "PYTHONPATH=src python3 -m pytest tests/test_prm_release_gate.py -q"
     }
   ],
   "schema_version": "public-dogfood-evidence-ledger.v1",

@@ -9,9 +9,10 @@ Last updated: 2026-08-11
 - Target branch: master
 - AI Workflow Playbook commit used: 5583eca96c4d2d480b5574ed78bea63e0b07ebf0
 - Adoption mode: Standard
-- Current phase: PRM-18 release/dogfood gate is implemented and blocks dogfood
-  start while final acceptance/product RAG chat acceptance evidence and human
-  approval are missing; legacy
+- Current phase: PRM-18 release/dogfood gate is implemented. The current
+  post-PRM28 receipt records deterministic local no-vector RAG readiness and
+  blocks dogfood start because explicit human dogfood-start approval is
+  missing; legacy
   live runtime is frozen; safe `prm-assistant` runtime is implemented but not
   installed, enabled, started, or dogfood evidence; PRM-18A through PRM-18C are
   implemented and their batched deep review is recorded. PRM-21 documentation
@@ -30,12 +31,14 @@ Last updated: 2026-08-11
   generated seed evidence, not independent human review and not approval for
   vector/backend work. PRM-26 accepted the no-vector path under
   `operator-approval-2026-08-11-no-vector-prm28-path`, and PRM-28 implements
-  the no-vector answer gate.
+  the no-vector answer gate. The current post-PRM28 PRM-18 receipt is
+  `evals/prm18_release_gate_receipt_2026-08-11_post_prm28.json`.
 - Blocked/not implemented slices: PRM-8, PRM-19, PRM-20, and PRM-27
   remain blocked until their gates are satisfied.
 - Next safe work: none under current hard stops. Stop before PRM-27/PRM-19.
-  PRM-19 only after explicit human dogfood-start approval exists and PRM-18
-  blockers are accepted or cleared.
+  PRM-19 only after explicit human dogfood-start approval exists. The current
+  post-PRM28 PRM-18 receipt has deterministic local stop-ship blockers clear
+  but still blocks dogfood on missing dogfood-start approval.
   PRM-20 only after real dogfood evidence and explicit compatibility
   archive/delete/move approval.
 
@@ -62,9 +65,9 @@ requires explicit receipts. PRM-16 adds a bounded Weekly Brief V3 projection and
 static renderer that localizes Radar failure to the Radar card while demoting
 V1 Brief and Atlas to compatibility/internal surfaces. PRM-17 adds deterministic
 workflow contracts and privacy-safe aggregate telemetry receipts for future
-runtime activation. PRM-18 adds a deterministic release/dogfood gate receipt;
-the current receipt is blocked and does not start dogfood or claim release
-readiness. On 2026-07-29 the old live Telegram bot and Report V2 weekly timer
+runtime activation. PRM-18 adds deterministic release/dogfood gate receipts;
+the current post-PRM28 receipt is blocked only on dogfood-start approval and
+does not start dogfood or claim release readiness. On 2026-07-29 the old live Telegram bot and Report V2 weekly timer
 were stopped and disabled. A dedicated `prm-assistant` mode now exists for the
 future operator entrypoint: ordinary text and voice transcript dispatch to
 `/chat`, legacy callbacks are disabled, and generation/write commands are
@@ -148,11 +151,13 @@ jobs from this handoff.
 - PRM-8 vector/hybrid retrieval remains blocked.
 - PRM-26 accepted the no-vector path and PRM-28 implemented the no-vector
   answer gate; PRM-27 remains gated behind a future successor vector ADR.
-- PRM-18 release/dogfood gate is implemented and currently blocked.
+- PRM-18 release/dogfood gate is implemented. The current post-PRM28 receipt
+  clears deterministic local stop-ship blockers and remains blocked on missing
+  dogfood-start approval.
 - PRM-18A through PRM-18C are implemented and the batched deep review is
   recorded at `docs/audit/PRM_DEEP_REVIEW_PRM18A_18C_2026-08-03.md`.
-- PRM-19 dogfood cannot start until explicit human dogfood approval is recorded,
-  and PRM-18 blockers are accepted or cleared.
+- PRM-19 dogfood cannot start until explicit human dogfood approval is
+  recorded.
 - PRM-20 cleanup/archive cannot start until PRM-19 dogfood evidence exists and
   compatibility archive/delete/move approval is explicit.
 - PRM-21 records the future research-session assistant contract. PRM-22 and
@@ -168,7 +173,7 @@ jobs from this handoff.
   `telegram-ai-split-report.timer` as PRM dogfood.
 - Safe runtime is not dogfood yet: do not start `src/main.py prm-assistant` or
   `systemd/telegram-prm-assistant.service` without explicit dogfood-start
-  approval and accepted or cleared PRM-18 blockers.
+  approval.
 - External skills are project-disabled until trust records are approved.
 - Legacy report-centered docs remain as historical/compatibility surfaces and
   need a safe archive/migration pass in PBR-7 or PRM-20.

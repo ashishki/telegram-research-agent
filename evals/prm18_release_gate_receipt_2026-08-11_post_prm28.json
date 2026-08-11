@@ -1,0 +1,318 @@
+{
+  "schema_version": "prm_release_gate.v1",
+  "artifact_type": "prm_release_gate",
+  "generated_at": "2026-08-11T12:00:00Z",
+  "project_commit": "52abcebae7b5eb10af33780237d90198f24802b4",
+  "acceptance_scenarios": [
+    {
+      "id": "e2e_01_known_reacted_post",
+      "title": "Find a known reacted post.",
+      "status": "passed",
+      "evidence_refs": [
+        "docs/retrieval_eval.md",
+        "evals/retrieval/product_rag_fts_baseline_report.json",
+        "evals/retrieval/product_rag_answer_gate_report.json"
+      ],
+      "notes": "Deterministic local RAG evidence covers archive/source recall and reacted-post searchability; not dogfood evidence."
+    },
+    {
+      "id": "e2e_02_semantic_topic_multi_month",
+      "title": "Answer a semantic topic question over multiple months.",
+      "status": "passed",
+      "evidence_refs": [
+        "docs/retrieval_eval.md",
+        "evals/retrieval/product_rag_gold_cases.jsonl",
+        "evals/retrieval/product_rag_answer_gate_report.json"
+      ],
+      "notes": "PRM-24 generated seed labels and PRM-28 answer gate cover semantic archive questions with citations; not independent human review."
+    },
+    {
+      "id": "e2e_03_compare_cases",
+      "title": "Find and compare several cases.",
+      "status": "passed",
+      "evidence_refs": [
+        "docs/retrieval_eval.md",
+        "tests/test_memory_research.py",
+        "evals/retrieval/product_rag_answer_gate_report.json"
+      ],
+      "notes": "Memory research/context-pack tests cover multi-source cited comparison scaffolding; not live operator dogfood."
+    },
+    {
+      "id": "e2e_04_project_application",
+      "title": "Apply archive evidence to one active project.",
+      "status": "passed",
+      "evidence_refs": [
+        "tests/test_project_context.py",
+        "tests/test_memory_research.py",
+        "evals/retrieval/product_rag_answer_gate_report.json"
+      ],
+      "notes": "Project-context and memory-research fixtures cover project-aware evidence routing without project mutation."
+    },
+    {
+      "id": "e2e_05_freshness_boundary",
+      "title": "Answer a freshness/news question with clear date boundaries.",
+      "status": "passed",
+      "evidence_refs": [
+        "tests/test_rag_context_pack.py",
+        "tests/test_memory_research.py",
+        "evals/retrieval/product_rag_answer_gate_report.json"
+      ],
+      "notes": "Answer gate refuses current external-fact claims and records external verification requirements without live research."
+    },
+    {
+      "id": "e2e_06_external_verification",
+      "title": "Trigger external verification without blending evidence classes.",
+      "status": "passed",
+      "evidence_refs": [
+        "tests/test_pi_chat.py",
+        "tests/test_memory_research.py",
+        "evals/retrieval/product_rag_answer_gate_report.json"
+      ],
+      "notes": "External verification is routed as a required boundary and not blended into archive evidence."
+    },
+    {
+      "id": "e2e_07_no_answer_for_gap",
+      "title": "Return insufficient evidence for a corpus gap.",
+      "status": "passed",
+      "evidence_refs": [
+        "tests/test_memory_research.py",
+        "evals/retrieval/product_rag_answer_gate_report.json"
+      ],
+      "notes": "Answer-level no-answer gate passes on generated seed no-answer cases."
+    },
+    {
+      "id": "e2e_08_save_knowledge_note",
+      "title": "Save a Knowledge Note after confirmation.",
+      "status": "passed",
+      "evidence_refs": [
+        "tests/test_pi_chat.py",
+        "docs/personal_research_memory_product_contract.md"
+      ],
+      "notes": "Confirmation-gated saved-memory proposal path has deterministic tests; no production write was performed."
+    },
+    {
+      "id": "e2e_09_create_watch_topic",
+      "title": "Create a Watch Topic after confirmation.",
+      "status": "passed",
+      "evidence_refs": [
+        "tests/test_pi_chat.py",
+        "docs/personal_research_memory_product_contract.md"
+      ],
+      "notes": "Confirmation-gated watch-topic proposal path has deterministic tests; no production write was performed."
+    },
+    {
+      "id": "e2e_10_weekly_brief_v3",
+      "title": "Show a useful secondary Weekly Brief based on actual usage.",
+      "status": "passed",
+      "evidence_refs": [
+        "tests/test_weekly_brief_v3.py",
+        "docs/final_acceptance_plan.md"
+      ],
+      "notes": "Weekly Brief V3 deterministic projection/render tests pass; no scheduled runtime or dogfood run was started."
+    },
+    {
+      "id": "e2e_11_knowledge_library_topic",
+      "title": "Open a Knowledge Library topic page with changes, memory, contradictions, questions, and sources.",
+      "status": "passed",
+      "evidence_refs": [
+        "tests/test_knowledge_library.py",
+        "docs/final_acceptance_plan.md"
+      ],
+      "notes": "Knowledge Library topic-page deterministic renderer tests pass; not dogfood evidence."
+    }
+  ],
+  "evaluations": {
+    "data": {
+      "status": "passed",
+      "evidence_refs": [
+        "docs/RAG_DATA_READINESS.md",
+        "evals/retrieval/product_rag_eval_manifest.json"
+      ],
+      "notes": "PRM-24 has 50 operator-approved generated seed labels and privacy-safe manifest coverage; not independent human review."
+    },
+    "retrieval": {
+      "status": "passed",
+      "evidence_refs": [
+        "docs/retrieval_eval.md",
+        "evals/retrieval/product_rag_fts_baseline_report.json",
+        "docs/adr/ADR-003-prm26-hybrid-retrieval-privacy-budget.md"
+      ],
+      "notes": "SQLite FTS/query planner recovers generated seed source labels and PRM-26 accepted the no-vector path; embeddings/vector remain false."
+    },
+    "generation": {
+      "status": "passed",
+      "evidence_refs": [
+        "docs/generation_eval.md",
+        "evals/retrieval/product_rag_answer_gate_report.json",
+        "tests/test_memory_research.py"
+      ],
+      "notes": "PRM-28 deterministic answer gate blocks unsupported current/project-state claims and passes no-answer boundary metrics."
+    },
+    "tool": {
+      "status": "passed",
+      "evidence_refs": [
+        "tests/test_pi_tools.py",
+        "tests/test_pi_chat.py",
+        "tests/test_rag_context_pack.py"
+      ],
+      "notes": "Read-only tools, context pack, and confirmation-gated writes have deterministic tests."
+    },
+    "agent": {
+      "status": "passed",
+      "evidence_refs": [
+        "tests/test_pi_chat.py",
+        "tests/test_memory_research.py",
+        "docs/AGENT_HARNESS_DESIGN.md"
+      ],
+      "notes": "Assistant loop and local product answer path have deterministic fixture tests; not live provider dogfood."
+    },
+    "privacy": {
+      "status": "passed",
+      "evidence_refs": [
+        "docs/PRIVACY_THREAT_MODEL.md",
+        "evals/retrieval/product_rag_answer_gate_report.json",
+        "tests/test_prm_release_gate.py"
+      ],
+      "notes": "Receipt and RAG reports keep raw text/provider payload egress false; no production DB mutation was performed."
+    },
+    "cost": {
+      "status": "passed",
+      "evidence_refs": [
+        "docs/COST_BUDGET.md",
+        "evals/retrieval/product_rag_answer_gate_report.json",
+        "tests/test_workflow_telemetry.py"
+      ],
+      "notes": "No live model/provider cost was spent; answer gate records provider/vector rates as zero."
+    },
+    "ui": {
+      "status": "passed",
+      "evidence_refs": [
+        "tests/test_cli.py",
+        "tests/test_handlers.py",
+        "tests/test_memory_research.py",
+        "docs/operator_workflow.md"
+      ],
+      "notes": "CLI and Telegram UX parity contracts are tested with fake/local paths; service was not started."
+    },
+    "end_to_end": {
+      "status": "passed",
+      "evidence_refs": [
+        "docs/final_acceptance_plan.md",
+        "evals/retrieval/product_rag_answer_gate_report.json",
+        "tests/test_memory_research.py"
+      ],
+      "notes": "Deterministic local acceptance path is covered after PRM-28; PRM-19 real dogfood remains separate and not started."
+    }
+  },
+  "review_findings": [
+    {
+      "id": "prm13-17-review",
+      "area": "block_review",
+      "status": "resolved",
+      "evidence_refs": [
+        "docs/audit/PRM_DEEP_REVIEW_PRM13_17_2026-07-29.md"
+      ],
+      "notes": "Telemetry budget validation finding was fixed before PRM-18."
+    },
+    {
+      "id": "prm18a-18c-review",
+      "area": "block_review",
+      "status": "resolved",
+      "evidence_refs": [
+        "docs/audit/PRM_DEEP_REVIEW_PRM18A_18C_2026-08-03.md"
+      ],
+      "notes": "LLM chat UX block review recorded; provider/runtime risks remain gated before dogfood."
+    },
+    {
+      "id": "prm24-28-rag-gate",
+      "area": "product_rag_gate",
+      "status": "resolved",
+      "evidence_refs": [
+        "docs/retrieval_eval.md",
+        "evals/retrieval/product_rag_answer_gate_report.json",
+        "docs/adr/ADR-003-prm26-hybrid-retrieval-privacy-budget.md"
+      ],
+      "notes": "PRM-24 generated seed set, PRM-26 no-vector decision, and PRM-28 answer gate close the no-vector RAG readiness blocker."
+    },
+    {
+      "id": "human-dogfood-approval",
+      "area": "completion_authority",
+      "status": "blocked",
+      "evidence_refs": [
+        "docs/REVIEW_POLICY.md",
+        "docs/final_acceptance_plan.md",
+        "docs/dogfood_4_week_plan.md"
+      ],
+      "notes": "Explicit PRM-19 dogfood-start approval is not recorded; the current operator hard stop remains in force."
+    }
+  ],
+  "stop_ship": {
+    "private_data_leakage": {
+      "triggered": false,
+      "evidence_refs": [
+        "docs/PRIVACY_THREAT_MODEL.md",
+        "tests/test_prm_release_gate.py"
+      ],
+      "notes": "Release receipts and PRM-28 eval reports contain no raw Telegram text or provider payloads."
+    },
+    "unsupported_claims": {
+      "triggered": false,
+      "evidence_refs": [
+        "docs/generation_eval.md",
+        "evals/retrieval/product_rag_answer_gate_report.json"
+      ],
+      "notes": "PRM-28 answer gate rejects unsupported current/project-state claims in deterministic local evals."
+    },
+    "retrieval_metric_failure": {
+      "triggered": false,
+      "evidence_refs": [
+        "docs/retrieval_eval.md",
+        "evals/retrieval/product_rag_fts_baseline_report.json",
+        "evals/retrieval/product_rag_answer_gate_report.json"
+      ],
+      "notes": "Generated seed source-label metrics and answer-level no-answer/current-claim metrics pass the accepted no-vector gate."
+    },
+    "unsafe_writes": {
+      "triggered": false,
+      "evidence_refs": [
+        "docs/PRIVACY_THREAT_MODEL.md",
+        "tests/test_pi_chat.py",
+        "tests/test_memory_research.py"
+      ],
+      "notes": "Write paths remain proposal/confirmation gated; no production write was performed."
+    },
+    "cost_budget_breach": {
+      "triggered": false,
+      "evidence_refs": [
+        "docs/COST_BUDGET.md",
+        "evals/retrieval/product_rag_answer_gate_report.json"
+      ],
+      "notes": "No provider egress, embedding run, or vector backend cost was incurred."
+    }
+  },
+  "dogfood_gate": {
+    "status": "blocked",
+    "blocking_reasons": [
+      "review_unresolved:human-dogfood-approval",
+      "missing_human_dogfood_start_approval"
+    ],
+    "human_approval_ref": "",
+    "dogfood_started": false,
+    "release_claimed": false
+  },
+  "privacy": {
+    "raw_telegram_text_egress": false,
+    "external_skill_used": false,
+    "provider_payload_logged": false,
+    "production_db_mutation": false,
+    "generated_private_report_committed": false
+  },
+  "verification_commands": [
+    "PYTHONPATH=src python3 -m pytest tests/test_prm_release_gate.py -q",
+    "python3 tools/test_tiers.py focused-prm",
+    "python3 tools/test_tiers.py fast-contract",
+    "PYTHONPATH=src python3 -m pytest tests/ -q",
+    "python3 tools/playbook_validate.py --root . --check tasks --check placeholders --check readiness --check delivery --check references",
+    "git diff --check"
+  ]
+}

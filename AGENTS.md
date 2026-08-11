@@ -17,9 +17,10 @@ projection/migration semantics, and PRM-16 deterministic Weekly Brief V3
 projection with legacy Brief/Atlas demotion semantics. HEAD also contains
 PRM-17 deterministic runtime workflow contracts and privacy-safe aggregate
 telemetry receipts. The PRM-13 through PRM-17 batched deep review is recorded.
-PRM-18 deterministic release/dogfood gate is implemented and currently blocks
-dogfood because explicit human dogfood approval and real dogfood evidence are
-missing. PRM-18A Operator LLM
+PRM-18 deterministic release/dogfood gate is implemented. The current
+post-PRM28 receipt records deterministic local no-vector RAG readiness but
+still blocks dogfood because explicit human dogfood-start approval is missing.
+PRM-18A Operator LLM
 Chat UX Contract,
 PRM-18B LLM-backed memory chat CLI, and PRM-18C Telegram `prm-assistant` UX
 parity/runbook are implemented; the PRM-18A through PRM-18C batched deep review
@@ -34,15 +35,18 @@ accepted the no-vector path for now under
 `operator-approval-2026-08-11-no-vector-prm28-path`, and PRM-28 implements the
 no-vector answer gate over SQLite FTS/context pack with provider egress,
 embeddings, vector backend, service start, migrations, production writes, and
-dogfood all false. PRM-24 through PRM-28 formalize the required full product
-RAG path before dogfood: gold eval set, citation-safe context pack,
+dogfood all false. The current post-PRM28 gate receipt is
+`evals/prm18_release_gate_receipt_2026-08-11_post_prm28.json`; it leaves
+`dogfood_started=false` and `release_claimed=false`. PRM-24 through PRM-28
+formalize the required full product RAG path before dogfood: gold eval set,
+citation-safe context pack,
 hybrid/vector ADR and privacy budget, approved retrieval implementation, and
 product chat acceptance gate. PRM-8
 remains blocked until that approval path is satisfied. PRM-19 and PRM-20 are
-not started; PRM-19 requires explicit human dogfood-start approval, accepted or
-cleared PRM-18 blockers, and real four-week operator dogfood evidence, and
-PRM-20 requires
-PRM-19 evidence plus explicit compatibility archive/delete/move approval. The old live
+not started; PRM-19 requires explicit human dogfood-start approval before it
+can start and real four-week operator dogfood evidence before it can complete.
+PRM-20 requires PRM-19 evidence plus explicit compatibility archive/delete/move
+approval. The old live
 Telegram bot and
 Report V2 weekly timer were stopped and disabled on 2026-07-29; see
 `docs/PRODUCT_OPERATING_MODEL.md` and
@@ -85,9 +89,10 @@ under `operator-approval-2026-08-11-all-50-generated-gold`; PRM-26 accepted the
 no-vector path under `operator-approval-2026-08-11-no-vector-prm28-path`; PRM-28
 implemented the no-vector answer gate. These do not approve embeddings, a
 vector backend, provider egress, live research, service start, production
-writes, or dogfood. Do not start PRM-19 dogfood until the human operator
-explicitly approves dogfood start and the PRM-18 blockers are accepted or
-cleared. Do not start PRM-20 cleanup/archive work until PRM-19 dogfood evidence
+writes, or dogfood. The post-PRM28 PRM-18 receipt has deterministic local
+stop-ship blockers clear, but it remains blocked on explicit dogfood-start
+approval. Do not start PRM-19 dogfood until the human operator explicitly
+approves dogfood start. Do not start PRM-20 cleanup/archive work until PRM-19 dogfood evidence
 exists and the human operator approves any compatibility archive/delete/move.
 Do not restart legacy bot/report timers as PRM dogfood. Do not start
 `prm-assistant` as dogfood without the same explicit approval. The

@@ -1,7 +1,7 @@
 # Evidence Index
 
 Status: active
-Last updated: 2026-08-03
+Last updated: 2026-08-11
 
 ## Repository State
 
@@ -33,12 +33,14 @@ Last updated: 2026-08-03
 | Product operating model | docs/PRODUCT_OPERATING_MODEL.md |
 | PRM deep-review corrective log | docs/audit/PRM_DEEP_REVIEW_CONSOLIDATED_2026-07-27.md |
 | PRM-18 release gate receipt | docs/audit/PRM18_RELEASE_GATE_2026-07-29.md |
+| PRM-18 post-PRM28 release gate receipt | docs/audit/PRM18_RELEASE_GATE_POST_PRM28_2026-08-11.md |
 | PRM runtime freeze receipt | docs/audit/PRM_RUNTIME_FREEZE_2026-07-29.md |
 | PRM safe assistant runtime receipt | docs/audit/PRM_SAFE_ASSISTANT_RUNTIME_2026-07-29.md |
 | PRM local memory ask receipt | docs/audit/PRM_LOCAL_MEMORY_ASK_2026-07-29.md |
 | PRM LLM chat UX task block receipt | docs/audit/PRM_LLM_CHAT_UX_TASKS_2026-07-29.md |
 | PRM architecture research prompt | docs/prompts/prm_architecture_research_agent.md |
-| PRM-18 sanitized gate JSON | evals/prm18_release_gate_receipt_2026-07-29.json |
+| PRM-18 historical sanitized gate JSON | evals/prm18_release_gate_receipt_2026-07-29.json |
+| PRM-18 current post-PRM28 sanitized gate JSON | evals/prm18_release_gate_receipt_2026-08-11_post_prm28.json |
 
 ## W29 Artifact Evidence
 
@@ -551,7 +553,7 @@ archive_retrieval_eval: rows=50 gold=50 candidates=0 output=evals/retrieval/prod
 | vector metrics | vector_backend_required_rate=0.0; embeddings_run_rate=0.0 |
 | privacy | report contains no queries, snippets, source URLs, raw Telegram text, or provider payloads |
 | side effects | no provider egress, live research, embeddings/vector backend, service start, migrations, production writes, dogfood, or compatibility archive/delete/move |
-| dogfood boundary | PRM-19 remains blocked until explicit dogfood-start approval and accepted/cleared PRM-18 blockers |
+| dogfood boundary | PRM-19 remains blocked until explicit dogfood-start approval |
 
 Focused commands:
 
@@ -560,6 +562,50 @@ PYTHONPATH=src python3 -m pytest tests/test_rag_context_pack.py tests/test_memor
 23 passed in 11.88s
 PYTHONPATH=src python3 tools/product_rag_answer_gate_eval.py --root . --cases evals/retrieval/product_rag_gold_cases.jsonl --json evals/retrieval/product_rag_answer_gate_report.json
 product_rag_answer_gate_eval: rows=50 no_answer_accuracy=1.0 external_verification_boundary_accuracy=1.0 output=evals/retrieval/product_rag_answer_gate_report.json
+```
+
+## PRM-18 Post-PRM28 Release Gate Refresh - 2026-08-11
+
+| Check | Result |
+| --- | --- |
+| receipt | `evals/prm18_release_gate_receipt_2026-08-11_post_prm28.json` |
+| base commit classified | `52abcebae7b5eb10af33780237d90198f24802b4` |
+| product RAG evidence | PRM-24 generated seed set, PRM-26 no-vector acceptance, and PRM-28 answer gate |
+| dogfood gate | blocked |
+| dogfood started | false |
+| release claimed | false |
+| acceptance scenarios | 11 passed, 0 failed, 0 blocked under deterministic local evidence |
+| evaluation areas | all passed under deterministic local evidence |
+| active stop-ship blockers | none in the post-PRM28 receipt |
+| active dogfood blockers | `review_unresolved:human-dogfood-approval`; `missing_human_dogfood_start_approval` |
+| privacy | no raw Telegram text, source URLs, snippets, provider payloads, prompts, completions, generated private reports, production DB mutation, or private report commit |
+| side effects | no Telegram service start, live ingestion, reaction sync, live research, provider egress, embeddings/vector backend, migrations, production writes, dogfood, release claim, or compatibility archive/delete/move |
+
+Targeted verification:
+
+```text
+PYTHONPATH=src python3 -m pytest tests/test_prm_release_gate.py -q
+6 passed in 0.09s
+```
+
+```text
+PYTHONPATH=src python3 -m pytest tests/test_public_evidence.py -q
+6 passed in 0.20s
+```
+
+```text
+python3 tools/test_tiers.py focused-prm
+131 passed in 35.29s
+```
+
+```text
+python3 tools/playbook_validate.py --root . --check tasks --check references
+playbook_validate: errors=0 warnings=0
+```
+
+```text
+git diff --check
+<no output>
 ```
 
 ## Local PRM Status UX - 2026-08-10
@@ -647,7 +693,7 @@ python3 tools/test_tiers.py focused-prm
 | unresolved stop-ship findings | none in PRM-18A..PRM-18C block |
 | repaired finding | documentation overclaim about missing-approval refusal boundary was corrected to PI chat/provider execution |
 | residual risks | real provider behavior and Telegram runtime activation remain gated; no dogfood or release claim |
-| PRM-19 state | blocked until explicit human dogfood-start approval and accepted or cleared PRM-18 blockers |
+| PRM-19 state | blocked until explicit human dogfood-start approval; current post-PRM28 release receipt clears deterministic local stop-ship blockers |
 
 Boundary evidence:
 

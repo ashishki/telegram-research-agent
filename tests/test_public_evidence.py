@@ -67,6 +67,15 @@ class TestPublicEvidence(unittest.TestCase):
             0,
         )
 
+    def test_all_public_evidence_items_are_content_addressed(self):
+        status = _load_json(STATUS_PATH)
+
+        for item in status["public_evidence_items"]:
+            path = ROOT / item["path"]
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            self.assertEqual(item["sha256"], digest, item["id"])
+            self.assertIn("dogfood_week", item["does_not_support"])
+
     def test_committed_demo_matches_credential_free_regeneration(self):
         result = subprocess.run(
             [sys.executable, "scripts/public_scorecard_demo.py", "--check"],

@@ -45,14 +45,14 @@ Target repo baseline: ad8689fa25b89f77122c4cec7c7a6b9da3f500cf
 | Learning state | PRM-15 fixture-only migration/projection maps legacy source presence to indexed/surfaced only and requires explicit receipts for opened/read/understood/explained/tried/applied/measured |
 | Weekly Brief V3 | PRM-16 deterministic secondary projection and static HTML renderer implemented for bounded supplied context; V1 Brief and Atlas are demoted to compatibility/internal surfaces |
 | Runtime workflows | PRM-17 deterministic workflow registry and privacy-safe aggregate telemetry receipt implemented; scheduled runtime activation is not approved |
-| Release gate | PRM-18 deterministic release/dogfood gate implemented; current sanitized receipt blocks dogfood because final acceptance/product RAG chat acceptance evidence and explicit human dogfood approval are missing |
+| Release gate | PRM-18 deterministic release/dogfood gate implemented; current post-PRM28 receipt records deterministic local no-vector RAG readiness but still blocks dogfood because explicit human dogfood-start approval is missing |
 | Runtime deployment | Legacy `telegram-bot.service` and `telegram-ai-split-report.timer` stopped and disabled on 2026-07-29; safe `prm-assistant` entrypoint and repo unit template implemented but not installed/enabled/started and without automatic startup migrations; no Telegram Research Agent service or timer is active |
 | PRM-13..17 review gate | Batched deep review recorded; one telemetry budget-validation finding fixed before PRM-18 |
 | PRM-18A..18C review gate | Batched deep review recorded on 2026-08-03; no unresolved stop-ship finding in this block, residual provider/runtime risks remain gated before PRM-19 |
 | W29 reports | V1 Brief and Atlas rendered despite V2 preview code existing elsewhere |
 | W29 reactions | Seven personal reactions resolved to posts, zero atoms, zero themes, zero ranking effects |
 | Radar | Historical W29 Radar stage failed; PRM-16 V3 fixtures localize Radar failure to the Radar card |
-| Dogfood | Not started for the new product; PRM-19 remains blocked until PRM-18 blockers are accepted or cleared, PRM-24..PRM-28 RAG gates are complete or explicitly waived by the human operator, and explicit human dogfood-start approval is recorded |
+| Dogfood | Not started for the new product; PRM-19 remains blocked until explicit human dogfood-start approval is recorded |
 
 ## Dependency Graph
 
@@ -1254,6 +1254,7 @@ Verification:
 Files:
   - evals/prm_release_gate.py
   - evals/prm18_release_gate_receipt_2026-07-29.json
+  - evals/prm18_release_gate_receipt_2026-08-11_post_prm28.json
   - tests/test_prm_release_gate.py
   - tools/test_tiers.py
   - docs/final_acceptance_plan.md
@@ -1270,9 +1271,12 @@ Cost-Budget: |
   approval_required_when: LLM judge, browser verification, or external model fan-out expands
 Notes: |
   Implemented as deterministic release-gate aggregation and validation. The
-  current PRM-18 receipt blocks dogfood; it does not run dogfood or claim
-  release readiness while stop-ship criteria, missing final acceptance evidence,
-  and missing human dogfood-start approval remain.
+  historical 2026-07-29 PRM-18 receipt blocked dogfood on stop-ship criteria,
+  missing final acceptance evidence, and missing human dogfood-start approval.
+  The current 2026-08-11 post-PRM28 receipt records deterministic local
+  no-vector RAG readiness and clears current stop-ship blockers, but still
+  blocks dogfood on missing explicit PRM-19 dogfood-start approval. It does not
+  run dogfood or claim release readiness.
 
 ### PRM-18A: Operator LLM Chat UX Contract
 
@@ -1475,8 +1479,7 @@ Notes: |
   The operator runbook documents preflight inspection, install/start/status,
   stop/disable, and rollback-to-disabled commands while preserving the hard
   gate: the service was not installed, enabled, started, or treated as dogfood.
-  PRM-19 remains blocked until explicit human dogfood-start approval and
-  accepted or cleared PRM-18 blockers.
+  PRM-19 remains blocked until explicit human dogfood-start approval.
 
 ### PRM-19: Four-Week Operator Dogfood
 
@@ -1516,10 +1519,10 @@ Cost-Budget: |
   max_retries: 1 per failed workflow
   approval_required_when: weekly budget or provider egress changes
 Notes: |
-  Do not predefine success as the system ran. PRM-19 is currently blocked by
-  the PRM-18 release gate and the full product RAG gate. It cannot start until
-  PRM-28 passes or the human operator explicitly waives the RAG gate, explicitly
-  approves dogfood start, and accepts or clears the recorded blockers.
+  Do not predefine success as the system ran. PRM-28 now passes the accepted
+  no-vector product RAG gate, and the current PRM-18 post-PRM28 receipt clears
+  deterministic local stop-ship blockers. PRM-19 still cannot start until the
+  human operator explicitly approves dogfood start.
 
 ### PRM-20: Post-Dogfood Simplification, Cleanup, And Archive
 
