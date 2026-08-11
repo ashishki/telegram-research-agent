@@ -34,6 +34,7 @@ Last updated: 2026-08-11
 | PRM deep-review corrective log | docs/audit/PRM_DEEP_REVIEW_CONSOLIDATED_2026-07-27.md |
 | PRM-18 release gate receipt | docs/audit/PRM18_RELEASE_GATE_2026-07-29.md |
 | PRM-18 post-PRM28 release gate receipt | docs/audit/PRM18_RELEASE_GATE_POST_PRM28_2026-08-11.md |
+| PRM local UX trial receipt | docs/audit/PRM_LOCAL_UX_TRIAL_2026-08-11.md |
 | PRM runtime freeze receipt | docs/audit/PRM_RUNTIME_FREEZE_2026-07-29.md |
 | PRM safe assistant runtime receipt | docs/audit/PRM_SAFE_ASSISTANT_RUNTIME_2026-07-29.md |
 | PRM local memory ask receipt | docs/audit/PRM_LOCAL_MEMORY_ASK_2026-07-29.md |
@@ -607,6 +608,20 @@ playbook_validate: errors=0 warnings=0
 git diff --check
 <no output>
 ```
+
+## PRM Local UX Trial - 2026-08-11
+
+| Check | Result |
+| --- | --- |
+| receipt | `docs/audit/PRM_LOCAL_UX_TRIAL_2026-08-11.md` |
+| scope | simulated local CLI use over representative operator questions |
+| surfaces | `memory research --limit 4`; `memory ask --limit 4` |
+| safety | no provider egress, live web research, Telegram service start, embeddings/vector backend, migrations, production writes, dogfood, or release claim |
+| positive finding | no-vector RAG is usable for local archive discovery and `memory ask` handles current-fact refusal clearly |
+| UX finding | `memory research` is audit-friendly but not yet pleasant daily UX: verbose, mixed English/Russian labels, long lines, noisy context pack, weak project routing, and occasional misleading freshness ordering |
+| recommendation | add compact default view, debug-only context pack, localized labels, freshness-first refusal, path redaction, curated-memory dedupe, and repo-doc routing for project questions |
+
+This receipt is diagnostic evidence only. It is not PRM-19 dogfood evidence.
 
 ## Local PRM Status UX - 2026-08-10
 

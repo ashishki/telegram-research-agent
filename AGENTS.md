@@ -41,7 +41,12 @@ dogfood all false. The current post-PRM28 gate receipt is
 formalize the required full product RAG path before dogfood: gold eval set,
 citation-safe context pack,
 hybrid/vector ADR and privacy budget, approved retrieval implementation, and
-product chat acceptance gate. PRM-8
+product chat acceptance gate. A post-PRM28 local UX trial is recorded at
+`docs/audit/PRM_LOCAL_UX_TRIAL_2026-08-11.md`: no-vector RAG is technically
+usable for local archive discovery, but the default `memory research` reading
+experience remains audit-oriented and needs compact view, localization,
+freshness-first refusal, path redaction, curated-memory dedupe, and stronger
+repo/project routing before it should be called pleasant daily UX. PRM-8
 remains blocked until that approval path is satisfied. PRM-19 and PRM-20 are
 not started; PRM-19 requires explicit human dogfood-start approval before it
 can start and real four-week operator dogfood evidence before it can complete.

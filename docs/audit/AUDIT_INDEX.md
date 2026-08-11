@@ -64,6 +64,12 @@ These files remain preserved for human reference, but they are no longer part of
   refresh: deterministic no-vector RAG evidence is now recorded, stop-ship
   blockers are clear in the current receipt, and dogfood remains blocked by
   missing explicit PRM-19 dogfood-start approval.
+- `PRM_LOCAL_UX_TRIAL_2026-08-11.md` - post-PRM28 local CLI usability trial
+  over simulated operator questions; records that RAG is technically usable but
+  the default reading experience needs compact view, localization,
+  freshness-first refusal, path redaction, and stronger project routing before
+  it should be considered pleasant daily operator UX. Not PRM-19 dogfood
+  evidence.
 - `PRM_RUNTIME_FREEZE_2026-07-29.md` - runtime freeze receipt after PRM-18:
   old Report V2 timer and live bot stopped/disabled, post-freeze systemd/cron
   checks, and historical W30 artifact boundary.
