@@ -43,10 +43,13 @@ Draft targets:
 - p95 local retrieval latency <= 1.5 seconds;
 - 100% of detected reacted posts searchable after the same sync run.
 
-These thresholds are not passed yet. PRM-24 generated seed baseline evidence
-passes source-label hit/citation/latency thresholds, but no-answer accuracy is
-0.0 and stale rejection is unmeasured; PRM-28 product chat acceptance remains
-blocked.
+PRM-24 generated seed baseline evidence passes source-label
+hit/citation/latency thresholds, but raw retrieval no-answer accuracy is 0.0
+and stale rejection is unmeasured. PRM-28 therefore adds a no-vector
+answer-level gate: current generated seed answer-gate metrics pass no-answer
+accuracy, external-verification boundary, current-claim rejection, and
+answerable-source-label checks at 1.0. This is product RAG gate evidence, not
+dogfood or release evidence.
 
 ## D. Generation Metrics
 

@@ -72,11 +72,12 @@ PRM-3/PRM-5/PRM-6/PRM-16 -> PRM-17
 PRM-10/PRM-11/PRM-12/PRM-16/PRM-17 -> PRM-18
 PRM-18 -> PRM-18A -> PRM-18B -> PRM-18C
 PRM-18C -> PRM-21 -> PRM-22 -> PRM-23
-PRM-23 -> PRM-24 -> PRM-25 -> PRM-26 -> PRM-27 conditional -> PRM-28
+PRM-23 -> PRM-24 -> PRM-25 -> PRM-26 -> PRM-28 no-vector path
+PRM-26 -> PRM-27 conditional vector path
 PRM-28 -> PRM-19 -> PRM-20
 PRM-24..PRM-28 formalize the required full product RAG path. PRM-26 refines
-the older PRM-8 hybrid/vector backend gate; PRM-27 must not start until the
-human operator accepts the backend ADR, privacy budget, and rollback plan.
+the older PRM-8 hybrid/vector backend gate; PRM-27 must not start unless the
+human operator accepts a vector backend ADR, privacy budget, and rollback plan.
 ```
 
 ## PBR Queue - Playbook Retrofit
@@ -806,7 +807,7 @@ Notes: |
 Owner: codex
 Phase: PRM
 Type: rag:query
-Status: blocked
+Status: implemented
 Depends-On: PRM-7
 Risk-Level: high
 Public-Tests-Required: required
@@ -1861,15 +1862,15 @@ Notes: |
   Implemented on 2026-08-08 as a fixture-only context-pack substrate. It
   excludes uncited/raw candidates, records exclusion reasons, keeps excerpts
   bounded, and is rendered by local `memory research`. PRM-24 now has 50
-  operator-approved generated seed gold labels; PRM-26 remains the next safe
-  ADR/privacy-budget gate before any vector/backend work.
+  operator-approved generated seed gold labels; PRM-26 accepted the no-vector
+  path for now; PRM-28 implements the no-vector answer gate.
 
 ### PRM-26: Hybrid Retrieval ADR And Privacy Budget
 
 Owner: human+codex
 Phase: PRM
 Type: rag:architecture eval:gate privacy:approval
-Status: blocked
+Status: implemented
 Depends-On: PRM-24, PRM-25
 Risk-Level: high
 Public-Tests-Required: required
@@ -1914,13 +1915,13 @@ Notes: |
   This task refines the older PRM-8 blocked gate for the product RAG path. It
   is documentation/eval/approval work only unless the human operator explicitly
   approves a backend.
-  Safe PRM-26 ADR/privacy/cost/rollback evidence was drafted on 2026-08-11 in
+  Safe PRM-26 ADR/privacy/cost/rollback evidence was accepted on 2026-08-11 in
   `docs/adr/ADR-003-prm26-hybrid-retrieval-privacy-budget.md`. The draft
-  recommends no vector/backend adoption from current generated seed evidence:
-  source-label hit/citation metrics are recovered by SQLite FTS/query planner,
-  while the measured gaps are no-answer/refusal behavior and missing stale
-  labels. PRM-26 remains blocked pending explicit operator backend/no-backend
-  acceptance; PRM-27 remains blocked.
+  accepts no vector/backend adoption for now from current generated seed
+  evidence: source-label hit/citation metrics are recovered by SQLite FTS/query
+  planner, while the measured gaps are no-answer/refusal behavior and missing
+  stale labels. Approval ref:
+  `operator-approval-2026-08-11-no-vector-prm28-path`. PRM-27 remains blocked.
 
 ### PRM-27: Hybrid Retrieval Implementation
 
@@ -1972,17 +1973,18 @@ Cost-Budget: |
   max_retries: 1
   approval_required_when: backend choice, embedding model, index persistence, or provider budget changes
 Notes: |
-  Blocked until PRM-26 is accepted. Do not run embeddings, create a vector
-  backend, write production indexes, or perform migrations from this task
-  description alone.
+  Blocked because PRM-26 accepted the no-vector path for now. Do not run
+  embeddings, create a vector backend, write production indexes, or perform
+  migrations from this task description alone. A future PRM-27 attempt requires
+  a successor vector/backend ADR with explicit operator approval.
 
 ### PRM-28: Product RAG Chat And Acceptance Gate
 
 Owner: codex
 Phase: PRM
 Type: assistant:workflow eval:gate product:ux
-Status: blocked
-Depends-On: PRM-25, PRM-27
+Status: implemented
+Depends-On: PRM-25, PRM-26
 Risk-Level: high
 Public-Tests-Required: required
 Critic-Required: required
@@ -1993,26 +1995,29 @@ Visual-Contract: optional
 Runtime-Verification: required
 Correction-Budget: 2
 Objective: |
-  Wire the approved RAG context pack into the local and LLM-backed chat
-  experience, pass the product RAG eval gate, and make the operator-facing
-  answer path fast, cited, no-answer aware, project-aware, and confirmation
-  gated before dogfood starts.
+  Wire the accepted no-vector RAG context pack into the local product answer
+  path, pass the product RAG answer gate, and make the operator-facing answer
+  path fast, cited, no-answer aware, freshness-aware, project-aware, and
+  confirmation gated before dogfood starts.
 Acceptance-Criteria:
-  - id: AC-1; description: `memory ask`, `memory research`, and approved `memory chat` share the same retrieval/context pack provenance and privacy/cost receipt; test: CLI parity tests pass with fake LLM clients.
-  - id: AC-2; description: LLM synthesis is a thin layer over cited context and cannot invent uncited claims, durable writes, or project actions; test: generation contract and refusal tests pass.
-  - id: AC-3; description: cold-start UX is fast enough for chat use and avoids unrelated heavy imports on help/chat paths; test: CLI startup regression test has a recorded threshold.
-  - id: AC-4; description: product eval passes recall, citation precision, no-answer accuracy, latency, and operator-readability thresholds on gold and holdout sets; verify: final eval report is recorded.
+  - id: AC-1; description: `memory research` emits the same retrieval/context-pack provenance, answer gate, and privacy/cost receipt without provider egress; test: memory research regression tests pass.
+  - id: AC-2; description: answer synthesis is a thin deterministic layer over cited context and cannot invent uncited claims, durable writes, or project actions; test: no-answer/current-fact regression tests block drafts.
+  - id: AC-3; description: no-vector product path does not require PRM-27, embeddings, vector backend, provider egress, service start, or production writes; verify: PRM-28 answer-gate report and ADR cite false vector/egress flags.
+  - id: AC-4; description: product eval passes recall, citation precision, answer-level no-answer accuracy, freshness boundary, latency, and operator-readability thresholds on the PRM-24 seed gold set; verify: final eval reports are recorded.
   - id: AC-5; description: PRM-19 dogfood remains blocked unless this task passes or the human operator explicitly waives the RAG gate; verify: dogfood gate receipt includes PRM-28 status.
 Verification:
-  - PYTHONPATH=src python3 -m pytest tests/test_cli.py tests/test_memory_research.py tests/test_pi_chat.py -q
-  - python3 tools/test_tiers.py focused-prm
+  - PYTHONPATH=src python3 -m pytest tests/test_rag_context_pack.py tests/test_memory_research.py tests/test_product_rag_eval.py tests/test_archive_retrieval_eval.py -q
+  - PYTHONPATH=src python3 tools/product_rag_answer_gate_eval.py --root . --cases evals/retrieval/product_rag_gold_cases.jsonl --json evals/retrieval/product_rag_answer_gate_report.json
   - retrieval/generation eval commands documented in docs/EVIDENCE_INDEX.md
   - python3 tools/playbook_validate.py --root . --check tasks --check references
   - git diff --check
 Files:
   - src/assistant/
   - src/main.py
+  - src/db/product_rag_answer_gate_eval.py
+  - tools/product_rag_answer_gate_eval.py
   - tests/
+  - evals/retrieval/product_rag_answer_gate_report.json
   - docs/operator_workflow.md
   - docs/final_acceptance_plan.md
   - docs/EVIDENCE_INDEX.md
@@ -2033,3 +2038,14 @@ Notes: |
   This is the full product RAG readiness gate before PRM-19. It does not start
   Telegram runtime dogfood by itself and does not approve provider egress beyond
   explicit command-line/runtime switches.
+  Implemented on 2026-08-11 as the accepted no-vector PRM-28 path. The
+  `rag_answer_gate.v1` layer blocks impossible/current project-state claims and
+  current-price/current-fact questions even when FTS returns related posts. It
+  records answer-gate status in `memory research` and the context pack, blocks
+  draft proposals when evidence is insufficient, and keeps provider egress,
+  embeddings, vector backend, service start, migrations, production writes, and
+  dogfood false. `evals/retrieval/product_rag_answer_gate_report.json` reports
+  no_answer_accuracy=1.0, external_verification_boundary_accuracy=1.0,
+  answerable_source_label_accuracy=1.0, vector_backend_required_rate=0.0, and
+  embeddings_run_rate=0.0 on the 50-row generated seed gold set. This satisfies
+  the no-vector RAG acceptance gate but does not start PRM-19 dogfood.

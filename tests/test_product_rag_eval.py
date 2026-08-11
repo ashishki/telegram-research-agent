@@ -9,6 +9,7 @@ from db.product_rag_eval import (
     merge_product_rag_gold_cases,
     validate_product_rag_thresholds,
 )
+from db.product_rag_answer_gate_eval import evaluate_product_rag_answer_gate
 
 
 def _thresholds():
@@ -209,6 +210,20 @@ class TestProductRagEval(unittest.TestCase):
 
         with self.assertRaisesRegex(ProductRagEvalError, "missing gold labels"):
             merge_product_rag_gold_cases(cases, labels[:-1], min_rows=6)
+
+    def test_product_rag_answer_gate_passes_no_vector_seed_acceptance(self):
+        root = Path(__file__).resolve().parents[1]
+        gold_cases = [json.loads(line) for line in (root / "evals/retrieval/product_rag_gold_cases.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+
+        report = evaluate_product_rag_answer_gate(gold_cases)
+
+        self.assertEqual(report["dataset"]["gold_row_count"], 50)
+        self.assertEqual(report["metrics"]["no_answer_accuracy"], 1.0)
+        self.assertEqual(report["metrics"]["external_verification_boundary_accuracy"], 1.0)
+        self.assertEqual(report["metrics"]["answerable_source_label_accuracy"], 1.0)
+        self.assertEqual(report["metrics"]["vector_backend_required_rate"], 0.0)
+        self.assertFalse(report["vector_backend_gate"]["vector_backend_adopted"])
+        self.assertFalse(report["privacy"]["queries_included"])
 
     def test_thresholds_require_recall_citation_no_answer_stale_duplicate_and_latency(self):
         thresholds = _thresholds()

@@ -214,7 +214,7 @@ Baseline metrics:
 | `hit_at_10` | 1.0 | generated source labels are recovered by the deterministic planner |
 | `mrr` | 1.0 | generated source labels are first-rank under the seed method |
 | `citation_precision` | 1.0 | generated seed source labels match returned citations |
-| `no_answer_accuracy` | 0.0 | raw FTS returns related evidence for no-answer/control questions; answer-level refusal still needs PRM-28 gating |
+| `no_answer_accuracy` | 0.0 | raw FTS returns related evidence for no-answer/control questions; PRM-28 adds a separate answer-level gate |
 | `stale_rejection` | null | no stale/forbidden document labels were approved in this generated seed set |
 | `duplicate_top10_rate` | 0.004 | below proposed duplicate threshold |
 | `latency_ms_p95` | 46.912 ms | below proposed local latency threshold |
@@ -350,8 +350,8 @@ Gold metrics are present but intentionally unscored:
 This section is historical PRM-7 evidence. The vector gate was closed with
 `vector_backend_gate.status=blocked_no_human_approved_gold` at that time.
 Current PRM-24 now has a full generated seed gold set and baseline report, but
-still lacks independent human-reviewed labels and PRM-28 product chat
-acceptance evidence.
+still lacks independent human-reviewed labels. PRM-28 adds a no-vector
+answer-level gate for no-answer/current-fact behavior.
 
 Verification:
 
@@ -391,14 +391,26 @@ ADR-002 is `proposed_not_accepted` and makes a negative decision for now: no
 vector backend is adopted because the current generated seed baseline does not
 show a source-recall/citation failure that justifies vector work.
 
-PRM-26 draft gate:
+PRM-26 accepted no-vector gate:
 
 ```text
 docs/adr/ADR-003-prm26-hybrid-retrieval-privacy-budget.md
 ```
 
-ADR-003 records the current PRM-24/PRM-25 evidence and keeps PRM-27 blocked.
-The draft recommends no vector/backend adoption from the generated seed
-baseline: source-label recall/citation is recovered by SQLite FTS/query planner,
-while the measured gaps are answer-level no-answer/refusal behavior and missing
-stale/forbidden labels.
+ADR-003 records the current PRM-24/PRM-25 evidence, accepts the no-vector path
+for now, and keeps PRM-27 blocked. The accepted path does not adopt vector
+backend because source-label recall/citation is recovered by SQLite FTS/query
+planner, while the measured gaps are answer-level no-answer/refusal behavior
+and missing stale/forbidden labels.
+
+PRM-28 answer-gate report:
+
+```text
+evals/retrieval/product_rag_answer_gate_report.json
+```
+
+The report scores the deterministic no-vector answer gate over the 50 generated
+seed gold cases: no_answer_accuracy=1.0,
+external_verification_boundary_accuracy=1.0, current_claim_rejection=1.0,
+answerable_source_label_accuracy=1.0, vector_backend_required_rate=0.0, and
+embeddings_run_rate=0.0.

@@ -47,6 +47,10 @@ Human-approved gold labels should be created in a separate file after PRM-1.
 - `product_rag_fts_baseline_report.json`: privacy-safe baseline report over
   `product_rag_gold_cases.jsonl`; contains metrics/counts only, not queries,
   snippets, source URLs, or raw Telegram text.
+- `product_rag_answer_gate_report.json`: privacy-safe PRM-28 no-vector
+  answer-gate report over `product_rag_gold_cases.jsonl`; contains
+  no-answer/freshness/current-claim gate metrics only, not queries, snippets,
+  source URLs, raw Telegram text, or provider payloads.
 - `product_rag_gold_label_drafts.jsonl`: seven non-gold, operator-review
   suggestions for the no-answer/external-verification cases. It is never read
   by the manifest or retrieval scorer.
@@ -81,6 +85,10 @@ PYTHONPATH=src python3 tools/archive_retrieval_eval.py \
   --cases evals/retrieval/product_rag_gold_cases.jsonl \
   --limit 10 \
   --json evals/retrieval/product_rag_fts_baseline_report.json
+PYTHONPATH=src python3 tools/product_rag_answer_gate_eval.py \
+  --root . \
+  --cases evals/retrieval/product_rag_gold_cases.jsonl \
+  --json evals/retrieval/product_rag_answer_gate_report.json
 ```
 
 Non-gating draft simulation:

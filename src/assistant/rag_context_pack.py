@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 
+from assistant.rag_answer_gate import assess_rag_answer_gate
+
 
 RAG_CONTEXT_PACK_SCHEMA_VERSION = "rag_context_pack.v1"
 _RAW_FIELDS = frozenset({"content", "raw_text", "raw_post_text", "telegram_text", "full_post_text", "provider_payload"})
@@ -16,10 +18,12 @@ class RagContextPackError(ValueError):
 
 def build_rag_context_pack(
     *,
+    question: str = "",
     archive_evidence: Mapping[str, Any],
     curated_memory: Mapping[str, Any],
     linked_source_evidence: Mapping[str, Any],
     project_fit: Mapping[str, Any],
+    external_verification_hint: bool = False,
     semantic_candidates: Sequence[Mapping[str, Any]] = (),
     max_sources: int = 12,
     max_excerpt_chars: int = 240,
@@ -79,14 +83,29 @@ def build_rag_context_pack(
     add_candidates("linked_source", _mappings(linked_source_evidence.get("items")), freshness="cached_fixture_or_unknown")
     add_candidates("semantic_candidate", _mappings(semantic_candidates), freshness="synthetic_not_executed")
 
-    status = "ready" if sources else "insufficient_evidence"
+    answer_gate = assess_rag_answer_gate(
+        question,
+        source_count=len(sources),
+        external_verification_hint=external_verification_hint,
+    )
+    if answer_gate["status"] == "needs_external_verification":
+        status = "needs_external_verification"
+    elif answer_gate["allow_answer"]:
+        status = "ready" if sources else "insufficient_evidence"
+    else:
+        status = "insufficient_evidence"
     return validate_rag_context_pack({
         "schema_version": RAG_CONTEXT_PACK_SCHEMA_VERSION,
         "status": status,
         "sources": sources,
         "excluded_candidates": excluded,
         "limits": {"max_sources": clean_max_sources, "max_excerpt_chars": clean_excerpt_limit},
-        "no_answer": {"threshold": threshold, "required": not sources, "reason": "no_cited_context" if not sources else "not_triggered"},
+        "no_answer": {
+            "threshold": threshold,
+            "required": bool(answer_gate["no_answer_required"]),
+            "reason": str(answer_gate["reason"]) if answer_gate["no_answer_required"] else "not_triggered",
+        },
+        "answer_gate": answer_gate,
         "privacy": {"raw_corpus_included": False, "provider_payload_included": False, "provider_egress": False, "embeddings_run": False},
     })
 
@@ -94,7 +113,7 @@ def build_rag_context_pack(
 def validate_rag_context_pack(pack: Mapping[str, Any]) -> dict[str, Any]:
     if pack.get("schema_version") != RAG_CONTEXT_PACK_SCHEMA_VERSION:
         raise RagContextPackError("context pack schema_version is invalid")
-    if pack.get("status") not in {"ready", "insufficient_evidence"}:
+    if pack.get("status") not in {"ready", "insufficient_evidence", "needs_external_verification"}:
         raise RagContextPackError("context pack status is invalid")
     limits = pack.get("limits")
     if not isinstance(limits, Mapping) or int(limits.get("max_sources") or 0) < 1 or int(limits.get("max_excerpt_chars") or 0) < 1:
@@ -120,12 +139,28 @@ def validate_rag_context_pack(pack: Mapping[str, Any]) -> dict[str, Any]:
         raise RagContextPackError("context pack privacy boundary is invalid")
     if pack["status"] == "ready" and not sources:
         raise RagContextPackError("ready context pack requires cited sources")
+    answer_gate = pack.get("answer_gate")
+    if isinstance(answer_gate, Mapping):
+        for field in ("allow_answer", "current_claim_allowed", "no_answer_required", "external_verification_required", "vector_backend_required", "embeddings_run"):
+            if not isinstance(answer_gate.get(field), bool):
+                raise RagContextPackError(f"context answer_gate.{field} must be boolean")
+        if answer_gate.get("vector_backend_required") is not False or answer_gate.get("embeddings_run") is not False:
+            raise RagContextPackError("context answer gate must not require vector backend or embeddings")
     return dict(pack)
 
 
 def render_rag_context_pack(pack: Mapping[str, Any]) -> str:
     validated = validate_rag_context_pack(pack)
     lines = ["Citation-Safe Context Pack", f"status={validated['status']}"]
+    answer_gate = validated.get("answer_gate")
+    if isinstance(answer_gate, Mapping):
+        lines.append(
+            "answer_gate={status}; no_answer_required={no_answer}; external_verification_required={external}".format(
+                status=answer_gate.get("status"),
+                no_answer=str(bool(answer_gate.get("no_answer_required"))).lower(),
+                external=str(bool(answer_gate.get("external_verification_required"))).lower(),
+            )
+        )
     for source in _mappings(validated.get("sources")):
         lines.append(f"- [{source['source_class']}] {source['source_ref']}: {source['excerpt']}")
     if not validated["sources"]:

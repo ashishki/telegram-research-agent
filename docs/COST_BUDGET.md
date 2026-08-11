@@ -26,7 +26,8 @@ Status: active PRM budget requiring human approval before live provider use
 | PRM-22 linked-source resolver implementation | $0 for implementation/tests | 0 for implementation/tests | live HTTP fetch, external skill, provider summarization, or durable production cache write |
 | PRM-23 memory research planner implementation | $0 for implementation/tests | 0 for implementation/tests | live linked-source fetch, provider synthesis, service start, dogfood start, production write, or vector/backend adoption |
 | PRM-24 generated seed gold labels and FTS baseline | $0 | 0 | raw Telegram text copied into eval rows, provider judge, embeddings, vector backend, live research, or production write |
-| PRM-26 hybrid/vector ADR draft | $0 | 0 | any embedding run, vector backend adoption, production index write, migration, provider egress, or accepted backend budget |
+| PRM-26 no-vector ADR acceptance | $0 | 0 | any embedding run, vector backend adoption, production index write, migration, provider egress, or accepted backend budget |
+| PRM-28 no-vector answer gate | $0 for implementation/tests | 0 for implementation/tests | provider synthesis, live fetch, embeddings/vector backend, service start, production write, or dogfood start |
 
 Monthly planning ceiling before dogfood: $25 unless the human approves more.
 
@@ -243,7 +244,8 @@ must name:
 
 ## PRM-26 Hybrid/Vector Gate Budget
 
-ADR-003 records no approved vector/backend budget. Current limits are:
+ADR-003 accepts the no-vector path for now and records no approved
+vector/backend budget. Current limits are:
 
 | Control | Value |
 | --- | ---: |
@@ -257,3 +259,7 @@ ADR-003 records no approved vector/backend budget. Current limits are:
 Any future backend experiment must name the provider/model or local model,
 backend, max rows, max tokens/chars, persistence boundary, rollback plan, and
 cost ceiling in an accepted ADR before execution.
+
+PRM-28 no-vector answer-gate implementation stays inside the same local budget:
+0 provider calls, 0 model calls, 0 embedding rows, 0 vector writes, and no
+service start.

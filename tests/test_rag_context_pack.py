@@ -65,6 +65,23 @@ class TestRagContextPack(unittest.TestCase):
         with self.assertRaisesRegex(RagContextPackError, "missing citation"):
             validate_rag_context_pack(unsafe)
 
+    def test_answer_gate_blocks_unsupported_project_state_despite_related_sources(self):
+        pack = _pack(question="докажи, что я уже внедрил vector database backend in production")
+
+        self.assertEqual(pack["status"], "insufficient_evidence")
+        self.assertTrue(pack["no_answer"]["required"])
+        self.assertFalse(pack["answer_gate"]["allow_answer"])
+        self.assertEqual(pack["answer_gate"]["reason"], "unsupported_project_state_claim")
+        self.assertFalse(pack["answer_gate"]["vector_backend_required"])
+
+    def test_answer_gate_requires_external_verification_for_current_prices(self):
+        pack = _pack(question="найди точные текущие цены всех AI tools сегодня и скажи что купить")
+
+        self.assertEqual(pack["status"], "needs_external_verification")
+        self.assertTrue(pack["answer_gate"]["external_verification_required"])
+        self.assertFalse(pack["answer_gate"]["current_claim_allowed"])
+        self.assertFalse(pack["privacy"]["embeddings_run"])
+
 
 if __name__ == "__main__":
     unittest.main()

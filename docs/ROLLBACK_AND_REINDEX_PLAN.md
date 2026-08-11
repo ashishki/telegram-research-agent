@@ -101,9 +101,11 @@ Failed enrichment does not remove archive search documents.
 
 ## Vector/Hybrid Future
 
-PRM-26 does not approve vector/hybrid retrieval. ADR-003 records zero approved
-embedding rows, zero vector writes, zero provider calls, and no production
-migration. Since no vector state exists, rollback is a code/docs revert.
+PRM-26 accepts the no-vector path for now and does not approve vector/hybrid
+retrieval. ADR-003 records zero approved embedding rows, zero vector writes,
+zero provider calls, and no production migration. Since no vector state exists,
+rollback is a code/docs revert. PRM-28 answer-gate rollback is also a code
+revert because it creates no durable index or production data.
 
 If a future accepted ADR approves vector/hybrid retrieval:
 

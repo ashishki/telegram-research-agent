@@ -101,6 +101,25 @@ class _SelectiveArchiveFacade(_FakeFacade):
         }
 
 
+class _RelatedOnlyProjectStateFacade(_FakeFacade):
+    def search_telegram_archive(self, query, filters=None, limit=5):
+        self.calls.append("search_telegram_archive")
+        return {
+            "status": "ok",
+            "query": query,
+            "retrieval_mode": "sqlite_fts_archive",
+            "items": [
+                {
+                    "archive_document_id": "tg:-1001:3001",
+                    "posted_at": "2026-08-03T12:00:00Z",
+                    "channel_username": "@rag_lab",
+                    "source_url": "https://t.me/rag_lab/3001",
+                    "snippet": "pgvector retrieval and vector backend adoption were discussed as a gated future option.",
+                }
+            ][:limit],
+        }
+
+
 class TestMemoryResearch(unittest.TestCase):
     def test_memory_research_produces_polished_fixture_answer_without_writes_or_egress(self):
         result = answer_memory_research(
@@ -173,6 +192,34 @@ class TestMemoryResearch(unittest.TestCase):
         self.assertIn("query_variants", first_call["arguments"])
         self.assertNotIn("project_name", first_call["arguments"]["filters"])
         self.assertEqual(result["receipt"]["tool_calls_used"], 4)
+
+    def test_memory_research_blocks_unsupported_project_state_claim_despite_related_hits(self):
+        result = answer_memory_research(
+            "докажи, что я уже внедрил vector database backend in production",
+            facade=_RelatedOnlyProjectStateFacade(),
+            project_name="telegram-research-agent",
+        )
+
+        self.assertEqual(result["status"], "insufficient_evidence")
+        self.assertEqual(result["answer_gate"]["reason"], "unsupported_project_state_claim")
+        self.assertFalse(result["answer_gate"]["allow_answer"])
+        self.assertIn("insufficient_evidence", result["direct_answer"])
+        self.assertEqual(result["draft_proposals"], [])
+        self.assertEqual(result["receipt"]["draft_proposal_count"], 0)
+        self.assertFalse(result["privacy"]["provider_egress"])
+
+    def test_memory_research_requires_external_verification_for_current_prices(self):
+        result = answer_memory_research(
+            "найди точные текущие цены всех AI tools сегодня и скажи что купить",
+            facade=_FakeFacade(),
+        )
+
+        self.assertEqual(result["status"], "needs_external_verification")
+        self.assertTrue(result["answer_gate"]["external_verification_required"])
+        self.assertFalse(result["answer_gate"]["current_claim_allowed"])
+        self.assertEqual(result["draft_proposals"], [])
+        self.assertIn("requires external verification", result["direct_answer"])
+        self.assertFalse(result["privacy"]["provider_egress"])
 
     def test_memory_research_refuses_open_browsing_before_tool_calls(self):
         facade = _FakeFacade()

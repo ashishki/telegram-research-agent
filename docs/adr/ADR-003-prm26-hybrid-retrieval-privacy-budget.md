@@ -1,7 +1,8 @@
 # ADR-003: PRM-26 Hybrid Retrieval And Privacy Budget Gate
 
-Status: blocked_pending_operator_backend_approval
+Status: accepted_no_vector_for_now
 Date: 2026-08-11
+Approval: operator-approval-2026-08-11-no-vector-prm28-path
 
 ## Context
 
@@ -29,7 +30,9 @@ without provider egress, live fetching, embeddings, migrations, or writes.
 
 ## Decision
 
-Do not adopt a vector backend in PRM-26.
+Do not adopt a vector backend in PRM-26. Proceed to the PRM-28 no-vector
+answer-gate path over SQLite FTS/query planner and the citation-safe context
+pack.
 
 The current generated seed evidence does not show a source-recall or citation
 precision failure that vector retrieval would clearly fix. The measured gaps
@@ -71,13 +74,13 @@ no production index was written, and no migration or provider call was made.
 
 ## Privacy And Cost Budget
 
-Current approved PRM-26 budget:
+Current approved PRM-26 no-vector budget:
 
 | Control | Value |
 | --- | --- |
 | Embedding provider | none approved |
 | Embedding model | none approved |
-| Vector backend | none approved |
+| Vector backend | none approved; no-vector path accepted |
 | Rows allowed for embedding | 0 |
 | Tokens/chars allowed for embedding | 0 |
 | Provider egress | false |
@@ -109,7 +112,8 @@ If a future approved vector/hybrid implementation starts, it must:
 
 ## Gate
 
-PRM-27 must not start until the operator explicitly approves a successor ADR or
-updates this ADR from `blocked_pending_operator_backend_approval` to an accepted
-backend/no-backend decision with the required privacy, cost, and rollback
-budget.
+PRM-27 must not start from this ADR. The accepted path is no-vector for now:
+PRM-28 may implement answer-level sufficiency/no-answer/freshness gating over
+SQLite FTS/query planner and the citation-safe context pack. A future vector
+experiment requires a successor ADR with explicit backend/model, privacy, cost,
+and rollback approval.

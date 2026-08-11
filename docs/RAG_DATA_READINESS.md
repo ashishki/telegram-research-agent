@@ -455,9 +455,10 @@ embeddings_run=false
 ```
 
 This completes PRM-24 coverage/eval scaffolding as operator-approved generated
-seed evidence. It does not approve embeddings, vector backend adoption,
-provider egress, live web research, migrations, production writes, service
-start, PRM-27, PRM-28, or dogfood.
+seed evidence. PRM-26 later accepted the no-vector path and PRM-28 added an
+answer-level no-answer/freshness gate. None of this approves embeddings, vector
+backend adoption, provider egress, live web research, migrations, production
+writes, service start, PRM-27, dogfood, or release.
 
 ## Exact Commands And Results
 

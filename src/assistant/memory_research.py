@@ -277,22 +277,26 @@ def answer_memory_research(
     curated_evidence = _curated_evidence(curated_result, max_items=bounded_limit)
     project_fit = _project_fit(project_context)
     context_pack = build_rag_context_pack(
+        question=clean_question,
         archive_evidence=archive_evidence,
         curated_memory=curated_evidence,
         linked_source_evidence=linked_evidence,
         project_fit=project_fit,
         max_sources=active_budget.max_archive_sources + active_budget.max_linked_sources,
     )
+    answer_gate = _mapping(context_pack.get("answer_gate"))
     comparison = _approach_comparison(archive_evidence, linked_evidence, curated_evidence)
-    next_steps = _next_steps(project_fit, archive_evidence, linked_evidence)
+    next_steps = _next_steps(project_fit, archive_evidence, linked_evidence, answer_gate)
     deeper_reading = _deeper_reading(linked_evidence, archive_evidence, curated_evidence)
     unknowns = _unknowns(archive_evidence, linked_evidence, project_fit, linked_result)
+    unknowns = _unique([*unknowns, *_answer_gate_unknowns(answer_gate)])
     direct_answer = _direct_answer(
         question=clean_question,
         archive_evidence=archive_evidence,
         linked_evidence=linked_evidence,
         project_fit=project_fit,
         unknowns=unknowns,
+        answer_gate=answer_gate,
     )
     source_refs = _unique(
         [
@@ -302,20 +306,26 @@ def answer_memory_research(
             *project_fit.get("source_refs", []),
         ]
     )
-    drafts = _draft_proposals(
-        question=clean_question,
-        direct_answer=direct_answer,
-        project_fit=project_fit,
-        source_refs=source_refs,
-        unknowns=unknowns,
+    drafts = (
+        _draft_proposals(
+            question=clean_question,
+            direct_answer=direct_answer,
+            project_fit=project_fit,
+            source_refs=source_refs,
+            unknowns=unknowns,
+        )
+        if bool(answer_gate.get("allow_answer"))
+        else []
     )
+    status = _answer_status(answer_gate, archive_evidence=archive_evidence, linked_evidence=linked_evidence, curated_evidence=curated_evidence)
     receipt = _receipt(
-        status="ok" if archive_evidence["items"] or linked_evidence["items"] or curated_evidence["items"] else "insufficient_evidence",
+        status=status,
         budget=active_budget,
         tool_calls=tool_calls,
         source_refs=source_refs,
         linked_result=linked_result,
         draft_count=len(drafts),
+        answer_gate=answer_gate,
     )
     return {
         "schema_version": MEMORY_RESEARCH_SCHEMA_VERSION,
@@ -329,6 +339,7 @@ def answer_memory_research(
         "approach_comparison": comparison,
         "project_fit": project_fit,
         "context_pack": context_pack,
+        "answer_gate": answer_gate,
         "next_steps": next_steps,
         "deeper_reading_path": deeper_reading,
         "unknowns": unknowns,
@@ -1075,13 +1086,18 @@ def _next_steps(
     project_fit: Mapping[str, Any],
     archive_evidence: Mapping[str, Any],
     linked_evidence: Mapping[str, Any],
+    answer_gate: Mapping[str, Any],
 ) -> dict[str, list[str]]:
     label = str(project_fit.get("relevance_label") or "no_match")
     apply: list[str] = []
     watch: list[str] = []
     ignore: list[str] = []
     study: list[str] = []
-    if label == "direct_implication":
+    if not bool(answer_gate.get("allow_answer", True)):
+        study.append("Do not answer or save a memory from related-but-insufficient evidence.")
+        if bool(answer_gate.get("external_verification_required")):
+            watch.append("Run an explicitly approved external verification step before making current claims.")
+    elif label == "direct_implication":
         apply.append("Draft one bounded project action from the cited evidence; require confirmation before saving.")
     elif label == "weak_watch":
         watch.append("Keep this as a watch signal until repeated archive or linked-source evidence appears.")
@@ -1161,10 +1177,25 @@ def _direct_answer(
     linked_evidence: Mapping[str, Any],
     project_fit: Mapping[str, Any],
     unknowns: Sequence[str],
+    answer_gate: Mapping[str, Any],
 ) -> str:
     archive_items = [item for item in archive_evidence.get("items") or [] if isinstance(item, Mapping)]
     linked_items = [item for item in linked_evidence.get("items") or [] if isinstance(item, Mapping)]
     label = str(project_fit.get("relevance_label") or "no_match")
+    gate_status = str(answer_gate.get("status") or "")
+    gate_reason = str(answer_gate.get("reason") or "")
+    if gate_status == "needs_external_verification":
+        return (
+            "This question requires external verification before a current claim or recommendation. "
+            "The local Telegram archive can be used only as discovery context; live/current verification was not approved or run."
+        )
+    if not bool(answer_gate.get("allow_answer", True)):
+        if gate_reason == "unsupported_project_state_claim":
+            return (
+                "I found at most related local material, but not sufficient cited proof for the requested completed/current project state. "
+                "This is insufficient_evidence, so I will not claim it happened."
+            )
+        return "I do not have enough cited local evidence to answer this reliably."
     if not archive_items and not linked_items:
         return "I do not have enough local archive or approved linked-source evidence to answer this reliably."
     first_archive = _short(archive_items[0].get("snippet") or archive_items[0].get("content") or "", 220) if archive_items else ""
@@ -1178,6 +1209,34 @@ def _direct_answer(
     if unknowns:
         pieces.append("Do not treat this as fully current until these gaps are cleared: " + "; ".join(unknowns[:3]) + ".")
     return " ".join(pieces)
+
+
+def _answer_status(
+    answer_gate: Mapping[str, Any],
+    *,
+    archive_evidence: Mapping[str, Any],
+    linked_evidence: Mapping[str, Any],
+    curated_evidence: Mapping[str, Any],
+) -> str:
+    gate_status = str(answer_gate.get("status") or "")
+    if gate_status == "needs_external_verification":
+        return "needs_external_verification"
+    if not bool(answer_gate.get("allow_answer", True)):
+        return "insufficient_evidence"
+    if archive_evidence.get("items") or linked_evidence.get("items") or curated_evidence.get("items"):
+        return "ok"
+    return "insufficient_evidence"
+
+
+def _answer_gate_unknowns(answer_gate: Mapping[str, Any]) -> list[str]:
+    unknowns: list[str] = []
+    if bool(answer_gate.get("external_verification_required")):
+        unknowns.append("external verification before current claims")
+    if bool(answer_gate.get("no_answer_required")):
+        unknowns.append("sufficient cited proof for the requested claim")
+    if not bool(answer_gate.get("current_claim_allowed", True)):
+        unknowns.append("current-claim freshness")
+    return unknowns
 
 
 def _draft_proposals(
@@ -1253,6 +1312,7 @@ def _receipt(
     source_refs: Sequence[str],
     linked_result: Mapping[str, Any],
     draft_count: int,
+    answer_gate: Mapping[str, Any],
 ) -> dict[str, Any]:
     linked_receipt = _mapping(linked_result.get("receipt"))
     linked_privacy = _mapping(linked_receipt.get("privacy"))
@@ -1265,6 +1325,7 @@ def _receipt(
         "tool_calls": [dict(item) for item in tool_calls],
         "source_ref_count": len(source_refs),
         "draft_proposal_count": int(draft_count),
+        "answer_gate": dict(answer_gate),
         "linked_source_receipt": linked_receipt,
         "privacy": {
             "mode": "local-research",

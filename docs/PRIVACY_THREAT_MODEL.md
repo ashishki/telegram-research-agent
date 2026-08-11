@@ -126,9 +126,9 @@ provider egress, live fetching, embeddings, vector lookup, migration, or write.
 
 ## PRM-26 Vector/Hybrid Gate Rule
 
-ADR-003 keeps vector/backend adoption blocked. Current approved embedding
-budget is zero rows, zero tokens/chars, zero provider calls, zero vector writes,
-and zero production migrations.
+ADR-003 accepts the no-vector path for now and keeps vector/backend adoption
+blocked. Current approved embedding budget is zero rows, zero tokens/chars,
+zero provider calls, zero vector writes, and zero production migrations.
 
 If a future accepted ADR approves vector/hybrid retrieval, the approval must
 define:
@@ -142,6 +142,19 @@ define:
 
 Until then, committed evidence may record only aggregate metrics, stable archive
 IDs, approval refs, and gate status.
+
+## PRM-28 No-Vector Answer Gate Rule
+
+`rag_answer_gate.v1` prevents related-but-insufficient retrieval hits from
+becoming claims. It marks impossible/current project-state claims as
+`insufficient_evidence`, marks current external-fact questions as
+`needs_external_verification`, and blocks draft proposals when the answer gate
+does not allow an answer.
+
+The gate records only status, reason, booleans, source count, and vector/egress
+flags. It does not include query text in eval reports, raw Telegram text,
+snippets, source URLs, prompts, completions, provider payloads, embeddings, or
+vector index data.
 
 ## Confirmation Rule
 

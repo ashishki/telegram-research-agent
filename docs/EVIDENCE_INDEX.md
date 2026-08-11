@@ -526,18 +526,41 @@ PYTHONPATH=src python3 tools/archive_retrieval_eval.py --root . --db data/agent.
 archive_retrieval_eval: rows=50 gold=50 candidates=0 output=evals/retrieval/product_rag_fts_baseline_report.json
 ```
 
-## PRM-26 Hybrid Retrieval ADR/Privacy Budget Draft - 2026-08-11
+## PRM-26 Hybrid Retrieval ADR/Privacy Budget Acceptance - 2026-08-11
 
 | Check | Result |
 | --- | --- |
 | ADR | `docs/adr/ADR-003-prm26-hybrid-retrieval-privacy-budget.md` |
-| status | `blocked_pending_operator_backend_approval` |
+| approval ref | `operator-approval-2026-08-11-no-vector-prm28-path` |
+| status | `accepted_no_vector_for_now` |
 | decision | no vector/backend adoption from current generated seed evidence |
 | failure map | source-label hit/citation recovered by SQLite FTS/query planner; no-answer/refusal gap remains; stale/forbidden labels unmeasured |
 | privacy/cost budget | 0 embedding rows, 0 tokens/chars, 0 provider calls, 0 vector writes, 0 migrations, $0 provider cost |
 | rollback | no vector state exists; future vector state must be derived, versioned, disable-able, and backed up before production writes |
-| gate impact | PRM-26 remains blocked pending explicit operator backend/no-backend acceptance; PRM-27 remains blocked |
+| gate impact | PRM-28 no-vector path is allowed; PRM-27 remains blocked unless a future successor vector ADR is approved |
 | side effects | documentation/evidence only; no embeddings, vector backend, provider egress, live research, service start, migrations, production writes, dogfood, or compatibility archive/delete/move |
+
+## PRM-28 No-Vector Answer Gate Acceptance - 2026-08-11
+
+| Check | Result |
+| --- | --- |
+| implementation | `rag_answer_gate.v1` blocks impossible/current project-state claims and current external-fact questions even when FTS returns related posts |
+| local product surface | `memory research` records `answer_gate` in the payload, receipt, and context pack |
+| eval report | `evals/retrieval/product_rag_answer_gate_report.json` |
+| answer-gate metrics | no_answer_accuracy=1.0; external_verification_boundary_accuracy=1.0; current_claim_rejection=1.0; answerable_source_label_accuracy=1.0 |
+| vector metrics | vector_backend_required_rate=0.0; embeddings_run_rate=0.0 |
+| privacy | report contains no queries, snippets, source URLs, raw Telegram text, or provider payloads |
+| side effects | no provider egress, live research, embeddings/vector backend, service start, migrations, production writes, dogfood, or compatibility archive/delete/move |
+| dogfood boundary | PRM-19 remains blocked until explicit dogfood-start approval and accepted/cleared PRM-18 blockers |
+
+Focused commands:
+
+```text
+PYTHONPATH=src python3 -m pytest tests/test_rag_context_pack.py tests/test_memory_research.py tests/test_product_rag_eval.py -q
+23 passed in 11.88s
+PYTHONPATH=src python3 tools/product_rag_answer_gate_eval.py --root . --cases evals/retrieval/product_rag_gold_cases.jsonl --json evals/retrieval/product_rag_answer_gate_report.json
+product_rag_answer_gate_eval: rows=50 no_answer_accuracy=1.0 external_verification_boundary_accuracy=1.0 output=evals/retrieval/product_rag_answer_gate_report.json
+```
 
 ## Local PRM Status UX - 2026-08-10
 
@@ -614,7 +637,7 @@ python3 tools/test_tiers.py focused-prm
 | exclusions | uncited, raw-corpus, duplicate, missing-excerpt, invalid, and over-budget candidates are excluded with privacy-safe reasons |
 | local rendering | `memory research` renders the pack without a provider call, live fetch, migration, or write |
 | semantic boundary | synthetic semantic candidates are fixture inputs only; no embeddings/vector lookup runs |
-| PRM-24 gate | full 50-row generated seed coverage recorded; PRM-26/PRM-27/PRM-28 gates still apply before dogfood |
+| PRM-24 gate | full 50-row generated seed coverage recorded; PRM-26 no-vector path accepted and PRM-28 no-vector answer gate implemented; PRM-19 dogfood remains blocked |
 
 ## PRM-18A..18C Deep Review Evidence - 2026-08-03
 
