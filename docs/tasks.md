@@ -1476,13 +1476,15 @@ Notes: |
   status. Telegram chat, Hermes, and ask aliases use the same privacy-safe PRM
   chat renderer as the CLI only when separately approved for provider egress
   and started with `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`.
-  Post-PRM28 local UX routing now sends ordinary text, voice transcripts, and
-  explicit `/research <question>` in `prm-assistant` mode through the
-  local-only compact `memory research` renderer, adds `/brief <question>` for
-  local-only source-backed editor theses, keeps volatile in-process follow-up
-  context per chat, and improves deterministic AI-transformation archive query
-  hints. Model calls, provider egress, open browsing, writes, service start,
-  and dogfood remain gated.
+  Post-PRM28 local UX routing now sends ordinary text and voice transcripts in
+  `prm-assistant` mode through the Telegram auto command, which chooses local-only compact
+  research or local-only source-backed editor brief by default. Explicit
+  `/research <question>` and `/brief <question>` remain manual fallbacks. The
+  runtime keeps volatile in-process follow-up context and previous mode per
+  chat, and improves deterministic AI-transformation archive query hints. LLM
+  auto-routing and auto chat require both `PRM_TELEGRAM_AUTO_LLM_ROUTER=1` and
+  `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`. Open browsing, writes, service start,
+  vector/backend work, and dogfood remain gated.
 
   The operator runbook documents preflight inspection, install/start/status,
   stop/disable, and rollback-to-disabled commands while preserving the hard

@@ -102,10 +102,13 @@ PYTHONPATH=src python3 -m pytest tests/test_workflow_telemetry.py -q
 
 ## PRM Assistant Runtime Boundary
 
-The safe Telegram runtime dispatches ordinary text and voice transcripts as
-`/chat` questions. It blocks the legacy `/message` and `/voice` intent router,
-legacy inline callbacks, direct reminder/tag/feedback writes, and generation
-commands such as `/run_digest` and `/run_mvp_weekly`.
+The safe Telegram runtime dispatches ordinary text and voice transcripts through
+`/auto`. By default this chooses local-only research or local-only editor brief
+rendering; LLM auto-routing and auto chat require both
+`PRM_TELEGRAM_AUTO_LLM_ROUTER=1` and
+`PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`. It blocks the legacy `/message` and
+`/voice` intent router, legacy inline callbacks, direct reminder/tag/feedback
+writes, and generation commands such as `/run_digest` and `/run_mvp_weekly`.
 
 The safe runtime does not run automatic startup migrations. Production DB
 migration remains a separate approved maintenance action.

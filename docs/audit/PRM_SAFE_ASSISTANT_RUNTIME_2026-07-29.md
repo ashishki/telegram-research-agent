@@ -41,10 +41,13 @@ Blocked command surface:
 
 Ordinary Telegram text and voice transcripts were initially dispatched as
 `/chat` in safe mode. On 2026-08-11 this was amended after the local UX trial:
-ordinary text, voice transcripts, and explicit `/research <question>` now route
-to the local-only compact `memory research` renderer. `/chat` remains a
-separate LLM-backed command requiring provider-egress approval and
-`PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`. Voice fallback copy hides legacy
+ordinary text and voice transcripts now route through `/auto`, which chooses
+local-only compact research or local-only editor brief rendering by default.
+The manual `/research <question>` and `/brief <question>` commands remain
+fallbacks. LLM auto-routing and auto chat require both
+`PRM_TELEGRAM_AUTO_LLM_ROUTER=1` and
+`PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`; `/chat` remains a separate LLM-backed
+command requiring provider-egress approval. Voice fallback copy hides legacy
 feedback commands.
 
 The safe CLI entrypoint does not run automatic startup migrations. Production

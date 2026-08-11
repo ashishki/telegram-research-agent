@@ -167,10 +167,12 @@ PRM-18A contracted command surfaces:
   `PYTHONPATH=src python3 src/main.py memory ask --llm-approved --allow-provider-egress "<question>"`;
 - PRM-18B interactive command:
   `PYTHONPATH=src python3 src/main.py memory chat --allow-provider-egress`;
-- Telegram local research command after approved runtime start:
-  `/research <question>` or ordinary text inside the disabled `prm-assistant`
-  runtime;
-- Telegram editor brief command after approved runtime start:
+- Telegram auto route after approved runtime start: ordinary text or voice
+  transcript inside the disabled `prm-assistant` runtime chooses local research
+  or local editor brief by default;
+- Telegram manual local research fallback after approved runtime start:
+  `/research <question>`;
+- Telegram manual editor brief fallback after approved runtime start:
   `/brief <question>` for local-only source-backed theses;
 - PRM-18C Telegram LLM parity command after separate provider-egress approval:
   `/chat <question>` with `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`.
@@ -199,17 +201,21 @@ Implemented `prm-assistant` runtime mode:
 
 - one service, disabled by default until dogfood approval;
 - no automatic timers;
-- `/research` or ordinary message for local-only grounded questions;
-- `/brief` for local-only source-backed editor/social-post theses;
+- ordinary text and voice transcripts enter `/auto`, which chooses local
+  research or local source-backed editor/social-post brief by default;
+- `/research` and `/brief` remain manual fallback commands;
 - short follow-ups can use the last in-process research question for that
-  chat; this dialog context is volatile and is not written to the database;
-- `/chat` remains the separate LLM-backed command and requires separate
-  provider-egress approval plus `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1` before
-  use with private snippets;
+  chat and previous mode; this dialog context is volatile and is not written to
+  the database;
+- LLM auto-routing and auto chat require both
+  `PRM_TELEGRAM_AUTO_LLM_ROUTER=1` and
+  `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`; `/chat` remains the separate
+  LLM-backed fallback command and requires provider-egress approval before use
+  with private snippets;
 - read-only tools enabled by default;
 - proposal tools return drafts only;
 - `confirm_save_proposal` is the only durable memory write;
-- ordinary text and voice transcript dispatch to `/research`, not the legacy
+- ordinary text and voice transcript dispatch to `/auto`, not the legacy
   `/message` or `/voice` feedback/reminder router;
 - legacy callbacks are disabled, so inline buttons cannot write old decision,
   reminder, or artifact-feedback rows;

@@ -131,8 +131,8 @@ or promoted to PRM dogfood evidence.
 | CLI entrypoint | `src/main.py prm-assistant` implemented |
 | repo unit template | `systemd/telegram-prm-assistant.service` added |
 | legacy bot compatibility | `src/main.py bot` still uses legacy runtime mode |
-| ordinary text in safe mode | dispatches to local-only research command, not legacy message router |
-| voice transcript in safe mode | dispatches to local-only research command, not legacy voice router |
+| ordinary text in safe mode | dispatches to the Telegram auto route, not the legacy message router |
+| voice transcript in safe mode | dispatches to the Telegram auto route, not the legacy voice router |
 | legacy callbacks in safe mode | disabled before DB write helpers run |
 | legacy generation/write commands in safe mode | blocked by allowlist |
 | safe runtime migrations | no automatic startup migration |
@@ -626,22 +626,22 @@ git diff --check
 
 This receipt is diagnostic evidence only. It is not PRM-19 dogfood evidence.
 
-## Telegram Local Research Routing - 2026-08-11
+## Telegram Auto Research Routing - 2026-08-11
 
 | Check | Result |
 | --- | --- |
-| implementation | `prm-assistant` ordinary text and transcribed voice now route to the Telegram research command, which renders local-only compact `memory research` output |
-| explicit command | the Telegram research command with a question is registered and allowed in PRM safe mode |
-| editor brief | the Telegram brief command is registered and renders local-only source-backed post/editor theses |
-| dialog context | short follow-up questions can use the previous in-process research question for the same chat; no durable database write is performed |
+| implementation | `prm-assistant` ordinary text and transcribed voice now route to the Telegram auto command, which chooses local-only compact research or local-only editor brief by default |
+| explicit commands | the Telegram research and brief commands remain registered and allowed as manual fallbacks in PRM safe mode |
+| editor brief | source/editorial wording in ordinary text routes to the local-only source-backed post/editor thesis renderer |
+| dialog context | short follow-up questions can use the previous in-process question and mode for the same chat; no durable database write is performed |
 | query planning | AI-transformation editorial questions get deterministic archive query hints for implementation success, ROI/productivity, failure/no-growth, and hiring/layoff angles |
 | answer gate | archive-scoped recent-post questions no longer trigger current-fact refusal, but current-price/current-stock questions still require external verification |
-| provider boundary | the Telegram research command uses `MemoryResearchBudget(max_model_calls=0, allow_provider_egress=false, allow_open_browsing=false)` |
-| LLM Telegram gate | Telegram chat, Hermes, and ask commands refuse by default unless `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1` is set before runtime startup |
+| provider boundary | local research and local brief use `MemoryResearchBudget(max_model_calls=0, allow_provider_egress=false, allow_open_browsing=false)` |
+| LLM Telegram gate | Telegram chat, Hermes, and ask commands refuse by default unless `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1` is set before runtime startup; ordinary-text LLM auto-routing additionally requires `PRM_TELEGRAM_AUTO_LLM_ROUTER=1` |
 | runtime boundary | service was not installed, enabled, started, or treated as dogfood |
-| simulation | local handler simulation: first AI-transformation question and short "а почему?" follow-up both keep the AI-pilot-vs-result angle; current Nvidia price question starts with the freshness boundary; brief mode emits a source-backed editor brief |
-| validation | `PYTHONPATH=src python3 -m pytest tests/test_memory_research.py tests/test_rag_context_pack.py tests/test_handlers.py tests/test_callbacks.py tests/test_product_rag_eval.py tests/test_archive_retrieval_eval.py -q` -> 86 passed in 28.34s; `python3 tools/test_tiers.py focused-prm` -> 139 passed in 24.78s; `python3 tools/playbook_validate.py --root . --check tasks --check references` -> errors=0 warnings=0; `git diff --check` -> no output |
-| operator use | after explicit manual runtime-start approval, send normal text or the Telegram research command with a question; use the Telegram brief command for post theses; do not use Telegram chat unless provider egress is separately approved |
+| simulation | local handler simulation: AI-transformation question routed to research; short "а почему?" kept prior research mode; source-packet/post wording routed to brief; current Nvidia price question used the deterministic hard local gate and started with the freshness boundary |
+| validation | `PYTHONPATH=src python3 -m pytest tests/test_memory_research.py tests/test_rag_context_pack.py tests/test_handlers.py tests/test_callbacks.py tests/test_product_rag_eval.py tests/test_archive_retrieval_eval.py -q` -> 94 passed in 38.22s; `python3 tools/test_tiers.py focused-prm` -> 139 passed in 24.37s; `python3 tools/playbook_validate.py --root . --check tasks --check references` -> errors=0 warnings=0; `git diff --check` -> no output |
+| operator use | after explicit manual runtime-start approval, send normal text; use manual research or brief commands only to override auto routing; do not use Telegram chat unless provider egress is separately approved |
 
 This is a safe Telegram UX routing change only. It is not PRM-19 dogfood
 evidence and does not approve provider egress, live web research, embeddings,

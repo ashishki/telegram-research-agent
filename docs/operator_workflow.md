@@ -50,10 +50,13 @@ PYTHONPATH=src python3 src/main.py memory ask --json "найди подтвер�
 This command is a local product preview, not PRM-19 dogfood evidence. The
 Telegram `prm-assistant` runtime remains disabled until explicit dogfood-start
 approval. When that runtime is approved for a manual smoke test, ordinary text
-and `/research <question>` use the same local-only compact research path; the
-runtime keeps a volatile in-memory last-research question per chat for short
-follow-ups. Use `/brief <question>` for source-backed post/editor theses. The
-LLM-backed `/chat` command remains behind separate provider-egress approval.
+and voice transcripts enter the auto-router: local research is the default,
+source/editorial wording routes to the local brief renderer, and short
+follow-ups reuse the previous in-process mode for that chat. Manual research and
+brief commands remain fallback controls. LLM auto-routing and auto chat require
+both `PRM_TELEGRAM_AUTO_LLM_ROUTER=1` and
+`PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`; the explicit chat command remains behind
+separate provider-egress approval.
 
 ## PRM-18 LLM Chat UX Block
 
@@ -78,8 +81,9 @@ Contracted command surfaces:
 | Local evidence JSON | `PYTHONPATH=src python3 src/main.py memory ask --json "<question>"` | available now | none |
 | One-shot LLM synthesis | `PYTHONPATH=src python3 src/main.py memory ask --llm-approved --allow-provider-egress "<question>"` | implemented in PRM-18B | bounded cited snippets only after explicit switch |
 | Interactive LLM chat | `PYTHONPATH=src python3 src/main.py memory chat --allow-provider-egress` | implemented in PRM-18B | bounded cited snippets only after explicit switch |
-| Telegram local research | `/research <question>` or ordinary text in `prm-assistant` mode | implemented; runtime remains disabled until explicit start approval | none |
-| Telegram editor brief | `/brief <question>` in `prm-assistant` mode | implemented; runtime remains disabled until explicit start approval | none |
+| Telegram auto route | ordinary text or voice transcript in `prm-assistant` mode | implemented; chooses local research or local brief by default; runtime remains disabled until explicit start approval | none by default; LLM router requires both Telegram auto-router and provider-egress flags |
+| Telegram local research | `/research <question>` fallback in `prm-assistant` mode | implemented; runtime remains disabled until explicit start approval | none |
+| Telegram editor brief | `/brief <question>` fallback in `prm-assistant` mode | implemented; runtime remains disabled until explicit start approval | none |
 | Telegram assistant chat | `/chat <question>` in `prm-assistant` mode | PRM-18C parity implemented; service remains disabled; runtime requires `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1` | bounded cited snippets only after explicit provider-egress approval |
 
 The LLM-backed commands are intentionally explicit:
@@ -91,9 +95,11 @@ PYTHONPATH=src python3 src/main.py memory ask --llm-approved --allow-provider-eg
 
 Telegram `/chat` is also gated at runtime. Without
 `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`, `/chat`, `/hermes`, and `/ask` refuse
-with "No provider call was made". Use `/research` or ordinary text for the
-local-only Telegram smoke test. Use `/brief` when the expected output is a
-source-backed editor brief rather than a conversational answer.
+with "No provider call was made". Without
+`PRM_TELEGRAM_AUTO_LLM_ROUTER=1`, ordinary text uses deterministic local routing
+and does not call a model for route selection. For the local-only Telegram smoke
+test, send a normal message; use the manual research or brief commands only
+when you want to override the auto decision.
 
 Without `--allow-provider-egress`, the product must either stay on the local
 `memory ask` path or refuse with clear copy such as:
@@ -410,8 +416,8 @@ Hermes commands and chat:
 - `/weekly` - current weekly artifact status and three main conclusions;
 - `/actions` - one to three actions for the week;
 - `/explain` - explain a selected signal or ask what to explain;
-- plain text, `/chat`, `/hermes`, or `/ask` - bounded LLM chat that can choose
-  read-only PI tools from context;
+- in legacy Hermes mode, plain text, `/chat`, `/hermes`, or `/ask` - bounded
+  LLM chat that can choose read-only PI tools from context;
 - `/remind` / `/reminders` - local daily reminder check-in workflow;
 - `/projects` - project actions and watch items;
 - `/mvp` - MVP Radar candidate status, source mix, missing evidence, and why
@@ -498,10 +504,10 @@ Expected interpretation:
   or inline callback is observed in production.
 
 Hermes readiness means the command concierge, bounded LLM chat, voice router,
-and daily reminder check-in are live:
-plain text, `/research`, `/chat`, `/hermes`, `/ask`, `/weekly`, `/actions`,
-`/explain`, `/projects`, `/mvp`, `/strategy`, `/remind`, `/reminders`, and
-`/codex`.
+and daily reminder check-in are live. In PRM assistant mode, readiness covers
+ordinary text auto-routing, voice transcript auto-routing, manual research and
+brief fallbacks, `/chat`, `/hermes`, `/ask`, `/weekly`, `/actions`, `/explain`,
+`/projects`, `/mvp`, `/strategy`, `/remind`, `/reminders`, and `/codex`.
 `/codex` prepares prompt text for manual approval and never executes Codex.
 
 RAG readiness is intentionally limited. The assistant layer reads curated

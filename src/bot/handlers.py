@@ -18,9 +18,11 @@ from assistant.memory_research import (
     render_memory_research_brief,
 )
 from assistant.pi_tools import call_pi_tool
+from assistant.rag_answer_gate import assess_rag_answer_gate
 from bot.telegram_delivery import _send_text_internal, send_document, send_report_preview, send_text
 from config.settings import PROJECT_ROOT, Settings
 from db.migrate import record_feedback, record_post_tag
+from llm.client import LLMClient
 from output.generate_digest import _compute_week_label, run_digest
 from output.generate_insight import generate_insight
 from output.generate_study_plan import generate_study_plan, mark_study_complete
@@ -57,6 +59,7 @@ PRM_SAFE_COMMANDS = frozenset(
         "/chat",
         "/hermes",
         "/ask",
+        "/auto",
         "/research",
         "/brief",
         "/costs",
@@ -77,6 +80,7 @@ COMMAND_DOCS: dict[str, tuple[str, str]] = {
     "/codex [focus]": ("handle_codex", "Prepare a Codex prompt draft; never executes Codex"),
     "/chat <message>": ("handle_chat", "Ask Hermes; LLM may call bounded read-only PI tools"),
     "/hermes <message>": ("handle_chat", "Ask Hermes; alias for /chat"),
+    "/auto <message>": ("handle_auto", "Choose PRM-safe tool automatically for an ordinary message"),
     "/research <question>": ("handle_research", "Run local-only compact PRM research over archive/context pack"),
     "/brief <question>": ("handle_research_brief", "Run local-only editor brief with source-backed points"),
     "/remind <when> <task>": ("handle_remind", "Create a daily-check-in reminder"),
@@ -120,6 +124,7 @@ TAG_ALIASES = {
     "read_later": "read_later",
 }
 _RESEARCH_DIALOG_STATE: dict[str, str] = {}
+_RESEARCH_DIALOG_MODE_STATE: dict[str, str] = {}
 _MAX_RESEARCH_DIALOGS = 100
 
 
@@ -179,11 +184,135 @@ def _telegram_provider_egress_allowed() -> bool:
 def _send_telegram_provider_egress_required(chat_id: str) -> None:
     lines = [
         "Telegram /chat is LLM-backed and provider egress is not approved for this runtime.",
-        "Use /research <question> or send ordinary text for local-only RAG.",
+        "Send ordinary text for auto local routing, or use /research <question> for local-only RAG.",
         "If you intentionally want an LLM-backed Telegram test, set PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1 before startup.",
         "No provider call was made.",
     ]
     send_message(_get_bot_token(), chat_id, "\n".join(lines), parse_mode=None)
+
+
+def _telegram_auto_llm_router_allowed() -> bool:
+    value = os.environ.get("PRM_TELEGRAM_AUTO_LLM_ROUTER", "").strip().casefold()
+    return value in {"1", "true", "yes", "approved"} and _telegram_provider_egress_allowed()
+
+
+def _route_auto_message(chat_id: str, text: str, *, input_kind: str = "text") -> dict[str, object]:
+    clean = _clean_operator_text(text)
+    previous_question = _RESEARCH_DIALOG_STATE.get(str(chat_id), "")
+    previous_mode = _RESEARCH_DIALOG_MODE_STATE.get(str(chat_id), "")
+    fallback = _deterministic_auto_route(clean, previous_question=previous_question, previous_mode=previous_mode)
+    hard_boundary = _hard_local_research_route(clean, previous_question=previous_question, previous_mode=previous_mode)
+    if hard_boundary is not None:
+        return {**hard_boundary, "router": "deterministic_hard_gate", "model_call_attempted": False}
+    if not _telegram_auto_llm_router_allowed():
+        return {**fallback, "router": "deterministic", "model_call_attempted": False}
+
+    prompt = (
+        "Choose the safest tool for a private Telegram research assistant. Return JSON only.\n"
+        "Allowed modes:\n"
+        "- research: local archive/context answer with citations; best for questions about what the archive says, project gates, current-fact boundaries, and evidence lookup.\n"
+        "- brief: local source-backed editor brief; best for requests to prepare theses, angles, source packets, drafts-for-post inputs, or social post research.\n"
+        "- chat: LLM-backed conversational synthesis; use only for freeform generation, rewriting, or final prose that cannot be handled as local cited research.\n\n"
+        "Rules:\n"
+        "- Prefer brief over chat when the user asks for post тезисы, опорные тезисы, source packet, редакторский бриф, or materials for social posts.\n"
+        "- Prefer research over chat when the user asks what their archive/posts said, what sources exist, or asks a current fact that must be refused/freshness-gated.\n"
+        "- For short follow-ups, keep the previous mode unless the message clearly asks for another output.\n"
+        "- Do not choose chat merely because the wording is informal.\n\n"
+        'Return exactly: {"mode":"research|brief|chat","confidence":0.0,"reason":"short"}\n\n'
+        f"Input kind: {input_kind}\n"
+        f"Previous mode: {previous_mode or 'none'}\n"
+        f"Previous question: {previous_question or 'none'}\n"
+        f"Message: {clean}"
+    )
+    try:
+        result = LLMClient.complete_json(prompt=prompt, system="", category="pi_chat", max_tokens=200)
+    except Exception as exc:
+        return {**fallback, "router": "deterministic_after_llm_error", "model_call_attempted": True, "error": type(exc).__name__}
+    if not isinstance(result, Mapping):
+        return {**fallback, "router": "deterministic_after_invalid_llm", "model_call_attempted": True}
+    mode = str(result.get("mode") or "").strip().casefold()
+    confidence = _safe_confidence(result.get("confidence"))
+    if mode not in {"research", "brief", "chat"} or confidence < 0.45:
+        return {**fallback, "router": "deterministic_after_low_confidence_llm", "model_call_attempted": True}
+    return {
+        "mode": mode,
+        "confidence": confidence,
+        "reason": str(result.get("reason") or "LLM auto-router").strip(),
+        "router": "llm",
+        "model_call_attempted": True,
+        "previous_mode": previous_mode,
+        "previous_question": previous_question,
+    }
+
+
+def _hard_local_research_route(text: str, *, previous_question: str = "", previous_mode: str = "") -> dict[str, object] | None:
+    gate = assess_rag_answer_gate(text, source_count=1)
+    reason = str(gate.get("reason") or "")
+    if reason not in {"current_external_fact_required", "unsupported_project_state_claim"}:
+        return None
+    return {
+        "mode": "research",
+        "confidence": 0.95,
+        "reason": f"Hard local research gate: {reason}.",
+        "previous_mode": previous_mode,
+        "previous_question": previous_question,
+    }
+
+
+def _deterministic_auto_route(text: str, *, previous_question: str = "", previous_mode: str = "") -> dict[str, object]:
+    clean = _clean_operator_text(text)
+    lowered = clean.casefold()
+    if _is_research_followup(clean) and previous_mode in {"brief", "research"}:
+        return {
+            "mode": previous_mode,
+            "confidence": 0.66,
+            "reason": "Short follow-up keeps previous mode.",
+            "previous_mode": previous_mode,
+            "previous_question": previous_question,
+        }
+    if _looks_like_editor_brief_request(lowered):
+        return {
+            "mode": "brief",
+            "confidence": 0.72,
+            "reason": "Editor/source-brief wording matched.",
+            "previous_mode": previous_mode,
+            "previous_question": previous_question,
+        }
+    return {
+        "mode": "research",
+        "confidence": 0.55,
+        "reason": "Default safe local archive research route.",
+        "previous_mode": previous_mode,
+        "previous_question": previous_question,
+    }
+
+
+def _looks_like_editor_brief_request(lowered: str) -> bool:
+    return any(
+        marker in lowered
+        for marker in (
+            "тезис",
+            "опорн",
+            "пост",
+            "соцсет",
+            "редактор",
+            "бриф",
+            "source packet",
+            "editor brief",
+            "social post",
+            "draft inputs",
+            "углы",
+            "angles",
+        )
+    )
+
+
+def _safe_confidence(value: object) -> float:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    return max(0.0, min(1.0, parsed))
 
 
 def _resolve_research_dialog_question(chat_id: str, question: str) -> dict[str, str | bool]:
@@ -205,12 +334,14 @@ def _resolve_research_dialog_question(chat_id: str, question: str) -> dict[str, 
     }
 
 
-def _remember_research_dialog(chat_id: str, effective_question: str) -> None:
+def _remember_research_dialog(chat_id: str, effective_question: str, *, mode: str = "research") -> None:
     key = str(chat_id)
     if len(_RESEARCH_DIALOG_STATE) >= _MAX_RESEARCH_DIALOGS and key not in _RESEARCH_DIALOG_STATE:
         oldest_key = next(iter(_RESEARCH_DIALOG_STATE))
         _RESEARCH_DIALOG_STATE.pop(oldest_key, None)
+        _RESEARCH_DIALOG_MODE_STATE.pop(oldest_key, None)
     _RESEARCH_DIALOG_STATE[key] = _clean_operator_text(effective_question)[:500]
+    _RESEARCH_DIALOG_MODE_STATE[key] = mode if mode in {"research", "brief", "chat"} else "research"
 
 
 def _is_research_followup(question: str) -> bool:
@@ -419,20 +550,19 @@ def handle_prm_start(chat_id: str, args: str, settings: Settings) -> None:
         "PRM safe assistant",
         "",
         "Dogfood status: not started. Service start requires explicit PRM-19 approval.",
-        "Use /research <question> or send a normal message after approved runtime start.",
-        "Use /brief <question> when you want source-backed theses for a post.",
-        "Research mode is local-only: no LLM, provider egress, live web, embeddings, or writes.",
-        "Use /chat only for a separately approved LLM-backed test; bounded cited snippets may go to the provider.",
+        "Send a normal message; auto mode chooses research, editor brief, or gated LLM chat.",
+        "Local research and editor brief modes are default: no LLM, provider egress, live web, embeddings, or writes.",
+        "LLM auto-routing/chat require PRM_TELEGRAM_AUTO_LLM_ROUTER=1 and PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1.",
         "Local-only CLI remains: memory ask <question>.",
         "",
-        "Safe read-only commands: /research, /brief, /weekly, /actions, /mvp, /strategy, /projects, /costs, /status.",
+        "Manual fallback commands: /research, /brief, /weekly, /actions, /mvp, /strategy, /projects, /costs, /status.",
         "MVP Radar is a decision-evidence card only; Telegram-only evidence cannot approve build.",
         "",
         "Blocked in this mode: ingestion, reaction sync, report generation, Radar generation,",
         "direct feedback/tag/reminder writes, legacy callbacks, Codex/config/code mutation,",
         "and dogfood/release claims.",
         "Memory saves remain disabled from /research; draft saves require a separate confirmed flow.",
-        "Every /research answer shows sources, limitations, planner limits, and Privacy.",
+        "Every auto research/brief answer shows sources, limitations, planner limits, and Privacy.",
     ]
     send_message(_get_bot_token(), chat_id, "\n".join(lines), parse_mode=None)
 
@@ -450,7 +580,7 @@ def _send_prm_safe_blocked(chat_id: str, command: str) -> None:
         "PRM safe mode blocked this legacy command.",
         f"Command: {shown_command}",
         "",
-        "Use /research for local-only grounded questions, /brief for source-backed theses, or /weekly /actions /mvp /strategy for read-only orientation.",
+        "Send ordinary text for auto local routing, or use /research for grounded questions, /brief for source-backed theses, or /weekly /actions /mvp /strategy for read-only orientation.",
         "No generation, ingestion, Radar, direct feedback/tag/reminder write, or report delivery was run.",
     ]
     send_message(_get_bot_token(), chat_id, "\n".join(lines), parse_mode=None)
@@ -872,6 +1002,24 @@ def handle_ask(chat_id: str, args: str, settings: Settings) -> None:
     handle_chat(chat_id, args, settings)
 
 
+def handle_auto(chat_id: str, args: str, settings: Settings) -> None:
+    question = args.strip()
+    if not question:
+        send_message(_get_bot_token(), chat_id, "Напиши обычный вопрос или задачу.", parse_mode=None)
+        return
+    route = _route_auto_message(chat_id, question)
+    mode = str(route.get("mode") or "research")
+    if mode == "brief":
+        handle_research_brief(chat_id, question, settings)
+        return
+    if mode == "chat":
+        handle_chat(chat_id, question, settings)
+        if _telegram_provider_egress_allowed():
+            _remember_research_dialog(chat_id, question, mode="chat")
+        return
+    handle_research(chat_id, question, settings)
+
+
 def handle_research(chat_id: str, args: str, settings: Settings) -> None:
     question = args.strip()
     if not question:
@@ -896,7 +1044,7 @@ def handle_research(chat_id: str, args: str, settings: Settings) -> None:
         send_message(_get_bot_token(), chat_id, f"Не смог выполнить local research: {exc}", parse_mode=None)
         return
     result = _with_dialog_context(result, dialog)
-    _remember_research_dialog(chat_id, str(dialog["effective_question"]))
+    _remember_research_dialog(chat_id, str(dialog["effective_question"]), mode="research")
     _send_research_text(chat_id, render_memory_research_answer(result), token=_get_bot_token())
 
 
@@ -924,7 +1072,7 @@ def handle_research_brief(chat_id: str, args: str, settings: Settings) -> None:
         send_message(_get_bot_token(), chat_id, f"Не смог собрать local brief: {exc}", parse_mode=None)
         return
     result = _with_dialog_context(result, dialog)
-    _remember_research_dialog(chat_id, str(dialog["effective_question"]))
+    _remember_research_dialog(chat_id, str(dialog["effective_question"]), mode="brief")
     _send_research_text(chat_id, render_memory_research_brief(result), token=_get_bot_token())
 
 
@@ -1451,6 +1599,7 @@ HANDLERS: dict[str, Callable[[str, str, Settings], None]] = {
     "/mvp": handle_mvp,
     "/strategy": handle_strategy,
     "/codex": handle_codex,
+    "/auto": handle_auto,
     "/chat": handle_chat,
     "/hermes": handle_chat,
     "/research": handle_research,

@@ -138,13 +138,13 @@ def _dispatch_bot_command(chat_id: str, text: str, settings: Settings, *, runtim
 
 def _operator_text_command(text: str, *, runtime_mode: str) -> str:
     if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
-        return f"/research {text}"
+        return f"/auto {text}"
     return f"/message {text}"
 
 
 def _voice_text_command(text: str, *, runtime_mode: str) -> str:
     if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
-        return f"/research {text}"
+        return f"/auto {text}"
     return f"/voice {text}"
 
 
@@ -158,7 +158,7 @@ def _voice_unavailable_message(*, runtime_mode: str) -> str:
     if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
         return (
             "Голосовое распознавание пока не настроено: нужен OPENAI_API_KEY. "
-            "Пока отправь текстом обычное сообщение или /research <вопрос>."
+            "Пока отправь обычное текстовое сообщение."
         )
     return (
         "Голосовое распознавание пока не настроено: нужен OPENAI_API_KEY. "
@@ -168,7 +168,7 @@ def _voice_unavailable_message(*, runtime_mode: str) -> str:
 
 def _voice_failed_message(*, runtime_mode: str) -> str:
     if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
-        return "Не смог распознать голосовое. Отправь текстом обычное сообщение или /research <вопрос>."
+        return "Не смог распознать голосовое. Отправь обычное текстовое сообщение."
     return "Не смог распознать голосовое. Отправь текстом обычное сообщение, /chat <вопрос> или /feedback <фидбек>."
 
 

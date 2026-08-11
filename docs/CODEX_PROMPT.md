@@ -75,12 +75,16 @@ runtime activation. PRM-18 adds deterministic release/dogfood gate receipts;
 the current post-PRM28 receipt is blocked only on dogfood-start approval and
 does not start dogfood or claim release readiness. On 2026-07-29 the old live Telegram bot and Report V2 weekly timer
 were stopped and disabled. A dedicated `prm-assistant` mode now exists for the
-future operator entrypoint: ordinary text and voice transcript dispatch to
-local-only `/research`, `/brief` provides local-only source-backed editor
-theses, legacy callbacks are disabled, and generation/write commands are
-blocked. It does not run automatic startup migrations. The full product is not
-released. For immediate local use, `memory ask` provides a no-LLM local
-evidence brief over bounded archive/curated/project context.
+future operator entrypoint: ordinary text and voice transcripts dispatch to
+`/auto`, which chooses local research or local editor brief by default and can
+choose LLM chat only when both `PRM_TELEGRAM_AUTO_LLM_ROUTER=1` and
+`PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1` are explicitly enabled. Manual
+`/research`, `/brief`, and separately gated `/chat` remain fallback commands.
+Legacy callbacks are disabled, and
+generation/write commands are blocked. It does not run automatic startup
+migrations. The full product is not released. For immediate local use,
+`memory ask` provides a no-LLM local evidence brief over bounded
+archive/curated/project context.
 LLM-backed `memory ask --llm-approved` and
 `memory chat --allow-provider-egress` now exist behind the explicit
 provider-egress switch; Telegram `/chat` remains a separate LLM-backed command,
@@ -162,11 +166,11 @@ jobs from this handoff.
   answer gate; PRM-27 remains gated behind a future successor vector ADR.
 - Post-PRM28 local UX polish improved `memory research` default rendering,
   localization, current-fact boundaries, path redaction, and narrow repo-context
-  cues. A follow-up Telegram UX polish adds local-only `/brief` editor briefs,
-  volatile per-chat `/research` follow-up context, deterministic
-  AI-transformation query hints, and a corrected archive-scope/current-price
-  answer gate. Remaining UX gaps are deeper multi-turn product memory and
-  curated-memory relevance/deduplication.
+  cues. A follow-up Telegram UX polish adds ordinary-message auto routing,
+  local-only `/brief` editor briefs, volatile per-chat mode-aware follow-up
+  context, deterministic AI-transformation query hints, and a corrected
+  archive-scope/current-price answer gate. Remaining UX gaps are deeper
+  multi-turn product memory and curated-memory relevance/deduplication.
 - PRM-18 release/dogfood gate is implemented. The current post-PRM28 receipt
   clears deterministic local stop-ship blockers and remains blocked on missing
   dogfood-start approval.

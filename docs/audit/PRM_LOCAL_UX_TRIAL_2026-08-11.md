@@ -5,11 +5,11 @@ Scope: local CLI usability review after PRM-28 no-vector RAG acceptance
 
 ## Boundary
 
-This trial simulated operator questions against local CLI surfaces only. It did
-not start PRM-19, Telegram services, live Telegram ingestion, reaction sync,
-live web research, provider egress, embeddings/vector backend, migrations,
-production database writes, release claims, or compatibility archive/delete/move
-work.
+This trial simulated operator questions against local CLI surfaces and local
+Telegram handler calls only. It did not start PRM-19, Telegram services, live
+Telegram ingestion, reaction sync, live web research, provider egress,
+embeddings/vector backend, migrations, production database writes, release
+claims, or compatibility archive/delete/move work.
 
 No raw Telegram post bodies or generated private reports are copied into this
 receipt.
@@ -44,6 +44,7 @@ queries:
 | Surface | Cases | Output size | Visual notes |
 | --- | ---: | --- | --- |
 | `memory research` compact default | 3 | 1.56k-1.72k chars, 29-30 lines | 3-5 lines over 140 chars; `Citation-Safe Context Pack` hidden unless `--debug`; current-fact case had no drafts |
+| Telegram auto route local simulation | 4 | 1.60k-2.67k chars, 24-29 non-empty lines | ordinary research, follow-up, editor brief, and current-fact hard boundary all render as readable single Telegram messages |
 
 Shared safety observations:
 
@@ -52,6 +53,8 @@ Shared safety observations:
   external skill use, durable writes, embeddings, and vector backend stayed
   false;
 - source links and privacy lines were visible in the CLI output.
+- Telegram auto routing used deterministic local routing by default; no model
+  routing call was attempted in the local-only simulation.
 
 ## What Works
 
@@ -63,6 +66,10 @@ Shared safety observations:
 - The `memory research` output is auditable: it shows archive evidence,
   linked-source absence, context-pack state, unknowns, draft proposal state,
   planner limits, and privacy flags.
+- Ordinary Telegram text no longer requires the operator to remember helper
+  commands: archive questions route to local research, post/source-packet tasks
+  route to the local brief renderer, and short follow-ups reuse the previous
+  mode in volatile memory.
 
 ## UX And Product Gaps
 
@@ -130,6 +137,10 @@ Safe UX polish implemented after this trial:
 10. Corrected the answer gate so archive-scoped recent-post questions can be
     answered from local archive context while current-price/current-stock
     questions still require external verification.
+11. Added Telegram `/auto` routing for ordinary text and voice transcripts, with
+    deterministic local routing by default and optional LLM route selection only
+    when both `PRM_TELEGRAM_AUTO_LLM_ROUTER=1` and
+    `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1` are set.
 
 Remaining known UX gaps:
 
@@ -137,6 +148,8 @@ Remaining known UX gaps:
 - curated memory relevance/deduplication still needs deeper scoring;
 - multi-turn context is volatile/in-process only and is not durable product
   memory;
+- LLM route selection is implemented behind an explicit provider-egress gate but
+  was validated with fakes/local simulation, not real provider calls;
 - the operational startup banner is emitted on stderr in direct terminal use;
 - live/current linked-source verification remains gated and was not run.
 
@@ -144,12 +157,12 @@ Remaining known UX gaps:
 
 ```text
 PYTHONPATH=src python3 -m pytest tests/test_memory_research.py tests/test_rag_context_pack.py tests/test_handlers.py tests/test_callbacks.py tests/test_product_rag_eval.py tests/test_archive_retrieval_eval.py -q
-86 passed in 28.34s
+94 passed in 38.22s
 ```
 
 ```text
 python3 tools/test_tiers.py focused-prm
-139 passed in 24.78s
+139 passed in 24.37s
 ```
 
 ```text
