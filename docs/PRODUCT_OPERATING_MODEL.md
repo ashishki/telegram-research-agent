@@ -226,6 +226,11 @@ Implemented `prm-assistant` runtime mode:
   recording is suppressed to avoid production DB writes;
 - Telegram research/brief responses are packaged topic reports and do not show
   technical metrics in the user-visible message;
+- freshness-scoped research questions such as "last two weeks" are strict
+  dated-archive queries: `date_from`/`date_to` are applied to SQLite FTS and the
+  local vector sidecar, stale candidates are rejected after retrieval, and the
+  user-facing answer must say when no local posts exist in that window instead
+  of using older related posts as evidence;
 - auto-routing guards archive/source questions from generic chat fallback, so
   questions about posts, archive evidence, AI transformation, companies,
   Telegram, RAG, or vectors stay on the RAG path;

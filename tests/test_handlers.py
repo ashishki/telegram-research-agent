@@ -576,6 +576,7 @@ class TestHandlers(unittest.TestCase):
         self.assertIn("Group related sources by topic", prompt)
         self.assertIn("Use a clean visual layout", prompt)
         self.assertIn("Do not show technical metrics", prompt)
+        self.assertIn("hard source eligibility boundary", prompt)
         message = mock_send_message.call_args.args[2]
         self.assertIn("PRM Research", message)
         self.assertIn("AI pilots need ROI proof", message)
@@ -585,6 +586,24 @@ class TestHandlers(unittest.TestCase):
         self.assertNotIn("model_calls", message)
         self.assertNotIn("estimated_cost", message)
         self.assertNotIn("bounded_telegram_snippet_provider_egress", message)
+
+    def test_telegram_rag_synthesis_context_carries_strict_time_window(self):
+        payload = _fake_research_payload("Что было интересного по моделям за последние две недели?")
+        payload["time_window"] = {
+            "requested": True,
+            "strict": True,
+            "label": "2026-07-28–2026-08-11",
+            "date_from": "2026-07-28T00:00:00Z",
+            "date_to": "2026-08-12T00:00:00Z",
+            "source": "последние две недели",
+        }
+
+        context = handlers._telegram_rag_synthesis_context(payload, mode="research")
+
+        self.assertTrue(context["time_window"]["requested"])
+        self.assertTrue(context["time_window"]["strict"])
+        self.assertEqual(context["time_window"]["label"], "2026-07-28–2026-08-11")
+        self.assertEqual(context["archive"]["sources"][0]["date"], "2026-08-01")
 
     def test_handle_research_uses_volatile_dialog_context_for_short_followups(self):
         settings = Settings(

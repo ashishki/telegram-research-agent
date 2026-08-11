@@ -1,5 +1,6 @@
 import json
 import unittest
+from datetime import datetime, timezone
 
 from assistant.memory_research import (
     MemoryResearchBudget,
@@ -138,7 +139,7 @@ class _AITransformationFacade(_FakeFacade):
             "items": [
                 {
                     "archive_document_id": "tg:-1001:4001",
-                    "posted_at": "2026-05-06T09:00:00Z",
+                    "posted_at": "2026-07-06T09:00:00Z",
                     "channel_username": "@redmad",
                     "source_url": "https://t.me/redmad/4001",
                     "snippet": (
@@ -146,6 +147,53 @@ class _AITransformationFacade(_FakeFacade):
                         "пилоты есть, но реальный эффект и финансовая выгода требуют процесса."
                     ),
                 }
+            ][:limit],
+        }
+
+
+class _StaleModelsFacade(_FakeFacade):
+    def search_telegram_archive(self, query, filters=None, limit=5):
+        self.calls.append("search_telegram_archive")
+        self.archive_filters.append(dict(filters or {}))
+        return {
+            "status": "ok",
+            "query": query,
+            "retrieval_mode": "sqlite_fts_archive",
+            "items": [
+                {
+                    "archive_document_id": "tg:-1001:5001",
+                    "posted_at": "2026-05-22T09:00:00Z",
+                    "channel_username": "@model_old",
+                    "source_url": "https://t.me/model_old/5001",
+                    "snippet": "Old model launch context that must not answer a last-two-weeks question.",
+                }
+            ][:limit],
+        }
+
+
+class _MixedModelsFacade(_FakeFacade):
+    def search_telegram_archive(self, query, filters=None, limit=5):
+        self.calls.append("search_telegram_archive")
+        self.archive_filters.append(dict(filters or {}))
+        return {
+            "status": "ok",
+            "query": query,
+            "retrieval_mode": "sqlite_fts_archive",
+            "items": [
+                {
+                    "archive_document_id": "tg:-1001:5101",
+                    "posted_at": "2026-07-20T09:00:00Z",
+                    "channel_username": "@model_old",
+                    "source_url": "https://t.me/model_old/5101",
+                    "snippet": "Older model item outside the requested window.",
+                },
+                {
+                    "archive_document_id": "tg:-1001:5102",
+                    "posted_at": "2026-08-05T09:00:00Z",
+                    "channel_username": "@model_recent",
+                    "source_url": "https://t.me/model_recent/5102",
+                    "snippet": "Fresh LLM model release inside the requested window.",
+                },
             ][:limit],
         }
 
@@ -270,6 +318,58 @@ class TestMemoryResearch(unittest.TestCase):
         self.assertIn("внедрение ИИ компании успешным", variants)
         self.assertIn("AI transformation companies ROI productivity", variants)
         self.assertNotEqual(variants[0], "AI собери опорные тезисы поста")
+
+    def test_memory_research_adds_ai_model_query_variants(self):
+        variants = _archive_query_variants(
+            "Что было интересного по моделям за последние две недели?",
+            project_name=None,
+            max_variants=4,
+        )
+
+        self.assertIn("AI models LLM", variants)
+        self.assertIn("LLM GPT Claude Gemini", variants)
+        self.assertIn("модели ИИ LLM", variants)
+        self.assertNotIn("последние", " ".join(variants).casefold())
+
+    def test_memory_research_enforces_last_two_weeks_and_rejects_stale_hits(self):
+        facade = _StaleModelsFacade()
+
+        result = answer_memory_research(
+            "Что было интересного по моделям за последние две недели?",
+            facade=facade,
+            now=datetime(2026, 8, 11, 12, 0, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual(result["time_window"]["date_from"], "2026-07-28T00:00:00Z")
+        self.assertEqual(result["time_window"]["date_to"], "2026-08-12T00:00:00Z")
+        self.assertTrue(all(item.get("date_from") == "2026-07-28T00:00:00Z" for item in facade.archive_filters))
+        self.assertTrue(all(item.get("date_to") == "2026-08-12T00:00:00Z" for item in facade.archive_filters))
+        self.assertEqual(result["archive_evidence"]["items"], [])
+        self.assertTrue(
+            any(attempt.get("rejected_by_time_window") for attempt in result["archive_evidence"]["attempted_queries"])
+        )
+
+        rendered = render_memory_research_answer(result)
+
+        self.assertIn("В локальном архиве за 2026-07-28–2026-08-11 не нашёл релевантных постов", rendered)
+        self.assertNotIn("Old model launch", rendered)
+        self.assertNotIn("2026-05-22", rendered)
+
+    def test_memory_research_keeps_recent_hits_inside_requested_window(self):
+        result = answer_memory_research(
+            "Что было интересного по моделям за последние две недели?",
+            facade=_MixedModelsFacade(),
+            now=datetime(2026, 8, 11, 12, 0, tzinfo=timezone.utc),
+        )
+
+        items = result["archive_evidence"]["items"]
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["source_url"], "https://t.me/model_recent/5102")
+        rendered = render_memory_research_answer(result)
+        self.assertIn("Fresh LLM model release", rendered)
+        self.assertIn("2026-08-05", rendered)
+        self.assertNotIn("Older model item", rendered)
+        self.assertNotIn("2026-07-20", rendered)
 
     def test_memory_research_archive_scoped_recent_posts_are_not_current_fact_refusal(self):
         result = answer_memory_research(

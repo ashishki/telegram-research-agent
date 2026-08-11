@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Mapping, Sequence
 
 from assistant.linked_sources import (
@@ -80,10 +81,14 @@ _QUERY_STOPWORDS = {
     "has",
     "have",
     "how",
+    "interesting",
     "into",
     "is",
     "it",
+    "last",
     "me",
+    "month",
+    "months",
     "my",
     "need",
     "needs",
@@ -91,6 +96,7 @@ _QUERY_STOPWORDS = {
     "on",
     "or",
     "our",
+    "recent",
     "should",
     "show",
     "so",
@@ -107,6 +113,10 @@ _QUERY_STOPWORDS = {
     "which",
     "why",
     "with",
+    "day",
+    "days",
+    "week",
+    "weeks",
     "а",
     "без",
     "было",
@@ -116,6 +126,11 @@ _QUERY_STOPWORDS = {
     "все",
     "всю",
     "где",
+    "два",
+    "две",
+    "дней",
+    "дня",
+    "день",
     "для",
     "до",
     "его",
@@ -132,6 +147,9 @@ _QUERY_STOPWORDS = {
     "какой",
     "когда",
     "ли",
+    "месяц",
+    "месяца",
+    "месяцев",
     "мне",
     "мой",
     "моего",
@@ -141,6 +159,9 @@ _QUERY_STOPWORDS = {
     "надо",
     "нам",
     "не",
+    "неделю",
+    "недели",
+    "недель",
     "него",
     "них",
     "но",
@@ -150,6 +171,9 @@ _QUERY_STOPWORDS = {
     "она",
     "они",
     "от",
+    "последние",
+    "последних",
+    "последнюю",
     "по",
     "под",
     "почему",
@@ -165,6 +189,7 @@ _QUERY_STOPWORDS = {
     "уже",
     "что",
     "чтобы",
+    "интересного",
     "это",
     "этого",
 }
@@ -191,6 +216,68 @@ _AI_TRANSFORMATION_HIRING_VARIANTS = (
     "AI layoffs hiring companies",
     "ИИ увольнения найм компании",
 )
+_AI_MODEL_VARIANTS = (
+    "AI models LLM",
+    "LLM GPT Claude Gemini",
+    "модели ИИ LLM",
+)
+
+_NUMBER_WORDS = {
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "один": 1,
+    "одну": 1,
+    "одна": 1,
+    "два": 2,
+    "две": 2,
+    "пару": 2,
+    "три": 3,
+    "трех": 3,
+    "трёх": 3,
+    "четыре": 4,
+    "четырех": 4,
+    "четырёх": 4,
+    "пять": 5,
+    "пяти": 5,
+    "шесть": 6,
+    "шести": 6,
+    "семь": 7,
+    "семи": 7,
+}
+_RELATIVE_WINDOW_RE = re.compile(
+    r"(?:за\s+)?(?:последн\w*|last|recent)\s+"
+    r"(?P<count>\d+|one|two|three|four|five|six|seven|один|одну|одна|два|две|пару|три|трех|трёх|четыре|четырех|четырёх|пять|пяти|шесть|шести|семь|семи)?\s*"
+    r"(?P<unit>дн(?:я|ей|ь)?|недел(?:я|ю|и|ь)?|месяц(?:а|ев|ы)?|days?|weeks?|months?)",
+    re.IGNORECASE,
+)
+_TODAY_WINDOW_RE = re.compile(r"\b(today|сегодня)\b", re.IGNORECASE)
+
+
+@dataclass(frozen=True)
+class ResearchTimeWindow:
+    requested: bool = False
+    strict: bool = False
+    date_from: str = ""
+    date_to: str = ""
+    label: str = ""
+    days: int = 0
+    source: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "requested": bool(self.requested),
+            "strict": bool(self.strict),
+            "date_from": self.date_from,
+            "date_to": self.date_to,
+            "label": self.label,
+            "days": int(self.days or 0),
+            "source": self.source,
+        }
 
 
 @dataclass(frozen=True)
@@ -237,6 +324,7 @@ def answer_memory_research(
     linked_source_fetcher: LinkedSourceFetcher | FakeLinkedSourceFetcher | None = None,
     linked_source_fixtures: Mapping[str, Mapping[str, Any]] | None = None,
     project_context_fixtures: Sequence[Mapping[str, Any]] | None = None,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
     clean_question = _clean_text(question)
     active_budget = budget or MemoryResearchBudget()
@@ -246,6 +334,7 @@ def answer_memory_research(
     if budget_refusal:
         return _refusal_payload(clean_question, active_budget, budget_refusal[0], budget_refusal[1])
 
+    time_window = _resolve_time_window(clean_question, now=now)
     bounded_limit = max(1, min(active_budget.max_archive_sources, int(limit or active_budget.max_archive_sources)))
     active_facade = facade or PersonalIntelligenceFacade(settings=settings)
     tool_calls: list[dict[str, Any]] = []
@@ -258,6 +347,7 @@ def answer_memory_research(
         limit=bounded_limit,
         tool_calls=tool_calls,
         budget=active_budget,
+        time_window=time_window,
     )
     curated_result = _call_curated_search(
         active_facade,
@@ -266,6 +356,7 @@ def answer_memory_research(
         limit=bounded_limit,
         tool_calls=tool_calls,
         budget=active_budget,
+        time_window=time_window,
     )
     project_context = _route_project_context(
         active_facade,
@@ -289,7 +380,7 @@ def answer_memory_research(
         budget=active_budget,
     )
 
-    archive_evidence = _archive_evidence(archive_result, max_items=bounded_limit)
+    archive_evidence = _archive_evidence(archive_result, max_items=bounded_limit, time_window=time_window)
     linked_evidence = _linked_evidence(linked_result, max_items=active_budget.max_linked_sources)
     curated_evidence = _curated_evidence(curated_result, max_items=bounded_limit)
     project_fit = _project_fit(project_context)
@@ -306,7 +397,7 @@ def answer_memory_research(
     comparison = _approach_comparison(archive_evidence, linked_evidence, curated_evidence)
     next_steps = _next_steps(project_fit, archive_evidence, linked_evidence, answer_gate)
     deeper_reading = _deeper_reading(linked_evidence, archive_evidence, curated_evidence)
-    unknowns = _unknowns(archive_evidence, linked_evidence, project_fit, linked_result)
+    unknowns = _unknowns(archive_evidence, linked_evidence, project_fit, linked_result, time_window=time_window)
     unknowns = _unique([*unknowns, *_answer_gate_unknowns(answer_gate)])
     repo_project_context = _repo_project_context(clean_question, project_name=project_name)
     direct_answer = _direct_answer(
@@ -316,6 +407,7 @@ def answer_memory_research(
         project_fit=project_fit,
         unknowns=unknowns,
         answer_gate=answer_gate,
+        time_window=time_window,
     )
     source_refs = _unique(
         [
@@ -352,6 +444,7 @@ def answer_memory_research(
         "status": receipt["status"],
         "mode": "local_research_fixture",
         "question": clean_question,
+        "time_window": time_window.to_dict(),
         "direct_answer": direct_answer,
         "archive_evidence": archive_evidence,
         "curated_memory": curated_evidence,
@@ -658,11 +751,30 @@ def _compact_answer(payload: Mapping[str, Any], *, ru: bool) -> str:
     linked_evidence = _mapping(payload.get("linked_source_evidence"))
     project_fit = _mapping(payload.get("project_fit"))
     repo_context = _mapping(payload.get("repo_project_context"))
+    time_window = _mapping(payload.get("time_window"))
     archive_items = [item for item in archive_evidence.get("items") or [] if isinstance(item, Mapping)]
     linked_items = [item for item in linked_evidence.get("items") or [] if isinstance(item, Mapping)]
     source_count = len(archive_items) + len(linked_items)
     project_label = str(project_fit.get("relevance_label") or "no_match")
-    if bool(answer_gate.get("external_verification_required")) and not bool(answer_gate.get("current_claim_allowed", True)):
+    gate_reason = str(answer_gate.get("reason") or "")
+    if gate_reason == "current_external_fact_required" or _is_current_external_fact_question(intent_question):
+        return (
+            "Сначала ограничение: текущий факт нельзя подтвердить локально. Архив ниже — только контекст; внешняя проверка не запускалась."
+            if ru
+            else "First constraint: this current fact cannot be verified locally. Archive evidence below is context only; no external verification was run."
+        )
+    if _time_window_requested(time_window) and not source_count:
+        label = _time_window_label(time_window, ru=ru)
+        return (
+            f"В локальном архиве за {label} не нашёл релевантных постов. Старые похожие посты не использую как ответ на свежий вопрос; live web не запускался."
+            if ru
+            else f"No relevant retained posts were found for {label}. Older related posts were not used as evidence for this freshness-scoped question; no live web verification was run."
+        )
+    if (
+        bool(answer_gate.get("external_verification_required"))
+        and not bool(answer_gate.get("current_claim_allowed", True))
+        and not bool(answer_gate.get("allow_answer", True))
+    ):
         return (
             "Сначала ограничение: текущий факт нельзя подтвердить локально. Архив ниже — только контекст; внешняя проверка не запускалась."
             if ru
@@ -692,12 +804,14 @@ def _compact_answer(payload: Mapping[str, Any], *, ru: bool) -> str:
     if source_count:
         first = archive_items[0] if archive_items else linked_items[0]
         snippet = _short(first.get("snippet") or first.get("content") or first.get("text_excerpt") or "", 150)
+        window_prefix_ru = f"за {_time_window_label(time_window, ru=True)} " if _time_window_requested(time_window) else ""
+        window_prefix_en = f"for {_time_window_label(time_window, ru=False)} " if _time_window_requested(time_window) else ""
         if ru:
             return (
-                f"Нашёл локальные источники: {source_count}. Главный первый сигнал: {snippet} "
+                f"Нашёл {window_prefix_ru}локальные источники: {source_count}. Главный первый сигнал: {snippet} "
                 f"Маршрут проекта: {_localized_project_label(project_label)}."
             )
-        return f"Found {source_count} local source(s). First strong signal: {snippet} Project routing: {project_label}."
+        return f"Found {source_count} local source(s) {window_prefix_en}. First strong signal: {snippet} Project routing: {project_label}."
     return (
         "Локальных источников не найдено. Я не буду додумывать ответ."
         if ru
@@ -844,6 +958,9 @@ def _localize_unknown(value: str) -> str:
         "external verification before current claims": "внешняя проверка перед текущими утверждениями",
         "current-claim freshness": "актуальность текущего утверждения",
         "direct project implication": "прямое влияние на проект",
+        "fresh local Telegram archive support for requested time window": (
+            "релевантные свежие посты в заданном окне локального Telegram-архива"
+        ),
         "local Telegram archive support": "поддержка в локальном Telegram-архиве",
         "sufficient cited proof for the requested claim": "достаточное цитируемое доказательство для запрошенного утверждения",
         "active project context": "контекст активного проекта",
@@ -958,6 +1075,145 @@ def render_memory_research_answer_body(
     return "\n".join(lines).rstrip()
 
 
+def _resolve_time_window(question: str, *, now: datetime | None = None) -> ResearchTimeWindow:
+    clean = _clean_text(question)
+    lowered = clean.casefold()
+    now_dt = _coerce_now(now)
+    today = now_dt.date()
+
+    relative = _RELATIVE_WINDOW_RE.search(lowered)
+    if relative:
+        raw_count = relative.group("count")
+        unit = str(relative.group("unit") or "").casefold()
+        count = _window_count(raw_count)
+        if not raw_count and unit in {"месяцы", "months"}:
+            count = 3
+        days = _window_days(count=count, unit=unit)
+        return _time_window_from_dates(
+            date_from=today - timedelta(days=days),
+            date_to_exclusive=today + timedelta(days=1),
+            days=days,
+            source=_clean_text(relative.group(0)),
+        )
+
+    if _TODAY_WINDOW_RE.search(lowered):
+        return _time_window_from_dates(
+            date_from=today,
+            date_to_exclusive=today + timedelta(days=1),
+            days=1,
+            source="today",
+        )
+
+    return ResearchTimeWindow()
+
+
+def _coerce_now(now: datetime | None) -> datetime:
+    value = now or datetime.now(timezone.utc)
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _window_count(value: str | None) -> int:
+    clean = str(value or "").strip().casefold()
+    if not clean:
+        return 1
+    if clean.isdigit():
+        return max(1, min(24, int(clean)))
+    return max(1, min(24, int(_NUMBER_WORDS.get(clean, 1))))
+
+
+def _window_days(*, count: int, unit: str) -> int:
+    if unit.startswith("д") or unit.startswith("day"):
+        return max(1, count)
+    if unit.startswith("нед") or unit.startswith("week"):
+        return max(1, count * 7)
+    if unit.startswith("мес") or unit.startswith("month"):
+        return max(1, count * 30)
+    return max(1, count)
+
+
+def _time_window_from_dates(
+    *,
+    date_from: date,
+    date_to_exclusive: date,
+    days: int,
+    source: str,
+) -> ResearchTimeWindow:
+    inclusive_to = date_to_exclusive - timedelta(days=1)
+    label = f"{date_from.isoformat()}–{inclusive_to.isoformat()}"
+    return ResearchTimeWindow(
+        requested=True,
+        strict=True,
+        date_from=f"{date_from.isoformat()}T00:00:00Z",
+        date_to=f"{date_to_exclusive.isoformat()}T00:00:00Z",
+        label=label,
+        days=max(1, int(days or 1)),
+        source=source,
+    )
+
+
+def _archive_item_matches_time_window(item: Mapping[str, Any], time_window: ResearchTimeWindow) -> bool:
+    if not time_window.requested or not time_window.strict:
+        return True
+    posted_at = _parse_archive_datetime(item.get("posted_at"))
+    date_from = _parse_archive_datetime(time_window.date_from)
+    date_to = _parse_archive_datetime(time_window.date_to)
+    if posted_at is None or date_from is None or date_to is None:
+        return False
+    return date_from <= posted_at < date_to
+
+
+def _is_current_external_fact_question(question: str) -> bool:
+    lowered = _clean_text(question).casefold()
+    if _contains_any(lowered, ("точные текущие цены", "текущая цена", "current prices", "current price", "pricing today")):
+        return True
+    if _contains_any(lowered, ("сегодня", "today")) and _contains_any(
+        lowered,
+        ("цены", "цена", "стоим", "акций", "акции", "price", "pricing", "stock", "buy", "купить"),
+    ):
+        return True
+    return False
+
+
+def _parse_archive_datetime(value: Any) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    normalized = text[:-1] + "+00:00" if text.endswith("Z") else text
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        try:
+            parsed_date = date.fromisoformat(text[:10])
+        except ValueError:
+            return None
+        parsed = datetime.combine(parsed_date, datetime.min.time(), tzinfo=timezone.utc)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _time_window_requested(time_window: Mapping[str, Any] | ResearchTimeWindow) -> bool:
+    if isinstance(time_window, ResearchTimeWindow):
+        return bool(time_window.requested)
+    return bool(time_window.get("requested"))
+
+
+def _time_window_label(time_window: Mapping[str, Any] | ResearchTimeWindow, *, ru: bool) -> str:
+    if isinstance(time_window, ResearchTimeWindow):
+        label = time_window.label
+        days = time_window.days
+    else:
+        label = str(time_window.get("label") or "")
+        days = int(time_window.get("days") or 0)
+    if label:
+        return label
+    if days:
+        return f"последние {days} дн." if ru else f"last {days} day(s)"
+    return "заданный период" if ru else "the requested period"
+
+
 def _call_archive_search(
     facade: Any,
     query: str,
@@ -967,12 +1223,16 @@ def _call_archive_search(
     limit: int,
     tool_calls: list[dict[str, Any]],
     budget: MemoryResearchBudget,
+    time_window: ResearchTimeWindow,
 ) -> dict[str, Any]:
     if len(tool_calls) >= budget.max_tool_calls or not hasattr(facade, "search_telegram_archive"):
         return {"status": "skipped", "query": query, "items": [], "message": "Archive search skipped by planner limit."}
     filters: dict[str, Any] = {}
     if week_label:
         filters["week_label"] = week_label
+    if time_window.requested and time_window.strict:
+        filters["date_from"] = time_window.date_from
+        filters["date_to"] = time_window.date_to
     if budget.allow_vector_retrieval:
         filters["retrieval_mode"] = "hybrid"
         if budget.vector_index_path:
@@ -990,6 +1250,7 @@ def _call_archive_search(
                 "filters": logged_filters,
                 "project_name_hint": project_name,
                 "limit": limit,
+                "time_window": time_window.to_dict(),
             },
         }
     )
@@ -1009,15 +1270,17 @@ def _call_archive_search(
             failures.append(type(exc).__name__)
             continue
         result_items = [dict(item) for item in result.get("items") or [] if isinstance(item, Mapping)]
-        accepted_items = [
+        query_matched_items = [
             item for item in result_items if _archive_item_matches_query_variant(item, variant)
         ]
+        accepted_items = [item for item in query_matched_items if _archive_item_matches_time_window(item, time_window)]
         attempts.append(
             {
                 "query": variant,
                 "status": str(result.get("status") or ("ok" if result_items else "insufficient_evidence")),
                 "item_count": len(result_items),
                 "accepted_count": len(accepted_items),
+                "rejected_by_time_window": max(0, len(query_matched_items) - len(accepted_items)),
             }
         )
         for item in accepted_items:
@@ -1038,13 +1301,18 @@ def _call_archive_search(
         message = f"Archive search failed for all query variants: {', '.join(_unique(failures)[:3])}."
     else:
         status = "insufficient_evidence"
-        message = "No retained Telegram archive evidence matched deterministic query variants."
+        message = (
+            "No retained Telegram archive evidence matched deterministic query variants inside the requested time window."
+            if time_window.requested and time_window.strict
+            else "No retained Telegram archive evidence matched deterministic query variants."
+        )
     return {
         "status": status,
         "query": query,
         "query_variants": query_variants,
         "attempted_queries": attempts,
         "filters": logged_filters,
+        "time_window": time_window.to_dict(),
         "project_name_hint": project_name,
         "items": items[:limit],
         "retrieval_mode": (
@@ -1068,6 +1336,7 @@ def _archive_query_variants(
     domain_specific = False
 
     candidates.extend(_ai_transformation_query_variants(lowered))
+    candidates.extend(_ai_model_query_variants(lowered))
     if _contains_any(lowered, ("lead response", "sla", "лид", "заявк")):
         candidates.append("lead response SLA no answer")
         domain_specific = True
@@ -1158,6 +1427,31 @@ def _ai_transformation_query_variants(lowered_query: str) -> list[str]:
     ):
         variants = [*_AI_TRANSFORMATION_HIRING_VARIANTS, *variants]
     return _unique_strings(variants)
+
+
+def _ai_model_query_variants(lowered_query: str) -> list[str]:
+    if not _is_ai_model_question(lowered_query):
+        return []
+    return list(_AI_MODEL_VARIANTS)
+
+
+def _is_ai_model_question(lowered_query: str) -> bool:
+    return _contains_any(
+        lowered_query,
+        (
+            "модел",
+            "models",
+            "llm",
+            "gpt",
+            "claude",
+            "gemini",
+            "openai",
+            "anthropic",
+            "mistral",
+            "qwen",
+            "llama",
+        ),
+    )
 
 
 def _is_ai_transformation_question(lowered_query: str) -> bool:
@@ -1378,10 +1672,30 @@ def _call_curated_search(
     limit: int,
     tool_calls: list[dict[str, Any]],
     budget: MemoryResearchBudget,
+    time_window: ResearchTimeWindow,
 ) -> dict[str, Any]:
     if len(tool_calls) >= budget.max_tool_calls or not hasattr(facade, "search_intelligence_items"):
         return {"status": "skipped", "query": query, "items": [], "message": "Curated search skipped by planner limit."}
     filters = {"week_label": week_label} if week_label else {}
+    if time_window.requested and time_window.strict and not week_label:
+        tool_calls.append(
+            {
+                "name": "search_intelligence_items",
+                "arguments": {
+                    "query": query,
+                    "filters": {"time_window_enforced": False},
+                    "limit": limit,
+                    "skipped_reason": "strict_time_window_not_supported_for_curated_memory",
+                    "time_window": time_window.to_dict(),
+                },
+            }
+        )
+        return {
+            "status": "skipped",
+            "query": query,
+            "items": [],
+            "message": "Curated search skipped because the requested recency window can only be enforced on dated archive posts.",
+        }
     tool_calls.append({"name": "search_intelligence_items", "arguments": {"query": query, "filters": filters, "limit": limit}})
     try:
         return dict(facade.search_intelligence_items(query, filters=filters, limit=limit))
@@ -1476,7 +1790,7 @@ def _call_linked_sources(
     )
 
 
-def _archive_evidence(result: Mapping[str, Any], *, max_items: int) -> dict[str, Any]:
+def _archive_evidence(result: Mapping[str, Any], *, max_items: int, time_window: ResearchTimeWindow) -> dict[str, Any]:
     items = [dict(item) for item in result.get("items") or [] if isinstance(item, Mapping)][:max_items]
     source_refs = _unique(
         [
@@ -1488,6 +1802,7 @@ def _archive_evidence(result: Mapping[str, Any], *, max_items: int) -> dict[str,
     return {
         "status": str(result.get("status") or ("ok" if items else "insufficient_evidence")),
         "retrieval_mode": result.get("retrieval_mode") or "sqlite_fts_archive",
+        "time_window": time_window.to_dict(),
         "query_variants": _strings(result.get("query_variants")),
         "attempted_queries": [dict(item) for item in result.get("attempted_queries") or [] if isinstance(item, Mapping)],
         "source_refs": source_refs,
@@ -1674,10 +1989,15 @@ def _unknowns(
     linked_evidence: Mapping[str, Any],
     project_fit: Mapping[str, Any],
     linked_result: Mapping[str, Any],
+    *,
+    time_window: ResearchTimeWindow,
 ) -> list[str]:
     unknowns: list[str] = []
     if not archive_evidence.get("items"):
-        unknowns.append("local Telegram archive support")
+        if time_window.requested:
+            unknowns.append("fresh local Telegram archive support for requested time window")
+        else:
+            unknowns.append("local Telegram archive support")
     if not linked_evidence.get("extracted_count"):
         unknowns.append("approved linked-source text")
     linked_receipt = _mapping(linked_result.get("receipt"))
@@ -1736,12 +2056,24 @@ def _direct_answer(
     project_fit: Mapping[str, Any],
     unknowns: Sequence[str],
     answer_gate: Mapping[str, Any],
+    time_window: ResearchTimeWindow,
 ) -> str:
     archive_items = [item for item in archive_evidence.get("items") or [] if isinstance(item, Mapping)]
     linked_items = [item for item in linked_evidence.get("items") or [] if isinstance(item, Mapping)]
     label = str(project_fit.get("relevance_label") or "no_match")
     gate_status = str(answer_gate.get("status") or "")
     gate_reason = str(answer_gate.get("reason") or "")
+    if gate_reason == "current_external_fact_required" or _is_current_external_fact_question(question):
+        return (
+            "This question requires external verification before a current claim or recommendation. "
+            "The local Telegram archive can be used only as discovery context; live/current verification was not approved or run."
+        )
+    if time_window.requested and not archive_items and not linked_items:
+        return (
+            f"No relevant retained Telegram posts were found for {time_window.label or 'the requested time window'}. "
+            "Older related posts were not used as evidence for this freshness-scoped question. "
+            "Live web verification was not run."
+        )
     if gate_status == "needs_external_verification":
         return (
             "This question requires external verification before a current claim or recommendation. "

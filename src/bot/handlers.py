@@ -1191,6 +1191,8 @@ def _synthesize_telegram_rag_answer(payload: Mapping[str, Any], *, mode: str) ->
         "- Use only the bounded_context JSON below for source-grounded claims.\n"
         "- Do not use general model background as evidence.\n"
         "- Do not invent source links, channels, dates, companies, ROI, hiring, layoffs, or current facts.\n"
+        "- If time_window.requested is true, treat that date window as a hard source eligibility boundary.\n"
+        "- For freshness-scoped questions, do not present older sources as recent evidence. If no archive sources remain in the window, say that clearly instead of answering from older context.\n"
         "- If the context says external verification is required, state that clearly.\n"
         "- Keep the answer compact enough for Telegram: roughly 1200-2200 characters.\n"
         "- Same language as the user.\n"
@@ -1232,6 +1234,7 @@ def _synthesize_telegram_rag_answer(payload: Mapping[str, Any], *, mode: str) ->
 def _telegram_rag_synthesis_context(payload: Mapping[str, Any], *, mode: str) -> dict[str, Any]:
     archive = _safe_mapping(payload.get("archive_evidence"))
     linked = _safe_mapping(payload.get("linked_source_evidence"))
+    time_window = _safe_mapping(payload.get("time_window"))
     answer_gate = _safe_mapping(payload.get("answer_gate"))
     next_steps = _safe_mapping(payload.get("next_steps"))
     project_fit = _safe_mapping(payload.get("project_fit"))
@@ -1259,6 +1262,14 @@ def _telegram_rag_synthesis_context(payload: Mapping[str, Any], *, mode: str) ->
         "schema_version": "telegram_rag_llm_synthesis_context.v1",
         "mode": mode,
         "question": str(payload.get("question") or ""),
+        "time_window": {
+            "requested": bool(time_window.get("requested")),
+            "strict": bool(time_window.get("strict")),
+            "label": time_window.get("label"),
+            "date_from": time_window.get("date_from"),
+            "date_to": time_window.get("date_to"),
+            "source": time_window.get("source"),
+        },
         "local_direct_answer": str(payload.get("direct_answer") or ""),
         "answer_status": payload.get("status"),
         "answer_gate": {

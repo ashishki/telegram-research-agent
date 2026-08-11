@@ -713,8 +713,9 @@ testing; see
 | route repair | archive/source questions are guarded from generic chat fallback; "what was in my posts" stays research, not editor brief |
 | synthesis repair | Telegram research/brief now run local hybrid RAG first, then optional bounded LLM synthesis when `PRM_TELEGRAM_RAG_LLM_SYNTHESIS=1` and provider egress are enabled |
 | presentation repair | Telegram research/brief render packaged topic reports and strip visible technical metrics/cost/tool-call/debug footers from the user message |
+| recency repair | questions such as "Что было интересного по моделям за последние две недели?" now parse strict date windows, pass `date_from`/`date_to` to archive/hybrid retrieval, reject stale candidates after retrieval, skip undated curated memory for strict windows, and say no fresh local posts instead of answering from older context |
 | privacy | selected bounded snippets/context may egress to provider; raw corpus egress=false; usage DB recording suppressed; durable_writes=false |
-| validation | `PYTHONPATH=src python3 -m pytest tests/test_handlers.py -q` -> 44 passed after routing/synthesis repair; follow-up presentation tests cover metric stripping |
+| validation | latest repair: `PYTHONPATH=src python3 -m pytest tests/test_memory_research.py tests/test_handlers.py -q` -> 66 passed; `python3 tools/test_tiers.py focused-prm` -> 199 passed; playbook validator errors=0 warnings=0; `git diff --check` clean |
 | dogfood boundary | not PRM-19 evidence; manual testing continues |
 
 ## Local PRM Status UX - 2026-08-10

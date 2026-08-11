@@ -148,11 +148,23 @@ Safe UX polish implemented after this trial:
 13. After the next manual UX feedback, changed Telegram research/brief
     presentation to packaged topic reports and stripped visible technical
     metrics/cost/tool-call/debug footers from user messages.
+14. After the operator question "Что было интересного по моделям за последние
+    две недели?" returned stale archive sources, added strict recency-window
+    parsing for `today` and last N days/weeks/months. The archive and local
+    hybrid retrieval filters now receive `date_from`/`date_to`; stale retrieved
+    candidates are rejected after retrieval as a safety backstop; curated memory
+    is skipped for strict recency windows when no exact date filter can be
+    enforced; AI-model questions get model-specific query variants. If no
+    local posts remain inside the requested window, Telegram/local research now
+    says that directly instead of answering from older context.
 
 Remaining known UX gaps:
 
 - LLM-backed Telegram synthesis still needs more manual testing for report
   usefulness, source grouping, and visual compactness;
+- freshness-scoped questions are now hard date-filtered, but if the local
+  archive has not been updated recently, the correct answer may be "no local
+  posts in this window" until ingestion is separately approved and run;
 - curated memory relevance/deduplication still needs deeper scoring;
 - multi-turn context is volatile/in-process only and is not durable product
   memory;
@@ -162,6 +174,31 @@ Remaining known UX gaps:
 - live/current linked-source verification remains gated and was not run.
 
 ## Validation
+
+```text
+PYTHONPATH=src python3 -m pytest tests/test_memory_research.py tests/test_handlers.py -q
+66 passed in 12.09s
+```
+
+```text
+PRM_ARCHIVE_HYBRID_RETRIEVAL=approved PRM_ARCHIVE_VECTOR_INDEX_PATH=data/vector/archive_vector.sqlite PYTHONPATH=src python3 src/main.py memory research --hybrid --limit 4 "Что было интересного по моделям за последние две недели?"
+local result: no relevant retained Telegram posts were found for 2026-07-28–2026-08-11; older related posts were not used; no live web/provider/write occurred
+```
+
+```text
+python3 tools/test_tiers.py focused-prm
+199 passed in 32.58s
+```
+
+```text
+python3 tools/playbook_validate.py --root . --check tasks --check placeholders --check readiness --check delivery --check references
+playbook_validate: errors=0 warnings=0
+```
+
+```text
+git diff --check
+<no output>
+```
 
 ```text
 PYTHONPATH=src python3 -m pytest tests/test_memory_research.py tests/test_rag_context_pack.py tests/test_handlers.py tests/test_callbacks.py tests/test_product_rag_eval.py tests/test_archive_retrieval_eval.py -q
