@@ -28,6 +28,7 @@ Status: active PRM budget requiring human approval before live provider use
 | PRM-24 generated seed gold labels and FTS baseline | $0 | 0 | raw Telegram text copied into eval rows, provider judge, embeddings, vector backend, live research, or production write |
 | PRM-26 no-vector ADR acceptance | $0 | 0 | any embedding run, vector backend adoption, production index write, migration, provider egress, or accepted backend budget |
 | PRM-28 no-vector answer gate | $0 for implementation/tests | 0 for implementation/tests | provider synthesis, live fetch, embeddings/vector backend, service start, production write, or dogfood start |
+| PRM-27 local vector sidecar | $0 provider cost; local CPU/disk only | 0 | external embeddings, hosted vector service, provider synthesis, service start, production DB write, or migration |
 
 Monthly planning ceiling before dogfood: $25 unless the human approves more.
 
@@ -263,3 +264,21 @@ cost ceiling in an accepted ADR before execution.
 PRM-28 no-vector answer-gate implementation stays inside the same local budget:
 0 provider calls, 0 model calls, 0 embedding rows, 0 vector writes, and no
 service start.
+
+## PRM-27 Local Vector Sidecar Budget
+
+ADR-004 approves only deterministic local vectorization and a local SQLite
+sidecar:
+
+| Control | Value |
+| --- | ---: |
+| Embedding provider calls | 0 |
+| External embedding payload chars | 0 |
+| Hosted vector service calls | 0 |
+| Canonical DB writes | 0 |
+| Production migrations | 0 |
+| Provider cost | $0 |
+
+The expected cost is local CPU time and disk for `data/vector/archive_vector.sqlite`.
+Any provider embedding model, hosted vector database, LLM reranker, production
+migration, or service-start budget requires a separate explicit approval.

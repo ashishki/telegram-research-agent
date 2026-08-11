@@ -34,6 +34,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--db", default="data/agent.db")
     parser.add_argument("--cases", required=True)
     parser.add_argument("--limit", type=int, default=10)
+    parser.add_argument(
+        "--retrieval-mode",
+        choices=("sqlite-fts", "hybrid-local-vector"),
+        default="sqlite-fts",
+    )
+    parser.add_argument(
+        "--vector-index-path",
+        default="data/vector/archive_vector.sqlite",
+        help="Local SQLite vector sidecar used only with --retrieval-mode hybrid-local-vector",
+    )
     parser.add_argument("--json", required=True, dest="json_output")
     return parser
 
@@ -57,6 +67,9 @@ def main(argv: list[str] | None = None) -> int:
     db_path = str(args.db)
     if not db_path.startswith("file:"):
         db_path = str((root / db_path).resolve())
+    vector_index_path = Path(args.vector_index_path)
+    if not vector_index_path.is_absolute():
+        vector_index_path = root / vector_index_path
 
     cases = _load_jsonl(cases_path)
     connection = sqlite3.connect(
@@ -66,7 +79,13 @@ def main(argv: list[str] | None = None) -> int:
     connection.row_factory = sqlite3.Row
     try:
         report = validate_archive_retrieval_eval_report(
-            evaluate_archive_retrieval(connection, cases, limit=args.limit)
+            evaluate_archive_retrieval(
+                connection,
+                cases,
+                limit=args.limit,
+                retrieval_mode=str(args.retrieval_mode).replace("-", "_"),
+                vector_index_path=vector_index_path,
+            )
         )
     finally:
         connection.close()
@@ -83,6 +102,7 @@ def main(argv: list[str] | None = None) -> int:
         f"rows={dataset['row_count']} "
         f"gold={dataset['gold_row_count']} "
         f"candidates={dataset['candidate_row_count']} "
+        f"mode={args.retrieval_mode} "
         f"output={output_path.resolve().relative_to(root)}"
     )
     return 0

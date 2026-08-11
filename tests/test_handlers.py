@@ -441,9 +441,37 @@ class TestHandlers(unittest.TestCase):
         self.assertEqual(budget.max_model_calls, 0)
         self.assertFalse(budget.allow_provider_egress)
         self.assertFalse(budget.allow_open_browsing)
+        self.assertFalse(budget.allow_vector_retrieval)
         render_mock.assert_called_once_with(payload)
         message = mock_send_message.call_args.args[2]
         self.assertIn("PRM Research", message)
+
+    def test_handle_research_can_use_approved_local_hybrid_vector_retrieval(self):
+        settings = Settings(
+            db_path=":memory:",
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+        payload = {"status": "ok", "question": "что дальше?", "privacy": {"model_calls": 0}}
+
+        with patch.dict(
+            os.environ,
+            {
+                "PRM_ARCHIVE_HYBRID_RETRIEVAL": "approved",
+                "PRM_ARCHIVE_VECTOR_INDEX_PATH": "/tmp/archive-vector.sqlite",
+            },
+            clear=False,
+        ):
+            with patch.object(handlers, "answer_memory_research", return_value=payload) as research_mock:
+                with patch.object(handlers, "render_memory_research_answer", return_value="PRM Research"):
+                    with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                        with patch.object(handlers, "send_message"):
+                            handlers.handle_research(chat_id="42", args="что дальше?", settings=settings)
+
+        budget = research_mock.call_args.kwargs["budget"]
+        self.assertTrue(budget.allow_vector_retrieval)
+        self.assertEqual(budget.vector_index_path, "/tmp/archive-vector.sqlite")
 
     def test_handle_research_uses_volatile_dialog_context_for_short_followups(self):
         settings = Settings(
@@ -497,6 +525,7 @@ class TestHandlers(unittest.TestCase):
         self.assertEqual(budget.max_model_calls, 0)
         self.assertFalse(budget.allow_provider_egress)
         self.assertFalse(budget.allow_open_browsing)
+        self.assertFalse(budget.allow_vector_retrieval)
         render_mock.assert_called_once()
         message = mock_send_message.call_args.args[2]
         self.assertIn("PRM редакторский бриф", message)

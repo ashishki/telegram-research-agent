@@ -53,9 +53,14 @@ class ArchiveSearchResult:
     reaction_count: int
     tag_count: int
     project_names: tuple[str, ...]
+    retrieval_mode: str = "sqlite_fts_archive"
+    semantic_score: float | None = None
+    fts_rank: int | None = None
+    vector_rank: int | None = None
+    fusion_score: float | None = None
 
     def as_dict(self) -> dict:
-        return {
+        payload = {
             "archive_document_id": self.archive_document_id,
             "post_archive_document_id": self.post_archive_document_id,
             "post_id": self.post_id,
@@ -76,7 +81,17 @@ class ArchiveSearchResult:
             "reaction_count": self.reaction_count,
             "tag_count": self.tag_count,
             "project_names": list(self.project_names),
+            "retrieval_mode": self.retrieval_mode,
         }
+        if self.semantic_score is not None:
+            payload["semantic_score"] = self.semantic_score
+        if self.fts_rank is not None:
+            payload["fts_rank"] = self.fts_rank
+        if self.vector_rank is not None:
+            payload["vector_rank"] = self.vector_rank
+        if self.fusion_score is not None:
+            payload["fusion_score"] = self.fusion_score
+        return payload
 
 
 def search_telegram_archive(

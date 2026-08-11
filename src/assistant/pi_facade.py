@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import sqlite3
 from contextlib import contextmanager
@@ -15,6 +16,7 @@ from db.archive_search import (
     ArchiveSearchFilters,
     search_telegram_archive,
 )
+from db.archive_vector import search_telegram_archive_hybrid
 from db.ai_report_feedback import fetch_ai_report_feedback, summarize_ai_report_feedback
 from db.idea_threads import fetch_idea_thread_atoms, fetch_idea_threads
 from output.action_status import build_action_status_projection, summarize_action_statuses
@@ -766,44 +768,57 @@ class PersonalIntelligenceFacade:
         limit: int = 10,
     ) -> dict:
         clean_filters = dict(filters or {})
+        public_filters = _archive_public_filters(clean_filters)
+        hybrid_requested = _archive_hybrid_retrieval_enabled(clean_filters)
+        retrieval_mode = "hybrid_local_vector_archive" if hybrid_requested else "sqlite_fts_archive"
         with self._readonly_connection() as connection:
             if (
                 connection is None
                 or not _table_exists(connection, "posts")
                 or not _table_exists(connection, "raw_posts")
-                or not _table_exists(connection, "posts_fts")
+                or (not hybrid_requested and not _table_exists(connection, "posts_fts"))
             ):
                 return {
                     "status": "missing",
                     "query": str(query or ""),
-                    "filters": clean_filters,
+                    "filters": public_filters,
                     "items": [],
-                    "retrieval_mode": "sqlite_fts_archive",
+                    "retrieval_mode": retrieval_mode,
                     "message": "Telegram archive search tables are unavailable.",
                 }
             try:
-                results = search_telegram_archive(
-                    connection,
-                    str(query or ""),
-                    filters=ArchiveSearchFilters(
-                        channel_usernames=tuple(_string_values(clean_filters.get("channel_usernames") or clean_filters.get("channels"))),
-                        languages=tuple(_string_values(clean_filters.get("languages") or clean_filters.get("language"))),
-                        date_from=_clean_text(clean_filters.get("date_from")) or None,
-                        date_to=_clean_text(clean_filters.get("date_to")) or None,
-                        reacted_only=bool(clean_filters.get("reacted_only") or False),
-                        reactions=tuple(_string_values(clean_filters.get("reactions") or clean_filters.get("reaction"))),
-                        tags=tuple(_string_values(clean_filters.get("tags") or clean_filters.get("tag"))),
-                        project_names=tuple(_string_values(clean_filters.get("project_names") or clean_filters.get("project_name"))),
-                    ),
-                    limit=max(1, min(20, int(limit or 10))),
+                archive_filters = ArchiveSearchFilters(
+                    channel_usernames=tuple(_string_values(clean_filters.get("channel_usernames") or clean_filters.get("channels"))),
+                    languages=tuple(_string_values(clean_filters.get("languages") or clean_filters.get("language"))),
+                    date_from=_clean_text(clean_filters.get("date_from")) or None,
+                    date_to=_clean_text(clean_filters.get("date_to")) or None,
+                    reacted_only=bool(clean_filters.get("reacted_only") or False),
+                    reactions=tuple(_string_values(clean_filters.get("reactions") or clean_filters.get("reaction"))),
+                    tags=tuple(_string_values(clean_filters.get("tags") or clean_filters.get("tag"))),
+                    project_names=tuple(_string_values(clean_filters.get("project_names") or clean_filters.get("project_name"))),
                 )
+                if hybrid_requested:
+                    results = search_telegram_archive_hybrid(
+                        connection,
+                        str(query or ""),
+                        vector_index_path=_archive_vector_index_path(clean_filters),
+                        filters=archive_filters,
+                        limit=max(1, min(20, int(limit or 10))),
+                    )
+                else:
+                    results = search_telegram_archive(
+                        connection,
+                        str(query or ""),
+                        filters=archive_filters,
+                        limit=max(1, min(20, int(limit or 10))),
+                    )
             except (ArchiveSearchError, sqlite3.Error, ValueError) as exc:
                 return {
                     "status": "invalid",
                     "query": str(query or ""),
-                    "filters": clean_filters,
+                    "filters": public_filters,
                     "items": [],
-                    "retrieval_mode": "sqlite_fts_archive",
+                    "retrieval_mode": retrieval_mode,
                     "message": f"Telegram archive search failed: {type(exc).__name__}.",
                 }
 
@@ -811,11 +826,13 @@ class PersonalIntelligenceFacade:
         return {
             "status": "ok" if items else "insufficient_evidence",
             "query": str(query or ""),
-            "filters": clean_filters,
+            "filters": public_filters,
             "items": items,
-            "retrieval_mode": "sqlite_fts_archive",
+            "retrieval_mode": retrieval_mode,
             "message": (
-                "Telegram archive posts matched SQLite FTS search."
+                "Telegram archive posts matched FTS-first hybrid local vector/SQLite FTS search."
+                if hybrid_requested and items
+                else "Telegram archive posts matched SQLite FTS search."
                 if items
                 else "No retained Telegram archive evidence matched the query."
             ),
@@ -2774,6 +2791,33 @@ def _table_exists(connection: sqlite3.Connection, table_name: str) -> bool:
     except sqlite3.Error:
         return False
     return row is not None
+
+
+def _archive_hybrid_retrieval_enabled(filters: Mapping[str, object]) -> bool:
+    requested = str(filters.get("retrieval_mode") or filters.get("archive_retrieval_mode") or "").strip().casefold()
+    if requested in {"hybrid", "vector", "local_vector", "hybrid_local_vector_archive"}:
+        return True
+    env_value = os.environ.get("PRM_ARCHIVE_HYBRID_RETRIEVAL", "").strip().casefold()
+    return env_value in {"1", "true", "yes", "approved"}
+
+
+def _archive_vector_index_path(filters: Mapping[str, object]) -> Path:
+    raw_value = (
+        str(filters.get("vector_index_path") or "").strip()
+        or os.environ.get("PRM_ARCHIVE_VECTOR_INDEX_PATH", "").strip()
+        or str(PROJECT_ROOT / "data" / "vector" / "archive_vector.sqlite")
+    )
+    path = Path(raw_value)
+    if not path.is_absolute():
+        path = PROJECT_ROOT / path
+    return path.resolve()
+
+
+def _archive_public_filters(filters: Mapping[str, object]) -> dict[str, object]:
+    public = {key: value for key, value in dict(filters or {}).items() if key != "vector_index_path"}
+    if filters.get("vector_index_path"):
+        public["vector_index_path_configured"] = True
+    return public
 
 
 def _tokens(value: object) -> list[str]:

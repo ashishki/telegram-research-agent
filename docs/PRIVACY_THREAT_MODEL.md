@@ -1,7 +1,7 @@
 # Privacy Threat Model
 
 Status: draft
-Last updated: 2026-08-03
+Last updated: 2026-08-11
 
 ## Assets
 
@@ -35,7 +35,7 @@ Last updated: 2026-08-03
 | linked-source cache leaks raw provider payloads or private post text | PRM-22 cache records store source URL, normalized title, content hash, bounded excerpt, status, and redacted failure reason only |
 | linked-source resolver crawls live web by default | PRM-22 uses fixture/fake fetchers by default and refuses live HTTP, external skills, and provider summarization without explicit approval/budget switches |
 | answer context contains uncited claims or a raw corpus dump | PRM-25 context pack admits only cited bounded excerpts; it excludes raw fields and records safe exclusion reasons |
-| vector index silently persists private corpus embeddings | PRM-26 has no approved vector backend; any future embedding/index run requires accepted ADR, explicit privacy budget, derived-state rollback, and aggregate-only receipts |
+| vector index silently persists private corpus embeddings | PRM-27 allows only the ADR-004 local SQLite sidecar under `data/vector/`, with canonical DB read-only, no provider egress, git ignore, redacted receipts, and FTS fallback; any external embedding or hosted vector backend still requires a new approval |
 | deletion cannot be honored | retention/deletion path required before dogfood |
 
 ## Provider Egress Rule
@@ -119,10 +119,13 @@ budget, and any required trust record for that run.
 PRM-25 `rag_context_pack.v1` is local and fixture-first. It may contain only
 bounded excerpts with a stable citation reference from Telegram archive,
 curated memory, linked-source cache, or a synthetic test candidate. It records
-source class, query variant, freshness status, and project label. It refuses
+source class, retrieval mode, query variant, freshness status, and project label. It refuses
 raw-corpus fields, provider payloads, uncited candidates, duplicate citations,
 and over-budget sources; reasons contain no copied source text. It performs no
-provider egress, live fetching, embeddings, vector lookup, migration, or write.
+provider egress, live fetching, migration, or write. When PRM-27 hybrid
+retrieval is enabled, it may record `vector_backend_used=true` and
+`local_embedding_backend=local_hashing_text_vector.v1`; external embedding
+provider egress remains false.
 
 ## PRM-26 Vector/Hybrid Gate Rule
 
@@ -130,7 +133,16 @@ ADR-003 accepts the no-vector path for now and keeps vector/backend adoption
 blocked. Current approved embedding budget is zero rows, zero tokens/chars,
 zero provider calls, zero vector writes, and zero production migrations.
 
-If a future accepted ADR approves vector/hybrid retrieval, the approval must
+ADR-004 later approves PRM-27 local-sidecar retrieval only:
+
+- local deterministic hashing model `local_hashing_text_vector.v1`;
+- local SQLite sidecar under `data/vector/`;
+- canonical archive DB opened read-only by the CLI indexer;
+- sidecar writes allowed, canonical DB writes/migrations disallowed;
+- provider egress and external embedding provider egress false;
+- receipts redact vector index paths in research payloads.
+
+If a future accepted ADR expands vector/hybrid retrieval, the approval must
 define:
 
 - provider/model or local embedding model;

@@ -16,7 +16,9 @@ from typing import Sequence
 PRM_TESTS = (
     "tests/test_archive_documents.py",
     "tests/test_archive_search.py",
+    "tests/test_archive_vector.py",
     "tests/test_pi_tools.py",
+    "tests/test_pi_facade_archive_vector.py",
     "tests/test_pi_chat.py",
     "tests/test_local_memory_ask.py",
     "tests/test_project_context.py",

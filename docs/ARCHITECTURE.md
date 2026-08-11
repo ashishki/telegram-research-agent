@@ -29,7 +29,7 @@ for the active operating model and consolidation plan.
 ```text
 Telegram channels
   -> Canonical Archive: every retained post
-     -> Archive Search: FTS + metadata, optional future hybrid retrieval
+     -> Archive Search: FTS + metadata + optional local vector sidecar
      -> Selective Enrichment: reactions, repeated search hits, watch topics,
         active projects, saved posts
   -> Assistant Router
@@ -55,6 +55,7 @@ linked-source resolver/cache layer. PRM-23 provides the bounded fixture-first
 Question
   -> project/context interpretation
   -> Telegram archive retrieval with deterministic SQLite FTS query variants
+     and optional local vector sidecar fusion
   -> approved linked-source fetch/cache
   -> approach comparison and contradiction check
   -> grounded synthesis with deeper-reading path
@@ -63,16 +64,16 @@ Question
 
 This requires RAG, but RAG is not enough by itself. The system also needs
 linked-source research, project-context routing, bounded planning, synthesis,
-and evals. SQLite FTS remains the baseline retrieval backend; vector or hybrid
-retrieval is still a PRM-8 conditional decision that requires measured FTS
-failure and human-approved backend adoption.
+and evals. SQLite FTS remains the baseline retrieval backend. PRM-27 adds an
+approved local SQLite vector sidecar using deterministic local hashing; external
+embedding providers and hosted vector services remain unapproved.
 
 The current PRM-23 planner uses deterministic synthesis and fake/fixture linked
 source paths only. The archive layer performs bounded query decomposition and
 acceptance filtering over the existing SQLite FTS backend; it is not approval
 for live web research, provider egress, service start, production DB writes,
 durable linked-source cache writes over private production inputs, dogfood, or
-vector/backend adoption.
+external vector/backend adoption.
 
 ## Problem Fit And Adoption Reality
 
@@ -202,9 +203,9 @@ handler does not create production tables lazily.
 Full product RAG is required before operator dogfood. The required path is
 formalized as PRM-24 through PRM-28: gold eval set, citation-safe context pack,
 hybrid/vector ADR and privacy budget, approved retrieval implementation, and
-product chat acceptance gate. This does not by itself approve embeddings,
-provider egress, production migrations, or a vector backend; those remain gated
-by the ADR, eval result, and explicit human approval.
+product chat acceptance gate. ADR-004 approves a local vector sidecar only. It
+does not approve external embeddings, hosted vector services, provider egress,
+production migrations, canonical DB writes, service start, or dogfood.
 
 Implementation order:
 
@@ -214,23 +215,22 @@ Implementation order:
 4. measure retrieval failures;
 5. build a citation-safe context pack over archive, curated, linked-source,
    project, freshness, and unknown evidence;
-6. compare embedding/hybrid alternatives only after measured failures;
-7. select vector backend through ADR and eval result;
-8. implement hybrid retrieval only when approved metrics improve;
+6. compare embedding/hybrid alternatives and require explicit ADR scope;
+7. select local sidecar/backend through ADR and eval result;
+8. implement hybrid retrieval only inside the approved privacy/cost boundary;
 9. gate local and LLM-backed chat on recall, citation precision, no-answer
    accuracy, latency, and privacy receipts.
 
-Candidate hybrid shape, if later justified:
+Implemented PRM-27 local hybrid shape:
 
 - metadata filters first;
 - FTS/BM25 candidates;
-- embedding candidates;
+- local hashing vector candidates from `data/vector/archive_vector.sqlite` only
+  when FTS misses by default;
 - duplicate/repost collapse;
 - freshness handling;
 - source diversity;
-- small reaction boost;
-- project/watch-topic boost;
-- bounded reranking;
+- reciprocal-rank fusion for explicit diagnostics/full-fusion tests;
 - citation-safe context assembly.
 
 ## Capability Profiles

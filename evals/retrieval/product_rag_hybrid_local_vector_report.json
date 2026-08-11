@@ -1,0 +1,1000 @@
+{
+  "candidates": {
+    "diagnostics": {
+      "duplicate_top10_rate": null,
+      "latency_ms_p95": 0.0,
+      "reacted_post_searchability": 0.967742,
+      "status": "diagnostic_only_not_gold"
+    },
+    "row_count": 0,
+    "rows": []
+  },
+  "dataset": {
+    "candidate_row_count": 0,
+    "candidate_unapproved_case_ids": [],
+    "gold_row_count": 50,
+    "row_count": 50
+  },
+  "gold": {
+    "metrics": {
+      "citation_precision": 1.0,
+      "duplicate_top10_rate": 0.004,
+      "hit_at_10": 1.0,
+      "latency_ms_p95": 59.077,
+      "mrr": 1.0,
+      "no_answer_accuracy": 0.0,
+      "reacted_post_searchability": 0.967742,
+      "stale_rejection": null,
+      "status": "scored"
+    },
+    "row_count": 50,
+    "rows": [
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-ARCH-001",
+        "category": "archive_recall",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 55.154,
+        "query_variant_count": 4,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-ARCH-002",
+        "category": "archive_recall",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 20.733,
+        "query_variant_count": 4,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-ARCH-003",
+        "category": "archive_recall",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 6.682,
+        "query_variant_count": 4,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-ARCH-004",
+        "category": "archive_recall",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 73.292,
+        "query_variant_count": 2,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-ARCH-005",
+        "category": "archive_recall",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 9.908,
+        "query_variant_count": 2,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-ARCH-006",
+        "category": "archive_recall",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 11.115,
+        "query_variant_count": 3,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-ARCH-007",
+        "category": "archive_recall",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 16.178,
+        "query_variant_count": 2,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-ARCH-008",
+        "category": "archive_recall",
+        "duplicate_top10_rate": 0.1,
+        "error_type": null,
+        "latency_ms": 14.614,
+        "query_variant_count": 2,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.1,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-ARCH-009",
+        "category": "archive_recall",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 11.513,
+        "query_variant_count": 1,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-ARCH-010",
+        "category": "archive_recall",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 16.231,
+        "query_variant_count": 3,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-SEM-001",
+        "category": "semantic_phrasing",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 8.698,
+        "query_variant_count": 4,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-SEM-002",
+        "category": "semantic_phrasing",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 16.194,
+        "query_variant_count": 4,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-SEM-003",
+        "category": "semantic_phrasing",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 21.868,
+        "query_variant_count": 4,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-SEM-004",
+        "category": "semantic_phrasing",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 31.725,
+        "query_variant_count": 1,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-SEM-005",
+        "category": "semantic_phrasing",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 12.721,
+        "query_variant_count": 4,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-SEM-006",
+        "category": "semantic_phrasing",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 7.024,
+        "query_variant_count": 2,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-SEM-007",
+        "category": "semantic_phrasing",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 7.167,
+        "query_variant_count": 2,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-SEM-008",
+        "category": "semantic_phrasing",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 59.077,
+        "query_variant_count": 2,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-SEM-009",
+        "category": "semantic_phrasing",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 22.94,
+        "query_variant_count": 1,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-SEM-010",
+        "category": "semantic_phrasing",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 9.917,
+        "query_variant_count": 1,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-PROJ-001",
+        "category": "project_fit",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 56.52,
+        "query_variant_count": 4,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-PROJ-002",
+        "category": "project_fit",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 7.434,
+        "query_variant_count": 2,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-PROJ-003",
+        "category": "project_fit",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 8.145,
+        "query_variant_count": 3,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-PROJ-004",
+        "category": "project_fit",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 11.114,
+        "query_variant_count": 2,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-PROJ-005",
+        "category": "project_fit",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 17.926,
+        "query_variant_count": 3,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-PROJ-006",
+        "category": "project_fit",
+        "duplicate_top10_rate": 0.1,
+        "error_type": null,
+        "latency_ms": 17.536,
+        "query_variant_count": 3,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.1,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-PROJ-007",
+        "category": "project_fit",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 13.998,
+        "query_variant_count": 1,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-PROJ-008",
+        "category": "project_fit",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 28.89,
+        "query_variant_count": 2,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-LINK-001",
+        "category": "linked_source_freshness",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 8.361,
+        "query_variant_count": 2,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-LINK-002",
+        "category": "linked_source_freshness",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 13.585,
+        "query_variant_count": 3,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-LINK-003",
+        "category": "linked_source_freshness",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 6.325,
+        "query_variant_count": 2,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-LINK-004",
+        "category": "linked_source_freshness",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 13.328,
+        "query_variant_count": 1,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-LINK-005",
+        "category": "linked_source_freshness",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 36.018,
+        "query_variant_count": 2,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-LINK-006",
+        "category": "linked_source_freshness",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 6.787,
+        "query_variant_count": 2,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-LINK-007",
+        "category": "linked_source_freshness",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 6.96,
+        "query_variant_count": 2,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-LINK-008",
+        "category": "linked_source_freshness",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 15.056,
+        "query_variant_count": 4,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-NOANS-001",
+        "category": "no_answer",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 56.9,
+        "query_variant_count": 1,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_direct",
+        "scores": {
+          "citation_precision": null,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": null,
+          "mrr": null,
+          "no_answer_accuracy": 0.0,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-NOANS-002",
+        "category": "no_answer",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 56.628,
+        "query_variant_count": 1,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_direct",
+        "scores": {
+          "citation_precision": null,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": null,
+          "mrr": null,
+          "no_answer_accuracy": 0.0,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-NOANS-003",
+        "category": "no_answer",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 52.212,
+        "query_variant_count": 1,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_direct",
+        "scores": {
+          "citation_precision": null,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": null,
+          "mrr": null,
+          "no_answer_accuracy": 0.0,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-NOANS-004",
+        "category": "no_answer",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 60.473,
+        "query_variant_count": 1,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_direct",
+        "scores": {
+          "citation_precision": null,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": null,
+          "mrr": null,
+          "no_answer_accuracy": 0.0,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-NOANS-005",
+        "category": "no_answer",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 57.357,
+        "query_variant_count": 1,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_direct",
+        "scores": {
+          "citation_precision": null,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": null,
+          "mrr": null,
+          "no_answer_accuracy": 0.0,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-NOANS-006",
+        "category": "no_answer",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 41.589,
+        "query_variant_count": 1,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_direct",
+        "scores": {
+          "citation_precision": null,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": null,
+          "mrr": null,
+          "no_answer_accuracy": 0.0,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-NOANS-007",
+        "category": "no_answer",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 48.23,
+        "query_variant_count": 1,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_direct",
+        "scores": {
+          "citation_precision": null,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": null,
+          "mrr": null,
+          "no_answer_accuracy": 0.0,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-DEC-001",
+        "category": "decision_support",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 72.187,
+        "query_variant_count": 3,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-DEC-002",
+        "category": "decision_support",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 33.03,
+        "query_variant_count": 4,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-DEC-003",
+        "category": "decision_support",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 10.711,
+        "query_variant_count": 1,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-DEC-004",
+        "category": "decision_support",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 18.976,
+        "query_variant_count": 3,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-DEC-005",
+        "category": "decision_support",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 41.17,
+        "query_variant_count": 2,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-DEC-006",
+        "category": "decision_support",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 24.458,
+        "query_variant_count": 3,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      },
+      {
+        "approval_status": "gold",
+        "case_id": "PRAG-DEC-007",
+        "category": "decision_support",
+        "duplicate_top10_rate": 0.0,
+        "error_type": null,
+        "latency_ms": 29.035,
+        "query_variant_count": 2,
+        "result_count": 10,
+        "retrieval_mode": "hybrid_local_vector_query_variants",
+        "scores": {
+          "citation_precision": 1.0,
+          "duplicate_top10_rate": 0.0,
+          "hit_at_10": 1.0,
+          "mrr": 1.0,
+          "no_answer_accuracy": null,
+          "stale_rejection": null
+        }
+      }
+    ]
+  },
+  "privacy": {
+    "external_embedding_provider_egress": false,
+    "provider_egress": false,
+    "queries_included": false,
+    "raw_telegram_text_printed": false,
+    "snippets_included": false,
+    "source_urls_included": false
+  },
+  "schema_version": "archive_retrieval_eval.v1",
+  "vector_backend_gate": {
+    "embedding_model": "local_hashing_text_vector.v1",
+    "embedding_provider": "local",
+    "embeddings_run": true,
+    "status": "local_vector_sidecar_enabled",
+    "vector_backend_adopted": true
+  }
+}

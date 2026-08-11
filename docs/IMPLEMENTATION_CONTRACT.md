@@ -49,6 +49,8 @@ explicit human approval.
   possible.
 - Do not duplicate full post text into a second store unless an ADR records the
   measured need, rollback path, and privacy boundary.
+- PRM-27 local vector sidecar is derived index state, not canonical storage;
+  it stores bounded snippets and local hashed vectors under `data/vector/`.
 - `posts_fts` or its successor is an index, not a second source of truth.
 - Knowledge Atoms, topics, notes, watch topics, decisions, and experiments are
   curated/derived layers.
@@ -59,7 +61,8 @@ explicit human approval.
   or curated retrieval item.
 - Full-archive FTS baseline comes before embeddings.
 - Do not install or select Qdrant, FAISS, sqlite-vec, Chroma, or a provider
-  vector store without PRM-7 evaluation and ADR approval.
+  vector store without evaluation and ADR approval. ADR-004 approves only the
+  built-in local SQLite sidecar with deterministic hashing.
 - External embedding APIs require explicit data-egress approval.
 - Assistant answers must support `insufficient_evidence` instead of filling
   gaps from model background.

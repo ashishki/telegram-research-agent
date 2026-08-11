@@ -51,6 +51,12 @@ accuracy, external-verification boundary, current-claim rejection, and
 answerable-source-label checks at 1.0. This is product RAG gate evidence, not
 dogfood or release evidence.
 
+PRM-27 later adds an approved local hybrid retrieval path using a gitignored
+SQLite vector sidecar and deterministic local hashing. Hybrid metrics are
+scored with the same privacy-safe aggregate retrieval report and do not approve
+external embeddings, hosted vector services, provider egress, migrations,
+service start, or dogfood.
+
 ## D. Generation Metrics
 
 - faithfulness;
@@ -127,7 +133,8 @@ Current gate status:
 - acceptance scenarios: 11 passed, 0 failed, 0 blocked in deterministic local
   evidence;
 - deterministic evaluation areas: all passed after PRM-24 generated seed
-  labels, PRM-26 no-vector acceptance, and PRM-28 answer gate;
+  labels, PRM-26 no-vector acceptance, PRM-28 answer gate, and PRM-27
+  local-sidecar fixture validation;
 - active stop-ship blockers in the current post-PRM28 receipt: none;
 - active dogfood blockers: unresolved human dogfood-start approval and missing
   dogfood-start approval reference;

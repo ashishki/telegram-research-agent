@@ -167,13 +167,17 @@ class TestArchiveSearch(unittest.TestCase):
             "reaction_count",
             "tag_count",
             "project_names",
+            "retrieval_mode",
         ):
             self.assertIn(field, result)
         self.assertEqual(result["archive_document_id"], "tg:-1001:1001")
         self.assertEqual(result["source_url"], "https://t.me/source/1001")
         self.assertEqual(result["channel_username"], "@source")
         self.assertEqual(result["language"], "ru")
+        self.assertEqual(result["retrieval_mode"], "sqlite_fts_archive")
         self.assertIn("Agent", result["snippet"])
+        self.assertNotIn("semantic_score", result)
+        self.assertNotIn("fusion_score", result)
 
     def test_metadata_filters_scope_results(self):
         _insert_post(self.connection, post_id=1, channel_username="@source", language="ru")

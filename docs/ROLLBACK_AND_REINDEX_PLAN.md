@@ -1,6 +1,6 @@
 # Rollback And Reindex Plan
 
-Status: draft; PRM-2 archive document rollback recorded; PRM-15 learning-state migration rollback recorded; PRM-17 workflow rollback/dry-run contract recorded; PRM-26 vector gate rollback recorded
+Status: draft; PRM-2 archive document rollback recorded; PRM-15 learning-state migration rollback recorded; PRM-17 workflow rollback/dry-run contract recorded; PRM-26 vector gate rollback recorded; PRM-27 local vector sidecar rollback recorded
 Last updated: 2026-08-11
 
 ## Archive Search
@@ -99,32 +99,46 @@ Enrichment writes must be additive and traceable:
 
 Failed enrichment does not remove archive search documents.
 
-## Vector/Hybrid Future
+## PRM-27 Local Vector Sidecar
 
-PRM-26 accepts the no-vector path for now and does not approve vector/hybrid
-retrieval. ADR-003 records zero approved embedding rows, zero vector writes,
-zero provider calls, and no production migration. Since no vector state exists,
-rollback is a code/docs revert. PRM-28 answer-gate rollback is also a code
-revert because it creates no durable index or production data.
+ADR-004 approves only a derived local SQLite sidecar. Canonical `raw_posts`,
+`posts`, and `posts_fts` remain authoritative and are not mutated by the
+sidecar indexer.
 
-If a future accepted ADR approves vector/hybrid retrieval:
+Reindex:
 
-- keep SQLite archive canonical;
-- record embedding provider/model/version;
-- record corpus/index version;
-- keep rebuild script;
-- support disabling vector path and falling back to FTS;
-- document backup/restore before dogfood.
+```bash
+python3 src/main.py memory vector-index --json
+```
 
-Future vector rollback requirements:
+Hybrid search smoke:
 
-1. Preserve canonical `raw_posts` and `posts`.
-2. Version every derived vector index and embedding payload.
-3. Keep a feature/config flag that disables vector retrieval and falls back to
-   SQLite FTS.
-4. Back up SQLite plus any sidecar vector store before production writes.
-5. Verify aggregate row counts and eval metrics after rollback without printing
+```bash
+PRM_ARCHIVE_HYBRID_RETRIEVAL=approved \
+python3 src/main.py memory research --hybrid "что из моих постов про AI transformation ROI?"
+```
+
+Rollback to FTS-only behavior:
+
+```bash
+unset PRM_ARCHIVE_HYBRID_RETRIEVAL
+rm -f data/vector/archive_vector.sqlite
+```
+
+Rollback requirements:
+
+1. Preserve canonical `raw_posts`, `posts`, and `posts_fts`.
+2. Version every sidecar schema and local vectorization model.
+3. Keep `PRM_ARCHIVE_HYBRID_RETRIEVAL` as the feature flag that disables vector
+   retrieval and falls back to SQLite FTS.
+4. Keep `data/vector/` gitignored.
+5. Before long-running production rebuilds, snapshot or back up the canonical
+   SQLite database plus sidecar path for operator evidence.
+6. Verify aggregate row counts and eval metrics after rollback without printing
    raw Telegram text.
+
+External embedding providers, hosted vector services, and production migrations
+remain outside ADR-004 and require a separate approval.
 
 ## Report/Library Projections
 

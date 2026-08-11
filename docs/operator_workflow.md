@@ -152,7 +152,9 @@ PRM-18B/PRM-18C implementation status:
 The target polished assistant is specified in
 `docs/personal_research_memory_product_contract.md` and scheduled in
 `docs/tasks.md` as PRM-21 through PRM-23. PRM-22 and PRM-23 are implemented
-fixture-first only and must not be counted as PRM-19 dogfood evidence.
+fixture-first only and must not be counted as PRM-19 dogfood evidence. PRM-27
+adds an approved local vector sidecar for archive retrieval; it is also not
+PRM-19 dogfood evidence by itself.
 
 Use `memory research` when you want the local project-aware research-session
 shape without live web research, provider calls, service starts, migrations, or
@@ -170,7 +172,8 @@ Current behavior:
 - use `--debug` when you need the older full audit view with context pack,
   approach comparison, deeper reading, and draft details;
 - search the local Telegram archive with deterministic short query variants
-  over SQLite FTS, then search curated memory;
+  over SQLite FTS, or with optional local FTS+vector fusion when enabled, then
+  search curated memory;
 - keep `--project` as a project-context hint rather than a hard archive FTS
   filter, so atomless posts are still retrievable;
 - identify relevant links inside selected posts;
@@ -189,6 +192,28 @@ Current behavior:
   no durable writes. The JSON receipt includes attempted `query_variants` and
   per-variant accepted item counts for retrieval debugging.
 
+Local vector sidecar build/search:
+
+```bash
+PYTHONPATH=src python3 src/main.py memory vector-index --json
+PYTHONPATH=src python3 src/main.py memory vector-search "AI transformation ROI" --limit 5
+```
+
+Hybrid local research:
+
+```bash
+PYTHONPATH=src python3 src/main.py memory research --hybrid \
+  "что в моих постах про AI transformation компаний и где есть ROI?"
+```
+
+Telegram PRM assistant uses the same local hybrid retrieval automatically only
+when the service environment includes:
+
+```bash
+PRM_ARCHIVE_HYBRID_RETRIEVAL=approved
+PRM_ARCHIVE_VECTOR_INDEX_PATH=/srv/openclaw-you/workspace/telegram-research-agent/data/vector/archive_vector.sqlite
+```
+
 Machine-readable receipt:
 
 ```bash
@@ -205,9 +230,10 @@ PYTHONPATH=src python3 src/main.py memory research --debug \
   "что из этого применимо к проекту?"
 ```
 
-RAG is required for this target, but RAG is not the whole product. Vector or
-hybrid retrieval remains conditional and must not be adopted until eval evidence
-shows the SQLite FTS baseline fails important user questions.
+RAG is required for this target, but RAG is not the whole product. PRM-27 local
+hybrid retrieval is allowed only inside ADR-004 scope: local sidecar, no
+external embeddings, no hosted vector service, no canonical DB mutation, no
+provider egress for vectorization, and no dogfood claim.
 
 ## Weekly Routine
 
@@ -514,8 +540,12 @@ RAG readiness is intentionally limited. The assistant layer reads curated
 retrieval items from workbook/claim/atom/thread/action/MVP/feedback and
 Strategy Reviewer projections. PI search applies filters first, then uses
 deterministic ranking plus request-local SQLite FTS over those curated objects.
-It does not run raw Telegram firehose RAG, does not use vector search, and does
-not expose raw SQLite sessions.
+Archive retrieval can use SQLite FTS plus the PRM-27 local vector sidecar when
+`PRM_ARCHIVE_HYBRID_RETRIEVAL=approved` is set. The default policy is
+FTS-first and uses local vector fallback only when FTS misses, preserving the
+PRM-24 citation precision metrics. It does not run raw Telegram firehose RAG,
+does not use external embeddings or hosted vector services, and does not expose
+raw SQLite sessions.
 
 ### PRM Assistant Runtime Runbook
 
@@ -580,8 +610,9 @@ Current implementation queue:
   implementation task in `docs/tasks.md`.
 - The next step is operational, not a new feature: generate or locate a real
   current private weekly package, then run `report-v2-rollout-gate`.
-- Do not start vector retrieval, raw Telegram RAG, assistant mutation tools, or
-  portfolio claims before the gate is eligible and dogfood evidence exists.
+- Do not expand vector retrieval beyond ADR-004, run raw Telegram RAG, enable
+  assistant mutation tools, or make portfolio claims before the gate is
+  eligible and dogfood evidence exists.
 - Obsidian remains a generated human navigation/audit projection, not runtime
   assistant memory.
 

@@ -1,3 +1,4 @@
+import json
 import unittest
 
 from assistant.memory_research import (
@@ -13,9 +14,11 @@ class _FakeFacade:
     def __init__(self, project_label="direct_implication"):
         self.project_label = project_label
         self.calls = []
+        self.archive_filters = []
 
     def search_telegram_archive(self, query, filters=None, limit=5):
         self.calls.append("search_telegram_archive")
+        self.archive_filters.append(dict(filters or {}))
         return {
             "status": "ok",
             "query": query,
@@ -80,6 +83,7 @@ class _SelectiveArchiveFacade(_FakeFacade):
     def search_telegram_archive(self, query, filters=None, limit=5):
         self.calls.append("search_telegram_archive")
         self.archive_queries.append(query)
+        self.archive_filters.append(dict(filters or {}))
         if query != "RAG retrieval":
             return {
                 "status": "insufficient_evidence",
@@ -106,6 +110,7 @@ class _SelectiveArchiveFacade(_FakeFacade):
 class _RelatedOnlyProjectStateFacade(_FakeFacade):
     def search_telegram_archive(self, query, filters=None, limit=5):
         self.calls.append("search_telegram_archive")
+        self.archive_filters.append(dict(filters or {}))
         return {
             "status": "ok",
             "query": query,
@@ -125,6 +130,7 @@ class _RelatedOnlyProjectStateFacade(_FakeFacade):
 class _AITransformationFacade(_FakeFacade):
     def search_telegram_archive(self, query, filters=None, limit=5):
         self.calls.append("search_telegram_archive")
+        self.archive_filters.append(dict(filters or {}))
         return {
             "status": "ok",
             "query": query,
@@ -224,6 +230,35 @@ class TestMemoryResearch(unittest.TestCase):
         self.assertIn("query_variants", first_call["arguments"])
         self.assertNotIn("project_name", first_call["arguments"]["filters"])
         self.assertEqual(result["receipt"]["tool_calls_used"], 4)
+
+    def test_memory_research_hybrid_budget_passes_vector_mode_without_path_leak(self):
+        facade = _FakeFacade()
+
+        result = answer_memory_research(
+            "How should eval gates affect Eval-Ground-Truth-Lab?",
+            facade=facade,
+            project_name="Eval-Ground-Truth-Lab",
+            budget=MemoryResearchBudget(
+                allow_vector_retrieval=True,
+                vector_index_path="/tmp/private-vector-sidecar.sqlite",
+            ),
+        )
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["archive_evidence"]["retrieval_mode"], "hybrid_local_vector_archive_query_planner")
+        self.assertEqual(facade.archive_filters[0]["retrieval_mode"], "hybrid")
+        self.assertEqual(facade.archive_filters[0]["vector_index_path"], "/tmp/private-vector-sidecar.sqlite")
+        self.assertNotIn("/tmp/private-vector-sidecar.sqlite", json.dumps(result, ensure_ascii=False))
+        first_call_filters = result["receipt"]["tool_calls"][0]["arguments"]["filters"]
+        self.assertNotIn("vector_index_path", first_call_filters)
+        self.assertTrue(first_call_filters["vector_index_path_configured"])
+        self.assertNotIn("vector_index_path", result["receipt"]["budget"])
+        self.assertTrue(result["receipt"]["budget"]["vector_index_path_configured"])
+        self.assertTrue(result["receipt"]["privacy"]["vector_backend_used"])
+        self.assertEqual(result["receipt"]["privacy"]["local_embedding_backend"], "local_hashing_text_vector.v1")
+        self.assertFalse(result["receipt"]["privacy"]["external_embedding_provider_egress"])
+        rendered = render_memory_research_answer(result)
+        self.assertIn("vector_backend_used=true", rendered)
 
     def test_memory_research_adds_ai_transformation_editorial_query_variants(self):
         variants = _archive_query_variants(

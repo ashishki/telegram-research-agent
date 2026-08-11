@@ -52,9 +52,11 @@ must search the large Telegram archive, inspect approved linked sources,
 compare approaches, infer project context, explain the result clearly, and
 recommend where to look next. The current PRM-23 `memory research` path uses
 bounded local archive/curated/project context, PRM-22 linked-source cache/fake
-fetcher evidence, deterministic synthesis, and confirmation-gated drafts; it
-does not approve live web research, provider egress, service start, production
-writes, dogfood, release claims, or vector/backend adoption.
+fetcher evidence, deterministic synthesis, and confirmation-gated drafts.
+PRM-27 adds optional local vector sidecar retrieval. These slices do not
+approve live web research, provider egress, service start, production writes,
+dogfood, release claims, external embeddings, or hosted vector/backend
+adoption.
 
 Example target question:
 
@@ -88,8 +90,9 @@ citation reference, evidence class, bounded excerpt, retrieval-query variant,
 freshness status, and project label. Candidates with raw-corpus fields, no
 citation, duplicate citation, missing excerpt, or over-budget source count are
 excluded with a reason. An empty pack requires no-answer handling. Synthetic
-semantic candidates are fixture-only inputs; they do not run embeddings or
-authorize a vector backend.
+semantic candidates are fixture-only inputs. PRM-27 archive candidates may
+record local hybrid/vector provenance, but the context pack must still exclude
+provider payloads and raw corpus fields.
 
 Required research-session capability stack:
 
@@ -122,9 +125,10 @@ Research-session answers must separate evidence classes:
 | `model_background` | Model knowledge not grounded in retrieved sources | Label clearly; do not use as proof |
 | `unknown` | Missing, stale, conflicting, or unverified evidence | State the gap and next verification step |
 
-SQLite FTS remains the baseline. Vector or hybrid retrieval remains conditional
-through PRM-8 and must not be adopted before human-approved evidence shows that
-the FTS baseline fails important retrieval scenarios.
+SQLite FTS remains the baseline. PRM-27 local hybrid retrieval is approved only
+as a local SQLite sidecar using deterministic hashing. External embeddings,
+hosted vector services, migrations, canonical DB writes, and dogfood start
+remain separate approvals.
 
 ## Project Application
 
@@ -272,7 +276,7 @@ PRM-15 implementation contract:
 
 - generic memory platform;
 - full archive LLM backfill;
-- vector database before measured FTS failure;
+- hosted vector database or external embeddings without explicit ADR approval;
 - automatic writes or permanent preferences;
 - public SaaS;
 - assistant-owned code/config/project mutation.

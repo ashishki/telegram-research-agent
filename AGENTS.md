@@ -33,9 +33,12 @@ durable production write/cache, or vector/backend approval. PRM-24 now has a
 baseline report; the labels are not independent human review evidence. PRM-26
 accepted the no-vector path for now under
 `operator-approval-2026-08-11-no-vector-prm28-path`, and PRM-28 implements the
-no-vector answer gate over SQLite FTS/context pack with provider egress,
-embeddings, vector backend, service start, migrations, production writes, and
-dogfood all false. The current post-PRM28 gate receipt is
+no-vector answer gate over SQLite FTS/context pack. PRM-27 was later approved
+and implemented as a local SQLite vector sidecar under
+`operator-approval-2026-08-11-full-stack-local-vector-telegram-llm` and
+`docs/adr/ADR-004-prm27-local-vector-sidecar.md`: no external embeddings, no
+hosted vector service, no canonical DB mutation, no live web research, no
+production migrations, and no dogfood start. The current post-PRM28 gate receipt is
 `evals/prm18_release_gate_receipt_2026-08-11_post_prm28.json`; it leaves
 `dogfood_started=false` and `release_claimed=false`. PRM-24 through PRM-28
 formalize the required full product RAG path before dogfood: gold eval set,
@@ -51,8 +54,9 @@ answers. A subsequent safe Telegram UX polish adds ordinary-message auto
 routing, local-only `/brief` source-backed editor briefs, volatile per-chat
 mode-aware follow-up context, deterministic AI-transformation query hints, and
 a corrected archive-scoped-vs-current-price answer gate. Remaining UX gaps are
-deeper multi-turn product memory and curated-memory relevance/deduplication. PRM-8
-remains blocked until that approval path is satisfied. PRM-19 and PRM-20 are
+deeper multi-turn product memory and curated-memory relevance/deduplication.
+PRM-8 remains historical/conditional outside the approved PRM-27 local sidecar
+scope. PRM-19 and PRM-20 are
 not started; PRM-19 requires explicit human dogfood-start approval before it
 can start and real four-week operator dogfood evidence before it can complete.
 PRM-20 requires PRM-19 evidence plus explicit compatibility archive/delete/move
@@ -79,8 +83,9 @@ writes.
 - Work directly in this repository; do not spawn nested Codex CLI processes for
   bootstrap or implementation.
 - Do not run live Telegram ingestion, reaction sync, Radar, Frontier, report
-  generation, full archive LLM backfill, embeddings, or external web research
-  jobs unless a task explicitly authorizes it.
+  generation, full archive LLM backfill, external embeddings, hosted vector
+  services, or external web research jobs unless a task explicitly authorizes
+  it. PRM-27 local vector sidecar indexing is authorized only inside ADR-004.
 - Do not modify production database contents.
 - Do not commit private Telegram data or generated private reports.
 - Do not enable external skills without approved trust records.
@@ -100,13 +105,15 @@ writes.
 
 ## Current Next Task
 
-No further PRM implementation task is eligible under the current hard stops.
 PRM-24's 50 generated seed gold labels were operator-approved on 2026-08-11
 under `operator-approval-2026-08-11-all-50-generated-gold`; PRM-26 accepted the
 no-vector path under `operator-approval-2026-08-11-no-vector-prm28-path`; PRM-28
-implemented the no-vector answer gate. These do not approve embeddings, a
-vector backend, provider egress, live research, service start, production
-writes, or dogfood. The post-PRM28 PRM-18 receipt has deterministic local
+implemented the no-vector answer gate; PRM-27 local vector sidecar is
+implemented under `operator-approval-2026-08-11-full-stack-local-vector-telegram-llm`.
+This approves only the local gitignored sidecar and hybrid retrieval flags, not
+external embeddings, hosted vector services, provider egress, live research,
+service start, production migrations, canonical DB writes, or dogfood. The
+post-PRM28 PRM-18 receipt has deterministic local
 stop-ship blockers clear, but it remains blocked on explicit dogfood-start
 approval. Do not start PRM-19 dogfood until the human operator explicitly
 approves dogfood start. Do not start PRM-20 cleanup/archive work until PRM-19 dogfood evidence
@@ -118,6 +125,4 @@ PRM-18A..PRM-18C deep review boundary is recorded at
 PRM-21 records the future polished-assistant contract. PRM-22 and PRM-23 are
 implemented fixture-first only; do not treat them as dogfood evidence or as
 approval for web research, provider egress, service start, durable production
-cache writes, production DB writes, or vector/backend adoption. PRM-27 hybrid
-retrieval implementation remains blocked unless a future successor vector ADR
-is explicitly approved.
+cache writes, production DB writes, or external vector/backend adoption.

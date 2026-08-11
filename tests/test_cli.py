@@ -12,6 +12,8 @@ from main import (
     handle_memory_ai_transformation_source_packet,
     handle_memory_research,
     handle_memory_status,
+    handle_memory_vector_index,
+    handle_memory_vector_search,
     handle_prm_assistant,
     handle_report_v2_rollout_gate,
     handle_weekly_intelligence_v2,
@@ -340,6 +342,39 @@ class TestCli(unittest.TestCase):
         self.assertTrue(args.debug)
         self.assertIs(args.handler, handle_memory_research)
 
+    def test_memory_research_parser_accepts_hybrid_vector_sidecar(self):
+        args = build_parser().parse_args(
+            [
+                "memory",
+                "research",
+                "--hybrid",
+                "--vector-index-path",
+                "/tmp/archive-vector.sqlite",
+                "что",
+                "есть",
+                "по",
+                "AI",
+            ]
+        )
+
+        self.assertTrue(args.hybrid)
+        self.assertEqual(args.vector_index_path, "/tmp/archive-vector.sqlite")
+        self.assertEqual(args.question, ["что", "есть", "по", "AI"])
+        self.assertIs(args.handler, handle_memory_research)
+
+    def test_memory_vector_cli_parsers_are_explicit(self):
+        index_args = build_parser().parse_args(["memory", "vector-index", "--limit", "10", "--force", "--json"])
+        search_args = build_parser().parse_args(["memory", "vector-search", "--limit", "3", "--json", "AI", "ROI"])
+
+        self.assertEqual(index_args.limit, 10)
+        self.assertTrue(index_args.force)
+        self.assertTrue(index_args.json)
+        self.assertIs(index_args.handler, handle_memory_vector_index)
+        self.assertEqual(search_args.limit, 3)
+        self.assertTrue(search_args.json)
+        self.assertEqual(search_args.query, ["AI", "ROI"])
+        self.assertIs(search_args.handler, handle_memory_vector_search)
+
     def test_memory_research_handler_skips_migrations_and_renders_answer(self):
         args = build_parser().parse_args(["memory", "research", "что", "есть", "по", "eval"])
         settings = SimpleNamespace(db_path="/tmp/agent.db")
@@ -374,6 +409,48 @@ class TestCli(unittest.TestCase):
         self.assertEqual(call_kwargs["budget"].max_model_calls, 0)
         self.assertFalse(call_kwargs["budget"].allow_open_browsing)
         self.assertFalse(call_kwargs["budget"].allow_provider_egress)
+        self.assertFalse(call_kwargs["budget"].allow_vector_retrieval)
+        self.assertEqual(output.getvalue(), "rendered research\n")
+
+    def test_memory_research_handler_passes_hybrid_budget_without_migrations(self):
+        args = build_parser().parse_args(
+            [
+                "memory",
+                "research",
+                "--hybrid",
+                "--vector-index-path",
+                "/tmp/archive-vector.sqlite",
+                "что",
+                "есть",
+                "по",
+                "eval",
+            ]
+        )
+        settings = SimpleNamespace(db_path="/tmp/agent.db")
+        payload = {
+            "schema_version": "memory_research_answer.v1",
+            "status": "ok",
+            "question": "что есть по eval",
+            "answer": "rendered research body",
+            "privacy": {"model_calls": 0},
+            "receipt": {"budget": {}, "tool_calls_used": 0},
+        }
+
+        with patch("main.load_settings", return_value=settings), patch("main.run_migrations") as migrations_mock, patch(
+            "assistant.memory_research.answer_memory_research",
+            return_value=payload,
+        ) as research_mock, patch(
+            "assistant.memory_research.render_memory_research_answer",
+            return_value="rendered research",
+        ):
+            output = StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(handle_memory_research(args), 0)
+
+        migrations_mock.assert_not_called()
+        call_kwargs = research_mock.call_args.kwargs
+        self.assertTrue(call_kwargs["budget"].allow_vector_retrieval)
+        self.assertTrue(call_kwargs["budget"].vector_index_path.endswith("/tmp/archive-vector.sqlite"))
         self.assertEqual(output.getvalue(), "rendered research\n")
 
     def test_memory_research_handler_returns_refusal_code(self):

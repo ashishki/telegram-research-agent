@@ -1,5 +1,7 @@
 import sqlite3
+import tempfile
 import unittest
+from pathlib import Path
 
 from db.archive_retrieval_eval import (
     ArchiveRetrievalEvalError,
@@ -7,6 +9,7 @@ from db.archive_retrieval_eval import (
     evaluate_archive_retrieval,
     validate_archive_retrieval_eval_report,
 )
+from db.archive_vector import build_archive_vector_index
 
 
 def _make_connection() -> sqlite3.Connection:
@@ -176,6 +179,58 @@ class TestArchiveRetrievalEval(unittest.TestCase):
         self.assertEqual(row["scores"]["hit_at_10"], 1.0)
         self.assertNotIn("query", row)
         self.assertFalse(report["privacy"]["queries_included"])
+
+    def test_eval_can_score_hybrid_local_vector_sidecar_without_provider_egress(self):
+        _seed_post(self.connection, post_id=1, content="AI transformation ROI productivity source.")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            index_path = Path(temp_dir) / "archive-vector.sqlite"
+            build_archive_vector_index(self.connection, index_path=index_path)
+            report = evaluate_archive_retrieval(
+                self.connection,
+                [
+                    {
+                        "case_id": "GOLD-HYBRID-001",
+                        "category": "semantic_topic",
+                        "language": "en",
+                        "query": "AI transformation productivity",
+                        "human_approved": True,
+                        "expected_post_ids": [1],
+                    }
+                ],
+                retrieval_mode="hybrid_local_vector",
+                vector_index_path=index_path,
+            )
+
+        validate_archive_retrieval_eval_report(report)
+        self.assertEqual(report["gold"]["metrics"]["hit_at_10"], 1.0)
+        self.assertEqual(report["gold"]["rows"][0]["retrieval_mode"], "hybrid_local_vector_direct")
+        self.assertEqual(report["vector_backend_gate"]["status"], "local_vector_sidecar_enabled")
+        self.assertTrue(report["vector_backend_gate"]["vector_backend_adopted"])
+        self.assertTrue(report["vector_backend_gate"]["embeddings_run"])
+        self.assertEqual(report["vector_backend_gate"]["embedding_provider"], "local")
+        self.assertFalse(report["privacy"]["provider_egress"])
+        self.assertFalse(report["privacy"]["external_embedding_provider_egress"])
+
+    def test_hybrid_eval_requires_existing_vector_sidecar(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            missing_path = Path(temp_dir) / "missing-archive-vector.sqlite"
+            with self.assertRaisesRegex(ArchiveRetrievalEvalError, "vector_index_path does not exist"):
+                evaluate_archive_retrieval(
+                    self.connection,
+                    [
+                        {
+                            "case_id": "GOLD-HYBRID-MISSING",
+                            "category": "semantic_topic",
+                            "language": "en",
+                            "query": "AI transformation productivity",
+                            "human_approved": True,
+                            "expected_post_ids": [1],
+                        }
+                    ],
+                    retrieval_mode="hybrid_local_vector",
+                    vector_index_path=missing_path,
+                )
 
     def test_metrics_are_present_when_no_gold_exists(self):
         _seed_post(self.connection, post_id=1, content="Gamma retrieval baseline source.")

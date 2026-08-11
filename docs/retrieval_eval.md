@@ -397,11 +397,32 @@ PRM-26 accepted no-vector gate:
 docs/adr/ADR-003-prm26-hybrid-retrieval-privacy-budget.md
 ```
 
-ADR-003 records the current PRM-24/PRM-25 evidence, accepts the no-vector path
-for now, and keeps PRM-27 blocked. The accepted path does not adopt vector
-backend because source-label recall/citation is recovered by SQLite FTS/query
-planner, while the measured gaps are answer-level no-answer/refusal behavior
-and missing stale/forbidden labels.
+ADR-003 records the current PRM-24/PRM-25 evidence and accepted the no-vector
+path for PRM-28. ADR-004 later approves PRM-27 local-sidecar retrieval only:
+deterministic local hashing, local SQLite sidecar, no external embeddings, no
+hosted vector service, no canonical DB mutation, no provider egress, and no
+dogfood start.
+
+PRM-27 hybrid-local-vector eval mode:
+
+```text
+PYTHONPATH=src python3 tools/archive_retrieval_eval.py --root . --db data/agent.db --cases evals/retrieval/product_rag_gold_cases.jsonl --limit 10 --retrieval-mode hybrid-local-vector --vector-index-path data/vector/archive_vector.sqlite --json evals/retrieval/product_rag_hybrid_local_vector_report.json
+```
+
+The report is aggregate/privacy-safe: it excludes query text, snippets, source
+URLs, raw Telegram text, prompts, provider payloads, and external embedding
+payloads.
+
+Current PRM-27 hybrid-local-vector report:
+
+```text
+evals/retrieval/product_rag_hybrid_local_vector_report.json
+```
+
+Metrics on the 50 generated seed gold cases: hit@10=1.0, MRR=1.0,
+citation_precision=1.0, duplicate_top10_rate=0.004, latency_ms_p95=59.077, and
+reacted_post_searchability=0.967742. Raw retrieval no_answer_accuracy remains
+0.0, so the PRM-28 answer gate remains the product no-answer boundary.
 
 PRM-28 answer-gate report:
 

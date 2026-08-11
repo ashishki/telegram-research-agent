@@ -8,6 +8,7 @@ import sqlite3
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from urllib.parse import quote
 
 from config.settings import PROJECT_ROOT, load_settings
 from db.migrate import run_migrations
@@ -48,6 +49,25 @@ def _positive_int(value: str) -> int:
 def _handle_sigterm(_: int, __) -> None:
     LOGGER.info("SIGTERM received, shutting down")
     sys.exit(0)
+
+
+def _archive_vector_index_path(value: str | None = None) -> Path:
+    raw_value = str(value or "").strip() or os.environ.get("PRM_ARCHIVE_VECTOR_INDEX_PATH", "").strip()
+    path = Path(raw_value) if raw_value else PROJECT_ROOT / "data" / "vector" / "archive_vector.sqlite"
+    if not path.is_absolute():
+        path = PROJECT_ROOT / path
+    return path.resolve()
+
+
+def _open_readonly_sqlite(db_path: object) -> sqlite3.Connection:
+    raw_path = str(db_path or "").strip()
+    if not raw_path or raw_path == ":memory:":
+        return sqlite3.connect(raw_path or ":memory:")
+    if raw_path.startswith("file:"):
+        return sqlite3.connect(raw_path, uri=True)
+    path = Path(raw_path)
+    uri = f"file:{quote(str(path.resolve()), safe='/')}?mode=ro"
+    return sqlite3.connect(uri, uri=True)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -671,6 +691,16 @@ def build_parser() -> argparse.ArgumentParser:
     research_parser.add_argument("--max-retries", type=int, default=0)
     research_parser.add_argument("--timeout-seconds", type=int, default=30)
     research_parser.add_argument("--max-prompt-chars", type=int, default=8000)
+    research_parser.add_argument(
+        "--hybrid",
+        action="store_true",
+        help="Use the approved local vector sidecar plus SQLite FTS for archive retrieval",
+    )
+    research_parser.add_argument(
+        "--vector-index-path",
+        default=None,
+        help="Optional local SQLite vector sidecar path (default: data/vector/archive_vector.sqlite)",
+    )
     research_parser.add_argument("--json", action="store_true")
     research_parser.add_argument(
         "--debug",
@@ -678,6 +708,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="Render full audit details including context pack, approach comparison, and draft proposal details",
     )
     research_parser.set_defaults(handler=handle_memory_research)
+
+    vector_index_parser = memory_sub.add_parser(
+        "vector-index",
+        help="Build or refresh the approved local archive vector sidecar",
+    )
+    vector_index_parser.add_argument("--index-path", default=None)
+    vector_index_parser.add_argument("--limit", type=int, default=0)
+    vector_index_parser.add_argument("--force", action="store_true")
+    vector_index_parser.add_argument("--json", action="store_true")
+    vector_index_parser.set_defaults(handler=handle_memory_vector_index)
+
+    vector_search_parser = memory_sub.add_parser(
+        "vector-search",
+        help="Search the approved local archive vector sidecar without provider egress",
+    )
+    vector_search_parser.add_argument("query", nargs="+")
+    vector_search_parser.add_argument("--index-path", default=None)
+    vector_search_parser.add_argument("--limit", type=int, default=5)
+    vector_search_parser.add_argument("--json", action="store_true")
+    vector_search_parser.set_defaults(handler=handle_memory_vector_search)
 
     ai_transform_parser = memory_sub.add_parser(
         "ai-transformation-source-packet",
@@ -2822,6 +2872,9 @@ def handle_memory_status(args: argparse.Namespace) -> int:
         "available_now": [
             {"command": "memory ask <question>", "purpose": "local cited evidence brief", "provider_egress": False},
             {"command": "memory research <question>", "purpose": "bounded local research session", "provider_egress": False},
+            {"command": "memory research --hybrid <question>", "purpose": "bounded local research with local vector sidecar plus SQLite FTS", "provider_egress": False},
+            {"command": "memory vector-index", "purpose": "build local archive vector sidecar", "provider_egress": False},
+            {"command": "memory vector-search <query>", "purpose": "search local archive vector sidecar", "provider_egress": False},
             {"command": "memory inspect-evidence", "purpose": "inspect local evidence metadata", "provider_egress": False},
             {
                 "command": "memory ai-transformation-source-packet --allow-live-fetch",
@@ -2833,7 +2886,7 @@ def handle_memory_status(args: argparse.Namespace) -> int:
             "human-approved PRM-24 gold labels before PRM-26",
             "provider egress switch for LLM-backed ask/chat",
             "live public Telegram preview fetch flag for fresh editor source packets",
-            "accepted PRM-26 ADR before embeddings or vector backend",
+            "production vector indexing requires operator approval plus backup/preflight",
             "dogfood-start approval after PRM-28 and PRM-18 blockers",
         ],
         "not_performed": {
@@ -2924,6 +2977,12 @@ def handle_memory_research(args: argparse.Namespace) -> int:
         max_cost_usd=0.0,
         allow_open_browsing=False,
         allow_provider_egress=False,
+        allow_vector_retrieval=bool(getattr(args, "hybrid", False)),
+        vector_index_path=(
+            str(_archive_vector_index_path(getattr(args, "vector_index_path", None)))
+            if bool(getattr(args, "hybrid", False))
+            else ""
+        ),
     )
     try:
         payload = answer_memory_research(
@@ -2946,6 +3005,90 @@ def handle_memory_research(args: argparse.Namespace) -> int:
         return 1
     if payload.get("status") == "refused":
         return 2
+    return 0
+
+
+def handle_memory_vector_index(args: argparse.Namespace) -> int:
+    from db.archive_vector import build_archive_vector_index
+
+    settings = load_settings()
+    index_path = _archive_vector_index_path(getattr(args, "index_path", None))
+    try:
+        with _open_readonly_sqlite(settings.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            payload = build_archive_vector_index(
+                connection,
+                index_path=index_path,
+                limit=max(0, int(getattr(args, "limit", 0) or 0)),
+                force=bool(getattr(args, "force", False)),
+            )
+    except Exception as exc:
+        sys.stdout.write(f"Error building local archive vector index: {exc}\n")
+        return 1
+
+    if getattr(args, "json", False):
+        sys.stdout.write(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
+        return 0
+    sys.stdout.write(
+        "Local archive vector index\n"
+        f"status={payload.get('status')} index_path={payload.get('index_path')}\n"
+        f"embedding_model={payload.get('embedding_model')} provider_egress=false canonical_db_mutated=false\n"
+        f"source_rows_scanned={payload.get('source_rows_scanned')} inserted={payload.get('inserted')} "
+        f"updated={payload.get('updated')} skipped={payload.get('skipped')} deleted={payload.get('deleted')}\n"
+    )
+    return 0
+
+
+def handle_memory_vector_search(args: argparse.Namespace) -> int:
+    from db.archive_vector import search_archive_vector_index
+
+    query = " ".join(args.query).strip()
+    index_path = _archive_vector_index_path(getattr(args, "index_path", None))
+    try:
+        results = search_archive_vector_index(
+            index_path=index_path,
+            query=query,
+            limit=max(1, int(getattr(args, "limit", 5) or 5)),
+        )
+    except Exception as exc:
+        sys.stdout.write(f"Error searching local archive vector index: {exc}\n")
+        return 1
+
+    payload = {
+        "status": "ok" if results else "insufficient_evidence",
+        "query": query,
+        "index_path": str(index_path),
+        "retrieval_mode": "local_vector_archive",
+        "items": [result.as_dict() for result in results],
+        "privacy": {
+            "embedding_provider": "local",
+            "provider_egress": False,
+            "raw_telegram_corpus_egress": False,
+            "canonical_db_mutated": False,
+        },
+    }
+    if getattr(args, "json", False):
+        sys.stdout.write(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
+        return 0
+
+    lines = [
+        "Local archive vector search",
+        f"query={query}",
+        "retrieval_mode=local_vector_archive; provider_egress=false; canonical_db_mutated=false",
+    ]
+    for item in payload["items"][: max(1, int(getattr(args, "limit", 5) or 5))]:
+        lines.append(
+            "- {date} {channel}: {snippet}".format(
+                date=str(item.get("posted_at") or "")[:10],
+                channel=item.get("channel_username") or "source",
+                snippet=str(item.get("snippet") or "")[:160],
+            )
+        )
+        if item.get("source_url"):
+            lines.append(f"  source: {item['source_url']}")
+    if not payload["items"]:
+        lines.append("- no local vector matches")
+    sys.stdout.write("\n".join(lines).rstrip() + "\n")
     return 0
 
 

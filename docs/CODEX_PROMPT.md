@@ -23,15 +23,17 @@ Last updated: 2026-08-11
   PRM-21 docs-only research-session contract, PRM-22 fixture-first
   linked-source resolver/cache, and PRM-23 fixture-first memory research
   planner/CLI, PRM-24 generated seed eval coverage, PRM-26 accepted no-vector
-  gate, and PRM-28 no-vector answer gate
-- Current safe slice: no further PRM implementation task is eligible under the
-  current hard stops. PRM-24 now has a
+  gate, PRM-28 no-vector answer gate, and PRM-27 local vector sidecar
+- Current safe slice: PRM-27 local vector sidecar is implemented under
+  `operator-approval-2026-08-11-full-stack-local-vector-telegram-llm`. PRM-24 now has a
   50-row operator-approved generated seed gold set and SQLite FTS baseline
   report under `operator-approval-2026-08-11-all-50-generated-gold`; this is
-  generated seed evidence, not independent human review and not approval for
-  vector/backend work. PRM-26 accepted the no-vector path under
+  generated seed evidence, not independent human review. PRM-26 accepted the no-vector path under
   `operator-approval-2026-08-11-no-vector-prm28-path`, and PRM-28 implements
-  the no-vector answer gate. The current post-PRM28 PRM-18 receipt is
+  the no-vector answer gate. PRM-27 later adds a gitignored local SQLite vector
+  sidecar and hybrid retrieval flags without external embeddings, provider
+  egress, production migrations, canonical DB writes, or dogfood start. The
+  current post-PRM28 PRM-18 receipt is
   `evals/prm18_release_gate_receipt_2026-08-11_post_prm28.json`. A local UX
   trial is recorded at `docs/audit/PRM_LOCAL_UX_TRIAL_2026-08-11.md`: RAG is
   technically usable. A follow-up safe UX polish adds compact default
@@ -39,9 +41,10 @@ Last updated: 2026-08-11
   localization, freshness-first current-fact boundaries, local path redaction,
   narrow repo-context cues, and no drafts for current-fact freshness-boundary
   answers.
-- Blocked/not implemented slices: PRM-8, PRM-19, PRM-20, and PRM-27
-  remain blocked until their gates are satisfied.
-- Next safe work: none under current hard stops. Stop before PRM-27/PRM-19.
+- Blocked/not implemented slices: PRM-8, PRM-19, and PRM-20 remain blocked
+  until their gates are satisfied.
+- Next safe work: local operator smoke/preflight for vector-backed Telegram
+  testing is eligible; stop before PRM-19 dogfood.
   PRM-19 only after explicit human dogfood-start approval exists. The current
   post-PRM28 PRM-18 receipt has deterministic local stop-ship blockers clear
   but still blocks dogfood on missing dogfood-start approval.
@@ -57,7 +60,7 @@ report as the product center. Full archive search is the primary planned value.
 Knowledge Atoms, topics, reports, and Atlas-like surfaces become selective or
 secondary projections.
 
-Do not claim dogfood, release readiness, vector adoption, independent
+Do not claim dogfood, release readiness, external vector-service adoption, independent
 human-reviewed gold labels, external-source execution, or approved
 external-verification evidence. HEAD
 contains a bounded SQLite FTS archive search, assistant vertical slice, grounded
@@ -99,9 +102,10 @@ production-cache approval, production DB write approval, or vector/backend
 approval.
 Full product RAG is now formalized as PRM-24 through PRM-28 before dogfood:
 gold eval set, citation-safe context pack, hybrid/vector ADR and privacy budget,
-approved retrieval implementation, and product chat acceptance gate. This does
-not approve embeddings, vector backend adoption, provider egress, migrations,
-or production writes by itself.
+approved retrieval implementation, and product chat acceptance gate. ADR-004
+approves only the PRM-27 local vector sidecar. It does not approve external
+embeddings, hosted vector services, provider egress, migrations, production
+writes, service start, or dogfood by itself.
 
 ## Active Profiles
 
@@ -152,8 +156,9 @@ Test tier helper:
 - python3 tools/test_tiers.py ops-date-sensitive
 
 Do not run live Telegram ingestion, reaction sync, LLM extraction, Frontier,
-Radar, report generation, full archive indexing, embeddings, or web research
-jobs from this handoff.
+Radar, report generation, full archive LLM backfill, external embeddings,
+hosted vector services, or web research jobs from this handoff. PRM-27 local
+vector sidecar indexing is authorized only inside ADR-004.
 
 ## Known Blockers
 
@@ -161,9 +166,10 @@ jobs from this handoff.
 - PRM-24 candidate retrieval queries became a 50-row operator-approved
   generated seed gold set on 2026-08-11. Do not overclaim this as independent
   human review, dogfood, or release evidence.
-- PRM-8 vector/hybrid retrieval remains blocked.
+- PRM-8 vector/hybrid retrieval remains historical/conditional outside the
+  approved PRM-27 local sidecar scope.
 - PRM-26 accepted the no-vector path and PRM-28 implemented the no-vector
-  answer gate; PRM-27 remains gated behind a future successor vector ADR.
+  answer gate; PRM-27 local vector sidecar is implemented under ADR-004.
 - Post-PRM28 local UX polish improved `memory research` default rendering,
   localization, current-fact boundaries, path redaction, and narrow repo-context
   cues. A follow-up Telegram UX polish adds ordinary-message auto routing,
@@ -186,9 +192,10 @@ jobs from this handoff.
   service start, durable production cache writes, production DB writes, or
   vector/backend adoption without explicit approval.
 - PRM-24 through PRM-28 are the required full product RAG path before dogfood
-  unless the human operator explicitly waives the RAG gate. Do not start PRM-27
-  hybrid retrieval implementation without an accepted PRM-26 ADR and explicit
-  backend/privacy/cost approval.
+  unless the human operator explicitly waives the RAG gate. PRM-27 is limited
+  to ADR-004 local sidecar scope; do not expand to external embeddings, hosted
+  vector services, migrations, canonical DB writes, or service start without
+  explicit approval.
 - Legacy runtime is frozen: do not restart `telegram-bot.service` or
   `telegram-ai-split-report.timer` as PRM dogfood.
 - Safe runtime is not dogfood yet: do not start `src/main.py prm-assistant` or

@@ -540,8 +540,46 @@ archive_retrieval_eval: rows=50 gold=50 candidates=0 output=evals/retrieval/prod
 | failure map | source-label hit/citation recovered by SQLite FTS/query planner; no-answer/refusal gap remains; stale/forbidden labels unmeasured |
 | privacy/cost budget | 0 embedding rows, 0 tokens/chars, 0 provider calls, 0 vector writes, 0 migrations, $0 provider cost |
 | rollback | no vector state exists; future vector state must be derived, versioned, disable-able, and backed up before production writes |
-| gate impact | PRM-28 no-vector path is allowed; PRM-27 remains blocked unless a future successor vector ADR is approved |
+| gate impact | PRM-28 no-vector path is allowed; PRM-27 was later unblocked only by successor ADR-004 local-sidecar approval |
 | side effects | documentation/evidence only; no embeddings, vector backend, provider egress, live research, service start, migrations, production writes, dogfood, or compatibility archive/delete/move |
+
+## PRM-27 Local Vector Sidecar - 2026-08-11
+
+| Check | Result |
+| --- | --- |
+| ADR | `docs/adr/ADR-004-prm27-local-vector-sidecar.md` |
+| approval ref | `operator-approval-2026-08-11-full-stack-local-vector-telegram-llm` |
+| implementation | `src/db/archive_vector.py`; `memory vector-index`; `memory vector-search`; `memory research --hybrid`; PI facade hybrid search; Telegram research and brief commands use env-gated hybrid retrieval |
+| local model | `local_hashing_text_vector.v1` |
+| sidecar path | default `data/vector/archive_vector.sqlite`, gitignored |
+| canonical DB | opened read-only by CLI indexer; no canonical `raw_posts`/`posts` mutation |
+| context provenance | `rag_context_pack.v1` sources include `retrieval_mode` such as `sqlite_fts_archive`, `local_vector_archive`, `hybrid_fts_vector`, or `hybrid_vector_only` |
+| eval mode | `tools/archive_retrieval_eval.py --retrieval-mode hybrid-local-vector --vector-index-path data/vector/archive_vector.sqlite` |
+| eval report | `evals/retrieval/product_rag_hybrid_local_vector_report.json` |
+| hybrid metrics | hit@10=1.0; MRR=1.0; citation_precision=1.0; duplicate_top10_rate=0.004; latency_ms_p95=59.077; reacted_post_searchability=0.967742 |
+| no-answer boundary | raw retrieval no_answer_accuracy remains 0.0 as in the FTS baseline; PRM-28 answer gate remains the product no-answer boundary |
+| privacy | provider_egress=false; external_embedding_provider_egress=false; raw_telegram_corpus_egress=false; research receipts redact vector index paths |
+| side effects | no external embeddings, hosted vector service, live web research, production migration, canonical DB write, dogfood start, release claim, or compatibility archive/delete/move |
+
+Focused validation:
+
+```text
+python3 -m py_compile src/db/archive_vector.py src/db/archive_search.py src/db/archive_retrieval_eval.py src/assistant/pi_facade.py src/assistant/memory_research.py src/assistant/rag_context_pack.py src/bot/handlers.py src/main.py tools/archive_retrieval_eval.py
+PYTHONPATH=src python3 -m pytest tests/test_archive_vector.py tests/test_archive_search.py tests/test_archive_retrieval_eval.py tests/test_rag_context_pack.py tests/test_memory_research.py tests/test_pi_facade_archive_vector.py tests/test_cli.py tests/test_handlers.py -q
+110 passed in 13.83s
+python3 tools/test_tiers.py focused-prm
+150 passed in 27.30s
+python3 tools/test_tiers.py fast-contract
+285 passed in 115.30s (0:01:55)
+python3 tools/playbook_validate.py --root . --check tasks --check placeholders --check readiness --check delivery --check references
+playbook_validate: errors=0 warnings=0
+git diff --check
+passed
+PYTHONPATH=src python3 src/main.py memory vector-index --json
+memory vector-index: source_rows_scanned=3215 inserted=3313 updated=0 skipped=0 deleted=0 provider_egress=false canonical_db_mutated=false
+PYTHONPATH=src python3 tools/archive_retrieval_eval.py --root . --db data/agent.db --cases evals/retrieval/product_rag_gold_cases.jsonl --limit 10 --retrieval-mode hybrid-local-vector --vector-index-path data/vector/archive_vector.sqlite --json evals/retrieval/product_rag_hybrid_local_vector_report.json
+archive_retrieval_eval: rows=50 gold=50 candidates=0 mode=hybrid-local-vector output=evals/retrieval/product_rag_hybrid_local_vector_report.json
+```
 
 ## PRM-28 No-Vector Answer Gate Acceptance - 2026-08-11
 

@@ -196,6 +196,15 @@ def _telegram_auto_llm_router_allowed() -> bool:
     return value in {"1", "true", "yes", "approved"} and _telegram_provider_egress_allowed()
 
 
+def _telegram_hybrid_retrieval_allowed() -> bool:
+    value = os.environ.get("PRM_ARCHIVE_HYBRID_RETRIEVAL", "").strip().casefold()
+    return value in {"1", "true", "yes", "approved"}
+
+
+def _telegram_vector_index_path() -> str:
+    return os.environ.get("PRM_ARCHIVE_VECTOR_INDEX_PATH", "").strip()
+
+
 def _route_auto_message(chat_id: str, text: str, *, input_kind: str = "text") -> dict[str, object]:
     clean = _clean_operator_text(text)
     previous_question = _RESEARCH_DIALOG_STATE.get(str(chat_id), "")
@@ -1037,6 +1046,8 @@ def handle_research(chat_id: str, args: str, settings: Settings) -> None:
         max_cost_usd=0.0,
         allow_open_browsing=False,
         allow_provider_egress=False,
+        allow_vector_retrieval=_telegram_hybrid_retrieval_allowed(),
+        vector_index_path=_telegram_vector_index_path(),
     )
     try:
         result = answer_memory_research(str(dialog["effective_question"]), settings=settings, limit=4, budget=budget)
@@ -1065,6 +1076,8 @@ def handle_research_brief(chat_id: str, args: str, settings: Settings) -> None:
         max_cost_usd=0.0,
         allow_open_browsing=False,
         allow_provider_egress=False,
+        allow_vector_retrieval=_telegram_hybrid_retrieval_allowed(),
+        vector_index_path=_telegram_vector_index_path(),
     )
     try:
         result = answer_memory_research(str(dialog["effective_question"]), settings=settings, limit=5, budget=budget)

@@ -16,6 +16,7 @@ def _pack(**overrides):
                 "archive_document_id": "tg:-1001:42",
                 "source_url": "https://t.me/rag_lab/42",
                 "snippet": "Use gold labels before considering a vector backend.",
+                "retrieval_mode": "sqlite_fts_archive",
             }],
         },
         "curated_memory": {"items": []},
@@ -32,6 +33,7 @@ class TestRagContextPack(unittest.TestCase):
 
         self.assertEqual(pack["status"], "ready")
         self.assertEqual(pack["sources"][0]["source_ref"], "https://t.me/rag_lab/42")
+        self.assertEqual(pack["sources"][0]["retrieval_mode"], "sqlite_fts_archive")
         self.assertEqual(pack["sources"][0]["retrieval_query_variant"], "RAG retrieval")
         self.assertLessEqual(pack["sources"][0]["excerpt_chars"], 48)
         self.assertFalse(pack["privacy"]["provider_egress"])
@@ -53,8 +55,31 @@ class TestRagContextPack(unittest.TestCase):
 
         self.assertEqual([source["source_ref"] for source in pack["sources"]], ["https://t.me/rag_lab/42", "fixture:semantic:1"])
         self.assertEqual(pack["sources"][1]["source_class"], "semantic_candidate")
+        self.assertEqual(pack["sources"][1]["retrieval_mode"], "synthetic_semantic_candidate")
         reasons = {item["reason"] for item in pack["excluded_candidates"]}
         self.assertTrue({"missing_citation", "raw_corpus_field_refused", "duplicate_citation"}.issubset(reasons))
+
+    def test_pack_records_hybrid_vector_provenance_without_provider_egress(self):
+        pack = _pack(
+            archive_evidence={
+                "query_variants": ["AI transformation ROI"],
+                "items": [{
+                    "archive_document_id": "tg:-1001:420",
+                    "source_url": "https://t.me/rag_lab/420",
+                    "snippet": "Hybrid local vector retrieval recovered an AI transformation ROI post.",
+                    "retrieval_mode": "hybrid_fts_vector",
+                }],
+            },
+            vector_backend_used=True,
+        )
+
+        self.assertEqual(pack["status"], "ready")
+        self.assertEqual(pack["sources"][0]["retrieval_mode"], "hybrid_fts_vector")
+        self.assertTrue(pack["privacy"]["vector_backend_used"])
+        self.assertEqual(pack["privacy"]["local_embedding_backend"], "local_hashing_text_vector.v1")
+        self.assertFalse(pack["privacy"]["external_embedding_provider_egress"])
+        rendered = render_rag_context_pack(pack)
+        self.assertIn("[telegram_archive:hybrid_fts_vector]", rendered)
 
     def test_no_cited_sources_requires_no_answer_and_validator_rejects_uncited_source(self):
         pack = _pack(archive_evidence={"items": []})

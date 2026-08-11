@@ -25,14 +25,15 @@ def build_rag_context_pack(
     project_fit: Mapping[str, Any],
     external_verification_hint: bool = False,
     semantic_candidates: Sequence[Mapping[str, Any]] = (),
+    vector_backend_used: bool = False,
     max_sources: int = 12,
     max_excerpt_chars: int = 240,
     no_answer_threshold: float = 0.60,
 ) -> dict[str, Any]:
     """Assemble only bounded excerpts that have a stable citation reference.
 
-    This deliberately accepts synthetic semantic candidates for contract tests,
-    but does not run semantic retrieval, embeddings, or external fetches.
+    This accepts already-retrieved archive/semantic candidates and records their
+    provenance, but does not itself run external fetches or provider calls.
     """
     clean_max_sources = max(1, min(20, int(max_sources or 1)))
     clean_excerpt_limit = max(40, min(500, int(max_excerpt_chars or 40)))
@@ -73,6 +74,7 @@ def build_rag_context_pack(
                 "source_class": source_class,
                 "excerpt": excerpt,
                 "excerpt_chars": len(excerpt),
+                "retrieval_mode": _retrieval_mode(candidate, source_class=source_class),
                 "retrieval_query_variant": str(candidate.get("matched_query_variant") or query_variant or ""),
                 "freshness_status": str(candidate.get("freshness_status") or freshness),
                 "project_label": project_label,
@@ -106,7 +108,15 @@ def build_rag_context_pack(
             "reason": str(answer_gate["reason"]) if answer_gate["no_answer_required"] else "not_triggered",
         },
         "answer_gate": answer_gate,
-        "privacy": {"raw_corpus_included": False, "provider_payload_included": False, "provider_egress": False, "embeddings_run": False},
+        "privacy": {
+            "raw_corpus_included": False,
+            "provider_payload_included": False,
+            "provider_egress": False,
+            "embeddings_run": False,
+            "vector_backend_used": bool(vector_backend_used),
+            "local_embedding_backend": "local_hashing_text_vector.v1" if vector_backend_used else "",
+            "external_embedding_provider_egress": False,
+        },
     })
 
 
@@ -137,6 +147,10 @@ def validate_rag_context_pack(pack: Mapping[str, Any]) -> dict[str, Any]:
     privacy = pack.get("privacy")
     if not isinstance(privacy, Mapping) or any(privacy.get(field) is not False for field in ("raw_corpus_included", "provider_payload_included", "provider_egress", "embeddings_run")):
         raise RagContextPackError("context pack privacy boundary is invalid")
+    if not isinstance(privacy.get("vector_backend_used", False), bool):
+        raise RagContextPackError("context pack privacy vector_backend_used must be boolean")
+    if privacy.get("external_embedding_provider_egress", False) is not False:
+        raise RagContextPackError("context pack must not use external embedding provider egress")
     if pack["status"] == "ready" and not sources:
         raise RagContextPackError("ready context pack requires cited sources")
     answer_gate = pack.get("answer_gate")
@@ -162,7 +176,8 @@ def render_rag_context_pack(pack: Mapping[str, Any]) -> str:
             )
         )
     for source in _mappings(validated.get("sources")):
-        lines.append(f"- [{source['source_class']}] {source['source_ref']}: {source['excerpt']}")
+        retrieval = str(source.get("retrieval_mode") or source["source_class"])
+        lines.append(f"- [{source['source_class']}:{retrieval}] {source['source_ref']}: {source['excerpt']}")
     if not validated["sources"]:
         lines.append("- no cited context; answer must use no-answer handling")
     return "\n".join(lines)
@@ -174,6 +189,18 @@ def _source_ref(candidate: Mapping[str, Any]) -> str:
         if value:
             return value
     return ""
+
+
+def _retrieval_mode(candidate: Mapping[str, Any], *, source_class: str) -> str:
+    mode = str(candidate.get("retrieval_mode") or "").strip()
+    if mode:
+        return mode
+    return {
+        "telegram_archive": "sqlite_fts_archive",
+        "curated_memory": "curated_memory",
+        "linked_source": "linked_source_cache",
+        "semantic_candidate": "synthetic_semantic_candidate",
+    }.get(source_class, source_class)
 
 
 def _mappings(value: Any) -> list[Mapping[str, Any]]:

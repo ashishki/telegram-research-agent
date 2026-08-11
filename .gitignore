@@ -8,6 +8,7 @@ data/output/**
 !data/output/**/.gitkeep
 data/output/live_source_intelligence/
 data/output/weekly_messages/
+data/vector/
 docs/artifacts/**/manual-quality-eval-*.md
 *.session
 .env

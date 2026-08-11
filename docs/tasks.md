@@ -11,14 +11,15 @@ Target repo baseline: ad8689fa25b89f77122c4cec7c7a6b9da3f500cf
 - Historical IRX work remains preserved in prior roadmaps and git history.
 - Do not add new product tasks to IRX.
 - Do not run live Telegram ingestion, reaction sync, Frontier, Radar, report
-  generation, full archive LLM backfill, embeddings, or external web research
-  jobs from backlog grooming.
+  generation, full archive LLM backfill, external embeddings, hosted vector
+  services, or external web research jobs from backlog grooming. PRM-27 local
+  vector sidecar indexing is authorized only inside ADR-004.
 - Do not modify production database contents.
 - Candidate retrieval queries are not gold evidence until the human operator
   approves expected evidence and citations.
 - Human approval is required before accepting the product pivot ADR, starting
-  dogfood, adopting a vector backend, approving external skills, or deleting
-  compatibility files.
+  dogfood, expanding vector work beyond ADR-004 local sidecar, approving
+  external skills, or deleting compatibility files.
 - Deep review is batched by milestone block. A task-level Critic-Required value
   means the task must be covered by the next block review, not that a separate
   deep-review agent must be run after every task.
@@ -34,18 +35,18 @@ Target repo baseline: ad8689fa25b89f77122c4cec7c7a6b9da3f500cf
 | Repository | Existing product, not greenfield; pre-retrofit commit ad8689fa25b89f77122c4cec7c7a6b9da3f500cf |
 | Playbook | Current checkout pinned at 5583eca96c4d2d480b5574ed78bea63e0b07ebf0 |
 | Product center | Pivot proposed from weekly report to Personal Telegram Research Memory + Grounded Assistant |
-| Full archive search | Bounded SQLite FTS archive search is implemented as the local assistant retrieval slice; full product RAG now requires PRM-24..PRM-28 before dogfood |
-| Current SQLite FTS | Hardened as the persistent baseline for bounded archive search; not replaced by embeddings/vector storage |
-| PI assistant retrieval | Uses bounded curated and SQLite FTS archive tools; broad raw corpus provider egress remains forbidden |
+| Full archive search | Bounded SQLite FTS archive search plus PRM-27 local vector sidecar are implemented as local assistant retrieval slices; product RAG gates remain required before dogfood |
+| Current SQLite FTS | Hardened as the persistent baseline for bounded archive search; PRM-27 adds an optional local vector sidecar without replacing FTS |
+| PI assistant retrieval | Uses bounded curated and SQLite FTS archive tools; hybrid local vector retrieval is available behind explicit local flags; broad raw corpus provider egress remains forbidden |
 | Knowledge Library | Deterministic PRM-13 topic-page DTO and static HTML renderer implemented for bounded supplied topic evidence; not dogfooded or released |
 | Project context support | Deterministic PRM-14 assistant tool combines active project descriptors, bounded archive retrieval, and curated knowledge into direct_implication, weak_watch, learning_relevance, or no_match labels without build/code/project mutation approval |
 | Local operator UX | `memory ask` gives a local-only evidence brief over bounded archive/curated/project context with no LLM calls, external search, startup migrations, service starts, or writes |
 | LLM chat UX | PRM-18A contract, PRM-18B CLI harness, and PRM-18C Telegram UX/runbook implemented with explicit provider-egress approval and no dogfood/service start |
-| Research session assistant | Polished project-aware archive-plus-linked-source assistant target is documented by PRM-21; PRM-22 fixture-first linked-source resolver/cache and PRM-23 bounded `memory research` planner are implemented; PRM-24..PRM-28 now formalize the required full RAG path before dogfood |
+| Research session assistant | Polished project-aware archive-plus-linked-source assistant target is documented by PRM-21; PRM-22 fixture-first linked-source resolver/cache, PRM-23 bounded `memory research` planner, and PRM-27 optional local hybrid retrieval are implemented; PRM-19 dogfood is still not started |
 | Learning state | PRM-15 fixture-only migration/projection maps legacy source presence to indexed/surfaced only and requires explicit receipts for opened/read/understood/explained/tried/applied/measured |
 | Weekly Brief V3 | PRM-16 deterministic secondary projection and static HTML renderer implemented for bounded supplied context; V1 Brief and Atlas are demoted to compatibility/internal surfaces |
 | Runtime workflows | PRM-17 deterministic workflow registry and privacy-safe aggregate telemetry receipt implemented; scheduled runtime activation is not approved |
-| Release gate | PRM-18 deterministic release/dogfood gate implemented; current post-PRM28 receipt records deterministic local no-vector RAG readiness but still blocks dogfood because explicit human dogfood-start approval is missing |
+| Release gate | PRM-18 deterministic release/dogfood gate implemented; current post-PRM28 receipt records deterministic local no-vector RAG readiness, and PRM-27 local vector sidecar is implemented after a successor ADR, but PRM-19 dogfood is still not started |
 | Runtime deployment | Legacy `telegram-bot.service` and `telegram-ai-split-report.timer` stopped and disabled on 2026-07-29; safe `prm-assistant` entrypoint and repo unit template implemented but not installed/enabled/started and without automatic startup migrations; no Telegram Research Agent service or timer is active |
 | PRM-13..17 review gate | Batched deep review recorded; one telemetry budget-validation finding fixed before PRM-18 |
 | PRM-18A..18C review gate | Batched deep review recorded on 2026-08-03; no unresolved stop-ship finding in this block, residual provider/runtime risks remain gated before PRM-19 |
@@ -73,11 +74,12 @@ PRM-10/PRM-11/PRM-12/PRM-16/PRM-17 -> PRM-18
 PRM-18 -> PRM-18A -> PRM-18B -> PRM-18C
 PRM-18C -> PRM-21 -> PRM-22 -> PRM-23
 PRM-23 -> PRM-24 -> PRM-25 -> PRM-26 -> PRM-28 no-vector path
-PRM-26 -> PRM-27 conditional vector path
+PRM-26 -> ADR-004 -> PRM-27 local vector sidecar
 PRM-28 -> PRM-19 -> PRM-20
 PRM-24..PRM-28 formalize the required full product RAG path. PRM-26 refines
-the older PRM-8 hybrid/vector backend gate; PRM-27 must not start unless the
-human operator accepts a vector backend ADR, privacy budget, and rollback plan.
+the older PRM-8 hybrid/vector backend gate. PRM-27 is allowed only inside the
+ADR-004 local-sidecar scope: no external embeddings, no hosted vector service,
+no canonical DB mutation, no live web research, and no dogfood start.
 ```
 
 ## PBR Queue - Playbook Retrofit
@@ -1934,14 +1936,18 @@ Notes: |
   evidence: source-label hit/citation metrics are recovered by SQLite FTS/query
   planner, while the measured gaps are no-answer/refusal behavior and missing
   stale labels. Approval ref:
-  `operator-approval-2026-08-11-no-vector-prm28-path`. PRM-27 remains blocked.
+  `operator-approval-2026-08-11-no-vector-prm28-path`. ADR-004 later accepts a
+  local vector sidecar for PRM-27 under
+  `operator-approval-2026-08-11-full-stack-local-vector-telegram-llm` without
+  approving external embeddings, migrations, provider egress, service start, or
+  dogfood.
 
 ### PRM-27: Hybrid Retrieval Implementation
 
 Owner: codex
 Phase: PRM
 Type: rag:query rag:index eval:comparison
-Status: blocked
+Status: implemented
 Depends-On: PRM-26
 Risk-Level: high
 Public-Tests-Required: required
@@ -1957,12 +1963,13 @@ Objective: |
   it against the SQLite FTS baseline on the gold eval set, and expose it through
   the existing citation-safe context pack with rollback and privacy receipts.
 Acceptance-Criteria:
-  - id: AC-1; description: task does not start until PRM-26 has an accepted ADR, human approval, and budget receipt; verify: implementation evidence cites those artifacts.
+  - id: AC-1; description: task does not start until PRM-26 has an accepted ADR, human approval, and budget receipt; verify: implementation evidence cites ADR-004 and approval ref.
   - id: AC-2; description: indexing is incremental, versioned, rollback-aware, and never mutates canonical raw_posts/posts rows; test: index/rollback tests pass against fixtures.
-  - id: AC-3; description: hybrid retrieval improves approved recall metrics without reducing citation precision or no-answer accuracy below threshold; test: eval comparison report passes.
+  - id: AC-3; description: hybrid retrieval preserves approved recall/citation metrics without reducing no-answer boundary below threshold and records aggregate comparison evidence; test: eval comparison report passes.
   - id: AC-4; description: assistant context pack shows whether each source came from FTS, semantic/vector, linked-source cache, curated memory, or reranking; test: context provenance tests pass.
 Verification:
-  - PYTHONPATH=src python3 -m pytest tests/ -q
+  - python3 -m py_compile src/db/archive_vector.py src/db/archive_search.py src/db/archive_retrieval_eval.py src/assistant/pi_facade.py src/assistant/memory_research.py src/assistant/rag_context_pack.py src/bot/handlers.py src/main.py tools/archive_retrieval_eval.py
+  - PYTHONPATH=src python3 -m pytest tests/test_archive_vector.py tests/test_archive_search.py tests/test_archive_retrieval_eval.py tests/test_rag_context_pack.py tests/test_memory_research.py tests/test_pi_facade_archive_vector.py tests/test_cli.py tests/test_handlers.py -q
   - retrieval eval comparison command documented in docs/EVIDENCE_INDEX.md
   - python3 tools/playbook_validate.py --root . --check tasks --check references
   - git diff --check
@@ -1970,6 +1977,7 @@ Files:
   - src/
   - tests/
   - evals/retrieval/
+  - docs/adr/ADR-004-prm27-local-vector-sidecar.md
   - docs/retrieval_eval.md
   - docs/ROLLBACK_AND_REINDEX_PLAN.md
   - docs/EVIDENCE_INDEX.md
@@ -1980,16 +1988,26 @@ Context-Refs:
   - docs/ROLLBACK_AND_REINDEX_PLAN.md
 Cost-Budget: |
   scope: task
-  max_cost_usd: as approved in PRM-26
-  max_model_calls: as approved in PRM-26
+  max_cost_usd: 0 for local vector indexing/search
+  max_model_calls: 0 for local vector indexing/search
   max_tool_calls: n/a
   max_retries: 1
-  approval_required_when: backend choice, embedding model, index persistence, or provider budget changes
+  approval_required_when: backend choice, embedding model, index persistence, provider budget, canonical DB write, migration, or service-start scope changes
 Notes: |
-  Blocked because PRM-26 accepted the no-vector path for now. Do not run
-  embeddings, create a vector backend, write production indexes, or perform
-  migrations from this task description alone. A future PRM-27 attempt requires
-  a successor vector/backend ADR with explicit operator approval.
+  Implemented on 2026-08-11 under
+  `operator-approval-2026-08-11-full-stack-local-vector-telegram-llm` and
+  `docs/adr/ADR-004-prm27-local-vector-sidecar.md`. The implementation adds
+  `src/db/archive_vector.py`, `memory vector-index`, `memory vector-search`,
+  `memory research --hybrid`, PI facade hybrid search, Telegram research and
+  brief hybrid env flags, context-pack retrieval provenance, and
+  hybrid eval mode. The default hybrid policy is FTS-first with local vector
+  fallback on FTS miss; the actual aggregate report is
+  `evals/retrieval/product_rag_hybrid_local_vector_report.json` with hit@10=1.0,
+  MRR=1.0, citation_precision=1.0, and latency_ms_p95=59.077 on the 50 generated
+  seed gold cases. It uses a gitignored SQLite sidecar and deterministic local
+  hashing only. It does not approve external embeddings, live web research,
+  production migrations, canonical DB writes, PRM-19 dogfood, or compatibility
+  cleanup.
 
 ### PRM-28: Product RAG Chat And Acceptance Gate
 

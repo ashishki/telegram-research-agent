@@ -205,6 +205,8 @@ class MemoryResearchBudget:
     max_cost_usd: float = 0.0
     allow_open_browsing: bool = False
     allow_provider_egress: bool = False
+    allow_vector_retrieval: bool = False
+    vector_index_path: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -218,6 +220,8 @@ class MemoryResearchBudget:
             "max_cost_usd": round(float(self.max_cost_usd or 0.0), 8),
             "allow_open_browsing": bool(self.allow_open_browsing),
             "allow_provider_egress": bool(self.allow_provider_egress),
+            "allow_vector_retrieval": bool(self.allow_vector_retrieval),
+            "vector_index_path_configured": bool(self.vector_index_path),
         }
 
 
@@ -295,6 +299,7 @@ def answer_memory_research(
         curated_memory=curated_evidence,
         linked_source_evidence=linked_evidence,
         project_fit=project_fit,
+        vector_backend_used=active_budget.allow_vector_retrieval,
         max_sources=active_budget.max_archive_sources + active_budget.max_linked_sources,
     )
     answer_gate = _mapping(context_pack.get("answer_gate"))
@@ -968,14 +973,21 @@ def _call_archive_search(
     filters: dict[str, Any] = {}
     if week_label:
         filters["week_label"] = week_label
+    if budget.allow_vector_retrieval:
+        filters["retrieval_mode"] = "hybrid"
+        if budget.vector_index_path:
+            filters["vector_index_path"] = budget.vector_index_path
     query_variants = _archive_query_variants(query, project_name=project_name, max_variants=_MAX_ARCHIVE_QUERY_VARIANTS)
+    logged_filters = {key: value for key, value in filters.items() if key != "vector_index_path"}
+    if "vector_index_path" in filters:
+        logged_filters["vector_index_path_configured"] = True
     tool_calls.append(
         {
             "name": "search_telegram_archive",
             "arguments": {
                 "query": query,
                 "query_variants": query_variants,
-                "filters": filters,
+                "filters": logged_filters,
                 "project_name_hint": project_name,
                 "limit": limit,
             },
@@ -1032,10 +1044,14 @@ def _call_archive_search(
         "query": query,
         "query_variants": query_variants,
         "attempted_queries": attempts,
-        "filters": filters,
+        "filters": logged_filters,
         "project_name_hint": project_name,
         "items": items[:limit],
-        "retrieval_mode": "sqlite_fts_archive_query_planner",
+        "retrieval_mode": (
+            "hybrid_local_vector_archive_query_planner"
+            if budget.allow_vector_retrieval
+            else "sqlite_fts_archive_query_planner"
+        ),
         "message": message,
     }
 
@@ -1887,6 +1903,9 @@ def _receipt(
             "external_skill_used": False,
             "linked_source_live_fetch": bool(linked_privacy.get("live_http_fetch_used")),
             "provider_summarization_used": False,
+            "vector_backend_used": bool(budget.allow_vector_retrieval),
+            "local_embedding_backend": "local_hashing_text_vector.v1" if budget.allow_vector_retrieval else "",
+            "external_embedding_provider_egress": False,
             "durable_writes": False,
             "drafts_only": True,
         },
@@ -2038,6 +2057,7 @@ def _privacy_line(privacy: Mapping[str, Any]) -> str:
         f"{_bool_text(privacy.get('bounded_telegram_snippet_provider_egress'))}; "
         f"raw_telegram_corpus_egress={_bool_text(privacy.get('raw_telegram_corpus_egress'))}; "
         f"linked_source_live_fetch={_bool_text(privacy.get('linked_source_live_fetch'))}; "
+        f"vector_backend_used={_bool_text(privacy.get('vector_backend_used'))}; "
         f"external_skill_used={_bool_text(privacy.get('external_skill_used'))}; "
         f"durable_writes={_bool_text(privacy.get('durable_writes'))}"
     )

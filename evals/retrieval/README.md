@@ -47,6 +47,11 @@ Human-approved gold labels should be created in a separate file after PRM-1.
 - `product_rag_fts_baseline_report.json`: privacy-safe baseline report over
   `product_rag_gold_cases.jsonl`; contains metrics/counts only, not queries,
   snippets, source URLs, or raw Telegram text.
+- `product_rag_hybrid_local_vector_report.json`: privacy-safe PRM-27 report
+  over `product_rag_gold_cases.jsonl` using the local vector sidecar and
+  FTS-first hybrid fallback; contains metrics/counts only, not queries,
+  snippets, source URLs, raw Telegram text, provider payloads, or external
+  embedding payloads.
 - `product_rag_answer_gate_report.json`: privacy-safe PRM-28 no-vector
   answer-gate report over `product_rag_gold_cases.jsonl`; contains
   no-answer/freshness/current-claim gate metrics only, not queries, snippets,
@@ -85,6 +90,15 @@ PYTHONPATH=src python3 tools/archive_retrieval_eval.py \
   --cases evals/retrieval/product_rag_gold_cases.jsonl \
   --limit 10 \
   --json evals/retrieval/product_rag_fts_baseline_report.json
+PYTHONPATH=src python3 src/main.py memory vector-index --json
+PYTHONPATH=src python3 tools/archive_retrieval_eval.py \
+  --root . \
+  --db data/agent.db \
+  --cases evals/retrieval/product_rag_gold_cases.jsonl \
+  --limit 10 \
+  --retrieval-mode hybrid-local-vector \
+  --vector-index-path data/vector/archive_vector.sqlite \
+  --json evals/retrieval/product_rag_hybrid_local_vector_report.json
 PYTHONPATH=src python3 tools/product_rag_answer_gate_eval.py \
   --root . \
   --cases evals/retrieval/product_rag_gold_cases.jsonl \

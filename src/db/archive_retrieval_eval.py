@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import sqlite3
 import time
+from pathlib import Path
 from typing import Mapping, Sequence
 
 from db.archive_search import ArchiveSearchError, ArchiveSearchResult, search_telegram_archive
+from db.archive_vector import ArchiveVectorIndexError, search_telegram_archive_hybrid
 from db.reaction_fast_lane import build_reaction_fast_lane_receipt
 
 
@@ -31,8 +33,18 @@ def evaluate_archive_retrieval(
     cases: Sequence[Mapping[str, object]],
     *,
     limit: int = 10,
+    retrieval_mode: str = "sqlite_fts",
+    vector_index_path: str | Path | None = None,
 ) -> dict[str, object]:
     clean_limit = max(1, int(limit or 10))
+    clean_mode = str(retrieval_mode or "sqlite_fts").strip()
+    if clean_mode not in {"sqlite_fts", "hybrid_local_vector"}:
+        raise ArchiveRetrievalEvalError("retrieval_mode must be sqlite_fts or hybrid_local_vector")
+    if clean_mode == "hybrid_local_vector" and not vector_index_path:
+        raise ArchiveRetrievalEvalError("vector_index_path is required for hybrid_local_vector eval")
+    if clean_mode == "hybrid_local_vector" and not Path(vector_index_path).exists():
+        raise ArchiveRetrievalEvalError("vector_index_path does not exist")
+    row_mode_prefix = "hybrid_local_vector" if clean_mode == "hybrid_local_vector" else "sqlite_fts"
     gold_rows: list[dict[str, object]] = []
     candidate_rows: list[dict[str, object]] = []
     gold_scores: list[dict[str, float | None]] = []
@@ -61,8 +73,10 @@ def evaluate_archive_retrieval(
                 retrieval_queries,
                 limit=clean_limit,
                 errors=errors,
+                retrieval_mode=clean_mode,
+                vector_index_path=vector_index_path,
             )
-        except (ArchiveSearchError, sqlite3.Error) as exc:
+        except (ArchiveSearchError, ArchiveVectorIndexError, sqlite3.Error) as exc:
             error_type = type(exc).__name__
         if error_type is None and errors and not results:
             error_type = errors[0]
@@ -74,9 +88,9 @@ def evaluate_archive_retrieval(
             "category": category,
             "approval_status": "gold" if is_gold else "candidate_unapproved",
             "retrieval_mode": (
-                "sqlite_fts_query_variants"
+                f"{row_mode_prefix}_query_variants"
                 if len(retrieval_queries) > 1 or retrieval_queries[0] != query
-                else "sqlite_fts_direct"
+                else f"{row_mode_prefix}_direct"
             ),
             "query_variant_count": len(retrieval_queries),
             "result_count": len(results),
@@ -124,18 +138,24 @@ def evaluate_archive_retrieval(
         },
         "vector_backend_gate": {
             "status": (
-                "blocked_no_human_approved_gold"
+                "local_vector_sidecar_enabled"
+                if clean_mode == "hybrid_local_vector"
+                else "blocked_no_human_approved_gold"
                 if not gold_rows
                 else "requires_human_approved_adr_before_vector_adoption"
             ),
-            "vector_backend_adopted": False,
-            "embeddings_run": False,
+            "vector_backend_adopted": clean_mode == "hybrid_local_vector",
+            "embeddings_run": clean_mode == "hybrid_local_vector",
+            "embedding_provider": "local" if clean_mode == "hybrid_local_vector" else "none",
+            "embedding_model": "local_hashing_text_vector.v1" if clean_mode == "hybrid_local_vector" else "none",
         },
         "privacy": {
             "raw_telegram_text_printed": False,
             "snippets_included": False,
             "source_urls_included": False,
             "queries_included": False,
+            "provider_egress": False,
+            "external_embedding_provider_egress": False,
         },
     }
 
@@ -151,13 +171,25 @@ def _search_retrieval_queries(
     *,
     limit: int,
     errors: list[str],
+    retrieval_mode: str,
+    vector_index_path: str | Path | None,
 ) -> list[ArchiveSearchResult]:
     results: list[ArchiveSearchResult] = []
     seen: set[str] = set()
     for query in queries:
         try:
-            matches = search_telegram_archive(connection, query, limit=limit)
-        except (ArchiveSearchError, sqlite3.Error) as exc:
+            if retrieval_mode == "hybrid_local_vector":
+                if vector_index_path is None:
+                    raise ArchiveVectorIndexError("vector index path is required")
+                matches = search_telegram_archive_hybrid(
+                    connection,
+                    query,
+                    vector_index_path=vector_index_path,
+                    limit=limit,
+                )
+            else:
+                matches = search_telegram_archive(connection, query, limit=limit)
+        except (ArchiveSearchError, ArchiveVectorIndexError, sqlite3.Error) as exc:
             errors.append(type(exc).__name__)
             continue
         for match in matches:
@@ -186,11 +218,15 @@ def validate_archive_retrieval_eval_report(report: Mapping[str, object]) -> dict
         if field not in metrics:
             raise ArchiveRetrievalEvalError(f"missing metric: {field}")
     gate = report.get("vector_backend_gate")
-    if not isinstance(gate, Mapping) or gate.get("vector_backend_adopted") is not False:
-        raise ArchiveRetrievalEvalError("vector backend must not be adopted by eval report")
+    if not isinstance(gate, Mapping) or not isinstance(gate.get("vector_backend_adopted"), bool):
+        raise ArchiveRetrievalEvalError("vector backend adoption flag must be explicit")
+    if not isinstance(gate.get("embeddings_run"), bool):
+        raise ArchiveRetrievalEvalError("embeddings_run flag must be explicit")
     privacy = report.get("privacy")
     if not isinstance(privacy, Mapping) or privacy.get("raw_telegram_text_printed") is not False:
         raise ArchiveRetrievalEvalError("retrieval eval report must exclude raw text")
+    if privacy.get("provider_egress", False) is not False:
+        raise ArchiveRetrievalEvalError("retrieval eval report must not use provider egress")
     return dict(report)
 
 
