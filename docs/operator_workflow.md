@@ -1,7 +1,7 @@
 # Operator Workflow
 
-**Version:** 2.5
-**Last updated:** 2026-08-03
+**Version:** 2.6
+**Last updated:** 2026-08-11
 **Audience:** System owner (single user, personal use)
 **Role:** supporting operating guide. Canonical roadmap:
 `docs/intelligence_report_v2_roadmap.md` for the Report V2 correction record and
@@ -19,9 +19,10 @@ PYTHONPATH=src python3 src/main.py memory status --json
 ```
 
 It performs no database operation or other product side effect. It lists local
-commands you can use now and the separate approvals still required for provider
-chat, vector work, and dogfood. The normal CLI startup banner may still report
-the configured local path/provider.
+commands you can use now and the separate approvals still required for dogfood,
+production writes, migrations, live web research, and external vector services.
+The normal CLI startup banner may still report the configured local
+path/provider.
 
 Use this when you want to ask the product a normal question now, without
 starting Telegram dogfood or sending Telegram snippets to an external model:
@@ -48,22 +49,22 @@ PYTHONPATH=src python3 src/main.py memory ask --json "найди подтвер�
 ```
 
 This command is a local product preview, not PRM-19 dogfood evidence. The
-Telegram `prm-assistant` runtime remains disabled until explicit dogfood-start
-approval. When that runtime is approved for a manual smoke test, ordinary text
-and voice transcripts enter the auto-router: local research is the default,
-source/editorial wording routes to the local brief renderer, and short
-follow-ups reuse the previous in-process mode for that chat. Manual research and
-brief commands remain fallback controls. LLM auto-routing and auto chat require
-both `PRM_TELEGRAM_AUTO_LLM_ROUTER=1` and
-`PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`; the explicit chat command remains behind
-separate provider-egress approval.
+Telegram `prm-assistant` runtime is currently installed, enabled, and running
+for manual operator testing only. Ordinary text and voice transcripts enter the
+auto-router: local research is the default, source/editorial wording routes to
+the local brief renderer, and short follow-ups reuse the previous in-process
+mode for that chat. Manual research and brief commands remain fallback controls.
+The current host `.env` enables both `PRM_TELEGRAM_AUTO_LLM_ROUTER=1` and
+`PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`, so `/chat` and model-based auto routing
+may send bounded cited context to the configured provider during manual tests.
 
 ## PRM-18 LLM Chat UX Block
 
 PRM-18A defined the operator-facing contract. PRM-18B and PRM-18C implemented
-the CLI and Telegram UX parity without starting Telegram dogfood, installing or
-starting `prm-assistant`, running external search, or authorizing default
-snippet egress.
+the CLI and Telegram UX parity without starting Telegram dogfood, running
+external search, or authorizing default snippet egress. A later 2026-08-11
+operator instruction enabled the local vector/RAG/LLM/Telegram stack for manual
+testing only.
 
 The PRM-18A through PRM-18C block is implemented:
 
@@ -71,7 +72,7 @@ The PRM-18A through PRM-18C block is implemented:
 - `PRM-18B`: implemented `memory chat` and `memory ask --llm-approved` over
   the existing PI chat/RAG harness;
 - `PRM-18C`: aligned Telegram `prm-assistant` output and wrote the start/stop
-  runbook without starting the service.
+  runbook; the service was later started for manual testing, not dogfood.
 
 Contracted command surfaces:
 
@@ -81,10 +82,10 @@ Contracted command surfaces:
 | Local evidence JSON | `PYTHONPATH=src python3 src/main.py memory ask --json "<question>"` | available now | none |
 | One-shot LLM synthesis | `PYTHONPATH=src python3 src/main.py memory ask --llm-approved --allow-provider-egress "<question>"` | implemented in PRM-18B | bounded cited snippets only after explicit switch |
 | Interactive LLM chat | `PYTHONPATH=src python3 src/main.py memory chat --allow-provider-egress` | implemented in PRM-18B | bounded cited snippets only after explicit switch |
-| Telegram auto route | ordinary text or voice transcript in `prm-assistant` mode | implemented; chooses local research or local brief by default; runtime remains disabled until explicit start approval | none by default; LLM router requires both Telegram auto-router and provider-egress flags |
-| Telegram local research | `/research <question>` fallback in `prm-assistant` mode | implemented; runtime remains disabled until explicit start approval | none |
-| Telegram editor brief | `/brief <question>` fallback in `prm-assistant` mode | implemented; runtime remains disabled until explicit start approval | none |
-| Telegram assistant chat | `/chat <question>` in `prm-assistant` mode | PRM-18C parity implemented; service remains disabled; runtime requires `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1` | bounded cited snippets only after explicit provider-egress approval |
+| Telegram auto route | ordinary text or voice transcript in `prm-assistant` mode | active for manual test; chooses local research/local brief by default and may choose LLM chat when router/provider flags allow | bounded cited snippets only if LLM route is selected |
+| Telegram local research | `/research <question>` fallback in `prm-assistant` mode | active for manual test | none |
+| Telegram editor brief | `/brief <question>` fallback in `prm-assistant` mode | active for manual test | none |
+| Telegram assistant chat | `/chat <question>` in `prm-assistant` mode | active for manual test; runtime requires `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1` | bounded cited snippets only after explicit provider-egress approval |
 
 The LLM-backed commands are intentionally explicit:
 
@@ -97,9 +98,9 @@ Telegram `/chat` is also gated at runtime. Without
 `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`, `/chat`, `/hermes`, and `/ask` refuse
 with "No provider call was made". Without
 `PRM_TELEGRAM_AUTO_LLM_ROUTER=1`, ordinary text uses deterministic local routing
-and does not call a model for route selection. For the local-only Telegram smoke
-test, send a normal message; use the manual research or brief commands only
-when you want to override the auto decision.
+and does not call a model for route selection. In the current manual runtime
+test both flags are enabled, so send a normal message first and use manual
+research or brief commands only when you want to override the auto decision.
 
 Without `--allow-provider-egress`, the product must either stay on the local
 `memory ask` path or refuse with clear copy such as:
@@ -549,17 +550,21 @@ raw SQLite sessions.
 
 ### PRM Assistant Runtime Runbook
 
-This runbook is for future approved PRM-19 dogfood only. Do not install, enable,
-or start `telegram-prm-assistant.service` until all prerequisites are recorded:
+The current runtime state is manual operator testing, not PRM-19 dogfood. As of
+2026-08-11 18:27 CEST, `telegram-prm-assistant.service` is installed, enabled,
+and running with PRM hybrid retrieval, local vector sidecar, Telegram auto LLM
+router, and provider-egress flags configured in the host `.env`. The service
+still skips automatic startup migrations. Production schema migrations remain a
+separate backup-and-approval operation.
 
-- PRM-18B and PRM-18C completed or explicitly deferred;
-- batched PRM-18A..PRM-18C review accepted, with stop-ship findings cleared or
-  explicitly accepted by the human operator;
+Do not convert this runtime into PRM-19 dogfood until these prerequisites are
+recorded:
+
 - PRM-18 release/dogfood blockers accepted or cleared;
 - explicit human PRM-19 dogfood-start approval;
-- any required production schema migration separately approved.
+- any required production schema migration separately approved and backed up.
 
-Preflight inspection that does not start the service:
+Inspection:
 
 ```bash
 systemd-analyze verify systemd/telegram-prm-assistant.service
@@ -567,7 +572,7 @@ systemctl status telegram-prm-assistant.service --no-pager
 systemctl is-enabled telegram-prm-assistant.service
 ```
 
-Install and start only after the approval prerequisites above:
+Reinstall/start if the unit is missing or has been stopped:
 
 ```bash
 sudo install -m 0644 systemd/telegram-prm-assistant.service /etc/systemd/system/telegram-prm-assistant.service

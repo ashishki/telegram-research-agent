@@ -35,6 +35,7 @@ Last updated: 2026-08-11
 | PRM-18 release gate receipt | docs/audit/PRM18_RELEASE_GATE_2026-07-29.md |
 | PRM-18 post-PRM28 release gate receipt | docs/audit/PRM18_RELEASE_GATE_POST_PRM28_2026-08-11.md |
 | PRM local UX trial receipt | docs/audit/PRM_LOCAL_UX_TRIAL_2026-08-11.md |
+| PRM manual Telegram assistant activation receipt | docs/audit/PRM_MANUAL_TELEGRAM_ASSISTANT_ACTIVATION_2026-08-11.md |
 | PRM runtime freeze receipt | docs/audit/PRM_RUNTIME_FREEZE_2026-07-29.md |
 | PRM safe assistant runtime receipt | docs/audit/PRM_SAFE_ASSISTANT_RUNTIME_2026-07-29.md |
 | PRM local memory ask receipt | docs/audit/PRM_LOCAL_MEMORY_ASK_2026-07-29.md |
@@ -336,7 +337,7 @@ pass, no output
 | Telegram chat output | uses shared PRM chat renderer with answer, sources, archive support, unknowns, write status, and privacy/cost line |
 | raw tool payload exposure | handler tests assert fake raw tool snippet is not sent |
 | runbook | docs/operator_workflow.md and docs/PRODUCT_OPERATING_MODEL.md document preflight, install/start/status, stop/disable, and rollback |
-| service activation | not installed, enabled, started, or treated as dogfood |
+| task-time service activation | not installed, enabled, started, or treated as dogfood during PRM-18C |
 
 Targeted verification:
 
@@ -676,14 +677,32 @@ This receipt is diagnostic evidence only. It is not PRM-19 dogfood evidence.
 | answer gate | archive-scoped recent-post questions no longer trigger current-fact refusal, but current-price/current-stock questions still require external verification |
 | provider boundary | local research and local brief use `MemoryResearchBudget(max_model_calls=0, allow_provider_egress=false, allow_open_browsing=false)` |
 | LLM Telegram gate | Telegram chat, Hermes, and ask commands refuse by default unless `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1` is set before runtime startup; ordinary-text LLM auto-routing additionally requires `PRM_TELEGRAM_AUTO_LLM_ROUTER=1` |
-| runtime boundary | service was not installed, enabled, started, or treated as dogfood |
+| task-time runtime boundary | service was not installed, enabled, started, or treated as dogfood during this UX-routing implementation |
 | simulation | local handler simulation: AI-transformation question routed to research; short "а почему?" kept prior research mode; source-packet/post wording routed to brief; current Nvidia price question used the deterministic hard local gate and started with the freshness boundary |
 | validation | `PYTHONPATH=src python3 -m pytest tests/test_memory_research.py tests/test_rag_context_pack.py tests/test_handlers.py tests/test_callbacks.py tests/test_product_rag_eval.py tests/test_archive_retrieval_eval.py -q` -> 94 passed in 38.22s; `python3 tools/test_tiers.py focused-prm` -> 139 passed in 24.37s; `python3 tools/playbook_validate.py --root . --check tasks --check references` -> errors=0 warnings=0; `git diff --check` -> no output |
 | operator use | after explicit manual runtime-start approval, send normal text; use manual research or brief commands only to override auto routing; do not use Telegram chat unless provider egress is separately approved |
 
-This is a safe Telegram UX routing change only. It is not PRM-19 dogfood
-evidence and does not approve provider egress, live web research, embeddings,
-service start, migrations, or production writes.
+This was a safe Telegram UX routing change only. It is not PRM-19 dogfood
+evidence and did not approve provider egress, live web research, embeddings,
+service start, migrations, or production writes by itself. A later 2026-08-11
+operator instruction enabled the local vector/RAG/LLM/Telegram stack for manual
+testing; see
+`docs/audit/PRM_MANUAL_TELEGRAM_ASSISTANT_ACTIVATION_2026-08-11.md`.
+
+## PRM Manual Telegram Assistant Activation - 2026-08-11
+
+| Check | Result |
+| --- | --- |
+| receipt | `docs/audit/PRM_MANUAL_TELEGRAM_ASSISTANT_ACTIVATION_2026-08-11.md` |
+| scope | manual operator testing of local vector/RAG/LLM/Telegram stack |
+| systemd unit | `telegram-prm-assistant.service` installed, enabled, and active |
+| startup migration behavior | automatic migrations skipped |
+| vector sidecar | `data/vector/archive_vector.sqlite`, gitignored, local deterministic hashing |
+| hybrid eval | 50 generated seed cases; hit@10=1.0, MRR=1.0, citation_precision=1.0, duplicate_top10_rate=0.004, latency_ms_p95=59.077 |
+| Telegram flags | `PRM_ARCHIVE_HYBRID_RETRIEVAL=approved`; `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`; `PRM_TELEGRAM_AUTO_LLM_ROUTER=1` |
+| delivery check | short Telegram service-check message sent; no private source text and no LLM provider call |
+| privacy boundary | no live Telegram ingestion, reaction sync, live web research, external embeddings, hosted vector service, production DB migration, canonical DB write, private report commit, dogfood start, or release claim |
+| dogfood boundary | not PRM-19 evidence; user manual testing and feedback still required before dogfood can be recorded |
 
 ## Local PRM Status UX - 2026-08-10
 

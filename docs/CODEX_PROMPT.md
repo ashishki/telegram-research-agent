@@ -13,8 +13,9 @@ Last updated: 2026-08-11
   post-PRM28 receipt records deterministic local no-vector RAG readiness and
   blocks dogfood start because explicit human dogfood-start approval is
   missing; legacy
-  live runtime is frozen; safe `prm-assistant` runtime is implemented but not
-  installed, enabled, started, or dogfood evidence; PRM-18A through PRM-18C are
+  live runtime is frozen; safe `prm-assistant` runtime is installed, enabled,
+  and running for manual operator testing only as of 2026-08-11 18:27 CEST, not
+  dogfood evidence; PRM-18A through PRM-18C are
   implemented and their batched deep review is recorded. PRM-21 documentation
   records the future project-aware research-session assistant target, PRM-22
   implements its fixture-first linked-source resolver/cache layer, and PRM-23
@@ -31,8 +32,12 @@ Last updated: 2026-08-11
   generated seed evidence, not independent human review. PRM-26 accepted the no-vector path under
   `operator-approval-2026-08-11-no-vector-prm28-path`, and PRM-28 implements
   the no-vector answer gate. PRM-27 later adds a gitignored local SQLite vector
-  sidecar and hybrid retrieval flags without external embeddings, provider
-  egress, production migrations, canonical DB writes, or dogfood start. The
+  sidecar and hybrid retrieval flags without external embeddings, production
+  migrations, canonical DB writes, or dogfood start. A later 2026-08-11
+  operator instruction enabled the local vector/RAG/LLM/Telegram stack for
+  manual testing: the sidecar was built, PRM hybrid retrieval and Telegram
+  LLM/router flags were set in the host `.env`, and
+  `telegram-prm-assistant.service` was installed, enabled, and started. The
   current post-PRM28 PRM-18 receipt is
   `evals/prm18_release_gate_receipt_2026-08-11_post_prm28.json`. A local UX
   trial is recorded at `docs/audit/PRM_LOCAL_UX_TRIAL_2026-08-11.md`: RAG is
@@ -77,8 +82,8 @@ workflow contracts and privacy-safe aggregate telemetry receipts for future
 runtime activation. PRM-18 adds deterministic release/dogfood gate receipts;
 the current post-PRM28 receipt is blocked only on dogfood-start approval and
 does not start dogfood or claim release readiness. On 2026-07-29 the old live Telegram bot and Report V2 weekly timer
-were stopped and disabled. A dedicated `prm-assistant` mode now exists for the
-future operator entrypoint: ordinary text and voice transcripts dispatch to
+were stopped and disabled. A dedicated `prm-assistant` mode now exists and is
+running for manual operator testing only: ordinary text and voice transcripts dispatch to
 `/auto`, which chooses local research or local editor brief by default and can
 choose LLM chat only when both `PRM_TELEGRAM_AUTO_LLM_ROUTER=1` and
 `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1` are explicitly enabled. Manual
@@ -91,8 +96,8 @@ archive/curated/project context.
 LLM-backed `memory ask --llm-approved` and
 `memory chat --allow-provider-egress` now exist behind the explicit
 provider-egress switch; Telegram `/chat` remains a separate LLM-backed command,
-requires `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`, and runtime start remains
-blocked.
+requires `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`, and the currently running
+Telegram runtime remains manual-test state, not dogfood.
 The polished archive-plus-linked-source project-aware research assistant target
 is specified in `docs/personal_research_memory_product_contract.md` and
 scheduled in `docs/tasks.md`; PRM-22 and PRM-23 are implemented fixture-first
@@ -104,8 +109,10 @@ Full product RAG is now formalized as PRM-24 through PRM-28 before dogfood:
 gold eval set, citation-safe context pack, hybrid/vector ADR and privacy budget,
 approved retrieval implementation, and product chat acceptance gate. ADR-004
 approves only the PRM-27 local vector sidecar. It does not approve external
-embeddings, hosted vector services, provider egress, migrations, production
-writes, service start, or dogfood by itself.
+embeddings, hosted vector services, migrations, production writes, or dogfood
+by itself. The subsequent operator instruction approved provider-egress flags
+and manual `prm-assistant` runtime activation for testing, but not PRM-19
+dogfood or release readiness.
 
 ## Active Profiles
 
@@ -188,19 +195,20 @@ vector sidecar indexing is authorized only inside ADR-004.
   compatibility archive/delete/move approval is explicit.
 - PRM-21 records the future research-session assistant contract. PRM-22 and
   PRM-23 are implemented fixture-first only. Neither task can be treated as
-  dogfood evidence or as approval for live web research, provider egress,
-  service start, durable production cache writes, production DB writes, or
-  vector/backend adoption without explicit approval.
+  dogfood evidence or as approval for live web research, durable production
+  cache writes, production DB writes, or external vector/backend adoption
+  without explicit approval.
 - PRM-24 through PRM-28 are the required full product RAG path before dogfood
   unless the human operator explicitly waives the RAG gate. PRM-27 is limited
   to ADR-004 local sidecar scope; do not expand to external embeddings, hosted
-  vector services, migrations, canonical DB writes, or service start without
-  explicit approval.
+  vector services, migrations, or canonical DB writes without explicit
+  approval.
 - Legacy runtime is frozen: do not restart `telegram-bot.service` or
   `telegram-ai-split-report.timer` as PRM dogfood.
-- Safe runtime is not dogfood yet: do not start `src/main.py prm-assistant` or
-  `systemd/telegram-prm-assistant.service` without explicit dogfood-start
-  approval.
+- Safe runtime is not dogfood yet: `systemd/telegram-prm-assistant.service` is
+  currently installed, enabled, and running only for manual operator testing.
+  Do not record PRM-19 dogfood evidence from this runtime without explicit
+  dogfood-start approval.
 - External skills are project-disabled until trust records are approved.
 - Legacy report-centered docs remain as historical/compatibility surfaces and
   need a safe archive/migration pass in PBR-7 or PRM-20.

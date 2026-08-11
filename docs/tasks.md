@@ -41,13 +41,13 @@ Target repo baseline: ad8689fa25b89f77122c4cec7c7a6b9da3f500cf
 | Knowledge Library | Deterministic PRM-13 topic-page DTO and static HTML renderer implemented for bounded supplied topic evidence; not dogfooded or released |
 | Project context support | Deterministic PRM-14 assistant tool combines active project descriptors, bounded archive retrieval, and curated knowledge into direct_implication, weak_watch, learning_relevance, or no_match labels without build/code/project mutation approval |
 | Local operator UX | `memory ask` gives a local-only evidence brief over bounded archive/curated/project context with no LLM calls, external search, startup migrations, service starts, or writes |
-| LLM chat UX | PRM-18A contract, PRM-18B CLI harness, and PRM-18C Telegram UX/runbook implemented with explicit provider-egress approval and no dogfood/service start |
+| LLM chat UX | PRM-18A contract, PRM-18B CLI harness, and PRM-18C Telegram UX/runbook implemented; Telegram provider-egress/router flags are enabled for manual testing, not dogfood |
 | Research session assistant | Polished project-aware archive-plus-linked-source assistant target is documented by PRM-21; PRM-22 fixture-first linked-source resolver/cache, PRM-23 bounded `memory research` planner, and PRM-27 optional local hybrid retrieval are implemented; PRM-19 dogfood is still not started |
 | Learning state | PRM-15 fixture-only migration/projection maps legacy source presence to indexed/surfaced only and requires explicit receipts for opened/read/understood/explained/tried/applied/measured |
 | Weekly Brief V3 | PRM-16 deterministic secondary projection and static HTML renderer implemented for bounded supplied context; V1 Brief and Atlas are demoted to compatibility/internal surfaces |
 | Runtime workflows | PRM-17 deterministic workflow registry and privacy-safe aggregate telemetry receipt implemented; scheduled runtime activation is not approved |
 | Release gate | PRM-18 deterministic release/dogfood gate implemented; current post-PRM28 receipt records deterministic local no-vector RAG readiness, and PRM-27 local vector sidecar is implemented after a successor ADR, but PRM-19 dogfood is still not started |
-| Runtime deployment | Legacy `telegram-bot.service` and `telegram-ai-split-report.timer` stopped and disabled on 2026-07-29; safe `prm-assistant` entrypoint and repo unit template implemented but not installed/enabled/started and without automatic startup migrations; no Telegram Research Agent service or timer is active |
+| Runtime deployment | Legacy `telegram-bot.service` and `telegram-ai-split-report.timer` stopped and disabled on 2026-07-29; safe `telegram-prm-assistant.service` is installed/enabled/running for manual operator testing as of 2026-08-11 18:27 CEST; startup migrations remain skipped and this is not PRM-19 dogfood evidence |
 | PRM-13..17 review gate | Batched deep review recorded; one telemetry budget-validation finding fixed before PRM-18 |
 | PRM-18A..18C review gate | Batched deep review recorded on 2026-08-03; no unresolved stop-ship finding in this block, residual provider/runtime risks remain gated before PRM-19 |
 | W29 reports | V1 Brief and Atlas rendered despite V2 preview code existing elsewhere |
@@ -1436,12 +1436,12 @@ Correction-Budget: 2
 Objective: |
   Align the safe Telegram `prm-assistant` experience with the CLI chat contract
   so the operator sees the same citations, unknowns, privacy boundary, and
-  confirmation-gated save behavior, while keeping the service disabled until
-  explicit PRM-19 dogfood-start approval.
+  confirmation-gated save behavior, while keeping any runtime activation
+  separate from PRM-19 dogfood-start approval.
 Acceptance-Criteria:
   - id: AC-1; description: Telegram start/help commands explain local-only mode, explicit LLM/provider-egress mode, safe commands, blocked legacy commands, and dogfood-not-started status; test: bot handler tests assert the help copy hides legacy generators and states the boundary.
   - id: AC-2; description: Telegram chat command output includes answer, sources, archive-support/unknowns, and privacy line without exposing raw tool payloads; test: handler tests use fake PI chat response and assert formatted output.
-  - id: AC-3; description: runtime runbook explains install/start/stop/status commands, rollback to disabled state, and approval prerequisites without enabling or starting the service; verify: docs/operator_workflow.md and docs/PRODUCT_OPERATING_MODEL.md updated.
+  - id: AC-3; description: runtime runbook explains install/start/stop/status commands, rollback to disabled state, and approval prerequisites without treating service activation as dogfood; verify: docs/operator_workflow.md and docs/PRODUCT_OPERATING_MODEL.md updated.
 Verification:
   - PYTHONPATH=src python3 -m pytest tests/test_handlers.py tests/test_callbacks.py tests/test_cli.py -q
   - systemd-analyze verify systemd/telegram-prm-assistant.service
@@ -1485,13 +1485,15 @@ Notes: |
   runtime keeps volatile in-process follow-up context and previous mode per
   chat, and improves deterministic AI-transformation archive query hints. LLM
   auto-routing and auto chat require both `PRM_TELEGRAM_AUTO_LLM_ROUTER=1` and
-  `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`. Open browsing, writes, service start,
-  vector/backend work, and dogfood remain gated.
+  `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`. Open browsing, writes, external
+  vector/backend work, production migrations, and dogfood remain gated.
+  A later 2026-08-11 operator instruction enabled the local vector/RAG/LLM/
+  Telegram stack for manual testing only.
 
   The operator runbook documents preflight inspection, install/start/status,
   stop/disable, and rollback-to-disabled commands while preserving the hard
-  gate: the service was not installed, enabled, started, or treated as dogfood.
-  PRM-19 remains blocked until explicit human dogfood-start approval.
+  gate: a running manual-test service is not dogfood. PRM-19 remains blocked
+  until explicit human dogfood-start approval.
 
 ### PRM-19: Four-Week Operator Dogfood
 

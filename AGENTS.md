@@ -38,7 +38,13 @@ and implemented as a local SQLite vector sidecar under
 `operator-approval-2026-08-11-full-stack-local-vector-telegram-llm` and
 `docs/adr/ADR-004-prm27-local-vector-sidecar.md`: no external embeddings, no
 hosted vector service, no canonical DB mutation, no live web research, no
-production migrations, and no dogfood start. The current post-PRM28 gate receipt is
+production migrations, and no dogfood start. A later 2026-08-11 operator
+instruction approved enabling the local vector/RAG/LLM/Telegram stack for
+manual user testing: the gitignored local vector sidecar was built, PRM hybrid
+retrieval and Telegram LLM/router flags were set in the host `.env`, and
+`telegram-prm-assistant.service` was installed, enabled, and started. This is a
+manual runtime test state only, not PRM-19 dogfood evidence. The current
+post-PRM28 gate receipt is
 `evals/prm18_release_gate_receipt_2026-08-11_post_prm28.json`; it leaves
 `dogfood_started=false` and `release_claimed=false`. PRM-24 through PRM-28
 formalize the required full product RAG path before dogfood: gold eval set,
@@ -65,10 +71,11 @@ Telegram bot and
 Report V2 weekly timer were stopped and disabled on 2026-07-29; see
 `docs/PRODUCT_OPERATING_MODEL.md` and
 `docs/audit/PRM_RUNTIME_FREEZE_2026-07-29.md`. A dedicated safe
-`prm-assistant` runtime entrypoint and repo unit template exist, but they are
-not installed, enabled, started, or dogfood evidence; the safe entrypoint does
-not run automatic startup migrations. After the local UX polish, the future
-`prm-assistant` runtime routes ordinary text and voice transcripts through
+`prm-assistant` runtime entrypoint and repo unit template exist. As of
+2026-08-11 18:27 CEST the unit is installed, enabled, and running for manual
+operator testing only; it is not dogfood evidence and the safe entrypoint does
+not run automatic startup migrations. The `prm-assistant` runtime routes
+ordinary text and voice transcripts through
 `/auto`: deterministic safe routing chooses local research or local editor
 briefs by default, while LLM auto-routing and auto chat require both
 `PRM_TELEGRAM_AUTO_LLM_ROUTER=1` and
@@ -110,19 +117,23 @@ under `operator-approval-2026-08-11-all-50-generated-gold`; PRM-26 accepted the
 no-vector path under `operator-approval-2026-08-11-no-vector-prm28-path`; PRM-28
 implemented the no-vector answer gate; PRM-27 local vector sidecar is
 implemented under `operator-approval-2026-08-11-full-stack-local-vector-telegram-llm`.
-This approves only the local gitignored sidecar and hybrid retrieval flags, not
-external embeddings, hosted vector services, provider egress, live research,
-service start, production migrations, canonical DB writes, or dogfood. The
+This approves only the local gitignored sidecar, hybrid retrieval flags, and
+manual `prm-assistant` runtime activation for user testing. It does not approve
+external embeddings, hosted vector services, live research, production
+migrations, canonical DB writes, compatibility cleanup, PRM-19 dogfood, or
+release claims. The
 post-PRM28 PRM-18 receipt has deterministic local
 stop-ship blockers clear, but it remains blocked on explicit dogfood-start
 approval. Do not start PRM-19 dogfood until the human operator explicitly
 approves dogfood start. Do not start PRM-20 cleanup/archive work until PRM-19 dogfood evidence
 exists and the human operator approves any compatibility archive/delete/move.
 Do not restart legacy bot/report timers as PRM dogfood. Do not start
-`prm-assistant` as dogfood without the same explicit approval. The
+`prm-assistant` as dogfood without the same explicit approval. The currently
+running `telegram-prm-assistant.service` must be treated as a manual test
+runtime, not dogfood evidence. The
 PRM-18A..PRM-18C deep review boundary is recorded at
 `docs/audit/PRM_DEEP_REVIEW_PRM18A_18C_2026-08-03.md`.
 PRM-21 records the future polished-assistant contract. PRM-22 and PRM-23 are
 implemented fixture-first only; do not treat them as dogfood evidence or as
-approval for web research, provider egress, service start, durable production
-cache writes, production DB writes, or external vector/backend adoption.
+approval for web research, durable production cache writes, production DB
+writes, or external vector/backend adoption.

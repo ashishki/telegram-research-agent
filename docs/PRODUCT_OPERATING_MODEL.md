@@ -11,16 +11,17 @@ PRM-18 implemented a deterministic release/dogfood gate. After PRM-24, PRM-26,
 and PRM-28, the current post-PRM28 receipt records deterministic local product
 RAG readiness for the accepted no-vector path, but the dogfood gate is still
 blocked because explicit PRM-19 dogfood-start approval is not recorded. Dogfood
-has not started, release readiness is not claimed, and the runtime remains
-frozen to prevent old weekly-report automation from producing new evidence that
-could be mistaken for PRM dogfood.
+has not started and release readiness is not claimed. Legacy weekly-report
+automation remains frozen so it cannot produce new evidence that could be
+mistaken for PRM dogfood. The safe PRM assistant runtime is separately active
+for manual operator testing only.
 
 Runtime freeze recorded on 2026-07-29:
 
 - `telegram-ai-split-report.timer` stopped and disabled;
 - `telegram-bot.service` stopped and disabled;
 - `telegram-ai-split-report.service` reset from failed to inactive;
-- no Telegram Research Agent systemd service or timer is active;
+- no legacy Telegram Research Agent systemd service or timer is active;
 - no `oc_you` crontab exists;
 - no project cron job was found in system cron.
 
@@ -29,8 +30,9 @@ outputs. They were not deleted, moved, archived, or promoted to dogfood
 evidence.
 
 A dedicated safe runtime now exists in code as `src/main.py prm-assistant` and
-as a repo unit template at `systemd/telegram-prm-assistant.service`. It has not
-been installed, enabled, started, or treated as dogfood.
+as a repo unit template at `systemd/telegram-prm-assistant.service`. It is
+installed, enabled, and running for manual operator testing as of 2026-08-11
+18:27 CEST, but it is not treated as PRM-19 dogfood evidence.
 
 ## Single Product Shape
 
@@ -51,9 +53,9 @@ are not separate products and must not compete for the primary workflow.
 | Layer | Role | Current state |
 | --- | --- | --- |
 | Canonical Telegram archive | Private retained source material in SQLite tables such as `raw_posts`, `posts`, and FTS indexes. | Existing. Live ingestion is frozen. |
-| Archive search | Bounded SQLite FTS retrieval with metadata and citation identity. | Implemented as local baseline. Vector/hybrid retrieval remains blocked. |
+| Archive search | Bounded SQLite FTS retrieval with metadata and citation identity. | Implemented as local baseline plus PRM-27 local vector sidecar for hybrid fallback; external embeddings/hosted vector services remain blocked. |
 | Curated knowledge | Knowledge Atoms, idea threads, saved notes, watch topics, project links, decisions, experiments. | Partial and fixture-backed; not complete dogfood evidence. |
-| Assistant tools | Read-only PRM tools plus confirmation-gated proposal/write tools. | Safe `prm-assistant` entrypoint implemented; disabled/not started until dogfood approval. |
+| Assistant tools | Read-only PRM tools plus confirmation-gated proposal/write tools. | Safe `prm-assistant` runtime active for manual testing only; not dogfood evidence. |
 | Knowledge Library | Topic-page projection over bounded supplied topic evidence. | Deterministic renderer implemented; not dogfooded. |
 | Weekly Brief V3 | Secondary weekly projection over usage, reactions, notes, projects, questions, and failures. | Deterministic fixture projection implemented; no scheduled runtime. |
 | MVP Radar | Evidence lens for market/build decisions. | Must be secondary, bounded, and blocked from auto-build/release claims. |
@@ -113,7 +115,8 @@ Allowed without a separate runtime approval:
 - inspect process/systemd state;
 - inspect artifact names, mtimes, sizes, and manifests when needed without
   committing private generated content;
-- inspect the safe PRM runtime command and unit template without starting it.
+- use the running safe PRM runtime for manual operator tests without recording
+  PRM-19 dogfood evidence.
 
 Not allowed as dogfood yet:
 
@@ -122,8 +125,8 @@ Not allowed as dogfood yet:
 - LLM extraction or LLM judge fan-out;
 - Frontier or Radar generation;
 - weekly report generation or delivery;
-- full archive indexing changes;
-- embeddings or vector backend adoption;
+- full archive indexing changes beyond the gitignored PRM-27 sidecar;
+- external embeddings, hosted vector services, or vector work beyond ADR-004;
 - external web research;
 - dogfood/release claims.
 
@@ -135,8 +138,8 @@ The explicit safe entrypoint is:
 PYTHONPATH=src python3 src/main.py prm-assistant
 ```
 
-Do not run this as dogfood until the human operator explicitly approves
-dogfood start.
+This may run for manual operator testing. Do not run or describe it as dogfood
+until the human operator explicitly approves dogfood start.
 
 For immediate local use, prefer:
 
@@ -199,7 +202,7 @@ Future polished assistant target:
 
 Implemented `prm-assistant` runtime mode:
 
-- one service, disabled by default until dogfood approval;
+- one service, currently enabled for manual operator testing only;
 - no automatic timers;
 - ordinary text and voice transcripts enter `/auto`, which chooses local
   research or local source-backed editor/social-post brief by default;
@@ -223,13 +226,13 @@ Implemented `prm-assistant` runtime mode:
   `/run_digest`, `/run_mvp_weekly`, old report delivery, ingest, sync, Radar,
   `/feedback_confirm`, direct tags, marks, and reminders.
 - startup does not run automatic DB migrations; any production schema migration
-  remains a separate approved maintenance action.
+  remains a separate approved maintenance action with backup.
 
 ## Consolidation Plan
 
 1. Keep legacy runtime frozen.
-2. Keep the dedicated PRM assistant runtime disabled until approved dogfood
-   start.
+2. Keep the dedicated PRM assistant runtime separated from dogfood evidence
+   until approved dogfood start.
 3. Replace old weekly-report timers with no timers by default. Later scheduled
    workflows must be PRM-17 registry-backed, idempotent, receipt-producing, and
    explicitly approved.
@@ -266,10 +269,10 @@ that can generate artifacts or write local feedback/tag/reminder rows, and the
 report timer includes live ingestion and weekly report generation.
 
 The safe assistant unit template is `systemd/telegram-prm-assistant.service`.
-Installing or starting it is a dogfood-start action and requires the same
-explicit approval as PRM-19.
+It is currently installed, enabled, and running for manual operator testing
+only. Starting or observing this service is not PRM-19 dogfood evidence.
 
-Future approved activation runbook:
+Current activation/status runbook:
 
 ```bash
 systemd-analyze verify systemd/telegram-prm-assistant.service
@@ -289,5 +292,5 @@ sudo rm -f /etc/systemd/system/telegram-prm-assistant.service
 sudo systemctl daemon-reload
 ```
 
-Do not run the activation commands until PRM-19 dogfood-start approval is
-explicitly recorded.
+Do not convert this manual runtime into PRM-19 dogfood until dogfood-start
+approval is explicitly recorded.
