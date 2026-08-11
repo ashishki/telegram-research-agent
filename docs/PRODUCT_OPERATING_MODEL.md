@@ -167,8 +167,11 @@ PRM-18A contracted command surfaces:
   `PYTHONPATH=src python3 src/main.py memory ask --llm-approved --allow-provider-egress "<question>"`;
 - PRM-18B interactive command:
   `PYTHONPATH=src python3 src/main.py memory chat --allow-provider-egress`;
-- PRM-18C Telegram parity command: `/chat <question>` or ordinary text inside
-  the disabled `prm-assistant` runtime.
+- Telegram local research command after approved runtime start:
+  `/research <question>` or ordinary text inside the disabled `prm-assistant`
+  runtime;
+- PRM-18C Telegram LLM parity command after separate provider-egress approval:
+  `/chat <question>` with `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`.
 
 Any LLM-backed surface must print sources, archive-support status, unknowns or
 external-verification needs, write status, and an explicit privacy/cost line.
@@ -194,11 +197,14 @@ Implemented `prm-assistant` runtime mode:
 
 - one service, disabled by default until dogfood approval;
 - no automatic timers;
-- `/chat` or ordinary message for grounded questions;
+- `/research` or ordinary message for local-only grounded questions;
+- `/chat` remains the separate LLM-backed command and requires separate
+  provider-egress approval plus `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1` before
+  use with private snippets;
 - read-only tools enabled by default;
 - proposal tools return drafts only;
 - `confirm_save_proposal` is the only durable memory write;
-- ordinary text and voice transcript dispatch to `/chat`, not the legacy
+- ordinary text and voice transcript dispatch to `/research`, not the legacy
   `/message` or `/voice` feedback/reminder router;
 - legacy callbacks are disabled, so inline buttons cannot write old decision,
   reminder, or artifact-feedback rows;

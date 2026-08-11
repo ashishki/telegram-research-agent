@@ -11,6 +11,7 @@ from assistant.pi_chat import answer_pi_chat
 from assistant.pi_facade import PersonalIntelligenceFacade
 from assistant.pi_intent import classify_operator_message
 from assistant.prm_chat_display import render_prm_chat_answer
+from assistant.memory_research import MemoryResearchBudget, answer_memory_research, render_memory_research_answer
 from assistant.pi_tools import call_pi_tool
 from bot.telegram_delivery import _send_text_internal, send_document, send_report_preview, send_text
 from config.settings import PROJECT_ROOT, Settings
@@ -51,6 +52,7 @@ PRM_SAFE_COMMANDS = frozenset(
         "/chat",
         "/hermes",
         "/ask",
+        "/research",
         "/costs",
         "/status",
     }
@@ -69,6 +71,7 @@ COMMAND_DOCS: dict[str, tuple[str, str]] = {
     "/codex [focus]": ("handle_codex", "Prepare a Codex prompt draft; never executes Codex"),
     "/chat <message>": ("handle_chat", "Ask Hermes; LLM may call bounded read-only PI tools"),
     "/hermes <message>": ("handle_chat", "Ask Hermes; alias for /chat"),
+    "/research <question>": ("handle_research", "Run local-only compact PRM research over archive/context pack"),
     "/remind <when> <task>": ("handle_remind", "Create a daily-check-in reminder"),
     "/reminders": ("handle_reminders", "List pending reminders"),
     "/remind_cancel <id>": ("handle_remind_cancel", "Cancel a pending reminder"),
@@ -157,6 +160,21 @@ def _with_db(settings: Settings) -> sqlite3.Connection:
 
 def _friendly_handler_error(chat_id: str) -> None:
     send_message(_get_bot_token(), chat_id, "The command could not be processed right now. Try again later.", parse_mode=None)
+
+
+def _telegram_provider_egress_allowed() -> bool:
+    value = os.environ.get("PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS", "").strip().casefold()
+    return value in {"1", "true", "yes", "approved"}
+
+
+def _send_telegram_provider_egress_required(chat_id: str) -> None:
+    lines = [
+        "Telegram /chat is LLM-backed and provider egress is not approved for this runtime.",
+        "Use /research <question> or send ordinary text for local-only RAG.",
+        "If you intentionally want an LLM-backed Telegram test, set PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1 before startup.",
+        "No provider call was made.",
+    ]
+    send_message(_get_bot_token(), chat_id, "\n".join(lines), parse_mode=None)
 
 
 def _format_post_snippet(text: str | None, limit: int = 150) -> str:
@@ -303,18 +321,19 @@ def handle_prm_start(chat_id: str, args: str, settings: Settings) -> None:
         "PRM safe assistant",
         "",
         "Dogfood status: not started. Service start requires explicit PRM-19 approval.",
-        "Use /chat <question> or send a normal message after approved runtime start.",
-        "Chat mode is LLM-approved only after runtime approval; bounded cited snippets may go to the provider.",
+        "Use /research <question> or send a normal message after approved runtime start.",
+        "Research mode is local-only: no LLM, provider egress, live web, embeddings, or writes.",
+        "Use /chat only for a separately approved LLM-backed test; bounded cited snippets may go to the provider.",
         "Local-only CLI remains: memory ask <question>.",
         "",
-        "Safe read-only commands: /weekly, /actions, /mvp, /strategy, /projects, /costs, /status.",
+        "Safe read-only commands: /research, /weekly, /actions, /mvp, /strategy, /projects, /costs, /status.",
         "MVP Radar is a decision-evidence card only; Telegram-only evidence cannot approve build.",
         "",
         "Blocked in this mode: ingestion, reaction sync, report generation, Radar generation,",
         "direct feedback/tag/reminder writes, legacy callbacks, Codex/config/code mutation,",
         "and dogfood/release claims.",
-        "Memory saves must go through explicit confirmed PRM proposals inside /chat.",
-        "Every /chat answer shows sources, archive support, unknowns, write status, and Privacy.",
+        "Memory saves remain disabled from /research; draft saves require a separate confirmed flow.",
+        "Every /research answer shows sources, limitations, planner limits, and Privacy.",
     ]
     send_message(_get_bot_token(), chat_id, "\n".join(lines), parse_mode=None)
 
@@ -332,7 +351,7 @@ def _send_prm_safe_blocked(chat_id: str, command: str) -> None:
         "PRM safe mode blocked this legacy command.",
         f"Command: {shown_command}",
         "",
-        "Use /chat for grounded questions or /weekly /actions /mvp /strategy for read-only orientation.",
+        "Use /research for local-only grounded questions or /weekly /actions /mvp /strategy for read-only orientation.",
         "No generation, ingestion, Radar, direct feedback/tag/reminder write, or report delivery was run.",
     ]
     send_message(_get_bot_token(), chat_id, "\n".join(lines), parse_mode=None)
@@ -754,6 +773,31 @@ def handle_ask(chat_id: str, args: str, settings: Settings) -> None:
     handle_chat(chat_id, args, settings)
 
 
+def handle_research(chat_id: str, args: str, settings: Settings) -> None:
+    question = args.strip()
+    if not question:
+        send_message(_get_bot_token(), chat_id, "Напиши вопрос после /research или просто отправь обычное сообщение.", parse_mode=None)
+        return
+    budget = MemoryResearchBudget(
+        max_tool_calls=4,
+        max_archive_sources=5,
+        max_linked_sources=3,
+        max_retries=0,
+        timeout_seconds=30,
+        max_prompt_chars=8000,
+        max_model_calls=0,
+        max_cost_usd=0.0,
+        allow_open_browsing=False,
+        allow_provider_egress=False,
+    )
+    try:
+        result = answer_memory_research(question, settings=settings, limit=4, budget=budget)
+    except Exception as exc:
+        send_message(_get_bot_token(), chat_id, f"Не смог выполнить local research: {exc}", parse_mode=None)
+        return
+    _send_research_text(chat_id, render_memory_research_answer(result), token=_get_bot_token())
+
+
 def handle_operator_message(chat_id: str, args: str, settings: Settings) -> None:
     _handle_operator_message(chat_id, args, settings, input_kind="text")
 
@@ -777,10 +821,45 @@ def _handle_operator_message(chat_id: str, args: str, settings: Settings, *, inp
     handle_chat(chat_id, text, settings)
 
 
+def _send_research_text(chat_id: str, text: str, *, token: str, limit: int = 3900) -> None:
+    chunks = _telegram_text_chunks(text, limit=limit)
+    for chunk in chunks:
+        send_message(token, chat_id, chunk, parse_mode=None)
+
+
+def _telegram_text_chunks(text: str, *, limit: int = 3900) -> list[str]:
+    clean = str(text or "").strip()
+    if not clean:
+        return [""]
+    if len(clean) <= limit:
+        return [clean]
+
+    chunks: list[str] = []
+    current = ""
+    for paragraph in clean.split("\n\n"):
+        candidate = paragraph if not current else f"{current}\n\n{paragraph}"
+        if len(candidate) <= limit:
+            current = candidate
+            continue
+        if current:
+            chunks.append(current)
+            current = ""
+        while len(paragraph) > limit:
+            chunks.append(paragraph[:limit].rstrip())
+            paragraph = paragraph[limit:].lstrip()
+        current = paragraph
+    if current:
+        chunks.append(current)
+    return chunks
+
+
 def handle_chat(chat_id: str, args: str, settings: Settings) -> None:
     question = args.strip()
     if not question:
         send_message(_get_bot_token(), chat_id, "Напиши вопрос после /chat или просто отправь обычное сообщение.", parse_mode=None)
+        return
+    if not _telegram_provider_egress_allowed():
+        _send_telegram_provider_egress_required(chat_id)
         return
     result = answer_pi_chat(question, settings=settings)
     send_message(_get_bot_token(), chat_id, render_prm_chat_answer(result, mode="llm-approved"), parse_mode=None)
@@ -1232,6 +1311,7 @@ HANDLERS: dict[str, Callable[[str, str, Settings], None]] = {
     "/codex": handle_codex,
     "/chat": handle_chat,
     "/hermes": handle_chat,
+    "/research": handle_research,
     "/remind": handle_remind,
     "/reminders": handle_reminders,
     "/remind_cancel": handle_remind_cancel,

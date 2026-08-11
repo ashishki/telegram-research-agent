@@ -60,7 +60,11 @@ Report V2 weekly timer were stopped and disabled on 2026-07-29; see
 `docs/audit/PRM_RUNTIME_FREEZE_2026-07-29.md`. A dedicated safe
 `prm-assistant` runtime entrypoint and repo unit template exist, but they are
 not installed, enabled, started, or dogfood evidence; the safe entrypoint does
-not run automatic startup migrations. A local user-facing `memory ask` command
+not run automatic startup migrations. After the local UX polish, the future
+`prm-assistant` runtime routes ordinary text and `/research <question>` to the
+local-only compact `memory research` path; `/chat` remains a separate
+LLM-backed command that requires provider-egress approval and
+`PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`. A local user-facing `memory ask` command
 exists for immediate local evidence questions without LLM calls, external
 search, service starts, migrations, or writes.
 

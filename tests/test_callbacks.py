@@ -350,7 +350,7 @@ class TestIdeaCallbacks(unittest.TestCase):
             settings=settings,
         )
 
-    def test_run_bot_prm_safe_dispatches_transcribed_voice_as_chat(self):
+    def test_run_bot_prm_safe_dispatches_transcribed_voice_as_research(self):
         settings = self._settings_with_idea()
         update = {
             "update_id": 101,
@@ -381,7 +381,7 @@ class TestIdeaCallbacks(unittest.TestCase):
 
         dispatch_mock.assert_called_once_with(
             chat_id="12345",
-            text="/chat Too shallow target=eval-gates.",
+            text="/research Too shallow target=eval-gates.",
             settings=settings,
             runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT,
         )
@@ -420,7 +420,7 @@ class TestIdeaCallbacks(unittest.TestCase):
             settings=settings,
         )
 
-    def test_run_bot_prm_safe_dispatches_plain_text_as_chat(self):
+    def test_run_bot_prm_safe_dispatches_plain_text_as_research(self):
         settings = self._settings_with_idea()
         update = {
             "update_id": 104,
@@ -450,7 +450,7 @@ class TestIdeaCallbacks(unittest.TestCase):
 
         dispatch_mock.assert_called_once_with(
             chat_id="12345",
-            text="/chat Что мне делать с weekly workbook?",
+            text="/research Что мне делать с weekly workbook?",
             settings=settings,
             runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT,
         )
@@ -579,7 +579,7 @@ class TestIdeaCallbacks(unittest.TestCase):
         self.assertEqual(send_message_mock.call_count, 2)
         fallback_message = send_message_mock.call_args_list[-1].args[2]
         self.assertIn("OPENAI_API_KEY", fallback_message)
-        self.assertIn("/chat <вопрос>", fallback_message)
+        self.assertIn("/research <вопрос>", fallback_message)
         self.assertNotIn("/feedback", fallback_message)
 
 

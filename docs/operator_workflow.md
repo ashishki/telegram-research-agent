@@ -48,8 +48,10 @@ PYTHONPATH=src python3 src/main.py memory ask --json "найди подтвер�
 ```
 
 This command is a local product preview, not PRM-19 dogfood evidence. The
-Telegram `prm-assistant` service and LLM-backed `/chat` remain behind explicit
-dogfood-start/privacy approval.
+Telegram `prm-assistant` runtime remains disabled until explicit dogfood-start
+approval. When that runtime is approved for a manual smoke test, ordinary text
+and `/research <question>` use the same local-only compact research path; the
+LLM-backed `/chat` command remains behind separate provider-egress approval.
 
 ## PRM-18 LLM Chat UX Block
 
@@ -74,7 +76,8 @@ Contracted command surfaces:
 | Local evidence JSON | `PYTHONPATH=src python3 src/main.py memory ask --json "<question>"` | available now | none |
 | One-shot LLM synthesis | `PYTHONPATH=src python3 src/main.py memory ask --llm-approved --allow-provider-egress "<question>"` | implemented in PRM-18B | bounded cited snippets only after explicit switch |
 | Interactive LLM chat | `PYTHONPATH=src python3 src/main.py memory chat --allow-provider-egress` | implemented in PRM-18B | bounded cited snippets only after explicit switch |
-| Telegram assistant chat | `/chat <question>` or ordinary text in `prm-assistant` mode | PRM-18C parity implemented; service remains disabled | same answer/privacy contract after approved runtime start |
+| Telegram local research | `/research <question>` or ordinary text in `prm-assistant` mode | implemented; runtime remains disabled until explicit start approval | none |
+| Telegram assistant chat | `/chat <question>` in `prm-assistant` mode | PRM-18C parity implemented; service remains disabled; runtime requires `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1` | bounded cited snippets only after explicit provider-egress approval |
 
 The LLM-backed commands are intentionally explicit:
 
@@ -82,6 +85,11 @@ The LLM-backed commands are intentionally explicit:
 PYTHONPATH=src python3 src/main.py memory chat --allow-provider-egress
 PYTHONPATH=src python3 src/main.py memory ask --llm-approved --allow-provider-egress "что говорит моя база?"
 ```
+
+Telegram `/chat` is also gated at runtime. Without
+`PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`, `/chat`, `/hermes`, and `/ask` refuse
+with "No provider call was made". Use `/research` or ordinary text for the
+local-only Telegram smoke test.
 
 Without `--allow-provider-egress`, the product must either stay on the local
 `memory ask` path or refuse with clear copy such as:
@@ -487,8 +495,9 @@ Expected interpretation:
 
 Hermes readiness means the command concierge, bounded LLM chat, voice router,
 and daily reminder check-in are live:
-plain text, `/chat`, `/hermes`, `/ask`, `/weekly`, `/actions`, `/explain`,
-`/projects`, `/mvp`, `/strategy`, `/remind`, `/reminders`, and `/codex`.
+plain text, `/research`, `/chat`, `/hermes`, `/ask`, `/weekly`, `/actions`,
+`/explain`, `/projects`, `/mvp`, `/strategy`, `/remind`, `/reminders`, and
+`/codex`.
 `/codex` prepares prompt text for manual approval and never executes Codex.
 
 RAG readiness is intentionally limited. The assistant layer reads curated

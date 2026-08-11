@@ -224,7 +224,18 @@ class TestHandlers(unittest.TestCase):
         )
 
     def test_hpi_hermes_commands_are_registered(self):
-        for command in ["/weekly", "/actions", "/explain", "/projects", "/mvp", "/strategy", "/codex", "/chat", "/hermes"]:
+        for command in [
+            "/weekly",
+            "/actions",
+            "/explain",
+            "/projects",
+            "/mvp",
+            "/strategy",
+            "/codex",
+            "/chat",
+            "/hermes",
+            "/research",
+        ]:
             self.assertIn(command, handlers.HANDLERS)
 
     def test_handle_chat_uses_bounded_pi_chat(self):
@@ -236,10 +247,11 @@ class TestHandlers(unittest.TestCase):
         )
         pi_chat_result = _fake_prm_chat_payload()
 
-        with patch.object(handlers, "answer_pi_chat", return_value=pi_chat_result) as mock_chat:
-            with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
-                with patch.object(handlers, "send_message") as mock_send_message:
-                    handlers.handle_chat(chat_id="42", args="что с eval gates?", settings=settings)
+        with patch.dict(os.environ, {"PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS": "1"}, clear=False):
+            with patch.object(handlers, "answer_pi_chat", return_value=pi_chat_result) as mock_chat:
+                with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                    with patch.object(handlers, "send_message") as mock_send_message:
+                        handlers.handle_chat(chat_id="42", args="что с eval gates?", settings=settings)
 
         mock_chat.assert_called_once_with("что с eval gates?", settings=settings)
         self.assertEqual(mock_send_message.call_count, 1)
@@ -251,6 +263,26 @@ class TestHandlers(unittest.TestCase):
         self.assertIn("Unknowns\n- independent source corroboration", message)
         self.assertIn("Privacy: mode=llm-approved", message)
         self.assertNotIn("RAW PRIVATE TOOL PAYLOAD", message)
+
+    def test_handle_chat_requires_telegram_provider_egress_flag(self):
+        settings = Settings(
+            db_path=":memory:",
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+
+        with patch.dict(os.environ, {"PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS": ""}, clear=False):
+            with patch.object(handlers, "answer_pi_chat") as mock_chat:
+                with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                    with patch.object(handlers, "send_message") as mock_send_message:
+                        handlers.handle_chat(chat_id="42", args="что с eval gates?", settings=settings)
+
+        mock_chat.assert_not_called()
+        message = mock_send_message.call_args.args[2]
+        self.assertIn("provider egress is not approved", message)
+        self.assertIn("/research <question>", message)
+        self.assertIn("No provider call was made", message)
 
     def test_prm_safe_start_help_hides_legacy_generation_commands(self):
         settings = Settings(
@@ -272,11 +304,12 @@ class TestHandlers(unittest.TestCase):
         message = mock_send_message.call_args.args[2]
         self.assertIn("PRM safe assistant", message)
         self.assertIn("Dogfood status: not started", message)
-        self.assertIn("/chat <question>", message)
-        self.assertIn("bounded cited snippets may go to the provider", message)
+        self.assertIn("/research <question>", message)
+        self.assertIn("Research mode is local-only", message)
+        self.assertIn("/chat only for a separately approved LLM-backed test", message)
         self.assertIn("Safe read-only commands", message)
         self.assertIn("MVP Radar is a decision-evidence card only", message)
-        self.assertIn("Every /chat answer shows sources", message)
+        self.assertIn("Every /research answer shows sources", message)
         self.assertNotIn("/run_digest", message)
         self.assertNotIn("/run_mvp_weekly", message)
         self.assertNotIn("/feedback_confirm", message)
@@ -360,21 +393,78 @@ class TestHandlers(unittest.TestCase):
         )
         pi_chat_result = _fake_prm_chat_payload(answer="Safe PRM answer.")
 
-        with patch.object(handlers, "answer_pi_chat", return_value=pi_chat_result) as mock_chat:
-            with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
-                with patch.object(handlers, "send_message") as mock_send_message:
-                    handlers.dispatch_command(
-                        chat_id="42",
-                        text="/chat what changed?",
-                        settings=settings,
-                        runtime_mode=handlers.BOT_RUNTIME_PRM_ASSISTANT,
-                    )
+        with patch.dict(os.environ, {"PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS": "1"}, clear=False):
+            with patch.object(handlers, "answer_pi_chat", return_value=pi_chat_result) as mock_chat:
+                with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                    with patch.object(handlers, "send_message") as mock_send_message:
+                        handlers.dispatch_command(
+                            chat_id="42",
+                            text="/chat what changed?",
+                            settings=settings,
+                            runtime_mode=handlers.BOT_RUNTIME_PRM_ASSISTANT,
+                        )
 
         mock_chat.assert_called_once_with("what changed?", settings=settings)
         message = mock_send_message.call_args.args[2]
         self.assertIn("Safe PRM answer.", message)
         self.assertIn("Archive support: status=supported", message)
         self.assertIn("Privacy: mode=llm-approved", message)
+
+    def test_handle_research_uses_local_memory_research_without_pi_chat(self):
+        settings = Settings(
+            db_path=":memory:",
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+        payload = {"status": "ok", "question": "что дальше?", "privacy": {"model_calls": 0}}
+
+        with patch.object(handlers, "answer_pi_chat") as chat_mock:
+            with patch.object(handlers, "answer_memory_research", return_value=payload) as research_mock:
+                with patch.object(handlers, "render_memory_research_answer", return_value="PRM Research\nPrivacy: mode=local-research; model_calls=0") as render_mock:
+                    with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                        with patch.object(handlers, "send_message") as mock_send_message:
+                            handlers.handle_research(chat_id="42", args="что дальше?", settings=settings)
+
+        chat_mock.assert_not_called()
+        research_mock.assert_called_once()
+        self.assertEqual(research_mock.call_args.args[0], "что дальше?")
+        self.assertIs(research_mock.call_args.kwargs["settings"], settings)
+        self.assertEqual(research_mock.call_args.kwargs["limit"], 4)
+        budget = research_mock.call_args.kwargs["budget"]
+        self.assertEqual(budget.max_model_calls, 0)
+        self.assertFalse(budget.allow_provider_egress)
+        self.assertFalse(budget.allow_open_browsing)
+        render_mock.assert_called_once_with(payload)
+        message = mock_send_message.call_args.args[2]
+        self.assertIn("PRM Research", message)
+        self.assertIn("model_calls=0", message)
+
+    def test_prm_safe_command_allowlist_allows_research(self):
+        settings = Settings(
+            db_path=":memory:",
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+        payload = {"status": "ok", "question": "what changed?"}
+
+        with patch.object(handlers, "answer_memory_research", return_value=payload) as research_mock:
+            with patch.object(handlers, "answer_pi_chat") as chat_mock:
+                with patch.object(handlers, "render_memory_research_answer", return_value="PRM Research\nlocal-only"):
+                    with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                        with patch.object(handlers, "send_message") as mock_send_message:
+                            handlers.dispatch_command(
+                                chat_id="42",
+                                text="/research what changed?",
+                                settings=settings,
+                                runtime_mode=handlers.BOT_RUNTIME_PRM_ASSISTANT,
+                            )
+
+        chat_mock.assert_not_called()
+        research_mock.assert_called_once()
+        message = mock_send_message.call_args.args[2]
+        self.assertIn("PRM Research", message)
 
     def test_handle_ask_delegates_to_pi_chat_not_raw_telegram_answer(self):
         settings = Settings(

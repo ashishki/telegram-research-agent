@@ -1473,8 +1473,13 @@ Notes: |
   Implemented on 2026-08-03. Telegram safe-mode start and help now state
   local-only CLI mode, approved LLM/provider-egress mode, safe read-only
   commands, blocked legacy generation/write commands, and dogfood-not-started
-  status. Telegram chat, Hermes, ask aliases, ordinary text, and voice
-  transcript dispatch use the same privacy-safe PRM chat renderer as the CLI.
+  status. Telegram chat, Hermes, and ask aliases use the same privacy-safe PRM
+  chat renderer as the CLI only when separately approved for provider egress
+  and started with `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`.
+  Post-PRM28 local UX routing now sends ordinary text, voice transcripts, and
+  explicit `/research <question>` in `prm-assistant` mode through the
+  local-only compact `memory research` renderer, with model calls, provider
+  egress, open browsing, writes, service start, and dogfood all still gated.
 
   The operator runbook documents preflight inspection, install/start/status,
   stop/disable, and rollback-to-disabled commands while preserving the hard

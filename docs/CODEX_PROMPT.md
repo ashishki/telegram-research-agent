@@ -76,13 +76,15 @@ the current post-PRM28 receipt is blocked only on dogfood-start approval and
 does not start dogfood or claim release readiness. On 2026-07-29 the old live Telegram bot and Report V2 weekly timer
 were stopped and disabled. A dedicated `prm-assistant` mode now exists for the
 future operator entrypoint: ordinary text and voice transcript dispatch to
-`/chat`, legacy callbacks are disabled, and generation/write commands are
-blocked. It does not run automatic startup migrations. The full product is not
-released. For immediate local use, `memory ask` provides a no-LLM local
-evidence brief over bounded archive/curated/project context. LLM-backed
-`memory ask --llm-approved` and `memory chat --allow-provider-egress` now exist
-behind the explicit provider-egress switch; Telegram chat uses the same display
-contract, while runtime start remains blocked.
+local-only `/research`, legacy callbacks are disabled, and generation/write
+commands are blocked. It does not run automatic startup migrations. The full
+product is not released. For immediate local use, `memory ask` provides a
+no-LLM local evidence brief over bounded archive/curated/project context.
+LLM-backed `memory ask --llm-approved` and
+`memory chat --allow-provider-egress` now exist behind the explicit
+provider-egress switch; Telegram `/chat` remains a separate LLM-backed command,
+requires `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`, and runtime start remains
+blocked.
 The polished archive-plus-linked-source project-aware research assistant target
 is specified in `docs/personal_research_memory_product_contract.md` and
 scheduled in `docs/tasks.md`; PRM-22 and PRM-23 are implemented fixture-first

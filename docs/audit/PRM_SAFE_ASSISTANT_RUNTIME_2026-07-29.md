@@ -21,6 +21,7 @@ Safe mode uses `BOT_RUNTIME_PRM_ASSISTANT`.
 
 Allowed command surface:
 
+- `/research`;
 - `/chat`, `/hermes`, `/ask`;
 - `/weekly`, `/actions`, `/explain`, `/projects`, `/mvp`, `/strategy`;
 - `/codex`, `/costs`, `/status`;
@@ -38,8 +39,13 @@ Blocked command surface:
 - legacy inline callbacks because they can write decision, reminder, or
   artifact-feedback rows.
 
-Ordinary Telegram text and voice transcripts are dispatched as `/chat` in safe
-mode. Voice fallback copy hides legacy feedback commands.
+Ordinary Telegram text and voice transcripts were initially dispatched as
+`/chat` in safe mode. On 2026-08-11 this was amended after the local UX trial:
+ordinary text, voice transcripts, and explicit `/research <question>` now route
+to the local-only compact `memory research` renderer. `/chat` remains a
+separate LLM-backed command requiring provider-egress approval and
+`PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`. Voice fallback copy hides legacy
+feedback commands.
 
 The safe CLI entrypoint does not run automatic startup migrations. Production
 DB migration remains a separate approved maintenance action.

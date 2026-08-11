@@ -131,8 +131,8 @@ or promoted to PRM dogfood evidence.
 | CLI entrypoint | `src/main.py prm-assistant` implemented |
 | repo unit template | `systemd/telegram-prm-assistant.service` added |
 | legacy bot compatibility | `src/main.py bot` still uses legacy runtime mode |
-| ordinary text in safe mode | dispatches to chat command, not legacy message router |
-| voice transcript in safe mode | dispatches to chat command, not legacy voice router |
+| ordinary text in safe mode | dispatches to local-only research command, not legacy message router |
+| voice transcript in safe mode | dispatches to local-only research command, not legacy voice router |
 | legacy callbacks in safe mode | disabled before DB write helpers run |
 | legacy generation/write commands in safe mode | blocked by allowlist |
 | safe runtime migrations | no automatic startup migration |
@@ -625,6 +625,22 @@ git diff --check
 | remaining gap | deterministic synthesis and curated-memory relevance are still shallow compared with a polished LLM-backed answer; live/current verification remains gated |
 
 This receipt is diagnostic evidence only. It is not PRM-19 dogfood evidence.
+
+## Telegram Local Research Routing - 2026-08-11
+
+| Check | Result |
+| --- | --- |
+| implementation | `prm-assistant` ordinary text and transcribed voice now route to the Telegram research command, which renders local-only compact `memory research` output |
+| explicit command | the Telegram research command with a question is registered and allowed in PRM safe mode |
+| provider boundary | the Telegram research command uses `MemoryResearchBudget(max_model_calls=0, allow_provider_egress=false, allow_open_browsing=false)` |
+| LLM Telegram gate | Telegram chat, Hermes, and ask commands refuse by default unless `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1` is set before runtime startup |
+| runtime boundary | service was not installed, enabled, started, or treated as dogfood |
+| validation | `PYTHONPATH=src python3 -m pytest tests/test_handlers.py tests/test_callbacks.py -q` -> 47 passed in 25.25s; `PYTHONPATH=src python3 -m pytest tests/test_handlers.py tests/test_callbacks.py tests/test_cli.py tests/test_memory_research.py tests/test_local_memory_ask.py -q` -> 82 passed in 32.26s; `python3 tools/test_tiers.py fast-contract` -> 254 passed in 75.89s; `python3 tools/playbook_validate.py --root . --check tasks --check references` -> errors=0 warnings=0; `git diff --check` -> no output |
+| operator use | after explicit manual runtime-start approval, send normal text or the Telegram research command with a question; do not use Telegram chat unless provider egress is separately approved |
+
+This is a safe Telegram UX routing change only. It is not PRM-19 dogfood
+evidence and does not approve provider egress, live web research, embeddings,
+service start, migrations, or production writes.
 
 ## Local PRM Status UX - 2026-08-10
 
