@@ -1869,7 +1869,7 @@ Notes: |
 Owner: human+codex
 Phase: PRM
 Type: rag:architecture eval:gate privacy:approval
-Status: proposed
+Status: blocked
 Depends-On: PRM-24, PRM-25
 Risk-Level: high
 Public-Tests-Required: required
@@ -1914,6 +1914,13 @@ Notes: |
   This task refines the older PRM-8 blocked gate for the product RAG path. It
   is documentation/eval/approval work only unless the human operator explicitly
   approves a backend.
+  Safe PRM-26 ADR/privacy/cost/rollback evidence was drafted on 2026-08-11 in
+  `docs/adr/ADR-003-prm26-hybrid-retrieval-privacy-budget.md`. The draft
+  recommends no vector/backend adoption from current generated seed evidence:
+  source-label hit/citation metrics are recovered by SQLite FTS/query planner,
+  while the measured gaps are no-answer/refusal behavior and missing stale
+  labels. PRM-26 remains blocked pending explicit operator backend/no-backend
+  acceptance; PRM-27 remains blocked.
 
 ### PRM-27: Hybrid Retrieval Implementation
 

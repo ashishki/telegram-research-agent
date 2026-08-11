@@ -526,6 +526,19 @@ PYTHONPATH=src python3 tools/archive_retrieval_eval.py --root . --db data/agent.
 archive_retrieval_eval: rows=50 gold=50 candidates=0 output=evals/retrieval/product_rag_fts_baseline_report.json
 ```
 
+## PRM-26 Hybrid Retrieval ADR/Privacy Budget Draft - 2026-08-11
+
+| Check | Result |
+| --- | --- |
+| ADR | `docs/adr/ADR-003-prm26-hybrid-retrieval-privacy-budget.md` |
+| status | `blocked_pending_operator_backend_approval` |
+| decision | no vector/backend adoption from current generated seed evidence |
+| failure map | source-label hit/citation recovered by SQLite FTS/query planner; no-answer/refusal gap remains; stale/forbidden labels unmeasured |
+| privacy/cost budget | 0 embedding rows, 0 tokens/chars, 0 provider calls, 0 vector writes, 0 migrations, $0 provider cost |
+| rollback | no vector state exists; future vector state must be derived, versioned, disable-able, and backed up before production writes |
+| gate impact | PRM-26 remains blocked pending explicit operator backend/no-backend acceptance; PRM-27 remains blocked |
+| side effects | documentation/evidence only; no embeddings, vector backend, provider egress, live research, service start, migrations, production writes, dogfood, or compatibility archive/delete/move |
+
 ## Local PRM Status UX - 2026-08-10
 
 | Check | Result |

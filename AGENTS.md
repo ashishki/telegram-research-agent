@@ -29,11 +29,12 @@ resolver/cache, and PRM-23 implements a bounded fixture-first `memory research`
 planner/CLI with no live fetch, provider call, service start, dogfood evidence,
 durable production write/cache, or vector/backend approval. PRM-24 now has a
 50-row operator-approved generated seed gold set and a privacy-safe SQLite FTS
-baseline report; the labels are not independent human review evidence. PRM-24
-through PRM-28 formalize the required full product RAG path before dogfood:
-gold eval set, citation-safe context pack, hybrid/vector ADR and privacy
-budget, approved retrieval implementation, and product chat acceptance gate.
-PRM-8
+baseline report; the labels are not independent human review evidence. PRM-26
+now has a safe ADR/privacy/cost/rollback draft that keeps vector/backend work
+blocked pending explicit operator backend/no-backend acceptance. PRM-24 through
+PRM-28 formalize the required full product RAG path before dogfood: gold eval
+set, citation-safe context pack, hybrid/vector ADR and privacy budget, approved
+retrieval implementation, and product chat acceptance gate. PRM-8
 remains blocked until that approval path is satisfied. PRM-19 and PRM-20 are
 not started; PRM-19 requires PRM-28 completion or an explicit human RAG-gate
 waiver, explicit human dogfood-start approval, accepted or cleared PRM-18
@@ -75,13 +76,13 @@ search, service starts, migrations, or writes.
 
 ## Current Next Task
 
-PRM-26 is the next safe task: document the hybrid/vector retrieval ADR and
-privacy budget from PRM-24/PRM-25 evidence only, without backend adoption.
-PRM-24's 50 generated seed gold labels were operator-approved on 2026-08-11
-under `operator-approval-2026-08-11-all-50-generated-gold`; they satisfy the
-PRM-24 coverage gate as generated seed labels, but they do not approve
-embeddings, a vector backend, provider egress, live research, service start, or
-dogfood. Do not start PRM-19 dogfood
+No RAG implementation task is currently eligible. PRM-26 is blocked pending
+explicit operator backend/no-backend acceptance; PRM-27 and PRM-28 remain
+blocked. PRM-24's 50 generated seed gold labels were operator-approved on
+2026-08-11 under `operator-approval-2026-08-11-all-50-generated-gold`; they
+satisfy the PRM-24 coverage gate as generated seed labels, but they do not
+approve embeddings, a vector backend, provider egress, live research, service
+start, or dogfood. Do not start PRM-19 dogfood
 until PRM-28 passes or the human operator explicitly waives the RAG gate,
 explicitly approves dogfood start, and the PRM-18 blockers are accepted or
 cleared. Do not start PRM-20 cleanup/archive work until PRM-19 dogfood evidence
@@ -95,4 +96,5 @@ implemented fixture-first only; do not treat them as dogfood evidence or as
 approval for web research, provider egress, service start, durable production
 cache writes, production DB writes, or vector/backend adoption. PRM-27 hybrid
 retrieval implementation and PRM-28 product RAG chat gate remain blocked until
-the PRM-26 ADR/privacy/budget approval gate is satisfied.
+the PRM-26 ADR/privacy/budget approval gate is satisfied or the operator
+explicitly changes the dependency path.

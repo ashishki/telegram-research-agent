@@ -21,17 +21,18 @@ Last updated: 2026-08-11
 - Implemented slices in HEAD: PRM-1 through PRM-7 plus PRM-9 through PRM-18C,
   PRM-21 docs-only research-session contract, PRM-22 fixture-first
   linked-source resolver/cache, and PRM-23 fixture-first memory research
-  planner/CLI
-- Current safe slice: PRM-26 Hybrid Retrieval ADR And Privacy Budget. PRM-24
-  now has a 50-row operator-approved generated seed gold set and SQLite FTS
-  baseline report under
-  `operator-approval-2026-08-11-all-50-generated-gold`; this is generated seed
-  evidence, not independent human review and not approval for vector/backend
-  work.
+  planner/CLI, PRM-24 generated seed eval coverage, and PRM-26 safe gate draft
+- Current safe slice: no RAG implementation task is eligible. PRM-24 now has a
+  50-row operator-approved generated seed gold set and SQLite FTS baseline
+  report under `operator-approval-2026-08-11-all-50-generated-gold`; this is
+  generated seed evidence, not independent human review and not approval for
+  vector/backend work. PRM-26 now has a safe ADR/privacy/cost/rollback draft
+  and is blocked pending explicit operator backend/no-backend acceptance.
 - Blocked/not implemented slices: PRM-8, PRM-19, PRM-20, PRM-27, and PRM-28
   remain blocked until their gates are satisfied.
-- Next safe work: PRM-26 documentation/eval-gate work only, without backend
-  adoption. Stop before PRM-27/PRM-19. PRM-19 only after PRM-28 passes
+- Next safe work: wait for explicit PRM-26 backend/no-backend acceptance or an
+  explicit dependency-path change. Stop before PRM-27/PRM-19. PRM-19 only after
+  PRM-28 passes
   or the human operator explicitly waives the RAG gate, explicit human
   dogfood-start approval exists, and PRM-18 blockers are accepted or cleared;
   PRM-20 only after real dogfood evidence and explicit compatibility
@@ -144,7 +145,8 @@ jobs from this handoff.
   generated seed gold set on 2026-08-11. Do not overclaim this as independent
   human review or PRM-28 product acceptance.
 - PRM-8 vector/hybrid retrieval remains blocked.
-- PRM-26 is the next safe RAG task; PRM-27/PRM-28 remain gated.
+- PRM-26 is blocked pending explicit operator backend/no-backend acceptance;
+  PRM-27/PRM-28 remain gated.
 - PRM-18 release/dogfood gate is implemented and currently blocked.
 - PRM-18A through PRM-18C are implemented and the batched deep review is
   recorded at `docs/audit/PRM_DEEP_REVIEW_PRM18A_18C_2026-08-03.md`.

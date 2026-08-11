@@ -1,7 +1,7 @@
 # Rollback And Reindex Plan
 
-Status: draft; PRM-2 archive document rollback recorded; PRM-15 learning-state migration rollback recorded; PRM-17 workflow rollback/dry-run contract recorded
-Last updated: 2026-07-29
+Status: draft; PRM-2 archive document rollback recorded; PRM-15 learning-state migration rollback recorded; PRM-17 workflow rollback/dry-run contract recorded; PRM-26 vector gate rollback recorded
+Last updated: 2026-08-11
 
 ## Archive Search
 
@@ -101,7 +101,11 @@ Failed enrichment does not remove archive search documents.
 
 ## Vector/Hybrid Future
 
-If PRM-7 approves vector/hybrid retrieval:
+PRM-26 does not approve vector/hybrid retrieval. ADR-003 records zero approved
+embedding rows, zero vector writes, zero provider calls, and no production
+migration. Since no vector state exists, rollback is a code/docs revert.
+
+If a future accepted ADR approves vector/hybrid retrieval:
 
 - keep SQLite archive canonical;
 - record embedding provider/model/version;
@@ -109,6 +113,16 @@ If PRM-7 approves vector/hybrid retrieval:
 - keep rebuild script;
 - support disabling vector path and falling back to FTS;
 - document backup/restore before dogfood.
+
+Future vector rollback requirements:
+
+1. Preserve canonical `raw_posts` and `posts`.
+2. Version every derived vector index and embedding payload.
+3. Keep a feature/config flag that disables vector retrieval and falls back to
+   SQLite FTS.
+4. Back up SQLite plus any sidecar vector store before production writes.
+5. Verify aggregate row counts and eval metrics after rollback without printing
+   raw Telegram text.
 
 ## Report/Library Projections
 

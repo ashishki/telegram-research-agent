@@ -388,5 +388,17 @@ docs/adr/ADR-002-vector-backend-gate.md
 ```
 
 ADR-002 is `proposed_not_accepted` and makes a negative decision for now: no
-vector backend is adopted because there is still no full approved product gold
-set or measured recall/citation failure evidence that justifies vector work.
+vector backend is adopted because the current generated seed baseline does not
+show a source-recall/citation failure that justifies vector work.
+
+PRM-26 draft gate:
+
+```text
+docs/adr/ADR-003-prm26-hybrid-retrieval-privacy-budget.md
+```
+
+ADR-003 records the current PRM-24/PRM-25 evidence and keeps PRM-27 blocked.
+The draft recommends no vector/backend adoption from the generated seed
+baseline: source-label recall/citation is recovered by SQLite FTS/query planner,
+while the measured gaps are answer-level no-answer/refusal behavior and missing
+stale/forbidden labels.

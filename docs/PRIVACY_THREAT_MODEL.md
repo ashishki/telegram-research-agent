@@ -35,6 +35,7 @@ Last updated: 2026-08-03
 | linked-source cache leaks raw provider payloads or private post text | PRM-22 cache records store source URL, normalized title, content hash, bounded excerpt, status, and redacted failure reason only |
 | linked-source resolver crawls live web by default | PRM-22 uses fixture/fake fetchers by default and refuses live HTTP, external skills, and provider summarization without explicit approval/budget switches |
 | answer context contains uncited claims or a raw corpus dump | PRM-25 context pack admits only cited bounded excerpts; it excludes raw fields and records safe exclusion reasons |
+| vector index silently persists private corpus embeddings | PRM-26 has no approved vector backend; any future embedding/index run requires accepted ADR, explicit privacy budget, derived-state rollback, and aggregate-only receipts |
 | deletion cannot be honored | retention/deletion path required before dogfood |
 
 ## Provider Egress Rule
@@ -122,6 +123,25 @@ source class, query variant, freshness status, and project label. It refuses
 raw-corpus fields, provider payloads, uncited candidates, duplicate citations,
 and over-budget sources; reasons contain no copied source text. It performs no
 provider egress, live fetching, embeddings, vector lookup, migration, or write.
+
+## PRM-26 Vector/Hybrid Gate Rule
+
+ADR-003 keeps vector/backend adoption blocked. Current approved embedding
+budget is zero rows, zero tokens/chars, zero provider calls, zero vector writes,
+and zero production migrations.
+
+If a future accepted ADR approves vector/hybrid retrieval, the approval must
+define:
+
+- provider/model or local embedding model;
+- backend and persistence boundary;
+- max rows and max tokens/chars;
+- whether any private text may leave the machine;
+- redaction/logging rules;
+- backup, disable/fallback, and rebuild procedure.
+
+Until then, committed evidence may record only aggregate metrics, stable archive
+IDs, approval refs, and gate status.
 
 ## Confirmation Rule
 

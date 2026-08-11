@@ -26,6 +26,7 @@ Status: active PRM budget requiring human approval before live provider use
 | PRM-22 linked-source resolver implementation | $0 for implementation/tests | 0 for implementation/tests | live HTTP fetch, external skill, provider summarization, or durable production cache write |
 | PRM-23 memory research planner implementation | $0 for implementation/tests | 0 for implementation/tests | live linked-source fetch, provider synthesis, service start, dogfood start, production write, or vector/backend adoption |
 | PRM-24 generated seed gold labels and FTS baseline | $0 | 0 | raw Telegram text copied into eval rows, provider judge, embeddings, vector backend, live research, or production write |
+| PRM-26 hybrid/vector ADR draft | $0 | 0 | any embedding run, vector backend adoption, production index write, migration, provider egress, or accepted backend budget |
 
 Monthly planning ceiling before dogfood: $25 unless the human approves more.
 
@@ -239,3 +240,20 @@ must name:
 - whether bounded Telegram snippets may leave the machine;
 - whether linked-source excerpts may be cached durably;
 - whether Telegram `prm-assistant` service start is allowed.
+
+## PRM-26 Hybrid/Vector Gate Budget
+
+ADR-003 records no approved vector/backend budget. Current limits are:
+
+| Control | Value |
+| --- | ---: |
+| Embedding rows | 0 |
+| Embedding tokens/chars | 0 |
+| Provider egress calls | 0 |
+| Vector backend writes | 0 |
+| Production migrations | 0 |
+| Max provider cost | $0 |
+
+Any future backend experiment must name the provider/model or local model,
+backend, max rows, max tokens/chars, persistence boundary, rollback plan, and
+cost ceiling in an accepted ADR before execution.
