@@ -38,6 +38,7 @@ Last updated: 2026-08-12
 | PRM manual Telegram assistant activation receipt | docs/audit/PRM_MANUAL_TELEGRAM_ASSISTANT_ACTIVATION_2026-08-11.md |
 | PRM manual archive refresh receipt | docs/audit/PRM_MANUAL_ARCHIVE_REFRESH_2026-08-12.md |
 | PRM weekly archive refresh timer receipt | docs/audit/PRM_WEEKLY_ARCHIVE_REFRESH_TIMER_2026-08-12.md |
+| README current state refresh receipt | docs/audit/README_CURRENT_STATE_REFRESH_2026-08-12.md |
 | PRM runtime freeze receipt | docs/audit/PRM_RUNTIME_FREEZE_2026-07-29.md |
 | PRM safe assistant runtime receipt | docs/audit/PRM_SAFE_ASSISTANT_RUNTIME_2026-07-29.md |
 | PRM local memory ask receipt | docs/audit/PRM_LOCAL_MEMORY_ASK_2026-07-29.md |

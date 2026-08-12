@@ -1,192 +1,461 @@
 # Telegram Research Agent
 
-Private, single-operator Telegram research system.
+Private, single-operator Telegram research memory and grounded assistant.
 
-Current direction: **Personal Telegram Research Memory + Grounded Assistant**.
-The old weekly-report pipeline remains in the repository as compatibility and
-implementation history, but it is no longer the product center.
-
-## Current Status
-
-Retrofit slices are implemented through the PRM release/dogfood gate and the
-PRM-18A through PRM-18C LLM chat UX block. The system now has bounded SQLite FTS
-archive search for the assistant path, grounded answer contracts,
-confirmation-gated saved-memory proposals, deterministic Knowledge Library
-topic-page rendering, deterministic project/weekly projections, safe runtime
-contracts, a gated CLI/Telegram chat surface, a recorded PRM-18A..18C deep
-review, and a blocked release gate. It still does **not** provide hybrid/vector
-RAG, live external verification evidence, the polished archive-plus-linked-source
-research assistant, a proven dogfood result, or release readiness.
-
-Historical baseline inspected before the retrofit:
-
-- target repo commit inspected:
-  `ad8689fa25b89f77122c4cec7c7a6b9da3f500cf`
-- Playbook commit used:
-  `5583eca96c4d2d480b5574ed78bea63e0b07ebf0`
-- local SQLite has `raw_posts`, `posts`, and `posts_fts`
-- PI Assistant search was curated-only and explicitly excluded raw Telegram
-  archive retrieval at that baseline
-- W29 delivered Brief/Atlas artifacts use `split_ai_report.v1`
-- W29 detected 7 personal reacted posts, but 0 linked atoms, 0 linked topics,
-  and 0 ranking effects
-
-## Product Direction
-
-North star:
+The project used to be centered on weekly Telegram intelligence reports. The
+current product direction is different:
 
 ```text
-Search everything.
-Enrich what matters.
-Save what proves useful.
-Generate reports only as a secondary projection.
+Personal Telegram Research Memory + Grounded Assistant
 ```
 
-The target product has one conversational entrypoint. A natural-language
-question should return a concise answer, relevant Telegram context, concrete
-Telegram source links, freshness boundaries, contradictions or uncertainty,
-and `insufficient_evidence` when the archive does not support the answer.
+The operator asks questions in Telegram or CLI, the system searches the local
+Telegram archive, builds a citation-safe context pack, and returns a grounded
+answer or editor-style brief with source boundaries.
 
-## Implemented Today
+This is not a public SaaS product and not a released/dogfooded system yet. It is
+currently running as a manual operator test environment.
 
-- Telegram ingestion into local SQLite.
-- Normalized `posts` and `posts_fts` storage.
-- Knowledge Atom and Idea Thread infrastructure.
-- V1 weekly Brief and Knowledge Atlas compatibility artifacts.
-- IRX V2 preview infrastructure in code, but not the delivered W29 surface.
-- Read-only Hermes/PI facade over curated intelligence items.
-- Reaction snapshot and receipt infrastructure.
-- Report V2 rollout gate and historical IRX task record.
-- Bounded full-archive SQLite FTS assistant retrieval.
-- Grounded assistant answer contracts with insufficient-evidence boundaries.
-- External-verification requirement routing without live browsing.
-- Confirmation-gated Knowledge Note, Watch Topic, project link, decision,
-  action, experiment, and feedback proposals.
-- Deterministic Knowledge Library topic-page DTO and static HTML renderer.
-- Deterministic project context decision support and learning-state projection
-  semantics.
-- Weekly Brief V3 deterministic secondary projection.
-- Gated LLM-backed `memory ask`/`memory chat` CLI and Telegram chat parity,
-  with the safe runtime still disabled.
-- Fixture-first project-aware `memory research` sessions that combine archive
-  retrieval, linked-source cache/fake fetcher evidence, project routing,
-  approach comparison, deeper-reading paths, and confirmation-gated draft
-  proposals without live web/provider/runtime approval.
+## Current State
 
-## Planned, Not Yet Implemented
+As of 2026-08-12:
 
-- Human-approved gold query labels and accepted retrieval thresholds.
-- Hybrid/vector retrieval only after FTS baseline failures justify it.
-- Live/provider-backed project-aware research sessions beyond the local
-  fixture-first `memory research` slice.
-- Real learning dogfood and spaced-repetition outcome evidence.
-- Dogfood, release readiness, and public value evidence.
+- local archive RAG is implemented over SQLite FTS plus an approved local SQLite
+  vector sidecar;
+- Telegram `prm-assistant` runtime is installed, enabled, and active for manual
+  testing only;
+- ordinary Telegram text and voice transcripts route through the PRM auto path;
+- Telegram `/research` and `/brief` return packaged topic reports with sources;
+- Telegram `/chat` and model-based auto routing are separately provider-egress
+  gated;
+- a weekly PRM archive refresh timer is installed and waiting;
+- legacy weekly-report automation remains frozen;
+- PRM-19 dogfood has not started;
+- release readiness is not claimed.
 
-## Unsupported Claims
+Current local archive snapshot on the active host:
 
-Do not claim:
+| Item | Value |
+| --- | --- |
+| `raw_posts` | 4166 |
+| `posts` | 4166 |
+| `posts_fts` | 4166 |
+| latest `posts.posted_at` | `2026-08-11T21:47:37+00:00` |
 
-- full Telegram archive RAG exists;
-- vector or hybrid retrieval is selected or installed;
-- live external verification was performed;
-- Knowledge Library topic pages were dogfooded on private production data;
-- the polished project-aware research-session assistant exists;
-- W29 proved user value;
-- four-week dogfood has started;
-- public/portfolio value is proven.
+Current installed runtime state:
 
-Public evidence boundary: this remains a secondary portfolio project with
-0/4 verified public dogfood weeks. The current public ledger is
-docs/evidence/public_dogfood_status.json. The committed public scorecard demo is
-synthetic evidence; it is not a dogfood run.
+| Unit | State | Purpose |
+| --- | --- | --- |
+| `telegram-prm-assistant.service` | enabled, active | manual Telegram assistant testing |
+| `telegram-prm-archive-refresh.timer` | enabled, active/waiting | weekly local archive freshness |
+| `telegram-prm-archive-refresh.service` | inactive until timer fires | bounded archive refresh job |
+| `telegram-bot.service` | disabled/inactive | legacy bot, do not use as PRM dogfood |
+| `telegram-ai-split-report.timer` | disabled/inactive | legacy weekly report timer |
 
-## Primary Operator Workflow
+The next scheduled archive refresh is handled by systemd and runs the bounded
+PRM refresh command once per week.
 
-Current local preview:
+## What The Product Does Now
 
-```bash
-PYTHONPATH=src python3 src/main.py memory ask "какие есть практики по eval gates?"
-PYTHONPATH=src python3 src/main.py memory ask --project telegram-research-agent "как эта идея применима к проекту?"
-PYTHONPATH=src python3 src/main.py memory ai-transformation-source-packet --allow-live-fetch --days 92
+The working product slice is a private research assistant over retained
+Telegram reading history.
+
+It can:
+
+- search the retained Telegram archive by natural-language question;
+- combine SQLite FTS retrieval with the local vector sidecar for hybrid recall;
+- enforce date windows for freshness-scoped questions such as "last two weeks";
+- reject stale evidence instead of answering from old related posts;
+- cite Telegram channels/posts from the local archive;
+- synthesize Telegram answers into readable report-like messages;
+- produce source-backed editor briefs for post-writing workflows;
+- keep short Telegram follow-up context in memory for the current chat session;
+- route ordinary Telegram messages to research, brief, or chat paths;
+- provide local-only CLI answers without LLM calls;
+- run LLM-backed chat only behind explicit provider-egress approval;
+- refresh the archive weekly without restarting legacy report automation.
+
+It does not currently:
+
+- claim PRM-19 dogfood evidence;
+- run live web research;
+- run external embeddings or a hosted vector database;
+- run production migrations automatically;
+- sync reactions automatically in the PRM refresh timer;
+- download media or run vision LLMs in the PRM refresh timer;
+- generate weekly reports as the main product;
+- save durable memory without explicit confirmation;
+- commit private Telegram source text or generated private reports.
+
+## How It Works
+
+Current PRM path:
+
+```text
+Telegram channels
+  -> local SQLite raw_posts
+  -> normalized posts + posts_fts
+  -> optional local SQLite vector sidecar
+  -> bounded retrieval
+  -> citation-safe context pack
+  -> deterministic answer gate
+  -> optional bounded LLM synthesis
+  -> Telegram/CLI answer with sources and boundaries
 ```
 
-This local command searches bounded PRM memory and SQLite Telegram archive
-indexes, returns source links/snippets, and does not call LLMs, external
-search, Telegram services, startup migrations, generation jobs, or write tools.
-The AI transformation source-packet command is a separate private editor
-workflow: it reads local reaction/channel evidence read-only, optionally fetches
-public `t.me/s` previews, and writes ignored Markdown/JSON under `data/output/**`
-without production DB writes, Telegram services, provider egress, embeddings, or
-dogfood evidence.
+Key storage:
 
-LLM chat UX contract:
+- `data/agent.db` — private local SQLite database, gitignored;
+- `raw_posts` — retained Telegram source rows;
+- `posts` / `posts_fts` — normalized searchable archive;
+- `data/vector/archive_vector.sqlite` — local vector sidecar, gitignored;
+- `data/backups/` — SQLite backups created before bounded refreshes, gitignored;
+- `data/output/**` — private generated outputs, gitignored.
 
-- `PRM-18A`: defines the LLM chat privacy/UX contract;
-- `PRM-18B`: implemented `memory chat` and `memory ask --llm-approved` over
-  the existing PI chat/RAG harness;
-- `PRM-18C`: aligned Telegram `prm-assistant` with the same answer/citation and
-  privacy format without starting dogfood.
+The vector sidecar is local-only. It does not use external embeddings and does
+not mutate the canonical database.
 
-Contracted local and approved chat commands:
+## Telegram Usage
+
+The intended manual-test interface is Telegram.
+
+In the running `prm-assistant` mode, send a normal message such as:
+
+```text
+Что было интересного по моделям за последние две недели?
+Что мои каналы писали про AI transformation в компаниях?
+Кто нанимает, а кто увольняет из-за AI?
+Собери мне редакторский бриф по агентам и enterprise adoption.
+```
+
+The assistant should choose the right mode automatically:
+
+- archive/source questions go to local research;
+- writing/source-packet questions go to editor brief;
+- short follow-ups reuse recent chat context;
+- generic chat is only allowed when provider-egress gates are enabled.
+
+Manual fallback commands:
+
+```text
+/research <question>
+/brief <question>
+/chat <question>
+```
+
+Expected Telegram answer style for `/research`, `/brief`, and auto-routed
+research/brief:
+
+- packaged topical report, not raw retrieval debug output;
+- clear sections;
+- source list;
+- freshness and evidence boundaries in plain language;
+- no visible retrieval metrics, costs, tool-call counts, or debug footer.
+
+## CLI Usage
+
+Use `PYTHONPATH=src` for local commands.
+
+Safe status:
 
 ```bash
-PYTHONPATH=src python3 src/main.py memory ask "какие есть практики по eval gates?"
-PYTHONPATH=src python3 src/main.py memory ask --json "найди подтверждения по agent evals"
-PYTHONPATH=src python3 src/main.py memory ask --llm-approved --allow-provider-egress "что говорит моя база?"
+PYTHONPATH=src python3 src/main.py memory status
+```
+
+Local-only evidence answer, no LLM/provider egress:
+
+```bash
+PYTHONPATH=src python3 src/main.py memory ask "что есть по eval gates?"
+```
+
+Bounded local research over archive, linked-source cache, and project context:
+
+```bash
+PYTHONPATH=src python3 src/main.py memory research --hybrid \
+  "Что было интересного по моделям за последние две недели?"
+```
+
+Debug/audit rendering:
+
+```bash
+PYTHONPATH=src python3 src/main.py memory research --hybrid --debug \
+  "что мои каналы писали про AI transformation?"
+```
+
+LLM-backed CLI chat requires explicit approval:
+
+```bash
 PYTHONPATH=src python3 src/main.py memory chat --allow-provider-egress
 ```
 
-The local-only commands never call a model. The LLM-backed commands are
-available, but must refuse unless the operator passes the explicit
-provider-egress switch. Approved LLM answers show answer, sources,
-archive-support status, unknowns/external verification needs, write status, and
-a privacy/cost line:
-
-```text
-Privacy: mode=<local-only|llm-approved>; model_calls=<n>; estimated_cost_usd=<usd>; bounded_telegram_snippet_provider_egress=<true|false>; raw_telegram_corpus_egress=false; durable_writes=false
-```
-
-Approved assistant workflow after PRM-18B/PRM-18C and explicit dogfood start:
-
-1. Ask Hermes a natural-language question.
-2. Hermes searches the Telegram archive and, when useful, curated knowledge.
-3. Hermes answers with Telegram source links and evidence boundaries.
-4. If the answer is useful, Hermes proposes a Knowledge Note, Watch Topic,
-   project link, decision, action, or experiment.
-5. Nothing is saved permanently without explicit confirmation.
-
-## Main Local Commands
+Build or refresh the local vector sidecar:
 
 ```bash
-python3 tools/playbook_validate.py --root . --check tasks --check placeholders --check readiness --check delivery --check references
-python3 tools/verify_project.py --root .
-python3 -m pytest tests/ -q
+PYTHONPATH=src python3 src/main.py memory vector-index --force
 ```
 
-Legacy operational commands remain available for compatibility, but do not use
-them as proof that the new product exists:
+Manual bounded archive refresh:
+
+```bash
+set -a
+source /srv/openclaw-you/.env
+set +a
+PYTHONPATH=src python3 src/main.py memory refresh-archive \
+  --days 21 \
+  --confirm-canonical-write \
+  --json
+```
+
+The refresh command deliberately avoids migrations, reaction sync, media
+download, vision LLM, provider egress, source-event writes, report generation,
+dogfood evidence, and release claims.
+
+Private editor source packet workflow:
+
+```bash
+PYTHONPATH=src python3 src/main.py memory ai-transformation-source-packet \
+  --days 92 \
+  --top-channels 8 \
+  --max-posts 120
+```
+
+Generated private files remain under ignored `data/output/**`.
+
+## Weekly Archive Refresh Timer
+
+The dedicated PRM archive freshness timer is separate from legacy ingestion and
+report timers.
+
+Repo templates:
+
+- `systemd/telegram-prm-archive-refresh.service`
+- `systemd/telegram-prm-archive-refresh.timer`
+
+Installed command:
+
+```bash
+/srv/openclaw-you/venv/bin/python3 src/main.py memory refresh-archive \
+  --days 21 \
+  --confirm-canonical-write \
+  --json
+```
+
+Schedule:
+
+```text
+Mon *-*-* 08:10:00 Europe/Berlin
+AccuracySec=5m
+RandomizedDelaySec=15m
+Persistent=false
+```
+
+`Persistent=false` is intentional: installing the timer must not immediately
+repeat a canonical DB write if the archive is already fresh.
+
+Status commands:
+
+```bash
+systemctl list-timers --all telegram-prm-archive-refresh.timer --no-pager
+systemctl status telegram-prm-archive-refresh.timer --no-pager
+systemctl status telegram-prm-archive-refresh.service --no-pager
+```
+
+Install/update:
+
+```bash
+systemd-analyze verify \
+  systemd/telegram-prm-archive-refresh.service \
+  systemd/telegram-prm-archive-refresh.timer
+
+sudo install -m 0644 systemd/telegram-prm-archive-refresh.service \
+  /etc/systemd/system/telegram-prm-archive-refresh.service
+sudo install -m 0644 systemd/telegram-prm-archive-refresh.timer \
+  /etc/systemd/system/telegram-prm-archive-refresh.timer
+sudo systemctl daemon-reload
+sudo systemctl enable --now telegram-prm-archive-refresh.timer
+```
+
+Rollback:
+
+```bash
+sudo systemctl disable --now telegram-prm-archive-refresh.timer
+sudo rm -f /etc/systemd/system/telegram-prm-archive-refresh.service
+sudo rm -f /etc/systemd/system/telegram-prm-archive-refresh.timer
+sudo systemctl daemon-reload
+```
+
+## Telegram Assistant Runtime
+
+Repo template:
+
+- `systemd/telegram-prm-assistant.service`
+
+Start manually:
+
+```bash
+PYTHONPATH=src python3 src/main.py prm-assistant
+```
+
+Systemd install/update:
+
+```bash
+systemd-analyze verify systemd/telegram-prm-assistant.service
+sudo install -m 0644 systemd/telegram-prm-assistant.service \
+  /etc/systemd/system/telegram-prm-assistant.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now telegram-prm-assistant.service
+```
+
+Status/logs:
+
+```bash
+systemctl status telegram-prm-assistant.service --no-pager
+journalctl -u telegram-prm-assistant.service -n 100 --no-pager
+```
+
+Provider-egress gates used by the Telegram runtime:
+
+```text
+PRM_ARCHIVE_HYBRID_RETRIEVAL=approved
+PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1
+PRM_TELEGRAM_AUTO_LLM_ROUTER=1
+PRM_TELEGRAM_RAG_LLM_SYNTHESIS=1
+```
+
+These flags allow bounded cited snippets/context to be sent to the configured
+LLM provider for synthesis. They do not allow raw corpus egress.
+
+The archive-refresh timer explicitly overrides Telegram LLM/router flags to
+`0` for its own unit.
+
+## Development And Validation
+
+Fast PRM-focused validation:
+
+```bash
+python3 tools/test_tiers.py focused-prm
+```
+
+Playbook/governance validation:
+
+```bash
+python3 tools/playbook_validate.py --root . \
+  --check tasks \
+  --check placeholders \
+  --check readiness \
+  --check delivery \
+  --check references
+```
+
+Full verifier:
+
+```bash
+python3 tools/verify_project.py --root .
+```
+
+Generic test run:
+
+```bash
+PYTHONPATH=src python3 -m pytest tests/ -q
+```
+
+Before committing:
+
+```bash
+git diff --check
+git status --short
+```
+
+## Privacy And Safety Boundaries
+
+Private Telegram data must stay local unless the operator explicitly approves a
+bounded egress path.
+
+Do not commit:
+
+- `data/agent.db`;
+- `data/vector/**`;
+- `data/backups/**`;
+- `data/output/**`;
+- generated private Telegram source packets;
+- full private Telegram post text.
+
+Do not start or enable as PRM dogfood:
+
+- `telegram-bot.service`;
+- `telegram-ai-split-report.timer`;
+- legacy report/digest/MVP timers.
+
+Do not run without explicit task approval:
+
+- live web research;
+- reaction sync;
+- media download or vision LLM;
+- external embeddings;
+- hosted vector services;
+- production migrations;
+- full archive LLM backfill;
+- Radar/Frontier/report generation;
+- compatibility file deletion/archive/move.
+
+## Current Gates
+
+Implemented PRM slices include:
+
+- bounded SQLite FTS archive search;
+- grounded assistant answer contracts;
+- confirmation-gated saved-memory proposals;
+- deterministic Knowledge Library topic page renderer;
+- project context and decision-support routing;
+- Weekly Brief V3 deterministic secondary projection;
+- safe runtime workflow contracts;
+- PRM-18 release/dogfood gate;
+- PRM-18A through PRM-18C LLM chat UX;
+- PRM-24 generated seed gold eval set;
+- PRM-27 local vector sidecar;
+- PRM-28 product RAG answer gate.
+
+Still gated:
+
+- PRM-19 dogfood start requires explicit human dogfood-start approval;
+- PRM-20 cleanup/archive requires real PRM-19 dogfood evidence and explicit
+  compatibility archive/delete/move approval;
+- generated PRM-24 labels are operator-approved seed evidence, not independent
+  human-reviewed gold evidence;
+- the product is not released and public value is not proven.
+
+## Legacy Surfaces
+
+The repository still contains report-centered commands and systemd templates
+for historical compatibility:
 
 ```bash
 python3 src/main.py ingest
 python3 src/main.py sync-reactions --days 14
-python3 src/main.py weekly-intelligence-v2 --week 2026-W28 --threads-limit 24 --atoms-limit 8
+python3 src/main.py weekly-intelligence-v2 --week 2026-W28
 python3 src/main.py report-v2-rollout-gate --week 2026-W28 --json
+python3 src/main.py mvp-weekly
 ```
 
-Do not run live ingestion, reaction sync, report generation, Frontier, Radar,
-LLM extraction, embeddings, or full archive indexing during planning-only
-sessions.
+They are not the current product path. Do not use their outputs as PRM dogfood
+or release evidence.
 
 ## Canonical Docs
 
+- [Product Operating Model](docs/PRODUCT_OPERATING_MODEL.md)
+- [Operator Workflow](docs/operator_workflow.md)
 - [Project Brief](docs/PROJECT_BRIEF.md)
-- [Product Pivot Audit](docs/product_pivot_current_state_audit.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Implementation Contract](docs/IMPLEMENTATION_CONTRACT.md)
-- [Product Contract](docs/personal_research_memory_product_contract.md)
-- [Roadmap](docs/personal_research_memory_roadmap.md)
-- [Final Acceptance Plan](docs/final_acceptance_plan.md)
+- [Personal Research Memory Product Contract](docs/personal_research_memory_product_contract.md)
+- [Privacy Threat Model](docs/PRIVACY_THREAT_MODEL.md)
+- [Cost Budget](docs/COST_BUDGET.md)
 - [Active Tasks](docs/tasks.md)
+- [Evidence Index](docs/EVIDENCE_INDEX.md)
 - [Codex Handoff](docs/CODEX_PROMPT.md)
 
-Private generated outputs under `data/output/**` remain ignored by default.
+Key receipts:
+
+- [Manual Telegram Assistant Activation](docs/audit/PRM_MANUAL_TELEGRAM_ASSISTANT_ACTIVATION_2026-08-11.md)
+- [Manual Archive Refresh](docs/audit/PRM_MANUAL_ARCHIVE_REFRESH_2026-08-12.md)
+- [Weekly Archive Refresh Timer](docs/audit/PRM_WEEKLY_ARCHIVE_REFRESH_TIMER_2026-08-12.md)
