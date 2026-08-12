@@ -1,7 +1,7 @@
 # Codex Session Handoff
 
 Status: active
-Last updated: 2026-08-11
+Last updated: 2026-08-12
 
 ## Repository State
 
@@ -116,6 +116,13 @@ local DB write for manual testing only, not PRM-19 dogfood evidence. The command
 avoids legacy services/timers, migrations, reaction sync, media download,
 vision LLM, provider egress, source-event writes, report generation, dogfood
 start, and release claims.
+On 2026-08-12 the operator then approved a once-weekly timer for that bounded
+path. `telegram-prm-archive-refresh.timer` runs
+`memory refresh-archive --days 21 --confirm-canonical-write --json` on Monday
+08:10 Europe/Berlin. This is a manual-test freshness timer only: no legacy
+report/bot timer, migrations, reaction sync, media download, vision LLM,
+provider egress, source-event writes, report generation, external embeddings,
+hosted vector service, dogfood start, or release claim.
 The polished archive-plus-linked-source project-aware research assistant target
 is specified in `docs/personal_research_memory_product_contract.md` and
 scheduled in `docs/tasks.md`; PRM-22 and PRM-23 are implemented fixture-first

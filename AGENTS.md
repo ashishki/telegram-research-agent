@@ -1,7 +1,7 @@
 # Codex Handoff
 
 Status: active
-Last updated: 2026-08-11
+Last updated: 2026-08-12
 
 ## Product Direction
 
@@ -101,6 +101,14 @@ local DB write for manual testing only, not PRM-19 dogfood evidence. The command
 avoids legacy services/timers, migrations, reaction sync, media download,
 vision LLM, provider egress, source-event writes, report generation, dogfood
 start, and release claims.
+On 2026-08-12 the operator then approved a once-weekly timer for this same
+bounded archive-refresh path. `telegram-prm-archive-refresh.timer` runs
+`telegram-prm-archive-refresh.service` weekly on Monday 08:10 Europe/Berlin,
+using `memory refresh-archive --days 21 --confirm-canonical-write --json`.
+The timer is not a legacy ingest/report timer, not PRM-19 dogfood evidence, and
+must preserve the same safety boundary: no migrations, reaction sync, media
+download, vision LLM, provider egress, source-event writes, report generation,
+external embeddings, hosted vector service, release claim, or dogfood start.
 
 ## Operating Rules
 
@@ -139,7 +147,7 @@ manual `prm-assistant` runtime activation for user testing. It does not approve
 external embeddings, hosted vector services, live research, production
 migrations, canonical DB writes, compatibility cleanup, PRM-19 dogfood, or
 release claims, except for the bounded 2026-08-12 manual archive refresh
-explicitly recorded above. The
+and weekly archive-refresh timer explicitly recorded above. The
 post-PRM28 PRM-18 receipt has deterministic local
 stop-ship blockers clear, but it remains blocked on explicit dogfood-start
 approval. Do not start PRM-19 dogfood until the human operator explicitly

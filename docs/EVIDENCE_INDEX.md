@@ -1,7 +1,7 @@
 # Evidence Index
 
 Status: active
-Last updated: 2026-08-11
+Last updated: 2026-08-12
 
 ## Repository State
 
@@ -37,6 +37,7 @@ Last updated: 2026-08-11
 | PRM local UX trial receipt | docs/audit/PRM_LOCAL_UX_TRIAL_2026-08-11.md |
 | PRM manual Telegram assistant activation receipt | docs/audit/PRM_MANUAL_TELEGRAM_ASSISTANT_ACTIVATION_2026-08-11.md |
 | PRM manual archive refresh receipt | docs/audit/PRM_MANUAL_ARCHIVE_REFRESH_2026-08-12.md |
+| PRM weekly archive refresh timer receipt | docs/audit/PRM_WEEKLY_ARCHIVE_REFRESH_TIMER_2026-08-12.md |
 | PRM runtime freeze receipt | docs/audit/PRM_RUNTIME_FREEZE_2026-07-29.md |
 | PRM safe assistant runtime receipt | docs/audit/PRM_SAFE_ASSISTANT_RUNTIME_2026-07-29.md |
 | PRM local memory ask receipt | docs/audit/PRM_LOCAL_MEMORY_ASK_2026-07-29.md |
@@ -733,6 +734,22 @@ testing; see
 | backup | SQLite backup created under gitignored `data/backups/` before writing |
 | smoke | `memory research --hybrid --limit 4 "Что было интересного по моделям за последние две недели?"` found fresh local Telegram citations inside the strict date window |
 | validation | py_compile for changed modules passed; `PYTHONPATH=src python3 -m pytest tests/test_cli.py tests/test_ingestion.py tests/test_memory_research.py tests/test_handlers.py -q` -> 97 passed; `python3 tools/test_tiers.py focused-prm` -> 199 passed; playbook validator errors=0 warnings=0; `git diff --check` clean |
+| dogfood boundary | not PRM-19 evidence; manual testing continues |
+
+## PRM Weekly Archive Refresh Timer - 2026-08-12
+
+| Check | Result |
+| --- | --- |
+| receipt | `docs/audit/PRM_WEEKLY_ARCHIVE_REFRESH_TIMER_2026-08-12.md` |
+| trigger | operator asked whether fresh runs existed and requested a once-weekly timer |
+| existing fresh pass | manual refresh on 2026-08-12 had already advanced archive freshness to 2026-08-11T21:47:37+00:00 |
+| service | `systemd/telegram-prm-archive-refresh.service` |
+| timer | `systemd/telegram-prm-archive-refresh.timer` |
+| command | `memory refresh-archive --days 21 --confirm-canonical-write --json` |
+| schedule | Monday 08:10 Europe/Berlin, with 5m accuracy and up to 15m randomized delay |
+| install-time catch-up | disabled with `Persistent=false`; installing the timer does not immediately repeat the already-fresh refresh |
+| safety | no legacy bot/report timer, migrations, reaction sync, media download, vision LLM, provider egress, source-event write, live web research, external embeddings, hosted vector service, report generation, dogfood start, or release claim |
+| validation | systemd verify passed; timer/CLI/ingest tests passed; `python3 tools/test_tiers.py focused-prm` -> 199 passed; playbook validator errors=0 warnings=0; `git diff --check` clean |
 | dogfood boundary | not PRM-19 evidence; manual testing continues |
 
 ## Local PRM Status UX - 2026-08-10

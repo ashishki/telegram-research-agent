@@ -1,7 +1,7 @@
 # Product Operating Model
 
 Status: active handoff
-Last updated: 2026-08-11
+Last updated: 2026-08-12
 
 ## Current Truth
 
@@ -237,6 +237,10 @@ Implemented `prm-assistant` runtime mode:
   deliberately avoids legacy services/timers, migrations, reaction sync, media
   download, vision LLM, provider egress, source-event writes, report
   generation, dogfood evidence, and release claims;
+- after explicit operator approval on 2026-08-12, weekly archive freshness uses
+  the dedicated `telegram-prm-archive-refresh.timer`, which runs only the same
+  bounded `memory refresh-archive --days 21 --confirm-canonical-write --json`
+  path and does not start legacy ingest/report automation;
 - auto-routing guards archive/source questions from generic chat fallback, so
   questions about posts, archive evidence, AI transformation, companies,
   Telegram, RAG, or vectors stay on the RAG path;
@@ -258,9 +262,10 @@ Implemented `prm-assistant` runtime mode:
 1. Keep legacy runtime frozen.
 2. Keep the dedicated PRM assistant runtime separated from dogfood evidence
    until approved dogfood start.
-3. Replace old weekly-report timers with no timers by default. Later scheduled
-   workflows must be PRM-17 registry-backed, idempotent, receipt-producing, and
-   explicitly approved.
+3. Replace old weekly-report timers with no report timers by default. The
+   explicitly approved `telegram-prm-archive-refresh.timer` may refresh the
+   local archive weekly for manual PRM testing, but it is not dogfood evidence
+   and must not generate reports.
 4. Convert Weekly Brief V3 into a secondary projection generated from real
    PRM usage receipts, not from the old Report V2 rollout gate.
 5. Convert MVP Radar into a bounded decision evidence card inside the assistant
@@ -319,3 +324,29 @@ sudo systemctl daemon-reload
 
 Do not convert this manual runtime into PRM-19 dogfood until dogfood-start
 approval is explicitly recorded.
+
+The safe archive-refresh timer templates are
+`systemd/telegram-prm-archive-refresh.service` and
+`systemd/telegram-prm-archive-refresh.timer`. They are separate from legacy
+`telegram-ingest.*` and `telegram-ai-split-report.*`.
+
+Current archive-refresh timer runbook:
+
+```bash
+systemd-analyze verify systemd/telegram-prm-archive-refresh.service systemd/telegram-prm-archive-refresh.timer
+sudo install -m 0644 systemd/telegram-prm-archive-refresh.service /etc/systemd/system/telegram-prm-archive-refresh.service
+sudo install -m 0644 systemd/telegram-prm-archive-refresh.timer /etc/systemd/system/telegram-prm-archive-refresh.timer
+sudo systemctl daemon-reload
+sudo systemctl enable --now telegram-prm-archive-refresh.timer
+systemctl list-timers --all telegram-prm-archive-refresh.timer --no-pager
+journalctl -u telegram-prm-archive-refresh.service -n 100 --no-pager
+```
+
+Rollback to disabled:
+
+```bash
+sudo systemctl disable --now telegram-prm-archive-refresh.timer
+sudo rm -f /etc/systemd/system/telegram-prm-archive-refresh.service
+sudo rm -f /etc/systemd/system/telegram-prm-archive-refresh.timer
+sudo systemctl daemon-reload
+```

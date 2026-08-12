@@ -1,0 +1,29 @@
+[Unit]
+Description=Telegram Research Agent - PRM Weekly Archive Refresh
+After=network.target
+
+[Service]
+Type=oneshot
+User=oc_you
+Group=oc_you
+WorkingDirectory=/srv/openclaw-you/workspace/telegram-research-agent
+EnvironmentFile=/srv/openclaw-you/.env
+Environment=PYTHONPATH=/srv/openclaw-you/workspace/telegram-research-agent
+Environment=PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=0
+Environment=PRM_TELEGRAM_AUTO_LLM_ROUTER=0
+Environment=PRM_TELEGRAM_RAG_LLM_SYNTHESIS=0
+ExecStart=/srv/openclaw-you/venv/bin/python3 src/main.py memory refresh-archive --days 21 --confirm-canonical-write --json
+Restart=no
+TimeoutStartSec=20m
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=telegram-prm-archive-refresh
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/openclaw-you/workspace/telegram-research-agent/data
+ReadWritePaths=/srv/openclaw-you/secrets
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,12 @@
+[Unit]
+Description=Telegram Research Agent - PRM Weekly Archive Refresh Timer
+
+[Timer]
+OnCalendar=Mon *-*-* 08:10:00 Europe/Berlin
+AccuracySec=5m
+RandomizedDelaySec=15m
+Persistent=false
+Unit=telegram-prm-archive-refresh.service
+
+[Install]
+WantedBy=timers.target
