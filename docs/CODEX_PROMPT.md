@@ -6,8 +6,10 @@ Last updated: 2026-08-12
 ## Repository State
 
 - Target repository commit inspected before retrofit: ad8689fa25b89f77122c4cec7c7a6b9da3f500cf
+- Target repository commit inspected for PRM-UX planning: 82c0c527ffdd797aab716a2d1079cd6849caa208
 - Target branch: master
-- AI Workflow Playbook commit used: 5583eca96c4d2d480b5574ed78bea63e0b07ebf0
+- AI Workflow Playbook commit used for retrofit baseline: 5583eca96c4d2d480b5574ed78bea63e0b07ebf0
+- AI Workflow Playbook commit inspected for PRM-UX planning: 965612aa463fca1a35a55104633d0e09da33d615
 - Adoption mode: Standard
 - Current phase: PRM-18 release/dogfood gate is implemented. The current
   post-PRM28 receipt records deterministic local no-vector RAG readiness and
@@ -48,11 +50,14 @@ Last updated: 2026-08-12
   answers.
 - Blocked/not implemented slices: PRM-8, PRM-19, and PRM-20 remain blocked
   until their gates are satisfied.
-- Next safe work: local operator smoke/preflight for vector-backed Telegram
-  testing is eligible; stop before PRM-19 dogfood.
-  PRM-19 only after explicit human dogfood-start approval exists. The current
-  post-PRM28 PRM-18 receipt has deterministic local stop-ship blockers clear
-  but still blocks dogfood on missing dogfood-start approval.
+- Next safe work: PRM-UX operator-experience implementation, starting with
+  PRM-UX-1 Single Conversational Entrypoint And Intent Acknowledgement. This is
+  product UX work over the existing PRM substrate, not another RAG
+  infrastructure wave.
+  PRM-19 only after the minimum PRM-UX dogfood-start slice and explicit human
+  dogfood-start approval exist. The current post-PRM28 PRM-18 receipt has
+  deterministic local stop-ship blockers clear but still blocks dogfood on
+  missing dogfood-start approval.
   PRM-20 only after real dogfood evidence and explicit compatibility
   archive/delete/move approval.
 
@@ -216,6 +221,10 @@ vector sidecar indexing is authorized only inside ADR-004.
   recorded at `docs/audit/PRM_DEEP_REVIEW_PRM18A_18C_2026-08-03.md`.
 - PRM-19 dogfood cannot start until explicit human dogfood approval is
   recorded.
+- PRM-UX is now the active next queue for daily Telegram usability,
+  professional personalization, active-project context, refresh/reaction loops,
+  post-answer actions, usefulness evals, and documentation consolidation.
+  PRM-UX does not start dogfood or prove user value by itself.
 - PRM-20 cleanup/archive cannot start until PRM-19 dogfood evidence exists and
   compatibility archive/delete/move approval is explicit.
 - PRM-21 records the future research-session assistant contract. PRM-22 and

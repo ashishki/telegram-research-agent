@@ -2,7 +2,7 @@
 
 Status: proposed
 
-Last updated: 2026-07-29
+Last updated: 2026-08-12
 
 ## North Star
 
@@ -159,6 +159,40 @@ Every grounded answer must include:
 - Model background, if used.
 - What requires external verification.
 - Optional next action.
+
+PRM-UX default Russian Telegram contract:
+
+1. `Короткий вывод`
+2. `Что найдено`
+3. `Почему это важно тебе`
+4. `Что сделать`
+5. `Где доказательства слабые`
+6. `Источники`
+
+Optional sections are allowed only when they add value: `Сравнение подходов`,
+`Связь с проектом`, `Что изменилось`, `Что проверить внешне`, and `Что пока
+игнорировать`.
+
+Ordinary Telegram output must hide retrieval receipts: no model-call count,
+token count, cost/debug footer, absolute local paths, raw database IDs, or
+unexplained internal labels. A zero-action answer is valid when evidence is
+weak. Current/high-stakes claims must show external-verification status.
+
+## Professional Personalization
+
+The versioned professional personalization contract lives in
+`docs/professional_personalization_contract.md`.
+
+Personalization layers:
+
+1. broad recall over archive evidence;
+2. rerank by professional lens, active project, freshness, reactions, and
+   source quality;
+3. frame in the language of the operator's current goal;
+4. propose one bounded next action.
+
+Personalization must not reduce raw retrieval recall. Permanent preference,
+profile, project, and source-policy changes require explicit confirmation.
 
 ## Reaction Fast Lane
 

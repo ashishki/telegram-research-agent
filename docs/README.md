@@ -1,7 +1,7 @@
 # Documentation Index
 
 Status: active
-Last updated: 2026-07-29
+Last updated: 2026-08-12
 
 ## Current Product Direction
 
@@ -10,6 +10,11 @@ Last updated: 2026-07-29
 - docs/IMPLEMENTATION_CONTRACT.md
 - docs/adr/ADR-001-product-pivot-to-personal-research-memory.md
 - docs/personal_research_memory_product_contract.md
+- docs/professional_personalization_contract.md
+- docs/prm_operator_experience_audit.md
+- docs/prm_operator_experience_roadmap.md
+- docs/prm19_dogfood_plan.md
+- docs/operator_quickstart.md
 - docs/personal_research_memory_architecture.md
 - docs/personal_research_memory_roadmap.md
 - docs/PRODUCT_OPERATING_MODEL.md
@@ -46,9 +51,14 @@ Last updated: 2026-07-29
 
 - docs/PRODUCT_OPERATING_MODEL.md
 - docs/audit/PRM_RUNTIME_FREEZE_2026-07-29.md
+- docs/audit/PRM_MANUAL_TELEGRAM_ASSISTANT_ACTIVATION_2026-08-11.md
+- docs/audit/PRM_MANUAL_ARCHIVE_REFRESH_2026-08-12.md
+- docs/audit/PRM_WEEKLY_ARCHIVE_REFRESH_TIMER_2026-08-12.md
 
-The live Telegram bot and old weekly Report V2 timer are stopped and disabled.
-PRM dogfood has not started.
+The safe `prm-assistant` runtime is active for manual testing only. The live
+legacy Telegram bot and old weekly Report V2 timer are stopped and disabled.
+The dedicated archive-refresh timer is active for bounded weekly archive
+freshness. PRM-19 dogfood has not started.
 
 ## Legacy And Compatibility Context
 

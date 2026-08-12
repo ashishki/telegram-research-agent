@@ -418,6 +418,8 @@ Implemented PRM slices include:
 Still gated:
 
 - PRM-19 dogfood start requires explicit human dogfood-start approval;
+- PRM-UX operator-experience and professional-personalization work is the next
+  implementation queue before PRM-19 can collect usefulness evidence;
 - PRM-20 cleanup/archive requires real PRM-19 dogfood evidence and explicit
   compatibility archive/delete/move approval;
 - generated PRM-24 labels are operator-approved seed evidence, not independent
@@ -448,6 +450,11 @@ or release evidence.
 - [Architecture](docs/ARCHITECTURE.md)
 - [Implementation Contract](docs/IMPLEMENTATION_CONTRACT.md)
 - [Personal Research Memory Product Contract](docs/personal_research_memory_product_contract.md)
+- [Operator Experience Audit](docs/prm_operator_experience_audit.md)
+- [Operator Experience Roadmap](docs/prm_operator_experience_roadmap.md)
+- [Professional Personalization Contract](docs/professional_personalization_contract.md)
+- [Operator Quickstart](docs/operator_quickstart.md)
+- [PRM-19 Dogfood Plan](docs/prm19_dogfood_plan.md)
 - [Privacy Threat Model](docs/PRIVACY_THREAT_MODEL.md)
 - [Cost Budget](docs/COST_BUDGET.md)
 - [Active Tasks](docs/tasks.md)

@@ -7,12 +7,14 @@ Last updated: 2026-08-12
 
 | Evidence | Value |
 | --- | --- |
-| Target repository commit inspected | ad8689fa25b89f77122c4cec7c7a6b9da3f500cf |
-| Target branch before edits | master |
-| Target git status before edits | clean |
-| Playbook commit used | 5583eca96c4d2d480b5574ed78bea63e0b07ebf0 |
-| Playbook branch | master |
-| Playbook git status | clean |
+| PRM-UX target repository commit inspected | 82c0c527ffdd797aab716a2d1079cd6849caa208 |
+| PRM-UX target branch before edits | master |
+| PRM-UX target git status before edits | clean |
+| Baseline Playbook pin recorded by target docs | 5583eca96c4d2d480b5574ed78bea63e0b07ebf0 |
+| PRM-UX Playbook checkout inspected | 965612aa463fca1a35a55104633d0e09da33d615 |
+| PRM-UX Playbook branch | master |
+| PRM-UX Playbook git status | clean |
+| PRM-UX Playbook pin status | stale relative to inspected checkout |
 
 ## Local Audit Evidence
 
@@ -39,6 +41,11 @@ Last updated: 2026-08-12
 | PRM manual archive refresh receipt | docs/audit/PRM_MANUAL_ARCHIVE_REFRESH_2026-08-12.md |
 | PRM weekly archive refresh timer receipt | docs/audit/PRM_WEEKLY_ARCHIVE_REFRESH_TIMER_2026-08-12.md |
 | README current state refresh receipt | docs/audit/README_CURRENT_STATE_REFRESH_2026-08-12.md |
+| PRM operator experience audit | docs/prm_operator_experience_audit.md |
+| PRM operator experience roadmap | docs/prm_operator_experience_roadmap.md |
+| Professional personalization contract | docs/professional_personalization_contract.md |
+| PRM-19 dogfood plan | docs/prm19_dogfood_plan.md |
+| Operator quickstart | docs/operator_quickstart.md |
 | PRM runtime freeze receipt | docs/audit/PRM_RUNTIME_FREEZE_2026-07-29.md |
 | PRM safe assistant runtime receipt | docs/audit/PRM_SAFE_ASSISTANT_RUNTIME_2026-07-29.md |
 | PRM local memory ask receipt | docs/audit/PRM_LOCAL_MEMORY_ASK_2026-07-29.md |
@@ -67,6 +74,11 @@ Verified facts recorded in docs/product_pivot_current_state_audit.md include:
 
 | Command | Result | Evidence |
 | --- | --- | --- |
+| python3 tools/playbook_validate.py --root . --check tasks --check placeholders --check readiness --check delivery --check references | pass, errors=0 warnings=0 | .playbook-artifacts/project_verification/playbook_contract/stdout.txt and terminal run during PRM-UX planning |
+| python3 tools/verify_project.py --root . | fail, required_failures=1; playbook_contract passed; project_tests timed out after 900 seconds with exit=124 | terminal run during PRM-UX planning; generated verifier artifacts intentionally not committed |
+| python3 -m pytest tests/test_insight_triage.py tests/test_intelligence_retrieval_items.py -q | pass, 69 passed in 18.61s; focused rerun of cached full-suite failure candidates | terminal run during PRM-UX planning |
+| git diff --check | pass, no output | terminal run during PRM-UX planning |
+| git diff --stat | pass, tracked-file stat recorded after verifier artifact update; new untracked PRM-UX docs are listed by git status rather than diff stat | terminal run during PRM-UX planning |
 | python3 tools/playbook_validate.py --root . --check tasks --check placeholders --check readiness --check delivery --check references | pass, errors=0 warnings=0 | .playbook-artifacts/project_verification/playbook_contract/stdout.txt |
 | python3 tools/verify_project.py --root . | fail, required_failures=1 | .playbook-artifacts/project_verification.json |
 | /usr/bin/python3 -m pytest tests/ -q | fail, 963 passed, 1 failed, 281 subtests passed | .playbook-artifacts/project_verification/project_tests/stdout.txt |

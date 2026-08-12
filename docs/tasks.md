@@ -1,15 +1,18 @@
 # Active Task Graph
 
 Status: proposed
-Last updated: 2026-08-11
-Playbook SHA: 5583eca96c4d2d480b5574ed78bea63e0b07ebf0
-Target repo baseline: ad8689fa25b89f77122c4cec7c7a6b9da3f500cf
+Last updated: 2026-08-12
+Playbook baseline SHA: 5583eca96c4d2d480b5574ed78bea63e0b07ebf0
+Playbook checkout inspected for PRM-UX planning: 965612aa463fca1a35a55104633d0e09da33d615
+Target repo inspected for PRM-UX planning: 82c0c527ffdd797aab716a2d1079cd6849caa208
 
 ## Operating Rules
 
 - Product work now flows through PBR and PRM only.
 - Historical IRX work remains preserved in prior roadmaps and git history.
 - Do not add new product tasks to IRX.
+- New operator-experience work flows through PRM-UX, not IRX and not a second
+  dogfood task.
 - Do not run live Telegram ingestion, reaction sync, Frontier, Radar, report
   generation, full archive LLM backfill, external embeddings, hosted vector
   services, or external web research jobs from backlog grooming. PRM-27 local
@@ -33,8 +36,8 @@ Target repo baseline: ad8689fa25b89f77122c4cec7c7a6b9da3f500cf
 | Area | Status |
 | --- | --- |
 | Repository | Existing product, not greenfield; pre-retrofit commit ad8689fa25b89f77122c4cec7c7a6b9da3f500cf |
-| Playbook | Current checkout pinned at 5583eca96c4d2d480b5574ed78bea63e0b07ebf0 |
-| Product center | Pivot proposed from weekly report to Personal Telegram Research Memory + Grounded Assistant |
+| Playbook | Retrofit baseline pin is 5583eca96c4d2d480b5574ed78bea63e0b07ebf0; current Playbook checkout inspected for PRM-UX is 965612aa463fca1a35a55104633d0e09da33d615 |
+| Product center | Personal Telegram Research Memory + Grounded Assistant; PRM-UX narrows the next phase to daily operator usefulness, not a new infrastructure wave |
 | Full archive search | Bounded SQLite FTS archive search plus PRM-27 local vector sidecar are implemented as local assistant retrieval slices; product RAG gates remain required before dogfood |
 | Current SQLite FTS | Hardened as the persistent baseline for bounded archive search; PRM-27 adds an optional local vector sidecar without replacing FTS |
 | PI assistant retrieval | Uses bounded curated and SQLite FTS archive tools; hybrid local vector retrieval is available behind explicit local flags; broad raw corpus provider egress remains forbidden |
@@ -75,11 +78,20 @@ PRM-18 -> PRM-18A -> PRM-18B -> PRM-18C
 PRM-18C -> PRM-21 -> PRM-22 -> PRM-23
 PRM-23 -> PRM-24 -> PRM-25 -> PRM-26 -> PRM-28 no-vector path
 PRM-26 -> ADR-004 -> PRM-27 local vector sidecar
-PRM-28 -> PRM-19 -> PRM-20
+PRM-28 -> PRM-UX-0 -> PRM-UX-1 -> PRM-UX-2 -> PRM-UX-3 -> PRM-UX-4
+PRM-UX-4 -> PRM-UX-5 -> PRM-UX-6 -> PRM-UX-7 -> PRM-UX-10
+PRM-UX-0 -> PRM-UX-11
+PRM-UX-3/PRM-UX-4/PRM-UX-2 -> PRM-UX-8A/8B/8C/8D/8E
+PRM-UX-2 -> PRM-UX-9
+PRM-UX-10/PRM-UX-11 + explicit human dogfood-start approval -> PRM-19
+PRM-19 -> PRM-UX-12 -> PRM-UX-13 -> PRM-20
 PRM-24..PRM-28 formalize the required full product RAG path. PRM-26 refines
 the older PRM-8 hybrid/vector backend gate. PRM-27 is allowed only inside the
 ADR-004 local-sidecar scope: no external embeddings, no hosted vector service,
 no canonical DB mutation, no live web research, and no dogfood start.
+PRM-UX formalizes the required operator-experience and professional
+personalization path before PRM-19 dogfood; it must not restart legacy
+bot/report timers or claim user value before real operator labels exist.
 ```
 
 ## PBR Queue - Playbook Retrofit
@@ -1508,7 +1520,7 @@ Owner: human
 Phase: PRM
 Type: eval:gate
 Status: blocked
-Depends-On: PRM-18C, PRM-28
+Depends-On: PRM-18C, PRM-28, PRM-UX-10, PRM-UX-11
 Risk-Level: high
 Public-Tests-Required: not_required
 Critic-Required: conditional
@@ -1527,11 +1539,14 @@ Acceptance-Criteria:
 Verification:
   - dogfood receipt review by human operator
 Files:
+  - docs/prm19_dogfood_plan.md
   - docs/dogfood_4_week_plan.md
   - docs/EVIDENCE_INDEX.md
 Context-Refs:
   - docs/final_acceptance_plan.md
   - docs/PRIVACY_THREAT_MODEL.md
+  - docs/prm_operator_experience_roadmap.md
+  - docs/prm19_dogfood_plan.md
 Cost-Budget: |
   scope: phase
   max_cost_usd: 0 until human-approved dogfood budget is recorded
@@ -1543,7 +1558,9 @@ Notes: |
   Do not predefine success as the system ran. PRM-28 now passes the accepted
   no-vector product RAG gate, and the current PRM-18 post-PRM28 receipt clears
   deterministic local stop-ship blockers. PRM-19 still cannot start until the
-  human operator explicitly approves dogfood start.
+  minimum PRM-UX dogfood-start slice is complete and the human operator
+  explicitly approves dogfood start. The current manual `prm-assistant`
+  runtime remains manual testing only until that approval exists.
 
 ### PRM-20: Post-Dogfood Simplification, Cleanup, And Archive
 
@@ -1551,7 +1568,7 @@ Owner: codex
 Phase: PRM
 Type: repo:hygiene
 Status: blocked
-Depends-On: PRM-19
+Depends-On: PRM-19, PRM-UX-13
 Risk-Level: high
 Public-Tests-Required: required
 Critic-Required: required
@@ -1578,6 +1595,7 @@ Files:
 Context-Refs:
   - docs/repo_hygiene_and_archive_plan.md
   - docs/final_acceptance_plan.md
+  - docs/prm_operator_experience_roadmap.md
 Cost-Budget: |
   scope: task
   max_cost_usd: 1.00
@@ -1586,9 +1604,10 @@ Cost-Budget: |
   max_retries: 1
   approval_required_when: deletion or archive affects compatibility surface
 Notes: |
-  Cleanup follows usage evidence; it is not a precondition for PRM-4. PRM-20 is
-  currently blocked by missing PRM-19 dogfood evidence and requires explicit
-  human approval before compatibility files are archived, deleted, or moved.
+  Cleanup follows usage evidence; it is not a precondition for PRM-UX dogfood.
+  PRM-20 is currently blocked by missing PRM-19 dogfood evidence, the
+  PRM-UX-13 simplification handoff, and explicit human approval before
+  compatibility files are archived, deleted, or moved.
 
 ### PRM-21: Project-Aware Research Session Contract
 
@@ -2089,3 +2108,907 @@ Notes: |
   answerable_source_label_accuracy=1.0, vector_backend_required_rate=0.0, and
   embeddings_run_rate=0.0 on the 50-row generated seed gold set. This satisfies
   the no-vector RAG acceptance gate but does not start PRM-19 dogfood.
+
+## PRM-UX Queue - Operator Experience And Professional Personalization
+
+### PRM-UX-0: Current Operator Experience And Documentation Audit
+
+Owner: codex
+Phase: PRM-UX
+Type: project:governance eval:gate
+Status: implemented
+Depends-On: PRM-28
+Risk-Level: medium
+Public-Tests-Required: not_required
+Critic-Required: conditional
+Holdout-Required: not_required
+Mutation-Required: not_required
+Property-Required: not_required
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Produce a grounded operator-experience audit that classifies current PRM runtime/product claims by code, tests, receipts, docs, stale state, contradictions, or unverifiable gaps, and converts the findings into a bounded PRM-UX roadmap.
+Acceptance-Criteria:
+  - id: AC-1; description: audit records target SHA, Playbook SHA, stale Playbook pin status, local-only UX probe metrics, claim classification table, and no private post bodies; verify: docs/prm_operator_experience_audit.md contains those sections.
+  - id: AC-2; description: roadmap records PRM-UX phases, dependency graph, minimum dogfood-start slice, anti-complexity rules, and evaluation updates; verify: docs/prm_operator_experience_roadmap.md contains those sections.
+  - id: AC-3; description: task graph contains PRM-UX queue and updates PRM-19/PRM-20 dependencies without adding IRX tasks; verify: docs/tasks.md contains PRM-UX-0 through PRM-UX-13 and no new IRX task.
+Verification:
+  - python3 tools/playbook_validate.py --root . --check tasks --check placeholders --check readiness --check delivery --check references
+  - python3 tools/verify_project.py --root .
+  - git diff --check
+Files:
+  - docs/prm_operator_experience_audit.md
+  - docs/prm_operator_experience_roadmap.md
+  - docs/professional_personalization_contract.md
+  - docs/prm19_dogfood_plan.md
+  - docs/operator_quickstart.md
+  - docs/tasks.md
+Context-Refs:
+  - docs/PRODUCT_OPERATING_MODEL.md
+  - docs/EVIDENCE_INDEX.md
+  - docs/audit/PRM_LOCAL_UX_TRIAL_2026-08-11.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0
+  max_model_calls: 0
+  max_tool_calls: n/a
+  max_retries: 0
+  approval_required_when: task scope expands to runtime/code behavior or provider calls
+Notes: |
+  User problem: the product has strong technical receipts but unclear daily value.
+  Boundary: documentation/task planning only; no code/runtime/data mutation.
+  Likely paths inspected: src/bot/handlers.py, src/assistant/memory_research.py,
+  src/assistant/local_memory_ask.py, src/db/archive_search.py, src/db/archive_vector.py.
+  Dogfood effect: creates the evidence baseline for PRM-UX but does not start PRM-19.
+
+### PRM-UX-1: Single Conversational Entrypoint And Intent Acknowledgement
+
+Owner: codex
+Phase: PRM-UX
+Type: product:ux agent:harness
+Status: proposed
+Depends-On: PRM-UX-0
+Risk-Level: medium
+Public-Tests-Required: required
+Critic-Required: conditional
+Holdout-Required: conditional
+Mutation-Required: conditional
+Property-Required: conditional
+Visual-Contract: optional
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Make ordinary Telegram text and voice transcripts the single normal operator entrypoint by adding deterministic intent acknowledgement for research, brief, gated chat, feedback, and clarification paths while keeping manual commands as fallback overrides.
+Acceptance-Criteria:
+  - id: AC-1; description: PRM assistant start/help copy presents normal text or voice as the default workflow and demotes slash research, slash brief, and slash chat to fallback controls; test: tests/test_handlers.py::test_prm_start_copy_contract_after_prm_ux_1.
+  - id: AC-2; description: auto-routed research and brief responses can include one compact Russian interpretation line when the route is non-obvious and omit it when it would repeat the question; test: tests/test_handlers.py::test_auto_route_intent_acknowledgement_copy.
+  - id: AC-3; description: ambiguous intent asks at most one compact clarification with bounded choices and does not call a provider or write memory; test: tests/test_handlers.py::test_auto_route_ambiguous_intent_clarification_is_local.
+  - id: AC-4; description: voice transcripts enter the same auto interpretation path as text and do not expose legacy slash voice feedback command copy in PRM safe mode; test: tests/test_callbacks.py::test_run_bot_prm_safe_dispatches_transcribed_voice_as_auto.
+Verification:
+  - PYTHONPATH=src python3 -m pytest tests/test_handlers.py tests/test_callbacks.py -q
+  - python3 tools/playbook_validate.py --root . --check tasks --check references
+  - git diff --check
+Files:
+  - src/bot/handlers.py
+  - tests/test_handlers.py
+  - tests/test_callbacks.py
+  - docs/operator_quickstart.md
+  - docs/operator_workflow.md
+Context-Refs:
+  - docs/prm_operator_experience_audit.md
+  - docs/prm_operator_experience_roadmap.md
+  - docs/PRODUCT_OPERATING_MODEL.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0 for tests
+  max_model_calls: 0 for tests
+  max_tool_calls: n/a
+  max_retries: 1
+  approval_required_when: provider-backed route selection, service restart, or durable write is proposed
+Notes: |
+  User problem: the operator should not choose between subsystems.
+  Product outcome: one Telegram conversation with compact interpretation.
+  Boundary: no provider calls, env changes, service starts, or DB writes.
+  Likely code paths: _route_auto_message, handle_auto, handle_research,
+  handle_research_brief, voice callback dispatch.
+  Interface changes: response copy only; no new durable schema.
+  Failure behavior: ambiguous route asks one question or falls back to safe local research.
+  Non-goal: answer contract rewrite belongs to PRM-UX-2.
+  Dogfood effect: required part of minimum PRM-19 start slice.
+
+### PRM-UX-2: Answer-First Telegram Response Contract
+
+Owner: codex
+Phase: PRM-UX
+Type: rag:generation product:ux eval:gate
+Status: proposed
+Depends-On: PRM-UX-1
+Risk-Level: medium
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: conditional
+Mutation-Required: conditional
+Property-Required: conditional
+Visual-Contract: required
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Enforce a single answer-first Russian Telegram response contract with source, uncertainty, professional relevance, one-next-action, insufficient-evidence, and external-verification boundaries while hiding retrieval receipts from ordinary output.
+Acceptance-Criteria:
+  - id: AC-1; description: ordinary Telegram research answer includes `Короткий вывод`, `Что найдено`, `Почему это важно тебе`, `Что сделать`, weak-evidence wording, and `Источники`; test: tests/test_handlers.py::test_telegram_research_answer_first_contract.
+  - id: AC-2; description: ordinary Telegram output excludes local paths, raw DB IDs, model/cost/token/tool/debug footers, and unexplained internal English labels; test: tests/test_handlers.py::test_telegram_research_hides_internal_receipts.
+  - id: AC-3; description: current/high-stakes questions lead with external-verification status and do not present archive context as current truth; test: tests/test_handlers.py::test_telegram_current_fact_answer_first_boundary.
+  - id: AC-4; description: generated response validators are documented for exact checks and human-review checks; verify: docs/generation_eval.md and docs/prm_operator_experience_roadmap.md list validator split.
+Verification:
+  - PYTHONPATH=src python3 -m pytest tests/test_handlers.py tests/test_memory_research.py -q
+  - python3 tools/playbook_validate.py --root . --check tasks --check references
+  - git diff --check
+Files:
+  - src/bot/handlers.py
+  - src/assistant/memory_research.py
+  - tests/test_handlers.py
+  - tests/test_memory_research.py
+  - docs/generation_eval.md
+  - docs/operator_quickstart.md
+Context-Refs:
+  - docs/prm_operator_experience_roadmap.md
+  - docs/generation_eval.md
+  - docs/PRIVACY_THREAT_MODEL.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0 for tests
+  max_model_calls: 0 for tests with fake/local paths
+  max_tool_calls: bounded by existing research path
+  max_retries: 1
+  approval_required_when: real provider synthesis prompt changes are tested against live private snippets
+Notes: |
+  User problem: a source-backed report can still fail as an answer.
+  Likely code paths: _synthesize_telegram_rag_answer, _telegram_report_without_technical_metrics,
+  render_memory_research_answer, render_memory_research_brief.
+  Data source: bounded context pack and answer gate.
+  Privacy: no raw corpus, local paths, provider payloads, or debug receipts in ordinary Telegram output.
+  Failure behavior: answer gate refusal or insufficient-evidence response.
+  Non-goal: new retrieval backend or external verification execution.
+  Dogfood effect: required part of minimum PRM-19 start slice.
+
+### PRM-UX-3: Professional Lens Profile V2
+
+Owner: human+codex
+Phase: PRM-UX
+Type: project:governance rag:query
+Status: proposed
+Depends-On: PRM-UX-2
+Risk-Level: medium
+Public-Tests-Required: required
+Critic-Required: conditional
+Holdout-Required: conditional
+Mutation-Required: conditional
+Property-Required: required
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Add a versioned professional-lens contract that separates recall, rerank, framing, and action so personalization improves answer relevance without reducing broad archive retrieval recall.
+Acceptance-Criteria:
+  - id: AC-1; description: professional lens schema covers ai_systems_engineer, portfolio_builder, career, product_strategy, enterprise_ai_adoption, writer_editor, and learning with goals, evidence preferences, and output preferences; test: tests/test_professional_personalization.py::test_lens_schema_contract.
+  - id: AC-2; description: retrieval recall path ignores lens as a hard filter while rerank/framing/action may use lens fields; test: tests/test_professional_personalization.py::test_lens_does_not_reduce_recall_candidates.
+  - id: AC-3; description: permanent profile changes are represented only as proposals requiring human confirmation; test: tests/test_professional_personalization.py::test_lens_preference_change_requires_confirmation.
+  - id: AC-4; description: operator approval checklist exists before profile configuration mutation; verify: docs/professional_personalization_contract.md lists approval rules and migration from current profile.
+Verification:
+  - PYTHONPATH=src python3 -m pytest tests/test_professional_personalization.py tests/test_memory_research.py -q
+  - python3 tools/playbook_validate.py --root . --check tasks --check references
+  - git diff --check
+Files:
+  - src/assistant/professional_personalization.py
+  - tests/test_professional_personalization.py
+  - docs/professional_personalization_contract.md
+  - src/config/profile.yaml
+Context-Refs:
+  - docs/professional_personalization_contract.md
+  - docs/prm_operator_experience_audit.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0
+  max_model_calls: 0
+  max_tool_calls: n/a
+  max_retries: 1
+  approval_required_when: writing profile.yaml, changing default lens, or using provider inference
+Notes: |
+  User problem: current profile is topic/source based rather than goal/output based.
+  Boundary: implement schema/loader/rerank hooks only; do not modify profile.yaml without approval.
+  Likely files: new assistant helper, memory research route/render tests.
+  Source of truth: professional_personalization.v2 plus current profile as legacy input.
+  Failure behavior: unknown lens falls back to neutral framing and broad recall.
+  Non-goal: automatic permanent preference learning.
+  Dogfood effect: required part of minimum PRM-19 start slice after human schema approval.
+
+### PRM-UX-4: Active Project Portfolio Context V2
+
+Owner: human+codex
+Phase: PRM-UX
+Type: project:governance rag:query
+Status: proposed
+Depends-On: PRM-UX-3
+Risk-Level: medium
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: conditional
+Mutation-Required: conditional
+Property-Required: required
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Add a versioned project portfolio context model with status, priority, current goal, blocker, next proof, signal preferences, and owner-confirmation status so assistant project actions target only approved active/priority work.
+Acceptance-Criteria:
+  - id: AC-1; description: project context schema validates required fields and accepted status values active, priority, watch, reference, paused, archived; test: tests/test_project_portfolio_context.py::test_project_context_v2_schema.
+  - id: AC-2; description: default routing uses only approved active/priority projects unless the operator names another project; test: tests/test_project_portfolio_context.py::test_default_project_set_excludes_watch_reference.
+  - id: AC-3; description: broad keyword overlap alone yields no action recommendation; test: tests/test_project_portfolio_context.py::test_keyword_overlap_is_not_project_action.
+  - id: AC-4; description: proposed classification table is documented and marked unapproved before projects.yaml mutation; verify: docs/professional_personalization_contract.md contains candidate project classification and approval boundary.
+Verification:
+  - PYTHONPATH=src python3 -m pytest tests/test_project_portfolio_context.py tests/test_project_context.py -q
+  - python3 tools/playbook_validate.py --root . --check tasks --check references
+  - git diff --check
+Files:
+  - src/assistant/project_context.py
+  - src/assistant/project_portfolio_context.py
+  - tests/test_project_portfolio_context.py
+  - tests/test_project_context.py
+  - docs/professional_personalization_contract.md
+  - src/config/projects.yaml
+Context-Refs:
+  - docs/professional_personalization_contract.md
+  - src/config/projects.yaml
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0
+  max_model_calls: 0
+  max_tool_calls: n/a
+  max_retries: 1
+  approval_required_when: changing project active status, priority, or default active set
+Notes: |
+  User problem: current project list is flat and contains report-era descriptors.
+  Boundary: schema/loader/routing behavior only unless human approves config edits.
+  Data source: projects.yaml plus explicit V2 overlay/proposal.
+  Privacy: no external repo sync or provider calls.
+  Failure behavior: unconfirmed project status routes as reference/watch, not action.
+  Non-goal: broad portfolio cleanup or GitHub mutation.
+  Dogfood effect: required part of minimum PRM-19 start slice after owner approval.
+
+### PRM-UX-5: Incremental Archive Freshness And Operator Refresh Receipt
+
+Owner: human+codex
+Phase: PRM-UX
+Type: rag:ingestion workflow:autonomous cost:telemetry
+Status: proposed
+Depends-On: PRM-UX-4
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: conditional
+Mutation-Required: conditional
+Property-Required: required
+Visual-Contract: optional
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Design and implement a bounded incremental archive freshness path and operator slash refresh receipt that can update Telegram archive/FTS within an approved staleness window without LLM calls, report generation, reaction sync coupling, or release/dogfood claims.
+Acceptance-Criteria:
+  - id: AC-1; description: refresh contract refuses routine schedule changes until operator timezone, source volume, rate limits, host availability, backup cost, vector cost, and acceptable staleness are recorded; verify: docs/PRODUCT_OPERATING_MODEL.md and docs/prm_operator_experience_roadmap.md list approval inputs.
+  - id: AC-2; description: slash refresh or CLI receipt returns new posts, channels touched, latest post age, reaction summary placeholder, enrichment pending, and no report/provider flags without raw post text; test: tests/test_prm_refresh_receipt.py::test_operator_refresh_receipt_contract.
+  - id: AC-3; description: archive refresh failure does not run reports, providers, migrations, reaction sync, or vector rebuild unless separately approved; test: tests/test_prm_refresh_receipt.py::test_refresh_failure_boundary.
+  - id: AC-4; description: current weekly Europe/Berlin timer remains unchanged unless a human approval reference is recorded; verify: systemd template diff and docs approval checklist.
+Verification:
+  - PYTHONPATH=src python3 -m pytest tests/test_prm_refresh_receipt.py tests/test_prm_archive_refresh_systemd.py tests/test_cli.py -q
+  - python3 tools/playbook_validate.py --root . --check tasks --check references
+  - git diff --check
+Files:
+  - src/main.py
+  - src/bot/handlers.py
+  - tests/test_prm_refresh_receipt.py
+  - tests/test_prm_archive_refresh_systemd.py
+  - docs/PRODUCT_OPERATING_MODEL.md
+  - docs/operator_quickstart.md
+Context-Refs:
+  - docs/audit/PRM_MANUAL_ARCHIVE_REFRESH_2026-08-12.md
+  - docs/audit/PRM_WEEKLY_ARCHIVE_REFRESH_TIMER_2026-08-12.md
+  - docs/prm_operator_experience_roadmap.md
+Cost-Budget: |
+  scope: workflow
+  max_cost_usd: 0 provider cost
+  max_model_calls: 0
+  max_tool_calls: n/a
+  max_retries: 1
+  approval_required_when: routine schedule, timezone, canonical DB write scope, vector rebuild cadence, or Telegram rate-limit policy changes
+Notes: |
+  User problem: weekly archive freshness is weak for current questions.
+  Boundary: production writes and schedule changes require explicit approval.
+  Likely code paths: memory refresh-archive, Telegram handler surface, systemd templates.
+  Data source: canonical local SQLite archive and FTS.
+  Failure behavior: old archive remains usable with stale receipt.
+  Non-goal: live web verification or report generation.
+  Dogfood effect: required part of minimum PRM-19 start slice after schedule/staleness approval.
+
+### PRM-UX-6: Reaction Sync And Searchable Fast Lane
+
+Owner: human+codex
+Phase: PRM-UX
+Type: rag:ingestion workflow:autonomous cost:telemetry
+Status: proposed
+Depends-On: PRM-UX-5
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: conditional
+Mutation-Required: conditional
+Property-Required: required
+Visual-Contract: optional
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Add a routine reaction fast-lane plan and receipt path where reaction sync can resolve personal reactions, confirm archive searchability, apply temporary interest boosts, queue enrichment, and fail independently from archive freshness.
+Acceptance-Criteria:
+  - id: AC-1; description: reaction receipt records detected reactions, resolved posts, already-searchable posts, newly indexed posts, queued/completed/failed enrichment, provisional topic/project links, ranking effects, and no-effect reasons without raw text or emoji semantics; test: tests/test_reaction_fast_lane.py::test_reaction_fast_lane_operator_receipt_fields.
+  - id: AC-2; description: no reaction maps to unknown and never negative; test: tests/test_reaction_fast_lane.py::test_no_reaction_is_unknown_not_negative.
+  - id: AC-3; description: reaction sync failure produces a receipt and does not block archive refresh success status; test: tests/test_reaction_sync.py::test_reaction_failure_isolated_from_archive_refresh.
+  - id: AC-4; description: adding reaction sync to any routine service is blocked until credentials, Telethon visibility, rate-limit, and approval boundaries are documented; verify: docs/prm_operator_experience_roadmap.md and docs/PRODUCT_OPERATING_MODEL.md list the approval gate.
+Verification:
+  - PYTHONPATH=src python3 -m pytest tests/test_reaction_fast_lane.py tests/test_reaction_sync.py tests/test_prm_refresh_receipt.py -q
+  - python3 tools/playbook_validate.py --root . --check tasks --check references
+  - git diff --check
+Files:
+  - src/db/reaction_fast_lane.py
+  - src/ingestion/reaction_sync.py
+  - src/bot/handlers.py
+  - tests/test_reaction_fast_lane.py
+  - tests/test_reaction_sync.py
+  - docs/PRODUCT_OPERATING_MODEL.md
+Context-Refs:
+  - docs/RAG_DATA_READINESS.md
+  - docs/prm_operator_experience_audit.md
+  - docs/prm_operator_experience_roadmap.md
+Cost-Budget: |
+  scope: workflow
+  max_cost_usd: 0 provider cost
+  max_model_calls: 0
+  max_tool_calls: n/a
+  max_retries: 1
+  approval_required_when: reaction sync is added to a routine timer/service or credential scope changes
+Notes: |
+  User problem: reactions are high-signal but not part of daily PRM refresh.
+  Boundary: no automatic routine reaction sync before approval.
+  Likely code paths: reaction_sync, reaction_fast_lane, archive search filters.
+  Source of truth: reaction_sync_state plus canonical archive rows.
+  Privacy: raw post text, source URLs in receipts, and emoji sentiment are excluded.
+  Non-goal: permanent preference learning.
+  Dogfood effect: required part of minimum PRM-19 start slice as a failure-isolated path.
+
+### PRM-UX-7: Post-Answer Save, Watch, Project, And Feedback Actions
+
+Owner: codex
+Phase: PRM-UX
+Type: tool:schema tool:call tool:unsafe product:ux
+Status: proposed
+Depends-On: PRM-UX-6
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: conditional
+Mutation-Required: conditional
+Property-Required: required
+Visual-Contract: optional
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Convert existing confirmation-gated proposal concepts into a simple Telegram post-answer habit for Save Knowledge Note, Watch Topic, Link To Project, Create Action, Create Experiment, Mark Useful, Mark Wrong Priority, Mark Too Shallow, and Mark Applied.
+Acceptance-Criteria:
+  - id: AC-1; description: ordinary answer renderer exposes only safe inline actions relevant to the answer type and keeps callback payloads bounded; test: tests/test_prm_post_answer_actions.py::test_action_markup_relevant_and_bounded.
+  - id: AC-2; description: selecting save/watch/project/action/experiment shows a compact proposal and performs no durable write before explicit confirmation; test: tests/test_prm_post_answer_actions.py::test_proposal_before_write.
+  - id: AC-3; description: confirmation creates or reuses the expected durable event and displays how to retrieve it; test: tests/test_prm_post_answer_actions.py::test_confirmed_action_receipt.
+  - id: AC-4; description: feedback actions record usefulness metadata without mutating profile.yaml, projects.yaml, provider config, or external systems; test: tests/test_prm_post_answer_actions.py::test_feedback_action_no_config_or_external_mutation.
+Verification:
+  - PYTHONPATH=src python3 -m pytest tests/test_prm_post_answer_actions.py tests/test_pi_tools.py tests/test_callbacks.py -q
+  - python3 tools/playbook_validate.py --root . --check tasks --check references
+  - git diff --check
+Files:
+  - src/bot/handlers.py
+  - src/bot/callbacks.py
+  - src/assistant/pi_tools.py
+  - src/assistant/pi_memory.py
+  - tests/test_prm_post_answer_actions.py
+  - docs/tool_eval.md
+Context-Refs:
+  - docs/personal_research_memory_product_contract.md
+  - docs/tool_eval.md
+  - docs/PRIVACY_THREAT_MODEL.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0
+  max_model_calls: 0
+  max_tool_calls: bounded by existing proposal/write catalog
+  max_retries: 1
+  approval_required_when: new durable table, external action, reminder, profile/project mutation, or unconfirmed write is proposed
+Notes: |
+  User problem: save/watch concepts exist but are not a pleasant habit.
+  Boundary: no write without explicit confirmation; no automatic reminders.
+  Data source: personal_memory_events and existing proposal confirmation contracts.
+  Failure behavior: expired/missing proposal asks for regeneration, not a guessed write.
+  Non-goal: generic task manager or automatic follow-up system.
+  Dogfood effect: required part of minimum PRM-19 start slice.
+
+### PRM-UX-8A: AI Systems And Project Application Workflow
+
+Owner: codex
+Phase: PRM-UX
+Type: rag:query rag:generation eval:gate
+Status: proposed
+Depends-On: PRM-UX-2, PRM-UX-3, PRM-UX-4
+Risk-Level: medium
+Public-Tests-Required: required
+Critic-Required: conditional
+Holdout-Required: conditional
+Mutation-Required: conditional
+Property-Required: conditional
+Visual-Contract: optional
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Add a bounded AI systems workflow that turns archive evidence about agent runtime failure modes, evals, RAG, context engineering, or safety into a failure taxonomy, one active-project implication, one PR-sized action, and one eval case.
+Acceptance-Criteria:
+  - id: AC-1; description: fixture question about agent runtime failure modes returns taxonomy, cited cases, project implication, one project action, one eval case, and uncertainty; test: tests/test_prm_professional_workflows.py::test_ai_systems_project_application_workflow.
+  - id: AC-2; description: project action is absent when evidence has only broad keyword overlap; test: tests/test_prm_professional_workflows.py::test_ai_systems_no_keyword_only_action.
+  - id: AC-3; description: output follows answer-first Telegram contract and marks external verification needs for current claims; test: tests/test_prm_professional_workflows.py::test_ai_systems_freshness_boundary.
+Verification:
+  - PYTHONPATH=src python3 -m pytest tests/test_prm_professional_workflows.py tests/test_handlers.py -q
+  - python3 tools/playbook_validate.py --root . --check tasks --check references
+  - git diff --check
+Files:
+  - src/assistant/memory_research.py
+  - src/bot/handlers.py
+  - tests/test_prm_professional_workflows.py
+  - docs/generation_eval.md
+Context-Refs:
+  - docs/professional_personalization_contract.md
+  - docs/prm_operator_experience_roadmap.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0 for tests
+  max_model_calls: 0 for tests
+  max_tool_calls: bounded by research path
+  max_retries: 1
+  approval_required_when: live provider synthesis or external verification is introduced
+Notes: |
+  User problem: systems research must become a project/eval move.
+  Boundary: one workflow slice, no broad renderer rewrite.
+  Dogfood effect: professional value slice; not required before first dogfood day.
+
+### PRM-UX-8B: Career And Portfolio Gap Workflow
+
+Owner: codex
+Phase: PRM-UX
+Type: rag:query rag:generation eval:gate
+Status: proposed
+Depends-On: PRM-UX-3, PRM-UX-4, PRM-UX-10
+Risk-Level: medium
+Public-Tests-Required: required
+Critic-Required: conditional
+Holdout-Required: conditional
+Mutation-Required: conditional
+Property-Required: conditional
+Visual-Contract: optional
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Add a career and portfolio workflow that extracts recurring Agentic AI Engineer requirements from local evidence, compares them with approved portfolio project evidence, identifies missing proof, and proposes one next portfolio action.
+Acceptance-Criteria:
+  - id: AC-1; description: fixture career question returns recurring requirement, source evidence, current portfolio evidence, missing proof, next portfolio action, and unstable job-market verification warning; test: tests/test_prm_professional_workflows.py::test_career_portfolio_gap_workflow.
+  - id: AC-2; description: absent local repo evidence is labelled unknown or reference-only instead of fabricated portfolio proof; test: tests/test_prm_professional_workflows.py::test_missing_portfolio_repo_not_fabricated.
+  - id: AC-3; description: career-market current facts require primary-source verification before recommendation; test: tests/test_prm_professional_workflows.py::test_career_current_market_verification_boundary.
+Verification:
+  - PYTHONPATH=src python3 -m pytest tests/test_prm_professional_workflows.py -q
+  - python3 tools/playbook_validate.py --root . --check tasks --check references
+  - git diff --check
+Files:
+  - src/assistant/memory_research.py
+  - src/assistant/project_portfolio_context.py
+  - tests/test_prm_professional_workflows.py
+  - docs/generation_eval.md
+Context-Refs:
+  - docs/professional_personalization_contract.md
+  - docs/prm19_dogfood_plan.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0 for tests
+  max_model_calls: 0 for tests
+  max_tool_calls: bounded by research path
+  max_retries: 1
+  approval_required_when: live job-market verification or provider synthesis is proposed
+Notes: |
+  User problem: career signals need mapping to portfolio proof.
+  Boundary: no external job scraping and no portfolio repo mutation.
+  Dogfood effect: professional value slice; labels feed PRM-19 usefulness evidence.
+
+### PRM-UX-8C: Product And Enterprise AI Adoption Workflow
+
+Owner: codex
+Phase: PRM-UX
+Type: rag:query rag:generation eval:gate
+Status: proposed
+Depends-On: PRM-UX-3, PRM-UX-4
+Risk-Level: medium
+Public-Tests-Required: required
+Critic-Required: conditional
+Holdout-Required: conditional
+Mutation-Required: conditional
+Property-Required: conditional
+Visual-Contract: optional
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Add a product and enterprise AI adoption workflow that extracts pain patterns, buyer/owner signals, workarounds, evidence maturity, relevant project implications, validation steps, and do-not-build boundaries from local archive evidence.
+Acceptance-Criteria:
+  - id: AC-1; description: enterprise adoption fixture returns pain pattern, evidence maturity, buyer/owner signal, relevant project, validation step, and do-not-build boundary; test: tests/test_prm_professional_workflows.py::test_enterprise_ai_adoption_workflow.
+  - id: AC-2; description: Telegram-only business claims are labelled discovery evidence and not build-ready validation; test: tests/test_prm_professional_workflows.py::test_telegram_only_product_claim_boundary.
+  - id: AC-3; description: no relevant active project yields watch/reference guidance and no action recommendation; test: tests/test_prm_professional_workflows.py::test_enterprise_no_project_action_without_direct_evidence.
+Verification:
+  - PYTHONPATH=src python3 -m pytest tests/test_prm_professional_workflows.py -q
+  - python3 tools/playbook_validate.py --root . --check tasks --check references
+  - git diff --check
+Files:
+  - src/assistant/memory_research.py
+  - tests/test_prm_professional_workflows.py
+  - docs/generation_eval.md
+Context-Refs:
+  - docs/professional_personalization_contract.md
+  - docs/prm_operator_experience_roadmap.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0 for tests
+  max_model_calls: 0 for tests
+  max_tool_calls: bounded by research path
+  max_retries: 1
+  approval_required_when: external demand validation or live web research is proposed
+Notes: |
+  User problem: product hypotheses need evidence maturity and do-not-build boundaries.
+  Boundary: no Demand-to-MVP live run and no external research.
+  Dogfood effect: professional value slice after initial UX.
+
+### PRM-UX-8D: Writer And Editor Brief Workflow
+
+Owner: codex
+Phase: PRM-UX
+Type: rag:generation product:ux eval:gate
+Status: proposed
+Depends-On: PRM-UX-2, PRM-UX-3
+Risk-Level: medium
+Public-Tests-Required: required
+Critic-Required: conditional
+Holdout-Required: conditional
+Mutation-Required: conditional
+Property-Required: conditional
+Visual-Contract: optional
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Add a writer/editor workflow that produces a source-backed Russian brief with thesis, two or three cases, counterargument, practical conclusion, source links, and claims requiring external verification.
+Acceptance-Criteria:
+  - id: AC-1; description: editor fixture about AI adoption workflow returns thesis, source-backed cases, counterargument, practical conclusion, sources, and verification-required claims; test: tests/test_prm_professional_workflows.py::test_writer_editor_brief_workflow.
+  - id: AC-2; description: brief output avoids draft-final-post claims when current external facts are unverified; test: tests/test_prm_professional_workflows.py::test_editor_brief_marks_unverified_current_claims.
+  - id: AC-3; description: source bullets support the thesis/cases without raw post bodies in committed fixtures; verify: test fixtures contain source refs only.
+Verification:
+  - PYTHONPATH=src python3 -m pytest tests/test_prm_professional_workflows.py tests/test_handlers.py -q
+  - python3 tools/playbook_validate.py --root . --check tasks --check references
+  - git diff --check
+Files:
+  - src/assistant/memory_research.py
+  - src/bot/handlers.py
+  - tests/test_prm_professional_workflows.py
+  - docs/generation_eval.md
+Context-Refs:
+  - docs/professional_personalization_contract.md
+  - docs/prm_operator_experience_roadmap.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0 for tests
+  max_model_calls: 0 for tests
+  max_tool_calls: bounded by research path
+  max_retries: 1
+  approval_required_when: live linked-source fetch or provider final drafting is proposed
+Notes: |
+  User problem: writing needs a thesis, not a retrieval dump.
+  Boundary: brief inputs only; no automatic publishing or final content claim.
+  Dogfood effect: professional value slice after answer contract.
+
+### PRM-UX-8E: Learning And Experiment Workflow
+
+Owner: codex
+Phase: PRM-UX
+Type: rag:generation eval:gate
+Status: proposed
+Depends-On: PRM-UX-2, PRM-UX-3, PRM-UX-4
+Risk-Level: medium
+Public-Tests-Required: required
+Critic-Required: conditional
+Holdout-Required: conditional
+Mutation-Required: conditional
+Property-Required: conditional
+Visual-Contract: optional
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Add a learning workflow that explains a complex AI engineering concept simply, cites local sources, connects it to existing knowledge/project context, and proposes one small experiment with success criterion and reflection question.
+Acceptance-Criteria:
+  - id: AC-1; description: context-engineering fixture returns plain explanation, analogy, source evidence, existing-knowledge relation, one experiment, success criterion, and reflection question; test: tests/test_prm_professional_workflows.py::test_learning_experiment_workflow.
+  - id: AC-2; description: learning state remains explicit and does not infer read/applied/measured from source existence; test: tests/test_learning_layer.py::test_learning_state_does_not_infer_progress_from_sources.
+  - id: AC-3; description: experiment action is a proposal and requires confirmation before durable write; test: tests/test_prm_professional_workflows.py::test_learning_experiment_confirmation_boundary.
+Verification:
+  - PYTHONPATH=src python3 -m pytest tests/test_prm_professional_workflows.py tests/test_learning_layer.py -q
+  - python3 tools/playbook_validate.py --root . --check tasks --check references
+  - git diff --check
+Files:
+  - src/assistant/memory_research.py
+  - tests/test_prm_professional_workflows.py
+  - docs/generation_eval.md
+Context-Refs:
+  - docs/professional_personalization_contract.md
+  - docs/personal_research_memory_product_contract.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0 for tests
+  max_model_calls: 0 for tests
+  max_tool_calls: bounded by research path
+  max_retries: 1
+  approval_required_when: provider tutoring mode or durable experiment write changes
+Notes: |
+  User problem: learning should become a small experiment, not passive reading.
+  Boundary: no automatic learning-state promotion.
+  Dogfood effect: professional value slice after initial UX.
+
+### PRM-UX-9: Targeted Primary-Source Verification
+
+Owner: human+codex
+Phase: PRM-UX
+Type: tool:schema tool:call skill:security rag:generation
+Status: proposed
+Depends-On: PRM-UX-2
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: required
+Mutation-Required: conditional
+Property-Required: required
+Visual-Contract: optional
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Add a bounded primary-source verification workflow triggered by the operator that separates Telegram signal, official/GitHub/paper/independent evidence, what changed, unknowns, and revised recommendation without enabling broad autonomous web research.
+Acceptance-Criteria:
+  - id: AC-1; description: `Проверить первоисточники` creates a verification plan with evidence classes and refuses live fetch when approval/trust record is missing; test: tests/test_primary_source_verification.py::test_verification_requires_approval_before_live_fetch.
+  - id: AC-2; description: official documentation and GitHub repository sources are preferred over broad external skill bundles when direct source URLs exist; test: tests/test_primary_source_verification.py::test_direct_primary_source_preference.
+  - id: AC-3; description: answer format separates Telegram signal, primary source, independent confirmation, changed facts, unknowns, and revised recommendation; test: tests/test_primary_source_verification.py::test_verification_answer_contract.
+  - id: AC-4; description: external skill enablement is blocked until trust record template is filled and approved; verify: templates/EXTERNAL_SKILL_TRUST_RECORD.md and docs/PRIVACY_THREAT_MODEL.md approval boundary.
+Verification:
+  - PYTHONPATH=src python3 -m pytest tests/test_primary_source_verification.py tests/test_pi_tools.py -q
+  - python3 tools/playbook_validate.py --root . --check tasks --check references
+  - git diff --check
+Files:
+  - src/assistant/primary_source_verification.py
+  - src/assistant/pi_tools.py
+  - tests/test_primary_source_verification.py
+  - docs/tool_eval.md
+  - docs/PRIVACY_THREAT_MODEL.md
+  - templates/EXTERNAL_SKILL_TRUST_RECORD.md
+Context-Refs:
+  - docs/prm_operator_experience_roadmap.md
+  - docs/PRIVACY_THREAT_MODEL.md
+  - templates/EXTERNAL_SKILL_TRUST_RECORD.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0 until approval
+  max_model_calls: 0 until approval
+  max_tool_calls: 0 live external calls until approval
+  max_retries: 0 until approval
+  approval_required_when: live web/API call, external skill, provider summary, or durable cache write is proposed
+Notes: |
+  User problem: Telegram is discovery evidence and often needs primary-source verification.
+  Boundary: no unrestricted web research and no skill install in this task.
+  Failure behavior: returns verification_required_not_run with next approval step.
+  Dogfood effect: not required for first dogfood day if verification-required claims are marked.
+
+### PRM-UX-10: Real-Question Evaluation And PRM-19 Instrumentation
+
+Owner: human+codex
+Phase: PRM-UX
+Type: eval:gate cost:telemetry
+Status: proposed
+Depends-On: PRM-UX-7
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: required
+Mutation-Required: conditional
+Property-Required: required
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Add privacy-safe real-question evaluation instrumentation for PRM-19 that records category, lens, project, intent, clarification, latency, source count, usefulness, trust, rephrase, evidence errors, saved actions, decision impact, time saved, corrections, and feedback notes.
+Acceptance-Criteria:
+  - id: AC-1; description: dogfood receipt schema validates the PRM-19 real-question fields and excludes raw post text, prompts, completions, and provider payloads; test: tests/test_prm19_dogfood_receipts.py::test_real_question_receipt_schema_privacy.
+  - id: AC-2; description: 30-question category plan is documented with generated labels excluded from independent user evidence; verify: docs/prm19_dogfood_plan.md contains category plan and label boundary.
+  - id: AC-3; description: 10-question smoke command can record metadata without starting PRM-19 or claiming success; test: tests/test_prm19_dogfood_receipts.py::test_smoke_receipt_not_dogfood_start.
+  - id: AC-4; description: useful/partial/no and trust labels are operator-owned fields, not LLM judge authority; test: tests/test_prm19_dogfood_receipts.py::test_operator_labels_are_primary.
+Verification:
+  - PYTHONPATH=src python3 -m pytest tests/test_prm19_dogfood_receipts.py tests/test_prm_release_gate.py -q
+  - python3 tools/playbook_validate.py --root . --check tasks --check references
+  - git diff --check
+Files:
+  - src/db/prm19_dogfood_receipts.py
+  - schemas/prm19_dogfood_receipt.schema.json
+  - tests/test_prm19_dogfood_receipts.py
+  - docs/prm19_dogfood_plan.md
+  - docs/final_acceptance_plan.md
+Context-Refs:
+  - docs/prm19_dogfood_plan.md
+  - docs/final_acceptance_plan.md
+  - evals/prm18_release_gate_receipt_2026-08-11_post_prm28.json
+Cost-Budget: |
+  scope: phase
+  max_cost_usd: 0 until human dogfood budget approval
+  max_model_calls: 0 until human dogfood budget approval
+  max_tool_calls: n/a
+  max_retries: 1
+  approval_required_when: dogfood start, provider budget, or durable production write scope changes
+Notes: |
+  User problem: existing evals measure mechanics more than usefulness.
+  Boundary: instrumentation and smoke only; PRM-19 start remains human-gated.
+  Data source: operator labels and privacy-safe metadata.
+  Failure behavior: missing labels mean unknown, not pass.
+  Dogfood effect: required part of minimum PRM-19 start slice.
+
+### PRM-UX-11: Documentation And Runbook Consolidation
+
+Owner: codex
+Phase: PRM-UX
+Type: project:governance
+Status: proposed
+Depends-On: PRM-UX-0
+Risk-Level: medium
+Public-Tests-Required: not_required
+Critic-Required: conditional
+Holdout-Required: not_required
+Mutation-Required: not_required
+Property-Required: not_required
+Visual-Contract: optional
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Consolidate operator-facing docs so root README stays product-first, operator quickstart explains daily use, runbooks hold operational detail, and legacy Report V2 / Atlas / Radar / old bot/timer material is clearly labelled compatibility history.
+Acceptance-Criteria:
+  - id: AC-1; description: docs/operator_quickstart.md answers bot input, expected answer, save, refresh, feedback, non-goals, and health questions; verify: docs/operator_quickstart.md contains all seven questions.
+  - id: AC-2; description: root README points to the PRM-UX phase without adding more systemd manual detail; verify: README.md navigation section links PRM-UX docs and runbooks.
+  - id: AC-3; description: operational detail is moved or linked to runbook docs and legacy surfaces are labelled compatibility-only; verify: docs/runbooks/assistant_runtime.md, docs/runbooks/archive_refresh.md, docs/runbooks/development.md, and docs/legacy_surfaces.md exist or task notes explain deferred creation.
+  - id: AC-4; description: docs/README.md current date and runtime truth match Product Operating Model; verify: docs/README.md has Last updated 2026-08-12 and PRM-UX links.
+Verification:
+  - python3 tools/playbook_validate.py --root . --check tasks --check placeholders --check references
+  - git diff --check
+Files:
+  - README.md
+  - docs/README.md
+  - docs/operator_quickstart.md
+  - docs/operator_workflow.md
+  - docs/PRODUCT_OPERATING_MODEL.md
+  - docs/legacy_surfaces.md
+  - docs/runbooks/assistant_runtime.md
+  - docs/runbooks/archive_refresh.md
+  - docs/runbooks/development.md
+Context-Refs:
+  - docs/prm_operator_experience_audit.md
+  - docs/prm_operator_experience_roadmap.md
+  - docs/PRODUCT_OPERATING_MODEL.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0
+  max_model_calls: 0
+  max_tool_calls: n/a
+  max_retries: 1
+  approval_required_when: compatibility docs are moved, archived, deleted, or renamed
+Notes: |
+  User problem: competing product eras make daily use unclear.
+  Boundary: docs only; do not delete compatibility docs in this task.
+  Failure behavior: stale operational detail must be labelled, not removed.
+  Dogfood effect: required part of minimum PRM-19 start slice.
+
+### PRM-UX-12: Usage-Derived Weekly Recap
+
+Owner: codex
+Phase: PRM-UX
+Type: rag:generation workflow:autonomous eval:gate
+Status: proposed
+Depends-On: PRM-19
+Risk-Level: medium
+Public-Tests-Required: required
+Critic-Required: conditional
+Holdout-Required: conditional
+Mutation-Required: conditional
+Property-Required: conditional
+Visual-Contract: optional
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Create a secondary weekly recap derived from actual PRM usage questions, reactions, saved notes, watches, project links, actions, experiments, and feedback rather than legacy report pipelines.
+Acceptance-Criteria:
+  - id: AC-1; description: recap builder uses dogfood/usage receipts and confirmed memory events, not legacy Report V2 gate outputs; test: tests/test_prm_usage_weekly_recap.py::test_recap_uses_usage_receipts_not_report_v2.
+  - id: AC-2; description: recap shows one main change, one action/study/watch-or-ignore item, reaction processing summary, project connection or honest zero, and feedback request; test: tests/test_prm_usage_weekly_recap.py::test_recap_contract.
+  - id: AC-3; description: recap generation is disabled until PRM-19 evidence exists or a human approves a fixture-only preview; test: tests/test_prm_usage_weekly_recap.py::test_recap_requires_usage_evidence.
+Verification:
+  - PYTHONPATH=src python3 -m pytest tests/test_prm_usage_weekly_recap.py tests/test_weekly_brief_v3.py -q
+  - python3 tools/playbook_validate.py --root . --check tasks --check references
+  - git diff --check
+Files:
+  - src/output/weekly_brief_v3.py
+  - src/output/prm_usage_weekly_recap.py
+  - tests/test_prm_usage_weekly_recap.py
+  - docs/personal_research_memory_product_contract.md
+Context-Refs:
+  - docs/prm19_dogfood_plan.md
+  - docs/personal_research_memory_product_contract.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0 for deterministic/fixture path
+  max_model_calls: 0 for deterministic/fixture path
+  max_tool_calls: n/a
+  max_retries: 1
+  approval_required_when: scheduled generation, provider synthesis, or delivery is proposed
+Notes: |
+  User problem: weekly projection should summarize actual use, not restart reports.
+  Boundary: secondary surface after PRM-19 evidence.
+  Dogfood effect: post-dogfood secondary product slice.
+
+### PRM-UX-13: Post-Dogfood Simplification And PRM-20 Handoff
+
+Owner: codex
+Phase: PRM-UX
+Type: repo:hygiene project:governance
+Status: proposed
+Depends-On: PRM-19, PRM-UX-12
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: conditional
+Mutation-Required: conditional
+Property-Required: conditional
+Visual-Contract: optional
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Convert real PRM-19 usage evidence into a simplification handoff that identifies which commands, docs, report surfaces, compatibility modules, and abstractions to keep, demote, archive, or leave untouched before PRM-20 cleanup.
+Acceptance-Criteria:
+  - id: AC-1; description: simplification table cites real dogfood usage evidence, current callers, migration risk, and verification command for every candidate; verify: docs/repo_hygiene_and_archive_plan.md contains evidence-backed candidate rows.
+  - id: AC-2; description: no delete, move, archive, or rename action is performed without explicit human compatibility approval; verify: git diff contains no compatibility path deletion/move and approval checklist is open.
+  - id: AC-3; description: PRM-20 handoff depends on PRM-19 evidence and this simplification table; verify: docs/tasks.md PRM-20 Depends-On includes PRM-UX-13.
+Verification:
+  - python3 tools/playbook_validate.py --root . --check tasks --check references
+  - git diff --check
+  - git status --short
+Files:
+  - docs/repo_hygiene_and_archive_plan.md
+  - docs/legacy_surfaces.md
+  - docs/tasks.md
+  - docs/EVIDENCE_INDEX.md
+Context-Refs:
+  - docs/repo_hygiene_and_archive_plan.md
+  - docs/prm19_dogfood_plan.md
+  - docs/prm_operator_experience_roadmap.md
+Cost-Budget: |
+  scope: task
+  max_cost_usd: 0
+  max_model_calls: 0
+  max_tool_calls: n/a
+  max_retries: 1
+  approval_required_when: any compatibility delete, move, archive, or rename is proposed
+Notes: |
+  User problem: cleanup must follow usage evidence, not aesthetic preference.
+  Boundary: handoff/planning only until PRM-20 approval.
+  Dogfood effect: bridge from PRM-19 evidence to canonical PRM-20 cleanup.

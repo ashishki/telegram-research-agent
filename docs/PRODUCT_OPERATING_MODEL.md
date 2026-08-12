@@ -16,6 +16,12 @@ automation remains frozen so it cannot produce new evidence that could be
 mistaken for PRM dogfood. The safe PRM assistant runtime is separately active
 for manual operator testing only.
 
+The next active queue is PRM-UX: Operator Experience And Professional
+Personalization. It is a minimum-sufficient product UX phase over the existing
+local PRM/RAG substrate. It must not be treated as approval for new vector
+backends, external embeddings, unrestricted web research, legacy report
+automation, dogfood start, or release claims.
+
 Runtime freeze recorded on 2026-07-29:
 
 - `telegram-ai-split-report.timer` stopped and disabled;
@@ -262,25 +268,45 @@ Implemented `prm-assistant` runtime mode:
 1. Keep legacy runtime frozen.
 2. Keep the dedicated PRM assistant runtime separated from dogfood evidence
    until approved dogfood start.
-3. Replace old weekly-report timers with no report timers by default. The
+3. Complete the minimum PRM-UX dogfood-start slice: single ordinary-message
+   entrypoint, answer-first Telegram contract, professional lens selection,
+   active-project context, approved freshness threshold, reaction searchability
+   path, confirmation-gated post-answer actions, real-question smoke eval, and
+   consistent operator docs.
+4. Replace old weekly-report timers with no report timers by default. The
    explicitly approved `telegram-prm-archive-refresh.timer` may refresh the
    local archive weekly for manual PRM testing, but it is not dogfood evidence
    and must not generate reports.
-4. Convert Weekly Brief V3 into a secondary projection generated from real
+5. Convert Weekly Brief V3 into a secondary projection generated from real
    PRM usage receipts, not from the old Report V2 rollout gate.
-5. Convert MVP Radar into a bounded decision evidence card inside the assistant
+6. Convert MVP Radar into a bounded decision evidence card inside the assistant
    and Weekly Brief V3, with external-evidence separation and no auto-build
    approval.
-6. Keep PRM-18A through PRM-18C as the pre-dogfood chat workflow and privacy
+7. Keep PRM-18A through PRM-18C as the pre-dogfood chat workflow and privacy
    contract baseline.
-7. Define PRM-19 dogfood metadata before collecting any dogfood evidence:
+8. Define PRM-19 dogfood metadata before collecting any dogfood evidence:
    at least 30 real questions, usefulness labels, corrections, saved notes,
    watch topics, decisions, time to useful answer, cost, value, and friction.
-8. Run PRM-19 only after human dogfood-start approval. The current post-PRM28
+9. Run PRM-19 only after human dogfood-start approval. The current post-PRM28
    PRM-18 receipt has deterministic local stop-ship blockers cleared, but the
    explicit dogfood-start approval blocker remains.
-9. Run PRM-20 cleanup only after real dogfood evidence justifies what to keep,
+10. Run PRM-20 cleanup only after real dogfood evidence justifies what to keep,
    demote, archive, or remove.
+
+## Human Approval Checklist For PRM-UX
+
+Explicit approval is required before:
+
+- accepting the professional lens schema;
+- changing `profile.yaml`;
+- changing project active/priority status or the default active project set;
+- changing archive-refresh schedule or systemd timezone;
+- adding reaction sync to a routine service;
+- starting live external verification or approving external skills;
+- changing provider-egress boundaries;
+- starting PRM-19 dogfood;
+- claiming PRM-19 success;
+- deleting, moving, or archiving legacy code/docs.
 
 ## Runtime Commands
 

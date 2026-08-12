@@ -1,15 +1,53 @@
 # Operator Workflow
 
-**Version:** 2.6
-**Last updated:** 2026-08-11
+**Version:** 2.7
+**Last updated:** 2026-08-12
 **Audience:** System owner (single user, personal use)
-**Role:** supporting operating guide. Canonical roadmap:
-`docs/intelligence_report_v2_roadmap.md` for the Report V2 correction record and
-`docs/portfolio_grade_intelligence_roadmap.md` for the broader product.
+**Role:** supporting operating guide. Current PRM authority:
+`docs/prm_operator_experience_roadmap.md`, `docs/operator_quickstart.md`, and
+`docs/PRODUCT_OPERATING_MODEL.md`. Legacy Report V2 / Atlas / Radar workflows
+below are compatibility history unless explicitly labelled current PRM use.
 
 ---
 
-## Current PRM Local Use
+## Current PRM Telegram Flow
+
+The intended daily interface is one Telegram conversation.
+
+Send normal text or voice. The `prm-assistant` runtime routes ordinary messages
+through `/auto`:
+
+```text
+text or voice transcript
+  -> local research, local editor brief, or gated LLM chat
+  -> answer-first response with sources and boundaries
+  -> optional confirmation-gated save/watch/project/action/feedback
+```
+
+The target answer shape for Russian questions is:
+
+1. `Короткий вывод`
+2. `Что найдено`
+3. `Почему это важно тебе`
+4. `Что сделать`
+5. `Где доказательства слабые`
+6. `Источники`
+
+Manual commands remain fallback controls:
+
+```text
+/research <question>
+/brief <question>
+/chat <question>
+```
+
+The running service remains manual testing only. It is not PRM-19 dogfood
+evidence, and PRM-19 cannot start until the minimum PRM-UX slice and explicit
+human dogfood-start approval are recorded.
+
+For the short operator quickstart, see `docs/operator_quickstart.md`.
+
+## Current PRM Local CLI Use
 
 Start with a no-side-effect capability check:
 
@@ -253,7 +291,11 @@ hybrid retrieval is allowed only inside ADR-004 scope: local sidecar, no
 external embeddings, no hosted vector service, no canonical DB mutation, no
 provider egress for vectorization, and no dogfood claim.
 
-## Weekly Routine
+## Compatibility: Legacy Weekly Report Routine
+
+This section preserves Report V2, Atlas, Radar, old bot, old timer, and
+historical weekly workflow details for compatibility and diagnosis. It is not
+the current PRM product flow and must not be used as PRM-19 dogfood evidence.
 
 ### Report V2 Rollout Hold
 

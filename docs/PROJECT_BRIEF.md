@@ -4,9 +4,16 @@ Project: `telegram-research-agent`
 
 Mode: Standard
 
-Last updated: 2026-07-26
+Last updated: 2026-08-12
 
 Playbook SHA: `5583eca96c4d2d480b5574ed78bea63e0b07ebf0`
+
+PRM-UX planning inspection:
+
+- target repo SHA: `82c0c527ffdd797aab716a2d1079cd6849caa208`;
+- Playbook checkout SHA: `965612aa463fca1a35a55104633d0e09da33d615`;
+- the Playbook SHA above remains the retrofit baseline pin and is stale
+  relative to the current Playbook checkout inspected for PRM-UX planning.
 
 ## 1. Project
 
@@ -17,9 +24,11 @@ Playbook SHA: `5583eca96c4d2d480b5574ed78bea63e0b07ebf0`
 - **Why this project exists:** The operator reads many Telegram channels and
   needs the accumulated corpus to answer concrete work and life questions with
   source links, not just produce weekly reports.
-- **What success looks like in v1:** The operator asks real questions and gets
-  useful, cited, freshness-aware answers from the full retained archive, with
-  optional confirmation-gated saving into durable knowledge objects.
+- **What success looks like in v1:** The operator asks real professional
+  questions in Telegram and gets useful, cited, freshness-aware, answer-first
+  responses from the retained archive and approved context, with optional
+  confirmation-gated saving into durable knowledge objects and at least one
+  bounded next action when evidence supports it.
 
 ## 1b. Problem Fit And Adoption Reality
 
@@ -36,9 +45,11 @@ Playbook SHA: `5583eca96c4d2d480b5574ed78bea63e0b07ebf0`
 - **What would make v1 not worth adopting:** The assistant cannot retrieve
   known retained posts with Telegram links, especially reacted posts, within a
   short interactive loop.
-- **Adoption proof metric:** A human-approved query set retrieves exact
-  Telegram source links from the canonical archive without requiring Knowledge
-  Atoms.
+- **Adoption proof metric:** The technical floor is a human-approved query set
+  retrieving exact Telegram source links from the canonical archive without
+  requiring Knowledge Atoms. The PRM-UX product floor adds real operator labels
+  showing that normal Telegram questions are useful or partially useful, source
+  supported, mobile-readable, and professionally actionable.
 - **Claims out of bounds before evidence:** full-archive RAG shipped,
   assistant reliability proven, dogfood success, portfolio value, vector search
   superiority, production readiness, autonomous preference learning.
@@ -65,8 +76,9 @@ Playbook SHA: `5583eca96c4d2d480b5574ed78bea63e0b07ebf0`
 - **Human review owner and budget:** private operator; initial budget 50-100
   minutes to approve query labels and expected evidence.
 - **LLM judge:** advisory only until calibrated against human labels.
-- **Release gate:** manual approval plus deterministic Playbook validation and
-  task-specific retrieval/generation/tool evaluation.
+- **Release gate:** manual approval plus deterministic Playbook validation,
+  task-specific retrieval/generation/tool evaluation, PRM-UX real-question
+  usefulness evidence, and explicit PRM-19 dogfood-start approval.
 
 ## 2. Users And Workflows
 
@@ -77,6 +89,8 @@ Playbook SHA: `5583eca96c4d2d480b5574ed78bea63e0b07ebf0`
   project context, decisions, or experiments after confirmation.
 - **Main workflow 3:** Review secondary weekly projections derived from actual
   queries, reactions, saved notes, watch topics, projects, and experiments.
+- **Main workflow 4:** Use professional lenses and active project context to
+  turn research into portfolio, career, product, writing, or learning actions.
 
 ## 3. Scope
 
