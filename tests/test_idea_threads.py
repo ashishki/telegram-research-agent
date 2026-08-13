@@ -351,9 +351,10 @@ class TestIdeaThreads(unittest.TestCase):
         stdout = io.StringIO()
         try:
             with patch.dict(os.environ, {"AGENT_DB_PATH": db_path}, clear=False):
-                with patch.object(sys, "argv", ["main.py", "idea-threads", "--weeks", "12"]):
-                    with redirect_stdout(stdout):
-                        exit_code = main.main()
+                with patch("output.idea_threads._utc_now", return_value=datetime(2026, 7, 8, tzinfo=timezone.utc)):
+                    with patch.object(sys, "argv", ["main.py", "idea-threads", "--weeks", "12"]):
+                        with redirect_stdout(stdout):
+                            exit_code = main.main()
             with sqlite3.connect(db_path) as connection:
                 thread_count = connection.execute("SELECT COUNT(*) FROM idea_threads").fetchone()[0]
                 link_count = connection.execute("SELECT COUNT(*) FROM idea_thread_atoms").fetchone()[0]

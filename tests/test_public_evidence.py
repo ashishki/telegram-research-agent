@@ -123,10 +123,9 @@ class TestPublicEvidence(unittest.TestCase):
     def test_readme_exposes_exact_public_evidence_boundary(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
-        self.assertIn("0/4 verified public dogfood weeks", readme)
-        self.assertIn("secondary portfolio project", readme)
-        self.assertIn("docs/evidence/public_dogfood_status.json", readme)
-        self.assertIn("it is not a dogfood run", readme)
+        self.assertIn("operator production tests are optional and operator-controlled", readme)
+        self.assertIn("release readiness is not claimed", readme)
+        self.assertIn("docs/prm19_dogfood_plan.md", readme)
 
 
 if __name__ == "__main__":

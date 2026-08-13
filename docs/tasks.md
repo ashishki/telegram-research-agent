@@ -101,7 +101,7 @@ bot/report timers or claim user value before real operator labels exist.
 Owner: codex
 Phase: PBR
 Type: project:governance
-Status: proposed
+Status: implemented
 Depends-On: none
 Risk-Level: medium
 Public-Tests-Required: not_required
@@ -140,7 +140,7 @@ Notes: |
 Owner: codex
 Phase: PBR
 Type: project:governance
-Status: proposed
+Status: implemented
 Depends-On: PBR-0
 Risk-Level: high
 Public-Tests-Required: not_required
@@ -181,7 +181,7 @@ Notes: |
 Owner: codex
 Phase: PBR
 Type: playbook:retrofit
-Status: proposed
+Status: implemented
 Depends-On: PBR-0, PBR-1
 Risk-Level: high
 Public-Tests-Required: required
@@ -225,7 +225,7 @@ Notes: |
 Owner: codex
 Phase: PBR
 Type: project:governance
-Status: proposed
+Status: implemented
 Depends-On: PBR-1, PBR-2
 Risk-Level: high
 Public-Tests-Required: not_required
@@ -266,7 +266,7 @@ Notes: |
 Owner: codex
 Phase: PBR
 Type: rag:data-readiness tool:schema agent:harness cost:architecture
-Status: proposed
+Status: implemented
 Depends-On: PBR-3
 Risk-Level: high
 Public-Tests-Required: conditional
@@ -308,7 +308,7 @@ Notes: |
 Owner: codex
 Phase: PBR
 Type: project:governance
-Status: proposed
+Status: implemented
 Depends-On: PBR-4
 Risk-Level: medium
 Public-Tests-Required: conditional
@@ -349,7 +349,7 @@ Notes: |
 Owner: codex
 Phase: PBR
 Type: rag:data-readiness rag:query rag:generation tool:schema agent:harness eval:gate cost:architecture skill:security
-Status: proposed
+Status: implemented
 Depends-On: PBR-3, PBR-5
 Risk-Level: high
 Public-Tests-Required: required
@@ -397,7 +397,7 @@ Notes: |
 Owner: codex
 Phase: PBR
 Type: repo:hygiene
-Status: proposed
+Status: implemented
 Depends-On: PBR-0, PBR-3
 Risk-Level: medium
 Public-Tests-Required: conditional
@@ -436,7 +436,7 @@ Notes: |
 Owner: codex
 Phase: PBR
 Type: eval:gate
-Status: proposed
+Status: implemented
 Depends-On: PBR-2, PBR-3, PBR-4, PBR-5, PBR-6, PBR-7
 Risk-Level: medium
 Public-Tests-Required: required

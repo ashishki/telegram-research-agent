@@ -279,6 +279,18 @@ full archive indexing, embeddings, external web research jobs, LLM calls,
 systemd starts, startup migrations, or production database writes were
 performed.
 
+## PBR Baseline Revalidation - 2026-08-13
+
+| Check | Result |
+| --- | --- |
+| Playbook validation | `errors=0 warnings=0` for tasks, placeholders, readiness, delivery, and references |
+| Project verifier | required failures: `0` |
+| Full test suite | `1209 passed in 801.52s` |
+| Diff check | passed with no whitespace errors |
+
+The generated verifier receipt remains local under `.playbook-artifacts/` and
+is not committed.
+
 ## LLM Chat CLI Evidence - 2026-08-03
 
 | Check | Result |
