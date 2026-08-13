@@ -245,7 +245,8 @@ def _route_auto_message(chat_id: str, text: str, *, input_kind: str = "text") ->
         "- Prefer research over chat when the user asks what their archive/posts said, what sources exist, or asks a current fact that must be refused/freshness-gated.\n"
         "- For short follow-ups, keep the previous mode unless the message clearly asks for another output.\n"
         "- Do not choose chat merely because the wording is informal.\n\n"
-        'Return exactly: {"mode":"research|brief|chat","confidence":0.0,"reason":"short"}\n\n'
+        "- For research or brief, include retrieval_query: 2-8 concise search terms that express the user's topic as it may occur in sources. Translate/transliterate when useful. Do not turn it into an answer or add facts.\n"
+        'Return exactly: {"mode":"research|brief|chat","confidence":0.0,"reason":"short","retrieval_query":"optional concise terms"}\n\n'
         f"Input kind: {input_kind}\n"
         f"Previous mode: {previous_mode or 'none'}\n"
         f"Previous question: {previous_question or 'none'}\n"
@@ -273,11 +274,19 @@ def _route_auto_message(chat_id: str, text: str, *, input_kind: str = "text") ->
         "mode": mode,
         "confidence": confidence,
         "reason": str(result.get("reason") or "LLM auto-router").strip(),
+        "retrieval_query": _bounded_retrieval_query(result.get("retrieval_query")),
         "router": "llm",
         "model_call_attempted": True,
         "previous_mode": previous_mode,
         "previous_question": previous_question,
     }
+
+
+def _bounded_retrieval_query(value: object) -> str:
+    clean = _clean_operator_text(value)
+    if not clean:
+        return ""
+    return " ".join(clean.split()[:8])[:240]
 
 
 def _hard_local_research_route(text: str, *, previous_question: str = "", previous_mode: str = "") -> dict[str, object] | None:
@@ -1110,14 +1119,26 @@ def handle_auto(chat_id: str, args: str, settings: Settings) -> None:
         return
     acknowledgement = _auto_intent_acknowledgement(route)
     if mode == "brief":
-        handle_research_brief(chat_id, question, settings, intent_acknowledgement=acknowledgement)
+        handle_research_brief(
+            chat_id,
+            question,
+            settings,
+            intent_acknowledgement=acknowledgement,
+            archive_query=_bounded_retrieval_query(route.get("retrieval_query")),
+        )
         return
     if mode == "chat":
         handle_chat(chat_id, question, settings)
         if _telegram_provider_egress_allowed():
             _remember_research_dialog(chat_id, question, mode="chat")
         return
-    handle_research(chat_id, question, settings, intent_acknowledgement=acknowledgement)
+    handle_research(
+        chat_id,
+        question,
+        settings,
+        intent_acknowledgement=acknowledgement,
+        archive_query=_bounded_retrieval_query(route.get("retrieval_query")),
+    )
 
 
 def _auto_intent_acknowledgement(route: Mapping[str, object]) -> str:
@@ -1130,7 +1151,14 @@ def _auto_intent_acknowledgement(route: Mapping[str, object]) -> str:
     return ""
 
 
-def handle_research(chat_id: str, args: str, settings: Settings, *, intent_acknowledgement: str = "") -> None:
+def handle_research(
+    chat_id: str,
+    args: str,
+    settings: Settings,
+    *,
+    intent_acknowledgement: str = "",
+    archive_query: str = "",
+) -> None:
     question = args.strip()
     if not question:
         send_message(_get_bot_token(), chat_id, "Напиши вопрос после /research или просто отправь обычное сообщение.", parse_mode=None)
@@ -1151,7 +1179,13 @@ def handle_research(chat_id: str, args: str, settings: Settings, *, intent_ackno
         vector_index_path=_telegram_vector_index_path(),
     )
     try:
-        result = answer_memory_research(str(dialog["effective_question"]), settings=settings, limit=4, budget=budget)
+        result = answer_memory_research(
+            str(dialog["effective_question"]),
+            archive_query=archive_query,
+            settings=settings,
+            limit=4,
+            budget=budget,
+        )
     except Exception as exc:
         send_message(_get_bot_token(), chat_id, f"Не смог выполнить local research: {exc}", parse_mode=None)
         return
@@ -1165,7 +1199,14 @@ def handle_research(chat_id: str, args: str, settings: Settings, *, intent_ackno
     _send_research_text(chat_id, response_text, token=_get_bot_token(), reply_markup=_prm_post_answer_markup(result))
 
 
-def handle_research_brief(chat_id: str, args: str, settings: Settings, *, intent_acknowledgement: str = "") -> None:
+def handle_research_brief(
+    chat_id: str,
+    args: str,
+    settings: Settings,
+    *,
+    intent_acknowledgement: str = "",
+    archive_query: str = "",
+) -> None:
     question = args.strip()
     if not question:
         send_message(_get_bot_token(), chat_id, "Напиши вопрос после /brief.", parse_mode=None)
@@ -1186,7 +1227,13 @@ def handle_research_brief(chat_id: str, args: str, settings: Settings, *, intent
         vector_index_path=_telegram_vector_index_path(),
     )
     try:
-        result = answer_memory_research(str(dialog["effective_question"]), settings=settings, limit=5, budget=budget)
+        result = answer_memory_research(
+            str(dialog["effective_question"]),
+            archive_query=archive_query,
+            settings=settings,
+            limit=5,
+            budget=budget,
+        )
     except Exception as exc:
         send_message(_get_bot_token(), chat_id, f"Не смог собрать local brief: {exc}", parse_mode=None)
         return

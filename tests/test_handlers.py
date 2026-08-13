@@ -913,7 +913,12 @@ class TestHandlers(unittest.TestCase):
             with patch.object(
                 handlers.LLMClient,
                 "complete_json",
-                return_value={"mode": "brief", "confidence": 0.91, "reason": "editor brief requested"},
+                return_value={
+                    "mode": "brief",
+                    "confidence": 0.91,
+                    "reason": "editor brief requested",
+                    "retrieval_query": "AI transformation company outcomes",
+                },
             ) as llm_mock:
                 with patch.object(handlers, "answer_pi_chat") as chat_mock:
                     with patch.object(handlers, "answer_memory_research", return_value=payload) as research_mock:
@@ -925,6 +930,7 @@ class TestHandlers(unittest.TestCase):
         llm_mock.assert_called_once()
         chat_mock.assert_not_called()
         research_mock.assert_called_once()
+        self.assertEqual(research_mock.call_args.kwargs["archive_query"], "AI transformation company outcomes")
         self.assertIn("PRM редакторский бриф", mock_send_message.call_args.args[2])
 
     def test_handle_auto_rejects_llm_chat_for_archive_question(self):

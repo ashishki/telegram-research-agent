@@ -322,6 +322,7 @@ class MemoryResearchBudget:
 def answer_memory_research(
     question: str,
     *,
+    archive_query: str | None = None,
     settings: Settings | None = None,
     facade: PersonalIntelligenceFacade | Any | None = None,
     week_label: str | None = None,
@@ -341,6 +342,7 @@ def answer_memory_research(
     if budget_refusal:
         return _refusal_payload(clean_question, active_budget, budget_refusal[0], budget_refusal[1])
 
+    clean_archive_query = _clean_text(archive_query) or clean_question
     time_window = _resolve_time_window(clean_question, now=now)
     bounded_limit = max(1, min(active_budget.max_archive_sources, int(limit or active_budget.max_archive_sources)))
     active_facade = facade or PersonalIntelligenceFacade(settings=settings)
@@ -348,7 +350,7 @@ def answer_memory_research(
 
     archive_result = _call_archive_search(
         active_facade,
-        clean_question,
+        clean_archive_query,
         week_label=week_label,
         project_name=project_name,
         limit=bounded_limit,

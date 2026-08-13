@@ -340,6 +340,18 @@ class TestMemoryResearch(unittest.TestCase):
 
         self.assertIn("harness", variants)
 
+    def test_memory_research_uses_semantic_archive_query_but_keeps_original_question(self):
+        facade = _SelectiveArchiveFacade()
+
+        result = answer_memory_research(
+            "Что полезно для моих проектов?",
+            archive_query="RAG retrieval",
+            facade=facade,
+        )
+
+        self.assertEqual(result["question"], "Что полезно для моих проектов?")
+        self.assertEqual(facade.archive_queries[0], "RAG retrieval")
+
     def test_memory_research_enforces_last_two_weeks_and_rejects_stale_hits(self):
         facade = _StaleModelsFacade()
 
