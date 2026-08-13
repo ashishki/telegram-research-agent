@@ -13,8 +13,15 @@ The operator asks questions in Telegram or CLI, the system searches the local
 Telegram archive, builds a citation-safe context pack, and returns a grounded
 answer or editor-style brief with source boundaries.
 
-This is not a public SaaS product and not a released/dogfooded system yet. It is
+This is not a public SaaS product and not a released system. It is
 currently running as a manual operator test environment.
+
+## Operator Documentation
+
+- `docs/operator_quickstart.md` for daily use;
+- `docs/operator_workflow.md` for supporting operational context;
+- `docs/runbooks/` for runtime, archive-refresh, and development boundaries;
+- `docs/legacy_surfaces.md` for compatibility-only history.
 
 ## Current State
 
@@ -30,7 +37,7 @@ As of 2026-08-12:
   gated;
 - a weekly PRM archive refresh timer is installed and waiting;
 - legacy weekly-report automation remains frozen;
-- PRM-19 dogfood has not started;
+- operator production tests are optional and operator-controlled;
 - release readiness is not claimed.
 
 Current local archive snapshot on the active host:
@@ -49,7 +56,7 @@ Current installed runtime state:
 | `telegram-prm-assistant.service` | enabled, active | manual Telegram assistant testing |
 | `telegram-prm-archive-refresh.timer` | enabled, active/waiting | weekly local archive freshness |
 | `telegram-prm-archive-refresh.service` | inactive until timer fires | bounded archive refresh job |
-| `telegram-bot.service` | disabled/inactive | legacy bot, do not use as PRM dogfood |
+| `telegram-bot.service` | disabled/inactive | legacy bot, not a PRM entrypoint |
 | `telegram-ai-split-report.timer` | disabled/inactive | legacy weekly report timer |
 
 The next scheduled archive refresh is handled by systemd and runs the bounded
@@ -77,7 +84,7 @@ It can:
 
 It does not currently:
 
-- claim PRM-19 dogfood evidence;
+- claim automatic product-value evidence;
 - run live web research;
 - run external embeddings or a hosted vector database;
 - run production migrations automatically;
@@ -208,7 +215,7 @@ PYTHONPATH=src python3 src/main.py memory refresh-archive \
 
 The refresh command deliberately avoids migrations, reaction sync, media
 download, vision LLM, provider egress, source-event writes, report generation,
-dogfood evidence, and release claims.
+operator-test evidence, and release claims.
 
 Private editor source packet workflow:
 
@@ -380,7 +387,7 @@ Do not commit:
 - generated private Telegram source packets;
 - full private Telegram post text.
 
-Do not start or enable as PRM dogfood:
+Do not start or enable as a PRM workflow:
 
 - `telegram-bot.service`;
 - `telegram-ai-split-report.timer`;
@@ -409,7 +416,7 @@ Implemented PRM slices include:
 - project context and decision-support routing;
 - Weekly Brief V3 deterministic secondary projection;
 - safe runtime workflow contracts;
-- PRM-18 release/dogfood gate;
+- PRM-18 historical release-gate receipt;
 - PRM-18A through PRM-18C LLM chat UX;
 - PRM-24 generated seed gold eval set;
 - PRM-27 local vector sidecar;
@@ -417,10 +424,9 @@ Implemented PRM slices include:
 
 Still gated:
 
-- PRM-19 dogfood start requires explicit human dogfood-start approval;
-- PRM-UX operator-experience and professional-personalization work is the next
-  implementation queue before PRM-19 can collect usefulness evidence;
-- PRM-20 cleanup/archive requires real PRM-19 dogfood evidence and explicit
+- live production tests remain operator-controlled and must respect their
+  privacy, provider, write, and runtime boundaries;
+- PRM-20 cleanup/archive requires real operator usage evidence and explicit
   compatibility archive/delete/move approval;
 - generated PRM-24 labels are operator-approved seed evidence, not independent
   human-reviewed gold evidence;
@@ -439,7 +445,7 @@ python3 src/main.py report-v2-rollout-gate --week 2026-W28 --json
 python3 src/main.py mvp-weekly
 ```
 
-They are not the current product path. Do not use their outputs as PRM dogfood
+They are not the current product path. Do not use their outputs as operator-test
 or release evidence.
 
 ## Canonical Docs
@@ -454,7 +460,7 @@ or release evidence.
 - [Operator Experience Roadmap](docs/prm_operator_experience_roadmap.md)
 - [Professional Personalization Contract](docs/professional_personalization_contract.md)
 - [Operator Quickstart](docs/operator_quickstart.md)
-- [PRM-19 Dogfood Plan](docs/prm19_dogfood_plan.md)
+- [PRM-19 Operator Production-Test Plan](docs/prm19_dogfood_plan.md)
 - [Privacy Threat Model](docs/PRIVACY_THREAT_MODEL.md)
 - [Cost Budget](docs/COST_BUDGET.md)
 - [Active Tasks](docs/tasks.md)

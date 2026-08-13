@@ -13,8 +13,13 @@ Last updated: 2026-08-12
 - docs/professional_personalization_contract.md
 - docs/prm_operator_experience_audit.md
 - docs/prm_operator_experience_roadmap.md
-- docs/prm19_dogfood_plan.md
+- docs/prm19_dogfood_plan.md (operator production-test plan; historical filename)
 - docs/operator_quickstart.md
+- docs/operator_workflow.md
+- docs/legacy_surfaces.md
+- docs/runbooks/assistant_runtime.md
+- docs/runbooks/archive_refresh.md
+- docs/runbooks/development.md
 - docs/personal_research_memory_architecture.md
 - docs/personal_research_memory_roadmap.md
 - docs/PRODUCT_OPERATING_MODEL.md
@@ -46,6 +51,7 @@ Last updated: 2026-08-12
 - docs/PRIVACY_THREAT_MODEL.md
 - docs/ROLLBACK_AND_REINDEX_PLAN.md
 - docs/repo_hygiene_and_archive_plan.md
+- docs/legacy_runtime_inventory.md
 
 ## Current Runtime Boundary
 
@@ -58,7 +64,7 @@ Last updated: 2026-08-12
 The safe `prm-assistant` runtime is active for manual testing only. The live
 legacy Telegram bot and old weekly Report V2 timer are stopped and disabled.
 The dedicated archive-refresh timer is active for bounded weekly archive
-freshness. PRM-19 dogfood has not started.
+freshness. Human production tests are optional and operator-controlled.
 
 ## Legacy And Compatibility Context
 
@@ -76,9 +82,12 @@ not the active product authority:
 - docs/weekly_run_manifest.md
 - docs/archive/
 
+Redirect stubs preserve historical paths. Full report-era documents now live
+under `docs/archive/legacy_report_era/`.
+
 ## Evidence Rule
 
 Candidate docs and tasks may define target behavior. They must not claim that
-full-archive RAG, assistant archive search, dogfood success, vector retrieval,
+full-archive RAG, assistant archive search, production-test success, vector retrieval,
 or external skill approval exists until implementation and verification evidence
 is recorded.

@@ -125,18 +125,18 @@ Implement separately testable workflows:
 5. PRM-UX-8E Learning And Experiment Workflow
 6. PRM-UX-9 Targeted Primary-Source Verification
 
-Targeted external verification is not required for the first dogfood day if
+Targeted external verification is not required for the first operator test if
 the assistant clearly marks verification-required claims.
 
-### Phase C — Real Dogfood
+### Phase C — Operator Production Tests
 
-Existing PRM-19 remains the canonical four-week dogfood task. Do not create a
-second dogfood task.
+PRM-19 records optional human-run production-test evidence. It does not block
+implementation of later deterministic UX slices.
 
 ### Phase D — Secondary Surfaces And Cleanup
 
 1. PRM-UX-12 Usage-Derived Weekly Recap
-2. PRM-UX-13 Post-Dogfood Simplification And PRM-20 Handoff
+2. PRM-UX-13 Post-Production-Test Simplification And PRM-20 Handoff
 3. Existing PRM-20 cleanup/archive
 
 ## PRM-UX Task Summaries
@@ -159,8 +159,8 @@ second dogfood task.
 | PRM-UX-9 | Targeted primary-source verification path with trust records before external skills. |
 | PRM-UX-10 | Real-question product-usefulness eval and PRM-19 instrumentation. |
 | PRM-UX-11 | README/operator/runbook/legacy docs consolidation. |
-| PRM-UX-12 | Usage-derived weekly recap after dogfood evidence starts. |
-| PRM-UX-13 | Post-dogfood simplification plan and PRM-20 handoff. |
+| PRM-UX-12 | Usage-derived weekly recap from receipts or an approved fixture preview. |
+| PRM-UX-13 | Post-production-test simplification plan and PRM-20 handoff. |
 
 ## Dependency Graph
 
@@ -179,30 +179,17 @@ PRM-UX-3/PRM-UX-2 -> PRM-UX-8D
 PRM-UX-3/PRM-UX-4 -> PRM-UX-8C
 PRM-UX-3/PRM-UX-4/PRM-UX-2 -> PRM-UX-8E
 PRM-UX-2/PRM-UX-9 -> later externally verified answer slices
-
-Minimum dogfood slice:
-PRM-UX-1 + PRM-UX-2 + PRM-UX-3 + PRM-UX-4 + PRM-UX-5
-  + PRM-UX-6 + PRM-UX-7 + PRM-UX-10 + PRM-UX-11
-  + explicit human dogfood-start approval
-  -> PRM-19
-
-PRM-19 -> PRM-UX-12 -> PRM-UX-13 -> PRM-20
+PRM-UX-10 -> PRM-UX-12 -> PRM-UX-13 -> PRM-20
+PRM-19 is optional human production-test evidence and may inform PRM-20
 ```
 
-## Minimum Dogfood-Start Slice
+## Operator Production Tests
 
-PRM-19 may start only after all of these are true:
-
-- ordinary Telegram messages are the normal entrypoint;
-- answer-first localized response contract is enforced in Telegram tests;
-- professional lens selection exists and does not reduce recall;
-- active-project priority model exists and has operator approval;
-- archive freshness threshold is approved and current;
-- reaction searchability path is defined with failure isolation;
-- save/watch actions are confirmation-gated and user-facing;
-- 10-question smoke evaluation has a privacy-safe receipt;
-- operator docs are consistent enough for daily use;
-- explicit human dogfood-start approval is recorded.
+Human production tests are optional evidence collection. They may use the
+privacy-safe receipt schema when the operator chooses to record a session, but
+they do not gate completion of deterministic UX tasks. Any live refresh,
+reaction sync, provider egress, durable write, runtime change, or compatibility
+cleanup remains subject to its own explicit approval boundary.
 
 ## Freshness Plan
 
@@ -238,6 +225,10 @@ archive refresh succeeds or manual reaction refresh requested
 Keep reaction sync separate from archive refresh. Rationale: Telethon reaction
 visibility and credential failures should not block archive freshness. Reaction
 sync failure should produce a receipt and leave archive search fresh.
+
+Routine reaction sync remains blocked until the operator records credential
+scope, Telethon reaction visibility, source volume, rate limits, failure
+handling, rollback, and approval for the exact timer/service boundary.
 
 ## Targeted Primary-Source Verification
 
@@ -295,4 +286,3 @@ advisory until calibrated.
   value.
 - Do not delete or archive compatibility code/docs before PRM-19 evidence and
   explicit approval.
-

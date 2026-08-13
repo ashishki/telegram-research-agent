@@ -5,22 +5,24 @@ Last updated: 2026-08-12
 
 ## Current Truth
 
-The product is not dogfood-started yet.
+### Superseding Operator Test Policy
 
-PRM-18 implemented a deterministic release/dogfood gate. After PRM-24, PRM-26,
-and PRM-28, the current post-PRM28 receipt records deterministic local product
-RAG readiness for the accepted no-vector path, but the dogfood gate is still
-blocked because explicit PRM-19 dogfood-start approval is not recorded. Dogfood
-has not started and release readiness is not claimed. Legacy weekly-report
-automation remains frozen so it cannot produce new evidence that could be
-mistaken for PRM dogfood. The safe PRM assistant runtime is separately active
-for manual operator testing only.
+The operator chose direct human production tests instead of a formal PRM-19
+dogfood phase on 2026-08-12. Historical dogfood-named receipts remain factual
+history, but they do not block active PRM-UX implementation. Any live action
+still requires its specific approval boundary for privacy, provider egress,
+canonical writes, runtime/service state, and compatibility cleanup.
+
+Historical PRM-18 release-gate receipts retain their original dogfood wording,
+but are not active UX gates. Release readiness is not claimed. Legacy
+weekly-report automation remains frozen, and the safe PRM assistant runtime is
+active only for operator-controlled testing.
 
 The next active queue is PRM-UX: Operator Experience And Professional
 Personalization. It is a minimum-sufficient product UX phase over the existing
 local PRM/RAG substrate. It must not be treated as approval for new vector
 backends, external embeddings, unrestricted web research, legacy report
-automation, dogfood start, or release claims.
+automation, or release claims.
 
 Runtime freeze recorded on 2026-07-29:
 
@@ -32,13 +34,13 @@ Runtime freeze recorded on 2026-07-29:
 - no project cron job was found in system cron.
 
 Existing generated artifacts under `data/output/` remain private historical
-outputs. They were not deleted, moved, archived, or promoted to dogfood
+outputs. They were not deleted, moved, archived, or promoted to operator-test
 evidence.
 
 A dedicated safe runtime now exists in code as `src/main.py prm-assistant` and
 as a repo unit template at `systemd/telegram-prm-assistant.service`. It is
 installed, enabled, and running for manual operator testing as of 2026-08-11
-18:27 CEST, but it is not treated as PRM-19 dogfood evidence.
+18:27 CEST.
 
 ## Single Product Shape
 
@@ -60,9 +62,9 @@ are not separate products and must not compete for the primary workflow.
 | --- | --- | --- |
 | Canonical Telegram archive | Private retained source material in SQLite tables such as `raw_posts`, `posts`, and FTS indexes. | Existing. Live ingestion is frozen. |
 | Archive search | Bounded SQLite FTS retrieval with metadata and citation identity. | Implemented as local baseline plus PRM-27 local vector sidecar for hybrid fallback; external embeddings/hosted vector services remain blocked. |
-| Curated knowledge | Knowledge Atoms, idea threads, saved notes, watch topics, project links, decisions, experiments. | Partial and fixture-backed; not complete dogfood evidence. |
-| Assistant tools | Read-only PRM tools plus confirmation-gated proposal/write tools. | Safe `prm-assistant` runtime active for manual testing only; not dogfood evidence. |
-| Knowledge Library | Topic-page projection over bounded supplied topic evidence. | Deterministic renderer implemented; not dogfooded. |
+| Curated knowledge | Knowledge Atoms, idea threads, saved notes, watch topics, project links, decisions, experiments. | Partial and fixture-backed; operator validation remains separate. |
+| Assistant tools | Read-only PRM tools plus confirmation-gated proposal/write tools. | Safe `prm-assistant` runtime active for operator-controlled testing. |
+| Knowledge Library | Topic-page projection over bounded supplied topic evidence. | Deterministic renderer implemented. |
 | Weekly Brief V3 | Secondary weekly projection over usage, reactions, notes, projects, questions, and failures. | Deterministic fixture projection implemented; no scheduled runtime. |
 | MVP Radar | Evidence lens for market/build decisions. | Must be secondary, bounded, and blocked from auto-build/release claims. |
 | Legacy reports | V1/V2 Brief, Atlas, Report V2 rollout, old digest/study/MVP commands. | Compatibility-only. Frozen from automatic runtime. |
@@ -308,12 +310,21 @@ Explicit approval is required before:
 - claiming PRM-19 success;
 - deleting, moving, or archiving legacy code/docs.
 
+Before reaction sync can be added to any routine service, the operator must
+record the credential scope, Telethon personal-reaction visibility result,
+channel/source volume, rate-limit policy, failure alerting/rollback behavior,
+and confirmation that reaction failure remains isolated from archive freshness.
+Until then, the PRM-UX-6 receipts are fixture/read-only models only and do not
+authorize a sync run, timer change, or durable preference learning.
+
 ## Runtime Commands
 
-Do not restart the legacy bot or report timer for PRM dogfood.
+Do not restart the legacy bot or report timer as a PRM workflow.
 
-If historical compatibility runtime is intentionally needed, record that as a
-separate approval and use explicit commands:
+The repo templates for the legacy report timer are archived at
+`systemd/archive/legacy_report_era/`. If historical compatibility runtime is
+intentionally needed, record that as a separate approval and use explicit
+commands against an already-installed host unit:
 
 ```bash
 systemctl start telegram-bot.service

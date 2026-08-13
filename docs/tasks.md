@@ -12,7 +12,7 @@ Target repo inspected for PRM-UX planning: 82c0c527ffdd797aab716a2d1079cd6849caa
 - Historical IRX work remains preserved in prior roadmaps and git history.
 - Do not add new product tasks to IRX.
 - New operator-experience work flows through PRM-UX, not IRX and not a second
-  dogfood task.
+  autonomous trial task.
 - Do not run live Telegram ingestion, reaction sync, Frontier, Radar, report
   generation, full archive LLM backfill, external embeddings, hosted vector
   services, or external web research jobs from backlog grooming. PRM-27 local
@@ -20,15 +20,15 @@ Target repo inspected for PRM-UX planning: 82c0c527ffdd797aab716a2d1079cd6849caa
 - Do not modify production database contents.
 - Candidate retrieval queries are not gold evidence until the human operator
   approves expected evidence and citations.
-- Human approval is required before accepting the product pivot ADR, starting
-  dogfood, expanding vector work beyond ADR-004 local sidecar, approving
+- Human approval is required before accepting the product pivot ADR, changing
+  a live runtime boundary, expanding vector work beyond ADR-004 local sidecar, approving
   external skills, or deleting compatibility files.
 - Deep review is batched by milestone block. A task-level Critic-Required value
   means the task must be covered by the next block review, not that a separate
   deep-review agent must be run after every task.
 - Immediate deep review still blocks continuation for privacy egress, unsafe
   writes, production data migration, vector backend adoption, external skill
-  approval, dogfood start, release claims, or deletion/archive of compatibility
+  approval, release claims, or deletion/archive of compatibility
   files.
 
 ## Current Baseline
@@ -38,25 +38,25 @@ Target repo inspected for PRM-UX planning: 82c0c527ffdd797aab716a2d1079cd6849caa
 | Repository | Existing product, not greenfield; pre-retrofit commit ad8689fa25b89f77122c4cec7c7a6b9da3f500cf |
 | Playbook | Retrofit baseline pin is 5583eca96c4d2d480b5574ed78bea63e0b07ebf0; current Playbook checkout inspected for PRM-UX is 965612aa463fca1a35a55104633d0e09da33d615 |
 | Product center | Personal Telegram Research Memory + Grounded Assistant; PRM-UX narrows the next phase to daily operator usefulness, not a new infrastructure wave |
-| Full archive search | Bounded SQLite FTS archive search plus PRM-27 local vector sidecar are implemented as local assistant retrieval slices; product RAG gates remain required before dogfood |
+| Full archive search | Bounded SQLite FTS archive search plus PRM-27 local vector sidecar are implemented as local assistant retrieval slices; product RAG gates remain required before live operator validation |
 | Current SQLite FTS | Hardened as the persistent baseline for bounded archive search; PRM-27 adds an optional local vector sidecar without replacing FTS |
 | PI assistant retrieval | Uses bounded curated and SQLite FTS archive tools; hybrid local vector retrieval is available behind explicit local flags; broad raw corpus provider egress remains forbidden |
-| Knowledge Library | Deterministic PRM-13 topic-page DTO and static HTML renderer implemented for bounded supplied topic evidence; not dogfooded or released |
+| Knowledge Library | Deterministic PRM-13 topic-page DTO and static HTML renderer implemented for bounded supplied topic evidence; not released |
 | Project context support | Deterministic PRM-14 assistant tool combines active project descriptors, bounded archive retrieval, and curated knowledge into direct_implication, weak_watch, learning_relevance, or no_match labels without build/code/project mutation approval |
 | Local operator UX | `memory ask` gives a local-only evidence brief over bounded archive/curated/project context with no LLM calls, external search, startup migrations, service starts, or writes |
-| LLM chat UX | PRM-18A contract, PRM-18B CLI harness, and PRM-18C Telegram UX/runbook implemented; Telegram provider-egress/router flags are enabled for manual testing, not dogfood |
-| Research session assistant | Polished project-aware archive-plus-linked-source assistant target is documented by PRM-21; PRM-22 fixture-first linked-source resolver/cache, PRM-23 bounded `memory research` planner, and PRM-27 optional local hybrid retrieval are implemented; PRM-19 dogfood is still not started |
+| LLM chat UX | PRM-18A contract, PRM-18B CLI harness, and PRM-18C Telegram UX/runbook implemented; Telegram provider-egress/router flags are enabled for manual testing |
+| Research session assistant | Polished project-aware archive-plus-linked-source assistant target is documented by PRM-21; PRM-22 fixture-first linked-source resolver/cache, PRM-23 bounded `memory research` planner, and PRM-27 optional local hybrid retrieval are implemented |
 | Learning state | PRM-15 fixture-only migration/projection maps legacy source presence to indexed/surfaced only and requires explicit receipts for opened/read/understood/explained/tried/applied/measured |
 | Weekly Brief V3 | PRM-16 deterministic secondary projection and static HTML renderer implemented for bounded supplied context; V1 Brief and Atlas are demoted to compatibility/internal surfaces |
 | Runtime workflows | PRM-17 deterministic workflow registry and privacy-safe aggregate telemetry receipt implemented; scheduled runtime activation is not approved |
-| Release gate | PRM-18 deterministic release/dogfood gate implemented; current post-PRM28 receipt records deterministic local no-vector RAG readiness, and PRM-27 local vector sidecar is implemented after a successor ADR, but PRM-19 dogfood is still not started |
-| Runtime deployment | Legacy `telegram-bot.service` and `telegram-ai-split-report.timer` stopped and disabled on 2026-07-29; safe `telegram-prm-assistant.service` is installed/enabled/running for manual operator testing as of 2026-08-11 18:27 CEST; startup migrations remain skipped and this is not PRM-19 dogfood evidence |
+| Release gate | PRM-18 historical deterministic release receipt remains recorded; current UX work uses explicit operator-test approvals rather than a dogfood gate |
+| Runtime deployment | Legacy `telegram-bot.service` and `telegram-ai-split-report.timer` stopped and disabled on 2026-07-29; safe `telegram-prm-assistant.service` is installed/enabled/running for manual operator testing as of 2026-08-11 18:27 CEST; startup migrations remain skipped |
 | PRM-13..17 review gate | Batched deep review recorded; one telemetry budget-validation finding fixed before PRM-18 |
 | PRM-18A..18C review gate | Batched deep review recorded on 2026-08-03; no unresolved stop-ship finding in this block, residual provider/runtime risks remain gated before PRM-19 |
 | W29 reports | V1 Brief and Atlas rendered despite V2 preview code existing elsewhere |
 | W29 reactions | Seven personal reactions resolved to posts, zero atoms, zero themes, zero ranking effects |
 | Radar | Historical W29 Radar stage failed; PRM-16 V3 fixtures localize Radar failure to the Radar card |
-| Dogfood | Not started for the new product; PRM-19 remains blocked until explicit human dogfood-start approval is recorded |
+| Operator production tests | Human-run production testing is optional evidence collection and does not block PRM-UX implementation |
 
 ## Dependency Graph
 
@@ -83,14 +83,14 @@ PRM-UX-4 -> PRM-UX-5 -> PRM-UX-6 -> PRM-UX-7 -> PRM-UX-10
 PRM-UX-0 -> PRM-UX-11
 PRM-UX-3/PRM-UX-4/PRM-UX-2 -> PRM-UX-8A/8B/8C/8D/8E
 PRM-UX-2 -> PRM-UX-9
-PRM-UX-10/PRM-UX-11 + explicit human dogfood-start approval -> PRM-19
-PRM-19 -> PRM-UX-12 -> PRM-UX-13 -> PRM-20
+PRM-UX-10 -> PRM-UX-12 -> PRM-UX-13 -> PRM-20
+PRM-19 is optional operator production-test evidence and may inform PRM-20
 PRM-24..PRM-28 formalize the required full product RAG path. PRM-26 refines
 the older PRM-8 hybrid/vector backend gate. PRM-27 is allowed only inside the
 ADR-004 local-sidecar scope: no external embeddings, no hosted vector service,
-no canonical DB mutation, no live web research, and no dogfood start.
+no canonical DB mutation, and no live web research.
 PRM-UX formalizes the required operator-experience and professional
-personalization path before PRM-19 dogfood; it must not restart legacy
+personalization path before operator production tests; it must not restart legacy
 bot/report timers or claim user value before real operator labels exist.
 ```
 
@@ -1514,12 +1514,12 @@ Notes: |
   gate: a running manual-test service is not dogfood. PRM-19 remains blocked
   until explicit human dogfood-start approval.
 
-### PRM-19: Four-Week Operator Dogfood
+### PRM-19: Operator Production-Test Evidence
 
 Owner: human
 Phase: PRM
 Type: eval:gate
-Status: blocked
+Status: proposed
 Depends-On: PRM-18C, PRM-28, PRM-UX-10, PRM-UX-11
 Risk-Level: high
 Public-Tests-Required: not_required
@@ -1531,13 +1531,13 @@ Visual-Contract: optional
 Runtime-Verification: required
 Correction-Budget: 2
 Objective: |
-  Run the actual product for four weeks and record real questions, useful answers, corrections, saved notes, watch topics, decisions, recovered reactions, time to useful answer, weekly cost, value score, friction score, and continuation decision.
+  Record human-run production-test questions, useful answers, corrections, saved notes, watch topics, decisions, recovered reactions, time to useful answer, cost, value score, friction score, and continuation decision.
 Acceptance-Criteria:
-  - id: AC-1; description: at least 30 real operator questions are recorded with privacy-safe metadata and usefulness labels; verify: dogfood receipt count and label coverage.
+  - id: AC-1; description: real operator questions are recorded with privacy-safe metadata and usefulness labels; verify: production-test receipt count and label coverage.
   - id: AC-2; description: saved notes, watch topics, project or life decisions, rejected answers, and corrections are counted separately; verify: dogfood summary table.
-  - id: AC-3; description: continuation decision is based on value, friction, latency, cost, and user desire to keep using it; verify: human dogfood decision record.
+  - id: AC-3; description: continuation decision is based on value, friction, latency, cost, and user desire to keep using it; verify: human production-test decision record.
 Verification:
-  - dogfood receipt review by human operator
+  - production-test receipt review by human operator
 Files:
   - docs/prm19_dogfood_plan.md
   - docs/dogfood_4_week_plan.md
@@ -1549,26 +1549,23 @@ Context-Refs:
   - docs/prm19_dogfood_plan.md
 Cost-Budget: |
   scope: phase
-  max_cost_usd: 0 until human-approved dogfood budget is recorded
-  max_model_calls: 0 until human-approved dogfood budget is recorded
+  max_cost_usd: 0 until human-approved production-test budget is recorded
+  max_model_calls: 0 until human-approved production-test budget is recorded
   max_tool_calls: n/a
   max_retries: 1 per failed workflow
   approval_required_when: weekly budget or provider egress changes
 Notes: |
-  Do not predefine success as the system ran. PRM-28 now passes the accepted
-  no-vector product RAG gate, and the current PRM-18 post-PRM28 receipt clears
-  deterministic local stop-ship blockers. PRM-19 still cannot start until the
-  minimum PRM-UX dogfood-start slice is complete and the human operator
-  explicitly approves dogfood start. The current manual `prm-assistant`
-  runtime remains manual testing only until that approval exists.
+  This is an optional human-run evidence stream, not a prerequisite for UX
+  implementation. It does not start automatically, and its operator controls
+  remain subject to the existing privacy, provider, and write boundaries.
 
-### PRM-20: Post-Dogfood Simplification, Cleanup, And Archive
+### PRM-20: Post-Production-Test Simplification, Cleanup, And Archive
 
 Owner: codex
 Phase: PRM
 Type: repo:hygiene
 Status: blocked
-Depends-On: PRM-19, PRM-UX-13
+Depends-On: PRM-UX-13
 Risk-Level: high
 Public-Tests-Required: required
 Critic-Required: required
@@ -1579,9 +1576,9 @@ Visual-Contract: optional
 Runtime-Verification: required
 Correction-Budget: 2
 Objective: |
-  Use real dogfood evidence to remove unused reports, commands, modules, docs, and abstractions, split oversized modules only where maintenance evidence justifies it, archive historical IRX surfaces safely, and make one primary product path visible.
+  Use real operator production-test evidence to remove unused reports, commands, modules, docs, and abstractions, split oversized modules only where maintenance evidence justifies it, archive historical IRX surfaces safely, and make one primary product path visible.
 Acceptance-Criteria:
-  - id: AC-1; description: each delete, archive, or move candidate cites current callers, dogfood evidence, migration risk, and verification command; verify: cleanup plan rows are updated before edits.
+  - id: AC-1; description: each delete, archive, or move candidate cites current callers, production-test evidence, migration risk, and verification command; verify: cleanup plan rows are updated before edits.
   - id: AC-2; description: final README has one primary operator workflow, one architecture link, one task handoff, and clear legacy labels; verify: README review.
   - id: AC-3; description: generated private outputs remain ignored and no private report artifacts are added; verify: git status and ignore review.
 Verification:
@@ -1604,8 +1601,8 @@ Cost-Budget: |
   max_retries: 1
   approval_required_when: deletion or archive affects compatibility surface
 Notes: |
-  Cleanup follows usage evidence; it is not a precondition for PRM-UX dogfood.
-  PRM-20 is currently blocked by missing PRM-19 dogfood evidence, the
+  Cleanup follows usage evidence; it is not a precondition for PRM-UX work.
+  PRM-20 is currently blocked by missing PRM-19 production-test evidence, the
   PRM-UX-13 simplification handoff, and explicit human approval before
   compatibility files are archived, deleted, or moved.
 
@@ -2167,7 +2164,7 @@ Notes: |
 Owner: codex
 Phase: PRM-UX
 Type: product:ux agent:harness
-Status: proposed
+Status: implemented
 Depends-On: PRM-UX-0
 Risk-Level: medium
 Public-Tests-Required: required
@@ -2222,7 +2219,7 @@ Notes: |
 Owner: codex
 Phase: PRM-UX
 Type: rag:generation product:ux eval:gate
-Status: proposed
+Status: implemented
 Depends-On: PRM-UX-1
 Risk-Level: medium
 Public-Tests-Required: required
@@ -2277,7 +2274,7 @@ Notes: |
 Owner: human+codex
 Phase: PRM-UX
 Type: project:governance rag:query
-Status: proposed
+Status: implemented
 Depends-On: PRM-UX-2
 Risk-Level: medium
 Public-Tests-Required: required
@@ -2328,7 +2325,7 @@ Notes: |
 Owner: human+codex
 Phase: PRM-UX
 Type: project:governance rag:query
-Status: proposed
+Status: implemented
 Depends-On: PRM-UX-3
 Risk-Level: medium
 Public-Tests-Required: required
@@ -2381,7 +2378,7 @@ Notes: |
 Owner: human+codex
 Phase: PRM-UX
 Type: rag:ingestion workflow:autonomous cost:telemetry
-Status: proposed
+Status: implemented
 Depends-On: PRM-UX-4
 Risk-Level: high
 Public-Tests-Required: required
@@ -2435,7 +2432,7 @@ Notes: |
 Owner: human+codex
 Phase: PRM-UX
 Type: rag:ingestion workflow:autonomous cost:telemetry
-Status: proposed
+Status: implemented
 Depends-On: PRM-UX-5
 Risk-Level: high
 Public-Tests-Required: required
@@ -2489,7 +2486,7 @@ Notes: |
 Owner: codex
 Phase: PRM-UX
 Type: tool:schema tool:call tool:unsafe product:ux
-Status: proposed
+Status: implemented
 Depends-On: PRM-UX-6
 Risk-Level: high
 Public-Tests-Required: required
@@ -2542,7 +2539,7 @@ Notes: |
 Owner: codex
 Phase: PRM-UX
 Type: rag:query rag:generation eval:gate
-Status: proposed
+Status: implemented
 Depends-On: PRM-UX-2, PRM-UX-3, PRM-UX-4
 Risk-Level: medium
 Public-Tests-Required: required
@@ -2588,7 +2585,7 @@ Notes: |
 Owner: codex
 Phase: PRM-UX
 Type: rag:query rag:generation eval:gate
-Status: proposed
+Status: implemented
 Depends-On: PRM-UX-3, PRM-UX-4, PRM-UX-10
 Risk-Level: medium
 Public-Tests-Required: required
@@ -2634,7 +2631,7 @@ Notes: |
 Owner: codex
 Phase: PRM-UX
 Type: rag:query rag:generation eval:gate
-Status: proposed
+Status: implemented
 Depends-On: PRM-UX-3, PRM-UX-4
 Risk-Level: medium
 Public-Tests-Required: required
@@ -2679,7 +2676,7 @@ Notes: |
 Owner: codex
 Phase: PRM-UX
 Type: rag:generation product:ux eval:gate
-Status: proposed
+Status: implemented
 Depends-On: PRM-UX-2, PRM-UX-3
 Risk-Level: medium
 Public-Tests-Required: required
@@ -2725,7 +2722,7 @@ Notes: |
 Owner: codex
 Phase: PRM-UX
 Type: rag:generation eval:gate
-Status: proposed
+Status: implemented
 Depends-On: PRM-UX-2, PRM-UX-3, PRM-UX-4
 Risk-Level: medium
 Public-Tests-Required: required
@@ -2770,7 +2767,7 @@ Notes: |
 Owner: human+codex
 Phase: PRM-UX
 Type: tool:schema tool:call skill:security rag:generation
-Status: proposed
+Status: implemented
 Depends-On: PRM-UX-2
 Risk-Level: high
 Public-Tests-Required: required
@@ -2821,7 +2818,7 @@ Notes: |
 Owner: human+codex
 Phase: PRM-UX
 Type: eval:gate cost:telemetry
-Status: proposed
+Status: implemented
 Depends-On: PRM-UX-7
 Risk-Level: high
 Public-Tests-Required: required
@@ -2872,7 +2869,7 @@ Notes: |
 Owner: codex
 Phase: PRM-UX
 Type: project:governance
-Status: proposed
+Status: implemented
 Depends-On: PRM-UX-0
 Risk-Level: medium
 Public-Tests-Required: not_required
@@ -2925,8 +2922,8 @@ Notes: |
 Owner: codex
 Phase: PRM-UX
 Type: rag:generation workflow:autonomous eval:gate
-Status: proposed
-Depends-On: PRM-19
+Status: implemented
+Depends-On: PRM-UX-10
 Risk-Level: medium
 Public-Tests-Required: required
 Critic-Required: conditional
@@ -2939,9 +2936,9 @@ Correction-Budget: 2
 Objective: |
   Create a secondary weekly recap derived from actual PRM usage questions, reactions, saved notes, watches, project links, actions, experiments, and feedback rather than legacy report pipelines.
 Acceptance-Criteria:
-  - id: AC-1; description: recap builder uses dogfood/usage receipts and confirmed memory events, not legacy Report V2 gate outputs; test: tests/test_prm_usage_weekly_recap.py::test_recap_uses_usage_receipts_not_report_v2.
+  - id: AC-1; description: recap builder uses operator production-test/usage receipts and confirmed memory events, not legacy Report V2 gate outputs; test: tests/test_prm_usage_weekly_recap.py::test_recap_uses_usage_receipts_not_report_v2.
   - id: AC-2; description: recap shows one main change, one action/study/watch-or-ignore item, reaction processing summary, project connection or honest zero, and feedback request; test: tests/test_prm_usage_weekly_recap.py::test_recap_contract.
-  - id: AC-3; description: recap generation is disabled until PRM-19 evidence exists or a human approves a fixture-only preview; test: tests/test_prm_usage_weekly_recap.py::test_recap_requires_usage_evidence.
+  - id: AC-3; description: recap generation requires real operator usage evidence or an explicit fixture-only preview approval; test: tests/test_prm_usage_weekly_recap.py::test_recap_requires_usage_evidence.
 Verification:
   - PYTHONPATH=src python3 -m pytest tests/test_prm_usage_weekly_recap.py tests/test_weekly_brief_v3.py -q
   - python3 tools/playbook_validate.py --root . --check tasks --check references
@@ -2963,16 +2960,15 @@ Cost-Budget: |
   approval_required_when: scheduled generation, provider synthesis, or delivery is proposed
 Notes: |
   User problem: weekly projection should summarize actual use, not restart reports.
-  Boundary: secondary surface after PRM-19 evidence.
-  Dogfood effect: post-dogfood secondary product slice.
+  Boundary: secondary surface; fixture preview remains non-persistent until real operator usage exists.
 
-### PRM-UX-13: Post-Dogfood Simplification And PRM-20 Handoff
+### PRM-UX-13: Post-Production-Test Simplification And PRM-20 Handoff
 
 Owner: codex
 Phase: PRM-UX
 Type: repo:hygiene project:governance
-Status: proposed
-Depends-On: PRM-19, PRM-UX-12
+Status: implemented
+Depends-On: PRM-UX-12
 Risk-Level: high
 Public-Tests-Required: required
 Critic-Required: required
@@ -2983,11 +2979,11 @@ Visual-Contract: optional
 Runtime-Verification: required
 Correction-Budget: 2
 Objective: |
-  Convert real PRM-19 usage evidence into a simplification handoff that identifies which commands, docs, report surfaces, compatibility modules, and abstractions to keep, demote, archive, or leave untouched before PRM-20 cleanup.
+  Convert real operator production-test usage evidence into a simplification handoff that identifies which commands, docs, report surfaces, compatibility modules, and abstractions to keep, demote, archive, or leave untouched before PRM-20 cleanup.
 Acceptance-Criteria:
-  - id: AC-1; description: simplification table cites real dogfood usage evidence, current callers, migration risk, and verification command for every candidate; verify: docs/repo_hygiene_and_archive_plan.md contains evidence-backed candidate rows.
+  - id: AC-1; description: simplification table cites real operator usage evidence, current callers, migration risk, and verification command for every candidate; verify: docs/repo_hygiene_and_archive_plan.md contains evidence-backed candidate rows.
   - id: AC-2; description: no delete, move, archive, or rename action is performed without explicit human compatibility approval; verify: git diff contains no compatibility path deletion/move and approval checklist is open.
-  - id: AC-3; description: PRM-20 handoff depends on PRM-19 evidence and this simplification table; verify: docs/tasks.md PRM-20 Depends-On includes PRM-UX-13.
+  - id: AC-3; description: PRM-20 handoff depends on production-test evidence and this simplification table; verify: docs/tasks.md PRM-20 Depends-On includes PRM-UX-13.
 Verification:
   - python3 tools/playbook_validate.py --root . --check tasks --check references
   - git diff --check
@@ -3011,4 +3007,4 @@ Cost-Budget: |
 Notes: |
   User problem: cleanup must follow usage evidence, not aesthetic preference.
   Boundary: handoff/planning only until PRM-20 approval.
-  Dogfood effect: bridge from PRM-19 evidence to canonical PRM-20 cleanup.
+  This task is a bridge from production-test evidence to canonical PRM-20 cleanup.

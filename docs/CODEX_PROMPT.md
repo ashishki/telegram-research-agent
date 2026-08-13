@@ -232,17 +232,16 @@ vector sidecar indexing is authorized only inside ADR-004.
   dogfood evidence or as approval for live web research, durable production
   cache writes, production DB writes, or external vector/backend adoption
   without explicit approval.
-- PRM-24 through PRM-28 are the required full product RAG path before dogfood
-  unless the human operator explicitly waives the RAG gate. PRM-27 is limited
+- PRM-24 through PRM-28 are the required full product RAG path before live
+  operator validation unless the human operator explicitly waives the RAG gate. PRM-27 is limited
   to ADR-004 local sidecar scope; do not expand to external embeddings, hosted
   vector services, migrations, or canonical DB writes without explicit
   approval.
 - Legacy runtime is frozen: do not restart `telegram-bot.service` or
-  `telegram-ai-split-report.timer` as PRM dogfood.
-- Safe runtime is not dogfood yet: `systemd/telegram-prm-assistant.service` is
-  currently installed, enabled, and running only for manual operator testing.
-  Do not record PRM-19 dogfood evidence from this runtime without explicit
-  dogfood-start approval.
+  `telegram-ai-split-report.timer` as a PRM workflow.
+- `systemd/telegram-prm-assistant.service` is currently installed, enabled,
+  and running only for operator-controlled testing. Do not treat its activity
+  as automatic evidence; record only operator-approved privacy-safe receipts.
 - External skills are project-disabled until trust records are approved.
 - Legacy report-centered docs remain as historical/compatibility surfaces and
   need a safe archive/migration pass in PBR-7 or PRM-20.
