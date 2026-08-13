@@ -354,6 +354,74 @@ class TestHandlers(unittest.TestCase):
         self.assertNotIn("/run_mvp_weekly", message)
         self.assertNotIn("/feedback_confirm", message)
 
+    def test_prm_start_copy_contract_after_prm_ux_1(self):
+        settings = Settings(
+            db_path=":memory:",
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+
+        with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+            with patch.object(handlers, "send_message") as mock_send_message:
+                handlers.dispatch_command(
+                    chat_id="42",
+                    text="/help",
+                    settings=settings,
+                    runtime_mode=handlers.BOT_RUNTIME_PRM_ASSISTANT,
+                )
+
+        message = mock_send_message.call_args.args[2]
+        self.assertIn("Просто напиши вопрос или отправь голосовое.", message)
+        self.assertIn("Запасные команды", message)
+        self.assertIn("/research, /brief, /chat", message)
+
+    def test_auto_route_intent_acknowledgement_copy(self):
+        settings = Settings(
+            db_path=":memory:",
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+        payload = {"status": "ok", "question": "what changed?", "privacy": {"model_calls": 0}}
+
+        with patch.dict(os.environ, {"PRM_TELEGRAM_AUTO_LLM_ROUTER": "", "PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS": ""}, clear=False):
+            with patch.object(handlers, "answer_memory_research", return_value=payload) as research_mock:
+                with patch.object(handlers, "render_memory_research_answer", return_value="PRM Research"):
+                    with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                        with patch.object(handlers, "send_message") as mock_send_message:
+                            handlers.handle_auto(chat_id="42", args="что нового?", settings=settings)
+
+        research_mock.assert_called_once()
+        message = mock_send_message.call_args.args[2]
+        self.assertTrue(message.startswith("Проверю по локальному архиву."))
+        self.assertEqual(message.count("Проверю по локальному архиву."), 1)
+
+    def test_auto_route_ambiguous_intent_clarification_is_local(self):
+        settings = Settings(
+            db_path=":memory:",
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+
+        with patch.dict(os.environ, {"PRM_TELEGRAM_AUTO_LLM_ROUTER": "1", "PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS": "1"}, clear=False):
+            with patch.object(handlers.LLMClient, "complete_json") as llm_mock:
+                with patch.object(handlers, "answer_memory_research") as research_mock:
+                    with patch.object(handlers, "answer_pi_chat") as chat_mock:
+                        with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                            with patch.object(handlers, "send_message") as mock_send_message:
+                                handlers.handle_auto(chat_id="42", args="помоги", settings=settings)
+
+        llm_mock.assert_not_called()
+        research_mock.assert_not_called()
+        chat_mock.assert_not_called()
+        self.assertEqual(mock_send_message.call_count, 1)
+        message = mock_send_message.call_args.args[2]
+        self.assertIn("Уточни", message)
+        self.assertIn("найти", message)
+        self.assertIn("бриф", message)
+
     def test_prm_safe_command_allowlist_blocks_legacy_generators(self):
         settings = Settings(
             db_path=":memory:",
@@ -478,7 +546,9 @@ class TestHandlers(unittest.TestCase):
         self.assertFalse(budget.allow_vector_retrieval)
         render_mock.assert_called_once_with(payload)
         message = mock_send_message.call_args.args[2]
-        self.assertIn("PRM Research", message)
+        self.assertIn("Короткий вывод", message)
+        self.assertIn("Источники", message)
+        self.assertNotIn("PRM Research", message)
         self.assertNotIn("Privacy:", message)
         self.assertNotIn("model_calls", message)
 
@@ -531,6 +601,65 @@ class TestHandlers(unittest.TestCase):
         self.assertNotIn("Privacy:", cleaned)
         self.assertNotIn("model_calls", cleaned)
         self.assertNotIn("tool_calls", cleaned)
+
+    def test_telegram_research_answer_first_contract(self):
+        payload = _fake_research_payload("что у меня было про AI transformation?")
+
+        rendered = handlers._render_telegram_research_response(
+            payload,
+            local_text="PRM Research\nInternal local fallback",
+            mode="research",
+        )
+
+        for heading in (
+            "Короткий вывод",
+            "Что найдено",
+            "Почему это важно тебе",
+            "Что сделать",
+            "Где доказательства слабые",
+            "Источники",
+        ):
+            self.assertIn(heading, rendered)
+        self.assertIn("https://t.me/ai_channel/101", rendered)
+        self.assertIn("недостаточно данных", rendered.casefold())
+
+    def test_telegram_research_hides_internal_receipts(self):
+        payload = _fake_research_payload("что у меня было про AI transformation?")
+        payload["repo_project_context"] = {
+            "status": "matched",
+            "summary_ru": "Смотри /srv/private/repo и post_id=123.",
+            "source_refs": ["/srv/private/repo/docs/tasks.md"],
+        }
+
+        rendered = handlers._render_telegram_research_response(
+            payload,
+            local_text="PRM Research\nmodel_calls=1\n/srv/private/archive.db\npost_id=123",
+            mode="research",
+        )
+
+        for forbidden in ("/srv/", "model_calls", "post_id=", "retrieval_mode", "PRM Research"):
+            self.assertNotIn(forbidden, rendered)
+
+    def test_telegram_current_fact_answer_first_boundary(self):
+        payload = _fake_research_payload("какая текущая цена акций Nvidia сегодня?")
+        payload["answer_gate"] = {
+            "allow_answer": False,
+            "external_verification_required": True,
+            "current_claim_allowed": False,
+            "reason": "current_external_fact_required",
+        }
+        payload["unknowns"] = ["external verification before current claims"]
+
+        rendered = handlers._render_telegram_research_response(
+            payload,
+            local_text="PRM Research\nOld archive context says $100.",
+            mode="research",
+        )
+
+        self.assertTrue(rendered.startswith("Внешняя проверка нужна"))
+        self.assertIn("Короткий вывод", rendered)
+        self.assertIn("не подтверждена", rendered)
+        self.assertNotIn("Old archive context says", rendered)
 
     def test_handle_research_can_send_llm_synthesis_after_local_rag(self):
         settings = Settings(

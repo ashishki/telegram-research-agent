@@ -44,6 +44,21 @@ Confirmation-gated write tools:
 - unsafe/mutation tool names remain blocked;
 - external verification is labelled separately from Telegram evidence.
 
+## PRM-UX-7 Telegram Post-Answer Actions
+
+Research answers can expose a bounded PRM-only callback namespace for Knowledge
+Note, Watch Topic, project/action/experiment when a project is present, and
+operator feedback. Callback data contains only a short opaque answer-context ID
+and action code. Selecting an action creates a volatile proposal and asks for a
+second explicit confirmation; it does not write. Only the confirmation callback
+uses the existing `confirm_save_proposal` path, which appends an event and
+returns its `memory_id` and `event_id` for retrieval.
+
+Fixture checks cover bounded markup, proposal-before-write, confirmed append-only
+receipt, and feedback proposals that do not alter profile/project/provider
+configuration or external systems. Legacy callback namespaces remain blocked in
+the PRM runtime.
+
 ## PRM-4 Tool Evidence
 
 Implementation:
@@ -263,6 +278,15 @@ Result:
 78 passed, 6 subtests passed in 11.38s
 131 passed, 6 subtests passed in 33.79s
 ```
+
+## PRM-UX-9 Primary-Source Verification Boundary
+
+`assistant.primary_source_verification` creates a plan only. It separates a
+Telegram discovery signal, preferred official/GitHub source candidates,
+independent confirmation, changed facts, unknowns, and the revised
+recommendation. Without both an approved trust record and separately approved
+bounded live fetch, it returns `verification_required_not_run`; no external
+skill, HTTP request, cache write, provider call, or durable note is performed.
 
 ## Stop-Ship Cases
 

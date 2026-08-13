@@ -20,16 +20,20 @@ Examples:
 Manual commands such as `/research`, `/brief`, and `/chat` are fallback
 controls, not the normal workflow.
 
+For a non-obvious request, the assistant may first say in one line how it will
+handle it. If the goal is unclear, it asks one short choice: archive research
+or an editor brief.
+
 ## 2. What kind of answer should I receive?
 
 The target answer is:
 
-- short conclusion first;
-- what was found;
-- why it matters to your professional goal;
-- one next action or honest zero-action;
-- weak evidence / external verification boundary;
-- sources.
+- `Короткий вывод`;
+- `Что найдено`;
+- `Почему это важно тебе`;
+- `Что сделать`;
+- `Где доказательства слабые`;
+- `Источники`.
 
 Ordinary Telegram answers should not show debug metrics, token counts, model
 call counts, local paths, raw DB IDs, or unexplained internal labels.
@@ -82,14 +86,14 @@ Voice feedback should enter the same proposal/confirmation path as text.
 
 It does not:
 
-- start PRM-19 dogfood without explicit approval;
+- start autonomous production testing without explicit approval;
 - prove product value before real labels;
 - run unrestricted web research;
 - use external embeddings or hosted vector services;
 - save memory without confirmation;
 - mutate code/config/projects automatically;
 - generate weekly reports as the product center;
-- treat legacy bot/report timers as PRM dogfood.
+- treat legacy bot/report timers as the PRM product.
 
 ## 7. Where do I see current health?
 
@@ -105,4 +109,3 @@ Gate status:
 - `docs/audit/PRM_MANUAL_TELEGRAM_ASSISTANT_ACTIVATION_2026-08-11.md`
 - `docs/audit/PRM_MANUAL_ARCHIVE_REFRESH_2026-08-12.md`
 - `docs/audit/PRM_WEEKLY_ARCHIVE_REFRESH_TIMER_2026-08-12.md`
-

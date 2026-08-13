@@ -19,6 +19,7 @@ through `/auto`:
 
 ```text
 text or voice transcript
+  -> compact intent acknowledgement or one clarification when needed
   -> local research, local editor brief, or gated LLM chat
   -> answer-first response with sources and boundaries
   -> optional confirmation-gated save/watch/project/action/feedback
@@ -41,9 +42,9 @@ Manual commands remain fallback controls:
 /chat <question>
 ```
 
-The running service remains manual testing only. It is not PRM-19 dogfood
-evidence, and PRM-19 cannot start until the minimum PRM-UX slice and explicit
-human dogfood-start approval are recorded.
+The running service is operator-controlled testing. It is not automatic product
+evidence; record a privacy-safe receipt only when the operator explicitly
+chooses to evaluate a session.
 
 For the short operator quickstart, see `docs/operator_quickstart.md`.
 
@@ -1081,7 +1082,7 @@ This lets study planning, recommendations, and project insights reason from rece
 - [ ] Create `/etc/demand-mvp-radar.env` from `Demand-to-MVP-Radar/config/live_sources.env.example` when external source credentials are available
 - [ ] Add at least `SERPAPI_API_KEY`, `YOUTUBE_API_KEY`, `PRODUCT_HUNT_TOKEN`, and Reddit credentials for the full broad-source weekly run; `GITHUB_TOKEN` and `STACK_EXCHANGE_KEY` improve quota but are optional
 - [ ] Set `DMR_LLM_PROVIDER=anthropic` and `DMR_LLM_MODEL_MVP_WEEKLY=claude-opus-4-7` for the weekly MVP report if LLM synthesis should run
-- [ ] Confirm `systemd/telegram-mvp-weekly.service` loads both `/srv/openclaw-you/.env` and optional `/etc/demand-mvp-radar.env`
+- [ ] Historical only: `systemd/archive/legacy_report_era/telegram-mvp-weekly.service` used to load both `/srv/openclaw-you/.env` and optional `/etc/demand-mvp-radar.env`; do not activate it for PRM.
 - [ ] Run `python3 src/main.py health-check` — verify DB and config presence
 - [ ] Run bootstrap ingestion for initial data
 - [ ] Run `python3 src/main.py score-stats` — verify scoring produces expected distribution

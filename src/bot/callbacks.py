@@ -3,6 +3,7 @@ import sqlite3
 from datetime import datetime, timezone
 
 from config.settings import Settings
+from assistant.prm_post_answer_actions import PRM_ACTION_PREFIX, PRM_CONFIRM_PREFIX, handle_post_answer_callback
 from db.artifact_feedback import record_artifact_feedback
 
 
@@ -257,3 +258,11 @@ def record_callback(settings: Settings, callback_data: str) -> str:
     if callback_data.startswith(f"{REMINDER_CALLBACK_PREFIX}:"):
         return record_reminder_callback(settings, callback_data)
     raise ValueError("Unsupported callback")
+
+
+def handle_prm_post_answer_callback(settings: Settings, callback_data: str) -> dict:
+    """Handle only the isolated PRM proposal/confirmation callback namespace."""
+
+    if not callback_data.startswith((f"{PRM_ACTION_PREFIX}:", f"{PRM_CONFIRM_PREFIX}:")):
+        raise ValueError("Unsupported PRM callback")
+    return handle_post_answer_callback(settings.db_path, callback_data)

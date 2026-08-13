@@ -7,7 +7,7 @@ from urllib import parse, request
 
 from config.settings import Settings
 
-from .callbacks import record_callback
+from .callbacks import handle_prm_post_answer_callback, record_callback
 from .handlers import (
     BOT_RUNTIME_LEGACY,
     BOT_RUNTIME_PRM_ASSISTANT,
@@ -210,8 +210,25 @@ def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_LEGACY) -> No
                     continue
                 data = str(callback_query.get("data") or "")
                 if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
-                    answer = "PRM safe mode: legacy callbacks are disabled."
-                    LOGGER.info("Blocked legacy callback in PRM safe mode data=%s", data)
+                    if data.startswith(("prma:", "prmc:")):
+                        try:
+                            result = handle_prm_post_answer_callback(settings, data)
+                            answer = "Готово"
+                            message = str(result.get("message") or "")
+                            if message:
+                                send_message(
+                                    token,
+                                    str(((callback_query.get("message") or {}).get("chat") or {}).get("id") or owner_chat_id),
+                                    message,
+                                    parse_mode=None,
+                                    reply_markup=result.get("reply_markup"),
+                                )
+                        except Exception:
+                            LOGGER.warning("PRM post-answer callback failed data=%s", data, exc_info=True)
+                            answer = "Не смог обработать действие"
+                    else:
+                        answer = "PRM safe mode: legacy callbacks are disabled."
+                        LOGGER.info("Blocked legacy callback in PRM safe mode data=%s", data)
                 else:
                     try:
                         answer = record_callback(settings, data)
