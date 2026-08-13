@@ -331,6 +331,15 @@ class TestMemoryResearch(unittest.TestCase):
         self.assertIn("модели ИИ LLM", variants)
         self.assertNotIn("последние", " ".join(variants).casefold())
 
+    def test_memory_research_normalizes_russian_harness_inflections(self):
+        variants = _archive_query_variants(
+            "Что было полезного для моих проектов в контексте харнесса?",
+            project_name=None,
+            max_variants=4,
+        )
+
+        self.assertIn("harness", variants)
+
     def test_memory_research_enforces_last_two_weeks_and_rejects_stale_hits(self):
         facade = _StaleModelsFacade()
 

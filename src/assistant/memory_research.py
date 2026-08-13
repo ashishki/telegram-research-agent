@@ -1451,6 +1451,9 @@ def _archive_query_variants(
         candidates.append("SQLite FTS")
     if _contains_any(lowered, ("pgvector", "vector", "вектор", "hybrid", "гибрид")):
         candidates.append("pgvector retrieval")
+    if _contains_any(lowered, ("harness", "харнес")):
+        # SQLite FTS does not lemmatize Russian transliterations such as "харнесса".
+        candidates.append("harness")
     if not domain_specific and _contains_any(lowered, ("gold", "eval", "оцен", "провер", "цитат", "grounded", "галлюцин")):
         candidates.extend(("gold labels citation precision", "eval gates grounded claims"))
     if not domain_specific and _contains_any(lowered, ("insufficient", "unsupported", "no answer", "no-answer", "недостат", "не хват", "не гад", "честно")):
