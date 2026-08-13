@@ -16,6 +16,38 @@ Last updated: 2026-08-12
 | PRM-UX Playbook git status | clean |
 | PRM-UX Playbook pin status | stale relative to inspected checkout |
 
+## Operator Test Policy
+
+The operator explicitly chose direct production tests instead of a formal
+dogfood phase on 2026-08-12. Historical PRM-18 dogfood-named receipts remain
+historical evidence only. Active PRM-UX implementation is not blocked by that
+label; live operations still require their own explicit privacy, write,
+provider, and compatibility approvals.
+
+The operator explicitly approved moving the report-era architecture, IRX V2
+roadmap, contract, and audit into `docs/archive/legacy_report_era/` on
+2026-08-12. Short redirect stubs remain at the former paths to preserve
+historical links. This approval does not authorize deletion or movement of any
+other compatibility path.
+
+The operator explicitly approved moving the legacy weekly split-report repo
+systemd templates into `systemd/archive/legacy_report_era/` on 2026-08-13.
+The host systemd state was not inspected or changed.
+
+The operator explicitly approved moving four legacy roadmaps into
+`docs/archive/legacy_report_era/` on 2026-08-13: Hermes PI Assistant,
+Portfolio Grade Intelligence, Report Quality, and Weekly Radar. Redirect stubs
+remain at the former paths.
+
+The operator explicitly approved moving the historical Project Plan, Next
+Development Roadmap, and Development Cycle into
+`docs/archive/legacy_report_era/` on 2026-08-13. Redirect stubs remain at the
+former paths.
+
+The operator approved a global archive of remaining legacy repo systemd
+templates on 2026-08-13. Only `telegram-prm-assistant` and bounded PRM archive
+refresh templates remain at `systemd/`; host systemd state was not changed.
+
 ## Local Audit Evidence
 
 | Evidence | Location |

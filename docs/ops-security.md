@@ -188,31 +188,26 @@ sudo -u oc_you nano /srv/openclaw-you/secrets/telegram_api.env
 cd /srv/openclaw-you/workspace/telegram-research-agent
 sudo -u oc_you bash scripts/setup.sh
 
-# 4. Run bootstrap ingestion (one-time)
-sudo -u oc_you bash scripts/run_bootstrap.sh
-
-# 5. Install and enable the weekly split HTML report timer
-sudo cp systemd/telegram-ai-split-report.service /etc/systemd/system/
-sudo cp systemd/telegram-ai-split-report.timer /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now telegram-ai-split-report.timer
+# 4. Historical boundary
+# The old bootstrap ingestion and weekly split-report timer are not part of the
+# active PRM workflow and must not be installed or enabled from this document.
 ```
 
-### Checking Service Status
+### Historical Service Status
 
 ```bash
 systemctl status telegram-ai-split-report.timer
 journalctl -u telegram-ai-split-report.service -n 80
 ```
 
-### Checking Output
+### Historical Output
 
 ```bash
 ls -la /srv/openclaw-you/workspace/telegram-research-agent/data/output/weekly_intelligence_briefs/
 ls -la /srv/openclaw-you/workspace/telegram-research-agent/data/output/knowledge_atlas/
 ```
 
-### Checking the Database
+### Historical Database Inspection
 
 ```bash
 sudo -u oc_you sqlite3 /srv/openclaw-you/workspace/telegram-research-agent/data/agent.db \
