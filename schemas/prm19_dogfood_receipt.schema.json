@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PRM-19 real question receipt",
+  "type": "object",
+  "required": ["schema_version", "question_id", "asked_at", "surface", "input_kind", "useful", "trust", "privacy", "dogfood_started", "write_performed"],
+  "properties": {
+    "schema_version": {"const": "prm19_real_question_receipt.v1"},
+    "question_id": {"type": "string", "minLength": 1},
+    "asked_at": {"type": "string", "minLength": 1},
+    "surface": {"enum": ["telegram", "cli"]},
+    "input_kind": {"enum": ["text", "voice_transcript"]},
+    "useful": {"enum": ["yes", "partial", "no", "unknown"]},
+    "trust": {"enum": ["high", "medium", "low", "unknown"]},
+    "privacy": {"type": "object"},
+    "dogfood_started": {"const": false},
+    "write_performed": {"const": false}
+  },
+  "additionalProperties": true,
+  "not": {"anyOf": [{"required": ["raw_post_text"]}, {"required": ["prompt"]}, {"required": ["completion"]}, {"required": ["provider_payload"]}]}
+}

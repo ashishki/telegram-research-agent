@@ -3092,6 +3092,7 @@ def handle_memory_refresh_archive(args: argparse.Namespace) -> int:
     This deliberately avoids the legacy ingest command because that path runs
     migrations, optional reaction sync, clustering, topic detection, and scoring.
     """
+    from assistant.prm_refresh_receipt import build_operator_refresh_receipt, build_refresh_failure_receipt
     from db.archive_vector import build_archive_vector_index
 
     if not bool(getattr(args, "confirm_canonical_write", False)):
@@ -3132,7 +3133,10 @@ def handle_memory_refresh_archive(args: argparse.Namespace) -> int:
                     force=True,
                 )
     except Exception as exc:
-        sys.stdout.write(f"Error refreshing PRM archive: {exc}\n")
+        if getattr(args, "json", False):
+            sys.stdout.write(json.dumps(build_refresh_failure_receipt(), ensure_ascii=False, sort_keys=True) + "\n")
+        else:
+            sys.stdout.write(f"Error refreshing PRM archive: {exc}\n")
         return 1
 
     payload = {
@@ -3175,6 +3179,7 @@ def handle_memory_refresh_archive(args: argparse.Namespace) -> int:
             "release_claim": False,
         },
     }
+    payload["operator_receipt"] = build_operator_refresh_receipt(payload)
     if getattr(args, "json", False):
         sys.stdout.write(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
     else:

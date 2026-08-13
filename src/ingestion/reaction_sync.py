@@ -10,6 +10,20 @@ from output.reporting_period import ReportingPeriod, register_reporting_period_s
 
 
 LOGGER = logging.getLogger(__name__)
+
+
+def build_reaction_sync_failure_receipt(*, archive_refresh_status: str) -> dict[str, object]:
+    """Record reaction failure without changing the independently completed archive refresh."""
+
+    return {
+        "schema_version": "prm_reaction_sync_failure_receipt.v1",
+        "status": "failed",
+        "archive_refresh_status": str(archive_refresh_status or "unknown"),
+        "archive_refresh_blocked": False,
+        "provider_egress": False,
+        "report_generation": False,
+        "raw_text_included": False,
+    }
 REACTION_SOURCE = "telegram_reaction"
 OPERATOR_INTEREST_TAG = "interesting"
 OPERATOR_INTEREST_FEEDBACK = "operator_marked_interesting"

@@ -27,6 +27,16 @@ class TestReactionSync(unittest.TestCase):
         self.db_path = str(Path(self.tmpdir.name) / "test.db")
         os.environ["AGENT_DB_PATH"] = self.db_path
 
+    def test_reaction_failure_isolated_from_archive_refresh(self):
+        from ingestion.reaction_sync import build_reaction_sync_failure_receipt
+
+        receipt = build_reaction_sync_failure_receipt(archive_refresh_status="ok")
+
+        self.assertEqual(receipt["status"], "failed")
+        self.assertEqual(receipt["archive_refresh_status"], "ok")
+        self.assertFalse(receipt["archive_refresh_blocked"])
+        self.assertFalse(receipt["provider_egress"])
+
     def tearDown(self):
         del os.environ["AGENT_DB_PATH"]
         self.tmpdir.cleanup()

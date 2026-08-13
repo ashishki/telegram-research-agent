@@ -232,6 +232,38 @@ def validate_reaction_fast_lane_receipt(receipt: Mapping[str, object]) -> dict[s
     return dict(receipt)
 
 
+def build_operator_reaction_receipt(receipt: Mapping[str, object]) -> dict[str, object]:
+    """Project a fast-lane receipt for the operator without sensitive reaction data."""
+
+    validated = validate_reaction_fast_lane_receipt(receipt)
+    counts = validated["counts"]
+    reasons = validated["incomplete_stage_reasons"]
+    return {
+        "schema_version": "prm_operator_reaction_receipt.v1",
+        "status": "ok" if validated["stage_statuses"]["reaction_detection"] == "complete" else "partial",
+        "detected_reactions": counts["personal_reaction_events_detected"],
+        "resolved_posts": counts["posts_resolved"],
+        "already_searchable_posts": counts["searchable_archive_posts"],
+        "newly_indexed_posts": 0,
+        "enrichment": {
+            "queued": counts["enrichment_attempts"],
+            "completed": counts["enrichment_successes"],
+            "failed": counts["enrichment_failures"],
+        },
+        "provisional_links": {
+            "topics": counts["topic_links"],
+            "projects": 0,
+        },
+        "ranking_effects": counts["ranking_effects"],
+        "no_effect_reasons": dict(reasons),
+        "privacy": {
+            "raw_text_included": False,
+            "source_urls_included": False,
+            "emoji_semantics_included": False,
+        },
+    }
+
+
 def _receipt(
     *,
     counts: Mapping[str, int],

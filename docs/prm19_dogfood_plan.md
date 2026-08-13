@@ -1,4 +1,4 @@
-# PRM-19 Dogfood Plan — Real Operator Usefulness Evidence
+# PRM-19 Operator Production-Test Plan — Real Operator Usefulness Evidence
 
 Status: proposed; PRM-19 not started
 Date: 2026-08-12
@@ -6,14 +6,12 @@ Date: 2026-08-12
 ## Relationship To Canonical PRM-19
 
 This document defines the product-usefulness evidence model for the existing
-PRM-19 task. It does not start dogfood and does not create a second dogfood
-task.
+PRM-19 task. The operator uses direct human production tests rather than a
+formal dogfood phase; this document does not start any runtime activity.
 
-PRM-19 remains blocked until:
-
-- the minimum PRM-UX dogfood-start slice is complete;
-- explicit human dogfood-start approval is recorded;
-- the operator accepts the evidence fields and success/failure criteria.
+Real production-test collection begins only when the operator chooses to record
+it. It requires accepted evidence fields and applicable runtime/privacy/write
+approvals, but it is not a prerequisite for implementing PRM-UX slices.
 
 ## Minimum Real-Question Set
 
@@ -28,6 +26,16 @@ Collect at least 30 real questions:
 
 Questions must come from real operator use. Generated questions can be smoke
 tests but not PRM-19 usefulness evidence.
+
+## PRM-UX-10 Smoke Boundary
+
+`prm19_real_question_receipt.v1` validates privacy-safe metadata for at most
+ten smoke questions before PRM-19. A smoke receipt has
+`status: smoke_only_not_dogfood`, `dogfood_started: false`, and
+`write_performed: false`. It cannot establish usefulness evidence, start
+dogfood, or replace explicit human dogfood-start approval. The `useful` and
+`trust` values are supplied by the operator; no LLM judge has authority over
+those labels.
 
 ## Interaction Receipt
 
@@ -153,4 +161,3 @@ PRM-19 should be judged failed or not-yet-successful if:
 - source support is too weak for trust;
 - no concrete professional action emerges;
 - the product creates more friction than manual search.
-

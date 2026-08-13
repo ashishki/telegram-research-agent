@@ -146,3 +146,10 @@ external verification, report generation, full archive indexing, embeddings, or
 external web research. PRM-19 cannot start until the human operator explicitly
 approves dogfood start. Deterministic local scenario pass status must not be
 reported as PRM-19 dogfood evidence or release readiness.
+
+## H. PRM-UX-10 Smoke Instrumentation
+
+The local receipt schema supports privacy-safe metadata-only smoke validation
+before PRM-19. Smoke receipts do not start dogfood, perform a write, or make a
+release claim. Real usefulness evidence remains operator-labelled and requires
+the separate PRM-19 start approval.

@@ -3,6 +3,7 @@ import unittest
 
 from db.archive_search import search_telegram_archive
 from db.reaction_fast_lane import (
+    build_operator_reaction_receipt,
     build_reaction_fast_lane_receipt,
     classify_reaction_semantics,
     validate_reaction_fast_lane_receipt,
@@ -246,6 +247,31 @@ class TestReactionFastLane(unittest.TestCase):
         self.assertEqual(multiple["emoji_count"], 2)
         self.assertEqual(multiple["emoji_interpretation"], "audit_metadata_only")
         self.assertEqual(multiple["interest_strength"], "weak")
+
+    def test_reaction_fast_lane_operator_receipt_fields(self):
+        _seed_reacted_archive_post(self.connection, post_id=1)
+
+        receipt = build_operator_reaction_receipt(build_reaction_fast_lane_receipt(self.connection))
+
+        for field in (
+            "detected_reactions",
+            "resolved_posts",
+            "already_searchable_posts",
+            "newly_indexed_posts",
+            "enrichment",
+            "provisional_links",
+            "ranking_effects",
+            "no_effect_reasons",
+        ):
+            self.assertIn(field, receipt)
+        self.assertFalse(receipt["privacy"]["raw_text_included"])
+        self.assertFalse(receipt["privacy"]["source_urls_included"])
+
+    def test_no_reaction_is_unknown_not_negative(self):
+        semantics = classify_reaction_semantics(()).as_dict()
+
+        self.assertEqual(semantics["interest_state"], "unknown")
+        self.assertFalse(semantics["negative_interest"])
 
 
 if __name__ == "__main__":
