@@ -193,6 +193,7 @@ def build_project_context_decision_support(
         "query": _clean_text(query),
         "project_name": descriptor["name"],
         "project_repo": descriptor.get("repo") or None,
+        "project_focus": descriptor.get("focus") or "",
         "relevance_label": label,
         "descriptor_fields_used": descriptor_fields_used,
         "field_matches": {key: value for key, value in field_matches.items() if value},

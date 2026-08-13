@@ -933,6 +933,36 @@ class TestHandlers(unittest.TestCase):
         self.assertEqual(research_mock.call_args.kwargs["archive_query"], "AI transformation company outcomes")
         self.assertIn("PRM редакторский бриф", mock_send_message.call_args.args[2])
 
+    def test_handle_auto_passes_explicit_git_project_to_research(self):
+        settings = Settings(db_path=":memory:", llm_api_key="", model_provider="anthropic", telegram_session_path="")
+        payload = {"status": "ok", "question": "research"}
+
+        with patch.dict(os.environ, {"PRM_TELEGRAM_AUTO_LLM_ROUTER": "", "PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS": ""}, clear=False):
+            with patch.object(handlers, "answer_memory_research", return_value=payload) as research_mock:
+                with patch.object(handlers, "render_memory_research_answer", return_value="PRM Research"):
+                    with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                        with patch.object(handlers, "send_message"):
+                            handlers.handle_auto(
+                                chat_id="42",
+                                args="Сделай deep research по agent evals для проекта gdev-agent",
+                                settings=settings,
+                            )
+
+        self.assertEqual(research_mock.call_args.kwargs["project_name"], "gdev-agent")
+
+    def test_telegram_project_relation_explains_explicit_project_match(self):
+        relation = handlers._telegram_project_relation(
+            {
+                "project_name": "gdev-agent",
+                "relevance_label": "weak_watch",
+                "matched_terms": ["eval", "agent runtime"],
+            }
+        )
+
+        self.assertIn("gdev-agent", relation)
+        self.assertIn("eval", relation)
+        self.assertIn("проектное действие пока не доказано", relation)
+
     def test_handle_auto_rejects_llm_chat_for_archive_question(self):
         settings = Settings(
             db_path=":memory:",

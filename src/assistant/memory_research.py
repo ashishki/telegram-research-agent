@@ -1951,10 +1951,13 @@ def _project_fit(context: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "status": str(context.get("status") or "ok"),
         "project_name": context.get("project_name"),
+        "project_repo": context.get("project_repo"),
+        "project_focus": context.get("project_focus"),
         "candidate_projects": list(context.get("candidate_projects") or []),
         "relevance_label": label,
         "confidence": _confidence(label),
         "descriptor_fields_used": _strings(context.get("descriptor_fields_used")),
+        "matched_terms": _strings(context.get("matched_terms")),
         "source_refs": _strings(context.get("source_refs")),
         "unknowns": _strings(context.get("unknowns")),
         "guidance": guidance_by_label[label],

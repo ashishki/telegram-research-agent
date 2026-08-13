@@ -11,6 +11,7 @@ from urllib import error
 from assistant.pi_chat import answer_pi_chat
 from assistant.pi_facade import PersonalIntelligenceFacade
 from assistant.pi_intent import classify_operator_message
+from assistant.project_context import load_project_descriptors
 from assistant.prm_chat_display import render_prm_chat_answer
 from assistant.memory_research import (
     MemoryResearchBudget,
@@ -287,6 +288,27 @@ def _bounded_retrieval_query(value: object) -> str:
     if not clean:
         return ""
     return " ".join(clean.split()[:8])[:240]
+
+
+def _named_project_from_message(value: object) -> str:
+    """Resolve only an explicitly named configured project; never infer one."""
+
+    normalized_message = re.sub(r"[^a-z0-9]+", "", _clean_operator_text(value).casefold())
+    if not normalized_message:
+        return ""
+    try:
+        descriptors = load_project_descriptors(PROJECT_ROOT / "src" / "config" / "projects.yaml")
+    except ValueError:
+        return ""
+    for descriptor in descriptors:
+        name = _clean_operator_text(descriptor.get("name"))
+        repo = _clean_operator_text(descriptor.get("repo"))
+        aliases = (name, repo, repo.rsplit("/", 1)[-1])
+        for alias in aliases:
+            normalized_alias = re.sub(r"[^a-z0-9]+", "", alias.casefold())
+            if len(normalized_alias) >= 5 and normalized_alias in normalized_message:
+                return name
+    return ""
 
 
 def _hard_local_research_route(text: str, *, previous_question: str = "", previous_mode: str = "") -> dict[str, object] | None:
@@ -1100,6 +1122,7 @@ def handle_auto(chat_id: str, args: str, settings: Settings) -> None:
         send_message(_get_bot_token(), chat_id, "Напиши обычный вопрос или задачу.", parse_mode=None)
         return
     route = _route_auto_message(chat_id, question)
+    project_name = _named_project_from_message(question)
     mode = str(route.get("mode") or "research")
     LOGGER.info(
         "PRM auto route selected chat_id=%s mode=%s router=%s confidence=%.2f model_call_attempted=%s",
@@ -1125,6 +1148,7 @@ def handle_auto(chat_id: str, args: str, settings: Settings) -> None:
             settings,
             intent_acknowledgement=acknowledgement,
             archive_query=_bounded_retrieval_query(route.get("retrieval_query")),
+            project_name=project_name,
         )
         return
     if mode == "chat":
@@ -1138,6 +1162,7 @@ def handle_auto(chat_id: str, args: str, settings: Settings) -> None:
         settings,
         intent_acknowledgement=acknowledgement,
         archive_query=_bounded_retrieval_query(route.get("retrieval_query")),
+        project_name=project_name,
     )
 
 
@@ -1158,6 +1183,7 @@ def handle_research(
     *,
     intent_acknowledgement: str = "",
     archive_query: str = "",
+    project_name: str = "",
 ) -> None:
     question = args.strip()
     if not question:
@@ -1182,6 +1208,7 @@ def handle_research(
         result = answer_memory_research(
             str(dialog["effective_question"]),
             archive_query=archive_query,
+            project_name=project_name or _named_project_from_message(dialog["effective_question"]),
             settings=settings,
             limit=4,
             budget=budget,
@@ -1206,6 +1233,7 @@ def handle_research_brief(
     *,
     intent_acknowledgement: str = "",
     archive_query: str = "",
+    project_name: str = "",
 ) -> None:
     question = args.strip()
     if not question:
@@ -1230,6 +1258,7 @@ def handle_research_brief(
         result = answer_memory_research(
             str(dialog["effective_question"]),
             archive_query=archive_query,
+            project_name=project_name or _named_project_from_message(dialog["effective_question"]),
             settings=settings,
             limit=5,
             budget=budget,
@@ -1310,7 +1339,7 @@ def _render_telegram_answer_first_research(payload: Mapping[str, Any]) -> str:
     if current_fact:
         lines.extend(
             [
-                "Внешняя проверка нужна: текущий факт не подтверждён локальным архивом.",
+                "Внешняя проверка нужна: актуальность текущего факта не подтверждена локальным архивом.",
                 "",
             ]
         )
@@ -1326,10 +1355,7 @@ def _render_telegram_answer_first_research(payload: Mapping[str, Any]) -> str:
             ),
         ]
     )
-    relevance = str(project_fit.get("guidance") or "").strip()
-    if not relevance:
-        relevance = "Прямая связь с активным проектом пока не подтверждена."
-    lines.extend(["", "Почему это важно тебе", _public_telegram_text(relevance)])
+    lines.extend(["", "Почему это важно тебе", _telegram_project_relation(project_fit)])
 
     action = _telegram_public_next_action(next_steps)
     if current_fact:
@@ -1380,9 +1406,12 @@ def _telegram_public_answer_summary(payload: Mapping[str, Any]) -> str:
     answer_gate = _safe_mapping(payload.get("answer_gate"))
     if not bool(answer_gate.get("allow_answer", True)):
         return "Недостаточно данных: локальный архив не подтверждает это утверждение."
-    direct_answer = _public_telegram_text(payload.get("direct_answer"))
-    if direct_answer:
-        return direct_answer
+    archive = _safe_mapping(payload.get("archive_evidence"))
+    items = _safe_mapping_list(archive.get("items"))
+    if items:
+        snippet = _format_post_snippet(str(items[0].get("snippet") or items[0].get("content") or ""), limit=300)
+        if snippet:
+            return f"В архиве найдено {len(items)} релевантных источника. Основной сигнал: {snippet}"
     return "Недостаточно данных: локальных доказательств для уверенного вывода нет."
 
 
@@ -1419,6 +1448,21 @@ def _telegram_public_next_action(next_steps: Mapping[str, Any]) -> str:
             }
             return _public_telegram_text(translations.get(values[0], values[0])) or "Не превращать этот сигнал в действие без более точных доказательств."
     return "Не превращать этот сигнал в действие без более точных доказательств."
+
+
+def _telegram_project_relation(project_fit: Mapping[str, Any]) -> str:
+    project_name = str(project_fit.get("project_name") or "").strip()
+    if not project_name:
+        return "Проект не указан: можно спросить, как тема относится к конкретному репозиторию."
+    matched_terms = [str(item).strip() for item in project_fit.get("matched_terms") or [] if str(item).strip()]
+    label = str(project_fit.get("relevance_label") or "no_match")
+    if label == "direct_implication":
+        terms = ", ".join(matched_terms[:4]) or "задачи проекта"
+        return f"Есть прямая связь с {project_name}: источники пересекаются с контекстом проекта по {terms}."
+    if label in {"weak_watch", "learning_relevance"}:
+        terms = ", ".join(matched_terms[:4]) or "инженерным контекстом"
+        return f"Для {project_name} это релевантный сигнал для изучения: пересечение по {terms}; проектное действие пока не доказано."
+    return f"Для {project_name} прямое совпадение в найденных источниках не доказано; это пока общий инженерный контекст, а не рекомендация по проекту."
 
 
 def _telegram_rag_source_count(payload: Mapping[str, Any]) -> int:
