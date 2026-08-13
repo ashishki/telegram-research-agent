@@ -19,6 +19,51 @@ knowledge evidence.
 - insufficient evidence is used when support is weak;
 - no raw private corpus dump appears in logs or artifacts.
 
+## PRM-UX-2 Telegram Answer Contract
+
+Deterministic Telegram validators check that Russian research responses include
+`Короткий вывод`, `Что найдено`, `Почему это важно тебе`, `Что сделать`,
+`Где доказательства слабые`, and `Источники`. They also reject local paths,
+raw database identifiers, technical receipts, model/cost/token/tool/debug
+fields, and internal retrieval labels. Current or high-stakes questions must
+lead with the external-verification boundary and must not present archive
+context as current truth.
+
+Human review checks whether the conclusion answers the actual decision,
+professional relevance is meaningful, the one next action is useful, and each
+source supports the claim it follows. These checks remain human judgement, not
+release evidence inferred from deterministic tests.
+
+## PRM-UX-8 Professional Workflow Projections
+
+The AI-systems workflow projects bounded local evidence into a failure taxonomy,
+cited cases, an approved-project implication, and at most one proposed eval
+case. A direct project action requires direct project evidence and no
+current-fact verification boundary.
+
+The writer/editor workflow returns an input brief only: a thesis, up to three
+source-backed cases, counterargument, practical conclusion, source links, and
+an explicit list of claims requiring external verification. It always marks
+the result as not ready for a final post and does not publish or write content.
+Deterministic tests cover field presence, source-only cases, and the current
+fact boundary; human review remains responsible for editorial quality.
+
+The enterprise AI adoption workflow treats archive material as discovery
+evidence only. It exposes a pain pattern, owner signal, project implication,
+validation step, and a do-not-build boundary. A project action is possible only
+for a direct project implication; otherwise the result is watch/reference
+guidance without a recommendation to build.
+
+The learning workflow returns a simple explanation, analogy, cited local
+evidence, one proposed experiment, success criterion, and reflection question.
+It reports learning state as `unknown` unless explicit evidence exists, and its
+experiment is confirmation-gated with no write performed by the projection.
+
+The career/portfolio workflow labels absent local portfolio evidence as
+`unknown` rather than fabricating proof. Any current job-market implication is
+held behind primary-source verification, and no portfolio action is proposed
+until direct project evidence is available.
+
 ## PRM-4 Vertical Slice Evidence
 
 PRM-4 does not claim full grounded answer generation quality. It verifies the

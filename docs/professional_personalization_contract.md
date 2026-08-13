@@ -273,6 +273,23 @@ professional_lenses:
 
 No config mutation is approved by this document.
 
+## Operator Approval Checklist Before Profile Mutation
+
+Before any future `src/config/profile.yaml` change, the operator must explicitly
+approve all of the following:
+
+- selected default lens and the reason it should be durable rather than
+  one-turn context;
+- any migrated boost/downrank topic or source rule, including lens exceptions;
+- the expected effect on reranking and framing, with confirmation that recall
+  remains broad and is not hard-filtered;
+- a rollback value for every changed preference;
+- the exact configuration diff.
+
+The current flat profile remains the legacy input. The PRM-UX-3 helper reads no
+profile file and applies no default lens. A requested permanent lens change is
+a proposal only until the operator confirms it in a separately approved task.
+
 ## Project Context Schema
 
 Proposed schema version: `project_portfolio_context.v2`.
@@ -347,4 +364,3 @@ Explicit approval is required for:
 - starting PRM-19 dogfood;
 - claiming dogfood success;
 - deleting, moving, or archiving legacy code/docs.
-

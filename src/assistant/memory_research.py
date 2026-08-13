@@ -14,6 +14,13 @@ from assistant.linked_sources import (
 )
 from assistant.pi_facade import PersonalIntelligenceFacade
 from assistant.pi_memory import build_memory_proposal
+from assistant.professional_workflows import (
+    build_ai_systems_project_application_workflow,
+    build_career_portfolio_gap_workflow,
+    build_enterprise_ai_adoption_workflow,
+    build_learning_experiment_workflow,
+    build_writer_editor_brief_workflow,
+)
 from assistant.rag_context_pack import build_rag_context_pack, render_rag_context_pack
 from config.settings import Settings
 
@@ -439,6 +446,47 @@ def answer_memory_research(
         draft_count=len(drafts),
         answer_gate=answer_gate,
     )
+    professional_workflows = {}
+    if _is_ai_systems_question(clean_question):
+        professional_workflows["ai_systems"] = build_ai_systems_project_application_workflow(
+            {
+                "archive_evidence": archive_evidence,
+                "project_fit": project_fit,
+                "answer_gate": answer_gate,
+            }
+        )
+    if _is_writer_editor_question(clean_question):
+        professional_workflows["writer_editor"] = build_writer_editor_brief_workflow(
+            {
+                "archive_evidence": archive_evidence,
+                "answer_gate": answer_gate,
+                "direct_answer": direct_answer,
+                "next_steps": next_steps,
+            }
+        )
+    if _is_enterprise_ai_adoption_question(clean_question):
+        professional_workflows["enterprise_ai_adoption"] = build_enterprise_ai_adoption_workflow(
+            {
+                "archive_evidence": archive_evidence,
+                "project_fit": project_fit,
+            }
+        )
+    if _is_learning_question(clean_question):
+        professional_workflows["learning_experiment"] = build_learning_experiment_workflow(
+            {
+                "archive_evidence": archive_evidence,
+                "project_fit": project_fit,
+                "concept": _learning_concept(clean_question),
+            }
+        )
+    if _is_career_question(clean_question):
+        professional_workflows["career_portfolio"] = build_career_portfolio_gap_workflow(
+            {
+                "archive_evidence": archive_evidence,
+                "project_fit": project_fit,
+                "answer_gate": answer_gate,
+            }
+        )
     return {
         "schema_version": MEMORY_RESEARCH_SCHEMA_VERSION,
         "status": receipt["status"],
@@ -457,6 +505,7 @@ def answer_memory_research(
         "next_steps": next_steps,
         "deeper_reading_path": deeper_reading,
         "unknowns": unknowns,
+        "professional_workflows": professional_workflows,
         "draft_proposals": drafts,
         "receipt": receipt,
         "privacy": receipt["privacy"],
@@ -473,6 +522,50 @@ def answer_memory_research(
             drafts=drafts,
         ),
     }
+
+
+def _is_ai_systems_question(question: str) -> bool:
+    return _contains_any(
+        question.casefold(),
+        ("agent", "eval", "evaluation", "rag", "retrieval", "context engineering", "tool", "safety", "runtime"),
+    )
+
+
+def _is_writer_editor_question(question: str) -> bool:
+    return _contains_any(
+        question.casefold(),
+        ("brief", "editor", "writer", "article", "post", "статья", "пост", "бриф", "редактор"),
+    )
+
+
+def _is_enterprise_ai_adoption_question(question: str) -> bool:
+    return _contains_any(
+        question.casefold(),
+        ("enterprise", "adoption", "buyer", "product", "компани", "внедрен", "покупател", "продукт"),
+    )
+
+
+def _is_learning_question(question: str) -> bool:
+    return _contains_any(
+        question.casefold(),
+        ("learn", "explain", "experiment", "объясни", "изучи", "эксперимент", "контекст-инжинир"),
+    )
+
+
+def _is_career_question(question: str) -> bool:
+    return _contains_any(
+        question.casefold(),
+        ("career", "portfolio", "job", "vacancy", "карьер", "портфолио", "ваканси"),
+    )
+
+
+def _learning_concept(question: str) -> str:
+    lowered = question.casefold()
+    if "rag" in lowered or "retrieval" in lowered:
+        return "retrieval"
+    if "eval" in lowered or "оцен" in lowered:
+        return "evaluation"
+    return "контекст-инжиниринг"
 
 
 def render_memory_research_answer(payload: Mapping[str, Any], *, debug: bool = False) -> str:
