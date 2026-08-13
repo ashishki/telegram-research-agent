@@ -1411,6 +1411,10 @@ def _telegram_public_next_action(next_steps: Mapping[str, Any]) -> str:
             translations = {
                 "Keep as source-backed editorial angle.": "Сохранить как редакторский угол, опирающийся на источники.",
                 "Do not apply this to active project work from the current evidence.": "Не применять к активному проекту на основании текущих доказательств.",
+                "Treat this as a cross-project engineering signal, not a project-specific action.": (
+                    "Использовать как общий инженерный сигнал для текущих проектов, "
+                    "но не как действие для конкретного проекта без явной привязки."
+                ),
                 "Run an explicitly approved external verification step before making current claims.": "Перед текущими утверждениями отдельно разрешить внешнюю проверку.",
             }
             return _public_telegram_text(translations.get(values[0], values[0])) or "Не превращать этот сигнал в действие без более точных доказательств."

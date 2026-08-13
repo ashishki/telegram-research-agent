@@ -404,6 +404,17 @@ class TestMemoryResearch(unittest.TestCase):
         self.assertIn("разрыв между AI-пилотами", rendered)
         self.assertNotIn("Сначала ограничение", rendered)
 
+    def test_memory_research_retrospective_project_question_uses_archive_evidence(self):
+        result = answer_memory_research(
+            "Что было полезного для моих проектов в последние пару недель?",
+            archive_query="eval gates",
+            facade=_FakeFacade(),
+        )
+
+        self.assertEqual(result["status"], "ok")
+        self.assertTrue(result["answer_gate"]["allow_answer"])
+        self.assertFalse(result["answer_gate"]["external_verification_required"])
+
     def test_memory_research_archive_context_does_not_override_current_price_boundary(self):
         result = answer_memory_research(
             "какая текущая цена акций Nvidia сегодня и что об этом говорит мой архив?",

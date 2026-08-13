@@ -73,6 +73,15 @@ _ARCHIVE_SCOPE_MARKERS = (
     "что говорит архив",
 )
 
+_RETROSPECTIVE_WINDOW_MARKERS = (
+    "за последние",
+    "последние пару недель",
+    "последние две недели",
+    "последние 2 недели",
+    "last two weeks",
+    "past two weeks",
+)
+
 _PROJECT_STATE_MARKERS = (
     "approved",
     "deployed",
@@ -232,6 +241,12 @@ def _requires_external_verification(question: str) -> bool:
     lowered = question.casefold()
     if _requires_current_answer(question):
         return True
+    # A bounded retrospective period is an archive filter, not a request for a
+    # live/current fact. Explicit verification requests still take precedence.
+    if _contains_any(lowered, _RETROSPECTIVE_WINDOW_MARKERS) and not _contains_any(
+        lowered, _EXTERNAL_VERIFICATION_MARKERS
+    ):
+        return False
     if _is_archive_scoped_question(lowered):
         return _contains_any(lowered, _EXTERNAL_VERIFICATION_MARKERS)
     return _contains_any(lowered, _CURRENT_MARKERS) or _contains_any(lowered, _EXTERNAL_VERIFICATION_MARKERS)

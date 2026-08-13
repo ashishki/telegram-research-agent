@@ -1945,7 +1945,7 @@ def _project_fit(context: Mapping[str, Any]) -> dict[str, Any]:
         "direct_implication": "Apply this to the named project after checking the cited evidence and drafting an explicit action.",
         "weak_watch": "Watch the signal, but do not turn it into project work yet.",
         "learning_relevance": "Study the source as background; direct project implication is not established.",
-        "no_match": "Ignore for project planning unless new evidence appears.",
+        "no_match": "No named project matched; treat this as a cross-project engineering signal, not a project-specific action.",
         "ambiguous_project": "Choose the target project before converting this research into an action.",
     }
     return {
@@ -2039,7 +2039,7 @@ def _next_steps(
     elif label == "ambiguous_project":
         watch.append("Resolve the target project before applying the research.")
     else:
-        ignore.append("Do not apply this to active project work from the current evidence.")
+        study.append("Treat this as a cross-project engineering signal, not a project-specific action.")
     if not linked_evidence.get("extracted_count"):
         watch.append("Fetch or approve linked-source reading later if live freshness matters.")
     if not archive_evidence.get("items"):
