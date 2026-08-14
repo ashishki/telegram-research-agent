@@ -2,7 +2,7 @@ import importlib.util
 import io
 import sys
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 
@@ -46,6 +46,14 @@ class TestTestTiers(unittest.TestCase):
 
         self.assertFalse(any("tests/test_product_ops.py" in command for command in commands))
         self.assertTrue(any("tests/test_core_boundaries.py" in command for command in commands))
+
+    def test_full_tier_is_refused_by_operator_policy(self):
+        stream = io.StringIO()
+        with redirect_stderr(stream):
+            exit_code = self.module.main(["full"])
+
+        self.assertEqual(exit_code, 2)
+        self.assertIn("prohibited", stream.getvalue())
 
 
 if __name__ == "__main__":

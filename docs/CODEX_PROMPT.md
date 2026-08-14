@@ -196,6 +196,11 @@ Test tier helper:
 - python3 tools/test_tiers.py fast-contract
 - python3 tools/test_tiers.py ops-date-sensitive
 
+The operator prohibits full pytest-suite runs. For every future task, select
+the smallest relevant focused/integration/security checks and record them in
+the task evidence; do not invoke `full` or treat project verification as an
+implicit full-test request.
+
 Do not run live Telegram ingestion, reaction sync, LLM extraction, Frontier,
 Radar, report generation, full archive LLM backfill, external embeddings,
 hosted vector services, or web research jobs from this handoff. PRM-27 local

@@ -145,16 +145,19 @@ operator validation.
 ## Test Tiers
 
 Use `docs/TEST_STRATEGY.md` and `tools/test_tiers.py` to choose the smallest
-appropriate deterministic test tier:
+appropriate deterministic test tier. The operator prohibits full-suite runs
+because the suite contains unrelated legacy coverage; do not use `full` or a
+full-suite block-review command as task evidence.
 
 - `focused-prm` for narrow PRM RAG/assistant changes;
 - `fast-contract` for shared contract, router, telemetry, and privacy-boundary
   changes;
 - `ops-date-sensitive` for product ops validation and known date-window
   failures;
-- `full` for complete pytest coverage;
-- `block-review` before closing a deep-review block.
+- `block-review` for Playbook validation, targeted/integration checks selected
+  for the block, and whitespace diff validation before closing a deep-review
+  block.
 
 Known failures must be isolated and named exactly. Do not delete, archive, move,
-or weaken tests merely because the full suite is large or one ops check is
-date-sensitive.
+or weaken tests merely because coverage is broad or one ops check is
+date-sensitive; collect retrofit candidates for PRM-MAT-16.

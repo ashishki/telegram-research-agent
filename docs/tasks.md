@@ -18,6 +18,9 @@ Target repo inspected for PRM-MAT planning: c282056210c09781cbe45fe00ac2b0008bc3
   services, or external web research jobs from backlog grooming. PRM-27 local
   vector sidecar indexing is authorized only inside ADR-004.
 - Do not modify production database contents.
+- The operator prohibits complete pytest-suite runs. Every present and future
+  task must select and record only its relevant focused/integration/security
+  checks; the test inventory is audited separately in PRM-MAT-16.
 - Candidate retrieval queries are not gold evidence until the human operator
   approves expected evidence and citations.
 - Human approval is required before accepting the product pivot ADR, changing

@@ -22,19 +22,6 @@
       "required": true,
       "expected_exit_code": 0,
       "timeout_seconds": 60
-    },
-    {
-      "id": "project_tests",
-      "argv": [
-        "{python}",
-        "-m",
-        "pytest",
-        "tests/",
-        "-q"
-      ],
-      "required": true,
-      "expected_exit_code": 0,
-      "timeout_seconds": 900
     }
   ]
 }

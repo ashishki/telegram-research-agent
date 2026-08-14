@@ -102,15 +102,14 @@ TEST_TIERS: dict[str, TestTier] = {
     ),
     "full": TestTier(
         name="full",
-        description="Complete pytest suite; currently expected to expose one known product_ops date-sensitive failure.",
-        commands=(TierCommand((*PYTEST_QUIET, "tests/", "-q"), env=(("PYTHONPATH", "src"),)),),
+        description="Complete pytest suite; prohibited by the current operator test policy.",
+        commands=(),
     ),
     "block-review": TestTier(
         name="block-review",
-        description="Block-review gate: playbook validator, full suite, and whitespace diff check.",
+        description="Block-review baseline: Playbook validator and whitespace diff check; record targeted tests separately.",
         commands=(
             TierCommand(PLAYBOOK_VALIDATOR),
-            TierCommand((*PYTEST_QUIET, "tests/", "-q"), env=(("PYTHONPATH", "src"),)),
             TierCommand(("git", "diff", "--check")),
         ),
     ),
@@ -155,6 +154,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     if not args.tier:
         build_parser().error("tier is required unless --list is used")
+    if args.tier == "full":
+        print("full test tier is prohibited by the current operator test policy; use a targeted tier instead.", file=sys.stderr)
+        return 2
     tier = TEST_TIERS[args.tier]
     for command in tier.commands:
         if args.print_only:

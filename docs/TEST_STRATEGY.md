@@ -21,8 +21,8 @@ Commands are implemented by `tools/test_tiers.py`.
 | `focused-prm` | Current PRM RAG/assistant/code-review repair loop. | `python3 tools/test_tiers.py focused-prm` |
 | `fast-contract` | Fast deterministic contract/unit subset, excluding date-sensitive ops. | `python3 tools/test_tiers.py fast-contract` |
 | `ops-date-sensitive` | Isolated product ops date-window checks. | `python3 tools/test_tiers.py ops-date-sensitive` |
-| `full` | Complete pytest suite. | `python3 tools/test_tiers.py full` |
-| `block-review` | Playbook validator, full suite, and whitespace diff check for review gates. | `python3 tools/test_tiers.py block-review` |
+| `full` | Complete pytest suite; prohibited by current operator test policy. | Do not run. |
+| `block-review` | Playbook validator, block-relevant targeted/integration checks, and whitespace diff check for review gates. | Select and record the commands for the changed block. |
 
 Print exact commands without running them:
 

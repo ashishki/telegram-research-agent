@@ -13,4 +13,8 @@ Status: proposed. Fixtures, local tests, manual runtime receipts and real operat
 | Operations | freshness isolation, backup/restore, budgets | hidden stale index/restore failure |
 | Live and four-week | approved bounded smoke then operator evidence | thresholds claimed without labels |
 
-Focused tests prove a task; integration tests trace the normal path; security/property tests protect identity, writes and network boundaries; full suite is opt-in. Mature completion requires approved gates plus real evidence and is not established today.
+Focused tests prove a task; integration tests trace the normal path;
+security/property tests protect identity, writes and network boundaries. The
+operator prohibits full-suite runs; test-suite retrofit is a separate
+PRM-MAT-16 concern. Mature completion requires approved gates plus real
+evidence and is not established today.
