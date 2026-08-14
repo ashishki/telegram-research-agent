@@ -626,9 +626,40 @@ CREATE TABLE IF NOT EXISTS prm_post_answer_proposals (
     proposals_json TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(proposals_json) AND json_type(proposals_json) = 'object'),
     created_at TEXT NOT NULL,
     expires_at TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'ready' CHECK(status IN ('ready', 'pending', 'confirmed', 'cancelled'))
+    status TEXT NOT NULL DEFAULT 'ready' CHECK(status IN ('ready', 'pending', 'confirmed', 'cancelled')),
+    receipt_status TEXT NOT NULL DEFAULT 'pending' CHECK(receipt_status IN ('pending', 'recorded', 'failed'))
 );
 CREATE INDEX IF NOT EXISTS idx_prm_post_answer_proposals_expiry ON prm_post_answer_proposals(expires_at);
+
+CREATE TABLE IF NOT EXISTS prm_interaction_ledger (
+    interaction_id TEXT PRIMARY KEY CHECK(length(trim(interaction_id)) BETWEEN 8 AND 32),
+    chat_id_hash TEXT NOT NULL CHECK(length(trim(chat_id_hash)) = 64),
+    surface TEXT NOT NULL CHECK(surface IN ('telegram', 'cli')),
+    input_kind TEXT NOT NULL CHECK(input_kind IN ('text', 'voice_transcript', 'unknown')),
+    answer_status TEXT NOT NULL CHECK(answer_status IN ('supported', 'partial', 'insufficient_evidence', 'verification_required', 'unknown')),
+    source_count INTEGER NOT NULL CHECK(source_count >= 0),
+    evidence_classes_json TEXT NOT NULL CHECK(json_valid(evidence_classes_json) AND json_type(evidence_classes_json) = 'array'),
+    external_verification_status TEXT NOT NULL CHECK(external_verification_status IN ('not_needed', 'required_not_run', 'approved_run', 'unavailable', 'unknown')),
+    selected_professional_lens TEXT NOT NULL DEFAULT 'unknown',
+    selected_project TEXT NOT NULL DEFAULT 'unknown',
+    primary_workflow TEXT NOT NULL DEFAULT 'unknown',
+    useful_label TEXT NOT NULL DEFAULT 'unknown' CHECK(useful_label IN ('yes', 'partial', 'no', 'unknown')),
+    feedback_transitioned_at TEXT,
+    receipt_status TEXT NOT NULL DEFAULT 'recorded' CHECK(receipt_status IN ('recorded', 'failed')),
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_prm_interaction_ledger_expiry ON prm_interaction_ledger(expires_at);
+CREATE INDEX IF NOT EXISTS idx_prm_interaction_ledger_chat_created ON prm_interaction_ledger(chat_id_hash, created_at);
+
+CREATE TABLE IF NOT EXISTS prm_interaction_feedback_transitions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    interaction_id TEXT NOT NULL UNIQUE,
+    feedback_action TEXT NOT NULL CHECK(feedback_action IN ('useful', 'wrong_priority', 'too_shallow', 'applied')),
+    useful_label TEXT NOT NULL CHECK(useful_label IN ('yes', 'partial', 'no')),
+    recorded_at TEXT NOT NULL,
+    FOREIGN KEY(interaction_id) REFERENCES prm_interaction_ledger(interaction_id) ON DELETE RESTRICT
+);
 
 CREATE TABLE IF NOT EXISTS projects (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

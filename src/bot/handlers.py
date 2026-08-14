@@ -1918,10 +1918,16 @@ def _prm_post_answer_markup(result: Mapping[str, Any], *, settings: Settings, ch
     project_fit = _safe_mapping(result.get("project_fit"))
     return build_post_answer_actions(
         {
-            "question": result.get("question"),
             "direct_answer": result.get("direct_answer"),
             "source_refs": source_refs,
             "project_name": project_fit.get("project_name"),
+            "answer_status": _safe_mapping(result.get("professional_answer")).get("answer_status"),
+            "source_count": len(source_refs),
+            "evidence_classes": result.get("evidence_classes"),
+            "external_verification_status": _safe_mapping(result.get("external_verification")).get("status"),
+            "selected_professional_lens": _safe_mapping(result.get("professional_answer")).get("professional_lens"),
+            "primary_workflow": _safe_mapping(result.get("professional_answer")).get("primary_workflow"),
+            "professional_answer": _safe_mapping(result.get("professional_answer")),
         }, db_path=settings.db_path, chat_id=chat_id
     )["reply_markup"]
 

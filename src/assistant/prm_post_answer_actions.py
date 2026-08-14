@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from assistant.pi_memory import build_memory_proposal, confirm_memory_proposal
+from db.prm19_dogfood_receipts import record_feedback_transition, record_interaction_receipt
 
 
 PRM_ACTION_PREFIX = "prma"
@@ -59,6 +60,12 @@ def handle_post_answer_callback(db_path: str, callback_data: str, *, chat_id: st
         return {"status": "expired", "write_performed": False, "message": "Действие устарело. Запроси ответ заново."}
     if prefix == PRM_ACTION_PREFIX:
         proposal_type, label = _ACTION_TYPES[action]
+        if proposal_type == "feedback":
+            try:
+                record_feedback_transition(db_path, interaction_id=context_id, action_code=action)
+            except sqlite3.Error:
+                # Feedback receipt failure must not discard the answer/action path.
+                pass
         proposal_result = context["proposals"].get(action)
         if not isinstance(proposal_result, Mapping):
             proposal_result = build_memory_proposal(proposal_type, _proposal_args(context, action))
@@ -94,16 +101,7 @@ def handle_post_answer_callback(db_path: str, callback_data: str, *, chat_id: st
 
 def _register_context(answer: Mapping[str, Any], *, db_path: str | Path | None, chat_id: str) -> str | None:
     if db_path is None or not chat_id or not Path(db_path).exists():
-        if len(_CONTEXTS) >= 100:
-            _CONTEXTS.pop(next(iter(_CONTEXTS)))
-        context_id = secrets.token_hex(5)
-        _CONTEXTS[context_id] = {
-            "title": _bounded_text(answer.get("title") or "PRM research"),
-            "body": _bounded_text(answer.get("body") or answer.get("direct_answer") or ""),
-            "source_refs": [str(ref) for ref in answer.get("source_refs") or [] if str(ref).startswith("https://")][:5],
-            "project_name": _bounded_text(answer.get("project_name") or ""), "proposals": {},
-        }
-        return context_id
+        return None
     context_id = secrets.token_hex(5)
     context = {
         "title": _bounded_text(answer.get("title") or "PRM research"),
@@ -118,6 +116,17 @@ def _register_context(answer: Mapping[str, Any], *, db_path: str | Path | None, 
             connection.execute("INSERT INTO prm_post_answer_proposals(context_id, chat_id_hash, summary_json, created_at, expires_at) VALUES (?, ?, ?, ?, ?)", (context_id, _chat_hash(chat_id), json.dumps({k: v for k, v in context.items() if k != "proposals"}, ensure_ascii=False), _iso(now), _iso(now + _PROPOSAL_TTL)))
     except sqlite3.Error:
         return None
+    try:
+        record_interaction_receipt(
+            db_path,
+            interaction_id=context_id,
+            chat_id_hash=_chat_hash(chat_id),
+            answer=_receipt_metadata(answer),
+        )
+    except (sqlite3.Error, ValueError):
+        _mark_receipt_status(db_path, context_id, "failed")
+    else:
+        _mark_receipt_status(db_path, context_id, "recorded")
     return context_id
 
 
@@ -184,3 +193,33 @@ def _parse_callback(callback_data: str) -> tuple[str, str, str]:
 
 def _bounded_text(value: object, limit: int = 240) -> str:
     return " ".join(str(value or "").split())[:limit]
+
+
+def _receipt_metadata(answer: Mapping[str, Any]) -> dict[str, Any]:
+    """Select non-content answer metadata for the private interaction ledger."""
+
+    professional = answer.get("professional_answer") if isinstance(answer.get("professional_answer"), Mapping) else {}
+    return {
+        "input_kind": answer.get("input_kind"),
+        "answer_status": answer.get("answer_status"),
+        "source_count": answer.get("source_count", 0),
+        "evidence_classes": answer.get("evidence_classes", []),
+        "external_verification_status": answer.get("external_verification_status"),
+        "selected_professional_lens": answer.get("selected_professional_lens"),
+        "selected_project": answer.get("project_name"),
+        "primary_workflow": answer.get("primary_workflow"),
+        "professional_answer": professional,
+    }
+
+
+def _mark_receipt_status(db_path: str | Path, context_id: str, status: str) -> None:
+    """Keep MAT-6 proposal callbacks usable before the approved MAT-7 migration."""
+
+    try:
+        with sqlite3.connect(db_path) as connection:
+            connection.execute(
+                "UPDATE prm_post_answer_proposals SET receipt_status = ? WHERE context_id = ?",
+                (status, context_id),
+            )
+    except sqlite3.Error:
+        pass

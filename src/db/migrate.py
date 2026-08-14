@@ -826,6 +826,14 @@ def run_migrations() -> Path:
         connection.executescript(schema_sql)
         _verify_canonical_idea_thread_schema(connection)
         _verify_personal_memory_schema(connection)
+        try:
+            connection.execute(
+                "ALTER TABLE prm_post_answer_proposals ADD COLUMN receipt_status TEXT NOT NULL DEFAULT 'pending' "
+                "CHECK(receipt_status IN ('pending', 'recorded', 'failed'))"
+            )
+        except sqlite3.OperationalError as exc:
+            if "duplicate column name" not in str(exc).lower():
+                raise
         connection.executescript(
             """
             CREATE TABLE IF NOT EXISTS reaction_sync_state (
