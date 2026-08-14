@@ -461,6 +461,19 @@ class TestHandlers(unittest.TestCase):
         self.assertIn("найти", message)
         self.assertIn("бриф", message)
 
+    def test_auto_route_keeps_project_decision_request_in_grounded_research(self):
+        with patch.dict(os.environ, {"PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS": "1", "PRM_TELEGRAM_AUTO_LLM_ROUTER": "1"}, clear=False):
+            with patch.object(handlers.LLMClient, "complete_json") as llm_mock:
+                route = handlers._route_auto_message(
+                    "project-decision-route",
+                    "Какие практические выводы для моего проекта можно сделать из материалов про AI adoption?",
+                )
+
+        self.assertEqual(route["mode"], "research")
+        self.assertEqual(route["router"], "deterministic_project_decision")
+        self.assertFalse(route["model_call_attempted"])
+        llm_mock.assert_not_called()
+
     def test_prm_safe_command_allowlist_blocks_legacy_generators(self):
         settings = Settings(
             db_path=":memory:",

@@ -232,6 +232,15 @@ def _route_auto_message(chat_id: str, text: str, *, input_kind: str = "text") ->
     hard_boundary = _hard_local_research_route(clean, previous_question=previous_question, previous_mode=previous_mode)
     if hard_boundary is not None:
         return {**hard_boundary, "router": "deterministic_hard_gate", "model_call_attempted": False}
+    if _is_project_decision_request(clean):
+        return {
+            **fallback,
+            "mode": "research",
+            "confidence": 0.9,
+            "reason": "Project decision request requires grounded local research.",
+            "router": "deterministic_project_decision",
+            "model_call_attempted": False,
+        }
     if not _telegram_auto_llm_router_allowed():
         return {**fallback, "router": "deterministic", "model_call_attempted": False}
 
@@ -359,6 +368,13 @@ def _deterministic_auto_route(text: str, *, previous_question: str = "", previou
         "previous_mode": previous_mode,
         "previous_question": previous_question,
     }
+
+
+def _is_project_decision_request(text: str) -> bool:
+    lowered = _clean_operator_text(text).casefold()
+    project_markers = ("моего проекта", "моему проекту", "для проекта", "project")
+    decision_markers = ("практические выводы", "что мне делать", "какие выводы", "решени", "следующий шаг")
+    return any(marker in lowered for marker in project_markers) and any(marker in lowered for marker in decision_markers)
 
 
 def _needs_auto_clarification(text: str, *, previous_question: str, previous_mode: str) -> bool:
