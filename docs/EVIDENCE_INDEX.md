@@ -7,6 +7,13 @@
 - Local pre-edit governance validation passed. Remote CI workflow exists, but the five most recent GitHub runs were failed; current-HEAD run observed: `31733747425`.
 - `docs/prm_mature_product_gap_audit.md` is the maturity/evidence index for proposed PRM-MAT successors; it is not operator-validation evidence.
 
+## PRM-MAT CI diagnosis (2026-08-14)
+
+The prior CI workflow invoked the operator-prohibited full command `python -m
+pytest tests/ -q`. MAT-16 replaces it with explicit focused PRM tests, MAT
+safety holdouts, and Playbook contract validation. This is a CI scope change,
+not evidence of a full-suite result or product readiness.
+
 Status: active
 Last updated: 2026-08-12
 

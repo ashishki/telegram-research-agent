@@ -29,8 +29,14 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
 
-      - name: Run tests
-        run: python -m pytest tests/ -q
+      - name: Run focused PRM tests
+        run: python tools/test_tiers.py focused-prm
+
+      - name: Run MAT safety holdouts
+        run: python tools/prm_mat_eval.py --check safety
+
+      - name: Validate Playbook contracts
+        run: python tools/playbook_validate.py --root . --check tasks --check references
 
       - name: Verify public evidence boundary
         run: PYTHONPATH=src python3 scripts/public_scorecard_demo.py --check
