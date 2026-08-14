@@ -5,6 +5,47 @@ from __future__ import annotations
 from typing import Any, Mapping, Sequence
 
 
+def build_professional_answer(payload: Mapping[str, Any], *, workflow: str) -> dict[str, Any]:
+    """Return the deterministic, citation-bound MAT-4 reader DTO."""
+
+    gate = _mapping(payload.get("answer_gate"))
+    archive = _mapping(payload.get("archive_evidence"))
+    sources = _sources({"archive_evidence": archive})
+    verification_required = bool(gate.get("external_verification_required"))
+    answer = " ".join(str(payload.get("direct_answer") or "").split())
+    return {
+        "schema_version": "professional_answer.v1",
+        "interaction_id": str(payload.get("interaction_id") or ""),
+        "primary_workflow": workflow,
+        "professional_lens": _mapping(payload.get("professional_lens")).get("selected", "neutral"),
+        "answer_status": "verification_required" if verification_required else ("supported" if sources else "insufficient_evidence"),
+        "short_answer": answer if not verification_required else "Требуется внешняя проверка актуального факта.",
+        "key_findings": [{"claim": item["snippet"], "citation": item["source_url"]} for item in sources],
+        "project_context": _mapping(payload.get("project_fit")),
+        "recommended_action": None if verification_required else _first_action(payload),
+        "uncertainty": _strings(payload.get("unknowns")),
+        "citations": [{"source_url": item["source_url"]} for item in sources],
+        "external_verification": {"required": verification_required},
+        "write_performed": False,
+    }
+
+
+def _first_action(payload: Mapping[str, Any]) -> str | None:
+    steps = payload.get("next_steps")
+    if isinstance(steps, Mapping):
+        for group in ("apply", "watch", "study"):
+            values = steps.get(group)
+            if isinstance(values, Sequence) and not isinstance(values, str) and values:
+                return str(values[0])
+    return None
+
+
+def _strings(value: object) -> list[str]:
+    if not isinstance(value, Sequence) or isinstance(value, str):
+        return []
+    return [str(item) for item in value if str(item or "").strip()]
+
+
 def build_ai_systems_project_application_workflow(payload: Mapping[str, Any]) -> dict[str, Any]:
     """Project bounded AI-systems evidence into one non-persisted work item."""
 

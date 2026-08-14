@@ -4,6 +4,7 @@ from assistant.professional_workflows import (
     build_enterprise_ai_adoption_workflow,
     build_learning_experiment_workflow,
     build_writer_editor_brief_workflow,
+    build_professional_answer,
 )
 
 
@@ -32,6 +33,18 @@ def test_ai_systems_project_application_workflow():
     assert result["project_action"]
     assert result["eval_case"]
     assert result["write_performed"] is False
+
+
+def test_professional_answer_claims_have_citations_and_one_workflow():
+    answer = build_professional_answer({**_payload(), "direct_answer": "Grounded result."}, workflow="ai_systems")
+    assert answer["primary_workflow"] == "ai_systems"
+    assert answer["key_findings"][0]["citation"] == "https://t.me/example/1"
+
+
+def test_professional_answer_current_fact_has_no_action():
+    answer = build_professional_answer({**_payload(current=True), "direct_answer": "Current claim."}, workflow="archive_research")
+    assert answer["answer_status"] == "verification_required"
+    assert answer["recommended_action"] is None
 
 
 def test_ai_systems_no_keyword_only_action():

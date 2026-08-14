@@ -11,6 +11,7 @@ from urllib import error
 from assistant.pi_chat import answer_pi_chat
 from assistant.pi_facade import PersonalIntelligenceFacade
 from assistant.pi_intent import classify_operator_message
+from assistant.operator_context import build_operator_context, validate_operator_context
 from assistant.project_context import load_project_descriptors
 from assistant.prm_chat_display import render_prm_chat_answer
 from assistant.memory_research import (
@@ -63,6 +64,7 @@ PRM_SAFE_COMMANDS = frozenset(
         "/hermes",
         "/ask",
         "/auto",
+        "/auto_voice",
         "/research",
         "/brief",
         "/costs",
@@ -1117,17 +1119,41 @@ def handle_ask(chat_id: str, args: str, settings: Settings) -> None:
 
 
 def handle_auto(chat_id: str, args: str, settings: Settings) -> None:
+    _handle_auto(chat_id, args, settings, input_kind="text")
+
+
+def handle_auto_voice(chat_id: str, args: str, settings: Settings) -> None:
+    """Internal PRM-safe voice route; the transcript remains ephemeral."""
+
+    _handle_auto(chat_id, args, settings, input_kind="voice_transcript")
+
+
+def _handle_auto(chat_id: str, args: str, settings: Settings, *, input_kind: str) -> None:
     question = args.strip()
     if not question:
         send_message(_get_bot_token(), chat_id, "Напиши обычный вопрос или задачу.", parse_mode=None)
         return
-    route = _route_auto_message(chat_id, question)
+    route = _route_auto_message(chat_id, question, input_kind=input_kind)
     project_name = _named_project_from_message(question)
     mode = str(route.get("mode") or "research")
+    operator_context = build_operator_context(
+        chat_id=chat_id,
+        query=question,
+        requested_mode=mode,
+        input_kind=input_kind,  # type: ignore[arg-type]
+        project_name=project_name,
+    )
+    validate_operator_context(operator_context)
+    mode = {
+        "writer_editor_brief": "brief",
+        "generic_chat": "chat",
+        "insufficient_evidence": "clarify",
+    }.get(operator_context.primary_workflow, "research")
     LOGGER.info(
-        "PRM auto route selected chat_id=%s mode=%s router=%s confidence=%.2f model_call_attempted=%s",
-        chat_id,
-        mode,
+        "PRM auto route selected interaction_id=%s chat_id_hash=%s workflow=%s router=%s confidence=%.2f model_call_attempted=%s",
+        operator_context.interaction_id,
+        operator_context.chat_id_hash,
+        operator_context.primary_workflow,
         route.get("router") or "unknown",
         _safe_confidence(route.get("confidence")),
         bool(route.get("model_call_attempted")),
@@ -1149,6 +1175,7 @@ def handle_auto(chat_id: str, args: str, settings: Settings) -> None:
             intent_acknowledgement=acknowledgement,
             archive_query=_bounded_retrieval_query(route.get("retrieval_query")),
             project_name=project_name,
+            operator_context=operator_context.to_dict(),
         )
         return
     if mode == "chat":
@@ -1163,6 +1190,7 @@ def handle_auto(chat_id: str, args: str, settings: Settings) -> None:
         intent_acknowledgement=acknowledgement,
         archive_query=_bounded_retrieval_query(route.get("retrieval_query")),
         project_name=project_name,
+        operator_context=operator_context.to_dict(),
     )
 
 
@@ -1184,6 +1212,7 @@ def handle_research(
     intent_acknowledgement: str = "",
     archive_query: str = "",
     project_name: str = "",
+    operator_context: Mapping[str, object] | None = None,
 ) -> None:
     question = args.strip()
     if not question:
@@ -1217,6 +1246,8 @@ def handle_research(
         send_message(_get_bot_token(), chat_id, f"Не смог выполнить local research: {exc}", parse_mode=None)
         return
     result = _with_dialog_context(result, dialog)
+    if operator_context is not None:
+        result["operator_context"] = dict(operator_context)
     _remember_research_dialog(chat_id, str(dialog["effective_question"]), mode="research")
     local_text = render_memory_research_answer(result)
     response_text = _with_auto_intent_acknowledgement(
@@ -1234,6 +1265,7 @@ def handle_research_brief(
     intent_acknowledgement: str = "",
     archive_query: str = "",
     project_name: str = "",
+    operator_context: Mapping[str, object] | None = None,
 ) -> None:
     question = args.strip()
     if not question:
@@ -1267,6 +1299,8 @@ def handle_research_brief(
         send_message(_get_bot_token(), chat_id, f"Не смог собрать local brief: {exc}", parse_mode=None)
         return
     result = _with_dialog_context(result, dialog)
+    if operator_context is not None:
+        result["operator_context"] = dict(operator_context)
     _remember_research_dialog(chat_id, str(dialog["effective_question"]), mode="brief")
     local_text = render_memory_research_brief(result)
     response_text = _with_auto_intent_acknowledgement(
@@ -2215,6 +2249,7 @@ HANDLERS: dict[str, Callable[[str, str, Settings], None]] = {
     "/strategy": handle_strategy,
     "/codex": handle_codex,
     "/auto": handle_auto,
+    "/auto_voice": handle_auto_voice,
     "/chat": handle_chat,
     "/hermes": handle_chat,
     "/research": handle_research,

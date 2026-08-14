@@ -115,6 +115,10 @@ def select_project_descriptor(
     best_score = 0
     best_descriptor: Mapping[str, Any] | None = None
     for descriptor in descriptors:
+        if str(descriptor.get("status") or "active").casefold() not in {"active", "priority"}:
+            continue
+        if str(descriptor.get("owner_confirmation_status") or "confirmed").casefold() != "confirmed":
+            continue
         name = _clean_text(descriptor.get("name"))
         score = 0
         if name and _normalize_text(name) in query_text:
@@ -279,6 +283,13 @@ def _normalize_project_descriptor(raw: Mapping[str, Any]) -> dict[str, Any]:
         "keywords": _string_values(raw.get("keywords")),
         "exclude_keywords": _string_values(raw.get("exclude_keywords")),
         "learning_keywords": _string_values(raw.get("learning_keywords")),
+        "status": _clean_text(raw.get("status")) or "active",
+        "priority": int(raw.get("priority") or 1),
+        "current_goal": _clean_text(raw.get("current_goal")) or "legacy project context",
+        "current_blocker": _clean_text(raw.get("current_blocker")),
+        "next_proof": _clean_text(raw.get("next_proof")) or "direct cited evidence",
+        "preferred_signal_types": _string_values(raw.get("preferred_signal_types")),
+        "owner_confirmation_status": _clean_text(raw.get("owner_confirmation_status")) or "confirmed",
     }
 
 
@@ -402,6 +413,10 @@ def _project_suggestions(
     descriptor_fields_used: Sequence[str],
 ) -> list[dict[str, Any]]:
     if label != "direct_implication":
+        return []
+    if str(descriptor.get("status")).casefold() not in {"active", "priority"} or str(descriptor.get("owner_confirmation_status")).casefold() != "confirmed":
+        return []
+    if not _clean_text(descriptor.get("current_goal")) or not _clean_text(descriptor.get("next_proof")):
         return []
     terms = _unique([*strong_keyword_matches, *keyword_matches])[:4]
     focus = ", ".join(terms) if terms else "the cited project-relevant evidence"

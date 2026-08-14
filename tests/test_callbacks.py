@@ -423,7 +423,7 @@ class TestIdeaCallbacks(unittest.TestCase):
 
         dispatch_mock.assert_called_once_with(
             chat_id="12345",
-            text="/auto Too shallow target=eval-gates.",
+            text="/auto_voice Too shallow target=eval-gates.",
             settings=settings,
             runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT,
         )

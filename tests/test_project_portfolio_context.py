@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 
 from assistant.project_portfolio_context import (
     PROJECT_PORTFOLIO_CONTEXT_SCHEMA_VERSION,
@@ -7,6 +8,7 @@ from assistant.project_portfolio_context import (
     select_project_portfolio_context,
     validate_project_portfolio_context,
 )
+from assistant.project_context import load_project_descriptors
 
 
 def _project(name: str, status: str, *, confirmed: str = "confirmed", priority: int = 1) -> dict:
@@ -54,6 +56,12 @@ class TestProjectPortfolioContext(unittest.TestCase):
         self.assertFalse(project_action_recommendation_allowed(active, direct_evidence=False))
         self.assertTrue(project_action_recommendation_allowed(active, direct_evidence=True))
         self.assertFalse(project_action_recommendation_allowed(watch, direct_evidence=True))
+
+    def test_real_v2_config_excludes_non_routable_legacy_records(self):
+        path = Path(__file__).resolve().parents[1] / "src" / "config" / "projects.yaml"
+        projects = load_project_descriptors(path)
+        self.assertEqual(len(projects), 10)
+        self.assertNotIn("entropy_protocol", {project["name"] for project in projects})
 
 
 if __name__ == "__main__":

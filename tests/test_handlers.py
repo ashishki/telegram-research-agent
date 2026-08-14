@@ -1093,6 +1093,21 @@ class TestHandlers(unittest.TestCase):
         research_mock.assert_called_once()
         self.assertIn("PRM Research", mock_send_message.call_args.args[2])
 
+    def test_handle_auto_voice_passes_one_ephemeral_context_to_retrieval(self):
+        settings = Settings(db_path=":memory:", llm_api_key="", model_provider="anthropic", telegram_session_path="")
+        payload = {"status": "ok", "question": "research"}
+
+        with patch.object(handlers, "answer_memory_research", return_value=payload):
+            with patch.object(handlers, "render_memory_research_answer", return_value="PRM Research") as render_mock:
+                with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                    with patch.object(handlers, "send_message"):
+                        handlers.handle_auto_voice(chat_id="42", args="что было в архиве про evals?", settings=settings)
+
+        context = render_mock.call_args.args[0]["operator_context"]
+        assert context["input_kind"] == "voice_transcript"
+        assert context["primary_workflow"] == "archive_research"
+        assert context["chat_id_hash"] != "42"
+
     def test_handle_auto_falls_back_local_when_llm_router_errors(self):
         settings = Settings(
             db_path=":memory:",

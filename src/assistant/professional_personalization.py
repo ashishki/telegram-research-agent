@@ -73,6 +73,23 @@ def normalize_lens_id(value: object) -> str | None:
     return lens_id if lens_id in _LENS_DEFINITIONS else None
 
 
+def infer_professional_lens(query: object) -> str | None:
+    """Infer one turn-local lens from bilingual, specific request phrasing."""
+
+    text = " ".join(str(query or "").casefold().split())
+    markers = {
+        "writer_editor": ("редактор", "бриф", "тезис", "для пост", "editor brief", "story angle"),
+        "ai_systems_engineer": ("rag", "eval", "evaluation", "архитектур", "надёжност", "reliability"),
+        "portfolio_builder": ("портфолио", "репозитор", "pull request", "pr-sized"),
+        "enterprise_ai_adoption": ("внедрен", "enterprise", "rollout", "guardrail"),
+        "learning": ("объясни", "разобраться", "experiment", "эксперимент"),
+    }
+    for lens_id, phrases in markers.items():
+        if any(phrase in text for phrase in phrases):
+            return lens_id
+    return None
+
+
 def rerank_for_professional_lens(
     candidates: Sequence[Mapping[str, Any]], *, lens_id: str | None
 ) -> list[dict[str, Any]]:
@@ -80,14 +97,14 @@ def rerank_for_professional_lens(
 
     normalized_lens = normalize_lens_id(lens_id)
     preferences = _LENS_DEFINITIONS.get(normalized_lens or "", {})
-    terms = " ".join(
-        item for field in ("goals", "evidence_preferences", "output_preferences") for item in preferences.get(field, ())
-    ).casefold()
+    phrases = tuple(
+        item.casefold() for field in ("goals", "evidence_preferences", "output_preferences") for item in preferences.get(field, ())
+    )
     ranked: list[dict[str, Any]] = []
     for index, candidate in enumerate(candidates):
         item = dict(candidate)
         evidence = " ".join(str(item.get(key) or "") for key in ("title", "snippet", "content", "channel_username")).casefold()
-        matches = sum(1 for term in terms.split() if len(term) > 3 and term in evidence)
+        matches = sum(1 for phrase in phrases if phrase in evidence)
         item["professional_lens"] = normalized_lens or "neutral"
         item["professional_lens_soft_boost"] = matches
         item["_original_index"] = index

@@ -15,12 +15,14 @@ from assistant.linked_sources import (
 from assistant.pi_facade import PersonalIntelligenceFacade
 from assistant.pi_memory import build_memory_proposal
 from assistant.professional_workflows import (
+    build_professional_answer,
     build_ai_systems_project_application_workflow,
     build_career_portfolio_gap_workflow,
     build_enterprise_ai_adoption_workflow,
     build_learning_experiment_workflow,
     build_writer_editor_brief_workflow,
 )
+from assistant.professional_personalization import infer_professional_lens, rerank_for_professional_lens
 from assistant.rag_context_pack import build_rag_context_pack, render_rag_context_pack
 from config.settings import Settings
 
@@ -392,6 +394,8 @@ def answer_memory_research(
     archive_evidence = _archive_evidence(archive_result, max_items=bounded_limit, time_window=time_window)
     linked_evidence = _linked_evidence(linked_result, max_items=active_budget.max_linked_sources)
     curated_evidence = _curated_evidence(curated_result, max_items=bounded_limit)
+    professional_lens = infer_professional_lens(clean_question)
+    archive_evidence["items"] = rerank_for_professional_lens(archive_evidence["items"], lens_id=professional_lens)
     project_fit = _project_fit(project_context)
     context_pack = build_rag_context_pack(
         question=clean_question,
@@ -489,6 +493,19 @@ def answer_memory_research(
                 "answer_gate": answer_gate,
             }
         )
+    primary_workflow = next(iter(professional_workflows), "archive_research")
+    professional_answer = build_professional_answer(
+        {
+            "direct_answer": direct_answer,
+            "archive_evidence": archive_evidence,
+            "project_fit": project_fit,
+            "answer_gate": answer_gate,
+            "professional_lens": {"selected": professional_lens or "neutral"},
+            "next_steps": next_steps,
+            "unknowns": unknowns,
+        },
+        workflow=primary_workflow,
+    )
     return {
         "schema_version": MEMORY_RESEARCH_SCHEMA_VERSION,
         "status": receipt["status"],
@@ -508,6 +525,12 @@ def answer_memory_research(
         "deeper_reading_path": deeper_reading,
         "unknowns": unknowns,
         "professional_workflows": professional_workflows,
+        "professional_answer": professional_answer,
+        "professional_lens": {
+            "selected": professional_lens or "neutral",
+            "selection_source": "turn_local_inference" if professional_lens else "neutral",
+            "recall_filtered": False,
+        },
         "draft_proposals": drafts,
         "receipt": receipt,
         "privacy": receipt["privacy"],

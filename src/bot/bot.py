@@ -144,7 +144,7 @@ def _operator_text_command(text: str, *, runtime_mode: str) -> str:
 
 def _voice_text_command(text: str, *, runtime_mode: str) -> str:
     if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
-        return f"/auto {text}"
+        return f"/auto_voice {text}"
     return f"/voice {text}"
 
 

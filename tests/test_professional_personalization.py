@@ -4,6 +4,7 @@ from assistant.professional_personalization import (
     LENS_IDS,
     PROFESSIONAL_PERSONALIZATION_SCHEMA_VERSION,
     professional_lens_schema,
+    infer_professional_lens,
     propose_lens_preference_change,
     rerank_for_professional_lens,
 )
@@ -34,6 +35,15 @@ class TestProfessionalPersonalization(unittest.TestCase):
         self.assertEqual({item["source_url"] for item in ranked}, {item["source_url"] for item in candidates})
         self.assertEqual(len(ranked), len(candidates))
         self.assertEqual(ranked[0]["source_url"], "https://t.me/example/1")
+
+    def test_bilingual_lens_rerank(self):
+        candidates = [
+            {"source_url": "a", "snippet": "общий контекст"},
+            {"source_url": "b", "snippet": "RAG quality and runtime safety"},
+        ]
+        ranked = rerank_for_professional_lens(candidates, lens_id=infer_professional_lens("Нужна архитектура RAG"))
+        self.assertEqual(ranked[0]["source_url"], "b")
+        self.assertGreater(ranked[0]["professional_lens_soft_boost"], 0)
 
     def test_lens_preference_change_requires_confirmation(self):
         proposal = propose_lens_preference_change(

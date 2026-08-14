@@ -14,12 +14,6 @@ from output.context_memory import (
 
 
 LOGGER = logging.getLogger(__name__)
-ACTIVE_PROJECTS = {
-    "ai-workflow-playbook",
-    "telegram-research-agent",
-    "film-school-assistant",
-    "gdev-agent",
-}
 VISIBLE_TAGS = {"strong", "interesting", "try_in_project", "funny"}
 
 
@@ -131,7 +125,9 @@ def _active_projects(projects: list[dict] | None) -> list[dict]:
     result = []
     for project in projects:
         name = str(project.get("name") or "")
-        if name not in ACTIVE_PROJECTS:
+        if str(project.get("status") or "active").casefold() not in {"active", "priority"}:
+            continue
+        if str(project.get("owner_confirmation_status") or "confirmed").casefold() != "confirmed":
             continue
         result.append(
             {
