@@ -1,10 +1,10 @@
 # Active Task Graph
 
 Status: proposed
-Last updated: 2026-08-12
-Playbook baseline SHA: 5583eca96c4d2d480b5574ed78bea63e0b07ebf0
-Playbook checkout inspected for PRM-UX planning: 965612aa463fca1a35a55104633d0e09da33d615
-Target repo inspected for PRM-UX planning: 82c0c527ffdd797aab716a2d1079cd6849caa208
+Last updated: 2026-08-13
+Playbook baseline SHA: 965612aa463fca1a35a55104633d0e09da33d615
+Historical Playbook pin retained in prior PRM evidence: 5583eca96c4d2d480b5574ed78bea63e0b07ebf0 (stale)
+Target repo inspected for PRM-MAT planning: c282056210c09781cbe45fe00ac2b0008bc35043
 
 ## Operating Rules
 
@@ -3008,3 +3008,844 @@ Notes: |
   User problem: cleanup must follow usage evidence, not aesthetic preference.
   Boundary: handoff/planning only until PRM-20 approval.
   This task is a bridge from production-test evidence to canonical PRM-20 cleanup.
+## PRM-MAT Queue — Mature Integrated Operator Product
+
+The historical PRM-UX records above remain foundation evidence. These proposed successor tasks reconcile their actual integration maturity; none authorizes runtime activation, config writes, live fetch, dogfood, release claim, or compatibility cleanup.
+
+### PRM-MAT-0: Integrated Maturity Audit And Task Truth Reconciliation
+
+Owner: codex
+Phase: A
+Type: project:governance
+Status: proposed
+Depends-On: none
+Risk-Level: medium
+Public-Tests-Required: not_required
+Critic-Required: required
+Holdout-Required: conditional
+Mutation-Required: not_required
+Property-Required: not_required
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+User-Problem: The operator cannot distinguish a fixture, local runtime receipt, integrated path, and validated value claim.
+Objective: Reconcile component maturity, current task evidence, CI state, runtime claims and documentation truth without changing product behavior.
+Implementation-Boundary: Documentation/evidence only; preserve historic records.
+Source-of-Truth: docs/prm_mature_product_gap_audit.md and git/test/CI evidence.
+Files:
+  - docs/prm_mature_product_gap_audit.md
+  - docs/tasks.md
+Schema-Interface-Changes: none
+Privacy-Boundary: No private corpus/question text in audit artifacts.
+Failure-Behavior: Report unresolved evidence as unknown, never inferred.
+Acceptance-Criteria:
+  - id: AC-1; description: Maturity matrix names all PRM-UX foundations with evidence class and gap; verify: rg -n "Existing PRM-UX component" docs/prm_mature_product_gap_audit.md.
+Executable-Tests:
+  - python3 tools/playbook_validate.py --root . --check tasks --check references
+Verification:
+  - python3 tools/playbook_validate.py --root . --check tasks --check references
+Integration-Checks: Compare current bot path with documented component claims.
+Eval-Impact: Establishes baselines only.
+Cost-Budget: max_cost_usd=0; max_model_calls=0; max_retries=0
+Migration-Backward-Compatibility: none
+Human-Approvals: none
+Non-Goals: no code, DB or service change
+Operator-Validation-Impact: prevents false validation claims
+
+### PRM-MAT-1: Canonical OperatorContext And Primary Workflow Selection
+
+Owner: codex
+Phase: A
+Type: rag:query agent:harness
+Status: proposed
+Depends-On: PRM-MAT-0
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: required
+Mutation-Required: required
+Property-Required: required
+Visual-Contract: required
+Runtime-Verification: required
+Correction-Budget: 2
+User-Problem: One request can receive conflicting route, workflow, project and date decisions.
+Objective: Create one validated context and select exactly one deterministic primary workflow before retrieval.
+Implementation-Boundary: Route/context only; no config migration, provider call, durable receipt or answer redesign.
+Source-of-Truth: docs/operator_context_contract.md and rag answer gate.
+Files:
+  - src/assistant/operator_context.py
+  - src/bot/handlers.py
+  - tests/test_operator_context.py
+Schema-Interface-Changes: operator_context.v1 in-memory contract only.
+Privacy-Boundary: Hash chat identity; raw query is ephemeral unless approved policy changes.
+Failure-Behavior: Low confidence emits one Russian clarification; safety gate wins.
+Acceptance-Criteria:
+  - id: AC-1; description: Each fixture request has one interaction ID and one allowed workflow; test: tests/test_operator_context.py::test_selects_one_workflow.
+  - id: AC-2; description: Current-fact fixture cannot route to unsafe chat; test: tests/test_operator_context.py::test_current_fact_gate_wins.
+Executable-Tests:
+  - python3 -m pytest tests/test_operator_context.py tests/test_handlers.py -q
+Verification:
+  - python3 -m pytest tests/test_operator_context.py tests/test_handlers.py -q
+Integration-Checks: Trace normal auto-command text and voice fixture through context into retrieval inputs.
+Eval-Impact: Adds 50-case routing holdout scaffold.
+Cost-Budget: max_cost_usd=0; max_model_calls=0; max_retries=0
+Migration-Backward-Compatibility: Preserve slash-command overrides.
+Human-Approvals: none
+Non-Goals: no LLM routing, persistent session or project config write
+Operator-Validation-Impact: prerequisite for interpretable receipt evidence
+
+### PRM-MAT-2: Professional Lens Runtime Integration
+
+Owner: codex
+Phase: A
+Type: rag:query eval:gate
+Status: proposed
+Depends-On: PRM-MAT-1
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: required
+Mutation-Required: required
+Property-Required: required
+Visual-Contract: required
+Runtime-Verification: required
+Correction-Budget: 2
+User-Problem: Lens preferences are lexical internal data that do not reliably improve answers.
+Objective: Apply a bilingual phrase-based soft lens rerank and pass the selected lens to answer framing.
+Implementation-Boundary: No default profile write; no recall filtering.
+Source-of-Truth: docs/prm_mature_product_contract.md.
+Files:
+  - src/assistant/professional_personalization.py
+  - src/assistant/memory_research.py
+  - tests/test_professional_personalization.py
+Schema-Interface-Changes: lens evidence/preferences fields only.
+Privacy-Boundary: Local candidate metadata only.
+Failure-Behavior: Unknown lens becomes neutral without reducing recall.
+Acceptance-Criteria:
+  - id: AC-1; description: Neutral versus lens ranking preserves candidate membership; test: tests/test_professional_personalization.py::test_lens_never_filters_recall.
+  - id: AC-2; description: Russian/English cross-language fixtures show measured soft-rank deltas; test: tests/test_professional_personalization.py::test_bilingual_lens_rerank.
+Executable-Tests:
+  - python3 -m pytest tests/test_professional_personalization.py tests/test_memory_research.py -q
+Verification:
+  - python3 -m pytest tests/test_professional_personalization.py tests/test_memory_research.py -q
+Integration-Checks: Confirm selected lens appears in reader DTO, not debug-only JSON.
+Eval-Impact: Adds required neutral/AI, portfolio/writer and source-quality exceptions.
+Cost-Budget: max_cost_usd=0; max_model_calls=0; max_retries=0
+Migration-Backward-Compatibility: Existing explicit lens IDs remain accepted.
+Human-Approvals: Default durable lenses before profile write.
+Non-Goals: hard filters or permanent inference
+Operator-Validation-Impact: makes personalization measurable
+
+### PRM-MAT-3: Project Portfolio V2 Configuration Migration
+
+Owner: codex
+Phase: A
+Type: compliance:control tool:schema
+Status: proposed
+Depends-On: PRM-MAT-2
+Risk-Level: critical
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: required
+Mutation-Required: required
+Property-Required: required
+Visual-Contract: optional
+Runtime-Verification: required
+Correction-Budget: 2
+User-Problem: Runtime project selection uses stale report-era descriptors rather than approved active work.
+Objective: Introduce reviewed Portfolio V2 loading with compatibility mapping and explicit approval-gated config write.
+Implementation-Boundary: Plan/read-only validation first; config mutation only after exact approval.
+Source-of-Truth: docs/prm_configuration_migration_plan.md.
+Files:
+  - src/config/projects.yaml
+  - src/assistant/project_portfolio_context.py
+  - tests/test_project_portfolio_context.py
+Schema-Interface-Changes: Versioned project descriptor only if durable compatibility boundary is approved.
+Privacy-Boundary: No repo/private content in public diffs.
+Failure-Behavior: Invalid/unapproved V2 config falls back to existing explicit named-project behavior.
+Acceptance-Criteria:
+  - id: AC-1; description: Approved active/priority and explicitly named watch/reference fixtures resolve deterministically; test: tests/test_project_portfolio_context.py::test_selection_policy.
+  - id: AC-2; description: Rollback fixture restores old descriptor resolution; test: tests/test_project_portfolio_context.py::test_legacy_mapping_rollback.
+Executable-Tests:
+  - python3 -m pytest tests/test_project_portfolio_context.py tests/test_project_context.py -q
+Verification:
+  - python3 -m pytest tests/test_project_portfolio_context.py tests/test_project_context.py -q
+Integration-Checks: Produce redacted approval diff and read-only config validation artifact.
+Eval-Impact: Adds project selection and false project-action cases.
+Cost-Budget: max_cost_usd=0; max_model_calls=0; max_retries=0
+Migration-Backward-Compatibility: Preserve old keyword/named links with rollback.
+Human-Approvals: Exact descriptor and active/priority approval required.
+Non-Goals: inferring status from absent repositories
+Operator-Validation-Impact: makes project actions auditable
+
+### PRM-MAT-4: Grounded Professional Synthesis And Unified Answer DTO
+
+Owner: codex
+Phase: A
+Type: rag:generation agent:harness cost:architecture
+Status: proposed
+Depends-On: PRM-MAT-3
+Risk-Level: critical
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: required
+Mutation-Required: required
+Property-Required: required
+Visual-Contract: required
+Runtime-Verification: required
+Correction-Budget: 2
+User-Problem: Answer rendering hides professional workflow output and has no unified grounded contract.
+Objective: Produce one validated professional answer DTO from shared context, evidence and project state with deterministic fallback.
+Implementation-Boundary: Bounded synthesis contract only; provider path remains separately approval-gated.
+Source-of-Truth: docs/prm_mature_product_contract.md.
+Files:
+  - src/assistant/memory_research.py
+  - src/assistant/professional_workflows.py
+  - tests/test_prm_professional_workflows.py
+Schema-Interface-Changes: professional_answer.v1 with explicit compatibility adapter.
+Privacy-Boundary: Provider sees only approved bounded cited snippets.
+Failure-Behavior: Validator/provider failure returns labelled deterministic limited answer.
+Acceptance-Criteria:
+  - id: AC-1; description: Every source-derived fixture claim maps to a citation and one workflow; test: tests/test_professional_answer.py::test_claim_citation_and_single_workflow.
+  - id: AC-2; description: Current-fact fixture returns verification_required without action; test: tests/test_professional_answer.py::test_current_fact_fallback.
+Executable-Tests:
+  - python3 -m pytest tests/test_prm_professional_workflows.py tests/test_memory_research.py -q
+Verification:
+  - python3 -m pytest tests/test_prm_professional_workflows.py tests/test_memory_research.py -q
+Integration-Checks: Render DTO through existing research and brief paths.
+Eval-Impact: Adds groundedness/action-specificity rubric.
+Cost-Budget: approval_required_before_provider; max_model_calls=1; max_retries=1
+Migration-Backward-Compatibility: Existing memory-research payload remains adapter-readable.
+Human-Approvals: Provider budget/egress before live model use.
+Non-Goals: autonomous browse/write/build approval
+Operator-Validation-Impact: enables attributable professional answer labels
+
+### PRM-MAT-5: Mature Telegram Conversation UX
+
+Owner: codex
+Phase: A
+Type: project:governance
+Status: proposed
+Depends-On: PRM-MAT-4
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: conditional
+Mutation-Required: required
+Property-Required: conditional
+Visual-Contract: required
+Runtime-Verification: required
+Correction-Budget: 2
+User-Problem: Primary Telegram UX exposes technical/runtime language and fragmented conversation state.
+Objective: Render answer-first Russian UX, start/help commands, session boundaries and final-chunk actions from the shared DTO.
+Implementation-Boundary: Renderer/copy/session policy; no durable proposal rewrite.
+Source-of-Truth: docs/prm_mature_product_contract.md and docs/operator_context_contract.md.
+Files:
+  - src/bot/handlers.py
+  - tests/test_handlers.py
+  - docs/operator_quickstart.md
+Schema-Interface-Changes: none
+Privacy-Boundary: No IDs/path/debug data in normal messages.
+Failure-Behavior: Friendly Russian local-evidence/expiry/clarification responses.
+Acceptance-Criteria:
+  - id: AC-1; description: Start-command fixture contains examples/boundaries/actions and no flag/runtime strings; test: tests/test_handlers.py::test_prm_start_is_operator_facing.
+  - id: AC-2; description: Chunked answer attaches buttons only to final chunk; test: tests/test_handlers.py::test_actions_on_final_chunk.
+Executable-Tests:
+  - python3 -m pytest tests/test_handlers.py tests/test_telegram_delivery.py -q
+Verification:
+  - python3 -m pytest tests/test_handlers.py tests/test_telegram_delivery.py -q
+Integration-Checks: Manual fixture screenshots reviewed for mobile line lengths and Russian-only copy.
+Eval-Impact: Adds visual/length/language checks.
+Cost-Budget: max_cost_usd=0; max_model_calls=0; max_retries=0
+Migration-Backward-Compatibility: Retain research, brief and chat command overrides.
+Human-Approvals: Public screenshots only.
+Non-Goals: dashboard or second bot
+Operator-Validation-Impact: first coherent answer surface
+### PRM-MAT-6: Durable Post-Answer Proposal And Confirmation Lifecycle
+
+Owner: codex
+Phase: B
+Type: tool:unsafe compliance:audit
+Status: proposed
+Depends-On: PRM-MAT-5
+Risk-Level: critical
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: required
+Mutation-Required: required
+Property-Required: required
+Visual-Contract: required
+Runtime-Verification: required
+Correction-Budget: 2
+User-Problem: Save actions disappear on restart and can leak IDs or replay writes.
+Objective: Replace volatile contexts with persistent chat-bound expiring idempotent proposal lifecycle.
+Implementation-Boundary: Proposal storage/callback only; no automatic memory promotion.
+Source-of-Truth: docs/prm_mature_product_contract.md.
+Files:
+  - src/assistant/prm_post_answer_actions.py
+  - src/db/migrate.py
+  - tests/test_prm_post_answer_actions.py
+Schema-Interface-Changes: approved proposal table migration.
+Privacy-Boundary: Store bounded summary/source refs; do not duplicate raw posts/questions.
+Failure-Behavior: Expired/cancelled/replayed token performs no write and gives Russian message.
+Acceptance-Criteria:
+  - id: AC-1; description: Proposal survives restart fixture and binds correct chat; test: tests/test_prm_post_answer_actions.py::test_restart_and_chat_isolation.
+  - id: AC-2; description: Repeat confirmation writes once; test: tests/test_prm_post_answer_actions.py::test_confirmation_idempotent.
+Verification:
+  - python3 -m pytest tests/test_prm_post_answer_actions.py -q
+Integration-Checks: Callback payload is Telegram-limit-safe and final message has no internal IDs.
+Eval-Impact: Adds replay/cancel/expiry/cross-chat suite.
+Cost-Budget: max_cost_usd=0; max_model_calls=0; max_retries=0
+Migration-Backward-Compatibility: Keep existing confirmation semantics behind adapter.
+Human-Approvals: Persistent schema migration and retention policy.
+Non-Goals: unconfirmed durable writes
+Operator-Validation-Impact: enables trustworthy saved-object evidence
+
+### PRM-MAT-7: Automatic Interaction Receipts And Feedback Loop
+
+Owner: codex
+Phase: B
+Type: compliance:audit cost:telemetry
+Status: proposed
+Depends-On: PRM-MAT-6
+Risk-Level: critical
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: required
+Mutation-Required: required
+Property-Required: required
+Visual-Contract: optional
+Runtime-Verification: required
+Correction-Budget: 2
+User-Problem: Useful-answer evidence is manual/schema-only and feedback is disconnected from answers.
+Objective: Persist private transition-audited interaction ledger entries and update them via context-aware feedback.
+Implementation-Boundary: Ledger and owner review/export only; no raw-question retention without approval.
+Source-of-Truth: docs/prm_mature_product_contract.md.
+Files:
+  - src/db/prm19_dogfood_receipts.py
+  - src/bot/handlers.py
+  - tests/test_prm19_dogfood_receipts.py
+Schema-Interface-Changes: approval-gated interaction ledger table.
+Privacy-Boundary: Hash identity; exclude raw posts/provider payloads/public exports.
+Failure-Behavior: Receipt failure does not lose answer; marks write status failed safely.
+Acceptance-Criteria:
+  - id: AC-1; description: Every answer fixture creates one receipt with unknown labels; test: tests/test_interaction_ledger.py::test_one_receipt_per_answer.
+  - id: AC-2; description: Feedback button updates same interaction once; test: tests/test_interaction_ledger.py::test_feedback_transition_audit.
+Verification:
+  - python3 -m pytest tests/test_prm19_dogfood_receipts.py tests/test_interaction_ledger.py -q
+Integration-Checks: Owner-only list/review and privacy-safe aggregate export fixture.
+Eval-Impact: Supplies evaluation/recap inputs without value claim.
+Cost-Budget: max_cost_usd=0; max_model_calls=0; max_retries=0
+Migration-Backward-Compatibility: Keep historical non-persisting PRM-19 builder.
+Human-Approvals: Ledger migration and raw-question policy.
+Non-Goals: dogfood start or public telemetry
+Operator-Validation-Impact: creates auditable labels after approval
+
+### PRM-MAT-8: Archive Freshness Orchestration And /refresh
+
+Owner: codex
+Phase: C
+Type: workflow:autonomous rag:ingestion
+Status: proposed
+Depends-On: PRM-MAT-0
+Risk-Level: critical
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: conditional
+Mutation-Required: required
+Property-Required: required
+Visual-Contract: required
+Runtime-Verification: required
+Correction-Budget: 2
+User-Problem: Freshness is an opaque timer/manual command and the refresh command does not exist.
+Objective: Define owner refresh orchestration with independent archive, reaction, vector and enrichment receipts.
+Implementation-Boundary: No schedule/systemd activation without approval; preserve bounded ingestion rules.
+Source-of-Truth: docs/prm_configuration_migration_plan.md.
+Files:
+  - src/assistant/prm_refresh_receipt.py
+  - src/bot/handlers.py
+  - tests/test_prm_refresh_receipt.py
+Schema-Interface-Changes: refresh-run receipt only if durable need is approved.
+Privacy-Boundary: Counts/timestamps only; no raw posts/log secrets.
+Failure-Behavior: Archive success remains success when reaction fails; stale vector is explicit.
+Acceptance-Criteria:
+  - id: AC-1; description: Owner refresh fixture renders archive/reaction/vector/error independently; test: tests/test_prm_refresh_receipt.py::test_independent_statuses.
+  - id: AC-2; description: Non-owner fixture cannot trigger refresh; test: tests/test_handlers.py::test_refresh_owner_only.
+Verification:
+  - python3 -m pytest tests/test_prm_refresh_receipt.py tests/test_handlers.py -q
+Integration-Checks: Dry-run only; no live ingestion/vector rebuild/systemd action.
+Eval-Impact: Adds freshness/failure-isolation checks.
+Cost-Budget: max_cost_usd=0; max_model_calls=0; max_retries=0
+Migration-Backward-Compatibility: Retain approved CLI refresh command.
+Human-Approvals: Schedule, timezone, rates and any canonical write.
+Non-Goals: report/Radar/provider work
+Operator-Validation-Impact: establishes visible freshness evidence
+
+### PRM-MAT-9: Reaction Fast Lane And Adaptive Preference Proposals
+
+Owner: codex
+Phase: C
+Type: rag:ingestion compliance:audit
+Status: proposed
+Depends-On: PRM-MAT-8
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: required
+Mutation-Required: required
+Property-Required: required
+Visual-Contract: required
+Runtime-Verification: required
+Correction-Budget: 2
+User-Problem: Reactions are not a reliable recall/personalization path.
+Objective: Connect personal reaction resolution, searchability, temporary boost, enrichment/proposal and receipt without permanent inference.
+Implementation-Boundary: No reaction schedule/credential change; no atom dependency for recall.
+Source-of-Truth: docs/prm_mature_product_contract.md.
+Files:
+  - src/db/reaction_fast_lane.py
+  - src/ingestion/reaction_sync.py
+  - tests/test_reaction_fast_lane.py
+Schema-Interface-Changes: temporary reaction interest state only if approved.
+Privacy-Boundary: Emoji is audit metadata, not preference text.
+Failure-Behavior: Missing reaction means unknown; failure never blocks archive refresh.
+Acceptance-Criteria:
+  - id: AC-1; description: Successful reacted post is FTS searchable end-to-end; test: tests/test_reaction_fast_lane.py::test_reacted_post_recall.
+  - id: AC-2; description: Repeated reaction proposes but cannot write preference; test: tests/test_reaction_fast_lane.py::test_preference_requires_confirmation.
+Verification:
+  - python3 -m pytest tests/test_reaction_fast_lane.py tests/test_reaction_sync.py -q
+Integration-Checks: Render grouped reaction-recall fixture with source links/status.
+Eval-Impact: Adds reaction searchability and weak-boost cases.
+Cost-Budget: max_cost_usd=0; max_model_calls=0; max_retries=0
+Migration-Backward-Compatibility: Preserve existing reaction rows.
+Human-Approvals: Reaction routine and durable preference policy.
+Non-Goals: emoji sentiment or permanent implicit preference
+Operator-Validation-Impact: provides two required validation questions
+
+### PRM-MAT-10: Bounded Primary-Source Verification Execution
+
+Owner: codex
+Phase: D
+Type: tool:call tool:unsafe compliance:control
+Status: proposed
+Depends-On: PRM-MAT-4
+Risk-Level: critical
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: required
+Mutation-Required: required
+Property-Required: required
+Visual-Contract: required
+Runtime-Verification: required
+Correction-Budget: 2
+User-Problem: Verification plans cannot confirm Telegram claims against trustworthy sources.
+Objective: Implement bounded class-specific verification with cache and safe partial results behind explicit fetch approval.
+Implementation-Boundary: GitHub/approved docs/vendor/arXiv metadata; no unrestricted browsing or code execution.
+Source-of-Truth: docs/prm_mature_product_contract.md.
+Files:
+  - src/assistant/primary_source_verification.py
+  - tests/test_primary_source_verification.py
+  - docs/runbooks/primary_source_verification.md
+Schema-Interface-Changes: separate external cache schema with TTL/hash/fetched-at.
+Privacy-Boundary: Cache separate from archive; no raw corpus/provider payloads.
+Failure-Behavior: SSRF/untrusted/timeout/content failure returns verification_required or partial.
+Acceptance-Criteria:
+  - id: AC-1; description: Fixture rejects private IP/redirect/content-size bypass; test: tests/test_primary_source_verification.py::test_network_boundaries.
+  - id: AC-2; description: `www.*` is not sufficient official proof; test: tests/test_primary_source_verification.py::test_official_relation_required.
+Verification:
+  - python3 -m pytest tests/test_primary_source_verification.py -q
+Integration-Checks: Fake transport traces Telegram versus primary evidence separately.
+Eval-Impact: Adds source-class, SSRF, partial/support and cache cases.
+Cost-Budget: max_fetches=3; max_retries=1; approval_required_before_live_fetch=true
+Migration-Backward-Compatibility: Existing plan-only API remains safe default.
+Human-Approvals: Live fetch, host policy, fetch/provider budget.
+Non-Goals: automatic browse or third-party code execution
+Operator-Validation-Impact: allows bounded verification questions after approval
+### PRM-MAT-11: Queryable Saved Knowledge And Watch Topics
+
+Owner: codex
+Phase: B
+Type: tool:schema tool:unsafe
+Status: proposed
+Depends-On: PRM-MAT-7
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: required
+Mutation-Required: required
+Property-Required: required
+Visual-Contract: required
+Runtime-Verification: required
+Correction-Budget: 2
+User-Problem: Confirmed saved objects cannot reliably inform later questions or be managed by state.
+Objective: Make confirmed notes/topics/links/decisions/actions/experiments/feedback/source cards queryable with history.
+Implementation-Boundary: Confirmed objects only; no automatic conversation-to-memory conversion.
+Source-of-Truth: docs/prm_mature_product_contract.md.
+Files:
+  - src/assistant/pi_memory.py
+  - src/db/migrate.py
+  - tests/test_pi_memory.py
+Schema-Interface-Changes: approved object/state/history migration.
+Privacy-Boundary: Save summaries/refs only; deletion/export follows retention policy.
+Failure-Behavior: Duplicate returns proposal/link, not second object; failed state update preserves history.
+Acceptance-Criteria:
+  - id: AC-1; description: Topic/project/date/state query fixtures return cited saved objects; test: tests/test_saved_knowledge.py::test_query_filters.
+  - id: AC-2; description: Closing action preserves prior history; test: tests/test_saved_knowledge.py::test_state_history.
+Verification:
+  - python3 -m pytest tests/test_pi_memory.py tests/test_saved_knowledge.py -q
+Integration-Checks: Saved knowledge appears as secondary evidence, never supersedes fresh archive evidence.
+Eval-Impact: Adds saved-memory recall cases.
+Cost-Budget: max_cost_usd=0; max_model_calls=0; max_retries=0
+Migration-Backward-Compatibility: Map existing personal_memory_events.
+Human-Approvals: Schema/retention/deletion policy.
+Non-Goals: automatic note creation
+Operator-Validation-Impact: enables saved-object count/usefulness evidence
+
+### PRM-MAT-12: Professional Workflow End-To-End Integration
+
+Owner: codex
+Phase: D
+Type: rag:generation eval:gate
+Status: proposed
+Depends-On: PRM-MAT-10
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: required
+Mutation-Required: required
+Property-Required: required
+Visual-Contract: required
+Runtime-Verification: required
+Correction-Budget: 2
+User-Problem: Professional workflows are projections rather than reader-facing product slices.
+Objective: Integrate each required workflow into shared context/evidence/DTO/Telegram/receipt/actions path.
+Implementation-Boundary: One workflow slice per bounded subtask/PR; no generic multi-output answer.
+Source-of-Truth: docs/prm_mature_product_contract.md.
+Files:
+  - src/assistant/professional_workflows.py
+  - src/assistant/memory_research.py
+  - tests/test_prm_professional_workflows.py
+Schema-Interface-Changes: workflow-specific DTO sections only.
+Privacy-Boundary: No fabricated portfolio/job-market proof.
+Failure-Behavior: Missing evidence returns partial/no-action workflow result.
+Acceptance-Criteria:
+  - id: AC-1; description: Each workflow fixture renders mandated fields and one shared context ID; test: tests/test_prm_professional_workflows.py::test_end_to_end_workflows.
+  - id: AC-2; description: Project action fixture requires direct evidence/current-goal acceptance criterion; test: tests/test_prm_professional_workflows.py::test_project_action_guard.
+Verification:
+  - python3 -m pytest tests/test_prm_professional_workflows.py tests/test_handlers.py -q
+Integration-Checks: Verify visible Telegram sections and context-aware buttons for every workflow.
+Eval-Impact: Adds workflow holdouts and anti-generic phrasing samples.
+Cost-Budget: max_model_calls=1; max_retries=1; approval_required_before_provider=true
+Migration-Backward-Compatibility: Keep current projections as adapters during rollout.
+Human-Approvals: Provider usage if synthesis is enabled.
+Non-Goals: automatic MVP/portfolio approval
+Operator-Validation-Impact: supports 36 workflow questions
+
+### PRM-MAT-13: Usage-Derived Weekly Recap V2
+
+Owner: codex
+Phase: E
+Type: project:governance
+Status: proposed
+Depends-On: PRM-MAT-7, PRM-MAT-9, PRM-MAT-11, PRM-MAT-12
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: conditional
+Mutation-Required: required
+Property-Required: conditional
+Visual-Contract: required
+Runtime-Verification: required
+Correction-Budget: 2
+User-Problem: Weekly recap is shallow and can confuse fixtures with real usage.
+Objective: Project actual ledger/knowledge/reaction/action/verification use into a privacy-safe secondary recap.
+Implementation-Boundary: No Report V2/Atlas/Frontier/Radar primary input.
+Source-of-Truth: docs/prm_mature_product_contract.md.
+Files:
+  - src/output/prm_usage_weekly_recap.py
+  - tests/test_prm_usage_weekly_recap.py
+Schema-Interface-Changes: recap DTO only if durable export boundary needs it.
+Privacy-Boundary: Aggregate/private local only; empty evidence says so.
+Failure-Behavior: Missing usage produces explicit no-evidence recap.
+Acceptance-Criteria:
+  - id: AC-1; description: Fixture reports all nine target sections from ledger evidence; test: tests/test_prm_usage_weekly_recap.py::test_usage_projection.
+  - id: AC-2; description: No-evidence fixture cannot claim change/usefulness; test: tests/test_prm_usage_weekly_recap.py::test_empty_usage_boundary.
+Verification:
+  - python3 -m pytest tests/test_prm_usage_weekly_recap.py -q
+Integration-Checks: Confirm legacy report inputs are absent.
+Eval-Impact: Adds recap provenance tests.
+Cost-Budget: max_cost_usd=0; max_model_calls=0; max_retries=0
+Migration-Backward-Compatibility: Retain existing V3 as compatibility projection.
+Human-Approvals: Any schedule/delivery change.
+Non-Goals: report pipeline revival
+Operator-Validation-Impact: summarizes real labels only
+
+### PRM-MAT-14: Mature Evaluation And Holdout Suite
+
+Owner: codex
+Phase: E
+Type: eval:gate eval:judge
+Status: proposed
+Depends-On: PRM-MAT-13
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: required
+Mutation-Required: required
+Property-Required: required
+Visual-Contract: required
+Runtime-Verification: required
+Correction-Budget: 2
+User-Problem: Component tests do not prove cross-layer safety or professional usefulness.
+Objective: Separate routing, retrieval, personalization, generation, write, verification and operator evaluation suites.
+Implementation-Boundary: Fixtures/holdouts only; no threshold success claim.
+Source-of-Truth: docs/prm_mature_acceptance_plan.md.
+Files:
+  - evals/prm_mat/
+  - tests/test_test_tiers.py
+  - docs/prm_mature_acceptance_plan.md
+Schema-Interface-Changes: versioned eval manifests only.
+Privacy-Boundary: Synthetic/redacted fixtures; no private corpus committed.
+Failure-Behavior: Missing gold/human label remains unscored, not pass.
+Acceptance-Criteria:
+  - id: AC-1; description: Routing suite contains >=50 categorized holdouts; verify: python3 tools/prm_mat_eval.py --check routing.
+  - id: AC-2; description: Write/verification suites exercise replay/SSRF negatives; verify: python3 tools/prm_mat_eval.py --check safety.
+Verification:
+  - python3 tools/prm_mat_eval.py --check all
+Integration-Checks: CI tier maps focused/integration/security/full commands.
+Eval-Impact: Creates authoritative holdout baseline.
+Cost-Budget: no LLM judge required; judge calibration requires separate approval
+Migration-Backward-Compatibility: Preserve existing RAG evals.
+Human-Approvals: Thresholds and judge authority.
+Non-Goals: generated labels as human evidence
+Operator-Validation-Impact: defines measurement before collection
+
+### PRM-MAT-15: Operations, Privacy, Cost, Backup, And Rollback
+
+Owner: codex
+Phase: E
+Type: compliance:control cost:telemetry agent:recovery
+Status: proposed
+Depends-On: PRM-MAT-14
+Risk-Level: critical
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: required
+Mutation-Required: required
+Property-Required: required
+Visual-Contract: required
+Runtime-Verification: required
+Correction-Budget: 2
+User-Problem: Operator lacks one friendly health/freshness/cost/restore view and tested recovery boundary.
+Objective: Define status, metrics, privacy retention, budgets, backup/restore and rollback runbooks with tested safe paths.
+Implementation-Boundary: Do not install/start/change services or environment in this task without approval.
+Source-of-Truth: docs/prm_mature_product_contract.md.
+Files:
+  - docs/runbooks/backup_restore.md
+  - docs/runbooks/assistant_runtime.md
+  - docs/COST_BUDGET.md
+Schema-Interface-Changes: telemetry only after approved ledger policy.
+Privacy-Boundary: No raw corpus in logs/receipts; hardened local data policy.
+Failure-Behavior: Stale/provider/index failures are visible partials with safe fallback.
+Acceptance-Criteria:
+  - id: AC-1; description: Status fixture reports health/freshness/reaction/vector/budget without secrets; test: tests/test_prm_status.py::test_safe_status.
+  - id: AC-2; description: Backup restore rehearsal artifact has checksum and rollback decision; verify: docs/runbooks/backup_restore.md contains rehearsal checklist.
+Verification:
+  - python3 -m pytest tests/test_prm_status.py -q
+Integration-Checks: Dry-run/rehearsal only, no production mutation.
+Eval-Impact: Adds failure/recovery budget assertions.
+Cost-Budget: Provider/daily/monthly limits require explicit approval.
+Migration-Backward-Compatibility: Retain existing safe runtime boundary.
+Human-Approvals: Budgets, retention, encryption/permissions, operational schedule.
+Non-Goals: service changes in planning
+Operator-Validation-Impact: gives readable operational confidence signals
+### PRM-MAT-16: Documentation, CI, And Developer Experience
+
+Owner: codex
+Phase: E
+Type: eval:gate none
+Status: proposed
+Depends-On: PRM-MAT-15
+Risk-Level: medium
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: conditional
+Mutation-Required: conditional
+Property-Required: not_required
+Visual-Contract: required
+Runtime-Verification: required
+Correction-Budget: 2
+User-Problem: Product docs, active runbooks and CI truth drift from the actual private assistant.
+Objective: Consolidate product-first docs, runbooks, CI tier diagnosis and evidence index without deleting compatibility surfaces.
+Implementation-Boundary: Documentation/CI config only; no broad refactor or legacy deletion.
+Source-of-Truth: docs/prm_mature_product_gap_audit.md.
+Files:
+  - README.md
+  - docs/README.md
+  - .github/workflows/ci.yml
+Schema-Interface-Changes: none
+Privacy-Boundary: Demo fixtures/screenshots remain redacted.
+Failure-Behavior: CI failure cause is recorded, not masked by local test success.
+Acceptance-Criteria:
+  - id: AC-1; description: Root README links product/quickstart/runbooks without systemd manual expansion; test: tests/test_repo_hygiene_handoff.py::test_readme_product_links.
+  - id: AC-2; description: CI tier commands are documented and current failed workflow is diagnosed; verify: docs/EVIDENCE_INDEX.md contains CI run evidence.
+Verification:
+  - python3 tools/playbook_validate.py --root . --check references
+Integration-Checks: Verify all active doc links and archived-surface labels.
+Eval-Impact: CI runs focused/integration/security/full tiers.
+Cost-Budget: max_cost_usd=0; max_model_calls=0; max_retries=0
+Migration-Backward-Compatibility: Legacy docs stay referenced as historical.
+Human-Approvals: Public examples/screenshots.
+Non-Goals: compatibility deletion
+Operator-Validation-Impact: prevents misleading operating instructions
+
+### PRM-MAT-17: Live Integration Smoke Acceptance
+
+Owner: codex
+Phase: F
+Type: eval:gate workflow:autonomous
+Status: proposed
+Depends-On: PRM-MAT-5, PRM-MAT-6, PRM-MAT-7, PRM-MAT-8, PRM-MAT-9, PRM-MAT-10, PRM-MAT-11, PRM-MAT-12, PRM-MAT-14, PRM-MAT-15, PRM-MAT-16
+Risk-Level: critical
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: required
+Mutation-Required: required
+Property-Required: required
+Visual-Contract: required
+Runtime-Verification: required
+Correction-Budget: 2
+User-Problem: Integrated behavior may differ from component fixtures.
+Objective: Run an explicitly approved bounded manual smoke trace and record evidence without dogfood/release claim.
+Implementation-Boundary: No dogfood start; no service/config/provider change outside approved trace.
+Source-of-Truth: docs/prm_mature_acceptance_plan.md.
+Files:
+  - evals/prm_mat_smoke_receipt.json
+  - docs/EVIDENCE_INDEX.md
+Schema-Interface-Changes: none
+Privacy-Boundary: Receipt is redacted/aggregate only.
+Failure-Behavior: Any boundary failure blocks validation start.
+Acceptance-Criteria:
+  - id: AC-1; description: Approved smoke trace preserves interaction identity through answer, receipt and proposal; verify: python3 tools/prm_mat_smoke.py --check.
+Verification:
+  - python3 tools/prm_mat_smoke.py --check
+Integration-Checks: One bounded real runtime trace after operator approval.
+Eval-Impact: Confirms fixture-to-runtime parity only.
+Cost-Budget: Explicit approved smoke budget.
+Migration-Backward-Compatibility: none
+Human-Approvals: Smoke runtime/provider/write scope.
+Non-Goals: PRM-19 dogfood evidence
+Operator-Validation-Impact: gate before four-week program
+
+### PRM-MAT-18: Four-Week Operator Validation
+
+Owner: operator
+Phase: F
+Type: eval:gate
+Status: proposed
+Depends-On: PRM-MAT-17
+Risk-Level: critical
+Public-Tests-Required: not_required
+Critic-Required: required
+Holdout-Required: not_required
+Mutation-Required: not_required
+Property-Required: not_required
+Visual-Contract: required
+Runtime-Verification: required
+Correction-Budget: 2
+User-Problem: Mature product value has no real operator evidence.
+Objective: Collect and review the approved 40-question private validation program.
+Implementation-Boundary: Operator-led evidence only; no automatic success/release claim.
+Source-of-Truth: docs/prm_operator_validation_plan.md.
+Files:
+  - docs/prm_operator_validation_plan.md
+  - evals/prm_mat_operator_aggregate.json
+Schema-Interface-Changes: none
+Privacy-Boundary: Private ledger; committed aggregate excludes raw text.
+Failure-Behavior: Unknown/missing labels do not count as useful.
+Acceptance-Criteria:
+  - id: AC-1; description: Aggregate records 40 categorized questions and labels provenance; verify: python3 tools/prm_mat_operator_eval.py --check.
+Verification:
+  - python3 tools/prm_mat_operator_eval.py --check
+Integration-Checks: Weekly operator review records corrections and boundaries.
+Eval-Impact: Produces sole user-value evidence source.
+Cost-Budget: Operator-approved monthly budget.
+Migration-Backward-Compatibility: none
+Human-Approvals: Validation start and final interpretation.
+Non-Goals: automatic dogfood/release success
+Operator-Validation-Impact: this is the validation program
+
+### PRM-MAT-19: Post-Validation Simplification And Release Candidate
+
+Owner: codex
+Phase: F
+Type: project:governance
+Status: proposed
+Depends-On: PRM-MAT-18
+Risk-Level: critical
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: required
+Mutation-Required: conditional
+Property-Required: conditional
+Visual-Contract: required
+Runtime-Verification: required
+Correction-Budget: 2
+User-Problem: Validated product can still retain needless complexity and unaddressed operator friction.
+Objective: Convert approved evidence into bounded fixes, simplification candidates and a release-candidate decision packet.
+Implementation-Boundary: No deletion/archive or release claim without separate approval.
+Source-of-Truth: PRM-MAT-18 aggregate and docs/REVIEW_POLICY.md.
+Files:
+  - docs/prm_mature_product_gap_audit.md
+  - docs/DECISION_LOG.md
+Schema-Interface-Changes: none unless independently approved.
+Privacy-Boundary: Aggregate evidence only.
+Failure-Behavior: Unmet approved target remains blocked, not rationalized.
+Acceptance-Criteria:
+  - id: AC-1; description: Decision packet maps each gap to evidence, keep/fix/defer choice and approval; verify: docs/DECISION_LOG.md contains PRM-MAT-19 record.
+Verification:
+  - python3 tools/playbook_validate.py --root . --check readiness --check delivery
+Integration-Checks: Re-run affected integration/holdout tests after each bounded correction.
+Eval-Impact: Re-evaluates only changed slices.
+Cost-Budget: No new provider spend without approval.
+Migration-Backward-Compatibility: Compatibility changes are separately proposed.
+Human-Approvals: Release candidate and any cleanup.
+Non-Goals: self-declared release
+Operator-Validation-Impact: turns evidence into explicit continuation choice
+
+### PRM-MAT-20: Portfolio Case Packaging After Product Evidence
+
+Owner: codex
+Phase: F
+Type: compliance:evidence
+Status: proposed
+Depends-On: PRM-MAT-19
+Risk-Level: high
+Public-Tests-Required: required
+Critic-Required: required
+Holdout-Required: not_required
+Mutation-Required: not_required
+Property-Required: not_required
+Visual-Contract: required
+Runtime-Verification: conditional
+Correction-Budget: 2
+User-Problem: Professional case material could overstate private-product evidence or expose private data.
+Objective: Prepare approval-gated redacted case specification from verified product evidence.
+Implementation-Boundary: Documentation/assets only after public-example approval.
+Source-of-Truth: PRM-MAT-18/19 approved evidence.
+Files:
+  - docs/portfolio/case-study.md
+  - docs/product_demo_spec.md
+Schema-Interface-Changes: none
+Privacy-Boundary: No raw Telegram text, question, secrets, local paths or unapproved screenshots.
+Failure-Behavior: Insufficient/publicly unsafe evidence produces no case publication.
+Acceptance-Criteria:
+  - id: AC-1; description: Case draft labels maturity/evidence and passes privacy scan; test: tests/test_public_evidence.py::test_public_artifacts_are_redacted.
+Verification:
+  - python3 scripts/public_scorecard_demo.py --check
+Integration-Checks: Human review approves every screenshot/example.
+Eval-Impact: References approved aggregate evidence only.
+Cost-Budget: max_cost_usd=0; max_model_calls=0; max_retries=0
+Migration-Backward-Compatibility: none
+Human-Approvals: Public portfolio examples and release wording.
+Non-Goals: public launch
+Operator-Validation-Impact: communicates evidence only after validation

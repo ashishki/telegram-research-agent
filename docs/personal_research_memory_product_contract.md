@@ -1,5 +1,7 @@
 # Personal Research Memory Product Contract
 
+> Successor planning: `docs/prm_mature_product_contract.md` defines the proposed integrated PRM-MAT target. This document remains the implemented/foundation contract; the successor does not retroactively change runtime status.
+
 Status: proposed
 
 Last updated: 2026-08-12

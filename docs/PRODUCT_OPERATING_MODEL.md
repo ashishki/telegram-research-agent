@@ -1,5 +1,7 @@
 # Product Operating Model
 
+> 2026-08-13 planning note: current runtime statements below are historical/local runtime receipts, not PRM-MAT operator-validation evidence. The proposed mature request, durability, freshness and approval boundaries are in `docs/prm_mature_product_contract.md`.
+
 Status: active handoff
 Last updated: 2026-08-12
 

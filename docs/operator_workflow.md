@@ -1,5 +1,7 @@
 # Operator Workflow
 
+> Current-path note (2026-08-13): sections describing Report V2, Radar, Atlas or legacy command routines are compatibility/history, not the primary PRM assistant workflow. `docs/operator_quickstart.md` is the daily surface; PRM-MAT redesign is proposed, not active.
+
 **Version:** 2.7
 **Last updated:** 2026-08-12
 **Audience:** System owner (single user, personal use)

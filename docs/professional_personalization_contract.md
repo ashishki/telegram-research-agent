@@ -1,5 +1,7 @@
 # Professional Personalization Contract
 
+> PRM-MAT successor note: current lens definitions are foundation contracts. Runtime bilingual reranking, reader-facing framing and approved defaults are proposed in `docs/prm_mature_product_contract.md` and PRM-MAT-2; do not infer they are live.
+
 Status: proposed, requires operator approval before configuration changes
 Date: 2026-08-12
 Schema version: `professional_personalization.v2.proposed`

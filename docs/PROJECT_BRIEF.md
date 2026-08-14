@@ -6,7 +6,9 @@ Mode: Standard
 
 Last updated: 2026-08-12
 
-Playbook SHA: `5583eca96c4d2d480b5574ed78bea63e0b07ebf0`
+Historical Playbook SHA: `5583eca96c4d2d480b5574ed78bea63e0b07ebf0` (stale; retained for prior evidence)
+
+Current planning Playbook SHA: `965612aa463fca1a35a55104633d0e09da33d615`
 
 PRM-UX planning inspection:
 

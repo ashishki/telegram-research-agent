@@ -1,5 +1,9 @@
 # Decision Log
 
+## D-PRM-MAT-2026-08-13 — Plan an integrated maturity queue without claiming completion
+
+Decision: preserve PRM-UX historical implementation evidence and create proposed PRM-MAT successor tasks for the missing shared request lifecycle, durability, receipts, freshness, verification, evaluation and operations. Rationale: repository inspection found several deterministic components that are not one reader-facing or durable live path. Consequence: no configuration, database, service, provider, fetch, dogfood, release or compatibility-cleanup authority is granted.
+
 Status: active
 Last updated: 2026-07-26
 

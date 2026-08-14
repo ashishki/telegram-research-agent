@@ -1,5 +1,9 @@
 # Codex Session Handoff
 
+## PRM-MAT Planning Update (2026-08-13)
+
+`docs/prm_mature_product_roadmap.md` and `docs/tasks.md` define the proposed PRM-MAT successor queue. It does not approve configuration/schema writes, live fetch/provider changes, schedules, dogfood, release claims, or compatibility cleanup. Treat PRM-UX implementation labels as foundation evidence; consult `docs/prm_mature_product_gap_audit.md` for verified integration maturity.
+
 Status: active
 Last updated: 2026-08-12
 

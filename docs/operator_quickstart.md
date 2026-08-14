@@ -65,7 +65,8 @@ PYTHONPATH=src python3 src/main.py memory refresh-archive \
   --json
 ```
 
-Target Telegram action `/refresh` is planned but not implemented by this
+Target Telegram action `/refresh` remains planned; PRM-MAT-8 defines the
+owner-only, independently reported refresh lifecycle. It is not implemented by this
 document.
 
 ## 5. How do I leave feedback?

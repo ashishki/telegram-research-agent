@@ -20,6 +20,7 @@ currently running as a manual operator test environment.
 
 - `docs/operator_quickstart.md` for daily use;
 - `docs/operator_workflow.md` for supporting operational context;
+- `docs/prm_mature_product_roadmap.md` for the proposed private-product completion plan;
 - `docs/runbooks/` for runtime, archive-refresh, and development boundaries;
 - `docs/legacy_surfaces.md` for compatibility-only history.
 

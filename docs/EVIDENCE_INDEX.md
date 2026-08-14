@@ -1,5 +1,12 @@
 # Evidence Index
 
+## PRM-MAT planning baseline (2026-08-13)
+
+- Target planning baseline: `c282056210c09781cbe45fe00ac2b0008bc35043`; requested `d27158a…` is an ancestor.
+- Playbook planning baseline: `965612aa463fca1a35a55104633d0e09da33d615`; historical `5583eca…` pin is stale.
+- Local pre-edit governance validation passed. Remote CI workflow exists, but the five most recent GitHub runs were failed; current-HEAD run observed: `31733747425`.
+- `docs/prm_mature_product_gap_audit.md` is the maturity/evidence index for proposed PRM-MAT successors; it is not operator-validation evidence.
+
 Status: active
 Last updated: 2026-08-12
 

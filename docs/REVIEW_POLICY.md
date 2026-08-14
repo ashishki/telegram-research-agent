@@ -1,8 +1,48 @@
 # Review Policy
 
+## PRM-MAT review boundary
+
+PRM-MAT-0 through PRM-MAT-16 require evidence-backed review; risky tasks require critic/holdout/property checks as declared in `docs/tasks.md`. PRM-MAT-17 needs explicit bounded smoke approval; PRM-MAT-18 needs explicit four-week validation-start approval. No fixture, local runtime receipt or LLM judge substitutes for operator labels.
+
+## PRM-MAT Deep Review Protocol
+
+Use the existing Playbook deep-review/audit mechanism; this section only fixes
+when PRM-MAT invokes it. Do not replace its audit checklist, evidence format,
+or completion authority with a new local protocol.
+
+Run one batched deep review after each completed block:
+
+- **A:** PRM-MAT-1 through PRM-MAT-5 — canonical context, routing, lens,
+  project context, answer DTO, and Telegram UX.
+- **B:** PRM-MAT-6, PRM-MAT-7, PRM-MAT-11 — durable proposals, receipts, and
+  queryable saved knowledge.
+- **C:** PRM-MAT-8 through PRM-MAT-9 — archive freshness and reaction path.
+- **D:** PRM-MAT-10 through PRM-MAT-12 — primary-source verification and
+  professional workflow integration.
+- **E:** PRM-MAT-13 through PRM-MAT-16 — recap, evaluation, operations,
+  privacy/cost, documentation, and CI.
+- **F:** before PRM-MAT-17, and again after PRM-MAT-18 evidence review —
+  smoke/validation readiness and post-validation decisions.
+
+Also invoke an immediate Playbook deep review before continuing after a task
+that changes or enables persistent schema/write behavior, production migration,
+provider/raw-text egress, live network verification, archive/reaction schedule,
+trust policy, backup/restore boundary, dogfood start, release claim, or
+compatibility deletion/archive/move. This includes PRM-MAT-3, -6, -7, -8, -10,
+-15, and -17 whenever their scoped implementation reaches that boundary.
+
+When the Playbook protocol calls for an exec-based Codex reviewer, request
+`gpt-5.6-terra` with `high` reasoning effort. Record the exact command, the
+effective model/effort reported by the runtime, reviewer input scope, findings,
+required corrections, and re-verification result. If the runtime cannot honor
+that model/effort selection, record the mismatch and do not represent the
+review as Terra/high. The review remains read-only unless a separate approved
+fix task is started; it cannot approve human gates or completion.
+
 Status: proposed
-Last updated: 2026-07-26
-Playbook SHA: 5583eca96c4d2d480b5574ed78bea63e0b07ebf0
+Last updated: 2026-08-14
+Playbook SHA: 965612aa463fca1a35a55104633d0e09da33d615
+Historical retrofit pin: 5583eca96c4d2d480b5574ed78bea63e0b07ebf0 (stale)
 
 ## Authority
 

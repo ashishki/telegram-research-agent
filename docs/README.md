@@ -13,6 +13,13 @@ Last updated: 2026-08-12
 - docs/professional_personalization_contract.md
 - docs/prm_operator_experience_audit.md
 - docs/prm_operator_experience_roadmap.md
+- docs/prm_mature_product_gap_audit.md
+- docs/prm_mature_product_contract.md
+- docs/prm_mature_product_roadmap.md
+- docs/operator_context_contract.md
+- docs/prm_mature_acceptance_plan.md
+- docs/prm_configuration_migration_plan.md
+- docs/prm_operator_validation_plan.md
 - docs/prm19_dogfood_plan.md (operator production-test plan; historical filename)
 - docs/operator_quickstart.md
 - docs/operator_workflow.md
@@ -20,6 +27,9 @@ Last updated: 2026-08-12
 - docs/runbooks/assistant_runtime.md
 - docs/runbooks/archive_refresh.md
 - docs/runbooks/development.md
+- docs/runbooks/reaction_sync.md (proposed)
+- docs/runbooks/primary_source_verification.md (proposed)
+- docs/runbooks/backup_restore.md (proposed)
 - docs/personal_research_memory_architecture.md
 - docs/personal_research_memory_roadmap.md
 - docs/PRODUCT_OPERATING_MODEL.md
