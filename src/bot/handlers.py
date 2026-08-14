@@ -57,21 +57,9 @@ PRM_SAFE_COMMANDS = frozenset(
     {
         "/start",
         "/help",
-        "/weekly",
-        "/actions",
-        "/explain",
-        "/projects",
-        "/mvp",
-        "/strategy",
-        "/codex",
         "/chat",
-        "/hermes",
-        "/ask",
-        "/auto",
-        "/auto_voice",
         "/research",
         "/brief",
-        "/costs",
         "/status",
         "/refresh",
         "/reactions",
@@ -778,11 +766,10 @@ def normalize_bot_runtime_mode(runtime_mode: str | None) -> str:
 def _send_prm_safe_blocked(chat_id: str, command: str) -> None:
     shown_command = command or "unknown"
     lines = [
-        "PRM safe mode blocked this legacy command.",
-        f"Command: {shown_command}",
-        "",
-        "Send ordinary text for auto local routing, or use /research for grounded questions, /brief for source-backed theses, or /weekly /actions /mvp /strategy for read-only orientation.",
-        "No generation, ingestion, Radar, direct feedback/tag/reminder write, or report delivery was run.",
+        "Эта команда не входит в обычный путь помощника.",
+        "Просто напиши, что хочешь узнать, решить или подготовить — я сам выберу исследование, бриф или уточняющий вопрос.",
+        "Запасные варианты: /research, /brief и /chat.",
+        "Никаких legacy-отчётов, ingestion или скрытых записей не запускалось.",
     ]
     send_message(_get_bot_token(), chat_id, "\n".join(lines), parse_mode=None)
 

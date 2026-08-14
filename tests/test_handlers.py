@@ -481,9 +481,9 @@ class TestHandlers(unittest.TestCase):
 
         mock_run_digest.assert_not_called()
         message = mock_send_message.call_args.args[2]
-        self.assertIn("PRM safe mode blocked", message)
-        self.assertIn("/run_digest", message)
-        self.assertIn("No generation", message)
+        self.assertIn("не входит в обычный путь", message)
+        self.assertIn("Просто напиши", message)
+        self.assertIn("Никаких legacy-отчётов", message)
 
     def test_prm_safe_blocks_operator_message_write_router(self):
         settings = Settings(
@@ -505,8 +505,8 @@ class TestHandlers(unittest.TestCase):
 
         classify_mock.assert_not_called()
         message = mock_send_message.call_args.args[2]
-        self.assertIn("PRM safe mode blocked", message)
-        self.assertIn("/message", message)
+        self.assertIn("не входит в обычный путь", message)
+        self.assertIn("/research", message)
 
     def test_prm_safe_blocks_direct_feedback_confirmation(self):
         settings = Settings(
@@ -528,8 +528,8 @@ class TestHandlers(unittest.TestCase):
 
         confirm_mock.assert_not_called()
         message = mock_send_message.call_args.args[2]
-        self.assertIn("PRM safe mode blocked", message)
-        self.assertIn("/feedback_confirm", message)
+        self.assertIn("не входит в обычный путь", message)
+        self.assertIn("скрытых записей", message)
 
     def test_prm_safe_command_allowlist_allows_chat(self):
         settings = Settings(
