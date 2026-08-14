@@ -512,6 +512,15 @@ class TestMemoryResearch(unittest.TestCase):
         self.assertIn("пилоты vs результат", rendered)
         self.assertIn("Privacy: mode=local-research; model_calls=0", rendered)
 
+    def test_memory_research_brief_without_sources_offers_plain_next_steps(self):
+        result = answer_memory_research("собери тезисы для поста про AI adoption", facade=_FakeFacade())
+
+        rendered = render_memory_research_brief(result)
+
+        self.assertIn("Как продолжим", rendered)
+        self.assertIn("Сформулируй тему шире", rendered)
+        self.assertIn("Пришли ссылку или материал", rendered)
+
     def test_memory_research_compact_render_localizes_russian_and_prioritizes_freshness(self):
         result = answer_memory_research(
             "какая текущая цена акций Nvidia сегодня?",

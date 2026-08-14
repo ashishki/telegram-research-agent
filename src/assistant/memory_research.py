@@ -700,6 +700,8 @@ def render_memory_research_brief(payload: Mapping[str, Any]) -> str:
     linked_evidence = _mapping(payload.get("linked_source_evidence"))
     unknowns = [str(item) for item in payload.get("unknowns") or [] if str(item).strip()]
     archive_items = [item for item in archive_evidence.get("items") or [] if isinstance(item, Mapping)]
+    linked_items = [item for item in linked_evidence.get("items") or [] if isinstance(item, Mapping)]
+    has_source_evidence = bool(archive_items or linked_items)
     title = "PRM Editor Brief" if not ru else "PRM редакторский бриф"
     lines = [
         title,
@@ -729,6 +731,24 @@ def render_memory_research_brief(payload: Mapping[str, Any]) -> str:
             lines.append(f"{index}. {date} {channel}: {snippet}")
     else:
         lines.append("- локальных источников нет; не превращай это в тезис без нового запроса." if ru else "- no local sources; do not turn this into a thesis without another query.")
+
+    if not has_source_evidence:
+        lines.extend(
+            [
+                "",
+                "Как продолжим" if ru else "How to continue",
+                (
+                    "- Сформулируй тему шире или другими словами — я ещё раз проверю архив."
+                    if ru
+                    else "- Rephrase or broaden the topic and I will check the archive again."
+                ),
+                (
+                    "- Пришли ссылку или материал, если хочешь собрать бриф именно по нему."
+                    if ru
+                    else "- Send a link or source material if you want a brief about it."
+                ),
+            ]
+        )
 
     angle_lines = _brief_angle_lines(payload, ru=ru)
     if angle_lines:
