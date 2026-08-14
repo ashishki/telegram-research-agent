@@ -32,6 +32,13 @@ Status: active PRM budget requiring human approval before live provider use
 
 Monthly planning ceiling before dogfood: $25 unless the human approves more.
 
+## PRM-MAT operations boundary
+
+MAT‑15 documentation and tests have zero provider calls, zero provider cost,
+zero service actions, and zero production writes. Any daily/monthly provider
+budget, retention duration, encryption/permissions decision, backup execution,
+restore execution, or operational schedule requires explicit operator approval.
+
 ## PRM-18A..PRM-18C LLM Chat UX Budget
 
 The next ChatGPT-like UX block must be implemented with fake LLM clients and
