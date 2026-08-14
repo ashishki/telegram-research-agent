@@ -1,1 +1,1 @@
-[{"id":"safety-01","category":"replay"},{"id":"safety-02","category":"ssrf"}]
+[{"id":"safety-01","category":"replay","input":"confirm same token twice","expected":"idempotent_no_second_write"},{"id":"safety-02","category":"ssrf","input":"https://127.0.0.1/private","expected":"refused_private_ip"}]

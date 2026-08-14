@@ -17,7 +17,7 @@ def main() -> int:
     if check in {"safety", "all"}:
         rows = json.loads((ROOT / "evals/prm_mat/safety_holdouts.v1.json").read_text())
         required = {"replay", "ssrf"}
-        if not required.issubset({row.get("category") for row in rows}): failures.append("safety")
+        if not required.issubset({row.get("category") for row in rows}) or any(not row.get("input") or not row.get("expected") for row in rows): failures.append("safety")
     print("prm_mat_eval: " + ("ok" if not failures else "failed=" + ",".join(failures)))
     return 0 if not failures else 1
 if __name__ == "__main__": raise SystemExit(main())

@@ -355,16 +355,12 @@ python3 tools/playbook_validate.py --root . \
   --check references
 ```
 
-Full verifier:
+The full verifier and `pytest tests/ -q` are prohibited by the current
+operator policy. Use only focused checks selected for the changed scope:
 
 ```bash
-python3 tools/verify_project.py --root .
-```
-
-Generic test run:
-
-```bash
-PYTHONPATH=src python3 -m pytest tests/ -q
+PYTHONPATH=src python3 -m pytest tests/test_prm_status.py -q
+python3 tools/prm_mat_eval.py --check safety
 ```
 
 Before committing:
