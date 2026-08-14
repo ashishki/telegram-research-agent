@@ -33,8 +33,9 @@ def test_recap_contract():
 
 
 def test_recap_requires_usage_evidence():
-    with pytest.raises(PRMUsageWeeklyRecapError, match="usage evidence"):
-        build_prm_usage_weekly_recap({})
+    empty = build_prm_usage_weekly_recap({})
+    assert empty["status"] == "no_usage_evidence"
+    assert "не заявляются" in empty["main_change"]
 
     preview = build_prm_usage_weekly_recap({"fixture_preview_approved": True})
     assert preview["status"] == "fixture_preview"
