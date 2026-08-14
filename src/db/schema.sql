@@ -587,7 +587,8 @@ CREATE TABLE IF NOT EXISTS personal_memory_events (
         'decision',
         'action',
         'experiment',
-        'feedback'
+        'feedback',
+        'source_card'
     )),
     event_type TEXT NOT NULL CHECK(event_type IN (
         'created',

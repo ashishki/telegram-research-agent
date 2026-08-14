@@ -21,6 +21,7 @@ MEMORY_OBJECT_TYPES = {
     "action",
     "experiment",
     "feedback",
+    "source_card",
 }
 
 MEMORY_OPERATIONS = {
@@ -81,7 +82,7 @@ def confirm_memory_proposal(db_path: str | Path, args: Mapping[str, Any]) -> dic
             "message": "Valid confirmation_token is required before persistence.",
         }
 
-    timestamp = _optional_string(args.get("confirmed_at")) or _now_iso()
+    timestamp = _canonical_timestamp(args.get("confirmed_at")) or _now_iso()
     confirmed_by = _optional_string(args.get("confirmed_by")) or "operator"
     memory_id = proposal.get("target_memory_id") or _memory_id(proposal)
     event_type = MEMORY_OPERATIONS[str(proposal["operation"])]
@@ -191,6 +192,45 @@ def confirm_memory_proposal(db_path: str | Path, args: Mapping[str, Any]) -> dic
     }
 
 
+def query_saved_knowledge(db_path: str | Path, *, filters: Mapping[str, Any] | None = None, limit: int = 20) -> dict[str, Any]:
+    """Project confirmed append-only memory into cited, secondary evidence only.
+
+    This is a read-only query over already-confirmed events. It never promotes a
+    chat turn into memory and it does not override fresher archive evidence.
+    """
+
+    requested = dict(filters or {})
+    max_items = max(1, min(int(limit), 50))
+    db_file = Path(db_path)
+    if not db_file.exists():
+        return _saved_query_result([], requested)
+    with sqlite3.connect(f"file:{db_file}?mode=ro", uri=True) as connection:
+        if not _schema_ready(connection):
+            return _saved_query_result([], requested)
+        connection.row_factory = sqlite3.Row
+        rows = connection.execute(
+            "SELECT id, memory_id, object_type, event_type, title, body, rationale, source_refs_json, "
+            "metadata_json, created_at FROM personal_memory_events ORDER BY memory_id, id"
+        ).fetchall()
+    histories: dict[str, list[sqlite3.Row]] = {}
+    for row in rows:
+        histories.setdefault(str(row["memory_id"]), []).append(row)
+    items = []
+    for history in histories.values():
+        latest = history[-1]
+        if str(latest["event_type"]) == "deleted":
+            state = "closed"
+        elif str(latest["event_type"]) == "rolled_back":
+            state = "rolled_back"
+        else:
+            state = "active"
+        item = _saved_item(latest, history, state)
+        if _matches_saved_filters(item, requested):
+            items.append(item)
+    items.sort(key=lambda item: (item["created_at"], item["memory_id"]), reverse=True)
+    return _saved_query_result(items[:max_items], requested)
+
+
 def _not_persisted(status: str, message: str) -> dict[str, object]:
     return {
         "status": status,
@@ -198,6 +238,56 @@ def _not_persisted(status: str, message: str) -> dict[str, object]:
         "write_performed": False,
         "message": message,
     }
+
+
+def _saved_query_result(items: list[dict[str, Any]], filters: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "schema_version": "prm_saved_knowledge_query.v1",
+        "status": "ok",
+        "filters": {key: value for key, value in filters.items() if key in {"topic", "project", "from_at", "to_at", "state", "object_type"}},
+        "items": items,
+        "secondary_evidence": True,
+        "write_performed": False,
+    }
+
+
+def _saved_item(latest: sqlite3.Row, history: list[sqlite3.Row], state: str) -> dict[str, Any]:
+    metadata = json.loads(str(latest["metadata_json"]))
+    refs = [ref for ref in json.loads(str(latest["source_refs_json"])) if str(ref).strip()]
+    return {
+        "memory_id": str(latest["memory_id"]),
+        "object_type": str(latest["object_type"]),
+        "state": state,
+        "title": str(latest["title"]),
+        "summary": _bounded_summary(latest["body"] or latest["rationale"]),
+        "source_refs": refs,
+        "citation": f"memory:{latest['memory_id']}",
+        "project_name": _optional_string(metadata.get("project_name")) or "",
+        "created_at": _canonical_timestamp(latest["created_at"]) or "",
+        "history": [{"event_id": int(row["id"]), "event_type": str(row["event_type"]), "created_at": _canonical_timestamp(row["created_at"]) or ""} for row in history],
+    }
+
+
+def _matches_saved_filters(item: Mapping[str, Any], filters: Mapping[str, Any]) -> bool:
+    object_type = _optional_string(filters.get("object_type"))
+    state = _optional_string(filters.get("state"))
+    if object_type and item["object_type"] != object_type:
+        return False
+    if state and item["state"] != state:
+        return False
+    topic = _optional_string(filters.get("topic"))
+    if topic and topic.casefold() not in f"{item['title']} {item['summary']}".casefold():
+        return False
+    project = _optional_string(filters.get("project"))
+    if project and project.casefold() != str(item["project_name"]).casefold():
+        return False
+    from_at = _canonical_timestamp(filters.get("from_at"))
+    to_at = _canonical_timestamp(filters.get("to_at"))
+    return (not from_at or item["created_at"] >= from_at) and (not to_at or item["created_at"] <= to_at)
+
+
+def _bounded_summary(value: object, limit: int = 240) -> str:
+    return " ".join(str(value or "").split())[:limit]
 
 
 def _schema_ready(connection: sqlite3.Connection) -> bool:
@@ -328,6 +418,19 @@ def _canonical_json(value: Mapping[str, Any]) -> str:
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _canonical_timestamp(value: object) -> str | None:
+    raw = _optional_string(value)
+    if raw is None:
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError("confirmed_at must be an ISO-8601 timestamp") from exc
+    if parsed.tzinfo is None:
+        raise ValueError("confirmed_at must include a timezone")
+    return parsed.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def _clean_required(value: object, field_name: str) -> str:

@@ -128,6 +128,24 @@ def _verify_personal_memory_schema(connection: sqlite3.Connection) -> None:
         )
 
 
+def _ensure_personal_memory_source_card(connection: sqlite3.Connection) -> None:
+    row = connection.execute("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'personal_memory_events'").fetchone()
+    if not row or "'source_card'" in str(row[0]):
+        return
+    connection.executescript("""
+        ALTER TABLE personal_memory_events RENAME TO personal_memory_events_old;
+        CREATE TABLE personal_memory_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, memory_id TEXT NOT NULL, object_type TEXT NOT NULL CHECK(object_type IN ('knowledge_note','watch_topic','project_link','decision','action','experiment','feedback','source_card')), event_type TEXT NOT NULL CHECK(event_type IN ('created','edited','deleted','rolled_back')), title TEXT NOT NULL, body TEXT, rationale TEXT, source_refs_json TEXT NOT NULL CHECK(json_valid(source_refs_json) AND json_type(source_refs_json) = 'array'), metadata_json TEXT NOT NULL CHECK(json_valid(metadata_json) AND json_type(metadata_json) = 'object'), proposal_id TEXT NOT NULL, rollback_of_event_id INTEGER, created_at TEXT NOT NULL, created_by TEXT NOT NULL, confirmation_token_hash TEXT NOT NULL, confirmation_receipt_json TEXT NOT NULL CHECK(json_valid(confirmation_receipt_json) AND json_type(confirmation_receipt_json) = 'object'), UNIQUE(proposal_id, confirmation_token_hash), FOREIGN KEY(rollback_of_event_id) REFERENCES personal_memory_events(id) ON DELETE RESTRICT
+        );
+        INSERT INTO personal_memory_events SELECT * FROM personal_memory_events_old;
+        DROP TABLE personal_memory_events_old;
+    """)
+    connection.executescript("""
+        CREATE INDEX IF NOT EXISTS idx_personal_memory_events_memory ON personal_memory_events(memory_id, id);
+        CREATE INDEX IF NOT EXISTS idx_personal_memory_events_type_created ON personal_memory_events(object_type, created_at);
+    """)
+
+
 def get_db_path() -> Path:
     raw_path = os.environ.get("AGENT_DB_PATH", DEFAULT_DB_PATH)
     path = Path(raw_path)
@@ -824,6 +842,7 @@ def run_migrations() -> Path:
         connection.execute("PRAGMA foreign_keys = ON;")
         connection.execute("PRAGMA journal_mode = WAL;")
         connection.executescript(schema_sql)
+        _ensure_personal_memory_source_card(connection)
         _verify_canonical_idea_thread_schema(connection)
         _verify_personal_memory_schema(connection)
         try:

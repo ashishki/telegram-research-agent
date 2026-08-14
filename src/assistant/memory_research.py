@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import sqlite3
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Mapping, Sequence
@@ -14,7 +15,7 @@ from assistant.linked_sources import (
     resolve_linked_sources,
 )
 from assistant.pi_facade import PersonalIntelligenceFacade
-from assistant.pi_memory import build_memory_proposal
+from assistant.pi_memory import build_memory_proposal, query_saved_knowledge
 from assistant.professional_workflows import (
     build_professional_answer,
     build_ai_systems_project_application_workflow,
@@ -371,6 +372,12 @@ def answer_memory_research(
         budget=active_budget,
         time_window=time_window,
     )
+    saved_result = _call_saved_knowledge(active_facade, clean_question, project_name=project_name, limit=bounded_limit)
+    curated_result = {
+        **curated_result,
+        "items": [*saved_result.get("items", []), *list(curated_result.get("items") or [])],
+        "saved_memory_secondary": True,
+    }
     project_context = _route_project_context(
         active_facade,
         clean_question,
@@ -1855,6 +1862,17 @@ def _call_curated_search(
         return dict(facade.search_intelligence_items(query, filters=filters, limit=limit))
     except Exception as exc:
         return {"status": "invalid", "query": query, "items": [], "message": f"Curated search failed: {type(exc).__name__}."}
+
+
+def _call_saved_knowledge(facade: Any, query: str, *, project_name: str | None, limit: int) -> dict[str, Any]:
+    settings = getattr(facade, "_settings", None)
+    db_path = getattr(settings, "db_path", None)
+    if not db_path:
+        return {"items": []}
+    try:
+        return query_saved_knowledge(db_path, filters={"topic": query, **({"project": project_name} if project_name else {})}, limit=limit)
+    except (OSError, sqlite3.Error, ValueError):
+        return {"items": []}
 
 
 def _route_project_context(

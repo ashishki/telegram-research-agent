@@ -1,4 +1,6 @@
 import json
+import os
+import tempfile
 import unittest
 from datetime import datetime, timezone
 
@@ -9,6 +11,9 @@ from assistant.memory_research import (
     render_memory_research_answer,
     render_memory_research_brief,
 )
+from assistant.pi_memory import build_memory_proposal, confirm_memory_proposal
+from config.settings import Settings
+from db.migrate import run_migrations
 
 
 class _FakeFacade:
@@ -199,6 +204,26 @@ class _MixedModelsFacade(_FakeFacade):
 
 
 class TestMemoryResearch(unittest.TestCase):
+    def test_confirmed_saved_memory_is_secondary_to_archive_evidence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = os.path.join(tmp, "memory.db")
+            previous = os.environ.get("AGENT_DB_PATH")
+            os.environ["AGENT_DB_PATH"] = db_path
+            try:
+                run_migrations()
+                draft = build_memory_proposal("knowledge_note", {"title": "Eval gates", "body": "Saved note", "source_refs": ["https://t.me/saved/1"]})
+                confirm_memory_proposal(db_path, {"proposal": draft["proposal"], "confirmation_token": draft["confirmation"]["token"]})
+                facade = _FakeFacade()
+                facade._settings = Settings(db_path=db_path, llm_api_key="", model_provider="", telegram_session_path="")
+                result = answer_memory_research("Eval gates", facade=facade, budget=MemoryResearchBudget(max_archive_sources=1, max_linked_sources=1))
+            finally:
+                if previous is None:
+                    os.environ.pop("AGENT_DB_PATH", None)
+                else:
+                    os.environ["AGENT_DB_PATH"] = previous
+        self.assertEqual(result["archive_evidence"]["items"][0]["source_url"], "https://t.me/eval_lab/1001")
+        self.assertTrue(result["curated_memory"]["items"])
+        self.assertTrue(result["curated_memory"].get("items")[0].get("citation", "").startswith("memory:"))
     def test_memory_research_includes_matching_workflow_section_in_shared_dto(self):
         result = answer_memory_research(
             "How should eval gates affect Eval-Ground-Truth-Lab?",
