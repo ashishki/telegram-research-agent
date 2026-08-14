@@ -1,7 +1,6 @@
 import logging
 import os
-
-from telethon import TelegramClient
+from typing import Any
 
 from config.settings import Settings
 
@@ -9,7 +8,7 @@ from config.settings import Settings
 LOGGER = logging.getLogger(__name__)
 
 
-async def make_client(settings: Settings) -> TelegramClient:
+async def make_client(settings: Settings) -> Any:
     api_id_raw = os.environ.get("TELEGRAM_API_ID")
     api_hash = os.environ.get("TELEGRAM_API_HASH")
 
@@ -20,6 +19,8 @@ async def make_client(settings: Settings) -> TelegramClient:
         api_id = int(api_id_raw)
     except ValueError as exc:
         raise RuntimeError("TELEGRAM_API_ID must be an integer") from exc
+
+    from telethon import TelegramClient
 
     client = TelegramClient(settings.telegram_session_path, api_id, api_hash)
     LOGGER.info("Connecting Telethon client with session %s", settings.telegram_session_path)

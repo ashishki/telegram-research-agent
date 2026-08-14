@@ -199,6 +199,35 @@ class _MixedModelsFacade(_FakeFacade):
 
 
 class TestMemoryResearch(unittest.TestCase):
+    def test_memory_research_includes_matching_workflow_section_in_shared_dto(self):
+        result = answer_memory_research(
+            "How should eval gates affect Eval-Ground-Truth-Lab?",
+            facade=_FakeFacade(),
+            project_name="Eval-Ground-Truth-Lab",
+            operator_context={
+                "interaction_id": "fixture-interaction",
+                "primary_workflow": "archive_research",
+            },
+        )
+
+        answer = result["professional_answer"]
+        self.assertEqual(answer["interaction_id"], "fixture-interaction")
+        self.assertEqual(answer["primary_workflow"], "archive_research")
+        self.assertEqual(answer["workflow_section"], result["professional_workflows"]["ai_systems"])
+
+    def test_memory_research_maps_career_section_to_archive_workflow(self):
+        result = answer_memory_research(
+            "What portfolio evidence is useful for an AI career?",
+            facade=_FakeFacade(),
+            project_name="Eval-Ground-Truth-Lab",
+            operator_context={"interaction_id": "career-interaction", "primary_workflow": "archive_research"},
+        )
+
+        self.assertEqual(
+            result["professional_answer"]["workflow_section"],
+            result["professional_workflows"]["career_portfolio"],
+        )
+
     def test_memory_research_produces_polished_fixture_answer_without_writes_or_egress(self):
         result = answer_memory_research(
             "How should eval gates affect Eval-Ground-Truth-Lab?",

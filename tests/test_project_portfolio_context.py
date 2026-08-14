@@ -21,6 +21,10 @@ def _project(name: str, status: str, *, confirmed: str = "confirmed", priority: 
         "next_proof": "one fixture test",
         "preferred_signal_types": ["eval case"],
         "owner_confirmation_status": confirmed,
+        "capabilities": ["eval"],
+        "aliases": [name],
+        "reviewed_metadata": "operator-approved-2026-08-14",
+        "source_metadata": "local-project-config",
     }
 
 
@@ -31,6 +35,8 @@ class TestProjectPortfolioContext(unittest.TestCase):
         self.assertEqual(project["schema_version"], PROJECT_PORTFOLIO_CONTEXT_SCHEMA_VERSION)
         self.assertEqual(project["status"], "priority")
         self.assertEqual(project["priority"], 1)
+        self.assertEqual(project["capabilities"], ["eval"])
+        self.assertEqual(project["aliases"], ["memory"])
         with self.assertRaises(ValueError):
             validate_project_portfolio_context(_project("invalid", "not-a-status"))
 
@@ -62,6 +68,8 @@ class TestProjectPortfolioContext(unittest.TestCase):
         projects = load_project_descriptors(path)
         self.assertEqual(len(projects), 10)
         self.assertNotIn("entropy_protocol", {project["name"] for project in projects})
+        self.assertTrue(all(project["schema_version"] == PROJECT_PORTFOLIO_CONTEXT_SCHEMA_VERSION for project in projects))
+        self.assertTrue(all(project["reviewed_metadata"] == "operator-approved-2026-08-14" for project in projects))
 
 
 if __name__ == "__main__":

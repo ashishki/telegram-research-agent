@@ -5,6 +5,13 @@ from __future__ import annotations
 from typing import Any, Mapping, Sequence
 
 
+PROFESSIONAL_ANSWER_SCHEMA_VERSION = "professional_answer.v1"
+_PROFESSIONAL_ANSWER_STATUSES = {"supported", "partial", "insufficient_evidence", "verification_required"}
+_OPERATOR_WORKFLOWS = {
+    "archive_research", "writer_editor_brief", "current_fact_verification", "generic_chat", "insufficient_evidence"
+}
+
+
 def build_professional_answer(payload: Mapping[str, Any], *, workflow: str) -> dict[str, Any]:
     """Return the deterministic, citation-bound MAT-4 reader DTO."""
 
@@ -13,8 +20,8 @@ def build_professional_answer(payload: Mapping[str, Any], *, workflow: str) -> d
     sources = _sources({"archive_evidence": archive})
     verification_required = bool(gate.get("external_verification_required"))
     answer = " ".join(str(payload.get("direct_answer") or "").split())
-    return {
-        "schema_version": "professional_answer.v1",
+    result = {
+        "schema_version": PROFESSIONAL_ANSWER_SCHEMA_VERSION,
         "interaction_id": str(payload.get("interaction_id") or ""),
         "primary_workflow": workflow,
         "professional_lens": _mapping(payload.get("professional_lens")).get("selected", "neutral"),
@@ -22,12 +29,51 @@ def build_professional_answer(payload: Mapping[str, Any], *, workflow: str) -> d
         "short_answer": answer if not verification_required else "Требуется внешняя проверка актуального факта.",
         "key_findings": [{"claim": item["snippet"], "citation": item["source_url"]} for item in sources],
         "project_context": _mapping(payload.get("project_fit")),
+        "workflow_section": _mapping(payload.get("workflow_section")),
+        "project_implication": str(_mapping(payload.get("project_fit")).get("guidance") or "Прямая связь с проектом не подтверждена."),
         "recommended_action": None if verification_required else _first_action(payload),
+        "do_not_do": "Не считать локальный сигнал подтвержденным без достаточных источников.",
         "uncertainty": _strings(payload.get("unknowns")),
+        "freshness": "external_verification_required" if verification_required else "archive_scoped",
+        "evidence_classes": ["archive_discovery"] if sources else [],
         "citations": [{"source_url": item["source_url"]} for item in sources],
         "external_verification": {"required": verification_required},
+        "saved_memory_options": [],
+        "telemetry_ref": None,
         "write_performed": False,
     }
+    validate_professional_answer(result)
+    return result
+
+
+def validate_professional_answer(answer: Mapping[str, Any]) -> None:
+    """Reject incomplete or uncited shared reader DTOs before Telegram rendering."""
+
+    required = {
+        "schema_version", "interaction_id", "primary_workflow", "professional_lens", "answer_status",
+        "short_answer", "key_findings", "project_context", "workflow_section", "project_implication", "recommended_action",
+        "do_not_do", "uncertainty", "freshness", "evidence_classes", "citations", "external_verification",
+        "saved_memory_options", "telemetry_ref",
+    }
+    missing = sorted(required.difference(answer))
+    if missing:
+        raise ValueError("professional answer missing: " + ", ".join(missing))
+    if answer.get("schema_version") != PROFESSIONAL_ANSWER_SCHEMA_VERSION:
+        raise ValueError("unsupported professional answer schema")
+    if not str(answer.get("interaction_id") or "").strip():
+        raise ValueError("professional answer interaction identity is required")
+    if str(answer.get("primary_workflow") or "") not in _OPERATOR_WORKFLOWS:
+        raise ValueError("professional answer workflow is not allowed")
+    if not isinstance(answer.get("workflow_section"), Mapping):
+        raise ValueError("professional answer workflow section is required")
+    if str(answer.get("answer_status") or "") not in _PROFESSIONAL_ANSWER_STATUSES:
+        raise ValueError("unsupported professional answer status")
+    citations = {str(item.get("source_url") or "") for item in _mappings(answer.get("citations"))}
+    for finding in _mappings(answer.get("key_findings")):
+        if not str(finding.get("claim") or "").strip() or str(finding.get("citation") or "") not in citations:
+            raise ValueError("professional answer finding requires a citation")
+    if bool(_mapping(answer.get("external_verification")).get("required")) and answer.get("recommended_action") is not None:
+        raise ValueError("verification-required answer cannot recommend an action")
 
 
 def _first_action(payload: Mapping[str, Any]) -> str | None:
@@ -44,6 +90,12 @@ def _strings(value: object) -> list[str]:
     if not isinstance(value, Sequence) or isinstance(value, str):
         return []
     return [str(item) for item in value if str(item or "").strip()]
+
+
+def _mappings(value: object) -> list[Mapping[str, Any]]:
+    if not isinstance(value, Sequence) or isinstance(value, str):
+        return []
+    return [item for item in value if isinstance(item, Mapping)]
 
 
 def build_ai_systems_project_application_workflow(payload: Mapping[str, Any]) -> dict[str, Any]:

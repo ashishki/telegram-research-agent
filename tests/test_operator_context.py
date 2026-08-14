@@ -42,3 +42,18 @@ def test_voice_context_is_ephemeral_and_validated():
     validate_operator_context(context)
     assert context.input_kind == "voice_transcript"
     assert context.privacy_mode == "ephemeral_local_only"
+
+
+def test_session_identity_rotates_after_thirty_minutes():
+    first = build_operator_context(
+        chat_id="42", query="что было про evals?", now=datetime(2026, 8, 14, 10, 5, tzinfo=timezone.utc)
+    )
+    same_session = build_operator_context(
+        chat_id="42", query="а почему?", now=datetime(2026, 8, 14, 10, 29, tzinfo=timezone.utc)
+    )
+    next_session = build_operator_context(
+        chat_id="42", query="новая тема", now=datetime(2026, 8, 14, 10, 31, tzinfo=timezone.utc)
+    )
+
+    assert first.session_id == same_session.session_id
+    assert first.session_id != next_session.session_id

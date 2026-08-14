@@ -169,6 +169,19 @@ class TestHandlers(unittest.TestCase):
         self.assertNotIn(r"\.", message)
         self.assertNotIn(r"1\.", message)
 
+    def test_prm_start_is_operator_facing(self):
+        settings = Settings(db_path=":memory:", llm_api_key="", model_provider="anthropic", telegram_session_path="")
+
+        with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+            with patch.object(handlers, "send_message") as mock_send_message:
+                handlers.handle_prm_start(chat_id="42", args="", settings=settings)
+
+        message = mock_send_message.call_args.args[2]
+        self.assertIn("Что обсуждали про agent evals", message)
+        self.assertIn("Сохранение заметки всегда требует явного подтверждения", message)
+        for internal in ("PRM_", "LLM", "Dogfood", "runtime", "hybrid RAG"):
+            self.assertNotIn(internal, message)
+
     def test_handle_digest_sends_markdown_content_without_parse_mode(self):
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
             db_path = tmp.name
@@ -342,17 +355,15 @@ class TestHandlers(unittest.TestCase):
                 )
 
         message = mock_send_message.call_args.args[2]
-        self.assertIn("PRM safe assistant", message)
-        self.assertIn("Dogfood status: not started", message)
-        self.assertIn("Send a normal message", message)
-        self.assertIn("auto mode chooses research, editor brief, or gated LLM chat", message)
-        self.assertIn("LLM auto-routing/chat require PRM_TELEGRAM_AUTO_LLM_ROUTER=1", message)
-        self.assertIn("Manual fallback commands", message)
-        self.assertIn("MVP Radar is a decision-evidence card only", message)
-        self.assertIn("Every auto research/brief answer shows sources", message)
+        self.assertIn("Личный помощник по исследованию", message)
+        self.assertIn("Просто напиши вопрос или отправь голосовое.", message)
+        self.assertIn("Что обсуждали про agent evals", message)
+        self.assertIn("Команды /research и /brief — запасной вариант.", message)
+        self.assertIn("Сохранение заметки всегда требует явного подтверждения.", message)
         self.assertNotIn("/run_digest", message)
         self.assertNotIn("/run_mvp_weekly", message)
         self.assertNotIn("/feedback_confirm", message)
+        self.assertNotIn("PRM_TELEGRAM_", message)
 
     def test_prm_start_copy_contract_after_prm_ux_1(self):
         settings = Settings(
@@ -373,8 +384,36 @@ class TestHandlers(unittest.TestCase):
 
         message = mock_send_message.call_args.args[2]
         self.assertIn("Просто напиши вопрос или отправь голосовое.", message)
-        self.assertIn("Запасные команды", message)
-        self.assertIn("/research, /brief, /chat", message)
+        self.assertIn("Команды /research и /brief — запасной вариант.", message)
+
+    def test_refresh_owner_only(self):
+        settings = Settings(db_path=":memory:", llm_api_key="", model_provider="anthropic", telegram_session_path="")
+        with patch.dict(os.environ, {"TELEGRAM_OWNER_CHAT_ID": "42"}, clear=False):
+            with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                with patch.object(handlers, "send_message") as send_mock:
+                    handlers.handle_refresh("41", "", settings)
+                    self.assertIn("только владельцу", send_mock.call_args.args[2])
+                    handlers.handle_refresh("42", "", settings)
+
+        self.assertIn("Статус обновления (dry-run)", send_mock.call_args.args[2])
+        self.assertIn("Ничего не запускалось", send_mock.call_args.args[2])
+
+    def test_reactions_owner_only_and_readonly_proposal(self):
+        settings = Settings(db_path="/missing.db", llm_api_key="", model_provider="anthropic", telegram_session_path="")
+        receipt = {"fixture": "reaction-receipt"}
+
+        with patch.dict(os.environ, {"TELEGRAM_OWNER_CHAT_ID": "42"}, clear=False):
+            with patch.object(handlers, "_load_reaction_receipt_readonly", return_value=receipt):
+                with patch.object(handlers, "render_operator_reaction_receipt", return_value="Реакции в архиве"):
+                    with patch.object(handlers, "build_reaction_preference_proposal", return_value={"status": "needs_confirmation", "write_performed": False}):
+                        with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                            with patch.object(handlers, "send_message") as send_mock:
+                                handlers.handle_reactions("41", "", settings)
+                                self.assertIn("только владельцу", send_mock.call_args.args[2])
+                                handlers.handle_reactions("42", "", settings)
+
+        self.assertIn("Реакции в архиве", send_mock.call_args.args[2])
+        self.assertIn("не сохранено", send_mock.call_args.args[2])
 
     def test_auto_route_intent_acknowledgement_copy(self):
         settings = Settings(
@@ -622,6 +661,55 @@ class TestHandlers(unittest.TestCase):
             self.assertIn(heading, rendered)
         self.assertIn("https://t.me/ai_channel/101", rendered)
         self.assertIn("недостаточно данных", rendered.casefold())
+
+    def test_telegram_professional_answer_uses_shared_dto_and_cited_findings(self):
+        payload = _fake_research_payload()
+        payload["professional_answer"] = {
+            "schema_version": "professional_answer.v1",
+            "answer_status": "supported",
+            "short_answer": "Сигнал стоит проверить в проектном контексте.",
+            "key_findings": [{"claim": "Нужен regression case.", "citation": "https://t.me/ai_channel/101"}],
+            "project_context": {"relevance_label": "no_match"},
+            "recommended_action": "Добавить один regression case.",
+            "uncertainty": ["current external truth"],
+            "citations": [{"source_url": "https://t.me/ai_channel/101"}],
+            "external_verification": {"required": False},
+        }
+
+        rendered = handlers._render_telegram_research_response(payload, local_text="ignored", mode="research")
+
+        for heading in ("Короткий вывод", "Что найдено", "Почему это важно тебе", "Что сделать", "Чего пока не делать", "Где доказательства слабые", "Источники"):
+            self.assertIn(heading, rendered)
+        self.assertIn("Нужен regression case.", rendered)
+        self.assertIn("https://t.me/ai_channel/101", rendered)
+        self.assertNotIn("ignored", rendered)
+
+    def test_telegram_professional_answer_renders_workflow_section(self):
+        payload = _fake_research_payload()
+        payload["professional_answer"] = {
+            "schema_version": "professional_answer.v1", "answer_status": "supported", "short_answer": "Вывод.",
+            "key_findings": [], "project_context": {}, "workflow_section": {"validation_step": "Проверить гипотезу на одном кейсе."},
+            "recommended_action": None, "uncertainty": [], "citations": [], "external_verification": {"required": False},
+        }
+
+        rendered = handlers._render_telegram_research_response(payload, local_text="ignored", mode="research")
+
+        self.assertIn("Рабочий фокус", rendered)
+        self.assertIn("Проверить гипотезу на одном кейсе.", rendered)
+
+    def test_telegram_professional_answer_renders_career_workflow_section(self):
+        payload = _fake_research_payload()
+        payload["professional_answer"] = {
+            "schema_version": "professional_answer.v1", "answer_status": "supported", "short_answer": "Вывод.",
+            "key_findings": [], "project_context": {},
+            "workflow_section": {"recurring_requirement": "Умение строить воспроизводимые evaluation-петли."},
+            "recommended_action": None, "uncertainty": [], "citations": [], "external_verification": {"required": False},
+        }
+
+        rendered = handlers._render_telegram_research_response(payload, local_text="ignored", mode="research")
+
+        self.assertIn("Рабочий фокус", rendered)
+        self.assertIn("Умение строить воспроизводимые evaluation-петли.", rendered)
 
     def test_telegram_research_hides_internal_receipts(self):
         payload = _fake_research_payload("что у меня было про AI transformation?")
@@ -1097,7 +1185,7 @@ class TestHandlers(unittest.TestCase):
         settings = Settings(db_path=":memory:", llm_api_key="", model_provider="anthropic", telegram_session_path="")
         payload = {"status": "ok", "question": "research"}
 
-        with patch.object(handlers, "answer_memory_research", return_value=payload):
+        with patch.object(handlers, "answer_memory_research", return_value=payload) as research_mock:
             with patch.object(handlers, "render_memory_research_answer", return_value="PRM Research") as render_mock:
                 with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
                     with patch.object(handlers, "send_message"):
@@ -1107,6 +1195,7 @@ class TestHandlers(unittest.TestCase):
         assert context["input_kind"] == "voice_transcript"
         assert context["primary_workflow"] == "archive_research"
         assert context["chat_id_hash"] != "42"
+        assert research_mock.call_args.kwargs["operator_context"]["interaction_id"] == context["interaction_id"]
 
     def test_handle_auto_falls_back_local_when_llm_router_errors(self):
         settings = Settings(
@@ -1160,6 +1249,22 @@ class TestHandlers(unittest.TestCase):
         second_question = research_mock.call_args_list[1].args[0]
         self.assertIn("собери тезисы про AI transformation", second_question)
         self.assertIn("Уточнение: а почему?", second_question)
+
+    def test_auto_context_session_changes_for_new_topic(self):
+        settings = Settings(db_path=":memory:", llm_api_key="", model_provider="anthropic", telegram_session_path="")
+        payload = {"status": "ok", "question": "research"}
+
+        with patch.object(handlers, "answer_memory_research", return_value=payload) as research_mock:
+            with patch.object(handlers, "render_memory_research_answer", return_value="PRM Research"):
+                with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                    with patch.object(handlers, "send_message"):
+                        handlers.handle_auto(chat_id="42", args="что было про evals?", settings=settings)
+                        handlers.handle_auto(chat_id="42", args="а почему?", settings=settings)
+                        handlers.handle_auto(chat_id="42", args="что было про RAG?", settings=settings)
+
+        sessions = [call.kwargs["operator_context"]["session_id"] for call in research_mock.call_args_list]
+        self.assertEqual(sessions[0], sessions[1])
+        self.assertNotEqual(sessions[1], sessions[2])
 
     def test_handle_ask_delegates_to_pi_chat_not_raw_telegram_answer(self):
         settings = Settings(

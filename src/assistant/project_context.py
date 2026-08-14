@@ -6,6 +6,8 @@ from typing import Any, Mapping, Sequence
 
 import yaml
 
+from assistant.project_portfolio_context import validate_project_portfolio_context
+
 
 PROJECT_CONTEXT_SCHEMA_VERSION = "project_context_decision_support.v1"
 MAX_PROJECT_DESCRIPTOR_BYTES = 512_000
@@ -98,7 +100,15 @@ def load_project_descriptors(path: str | Path) -> list[dict[str, Any]]:
     projects = payload.get("projects")
     if not isinstance(projects, list):
         raise ValueError("project descriptor root must contain a projects list")
-    return [_normalize_project_descriptor(item) for item in projects if isinstance(item, Mapping)]
+    normalized: list[dict[str, Any]] = []
+    for item in projects:
+        if not isinstance(item, Mapping):
+            continue
+        # The live resolver consumes the approved Portfolio V2 policy before
+        # adapting it to the established project-context shape.
+        portfolio = validate_project_portfolio_context(item)
+        normalized.append({**_normalize_project_descriptor(item), **portfolio})
+    return normalized
 
 
 def select_project_descriptor(

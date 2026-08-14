@@ -16,6 +16,10 @@ _REQUIRED_FIELDS = (
     "next_proof",
     "preferred_signal_types",
     "owner_confirmation_status",
+    "capabilities",
+    "aliases",
+    "reviewed_metadata",
+    "source_metadata",
 )
 
 
@@ -45,6 +49,10 @@ def validate_project_portfolio_context(raw: Mapping[str, Any]) -> dict[str, Any]
         "preferred_signal_types": _string_list(raw["preferred_signal_types"]),
         "excluded_signal_types": _string_list(raw.get("excluded_signal_types") or []),
         "owner_confirmation_status": str(raw["owner_confirmation_status"]).strip().casefold(),
+        "capabilities": _string_list(raw["capabilities"]),
+        "aliases": _string_list(raw["aliases"]),
+        "reviewed_metadata": str(raw["reviewed_metadata"]).strip(),
+        "source_metadata": str(raw["source_metadata"]).strip(),
     }
 
 

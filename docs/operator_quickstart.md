@@ -24,14 +24,19 @@ For a non-obvious request, the assistant may first say in one line how it will
 handle it. If the goal is unclear, it asks one short choice: archive research
 or an editor brief.
 
+The current conversation context is temporary: a follow-up can use the recent
+topic for up to 30 minutes. A new topic, an explicit command, or a restart
+starts a new conversation rather than creating permanent memory.
+
 ## 2. What kind of answer should I receive?
 
-The target answer is:
+The normal answer is:
 
 - `Короткий вывод`;
 - `Что найдено`;
 - `Почему это важно тебе`;
 - `Что сделать`;
+- `Чего пока не делать`;
 - `Где доказательства слабые`;
 - `Источники`.
 

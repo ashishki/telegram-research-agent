@@ -1,4 +1,5 @@
 import json
+import hashlib
 import logging
 import os
 import re
@@ -7,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping
 from urllib import error
+from uuid import uuid4
 
 from assistant.pi_chat import answer_pi_chat
 from assistant.pi_facade import PersonalIntelligenceFacade
@@ -14,6 +16,8 @@ from assistant.pi_intent import classify_operator_message
 from assistant.operator_context import build_operator_context, validate_operator_context
 from assistant.project_context import load_project_descriptors
 from assistant.prm_chat_display import render_prm_chat_answer
+from assistant.prm_refresh_receipt import build_refresh_receipt, render_refresh_receipt
+from db.reaction_fast_lane import build_reaction_fast_lane_receipt, build_reaction_preference_proposal, render_operator_reaction_receipt
 from assistant.memory_research import (
     MemoryResearchBudget,
     answer_memory_research,
@@ -69,6 +73,8 @@ PRM_SAFE_COMMANDS = frozenset(
         "/brief",
         "/costs",
         "/status",
+        "/refresh",
+        "/reactions",
     }
 )
 QUESTION_WORD_RE = re.compile(r"[^\W_]+", re.UNICODE)
@@ -128,9 +134,10 @@ TAG_ALIASES = {
     "later": "read_later",
     "read_later": "read_later",
 }
-_RESEARCH_DIALOG_STATE: dict[str, str] = {}
+_RESEARCH_DIALOG_STATE: dict[str, dict[str, object]] = {}
 _RESEARCH_DIALOG_MODE_STATE: dict[str, str] = {}
 _MAX_RESEARCH_DIALOGS = 100
+_RESEARCH_DIALOG_TTL = timedelta(minutes=30)
 
 
 def _get_bot_token() -> str:
@@ -226,8 +233,11 @@ def _telegram_vector_index_path() -> str:
 
 def _route_auto_message(chat_id: str, text: str, *, input_kind: str = "text") -> dict[str, object]:
     clean = _clean_operator_text(text)
-    previous_question = _RESEARCH_DIALOG_STATE.get(str(chat_id), "")
-    previous_mode = _RESEARCH_DIALOG_MODE_STATE.get(str(chat_id), "")
+    key = _dialog_key(chat_id)
+    entry = _active_dialog_entry(key)
+    summaries = entry.get("summaries") if isinstance(entry, Mapping) else []
+    previous_question = str(summaries[-1] if isinstance(summaries, list) and summaries else "")
+    previous_mode = _RESEARCH_DIALOG_MODE_STATE.get(key, "")
     fallback = _deterministic_auto_route(clean, previous_question=previous_question, previous_mode=previous_mode)
     if fallback.get("mode") == "clarify":
         return {**fallback, "router": "deterministic_ambiguous", "model_call_attempted": False}
@@ -427,9 +437,16 @@ def _safe_confidence(value: object) -> float:
     return max(0.0, min(1.0, parsed))
 
 
-def _resolve_research_dialog_question(chat_id: str, question: str) -> dict[str, str | bool]:
+def _dialog_key(chat_id: str) -> str:
+    return hashlib.sha256(f"prm.research-dialog.v1:{chat_id}".encode("utf-8")).hexdigest()[:24]
+
+
+def _resolve_research_dialog_question(chat_id: str, question: str, *, now: datetime | None = None) -> dict[str, str | bool]:
     clean_question = _clean_operator_text(question)
-    previous = _RESEARCH_DIALOG_STATE.get(str(chat_id), "")
+    key = _dialog_key(chat_id)
+    entry = _active_dialog_entry(key, now=now)
+    summaries = entry.get("summaries") if isinstance(entry, Mapping) else []
+    previous = str(summaries[-1] if isinstance(summaries, list) and summaries else "")
     if previous and _is_research_followup(clean_question):
         effective = _clean_operator_text(f"{previous}. Уточнение: {clean_question}")
         return {
@@ -446,13 +463,45 @@ def _resolve_research_dialog_question(chat_id: str, question: str) -> dict[str, 
     }
 
 
-def _remember_research_dialog(chat_id: str, effective_question: str, *, mode: str = "research") -> None:
-    key = str(chat_id)
+def _active_dialog_entry(key: str, *, now: datetime | None = None) -> dict[str, object]:
+    entry = _RESEARCH_DIALOG_STATE.get(key, {})
+    timestamp = now or datetime.now(timezone.utc)
+    updated_at = entry.get("updated_at") if isinstance(entry, Mapping) else None
+    if not isinstance(updated_at, datetime) or timestamp - updated_at > _RESEARCH_DIALOG_TTL:
+        _RESEARCH_DIALOG_STATE.pop(key, None)
+        _RESEARCH_DIALOG_MODE_STATE.pop(key, None)
+        return {}
+    return dict(entry)
+
+
+def _dialog_session_id(chat_id: str, question: str) -> str:
+    """Continue only a short follow-up; every new topic starts a fresh session."""
+
+    entry = _active_dialog_entry(_dialog_key(chat_id))
+    session_id = str(entry.get("session_id") or "")
+    if session_id and _is_research_followup(_clean_operator_text(question)):
+        return session_id
+    return str(uuid4())
+
+
+def _remember_research_dialog(
+    chat_id: str, effective_question: str, *, mode: str = "research", session_id: str = ""
+) -> None:
+    key = _dialog_key(chat_id)
     if len(_RESEARCH_DIALOG_STATE) >= _MAX_RESEARCH_DIALOGS and key not in _RESEARCH_DIALOG_STATE:
         oldest_key = next(iter(_RESEARCH_DIALOG_STATE))
         _RESEARCH_DIALOG_STATE.pop(oldest_key, None)
         _RESEARCH_DIALOG_MODE_STATE.pop(oldest_key, None)
-    _RESEARCH_DIALOG_STATE[key] = _clean_operator_text(effective_question)[:500]
+    existing = _active_dialog_entry(key)
+    summaries = existing.get("summaries") if isinstance(existing.get("summaries"), list) else []
+    summary = _clean_operator_text(effective_question)[:500]
+    if not summaries or summaries[-1] != summary:
+        summaries = [*summaries, summary][-6:]
+    _RESEARCH_DIALOG_STATE[key] = {
+        "summaries": summaries,
+        "updated_at": datetime.now(timezone.utc),
+        "session_id": str(session_id or existing.get("session_id") or uuid4()),
+    }
     _RESEARCH_DIALOG_MODE_STATE[key] = mode if mode in {"research", "brief", "chat"} else "research"
 
 
@@ -659,27 +708,63 @@ def handle_start(chat_id: str, args: str, settings: Settings) -> None:
 def handle_prm_start(chat_id: str, args: str, settings: Settings) -> None:
     del args, settings
     lines = [
-        "PRM safe assistant",
+        "Личный помощник по исследованию",
         "",
-        "Dogfood status: not started. Current runtime is manual testing only.",
         "Просто напиши вопрос или отправь голосовое.",
-        "Я сам выберу поиск по архиву, редакторский бриф или уточню цель.",
-        "Send a normal message; auto mode chooses research, editor brief, or gated LLM chat.",
-        "Research/brief first run local hybrid RAG. If approved, Telegram can add LLM synthesis over bounded cited snippets.",
-        "LLM auto-routing/chat require PRM_TELEGRAM_AUTO_LLM_ROUTER=1 and PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1.",
-        "RAG LLM synthesis additionally requires PRM_TELEGRAM_RAG_LLM_SYNTHESIS=1.",
-        "Local-only CLI remains: memory ask <question>.",
+        "Найду материалы в твоём архиве, соберу бриф или задам один короткий уточняющий вопрос.",
         "",
-        "Запасные команды: /research, /brief, /chat.",
-        "Manual fallback commands: /research, /brief, /weekly, /actions, /mvp, /strategy, /projects, /costs, /status.",
-        "MVP Radar is a decision-evidence card only; Telegram-only evidence cannot approve build.",
+        "Например:",
+        "• Что обсуждали про agent evals за последние 90 дней?",
+        "• Что из этого относится к моему проекту?",
+        "• Собери бриф для поста про AI adoption.",
         "",
-        "Blocked in this mode: ingestion, reaction sync, report generation, Radar generation,",
-        "direct feedback/tag/reminder writes, legacy callbacks, Codex/config/code mutation,",
-        "and dogfood/release claims.",
-        "Memory saves remain disabled from /research; draft saves require a separate confirmed flow.",
-        "Every auto research/brief answer shows sources, limitations, planner limits, and Privacy.",
+        "Команды /research и /brief — запасной вариант.",
+        "Я показываю источники и отмечаю, где данных недостаточно. Актуальные внешние факты требуют отдельной проверки.",
+        "Сохранение заметки всегда требует явного подтверждения.",
     ]
+    send_message(_get_bot_token(), chat_id, "\n".join(lines), parse_mode=None)
+
+
+def handle_refresh(chat_id: str, args: str, settings: Settings) -> None:
+    """Show a read-only refresh orchestration receipt; never starts a routine."""
+
+    del args, settings
+    owner_chat_id = os.environ.get("TELEGRAM_OWNER_CHAT_ID", "").strip()
+    if not owner_chat_id or str(chat_id) != owner_chat_id:
+        send_message(_get_bot_token(), chat_id, "Обновление доступно только владельцу. Ничего не запускалось.", parse_mode=None)
+        return
+    receipt = build_refresh_receipt()
+    send_message(_get_bot_token(), chat_id, render_refresh_receipt(receipt), parse_mode=None)
+
+
+def _load_reaction_receipt_readonly(db_path: str) -> dict[str, object] | None:
+    path = Path(db_path)
+    if not path.exists():
+        return None
+    try:
+        with sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True) as connection:
+            connection.row_factory = sqlite3.Row
+            return build_reaction_fast_lane_receipt(connection)
+    except (OSError, sqlite3.Error):
+        return None
+
+
+def handle_reactions(chat_id: str, args: str, settings: Settings) -> None:
+    """Render the existing reaction receipt read-only; never starts sync or writes a preference."""
+
+    del args
+    owner_chat_id = os.environ.get("TELEGRAM_OWNER_CHAT_ID", "").strip()
+    if not owner_chat_id or str(chat_id) != owner_chat_id:
+        send_message(_get_bot_token(), chat_id, "Реакции доступны только владельцу. Ничего не запускалось.", parse_mode=None)
+        return
+    receipt = _load_reaction_receipt_readonly(settings.db_path)
+    if receipt is None:
+        send_message(_get_bot_token(), chat_id, "Статус реакций пока недоступен. Синхронизация не запускалась.", parse_mode=None)
+        return
+    lines = [render_operator_reaction_receipt(receipt)]
+    proposal = build_reaction_preference_proposal(receipt)
+    if proposal["status"] == "needs_confirmation":
+        lines.extend(["", "Есть предложение настройки интересов; оно не сохранено и ждёт отдельного подтверждения."])
     send_message(_get_bot_token(), chat_id, "\n".join(lines), parse_mode=None)
 
 
@@ -1142,6 +1227,7 @@ def _handle_auto(chat_id: str, args: str, settings: Settings, *, input_kind: str
         requested_mode=mode,
         input_kind=input_kind,  # type: ignore[arg-type]
         project_name=project_name,
+        session_id=_dialog_session_id(chat_id, question),
     )
     validate_operator_context(operator_context)
     mode = {
@@ -1241,6 +1327,7 @@ def handle_research(
             settings=settings,
             limit=4,
             budget=budget,
+            operator_context=operator_context,
         )
     except Exception as exc:
         send_message(_get_bot_token(), chat_id, f"Не смог выполнить local research: {exc}", parse_mode=None)
@@ -1248,13 +1335,18 @@ def handle_research(
     result = _with_dialog_context(result, dialog)
     if operator_context is not None:
         result["operator_context"] = dict(operator_context)
-    _remember_research_dialog(chat_id, str(dialog["effective_question"]), mode="research")
+    _remember_research_dialog(
+        chat_id,
+        str(dialog["effective_question"]),
+        mode="research",
+        session_id=str(_safe_mapping(operator_context).get("session_id") or ""),
+    )
     local_text = render_memory_research_answer(result)
     response_text = _with_auto_intent_acknowledgement(
         _render_telegram_research_response(result, local_text=local_text, mode="research"),
         intent_acknowledgement,
     )
-    _send_research_text(chat_id, response_text, token=_get_bot_token(), reply_markup=_prm_post_answer_markup(result))
+    _send_research_text(chat_id, response_text, token=_get_bot_token(), reply_markup=_prm_post_answer_markup(result, settings=settings, chat_id=chat_id))
 
 
 def handle_research_brief(
@@ -1294,6 +1386,7 @@ def handle_research_brief(
             settings=settings,
             limit=5,
             budget=budget,
+            operator_context=operator_context,
         )
     except Exception as exc:
         send_message(_get_bot_token(), chat_id, f"Не смог собрать local brief: {exc}", parse_mode=None)
@@ -1301,13 +1394,18 @@ def handle_research_brief(
     result = _with_dialog_context(result, dialog)
     if operator_context is not None:
         result["operator_context"] = dict(operator_context)
-    _remember_research_dialog(chat_id, str(dialog["effective_question"]), mode="brief")
+    _remember_research_dialog(
+        chat_id,
+        str(dialog["effective_question"]),
+        mode="brief",
+        session_id=str(_safe_mapping(operator_context).get("session_id") or ""),
+    )
     local_text = render_memory_research_brief(result)
     response_text = _with_auto_intent_acknowledgement(
         _render_telegram_research_response(result, local_text=local_text, mode="brief"),
         intent_acknowledgement,
     )
-    _send_research_text(chat_id, response_text, token=_get_bot_token(), reply_markup=_prm_post_answer_markup(result))
+    _send_research_text(chat_id, response_text, token=_get_bot_token(), reply_markup=_prm_post_answer_markup(result, settings=settings, chat_id=chat_id))
 
 
 def _with_auto_intent_acknowledgement(response_text: str, acknowledgement: str) -> str:
@@ -1333,6 +1431,9 @@ def _render_telegram_research_response(payload: Mapping[str, Any], *, local_text
     """Optionally synthesize a Telegram RAG answer after local retrieval has run."""
 
     clean_local_text = _telegram_report_without_technical_metrics(local_text)
+    professional_answer = _safe_mapping(payload.get("professional_answer"))
+    if professional_answer.get("schema_version") == "professional_answer.v1":
+        return _render_telegram_professional_answer(professional_answer)
     answer_gate = _safe_mapping(payload.get("answer_gate"))
     current_fact_boundary = bool(answer_gate.get("external_verification_required")) and not bool(
         answer_gate.get("current_claim_allowed", True)
@@ -1347,6 +1448,78 @@ def _render_telegram_research_response(payload: Mapping[str, Any], *, local_text
     if mode == "research" and _looks_russian(str(payload.get("question") or "")):
         return _render_telegram_answer_first_research(payload)
     return clean_local_text
+
+
+def _render_telegram_professional_answer(answer: Mapping[str, Any]) -> str:
+    """Render the shared MAT reader DTO without exposing runtime-only fields."""
+
+    verification_required = str(answer.get("answer_status") or "") == "verification_required" or bool(
+        _safe_mapping(answer.get("external_verification")).get("required")
+    )
+    findings: list[str] = []
+    sources: list[str] = []
+    for item in _safe_mapping_list(answer.get("key_findings"))[:4]:
+        claim = _public_telegram_text(item.get("claim"))
+        citation = _public_telegram_text(item.get("citation"))
+        if claim:
+            findings.append(f"- {claim}")
+        if citation:
+            sources.append(f"- {citation}")
+    if not sources:
+        for item in _safe_mapping_list(answer.get("citations"))[:4]:
+            citation = _public_telegram_text(item.get("source_url"))
+            if citation:
+                sources.append(f"- {citation}")
+
+    project_context = _safe_mapping(answer.get("project_context"))
+    uncertainty = [
+        _public_telegram_text(_localize_telegram_unknown(str(item)))
+        for item in answer.get("uncertainty") or []
+        if str(item).strip()
+    ]
+    short_answer = _public_telegram_text(answer.get("short_answer")) or "Недостаточно данных для уверенного вывода."
+    if verification_required:
+        short_answer = "Требуется отдельная внешняя проверка актуального факта."
+        uncertainty.insert(0, "Архив может дать только контекст, а не подтверждение текущего факта.")
+    if not uncertainty:
+        uncertainty.append("Недостаточно данных для более сильного вывода без дополнительной проверки.")
+
+    action = _public_telegram_text(answer.get("recommended_action"))
+    if verification_required:
+        action = "Сначала нужна отдельная внешняя проверка; в этом ответе она не запускалась."
+    if not action:
+        action = "Не превращать этот сигнал в действие без более точных доказательств."
+    workflow_section = _safe_mapping(answer.get("workflow_section"))
+    workflow_line = _telegram_workflow_line(workflow_section)
+
+    lines = [
+        "Короткий вывод", short_answer, "", "Что найдено",
+        *(findings or ["- Локальных источников для сильного вывода не найдено."]), "",
+        "Почему это важно тебе", _telegram_project_relation(project_context), "",
+        *( ["Рабочий фокус", workflow_line, ""] if workflow_line else []),
+        "Что сделать", action, "", "Чего пока не делать",
+        "Не считать локальные сигналы подтверждением без достаточных источников.", "",
+        "Где доказательства слабые", *[f"- {item}" for item in uncertainty[:2]], "",
+        "Источники", *(sources or ["- локальных источников нет"]),
+    ]
+    return _telegram_report_without_technical_metrics("\n".join(lines))
+
+
+def _telegram_workflow_line(section: Mapping[str, Any]) -> str:
+    for field in (
+        "project_implication",
+        "practical_conclusion",
+        "validation_step",
+        "plain_explanation",
+        "recurring_requirement",
+        "next_portfolio_action",
+        "market_boundary",
+        "gap_summary",
+    ):
+        value = _public_telegram_text(section.get(field))
+        if value:
+            return value
+    return ""
 
 
 def _render_telegram_answer_first_research(payload: Mapping[str, Any]) -> str:
@@ -1732,7 +1905,7 @@ def _handle_operator_message(chat_id: str, args: str, settings: Settings, *, inp
     handle_chat(chat_id, text, settings)
 
 
-def _prm_post_answer_markup(result: Mapping[str, Any]) -> dict | None:
+def _prm_post_answer_markup(result: Mapping[str, Any], *, settings: Settings, chat_id: str) -> dict | None:
     answer_gate = _safe_mapping(result.get("answer_gate"))
     if not bool(answer_gate.get("allow_answer", True)):
         return None
@@ -1749,7 +1922,7 @@ def _prm_post_answer_markup(result: Mapping[str, Any]) -> dict | None:
             "direct_answer": result.get("direct_answer"),
             "source_refs": source_refs,
             "project_name": project_fit.get("project_name"),
-        }
+        }, db_path=settings.db_path, chat_id=chat_id
     )["reply_markup"]
 
 
@@ -2268,6 +2441,8 @@ HANDLERS: dict[str, Callable[[str, str, Settings], None]] = {
     "/run_digest": handle_run_digest,
     "/run_mvp_weekly": handle_run_mvp_weekly,
     "/status": handle_status,
+    "/refresh": handle_refresh,
+    "/reactions": handle_reactions,
     "/mark_useful": handle_mark_useful,
     "/mark_skipped": handle_mark_skipped,
     "/feedback": handle_feedback,

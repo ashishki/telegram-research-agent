@@ -1,3 +1,5 @@
+import pytest
+
 from assistant.professional_workflows import (
     build_ai_systems_project_application_workflow,
     build_career_portfolio_gap_workflow,
@@ -5,11 +7,13 @@ from assistant.professional_workflows import (
     build_learning_experiment_workflow,
     build_writer_editor_brief_workflow,
     build_professional_answer,
+    validate_professional_answer,
 )
 
 
 def _payload(*, label: str = "direct_implication", current: bool = False) -> dict:
     return {
+        "interaction_id": "fixture-interaction",
         "archive_evidence": {
             "items": [
                 {
@@ -36,9 +40,37 @@ def test_ai_systems_project_application_workflow():
 
 
 def test_professional_answer_claims_have_citations_and_one_workflow():
-    answer = build_professional_answer({**_payload(), "direct_answer": "Grounded result."}, workflow="ai_systems")
-    assert answer["primary_workflow"] == "ai_systems"
+    answer = build_professional_answer({**_payload(), "direct_answer": "Grounded result."}, workflow="archive_research")
+    assert answer["primary_workflow"] == "archive_research"
     assert answer["key_findings"][0]["citation"] == "https://t.me/example/1"
+    for field in ("project_implication", "do_not_do", "freshness", "evidence_classes", "saved_memory_options", "telemetry_ref"):
+        assert field in answer
+    assert answer["workflow_section"] == {}
+
+
+def test_end_to_end_workflows_share_context_and_keep_actions_guarded():
+    payload = _payload()
+    workflows = [
+        build_ai_systems_project_application_workflow(payload),
+        build_writer_editor_brief_workflow({**payload, "direct_answer": "Grounded result."}),
+        build_enterprise_ai_adoption_workflow(payload),
+        build_learning_experiment_workflow(payload),
+        build_career_portfolio_gap_workflow(payload),
+    ]
+
+    for section in workflows:
+        answer = build_professional_answer({**payload, "direct_answer": "Grounded result.", "workflow_section": section}, workflow="archive_research")
+        assert answer["interaction_id"] == "fixture-interaction"
+        assert answer["workflow_section"] == section
+        assert answer["write_performed"] is False
+
+
+def test_professional_answer_validator_rejects_uncited_claim():
+    answer = build_professional_answer({**_payload(), "direct_answer": "Grounded result."}, workflow="archive_research")
+    answer["key_findings"][0]["citation"] = "https://t.me/other/1"
+
+    with pytest.raises(ValueError, match="citation"):
+        validate_professional_answer(answer)
 
 
 def test_professional_answer_current_fact_has_no_action():

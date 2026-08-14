@@ -5,6 +5,7 @@ import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Mapping, Sequence
+from uuid import uuid4
 
 from assistant.linked_sources import (
     FakeLinkedSourceFetcher,
@@ -334,6 +335,7 @@ def answer_memory_research(
     linked_source_fetcher: LinkedSourceFetcher | FakeLinkedSourceFetcher | None = None,
     linked_source_fixtures: Mapping[str, Mapping[str, Any]] | None = None,
     project_context_fixtures: Sequence[Mapping[str, Any]] | None = None,
+    operator_context: Mapping[str, Any] | None = None,
     now: datetime | None = None,
 ) -> dict[str, Any]:
     clean_question = _clean_text(question)
@@ -493,9 +495,13 @@ def answer_memory_research(
                 "answer_gate": answer_gate,
             }
         )
-    primary_workflow = next(iter(professional_workflows), "archive_research")
+    context = _mapping(operator_context)
+    interaction_id = str(context.get("interaction_id") or f"local-{uuid4()}")
+    primary_workflow = str(context.get("primary_workflow") or "archive_research")
+    workflow_section_key = _professional_workflow_section_key(primary_workflow, professional_workflows)
     professional_answer = build_professional_answer(
         {
+            "interaction_id": interaction_id,
             "direct_answer": direct_answer,
             "archive_evidence": archive_evidence,
             "project_fit": project_fit,
@@ -503,6 +509,7 @@ def answer_memory_research(
             "professional_lens": {"selected": professional_lens or "neutral"},
             "next_steps": next_steps,
             "unknowns": unknowns,
+            "workflow_section": professional_workflows.get(workflow_section_key, {}),
         },
         workflow=primary_workflow,
     )
@@ -526,6 +533,8 @@ def answer_memory_research(
         "unknowns": unknowns,
         "professional_workflows": professional_workflows,
         "professional_answer": professional_answer,
+        "interaction_id": interaction_id,
+        "operator_context": dict(context),
         "professional_lens": {
             "selected": professional_lens or "neutral",
             "selection_source": "turn_local_inference" if professional_lens else "neutral",
@@ -547,6 +556,30 @@ def answer_memory_research(
             drafts=drafts,
         ),
     }
+
+
+def _professional_workflow_section_key(primary_workflow: str, sections: Mapping[str, object]) -> str:
+    """Choose the one derived professional view allowed by the operator workflow.
+
+    The reader DTO has one operator workflow, while the local research helpers
+    may derive several domain-specific sections.  This selection remains
+    deterministic and does not invent a section when no predicate matched.
+    """
+
+    preferences = {
+        "archive_research": (
+            "ai_systems",
+            "enterprise_ai_adoption",
+            "learning_experiment",
+            "career_portfolio",
+            "writer_editor",
+        ),
+        "writer_editor_brief": ("writer_editor",),
+    }
+    for key in preferences.get(primary_workflow, ()):
+        if isinstance(sections.get(key), Mapping):
+            return key
+    return ""
 
 
 def _is_ai_systems_question(question: str) -> bool:

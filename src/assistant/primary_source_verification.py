@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 from typing import Any, Mapping, Sequence
 from urllib.parse import urlparse
 
@@ -56,11 +57,15 @@ def render_primary_source_verification_answer(payload: Mapping[str, Any]) -> str
 def _prioritize_primary_sources(urls: Sequence[object]) -> list[dict[str, str]]:
     candidates = []
     for value in urls:
-        url = str(value or "").strip()
-        if not url.startswith(("https://", "http://")):
+        raw = _mapping(value)
+        url = str(raw.get("source_url") or raw.get("url") or value or "").strip()
+        validation = _validate_candidate_url(url)
+        if validation != "accepted":
             continue
-        host = urlparse(url).netloc.casefold()
-        source_class = "official_or_github" if host.endswith("github.com") or "docs" in host or host.startswith("www.") else "other"
+        host = str(urlparse(url).hostname or "").casefold()
+        official_relation = bool(raw.get("official_relation"))
+        github_host = host == "github.com" or host.endswith(".github.com")
+        source_class = "official_or_github" if github_host or official_relation else "other"
         candidates.append({"source_url": url, "evidence_class": source_class})
     return sorted(candidates, key=lambda item: (item["evidence_class"] != "official_or_github", item["source_url"]))
 
@@ -77,6 +82,19 @@ def _render_refs(refs: Sequence[str]) -> str:
 
 def _render_urls(sources: Sequence[Mapping[str, str]]) -> str:
     return ", ".join(item["source_url"] for item in sources) if sources else "не выбран"
+
+
+def _validate_candidate_url(url: str) -> str:
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+        return "invalid_url"
+    try:
+        address = ipaddress.ip_address(parsed.hostname)
+    except ValueError:
+        return "accepted"
+    if address.is_private or address.is_loopback or address.is_link_local or address.is_reserved:
+        return "private_address"
+    return "accepted"
 
 
 def _mapping(value: object) -> dict[str, Any]:

@@ -12,6 +12,10 @@ projects:
     next_proof: "One cited operator workflow hypothesis."
     preferred_signal_types: [user pain, workflow evidence]
     owner_confirmation_status: confirmed
+    capabilities: [Georgia, community, navigation, local services]
+    aliases: [Georgia-Community-Navigator, ashishki/Georgia-Community-Navigator]
+    reviewed_metadata: operator-approved-2026-08-14
+    source_metadata: local-project-config
   - name: telegram-research-agent
     repo: ashishki/telegram-research-agent
     description: "Private Telegram research intelligence pipeline with evidence-bound briefs and explicit dogfood limits."
@@ -25,6 +29,10 @@ projects:
     next_proof: "One cited local research outcome."
     preferred_signal_types: [retrieval evidence, operator feedback]
     owner_confirmation_status: confirmed
+    capabilities: [Telegram, research memory, RAG, citations, retrieval]
+    aliases: [telegram-research-agent, ashishki/telegram-research-agent]
+    reviewed_metadata: operator-approved-2026-08-14
+    source_metadata: local-project-config
   - name: Dream_Motif_Interpreter
     repo: ashishki/Dream_Motif_Interpreter
     description: "Document-intelligence system with hybrid retrieval, review, voice input, and evidence-bounded motif research."
@@ -38,6 +46,10 @@ projects:
     next_proof: "One cited retrieval hypothesis."
     preferred_signal_types: [source quality, retrieval pattern]
     owner_confirmation_status: confirmed
+    capabilities: [dream motif, document intelligence, retrieval, voice]
+    aliases: [Dream_Motif_Interpreter, ashishki/Dream_Motif_Interpreter]
+    reviewed_metadata: operator-approved-2026-08-14
+    source_metadata: local-project-config
   - name: AI_workflow_playbook
     repo: ashishki/AI_workflow_playbook
     description: "Governance and evidence toolkit for AI-assisted software development."
@@ -51,6 +63,10 @@ projects:
     next_proof: "One measured workflow hypothesis."
     preferred_signal_types: [evaluation, reliability, governance]
     owner_confirmation_status: confirmed
+    capabilities: [AI workflow, task contracts, review gates, validation]
+    aliases: [AI_workflow_playbook, ashishki/AI_workflow_playbook]
+    reviewed_metadata: operator-approved-2026-08-14
+    source_metadata: local-project-config
   - name: Pulse_TG
     repo: ashishki/Pulse_TG
     description: "Active private Telegram project; use only direct evidence for relevance hypotheses."
@@ -64,6 +80,10 @@ projects:
     next_proof: "One cited workflow hypothesis."
     preferred_signal_types: [operator workflow, user pain]
     owner_confirmation_status: confirmed
+    capabilities: [Telegram, operations, assistant]
+    aliases: [Pulse_TG, ashishki/Pulse_TG]
+    reviewed_metadata: operator-approved-2026-08-14
+    source_metadata: local-project-config
   - name: Demand-to-MVP-Radar
     repo: ashishki/Demand-to-MVP-Radar
     description: "Local-first demand-to-MVP research prototype with source gates and candidate dossiers."
@@ -77,6 +97,10 @@ projects:
     next_proof: "One cited candidate dossier."
     preferred_signal_types: [repeated questions, manual workarounds]
     owner_confirmation_status: confirmed
+    capabilities: [demand, MVP, validation, source evidence]
+    aliases: [Demand-to-MVP-Radar, ashishki/Demand-to-MVP-Radar]
+    reviewed_metadata: operator-approved-2026-08-14
+    source_metadata: local-project-config
   - name: gdev-agent
     repo: ashishki/gdev-agent
     description: "Local-first governed LLM support workflow with guardrails, approvals, audit trails, cost controls and evaluation."
@@ -90,6 +114,10 @@ projects:
     next_proof: "One cited operational hypothesis."
     preferred_signal_types: [eval, guardrails, operator workflow]
     owner_confirmation_status: confirmed
+    capabilities: [support triage, guardrails, approval, eval]
+    aliases: [gdev-agent, ashishki/gdev-agent]
+    reviewed_metadata: operator-approved-2026-08-14
+    source_metadata: local-project-config
   - name: Eval-Ground-Truth-Lab
     repo: ashishki/Eval-Ground-Truth-Lab
     description: "Local-first regression evaluation for LLM and agent workflows with versioned datasets and deterministic validators."
@@ -103,6 +131,10 @@ projects:
     next_proof: "One cited evaluation hypothesis."
     preferred_signal_types: [eval, regression, latency]
     owner_confirmation_status: confirmed
+    capabilities: [evaluation, ground truth, validator, baseline]
+    aliases: [Eval-Ground-Truth-Lab, ashishki/Eval-Ground-Truth-Lab]
+    reviewed_metadata: operator-approved-2026-08-14
+    source_metadata: local-project-config
   - name: Agent-Runtime-Grid
     repo: ashishki/Agent-Runtime-Grid
     description: "Local-first queue-backed runtime for reproducible AI jobs, retries, artifacts, telemetry and failure reports."
@@ -116,6 +148,10 @@ projects:
     next_proof: "One cited runtime hypothesis."
     preferred_signal_types: [runtime, failure reports, cost telemetry]
     owner_confirmation_status: confirmed
+    capabilities: [agent runtime, jobs, retries, artifacts, telemetry]
+    aliases: [Agent-Runtime-Grid, ashishki/Agent-Runtime-Grid]
+    reviewed_metadata: operator-approved-2026-08-14
+    source_metadata: local-project-config
   - name: ai-workflow-reliability-lab
     repo: ashishki/ai-workflow-reliability-lab
     description: "Reproducible local demo for baseline/candidate LLM workflow evaluation and verifiable evidence packs."
@@ -129,6 +165,10 @@ projects:
     next_proof: "One cited reliability hypothesis."
     preferred_signal_types: [reliability, controlled failure, review]
     owner_confirmation_status: confirmed
+    capabilities: [workflow reliability, evaluation, evidence packs]
+    aliases: [ai-workflow-reliability-lab, ashishki/ai-workflow-reliability-lab]
+    reviewed_metadata: operator-approved-2026-08-14
+    source_metadata: local-project-config
 legacy_project_descriptors:
   schema_version: legacy_project_descriptors.v1
   routing: non_routable

@@ -63,6 +63,7 @@ def build_operator_context(
     requested_mode: str = "research",
     input_kind: InputKind = "text",
     project_name: str = "",
+    session_id: str | None = None,
     now: datetime | None = None,
 ) -> OperatorContext:
     """Select exactly one safe workflow without doing I/O or retaining text."""
@@ -80,7 +81,7 @@ def build_operator_context(
         schema_version=OPERATOR_CONTEXT_SCHEMA_VERSION,
         interaction_id=str(uuid4()),
         chat_id_hash=_hash_chat_id(chat_id),
-        session_id=_session_id(chat_id),
+        session_id=str(session_id or _session_id(chat_id, now=timestamp)),
         input_kind=input_kind,
         language=language,
         normalized_query=normalized_query,
@@ -138,5 +139,9 @@ def _hash_chat_id(chat_id: str) -> str:
     return hashlib.sha256(f"prm.operator-context.v1:{chat_id}".encode("utf-8")).hexdigest()[:24]
 
 
-def _session_id(chat_id: str) -> str:
-    return hashlib.sha256(f"prm.operator-session.v1:{chat_id}".encode("utf-8")).hexdigest()[:24]
+def _session_id(chat_id: str, *, now: datetime | None = None) -> str:
+    """Return a privacy-safe session identity that rotates every 30 minutes."""
+
+    timestamp = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    window = int(timestamp.timestamp()) // (30 * 60)
+    return hashlib.sha256(f"prm.operator-session.v1:{chat_id}:{window}".encode("utf-8")).hexdigest()[:24]

@@ -264,6 +264,51 @@ def build_operator_reaction_receipt(receipt: Mapping[str, object]) -> dict[str, 
     }
 
 
+def render_operator_reaction_receipt(receipt: Mapping[str, object]) -> str:
+    """Render a privacy-safe grouped reaction-recall view from a supplied receipt."""
+
+    operator = build_operator_reaction_receipt(receipt)
+    enrichment = operator["enrichment"]
+    links = operator["provisional_links"]
+    lines = [
+        "Реакции в архиве",
+        f"Найдено личных реакций: {operator['detected_reactions']}.",
+        f"Связано с постами: {operator['resolved_posts']}; доступно в поиске: {operator['already_searchable_posts']}.",
+        f"Обогащение: готово {enrichment['completed']} из {enrichment['queued']}; ошибок: {enrichment['failed']}.",
+        f"Временные связи с темами: {links['topics']}.",
+    ]
+    reasons = operator["no_effect_reasons"]
+    if reasons:
+        lines.append("Ограничения: " + ", ".join(sorted(str(reason) for reason in reasons)))
+    lines.append("Реакции — слабый временный сигнал; предпочтения не менялись.")
+    return "\n".join(lines)
+
+
+def build_reaction_preference_proposal(receipt: Mapping[str, object], *, threshold: int = 2) -> dict[str, object]:
+    """Suggest, but never infer or write, a preference from repeated reactions."""
+
+    validated = validate_reaction_fast_lane_receipt(receipt)
+    count = int(validated["counts"]["unique_reacted_posts"])
+    required = max(2, int(threshold))
+    if count < required:
+        return {
+            "status": "insufficient_signal",
+            "write_performed": False,
+            "confirmation_required": False,
+            "unique_reacted_posts": count,
+        }
+    return {
+        "status": "needs_confirmation",
+        "write_performed": False,
+        "confirmation_required": True,
+        "proposal": {
+            "kind": "reaction_interest_preference",
+            "summary": f"Повторный интерес к {count} материалам; предложить настройку предпочтения.",
+            "source_count": count,
+        },
+    }
+
+
 def _receipt(
     *,
     counts: Mapping[str, int],

@@ -4,8 +4,10 @@ import unittest
 from db.archive_search import search_telegram_archive
 from db.reaction_fast_lane import (
     build_operator_reaction_receipt,
+    build_reaction_preference_proposal,
     build_reaction_fast_lane_receipt,
     classify_reaction_semantics,
+    render_operator_reaction_receipt,
     validate_reaction_fast_lane_receipt,
 )
 
@@ -231,6 +233,27 @@ class TestReactionFastLane(unittest.TestCase):
             self.assertIn(stage, receipt["stage_statuses"])
         self.assertFalse(receipt["privacy"]["raw_text_included"])
         self.assertFalse(receipt["privacy"]["emoji_values_included"])
+
+    def test_operator_receipt_renders_grouped_searchability_without_raw_text(self):
+        _seed_reacted_archive_post(self.connection, post_id=1)
+
+        rendered = render_operator_reaction_receipt(build_reaction_fast_lane_receipt(self.connection))
+
+        self.assertIn("Реакции в архиве", rendered)
+        self.assertIn("доступно в поиске: 1", rendered)
+        self.assertIn("предпочтения не менялись", rendered)
+        self.assertNotIn("Reaction fastlane searchable archive fixture", rendered)
+
+    def test_preference_requires_confirmation(self):
+        for post_id in range(1, 3):
+            _seed_reacted_archive_post(self.connection, post_id=post_id)
+
+        proposal = build_reaction_preference_proposal(build_reaction_fast_lane_receipt(self.connection))
+
+        self.assertEqual(proposal["status"], "needs_confirmation")
+        self.assertTrue(proposal["confirmation_required"])
+        self.assertFalse(proposal["write_performed"])
+        self.assertEqual(proposal["proposal"]["source_count"], 2)
 
     def test_absent_and_multiple_emoji_semantics_are_bounded(self):
         absent = classify_reaction_semantics(()).as_dict()
