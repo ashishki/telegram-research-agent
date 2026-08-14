@@ -351,7 +351,7 @@ class TestIdeaCallbacks(unittest.TestCase):
         ) as answer_mock:
             bot_runtime.run_bot(settings, runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT)
 
-        action_mock.assert_called_once_with(settings, "prma:opaque:n")
+        action_mock.assert_called_once_with(settings, "prma:opaque:n", chat_id="12345")
         send_mock.assert_called_once_with(
             "token", "12345", "Черновик готов.", parse_mode=None, reply_markup={"inline_keyboard": []}
         )

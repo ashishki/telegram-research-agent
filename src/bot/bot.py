@@ -212,13 +212,14 @@ def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_LEGACY) -> No
                 if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
                     if data.startswith(("prma:", "prmc:")):
                         try:
-                            result = handle_prm_post_answer_callback(settings, data)
+                            chat_id = str(((callback_query.get("message") or {}).get("chat") or {}).get("id") or owner_chat_id)
+                            result = handle_prm_post_answer_callback(settings, data, chat_id=chat_id)
                             answer = "Готово"
                             message = str(result.get("message") or "")
                             if message:
                                 send_message(
                                     token,
-                                    str(((callback_query.get("message") or {}).get("chat") or {}).get("id") or owner_chat_id),
+                                    chat_id,
                                     message,
                                     parse_mode=None,
                                     reply_markup=result.get("reply_markup"),

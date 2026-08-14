@@ -619,6 +619,17 @@ CREATE INDEX IF NOT EXISTS idx_personal_memory_events_memory
 CREATE INDEX IF NOT EXISTS idx_personal_memory_events_type_created
     ON personal_memory_events(object_type, created_at);
 
+CREATE TABLE IF NOT EXISTS prm_post_answer_proposals (
+    context_id TEXT PRIMARY KEY CHECK(length(trim(context_id)) BETWEEN 8 AND 32),
+    chat_id_hash TEXT NOT NULL CHECK(length(trim(chat_id_hash)) = 64),
+    summary_json TEXT NOT NULL CHECK(json_valid(summary_json) AND json_type(summary_json) = 'object'),
+    proposals_json TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(proposals_json) AND json_type(proposals_json) = 'object'),
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'ready' CHECK(status IN ('ready', 'pending', 'confirmed', 'cancelled'))
+);
+CREATE INDEX IF NOT EXISTS idx_prm_post_answer_proposals_expiry ON prm_post_answer_proposals(expires_at);
+
 CREATE TABLE IF NOT EXISTS projects (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,

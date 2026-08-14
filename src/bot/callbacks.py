@@ -260,9 +260,9 @@ def record_callback(settings: Settings, callback_data: str) -> str:
     raise ValueError("Unsupported callback")
 
 
-def handle_prm_post_answer_callback(settings: Settings, callback_data: str) -> dict:
+def handle_prm_post_answer_callback(settings: Settings, callback_data: str, *, chat_id: str) -> dict:
     """Handle only the isolated PRM proposal/confirmation callback namespace."""
 
     if not callback_data.startswith((f"{PRM_ACTION_PREFIX}:", f"{PRM_CONFIRM_PREFIX}:")):
         raise ValueError("Unsupported PRM callback")
-    return handle_post_answer_callback(settings.db_path, callback_data)
+    return handle_post_answer_callback(settings.db_path, callback_data, chat_id=chat_id)

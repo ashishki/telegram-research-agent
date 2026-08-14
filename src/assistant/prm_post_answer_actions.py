@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import secrets
+import sqlite3
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Mapping
 
 from assistant.pi_memory import build_memory_proposal, confirm_memory_proposal
@@ -22,13 +27,15 @@ _ACTION_TYPES = {
     "d": ("feedback", "Применил"),
 }
 _CONTEXTS: dict[str, dict[str, Any]] = {}
-_MAX_CONTEXTS = 100
+_PROPOSAL_TTL = timedelta(minutes=30)
 
 
-def build_post_answer_actions(answer: Mapping[str, Any]) -> dict[str, Any]:
+def build_post_answer_actions(answer: Mapping[str, Any], *, db_path: str | Path | None = None, chat_id: str = "") -> dict[str, Any]:
     """Register a bounded answer context and return only relevant safe actions."""
 
-    context_id = _register_context(answer)
+    context_id = _register_context(answer, db_path=db_path, chat_id=chat_id)
+    if context_id is None:
+        return {"context_id": None, "reply_markup": None}
     action_codes = ["n", "w", "u", "r", "s"]
     if str(answer.get("project_name") or "").strip():
         action_codes.extend(["p", "a", "e"])
@@ -43,17 +50,20 @@ def build_post_answer_actions(answer: Mapping[str, Any]) -> dict[str, Any]:
     return {"context_id": context_id, "reply_markup": {"inline_keyboard": rows}}
 
 
-def handle_post_answer_callback(db_path: str, callback_data: str) -> dict[str, Any]:
+def handle_post_answer_callback(db_path: str, callback_data: str, *, chat_id: str) -> dict[str, Any]:
     """Draft or confirm a proposal. No callback is a write unless it is `prmc`."""
 
     prefix, context_id, action = _parse_callback(callback_data)
-    context = _CONTEXTS.get(context_id)
+    context = _load_context(db_path, context_id, chat_id)
     if context is None:
         return {"status": "expired", "write_performed": False, "message": "Действие устарело. Запроси ответ заново."}
     if prefix == PRM_ACTION_PREFIX:
         proposal_type, label = _ACTION_TYPES[action]
-        proposal_result = build_memory_proposal(proposal_type, _proposal_args(context, action))
-        context["proposals"][action] = proposal_result
+        proposal_result = context["proposals"].get(action)
+        if not isinstance(proposal_result, Mapping):
+            proposal_result = build_memory_proposal(proposal_type, _proposal_args(context, action))
+            context["proposals"][action] = proposal_result
+            _save_proposals(db_path, context_id, context["proposals"])
         confirm_data = f"{PRM_CONFIRM_PREFIX}:{context_id}:{action}"
         return {
             "status": "needs_confirmation",
@@ -74,26 +84,72 @@ def handle_post_answer_callback(db_path: str, callback_data: str) -> dict[str, A
         },
     )
     if result.get("persisted"):
-        _CONTEXTS.pop(context_id, None)
+        _mark_confirmed(db_path, context_id)
         return {
             **result,
-            "message": f"Сохранено. Найти запись: memory_id={result.get('memory_id')}; event_id={result.get('event_id')}.",
+            "message": "Сохранено. Запись можно использовать в следующих исследованиях.",
         }
     return result
 
 
-def _register_context(answer: Mapping[str, Any]) -> str:
-    if len(_CONTEXTS) >= _MAX_CONTEXTS:
-        _CONTEXTS.pop(next(iter(_CONTEXTS)))
-    context_id = secrets.token_urlsafe(6).replace("-", "").replace("_", "")[:10]
-    _CONTEXTS[context_id] = {
-        "title": _bounded_text(answer.get("title") or answer.get("question") or "PRM research"),
+def _register_context(answer: Mapping[str, Any], *, db_path: str | Path | None, chat_id: str) -> str | None:
+    if db_path is None or not chat_id or not Path(db_path).exists():
+        if len(_CONTEXTS) >= 100:
+            _CONTEXTS.pop(next(iter(_CONTEXTS)))
+        context_id = secrets.token_hex(5)
+        _CONTEXTS[context_id] = {
+            "title": _bounded_text(answer.get("title") or "PRM research"),
+            "body": _bounded_text(answer.get("body") or answer.get("direct_answer") or ""),
+            "source_refs": [str(ref) for ref in answer.get("source_refs") or [] if str(ref).startswith("https://")][:5],
+            "project_name": _bounded_text(answer.get("project_name") or ""), "proposals": {},
+        }
+        return context_id
+    context_id = secrets.token_hex(5)
+    context = {
+        "title": _bounded_text(answer.get("title") or "PRM research"),
         "body": _bounded_text(answer.get("body") or answer.get("direct_answer") or ""),
         "source_refs": [str(ref) for ref in answer.get("source_refs") or [] if str(ref).startswith("https://")][:5],
         "project_name": _bounded_text(answer.get("project_name") or ""),
         "proposals": {},
     }
+    now = datetime.now(timezone.utc)
+    try:
+        with sqlite3.connect(db_path) as connection:
+            connection.execute("INSERT INTO prm_post_answer_proposals(context_id, chat_id_hash, summary_json, created_at, expires_at) VALUES (?, ?, ?, ?, ?)", (context_id, _chat_hash(chat_id), json.dumps({k: v for k, v in context.items() if k != "proposals"}, ensure_ascii=False), _iso(now), _iso(now + _PROPOSAL_TTL)))
+    except sqlite3.Error:
+        return None
     return context_id
+
+
+def _load_context(db_path: str | Path, context_id: str, chat_id: str) -> dict[str, Any] | None:
+    if not chat_id:
+        return None
+    try:
+        with sqlite3.connect(db_path) as connection:
+            row = connection.execute("SELECT chat_id_hash, summary_json, proposals_json, expires_at, status FROM prm_post_answer_proposals WHERE context_id = ?", (context_id,)).fetchone()
+    except sqlite3.Error:
+        return None
+    if row is None or row[0] != _chat_hash(chat_id) or row[4] == "cancelled" or datetime.fromisoformat(str(row[3]).replace("Z", "+00:00")) <= datetime.now(timezone.utc):
+        return None
+    context = json.loads(str(row[1])); context["proposals"] = json.loads(str(row[2])); return context
+
+
+def _save_proposals(db_path: str | Path, context_id: str, proposals: Mapping[str, Any]) -> None:
+    with sqlite3.connect(db_path) as connection:
+        connection.execute("UPDATE prm_post_answer_proposals SET proposals_json = ?, status = 'pending' WHERE context_id = ?", (json.dumps(proposals, ensure_ascii=False, sort_keys=True), context_id))
+
+
+def _mark_confirmed(db_path: str | Path, context_id: str) -> None:
+    with sqlite3.connect(db_path) as connection:
+        connection.execute("UPDATE prm_post_answer_proposals SET status = 'confirmed' WHERE context_id = ?", (context_id,))
+
+
+def _chat_hash(chat_id: str) -> str:
+    return hashlib.sha256(f"prm.post-answer.v1:{chat_id}".encode()).hexdigest()
+
+
+def _iso(value: datetime) -> str:
+    return value.isoformat().replace("+00:00", "Z")
 
 
 def _proposal_args(context: Mapping[str, Any], action: str) -> dict[str, Any]:
