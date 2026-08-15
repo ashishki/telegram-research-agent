@@ -730,48 +730,71 @@ class TestHandlers(unittest.TestCase):
         payload = _fake_research_payload("что в архиве было про evals?")
 
         with patch.object(handlers.LLMClient, "complete_with_receipt", return_value=types.SimpleNamespace(text="Русский ответ с источником")):
-            with patch.object(handlers.LLMClient, "complete_json", return_value={"verdict": "pass"}) as verifier:
+            with patch.object(
+                handlers.LLMClient,
+                "complete_with_receipt",
+                side_effect=(types.SimpleNamespace(text="Русский ответ с источником"), types.SimpleNamespace(text="PASS")),
+            ) as completion:
                 rendered = handlers._synthesize_telegram_rag_answer(payload, mode="research")
 
         self.assertIn("Русский ответ", rendered)
-        self.assertEqual(verifier.call_args.kwargs["max_tokens"], 80)
-        self.assertEqual(verifier.call_args.kwargs["max_attempts"], 1)
-        self.assertIn("proposed_answer", verifier.call_args.kwargs["prompt"])
+        self.assertEqual(completion.call_count, 2)
+        self.assertEqual(completion.call_args.kwargs["max_tokens"], 80)
+        self.assertEqual(completion.call_args.kwargs["max_attempts"], 1)
+        self.assertIn("proposed_answer", completion.call_args.kwargs["prompt"])
 
     def test_telegram_synthesis_suppresses_usage_for_both_provider_calls(self):
         payload = _fake_research_payload("что в архиве было про evals?")
 
         with patch.object(handlers, "suppress_usage_recording", side_effect=nullcontext) as suppress:
-            with patch.object(handlers.LLMClient, "complete_with_receipt", return_value=types.SimpleNamespace(text="Русский ответ с источником")):
-                with patch.object(handlers.LLMClient, "complete_json", return_value={"verdict": "pass"}):
-                    handlers._synthesize_telegram_rag_answer(payload, mode="research")
+            with patch.object(
+                handlers.LLMClient,
+                "complete_with_receipt",
+                side_effect=(types.SimpleNamespace(text="Русский ответ с источником"), types.SimpleNamespace(text="PASS")),
+            ):
+                handlers._synthesize_telegram_rag_answer(payload, mode="research")
 
         self.assertEqual(suppress.call_count, 2)
 
     def test_telegram_synthesis_fails_closed_when_entailment_rejects_answer(self):
         payload = _fake_research_payload("что в архиве было про evals?")
 
-        with patch.object(handlers.LLMClient, "complete_with_receipt", return_value=types.SimpleNamespace(text="Русский ответ с неподтверждённой деталью")):
-            with patch.object(handlers.LLMClient, "complete_json", return_value={"verdict": "fail"}):
-                with self.assertRaisesRegex(RuntimeError, "unsupported_llm_synthesis"):
-                    handlers._synthesize_telegram_rag_answer(payload, mode="research")
+        with patch.object(
+            handlers.LLMClient,
+            "complete_with_receipt",
+            side_effect=(types.SimpleNamespace(text="Русский ответ с неподтверждённой деталью"), types.SimpleNamespace(text="FAIL")),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "unsupported_llm_synthesis"):
+                handlers._synthesize_telegram_rag_answer(payload, mode="research")
 
     def test_telegram_synthesis_fails_closed_when_entailment_response_is_invalid(self):
         payload = _fake_research_payload("что в архиве было про evals?")
 
-        with patch.object(handlers.LLMClient, "complete_with_receipt", return_value=types.SimpleNamespace(text="Русский ответ с источником")):
-            with patch.object(handlers.LLMClient, "complete_json", return_value={"verdict": "uncertain"}):
-                with self.assertRaisesRegex(RuntimeError, "unsupported_llm_synthesis"):
-                    handlers._synthesize_telegram_rag_answer(payload, mode="research")
+        with patch.object(
+            handlers.LLMClient,
+            "complete_with_receipt",
+            side_effect=(types.SimpleNamespace(text="Русский ответ с источником"), types.SimpleNamespace(text="uncertain")),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "unsupported_llm_synthesis"):
+                handlers._synthesize_telegram_rag_answer(payload, mode="research")
+
+    def test_telegram_synthesis_rejects_non_exact_entailment_pass_token(self):
+        for verdict in ("pass", " PASS", "PASS\n", "PASS."):
+            with self.subTest(verdict=verdict):
+                with patch.object(handlers.LLMClient, "complete_with_receipt", return_value=types.SimpleNamespace(text=verdict)):
+                    self.assertFalse(handlers._telegram_rag_synthesis_is_entailing("Ответ", {}))
 
     def test_telegram_synthesis_falls_back_when_entailment_verifier_errors(self):
         payload = _fake_research_payload("что в архиве было про evals?")
         payload["professional_answer"] = {"schema_version": "professional_answer.v1", "short_answer": "Безопасный fallback"}
 
         with patch.dict(os.environ, {"PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS": "1", "PRM_TELEGRAM_RAG_LLM_SYNTHESIS": "1"}, clear=False):
-            with patch.object(handlers.LLMClient, "complete_with_receipt", return_value=types.SimpleNamespace(text="Русский ответ с источником")) as synthesis:
-                with patch.object(handlers.LLMClient, "complete_json", side_effect=RuntimeError("provider unavailable")):
-                    rendered = handlers._render_telegram_research_response(payload, local_text="ignored", mode="research")
+            with patch.object(
+                handlers.LLMClient,
+                "complete_with_receipt",
+                side_effect=(types.SimpleNamespace(text="Русский ответ с источником"), RuntimeError("provider unavailable")),
+            ) as synthesis:
+                rendered = handlers._render_telegram_research_response(payload, local_text="ignored", mode="research")
 
         self.assertIn("Безопасный fallback", rendered)
         self.assertEqual(synthesis.call_args.kwargs["max_attempts"], 1)
@@ -904,26 +927,31 @@ class TestHandlers(unittest.TestCase):
         ):
             with patch.object(handlers, "answer_memory_research", return_value=payload) as research_mock:
                 with patch.object(handlers, "render_memory_research_answer", return_value="LOCAL RAG FALLBACK") as render_mock:
-                    with patch.object(handlers.LLMClient, "complete_with_receipt", return_value=receipt) as llm_mock:
-                        with patch.object(handlers.LLMClient, "complete_json", return_value={"verdict": "pass"}):
-                            with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
-                                with patch.object(handlers, "send_message") as mock_send_message:
-                                    handlers.handle_research(
-                                        chat_id="42",
-                                        args="что у меня было про AI transformation?",
-                                        settings=settings,
-                                    )
+                    with patch.object(
+                        handlers.LLMClient,
+                        "complete_with_receipt",
+                        side_effect=(receipt, types.SimpleNamespace(text="PASS")),
+                    ) as llm_mock:
+                        with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                            with patch.object(handlers, "send_message") as mock_send_message:
+                                handlers.handle_research(
+                                    chat_id="42",
+                                    args="что у меня было про AI transformation?",
+                                    settings=settings,
+                                )
 
         research_mock.assert_called_once()
         render_mock.assert_called_once_with(payload)
-        llm_mock.assert_called_once()
-        prompt = llm_mock.call_args.kwargs["prompt"]
-        self.assertIn("AI transformation pilots", prompt)
-        self.assertIn("polished, ready-to-read Telegram report", prompt)
-        self.assertIn("Group related sources by topic", prompt)
-        self.assertIn("Use a clean visual layout", prompt)
-        self.assertIn("Do not show technical metrics", prompt)
-        self.assertIn("hard source eligibility boundary", prompt)
+        self.assertEqual(llm_mock.call_count, 2)
+        synthesis_prompt = llm_mock.call_args_list[0].kwargs["prompt"]
+        verifier_prompt = llm_mock.call_args_list[1].kwargs["prompt"]
+        self.assertIn("AI transformation pilots", synthesis_prompt)
+        self.assertIn("polished, ready-to-read Telegram report", synthesis_prompt)
+        self.assertIn("Group related sources by topic", synthesis_prompt)
+        self.assertIn("Use a clean visual layout", synthesis_prompt)
+        self.assertIn("Do not show technical metrics", synthesis_prompt)
+        self.assertIn("hard source eligibility boundary", synthesis_prompt)
+        self.assertIn("Return exactly one word: PASS or FAIL", verifier_prompt)
         message = mock_send_message.call_args.args[2]
         self.assertIn("PRM Research", message)
         self.assertIn("AI pilots need ROI proof", message)

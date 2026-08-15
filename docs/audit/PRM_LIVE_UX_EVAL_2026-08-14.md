@@ -38,3 +38,8 @@ the existing bounded professional contract to approved synthesis: sanitized
 short answer, up to four claim/citation pairs, one recommended action, and up
 to three uncertainty items. Field caps are enforced in focused tests; no raw
 DTO, internal path, ID, or telemetry field is sent.
+
+The 2026-08-15 synthesis quality filter adds one bounded verifier call. A full
+100-case live run therefore permits up to 400 provider calls: router,
+synthesis, verifier, and judge per case. The evaluator enforces that cap and
+does not treat budget exhaustion as a valid quality result.

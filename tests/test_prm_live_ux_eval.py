@@ -69,6 +69,38 @@ def test_live_ux_eval_requires_egress_and_suppresses_usage_with_budget(monkeypat
     assert LLMClient.complete_json(prompt="", system="", category="", max_tokens=1)["mode"] == "research"
 
 
+def test_live_ux_eval_budgets_router_synthesis_verifier_and_judge(monkeypatch):
+    path = Path(__file__).parents[1] / "tools" / "prm_live_ux_eval.py"
+    spec = importlib.util.spec_from_file_location("prm_live_ux_eval_four_calls", path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec and spec.loader
+    spec.loader.exec_module(module)
+    from llm.client import LLMClient
+
+    def complete_json(**_kwargs):
+        return {"mode": "research", "confidence": 0.9, "reason": "test", "retrieval_query": "eval"}
+
+    def complete_with_receipt(**kwargs):
+        system = str(kwargs.get("system") or "")
+        if "citation entailment verifier" in system:
+            return SimpleNamespace(text="PASS")
+        if "source-grounded Telegram answers" in system:
+            return SimpleNamespace(text="Русский ответ с источником")
+        return SimpleNamespace(text='{"score": 5, "clear": true, "action_oriented": true, "grounded": true, "technical_leak": false}')
+
+    monkeypatch.setenv("PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS", "1")
+    monkeypatch.setenv("PRM_TELEGRAM_AUTO_LLM_ROUTER", "1")
+    monkeypatch.setenv("PRM_TELEGRAM_RAG_LLM_SYNTHESIS", "1")
+    monkeypatch.setattr(LLMClient, "complete_json", staticmethod(complete_json))
+    monkeypatch.setattr(LLMClient, "complete_with_receipt", staticmethod(complete_with_receipt))
+
+    receipt = module.run(live=True, case_limit=1, case_offset=0, max_provider_calls=4)
+
+    assert receipt["provider_calls"] == 4
+    assert receipt["provider_call_budget"] == 4
+    assert receipt["failure_counts"] == {}
+
+
 def test_live_ux_eval_main_refuses_live_without_runtime_egress(monkeypatch):
     path = Path(__file__).parents[1] / "tools" / "prm_live_ux_eval.py"
     spec = importlib.util.spec_from_file_location("prm_live_ux_eval_cli", path)

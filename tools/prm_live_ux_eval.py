@@ -28,6 +28,7 @@ TOPICS = (
 )
 PRIVATE_RECEIPT_ROOT = (Path(__file__).resolve().parents[1] / "data" / "events").resolve()
 JUDGE_MIN_SCORE = 4
+MAX_LIVE_PROVIDER_CALLS = 400
 
 
 def build_cases() -> list[dict[str, str]]:
@@ -231,7 +232,13 @@ def main() -> int:
     parser.add_argument("--confirm-live-eval", action="store_true", help="Required together with --live.")
     parser.add_argument("--cases", type=int, default=100, choices=range(1, 101))
     parser.add_argument("--offset", type=int, default=0, choices=range(0, 100))
-    parser.add_argument("--max-provider-calls", type=int, default=300, choices=range(1, 301))
+    parser.add_argument(
+        "--max-provider-calls",
+        type=int,
+        default=MAX_LIVE_PROVIDER_CALLS,
+        choices=range(1, MAX_LIVE_PROVIDER_CALLS + 1),
+        help="Bounded live budget: up to router, synthesis, verifier, and judge per case.",
+    )
     parser.add_argument("--receipt", type=Path, help="Optional gitignored aggregate-only receipt path.")
     args = parser.parse_args()
     if args.live and not args.confirm_live_eval:
