@@ -43,3 +43,21 @@ The 2026-08-15 synthesis quality filter adds one bounded verifier call. A full
 100-case live run therefore permits up to 400 provider calls: router,
 synthesis, verifier, and judge per case. The evaluator enforces that cap and
 does not treat budget exhaustion as a valid quality result.
+
+## 2026-08-15 fixed-corpus follow-up
+
+A complete 100-case run of the generated corpus completed with 301 bounded
+provider calls, no Telegram sends, no durable writes, and aggregate-only
+gitignored receipts. The pre-calibration judge reported 2/100 passes and an
+average 1.57/5, including 64 alleged technical leaks and 83 alleged grounding
+failures. These are diagnostic baseline signals, not a release or product
+quality claim: the judge rubric was demonstrably over-broad about normal source
+URLs, local-only boundaries, and technical subject vocabulary.
+
+The evaluator rubric was corrected before any comparison rerun. It now treats
+those normal user-facing elements as valid, requires a clear local-boundary
+refusal for current-fact questions, and records `action_oriented` as tracked
+only rather than a universal pass/fail gate. The corrected rubric passed
+focused tests and required read-only re-review; effective reviewer assignment:
+`unverified`. No raw questions, answers, sources, chat IDs, or judge prose are
+stored in this document.

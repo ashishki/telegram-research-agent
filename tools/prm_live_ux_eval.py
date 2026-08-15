@@ -65,7 +65,16 @@ def _judge_answer(question: str, answer: str, *, source_count: int, current_fact
 
     prompt = (
         "Score this private Telegram-assistant answer as a demanding user and UX designer. "
-        "Judge only the supplied answer; do not add facts. Return JSON only with keys "
+        "Judge only the supplied answer; do not add facts. A source-backed deterministic answer is valid even when it "
+        "states uncertainty, declines a current-fact claim, or gives a cautious next step. "
+        "Treat normal source URLs, archive/local-only boundaries, technical subject terms, and concise citations as user-facing "
+        "content, not technical leaks. A technical leak means only internal diagnostics or implementation telemetry such as model calls, "
+        "costs, tool traces, filesystem paths, debug IDs, backend flags, or stack traces. "
+        "Mark grounded true when the answer keeps source-derived claims tied to visible supplied citations and clearly names limits; "
+        "do not require live-web facts. Score 4 or 5 for a clear, directly useful, source-backed answer that respects the requested "
+        "freshness boundary. If Current-fact boundary required is true, any asserted current fact is ungrounded and cannot score 4 or 5; "
+        "only a clear refusal of the current claim plus a local-archive boundary can receive a high score. "
+        "Return JSON only with keys "
         "score (integer 1..5), clear (boolean), action_oriented (boolean), grounded (boolean), "
         "technical_leak (boolean), reason (max 160 chars).\n"
         f"Question: {question}\nSource count: {source_count}\n"
@@ -210,6 +219,7 @@ def run(*, live: bool, case_limit: int, case_offset: int, max_provider_calls: in
         "provider_call_budget": max_provider_calls if live else 0,
         "provider_retry_limit": 1 if live else 0,
         "judge_threshold": {"minimum_score": JUDGE_MIN_SCORE, "requires_clear": True, "requires_grounded": True},
+        "action_oriented_tracked_only": True,
         "failure_counts": dict(sorted(Counter(reason for item in failures for reason in item["failures"]).items())),
         "cases": results,
         "privacy": {

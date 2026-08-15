@@ -19,6 +19,31 @@ def test_live_ux_eval_generates_a_private_100_case_contract():
     assert all("expected" in case and "question" in case for case in cases)
 
 
+def test_live_ux_judge_prompt_distinguishes_product_boundaries_from_technical_leaks(monkeypatch):
+    path = Path(__file__).parents[1] / "tools" / "prm_live_ux_eval.py"
+    spec = importlib.util.spec_from_file_location("prm_live_ux_eval_judge_prompt", path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec and spec.loader
+    spec.loader.exec_module(module)
+    from llm.client import LLMClient
+
+    observed = {}
+
+    def complete_with_receipt(**kwargs):
+        observed.update(kwargs)
+        return SimpleNamespace(text='{"score": 4, "clear": true, "action_oriented": true, "grounded": true, "technical_leak": false}')
+
+    monkeypatch.setattr(LLMClient, "complete_with_receipt", staticmethod(complete_with_receipt))
+    result = module._judge_answer("question", "answer", source_count=1, current_fact_boundary=False)
+
+    assert result["score"] == 4
+    assert "normal source URLs" in observed["prompt"]
+    assert "not technical leaks" in observed["prompt"]
+    assert "internal diagnostics" in observed["prompt"]
+    assert "Current-fact boundary required is true" in observed["prompt"]
+    assert "clear refusal of the current claim" in observed["prompt"]
+
+
 def test_live_ux_eval_receipts_are_restricted_to_private_events_dir():
     path = Path(__file__).parents[1] / "tools" / "prm_live_ux_eval.py"
     spec = importlib.util.spec_from_file_location("prm_live_ux_eval_path", path)
@@ -98,6 +123,7 @@ def test_live_ux_eval_budgets_router_synthesis_verifier_and_judge(monkeypatch):
 
     assert receipt["provider_calls"] == 4
     assert receipt["provider_call_budget"] == 4
+    assert receipt["action_oriented_tracked_only"] is True
     assert receipt["failure_counts"] == {}
 
 
