@@ -1435,19 +1435,25 @@ def _render_telegram_research_response(payload: Mapping[str, Any], *, local_text
 
     clean_local_text = _telegram_report_without_technical_metrics(local_text)
     professional_answer = _safe_mapping(payload.get("professional_answer"))
-    if professional_answer.get("schema_version") == "professional_answer.v1":
-        return _render_telegram_professional_answer(professional_answer)
+    professional_verification_required = (
+        str(professional_answer.get("answer_status") or "") == "verification_required"
+        or bool(_safe_mapping(professional_answer.get("external_verification")).get("required"))
+    )
     answer_gate = _safe_mapping(payload.get("answer_gate"))
     current_fact_boundary = bool(answer_gate.get("external_verification_required")) and not bool(
         answer_gate.get("current_claim_allowed", True)
     )
     if current_fact_boundary:
         return _render_telegram_answer_first_research(payload)
+    if professional_verification_required:
+        return _render_telegram_professional_answer(professional_answer)
     if _telegram_rag_llm_synthesis_allowed() and _telegram_rag_source_count(payload) > 0:
         try:
             return _synthesize_telegram_rag_answer(payload, mode=mode)
         except Exception:
             LOGGER.warning("Telegram RAG LLM synthesis failed mode=%s", mode, exc_info=True)
+    if professional_answer.get("schema_version") == "professional_answer.v1":
+        return _render_telegram_professional_answer(professional_answer)
     if mode == "research" and _looks_russian(str(payload.get("question") or "")):
         return _render_telegram_answer_first_research(payload)
     return clean_local_text
@@ -1742,6 +1748,7 @@ def _telegram_rag_synthesis_context(payload: Mapping[str, Any], *, mode: str) ->
     answer_gate = _safe_mapping(payload.get("answer_gate"))
     next_steps = _safe_mapping(payload.get("next_steps"))
     project_fit = _safe_mapping(payload.get("project_fit"))
+    professional_answer = _safe_mapping(payload.get("professional_answer"))
     privacy = _safe_mapping(payload.get("privacy"))
     archive_items = [
         {
@@ -1796,6 +1803,18 @@ def _telegram_rag_synthesis_context(payload: Mapping[str, Any], *, mode: str) ->
         "next_steps": {
             key: [str(item) for item in next_steps.get(key) or [] if str(item).strip()][:3]
             for key in ("apply", "watch", "ignore", "study")
+        },
+        "professional_contract": {
+            "short_answer": _public_telegram_text(professional_answer.get("short_answer"))[:420],
+            "findings": [
+                {
+                    "claim": _public_telegram_text(item.get("claim"))[:300],
+                    "citation": _public_telegram_text(item.get("citation"))[:240],
+                }
+                for item in _safe_mapping_list(professional_answer.get("key_findings"))[:4]
+            ],
+            "recommended_action": _public_telegram_text(professional_answer.get("recommended_action"))[:320],
+            "uncertainty": [_public_telegram_text(item)[:220] for item in professional_answer.get("uncertainty") or []][:3],
         },
         "unknowns": [str(item) for item in payload.get("unknowns") or [] if str(item).strip()][:6],
         "privacy": {

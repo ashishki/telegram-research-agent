@@ -697,6 +697,33 @@ class TestHandlers(unittest.TestCase):
         self.assertIn("https://t.me/ai_channel/101", rendered)
         self.assertNotIn("ignored", rendered)
 
+    def test_telegram_approved_synthesis_precedes_professional_dto(self):
+        payload = _fake_research_payload()
+        payload["professional_answer"] = {"schema_version": "professional_answer.v1", "short_answer": "DTO fallback"}
+
+        with patch.dict(os.environ, {"PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS": "1", "PRM_TELEGRAM_RAG_LLM_SYNTHESIS": "1"}, clear=False):
+            with patch.object(handlers, "_synthesize_telegram_rag_answer", return_value="Полированный ответ") as synthesis:
+                rendered = handlers._render_telegram_research_response(payload, local_text="ignored", mode="research")
+
+        self.assertEqual(rendered, "Полированный ответ")
+        synthesis.assert_called_once_with(payload, mode="research")
+
+    def test_telegram_verification_dto_never_enters_synthesis(self):
+        payload = _fake_research_payload()
+        payload["professional_answer"] = {
+            "schema_version": "professional_answer.v1",
+            "answer_status": "verification_required",
+            "short_answer": "Нужна проверка.",
+            "external_verification": {"required": True},
+        }
+
+        with patch.dict(os.environ, {"PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS": "1", "PRM_TELEGRAM_RAG_LLM_SYNTHESIS": "1"}, clear=False):
+            with patch.object(handlers, "_synthesize_telegram_rag_answer") as synthesis:
+                rendered = handlers._render_telegram_research_response(payload, local_text="ignored", mode="research")
+
+        synthesis.assert_not_called()
+        self.assertIn("Требуется отдельная внешняя проверка", rendered)
+
     def test_telegram_professional_answer_renders_workflow_section(self):
         payload = _fake_research_payload()
         payload["professional_answer"] = {
