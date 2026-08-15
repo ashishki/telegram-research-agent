@@ -1701,6 +1701,9 @@ def _synthesize_telegram_rag_answer(payload: Mapping[str, Any], *, mode: str) ->
         "- Use only the bounded_context JSON below for source-grounded claims.\n"
         "- Do not use general model background as evidence.\n"
         "- Do not invent source links, channels, dates, companies, ROI, hiring, layoffs, or current facts.\n"
+        "- Do not invent source titles, descriptions, metaphors, causal links, or project context. Source labels must use only the supplied date, channel, and source_url.\n"
+        "- If the supplied sources do not directly support the user's topic, say that there is no topical local evidence. Do not connect unrelated sources by analogy or turn them into a recommendation.\n"
+        "- Mention a project only when project_fit.project_name is non-empty; otherwise do not infer a project name.\n"
         "- If time_window.requested is true, treat that date window as a hard source eligibility boundary.\n"
         "- For freshness-scoped questions, do not present older sources as recent evidence. If no archive sources remain in the window, say that clearly instead of answering from older context.\n"
         "- If the context says external verification is required, state that clearly.\n"
@@ -1738,6 +1741,8 @@ def _synthesize_telegram_rag_answer(payload: Mapping[str, Any], *, mode: str) ->
     answer = str(receipt.text or "").strip()
     if not answer:
         raise RuntimeError("empty_llm_synthesis")
+    if ru and not _looks_russian(answer):
+        raise RuntimeError("wrong_language_llm_synthesis")
     return _ensure_telegram_report_boundary(_telegram_report_without_technical_metrics(answer), ru=ru)
 
 
