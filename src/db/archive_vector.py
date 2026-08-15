@@ -22,6 +22,7 @@ LOCAL_EMBEDDING_MODEL = "local_hashing_text_vector.v1"
 DEFAULT_VECTOR_DIM = 2048
 DEFAULT_MAX_INDEX_ROWS = 50_000
 RRF_K = 60
+_VECTOR_ROW_CACHE: dict[tuple[str, int, int], list[tuple[dict[str, Any], dict[int, float]]]] = {}
 
 
 class ArchiveVectorIndexError(ValueError):
@@ -174,6 +175,7 @@ def build_archive_vector_index(
         sidecar.commit()
     finally:
         sidecar.close()
+    _clear_vector_cache(path)
 
     return {
         "schema_version": ARCHIVE_VECTOR_INDEX_SCHEMA_VERSION,
@@ -223,15 +225,15 @@ def search_archive_vector_index(
         query_vector = _embed_text(clean_query, dim=vector_dim)
         if not query_vector:
             return []
-        rows = _load_candidate_rows(sidecar, normalized_filters, limit=clean_scan)
+        rows = _load_cached_candidate_rows(path, sidecar, normalized_filters, limit=clean_scan)
     finally:
         sidecar.close()
 
-    scored: list[tuple[float, sqlite3.Row]] = []
-    for row in rows:
+    scored: list[tuple[float, Mapping[str, Any]]] = []
+    for row, vector in rows:
         if not _row_matches_filters(row, normalized_filters):
             continue
-        score = _dot(query_vector, _load_vector(str(row["vector_json"] or "")))
+        score = _dot(query_vector, vector)
         if score <= 0:
             continue
         scored.append((score, row))
@@ -433,7 +435,58 @@ def _load_candidate_rows(
     return connection.execute(sql, [*params, limit]).fetchall()
 
 
-def _row_matches_filters(row: sqlite3.Row, filters: ArchiveSearchFilters) -> bool:
+def _load_cached_candidate_rows(
+    path: Path,
+    connection: sqlite3.Connection,
+    filters: ArchiveSearchFilters,
+    *,
+    limit: int,
+) -> list[tuple[dict[str, Any], dict[int, float]]]:
+    cache_key = _vector_cache_key(path)
+    cached = _VECTOR_ROW_CACHE.get(cache_key)
+    if cached is None:
+        rows = connection.execute(
+            "SELECT * FROM archive_vector_documents ORDER BY posted_at DESC, post_id DESC LIMIT ?",
+            (DEFAULT_MAX_INDEX_ROWS,),
+        ).fetchall()
+        cached = [({key: row[key] for key in row.keys()}, _load_vector(str(row["vector_json"] or ""))) for row in rows]
+        _VECTOR_ROW_CACHE.clear()
+        _VECTOR_ROW_CACHE[cache_key] = cached
+    selected: list[tuple[dict[str, Any], dict[int, float]]] = []
+    for row, vector in cached:
+        if not _row_matches_primary_filters(row, filters):
+            continue
+        selected.append((row, vector))
+        if len(selected) >= limit:
+            break
+    return selected
+
+
+def _row_matches_primary_filters(row: Mapping[str, Any], filters: ArchiveSearchFilters) -> bool:
+    if filters.channel_usernames and str(row["channel_username"]) not in filters.channel_usernames:
+        return False
+    if filters.languages and str(row["language"]) not in filters.languages:
+        return False
+    if filters.date_from and str(row["posted_at"]) < filters.date_from:
+        return False
+    if filters.date_to and str(row["posted_at"]) >= filters.date_to:
+        return False
+    return True
+
+
+def _vector_cache_key(path: Path) -> tuple[str, int, int]:
+    stat = path.stat()
+    return (str(path.resolve()), int(stat.st_mtime_ns), int(stat.st_size))
+
+
+def _clear_vector_cache(path: Path) -> None:
+    resolved = str(path.resolve())
+    for key in list(_VECTOR_ROW_CACHE):
+        if key[0] == resolved:
+            _VECTOR_ROW_CACHE.pop(key, None)
+
+
+def _row_matches_filters(row: Mapping[str, Any], filters: ArchiveSearchFilters) -> bool:
     if filters.reacted_only and int(row["reaction_count"] or 0) <= 0:
         return False
     if filters.reactions and not set(filters.reactions).intersection(_json_strings(row["reactions_json"])):
@@ -445,7 +498,7 @@ def _row_matches_filters(row: sqlite3.Row, filters: ArchiveSearchFilters) -> boo
     return True
 
 
-def _result_from_vector_row(row: sqlite3.Row, *, score: float) -> ArchiveSearchResult:
+def _result_from_vector_row(row: Mapping[str, Any], *, score: float) -> ArchiveSearchResult:
     return ArchiveSearchResult(
         archive_document_id=str(row["archive_document_id"]),
         post_archive_document_id=str(row["post_archive_document_id"]),

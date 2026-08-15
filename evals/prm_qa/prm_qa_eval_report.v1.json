@@ -1,0 +1,171 @@
+{
+  "case_count": 160,
+  "case_fingerprint": "sha256:4e6da1bd2e0a977df57cbdcf974f966fbe4cf45b5cd8cc285ee7b1c109488a02",
+  "check": "all",
+  "claim_grounding": {
+    "citation_completeness": 0.9894,
+    "citation_precision": 1.0,
+    "claim_count": 470,
+    "current_fact_violations": 0,
+    "partial_claim_rate": 0.0,
+    "schema_version": "prm_claim_grounding_metrics.v1",
+    "supported_claim_rate": 0.9894,
+    "technical_leaks": 0,
+    "unsupported_claim_rate": 0.0106
+  },
+  "dense_candidate": {
+    "adopted": false,
+    "provider_egress": false,
+    "reason": "Dense runtime not installed locally.",
+    "runtime_available": false,
+    "variant": "R4_true_local_dense_candidate"
+  },
+  "evidence_quality": {
+    "direct_rate": 0.0238,
+    "evidence_count": 800,
+    "independent_rate": 0.0,
+    "relevant_rate": 0.19,
+    "schema_version": "prm_evidence_quality_summary.v1",
+    "source_classes": {
+      "telegram_commentary": 754,
+      "telegram_firsthand_case": 1,
+      "telegram_forward": 45
+    },
+    "source_group_count": 395
+  },
+  "generated_at": "2026-08-15T17:20:26.481890Z",
+  "honesty_boundary": "Automated generated/silver evaluation is regression evidence only and does not prove real operator usefulness.",
+  "job_type_counts": {
+    "ambiguous_project": 10,
+    "case_study": 15,
+    "comparison": 12,
+    "current_fact": 5,
+    "distractor_hard_negative": 5,
+    "exact_known_item": 20,
+    "learning_experiment": 8,
+    "named_project_decision": 25,
+    "no_answer": 5,
+    "reacted_post_recall": 5,
+    "saved_knowledge_recall": 5,
+    "semantic_topic": 25,
+    "timeline_freshness": 12,
+    "writer_editor": 8
+  },
+  "label_quality_counts": {
+    "deterministic": 75,
+    "silver": 80,
+    "synthetic_negative": 5
+  },
+  "partition": "all",
+  "presentation": {
+    "evaluated_cases": 160,
+    "judge_type": "deterministic_static_proxy",
+    "language_match_rate": 1.0,
+    "schema_version": "prm_presentation_proxy.v1",
+    "technical_leaks": 0
+  },
+  "privacy": {
+    "private_traces_gitignored": true,
+    "public_report_contains_queries": false,
+    "public_report_contains_raw_telegram_body": false,
+    "public_report_contains_source_urls": false
+  },
+  "retrieval": {
+    "R0_sqlite_fts_strict_or_baseline": {
+      "available": true,
+      "context_precision_at_5": 0.3,
+      "duplicate_top10_rate": 0.0044,
+      "evaluated_cases": 160,
+      "freshness_compliance": 0.9662,
+      "mrr": 0.9845,
+      "ndcg_at_10": 0.9885,
+      "p50_latency_ms": 53.4514,
+      "p95_latency_ms": 109.9527,
+      "reacted_post_recall": 1.0,
+      "recall_at_10": 1.0,
+      "recall_at_5": 1.0,
+      "source_group_diversity": 0.9956
+    },
+    "R1_fts_hash_vector_fallback": {
+      "available": true,
+      "context_precision_at_5": 0.3,
+      "duplicate_top10_rate": 0.0044,
+      "evaluated_cases": 160,
+      "freshness_compliance": 0.9662,
+      "mrr": 0.9845,
+      "ndcg_at_10": 0.9885,
+      "p50_latency_ms": 49.6781,
+      "p95_latency_ms": 94.0055,
+      "reacted_post_recall": 1.0,
+      "recall_at_10": 1.0,
+      "recall_at_5": 1.0,
+      "source_group_diversity": 0.9956
+    },
+    "R2_fts_hash_vector_always": {
+      "available": true,
+      "context_precision_at_5": 0.2987,
+      "duplicate_top10_rate": 0.0081,
+      "evaluated_cases": 160,
+      "freshness_compliance": 0.9613,
+      "mrr": 0.875,
+      "ndcg_at_10": 0.9069,
+      "p50_latency_ms": 462.0132,
+      "p95_latency_ms": 682.4433,
+      "reacted_post_recall": 1.0,
+      "recall_at_10": 1.0,
+      "recall_at_5": 0.9929,
+      "source_group_diversity": 0.9919
+    },
+    "R3_fts_bounded_query_rewrite": {
+      "available": true,
+      "context_precision_at_5": 0.3,
+      "duplicate_top10_rate": 0.0049,
+      "evaluated_cases": 160,
+      "freshness_compliance": 0.9684,
+      "mrr": 0.9845,
+      "ndcg_at_10": 0.9885,
+      "p50_latency_ms": 58.2517,
+      "p95_latency_ms": 112.2836,
+      "reacted_post_recall": 1.0,
+      "recall_at_10": 1.0,
+      "recall_at_5": 1.0,
+      "source_group_diversity": 0.9951
+    },
+    "R4_true_local_dense_candidate": {
+      "available": false,
+      "evaluated_cases": 160
+    },
+    "R5_candidate_pool_reranker": {
+      "available": true,
+      "context_precision_at_5": 0.3,
+      "duplicate_top10_rate": 0.0075,
+      "evaluated_cases": 160,
+      "freshness_compliance": 0.9656,
+      "mrr": 0.8702,
+      "ndcg_at_10": 0.903,
+      "p50_latency_ms": 524.8498,
+      "p95_latency_ms": 755.2147,
+      "reacted_post_recall": 1.0,
+      "recall_at_10": 1.0,
+      "recall_at_5": 1.0,
+      "source_group_diversity": 0.9925
+    }
+  },
+  "routing": {
+    "ambiguous_project_clarification": 1.0,
+    "current_fact_boundary": 1.0,
+    "evaluated_cases": 160,
+    "route_accuracy": 1.0,
+    "unsafe_chat_rate": 0.0,
+    "workflow_accuracy": 1.0,
+    "wrong_project_rate": 0.0
+  },
+  "schema_version": "prm_qa_eval_report.v1",
+  "status": "pass",
+  "task_success_proxy": {
+    "clarified": 10,
+    "synthetic_miss_proxy": 15,
+    "synthetic_success_proxy": 130,
+    "verification_boundary": 5
+  }
+}

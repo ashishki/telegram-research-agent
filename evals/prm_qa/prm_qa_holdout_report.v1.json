@@ -1,0 +1,169 @@
+{
+  "case_count": 34,
+  "case_fingerprint": "sha256:fb5ec617301ec665f49b56a4ec91728320e0146b5d0b01bb693398bfd53943bd",
+  "check": "all",
+  "claim_grounding": {
+    "citation_completeness": 0.99,
+    "citation_precision": 1.0,
+    "claim_count": 100,
+    "current_fact_violations": 0,
+    "partial_claim_rate": 0.0,
+    "schema_version": "prm_claim_grounding_metrics.v1",
+    "supported_claim_rate": 0.99,
+    "technical_leaks": 0,
+    "unsupported_claim_rate": 0.01
+  },
+  "dense_candidate": {
+    "adopted": false,
+    "provider_egress": false,
+    "reason": "Dense runtime not installed locally.",
+    "runtime_available": false,
+    "variant": "R4_true_local_dense_candidate"
+  },
+  "evidence_quality": {
+    "direct_rate": 0.0235,
+    "evidence_count": 170,
+    "independent_rate": 0.0,
+    "relevant_rate": 0.1941,
+    "schema_version": "prm_evidence_quality_summary.v1",
+    "source_classes": {
+      "telegram_commentary": 157,
+      "telegram_firsthand_case": 1,
+      "telegram_forward": 12
+    },
+    "source_group_count": 121
+  },
+  "generated_at": "2026-08-15T17:21:12.367357Z",
+  "honesty_boundary": "Automated generated/silver evaluation is regression evidence only and does not prove real operator usefulness.",
+  "job_type_counts": {
+    "ambiguous_project": 2,
+    "case_study": 6,
+    "comparison": 1,
+    "current_fact": 1,
+    "distractor_hard_negative": 1,
+    "exact_known_item": 3,
+    "learning_experiment": 1,
+    "named_project_decision": 6,
+    "reacted_post_recall": 1,
+    "semantic_topic": 6,
+    "timeline_freshness": 2,
+    "writer_editor": 4
+  },
+  "label_quality_counts": {
+    "deterministic": 13,
+    "silver": 20,
+    "synthetic_negative": 1
+  },
+  "partition": "holdout",
+  "presentation": {
+    "evaluated_cases": 34,
+    "judge_type": "deterministic_static_proxy",
+    "language_match_rate": 1.0,
+    "schema_version": "prm_presentation_proxy.v1",
+    "technical_leaks": 0
+  },
+  "privacy": {
+    "private_traces_gitignored": true,
+    "public_report_contains_queries": false,
+    "public_report_contains_raw_telegram_body": false,
+    "public_report_contains_source_urls": false
+  },
+  "retrieval": {
+    "R0_sqlite_fts_strict_or_baseline": {
+      "available": true,
+      "context_precision_at_5": 0.2471,
+      "duplicate_top10_rate": 0.0059,
+      "evaluated_cases": 34,
+      "freshness_compliance": 0.9676,
+      "mrr": 1.0,
+      "ndcg_at_10": 1.0,
+      "p50_latency_ms": 50.6369,
+      "p95_latency_ms": 79.711,
+      "reacted_post_recall": 1.0,
+      "recall_at_10": 1.0,
+      "recall_at_5": 1.0,
+      "source_group_diversity": 0.9941
+    },
+    "R1_fts_hash_vector_fallback": {
+      "available": true,
+      "context_precision_at_5": 0.2471,
+      "duplicate_top10_rate": 0.0059,
+      "evaluated_cases": 34,
+      "freshness_compliance": 0.9676,
+      "mrr": 1.0,
+      "ndcg_at_10": 1.0,
+      "p50_latency_ms": 50.4914,
+      "p95_latency_ms": 78.7893,
+      "reacted_post_recall": 1.0,
+      "recall_at_10": 1.0,
+      "recall_at_5": 1.0,
+      "source_group_diversity": 0.9941
+    },
+    "R2_fts_hash_vector_always": {
+      "available": true,
+      "context_precision_at_5": 0.2471,
+      "duplicate_top10_rate": 0.0088,
+      "evaluated_cases": 34,
+      "freshness_compliance": 0.9676,
+      "mrr": 0.8411,
+      "ndcg_at_10": 0.8818,
+      "p50_latency_ms": 502.3155,
+      "p95_latency_ms": 689.7799,
+      "reacted_post_recall": 1.0,
+      "recall_at_10": 1.0,
+      "recall_at_5": 1.0,
+      "source_group_diversity": 0.9912
+    },
+    "R3_fts_bounded_query_rewrite": {
+      "available": true,
+      "context_precision_at_5": 0.2471,
+      "duplicate_top10_rate": 0.0042,
+      "evaluated_cases": 34,
+      "freshness_compliance": 0.9674,
+      "mrr": 1.0,
+      "ndcg_at_10": 1.0,
+      "p50_latency_ms": 65.2739,
+      "p95_latency_ms": 111.1032,
+      "reacted_post_recall": 1.0,
+      "recall_at_10": 1.0,
+      "recall_at_5": 1.0,
+      "source_group_diversity": 0.9958
+    },
+    "R4_true_local_dense_candidate": {
+      "available": false,
+      "evaluated_cases": 34
+    },
+    "R5_candidate_pool_reranker": {
+      "available": true,
+      "context_precision_at_5": 0.2471,
+      "duplicate_top10_rate": 0.0059,
+      "evaluated_cases": 34,
+      "freshness_compliance": 0.9706,
+      "mrr": 0.849,
+      "ndcg_at_10": 0.887,
+      "p50_latency_ms": 564.5742,
+      "p95_latency_ms": 789.1008,
+      "reacted_post_recall": 1.0,
+      "recall_at_10": 1.0,
+      "recall_at_5": 1.0,
+      "source_group_diversity": 0.9941
+    }
+  },
+  "routing": {
+    "ambiguous_project_clarification": 1.0,
+    "current_fact_boundary": 1.0,
+    "evaluated_cases": 34,
+    "route_accuracy": 1.0,
+    "unsafe_chat_rate": 0.0,
+    "workflow_accuracy": 1.0,
+    "wrong_project_rate": 0.0
+  },
+  "schema_version": "prm_qa_eval_report.v1",
+  "status": "pass",
+  "task_success_proxy": {
+    "clarified": 2,
+    "synthetic_miss_proxy": 1,
+    "synthetic_success_proxy": 30,
+    "verification_boundary": 1
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://telegram-research-agent.local/schemas/prm_qa_case.schema.json",
+  "title": "PRM-QA Private Evaluation Case",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "case_id",
+    "dataset_version",
+    "generation_seed",
+    "corpus_fingerprint",
+    "job_type",
+    "query",
+    "language",
+    "expected_route",
+    "expected_workflow",
+    "project_name",
+    "date_from",
+    "date_to",
+    "expected_source_ids",
+    "expected_source_urls",
+    "expected_source_group_ids",
+    "expected_no_answer",
+    "expected_external_verification",
+    "expected_clarification",
+    "label_quality",
+    "generation_method",
+    "holdout_partition",
+    "privacy"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"type": "string", "const": "prm_qa.case.v1"},
+    "case_id": {"type": "string", "minLength": 1},
+    "dataset_version": {"type": "string", "minLength": 1},
+    "generation_seed": {"type": "integer"},
+    "corpus_fingerprint": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "job_type": {
+      "type": "string",
+      "enum": [
+        "exact_known_item",
+        "semantic_topic",
+        "case_study",
+        "comparison",
+        "timeline_freshness",
+        "named_project_decision",
+        "ambiguous_project",
+        "writer_editor",
+        "learning_experiment",
+        "reacted_post_recall",
+        "saved_knowledge_recall",
+        "no_answer",
+        "current_fact",
+        "distractor_hard_negative"
+      ]
+    },
+    "query": {"type": "string", "minLength": 1},
+    "language": {"type": "string", "enum": ["ru", "en", "mixed"]},
+    "expected_route": {"type": "string", "minLength": 1},
+    "expected_workflow": {"type": "string", "minLength": 1},
+    "project_name": {"type": "string"},
+    "date_from": {"type": ["string", "null"]},
+    "date_to": {"type": ["string", "null"]},
+    "expected_source_ids": {"type": "array", "items": {"type": "string"}},
+    "expected_source_urls": {"type": "array", "items": {"type": "string"}},
+    "expected_source_group_ids": {"type": "array", "items": {"type": "string"}},
+    "expected_no_answer": {"type": "boolean"},
+    "expected_external_verification": {"type": "boolean"},
+    "expected_clarification": {"type": "boolean"},
+    "label_quality": {"type": "string", "enum": ["deterministic", "silver", "synthetic_negative"]},
+    "generation_method": {"type": "string", "minLength": 1},
+    "holdout_partition": {"type": "string", "enum": ["development", "tuning", "holdout"]},
+    "privacy": {
+      "type": "object",
+      "required": [
+        "contains_private_query",
+        "contains_raw_telegram_body",
+        "public_safe",
+        "commit_allowed"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "contains_private_query": {"type": "boolean"},
+        "contains_raw_telegram_body": {"type": "boolean"},
+        "public_safe": {"type": "boolean"},
+        "commit_allowed": {"type": "boolean"}
+      }
+    }
+  }
+}

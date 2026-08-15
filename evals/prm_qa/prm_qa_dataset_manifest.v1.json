@@ -1,0 +1,45 @@
+{
+  "case_count": 160,
+  "corpus_fingerprint": "sha256:59e2dc9c852887a3a67f05d195870ddfb24cb11fc870dc0abd9dfd56f14d9a57",
+  "dataset_version": "prm_qa_private_2026-08-15_v1",
+  "generated_at": "2026-08-15T16:58:50.547293Z",
+  "generation_seed": 240815,
+  "generator_version": "prm_qa_private_dataset_generator.v1",
+  "holdout_strategy": "Source-group hash isolation where source-backed; case hash for synthetic negatives/current-fact cases.",
+  "honesty_boundary": "Generated questions and deterministic/silver labels are regression evidence only, not proof of real operator value.",
+  "job_type_counts": {
+    "ambiguous_project": 10,
+    "case_study": 15,
+    "comparison": 12,
+    "current_fact": 5,
+    "distractor_hard_negative": 5,
+    "exact_known_item": 20,
+    "learning_experiment": 8,
+    "named_project_decision": 25,
+    "no_answer": 5,
+    "reacted_post_recall": 5,
+    "saved_knowledge_recall": 5,
+    "semantic_topic": 25,
+    "timeline_freshness": 12,
+    "writer_editor": 8
+  },
+  "label_quality_counts": {
+    "deterministic": 75,
+    "silver": 80,
+    "synthetic_negative": 5
+  },
+  "partition_counts": {
+    "development": 89,
+    "holdout": 34,
+    "tuning": 37
+  },
+  "privacy": {
+    "manifest_contains_queries": false,
+    "manifest_contains_raw_telegram_body": false,
+    "manifest_contains_source_urls": false,
+    "private_cases_gitignored": true,
+    "public_commit_allowed": true
+  },
+  "private_dataset_path": "data/evals/private/prm_qa/cases.v1.jsonl",
+  "schema_version": "prm_qa_dataset_manifest.v1"
+}
