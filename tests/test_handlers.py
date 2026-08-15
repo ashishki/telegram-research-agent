@@ -836,6 +836,18 @@ class TestHandlers(unittest.TestCase):
         self.assertNotIn("model_calls", str(contract))
         self.assertNotIn("post_id", str(contract))
 
+    def test_telegram_synthesis_context_normalizes_all_evidence_urls(self):
+        payload = _fake_research_payload()
+        payload["linked_source_evidence"] = {"items": [{"normalized_title": "Linked", "normalized_url": "https://example.test/linked", "text_excerpt": "Linked evidence."}]}
+        payload["professional_answer"] = {"key_findings": [{"claim": "Professional evidence.", "citation": "https://example.test/professional"}, {"claim": "Unlinked evidence.", "citation": ""}]}
+
+        context = handlers._telegram_rag_synthesis_context(payload, mode="research")
+
+        self.assertEqual(context["archive"]["sources"][0]["source_url"], "https://t.me/ai_channel/101")
+        self.assertEqual(context["linked_sources"][0]["source_url"], "https://example.test/linked")
+        self.assertEqual(context["professional_contract"]["findings"][0]["source_url"], "https://example.test/professional")
+        self.assertEqual(context["professional_contract"]["findings"][1]["source_url"], "")
+
     def test_telegram_professional_answer_renders_workflow_section(self):
         payload = _fake_research_payload()
         payload["professional_answer"] = {
@@ -951,7 +963,11 @@ class TestHandlers(unittest.TestCase):
         self.assertIn("Use a clean visual layout", synthesis_prompt)
         self.assertIn("Do not show technical metrics", synthesis_prompt)
         self.assertIn("hard source eligibility boundary", synthesis_prompt)
+        self.assertIn("Every source-derived factual assertion", synthesis_prompt)
+        self.assertIn("close paraphrase of one supplied snippet", synthesis_prompt)
+        self.assertIn("only an explicitly labelled practical suggestion", synthesis_prompt)
         self.assertIn("Return exactly one word: PASS or FAIL", verifier_prompt)
+        self.assertIn("lacks a supplied source_url", verifier_prompt)
         message = mock_send_message.call_args.args[2]
         self.assertIn("PRM Research", message)
         self.assertIn("AI pilots need ROI proof", message)
