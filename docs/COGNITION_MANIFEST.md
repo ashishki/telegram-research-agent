@@ -26,8 +26,8 @@ Repo-local map that translates the project's existing runtime memory architectur
 
 ## Shared VPS Cognition Vault
 
-- Vault path: `/srv/codex-entropy/repos/product-3/engineering-cognition-vault`.
-- Live checkout on this VPS: `/srv/openclaw-you/workspace/telegram-research-agent`.
+- Vault path: VPS-local engineering cognition vault path.
+- Live checkout on this VPS: VPS-local telegram-research-agent checkout path.
 - Repo-local docs remain the source of truth for architecture, prompts, runbooks, tasks, evals, findings, and decisions.
 - The vault is a downstream/navigation layer for cross-project discovery and context packets; do not hand-write canonical findings, evals, or decisions there.
 - Operational policy: `docs/VPS_COGNITION_VAULT.md`.

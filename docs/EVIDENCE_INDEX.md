@@ -12,8 +12,8 @@
 | Retrieval ADR | `docs/adr/ADR-005-prm-qa-selected-retrieval-policy.md` |
 | Product contract | `docs/prm_qa_product_contract.md` |
 | Acceptance plan | `docs/prm_qa_acceptance_plan.md` |
-| Private cases | `data/evals/private/prm_qa/cases.v1.jsonl`, gitignored |
-| Private traces | `data/evals/private/prm_qa/failed_cases/`, gitignored |
+| Private cases | gitignored local path: data/evals/private/prm_qa/cases.v1.jsonl |
+| Private traces | gitignored local path: data/evals/private/prm_qa/failed_cases/ |
 | CI follow-up | remote run `31899242121` failed on `memory ask` local path redaction; fixed and reverified with `tests/test_local_memory_ask.py` and `tools/test_tiers.py focused-prm` |
 
 Privacy boundary: public artifacts contain aggregate counts, fingerprints,
@@ -649,7 +649,7 @@ archive_retrieval_eval: rows=50 gold=50 candidates=0 output=evals/retrieval/prod
 | approval ref | `operator-approval-2026-08-11-full-stack-local-vector-telegram-llm` |
 | implementation | `src/db/archive_vector.py`; `memory vector-index`; `memory vector-search`; `memory research --hybrid`; PI facade hybrid search; Telegram research and brief commands use env-gated hybrid retrieval |
 | local model | `local_hashing_text_vector.v1` |
-| sidecar path | default `data/vector/archive_vector.sqlite`, gitignored |
+| sidecar path | default gitignored local path: data/vector/archive_vector.sqlite |
 | canonical DB | opened read-only by CLI indexer; no canonical `raw_posts`/`posts` mutation |
 | context provenance | `rag_context_pack.v1` sources include `retrieval_mode` such as `sqlite_fts_archive`, `local_vector_archive`, `hybrid_fts_vector`, or `hybrid_vector_only` |
 | eval mode | `tools/archive_retrieval_eval.py --retrieval-mode hybrid-local-vector --vector-index-path data/vector/archive_vector.sqlite` |
@@ -794,7 +794,7 @@ testing; see
 | scope | manual operator testing of local vector/RAG/LLM/Telegram stack |
 | systemd unit | `telegram-prm-assistant.service` installed, enabled, and active |
 | startup migration behavior | automatic migrations skipped |
-| vector sidecar | `data/vector/archive_vector.sqlite`, gitignored, local deterministic hashing |
+| vector sidecar | gitignored local path data/vector/archive_vector.sqlite, local deterministic hashing |
 | hybrid eval | 50 generated seed cases; hit@10=1.0, MRR=1.0, citation_precision=1.0, duplicate_top10_rate=0.004, latency_ms_p95=59.077 |
 | Telegram flags | `PRM_ARCHIVE_HYBRID_RETRIEVAL=approved`; `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`; `PRM_TELEGRAM_AUTO_LLM_ROUTER=1`; `PRM_TELEGRAM_RAG_LLM_SYNTHESIS=1` |
 | delivery check | short Telegram service-check message sent; no private source text and no LLM provider call |
@@ -825,8 +825,8 @@ testing; see
 | canonical archive write | raw_posts/posts/posts_fts updated from 3709 to 4166 rows |
 | freshness | max `posts.posted_at` advanced from 2026-07-26T22:40:28+00:00 to 2026-08-11T21:47:37+00:00 |
 | safety | no legacy service/timer restart, migrations, reaction sync, media download, vision LLM, provider egress, source-event write, live web research, external embeddings, hosted vector service, report generation, dogfood start, or release claim |
-| vector sidecar | approved local gitignored vector sidecar rebuilt at `data/vector/archive_vector.sqlite` |
-| backup | SQLite backup created under gitignored `data/backups/` before writing |
+| vector sidecar | approved local gitignored vector sidecar rebuilt at data/vector/archive_vector.sqlite |
+| backup | SQLite backup created under gitignored data/backups/ before writing |
 | smoke | `memory research --hybrid --limit 4 "Что было интересного по моделям за последние две недели?"` found fresh local Telegram citations inside the strict date window |
 | validation | py_compile for changed modules passed; `PYTHONPATH=src python3 -m pytest tests/test_cli.py tests/test_ingestion.py tests/test_memory_research.py tests/test_handlers.py -q` -> 97 passed; `python3 tools/test_tiers.py focused-prm` -> 199 passed; playbook validator errors=0 warnings=0; `git diff --check` clean |
 | dogfood boundary | not PRM-19 evidence; manual testing continues |
