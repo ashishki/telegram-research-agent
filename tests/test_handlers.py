@@ -901,6 +901,7 @@ class TestHandlers(unittest.TestCase):
             "reason": "current_external_fact_required",
         }
         payload["unknowns"] = ["external verification before current claims"]
+        payload["archive_evidence"] = {"items": [{"posted_at": "2026-08-01T00:00:00Z", "channel_username": "@archive", "snippet": "Historical archive note.", "source_url": "https://t.me/archive/1"}]}
 
         rendered = handlers._render_telegram_research_response(
             payload,
@@ -908,9 +909,14 @@ class TestHandlers(unittest.TestCase):
             mode="research",
         )
 
-        self.assertTrue(rendered.startswith("Внешняя проверка нужна"))
-        self.assertIn("Короткий вывод", rendered)
-        self.assertIn("не подтверждена", rendered)
+        self.assertTrue(rendered.startswith("Я не могу подтвердить текущий факт"))
+        self.assertIn("Что есть в архиве", rendered)
+        self.assertIn("Что нужно для точного ответа", rendered)
+        self.assertIn("Внешняя проверка не запускалась", rendered)
+        self.assertIn("Источники из архива", rendered)
+        self.assertIn("Historical archive note.", rendered)
+        self.assertIn("https://t.me/archive/1", rendered)
+        self.assertLess(rendered.index("Что есть в архиве"), rendered.index("Historical archive note."))
         self.assertNotIn("Old archive context says", rendered)
 
     def test_handle_research_can_send_llm_synthesis_after_local_rag(self):
