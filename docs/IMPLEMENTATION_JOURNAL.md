@@ -70,6 +70,55 @@ No full pytest suite was run. No production database contents, provider call,
 live Telegram job, live fetch, external embedding, hosted vector service,
 dogfood start, release claim, or compatibility cleanup was performed.
 
+## 2026-08-15 — PRM-QA API dense retrieval follow-up
+
+The operator explicitly approved API use for assistant retrieval and embeddings
+after the local-only PRM-QA pass. A repo-local `.env` was copied from
+`/srv/openclaw-you/.env` and remains gitignored; secret values were not printed
+or committed.
+
+Implemented a separate API embedding sidecar:
+
+- code: `src/db/archive_api_vector.py`
+- CLI: `memory api-vector-index`, `memory api-vector-search`
+- eval adapter: `R4_api_dense_candidate`
+- provider/model: OpenAI `text-embedding-3-large`
+- vector dimensions: 3072
+- sidecar: gitignored local path data/vector/archive_api_vector.sqlite
+- sidecar permissions: 0600
+- sidecar size: 130.8 MB
+- indexed chunks: 3,706 from 3,590 archive rows
+- provider calls: 29
+- input tokens: 1,356,089
+- canonical DB mutated: false
+
+API dense eval evidence:
+
+- all cases: `evals/prm_qa/prm_qa_api_dense_report.v1.json`, status `pass`;
+  R1 Recall@10 1.0000, MRR 0.9845, nDCG@10 0.9885, p95 85.4424 ms;
+  R4 API dense hybrid Recall@10 1.0000, MRR 0.7917, nDCG@10 0.8451,
+  p95 635.4212 ms.
+- holdout: `evals/prm_qa/prm_qa_api_dense_holdout_report.v1.json`, status
+  `pass`; R1 Recall@10 1.0000, MRR 1.0000, nDCG@10 1.0000, p95 111.7023 ms;
+  R4 API dense hybrid Recall@10 1.0000, MRR 0.7240, nDCG@10 0.7957,
+  p95 726.8114 ms.
+
+Decision: API dense retrieval is implemented and measurable, but not adopted as
+the default runtime policy because it did not improve holdout ranking and added
+latency/provider cost. It remains an eval/runtime adapter for future query
+shaping, chunking, fusion, or reranker work.
+
+Focused verification:
+
+```text
+PYTHONPATH=src python3 -m pytest tests/test_archive_api_vector.py tests/test_prm_qa_dataset_eval.py -q
+4 passed in 6.25s
+```
+
+No full pytest suite was run. No production database contents, hosted vector
+service, live web research, live Telegram job, production migration, dogfood
+start, release claim, or compatibility cleanup was performed.
+
 ## 2026-08-13 — PRM-MAT documentation-only completion audit
 
 Recorded target/Playbook baselines, component maturity, CI observation, target contract, migration/acceptance/validation plans and a 21-task proposed queue. No runtime/product code, production data, systemd state, environment value, provider call, live Telegram job, live fetch or vector rebuild was performed.

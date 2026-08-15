@@ -11,7 +11,8 @@ Date: 2026-08-15
   metrics are reported separately.
 - Retrieval ablation compares R0 through R5.
 - Selected retrieval policy is based on measured results.
-- Dense retrieval is adopted only after a measured holdout gain.
+- Dense retrieval, including approved API embeddings, is adopted as default only
+  after a measured holdout gain.
 - Evidence quality and source independence are represented.
 - Claim ledger and citation checks exist.
 - Ambiguous project requests clarify.

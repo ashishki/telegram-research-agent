@@ -9,17 +9,22 @@
 | Dataset manifest | `evals/prm_qa/prm_qa_dataset_manifest.v1.json` |
 | All-case eval report | `evals/prm_qa/prm_qa_eval_report.v1.json` |
 | Holdout eval report | `evals/prm_qa/prm_qa_holdout_report.v1.json` |
+| API dense all-case report | `evals/prm_qa/prm_qa_api_dense_report.v1.json` |
+| API dense holdout report | `evals/prm_qa/prm_qa_api_dense_holdout_report.v1.json` |
 | Retrieval ADR | `docs/adr/ADR-005-prm-qa-selected-retrieval-policy.md` |
 | Product contract | `docs/prm_qa_product_contract.md` |
 | Acceptance plan | `docs/prm_qa_acceptance_plan.md` |
 | Private cases | gitignored local path: data/evals/private/prm_qa/cases.v1.jsonl |
 | Private traces | gitignored local path: data/evals/private/prm_qa/failed_cases/ |
+| API dense sidecar | gitignored local path: data/vector/archive_api_vector.sqlite; OpenAI `text-embedding-3-large`, 3072 dimensions, 3,706 chunks, 1,356,089 input tokens, 29 provider calls |
 | CI follow-up | remote run `31899242121` failed on `memory ask` local path redaction; fixed and reverified with `tests/test_local_memory_ask.py` and `tools/test_tiers.py focused-prm` |
 
 Privacy boundary: public artifacts contain aggregate counts, fingerprints,
 metrics, and status only. They do not contain raw Telegram bodies, private
 queries, source URLs, snippets, chat IDs, prompts, completions, or provider
-payloads.
+payloads. The API dense sidecar used bounded archive text provider egress after
+explicit operator approval; the sidecar and `.env` remain gitignored and are not
+public evidence.
 
 Automated evidence boundary: generated/silver labels and synthetic task-success
 proxy are regression evidence only; they do not prove real operator usefulness.

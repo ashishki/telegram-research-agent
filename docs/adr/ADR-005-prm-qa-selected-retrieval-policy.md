@@ -4,9 +4,10 @@ Date: 2026-08-15
 
 ## Status
 
-Accepted for local manual-test runtime. This does not start PRM-19 dogfood and
-does not approve external embeddings, hosted vector services, live web research,
-production migrations, or release claims.
+Accepted for manual-test runtime. This does not start PRM-19 dogfood and does
+not approve hosted vector services, live web research, production migrations, or
+release claims. On 2026-08-15 the operator separately approved API embeddings
+for this product; this ADR now records the measured OpenAI embedding candidate.
 
 ## Context
 
@@ -16,11 +17,12 @@ deterministic/silver regression evidence only. They are not human gold labels
 and do not prove real operator value.
 
 The current local vector sidecar uses deterministic hashing over words, word
-bigrams, and character n-grams. A true multilingual dense retriever was not
-available in the local environment because the dense runtime libraries were not
-installed. Official model-card candidates recorded for future local-only
-evaluation are `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`
-(Apache-2.0) and `intfloat/multilingual-e5-small` (MIT); neither was adopted.
+bigrams, and character n-grams. After the initial local-only pass, the operator
+approved API embeddings because this is an API-backed assistant product. The
+API candidate uses OpenAI `text-embedding-3-large`, which official OpenAI docs
+describe as the most capable embedding model for English and non-English tasks.
+The sidecar remains local SQLite; provider egress is limited to bounded archive
+chunks and query strings sent for embeddings. No hosted vector database is used.
 
 ## Decision
 
@@ -28,8 +30,8 @@ Default runtime retrieval remains SQLite FTS with deterministic OR fallback,
 plus bounded generic query rewrites at the memory-research layer. The local
 hash-vector sidecar remains fallback-only when FTS returns no evidence.
 
-Always-on hash-vector fusion and the candidate-pool reranker remain eval
-adapters, not default runtime policy.
+Always-on hash-vector fusion, API dense hybrid fusion, and the candidate-pool
+reranker remain eval adapters, not default runtime policy.
 
 ## Evidence
 
@@ -38,6 +40,8 @@ Public aggregate reports:
 - `evals/prm_qa/prm_qa_dataset_manifest.v1.json`
 - `evals/prm_qa/prm_qa_eval_report.v1.json`
 - `evals/prm_qa/prm_qa_holdout_report.v1.json`
+- `evals/prm_qa/prm_qa_api_dense_report.v1.json`
+- `evals/prm_qa/prm_qa_api_dense_holdout_report.v1.json`
 
 All-partition selected metrics:
 
@@ -55,6 +59,19 @@ Holdout selected metrics:
 - R1: Recall@10 1.0000, MRR 1.0000, nDCG@10 1.0000, p95 78.7893 ms.
 - R3: Recall@10 1.0000, MRR 1.0000, nDCG@10 1.0000, p95 111.1032 ms.
 - R2/R5 did not improve recall and materially worsened ranking latency.
+- API dense hybrid with `text-embedding-3-large`: Recall@10 1.0000, MRR
+  0.7240, nDCG@10 0.7957, context_precision@5 0.2471, p95 726.8114 ms.
+
+API sidecar build evidence:
+
+- provider/model: OpenAI `text-embedding-3-large`
+- dimensions: 3072
+- sidecar: gitignored local path data/vector/archive_api_vector.sqlite
+- sidecar size: 130.8 MB
+- indexed chunks: 3,706 from 3,590 archive rows
+- provider calls: 29
+- input tokens: 1,356,089
+- canonical DB mutated: false
 
 ## Consequences
 
@@ -62,6 +79,8 @@ Holdout selected metrics:
   latency by default.
 - The sidecar row cache improves eval/runtime vector scans without changing the
   sidecar format or mutating canonical data.
-- Dense retrieval can be reconsidered only after a local model is installed,
-  license and resource costs are recorded, and untouched holdout gains are
-  measured.
+- API dense retrieval is available as an explicitly approved measured adapter,
+  but is not the default because it did not improve holdout nDCG/MRR and added
+  latency/provider cost.
+- API dense can be reconsidered after query/document shaping, chunk policy, or
+  reranking changes produce a real holdout gain without weakening privacy.

@@ -19,18 +19,24 @@ Public PRM-QA evidence:
 - `evals/prm_qa/prm_qa_dataset_manifest.v1.json`
 - `evals/prm_qa/prm_qa_eval_report.v1.json`
 - `evals/prm_qa/prm_qa_holdout_report.v1.json`
+- `evals/prm_qa/prm_qa_api_dense_report.v1.json`
+- `evals/prm_qa/prm_qa_api_dense_holdout_report.v1.json`
 - `docs/adr/ADR-005-prm-qa-selected-retrieval-policy.md`
 
 Selected runtime retrieval policy is FTS plus deterministic OR fallback and
 bounded query rewrites, with local hash-vector search fallback-only on FTS miss.
 Always-on hash-vector fusion and reranker remain eval adapters because they did
-not improve holdout quality and materially worsened latency. True dense
-retrieval was not adopted because no local dense runtime was installed and no
-holdout gain was measured.
+not improve holdout quality and materially worsened latency. After explicit
+operator approval, OpenAI API dense retrieval was implemented with
+`text-embedding-3-large` and a gitignored SQLite sidecar. It is measurable but
+not adopted as default because holdout MRR/nDCG regressed versus R1 and latency
+increased.
 
-Do not claim user value, PRM-19 dogfood, release readiness, external embeddings,
-hosted vector adoption, automatic live verification, or independent human gold
-labels from PRM-QA. The generated 160-case dataset is regression evidence only.
+Do not claim user value, PRM-19 dogfood, release readiness, hosted vector
+adoption, automatic live verification, or independent human gold labels from
+PRM-QA. The generated 160-case dataset is regression evidence only. API
+embedding egress is approved only for the bounded sidecar/eval path unless the
+operator grants a new runtime scope.
 
 ## PRM-MAT Planning Update (2026-08-13)
 

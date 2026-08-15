@@ -59,6 +59,14 @@ def _archive_vector_index_path(value: str | None = None) -> Path:
     return path.resolve()
 
 
+def _archive_api_vector_index_path(value: str | None = None) -> Path:
+    raw_value = str(value or "").strip() or os.environ.get("PRM_API_VECTOR_INDEX_PATH", "").strip()
+    path = Path(raw_value) if raw_value else PROJECT_ROOT / "data" / "vector" / "archive_api_vector.sqlite"
+    if not path.is_absolute():
+        path = PROJECT_ROOT / path
+    return path.resolve()
+
+
 def _open_readonly_sqlite(db_path: object) -> sqlite3.Connection:
     raw_path = str(db_path or "").strip()
     if not raw_path or raw_path == ":memory:":
@@ -760,6 +768,29 @@ def build_parser() -> argparse.ArgumentParser:
     vector_search_parser.add_argument("--limit", type=int, default=5)
     vector_search_parser.add_argument("--json", action="store_true")
     vector_search_parser.set_defaults(handler=handle_memory_vector_search)
+
+    api_vector_index_parser = memory_sub.add_parser(
+        "api-vector-index",
+        help="Build or refresh the approved API embedding archive sidecar",
+    )
+    api_vector_index_parser.add_argument("--index-path", default=None)
+    api_vector_index_parser.add_argument("--limit", type=int, default=0)
+    api_vector_index_parser.add_argument("--batch-size", type=int, default=64)
+    api_vector_index_parser.add_argument("--model", default=None)
+    api_vector_index_parser.add_argument("--force", action="store_true")
+    api_vector_index_parser.add_argument("--json", action="store_true")
+    api_vector_index_parser.set_defaults(handler=handle_memory_api_vector_index)
+
+    api_vector_search_parser = memory_sub.add_parser(
+        "api-vector-search",
+        help="Search the approved API embedding archive sidecar",
+    )
+    api_vector_search_parser.add_argument("query", nargs="+")
+    api_vector_search_parser.add_argument("--index-path", default=None)
+    api_vector_search_parser.add_argument("--limit", type=int, default=5)
+    api_vector_search_parser.add_argument("--model", default=None)
+    api_vector_search_parser.add_argument("--json", action="store_true")
+    api_vector_search_parser.set_defaults(handler=handle_memory_api_vector_search)
 
     refresh_archive_parser = memory_sub.add_parser(
         "refresh-archive",
@@ -3247,6 +3278,99 @@ def handle_memory_vector_search(args: argparse.Namespace) -> int:
             lines.append(f"  source: {item['source_url']}")
     if not payload["items"]:
         lines.append("- no local vector matches")
+    sys.stdout.write("\n".join(lines).rstrip() + "\n")
+    return 0
+
+
+def handle_memory_api_vector_index(args: argparse.Namespace) -> int:
+    from db.archive_api_vector import build_archive_api_vector_index
+
+    settings = load_settings()
+    index_path = _archive_api_vector_index_path(getattr(args, "index_path", None))
+    try:
+        with _open_readonly_sqlite(settings.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            payload = build_archive_api_vector_index(
+                connection,
+                index_path=index_path,
+                limit=max(0, int(getattr(args, "limit", 0) or 0)),
+                force=bool(getattr(args, "force", False)),
+                batch_size=max(1, int(getattr(args, "batch_size", 64) or 64)),
+                model=getattr(args, "model", None),
+            )
+    except Exception as exc:
+        sys.stdout.write(f"Error building API archive vector index: {exc}\n")
+        return 1
+
+    if getattr(args, "json", False):
+        sys.stdout.write(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
+        return 0
+    sys.stdout.write(
+        "API archive vector index\n"
+        f"status={payload.get('status')} index_path={payload.get('index_path')}\n"
+        f"embedding_provider={payload.get('embedding_provider')} embedding_model={payload.get('embedding_model')} "
+        "provider_egress=true canonical_db_mutated=false\n"
+        f"source_rows_scanned={payload.get('source_rows_scanned')} inserted={payload.get('inserted')} "
+        f"updated={payload.get('updated')} skipped={payload.get('skipped')} deleted={payload.get('deleted')}\n"
+        f"provider_calls={payload.get('provider_calls')} total_tokens={payload.get('total_tokens')} "
+        f"provider_duration_ms={payload.get('provider_duration_ms')}\n"
+    )
+    return 0
+
+
+def handle_memory_api_vector_search(args: argparse.Namespace) -> int:
+    from db.archive_api_vector import search_archive_api_vector_index
+
+    query = " ".join(args.query).strip()
+    index_path = _archive_api_vector_index_path(getattr(args, "index_path", None))
+    try:
+        results = search_archive_api_vector_index(
+            index_path=index_path,
+            query=query,
+            limit=max(1, int(getattr(args, "limit", 5) or 5)),
+            model=getattr(args, "model", None),
+        )
+    except Exception as exc:
+        sys.stdout.write(f"Error searching API archive vector index: {exc}\n")
+        return 1
+
+    payload = {
+        "status": "ok" if results else "insufficient_evidence",
+        "query": query,
+        "index_path": str(index_path),
+        "retrieval_mode": "api_vector_archive",
+        "items": [result.as_dict() for result in results],
+        "privacy": {
+            "embedding_provider": "openai",
+            "provider_egress": True,
+            "external_embedding_provider_egress": True,
+            "bounded_telegram_text_provider_egress": True,
+            "raw_telegram_corpus_egress": False,
+            "provider_payload_recorded": False,
+            "canonical_db_mutated": False,
+        },
+    }
+    if getattr(args, "json", False):
+        sys.stdout.write(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
+        return 0
+
+    lines = [
+        "API archive vector search",
+        f"query={query}",
+        "retrieval_mode=api_vector_archive; provider_egress=true; canonical_db_mutated=false",
+    ]
+    for item in payload["items"][: max(1, int(getattr(args, "limit", 5) or 5))]:
+        lines.append(
+            "- {date} {channel}: {snippet}".format(
+                date=str(item.get("posted_at") or "")[:10],
+                channel=item.get("channel_username") or "source",
+                snippet=str(item.get("snippet") or "")[:160],
+            )
+        )
+        if item.get("source_url"):
+            lines.append(f"  source: {item['source_url']}")
+    if not payload["items"]:
+        lines.append("- no API vector matches")
     sys.stdout.write("\n".join(lines).rstrip() + "\n")
     return 0
 

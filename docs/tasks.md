@@ -15,9 +15,11 @@ Target repo inspected for PRM-QA implementation: 516fc7206f99b58e6d276585c3dba6d
 - New operator-experience work flows through PRM-UX, not IRX and not a second
   autonomous trial task.
 - Do not run live Telegram ingestion, reaction sync, Frontier, Radar, report
-  generation, full archive LLM backfill, external embeddings, hosted vector
-  services, or external web research jobs from backlog grooming. PRM-27 local
-  vector sidecar indexing is authorized only inside ADR-004.
+  generation, full archive LLM backfill, hosted vector services, or external
+  web research jobs from backlog grooming. PRM-27 local vector sidecar indexing
+  is authorized only inside ADR-004. External embedding API calls are authorized
+  only inside the 2026-08-15 operator-approved PRM-QA-4A API dense retrieval
+  evaluation scope.
 - Do not modify production database contents.
 - The operator prohibits complete pytest-suite runs. Every present and future
   task must select and record only its relevant focused/integration/security
@@ -93,6 +95,9 @@ PRM-24..PRM-28 formalize the required full product RAG path. PRM-26 refines
 the older PRM-8 hybrid/vector backend gate. PRM-27 is allowed only inside the
 ADR-004 local-sidecar scope: no external embeddings, no hosted vector service,
 no canonical DB mutation, and no live web research.
+PRM-QA-4A separately records the operator-approved API embedding evaluation
+scope: OpenAI embeddings sidecar/cache only, no hosted vector DB, no canonical
+DB mutation, and no automatic default adoption without measured holdout gain.
 PRM-UX formalizes the required operator-experience and professional
 personalization path before operator production tests; it must not restart legacy
 bot/report timers or claim user value before real operator labels exist.
@@ -105,9 +110,10 @@ PRM-20 compatibility cleanup.
 
 Common boundaries for all PRM-QA tasks: no production DB content mutation, no
 legacy runtime/timer restart, no provider call unless explicitly gated by the
-existing Telegram/LLM flags, no external embeddings, no hosted vector service,
-no raw private data in committed artifacts, no dogfood start, no release claim.
-Cost budget is zero external provider cost for deterministic eval/build tasks.
+existing Telegram/LLM flags or the explicit PRM-QA-4A API embedding approval,
+no hosted vector service, no raw private data in committed artifacts, no dogfood
+start, no release claim. Cost budget is zero external provider cost for
+deterministic eval/build tasks except PRM-QA-4A's bounded OpenAI embedding run.
 Source of truth is `docs/prm_qa_product_contract.md`,
 `docs/prm_qa_acceptance_plan.md`, `docs/adr/ADR-005-prm-qa-selected-retrieval-policy.md`,
 and the public reports under `evals/prm_qa/`.
@@ -239,13 +245,43 @@ Cost-Budget: |
 Notes: |
   Problem: vector/reranker value was assumed. User impact: evidence-based default. Privacy: aggregate reports only. Rollback: revert eval adapter/cache. Non-goals: dense adoption without holdout gain. Commit: feat(prm-rag): run retrieval ablation. Push checkpoint: after reports pass.
 
+### PRM-QA-4A: Operator-Approved API Dense Retrieval Evaluation
+
+Owner: codex
+Phase: PRM-QA
+Type: retrieval:evaluation
+Status: implemented
+Depends-On: PRM-QA-4
+Objective: |
+  Build an OpenAI API embedding sidecar with the quality-first large embedding model and compare API dense hybrid retrieval against the selected R1 baseline.
+Acceptance-Criteria:
+  - id: AC-1; description: API embedding sidecar build records provider, model, dimensions, rows, token count, and privacy boundary; verify: docs/IMPLEMENTATION_JOURNAL.md.
+  - id: AC-2; description: all-case and holdout API dense reports compare R1 and R4 without private query/source leakage; verify: evals/prm_qa/prm_qa_api_dense_report.v1.json and evals/prm_qa/prm_qa_api_dense_holdout_report.v1.json.
+  - id: AC-3; description: API dense is not adopted as default unless holdout gain threshold is met; verify: docs/adr/ADR-005-prm-qa-selected-retrieval-policy.md.
+Verification:
+  - PYTHONPATH=src python3 -m pytest tests/test_archive_api_vector.py tests/test_prm_qa_dataset_eval.py -q
+  - python3 tools/prm_qa_eval.py --db data/agent.db --cases data/evals/private/prm_qa/cases.v1.jsonl --vector-index data/vector/archive_vector.sqlite --api-vector-index data/vector/archive_api_vector.sqlite --variants R1_fts_hash_vector_fallback,R4_api_dense_candidate --public-report evals/prm_qa/prm_qa_api_dense_report.v1.json --check all
+Files:
+  - src/db/archive_api_vector.py
+  - src/main.py
+  - tools/prm_qa_eval.py
+  - tests/test_archive_api_vector.py
+  - evals/prm_qa/prm_qa_api_dense_report.v1.json
+  - evals/prm_qa/prm_qa_api_dense_holdout_report.v1.json
+Context-Refs:
+  - docs/prm_retrieval_ablation.md
+Cost-Budget: |
+  OpenAI text-embedding-3-large over bounded retained archive chunks; observed 1,356,089 input tokens and 29 provider calls for the sidecar build.
+Notes: |
+  Problem: API embeddings were approved after the local-only PRM-QA pass. User impact: real semantic candidate measured instead of guessed. Privacy: bounded chunks egress to OpenAI; provider payloads and raw private data are not committed. Rollback: delete ignored data/vector/archive_api_vector.sqlite and disable PRM_API_EMBEDDINGS_APPROVED. Non-goals: hosted vector DB, production DB mutation, automatic default adoption, dogfood. Commit: feat(prm-rag): add API dense retrieval evaluation. Push checkpoint: after focused tests, reports, and CI.
+
 ### PRM-QA-5: Selected Retrieval Policy Integration And Retrieval ADR
 
 Owner: codex
 Phase: PRM-QA
 Type: retrieval:adr
 Status: implemented
-Depends-On: PRM-QA-4
+Depends-On: PRM-QA-4, PRM-QA-4A
 Objective: |
   Select and document the measured runtime retrieval policy.
 Acceptance-Criteria:

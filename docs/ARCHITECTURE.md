@@ -65,8 +65,9 @@ Question
 This requires RAG, but RAG is not enough by itself. The system also needs
 linked-source research, project-context routing, bounded planning, synthesis,
 and evals. SQLite FTS remains the baseline retrieval backend. PRM-27 adds an
-approved local SQLite vector sidecar using deterministic local hashing; external
-embedding providers and hosted vector services remain unapproved.
+approved local SQLite vector sidecar using deterministic local hashing. A
+2026-08-15 operator approval allows OpenAI API embeddings for a separate
+gitignored SQLite sidecar/eval path. Hosted vector services remain unapproved.
 
 The current PRM-23 planner uses deterministic synthesis and fake/fixture linked
 source paths only. The archive layer performs bounded query decomposition and
@@ -204,8 +205,10 @@ Full product RAG is required before operator dogfood. The required path is
 formalized as PRM-24 through PRM-28: gold eval set, citation-safe context pack,
 hybrid/vector ADR and privacy budget, approved retrieval implementation, and
 product chat acceptance gate. ADR-004 approves a local vector sidecar only. It
-does not approve external embeddings, hosted vector services, provider egress,
-production migrations, canonical DB writes, service start, or dogfood.
+does not approve hosted vector services, production migrations, canonical DB
+writes, service start, or dogfood. The later PRM-QA API dense slice approves
+bounded OpenAI embedding egress for evaluation and a local sidecar only; it did
+not adopt API dense retrieval as the default because holdout ranking regressed.
 
 Implementation order:
 

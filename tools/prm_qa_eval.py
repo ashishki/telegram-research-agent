@@ -5,15 +5,15 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import importlib.util
 import json
 import math
+import os
 import sqlite3
 import statistics
 import time
 from collections import Counter, defaultdict
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Mapping, Sequence
 
 import sys
 
@@ -27,12 +27,14 @@ from assistant.evidence_quality import build_evidence_quality_items, evidence_qu
 from assistant.prm_private_traces import write_private_failure_trace  # noqa: E402
 from assistant.retrieval_policy import build_query_rewrites, select_retrieval_policy  # noqa: E402
 from db.archive_search import search_telegram_archive  # noqa: E402
+from db.archive_api_vector import api_embeddings_approved, search_telegram_archive_api_hybrid  # noqa: E402
 from db.archive_vector import search_telegram_archive_hybrid  # noqa: E402
 
 
 DEFAULT_DB_PATH = PROJECT_ROOT / "data" / "agent.db"
 DEFAULT_CASES = PROJECT_ROOT / "data" / "evals" / "private" / "prm_qa" / "cases.v1.jsonl"
 DEFAULT_VECTOR_INDEX = PROJECT_ROOT / "data" / "vector" / "archive_vector.sqlite"
+DEFAULT_API_VECTOR_INDEX = PROJECT_ROOT / "data" / "vector" / "archive_api_vector.sqlite"
 DEFAULT_PUBLIC_REPORT = PROJECT_ROOT / "evals" / "prm_qa" / "prm_qa_eval_report.v1.json"
 DEFAULT_TRACE_DIR = PROJECT_ROOT / "data" / "evals" / "private" / "prm_qa" / "failed_cases"
 
@@ -41,7 +43,7 @@ VARIANTS = [
     "R1_fts_hash_vector_fallback",
     "R2_fts_hash_vector_always",
     "R3_fts_bounded_query_rewrite",
-    "R4_true_local_dense_candidate",
+    "R4_api_dense_candidate",
     "R5_candidate_pool_reranker",
 ]
 
@@ -51,16 +53,23 @@ def main() -> int:
     parser.add_argument("--db", default=str(DEFAULT_DB_PATH))
     parser.add_argument("--cases", default=str(DEFAULT_CASES))
     parser.add_argument("--vector-index", default=str(DEFAULT_VECTOR_INDEX))
+    parser.add_argument("--api-vector-index", default=str(DEFAULT_API_VECTOR_INDEX))
     parser.add_argument("--public-report", default=str(DEFAULT_PUBLIC_REPORT))
     parser.add_argument("--private-trace-dir", default=str(DEFAULT_TRACE_DIR))
     parser.add_argument("--partition", choices=["all", "development", "tuning", "holdout"], default="all")
     parser.add_argument("--check", choices=["all", "routing", "retrieval", "evidence", "grounding", "presentation", "task_success"], default="all")
+    parser.add_argument(
+        "--variants",
+        default=",".join(VARIANTS),
+        help="Comma-separated retrieval variants to run; defaults to all R0-R5 variants.",
+    )
     parser.add_argument("--write-private-traces", action="store_true")
     args = parser.parse_args()
 
     cases = _load_cases(Path(args.cases), partition=args.partition)
     if not cases:
         raise SystemExit("no private PRM-QA cases found; run tools/prm_qa_generate_private_eval.py first")
+    enabled_variants = _parse_variants(str(args.variants or ""))
 
     with sqlite3.connect(f"file:{Path(args.db)}?mode=ro", uri=True) as connection:
         connection.row_factory = sqlite3.Row
@@ -68,6 +77,8 @@ def main() -> int:
             connection,
             cases,
             vector_index_path=Path(args.vector_index),
+            api_vector_index_path=Path(args.api_vector_index),
+            enabled_variants=enabled_variants,
             trace_dir=Path(args.private_trace_dir),
             write_private_traces=bool(args.write_private_traces),
         )
@@ -86,22 +97,25 @@ def evaluate_cases(
     cases: list[Mapping[str, Any]],
     *,
     vector_index_path: Path,
+    api_vector_index_path: Path,
     trace_dir: Path,
+    enabled_variants: Sequence[str] | None = None,
     write_private_traces: bool,
 ) -> dict[str, Any]:
+    active_variants = tuple(enabled_variants or VARIANTS)
     routing_results = [_eval_route(case) for case in cases]
-    retrieval_by_variant: dict[str, list[dict[str, Any]]] = {variant: [] for variant in VARIANTS}
+    retrieval_by_variant: dict[str, list[dict[str, Any]]] = {variant: [] for variant in active_variants}
     evidence_items: list[Mapping[str, Any]] = []
     grounding_claims: list[Mapping[str, Any]] = []
     task_success_proxy = Counter()
-    dense_available = _dense_runtime_available()
+    dense_available, dense_reason = _api_dense_available(api_vector_index_path)
 
     for case in cases:
         variant_results: dict[str, list[dict[str, Any]]] = {}
         variant_latencies: dict[str, float] = {}
-        for variant in VARIANTS:
+        for variant in active_variants:
             started = time.perf_counter()
-            if variant == "R4_true_local_dense_candidate" and not dense_available:
+            if variant == "R4_api_dense_candidate" and not dense_available:
                 results: list[dict[str, Any]] = []
                 unavailable = True
             elif variant == "R5_candidate_pool_reranker":
@@ -116,7 +130,13 @@ def evaluate_cases(
                 )[:10]
                 unavailable = False
             else:
-                results = _run_variant(connection, case, variant, vector_index_path=vector_index_path)
+                results = _run_variant(
+                    connection,
+                    case,
+                    variant,
+                    vector_index_path=vector_index_path,
+                    api_vector_index_path=api_vector_index_path,
+                )
                 unavailable = False
             latency_ms = (time.perf_counter() - started) * 1000.0
             if variant == "R5_candidate_pool_reranker":
@@ -124,14 +144,20 @@ def evaluate_cases(
             variant_latencies[variant] = latency_ms
             variant_results[variant] = results
             retrieval_by_variant[variant].append(_score_retrieval(case, results, latency_ms=latency_ms, unavailable=unavailable))
-        selected_results = variant_results["R5_candidate_pool_reranker"] or variant_results["R2_fts_hash_vector_always"] or variant_results["R0_sqlite_fts_strict_or_baseline"]
+        selected_variant = _select_variant(_temporary_summary(retrieval_by_variant))
+        selected_results = (
+            variant_results.get(selected_variant)
+            or variant_results["R1_fts_hash_vector_fallback"]
+            or variant_results["R0_sqlite_fts_strict_or_baseline"]
+        )
         eq_items = build_evidence_quality_items(selected_results[:5], question=str(case["query"]), project_name=str(case.get("project_name") or ""))
         evidence_items.extend(eq_items)
         claims = _claims_from_results(case, eq_items)
         ledger = build_claim_ledger(claims, eq_items, current_fact_required=bool(case.get("expected_external_verification")), project_name=str(case.get("project_name") or ""))
         grounding_claims.extend(ledger["claims"])
-        _update_task_success_proxy(task_success_proxy, case, routing_results[-1], retrieval_by_variant["R5_candidate_pool_reranker"][-1], ledger["metrics"])
-        if write_private_traces and _failed(case, routing_results[-1], retrieval_by_variant["R5_candidate_pool_reranker"][-1], ledger["metrics"]):
+        selected_score = retrieval_by_variant.get(selected_variant, retrieval_by_variant["R1_fts_hash_vector_fallback"])[-1]
+        _update_task_success_proxy(task_success_proxy, case, routing_results[-1], selected_score, ledger["metrics"])
+        if write_private_traces and _failed(case, routing_results[-1], selected_score, ledger["metrics"]):
             write_private_failure_trace(
                 {
                     "selected_route": routing_results[-1],
@@ -142,13 +168,14 @@ def evaluate_cases(
                     "evidence_quality": {"summary": evidence_quality_summary(eq_items), "items": eq_items},
                     "claim_ledger": ledger,
                     "claim_verification": ledger["metrics"],
-                    "failure_codes": _failure_codes(routing_results[-1], retrieval_by_variant["R5_candidate_pool_reranker"][-1], ledger["metrics"]),
+                    "failure_codes": _failure_codes(routing_results[-1], selected_score, ledger["metrics"]),
                 },
                 trace_id=str(case["case_id"]),
                 trace_root=trace_dir,
             )
 
     retrieval_summary = {variant: _summarize_retrieval(scores) for variant, scores in retrieval_by_variant.items()}
+    selected_variant = _select_variant(retrieval_summary)
     grounding_metrics = evaluate_claim_grounding(grounding_claims)
     return {
         "schema_version": "prm_qa_eval_report.v1",
@@ -157,30 +184,45 @@ def evaluate_cases(
         "case_fingerprint": _cases_fingerprint(cases),
         "job_type_counts": dict(sorted(Counter(str(case["job_type"]) for case in cases).items())),
         "label_quality_counts": dict(sorted(Counter(str(case["label_quality"]) for case in cases).items())),
+        "variants_run": list(active_variants),
         "routing": _summarize_routing(routing_results),
         "retrieval": retrieval_summary,
+        "selected_retrieval_policy": {
+            "variant": selected_variant,
+            "reason": _selection_reason(retrieval_summary, selected_variant),
+            "api_dense_available": dense_available,
+        },
         "evidence_quality": evidence_quality_summary(evidence_items),
         "claim_grounding": grounding_metrics,
         "presentation": _presentation_proxy(cases),
         "task_success_proxy": dict(sorted(task_success_proxy.items())),
         "dense_candidate": {
-            "variant": "R4_true_local_dense_candidate",
+            "variant": "R4_api_dense_candidate",
             "runtime_available": dense_available,
-            "adopted": False,
-            "reason": "Dense runtime not installed locally." if not dense_available else "Candidate adapter present; not selected until holdout gain is measured.",
-            "provider_egress": False,
+            "adopted": selected_variant == "R4_api_dense_candidate",
+            "reason": dense_reason if not dense_available else _selection_reason(retrieval_summary, selected_variant),
+            "provider_egress": bool(dense_available),
         },
         "privacy": {
             "public_report_contains_queries": False,
             "public_report_contains_raw_telegram_body": False,
             "public_report_contains_source_urls": False,
             "private_traces_gitignored": True,
+            "api_embedding_provider_egress": bool(dense_available),
+            "api_embedding_provider_payloads_recorded": False,
         },
         "honesty_boundary": "Automated generated/silver evaluation is regression evidence only and does not prove real operator usefulness.",
     }
 
 
-def _run_variant(connection: sqlite3.Connection, case: Mapping[str, Any], variant: str, *, vector_index_path: Path) -> list[dict[str, Any]]:
+def _run_variant(
+    connection: sqlite3.Connection,
+    case: Mapping[str, Any],
+    variant: str,
+    *,
+    vector_index_path: Path,
+    api_vector_index_path: Path,
+) -> list[dict[str, Any]]:
     query = str(case["query"])
     limit = 10
     if variant == "R0_sqlite_fts_strict_or_baseline":
@@ -197,6 +239,17 @@ def _run_variant(connection: sqlite3.Connection, case: Mapping[str, Any], varian
                 for item in search_telegram_archive(connection, rewrite, limit=max(3, limit // 2))
             ]
         )[:limit]
+    if variant == "R4_api_dense_candidate":
+        return [
+            item.as_dict()
+            for item in search_telegram_archive_api_hybrid(
+                connection,
+                query,
+                api_vector_index_path=api_vector_index_path,
+                limit=limit,
+                vector_policy="always",
+            )
+        ]
     if variant == "R5_candidate_pool_reranker":
         return []
     return []
@@ -320,7 +373,8 @@ def _update_task_success_proxy(counter: Counter, case: Mapping[str, Any], route:
 
 def _status(report: Mapping[str, Any], *, check: str) -> str:
     routing = report["routing"]
-    retrieval = report["retrieval"]["R5_candidate_pool_reranker"]
+    selected_variant = str((report.get("selected_retrieval_policy") or {}).get("variant") or "R1_fts_hash_vector_fallback")
+    retrieval = report["retrieval"].get(selected_variant) or report["retrieval"].get("R1_fts_hash_vector_fallback") or next(iter(report["retrieval"].values()))
     grounding = report["claim_grounding"]
     if check in {"all", "routing"} and (routing["route_accuracy"] < 0.90 or routing["ambiguous_project_clarification"] < 1.0 or routing["unsafe_chat_rate"] > 0):
         return "fail"
@@ -329,6 +383,36 @@ def _status(report: Mapping[str, Any], *, check: str) -> str:
     if check in {"all", "grounding"} and (grounding["current_fact_violations"] > 0 or grounding["technical_leaks"] > 0):
         return "fail"
     return "pass"
+
+
+def _temporary_summary(scores_by_variant: Mapping[str, list[Mapping[str, Any]]]) -> dict[str, Mapping[str, Any]]:
+    return {variant: _summarize_retrieval(scores) for variant, scores in scores_by_variant.items() if scores}
+
+
+def _select_variant(retrieval_summary: Mapping[str, Mapping[str, Any]]) -> str:
+    baseline = retrieval_summary.get("R1_fts_hash_vector_fallback") or {}
+    api_dense = retrieval_summary.get("R4_api_dense_candidate") or {}
+    if (
+        api_dense.get("available")
+        and float(api_dense.get("ndcg_at_10") or 0.0) >= float(baseline.get("ndcg_at_10") or 0.0) + 0.02
+        and float(api_dense.get("context_precision_at_5") or 0.0) >= float(baseline.get("context_precision_at_5") or 0.0)
+        and float(api_dense.get("p95_latency_ms") or 99_999.0) <= 2_000.0
+    ):
+        return "R4_api_dense_candidate"
+    if baseline:
+        return "R1_fts_hash_vector_fallback"
+    if api_dense:
+        return "R4_api_dense_candidate"
+    return next(iter(retrieval_summary.keys()), "R1_fts_hash_vector_fallback")
+
+
+def _selection_reason(retrieval_summary: Mapping[str, Mapping[str, Any]], selected_variant: str) -> str:
+    if selected_variant == "R4_api_dense_candidate":
+        return "API dense selected because it materially improved nDCG@10 without context precision or latency regression."
+    api_dense = retrieval_summary.get("R4_api_dense_candidate") or {}
+    if not api_dense.get("available"):
+        return "API dense was unavailable for this run; selected FTS plus hash-vector fallback."
+    return "API dense did not meet the measured holdout gain threshold over FTS plus hash-vector fallback."
 
 
 def _failed(case: Mapping[str, Any], route: Mapping[str, Any], retrieval: Mapping[str, Any], grounding: Mapping[str, Any]) -> bool:
@@ -440,8 +524,24 @@ def _load_cases(path: Path, *, partition: str) -> list[Mapping[str, Any]]:
     return rows
 
 
-def _dense_runtime_available() -> bool:
-    return importlib.util.find_spec("sentence_transformers") is not None
+def _api_dense_available(index_path: Path) -> tuple[bool, str]:
+    if not api_embeddings_approved():
+        return False, "API embeddings are not approved in this process; set PRM_API_EMBEDDINGS_APPROVED=1."
+    if not os.environ.get("OPENAI_API_KEY", "").strip():
+        return False, "OPENAI_API_KEY is not set."
+    if not index_path.exists():
+        return False, "API vector sidecar is missing; run memory api-vector-index."
+    return True, "API dense candidate sidecar and key are available."
+
+
+def _parse_variants(raw: str) -> tuple[str, ...]:
+    values = tuple(value.strip() for value in raw.split(",") if value.strip())
+    if not values:
+        raise SystemExit("--variants must include at least one variant")
+    unknown = [value for value in values if value not in VARIANTS]
+    if unknown:
+        raise SystemExit("unknown retrieval variant(s): " + ", ".join(unknown))
+    return values
 
 
 def _mean(values: Any) -> float:

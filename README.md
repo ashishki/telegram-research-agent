@@ -141,7 +141,8 @@ It does not currently:
 
 - claim automatic product-value evidence;
 - run live web research;
-- run external embeddings or a hosted vector database;
+- use hosted vector databases;
+- use API dense retrieval as the default path without measured holdout gain;
 - run production migrations automatically;
 - sync reactions automatically in the PRM refresh timer;
 - download media or run vision LLMs in the PRM refresh timer;
@@ -157,7 +158,7 @@ Current PRM path:
 Telegram channels
   -> local SQLite raw_posts
   -> normalized posts + posts_fts
-  -> optional local SQLite vector sidecar
+  -> optional local SQLite vector sidecar or approved API embedding sidecar
   -> bounded retrieval
   -> citation-safe context pack
   -> deterministic answer gate
@@ -170,12 +171,16 @@ Key storage:
 - `data/agent.db` — private local SQLite database, gitignored;
 - `raw_posts` — retained Telegram source rows;
 - `posts` / `posts_fts` — normalized searchable archive;
-- `data/vector/archive_vector.sqlite` — local vector sidecar, gitignored;
+- `data/vector/archive_vector.sqlite` — local hash-vector sidecar, gitignored;
+- `data/vector/archive_api_vector.sqlite` — approved OpenAI embedding sidecar,
+  gitignored;
 - `data/backups/` — SQLite backups created before bounded refreshes, gitignored;
 - `data/output/**` — private generated outputs, gitignored.
 
-The vector sidecar is local-only. It does not use external embeddings and does
-not mutate the canonical database.
+Vector sidecars do not mutate the canonical database. The local hash-vector
+sidecar has no provider egress. The API embedding sidecar uses bounded OpenAI
+embedding calls when explicitly enabled and remains gitignored; it is measured
+as an eval adapter, not the default runtime retrieval path.
 
 ## Telegram Usage
 
@@ -449,8 +454,8 @@ Do not run without explicit task approval:
 - live web research;
 - reaction sync;
 - media download or vision LLM;
-- external embeddings;
 - hosted vector services;
+- external embeddings outside the approved PRM-QA API sidecar/eval scope;
 - production migrations;
 - full archive LLM backfill;
 - Radar/Frontier/report generation;

@@ -444,12 +444,16 @@ aggregate reports are:
 - `evals/prm_qa/prm_qa_dataset_manifest.v1.json`
 - `evals/prm_qa/prm_qa_eval_report.v1.json`
 - `evals/prm_qa/prm_qa_holdout_report.v1.json`
+- `evals/prm_qa/prm_qa_api_dense_report.v1.json`
+- `evals/prm_qa/prm_qa_api_dense_holdout_report.v1.json`
 
 Selected policy: SQLite FTS with deterministic fallback and bounded query
 rewrites; local hash-vector search remains fallback-only on FTS miss. Always-on
 hash-vector fusion and reranking are retained as eval adapters because they
 did not improve holdout recall/nDCG and had materially worse p95 latency.
 
-Dense retrieval was not adopted; no local dense runtime was installed and no
-holdout gain was measured. See
+After explicit operator approval, API dense retrieval was evaluated with OpenAI
+`text-embedding-3-large` over a gitignored SQLite sidecar. It was not adopted
+as default because holdout MRR/nDCG regressed versus R1 while latency/provider
+cost increased. See
 `docs/adr/ADR-005-prm-qa-selected-retrieval-policy.md`.

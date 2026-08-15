@@ -4,23 +4,28 @@
 
 Decision: default PRM runtime retrieval uses SQLite FTS with deterministic OR
 fallback, bounded generic query rewrites, and local hash-vector search only when
-FTS misses. Always-on hash-vector fusion and the candidate-pool reranker remain
-eval adapters. True dense retrieval is not adopted.
+FTS misses. Always-on hash-vector fusion, OpenAI API dense hybrid retrieval, and
+the candidate-pool reranker remain eval adapters. API dense retrieval is not
+adopted as the default.
 
 Rationale: PRM-QA all-case and holdout ablations showed no recall/nDCG gain from
 always-on hash-vector fusion, while MRR and p95 latency regressed materially.
-Dense runtime was unavailable locally, so there was no measured dense holdout
-gain.
+After the operator approved API embeddings on 2026-08-15, OpenAI
+`text-embedding-3-large` was measured over a gitignored SQLite sidecar. It
+preserved Recall@10 but regressed holdout MRR/nDCG versus R1 and increased p95
+latency/provider cost, so it remains non-default.
 
 Evidence:
 
 - `evals/prm_qa/prm_qa_eval_report.v1.json`
 - `evals/prm_qa/prm_qa_holdout_report.v1.json`
+- `evals/prm_qa/prm_qa_api_dense_report.v1.json`
+- `evals/prm_qa/prm_qa_api_dense_holdout_report.v1.json`
 - `docs/adr/ADR-005-prm-qa-selected-retrieval-policy.md`
 
-Boundary: this decision does not approve external embeddings, hosted vector
-services, live web research, production migrations, PRM-19 dogfood, or release
-claims.
+Boundary: this decision approves only the bounded API embedding evaluation and
+local gitignored API sidecar. It does not approve hosted vector services, live
+web research, production migrations, PRM-19 dogfood, or release claims.
 
 ## D-PRM-MAT-2026-08-13 — Plan an integrated maturity queue without claiming completion
 

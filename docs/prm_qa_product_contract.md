@@ -42,3 +42,6 @@ ordinary Telegram text or voice
 - Project actions require explicit project identity and direct evidence.
 - Durable saves, watches, links, actions, experiments, and decisions remain
   confirmation-gated.
+- API embedding egress is allowed only for approved bounded sidecar/eval or
+  explicitly approved runtime scopes; public artifacts still exclude raw
+  private text, source URLs, prompts, completions, and provider payloads.
