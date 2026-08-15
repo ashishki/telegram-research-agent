@@ -4,6 +4,7 @@ import sys
 import tempfile
 import types
 import unittest
+from contextlib import nullcontext
 from unittest.mock import patch
 
 
@@ -725,6 +726,56 @@ class TestHandlers(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "wrong_language_llm_synthesis"):
                 handlers._synthesize_telegram_rag_answer(payload, mode="research")
 
+    def test_telegram_synthesis_requires_entailment_verdict_before_returning_text(self):
+        payload = _fake_research_payload("что в архиве было про evals?")
+
+        with patch.object(handlers.LLMClient, "complete_with_receipt", return_value=types.SimpleNamespace(text="Русский ответ с источником")):
+            with patch.object(handlers.LLMClient, "complete_json", return_value={"verdict": "pass"}) as verifier:
+                rendered = handlers._synthesize_telegram_rag_answer(payload, mode="research")
+
+        self.assertIn("Русский ответ", rendered)
+        self.assertEqual(verifier.call_args.kwargs["max_tokens"], 80)
+        self.assertEqual(verifier.call_args.kwargs["max_attempts"], 1)
+        self.assertIn("proposed_answer", verifier.call_args.kwargs["prompt"])
+
+    def test_telegram_synthesis_suppresses_usage_for_both_provider_calls(self):
+        payload = _fake_research_payload("что в архиве было про evals?")
+
+        with patch.object(handlers, "suppress_usage_recording", side_effect=nullcontext) as suppress:
+            with patch.object(handlers.LLMClient, "complete_with_receipt", return_value=types.SimpleNamespace(text="Русский ответ с источником")):
+                with patch.object(handlers.LLMClient, "complete_json", return_value={"verdict": "pass"}):
+                    handlers._synthesize_telegram_rag_answer(payload, mode="research")
+
+        self.assertEqual(suppress.call_count, 2)
+
+    def test_telegram_synthesis_fails_closed_when_entailment_rejects_answer(self):
+        payload = _fake_research_payload("что в архиве было про evals?")
+
+        with patch.object(handlers.LLMClient, "complete_with_receipt", return_value=types.SimpleNamespace(text="Русский ответ с неподтверждённой деталью")):
+            with patch.object(handlers.LLMClient, "complete_json", return_value={"verdict": "fail"}):
+                with self.assertRaisesRegex(RuntimeError, "unsupported_llm_synthesis"):
+                    handlers._synthesize_telegram_rag_answer(payload, mode="research")
+
+    def test_telegram_synthesis_fails_closed_when_entailment_response_is_invalid(self):
+        payload = _fake_research_payload("что в архиве было про evals?")
+
+        with patch.object(handlers.LLMClient, "complete_with_receipt", return_value=types.SimpleNamespace(text="Русский ответ с источником")):
+            with patch.object(handlers.LLMClient, "complete_json", return_value={"verdict": "uncertain"}):
+                with self.assertRaisesRegex(RuntimeError, "unsupported_llm_synthesis"):
+                    handlers._synthesize_telegram_rag_answer(payload, mode="research")
+
+    def test_telegram_synthesis_falls_back_when_entailment_verifier_errors(self):
+        payload = _fake_research_payload("что в архиве было про evals?")
+        payload["professional_answer"] = {"schema_version": "professional_answer.v1", "short_answer": "Безопасный fallback"}
+
+        with patch.dict(os.environ, {"PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS": "1", "PRM_TELEGRAM_RAG_LLM_SYNTHESIS": "1"}, clear=False):
+            with patch.object(handlers.LLMClient, "complete_with_receipt", return_value=types.SimpleNamespace(text="Русский ответ с источником")) as synthesis:
+                with patch.object(handlers.LLMClient, "complete_json", side_effect=RuntimeError("provider unavailable")):
+                    rendered = handlers._render_telegram_research_response(payload, local_text="ignored", mode="research")
+
+        self.assertIn("Безопасный fallback", rendered)
+        self.assertEqual(synthesis.call_args.kwargs["max_attempts"], 1)
+
     def test_telegram_verification_dto_never_enters_synthesis(self):
         payload = _fake_research_payload()
         payload["professional_answer"] = {
@@ -854,13 +905,14 @@ class TestHandlers(unittest.TestCase):
             with patch.object(handlers, "answer_memory_research", return_value=payload) as research_mock:
                 with patch.object(handlers, "render_memory_research_answer", return_value="LOCAL RAG FALLBACK") as render_mock:
                     with patch.object(handlers.LLMClient, "complete_with_receipt", return_value=receipt) as llm_mock:
-                        with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
-                            with patch.object(handlers, "send_message") as mock_send_message:
-                                handlers.handle_research(
-                                    chat_id="42",
-                                    args="что у меня было про AI transformation?",
-                                    settings=settings,
-                                )
+                        with patch.object(handlers.LLMClient, "complete_json", return_value={"verdict": "pass"}):
+                            with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                                with patch.object(handlers, "send_message") as mock_send_message:
+                                    handlers.handle_research(
+                                        chat_id="42",
+                                        args="что у меня было про AI transformation?",
+                                        settings=settings,
+                                    )
 
         research_mock.assert_called_once()
         render_mock.assert_called_once_with(payload)

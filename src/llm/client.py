@@ -176,14 +176,18 @@ def complete(
     max_tokens: int = 2048,
     category: str = "unknown",
     model: str | None = None,
+    max_attempts: int | None = None,
 ) -> str:
-    return complete_with_receipt(
-        prompt=prompt,
-        system=system,
-        max_tokens=max_tokens,
-        category=category,
-        model=model,
-    ).text
+    receipt_kwargs: dict[str, Any] = {
+        "prompt": prompt,
+        "system": system,
+        "max_tokens": max_tokens,
+        "category": category,
+        "model": model,
+    }
+    if max_attempts is not None:
+        receipt_kwargs["max_attempts"] = max_attempts
+    return complete_with_receipt(**receipt_kwargs).text
 
 
 def complete_with_receipt(
@@ -192,9 +196,11 @@ def complete_with_receipt(
     max_tokens: int = 2048,
     category: str = "unknown",
     model: str | None = None,
+    max_attempts: int | None = None,
 ) -> LLMCompletionReceipt:
     client = _get_client()
     selected_model = model or _get_model(category)
+    attempt_limit = MAX_RETRIES if max_attempts is None else max(1, min(int(max_attempts), MAX_RETRIES))
     attempt = 0
 
     while True:
@@ -254,12 +260,12 @@ def complete_with_receipt(
                 usage_recorded=usage_recorded,
             )
         except Exception as exc:
-            if attempt >= MAX_RETRIES or not _should_retry(exc):
+            if attempt >= attempt_limit or not _should_retry(exc):
                 LOGGER.exception("Anthropic completion failed after %s attempt(s)", attempt)
                 raise LLMError("Anthropic completion failed") from exc
 
             delay = 2 ** (attempt - 1)
-            remaining_attempts = MAX_RETRIES - attempt
+            remaining_attempts = attempt_limit - attempt
             LOGGER.warning(
                 "Anthropic completion retrying in %s second(s) after %s remaining_attempts=%s",
                 delay,
@@ -360,6 +366,7 @@ def complete_json(
     category: str = "unknown",
     model: str | None = None,
     max_tokens: int = 2048,
+    max_attempts: int | None = None,
 ) -> dict[str, Any] | list[Any]:
     response_text = _strip_code_fence(
         complete(
@@ -368,6 +375,7 @@ def complete_json(
             max_tokens=max_tokens,
             category=category,
             model=model,
+            max_attempts=max_attempts,
         )
     )
     try:
@@ -389,8 +397,16 @@ class LLMClient:
         max_tokens: int = 2048,
         category: str = "unknown",
         model: str | None = None,
+        max_attempts: int | None = None,
     ) -> str:
-        return complete(prompt=prompt, system=system, max_tokens=max_tokens, category=category, model=model)
+        return complete(
+            prompt=prompt,
+            system=system,
+            max_tokens=max_tokens,
+            category=category,
+            model=model,
+            max_attempts=max_attempts,
+        )
 
     @staticmethod
     def complete_with_receipt(
@@ -399,6 +415,7 @@ class LLMClient:
         max_tokens: int = 2048,
         category: str = "unknown",
         model: str | None = None,
+        max_attempts: int | None = None,
     ) -> LLMCompletionReceipt:
         return complete_with_receipt(
             prompt=prompt,
@@ -406,6 +423,7 @@ class LLMClient:
             max_tokens=max_tokens,
             category=category,
             model=model,
+            max_attempts=max_attempts,
         )
 
     @staticmethod
@@ -415,6 +433,7 @@ class LLMClient:
         category: str = "unknown",
         model: str | None = None,
         max_tokens: int = 2048,
+        max_attempts: int | None = None,
     ) -> dict[str, Any] | list[Any]:
         return complete_json(
             prompt=prompt,
@@ -422,6 +441,7 @@ class LLMClient:
             category=category,
             model=model,
             max_tokens=max_tokens,
+            max_attempts=max_attempts,
         )
 
     @staticmethod

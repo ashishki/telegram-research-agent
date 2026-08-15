@@ -135,6 +135,31 @@ class TestLLMClient(unittest.TestCase):
         self.assertEqual(receipt.attempts, 2)
         self.assertTrue(receipt.usage_recorded)
 
+    def test_complete_with_receipt_honors_single_attempt_budget(self):
+        calls = 0
+
+        def create(**_kwargs):
+            nonlocal calls
+            calls += 1
+            raise RuntimeError("temporary failure")
+
+        mock_client = SimpleNamespace(messages=SimpleNamespace(create=create))
+        with (
+            patch.object(client, "_get_client", return_value=mock_client),
+            patch.object(client, "_should_retry", return_value=True),
+            patch.object(client.time, "sleep") as sleep_mock,
+        ):
+            with self.assertRaises(client.LLMError):
+                client.complete_with_receipt(
+                    prompt="bounded",
+                    category="test",
+                    model="claude-haiku-4-5",
+                    max_attempts=1,
+                )
+
+        self.assertEqual(calls, 1)
+        sleep_mock.assert_not_called()
+
     def test_complete_with_receipt_records_provider_reported_model(self):
         response = SimpleNamespace(
             model="provider-resolved-model",
