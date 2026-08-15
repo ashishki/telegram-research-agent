@@ -1469,14 +1469,15 @@ def _render_telegram_research_response(payload: Mapping[str, Any], *, local_text
         project_fit = _safe_mapping(payload.get("project_fit"))
         if str(project_fit.get("project_name") or "").strip():
             return _render_telegram_project_decision_answer(payload)
-    job_specific = _render_telegram_job_specific_answer(payload, mode=mode)
-    if job_specific:
-        return job_specific
-    if _telegram_rag_llm_synthesis_allowed() and _telegram_rag_source_count(payload) > 0:
+        return _project_clarification_message()
+    if _telegram_rag_llm_synthesis_should_run(payload):
         try:
             return _synthesize_telegram_rag_answer(payload, mode=mode)
         except Exception:
             LOGGER.warning("Telegram RAG LLM synthesis failed mode=%s", mode, exc_info=True)
+    job_specific = _render_telegram_job_specific_answer(payload, mode=mode)
+    if job_specific:
+        return job_specific
     if professional_answer.get("schema_version") == "professional_answer.v1":
         return _render_telegram_professional_answer(professional_answer)
     if mode == "research" and _looks_russian(str(payload.get("question") or "")):
@@ -1972,6 +1973,21 @@ def _telegram_rag_source_count(payload: Mapping[str, Any]) -> int:
     return len(_safe_mapping_list(archive.get("items"))) + len(_safe_mapping_list(linked.get("items")))
 
 
+def _telegram_rag_llm_synthesis_should_run(payload: Mapping[str, Any]) -> bool:
+    if not _telegram_rag_llm_synthesis_allowed() or _telegram_rag_source_count(payload) <= 0:
+        return False
+    answer_gate = _safe_mapping(payload.get("answer_gate"))
+    current_fact_boundary = bool(answer_gate.get("external_verification_required")) and not bool(
+        answer_gate.get("current_claim_allowed", True)
+    )
+    if current_fact_boundary:
+        return False
+    policy = _safe_mapping(payload.get("retrieval_policy"))
+    if str(policy.get("job_type") or "") in {"current_fact", "ambiguous_project"}:
+        return False
+    return True
+
+
 def _synthesize_telegram_rag_answer(payload: Mapping[str, Any], *, mode: str) -> str:
     context = _telegram_rag_synthesis_context(payload, mode=mode)
     question = str(context.get("question") or "")
@@ -2018,6 +2034,13 @@ def _synthesize_telegram_rag_answer(payload: Mapping[str, Any], *, mode: str) ->
         "4. Angles for a post.\n"
         "5. Sources.\n"
         "6. Boundaries: local archive only, no live web verification, no writes.\n\n"
+        "Job-specific structure, when bounded_context.retrieval_policy.job_type is present:\n"
+        "- exact_known_item: Нашёл / Короткий фрагмент / Источник / Похожие материалы.\n"
+        "- semantic_topic, case_study, timeline_freshness: Короткое объяснение / Главные идеи / Противоречия / Что остаётся неизвестным / Источники.\n"
+        "- comparison: Подходы / Различия / Доказательства / Когда какой подход использовать / Ограничения.\n"
+        "- writer_editor: Тезис / Кейсы / Контраргумент / Практический вывод / Что проверить / Источники.\n"
+        "- learning_experiment: Объяснение / Аналогия / Связь с проектом / Эксперимент / Критерий успеха / Источники.\n"
+        "Keep these as user-facing headings when they fit the question, but never fill a section with unsupported content.\n\n"
         f"bounded_context:\n{json.dumps(context, ensure_ascii=False, indent=2)}"
     )
     with suppress_usage_recording():
@@ -2100,6 +2123,9 @@ def _telegram_rag_synthesis_context(payload: Mapping[str, Any], *, mode: str) ->
         "schema_version": "telegram_rag_llm_synthesis_context.v1",
         "mode": mode,
         "question": str(payload.get("question") or ""),
+        "retrieval_policy": {
+            "job_type": _safe_mapping(payload.get("retrieval_policy")).get("job_type"),
+        },
         "time_window": {
             "requested": bool(time_window.get("requested")),
             "strict": bool(time_window.get("strict")),

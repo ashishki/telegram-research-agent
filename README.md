@@ -129,7 +129,8 @@ It can:
 - enforce date windows for freshness-scoped questions such as "last two weeks";
 - reject stale evidence instead of answering from old related posts;
 - cite Telegram channels/posts from the local archive;
-- synthesize Telegram answers into readable report-like messages;
+- synthesize Telegram answers into readable report-like messages through the
+  approved bounded API LLM path, with deterministic templates as fallback;
 - produce source-backed editor briefs for post-writing workflows;
 - keep short Telegram follow-up context in memory for the current chat session;
 - route ordinary Telegram messages to research, brief, or chat paths;
@@ -162,7 +163,8 @@ Telegram channels
   -> bounded retrieval
   -> citation-safe context pack
   -> deterministic answer gate
-  -> optional bounded LLM synthesis
+  -> approved bounded LLM synthesis first when safe
+  -> deterministic Telegram fallback when synthesis is unavailable or rejected
   -> Telegram/CLI answer with sources and boundaries
 ```
 
@@ -180,7 +182,9 @@ Key storage:
 Vector sidecars do not mutate the canonical database. The local hash-vector
 sidecar has no provider egress. The API embedding sidecar uses bounded OpenAI
 embedding calls when explicitly enabled and remains gitignored; it is measured
-as an eval adapter, not the default runtime retrieval path.
+as an eval adapter, not the default runtime retrieval path. The public R1-vs-R4
+reports include aggregate retrieval metrics by job type so this decision can be
+revisited without exposing private questions or source text.
 
 ## Telegram Usage
 

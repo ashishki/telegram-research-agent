@@ -30,13 +30,18 @@ not improve holdout quality and materially worsened latency. After explicit
 operator approval, OpenAI API dense retrieval was implemented with
 `text-embedding-3-large` and a gitignored SQLite sidecar. It is measurable but
 not adopted as default because holdout MRR/nDCG regressed versus R1 and latency
-increased.
+increased. PRM-QA-16 adds public `retrieval_by_job_type` metrics to the API
+dense reports and makes approved bounded Telegram RAG LLM synthesis the first
+normal user-facing answer layer after local RAG; deterministic templates remain
+fallback and current-fact/project-decision safety paths remain deterministic.
 
 Do not claim user value, PRM-19 dogfood, release readiness, hosted vector
 adoption, automatic live verification, or independent human gold labels from
 PRM-QA. The generated 160-case dataset is regression evidence only. API
-embedding egress is approved only for the bounded sidecar/eval path unless the
-operator grants a new runtime scope.
+embedding egress is implemented for the bounded sidecar/eval path but is not
+selected as default retrieval. Telegram synthesis provider egress remains
+controlled by the existing runtime flags and must use bounded cited snippets,
+not raw corpus egress.
 
 ## PRM-MAT Planning Update (2026-08-13)
 

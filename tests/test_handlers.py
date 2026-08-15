@@ -741,6 +741,17 @@ class TestHandlers(unittest.TestCase):
         self.assertEqual(rendered, "Полированный ответ")
         synthesis.assert_called_once_with(payload, mode="research")
 
+    def test_telegram_approved_synthesis_precedes_job_specific_template(self):
+        payload = _fake_research_payload("объясни что было про AI transformation")
+        payload["retrieval_policy"] = {"job_type": "semantic_topic"}
+
+        with patch.dict(os.environ, {"PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS": "1", "PRM_TELEGRAM_RAG_LLM_SYNTHESIS": "1"}, clear=False):
+            with patch.object(handlers, "_synthesize_telegram_rag_answer", return_value="Полированный API-ответ") as synthesis:
+                rendered = handlers._render_telegram_research_response(payload, local_text="ignored", mode="research")
+
+        self.assertEqual(rendered, "Полированный API-ответ")
+        synthesis.assert_called_once_with(payload, mode="research")
+
     def test_project_decision_detector_is_bounded_and_covers_russian_project_phrase(self):
         self.assertFalse(handlers._is_project_decision_request("Projected ROI: что мне делать?"))
         self.assertTrue(handlers._is_project_decision_request("Что делать с проектом Atlas после этих материалов?"))
@@ -750,6 +761,18 @@ class TestHandlers(unittest.TestCase):
         payload["answer_gate"] = {"external_verification_required": True, "current_claim_allowed": False}
         rendered = handlers._render_telegram_research_response(payload, local_text="ignored", mode="research")
         self.assertTrue(rendered.startswith("Я не могу подтвердить текущий факт"))
+
+    def test_project_decision_without_project_clarifies_before_synthesis(self):
+        payload = _fake_research_payload("Какие практические выводы для моего проекта сделать из этих источников?")
+        payload["project_fit"] = {"relevance_label": "ambiguous_project"}
+
+        with patch.dict(os.environ, {"PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS": "1", "PRM_TELEGRAM_RAG_LLM_SYNTHESIS": "1"}, clear=False):
+            with patch.object(handlers, "_synthesize_telegram_rag_answer") as synthesis:
+                rendered = handlers._render_telegram_research_response(payload, local_text="ignored", mode="research")
+
+        synthesis.assert_not_called()
+        self.assertIn("К какому проекту", rendered)
+        self.assertIn("[Другой]", rendered)
 
     def test_named_project_decision_uses_decision_memo_contract(self):
         payload = _fake_research_payload("Что из материалов про agent reliability применимо к Agent-Runtime-Grid?")

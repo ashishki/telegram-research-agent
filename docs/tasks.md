@@ -17,9 +17,11 @@ Target repo inspected for PRM-QA implementation: 516fc7206f99b58e6d276585c3dba6d
 - Do not run live Telegram ingestion, reaction sync, Frontier, Radar, report
   generation, full archive LLM backfill, hosted vector services, or external
   web research jobs from backlog grooming. PRM-27 local vector sidecar indexing
-  is authorized only inside ADR-004. External embedding API calls are authorized
-  only inside the 2026-08-15 operator-approved PRM-QA-4A API dense retrieval
-  evaluation scope.
+  is authorized only inside ADR-004. Telegram bounded LLM synthesis is allowed
+  behind the existing provider-egress runtime flags. External embedding API
+  calls are authorized for the 2026-08-15 operator-approved PRM-QA-4A API dense
+  retrieval evaluation scope, but API dense retrieval is not the default runtime
+  policy without measured holdout gain.
 - Do not modify production database contents.
 - The operator prohibits complete pytest-suite runs. Every present and future
   task must select and record only its relevant focused/integration/security
@@ -549,6 +551,68 @@ Cost-Budget: |
   max_cost_usd: 0 for verification; provider_calls: 0
 Notes: |
   Problem: implementation must finish with green evidence and remote handoff. User impact: recoverable delivery state. Privacy: inspect staged files and exclude private data. Eval: PRM-QA all/holdout reports. Rollback: follow-up commits only after push. Non-goals: force push, merge, dogfood/release claim. Commit: bounded PRM-QA commits. Push checkpoint: current branch if policy permits.
+
+### PRM-QA-16: API-First Telegram Synthesis And Job-Type Retrieval Reporting
+
+Owner: codex
+Phase: PRM-QA
+Type: product:quality
+Status: implemented
+Depends-On: PRM-QA-4A, PRM-QA-9
+Risk-Level: medium
+Public-Tests-Required: required
+Critic-Required: conditional
+Holdout-Required: required
+Mutation-Required: not_required
+Property-Required: not_required
+Visual-Contract: not_applicable
+Runtime-Verification: required
+Correction-Budget: 2
+Objective: |
+  Make approved API LLM synthesis the first normal Telegram answer layer after
+  local RAG, while preserving deterministic fallback, current-fact refusal, and
+  named-project decision memo contracts. Add public retrieval metrics by
+  job_type so retrieval changes are judged by operator task class, not only by
+  aggregate scores.
+Acceptance-Criteria:
+  - id: AC-1; description: approved Telegram RAG LLM synthesis runs before job-specific templates for answerable source-backed research; verify: tests/test_handlers.py.
+  - id: AC-2; description: current-fact and ambiguous-project safety boundaries do not enter the API synthesis path; verify: tests/test_handlers.py and existing focused PRM tier.
+  - id: AC-3; description: PRM-QA public eval reports include `retrieval_by_job_type` without private queries, snippets, or source URLs; verify: evals/prm_qa/prm_qa_api_dense_report.v1.json and evals/prm_qa/prm_qa_api_dense_holdout_report.v1.json.
+  - id: AC-4; description: API dense retrieval remains non-default because holdout job-type metrics do not show a material gain over R1; verify: docs/DECISION_LOG.md and docs/prm_retrieval_ablation.md.
+Verification:
+  - PYTHONPATH=src python3 -m pytest tests/test_handlers.py tests/test_prm_qa_dataset_eval.py -q
+  - python3 tools/prm_qa_eval.py --variants R1_fts_hash_vector_fallback,R4_api_dense_candidate --api-vector-index data/vector/archive_api_vector.sqlite --public-report evals/prm_qa/prm_qa_api_dense_report.v1.json --check retrieval
+  - python3 tools/prm_qa_eval.py --partition holdout --variants R1_fts_hash_vector_fallback,R4_api_dense_candidate --api-vector-index data/vector/archive_api_vector.sqlite --public-report evals/prm_qa/prm_qa_api_dense_holdout_report.v1.json --check retrieval
+Files:
+  - src/bot/handlers.py
+  - tools/prm_qa_eval.py
+  - tests/test_handlers.py
+  - tests/test_prm_qa_dataset_eval.py
+  - evals/prm_qa/prm_qa_api_dense_report.v1.json
+  - evals/prm_qa/prm_qa_api_dense_holdout_report.v1.json
+Context-Refs:
+  - docs/prm_qa_product_contract.md
+  - docs/prm_retrieval_ablation.md
+  - docs/DECISION_LOG.md
+Cost-Budget: |
+  scope: bounded eval + runtime rendering
+  max_cost_usd: bounded by OpenAI query-embedding eval calls and normal Telegram
+    synthesis calls behind existing provider-egress flags
+  provider_calls: eval query embeddings plus Telegram synthesis/verifier only
+  approval_required_when: enabling a new default retrieval policy, hosted vector
+    service, live web research, production DB write, or dogfood claim
+Notes: |
+  Problem: user-visible answers could remain deterministic templates even when
+  API synthesis was approved, while retrieval reports hid per-task-class
+  regressions. User impact: normal Telegram answers are more polished when the
+  API path is enabled, and retrieval decisions are easier to debug by job type.
+  Privacy: public reports contain only aggregate metrics; private cases,
+  source text, provider prompts/completions, sidecars, and `.env` stay ignored.
+  Eval: R1 and R4 all/holdout reports include job-type sections. Rollback:
+  restore renderer order and remove `retrieval_by_job_type` report field.
+  Non-goals: adopting API dense retrieval by preference, weakening current-fact
+  safety, changing durable memory writes, or claiming real user value from
+  synthetic metrics. Commit: feat(prm-ux): prefer approved api synthesis in telegram. Push checkpoint: after focused tests, milestone checks, and CI.
 
 ## PBR Queue - Playbook Retrofit
 

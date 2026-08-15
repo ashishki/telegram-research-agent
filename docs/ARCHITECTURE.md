@@ -209,6 +209,10 @@ does not approve hosted vector services, production migrations, canonical DB
 writes, service start, or dogfood. The later PRM-QA API dense slice approves
 bounded OpenAI embedding egress for evaluation and a local sidecar only; it did
 not adopt API dense retrieval as the default because holdout ranking regressed.
+Telegram answer rendering can use approved bounded API LLM synthesis after
+local RAG and the answer gate, before deterministic job-template fallback. The
+synthesis receives cited snippets only; current-fact refusals and named-project
+decision memo safety paths remain deterministic.
 
 Implementation order:
 

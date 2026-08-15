@@ -13,11 +13,14 @@ Date: 2026-08-15
 - Selected retrieval policy is based on measured results.
 - Dense retrieval, including approved API embeddings, is adopted as default only
   after a measured holdout gain.
+- Retrieval reports include job-type metrics before changing a default policy.
 - Evidence quality and source independence are represented.
 - Claim ledger and citation checks exist.
 - Ambiguous project requests clarify.
 - Named project requests render a decision memo.
-- Job-specific Telegram renderers exist.
+- Approved Telegram API synthesis runs before job-specific fallback templates
+  for normal source-backed answers.
+- Job-specific Telegram fallback renderers exist.
 - Feedback receipts and private failed-case traces are gitignored.
 - Current-fact safety has zero violations.
 - Focused PRM tests and safety checks pass.

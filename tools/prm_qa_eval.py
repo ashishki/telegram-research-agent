@@ -175,6 +175,7 @@ def evaluate_cases(
             )
 
     retrieval_summary = {variant: _summarize_retrieval(scores) for variant, scores in retrieval_by_variant.items()}
+    retrieval_by_job_type = _summarize_retrieval_by_job_type(retrieval_by_variant)
     selected_variant = _select_variant(retrieval_summary)
     grounding_metrics = evaluate_claim_grounding(grounding_claims)
     return {
@@ -187,6 +188,7 @@ def evaluate_cases(
         "variants_run": list(active_variants),
         "routing": _summarize_routing(routing_results),
         "retrieval": retrieval_summary,
+        "retrieval_by_job_type": retrieval_by_job_type,
         "selected_retrieval_policy": {
             "variant": selected_variant,
             "reason": _selection_reason(retrieval_summary, selected_variant),
@@ -256,8 +258,9 @@ def _run_variant(
 
 
 def _score_retrieval(case: Mapping[str, Any], results: list[Mapping[str, Any]], *, latency_ms: float, unavailable: bool) -> dict[str, Any]:
+    job_type = str(case.get("job_type") or "unknown")
     if unavailable:
-        return {"unavailable": True, "latency_ms": latency_ms}
+        return {"unavailable": True, "latency_ms": latency_ms, "job_type": job_type}
     expected_ids = {str(value) for value in case.get("expected_source_ids") or [] if str(value)}
     expected_groups = {str(value) for value in case.get("expected_source_group_ids") or [] if str(value)}
     if bool(case.get("expected_no_answer")) or bool(case.get("expected_external_verification")) or bool(case.get("expected_clarification")):
@@ -275,6 +278,7 @@ def _score_retrieval(case: Mapping[str, Any], results: list[Mapping[str, Any]], 
     top5 = results[:5]
     return {
         "unavailable": False,
+        "job_type": job_type,
         "positive_expected": positive_expected,
         "recall_at_5": 1.0 if best_rank and best_rank <= 5 else 0.0 if positive_expected else None,
         "recall_at_10": 1.0 if best_rank and best_rank <= 10 else 0.0 if positive_expected else None,
@@ -309,6 +313,19 @@ def _summarize_retrieval(scores: list[Mapping[str, Any]]) -> dict[str, Any]:
         "p50_latency_ms": _percentile([float(score.get("latency_ms") or 0.0) for score in available], 50),
         "p95_latency_ms": _percentile([float(score.get("latency_ms") or 0.0) for score in available], 95),
     }
+
+
+def _summarize_retrieval_by_job_type(scores_by_variant: Mapping[str, list[Mapping[str, Any]]]) -> dict[str, dict[str, Any]]:
+    by_variant: dict[str, dict[str, Any]] = {}
+    for variant, scores in scores_by_variant.items():
+        grouped: dict[str, list[Mapping[str, Any]]] = defaultdict(list)
+        for score in scores:
+            grouped[str(score.get("job_type") or "unknown")].append(score)
+        by_variant[variant] = {
+            job_type: _summarize_retrieval(job_scores)
+            for job_type, job_scores in sorted(grouped.items())
+        }
+    return by_variant
 
 
 def _eval_route(case: Mapping[str, Any]) -> dict[str, Any]:

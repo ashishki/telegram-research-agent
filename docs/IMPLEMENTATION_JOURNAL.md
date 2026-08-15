@@ -95,13 +95,16 @@ Implemented a separate API embedding sidecar:
 API dense eval evidence:
 
 - all cases: `evals/prm_qa/prm_qa_api_dense_report.v1.json`, status `pass`;
-  R1 Recall@10 1.0000, MRR 0.9845, nDCG@10 0.9885, p95 85.4424 ms;
+  R1 Recall@10 1.0000, MRR 0.9845, nDCG@10 0.9885, p95 92.9449 ms;
   R4 API dense hybrid Recall@10 1.0000, MRR 0.7917, nDCG@10 0.8451,
-  p95 635.4212 ms.
+  p95 572.6861 ms.
 - holdout: `evals/prm_qa/prm_qa_api_dense_holdout_report.v1.json`, status
-  `pass`; R1 Recall@10 1.0000, MRR 1.0000, nDCG@10 1.0000, p95 111.7023 ms;
+  `pass`; R1 Recall@10 1.0000, MRR 1.0000, nDCG@10 1.0000, p95 86.0825 ms;
   R4 API dense hybrid Recall@10 1.0000, MRR 0.7240, nDCG@10 0.7957,
-  p95 726.8114 ms.
+  p95 618.3259 ms.
+
+The public API dense reports now also include `retrieval_by_job_type`, with
+aggregate-only task-class metrics and no private query/source/snippet leakage.
 
 Decision: API dense retrieval is implemented and measurable, but not adopted as
 the default runtime policy because it did not improve holdout ranking and added
@@ -118,6 +121,67 @@ PYTHONPATH=src python3 -m pytest tests/test_archive_api_vector.py tests/test_prm
 No full pytest suite was run. No production database contents, hosted vector
 service, live web research, live Telegram job, production migration, dogfood
 start, release claim, or compatibility cleanup was performed.
+
+## 2026-08-15 — PRM-QA-16 API-first Telegram synthesis and job-type eval reporting
+
+Implemented a bounded quality slice after operator approval for API-backed
+assistant behavior:
+
+- Telegram research/brief rendering now tries approved bounded API LLM synthesis
+  before deterministic job-specific templates when the answer is source-backed
+  and not a current-fact or ambiguous-project boundary.
+- Current-fact refusal, verification-required DTO rendering, and named-project
+  decision memo contracts still bypass the generic API synthesis path.
+- The LLM synthesis prompt now receives the selected job type and asks for the
+  matching Telegram answer contract where supported by bounded evidence.
+- `tools/prm_qa_eval.py` now reports `retrieval_by_job_type` for every variant,
+  preserving the public privacy boundary.
+
+Evidence:
+
+- `evals/prm_qa/prm_qa_api_dense_report.v1.json`, status `pass`, 160 cases.
+- `evals/prm_qa/prm_qa_api_dense_holdout_report.v1.json`, status `pass`, 34
+  holdout cases.
+- Holdout R1 remained selected: Recall@10 1.0000, MRR 1.0000, nDCG@10 1.0000,
+  context precision@5 0.2471, p95 86.0825 ms.
+- Holdout R4 API dense hybrid remained non-default: Recall@10 1.0000, MRR
+  0.7240, nDCG@10 0.7957, context precision@5 0.2471, p95 618.3259 ms.
+
+Focused verification:
+
+```text
+PYTHONPATH=src python3 -m pytest tests/test_handlers.py tests/test_prm_qa_dataset_eval.py -q
+85 passed in 12.80s
+```
+
+```text
+python3 tools/test_tiers.py focused-prm
+249 passed in 29.56s
+```
+
+```text
+python3 tools/prm_mat_eval.py --check safety
+prm_mat_eval: ok
+```
+
+```text
+python3 tools/playbook_validate.py --root . --check tasks --check references
+playbook_validate: errors=0 warnings=0
+```
+
+```text
+PYTHONPATH=src python3 scripts/public_scorecard_demo.py --check
+verified sha256:7b8e3203ade62c17a624888d3532b7ab6e7d639d141d6a0a78487dac18694b83 docs/evidence/public_demo_scorecard.json
+```
+
+```text
+git diff --check
+pass, no output
+```
+
+No full pytest suite was run. No production database contents, live Telegram job,
+live web research, hosted vector service, dogfood start, release claim, or
+compatibility cleanup was performed.
 
 ## 2026-08-13 — PRM-MAT documentation-only completion audit
 

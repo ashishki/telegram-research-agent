@@ -158,4 +158,6 @@ def test_prm_qa_eval_public_report_has_no_private_queries(tmp_path):
 
     assert report["privacy"]["public_report_contains_queries"] is False
     assert report["retrieval"]["R0_sqlite_fts_strict_or_baseline"]["available"] is True
+    assert report["retrieval_by_job_type"]["R0_sqlite_fts_strict_or_baseline"]
+    assert "semantic_topic" in report["retrieval_by_job_type"]["R0_sqlite_fts_strict_or_baseline"]
     assert report["dense_candidate"]["adopted"] is False

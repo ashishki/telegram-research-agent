@@ -35,6 +35,17 @@ archive rows, used 29 provider calls and 1,356,089 input tokens, and produced a
 130.8 MB gitignored SQLite sidecar. It was not adopted as default because
 holdout MRR/nDCG regressed versus R1:
 
-- R1 holdout: Recall@10 1.0000, MRR 1.0000, nDCG@10 1.0000, p95 111.7023 ms.
+- R1 holdout: Recall@10 1.0000, MRR 1.0000, nDCG@10 1.0000, p95 86.0825 ms.
 - R4 API dense hybrid holdout: Recall@10 1.0000, MRR 0.7240, nDCG@10 0.7957,
-  p95 726.8114 ms.
+  p95 618.3259 ms.
+
+The 2026-08-15 PRM-QA-16 rerun preserved the same selection with
+`retrieval_by_job_type` added to the public reports:
+
+- R1 holdout: Recall@10 1.0000, MRR 1.0000, nDCG@10 1.0000,
+  context precision@5 0.2471, p95 86.0825 ms.
+- R4 API dense hybrid holdout: Recall@10 1.0000, MRR 0.7240, nDCG@10 0.7957,
+  context precision@5 0.2471, p95 618.3259 ms.
+
+No holdout job-type segment showed a material enough API dense gain to justify
+changing the default retrieval policy.

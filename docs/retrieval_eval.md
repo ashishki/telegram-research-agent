@@ -455,5 +455,8 @@ did not improve holdout recall/nDCG and had materially worse p95 latency.
 After explicit operator approval, API dense retrieval was evaluated with OpenAI
 `text-embedding-3-large` over a gitignored SQLite sidecar. It was not adopted
 as default because holdout MRR/nDCG regressed versus R1 while latency/provider
-cost increased. See
+cost increased. The public API dense reports now include
+`retrieval_by_job_type` so regressions can be inspected by operator task class
+without exposing private questions, source URLs, snippets, prompts, or
+completions. See
 `docs/adr/ADR-005-prm-qa-selected-retrieval-policy.md`.

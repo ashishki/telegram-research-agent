@@ -14,6 +14,9 @@ After the operator approved API embeddings on 2026-08-15, OpenAI
 `text-embedding-3-large` was measured over a gitignored SQLite sidecar. It
 preserved Recall@10 but regressed holdout MRR/nDCG versus R1 and increased p95
 latency/provider cost, so it remains non-default.
+The later PRM-QA-16 rerun added public `retrieval_by_job_type` metrics; no
+holdout task class showed a material enough API dense gain to change this
+decision.
 
 Evidence:
 

@@ -11,12 +11,14 @@
 | Holdout eval report | `evals/prm_qa/prm_qa_holdout_report.v1.json` |
 | API dense all-case report | `evals/prm_qa/prm_qa_api_dense_report.v1.json` |
 | API dense holdout report | `evals/prm_qa/prm_qa_api_dense_holdout_report.v1.json` |
+| Job-type retrieval metrics | included under `retrieval_by_job_type` in both API dense reports |
 | Retrieval ADR | `docs/adr/ADR-005-prm-qa-selected-retrieval-policy.md` |
 | Product contract | `docs/prm_qa_product_contract.md` |
 | Acceptance plan | `docs/prm_qa_acceptance_plan.md` |
 | Private cases | gitignored local path: data/evals/private/prm_qa/cases.v1.jsonl |
 | Private traces | gitignored local path: data/evals/private/prm_qa/failed_cases/ |
 | API dense sidecar | gitignored local path: data/vector/archive_api_vector.sqlite; OpenAI `text-embedding-3-large`, 3072 dimensions, 3,706 chunks, 1,356,089 input tokens, 29 provider calls |
+| Telegram API synthesis order | `src/bot/handlers.py` tries approved bounded LLM synthesis before deterministic job templates for answerable source-backed requests; current-fact and project-decision safety paths remain deterministic |
 | CI follow-up | remote run `31899242121` failed on `memory ask` local path redaction; fixed and reverified with `tests/test_local_memory_ask.py` and `tools/test_tiers.py focused-prm` |
 
 Privacy boundary: public artifacts contain aggregate counts, fingerprints,

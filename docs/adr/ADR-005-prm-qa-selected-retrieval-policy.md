@@ -60,7 +60,9 @@ Holdout selected metrics:
 - R3: Recall@10 1.0000, MRR 1.0000, nDCG@10 1.0000, p95 111.1032 ms.
 - R2/R5 did not improve recall and materially worsened ranking latency.
 - API dense hybrid with `text-embedding-3-large`: Recall@10 1.0000, MRR
-  0.7240, nDCG@10 0.7957, context_precision@5 0.2471, p95 726.8114 ms.
+  0.7240, nDCG@10 0.7957, context_precision@5 0.2471, p95 618.3259 ms.
+- PRM-QA-16 added `retrieval_by_job_type` to the public R1/R4 reports. No
+  holdout job-type segment showed a material enough API dense gain to adopt R4.
 
 API sidecar build evidence:
 

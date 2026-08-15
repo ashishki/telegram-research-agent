@@ -13,7 +13,8 @@ ordinary Telegram text or voice
 -> evidence quality assessment
 -> claim ledger
 -> grounded answer contract
--> concise Telegram rendering
+-> approved bounded API synthesis when safe
+-> concise Telegram rendering with deterministic fallback
 -> usefulness feedback
 -> confirmation-gated save/watch/action/experiment
 ```
