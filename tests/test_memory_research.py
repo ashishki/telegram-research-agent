@@ -394,6 +394,16 @@ class TestMemoryResearch(unittest.TestCase):
 
         self.assertIn("harness", variants)
 
+    def test_memory_research_keeps_agent_evals_in_archive_query_variants(self):
+        variants = _archive_query_variants(
+            "Что в моём архиве было про agent evals и что мне с этим делать?",
+            project_name=None,
+            max_variants=4,
+        )
+
+        self.assertIn("agent evals", variants)
+        self.assertNotIn("моём архиве", " ".join(variants).casefold())
+
     def test_memory_research_uses_semantic_archive_query_but_keeps_original_question(self):
         facade = _SelectiveArchiveFacade()
 

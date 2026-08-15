@@ -67,8 +67,6 @@ _QUERY_STOPWORDS = {
     "about",
     "after",
     "again",
-    "agent",
-    "agents",
     "all",
     "already",
     "and",
@@ -203,6 +201,12 @@ _QUERY_STOPWORDS = {
     "интересного",
     "это",
     "этого",
+    "этим",
+    "архива",
+    "архиве",
+    "делать",
+    "моем",
+    "моём",
 }
 _PROJECT_QUERY_HINTS = {
     "ai rollout training os": ("AI rollout training SOP guardrails",),
