@@ -1096,3 +1096,22 @@ This lets study planning, recommendations, and project insights reason from rece
       timer in the current dogfood schedule
 
 For the complete MVP Radar bridge contract, see `docs/mvp_weekly_radar.md`.
+# PRM-QA Operator Workflow Update - 2026-08-15
+
+The operator workflow now routes questions through job-specific answer contracts:
+
+- find: `Нашёл`, `Короткий фрагмент`, `Источник`, `Похожие материалы`;
+- explain: `Короткое объяснение`, `Главные идеи`, `Противоречия`,
+  `Что остаётся неизвестным`, `Источники`;
+- compare: `Подходы`, `Различия`, `Доказательства`,
+  `Когда какой подход использовать`, `Ограничения`;
+- project decision: the dedicated decision memo contract;
+- editor brief: `Тезис`, `Кейсы`, `Контраргумент`, `Практический вывод`,
+  `Что проверить`, `Источники`;
+- learning: `Объяснение`, `Аналогия`, `Связь с проектом`, `Эксперимент`,
+  `Критерий успеха`, `Источники`;
+- current fact: fail-closed archive boundary plus optional approved
+  primary-source verification.
+
+Internal policy names, paths, DB IDs, cost telemetry, and model/tool metrics stay
+out of normal Telegram output.

@@ -115,3 +115,22 @@ Gate status:
 - `docs/audit/PRM_MANUAL_TELEGRAM_ASSISTANT_ACTIVATION_2026-08-11.md`
 - `docs/audit/PRM_MANUAL_ARCHIVE_REFRESH_2026-08-12.md`
 - `docs/audit/PRM_WEEKLY_ARCHIVE_REFRESH_TIMER_2026-08-12.md`
+# PRM-QA Operator Quickstart Update - 2026-08-15
+
+Normal Telegram use remains one conversational entrypoint: send ordinary text or
+voice to the `prm-assistant` runtime. The runtime is still manual testing only,
+not PRM-19 dogfood evidence.
+
+Project-decision questions must name a project. If the message says “мой
+проект” without an explicit configured project, the assistant asks which project
+to use before making a recommendation.
+
+After answers, use:
+
+- `Полезно` for useful answers;
+- `Частично` for partial answers, then choose a reason when offered;
+- `Мимо` for misses, then choose a reason when offered.
+
+Save/watch/project/action/experiment buttons are confirmation-gated. Feedback
+and private interaction receipts are local owner artifacts and are not public
+product-value claims.

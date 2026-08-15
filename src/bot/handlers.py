@@ -233,6 +233,15 @@ def _route_auto_message(chat_id: str, text: str, *, input_kind: str = "text") ->
     if hard_boundary is not None:
         return {**hard_boundary, "router": "deterministic_hard_gate", "model_call_attempted": False}
     if _is_project_decision_request(clean):
+        if not _named_project_from_message(clean):
+            return {
+                **fallback,
+                "mode": "project_clarify",
+                "confidence": 0.95,
+                "reason": "Project decision request requires explicit project identity.",
+                "router": "deterministic_project_clarification",
+                "model_call_attempted": False,
+            }
         return {
             **fallback,
             "mode": "research",
@@ -372,9 +381,9 @@ def _deterministic_auto_route(text: str, *, previous_question: str = "", previou
 
 def _is_project_decision_request(text: str) -> bool:
     lowered = _clean_operator_text(text).casefold()
-    project_markers = ("моего проекта", "моему проекту", "для проекта", "с проектом")
-    decision_markers = ("практические выводы", "что мне делать", "что делать", "какие выводы", "решени", "следующий шаг")
-    has_project = any(marker in lowered for marker in project_markers) or bool(re.search(r"\bproject\b", lowered))
+    project_markers = ("моего проекта", "моему проекту", "мой проект", "для проекта", "с проектом")
+    decision_markers = ("практические выводы", "что мне делать", "что делать", "какие выводы", "решени", "следующий шаг", "примен")
+    has_project = any(marker in lowered for marker in project_markers) or bool(re.search(r"\bproject\b", lowered)) or bool(_named_project_from_message(text))
     return has_project and any(marker in lowered for marker in decision_markers)
 
 
@@ -1225,6 +1234,14 @@ def _handle_auto(chat_id: str, args: str, settings: Settings, *, input_kind: str
     route = _route_auto_message(chat_id, question, input_kind=input_kind)
     project_name = _named_project_from_message(question)
     mode = str(route.get("mode") or "research")
+    if mode == "project_clarify":
+        send_message(
+            _get_bot_token(),
+            chat_id,
+            _project_clarification_message(),
+            parse_mode=None,
+        )
+        return
     operator_context = build_operator_context(
         chat_id=chat_id,
         query=question,
@@ -1448,6 +1465,13 @@ def _render_telegram_research_response(payload: Mapping[str, Any], *, local_text
         return _render_telegram_answer_first_research(payload)
     if professional_verification_required:
         return _render_telegram_professional_answer(professional_answer)
+    if mode == "research" and _is_project_decision_request(str(payload.get("question") or "")):
+        project_fit = _safe_mapping(payload.get("project_fit"))
+        if str(project_fit.get("project_name") or "").strip():
+            return _render_telegram_project_decision_answer(payload)
+    job_specific = _render_telegram_job_specific_answer(payload, mode=mode)
+    if job_specific:
+        return job_specific
     if _telegram_rag_llm_synthesis_allowed() and _telegram_rag_source_count(payload) > 0:
         try:
             return _synthesize_telegram_rag_answer(payload, mode=mode)
@@ -1605,6 +1629,229 @@ def _render_telegram_answer_first_research(payload: Mapping[str, Any]) -> str:
     return _telegram_report_without_technical_metrics("\n".join(lines))
 
 
+def _render_telegram_project_decision_answer(payload: Mapping[str, Any]) -> str:
+    """Render the dedicated project-decision memo without exposing internals."""
+
+    project_fit = _safe_mapping(payload.get("project_fit"))
+    archive = _safe_mapping(payload.get("archive_evidence"))
+    linked = _safe_mapping(payload.get("linked_source_evidence"))
+    next_steps = _safe_mapping(payload.get("next_steps"))
+    evidence_quality = _safe_mapping(payload.get("evidence_quality"))
+    evidence_summary = _safe_mapping(evidence_quality.get("summary"))
+    source_lines = [_public_telegram_text(line) for line in _telegram_public_source_lines(archive, linked)]
+    source_lines = [line for line in source_lines if line]
+    source_count = len(_safe_mapping_list(archive.get("items"))) + len(_safe_mapping_list(linked.get("items")))
+    project_name = _public_telegram_text(project_fit.get("project_name")) or "проект"
+    relation = _telegram_project_relation(project_fit)
+    recommendation = _telegram_public_next_action(next_steps)
+    if not source_count or str(project_fit.get("relevance_label") or "") not in {"direct_implication", "weak_watch", "learning_relevance"}:
+        recommendation = "Не принимать проектное решение: прямой связи с источниками пока недостаточно."
+    criterion = (
+        "Один PR-sized эксперимент успешен, если его результат можно привязать к цитируемому источнику и проверить без расширения области работ."
+        if source_count
+        else "Успех сначала означает найти релевантный источник или явно отказаться от проектного действия."
+    )
+    weak = [
+        "Источник считается независимым только при явной первичности; повторы Telegram-сигналов не считаются независимым подтверждением.",
+        f"Групп источников: {int(evidence_summary.get('source_group_count') or 0)}; прямота доказательств: {float(evidence_summary.get('direct_rate') or 0.0):.2f}.",
+    ]
+    lines = [
+        "Решение",
+        f"Для {project_name}: {recommendation}",
+        "",
+        "Что найдено в источниках",
+        (
+            f"Найдено локальных источников: {source_count}. Использую их как архивный контекст, не как актуальную внешнюю проверку."
+            if source_count
+            else "Релевантных локальных источников не найдено."
+        ),
+        "",
+        "Контекст проекта",
+        relation,
+        "",
+        "Варианты",
+        "- Не делать проектное изменение, если связь с источниками слабая.",
+        "- Сформулировать один маленький проверяемый эксперимент, если связь подтверждается источником.",
+        "",
+        "Рекомендация",
+        recommendation,
+        "",
+        "Следующий эксперимент / PR-sized action",
+        _telegram_project_action(next_steps, source_count=source_count),
+        "",
+        "Критерий успеха",
+        criterion,
+        "",
+        "Что изменило бы решение",
+        "Прямой первоисточник, свежая проверка или повторяемый независимый кейс по той же задаче проекта.",
+        "",
+        "Где доказательства слабые",
+        *[f"- {item}" for item in weak],
+        "",
+        "Источники",
+        *(source_lines or ["- локальных источников нет"]),
+    ]
+    return _telegram_report_without_technical_metrics("\n".join(lines))
+
+
+def _render_telegram_job_specific_answer(payload: Mapping[str, Any], *, mode: str) -> str:
+    policy = _safe_mapping(payload.get("retrieval_policy"))
+    job_type = str(policy.get("job_type") or "").strip()
+    if job_type == "writer_editor":
+        return _render_telegram_editor_brief_answer(payload)
+    if job_type == "exact_known_item":
+        return _render_telegram_find_answer(payload)
+    if job_type == "comparison":
+        return _render_telegram_compare_answer(payload)
+    if job_type == "learning_experiment":
+        return _render_telegram_learning_answer(payload)
+    if job_type in {"semantic_topic", "case_study", "timeline_freshness"}:
+        return _render_telegram_explain_answer(payload)
+    return ""
+
+
+def _render_telegram_find_answer(payload: Mapping[str, Any]) -> str:
+    archive = _safe_mapping(payload.get("archive_evidence"))
+    items = _safe_mapping_list(archive.get("items"))
+    first = items[0] if items else {}
+    source_lines = _telegram_public_source_lines(archive, _safe_mapping(payload.get("linked_source_evidence")))
+    lines = [
+        "Нашёл",
+        _public_telegram_text(first.get("snippet")) if first else "Точный материал не найден.",
+        "",
+        "Короткий фрагмент",
+        _public_telegram_text(first.get("snippet"))[:360] if first else "Нет локального фрагмента.",
+        "",
+        "Источник",
+        *(source_lines[:1] or ["- локальных источников нет"]),
+        "",
+        "Похожие материалы",
+        *(source_lines[1:4] or ["- похожих локальных материалов нет"]),
+    ]
+    return _telegram_report_without_technical_metrics("\n".join(lines))
+
+
+def _render_telegram_explain_answer(payload: Mapping[str, Any]) -> str:
+    archive = _safe_mapping(payload.get("archive_evidence"))
+    linked = _safe_mapping(payload.get("linked_source_evidence"))
+    source_lines = _telegram_public_source_lines(archive, linked)
+    summary = _telegram_public_answer_summary(payload)
+    unknowns = [_public_telegram_text(item) for item in payload.get("unknowns") or [] if str(item).strip()]
+    lines = [
+        "Короткое объяснение",
+        summary,
+        "",
+        "Главные идеи",
+        *(_telegram_evidence_bullets(archive) or ["- В локальном архиве нет сильного тематического сигнала."]),
+        "",
+        "Противоречия",
+        "- Явных противоречий в выбранных локальных фрагментах не выделено.",
+        "",
+        "Что остаётся неизвестным",
+        *(f"- {item}" for item in (unknowns[:2] or ["Недостаточно данных для более сильного вывода без дополнительной проверки."])),
+        "",
+        "Источники",
+        *(source_lines or ["- локальных источников нет"]),
+    ]
+    return _telegram_report_without_technical_metrics("\n".join(lines))
+
+
+def _render_telegram_compare_answer(payload: Mapping[str, Any]) -> str:
+    archive = _safe_mapping(payload.get("archive_evidence"))
+    linked = _safe_mapping(payload.get("linked_source_evidence"))
+    source_lines = _telegram_public_source_lines(archive, linked)
+    lines = [
+        "Подходы",
+        *(_telegram_evidence_bullets(archive)[:3] or ["- Недостаточно локальных источников для уверенного сравнения."]),
+        "",
+        "Различия",
+        "Сравнение ограничено выбранными архивными фрагментами; повтор Telegram-сигнала не считается независимым доказательством.",
+        "",
+        "Доказательства",
+        *(source_lines[:5] or ["- локальных источников нет"]),
+        "",
+        "Когда какой подход использовать",
+        _telegram_public_next_action(_safe_mapping(payload.get("next_steps"))),
+        "",
+        "Ограничения",
+        "Нужна отдельная проверка первоисточников, если решение зависит от актуального состояния рынка или продукта.",
+    ]
+    return _telegram_report_without_technical_metrics("\n".join(lines))
+
+
+def _render_telegram_editor_brief_answer(payload: Mapping[str, Any]) -> str:
+    archive = _safe_mapping(payload.get("archive_evidence"))
+    linked = _safe_mapping(payload.get("linked_source_evidence"))
+    source_lines = _telegram_public_source_lines(archive, linked)
+    lines = [
+        "Тезис",
+        _telegram_public_answer_summary(payload),
+        "",
+        "Кейсы",
+        *(_telegram_evidence_bullets(archive)[:3] or ["- Сильный кейс в локальном архиве не найден."]),
+        "",
+        "Контраргумент",
+        "Доказательства могут быть вторичными или повторёнными в Telegram; это не независимое подтверждение.",
+        "",
+        "Практический вывод",
+        _telegram_public_next_action(_safe_mapping(payload.get("next_steps"))),
+        "",
+        "Что проверить",
+        "Свежий первоисточник или прямой кейс перед публикацией сильного утверждения.",
+        "",
+        "Источники",
+        *(source_lines or ["- локальных источников нет"]),
+    ]
+    return _telegram_report_without_technical_metrics("\n".join(lines))
+
+
+def _render_telegram_learning_answer(payload: Mapping[str, Any]) -> str:
+    archive = _safe_mapping(payload.get("archive_evidence"))
+    linked = _safe_mapping(payload.get("linked_source_evidence"))
+    source_lines = _telegram_public_source_lines(archive, linked)
+    project_fit = _safe_mapping(payload.get("project_fit"))
+    lines = [
+        "Объяснение",
+        _telegram_public_answer_summary(payload),
+        "",
+        "Аналогия",
+        "Думай об этом как о небольшом проверяемом рабочем предположении, а не как о готовой истине.",
+        "",
+        "Связь с проектом",
+        _telegram_project_relation(project_fit),
+        "",
+        "Эксперимент",
+        _telegram_public_next_action(_safe_mapping(payload.get("next_steps"))),
+        "",
+        "Критерий успеха",
+        "После эксперимента есть наблюдаемый результат и понятно, какой источник был полезен.",
+        "",
+        "Источники",
+        *(source_lines or ["- локальных источников нет"]),
+    ]
+    return _telegram_report_without_technical_metrics("\n".join(lines))
+
+
+def _telegram_evidence_bullets(archive: Mapping[str, Any]) -> list[str]:
+    bullets = []
+    for item in _safe_mapping_list(archive.get("items"))[:4]:
+        snippet = _public_telegram_text(item.get("snippet"))[:260]
+        source_url = _public_telegram_text(item.get("source_url"))
+        if snippet:
+            bullets.append(f"- {snippet}" + (f" {source_url}" if source_url else ""))
+    return bullets
+
+
+def _telegram_project_action(next_steps: Mapping[str, Any], *, source_count: int) -> str:
+    if not source_count:
+        return "Не создавать действие; сначала уточнить запрос или найти источник."
+    for key in ("apply", "study", "watch"):
+        values = [str(item).strip() for item in next_steps.get(key) or [] if str(item).strip()]
+        if values:
+            return _public_telegram_text(values[0])
+    return "Сформулировать один эксперимент после ручной проверки источников."
+
+
 def _public_telegram_text(value: object) -> str:
     """Remove implementation-only fragments from text entering the Telegram view."""
 
@@ -1692,6 +1939,31 @@ def _telegram_project_relation(project_fit: Mapping[str, Any]) -> str:
         terms = ", ".join(matched_terms[:4]) or "инженерным контекстом"
         return f"Для {project_name} это релевантный сигнал для изучения: пересечение по {terms}; проектное действие пока не доказано."
     return f"Для {project_name} прямое совпадение в найденных источниках не доказано; это пока общий инженерный контекст, а не рекомендация по проекту."
+
+
+def _project_clarification_message() -> str:
+    choices = _project_choice_labels()
+    lines = ["К какому проекту применить находки?", ""]
+    lines.extend(f"[{choice}]" for choice in choices)
+    return "\n".join(lines)
+
+
+def _project_choice_labels(limit: int = 3) -> list[str]:
+    preferred = ["telegram-research-agent", "AI_workflow_playbook", "Agent-Runtime-Grid"]
+    try:
+        descriptors = load_project_descriptors(PROJECT_ROOT / "src" / "config" / "projects.yaml")
+    except ValueError:
+        descriptors = []
+    available = {str(descriptor.get("name") or "") for descriptor in descriptors}
+    labels = [label for label in preferred if not available or label in available]
+    if len(labels) < limit:
+        for descriptor in descriptors:
+            name = str(descriptor.get("name") or "").strip()
+            if name and name not in labels:
+                labels.append(name)
+            if len(labels) >= limit:
+                break
+    return [*labels[: max(1, min(int(limit or 3), 3))], "Другой"]
 
 
 def _telegram_rag_source_count(payload: Mapping[str, Any]) -> int:
@@ -2006,6 +2278,12 @@ def _prm_post_answer_markup(result: Mapping[str, Any], *, settings: Settings, ch
             "selected_professional_lens": _safe_mapping(result.get("professional_answer")).get("professional_lens"),
             "primary_workflow": _safe_mapping(result.get("professional_answer")).get("primary_workflow"),
             "professional_answer": _safe_mapping(result.get("professional_answer")),
+            "archive_evidence": archive,
+            "retrieval_policy": _safe_mapping(result.get("retrieval_policy")),
+            "evidence_quality": _safe_mapping(result.get("evidence_quality")),
+            "claim_ledger": _safe_mapping(result.get("claim_ledger")),
+            "receipt": _safe_mapping(result.get("receipt")),
+            "privacy": _safe_mapping(result.get("privacy")),
         }, db_path=settings.db_path, chat_id=chat_id
     )["reply_markup"]
 

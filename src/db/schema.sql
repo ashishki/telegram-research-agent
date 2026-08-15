@@ -656,7 +656,7 @@ CREATE INDEX IF NOT EXISTS idx_prm_interaction_ledger_chat_created ON prm_intera
 CREATE TABLE IF NOT EXISTS prm_interaction_feedback_transitions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     interaction_id TEXT NOT NULL UNIQUE,
-    feedback_action TEXT NOT NULL CHECK(feedback_action IN ('useful', 'wrong_priority', 'too_shallow', 'applied')),
+    feedback_action TEXT NOT NULL CHECK(feedback_action IN ('useful', 'partial', 'miss', 'wrong_sources', 'too_general', 'wrong_project', 'no_useful_action', 'too_long', 'weak_evidence', 'wrong_priority', 'too_shallow', 'applied')),
     useful_label TEXT NOT NULL CHECK(useful_label IN ('yes', 'partial', 'no')),
     recorded_at TEXT NOT NULL,
     FOREIGN KEY(interaction_id) REFERENCES prm_interaction_ledger(interaction_id) ON DELETE RESTRICT

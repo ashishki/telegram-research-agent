@@ -29,7 +29,7 @@ def test_action_markup_relevant_and_bounded(monkeypatch):
         markup = build_post_answer_actions(_answer(project_name="telegram-research-agent"), db_path=db_path, chat_id="42")["reply_markup"]
         buttons = [button for row in markup["inline_keyboard"] for button in row]
 
-    assert {button["text"] for button in buttons}.issuperset({"Сохранить заметку", "Следить", "Отметить полезным"})
+    assert {button["text"] for button in buttons}.issuperset({"Полезно", "Частично", "Мимо", "Сохранить заметку", "Следить"})
     assert {button["text"] for button in buttons}.issuperset({"Связать с проектом", "Создать действие", "Создать эксперимент"})
     assert all(button["callback_data"].startswith(f"{PRM_ACTION_PREFIX}:") for button in buttons)
     assert all(len(button["callback_data"]) <= 64 for button in buttons)
@@ -135,3 +135,20 @@ def test_feedback_action_no_config_or_external_mutation(monkeypatch):
         assert result["proposal"]["object_type"] == "feedback"
         assert result["write_performed"] is False
         assert os.path.exists(db_path)
+
+
+def test_partial_feedback_prompts_for_reason_and_updates_private_receipt(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmp:
+        db_path = os.path.join(tmp, "memory.db")
+        monkeypatch.setenv("AGENT_DB_PATH", db_path)
+        run_migrations()
+        context_id = build_post_answer_actions(_answer(), db_path=db_path, chat_id="42")["context_id"]
+
+        prompt = handle_post_answer_callback(db_path, f"{PRM_ACTION_PREFIX}:{context_id}:m", chat_id="42")
+        reason = handle_post_answer_callback(db_path, f"{PRM_ACTION_PREFIX}:{context_id}:ws", chat_id="42")
+
+        assert prompt["status"] == "needs_reason"
+        buttons = [button for row in prompt["reply_markup"]["inline_keyboard"] for button in row]
+        assert "Не те источники" in {button["text"] for button in buttons}
+        assert reason["status"] == "recorded"
+        assert reason["write_performed"] is False

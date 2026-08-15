@@ -1,0 +1,30 @@
+{
+  "feedback": {
+    "miss": 4,
+    "unknown": 24,
+    "useful": 4
+  },
+  "honesty_boundary": "Aggregate interaction receipts are usage instrumentation; product-value claims require explicit operator feedback over time.",
+  "job_types": {
+    "unknown": 32
+  },
+  "miss_rate": 0.125,
+  "partial_rate": 0.0,
+  "privacy": {
+    "private_receipts_gitignored": true,
+    "public_summary_contains_questions": false,
+    "public_summary_contains_raw_answers": false,
+    "public_summary_contains_source_urls": false
+  },
+  "receipt_count": 32,
+  "save_watch_action_counts": {
+    "actions": 0,
+    "saved": 0,
+    "watched": 0
+  },
+  "schema_version": "prm_qa_usage_recap_summary.v1",
+  "useful_rate": 0.125,
+  "workflows": {
+    "unknown": 32
+  }
+}

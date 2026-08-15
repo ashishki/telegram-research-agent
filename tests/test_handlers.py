@@ -462,7 +462,7 @@ class TestHandlers(unittest.TestCase):
         self.assertIn("найти", message)
         self.assertIn("бриф", message)
 
-    def test_auto_route_keeps_project_decision_request_in_grounded_research(self):
+    def test_auto_route_clarifies_ambiguous_project_decision_request(self):
         with patch.dict(os.environ, {"PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS": "1", "PRM_TELEGRAM_AUTO_LLM_ROUTER": "1"}, clear=False):
             with patch.object(handlers.LLMClient, "complete_json") as llm_mock:
                 route = handlers._route_auto_message(
@@ -470,10 +470,42 @@ class TestHandlers(unittest.TestCase):
                     "Какие практические выводы для моего проекта можно сделать из материалов про AI adoption?",
                 )
 
-        self.assertEqual(route["mode"], "research")
-        self.assertEqual(route["router"], "deterministic_project_decision")
+        self.assertEqual(route["mode"], "project_clarify")
+        self.assertEqual(route["router"], "deterministic_project_clarification")
         self.assertFalse(route["model_call_attempted"])
         llm_mock.assert_not_called()
+
+    def test_auto_route_keeps_named_project_decision_in_grounded_research(self):
+        route = handlers._route_auto_message(
+            "project-decision-route",
+            "Что из материалов про agent reliability применимо к Agent-Runtime-Grid?",
+        )
+
+        self.assertEqual(route["mode"], "research")
+        self.assertEqual(route["router"], "deterministic_project_decision")
+
+    def test_handle_auto_project_decision_clarification_is_local(self):
+        settings = Settings(
+            db_path=":memory:",
+            llm_api_key="",
+            model_provider="anthropic",
+            telegram_session_path="",
+        )
+
+        with patch.object(handlers, "answer_memory_research") as research_mock:
+            with patch.object(handlers, "_get_bot_token", return_value="bot-token"):
+                with patch.object(handlers, "send_message") as mock_send_message:
+                    handlers.handle_auto(
+                        chat_id="42",
+                        args="Какие практические выводы для моего проекта можно сделать из материалов про AI adoption?",
+                        settings=settings,
+                    )
+
+        research_mock.assert_not_called()
+        message = mock_send_message.call_args.args[2]
+        self.assertIn("К какому проекту", message)
+        self.assertIn("[telegram-research-agent]", message)
+        self.assertIn("[Agent-Runtime-Grid]", message)
 
     def test_prm_safe_command_allowlist_blocks_legacy_generators(self):
         settings = Settings(
@@ -718,6 +750,49 @@ class TestHandlers(unittest.TestCase):
         payload["answer_gate"] = {"external_verification_required": True, "current_claim_allowed": False}
         rendered = handlers._render_telegram_research_response(payload, local_text="ignored", mode="research")
         self.assertTrue(rendered.startswith("Я не могу подтвердить текущий факт"))
+
+    def test_named_project_decision_uses_decision_memo_contract(self):
+        payload = _fake_research_payload("Что из материалов про agent reliability применимо к Agent-Runtime-Grid?")
+        payload["project_fit"] = {
+            "project_name": "Agent-Runtime-Grid",
+            "relevance_label": "direct_implication",
+            "matched_terms": ["agent", "reliability"],
+        }
+        payload["next_steps"] = {"apply": ["Draft one bounded project action from the cited evidence."]}
+        payload["evidence_quality"] = {"summary": {"source_group_count": 1, "direct_rate": 1.0}}
+
+        rendered = handlers._render_telegram_research_response(payload, local_text="ignored", mode="research")
+
+        for heading in (
+            "Решение",
+            "Что найдено в источниках",
+            "Контекст проекта",
+            "Варианты",
+            "Рекомендация",
+            "Следующий эксперимент / PR-sized action",
+            "Критерий успеха",
+            "Что изменило бы решение",
+            "Где доказательства слабые",
+            "Источники",
+        ):
+            self.assertIn(heading, rendered)
+        self.assertNotIn("ignored", rendered)
+
+    def test_job_specific_renderers_use_distinct_contracts(self):
+        payload = _fake_research_payload("Сравни подходы к RAG")
+        payload["retrieval_policy"] = {"job_type": "comparison"}
+        compare = handlers._render_telegram_research_response(payload, local_text="ignored", mode="research")
+        payload["retrieval_policy"] = {"job_type": "learning_experiment"}
+        learning = handlers._render_telegram_research_response(payload, local_text="ignored", mode="research")
+        payload["retrieval_policy"] = {"job_type": "writer_editor"}
+        brief = handlers._render_telegram_research_response(payload, local_text="ignored", mode="brief")
+
+        self.assertIn("Подходы", compare)
+        self.assertIn("Когда какой подход использовать", compare)
+        self.assertIn("Объяснение", learning)
+        self.assertIn("Эксперимент", learning)
+        self.assertIn("Тезис", brief)
+        self.assertIn("Практический вывод", brief)
 
     def test_telegram_synthesis_falls_back_when_russian_answer_is_wrong_language(self):
         payload = _fake_research_payload("что в архиве было про evals?")

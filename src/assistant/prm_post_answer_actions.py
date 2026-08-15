@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from assistant.pi_memory import build_memory_proposal, confirm_memory_proposal
+from assistant.prm_private_traces import update_private_interaction_feedback, write_private_interaction_receipt
 from db.prm19_dogfood_receipts import record_feedback_transition, record_interaction_receipt
 
 
@@ -22,7 +23,15 @@ _ACTION_TYPES = {
     "p": ("project_link", "Связать с проектом"),
     "a": ("action", "Создать действие"),
     "e": ("experiment", "Создать эксперимент"),
-    "u": ("feedback", "Отметить полезным"),
+    "u": ("feedback", "Полезно"),
+    "m": ("feedback_reason_prompt", "Частично"),
+    "x": ("feedback_reason_prompt", "Мимо"),
+    "ws": ("feedback_reason", "Не те источники"),
+    "og": ("feedback_reason", "Слишком общий ответ"),
+    "wp": ("feedback_reason", "Не тот проект"),
+    "na": ("feedback_reason", "Нет полезного действия"),
+    "lg": ("feedback_reason", "Слишком длинно"),
+    "we": ("feedback_reason", "Слабые доказательства"),
     "r": ("feedback", "Не тот приоритет"),
     "s": ("feedback", "Слишком поверхностно"),
     "d": ("feedback", "Применил"),
@@ -37,7 +46,7 @@ def build_post_answer_actions(answer: Mapping[str, Any], *, db_path: str | Path 
     context_id = _register_context(answer, db_path=db_path, chat_id=chat_id)
     if context_id is None:
         return {"context_id": None, "reply_markup": None}
-    action_codes = ["n", "w", "u", "r", "s"]
+    action_codes = ["u", "m", "x", "n", "w"]
     if str(answer.get("project_name") or "").strip():
         action_codes.extend(["p", "a", "e"])
     rows: list[list[dict[str, str]]] = []
@@ -60,12 +69,49 @@ def handle_post_answer_callback(db_path: str, callback_data: str, *, chat_id: st
         return {"status": "expired", "write_performed": False, "message": "Действие устарело. Запроси ответ заново."}
     if prefix == PRM_ACTION_PREFIX:
         proposal_type, label = _ACTION_TYPES[action]
-        if proposal_type == "feedback":
+        if proposal_type == "feedback_reason_prompt":
+            try:
+                record_feedback_transition(db_path, interaction_id=context_id, action_code=action)
+            except sqlite3.Error:
+                pass
+            update_private_interaction_feedback(context_id, feedback="partial" if action == "m" else "miss")
+            reason_rows = [
+                [
+                    {"text": _ACTION_TYPES["ws"][1], "callback_data": f"{PRM_ACTION_PREFIX}:{context_id}:ws"},
+                    {"text": _ACTION_TYPES["og"][1], "callback_data": f"{PRM_ACTION_PREFIX}:{context_id}:og"},
+                ],
+                [
+                    {"text": _ACTION_TYPES["wp"][1], "callback_data": f"{PRM_ACTION_PREFIX}:{context_id}:wp"},
+                    {"text": _ACTION_TYPES["na"][1], "callback_data": f"{PRM_ACTION_PREFIX}:{context_id}:na"},
+                ],
+                [
+                    {"text": _ACTION_TYPES["lg"][1], "callback_data": f"{PRM_ACTION_PREFIX}:{context_id}:lg"},
+                    {"text": _ACTION_TYPES["we"][1], "callback_data": f"{PRM_ACTION_PREFIX}:{context_id}:we"},
+                ],
+            ]
+            return {
+                "status": "needs_reason",
+                "write_performed": False,
+                "message": "Уточни причину, чтобы следующая итерация была полезнее.",
+                "reply_markup": {"inline_keyboard": reason_rows},
+            }
+        if proposal_type in {"feedback", "feedback_reason"}:
             try:
                 record_feedback_transition(db_path, interaction_id=context_id, action_code=action)
             except sqlite3.Error:
                 # Feedback receipt failure must not discard the answer/action path.
                 pass
+            update_private_interaction_feedback(
+                context_id,
+                feedback=_feedback_label(action),
+                reason=label if proposal_type == "feedback_reason" else "",
+            )
+        if proposal_type == "feedback_reason":
+            return {
+                "status": "recorded",
+                "write_performed": False,
+                "message": "Записал причину обратной связи.",
+            }
         proposal_result = context["proposals"].get(action)
         if not isinstance(proposal_result, Mapping):
             proposal_result = build_memory_proposal(proposal_type, _proposal_args(context, action))
@@ -123,6 +169,7 @@ def _register_context(answer: Mapping[str, Any], *, db_path: str | Path | None, 
             chat_id_hash=_chat_hash(chat_id),
             answer=_receipt_metadata(answer),
         )
+        write_private_interaction_receipt(answer, interaction_id=context_id)
     except (sqlite3.Error, ValueError):
         _mark_receipt_status(db_path, context_id, "failed")
     else:
@@ -163,7 +210,7 @@ def _iso(value: datetime) -> str:
 
 def _proposal_args(context: Mapping[str, Any], action: str) -> dict[str, Any]:
     title = str(context["title"])
-    feedback_titles = {"u": "Полезно", "r": "Не тот приоритет", "s": "Слишком поверхностно", "d": "Применил"}
+    feedback_titles = {"u": "Полезно", "m": "Частично", "x": "Мимо", "r": "Не тот приоритет", "s": "Слишком поверхностно", "d": "Применил"}
     if action in feedback_titles:
         return {
             "title": feedback_titles[action],
@@ -210,6 +257,18 @@ def _receipt_metadata(answer: Mapping[str, Any]) -> dict[str, Any]:
         "primary_workflow": answer.get("primary_workflow"),
         "professional_answer": professional,
     }
+
+
+def _feedback_label(action: str) -> str:
+    if action == "u":
+        return "useful"
+    if action in {"m", "og", "na", "lg", "we"}:
+        return "partial"
+    if action in {"x", "ws", "wp"}:
+        return "miss"
+    if action == "d":
+        return "useful"
+    return "partial"
 
 
 def _mark_receipt_status(db_path: str | Path, context_id: str, status: str) -> None:

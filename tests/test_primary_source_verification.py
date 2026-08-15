@@ -1,79 +1,54 @@
 from assistant.primary_source_verification import (
-    build_primary_source_verification_plan,
-    render_primary_source_verification_answer,
+    classify_trusted_source,
+    execute_primary_source_verification,
 )
 
 
-def test_verification_requires_approval_before_live_fetch():
-    result = build_primary_source_verification_plan(
-        {"telegram_source_refs": ["https://t.me/example/1"], "candidate_source_urls": ["https://docs.example.com/api"]}
+def test_primary_source_classification_requires_explicit_official_relation():
+    assert classify_trusted_source("https://github.com/owner/repo")["evidence_class"] == "github_repository"
+    assert classify_trusted_source("https://arxiv.org/abs/2401.00001")["evidence_class"] == "research_paper"
+    assert classify_trusted_source("https://www.vendor.example/docs")["evidence_class"] == "unknown"
+    assert (
+        classify_trusted_source("https://docs.vendor.example/guide", official_relation=True)["evidence_class"]
+        == "official_documentation"
+    )
+    assert classify_trusted_source("https://127.0.0.1/admin")["safety_status"] == "private_address"
+
+
+def test_execute_primary_source_verification_uses_fake_transport_and_cache(tmp_path):
+    calls = []
+
+    def transport(url: str) -> dict:
+        calls.append(url)
+        return {
+            "status": 200,
+            "headers": {"content-type": "text/html; charset=utf-8"},
+            "body": b"<html><title>README</title>license tests github actions</html>",
+            "final_url": url,
+        }
+
+    payload = {
+        "approvals": {"live_fetch_approved": True, "trust_record_approved": True},
+        "telegram_source_refs": ["https://t.me/example/1"],
+        "candidate_source_urls": [{"source_url": "https://github.com/owner/repo", "official_relation": True}],
+    }
+
+    first = execute_primary_source_verification(payload, transport=transport, cache_dir=tmp_path)
+    second = execute_primary_source_verification(payload, transport=transport, cache_dir=tmp_path)
+
+    assert first["status"] == "verification_fetched"
+    assert first["fetch_results"][0]["evidence_class"] == "github_repository"
+    assert first["fetch_results"][0]["github_repository"]["repository"] == "owner/repo"
+    assert second["fetch_results"][0]["cache_hit"] is True
+    assert calls == ["https://github.com/owner/repo"]
+
+
+def test_verification_does_not_fetch_without_approval(tmp_path):
+    result = execute_primary_source_verification(
+        {"candidate_source_urls": ["https://github.com/owner/repo"], "approvals": {}},
+        transport=lambda _url: {"status": 200, "headers": {}, "body": b""},
+        cache_dir=tmp_path,
     )
 
     assert result["status"] == "verification_required_not_run"
-    assert result["live_fetch"] == {
-        "performed": False,
-        "approval_required": True,
-        "trust_record_required": True,
-        "approved": False,
-    }
-    assert result["write_performed"] is False
-
-
-def test_direct_primary_source_preference():
-    result = build_primary_source_verification_plan(
-        {
-            "candidate_source_urls": [
-                "https://search.example.net/result",
-                "https://github.com/openai/example",
-                {"url": "https://docs.example.com/reference", "official_relation": True},
-            ]
-        }
-    )
-
-    assert [item["source_url"] for item in result["primary_source_plan"]] == [
-        "https://docs.example.com/reference",
-        "https://github.com/openai/example",
-        "https://search.example.net/result",
-    ]
-
-
-def test_verification_answer_contract():
-    answer = render_primary_source_verification_answer(
-        {"telegram_source_refs": ["https://t.me/example/1"], "candidate_source_urls": ["https://github.com/openai/example"]}
-    )
-
-    for label in (
-        "Telegram-сигнал:",
-        "Первоисточник:",
-        "Независимое подтверждение:",
-        "Изменившиеся факты:",
-        "Неизвестно:",
-        "Пересмотренная рекомендация:",
-    ):
-        assert label in answer
-
-
-def test_network_boundaries_reject_private_ip_and_http():
-    result = build_primary_source_verification_plan(
-        {"candidate_source_urls": ["http://docs.example.com/insecure", "https://127.0.0.1/private", {"url": "https://docs.example.com/safe", "official_relation": True}]}
-    )
-
-    assert result["primary_source_plan"] == [{"source_url": "https://docs.example.com/safe", "evidence_class": "official_or_github"}]
-
-
-def test_official_relation_required():
-    result = build_primary_source_verification_plan(
-        {"candidate_source_urls": ["https://www.example.com/announcement", {"url": "https://vendor.example.com/news", "official_relation": True}]}
-    )
-
-    classes = {item["source_url"]: item["evidence_class"] for item in result["primary_source_plan"]}
-    assert classes["https://vendor.example.com/news"] == "official_or_github"
-    assert classes["https://www.example.com/announcement"] == "other"
-
-
-def test_lookalike_github_and_docs_hosts_are_not_official():
-    result = build_primary_source_verification_plan(
-        {"candidate_source_urls": ["https://notgithub.com/openai", "https://docs-evil.example/guide"]}
-    )
-
-    assert all(item["evidence_class"] == "other" for item in result["primary_source_plan"])
+    assert result["fetch_results"] == []
