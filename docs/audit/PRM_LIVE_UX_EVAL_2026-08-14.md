@@ -32,3 +32,9 @@ reviewer assignment was `unverified`; it found and the implementation fixed
 the egress approval, usage-write suppression, retry/call budget, receipt
 privacy/path, and staticmethod restoration findings. This run is manual
 evaluation evidence only; it is not dogfood or a release claim.
+
+Follow-up `8b564b2` keeps verification-required answers deterministic and adds
+the existing bounded professional contract to approved synthesis: sanitized
+short answer, up to four claim/citation pairs, one recommended action, and up
+to three uncertainty items. Field caps are enforced in focused tests; no raw
+DTO, internal path, ID, or telemetry field is sent.

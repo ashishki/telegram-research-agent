@@ -724,6 +724,27 @@ class TestHandlers(unittest.TestCase):
         synthesis.assert_not_called()
         self.assertIn("Требуется отдельная внешняя проверка", rendered)
 
+    def test_telegram_synthesis_context_bounds_and_redacts_professional_contract(self):
+        payload = _fake_research_payload()
+        payload["professional_answer"] = {
+            "short_answer": "/srv/private " + "a" * 500,
+            "key_findings": [{"claim": "model_calls=9\n" + "b" * 400, "citation": "/srv/secret\n" + "c" * 300}],
+            "recommended_action": "post_id=1\n" + "d" * 400,
+            "uncertainty": ["/srv/private\n" + "e" * 300],
+        }
+
+        context = handlers._telegram_rag_synthesis_context(payload, mode="research")
+        contract = context["professional_contract"]
+
+        self.assertLessEqual(len(contract["short_answer"]), 420)
+        self.assertLessEqual(len(contract["findings"][0]["claim"]), 300)
+        self.assertLessEqual(len(contract["findings"][0]["citation"]), 240)
+        self.assertLessEqual(len(contract["recommended_action"]), 320)
+        self.assertLessEqual(len(contract["uncertainty"][0]), 220)
+        self.assertNotIn("/srv/", str(contract))
+        self.assertNotIn("model_calls", str(contract))
+        self.assertNotIn("post_id", str(contract))
+
     def test_telegram_professional_answer_renders_workflow_section(self):
         payload = _fake_research_payload()
         payload["professional_answer"] = {
