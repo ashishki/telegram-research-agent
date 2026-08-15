@@ -1,5 +1,28 @@
 # Evidence Index
 
+## PRM-QA Evidence - 2026-08-15
+
+| Evidence | Path / Value |
+| --- | --- |
+| Repo baseline | `516fc7206f99b58e6d276585c3dba6d87a39392f` |
+| Playbook baseline | `965612aa463fca1a35a55104633d0e09da33d615` |
+| Dataset manifest | `evals/prm_qa/prm_qa_dataset_manifest.v1.json` |
+| All-case eval report | `evals/prm_qa/prm_qa_eval_report.v1.json` |
+| Holdout eval report | `evals/prm_qa/prm_qa_holdout_report.v1.json` |
+| Retrieval ADR | `docs/adr/ADR-005-prm-qa-selected-retrieval-policy.md` |
+| Product contract | `docs/prm_qa_product_contract.md` |
+| Acceptance plan | `docs/prm_qa_acceptance_plan.md` |
+| Private cases | `data/evals/private/prm_qa/cases.v1.jsonl`, gitignored |
+| Private traces | `data/evals/private/prm_qa/failed_cases/`, gitignored |
+
+Privacy boundary: public artifacts contain aggregate counts, fingerprints,
+metrics, and status only. They do not contain raw Telegram bodies, private
+queries, source URLs, snippets, chat IDs, prompts, completions, or provider
+payloads.
+
+Automated evidence boundary: generated/silver labels and synthetic task-success
+proxy are regression evidence only; they do not prove real operator usefulness.
+
 ## PRM-MAT planning baseline (2026-08-13)
 
 - Target planning baseline: `c282056210c09781cbe45fe00ac2b0008bc35043`; requested `d27158a…` is an ancestor.

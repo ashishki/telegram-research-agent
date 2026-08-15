@@ -36,3 +36,25 @@ and recovery evaluation. It does not justify T3 runtime.
 - result evidence status;
 - latency/cost per retrieval and generation stage;
 - privacy review for prompt/context/log handling.
+# PRM-QA Agent Eval Update - 2026-08-15
+
+The active agent-quality eval is layered, not a single judge score:
+
+1. routing;
+2. retrieval;
+3. evidence quality;
+4. claim grounding;
+5. presentation proxy;
+6. task-success proxy.
+
+Latest all-case routing metrics: route accuracy 1.0000, workflow accuracy
+1.0000, ambiguous-project clarification 1.0000, current-fact boundary 1.0000,
+unsafe chat rate 0.0000.
+
+Latest holdout routing metrics: route accuracy 1.0000, workflow accuracy
+1.0000, ambiguous-project clarification 1.0000, current-fact boundary 1.0000,
+unsafe chat rate 0.0000.
+
+Synthetic task-success proxy is regression evidence only. Real operator value
+requires future usefulness feedback, saves, watches, actions, experiments,
+decision changes, time saved, and repeated use.

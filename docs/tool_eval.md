@@ -297,3 +297,16 @@ skill, HTTP request, cache write, provider call, or durable note is performed.
 - raw corpus text in ordinary logs;
 - external skill reads secrets without trust approval;
 - no-answer query produces unsupported claim.
+# PRM-QA Tool Eval Update - 2026-08-15
+
+Tool surfaces added or extended:
+
+- `tools/prm_qa_generate_private_eval.py`: read-only private dataset generator.
+- `tools/prm_qa_eval.py`: layered routing/retrieval/evidence/grounding/
+  presentation/task-success-proxy eval and ablation harness.
+- `src/assistant/primary_source_verification.py`: gated primary-source fetch
+  adapter with HTTPS, DNS/IP safety, redirect, timeout, size, content-type, hash,
+  and cache controls. Live fetch is still disabled unless explicitly approved.
+
+No tool writes raw private questions, raw Telegram bodies, source snippets, chat
+IDs, prompts, completions, or provider payloads to committed artifacts.

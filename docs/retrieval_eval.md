@@ -435,3 +435,21 @@ seed gold cases: no_answer_accuracy=1.0,
 external_verification_boundary_accuracy=1.0, current_claim_rejection=1.0,
 answerable_source_label_accuracy=1.0, vector_backend_required_rate=0.0, and
 embeddings_run_rate=0.0.
+# PRM-QA Retrieval Eval Update - 2026-08-15
+
+PRM-QA adds `tools/prm_qa_generate_private_eval.py` and
+`tools/prm_qa_eval.py` for private archive-derived retrieval regression. Public
+aggregate reports are:
+
+- `evals/prm_qa/prm_qa_dataset_manifest.v1.json`
+- `evals/prm_qa/prm_qa_eval_report.v1.json`
+- `evals/prm_qa/prm_qa_holdout_report.v1.json`
+
+Selected policy: SQLite FTS with deterministic fallback and bounded query
+rewrites; local hash-vector search remains fallback-only on FTS miss. Always-on
+hash-vector fusion and reranking are retained as eval adapters because they
+did not improve holdout recall/nDCG and had materially worse p95 latency.
+
+Dense retrieval was not adopted; no local dense runtime was installed and no
+holdout gain was measured. See
+`docs/adr/ADR-005-prm-qa-selected-retrieval-policy.md`.

@@ -1,5 +1,27 @@
 # Decision Log
 
+## D-PRM-QA-2026-08-15 — Select FTS/query-rewrite retrieval and demote always-on hash-vector fusion
+
+Decision: default PRM runtime retrieval uses SQLite FTS with deterministic OR
+fallback, bounded generic query rewrites, and local hash-vector search only when
+FTS misses. Always-on hash-vector fusion and the candidate-pool reranker remain
+eval adapters. True dense retrieval is not adopted.
+
+Rationale: PRM-QA all-case and holdout ablations showed no recall/nDCG gain from
+always-on hash-vector fusion, while MRR and p95 latency regressed materially.
+Dense runtime was unavailable locally, so there was no measured dense holdout
+gain.
+
+Evidence:
+
+- `evals/prm_qa/prm_qa_eval_report.v1.json`
+- `evals/prm_qa/prm_qa_holdout_report.v1.json`
+- `docs/adr/ADR-005-prm-qa-selected-retrieval-policy.md`
+
+Boundary: this decision does not approve external embeddings, hosted vector
+services, live web research, production migrations, PRM-19 dogfood, or release
+claims.
+
 ## D-PRM-MAT-2026-08-13 — Plan an integrated maturity queue without claiming completion
 
 Decision: preserve PRM-UX historical implementation evidence and create proposed PRM-MAT successor tasks for the missing shared request lifecycle, durability, receipts, freshness, verification, evaluation and operations. Rationale: repository inspection found several deterministic components that are not one reader-facing or durable live path. Consequence: no configuration, database, service, provider, fetch, dogfood, release or compatibility-cleanup authority is granted.

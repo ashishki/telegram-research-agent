@@ -1,5 +1,37 @@
 # Codex Session Handoff
 
+## PRM-QA Implementation Update (2026-08-15)
+
+Repository baseline inspected before PRM-QA implementation:
+`516fc7206f99b58e6d276585c3dba6d87a39392f` on `master`.
+AI Workflow Playbook baseline inspected:
+`965612aa463fca1a35a55104633d0e09da33d615` on `master`.
+
+PRM-QA added the active evaluation-led quality queue, private generated
+archive-derived regression dataset, layered eval harness, retrieval ablation,
+intent retrieval policy, evidence-quality contract, claim ledger, project
+clarification/decision memo UX, job-specific Telegram answer renderers,
+metadata-only usefulness feedback/private traces, and gated primary-source
+verification fetcher.
+
+Public PRM-QA evidence:
+
+- `evals/prm_qa/prm_qa_dataset_manifest.v1.json`
+- `evals/prm_qa/prm_qa_eval_report.v1.json`
+- `evals/prm_qa/prm_qa_holdout_report.v1.json`
+- `docs/adr/ADR-005-prm-qa-selected-retrieval-policy.md`
+
+Selected runtime retrieval policy is FTS plus deterministic OR fallback and
+bounded query rewrites, with local hash-vector search fallback-only on FTS miss.
+Always-on hash-vector fusion and reranker remain eval adapters because they did
+not improve holdout quality and materially worsened latency. True dense
+retrieval was not adopted because no local dense runtime was installed and no
+holdout gain was measured.
+
+Do not claim user value, PRM-19 dogfood, release readiness, external embeddings,
+hosted vector adoption, automatic live verification, or independent human gold
+labels from PRM-QA. The generated 160-case dataset is regression evidence only.
+
 ## PRM-MAT Planning Update (2026-08-13)
 
 `docs/prm_mature_product_roadmap.md` and `docs/tasks.md` define the proposed PRM-MAT successor queue. It does not approve configuration/schema writes, live fetch/provider changes, schedules, dogfood, release claims, or compatibility cleanup. Treat PRM-UX implementation labels as foundation evidence; consult `docs/prm_mature_product_gap_audit.md` for verified integration maturity.

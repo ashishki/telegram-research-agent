@@ -175,3 +175,23 @@ python3 tools/test_tiers.py focused-prm
 python3 tools/test_tiers.py fast-contract
 131 passed, 6 subtests passed in 33.79s
 ```
+# PRM-QA Generation/Grounding Eval Update - 2026-08-15
+
+PRM-QA separates answer presentation from grounding. The previous live UX judge
+remains a presentation/boundary proxy because it does not inspect exact
+supporting snippets. New grounding regression uses:
+
+- `src/assistant/evidence_quality.py` for evidence dimensions and source groups;
+- `src/assistant/claim_ledger.py` for claim-level citation and support checks;
+- `tools/prm_qa_eval.py` for aggregate claim metrics.
+
+Latest aggregate claim metrics:
+
+- all cases: supported claim rate 0.9894, unsupported claim rate 0.0106,
+  citation completeness 0.9894, citation precision 1.0000, current-fact
+  violations 0, technical leaks 0.
+- holdout: supported claim rate 0.9900, unsupported claim rate 0.0100,
+  citation completeness 0.9900, citation precision 1.0000, current-fact
+  violations 0, technical leaks 0.
+
+These are deterministic regression signals, not proof of real product value.

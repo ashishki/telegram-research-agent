@@ -20,6 +20,8 @@ currently running as a manual operator test environment.
 
 - `docs/operator_quickstart.md` for daily use;
 - `docs/operator_workflow.md` for supporting operational context;
+- `docs/prm_qa_product_contract.md` and `docs/prm_qa_acceptance_plan.md` for
+  the active evaluation-led quality contract;
 - `docs/prm_mature_product_roadmap.md` for the proposed private-product completion plan;
 - `docs/runbooks/` for runtime, archive-refresh, and development boundaries;
 - `docs/legacy_surfaces.md` for compatibility-only history.
@@ -40,6 +42,8 @@ As of 2026-08-15:
 - legacy weekly-report automation remains frozen;
 - operator production tests are optional and operator-controlled;
 - release readiness is not claimed.
+- PRM-QA automated private regression exists over 160 generated local-corpus
+  cases with separate development/tuning/holdout partitions.
 
 ### Product status for design discussion
 
@@ -56,36 +60,36 @@ a shared starting point for product/design work, not as a release claim.
 | Persistent memory | Confirmed post-answer proposals have a privacy-safe durable lifecycle. | No automatic conversion of chat/questions into memory; confirmation is required. |
 | Freshness | A bounded weekly archive-refresh timer keeps the local archive current. | No reactions, media, vision, provider egress, or report generation in that timer. |
 | Evaluation | A repeatable 100-case synthetic live UX harness runs the actual routing, retrieval, renderer, and bounded judge without sending Telegram messages. | It is synthetic/LLM-judged, not independent human-label evidence. |
+| PRM-QA regression | A private generated 160-case dataset evaluates routing, retrieval ablations, evidence quality, claim grounding, presentation proxy, and task-success proxy. | Generated/silver labels are regression evidence only; real operator usefulness still requires future usage labels. |
 
 #### Confirmed product gaps
 
-- Project-decision answers are the weakest evaluated user path. The calibrated
-  baseline was 5/25 with an average 2.16/5. A deterministic renderer experiment
-  regressed to 0/25 and was reverted; the current path is the previously safer
-  source-first synthesis with fallback. This needs a new design, not a metric-only
-  tweak.
+- Project-decision ambiguity is now fail-closed: “мой проект” requests ask which
+  project to use, and explicitly named project requests render a bounded
+  decision memo. This is automated regression evidence, not proof that future
+  operator decisions are useful.
 - Research and editor briefs need further answer-level evaluation for clarity,
   source entailment, and useful next actions. A synthetic judge can identify
   regressions, but cannot replace human review.
 - Multi-turn memory is intentionally volatile in the Telegram session. Curated
   memory relevance, deduplication, and explicit user-controlled save/review UX
   remain product work.
-- Current facts require a separately approved external verification capability;
-  the product currently refuses rather than browsing.
+- Current facts still fail closed by default. A bounded primary-source
+  verification fetcher exists for approved GitHub/docs/vendor/arXiv targets, but
+  live fetch is not automatic and requires explicit approval.
 - No public release, dogfood programme, automatic memory capture, or PRM-19
   evidence exists. Do not represent the system as production-validated.
 
 #### Safe next design questions
 
-1. What should a project-decision answer contain when no specific project is
-   named: a clarification, a bounded generic recommendation, or a choice of
-   projects?
+1. Which project-decision memos lead to real useful actions in future operator
+   use, and which still need rephrasing or better evidence?
 2. Which response quality dimensions should receive explicit human labels:
    evidence fidelity, usefulness, clarity, source coverage, or actionability?
 3. What is the smallest user-controlled workflow for saving, merging, and
    revisiting research memory without turning raw chat into durable memory?
-4. When external verification becomes approved, which trusted hosts, fetch
-   limits, retries, redirects, response-size caps, and TTL should apply?
+4. Which trusted primary-source hosts should be approved first for live
+   verification beyond the current gated fetcher?
 
 See `docs/audit/PRM_LIVE_UX_EVAL_2026-08-14.md` for the aggregate evaluation
 history and `docs/audit/PRM_LLM_SYNTHESIS_CITATION_FILTER_2026-08-15.md` for

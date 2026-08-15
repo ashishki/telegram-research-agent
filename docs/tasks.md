@@ -1,10 +1,11 @@
 # Active Task Graph
 
-Status: proposed
-Last updated: 2026-08-13
+Status: active
+Last updated: 2026-08-15
 Playbook baseline SHA: 965612aa463fca1a35a55104633d0e09da33d615
 Historical Playbook pin retained in prior PRM evidence: 5583eca96c4d2d480b5574ed78bea63e0b07ebf0 (stale)
 Target repo inspected for PRM-MAT planning: c282056210c09781cbe45fe00ac2b0008bc35043
+Target repo inspected for PRM-QA implementation: 516fc7206f99b58e6d276585c3dba6d87a39392f
 
 ## Operating Rules
 
@@ -95,7 +96,423 @@ no canonical DB mutation, and no live web research.
 PRM-UX formalizes the required operator-experience and professional
 personalization path before operator production tests; it must not restart legacy
 bot/report timers or claim user value before real operator labels exist.
+PRM-QA is the current active queue for evaluation-led RAG, grounding, and
+operator-experience completion. It does not start PRM-19 dogfood or approve
+PRM-20 compatibility cleanup.
 ```
+
+## PRM-QA Queue - Evaluation-Led RAG And Operator Experience Completion
+
+Common boundaries for all PRM-QA tasks: no production DB content mutation, no
+legacy runtime/timer restart, no provider call unless explicitly gated by the
+existing Telegram/LLM flags, no external embeddings, no hosted vector service,
+no raw private data in committed artifacts, no dogfood start, no release claim.
+Cost budget is zero external provider cost for deterministic eval/build tasks.
+Source of truth is `docs/prm_qa_product_contract.md`,
+`docs/prm_qa_acceptance_plan.md`, `docs/adr/ADR-005-prm-qa-selected-retrieval-policy.md`,
+and the public reports under `evals/prm_qa/`.
+
+### PRM-QA-0: Current Quality Baseline And Task Truth Audit
+
+Owner: codex
+Phase: PRM-QA
+Type: evaluation:baseline
+Status: implemented
+Depends-On: none
+Objective: |
+  Verify current repository, Playbook, product behavior, quality gaps, and delivery policy before implementation.
+Acceptance-Criteria:
+  - id: AC-1; description: baseline repo and Playbook SHAs are recorded; verify: docs/IMPLEMENTATION_JOURNAL.md and docs/EVIDENCE_INDEX.md cite both SHAs.
+  - id: AC-2; description: verified retrieval, grounding, project-decision, usefulness, and observability gaps are recorded; verify: docs/prm_quality_gap_audit.md.
+Verification:
+  - python3 tools/playbook_validate.py --root . --check tasks --check references
+Files:
+  - docs/prm_quality_gap_audit.md
+  - docs/tasks.md
+  - docs/EVIDENCE_INDEX.md
+  - docs/IMPLEMENTATION_JOURNAL.md
+Context-Refs:
+  - docs/CODEX_PROMPT.md
+Cost-Budget: |
+  max_cost_usd: 0; provider_calls: 0
+Notes: |
+  Problem: quality truth was spread across docs, tests, receipts, and code. User impact: overclaim risk. Boundaries/privacy: aggregate docs only. Eval command: documentation validation. Rollback: revert docs. Non-goals: dogfood, release, external verification. Commit: docs(prm-qa): record quality baseline. Push checkpoint: after docs validation.
+
+### PRM-QA-1: Automated Private Question And Label Generator
+
+Owner: codex
+Phase: PRM-QA
+Type: evaluation:data
+Status: implemented
+Depends-On: PRM-QA-0
+Objective: |
+  Generate reproducible private archive-derived questions and deterministic/silver labels without operator-written benchmark questions.
+Acceptance-Criteria:
+  - id: AC-1; description: at least 150 private cases are generated across required categories; verify: evals/prm_qa/prm_qa_dataset_manifest.v1.json records 160 cases.
+  - id: AC-2; description: public manifest contains no queries, source URLs, raw Telegram bodies, snippets, prompts, or completions; test: PYTHONPATH=src python3 -m pytest tests/test_prm_qa_dataset_eval.py -q.
+Verification:
+  - python3 tools/prm_qa_generate_private_eval.py --db data/agent.db --out data/evals/private/prm_qa/cases.v1.jsonl --public-manifest evals/prm_qa/prm_qa_dataset_manifest.v1.json --min-cases 150
+Files:
+  - tools/prm_qa_generate_private_eval.py
+  - schemas/prm_qa_case.schema.json
+  - evals/prm_qa/prm_qa_dataset_manifest.v1.json
+  - .gitignore
+Context-Refs:
+  - docs/prm_automated_eval_dataset.md
+Cost-Budget: |
+  max_cost_usd: 0; provider_calls: 0
+Notes: |
+  Problem: the operator should not manually invent benchmark questions. User impact: repeatable regression coverage. Privacy: private JSONL is gitignored. Eval command: generator command above. Rollback: remove private file/manifest and revert generator. Non-goals: human gold claims. Commit: feat(prm-qa): generate private archive-derived evaluation cases. Push checkpoint: after generator test.
+
+### PRM-QA-2: Layered Routing, Retrieval, Evidence, Generation And Task-Success Eval Harness
+
+Owner: codex
+Phase: PRM-QA
+Type: evaluation:harness
+Status: implemented
+Depends-On: PRM-QA-1
+Objective: |
+  Evaluate routing, retrieval, evidence quality, claim grounding, presentation proxy, and task-success proxy separately.
+Acceptance-Criteria:
+  - id: AC-1; description: all-case and holdout reports are produced and privacy-safe; verify: evals/prm_qa/prm_qa_eval_report.v1.json and evals/prm_qa/prm_qa_holdout_report.v1.json.
+  - id: AC-2; description: reports contain no raw private content; test: PYTHONPATH=src python3 -m pytest tests/test_prm_qa_dataset_eval.py -q.
+Verification:
+  - python3 tools/prm_qa_eval.py --db data/agent.db --cases data/evals/private/prm_qa/cases.v1.jsonl --vector-index data/vector/archive_vector.sqlite --public-report evals/prm_qa/prm_qa_eval_report.v1.json
+Files:
+  - tools/prm_qa_eval.py
+  - evals/prm_qa/prm_qa_eval_report.v1.json
+  - evals/prm_qa/prm_qa_holdout_report.v1.json
+Context-Refs:
+  - docs/prm_qa_acceptance_plan.md
+Cost-Budget: |
+  max_cost_usd: 0; provider_calls: 0
+Notes: |
+  Problem: one judge score hid failures. User impact: diagnosable regressions. Privacy: aggregate metrics only. Eval command: all and holdout PRM-QA reports. Rollback: revert harness/reports. Non-goals: real product-value proof. Commit: feat(prm-rag): add layered evaluation harness. Push checkpoint: after reports pass.
+
+### PRM-QA-3: Intent-Specific Retrieval Policy And Query Planner Refactor
+
+Owner: codex
+Phase: PRM-QA
+Type: retrieval:policy
+Status: implemented
+Depends-On: PRM-QA-2
+Objective: |
+  Add deterministic job-specific retrieval policy, bounded generic rewrites, and safe vector_policy pass-through.
+Acceptance-Criteria:
+  - id: AC-1; description: retrieval policy is recorded in memory research payloads; test: PYTHONPATH=src python3 -m pytest tests/test_retrieval_policy.py -q.
+  - id: AC-2; description: PI facade preserves safe vector_policy behavior; test: PYTHONPATH=src python3 -m pytest tests/test_pi_facade_archive_vector.py -q.
+Verification:
+  - PYTHONPATH=src python3 -m pytest tests/test_retrieval_policy.py tests/test_pi_facade_archive_vector.py -q
+Files:
+  - src/assistant/retrieval_policy.py
+  - src/assistant/memory_research.py
+  - src/assistant/pi_facade.py
+Context-Refs:
+  - docs/prm_retrieval_ablation.md
+Cost-Budget: |
+  max_cost_usd: 0; provider_calls: 0
+Notes: |
+  Problem: implicit vector participation and overfit expansions. User impact: measurable job-specific retrieval. Privacy: policy traces private/internal. Eval: PRM-QA ablation. Rollback: remove pass-through/policy layer. Non-goals: deleting all legacy query variants. Commit: feat(prm-rag): add intent retrieval policy. Push checkpoint: after retrieval tests.
+
+### PRM-QA-4: Retrieval Ablation
+
+Owner: codex
+Phase: PRM-QA
+Type: retrieval:evaluation
+Status: implemented
+Depends-On: PRM-QA-1, PRM-QA-2, PRM-QA-3
+Objective: |
+  Compare R0 FTS, R1 fallback hybrid, R2 always hybrid, R3 rewrite, R4 dense candidate, and R5 reranker.
+Acceptance-Criteria:
+  - id: AC-1; description: R0 through R5 are reported on identical private cases; verify: evals/prm_qa/prm_qa_eval_report.v1.json.
+  - id: AC-2; description: vector sidecar scans are cached safely in process without data mutation; test: PYTHONPATH=src python3 -m pytest tests/test_archive_vector.py -q.
+Verification:
+  - python3 tools/prm_qa_eval.py --db data/agent.db --cases data/evals/private/prm_qa/cases.v1.jsonl --vector-index data/vector/archive_vector.sqlite --public-report evals/prm_qa/prm_qa_eval_report.v1.json
+Files:
+  - tools/prm_qa_eval.py
+  - src/db/archive_vector.py
+  - docs/prm_retrieval_ablation.md
+Context-Refs:
+  - evals/prm_qa/prm_qa_eval_report.v1.json
+Cost-Budget: |
+  max_cost_usd: 0; provider_calls: 0
+Notes: |
+  Problem: vector/reranker value was assumed. User impact: evidence-based default. Privacy: aggregate reports only. Rollback: revert eval adapter/cache. Non-goals: dense adoption without holdout gain. Commit: feat(prm-rag): run retrieval ablation. Push checkpoint: after reports pass.
+
+### PRM-QA-5: Selected Retrieval Policy Integration And Retrieval ADR
+
+Owner: codex
+Phase: PRM-QA
+Type: retrieval:adr
+Status: implemented
+Depends-On: PRM-QA-4
+Objective: |
+  Select and document the measured runtime retrieval policy.
+Acceptance-Criteria:
+  - id: AC-1; description: ADR records selected policy, metrics, and dense non-adoption; verify: docs/adr/ADR-005-prm-qa-selected-retrieval-policy.md.
+  - id: AC-2; description: runtime policy demotes always-on hash vector; test: PYTHONPATH=src python3 -m pytest tests/test_retrieval_policy.py -q.
+Verification:
+  - PYTHONPATH=src python3 -m pytest tests/test_retrieval_policy.py -q
+Files:
+  - docs/adr/ADR-005-prm-qa-selected-retrieval-policy.md
+  - src/assistant/retrieval_policy.py
+Context-Refs:
+  - evals/prm_qa/prm_qa_holdout_report.v1.json
+Cost-Budget: |
+  max_cost_usd: 0; provider_calls: 0
+Notes: |
+  Problem: always-on hash-vector fusion had no measured benefit. User impact: lower latency. Privacy: none. Eval: holdout report. Rollback: restore old policy. Non-goals: hosted vector DB. Commit: feat(prm-rag): integrate selected retrieval policy. Push checkpoint: after ADR/tests.
+
+### PRM-QA-6: Evidence Quality Model, Source Independence And Claim Ledger
+
+Owner: codex
+Phase: PRM-QA
+Type: grounding:model
+Status: implemented
+Depends-On: PRM-QA-2
+Objective: |
+  Separate evidence relevance from evidence quality, source independence, and claim support.
+Acceptance-Criteria:
+  - id: AC-1; description: evidence-quality contract fields exist; test: PYTHONPATH=src python3 -m pytest tests/test_evidence_quality.py -q.
+  - id: AC-2; description: claim ledger and metrics exist; test: PYTHONPATH=src python3 -m pytest tests/test_claim_ledger.py -q.
+Verification:
+  - PYTHONPATH=src python3 -m pytest tests/test_evidence_quality.py tests/test_claim_ledger.py -q
+Files:
+  - src/assistant/evidence_quality.py
+  - src/assistant/claim_ledger.py
+  - docs/prm_evidence_quality_contract.md
+  - docs/prm_claim_ledger_contract.md
+Context-Refs:
+  - evals/prm_qa/prm_qa_eval_report.v1.json
+Cost-Budget: |
+  max_cost_usd: 0; provider_calls: 0
+Notes: |
+  Problem: source count could be mistaken for independence. User impact: weak evidence is visible. Privacy: claim IDs internal/private. Eval: claim/evidence sections in PRM-QA reports. Rollback: remove additive payload fields. Non-goals: LLM entailment as proof. Commit: feat(prm-grounding): add evidence quality and claim ledger. Push checkpoint: after tests/eval.
+
+### PRM-QA-7: Claim-Level Grounding Evaluation And Synthesis Redesign
+
+Owner: codex
+Phase: PRM-QA
+Type: grounding:evaluation
+Status: implemented
+Depends-On: PRM-QA-6
+Objective: |
+  Add claim-level citation/freshness checks and keep unsupported/current claims fail-closed.
+Acceptance-Criteria:
+  - id: AC-1; description: current-fact violations and technical leaks are zero in reports; verify: evals/prm_qa/prm_qa_eval_report.v1.json.
+  - id: AC-2; description: citation precision is deterministic and bounded; test: PYTHONPATH=src python3 -m pytest tests/test_claim_ledger.py -q.
+Verification:
+  - python3 tools/prm_qa_eval.py --db data/agent.db --cases data/evals/private/prm_qa/cases.v1.jsonl --vector-index data/vector/archive_vector.sqlite --public-report evals/prm_qa/prm_qa_eval_report.v1.json
+Files:
+  - src/assistant/claim_ledger.py
+  - tools/prm_qa_eval.py
+  - docs/generation_eval.md
+Context-Refs:
+  - docs/prm_claim_ledger_contract.md
+Cost-Budget: |
+  max_cost_usd: 0; provider_calls: 0
+Notes: |
+  Problem: whole-answer grounding was overloaded. User impact: claim-level failure isolation. Privacy: no private judge prose public. Rollback: fallback to answer gate. Non-goals: claiming independent proof from LLM verifier. Commit: feat(prm-grounding): add claim-level verification. Push checkpoint: after grounding eval.
+
+### PRM-QA-8: Project-Decision Clarification, Project Snapshot And Decision Memo
+
+Owner: codex
+Phase: PRM-QA
+Type: ux:project-decision
+Status: implemented
+Depends-On: PRM-QA-3, PRM-QA-6
+Objective: |
+  Clarify unnamed project decisions and render named-project decision memos.
+Acceptance-Criteria:
+  - id: AC-1; description: ambiguous project questions clarify before recommendation; test: PYTHONPATH=src python3 -m pytest tests/test_handlers.py -q.
+  - id: AC-2; description: PRM-QA routing reports ambiguous_project_clarification 1.0000; verify: evals/prm_qa/prm_qa_eval_report.v1.json.
+Verification:
+  - PYTHONPATH=src python3 -m pytest tests/test_handlers.py -q
+Files:
+  - src/bot/handlers.py
+  - docs/prm_project_decision_contract.md
+Context-Refs:
+  - src/config/projects.yaml
+Cost-Budget: |
+  max_cost_usd: 0; provider_calls: 0
+Notes: |
+  Problem: “мой проект” routed to generic research. User impact: wrong-project action risk. Privacy: no project inference from Telegram posts alone. Eval: PRM-QA routing/project cases. Rollback: remove project clarify mode. Non-goals: automatic project mutation. Commit: feat(prm-ux): redesign project decision workflow. Push checkpoint: after handler tests.
+
+### PRM-QA-9: Job-Specific Telegram Answer Contracts
+
+Owner: codex
+Phase: PRM-QA
+Type: ux:telegram
+Status: implemented
+Depends-On: PRM-QA-3, PRM-QA-8
+Objective: |
+  Add job-specific Telegram answer contracts for find, explain, compare, project decision, editor brief, learning, and current-fact paths.
+Acceptance-Criteria:
+  - id: AC-1; description: renderers expose distinct headings and hide technical internals; test: PYTHONPATH=src python3 -m pytest tests/test_handlers.py -q.
+  - id: AC-2; description: presentation proxy reports technical_leaks 0; verify: evals/prm_qa/prm_qa_eval_report.v1.json.
+Verification:
+  - PYTHONPATH=src python3 -m pytest tests/test_handlers.py -q
+Files:
+  - src/bot/handlers.py
+  - docs/operator_workflow.md
+Context-Refs:
+  - docs/prm_qa_product_contract.md
+Cost-Budget: |
+  max_cost_usd: 0; provider_calls: 0
+Notes: |
+  Problem: generic template did not fit jobs. User impact: mobile-readable answers. Privacy: no local paths/DB IDs/cost/model telemetry in normal output. Eval: presentation proxy. Rollback: professional DTO fallback. Non-goals: marketing UI. Commit: feat(prm-ux): add job-specific Telegram answers. Push checkpoint: after handler tests.
+
+### PRM-QA-10: Automatic Interaction Receipts, Usefulness Feedback And Private Debug Traces
+
+Owner: codex
+Phase: PRM-QA
+Type: feedback:receipts
+Status: implemented
+Depends-On: PRM-QA-2, PRM-QA-6
+Objective: |
+  Add usefulness feedback buttons, reason capture, metadata-only private receipts, and failed-case traces.
+Acceptance-Criteria:
+  - id: AC-1; description: feedback prompts for reasons and does not auto-write memory; test: PYTHONPATH=src python3 -m pytest tests/test_prm_post_answer_actions.py -q.
+  - id: AC-2; description: private traces remain gitignored and public reports contain no raw content; verify: git status --short --ignored data/evals/private/prm_qa.
+Verification:
+  - PYTHONPATH=src python3 -m pytest tests/test_prm_post_answer_actions.py tests/test_prm19_dogfood_receipts.py -q
+Files:
+  - src/assistant/prm_post_answer_actions.py
+  - src/assistant/prm_private_traces.py
+  - src/db/prm19_dogfood_receipts.py
+Context-Refs:
+  - docs/prm_user_task_success.md
+Cost-Budget: |
+  max_cost_usd: 0; provider_calls: 0
+Notes: |
+  Problem: failures were hard to debug and usefulness under-instrumented. User impact: lightweight feedback. Privacy: traces gitignored. Eval: failed-case traces from PRM-QA eval. Rollback: restore old buttons. Non-goals: automatic durable memory write. Commit: feat(prm-feedback): add task-success interaction loop. Push checkpoint: after feedback tests.
+
+### PRM-QA-11: Targeted Primary-Source Verification Vertical Slice
+
+Owner: codex
+Phase: PRM-QA
+Type: verification:primary-source
+Status: implemented
+Depends-On: PRM-QA-7
+Objective: |
+  Add a gated primary-source verification fetcher for GitHub, official docs/vendor announcements, and arXiv metadata.
+Acceptance-Criteria:
+  - id: AC-1; description: fetch requires approval and fake transport tests cover cache/classification; test: PYTHONPATH=src python3 -m pytest tests/test_primary_source_verification.py -q.
+  - id: AC-2; description: current-fact safety remains fail-closed; verify: evals/prm_qa/prm_qa_eval_report.v1.json current_fact_violations=0.
+Verification:
+  - PYTHONPATH=src python3 -m pytest tests/test_primary_source_verification.py -q
+Files:
+  - src/assistant/primary_source_verification.py
+  - docs/prm_primary_source_verification.md
+Context-Refs:
+  - docs/tool_eval.md
+Cost-Budget: |
+  max_cost_usd: 0 by default; live_fetch: disabled unless explicitly approved
+Notes: |
+  Problem: current facts could only be refused. User impact: bounded approved verification path. Privacy: cache gitignored. Eval: current-fact violations 0. Rollback: plan-only verifier. Non-goals: general autonomous browsing. Commit: feat(prm-verify): add bounded primary source verification. Push checkpoint: after verifier tests.
+
+### PRM-QA-12: Saved Knowledge, Reaction Recall And Usage-Derived Recap Integration
+
+Owner: codex
+Phase: PRM-QA
+Type: feedback:recap
+Status: implemented
+Depends-On: PRM-QA-1, PRM-QA-10
+Objective: |
+  Include reaction/saved-memory recall cases and aggregate private receipts into a safe usage recap.
+Acceptance-Criteria:
+  - id: AC-1; description: reacted and saved-memory categories exist in dataset manifest; verify: evals/prm_qa/prm_qa_dataset_manifest.v1.json.
+  - id: AC-2; description: usage recap is aggregate-only; test: PYTHONPATH=src python3 -m pytest tests/test_prm_qa_usage_recap.py -q.
+Verification:
+  - python3 tools/prm_qa_usage_recap.py --private-dir data/evals/private/prm_qa/interactions --public-summary evals/prm_qa/prm_qa_usage_recap_summary.v1.json
+Files:
+  - tools/prm_qa_generate_private_eval.py
+  - tools/prm_qa_usage_recap.py
+  - evals/prm_qa/prm_qa_usage_recap_summary.v1.json
+Context-Refs:
+  - docs/prm_user_task_success.md
+Cost-Budget: |
+  max_cost_usd: 0; provider_calls: 0
+Notes: |
+  Problem: reaction/saved recall and recap were not first-class. User impact: future usefulness summaries measurable. Privacy: public summary aggregate only. Eval: PRM-QA report plus usage recap. Rollback: remove recap tool/report. Non-goals: legacy weekly report restart. Commit: feat(prm-feedback): add usage recap aggregation. Push checkpoint: after recap test.
+
+### PRM-QA-13: Private Holdout Evaluation And Regression Gate
+
+Owner: codex
+Phase: PRM-QA
+Type: evaluation:holdout
+Status: implemented
+Depends-On: PRM-QA-1, PRM-QA-2, PRM-QA-3, PRM-QA-4, PRM-QA-5, PRM-QA-6, PRM-QA-7, PRM-QA-8, PRM-QA-9, PRM-QA-10, PRM-QA-11, PRM-QA-12
+Objective: |
+  Keep development/tuning/holdout partitions separate and record untouched holdout metrics.
+Acceptance-Criteria:
+  - id: AC-1; description: holdout report has 34 cases and status pass; verify: evals/prm_qa/prm_qa_holdout_report.v1.json.
+  - id: AC-2; description: holdout cases remain private; verify: .gitignore and public report privacy flags.
+Verification:
+  - python3 tools/prm_qa_eval.py --db data/agent.db --cases data/evals/private/prm_qa/cases.v1.jsonl --vector-index data/vector/archive_vector.sqlite --public-report evals/prm_qa/prm_qa_holdout_report.v1.json --partition holdout
+Files:
+  - evals/prm_qa/prm_qa_holdout_report.v1.json
+  - tools/prm_qa_eval.py
+Context-Refs:
+  - docs/prm_automated_eval_dataset.md
+Cost-Budget: |
+  max_cost_usd: 0; provider_calls: 0
+Notes: |
+  Problem: tuning/holdout contamination risk. User impact: safer regression decisions. Privacy: holdout cases private. Rollback: regenerate with same seed. Non-goals: tuning on holdout. Commit: test(prm-qa): add private holdout regression gate. Push checkpoint: after holdout pass.
+
+### PRM-QA-14: Documentation, Runbooks, CI And Operator Quickstart Update
+
+Owner: codex
+Phase: PRM-QA
+Type: docs:operator
+Status: implemented
+Depends-On: PRM-QA-0, PRM-QA-1, PRM-QA-2, PRM-QA-3, PRM-QA-4, PRM-QA-5, PRM-QA-6, PRM-QA-7, PRM-QA-8, PRM-QA-9, PRM-QA-10, PRM-QA-11, PRM-QA-12, PRM-QA-13
+Objective: |
+  Update canonical docs, runbooks, README, handoff, evidence, journal, and decision log with actual PRM-QA behavior.
+Acceptance-Criteria:
+  - id: AC-1; description: required PRM-QA docs exist and cite reports/honesty boundary; verify: docs/prm_qa_acceptance_plan.md and docs/EVIDENCE_INDEX.md.
+  - id: AC-2; description: Playbook tasks/references validation passes; verify: python3 tools/playbook_validate.py --root . --check tasks --check references.
+Verification:
+  - python3 tools/playbook_validate.py --root . --check tasks --check references
+Files:
+  - README.md
+  - docs/CODEX_PROMPT.md
+  - docs/EVIDENCE_INDEX.md
+  - docs/IMPLEMENTATION_JOURNAL.md
+  - docs/DECISION_LOG.md
+  - docs/prm_qa_acceptance_plan.md
+Context-Refs:
+  - docs/prm_qa_product_contract.md
+Cost-Budget: |
+  max_cost_usd: 0; provider_calls: 0
+Notes: |
+  Problem: docs lagged implementation truth. User impact: clear handoff. Privacy: no private content. Eval: docs validation. Rollback: revert docs. Non-goals: duplicate giant roadmap. Commit: docs(prm): record evaluation-led product state. Push checkpoint: after validation.
+
+### PRM-QA-15: Final Focused Acceptance, Commit/Push Completion And Handoff
+
+Owner: codex
+Phase: PRM-QA
+Type: delivery:acceptance
+Status: implemented
+Depends-On: PRM-QA-0, PRM-QA-1, PRM-QA-2, PRM-QA-3, PRM-QA-4, PRM-QA-5, PRM-QA-6, PRM-QA-7, PRM-QA-8, PRM-QA-9, PRM-QA-10, PRM-QA-11, PRM-QA-12, PRM-QA-13, PRM-QA-14
+Objective: |
+  Run focused acceptance checks, commit bounded changes, push according to repository policy, and provide final handoff.
+Acceptance-Criteria:
+  - id: AC-1; description: focused PRM tier, MAT safety, Playbook validation, PRM-QA reports, and diff check pass; verify: final response lists commands and results.
+  - id: AC-2; description: private artifacts are not staged or pushed; verify: git status --short and staged file inspection.
+Verification:
+  - python3 tools/test_tiers.py focused-prm
+  - python3 tools/prm_mat_eval.py --check safety
+  - python3 tools/playbook_validate.py --root . --check tasks --check references
+  - git diff --check
+Files:
+  - git history
+Context-Refs:
+  - docs/REVIEW_POLICY.md
+Cost-Budget: |
+  max_cost_usd: 0 for verification; provider_calls: 0
+Notes: |
+  Problem: implementation must finish with green evidence and remote handoff. User impact: recoverable delivery state. Privacy: inspect staged files and exclude private data. Eval: PRM-QA all/holdout reports. Rollback: follow-up commits only after push. Non-goals: force push, merge, dogfood/release claim. Commit: bounded PRM-QA commits. Push checkpoint: current branch if policy permits.
 
 ## PBR Queue - Playbook Retrofit
 
