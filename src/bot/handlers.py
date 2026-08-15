@@ -1448,10 +1448,6 @@ def _render_telegram_research_response(payload: Mapping[str, Any], *, local_text
         return _render_telegram_answer_first_research(payload)
     if professional_verification_required:
         return _render_telegram_professional_answer(professional_answer)
-    if _is_project_decision_request(str(payload.get("question") or "")):
-        if professional_answer.get("schema_version") == "professional_answer.v1":
-            return _render_telegram_professional_answer(professional_answer)
-        return _render_telegram_answer_first_research(payload)
     if _telegram_rag_llm_synthesis_allowed() and _telegram_rag_source_count(payload) > 0:
         try:
             return _synthesize_telegram_rag_answer(payload, mode=mode)
