@@ -51,6 +51,21 @@ python3 tools/playbook_validate.py --root . --check tasks --check references
 playbook_validate: errors=0 warnings=0
 ```
 
+CI follow-up: remote run `31899242121` exposed an environment-dependent local
+path redaction regression in `memory ask`. The renderer now strips
+repo-anchored absolute paths from any checkout root and falls back to basename
+for other absolute local files. Follow-up verification:
+
+```text
+PYTHONPATH=src python3 -m pytest tests/test_local_memory_ask.py -q
+4 passed in 1.75s
+```
+
+```text
+python3 tools/test_tiers.py focused-prm
+247 passed in 45.26s
+```
+
 No full pytest suite was run. No production database contents, provider call,
 live Telegram job, live fetch, external embedding, hosted vector service,
 dogfood start, release claim, or compatibility cleanup was performed.

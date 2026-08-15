@@ -324,6 +324,14 @@ def _display_ref(value: object) -> str:
     root_text = str(Path(__file__).resolve().parents[2])
     if text.startswith(root_text + "/"):
         return text[len(root_text) + 1 :]
+    if text.startswith("/"):
+        parts = Path(text).parts
+        if "telegram-research-agent" in parts:
+            index = parts.index("telegram-research-agent")
+            relative_parts = parts[index + 1 :]
+            if relative_parts:
+                return "/".join(relative_parts)
+        return Path(text).name
     return text
 
 

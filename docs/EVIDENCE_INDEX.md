@@ -14,6 +14,7 @@
 | Acceptance plan | `docs/prm_qa_acceptance_plan.md` |
 | Private cases | `data/evals/private/prm_qa/cases.v1.jsonl`, gitignored |
 | Private traces | `data/evals/private/prm_qa/failed_cases/`, gitignored |
+| CI follow-up | remote run `31899242121` failed on `memory ask` local path redaction; fixed and reverified with `tests/test_local_memory_ask.py` and `tools/test_tiers.py focused-prm` |
 
 Privacy boundary: public artifacts contain aggregate counts, fingerprints,
 metrics, and status only. They do not contain raw Telegram bodies, private
