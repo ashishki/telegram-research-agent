@@ -26,7 +26,7 @@ currently running as a manual operator test environment.
 
 ## Current State
 
-As of 2026-08-12:
+As of 2026-08-15:
 
 - local archive RAG is implemented over SQLite FTS plus an approved local SQLite
   vector sidecar;
@@ -40,6 +40,56 @@ As of 2026-08-12:
 - legacy weekly-report automation remains frozen;
 - operator production tests are optional and operator-controlled;
 - release readiness is not claimed.
+
+### Product status for design discussion
+
+This is the honest current state of the manual-test product. It is intended as
+a shared starting point for product/design work, not as a release claim.
+
+| Area | What works now | Evidence / limitation |
+| --- | --- | --- |
+| Archive research | Natural-language local archive search, hybrid FTS/local-vector recall, cited Telegram sources, and date-window boundaries. | Local archive only; no live web verification. |
+| Telegram UX | Ordinary messages can route to research or editor brief; `/research`, `/brief`, and `/chat` remain fallbacks. | The manual runtime is active, but it is not dogfood. |
+| Grounding | Current external facts are refused before synthesis; the response says no verification ran and labels archive material as historical context. | A targeted generated regression set passed 25/25 current-fact cases, average calibrated score 4.04/5. |
+| LLM synthesis | Optional, explicitly egress-gated synthesis receives bounded snippets only. A strict `PASS` filter rejects unsupported output and falls back safely. | It is best-effort quality filtering, not an independent citation-security guarantee. |
+| Editor briefs | Source-backed editorial briefs are available through ordinary-message routing and `/brief`. | Brief quality still needs broader user evaluation. |
+| Persistent memory | Confirmed post-answer proposals have a privacy-safe durable lifecycle. | No automatic conversion of chat/questions into memory; confirmation is required. |
+| Freshness | A bounded weekly archive-refresh timer keeps the local archive current. | No reactions, media, vision, provider egress, or report generation in that timer. |
+| Evaluation | A repeatable 100-case synthetic live UX harness runs the actual routing, retrieval, renderer, and bounded judge without sending Telegram messages. | It is synthetic/LLM-judged, not independent human-label evidence. |
+
+#### Confirmed product gaps
+
+- Project-decision answers are the weakest evaluated user path. The calibrated
+  baseline was 5/25 with an average 2.16/5. A deterministic renderer experiment
+  regressed to 0/25 and was reverted; the current path is the previously safer
+  source-first synthesis with fallback. This needs a new design, not a metric-only
+  tweak.
+- Research and editor briefs need further answer-level evaluation for clarity,
+  source entailment, and useful next actions. A synthetic judge can identify
+  regressions, but cannot replace human review.
+- Multi-turn memory is intentionally volatile in the Telegram session. Curated
+  memory relevance, deduplication, and explicit user-controlled save/review UX
+  remain product work.
+- Current facts require a separately approved external verification capability;
+  the product currently refuses rather than browsing.
+- No public release, dogfood programme, automatic memory capture, or PRM-19
+  evidence exists. Do not represent the system as production-validated.
+
+#### Safe next design questions
+
+1. What should a project-decision answer contain when no specific project is
+   named: a clarification, a bounded generic recommendation, or a choice of
+   projects?
+2. Which response quality dimensions should receive explicit human labels:
+   evidence fidelity, usefulness, clarity, source coverage, or actionability?
+3. What is the smallest user-controlled workflow for saving, merging, and
+   revisiting research memory without turning raw chat into durable memory?
+4. When external verification becomes approved, which trusted hosts, fetch
+   limits, retries, redirects, response-size caps, and TTL should apply?
+
+See `docs/audit/PRM_LIVE_UX_EVAL_2026-08-14.md` for the aggregate evaluation
+history and `docs/audit/PRM_LLM_SYNTHESIS_CITATION_FILTER_2026-08-15.md` for
+the bounded synthesis/filter contract.
 
 Current local archive snapshot on the active host:
 
