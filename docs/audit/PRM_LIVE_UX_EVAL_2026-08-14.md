@@ -61,3 +61,11 @@ only rather than a universal pass/fail gate. The corrected rubric passed
 focused tests and required read-only re-review; effective reviewer assignment:
 `unverified`. No raw questions, answers, sources, chat IDs, or judge prose are
 stored in this document.
+
+After the deterministic current-fact renderer was changed to lead with an
+unambiguous refusal, state that external verification was not run, and label
+archive material historical, a targeted regenerated 25-case current-fact run
+completed 25/25 with an average calibrated judge score of 4.04/5. It used 50
+bounded provider calls, sent no Telegram messages, made no durable writes, and
+stored only gitignored aggregate receipts. This is a scoped regression result,
+not a release claim or dogfood evidence.
