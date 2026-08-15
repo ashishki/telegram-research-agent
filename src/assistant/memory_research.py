@@ -14,6 +14,8 @@ from assistant.linked_sources import (
     LinkedSourceFetcher,
     resolve_linked_sources,
 )
+from assistant.claim_ledger import build_claim_ledger_from_payload, claim_ledger_public_summary
+from assistant.evidence_quality import build_evidence_quality_items, evidence_quality_summary
 from assistant.pi_facade import PersonalIntelligenceFacade
 from assistant.pi_memory import build_memory_proposal, query_saved_knowledge
 from assistant.professional_workflows import (
@@ -26,6 +28,7 @@ from assistant.professional_workflows import (
 )
 from assistant.professional_personalization import infer_professional_lens, rerank_for_professional_lens
 from assistant.rag_context_pack import build_rag_context_pack, render_rag_context_pack
+from assistant.retrieval_policy import build_query_rewrites, select_retrieval_policy
 from config.settings import Settings
 
 
@@ -524,6 +527,32 @@ def answer_memory_research(
         },
         workflow=primary_workflow,
     )
+    selected_evidence_items = [
+        *[item for item in archive_evidence.get("items") or [] if isinstance(item, Mapping)],
+        *[item for item in linked_evidence.get("items") or [] if isinstance(item, Mapping)],
+    ]
+    evidence_quality_items = build_evidence_quality_items(
+        selected_evidence_items,
+        question=clean_question,
+        project_name=str(project_fit.get("project_name") or ""),
+    )
+    evidence_quality = {
+        "schema_version": "prm_evidence_quality_bundle.v1",
+        "items": evidence_quality_items,
+        "summary": evidence_quality_summary(evidence_quality_items),
+    }
+    claim_ledger = build_claim_ledger_from_payload(
+        {
+            "direct_answer": direct_answer,
+            "professional_answer": professional_answer,
+            "answer_gate": answer_gate,
+            "project_name": project_fit.get("project_name") or "",
+        },
+        evidence_quality_items,
+    )
+    receipt["retrieval_policy"] = _mapping(archive_result.get("retrieval_policy"))
+    receipt["evidence_quality_summary"] = evidence_quality["summary"]
+    receipt["claim_grounding"] = claim_ledger_public_summary(claim_ledger)
     return {
         "schema_version": MEMORY_RESEARCH_SCHEMA_VERSION,
         "status": receipt["status"],
@@ -538,6 +567,9 @@ def answer_memory_research(
         "project_fit": project_fit,
         "repo_project_context": repo_project_context,
         "context_pack": context_pack,
+        "retrieval_policy": _mapping(archive_result.get("retrieval_policy")),
+        "evidence_quality": evidence_quality,
+        "claim_ledger": claim_ledger,
         "answer_gate": answer_gate,
         "next_steps": next_steps,
         "deeper_reading_path": deeper_reading,
@@ -1415,11 +1447,23 @@ def _call_archive_search(
     if time_window.requested and time_window.strict:
         filters["date_from"] = time_window.date_from
         filters["date_to"] = time_window.date_to
+    retrieval_policy = select_retrieval_policy(
+        query,
+        project_name=str(project_name or ""),
+        requested_mode="research",
+    )
     if budget.allow_vector_retrieval:
         filters["retrieval_mode"] = "hybrid"
+        filters["vector_policy"] = retrieval_policy.vector_policy
         if budget.vector_index_path:
             filters["vector_index_path"] = budget.vector_index_path
-    query_variants = _archive_query_variants(query, project_name=project_name, max_variants=_MAX_ARCHIVE_QUERY_VARIANTS)
+    legacy_variants = _archive_query_variants(query, project_name=project_name, max_variants=_MAX_ARCHIVE_QUERY_VARIANTS)
+    policy_variants = build_query_rewrites(
+        query,
+        job_type=retrieval_policy.job_type,
+        max_variants=_MAX_ARCHIVE_QUERY_VARIANTS,
+    )
+    query_variants = _unique([*policy_variants, *legacy_variants])[:_MAX_ARCHIVE_QUERY_VARIANTS]
     logged_filters = {key: value for key, value in filters.items() if key != "vector_index_path"}
     if "vector_index_path" in filters:
         logged_filters["vector_index_path_configured"] = True
@@ -1431,6 +1475,7 @@ def _call_archive_search(
                 "query_variants": query_variants,
                 "filters": logged_filters,
                 "project_name_hint": project_name,
+                "retrieval_policy": retrieval_policy.to_dict(),
                 "limit": limit,
                 "time_window": time_window.to_dict(),
             },
@@ -1494,6 +1539,7 @@ def _call_archive_search(
         "query_variants": query_variants,
         "attempted_queries": attempts,
         "filters": logged_filters,
+        "retrieval_policy": retrieval_policy.to_dict(),
         "time_window": time_window.to_dict(),
         "project_name_hint": project_name,
         "items": items[:limit],

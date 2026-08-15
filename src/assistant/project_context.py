@@ -106,8 +106,9 @@ def load_project_descriptors(path: str | Path) -> list[dict[str, Any]]:
             continue
         # The live resolver consumes the approved Portfolio V2 policy before
         # adapting it to the established project-context shape.
-        portfolio = validate_project_portfolio_context(item)
-        normalized.append({**_normalize_project_descriptor(item), **portfolio})
+        descriptor = _normalize_project_descriptor(item)
+        portfolio = validate_project_portfolio_context(descriptor)
+        normalized.append({**descriptor, **portfolio})
     return normalized
 
 
@@ -296,10 +297,14 @@ def _normalize_project_descriptor(raw: Mapping[str, Any]) -> dict[str, Any]:
         "status": _clean_text(raw.get("status")) or "active",
         "priority": int(raw.get("priority") or 1),
         "current_goal": _clean_text(raw.get("current_goal")) or "legacy project context",
-        "current_blocker": _clean_text(raw.get("current_blocker")),
+        "current_blocker": _clean_text(raw.get("current_blocker")) or "none",
         "next_proof": _clean_text(raw.get("next_proof")) or "direct cited evidence",
-        "preferred_signal_types": _string_values(raw.get("preferred_signal_types")),
+        "preferred_signal_types": _string_values(raw.get("preferred_signal_types")) or ["archive_evidence"],
         "owner_confirmation_status": _clean_text(raw.get("owner_confirmation_status")) or "confirmed",
+        "capabilities": _string_values(raw.get("capabilities")) or _string_values(raw.get("keywords")) or ["project_context"],
+        "aliases": _string_values(raw.get("aliases")) or [value for value in (name, _clean_text(raw.get("repo"))) if value],
+        "reviewed_metadata": _clean_text(raw.get("reviewed_metadata")) or "legacy_default",
+        "source_metadata": _clean_text(raw.get("source_metadata")) or "local_project_descriptors",
     }
 
 

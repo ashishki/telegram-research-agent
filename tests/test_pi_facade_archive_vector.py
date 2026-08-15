@@ -106,6 +106,41 @@ class TestPiFacadeArchiveVector(unittest.TestCase):
         self.assertEqual(result["items"][0]["retrieval_mode"], "hybrid_fts_only")
         self.assertIn("FTS-first hybrid", result["message"])
 
+    def test_hybrid_archive_search_accepts_always_on_vector_policy(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            db_path = root / "agent.db"
+            index_path = root / "archive-vector.sqlite"
+            _seed_archive_db(db_path)
+            connection = sqlite3.connect(db_path)
+            connection.row_factory = sqlite3.Row
+            try:
+                build_archive_vector_index(connection, index_path=index_path)
+            finally:
+                connection.close()
+            facade = PersonalIntelligenceFacade(
+                settings=Settings(
+                    db_path=str(db_path),
+                    llm_api_key="",
+                    model_provider="",
+                    telegram_session_path="",
+                ),
+                output_root=root,
+            )
+
+            result = facade.search_telegram_archive(
+                "AI transformation ROI",
+                filters={
+                    "retrieval_mode": "hybrid",
+                    "vector_index_path": str(index_path),
+                    "vector_policy": "always",
+                },
+                limit=3,
+            )
+
+        self.assertEqual(result["items"][0]["retrieval_mode"], "hybrid_fts_vector")
+        self.assertEqual(result["filters"]["vector_policy"], "always")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -804,6 +804,7 @@ class PersonalIntelligenceFacade:
                         vector_index_path=_archive_vector_index_path(clean_filters),
                         filters=archive_filters,
                         limit=max(1, min(20, int(limit or 10))),
+                        vector_policy=_archive_vector_policy(clean_filters),
                     )
                 else:
                     results = search_telegram_archive(
@@ -2811,6 +2812,11 @@ def _archive_vector_index_path(filters: Mapping[str, object]) -> Path:
     if not path.is_absolute():
         path = PROJECT_ROOT / path
     return path.resolve()
+
+
+def _archive_vector_policy(filters: Mapping[str, object]) -> str:
+    value = str(filters.get("vector_policy") or "").strip()
+    return value if value in {"fallback_on_fts_miss", "always"} else "fallback_on_fts_miss"
 
 
 def _archive_public_filters(filters: Mapping[str, object]) -> dict[str, object]:
