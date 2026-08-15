@@ -372,9 +372,10 @@ def _deterministic_auto_route(text: str, *, previous_question: str = "", previou
 
 def _is_project_decision_request(text: str) -> bool:
     lowered = _clean_operator_text(text).casefold()
-    project_markers = ("моего проекта", "моему проекту", "для проекта", "project")
-    decision_markers = ("практические выводы", "что мне делать", "какие выводы", "решени", "следующий шаг")
-    return any(marker in lowered for marker in project_markers) and any(marker in lowered for marker in decision_markers)
+    project_markers = ("моего проекта", "моему проекту", "для проекта", "с проектом")
+    decision_markers = ("практические выводы", "что мне делать", "что делать", "какие выводы", "решени", "следующий шаг")
+    has_project = any(marker in lowered for marker in project_markers) or bool(re.search(r"\bproject\b", lowered))
+    return has_project and any(marker in lowered for marker in decision_markers)
 
 
 def _needs_auto_clarification(text: str, *, previous_question: str, previous_mode: str) -> bool:
@@ -1447,6 +1448,10 @@ def _render_telegram_research_response(payload: Mapping[str, Any], *, local_text
         return _render_telegram_answer_first_research(payload)
     if professional_verification_required:
         return _render_telegram_professional_answer(professional_answer)
+    if _is_project_decision_request(str(payload.get("question") or "")):
+        if professional_answer.get("schema_version") == "professional_answer.v1":
+            return _render_telegram_professional_answer(professional_answer)
+        return _render_telegram_answer_first_research(payload)
     if _telegram_rag_llm_synthesis_allowed() and _telegram_rag_source_count(payload) > 0:
         try:
             return _synthesize_telegram_rag_answer(payload, mode=mode)

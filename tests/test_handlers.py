@@ -709,6 +709,41 @@ class TestHandlers(unittest.TestCase):
         self.assertEqual(rendered, "Полированный ответ")
         synthesis.assert_called_once_with(payload, mode="research")
 
+    def test_telegram_project_decision_uses_grounded_professional_renderer_before_synthesis(self):
+        payload = _fake_research_payload("Какие практические выводы для моего проекта можно сделать из материалов про AI adoption?")
+        payload["professional_answer"] = {
+            "schema_version": "professional_answer.v1", "answer_status": "supported", "short_answer": "Нужен один проверяемый шаг.",
+            "key_findings": [{"claim": "Есть локальный сигнал.", "citation": "https://t.me/ai_channel/101"}],
+            "project_context": {}, "recommended_action": "Проверить один кейс.", "uncertainty": ["Проект не назван."],
+            "external_verification": {"required": False},
+        }
+
+        with patch.dict(os.environ, {"PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS": "1", "PRM_TELEGRAM_RAG_LLM_SYNTHESIS": "1"}, clear=False):
+            with patch.object(handlers, "_synthesize_telegram_rag_answer") as synthesis:
+                rendered = handlers._render_telegram_research_response(payload, local_text="ignored", mode="research")
+
+        synthesis.assert_not_called()
+        self.assertIn("Нужен один проверяемый шаг.", rendered)
+        self.assertIn("Проверить один кейс.", rendered)
+
+    def test_project_decision_detector_is_bounded_and_covers_russian_project_phrase(self):
+        self.assertFalse(handlers._is_project_decision_request("Projected ROI: что мне делать?"))
+        self.assertTrue(handlers._is_project_decision_request("Что делать с проектом Atlas после этих материалов?"))
+
+    def test_telegram_project_decision_without_dto_falls_back_without_synthesis(self):
+        payload = _fake_research_payload("Какие практические выводы для моего проекта можно сделать?")
+        with patch.dict(os.environ, {"PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS": "1", "PRM_TELEGRAM_RAG_LLM_SYNTHESIS": "1"}, clear=False):
+            with patch.object(handlers, "_synthesize_telegram_rag_answer") as synthesis:
+                rendered = handlers._render_telegram_research_response(payload, local_text="ignored", mode="research")
+        synthesis.assert_not_called()
+        self.assertIn("Короткий вывод", rendered)
+
+    def test_current_fact_refusal_precedes_project_decision_renderer(self):
+        payload = _fake_research_payload("Какие практические выводы для моего проекта можно сделать сейчас?")
+        payload["answer_gate"] = {"external_verification_required": True, "current_claim_allowed": False}
+        rendered = handlers._render_telegram_research_response(payload, local_text="ignored", mode="research")
+        self.assertTrue(rendered.startswith("Я не могу подтвердить текущий факт"))
+
     def test_telegram_synthesis_falls_back_when_russian_answer_is_wrong_language(self):
         payload = _fake_research_payload("что в архиве было про evals?")
         payload["professional_answer"] = {"schema_version": "professional_answer.v1", "short_answer": "Безопасный fallback"}
