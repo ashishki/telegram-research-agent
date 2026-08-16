@@ -28,7 +28,6 @@ PRM_ACTIVE_TESTS = (
     "tests/test_reaction_fast_lane.py",
     "tests/test_prm_post_answer_actions.py",
     "tests/test_prm_qa_dataset_eval.py",
-    "tests/test_prm_live_ux_eval.py",
     "tests/test_callbacks.py",
     "tests/test_prm_application.py",
     "tests/test_prm_bot_dispatch.py",
@@ -37,6 +36,7 @@ PRM_ACTIVE_TESTS = (
 )
 
 LEGACY_COMPAT_TESTS = (
+    "tests/test_prm_live_ux_eval.py",
     "tests/test_weekly_brief_v3.py",
     "tests/test_knowledge_library.py",
     "tests/test_prm_release_gate.py",
@@ -103,7 +103,7 @@ TEST_TIERS = {
     ),
     "legacy-compat": TestTier(
         "legacy-compat",
-        "Explicit report-era compatibility tests; not part of normal PRM work.",
+        "Explicit report-era and superseded evaluator compatibility tests.",
         (TierCommand((*PYTEST, *LEGACY_COMPAT_TESTS, "-q"), env=(("PYTHONPATH", "src"),)),),
     ),
     "fast-contract": TestTier(

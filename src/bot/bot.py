@@ -88,8 +88,17 @@ def _is_authorized_callback(callback_query: dict[str, Any], owner_chat_id: str) 
     return owner_chat_id in {from_id, chat_id}
 
 
-def _dispatch_bot_command(chat_id: str, text: str, settings: Settings, *, runtime_mode: str) -> None:
-    if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
+def dispatch_command(
+    chat_id: str,
+    text: str,
+    settings: Settings,
+    *,
+    runtime_mode: str = BOT_RUNTIME_LEGACY,
+) -> None:
+    """Stable patch point and explicit compatibility dispatcher."""
+
+    mode = normalize_bot_runtime_mode(runtime_mode)
+    if mode == BOT_RUNTIME_PRM_ASSISTANT:
         dispatch_prm_command(chat_id, text, settings)
         return
     legacy = import_module("bot.legacy_handlers")
@@ -112,8 +121,14 @@ def _voice_received_message(runtime_mode: str) -> str:
 
 def _voice_unavailable_message(runtime_mode: str) -> str:
     if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
-        return "Голосовое распознавание не настроено: отправь обычное текстовое сообщение."
-    return "Голосовое распознавание не настроено: отправь сообщение текстом."
+        return (
+            "Голосовое распознавание недоступно: OPENAI_API_KEY не настроен. "
+            "Отправь обычное текстовое сообщение."
+        )
+    return (
+        "Голосовое распознавание недоступно: OPENAI_API_KEY не настроен. "
+        "Отправь сообщение текстом или используй /feedback <фидбек>."
+    )
 
 
 def _voice_failed_message(runtime_mode: str) -> str:
@@ -134,11 +149,13 @@ def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_LEGACY) -> No
     offset: int | None = None
     LOGGER.info("Telegram polling started owner_chat_id=%s runtime_mode=%s", owner_chat_id, runtime_mode)
 
-    while not state.stop_requested:
+    while True:
         try:
-            updates = _telegram_get_updates(token, offset)
+            updates = _telegram_get_updates(token=token, offset=offset)
         except Exception:
             LOGGER.warning("Telegram getUpdates failed", exc_info=True)
+            if state.stop_requested:
+                break
             continue
 
         for update in updates:
@@ -155,12 +172,19 @@ def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_LEGACY) -> No
             text = str(message.get("text") or "").strip()
             if text:
                 command = text if text.startswith("/") else _operator_text_command(text, runtime_mode=runtime_mode)
-                _dispatch_bot_command(chat_id, command, settings, runtime_mode=runtime_mode)
+                if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
+                    dispatch_command(chat_id=chat_id, text=command, settings=settings, runtime_mode=runtime_mode)
+                else:
+                    dispatch_command(chat_id=chat_id, text=command, settings=settings)
                 continue
 
             transcript = _embedded_voice_transcript(message)
             if transcript:
-                _dispatch_bot_command(chat_id, _voice_text_command(transcript, runtime_mode=runtime_mode), settings, runtime_mode=runtime_mode)
+                command = _voice_text_command(transcript, runtime_mode=runtime_mode)
+                if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
+                    dispatch_command(chat_id=chat_id, text=command, settings=settings, runtime_mode=runtime_mode)
+                else:
+                    dispatch_command(chat_id=chat_id, text=command, settings=settings)
                 continue
             if not message.get("voice"):
                 continue
@@ -178,7 +202,14 @@ def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_LEGACY) -> No
                 LOGGER.warning("Voice transcription failed chat_id=%s", chat_id, exc_info=True)
                 send_message(token, chat_id, _voice_failed_message(runtime_mode))
                 continue
-            _dispatch_bot_command(chat_id, _voice_text_command(transcript, runtime_mode=runtime_mode), settings, runtime_mode=runtime_mode)
+            command = _voice_text_command(transcript, runtime_mode=runtime_mode)
+            if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
+                dispatch_command(chat_id=chat_id, text=command, settings=settings, runtime_mode=runtime_mode)
+            else:
+                dispatch_command(chat_id=chat_id, text=command, settings=settings)
+
+        if state.stop_requested:
+            break
 
     LOGGER.info("Telegram polling stopped runtime_mode=%s", runtime_mode)
 
@@ -194,13 +225,13 @@ def _handle_callback(callback: dict[str, Any], *, token: str, owner_chat_id: str
     try:
         if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
             if not data.startswith(("prma:", "prmc:")):
-                answer = "Legacy callbacks are disabled in PRM mode."
+                answer = "PRM safe mode: legacy callbacks are disabled."
             else:
                 chat_id = str((((callback.get("message") or {}).get("chat") or {}).get("id") or owner_chat_id))
                 result = handle_prm_post_answer_callback(settings, data, chat_id=chat_id)
                 message = str(result.get("message") or "")
                 if message:
-                    send_message(token, chat_id, message, reply_markup=result.get("reply_markup"))
+                    send_message(token, chat_id, message, parse_mode=None, reply_markup=result.get("reply_markup"))
         else:
             answer = record_callback(settings, data)
     except Exception:
