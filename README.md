@@ -26,6 +26,8 @@ Telegram text or voice
 ## Current maturity
 
 Manual private-alpha. Engineering regression evidence exists; operator usefulness still requires a controlled 15-20 question smoke session and later longitudinal use. No public release or production-value claim is made.
+Operator production tests are optional and operator-controlled. Release readiness is not claimed.
+PRM-19 dogfood gates are tracked in `docs/prm19_dogfood_plan.md`.
 
 ## Daily use
 
@@ -78,7 +80,3 @@ The complete historical pytest suite is intentionally not part of the normal loo
 - [Privacy threat model](docs/PRIVACY_THREAT_MODEL.md)
 - [Repository retrofit plan](docs/retrofit/RFX_REPOSITORY_RETROFIT.md)
 - [Legacy and compatibility surfaces](docs/legacy_surfaces.md)
-
-## Privacy
-
-The canonical archive stays in local SQLite. Raw Telegram bodies, private eval questions, vector sidecars and generated outputs are gitignored. Provider-backed synthesis receives bounded cited snippets only when explicitly enabled.
