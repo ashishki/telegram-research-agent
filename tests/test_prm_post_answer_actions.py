@@ -152,3 +152,26 @@ def test_partial_feedback_prompts_for_reason_and_updates_private_receipt(monkeyp
         assert "Не те источники" in {button["text"] for button in buttons}
         assert reason["status"] == "recorded"
         assert reason["write_performed"] is False
+
+
+def test_private_receipt_write_failure_does_not_drop_answer(monkeypatch):
+    def fail_receipt(*args, **kwargs):
+        raise PermissionError("private trace directory is not writable")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        db_path = os.path.join(tmp, "memory.db")
+        monkeypatch.setenv("AGENT_DB_PATH", db_path)
+        monkeypatch.setattr("assistant.prm_post_answer_actions.write_private_interaction_receipt", fail_receipt)
+        run_migrations()
+
+        result = build_post_answer_actions(_answer(), db_path=db_path, chat_id="42")
+
+        assert result["context_id"]
+        assert result["reply_markup"]
+        with sqlite3.connect(db_path) as connection:
+            status = connection.execute(
+                "SELECT receipt_status FROM prm_post_answer_proposals WHERE context_id = ?",
+                (result["context_id"],),
+            ).fetchone()[0]
+
+        assert status == "failed"

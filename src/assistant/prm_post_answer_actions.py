@@ -170,7 +170,7 @@ def _register_context(answer: Mapping[str, Any], *, db_path: str | Path | None, 
             answer=_receipt_metadata(answer),
         )
         write_private_interaction_receipt(answer, interaction_id=context_id)
-    except (sqlite3.Error, ValueError):
+    except (sqlite3.Error, ValueError, OSError):
         _mark_receipt_status(db_path, context_id, "failed")
     else:
         _mark_receipt_status(db_path, context_id, "recorded")
