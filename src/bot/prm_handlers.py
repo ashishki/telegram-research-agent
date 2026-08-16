@@ -57,7 +57,7 @@ def dispatch_prm_command(chat_id: str, text: str, settings: Settings) -> None:
 def _delegate_safe_ops(command: str, chat_id: str, args: str, settings: Settings) -> None:
     from bot import legacy_handlers
 
-    handler_name = {"/status": "handle_status", "/refresh": "handle_prm_refresh", "/reactions": "handle_reactions"}[command]
+    handler_name = {"/status": "handle_status", "/refresh": "handle_refresh", "/reactions": "handle_reactions"}[command]
     handler = getattr(legacy_handlers, handler_name, None)
     if handler is None:
         send_message(_token(), chat_id, "Операционная команда пока недоступна в текущей сборке.")

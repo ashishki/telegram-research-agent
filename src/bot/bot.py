@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from importlib import import_module
 import json
 import logging
 import os
@@ -91,9 +92,8 @@ def _dispatch_bot_command(chat_id: str, text: str, settings: Settings, *, runtim
     if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
         dispatch_prm_command(chat_id, text, settings)
         return
-    from .legacy_handlers import dispatch_command
-
-    dispatch_command(chat_id=chat_id, text=text, settings=settings, runtime_mode=BOT_RUNTIME_LEGACY)
+    legacy = import_module("bot.legacy_handlers")
+    legacy.dispatch_command(chat_id=chat_id, text=text, settings=settings, runtime_mode=BOT_RUNTIME_LEGACY)
 
 
 def _operator_text_command(text: str, *, runtime_mode: str) -> str:
