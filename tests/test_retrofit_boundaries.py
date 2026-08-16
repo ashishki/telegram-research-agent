@@ -27,3 +27,9 @@ def test_focused_tier_excludes_report_era():
     active = text.split("LEGACY_COMPAT_TESTS", 1)[0]
     for name in ("test_weekly_brief_v3.py", "test_knowledge_library.py", "test_prm_release_gate.py"):
         assert name not in active
+
+
+def test_eval_v2_uses_application_boundary():
+    text = (ROOT / "tools" / "prm_qa_eval_v2.py").read_text(encoding="utf-8")
+    assert "from prm.application import PersonalResearchAssistant" in text
+    assert "from bot.handlers import _run_prm_auto_message_once" not in text
