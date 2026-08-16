@@ -6,40 +6,26 @@ import re
 from dataclasses import asdict, dataclass
 from typing import Mapping
 
+from assistant.archive_relevance import canonical_query_variants
 
 RETRIEVAL_POLICY_SCHEMA_VERSION = "prm_retrieval_policy.v1"
 
 _TOKEN_RE = re.compile(r"[A-Za-zА-Яа-яЁё0-9][A-Za-zА-Яа-яЁё0-9_+-]{2,}")
 _STOPWORDS = {
-    "что",
-    "как",
-    "где",
-    "когда",
-    "какие",
-    "какой",
-    "какая",
-    "можно",
-    "нужно",
-    "мне",
-    "мой",
-    "моего",
-    "моему",
-    "про",
-    "для",
-    "после",
-    "этих",
-    "материалов",
-    "найди",
-    "сделать",
-    "from",
-    "with",
-    "what",
-    "which",
-    "about",
-    "after",
-    "find",
-    "project",
+    "что", "как", "где", "когда", "какие", "какой", "какая", "можно", "нужно", "мне", "мой",
+    "моего", "моему", "моем", "моём", "про", "для", "после", "этих", "материалов", "найди",
+    "сделать", "архиве", "архива", "есть", "было", "этого", "реально", "применимо", "сейчас",
+    "from", "with", "what", "which", "about", "after", "find", "project", "archive", "materials",
+    "now", "current", "apply", "applicable",
 }
+_ARCHIVE_SCOPE_MARKERS = (
+    "в архиве", "мой архив", "моем архиве", "моём архиве", "из архива", "что у меня было",
+    "my archive", "in my archive", "telegram archive", "saved materials",
+)
+_EXPLICIT_EXTERNAL_MARKERS = (
+    "в интернете", "внешний", "официальный источник", "проверь актуальность", "live web",
+    "external source", "official source", "verify online",
+)
 
 
 @dataclass(frozen=True)
@@ -112,18 +98,23 @@ def select_retrieval_policy(
     if clean_job == "current_fact":
         return _policy(clean_job, "archive_context_then_verification_boundary", "fallback_on_fts_miss", 8, True, False, True)
     if clean_job in {"writer_editor", "learning_experiment", "semantic_topic"}:
-        return _policy(clean_job, "bounded_query_rewrite", "fallback_on_fts_miss", 12, True, False, False)
+        return _policy(clean_job, "phrase_preserving_bounded_rewrite", "fallback_on_fts_miss", 12, True, False, False)
     if clean_job in {"no_answer", "distractor_hard_negative"}:
         return _policy(clean_job, "strict_fts_then_fail_closed", "fallback_on_fts_miss", 8, True, False, False)
     return _policy("semantic_topic", "fts_dense_fusion", "always", 12, True, False, False)
 
 
 def build_query_rewrites(question: str, *, job_type: str = "semantic_topic", max_variants: int = 4) -> list[str]:
-    """Create bounded generic rewrites without hand-authored domain dictionaries."""
+    """Create bounded rewrites while preserving mixed-language technical phrases."""
 
     original = _single_line(question)
     if not original:
         return []
+    clean_limit = max(1, min(int(max_variants or 4), 6))
+    aliases = canonical_query_variants(original, max_variants=clean_limit)
+    if aliases and aliases[0] == "agent evals":
+        return _unique([aliases[0], *aliases[1:], original])[:clean_limit]
+
     tokens = _keywords(original)
     variants = [original]
     if tokens:
@@ -137,7 +128,7 @@ def build_query_rewrites(question: str, *, job_type: str = "semantic_topic", max
         variants.append(" ".join([*tokens[:6], "изменилось", "динамика"]).strip())
     if job_type == "case_study":
         variants.append(" ".join([*tokens[:6], "case", "пример", "практика"]).strip())
-    return _unique([variant for variant in variants if variant])[: max(1, min(int(max_variants or 4), 6))]
+    return _unique([variant for variant in variants if variant])[:clean_limit]
 
 
 def _policy(
@@ -180,14 +171,20 @@ def _single_line(value: object) -> str:
 
 def _unique(values: list[str]) -> list[str]:
     result: list[str] = []
+    seen: set[str] = set()
     for value in values:
         clean = _single_line(value)
-        if clean and clean not in result:
+        key = clean.casefold()
+        if clean and key not in seen:
+            seen.add(key)
             result.append(clean)
     return result
 
 
 def _has_current_fact_marker(lowered: str) -> bool:
+    archive_scoped = any(marker in lowered for marker in _ARCHIVE_SCOPE_MARKERS)
+    if archive_scoped and not any(marker in lowered for marker in _EXPLICIT_EXTERNAL_MARKERS):
+        return False
     return any(marker in lowered for marker in ("сейчас", "сегодня", "актуаль", "latest", "current", "now", "today"))
 
 
@@ -213,7 +210,7 @@ def _has_project_decision_marker(lowered: str) -> bool:
 
 
 def _has_decision_marker(lowered: str) -> bool:
-    decision_markers = ("что делать", "примен", "вывод", "реш", "recommend", "next action", "action")
+    decision_markers = ("что делать", "примен", "вывод", "реш", "recommend", "next action", "action", "backlog", "бэклог")
     return any(marker in lowered for marker in decision_markers)
 
 
