@@ -26,6 +26,7 @@ from prm.contracts import OperatorRequest  # noqa: E402
 DEFAULT_DB_PATH = PROJECT_ROOT / "data" / "agent.db"
 DEFAULT_CASES = PROJECT_ROOT / "data" / "evals" / "private" / "prm_qa" / "cases.v2.jsonl"
 DEFAULT_PUBLIC_REPORT = PROJECT_ROOT / "evals" / "prm_qa" / "prm_qa_eval_report.v2.json"
+_ARCHIVE_FORBIDDEN = ("\nРешение\n", "\nГлавный риск\n", "\nКритерий успеха\n", "backlog")
 
 
 def main() -> int:
@@ -88,6 +89,7 @@ def evaluate_cases(cases: Sequence[Mapping[str, Any]], *, settings: Settings, li
     routing_rows = [item["routing"] for item in observations]
     retrieval_rows = [item["retrieval"] for item in observations]
     verification_rows = [item["final_answer_verification"] for item in observations]
+    presentation_rows = [item["presentation"] for item in observations]
     failures = [failure for item in observations for failure in item["failures"]]
     return {
         "schema_version": "prm_qa_eval_report.v2",
@@ -100,6 +102,7 @@ def evaluate_cases(cases: Sequence[Mapping[str, Any]], *, settings: Settings, li
         "routing": _routing_summary(routing_rows),
         "retrieval": _retrieval_summary(retrieval_rows),
         "retrieval_by_job_type": _retrieval_by_job_type(retrieval_rows),
+        "presentation": _presentation_summary(presentation_rows),
         "final_answer_verification": _verification_summary(verification_rows),
         "task_success": _task_success_summary(observations),
         "failure_counts": dict(sorted(Counter(failures).items())),
@@ -109,6 +112,8 @@ def evaluate_cases(cases: Sequence[Mapping[str, Any]], *, settings: Settings, li
                 "job_type": item["job_type"],
                 "actual_route": item["routing"]["actual_route"],
                 "expected_route": item["routing"]["expected_route"],
+                "actual_intent": item["routing"]["actual_intent"],
+                "expected_intent": item["routing"]["expected_intent"],
                 "runtime_status": item["runtime_status"],
                 "failure_count": len(item["failures"]),
             }
@@ -118,11 +123,12 @@ def evaluate_cases(cases: Sequence[Mapping[str, Any]], *, settings: Settings, li
             "public_report_contains_queries": False,
             "public_report_contains_raw_telegram_body": False,
             "public_report_contains_source_urls": False,
+            "public_report_contains_private_candidate_ids": False,
             "telegram_messages_sent": False,
             "durable_writes_requested": False,
             "provider_egress": bool(live),
         },
-        "honesty_boundary": "Eval V2 is automated silver evidence through the active application boundary, not human usefulness proof.",
+        "honesty_boundary": "Eval V2 is automated regression evidence through the active application boundary, not human usefulness proof.",
     }
 
 
@@ -133,29 +139,40 @@ def _observation(case: Mapping[str, Any], runtime: Mapping[str, Any]) -> dict[st
     verification = _mapping(runtime.get("final_answer_verification"))
     metrics = _mapping(verification.get("metrics"))
     retrieval = _score_retrieval(case, payload)
+    answer = str(runtime.get("final_answer") or runtime.get("text") or "")
     actual_route = str(runtime.get("mode") or "")
     expected_route = str(case.get("expected_route") or "")
     expected_workflow = str(case.get("expected_workflow") or "")
     actual_workflow = str(context.get("primary_workflow") or "")
     expected_mode = "project_clarify" if bool(case.get("expected_clarification")) else expected_route
     workflow_correct = not expected_workflow or actual_workflow == expected_workflow or actual_route == "project_clarify"
+    expected_intent = _expected_intent(case)
+    actual_intent = str(route.get("primary_intent") or "unknown")
+    intent_correct = expected_intent in {"", "unknown"} or actual_intent == expected_intent
     routing = {
         "expected_route": expected_mode,
         "actual_route": actual_route,
+        "expected_intent": expected_intent or "unknown",
+        "actual_intent": actual_intent,
         "expected_workflow": expected_workflow,
         "operator_context_workflow": actual_workflow,
         "operator_context_present": bool(context) or actual_route == "project_clarify",
         "router": str(route.get("reason") or "unknown"),
         "workflow_correct": workflow_correct,
-        "correct": actual_route == expected_mode and workflow_correct,
+        "intent_correct": intent_correct,
+        "correct": actual_route == expected_mode and workflow_correct and intent_correct,
     }
+    presentation = _presentation_observation(answer, route=route, payload=payload)
     failures = []
     if not routing["correct"]:
-        failures.append("route_miss")
-    if case.get("expected_external_verification"):
-        gate = _mapping(payload.get("answer_gate"))
-        if not bool(gate.get("external_verification_required")):
-            failures.append("external_verification_boundary_miss")
+        failures.append("route_or_intent_miss")
+    gate = _mapping(payload.get("answer_gate"))
+    expected_external = bool(case.get("expected_external_verification"))
+    actual_external = bool(gate.get("external_verification_required"))
+    if expected_external and not actual_external:
+        failures.append("external_verification_boundary_miss")
+    if not expected_external and actual_external and actual_intent.startswith("archive_"):
+        failures.append("external_verification_false_positive")
     if retrieval.get("positive_expected") and retrieval.get("recall_at_5") == 0.0:
         failures.append("retrieval_miss")
     if int(metrics.get("current_fact_violations") or 0):
@@ -164,12 +181,14 @@ def _observation(case: Mapping[str, Any], runtime: Mapping[str, Any]) -> dict[st
         failures.append("final_answer_grounding_miss")
     if bool(_mapping(payload.get("privacy")).get("durable_writes")):
         failures.append("durable_write")
+    failures.extend(presentation["failures"])
     return {
         "case_id_hash": _hash(str(case.get("case_id") or case.get("query") or "")),
         "job_type": str(case.get("job_type") or "unknown"),
         "runtime_status": str(runtime.get("status") or ""),
         "routing": routing,
         "retrieval": retrieval,
+        "presentation": {key: value for key, value in presentation.items() if key != "failures"},
         "final_answer_verification": {
             "claim_count": int(verification.get("claim_count") or 0),
             "unsupported_claim_rate": float(metrics.get("unsupported_claim_rate") or 0.0),
@@ -196,6 +215,7 @@ def _score_retrieval(case: Mapping[str, Any], payload: Mapping[str, Any]) -> dic
         if str(item.get("post_id") or "") in positives or _source_group_id(item) in groups
     ]
     best = min(ranks or [0])
+    labels = Counter(str(item.get("relevance_label") or "unknown") for item in items)
     return {
         "job_type": str(case.get("job_type") or "unknown"),
         "positive_expected": positive_expected,
@@ -203,16 +223,63 @@ def _score_retrieval(case: Mapping[str, Any], payload: Mapping[str, Any]) -> dic
         "recall_at_5": 1.0 if best and best <= 5 else 0.0 if positive_expected else None,
         "mrr": round(1.0 / best, 4) if best else 0.0 if positive_expected else None,
         "context_precision_at_5": _context_precision(positives, groups, items[:5]) if items else 0.0 if positive_expected else None,
+        "direct_count": labels.get("direct", 0),
+        "partial_count": labels.get("partial", 0),
+        "adjacent_count": labels.get("adjacent", 0),
+        "adjacent_contamination_rate": round(labels.get("adjacent", 0) / len(items), 4) if items else 0.0,
     }
+
+
+def _presentation_observation(answer: str, *, route: Mapping[str, Any], payload: Mapping[str, Any]) -> dict[str, Any]:
+    intent = str(route.get("primary_intent") or "")
+    contract = _mapping(payload.get("archive_contract"))
+    summary = _mapping(contract.get("result_summary"))
+    failures: list[str] = []
+    if not answer.strip():
+        failures.append("empty_answer")
+    if intent.startswith("archive_"):
+        if bool(route.get("project_name")):
+            failures.append("unsupported_project_context")
+        if any(marker.casefold() in answer.casefold() for marker in _ARCHIVE_FORBIDDEN):
+            failures.append("irrelevant_project_template")
+        if int(summary.get("direct_count") or 0) == 0 and answer and "прям" not in answer.casefold():
+            failures.append("no_direct_disclosure_missing")
+        if len(answer) > 3600:
+            failures.append("mobile_length")
+    return {
+        "answer_chars": len(answer),
+        "first_useful_information_position": 0 if answer.strip() else None,
+        "archive_contract_present": bool(contract),
+        "direct_count": int(summary.get("direct_count") or 0),
+        "partial_count": int(summary.get("partial_count") or 0),
+        "adjacent_count": int(summary.get("adjacent_count") or 0),
+        "failures": failures,
+    }
+
+
+def _expected_intent(case: Mapping[str, Any]) -> str:
+    explicit = str(case.get("expected_intent") or "").strip()
+    if explicit:
+        return explicit
+    job = str(case.get("job_type") or "")
+    return {
+        "ambiguous_project": "decision_support",
+        "named_project_decision": "decision_support",
+        "current_fact": "current_fact_verification",
+        "writer_editor": "writer_brief",
+        "exact_known_item": "archive_lookup",
+        "semantic_topic": "archive_synthesis",
+    }.get(job, "")
 
 
 def _routing_summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     total = len(rows)
     return {
         "evaluated_cases": total,
-        "route_accuracy": round(sum(1 for row in rows if row.get("correct")) / total, 4) if total else 0.0,
-        "workflow_accuracy": round(sum(1 for row in rows if row.get("workflow_correct")) / total, 4) if total else 0.0,
-        "operator_context_rate": round(sum(1 for row in rows if row.get("operator_context_present")) / total, 4) if total else 0.0,
+        "route_accuracy": _rate(sum(1 for row in rows if row.get("correct")), total),
+        "intent_accuracy": _rate(sum(1 for row in rows if row.get("intent_correct")), total),
+        "workflow_accuracy": _rate(sum(1 for row in rows if row.get("workflow_correct")), total),
+        "operator_context_rate": _rate(sum(1 for row in rows if row.get("operator_context_present")), total),
         "routers": dict(sorted(Counter(str(row.get("router") or "unknown") for row in rows).items())),
     }
 
@@ -225,6 +292,10 @@ def _retrieval_summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "recall_at_5": _mean(row.get("recall_at_5") for row in positives),
         "mrr": _mean(row.get("mrr") for row in positives),
         "context_precision_at_5": _mean(row.get("context_precision_at_5") for row in positives),
+        "direct_count": sum(int(row.get("direct_count") or 0) for row in rows),
+        "partial_count": sum(int(row.get("partial_count") or 0) for row in rows),
+        "adjacent_count": sum(int(row.get("adjacent_count") or 0) for row in rows),
+        "adjacent_contamination_rate": _mean(row.get("adjacent_contamination_rate") for row in rows),
     }
 
 
@@ -233,6 +304,15 @@ def _retrieval_by_job_type(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     for row in rows:
         grouped[str(row.get("job_type") or "unknown")].append(row)
     return {key: _retrieval_summary(value) for key, value in sorted(grouped.items())}
+
+
+def _presentation_summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    return {
+        "evaluated_cases": len(rows),
+        "direct_answer_rate": _rate(sum(1 for row in rows if row.get("first_useful_information_position") == 0), len(rows)),
+        "answer_chars_mean": round(statistics.mean(int(row.get("answer_chars") or 0) for row in rows), 4) if rows else 0.0,
+        "archive_contract_rate": _rate(sum(1 for row in rows if row.get("archive_contract_present")), len(rows)),
+    }
 
 
 def _verification_summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
@@ -247,7 +327,7 @@ def _verification_summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
 
 def _task_success_summary(observations: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     success = sum(1 for item in observations if not item.get("failures"))
-    return {"success_count": success, "miss_count": len(observations) - success, "success_rate": round(success / len(observations), 4) if observations else 0.0}
+    return {"success_count": success, "miss_count": len(observations) - success, "success_rate": _rate(success, len(observations))}
 
 
 def _context_precision(positive_ids: set[str], positive_groups: set[str], items: Sequence[Mapping[str, Any]]) -> float:
@@ -286,6 +366,10 @@ def _case_fingerprint(cases: Sequence[Mapping[str, Any]]) -> str:
 def _mean(values: Any) -> float:
     clean = [float(value) for value in values if value is not None]
     return round(sum(clean) / len(clean), 4) if clean else 0.0
+
+
+def _rate(value: int, total: int) -> float:
+    return round(value / total, 4) if total else 0.0
 
 
 def _hash(value: str) -> str:

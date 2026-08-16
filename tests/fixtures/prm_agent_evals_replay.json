@@ -1,0 +1,36 @@
+{
+  "schema_version": "prm_replay_fixture.v1",
+  "privacy": {"synthetic": true, "contains_telegram_archive_text": false},
+  "items": [
+    {
+      "archive_document_id": "fixture:direct-agent-evals",
+      "post_id": 101,
+      "posted_at": "2026-08-10T10:00:00Z",
+      "channel_username": "eval_fixture",
+      "source_url": "https://t.me/fixture/101",
+      "snippet": "Agent evaluation should measure task success, groundedness, tool-call correctness, and regression results against reviewed gold labels.",
+      "matched_query_variant": "agent evals",
+      "rank": -8.0
+    },
+    {
+      "archive_document_id": "fixture:adjacent-agent-ops",
+      "post_id": 102,
+      "posted_at": "2026-08-09T10:00:00Z",
+      "channel_username": "ops_fixture",
+      "source_url": "https://t.me/fixture/102",
+      "snippet": "Agent Operations covers access control, approvals, audit trails, deployment, and runtime ownership.",
+      "matched_query_variant": "agent operations",
+      "rank": -12.0
+    },
+    {
+      "archive_document_id": "fixture:unrelated",
+      "post_id": 103,
+      "posted_at": "2026-08-08T10:00:00Z",
+      "channel_username": "other_fixture",
+      "source_url": "https://t.me/fixture/103",
+      "snippet": "A general note about product design and mobile interface spacing.",
+      "matched_query_variant": "agent evals",
+      "rank": -20.0
+    }
+  ]
+}

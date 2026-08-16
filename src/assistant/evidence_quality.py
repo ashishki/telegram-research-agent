@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from typing import Any, Mapping, Sequence
 from urllib.parse import urlparse
 
+from assistant.archive_relevance import classify_archive_relevance
 
 EVIDENCE_QUALITY_SCHEMA_VERSION = "prm_evidence_quality.v1"
 SOURCE_CLASSES = {
@@ -41,6 +42,7 @@ def build_evidence_quality_items(
     result = []
     for index, item in enumerate(items, start=1):
         group_id = _source_group_id(item)
+        relevance = classify_archive_relevance(question, item)
         result.append(
             {
                 "schema_version": EVIDENCE_QUALITY_SCHEMA_VERSION,
@@ -50,8 +52,11 @@ def build_evidence_quality_items(
                 "source_group_id": group_id,
                 "posted_at": str(item.get("posted_at") or item.get("fetched_at") or ""),
                 "freshness_status": _freshness_status(item, now=now),
-                "relevance_score": _relevance_score(question, item),
-                "directness": _directness(question, item),
+                "relevance_score": round(float(relevance.score), 4),
+                "directness": _directness_label(relevance.label),
+                "relevance_label": relevance.label,
+                "relevance_reason": relevance.reason,
+                "matched_relevance_terms": list(relevance.matched_terms),
                 "independence": _independence(item),
                 "corroboration_count": max(0, int(group_counts[group_id]) - 1),
                 "primary_source_status": _primary_source_status(item),
@@ -71,6 +76,7 @@ def evidence_quality_summary(items: Sequence[Mapping[str, Any]]) -> dict[str, An
     direct = sum(1 for item in items if item.get("directness") == "direct")
     relevant = sum(1 for item in items if float(item.get("relevance_score") or 0.0) >= 0.35)
     independent = sum(1 for item in items if item.get("independence") == "independent")
+    labels = Counter(str(item.get("relevance_label") or "unrelated") for item in items)
     return {
         "schema_version": "prm_evidence_quality_summary.v1",
         "evidence_count": total,
@@ -79,6 +85,8 @@ def evidence_quality_summary(items: Sequence[Mapping[str, Any]]) -> dict[str, An
         "direct_rate": round(direct / total, 4) if total else 0.0,
         "relevant_rate": round(relevant / total, 4) if total else 0.0,
         "independent_rate": round(independent / total, 4) if total else 0.0,
+        "relevance_labels": dict(sorted(labels.items())),
+        "adjacent_contamination_rate": round(labels.get("adjacent", 0) / total, 4) if total else 0.0,
     }
 
 
@@ -153,20 +161,10 @@ def _freshness_status(item: Mapping[str, Any], *, now: datetime | None) -> str:
     return "stale"
 
 
-def _relevance_score(question: str, item: Mapping[str, Any]) -> float:
-    query = set(_tokens(question))
-    if not query:
-        return 0.0
-    haystack = set(_tokens(_support_span(item)))
-    overlap = len(query & haystack)
-    return round(min(1.0, overlap / max(1, min(len(query), 8))), 4)
-
-
-def _directness(question: str, item: Mapping[str, Any]) -> str:
-    score = _relevance_score(question, item)
-    if score >= 0.45:
+def _directness_label(label: str) -> str:
+    if label == "direct":
         return "direct"
-    if score >= 0.18:
+    if label == "partial":
         return "indirect"
     return "background"
 

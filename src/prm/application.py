@@ -11,27 +11,30 @@ from assistant.operator_context import build_operator_context, validate_operator
 from assistant.pi_chat import answer_pi_chat
 from assistant.prm_chat_display import render_prm_chat_answer
 from config.settings import Settings
+from prm.archive_contract import ARCHIVE_RESPONSE_INTENTS, apply_archive_response_contract
 from prm.contracts import AssistantResult, OperatorRequest
 from prm.presentation import render_payload, render_project_clarification
+from prm.research_facade import build_research_facade
 from prm.routing import decide_route
 from prm.synthesis import synthesize_answer
 
 
 class PersonalResearchAssistant:
-    """Coordinate one side-effect-free PRM request lifecycle."""
+    """Coordinate one bounded PRM request lifecycle."""
 
     def __init__(self, *, settings: Settings) -> None:
         self.settings = settings
 
     def answer(self, request: OperatorRequest) -> AssistantResult:
         route = decide_route(request.query, requested_mode=request.mode, explicit_project=request.project_name)
+        route_payload = route.to_dict()
         if route.mode == "project_clarify":
             return AssistantResult(
                 interaction_id="",
                 status="clarify",
                 mode="project_clarify",
                 text=render_project_clarification(),
-                route=route.to_dict(),
+                route=route_payload,
             )
         if route.mode == "clarify":
             return AssistantResult(
@@ -39,7 +42,7 @@ class PersonalResearchAssistant:
                 status="clarify",
                 mode="clarify",
                 text="Уточни: найти материалы в архиве, собрать бриф или задать свободный вопрос?",
-                route=route.to_dict(),
+                route=route_payload,
             )
 
         context = build_operator_context(
@@ -50,9 +53,15 @@ class PersonalResearchAssistant:
             project_name=route.project_name,
         )
         validate_operator_context(context)
+        context_payload = {
+            **context.to_dict(),
+            "primary_intent": route.primary_intent,
+            "response_contract_id": route.response_contract_id,
+            "archive_scope": route.archive_scope,
+        }
 
         if route.mode == "chat":
-            return self._chat(request, context.to_dict(), route.to_dict())
+            return self._chat(request, context_payload, route_payload)
 
         budget = MemoryResearchBudget(
             max_tool_calls=4,
@@ -68,15 +77,36 @@ class PersonalResearchAssistant:
             allow_vector_retrieval=_env_enabled("PRM_ARCHIVE_HYBRID_RETRIEVAL"),
             vector_index_path=os.environ.get("PRM_ARCHIVE_VECTOR_INDEX_PATH", "").strip(),
         )
+        facade = build_research_facade(
+            settings=self.settings,
+            question=request.query,
+            project_context_required=route.project_context_required,
+        )
         payload = answer_memory_research(
             request.query,
             archive_query=route.retrieval_query,
-            project_name=route.project_name,
+            project_name=route.project_name if route.project_context_required else "",
             settings=self.settings,
+            facade=facade,
             limit=5 if route.mode == "brief" else 4,
             budget=budget,
-            operator_context=context.to_dict(),
+            operator_context=context_payload,
         )
+        payload = {
+            **dict(payload),
+            "question": request.query,
+            "primary_intent": route.primary_intent,
+            "response_contract_id": route.response_contract_id,
+            "route_decision": route_payload,
+        }
+        payload = _apply_route_boundaries(payload, route_payload)
+        if route.primary_intent in ARCHIVE_RESPONSE_INTENTS:
+            payload = apply_archive_response_contract(
+                payload,
+                question=request.query,
+                route=route_payload,
+            )
+
         deterministic = render_payload(payload, mode=route.mode)
         evidence_items = [
             item
@@ -88,6 +118,8 @@ class PersonalResearchAssistant:
             deterministic_fallback=deterministic,
             mode=route.mode,
             evidence_items=evidence_items,
+            primary_intent=route.primary_intent,
+            response_contract_id=route.response_contract_id,
         )
         final_text = synthesized or deterministic
         gate = _mapping(payload.get("answer_gate"))
@@ -96,7 +128,11 @@ class PersonalResearchAssistant:
             evidence_items,
             current_fact_required=bool(gate.get("external_verification_required"))
             and not bool(gate.get("current_claim_allowed", True)),
-            project_name=str(_mapping(payload.get("project_fit")).get("project_name") or ""),
+            project_name=(
+                str(_mapping(payload.get("project_fit")).get("project_name") or "")
+                if route.project_context_required
+                else ""
+            ),
         )
         payload = {
             **dict(payload),
@@ -109,13 +145,13 @@ class PersonalResearchAssistant:
             mode=route.mode,  # type: ignore[arg-type]
             text=final_text,
             payload=payload,
-            operator_context=context.to_dict(),
+            operator_context=context_payload,
             final_answer_verification={
                 "claim_count": int(verification.get("claim_count") or 0),
                 "metrics": verification.get("metrics") or {},
                 "summary": claim_ledger_public_summary(verification),
             },
-            route=route.to_dict(),
+            route=route_payload,
         )
 
     def _chat(self, request: OperatorRequest, context: Mapping[str, Any], route: Mapping[str, Any]) -> AssistantResult:
@@ -138,6 +174,22 @@ class PersonalResearchAssistant:
             operator_context=context,
             route=route,
         )
+
+
+def _apply_route_boundaries(payload: Mapping[str, Any], route: Mapping[str, Any]) -> dict[str, Any]:
+    result = dict(payload)
+    if str(route.get("primary_intent") or "") == "current_fact_verification":
+        gate = _mapping(result.get("answer_gate"))
+        result["answer_gate"] = {
+            **gate,
+            "status": "needs_external_verification",
+            "reason": gate.get("reason") or "current_external_fact_required",
+            "allow_answer": False,
+            "current_claim_allowed": False,
+            "no_answer_required": True,
+            "external_verification_required": True,
+        }
+    return result
 
 
 def _env_enabled(name: str) -> bool:

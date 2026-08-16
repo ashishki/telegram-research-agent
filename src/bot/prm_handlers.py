@@ -77,13 +77,23 @@ def _post_answer_markup(payload: Mapping[str, Any], *, settings: Settings, chat_
     ]
     professional = _mapping(payload.get("professional_answer"))
     project = _mapping(payload.get("project_fit"))
+    contract = _mapping(payload.get("archive_contract"))
+    summary = _mapping(contract.get("result_summary"))
+    direct_count = int(summary.get("direct_count") or 0)
+    partial_count = int(summary.get("partial_count") or 0)
     bundle = build_post_answer_actions(
         {
+            "query": payload.get("question"),
             "direct_answer": payload.get("direct_answer"),
             "source_refs": source_refs,
             "project_name": project.get("project_name"),
-            "answer_status": professional.get("answer_status"),
+            "answer_status": professional.get("answer_status") or contract.get("answer_status"),
             "source_count": len(source_refs),
+            "direct_count": direct_count,
+            "partial_count": partial_count,
+            "relevance_established": direct_count + partial_count > 0,
+            "primary_intent": payload.get("primary_intent"),
+            "response_contract_id": payload.get("response_contract_id"),
             "selected_professional_lens": professional.get("professional_lens"),
             "primary_workflow": professional.get("primary_workflow"),
             "professional_answer": professional,
@@ -93,6 +103,9 @@ def _post_answer_markup(payload: Mapping[str, Any], *, settings: Settings, chat_
             "claim_ledger": _mapping(payload.get("claim_ledger")),
             "receipt": _mapping(payload.get("receipt")),
             "privacy": _mapping(payload.get("privacy")),
+            "route_decision": _mapping(payload.get("route_decision")),
+            "archive_contract": contract,
+            "render_mode": "telegram_archive_contract_v2" if contract else "telegram_legacy",
         },
         db_path=settings.db_path,
         chat_id=chat_id,
@@ -100,21 +113,55 @@ def _post_answer_markup(payload: Mapping[str, Any], *, settings: Settings, chat_
     return bundle.get("reply_markup") if isinstance(bundle, Mapping) else None
 
 
-def _send_chunks(chat_id: str, text: str, *, reply_markup: dict | None, limit: int = 3900) -> None:
-    chunks = []
-    current = ""
-    for paragraph in str(text or "").split("\n\n"):
-        candidate = paragraph if not current else f"{current}\n\n{paragraph}"
-        if len(candidate) <= limit:
-            current = candidate
-            continue
-        if current:
-            chunks.append(current)
-        current = paragraph
-    if current or not chunks:
-        chunks.append(current)
+def _send_chunks(chat_id: str, text: str, *, reply_markup: dict | None, limit: int = 3400) -> None:
+    chunks = _split_telegram_text(text, limit=limit)
     for index, chunk in enumerate(chunks):
         send_message(_token(), chat_id, chunk, reply_markup=reply_markup if index == len(chunks) - 1 else None)
+
+
+def _split_telegram_text(text: str, *, limit: int = 3400) -> list[str]:
+    clean = str(text or "").strip()
+    if not clean:
+        return [""]
+    chunks: list[str] = []
+    current = ""
+    for paragraph in clean.split("\n\n"):
+        pieces = _bounded_pieces(paragraph, limit=limit)
+        for piece in pieces:
+            candidate = piece if not current else f"{current}\n\n{piece}"
+            if len(candidate) <= limit:
+                current = candidate
+                continue
+            if current:
+                chunks.append(current)
+            current = piece
+    if current:
+        chunks.append(current)
+    return chunks or [clean[:limit]]
+
+
+def _bounded_pieces(paragraph: str, *, limit: int) -> list[str]:
+    if len(paragraph) <= limit:
+        return [paragraph]
+    lines = paragraph.splitlines() or [paragraph]
+    result: list[str] = []
+    current = ""
+    for line in lines:
+        if len(line) > limit:
+            if current:
+                result.append(current)
+                current = ""
+            result.extend(line[index : index + limit] for index in range(0, len(line), limit))
+            continue
+        candidate = line if not current else f"{current}\n{line}"
+        if len(candidate) <= limit:
+            current = candidate
+        else:
+            result.append(current)
+            current = line
+    if current:
+        result.append(current)
+    return result
 
 
 def _split_command(text: str) -> tuple[str, str]:
@@ -132,14 +179,15 @@ def _token() -> str:
 
 def _help_text() -> str:
     return (
-        "Я ищу по твоему Telegram-архиву и отвечаю со ссылками.\n\n"
-        "Просто напиши вопрос или отправь голосовое.\n\n"
+        "Я ищу по твоему Telegram-архиву и сначала отвечаю на сам вопрос.\n\n"
+        "Прямые совпадения, частичные и смежные материалы показываются отдельно. "
+        "Проектная привязка и внешняя проверка включаются только когда ты их явно просишь.\n\n"
         "Примеры:\n"
-        "• Что писали про agent evals?\n"
-        "• Что применить к telegram-research-agent?\n"
-        "• Собери бриф для поста.\n"
-        "• Что я отмечал реакциями?\n\n"
-        "После ответа можно сохранить заметку, следить за темой или оценить полезность."
+        "• Что в архиве есть про agent evals?\n"
+        "• Что из найденного применимо сейчас?\n"
+        "• Как это связано с Eval-Ground-Truth-Lab?\n"
+        "• Что сейчас известно про внешний benchmark?\n\n"
+        "После релевантного ответа можно показать ещё, уточнить поиск или сохранить заметку."
     )
 
 
