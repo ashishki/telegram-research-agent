@@ -1,103 +1,41 @@
-# Documentation Index
+# Documentation
 
-Status: active
-Last updated: 2026-08-12
+## Current product
 
-## Current Product Direction
+1. `PROJECT_BRIEF.md`
+2. `ARCHITECTURE.md`
+3. `IMPLEMENTATION_CONTRACT.md`
+4. `PRODUCT_OPERATING_MODEL.md`
+5. `operator_quickstart.md`
+6. `operator_workflow.md`
 
-- docs/PROJECT_BRIEF.md
-- docs/ARCHITECTURE.md
-- docs/IMPLEMENTATION_CONTRACT.md
-- docs/adr/ADR-001-product-pivot-to-personal-research-memory.md
-- docs/personal_research_memory_product_contract.md
-- docs/professional_personalization_contract.md
-- docs/prm_operator_experience_audit.md
-- docs/prm_operator_experience_roadmap.md
-- docs/prm_mature_product_gap_audit.md
-- docs/prm_mature_product_contract.md
-- docs/prm_mature_product_roadmap.md
-- docs/operator_context_contract.md
-- docs/prm_mature_acceptance_plan.md
-- docs/prm_configuration_migration_plan.md
-- docs/prm_operator_validation_plan.md
-- docs/prm19_dogfood_plan.md (operator production-test plan; historical filename)
-- docs/operator_quickstart.md
-- docs/operator_workflow.md
-- docs/legacy_surfaces.md
-- docs/runbooks/assistant_runtime.md
-- docs/runbooks/archive_refresh.md
-- docs/runbooks/development.md
-- docs/runbooks/reaction_sync.md (proposed)
-- docs/runbooks/primary_source_verification.md (proposed)
-- docs/runbooks/backup_restore.md (proposed)
-- docs/personal_research_memory_architecture.md
-- docs/personal_research_memory_roadmap.md
-- docs/PRODUCT_OPERATING_MODEL.md
-- docs/final_acceptance_plan.md
+## Active delivery
 
-## Playbook Governance
+- `tasks.md` — one current RFX queue;
+- `CODEX_PROMPT.md` — concise implementation handoff;
+- `EVIDENCE_INDEX.md` — current evidence only;
+- `IMPLEMENTATION_JOURNAL.md` — current phase journal;
+- `REVIEW_POLICY.md` — review and approval boundaries.
 
-- docs/playbook_retrofit_audit.md
-- docs/tasks.md
-- docs/CODEX_PROMPT.md
-- docs/DECISION_LOG.md
-- docs/IMPLEMENTATION_JOURNAL.md
-- docs/EVIDENCE_INDEX.md
-- docs/REVIEW_POLICY.md
-- .playbook/project_verification.json
-- .playbook/delivery_execution_model.json
+## Retrofit
 
-## RAG, Assistant, Cost, Privacy, Operations
+- `retrofit/RFX_REPOSITORY_RETROFIT.md`
+- `retrofit/RFX_DEEP_REVIEW.md`
+- `repo_hygiene_and_archive_plan.md`
+- `legacy_runtime_inventory.md`
+- `legacy_surfaces.md`
 
-- docs/RAG_DATA_READINESS.md
-- docs/retrieval_eval.md
-- docs/generation_eval.md
-- docs/tool_eval.md
-- docs/agent_eval.md
-- docs/AGENT_HARNESS_DESIGN.md
-- docs/COST_BUDGET.md
-- docs/ai_cost_architecture.md
-- docs/AUTONOMOUS_WORKFLOW_CONTRACT.md
-- docs/PRIVACY_THREAT_MODEL.md
-- docs/ROLLBACK_AND_REINDEX_PLAN.md
-- docs/repo_hygiene_and_archive_plan.md
-- docs/legacy_runtime_inventory.md
+## RAG, privacy and operations
 
-## Current Runtime Boundary
+- `retrieval_eval.md`
+- `generation_eval.md`
+- `tool_eval.md`
+- `agent_eval.md`
+- `PRIVACY_THREAT_MODEL.md`
+- `COST_BUDGET.md`
+- `ROLLBACK_AND_REINDEX_PLAN.md`
+- `runbooks/`
 
-- docs/PRODUCT_OPERATING_MODEL.md
-- docs/audit/PRM_RUNTIME_FREEZE_2026-07-29.md
-- docs/audit/PRM_MANUAL_TELEGRAM_ASSISTANT_ACTIVATION_2026-08-11.md
-- docs/audit/PRM_MANUAL_ARCHIVE_REFRESH_2026-08-12.md
-- docs/audit/PRM_WEEKLY_ARCHIVE_REFRESH_TIMER_2026-08-12.md
+## History
 
-The safe `prm-assistant` runtime is active for manual testing only. The live
-legacy Telegram bot and old weekly Report V2 timer are stopped and disabled.
-The dedicated archive-refresh timer is active for bounded weekly archive
-freshness. Human production tests are optional and operator-controlled.
-
-## Legacy And Compatibility Context
-
-These documents describe prior weekly-report, IRX, Radar, Atlas, or curated-only
-assistant work. They are preserved as history or compatibility context and are
-not the active product authority:
-
-- docs/architecture.md
-- docs/curated_semantic_retrieval.md
-- docs/hermes_pi_assistant_roadmap.md
-- docs/intelligence_report_v2_roadmap.md
-- docs/intelligence_report_v2_contract.md
-- docs/intelligence_report_v2_audit.md
-- docs/reaction_personalization_contract.md
-- docs/weekly_run_manifest.md
-- docs/archive/
-
-Redirect stubs preserve historical paths. Full report-era documents now live
-under `docs/archive/legacy_report_era/`.
-
-## Evidence Rule
-
-Candidate docs and tasks may define target behavior. They must not claim that
-full-archive RAG, assistant archive search, production-test success, vector retrieval,
-or external skill approval exists until implementation and verification evidence
-is recorded.
+Historical report-era, roadmap, task, evidence and handoff documents are under `docs/archive/`. They are reference material, not active product authority.
