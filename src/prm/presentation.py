@@ -4,14 +4,26 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 
+from prm.archive_contract import ARCHIVE_RESPONSE_CONTRACTS
+
 
 def render_payload(payload: Mapping[str, Any], *, mode: str) -> str:
+    contract_id = str(payload.get("response_contract_id") or "")
+    archive_contract = _mapping(payload.get("archive_contract"))
+    if contract_id in ARCHIVE_RESPONSE_CONTRACTS and archive_contract:
+        return _render_archive_contract(archive_contract)
+
     gate = _mapping(payload.get("answer_gate"))
     if bool(gate.get("external_verification_required")) and not bool(gate.get("current_claim_allowed", True)):
         return _render_current_boundary(payload)
     decision = _mapping(payload.get("project_decision"))
     project_fit = _mapping(payload.get("project_fit"))
-    if decision and str(project_fit.get("project_name") or "").strip():
+    if contract_id == "decision_support.v2" and decision and str(project_fit.get("project_name") or "").strip():
+        return _render_project_decision(payload)
+    if contract_id == "project_mapping.v2" and str(project_fit.get("project_name") or "").strip():
+        return _render_project_mapping(payload)
+    # Backward compatibility for callers that predate explicit response contracts.
+    if not contract_id and decision and str(project_fit.get("project_name") or "").strip():
         return _render_project_decision(payload)
     if mode == "brief":
         return _render_brief(payload)
@@ -25,6 +37,55 @@ def render_project_clarification(project_names: Sequence[str] = ()) -> str:
     return "\n".join(["К какому проекту применить находки?", "", *[f"[{name}]" for name in choices], "[Другой]"])
 
 
+def _render_archive_contract(contract: Mapping[str, Any]) -> str:
+    summary = _mapping(contract.get("result_summary"))
+    direct = _mappings(contract.get("direct_findings"))
+    partial = _mappings(contract.get("partial_findings"))
+    adjacent = _mappings(contract.get("adjacent_findings"))
+    applicability = _mappings(contract.get("applicability"))
+    limitations = _strings(contract.get("limitations"))
+    sources = _mappings(contract.get("sources"))
+    refinements = _strings(contract.get("search_refinements"))
+
+    lines = [_text(contract.get("direct_answer")) or "По текущей выдаче недостаточно данных для ответа."]
+    lines.extend(
+        [
+            "",
+            "Найдено",
+            (
+                f"Прямых: {int(summary.get('direct_count') or 0)} · "
+                f"частичных: {int(summary.get('partial_count') or 0)} · "
+                f"смежных: {int(summary.get('adjacent_count') or 0)}"
+            ),
+        ]
+    )
+    if direct:
+        lines.extend(["", "Прямые находки", *[_finding_line(item) for item in direct[:4]]])
+    if partial:
+        lines.extend(["", "Частичные совпадения", *[_finding_line(item) for item in partial[:3]]])
+    if adjacent:
+        lines.extend(["", "Смежные материалы", *[_finding_line(item) for item in adjacent[:3]]])
+    if applicability:
+        lines.extend(
+            [
+                "",
+                "Что применимо сейчас",
+                *[
+                    f"- {_text(item.get('recommendation'))}"
+                    + (f" → {_text(item.get('target_project'))}" if _text(item.get("target_project")) else "")
+                    for item in applicability[:4]
+                    if _text(item.get("recommendation"))
+                ],
+            ]
+        )
+    elif int(summary.get("direct_count") or 0) == 0 and refinements:
+        lines.extend(["", "Как уточнить поиск", "- " + "; ".join(refinements[:6])])
+    if limitations:
+        lines.extend(["", "Ограничения", *[f"- {item}" for item in limitations[:3]]])
+    lines.extend(["", "Источники", *(_archive_source_lines(sources) or ["- локальных источников нет"])])
+    return _compact(lines)
+
+
 def _render_research(payload: Mapping[str, Any]) -> str:
     professional = _mapping(payload.get("professional_answer"))
     findings = _findings(professional, payload)
@@ -32,12 +93,23 @@ def _render_research(payload: Mapping[str, Any]) -> str:
     action = _text(professional.get("recommended_action")) or _first_step(payload)
     unknowns = _strings(professional.get("uncertainty")) or _strings(payload.get("unknowns"))
     lines = [
-        "Короткий вывод", _text(professional.get("short_answer")) or _text(payload.get("direct_answer")) or "Недостаточно данных для уверенного вывода.", "",
-        "Что найдено", *(findings or ["- Релевантных локальных источников не найдено."]), "",
-        "Почему это важно тебе", _project_relation(project), "",
-        "Что сделать", action or "Не превращать сигнал в действие без более точных доказательств.", "",
-        "Где доказательства слабые", *[f"- {_localize_unknown(item)}" for item in (unknowns[:3] or ["Нужна дополнительная проверка."])], "",
-        "Источники", *(_source_lines(payload) or ["- локальных источников нет"]),
+        "Короткий вывод",
+        _text(professional.get("short_answer")) or _text(payload.get("direct_answer")) or "Недостаточно данных для уверенного вывода.",
+        "",
+        "Что найдено",
+        *(findings or ["- Релевантных локальных источников не найдено."]),
+        "",
+        "Почему это важно тебе",
+        _project_relation(project),
+        "",
+        "Что сделать",
+        action or "Не превращать сигнал в действие без более точных доказательств.",
+        "",
+        "Где доказательства слабые",
+        *[f"- {_localize_unknown(item)}" for item in (unknowns[:3] or ["Нужна дополнительная проверка."])],
+        "",
+        "Источники",
+        *(_source_lines(payload) or ["- локальных источников нет"]),
     ]
     return _compact(lines)
 
@@ -47,14 +119,49 @@ def _render_brief(payload: Mapping[str, Any]) -> str:
     workflow = _mapping(professional.get("workflow_section"))
     cases = _findings(professional, payload)[:3]
     lines = [
-        "Тезис", _text(workflow.get("thesis")) or _text(professional.get("short_answer")) or _text(payload.get("direct_answer")), "",
-        "Кейсы", *(cases or ["- Сильный кейс в локальном архиве не найден."]), "",
-        "Контраргумент", _text(workflow.get("counterargument")) or "Повтор Telegram-сигнала не является независимым подтверждением.", "",
-        "Практический вывод", _text(workflow.get("practical_conclusion")) or _text(professional.get("recommended_action")) or "Проверить первоисточник перед сильным публичным утверждением.", "",
-        "Что проверить", "Свежесть, первичность и независимость источников.", "",
-        "Источники", *(_source_lines(payload) or ["- локальных источников нет"]),
+        "Тезис",
+        _text(workflow.get("thesis")) or _text(professional.get("short_answer")) or _text(payload.get("direct_answer")),
+        "",
+        "Кейсы",
+        *(cases or ["- Сильный кейс в локальном архиве не найден."]),
+        "",
+        "Контраргумент",
+        _text(workflow.get("counterargument")) or "Повтор Telegram-сигнала не является независимым подтверждением.",
+        "",
+        "Практический вывод",
+        _text(workflow.get("practical_conclusion")) or _text(professional.get("recommended_action")) or "Проверить первоисточник перед сильным публичным утверждением.",
+        "",
+        "Что проверить",
+        "Свежесть, первичность и независимость источников.",
+        "",
+        "Источники",
+        *(_source_lines(payload) or ["- локальных источников нет"]),
     ]
     return _compact(lines)
+
+
+def _render_project_mapping(payload: Mapping[str, Any]) -> str:
+    professional = _mapping(payload.get("professional_answer"))
+    project = _mapping(payload.get("project_fit"))
+    findings = _findings(professional, payload)
+    action = _text(professional.get("recommended_action")) or _first_step(payload)
+    return _compact(
+        [
+            _text(professional.get("short_answer")) or _text(payload.get("direct_answer")) or "Недостаточно данных.",
+            "",
+            "Что найдено в архиве",
+            *(findings or ["- Прямых находок нет."]),
+            "",
+            "Связь с проектом",
+            _project_relation(project),
+            "",
+            "Небольшой следующий шаг",
+            action or "Сначала уточнить проектную связь на одном источнике.",
+            "",
+            "Источники",
+            *(_source_lines(payload) or ["- локальных источников нет"]),
+        ]
+    )
 
 
 def _render_project_decision(payload: Mapping[str, Any]) -> str:
@@ -65,15 +172,32 @@ def _render_project_decision(payload: Mapping[str, Any]) -> str:
     recommendation = _text(decision.get("grounded_recommendation")) or "Не принимать проектное решение: прямой связи с источниками недостаточно."
     next_action = _text(decision.get("next_action"))
     lines = [
-        "Решение", recommendation, "",
-        "Что найдено в источниках", *(claim_lines or ["- Поддержанных утверждений для проектного решения нет."]), "",
-        "Контекст проекта", _project_relation(project), "",
-        "Цель проекта", _localize_project_goal(_text(decision.get("project_goal"))) or "не зафиксирована", "",
-        "Главный риск", _text(decision.get("current_blocker")) or "не зафиксирован", "",
-        "Критерий успеха", _text(decision.get("acceptance_criterion")) or "Есть наблюдаемый результат, связанный с цитируемым источником.", "",
-        "Что изменило бы решение", _text(decision.get("next_proof")) or "Новый прямой источник или результат ограниченного эксперимента.", "",
-        "Где доказательства слабые", *[f"- {_localize_unknown(item)}" for item in (_strings(payload.get("unknowns"))[:3] or ["Независимость источников не подтверждена."])], "",
-        "Источники", *(_source_lines(payload) or ["- локальных источников нет"]),
+        "Решение",
+        recommendation,
+        "",
+        "Что найдено в источниках",
+        *(claim_lines or ["- Поддержанных утверждений для проектного решения нет."]),
+        "",
+        "Контекст проекта",
+        _project_relation(project),
+        "",
+        "Цель проекта",
+        _localize_project_goal(_text(decision.get("project_goal"))) or "не зафиксирована",
+        "",
+        "Главный риск",
+        _text(decision.get("current_blocker")) or "не зафиксирован",
+        "",
+        "Критерий успеха",
+        _text(decision.get("acceptance_criterion")) or "Есть наблюдаемый результат, связанный с цитируемым источником.",
+        "",
+        "Что изменило бы решение",
+        _text(decision.get("next_proof")) or "Новый прямой источник или результат ограниченного эксперимента.",
+        "",
+        "Где доказательства слабые",
+        *[f"- {_localize_unknown(item)}" for item in (_strings(payload.get("unknowns"))[:3] or ["Независимость источников не подтверждена."])],
+        "",
+        "Источники",
+        *(_source_lines(payload) or ["- локальных источников нет"]),
     ]
     if next_action and next_action != recommendation:
         insert_at = lines.index("Критерий успеха")
@@ -82,13 +206,63 @@ def _render_project_decision(payload: Mapping[str, Any]) -> str:
 
 
 def _render_current_boundary(payload: Mapping[str, Any]) -> str:
-    return _compact([
-        "Я не могу подтвердить актуальный факт по локальному архиву.",
-        "Внешняя проверка не запускалась, поэтому архивный контекст не выдается за текущую истину.", "",
-        "Что есть в архиве", *(_findings({}, payload) or ["- Релевантного исторического контекста нет."]), "",
-        "Что нужно для точного ответа", "Отдельно разрешить проверку официального первоисточника.", "",
-        "Источники из архива", *(_source_lines(payload) or ["- локальных источников нет"]),
-    ])
+    return _compact(
+        [
+            "Я не могу подтвердить актуальный внешний факт по локальному архиву.",
+            "Внешняя проверка не запускалась, поэтому архивный контекст не выдаётся за текущую истину.",
+            "",
+            "Что есть в архиве",
+            *(_findings({}, payload) or ["- Релевантного исторического контекста нет."]),
+            "",
+            "Что нужно для точного ответа",
+            "Отдельно разрешить проверку официального первоисточника.",
+            "",
+            "Источники из архива",
+            *(_source_lines(payload) or ["- локальных источников нет"]),
+        ]
+    )
+
+
+def _finding_line(item: Mapping[str, Any]) -> str:
+    date = _text(item.get("posted_at"))[:10] or "дата неизвестна"
+    channel = _text(item.get("channel_username")) or "источник"
+    summary = _text(item.get("summary"))
+    reason = _human_relevance_reason(_text(item.get("relevance_reason")))
+    suffix = f" — {reason}" if reason else ""
+    return f"- {date} @{channel}: {summary}{suffix}"
+
+
+def _human_relevance_reason(value: str) -> str:
+    return {
+        "exact_agent_eval_phrase": "точное совпадение с agent evals",
+        "agent_and_evaluation_concepts_present": "есть и агентный, и evaluation-контекст",
+        "evaluation_concept_without_explicit_agent_scope": "evaluation есть, агентный scope неявный",
+        "agent_context_without_evaluation_practice": "агентный контекст без практики оценки",
+        "exact_topic_phrase": "точная формулировка темы",
+        "high_topic_coverage": "высокое покрытие темы",
+        "partial_topic_coverage": "частичное покрытие темы",
+        "weak_topic_overlap": "слабое тематическое пересечение",
+    }.get(value, "")
+
+
+def _archive_source_lines(sources: Sequence[Mapping[str, Any]]) -> list[str]:
+    result = []
+    for item in sources[:8]:
+        date = _text(item.get("posted_at"))[:10] or "дата неизвестна"
+        channel = _text(item.get("channel_username")) or "источник"
+        url = _text(item.get("source_url"))
+        label = _localized_relevance_label(_text(item.get("relevance_label")))
+        result.append(f"- {date} @{channel} [{label}]" + (f": {url}" if url else ""))
+    return result
+
+
+def _localized_relevance_label(value: str) -> str:
+    return {
+        "direct": "прямой",
+        "partial": "частичный",
+        "adjacent": "смежный",
+        "unrelated": "нерелевантный",
+    }.get(value, value or "не определён")
 
 
 def _findings(professional: Mapping[str, Any], payload: Mapping[str, Any]) -> list[str]:
@@ -125,11 +299,11 @@ def _project_relation(project: Mapping[str, Any]) -> str:
     label = _text(project.get("relevance_label"))
     guidance = _text(project.get("guidance"))
     if not name:
-        return "Проект не указан. Можно задать следующий вопрос с названием репозитория."
+        return "Проект не указан. Проектную привязку можно запросить после основного архивного ответа."
     if label == "direct_implication":
         return guidance or f"Есть прямая связь с {name}."
     if label in {"weak_watch", "learning_relevance"}:
-        return guidance or f"Для {name} это сигнал для изучения, но действие не доказано."
+        return guidance or f"Для {name} это материал для изучения, но действие не доказано."
     return guidance or f"Для {name} прямая связь пока не доказана."
 
 
