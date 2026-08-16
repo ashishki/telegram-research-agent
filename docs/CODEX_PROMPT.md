@@ -1,327 +1,49 @@
-# Codex Session Handoff
-
-## PRM-QA Implementation Update (2026-08-15)
-
-Repository baseline inspected before PRM-QA implementation:
-`516fc7206f99b58e6d276585c3dba6d87a39392f` on `master`.
-AI Workflow Playbook baseline inspected:
-`965612aa463fca1a35a55104633d0e09da33d615` on `master`.
-
-PRM-QA added the active evaluation-led quality queue, private generated
-archive-derived regression dataset, layered eval harness, retrieval ablation,
-intent retrieval policy, evidence-quality contract, claim ledger, project
-clarification/decision memo UX, job-specific Telegram answer renderers,
-metadata-only usefulness feedback/private traces, and gated primary-source
-verification fetcher.
-
-Public PRM-QA evidence:
-
-- `evals/prm_qa/prm_qa_dataset_manifest.v1.json`
-- `evals/prm_qa/prm_qa_eval_report.v1.json`
-- `evals/prm_qa/prm_qa_holdout_report.v1.json`
-- `evals/prm_qa/prm_qa_api_dense_report.v1.json`
-- `evals/prm_qa/prm_qa_api_dense_holdout_report.v1.json`
-- `docs/adr/ADR-005-prm-qa-selected-retrieval-policy.md`
-
-Selected runtime retrieval policy is FTS plus deterministic OR fallback and
-bounded query rewrites, with local hash-vector search fallback-only on FTS miss.
-Always-on hash-vector fusion and reranker remain eval adapters because they did
-not improve holdout quality and materially worsened latency. After explicit
-operator approval, OpenAI API dense retrieval was implemented with
-`text-embedding-3-large` and a gitignored SQLite sidecar. It is measurable but
-not adopted as default because holdout MRR/nDCG regressed versus R1 and latency
-increased. PRM-QA-16 adds public `retrieval_by_job_type` metrics to the API
-dense reports and makes approved bounded Telegram RAG LLM synthesis the first
-normal user-facing answer layer after local RAG; deterministic templates remain
-fallback and current-fact/project-decision safety paths remain deterministic.
-
-Do not claim user value, PRM-19 dogfood, release readiness, hosted vector
-adoption, automatic live verification, or independent human gold labels from
-PRM-QA. The generated 160-case dataset is regression evidence only. API
-embedding egress is implemented for the bounded sidecar/eval path but is not
-selected as default retrieval. Telegram synthesis provider egress remains
-controlled by the existing runtime flags and must use bounded cited snippets,
-not raw corpus egress.
-
-## PRM-MAT Planning Update (2026-08-13)
-
-`docs/prm_mature_product_roadmap.md` and `docs/tasks.md` define the proposed PRM-MAT successor queue. It does not approve configuration/schema writes, live fetch/provider changes, schedules, dogfood, release claims, or compatibility cleanup. Treat PRM-UX implementation labels as foundation evidence; consult `docs/prm_mature_product_gap_audit.md` for verified integration maturity.
+# Codex Handoff
 
 Status: active
-Last updated: 2026-08-12
+Last updated: 2026-08-16
+Repository baseline: `5dfd38660b7d8d24998b4dcdf801c419c1dc8f7c`
+Active branch: `refactor/prm-repository-retrofit`
+Archive branch: `archive/pre-prm-retrofit-2026-08-16`
 
-## Repository State
+## Product
 
-- Target repository commit inspected before retrofit: ad8689fa25b89f77122c4cec7c7a6b9da3f500cf
-- Target repository commit inspected for PRM-UX planning: 82c0c527ffdd797aab716a2d1079cd6849caa208
-- Target branch: master
-- AI Workflow Playbook commit used for retrofit baseline: 5583eca96c4d2d480b5574ed78bea63e0b07ebf0
-- AI Workflow Playbook commit inspected for PRM-UX planning: 965612aa463fca1a35a55104633d0e09da33d615
-- Adoption mode: Standard
-- Current phase: PRM-18 release/dogfood gate is implemented. The current
-  post-PRM28 receipt records deterministic local no-vector RAG readiness and
-  blocks dogfood start because explicit human dogfood-start approval is
-  missing; legacy
-  live runtime is frozen; safe `prm-assistant` runtime is installed, enabled,
-  and running for manual operator testing only as of 2026-08-11 18:27 CEST, not
-  dogfood evidence; PRM-18A through PRM-18C are
-  implemented and their batched deep review is recorded. PRM-21 documentation
-  records the future project-aware research-session assistant target, PRM-22
-  implements its fixture-first linked-source resolver/cache layer, and PRM-23
-  implements a bounded fixture-first `memory research` planner/CLI.
-- Implemented slices in HEAD: PRM-1 through PRM-7 plus PRM-9 through PRM-18C,
-  PRM-21 docs-only research-session contract, PRM-22 fixture-first
-  linked-source resolver/cache, and PRM-23 fixture-first memory research
-  planner/CLI, PRM-24 generated seed eval coverage, PRM-26 accepted no-vector
-  gate, PRM-28 no-vector answer gate, and PRM-27 local vector sidecar
-- Current safe slice: PRM-27 local vector sidecar is implemented under
-  `operator-approval-2026-08-11-full-stack-local-vector-telegram-llm`. PRM-24 now has a
-  50-row operator-approved generated seed gold set and SQLite FTS baseline
-  report under `operator-approval-2026-08-11-all-50-generated-gold`; this is
-  generated seed evidence, not independent human review. PRM-26 accepted the no-vector path under
-  `operator-approval-2026-08-11-no-vector-prm28-path`, and PRM-28 implements
-  the no-vector answer gate. PRM-27 later adds a gitignored local SQLite vector
-  sidecar and hybrid retrieval flags without external embeddings, production
-  migrations, canonical DB writes, or dogfood start. A later 2026-08-11
-  operator instruction enabled the local vector/RAG/LLM/Telegram stack for
-  manual testing: the sidecar was built, PRM hybrid retrieval and Telegram
-  LLM/router flags were set in the host `.env`, and
-  `telegram-prm-assistant.service` was installed, enabled, and started. The
-  current post-PRM28 PRM-18 receipt is
-  `evals/prm18_release_gate_receipt_2026-08-11_post_prm28.json`. A local UX
-  trial is recorded at `docs/audit/PRM_LOCAL_UX_TRIAL_2026-08-11.md`: RAG is
-  technically usable. A follow-up safe UX polish adds compact default
-  `memory research` rendering, `--debug` audit rendering, Russian heading
-  localization, freshness-first current-fact boundaries, local path redaction,
-  narrow repo-context cues, and no drafts for current-fact freshness-boundary
-  answers.
-- Blocked/not implemented slices: PRM-8, PRM-19, and PRM-20 remain blocked
-  until their gates are satisfied.
-- Next safe work: PRM-UX operator-experience implementation, starting with
-  PRM-UX-1 Single Conversational Entrypoint And Intent Acknowledgement. This is
-  product UX work over the existing PRM substrate, not another RAG
-  infrastructure wave.
-  PRM-19 only after the minimum PRM-UX dogfood-start slice and explicit human
-  dogfood-start approval exist. The current post-PRM28 PRM-18 receipt has
-  deterministic local stop-ship blockers clear but still blocks dogfood on
-  missing dogfood-start approval.
-  PRM-20 only after real dogfood evidence and explicit compatibility
-  archive/delete/move approval.
+Private Personal Telegram Research Memory and Grounded Assistant. Search and grounded answers are primary; report-era surfaces are compatibility-only.
 
-## Product Direction
+## Current phase
 
-The product pivot is proposed, not accepted:
+RFX repository retrofit. Follow `docs/tasks.md` in dependency order. Do not add product features while restructuring.
 
-Personal Telegram Research Memory + Grounded Assistant replaces the weekly
-report as the product center. Full archive search is the primary planned value.
-Knowledge Atoms, topics, reports, and Atlas-like surfaces become selective or
-secondary projections.
+## Rules
 
-Do not claim dogfood, release readiness, external vector-service adoption, independent
-human-reviewed gold labels, external-source execution, or approved
-external-verification evidence. HEAD
-contains a bounded SQLite FTS archive search, assistant vertical slice, grounded
-answer contract, local external-verification requirement path,
-confirmation-gated saved memory proposal flow, and deterministic Knowledge
-Library topic-page renderer. PRM-14 adds deterministic project context decision
-support for active project descriptors, archive citations, curated knowledge,
-and weak/learning/no-match classification. PRM-15 corrects learning-state
-semantics so legacy source presence maps only to indexed/surfaced and progress
-requires explicit receipts. PRM-16 adds a bounded Weekly Brief V3 projection and
-static renderer that localizes Radar failure to the Radar card while demoting
-V1 Brief and Atlas to compatibility/internal surfaces. PRM-17 adds deterministic
-workflow contracts and privacy-safe aggregate telemetry receipts for future
-runtime activation. PRM-18 adds deterministic release/dogfood gate receipts;
-the current post-PRM28 receipt is blocked only on dogfood-start approval and
-does not start dogfood or claim release readiness. On 2026-07-29 the old live Telegram bot and Report V2 weekly timer
-were stopped and disabled. A dedicated `prm-assistant` mode now exists and is
-running for manual operator testing only: ordinary text and voice transcripts dispatch to
-`/auto`, which chooses local research or local editor brief by default and can
-choose LLM chat only when both `PRM_TELEGRAM_AUTO_LLM_ROUTER=1` and
-`PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1` are explicitly enabled. Manual
-`/research`, `/brief`, and separately gated `/chat` remain fallback commands.
-Telegram research/brief can add bounded LLM synthesis only after local hybrid
-RAG has run when `PRM_TELEGRAM_RAG_LLM_SYNTHESIS=1` is also set; the provider
-receives only bounded cited snippets/context, not the raw corpus, and usage
-recording is suppressed to avoid production DB writes. Telegram research/brief
-answers are packaged topic reports and must not expose technical metrics,
-costs, tool-call counts, retrieval modes, budgets, or debug/privacy footers in
-the user-visible message.
-Legacy callbacks are disabled, and
-generation/write commands are blocked. It does not run automatic startup
-migrations. The full product is not released. For immediate local use,
-`memory ask` provides a no-LLM local evidence brief over bounded
-archive/curated/project context.
-LLM-backed `memory ask --llm-approved` and
-`memory chat --allow-provider-egress` now exist behind the explicit
-provider-egress switch; Telegram `/chat` remains a separate LLM-backed command,
-requires `PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS=1`, and the currently running
-Telegram runtime remains manual-test state, not dogfood.
-On 2026-08-12 a bounded manual PRM archive refresh was added and run after
-operator instruction. `memory refresh-archive --days 21
---confirm-canonical-write` refreshed the canonical local Telegram archive from
-3,709 to 4,166 rows, advanced max `posts.posted_at` to
-2026-08-11T21:47:37+00:00, rebuilt the approved local gitignored vector
-sidecar, and is recorded at
-`docs/audit/PRM_MANUAL_ARCHIVE_REFRESH_2026-08-12.md`. This was a canonical
-local DB write for manual testing only, not PRM-19 dogfood evidence. The command
-avoids legacy services/timers, migrations, reaction sync, media download,
-vision LLM, provider egress, source-event writes, report generation, dogfood
-start, and release claims.
-On 2026-08-12 the operator then approved a once-weekly timer for that bounded
-path. `telegram-prm-archive-refresh.timer` runs
-`memory refresh-archive --days 21 --confirm-canonical-write --json` on Monday
-08:10 Europe/Berlin. This is a manual-test freshness timer only: no legacy
-report/bot timer, migrations, reaction sync, media download, vision LLM,
-provider egress, source-event writes, report generation, external embeddings,
-hosted vector service, dogfood start, or release claim.
-The polished archive-plus-linked-source project-aware research assistant target
-is specified in `docs/personal_research_memory_product_contract.md` and
-scheduled in `docs/tasks.md`; PRM-22 and PRM-23 are implemented fixture-first
-only. They must not be claimed as dogfood evidence, live external-source
-execution, provider-egress approval, service start approval, durable
-production-cache approval, production DB write approval, or vector/backend
-approval.
-Full product RAG is now formalized as PRM-24 through PRM-28 before dogfood:
-gold eval set, citation-safe context pack, hybrid/vector ADR and privacy budget,
-approved retrieval implementation, and product chat acceptance gate. ADR-004
-approves only the PRM-27 local vector sidecar. It does not approve external
-embeddings, hosted vector services, migrations, production writes, or dogfood
-by itself. The subsequent operator instruction approved provider-egress flags
-and manual `prm-assistant` runtime activation for testing, but not PRM-19
-dogfood or release readiness.
+- preserve SQLite migrations and privacy/safety tests;
+- do not move executable history into `src/archive`;
+- keep old code only behind explicit compatibility adapters;
+- separate pure moves, import rewrites and behavior changes;
+- do not run the complete pytest suite;
+- use focused PRM, retrofit-boundary, MAT safety and Playbook checks;
+- do not claim operator value before the 15-20 question smoke review;
+- no force push or history rewrite.
 
-## Active Profiles
+## Verification
 
-- RAG: ON
-- Tool-Use: ON
-- Agentic: ON, bounded to the existing/planned read-only assistant tool loop
-- Autonomous Workflow: required for ingestion, indexing, enrichment, and weekly routines
-- Cost Architecture: ON
-- Planning: OFF
-- Compliance: OFF, with privacy/security controls still required
+```bash
+python tools/test_tiers.py focused-prm
+python tools/test_tiers.py retrofit-boundaries
+python tools/prm_mat_eval.py --check safety
+python tools/playbook_validate.py --root . --check tasks --check references
+git diff --check
+```
 
-Runtime tier: T1.
+## Next task
 
-Hermes reuse decision: official NousResearch Hermes Agent is pattern_only. It is
-not a dependency and should not be introduced for T1 work.
+Continue from the first `planned` RFX task in `docs/tasks.md`. Update task status and current evidence in the same bounded commit.
 
-## Delivery Model
+## Canonical references
 
-- Bootstrap: Codex Direct.
-- Ongoing delivery candidate: split_orchestrated.
-- Orchestrator: main Codex session under human direction.
-- Implementer: one scoped task at a time.
-- Reviewer: optional read-only subagent when policy requires.
-- Verifier: deterministic tests, evals, CI, Playbook validators.
-- Completion authority: human.
-- Child agents must not commit, push, self-review, or approve completion.
-- Deep review is batched by implementation block. For the PRM LLM chat block,
-  the PRM-18A through PRM-18C review is recorded before PRM-19. Do not spawn a
-  separate deep-review subagent after every task unless the task touches a
-  stop-ship boundary such as live provider egress, unsafe writes, vector backend
-  adoption, production data migration, external skill approval, service start,
-  dogfood start, release claim, or file deletion/archive.
-
-## Verification Commands
-
-Run these before claiming a planning or implementation handoff is clean:
-
-- python3 tools/playbook_validate.py --root . --check tasks --check placeholders --check readiness --check delivery --check references
-- python3 tools/verify_project.py --root .
-- git diff --check
-- git diff --stat
-
-Test tier helper:
-
-- python3 tools/test_tiers.py --list
-- python3 tools/test_tiers.py focused-prm
-- python3 tools/test_tiers.py fast-contract
-- python3 tools/test_tiers.py ops-date-sensitive
-
-The operator prohibits full pytest-suite runs. For every future task, select
-the smallest relevant focused/integration/security checks and record them in
-the task evidence; do not invoke `full` or treat project verification as an
-implicit full-test request.
-
-Do not run live Telegram ingestion, reaction sync, LLM extraction, Frontier,
-Radar, report generation, full archive LLM backfill, external embeddings,
-hosted vector services, or web research jobs from this handoff. PRM-27 local
-vector sidecar indexing is authorized only inside ADR-004.
-
-## Known Blockers
-
-- Product pivot ADR remains proposed and needs human approval.
-- PRM-24 candidate retrieval queries became a 50-row operator-approved
-  generated seed gold set on 2026-08-11. Do not overclaim this as independent
-  human review, dogfood, or release evidence.
-- PRM-8 vector/hybrid retrieval remains historical/conditional outside the
-  approved PRM-27 local sidecar scope.
-- PRM-26 accepted the no-vector path and PRM-28 implemented the no-vector
-  answer gate; PRM-27 local vector sidecar is implemented under ADR-004.
-- Post-PRM28 local UX polish improved `memory research` default rendering,
-  localization, current-fact boundaries, path redaction, and narrow repo-context
-  cues. A follow-up Telegram UX polish adds ordinary-message auto routing,
-  local-only `/brief` editor briefs, volatile per-chat mode-aware follow-up
-  context, deterministic AI-transformation query hints, and a corrected
-  archive-scope/current-price answer gate. Remaining UX gaps are deeper
-  multi-turn product memory and curated-memory relevance/deduplication.
-- PRM-18 release/dogfood gate is implemented. The current post-PRM28 receipt
-  clears deterministic local stop-ship blockers and remains blocked on missing
-  dogfood-start approval.
-- PRM-18A through PRM-18C are implemented and the batched deep review is
-  recorded at `docs/audit/PRM_DEEP_REVIEW_PRM18A_18C_2026-08-03.md`.
-- PRM-19 dogfood cannot start until explicit human dogfood approval is
-  recorded.
-- PRM-UX is now the active next queue for daily Telegram usability,
-  professional personalization, active-project context, refresh/reaction loops,
-  post-answer actions, usefulness evals, and documentation consolidation.
-  PRM-UX does not start dogfood or prove user value by itself.
-- PRM-20 cleanup/archive cannot start until PRM-19 dogfood evidence exists and
-  compatibility archive/delete/move approval is explicit.
-- PRM-21 records the future research-session assistant contract. PRM-22 and
-  PRM-23 are implemented fixture-first only. Neither task can be treated as
-  dogfood evidence or as approval for live web research, durable production
-  cache writes, production DB writes, or external vector/backend adoption
-  without explicit approval.
-- PRM-24 through PRM-28 are the required full product RAG path before live
-  operator validation unless the human operator explicitly waives the RAG gate. PRM-27 is limited
-  to ADR-004 local sidecar scope; do not expand to external embeddings, hosted
-  vector services, migrations, or canonical DB writes without explicit
-  approval.
-- Legacy runtime is frozen: do not restart `telegram-bot.service` or
-  `telegram-ai-split-report.timer` as a PRM workflow.
-- `systemd/telegram-prm-assistant.service` is currently installed, enabled,
-  and running only for operator-controlled testing. Do not treat its activity
-  as automatic evidence; record only operator-approved privacy-safe receipts.
-- External skills are project-disabled until trust records are approved.
-- Legacy report-centered docs remain as historical/compatibility surfaces and
-  need a safe archive/migration pass in PBR-7 or PRM-20.
-- Current full verifier is green after PRM-23 local fixture work:
-  `python3 tools/verify_project.py --root .` passed on 2026-08-03 with
-  `1083 passed, 291 subtests passed in 465.66s (0:07:45)`. The former
-  date-window fixture drift in product ops and source-trust tests is corrected
-  with relative fixture timestamps.
-
-## Canonical Docs
-
-- docs/PROJECT_BRIEF.md
-- docs/ARCHITECTURE.md
-- docs/IMPLEMENTATION_CONTRACT.md
-- docs/adr/ADR-001-product-pivot-to-personal-research-memory.md
-- docs/personal_research_memory_product_contract.md
-- docs/personal_research_memory_architecture.md
-- docs/personal_research_memory_roadmap.md
-- docs/final_acceptance_plan.md
-- docs/tasks.md
-- docs/playbook_retrofit_audit.md
-- docs/product_pivot_current_state_audit.md
-- docs/RAG_DATA_READINESS.md
-- docs/retrieval_eval.md
-- docs/generation_eval.md
-- docs/tool_eval.md
-- docs/agent_eval.md
-- docs/AGENT_HARNESS_DESIGN.md
-- docs/COST_BUDGET.md
-- docs/PRIVACY_THREAT_MODEL.md
-- docs/ROLLBACK_AND_REINDEX_PLAN.md
+- `README.md`
+- `docs/ARCHITECTURE.md`
+- `docs/IMPLEMENTATION_CONTRACT.md`
+- `docs/tasks.md`
+- `docs/retrofit/RFX_REPOSITORY_RETROFIT.md`
+- `docs/retrofit/RFX_DEEP_REVIEW.md`
