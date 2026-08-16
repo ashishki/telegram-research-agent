@@ -36,7 +36,7 @@ def _render_research(payload: Mapping[str, Any]) -> str:
         "Что найдено", *(findings or ["- Релевантных локальных источников не найдено."]), "",
         "Почему это важно тебе", _project_relation(project), "",
         "Что сделать", action or "Не превращать сигнал в действие без более точных доказательств.", "",
-        "Где доказательства слабые", *[f"- {item}" for item in (unknowns[:3] or ["Нужна дополнительная проверка."])], "",
+        "Где доказательства слабые", *[f"- {_localize_unknown(item)}" for item in (unknowns[:3] or ["Нужна дополнительная проверка."])], "",
         "Источники", *(_source_lines(payload) or ["- локальных источников нет"]),
     ]
     return _compact(lines)
@@ -63,19 +63,21 @@ def _render_project_decision(payload: Mapping[str, Any]) -> str:
     claims = _mappings(_mapping(payload.get("claim_ledger")).get("claims"))
     claim_lines = [f"- {_text(item.get('claim_text'))}" for item in claims[:4] if _text(item.get("claim_text"))]
     recommendation = _text(decision.get("grounded_recommendation")) or "Не принимать проектное решение: прямой связи с источниками недостаточно."
+    next_action = _text(decision.get("next_action"))
     lines = [
         "Решение", recommendation, "",
         "Что найдено в источниках", *(claim_lines or ["- Поддержанных утверждений для проектного решения нет."]), "",
         "Контекст проекта", _project_relation(project), "",
-        "Текущая цель", _text(decision.get("project_goal")) or "не зафиксирована", "",
-        "Текущий blocker", _text(decision.get("current_blocker")) or "не зафиксирован", "",
-        "Рекомендация", recommendation, "",
-        "Следующий эксперимент / PR-sized action", _text(decision.get("next_action")) or recommendation, "",
+        "Цель проекта", _localize_project_goal(_text(decision.get("project_goal"))) or "не зафиксирована", "",
+        "Главный риск", _text(decision.get("current_blocker")) or "не зафиксирован", "",
         "Критерий успеха", _text(decision.get("acceptance_criterion")) or "Есть наблюдаемый результат, связанный с цитируемым источником.", "",
         "Что изменило бы решение", _text(decision.get("next_proof")) or "Новый прямой источник или результат ограниченного эксперимента.", "",
-        "Где доказательства слабые", *[f"- {item}" for item in (_strings(payload.get("unknowns"))[:3] or ["Независимость источников не подтверждена."])], "",
+        "Где доказательства слабые", *[f"- {_localize_unknown(item)}" for item in (_strings(payload.get("unknowns"))[:3] or ["Независимость источников не подтверждена."])], "",
         "Источники", *(_source_lines(payload) or ["- локальных источников нет"]),
     ]
+    if next_action and next_action != recommendation:
+        insert_at = lines.index("Критерий успеха")
+        lines[insert_at:insert_at] = ["Следующий шаг", next_action, ""]
     return _compact(lines)
 
 
@@ -112,7 +114,7 @@ def _source_lines(payload: Mapping[str, Any]) -> list[str]:
     result = []
     for item in _mappings(archive.get("items"))[:6]:
         date = _text(item.get("posted_at"))[:10] or "дата неизвестна"
-        channel = _text(item.get("channel_username")) or "источник"
+        channel = _text(item.get("channel_username")).lstrip("@") or "источник"
         url = _text(item.get("source_url") or item.get("telegram_url"))
         result.append(f"- {date} @{channel}" + (f": {url}" if url else ""))
     return result
@@ -154,6 +156,33 @@ def _strings(value: Any) -> list[str]:
     if not isinstance(value, (list, tuple)):
         return []
     return [_text(item) for item in value if _text(item)]
+
+
+def _localize_unknown(value: str) -> str:
+    return {
+        "approved linked-source text": "нет утверждённого текста связанного первоисточника",
+        "live external freshness": "не проверена актуальность вне локального архива",
+        "matching project descriptor": "не найдено точное описание проекта",
+        "external verification before current claims": "нужна внешняя проверка перед текущими утверждениями",
+        "current-claim freshness": "не подтверждена свежесть текущего утверждения",
+        "direct project implication": "прямое влияние на проект не доказано",
+        "local Telegram archive support": "слабая поддержка в локальном Telegram-архиве",
+        "sufficient cited proof for the requested claim": "недостаточно цитируемого доказательства для запрошенного утверждения",
+        "target project selection": "нужно выбрать целевой проект",
+    }.get(value, value)
+
+
+def _localize_project_goal(value: str) -> str:
+    replacements = {
+        "support triage": "разбор обращений",
+        "guardrails": "защитные ограничения",
+        "human approval": "подтверждение человеком",
+        "evaluation": "оценка качества",
+    }
+    result = value
+    for source, target in replacements.items():
+        result = result.replace(source, target)
+    return result
 
 
 def _text(value: Any) -> str:

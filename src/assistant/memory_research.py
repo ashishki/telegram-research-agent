@@ -1174,18 +1174,18 @@ def _localize_next_step(value: str) -> str:
             "не применять к активному проекту из текущих доказательств."
         ),
         "Read the linked source or archive thread as background before creating a project action.": (
-            "читать как фон; не превращать в проектное действие без проверки и подтверждения."
+            "Читать как фон; не превращать в проектное действие без проверки и подтверждения."
         ),
         "Draft one bounded project action from the cited evidence; require confirmation before saving.": (
-            "сформулировать одно ограниченное действие из цитируемых источников; сохранить только после подтверждения."
+            "Сформулировать одно ограниченное действие из цитируемых источников; сохранить только после подтверждения."
         ),
         "Run an explicitly approved external verification step before making current claims.": (
-            "перед текущими утверждениями отдельно разрешить внешнюю проверку."
+            "Перед текущими утверждениями отдельно разрешить внешнюю проверку."
         ),
         "Do not answer or save a memory from related-but-insufficient evidence.": (
-            "не отвечать и не сохранять память из похожих, но недостаточных доказательств."
+            "Не отвечать и не сохранять память из похожих, но недостаточных доказательств."
         ),
-        "Resolve the target project before applying the research.": "сначала выбрать целевой проект.",
+        "Resolve the target project before applying the research.": "Сначала выбрать целевой проект.",
         "Keep this as a watch signal until repeated archive or linked-source evidence appears.": (
             "оставить как watch-сигнал до повторных архивных или linked-source доказательств."
         ),
@@ -2118,11 +2118,11 @@ def _project_fit(context: Mapping[str, Any]) -> dict[str, Any]:
     if label not in PROJECT_LABELS:
         label = "no_match"
     guidance_by_label = {
-        "direct_implication": "Apply this to the named project after checking the cited evidence and drafting an explicit action.",
-        "weak_watch": "Watch the signal, but do not turn it into project work yet.",
-        "learning_relevance": "Study the source as background; direct project implication is not established.",
-        "no_match": "No named project matched; treat this as a cross-project engineering signal, not a project-specific action.",
-        "ambiguous_project": "Choose the target project before converting this research into an action.",
+        "direct_implication": "Можно применить к проекту только через маленькое проверяемое действие из цитируемого источника.",
+        "weak_watch": "Оставить как сигнал для наблюдения; пока не превращать в проектную работу.",
+        "learning_relevance": "Использовать как материал для изучения; прямое проектное действие не доказано.",
+        "no_match": "Проект не совпал; считать это общим инженерным сигналом, а не проектным действием.",
+        "ambiguous_project": "Сначала выбрать целевой проект, потом превращать исследование в действие.",
     }
     return {
         "status": str(context.get("status") or "ok"),
@@ -2198,6 +2198,7 @@ def _project_decision_synthesis(
         "approved_claim_refs": [str(claim.get("claim_id") or "") for claim in approved_claims if str(claim.get("claim_id") or "")],
         "source_refs": source_refs[:5],
         "grounded_recommendation": grounded_recommendation,
+        "next_action": grounded_recommendation,
         "acceptance_criterion": _project_decision_acceptance_criterion(
             project_fit=project_fit,
             approved_claims=approved_claims,
@@ -2243,7 +2244,7 @@ def _project_decision_blocker(
         return "Нет approved claim ledger: нельзя делать проектную рекомендацию без поддержанного claims."
     label = str(project_fit.get("relevance_label") or "no_match")
     if label == "direct_implication":
-        return "Главный риск сейчас — превратить discovery-сигнал в изменение без маленького проверяемого proof."
+        return "Главный риск сейчас — превратить архивный сигнал в изменение без маленького проверяемого подтверждения."
     if label == "weak_watch":
         return "Связь с проектом пока слабая: нужен повторяемый сигнал или первичный источник."
     if label == "learning_relevance":
@@ -2266,7 +2267,7 @@ def _project_decision_next_proof(
         return "Найти один релевантный локальный или первичный источник и провести claim-ledger проверку."
     label = str(project_fit.get("relevance_label") or "no_match")
     if label == "direct_implication":
-        return "Сделать один PR-sized fixture/smoke case, который проверяет поддержанный claim на проекте."
+        return "Сделать один маленький проверочный кейс в проекте и связать результат с цитируемым источником."
     if label == "weak_watch":
         return "Дождаться второго независимого источника или ручного подтверждения, что это влияет на backlog."
     if label == "learning_relevance":
@@ -2289,15 +2290,44 @@ def _project_decision_recommendation(
         return "Не менять проект: подтверждённых claims недостаточно."
     label = str(project_fit.get("relevance_label") or "no_match")
     if label == "direct_implication":
+        concrete = _project_decision_concrete_action(project_fit=project_fit, approved_claims=approved_claims)
+        if concrete:
+            return concrete
         values = [str(item) for item in next_steps.get("apply") or [] if str(item).strip()]
-        return values[0] if values else "Сформулировать один bounded project action из approved claims."
+        return _localize_next_step(values[0]) if values else "Сформулировать одно маленькое проверяемое действие из поддержанных источниками утверждений."
     if label == "weak_watch":
         values = [str(item) for item in next_steps.get("watch") or [] if str(item).strip()]
-        return values[0] if values else "Оставить как watch-сигнал, не заводя изменение."
+        return _localize_next_step(values[0]) if values else "Оставить как watch-сигнал, не заводя изменение."
     if label == "learning_relevance":
         values = [str(item) for item in next_steps.get("study") or [] if str(item).strip()]
-        return values[0] if values else "Использовать как learning input, не как проектное решение."
+        return _localize_next_step(values[0]) if values else "Использовать как learning input, не как проектное решение."
     return "Не применять к проекту из текущих доказательств."
+
+
+def _project_decision_concrete_action(
+    *,
+    project_fit: Mapping[str, Any],
+    approved_claims: Sequence[Mapping[str, Any]],
+) -> str:
+    project_name = _clean_text(project_fit.get("project_name")) or "проекта"
+    haystack = _clean_text(
+        " ".join(
+            [
+                str(project_fit.get("project_focus") or ""),
+                *[str(claim.get("claim_text") or "") for claim in approved_claims],
+            ]
+        )
+    ).casefold()
+    if _contains_any(haystack, ("agent operations", "agentops", "доступ", "аудит", "audit", "access")):
+        return (
+            f"Для {project_name}: сделать одну проверку по agent operations: "
+            "какой агент имеет доступ, кто подтверждает этот доступ и где остаётся журнал аудита."
+        )
+    if _contains_any(haystack, ("eval", "evaluation", "regression", "регресс", "оценк")):
+        return f"Для {project_name}: добавить один проверочный кейс, который ловит описанный сбой на цитируемом примере."
+    if _contains_any(haystack, ("retrieval", "rag", "citation", "цит", "источник")):
+        return f"Для {project_name}: проверить один сценарий поиска и цитирования на этом источнике и зафиксировать, где ответ теряет опору на доказательства."
+    return ""
 
 
 def _project_decision_acceptance_criterion(
@@ -2307,17 +2337,19 @@ def _project_decision_acceptance_criterion(
     recommendation: str,
 ) -> str:
     if not approved_claims:
-        return "Acceptance: найден хотя бы один supported claim с citation и явной связью с проектом."
+        return "Найдено хотя бы одно поддержанное источником утверждение с явной связью с проектом."
+    if "agent operations" in recommendation.casefold() or "журнал аудита" in recommendation.casefold():
+        return "Есть короткая проверка с агентом, уровнем доступа, подтверждающим человеком и местом аудита; без этого изменение не принимается."
     label = str(project_fit.get("relevance_label") or "no_match")
     if label == "direct_implication":
-        return "Acceptance: один маленький эксперимент воспроизводимо проходит и его результат связан с cited claim."
+        return "Один маленький эксперимент воспроизводимо проходит, а его результат связан с цитируемым источником."
     if label == "weak_watch":
-        return "Acceptance: появляется второй независимый источник или ручное подтверждение влияния на backlog."
+        return "Появляется второй независимый источник или ручное подтверждение влияния на backlog."
     if label == "learning_relevance":
-        return "Acceptance: сформулирован learning note с источником и без project mutation."
+        return "Сформулирована учебная заметка с источником и без изменения проекта."
     if recommendation:
-        return "Acceptance: рекомендация остаётся отказом от изменения, пока нет direct project evidence."
-    return "Acceptance: решение не принимается без нового cited proof."
+        return "Рекомендация остаётся отказом от изменения, пока нет прямого проектного доказательства."
+    return "Решение не принимается без нового цитируемого доказательства."
 
 
 def _approach_comparison(
@@ -2514,41 +2546,53 @@ def _direct_answer(
     label = str(project_fit.get("relevance_label") or "no_match")
     gate_status = str(answer_gate.get("status") or "")
     gate_reason = str(answer_gate.get("reason") or "")
+    ru = _is_russian(question)
     if gate_reason == "current_external_fact_required" or _is_current_external_fact_question(question):
-        return (
-            "This question requires external verification before a current claim or recommendation. "
-            "The local Telegram archive can be used only as discovery context; live/current verification was not approved or run."
-        )
+        if ru:
+            return "Нужна внешняя проверка перед текущим выводом. Локальный Telegram-архив ниже можно использовать только как discovery-контекст."
+        return "External verification is required before a current claim. The local Telegram archive below is discovery context only."
     if time_window.requested and not archive_items and not linked_items:
-        return (
-            f"No relevant retained Telegram posts were found for {time_window.label or 'the requested time window'}. "
-            "Older related posts were not used as evidence for this freshness-scoped question. "
-            "Live web verification was not run."
-        )
+        label_text = time_window.label or ("заданное окно" if ru else "the requested time window")
+        if ru:
+            return f"За {label_text} релевантных сохранённых Telegram-постов не найдено. Старые похожие посты не использую как ответ на свежий вопрос."
+        return f"No relevant retained Telegram posts were found for {label_text}. Older related posts were not used as evidence for this freshness-scoped question."
     if gate_status == "needs_external_verification":
-        return (
-            "This question requires external verification before a current claim or recommendation. "
-            "The local Telegram archive can be used only as discovery context; live/current verification was not approved or run."
-        )
+        if ru:
+            return "Для этого вывода нужна внешняя проверка. Локальный архив даёт только направление, не финальное подтверждение."
+        return "External verification is required for this answer. The local archive is directional context, not final proof."
     if not bool(answer_gate.get("allow_answer", True)):
         if gate_reason == "unsupported_project_state_claim":
-            return (
-                "I found at most related local material, but not sufficient cited proof for the requested completed/current project state. "
-                "This is insufficient_evidence, so I will not claim it happened."
-            )
-        return "I do not have enough cited local evidence to answer this reliably."
+            if ru:
+                return "Нашёл только близкий локальный материал, но не цитируемое доказательство текущего/завершённого состояния проекта. Не буду утверждать, что это произошло."
+            return "I found only related local material, not cited proof for the requested current/completed project state. I will not claim it happened."
+        return "Недостаточно цитируемых локальных доказательств для надёжного ответа." if ru else "I do not have enough cited local evidence to answer reliably."
     if not archive_items and not linked_items:
-        return "I do not have enough local archive or approved linked-source evidence to answer this reliably."
+        return "Локальных архивных или утверждённых linked-source доказательств недостаточно для ответа." if ru else "I do not have enough local archive or approved linked-source evidence to answer reliably."
     first_archive = _short(archive_items[0].get("snippet") or archive_items[0].get("content") or "", 220) if archive_items else ""
     first_linked = _short(linked_items[0].get("text_excerpt") or linked_items[0].get("redacted_failure_reason") or "", 220) if linked_items else ""
-    pieces = ["The local research path found grounded evidence."]
-    if first_archive:
-        pieces.append(f"Archive signal: {first_archive}")
-    if first_linked:
-        pieces.append(f"Linked-source signal: {first_linked}")
-    pieces.append(f"Project routing is `{label}`.")
+    source_count = len(archive_items) + len(linked_items)
+    if ru:
+        pieces = [f"Нашёл локальные источники: {source_count}."]
+        first_signal = first_archive or first_linked
+        if first_signal:
+            pieces.append(f"Первый полезный сигнал: {first_signal}")
+        guidance = str(project_fit.get("guidance") or "").strip()
+        project_name = str(project_fit.get("project_name") or "").strip()
+        if guidance:
+            pieces.append(f"Для {project_name or 'проекта'}: {guidance}")
+        else:
+            pieces.append(f"Связь с проектом: {_localized_project_label(label)}.")
+        if unknowns:
+            gaps = "; ".join(_localize_unknown(str(item)) for item in unknowns[:3])
+            pieces.append(f"Ограничение: {gaps}.")
+        return " ".join(pieces)
+    pieces = [f"Found {source_count} local source(s)."]
+    first_signal = first_archive or first_linked
+    if first_signal:
+        pieces.append(f"First useful signal: {first_signal}")
+    pieces.append(f"Project relation: {label}.")
     if unknowns:
-        pieces.append("Do not treat this as fully current until these gaps are cleared: " + "; ".join(unknowns[:3]) + ".")
+        pieces.append("Limit: " + "; ".join(str(item) for item in unknowns[:3]) + ".")
     return " ".join(pieces)
 
 

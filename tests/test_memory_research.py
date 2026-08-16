@@ -293,7 +293,10 @@ class TestMemoryResearch(unittest.TestCase):
 
         self.assertEqual(result["schema_version"], "memory_research_answer.v1")
         self.assertEqual(result["status"], "ok")
-        self.assertIn("Archive signal", result["direct_answer"])
+        self.assertIn("Found", result["direct_answer"])
+        self.assertIn("First useful signal", result["direct_answer"])
+        self.assertNotIn("Archive signal", result["direct_answer"])
+        self.assertNotIn("Project routing", result["direct_answer"])
         self.assertEqual(result["archive_evidence"]["retrieval_mode"], "sqlite_fts_archive_query_planner")
         self.assertTrue(result["archive_evidence"]["query_variants"])
         self.assertEqual(result["linked_source_evidence"]["extracted_count"], 1)
@@ -597,7 +600,7 @@ class TestMemoryResearch(unittest.TestCase):
         self.assertEqual(result["status"], "insufficient_evidence")
         self.assertEqual(result["answer_gate"]["reason"], "unsupported_project_state_claim")
         self.assertFalse(result["answer_gate"]["allow_answer"])
-        self.assertIn("insufficient_evidence", result["direct_answer"])
+        self.assertIn("не цитируемое доказательство", result["direct_answer"])
         self.assertEqual(result["draft_proposals"], [])
         self.assertEqual(result["receipt"]["draft_proposal_count"], 0)
         self.assertFalse(result["privacy"]["provider_egress"])
@@ -612,7 +615,7 @@ class TestMemoryResearch(unittest.TestCase):
         self.assertTrue(result["answer_gate"]["external_verification_required"])
         self.assertFalse(result["answer_gate"]["current_claim_allowed"])
         self.assertEqual(result["draft_proposals"], [])
-        self.assertIn("requires external verification", result["direct_answer"])
+        self.assertIn("Нужна внешняя проверка", result["direct_answer"])
         self.assertFalse(result["privacy"]["provider_egress"])
 
     def test_memory_research_refuses_open_browsing_before_tool_calls(self):

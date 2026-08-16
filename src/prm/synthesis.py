@@ -9,6 +9,13 @@ from typing import Any, Mapping, Sequence
 from assistant.claim_ledger import verify_answer_against_evidence
 from llm.client import LLMClient
 
+_FORBIDDEN_USER_MARKERS = (
+    "The local research path found grounded evidence",
+    "Archive signal:",
+    "Linked-source signal:",
+    "Project routing",
+)
+
 
 def synthesis_allowed() -> bool:
     enabled = os.environ.get("PRM_TELEGRAM_RAG_LLM_SYNTHESIS", "").strip().casefold()
@@ -61,6 +68,8 @@ def synthesize_answer(
     except Exception:
         return None
     if not answer:
+        return None
+    if any(marker in answer for marker in _FORBIDDEN_USER_MARKERS):
         return None
     verification = verify_answer_against_evidence(
         answer,
