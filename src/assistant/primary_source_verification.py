@@ -14,6 +14,9 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 from urllib.parse import urljoin, urlparse
 
+from assistant.claim_ledger import build_claim_ledger, claim_ledger_public_summary
+from assistant.evidence_quality import build_evidence_quality_items
+
 
 PRIMARY_SOURCE_VERIFICATION_SCHEMA_VERSION = "prm_primary_source_verification.v1"
 PRIMARY_SOURCE_FETCH_SCHEMA_VERSION = "prm_primary_source_fetch.v1"
@@ -111,6 +114,7 @@ def execute_primary_source_verification(
             "content_type": fetched["content_type"],
             "content_bytes": len(fetched["body"]),
             "content_hash": "sha256:" + hashlib.sha256(fetched["body"]).hexdigest(),
+            "text_excerpt": _text_excerpt(fetched["body"]),
             "fetched_at": _now(),
             "cache_ttl_seconds": int(_CACHE_TTL.total_seconds()),
             "evidence_class": classification["evidence_class"],
@@ -121,12 +125,73 @@ def execute_primary_source_verification(
         }
         _write_cache(cache_root, source_url, result)
         results.append(result)
+    claim_update = build_primary_source_claim_ledger(payload, results)
     return {
         **plan,
         "status": "verification_fetched" if results else "verification_required_not_run",
         "fetch_results": results,
+        "claim_ledger": claim_update["claim_ledger"],
+        "claim_ledger_summary": claim_update["claim_ledger_summary"],
+        "support_comparison": claim_update["support_comparison"],
+        "revised_recommendation": claim_update["revised_recommendation"],
         "live_fetch": {**plan["live_fetch"], "performed": bool(results), "allow_live_fetch_runtime": bool(allow_live_fetch), "response_size_cap_bytes": _MAX_RESPONSE_BYTES},
         "write_performed": False,
+    }
+
+
+def build_primary_source_claim_ledger(
+    payload: Mapping[str, Any],
+    fetch_results: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Project fetched official evidence into the same claim-ledger contract."""
+
+    telegram_claims = _telegram_claims(payload)
+    evidence_items = build_evidence_quality_items(
+        [
+            {
+                "source_url": item.get("final_url") or item.get("source_url"),
+                "source_class": item.get("evidence_class"),
+                "text_excerpt": item.get("text_excerpt"),
+                "fetched_at": item.get("fetched_at"),
+                "primary_source_status": item.get("primary_source_status"),
+            }
+            for item in fetch_results
+            if isinstance(item, Mapping) and item.get("status") == "fetched"
+        ],
+        question=" ".join(telegram_claims),
+    )
+    ledger = build_claim_ledger(
+        [{"claim_text": claim, "claim_type": "source_fact"} for claim in telegram_claims],
+        evidence_items,
+    )
+    comparisons = []
+    for claim in ledger.get("claims") or []:
+        if not isinstance(claim, Mapping):
+            continue
+        snippets = [
+            item
+            for item in evidence_items
+            if str(item.get("source_url") or "") in {str(ref) for ref in claim.get("evidence_refs") or []}
+        ]
+        comparisons.append(
+            {
+                "telegram_claim": claim.get("claim_text") or "",
+                "official_source_refs": claim.get("evidence_refs") or [],
+                "support_status": claim.get("support_status") or "unsupported",
+                "support_snippets": [
+                    {
+                        "source_url": item.get("source_url") or "",
+                        "support_span": item.get("support_span") or "",
+                    }
+                    for item in snippets[:3]
+                ],
+            }
+        )
+    return {
+        "claim_ledger": ledger,
+        "claim_ledger_summary": claim_ledger_public_summary(ledger),
+        "support_comparison": comparisons,
+        "revised_recommendation": _revised_recommendation(comparisons),
     }
 
 
@@ -274,6 +339,32 @@ def _validate_fetch_response(url: str, *, status: int, headers: Mapping[str, str
 
 def _content_type(headers: Mapping[str, str]) -> str:
     return str(headers.get("content-type") or "").split(";")[0].strip().casefold()
+
+
+def _text_excerpt(body: bytes, *, limit: int = 700) -> str:
+    text = body[:80_000].decode("utf-8", errors="ignore")
+    text = " ".join(text.split())
+    return text[: max(120, min(1200, int(limit or 700)))]
+
+
+def _telegram_claims(payload: Mapping[str, Any]) -> list[str]:
+    raw = payload.get("telegram_claims")
+    if isinstance(raw, Sequence) and not isinstance(raw, str):
+        claims = [str(item).strip() for item in raw if str(item).strip()]
+    else:
+        claims = [str(payload.get("telegram_claim") or "").strip()]
+    return [claim for claim in claims if claim][:6]
+
+
+def _revised_recommendation(comparisons: Sequence[Mapping[str, Any]]) -> str:
+    if not comparisons:
+        return "No Telegram claim was supplied for primary-source comparison."
+    statuses = [str(item.get("support_status") or "") for item in comparisons]
+    if statuses and all(status == "supported" for status in statuses):
+        return "Primary-source fetch supports the Telegram claim; recommendation may cite the official source."
+    if any(status == "partially_supported" for status in statuses):
+        return "Primary source only partially supports the Telegram claim; revise the recommendation to the narrower supported claim."
+    return "Primary source does not support the Telegram claim; keep Telegram as discovery context and do not recommend from it."
 
 
 def _github_repository_summary(url: str, body: bytes) -> dict[str, Any]:

@@ -18,8 +18,15 @@ def build_professional_answer(payload: Mapping[str, Any], *, workflow: str) -> d
     gate = _mapping(payload.get("answer_gate"))
     archive = _mapping(payload.get("archive_evidence"))
     sources = _sources({"archive_evidence": archive})
+    approved_sources = _approved_claim_sources(payload.get("approved_claim_ledger"))
+    if approved_sources:
+        sources = approved_sources
     verification_required = bool(gate.get("external_verification_required"))
     answer = " ".join(str(payload.get("direct_answer") or "").split())
+    project_decision = _mapping(payload.get("project_decision"))
+    recommended_action = None if verification_required else _first_action(payload)
+    if not verification_required and project_decision.get("grounded_recommendation"):
+        recommended_action = str(project_decision["grounded_recommendation"])
     result = {
         "schema_version": PROFESSIONAL_ANSWER_SCHEMA_VERSION,
         "interaction_id": str(payload.get("interaction_id") or ""),
@@ -31,7 +38,7 @@ def build_professional_answer(payload: Mapping[str, Any], *, workflow: str) -> d
         "project_context": _mapping(payload.get("project_fit")),
         "workflow_section": _mapping(payload.get("workflow_section")),
         "project_implication": str(_mapping(payload.get("project_fit")).get("guidance") or "Прямая связь с проектом не подтверждена."),
-        "recommended_action": None if verification_required else _first_action(payload),
+        "recommended_action": recommended_action,
         "do_not_do": "Не считать локальный сигнал подтвержденным без достаточных источников.",
         "uncertainty": _strings(payload.get("unknowns")),
         "freshness": "external_verification_required" if verification_required else "archive_scoped",
@@ -84,6 +91,24 @@ def _first_action(payload: Mapping[str, Any]) -> str | None:
             if isinstance(values, Sequence) and not isinstance(values, str) and values:
                 return str(values[0])
     return None
+
+
+def _approved_claim_sources(value: object) -> list[dict[str, str]]:
+    ledger = _mapping(value)
+    result: list[dict[str, str]] = []
+    for claim in _mappings(ledger.get("claims")):
+        refs = _strings(claim.get("evidence_refs"))
+        if not refs:
+            continue
+        result.append(
+            {
+                "source_url": refs[0],
+                "snippet": " ".join(str(claim.get("claim_text") or "").split())[:220],
+            }
+        )
+        if len(result) >= 3:
+            break
+    return result
 
 
 def _strings(value: object) -> list[str]:

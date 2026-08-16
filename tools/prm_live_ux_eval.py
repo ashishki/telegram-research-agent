@@ -26,6 +26,12 @@ TOPICS = (
     "long context", "memory systems", "AI strategy", "data quality", "human in the loop",
     "agent reliability", "AI transformation",
 )
+PROJECTS = (
+    "telegram-research-agent",
+    "AI_workflow_playbook",
+    "Eval-Ground-Truth-Lab",
+    "Demand-to-MVP-Radar",
+)
 PRIVATE_RECEIPT_ROOT = (Path(__file__).resolve().parents[1] / "data" / "events").resolve()
 JUDGE_MIN_SCORE = 4
 MAX_LIVE_PROVIDER_CALLS = 400
@@ -34,12 +40,13 @@ MAX_LIVE_PROVIDER_CALLS = 400
 def build_cases() -> list[dict[str, str]]:
     """Return exactly 100 generated user scenarios, without operator input."""
     cases: list[dict[str, str]] = []
-    for topic in TOPICS:
+    for index, topic in enumerate(TOPICS):
+        project = PROJECTS[index % len(PROJECTS)]
         cases.extend(
             (
                 {"kind": "research", "question": f"Что в моём архиве было про {topic} и что мне с этим делать?", "expected": "research"},
                 {"kind": "brief", "question": f"Собери опорные тезисы для поста про {topic}.", "expected": "brief"},
-                {"kind": "decision", "question": f"Какие практические выводы для моего проекта можно сделать из материалов про {topic}?", "expected": "research"},
+                {"kind": "decision", "question": f"Что из материалов про {topic} применимо к проекту {project}?", "expected": "research"},
                 {"kind": "current_fact", "question": f"Что сейчас самое новое и важное про {topic}?", "expected": "research"},
             )
         )
@@ -117,8 +124,7 @@ def run(*, live: bool, case_limit: int, case_offset: int, max_provider_calls: in
         os.environ["PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS"] = "0"
         os.environ["PRM_TELEGRAM_AUTO_LLM_ROUTER"] = "0"
         os.environ["PRM_TELEGRAM_RAG_LLM_SYNTHESIS"] = "0"
-    from assistant.memory_research import MemoryResearchBudget, answer_memory_research, render_memory_research_answer, render_memory_research_brief
-    from bot.handlers import _render_telegram_research_response, _route_auto_message
+    from bot.handlers import _run_prm_auto_message_once
     from config.settings import load_settings
     from llm.client import LLMClient, suppress_usage_recording
     import llm.client as llm_client
@@ -147,20 +153,20 @@ def run(*, live: bool, case_limit: int, case_offset: int, max_provider_calls: in
         for case in cases:
             case_id = _case_id(case)
             with suppress_usage_recording():
-                route = _route_auto_message(f"prm-live-eval-{case_id}", case["question"])
-            route_mode = str(route.get("mode") or "")
-            budget = MemoryResearchBudget(
-            max_tool_calls=4, max_archive_sources=5, max_linked_sources=3, max_retries=0,
-            timeout_seconds=30, max_prompt_chars=8000, max_model_calls=0, max_cost_usd=0.0,
-            allow_open_browsing=False, allow_provider_egress=False,
-            allow_vector_retrieval=os.environ.get("PRM_ARCHIVE_HYBRID_RETRIEVAL", "").casefold() in {"1", "true", "yes", "approved"},
-            vector_index_path=os.environ.get("PRM_ARCHIVE_VECTOR_INDEX_PATH", ""),
-        )
-            payload = answer_memory_research(case["question"], settings=load_settings(), limit=5, budget=budget)
-            local_text = render_memory_research_brief(payload) if route_mode == "brief" else render_memory_research_answer(payload)
-            current_boundary = bool((payload.get("answer_gate") or {}).get("external_verification_required"))
-            with suppress_usage_recording():
-                answer = _render_telegram_research_response(payload, local_text=local_text, mode=route_mode if route_mode == "brief" else "research")
+                runtime = _run_prm_auto_message_once(
+                    f"prm-live-eval-{case_id}",
+                    case["question"],
+                    load_settings(),
+                    remember_dialog=False,
+                )
+            route = runtime.get("route") if isinstance(runtime.get("route"), Mapping) else {}
+            route_mode = str(runtime.get("mode") or "")
+            payload = runtime.get("payload") if isinstance(runtime.get("payload"), Mapping) else {}
+            answer = str(runtime.get("final_answer") or "")
+            answer_gate = payload.get("answer_gate") if isinstance(payload.get("answer_gate"), Mapping) else {}
+            current_boundary = bool(answer_gate.get("external_verification_required")) and not bool(
+                answer_gate.get("current_claim_allowed", True)
+            )
             source_count = len((payload.get("archive_evidence") or {}).get("items") or []) + len((payload.get("linked_source_evidence") or {}).get("items") or [])
             deterministic_failures: list[str] = []
             if route_mode != case["expected"]:
@@ -173,6 +179,12 @@ def run(*, live: bool, case_limit: int, case_offset: int, max_provider_calls: in
                 deterministic_failures.append("technical_leak")
             if bool((payload.get("privacy") or {}).get("durable_writes")):
                 deterministic_failures.append("durable_write")
+            final_verification = runtime.get("final_answer_verification") if isinstance(runtime.get("final_answer_verification"), Mapping) else {}
+            final_metrics = final_verification.get("metrics") if isinstance(final_verification.get("metrics"), Mapping) else {}
+            if int(final_metrics.get("current_fact_violations") or 0):
+                deterministic_failures.append("final_current_fact_violation")
+            if float(final_metrics.get("unsupported_claim_rate") or 0.0) > 0.50 and source_count:
+                deterministic_failures.append("final_claim_verification")
             judge: dict[str, Any] | None = None
             if live:
                 try:
@@ -194,6 +206,11 @@ def run(*, live: bool, case_limit: int, case_offset: int, max_provider_calls: in
                 "actual_route": route_mode, "router": str(route.get("router") or ""),
                 "source_count": source_count, "current_fact_boundary": current_boundary,
                 "answer_chars": len(answer), "failures": deterministic_failures, "judge": judge,
+                "final_answer_verification": {
+                    "claim_count": int(final_verification.get("claim_count") or 0),
+                    "unsupported_claim_rate": float(final_metrics.get("unsupported_claim_rate") or 0.0),
+                    "current_fact_violations": int(final_metrics.get("current_fact_violations") or 0),
+                },
             })
     finally:
         if live:

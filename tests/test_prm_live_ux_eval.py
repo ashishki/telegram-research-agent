@@ -1,5 +1,6 @@
 import importlib.util
 import os
+import re
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -110,7 +111,12 @@ def test_live_ux_eval_budgets_router_synthesis_verifier_and_judge(monkeypatch):
         if "citation entailment verifier" in system:
             return SimpleNamespace(text="PASS")
         if "source-grounded Telegram answers" in system:
-            return SimpleNamespace(text="Русский ответ с источником")
+            prompt = str(kwargs.get("prompt") or "")
+            url_match = re.search(r"https://[^\"]+", prompt)
+            url = url_match.group(0) if url_match else "https://t.me/source/1"
+            snippet_match = re.search(r'"snippet": "([^"]+)"', prompt)
+            snippet = snippet_match.group(1) if snippet_match else "eval evidence grounding"
+            return SimpleNamespace(text=f"Короткий вывод\n{snippet[:140]} {url}")
         return SimpleNamespace(text='{"score": 5, "clear": true, "action_oriented": true, "grounded": true, "technical_leak": false}')
 
     monkeypatch.setenv("PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS", "1")

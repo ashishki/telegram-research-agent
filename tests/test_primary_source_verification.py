@@ -38,6 +38,7 @@ def test_execute_primary_source_verification_uses_fake_transport_and_cache(tmp_p
 
     assert first["status"] == "verification_fetched"
     assert first["fetch_results"][0]["evidence_class"] == "github_repository"
+    assert first["fetch_results"][0]["text_excerpt"]
     assert first["fetch_results"][0]["github_repository"]["repository"] == "owner/repo"
     assert second["fetch_results"][0]["cache_hit"] is True
     assert calls == ["https://github.com/owner/repo"]
@@ -52,3 +53,30 @@ def test_verification_does_not_fetch_without_approval(tmp_path):
 
     assert result["status"] == "verification_required_not_run"
     assert result["fetch_results"] == []
+
+
+def test_primary_source_fetch_result_enters_claim_ledger(tmp_path):
+    def transport(url: str) -> dict:
+        return {
+            "status": 200,
+            "headers": {"content-type": "text/plain"},
+            "body": b"The official changelog confirms claim ledger verification before synthesis.",
+            "final_url": url,
+        }
+
+    result = execute_primary_source_verification(
+        {
+            "approvals": {"live_fetch_approved": True, "trust_record_approved": True},
+            "telegram_source_refs": ["https://t.me/example/2"],
+            "telegram_claim": "claim ledger verification before synthesis",
+            "candidate_source_urls": [{"source_url": "https://docs.vendor.example/changelog", "official_relation": True}],
+        },
+        transport=transport,
+        cache_dir=tmp_path,
+    )
+
+    comparison = result["support_comparison"][0]
+    assert comparison["support_status"] == "supported"
+    assert comparison["support_snippets"][0]["support_span"].startswith("The official changelog")
+    assert result["claim_ledger_summary"]["supported_claim_rate"] == 1.0
+    assert "official source" in result["revised_recommendation"]

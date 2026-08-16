@@ -161,3 +161,92 @@ def test_prm_qa_eval_public_report_has_no_private_queries(tmp_path):
     assert report["retrieval_by_job_type"]["R0_sqlite_fts_strict_or_baseline"]
     assert "semantic_topic" in report["retrieval_by_job_type"]["R0_sqlite_fts_strict_or_baseline"]
     assert report["dense_candidate"]["adopted"] is False
+
+
+def test_private_generator_v2_uses_leak_checked_pairwise_silver_labels(tmp_path):
+    db_path = tmp_path / "agent.db"
+    cases_path = tmp_path / "private" / "cases.v2.jsonl"
+    manifest_path = tmp_path / "manifest.v2.json"
+    _seed_archive(db_path)
+
+    subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "tools" / "prm_qa_generate_private_eval_v2.py"),
+            "--db",
+            str(db_path),
+            "--out",
+            str(cases_path),
+            "--public-manifest",
+            str(manifest_path),
+            "--min-cases",
+            "60",
+        ],
+        cwd=ROOT,
+        check=True,
+    )
+
+    manifest = json.loads(manifest_path.read_text())
+    rows = [json.loads(line) for line in cases_path.read_text().splitlines() if line.strip()]
+    labelled = next(row for row in rows if row["relevance_labels"])
+
+    assert manifest["schema_version"] == "prm_qa_dataset_manifest.v2"
+    assert manifest["methodology"]["query_generator_independent_from_relevance_reviewer"] is True
+    assert labelled["schema_version"] == "prm_qa.case.v2"
+    assert labelled["query_generation"]["leak_check"]["passed"] is True
+    assert labelled["query_generation"]["input"] == "semantic_summary_without_names_or_rare_terms"
+    assert labelled["relevance_labels"][0]["reviewer_role"] == "pairwise_relevance_reviewer"
+    assert labelled["relevance_labels"][0]["reviewer_independent_of_query_generator"] is True
+    assert "Agent reliability evaluation case" not in labelled["query"]
+    assert labelled["privacy"]["contains_raw_telegram_body"] is False
+
+
+def test_prm_qa_eval_v2_runs_real_runtime_route_without_public_queries(tmp_path):
+    db_path = tmp_path / "agent.db"
+    cases_path = tmp_path / "private" / "cases.v2.jsonl"
+    manifest_path = tmp_path / "manifest.v2.json"
+    report_path = tmp_path / "report.v2.json"
+    _seed_archive(db_path)
+    subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "tools" / "prm_qa_generate_private_eval_v2.py"),
+            "--db",
+            str(db_path),
+            "--out",
+            str(cases_path),
+            "--public-manifest",
+            str(manifest_path),
+            "--min-cases",
+            "60",
+        ],
+        cwd=ROOT,
+        check=True,
+    )
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "tools" / "prm_qa_eval_v2.py"),
+            "--db",
+            str(db_path),
+            "--cases",
+            str(cases_path),
+            "--public-report",
+            str(report_path),
+            "--case-limit",
+            "6",
+        ],
+        cwd=ROOT,
+        check=False,
+    )
+
+    assert completed.returncode in {0, 1}
+    report = json.loads(report_path.read_text())
+
+    assert report["schema_version"] == "prm_qa_eval_report.v2"
+    assert report["privacy"]["public_report_contains_queries"] is False
+    assert report["privacy"]["telegram_messages_sent"] is False
+    assert report["routing"]["operator_context_rate"] == 1.0
+    assert report["final_answer_verification"]["evaluated_cases"] == 6
+    assert all("case_id_hash" in item and "query" not in item for item in report["cases"])

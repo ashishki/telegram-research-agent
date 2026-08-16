@@ -87,3 +87,7 @@ These files remain preserved for human reference, but they are no longer part of
 - `PRM_DEEP_REVIEW_PRM18A_18C_2026-08-03.md` - PRM-18A through PRM-18C
   batched deep review, documentation overclaim repair, verifier evidence,
   residual provider/runtime risks, and stop boundary before PRM-19.
+- `PRM_EVAL_V2_QUALITY_PASS_2026-08-15.md` - scoped evaluation-methodology
+  correction: self-answer-resistant Eval V2 generation, real runtime route
+  evaluator, rendered-answer claim verification, pre-synthesis approved claim
+  ledger, project-decision synthesis, and primary-source ledger integration.

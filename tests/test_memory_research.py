@@ -240,6 +240,30 @@ class TestMemoryResearch(unittest.TestCase):
         self.assertEqual(answer["primary_workflow"], "archive_research")
         self.assertEqual(answer["workflow_section"], result["professional_workflows"]["ai_systems"])
 
+    def test_memory_research_builds_project_decision_from_approved_claim_ledger(self):
+        result = answer_memory_research(
+            "Что из материалов про eval gates применимо к Eval-Ground-Truth-Lab?",
+            facade=_FakeFacade(),
+            project_name="Eval-Ground-Truth-Lab",
+            operator_context={
+                "interaction_id": "decision-interaction",
+                "primary_workflow": "archive_research",
+            },
+        )
+
+        decision = result["project_decision"]
+
+        self.assertEqual(decision["schema_version"], "prm_project_decision_synthesis.v1")
+        self.assertEqual(decision["project_name"], "Eval-Ground-Truth-Lab")
+        self.assertTrue(result["candidate_claim_ledger"]["claims"])
+        self.assertTrue(result["claim_ledger"]["claims"])
+        self.assertTrue(decision["approved_claim_refs"])
+        self.assertTrue(decision["current_blocker"])
+        self.assertTrue(decision["next_proof"])
+        self.assertTrue(decision["grounded_recommendation"])
+        self.assertTrue(decision["acceptance_criterion"])
+        self.assertFalse(decision["write_performed"])
+
     def test_memory_research_maps_career_section_to_archive_workflow(self):
         result = answer_memory_research(
             "What portfolio evidence is useful for an AI career?",

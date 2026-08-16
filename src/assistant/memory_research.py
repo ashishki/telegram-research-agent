@@ -14,7 +14,13 @@ from assistant.linked_sources import (
     LinkedSourceFetcher,
     resolve_linked_sources,
 )
-from assistant.claim_ledger import build_claim_ledger_from_payload, claim_ledger_public_summary
+from assistant.claim_ledger import (
+    approve_claim_ledger,
+    build_candidate_claims_from_evidence,
+    build_claim_ledger,
+    claim_ledger_public_summary,
+    verify_answer_against_evidence,
+)
 from assistant.evidence_quality import build_evidence_quality_items, evidence_quality_summary
 from assistant.pi_facade import PersonalIntelligenceFacade
 from assistant.pi_memory import build_memory_proposal, query_saved_knowledge
@@ -509,6 +515,39 @@ def answer_memory_research(
                 "answer_gate": answer_gate,
             }
         )
+    selected_evidence_items = [
+        *[item for item in archive_evidence.get("items") or [] if isinstance(item, Mapping)],
+        *[item for item in linked_evidence.get("items") or [] if isinstance(item, Mapping)],
+    ]
+    evidence_quality_items = build_evidence_quality_items(
+        selected_evidence_items,
+        question=clean_question,
+        project_name=str(project_fit.get("project_name") or ""),
+    )
+    evidence_quality = {
+        "schema_version": "prm_evidence_quality_bundle.v1",
+        "items": evidence_quality_items,
+        "summary": evidence_quality_summary(evidence_quality_items),
+    }
+    current_fact_required = bool(answer_gate.get("external_verification_required")) and not bool(
+        answer_gate.get("current_claim_allowed", True)
+    )
+    candidate_claim_ledger = build_claim_ledger(
+        build_candidate_claims_from_evidence(evidence_quality_items),
+        evidence_quality_items,
+        current_fact_required=current_fact_required,
+        project_name=str(project_fit.get("project_name") or ""),
+    )
+    claim_ledger = approve_claim_ledger(candidate_claim_ledger)
+    project_decision = _project_decision_synthesis(
+        question=clean_question,
+        project_fit=project_fit,
+        curated_evidence=curated_evidence,
+        approved_claim_ledger=claim_ledger,
+        next_steps=next_steps,
+        unknowns=unknowns,
+        answer_gate=answer_gate,
+    )
     context = _mapping(operator_context)
     interaction_id = str(context.get("interaction_id") or f"local-{uuid4()}")
     primary_workflow = str(context.get("primary_workflow") or "archive_research")
@@ -524,35 +563,36 @@ def answer_memory_research(
             "next_steps": next_steps,
             "unknowns": unknowns,
             "workflow_section": professional_workflows.get(workflow_section_key, {}),
+            "approved_claim_ledger": claim_ledger,
+            "project_decision": project_decision,
         },
         workflow=primary_workflow,
     )
-    selected_evidence_items = [
-        *[item for item in archive_evidence.get("items") or [] if isinstance(item, Mapping)],
-        *[item for item in linked_evidence.get("items") or [] if isinstance(item, Mapping)],
-    ]
-    evidence_quality_items = build_evidence_quality_items(
-        selected_evidence_items,
-        question=clean_question,
-        project_name=str(project_fit.get("project_name") or ""),
+    answer_body = render_memory_research_answer_body(
+        direct_answer=direct_answer,
+        archive_evidence=archive_evidence,
+        linked_evidence=linked_evidence,
+        comparison=comparison,
+        project_fit=project_fit,
+        context_pack=context_pack,
+        next_steps=next_steps,
+        deeper_reading=deeper_reading,
+        unknowns=unknowns,
+        drafts=drafts,
     )
-    evidence_quality = {
-        "schema_version": "prm_evidence_quality_bundle.v1",
-        "items": evidence_quality_items,
-        "summary": evidence_quality_summary(evidence_quality_items),
-    }
-    claim_ledger = build_claim_ledger_from_payload(
-        {
-            "direct_answer": direct_answer,
-            "professional_answer": professional_answer,
-            "answer_gate": answer_gate,
-            "project_name": project_fit.get("project_name") or "",
-        },
+    final_answer_verification = verify_answer_against_evidence(
+        answer_body,
         evidence_quality_items,
+        current_fact_required=current_fact_required,
+        project_name=str(project_fit.get("project_name") or ""),
     )
     receipt["retrieval_policy"] = _mapping(archive_result.get("retrieval_policy"))
     receipt["evidence_quality_summary"] = evidence_quality["summary"]
     receipt["claim_grounding"] = claim_ledger_public_summary(claim_ledger)
+    receipt["final_answer_verification"] = {
+        "claim_count": int(final_answer_verification.get("claim_count") or 0),
+        "metrics": final_answer_verification.get("metrics") or {},
+    }
     return {
         "schema_version": MEMORY_RESEARCH_SCHEMA_VERSION,
         "status": receipt["status"],
@@ -569,7 +609,10 @@ def answer_memory_research(
         "context_pack": context_pack,
         "retrieval_policy": _mapping(archive_result.get("retrieval_policy")),
         "evidence_quality": evidence_quality,
+        "candidate_claim_ledger": candidate_claim_ledger,
         "claim_ledger": claim_ledger,
+        "project_decision": project_decision,
+        "final_answer_verification": final_answer_verification,
         "answer_gate": answer_gate,
         "next_steps": next_steps,
         "deeper_reading_path": deeper_reading,
@@ -586,18 +629,7 @@ def answer_memory_research(
         "draft_proposals": drafts,
         "receipt": receipt,
         "privacy": receipt["privacy"],
-        "answer": render_memory_research_answer_body(
-            direct_answer=direct_answer,
-            archive_evidence=archive_evidence,
-            linked_evidence=linked_evidence,
-            comparison=comparison,
-            project_fit=project_fit,
-            context_pack=context_pack,
-            next_steps=next_steps,
-            deeper_reading=deeper_reading,
-            unknowns=unknowns,
-            drafts=drafts,
-        ),
+        "answer": answer_body,
     }
 
 
@@ -2112,6 +2144,180 @@ def _project_fit(context: Mapping[str, Any]) -> dict[str, Any]:
             "project_mutation_exposed": False,
         },
     }
+
+
+def _project_decision_synthesis(
+    *,
+    question: str,
+    project_fit: Mapping[str, Any],
+    curated_evidence: Mapping[str, Any],
+    approved_claim_ledger: Mapping[str, Any],
+    next_steps: Mapping[str, Sequence[str]],
+    unknowns: Sequence[str],
+    answer_gate: Mapping[str, Any],
+) -> dict[str, Any]:
+    project_name = _clean_text(project_fit.get("project_name")) or "проект"
+    label = str(project_fit.get("relevance_label") or "no_match")
+    approved_claims = [item for item in approved_claim_ledger.get("claims") or [] if isinstance(item, Mapping)]
+    source_refs = _unique(
+        [
+            ref
+            for claim in approved_claims
+            for ref in _strings(claim.get("evidence_refs"))
+        ]
+    )
+    saved_decisions = _saved_project_decisions(curated_evidence, project_name=project_name)
+    current_blocker = _project_decision_blocker(
+        project_fit=project_fit,
+        approved_claims=approved_claims,
+        unknowns=unknowns,
+        answer_gate=answer_gate,
+    )
+    next_proof = _project_decision_next_proof(
+        project_fit=project_fit,
+        approved_claims=approved_claims,
+        unknowns=unknowns,
+        answer_gate=answer_gate,
+    )
+    grounded_recommendation = _project_decision_recommendation(
+        project_fit=project_fit,
+        approved_claims=approved_claims,
+        next_steps=next_steps,
+        answer_gate=answer_gate,
+    )
+    return {
+        "schema_version": "prm_project_decision_synthesis.v1",
+        "status": "ready" if approved_claims and label in {"direct_implication", "weak_watch", "learning_relevance"} else "insufficient_evidence",
+        "question_intent": _clean_text(question)[:220],
+        "project_name": project_name,
+        "project_goal": _clean_text(project_fit.get("project_focus"))
+        or "Связать локальный исследовательский сигнал с одним проверяемым действием проекта.",
+        "current_blocker": current_blocker,
+        "next_proof": next_proof,
+        "saved_project_decisions": saved_decisions,
+        "approved_claim_refs": [str(claim.get("claim_id") or "") for claim in approved_claims if str(claim.get("claim_id") or "")],
+        "source_refs": source_refs[:5],
+        "grounded_recommendation": grounded_recommendation,
+        "acceptance_criterion": _project_decision_acceptance_criterion(
+            project_fit=project_fit,
+            approved_claims=approved_claims,
+            recommendation=grounded_recommendation,
+        ),
+        "write_performed": False,
+    }
+
+
+def _saved_project_decisions(curated_evidence: Mapping[str, Any], *, project_name: str) -> list[str]:
+    result: list[str] = []
+    needle = project_name.casefold()
+    for item in curated_evidence.get("items") or []:
+        if not isinstance(item, Mapping):
+            continue
+        text = _clean_text(
+            item.get("title")
+            or item.get("summary")
+            or item.get("text")
+            or item.get("body")
+            or item.get("id")
+        )
+        haystack = f"{text} {item.get('item_type') or ''}".casefold()
+        if "decision" not in haystack and "решени" not in haystack and needle not in haystack:
+            continue
+        if text and text not in result:
+            result.append(text[:220])
+        if len(result) >= 3:
+            break
+    return result
+
+
+def _project_decision_blocker(
+    *,
+    project_fit: Mapping[str, Any],
+    approved_claims: Sequence[Mapping[str, Any]],
+    unknowns: Sequence[str],
+    answer_gate: Mapping[str, Any],
+) -> str:
+    if bool(answer_gate.get("external_verification_required")):
+        return "Нужна отдельная первоисточниковая проверка: текущий факт нельзя подтвердить локальным архивом."
+    if not approved_claims:
+        return "Нет approved claim ledger: нельзя делать проектную рекомендацию без поддержанного claims."
+    label = str(project_fit.get("relevance_label") or "no_match")
+    if label == "direct_implication":
+        return "Главный риск сейчас — превратить discovery-сигнал в изменение без маленького проверяемого proof."
+    if label == "weak_watch":
+        return "Связь с проектом пока слабая: нужен повторяемый сигнал или первичный источник."
+    if label == "learning_relevance":
+        return "Материал полезен для обучения, но прямое product/code действие не доказано."
+    if unknowns:
+        return "Не закрыто: " + "; ".join(str(item) for item in unknowns[:2]) + "."
+    return "Прямая связь с проектом не подтверждена."
+
+
+def _project_decision_next_proof(
+    *,
+    project_fit: Mapping[str, Any],
+    approved_claims: Sequence[Mapping[str, Any]],
+    unknowns: Sequence[str],
+    answer_gate: Mapping[str, Any],
+) -> str:
+    if bool(answer_gate.get("external_verification_required")):
+        return "Получить approved primary-source verification и сравнить её с Telegram claim."
+    if not approved_claims:
+        return "Найти один релевантный локальный или первичный источник и провести claim-ledger проверку."
+    label = str(project_fit.get("relevance_label") or "no_match")
+    if label == "direct_implication":
+        return "Сделать один PR-sized fixture/smoke case, который проверяет поддержанный claim на проекте."
+    if label == "weak_watch":
+        return "Дождаться второго независимого источника или ручного подтверждения, что это влияет на backlog."
+    if label == "learning_relevance":
+        return "Провести маленький learning experiment и записать результат только после подтверждения."
+    if unknowns:
+        return "Закрыть первый неизвестный пункт: " + str(unknowns[0]) + "."
+    return "Сначала выбрать более точный проектный критерий."
+
+
+def _project_decision_recommendation(
+    *,
+    project_fit: Mapping[str, Any],
+    approved_claims: Sequence[Mapping[str, Any]],
+    next_steps: Mapping[str, Sequence[str]],
+    answer_gate: Mapping[str, Any],
+) -> str:
+    if bool(answer_gate.get("external_verification_required")):
+        return "Не принимать проектное решение до первоисточниковой проверки."
+    if not approved_claims:
+        return "Не менять проект: подтверждённых claims недостаточно."
+    label = str(project_fit.get("relevance_label") or "no_match")
+    if label == "direct_implication":
+        values = [str(item) for item in next_steps.get("apply") or [] if str(item).strip()]
+        return values[0] if values else "Сформулировать один bounded project action из approved claims."
+    if label == "weak_watch":
+        values = [str(item) for item in next_steps.get("watch") or [] if str(item).strip()]
+        return values[0] if values else "Оставить как watch-сигнал, не заводя изменение."
+    if label == "learning_relevance":
+        values = [str(item) for item in next_steps.get("study") or [] if str(item).strip()]
+        return values[0] if values else "Использовать как learning input, не как проектное решение."
+    return "Не применять к проекту из текущих доказательств."
+
+
+def _project_decision_acceptance_criterion(
+    *,
+    project_fit: Mapping[str, Any],
+    approved_claims: Sequence[Mapping[str, Any]],
+    recommendation: str,
+) -> str:
+    if not approved_claims:
+        return "Acceptance: найден хотя бы один supported claim с citation и явной связью с проектом."
+    label = str(project_fit.get("relevance_label") or "no_match")
+    if label == "direct_implication":
+        return "Acceptance: один маленький эксперимент воспроизводимо проходит и его результат связан с cited claim."
+    if label == "weak_watch":
+        return "Acceptance: появляется второй независимый источник или ручное подтверждение влияния на backlog."
+    if label == "learning_relevance":
+        return "Acceptance: сформулирован learning note с источником и без project mutation."
+    if recommendation:
+        return "Acceptance: рекомендация остаётся отказом от изменения, пока нет direct project evidence."
+    return "Acceptance: решение не принимается без нового cited proof."
 
 
 def _approach_comparison(
