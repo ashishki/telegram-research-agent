@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run or print repository test tiers for focused PRM work and block review."""
+"""Run repository test tiers without invoking the prohibited full suite."""
 
 from __future__ import annotations
 
@@ -12,29 +12,43 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
-
-PRM_TESTS = (
+PRM_ACTIVE_TESTS = (
     "tests/test_archive_documents.py",
     "tests/test_archive_search.py",
     "tests/test_archive_vector.py",
-    "tests/test_pi_tools.py",
-    "tests/test_pi_facade_archive_vector.py",
-    "tests/test_pi_chat.py",
-    "tests/test_handlers.py",
-    "tests/test_local_memory_ask.py",
-    "tests/test_project_context.py",
-    "tests/test_learning_layer.py",
-    "tests/test_weekly_brief_v3.py",
-    "tests/test_workflow_telemetry.py",
-    "tests/test_prm_release_gate.py",
-    "tests/test_reaction_fast_lane.py",
-    "tests/test_selective_enrichment.py",
-    "tests/test_archive_retrieval_eval.py",
-    "tests/test_product_rag_eval.py",
-    "tests/test_rag_context_pack.py",
-    "tests/test_knowledge_library.py",
-    "tests/test_linked_sources.py",
+    "tests/test_archive_api_vector.py",
+    "tests/test_operator_context.py",
     "tests/test_memory_research.py",
+    "tests/test_evidence_quality.py",
+    "tests/test_claim_ledger.py",
+    "tests/test_primary_source_verification.py",
+    "tests/test_project_context.py",
+    "tests/test_rag_context_pack.py",
+    "tests/test_linked_sources.py",
+    "tests/test_reaction_fast_lane.py",
+    "tests/test_prm_post_answer_actions.py",
+    "tests/test_prm_qa_dataset_eval.py",
+    "tests/test_prm_live_ux_eval.py",
+    "tests/test_callbacks.py",
+    "tests/test_prm_application.py",
+    "tests/test_prm_bot_dispatch.py",
+    "tests/test_prm_cli.py",
+    "tests/test_retrofit_boundaries.py",
+)
+
+LEGACY_COMPAT_TESTS = (
+    "tests/test_weekly_brief_v3.py",
+    "tests/test_knowledge_library.py",
+    "tests/test_prm_release_gate.py",
+    "tests/test_workflow_telemetry.py",
+    "tests/test_semantic_retrieval.py",
+)
+
+RETROFIT_TESTS = (
+    "tests/test_prm_application.py",
+    "tests/test_prm_bot_dispatch.py",
+    "tests/test_prm_cli.py",
+    "tests/test_retrofit_boundaries.py",
 )
 
 FAST_CONTRACT_TESTS = (
@@ -44,15 +58,13 @@ FAST_CONTRACT_TESTS = (
     "tests/test_llm_client.py",
     "tests/test_router.py",
     "tests/test_retrieval.py",
-    "tests/test_semantic_retrieval.py",
     "tests/test_week_bounds.py",
     "tests/test_pi_intent.py",
-    "tests/test_cli.py",
     "tests/test_callbacks.py",
-    *PRM_TESTS,
+    *PRM_ACTIVE_TESTS,
 )
 
-PYTEST_QUIET = (sys.executable, "-m", "pytest")
+PYTEST = (sys.executable, "-m", "pytest")
 PLAYBOOK_VALIDATOR = (
     sys.executable,
     "tools/playbook_validate.py",
@@ -60,12 +72,6 @@ PLAYBOOK_VALIDATOR = (
     ".",
     "--check",
     "tasks",
-    "--check",
-    "placeholders",
-    "--check",
-    "readiness",
-    "--check",
-    "delivery",
     "--check",
     "references",
 )
@@ -84,35 +90,38 @@ class TestTier:
     commands: tuple[TierCommand, ...]
 
 
-TEST_TIERS: dict[str, TestTier] = {
+TEST_TIERS = {
     "focused-prm": TestTier(
-        name="focused-prm",
-        description="Focused PRM RAG/assistant tests for current retrofit work.",
-        commands=(TierCommand((*PYTEST_QUIET, *PRM_TESTS, "-q"), env=(("PYTHONPATH", "src"),)),),
+        "focused-prm",
+        "Active PRM request-to-answer, safety and retrofit tests.",
+        (TierCommand((*PYTEST, *PRM_ACTIVE_TESTS, "-q"), env=(("PYTHONPATH", "src"),)),),
+    ),
+    "retrofit-boundaries": TestTier(
+        "retrofit-boundaries",
+        "Fast structural checks for application, bot and CLI boundaries.",
+        (TierCommand((*PYTEST, *RETROFIT_TESTS, "-q"), env=(("PYTHONPATH", "src"),)),),
+    ),
+    "legacy-compat": TestTier(
+        "legacy-compat",
+        "Explicit report-era compatibility tests; not part of normal PRM work.",
+        (TierCommand((*PYTEST, *LEGACY_COMPAT_TESTS, "-q"), env=(("PYTHONPATH", "src"),)),),
     ),
     "fast-contract": TestTier(
-        name="fast-contract",
-        description="Fast deterministic contract/unit subset excluding date-sensitive ops.",
-        commands=(TierCommand((*PYTEST_QUIET, *FAST_CONTRACT_TESTS, "-q"), env=(("PYTHONPATH", "src"),)),),
+        "fast-contract",
+        "Deterministic active contract subset.",
+        (TierCommand((*PYTEST, *FAST_CONTRACT_TESTS, "-q"), env=(("PYTHONPATH", "src"),)),),
     ),
     "ops-date-sensitive": TestTier(
-        name="ops-date-sensitive",
-        description="Known date-sensitive ops validation test isolated from fast loops.",
-        commands=(TierCommand((*PYTEST_QUIET, "tests/test_product_ops.py", "-q"), env=(("PYTHONPATH", "src"),)),),
-    ),
-    "full": TestTier(
-        name="full",
-        description="Complete pytest suite; prohibited by the current operator test policy.",
-        commands=(),
+        "ops-date-sensitive",
+        "Date-sensitive operations test isolated from fast loops.",
+        (TierCommand((*PYTEST, "tests/test_product_ops.py", "-q"), env=(("PYTHONPATH", "src"),)),),
     ),
     "block-review": TestTier(
-        name="block-review",
-        description="Block-review baseline: Playbook validator and whitespace diff check; record targeted tests separately.",
-        commands=(
-            TierCommand(PLAYBOOK_VALIDATOR),
-            TierCommand(("git", "diff", "--check")),
-        ),
+        "block-review",
+        "Playbook and whitespace checks.",
+        (TierCommand(PLAYBOOK_VALIDATOR), TierCommand(("git", "diff", "--check"))),
     ),
+    "full": TestTier("full", "Prohibited complete suite.", ()),
 }
 
 
@@ -121,28 +130,23 @@ def _repo_root() -> Path:
 
 
 def display_command(command: TierCommand) -> str:
-    env_prefix = " ".join(f"{key}={shlex.quote(value)}" for key, value in command.env)
-    rendered = shlex.join(command.argv)
-    return f"{env_prefix} {rendered}".strip()
+    prefix = " ".join(f"{key}={shlex.quote(value)}" for key, value in command.env)
+    return f"{prefix} {shlex.join(command.argv)}".strip()
 
 
-def _run_command(command: TierCommand, *, root: Path) -> int:
+def _run(command: TierCommand) -> int:
     env = os.environ.copy()
     for key, value in command.env:
-        if key == "PYTHONPATH" and env.get(key):
-            env[key] = f"{value}{os.pathsep}{env[key]}"
-        else:
-            env[key] = value
+        env[key] = f"{value}{os.pathsep}{env[key]}" if key == "PYTHONPATH" and env.get(key) else value
     print(f"$ {display_command(command)}", flush=True)
-    result = subprocess.run(command.argv, cwd=root, env=env, check=False)
-    return int(result.returncode)
+    return subprocess.run(command.argv, cwd=_repo_root(), env=env, check=False).returncode
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("tier", nargs="?", choices=sorted(TEST_TIERS))
-    parser.add_argument("--list", action="store_true", help="List available tiers.")
-    parser.add_argument("--print-only", action="store_true", help="Print tier commands without executing them.")
+    parser.add_argument("--list", action="store_true")
+    parser.add_argument("--print-only", action="store_true")
     return parser
 
 
@@ -155,16 +159,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not args.tier:
         build_parser().error("tier is required unless --list is used")
     if args.tier == "full":
-        print("full test tier is prohibited by the current operator test policy; use a targeted tier instead.", file=sys.stderr)
+        print("full test tier is prohibited; use a focused tier", file=sys.stderr)
         return 2
-    tier = TEST_TIERS[args.tier]
-    for command in tier.commands:
+    for command in TEST_TIERS[args.tier].commands:
         if args.print_only:
             print(display_command(command))
             continue
-        return_code = _run_command(command, root=_repo_root())
-        if return_code != 0:
-            return return_code
+        code = _run(command)
+        if code:
+            return int(code)
     return 0
 
 

@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: ["master", "main"]
+    branches: ["master", "main", "refactor/**"]
   pull_request:
     branches: ["master", "main"]
 
@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   test:
-    name: Test suite
+    name: Focused PRM and retrofit checks
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -31,6 +31,9 @@ jobs:
 
       - name: Run focused PRM tests
         run: python tools/test_tiers.py focused-prm
+
+      - name: Verify retrofit boundaries
+        run: python tools/test_tiers.py retrofit-boundaries
 
       - name: Run MAT safety holdouts
         run: python tools/prm_mat_eval.py --check safety
