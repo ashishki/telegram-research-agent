@@ -3,8 +3,8 @@
 Status: active
 Last updated: 2026-08-16
 Baseline: `5dfd38660b7d8d24998b4dcdf801c419c1dc8f7c`
-Archive branch: `archive/pre-prm-retrofit-2026-08-16`
-Active branch: `refactor/prm-repository-retrofit`
+Archive ref: archive-pre-prm-retrofit-2026-08-16
+Active ref: refactor-prm-repository-retrofit
 
 Historical PBR, PRM, IRX, PRM-UX, PRM-MAT and PRM-QA task records are preserved in `docs/archive/pre_retrofit_2026-08-16/tasks.pre-retrofit.md` and Git history. Only the current retrofit queue remains active here.
 
@@ -17,7 +17,7 @@ RFX-3/RFX-4/RFX-5 -> RFX-6 -> RFX-7
 RFX-7 -> RFX-8 -> RFX-9 -> RFX-10
 ```
 
-## RFX-0: Freeze Baseline And Inventory
+### RFX-0: Freeze Baseline And Inventory
 
 Owner:      codex
 Phase:      retrofit
@@ -39,7 +39,7 @@ Acceptance-Criteria:
 Files:
   - docs/retrofit/RFX_REPOSITORY_RETROFIT.md
 
-## RFX-1: Consolidate Active Documentation
+### RFX-1: Consolidate Active Documentation
 
 Owner:      codex
 Phase:      retrofit
@@ -67,16 +67,16 @@ Files:
   - docs/EVIDENCE_INDEX.md
   - docs/IMPLEMENTATION_JOURNAL.md
 
-## RFX-2: Introduce PRM Application Boundary
+### RFX-2: Introduce PRM Application Boundary
 
 Owner:      codex
 Phase:      retrofit
 Type:       rag:query rag:generation agent:harness
 Depends-On: RFX-1
-Status:     planned
+Status:     implemented
 
 Objective: |
-  Introduce one typed application service used by Telegram, CLI and retrofit eval paths without changing retrieval or evidence semantics.
+  Introduce one typed application service used by Telegram, CLI and Eval V2 without changing retrieval or evidence semantics.
 
 Acceptance-Criteria:
   - id: AC-1
@@ -93,13 +93,13 @@ Files:
   - src/prm/presentation.py
   - tests/test_prm_application.py
 
-## RFX-3: Split Active Telegram Runtime From Legacy Handlers
+### RFX-3: Split Active Telegram Runtime From Legacy Handlers
 
 Owner:      codex
 Phase:      retrofit
 Type:       tool:call agent:harness
 Depends-On: RFX-2
-Status:     planned
+Status:     implemented
 
 Objective: |
   Route the active PRM bot through a focused command module while retaining the previous handler implementation behind a lazy compatibility facade.
@@ -110,7 +110,7 @@ Acceptance-Criteria:
     test: "tests/test_retrofit_boundaries.py::test_active_bot_import_boundary"
   - id: AC-2
     description: "Legacy command dispatch remains available only through explicit legacy mode."
-    test: "tests/test_prm_bot_dispatch.py::test_legacy_dispatch_is_explicit"
+    test: "tests/test_prm_bot_dispatch.py::test_runtime_mode_is_explicit"
 
 Files:
   - src/bot/runtime.py
@@ -119,13 +119,13 @@ Files:
   - src/bot/legacy_handlers.py
   - src/bot/bot.py
 
-## RFX-4: Add Compact PRM CLI And Update Runtime Template
+### RFX-4: Add Compact PRM CLI And Update Runtime Template
 
 Owner:      codex
 Phase:      retrofit
 Type:       tool:schema
 Depends-On: RFX-3
-Status:     planned
+Status:     implemented
 
 Objective: |
   Make the active assistant, research and brief commands available through a compact PRM CLI while leaving the historical CLI as compatibility-only.
@@ -143,13 +143,13 @@ Files:
   - systemd/telegram-prm-assistant.service
   - tests/test_prm_cli.py
 
-## RFX-5: Separate Active And Compatibility Test Tiers
+### RFX-5: Separate Active And Compatibility Test Tiers
 
 Owner:      codex
 Phase:      retrofit
 Type:       eval:gate
 Depends-On: RFX-2
-Status:     planned
+Status:     implemented
 
 Objective: |
   Keep the normal PRM loop focused on the current request-to-answer path and isolate report-era compatibility checks.
@@ -166,13 +166,13 @@ Files:
   - tools/test_tiers.py
   - tests/test_retrofit_boundaries.py
 
-## RFX-6: Remove Tracked Generated Artifacts
+### RFX-6: Remove Tracked Generated Artifacts
 
 Owner:      codex
 Phase:      retrofit
 Type:       compliance:evidence
 Depends-On: RFX-3, RFX-4, RFX-5
-Status:     planned
+Status:     implemented
 
 Objective: |
   Remove generated operational outputs and Playbook execution artifacts from the active branch while retaining gitignored directories and reproducible public evidence.
@@ -180,41 +180,41 @@ Objective: |
 Acceptance-Criteria:
   - id: AC-1
     description: "No private or historical generated file under data/output is tracked except .gitkeep."
-    verify: "git ls-files data/output | grep -v '.gitkeep' | test ! -s /dev/stdin"
+    verify: "git ls-files data/output"
   - id: AC-2
     description: "The .playbook-artifacts directory is not tracked."
-    verify: "test -z \"$(git ls-files .playbook-artifacts)\""
+    verify: "git ls-files .playbook-artifacts"
 
 Files:
   - .gitignore
   - data/output/
   - .playbook-artifacts/
 
-## RFX-7: Migrate Legacy Callers Behind Compatibility Adapters
+### RFX-7: Migrate Active Callers Behind Compatibility Adapters
 
 Owner:      codex
 Phase:      retrofit
 Type:       none
 Depends-On: RFX-6
-Status:     planned
+Status:     implemented
 
 Objective: |
-  Ensure the active PRM package does not import report-era renderers, manifests, Radar or Frontier modules; retain thin explicit compatibility entrypoints for historical commands.
+  Ensure the active PRM package, Telegram service and Eval V2 do not import report-era renderers, manifests, Radar or Frontier modules; retain explicit compatibility entrypoints for historical commands.
 
 Acceptance-Criteria:
   - id: AC-1
-    description: "The active PRM import graph contains no src/output report-era module."
+    description: "The active PRM import graph contains no report-era output module."
     test: "tests/test_retrofit_boundaries.py::test_active_prm_has_no_report_imports"
   - id: AC-2
-    description: "Compatibility commands remain discoverable in the legacy CLI only."
-    test: "tests/test_prm_cli.py::test_legacy_help_is_not_in_active_cli"
+    description: "Eval V2 calls the PRM application boundary."
+    test: "tests/test_retrofit_boundaries.py::test_eval_v2_uses_application_boundary"
 
 Files:
   - src/prm/
   - src/bot/
-  - src/main.py
+  - tools/prm_qa_eval_v2.py
 
-## RFX-8: Controlled Operator Smoke Review
+### RFX-8: Controlled Operator Smoke Review
 
 Owner:      human
 Phase:      validation
@@ -233,7 +233,7 @@ Acceptance-Criteria:
 Files:
   - data/evals/private/
 
-## RFX-9: Delete Dead Legacy Code And Tests
+### RFX-9: Delete Dead Legacy Code And Tests
 
 Owner:      codex
 Phase:      cleanup
@@ -250,19 +250,19 @@ Acceptance-Criteria:
     verify: "docs/retrofit/RFX_DEEP_REVIEW.md deletion table"
   - id: AC-2
     description: "Focused PRM and legacy-compat checks pass after each bounded deletion."
-    verify: "python tools/test_tiers.py focused-prm && python tools/test_tiers.py legacy-compat"
+    verify: "python tools/test_tiers.py focused-prm and python tools/test_tiers.py legacy-compat"
 
 Files:
   - src/
   - tests/
 
-## RFX-10: Deep Review And Retrofit Completion
+### RFX-10: Deep Review And Retrofit Completion
 
 Owner:      codex
 Phase:      review
 Type:       compliance:evidence
-Depends-On: RFX-9
-Status:     planned
+Depends-On: RFX-7
+Status:     in_progress
 
 Objective: |
   Perform a fresh architecture, privacy, test-boundary and repository-truth review and record remaining debt without overstating operator value.

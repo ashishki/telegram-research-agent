@@ -8,8 +8,8 @@ Historical evidence is preserved in `docs/archive/pre_retrofit_2026-08-16/EVIDEN
 ## Current baseline
 
 - repository: `5dfd38660b7d8d24998b4dcdf801c419c1dc8f7c`;
-- archive branch: `archive/pre-prm-retrofit-2026-08-16`;
-- retrofit branch: `refactor/prm-repository-retrofit`;
+- archive ref: archive-pre-prm-retrofit-2026-08-16;
+- retrofit ref: refactor-prm-repository-retrofit;
 - Eval V2 audit: `docs/audit/PRM_EVAL_V2_QUALITY_PASS_2026-08-15.md`;
 - retrieval ADR: `docs/adr/ADR-005-prm-qa-selected-retrieval-policy.md`;
 - public regression reports: `evals/prm_qa/`;
@@ -23,9 +23,11 @@ Historical evidence is preserved in `docs/archive/pre_retrofit_2026-08-16/EVIDEN
 | Active architecture | `docs/ARCHITECTURE.md` | current |
 | Active task queue | `docs/tasks.md` | current |
 | Pre-retrofit docs | `docs/archive/pre_retrofit_2026-08-16/` | preserved |
-| Deep review | `docs/retrofit/RFX_DEEP_REVIEW.md` | pending final review |
-| Focused PRM tests | GitHub Actions / local receipts | pending branch CI |
-| Retrofit boundary tests | GitHub Actions / local receipts | pending implementation |
+| Deep review | `docs/retrofit/RFX_DEEP_REVIEW.md` | in progress |
+| Focused PRM tests | GitHub Actions PR 3 | 126 passed |
+| Retrofit boundary tests | GitHub Actions PR 3 | 10 passed |
+| MAT safety | GitHub Actions PR 3 | passed |
+| Playbook validation | GitHub Actions PR 3 | pending corrected documentation run |
 
 ## Evidence rules
 
