@@ -33,6 +33,10 @@ PRM_ACTIVE_TESTS = (
     "tests/test_prm_bot_dispatch.py",
     "tests/test_prm_cli.py",
     "tests/test_retrofit_boundaries.py",
+    "tests/test_prm_intent_archive_contract.py",
+    "tests/test_prm_replay_query.py",
+    "tests/test_prm_private_traces.py",
+    "tests/test_prm_qa_usage_recap.py",
 )
 
 LEGACY_COMPAT_TESTS = (
@@ -49,6 +53,7 @@ RETROFIT_TESTS = (
     "tests/test_prm_bot_dispatch.py",
     "tests/test_prm_cli.py",
     "tests/test_retrofit_boundaries.py",
+    "tests/test_prm_intent_archive_contract.py",
 )
 
 FAST_CONTRACT_TESTS = (
@@ -93,7 +98,7 @@ class TestTier:
 TEST_TIERS = {
     "focused-prm": TestTier(
         "focused-prm",
-        "Active PRM request-to-answer, safety and retrofit tests.",
+        "Active PRM request-to-answer, safety, intent-contract and retrofit tests.",
         (TierCommand((*PYTEST, *PRM_ACTIVE_TESTS, "-q"), env=(("PYTHONPATH", "src"),)),),
     ),
     "retrofit-boundaries": TestTier(
