@@ -88,17 +88,17 @@ def select_retrieval_policy(
     if clean_job == "saved_knowledge_recall":
         return _policy(clean_job, "saved_object_first", "fallback_on_fts_miss", 10, True, False, False)
     if clean_job == "comparison":
-        return _policy(clean_job, "subtopic_decomposition", "fallback_on_fts_miss", 16, True, False, False)
+        return _policy(clean_job, "subtopic_decomposition", "always", 16, True, False, False)
     if clean_job == "case_study":
-        return _policy(clean_job, "case_pool_diversity", "fallback_on_fts_miss", 16, True, False, False)
+        return _policy(clean_job, "case_pool_diversity", "always", 16, True, False, False)
     if clean_job == "named_project_decision":
-        return _policy(clean_job, "project_snapshot_plus_archive", "fallback_on_fts_miss", 14, True, True, False)
+        return _policy(clean_job, "project_snapshot_plus_archive", "always", 14, True, True, False)
     if clean_job == "ambiguous_project":
         return _policy(clean_job, "clarify_project_before_retrieval", "fallback_on_fts_miss", 0, False, True, False)
     if clean_job == "current_fact":
         return _policy(clean_job, "archive_context_then_verification_boundary", "fallback_on_fts_miss", 8, True, False, True)
     if clean_job in {"writer_editor", "learning_experiment", "semantic_topic"}:
-        return _policy(clean_job, "phrase_preserving_bounded_rewrite", "fallback_on_fts_miss", 12, True, False, False)
+        return _policy(clean_job, "phrase_preserving_bounded_rewrite", "always", 12, True, False, False)
     if clean_job in {"no_answer", "distractor_hard_negative"}:
         return _policy(clean_job, "strict_fts_then_fail_closed", "fallback_on_fts_miss", 8, True, False, False)
     return _policy("semantic_topic", "fts_dense_fusion", "always", 12, True, False, False)

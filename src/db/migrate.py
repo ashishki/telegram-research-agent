@@ -146,6 +146,73 @@ def _ensure_personal_memory_source_card(connection: sqlite3.Connection) -> None:
     """)
 
 
+def _ensure_prm_feedback_transition_actions(connection: sqlite3.Connection) -> None:
+    row = connection.execute(
+        """
+        SELECT sql
+        FROM sqlite_master
+        WHERE type = 'table' AND name = 'prm_interaction_feedback_transitions'
+        LIMIT 1
+        """
+    ).fetchone()
+    table_sql = str(row[0] if row else "")
+    required_tokens = (
+        "'partial'",
+        "'miss'",
+        "'wrong_sources'",
+        "'too_general'",
+        "'wrong_project'",
+        "'no_useful_action'",
+        "'too_long'",
+        "'weak_evidence'",
+    )
+    if not table_sql or all(token in table_sql for token in required_tokens):
+        return
+
+    LOGGER.info("Rebuilding prm_interaction_feedback_transitions to allow PRM reason feedback actions")
+    connection.executescript(
+        """
+        ALTER TABLE prm_interaction_feedback_transitions RENAME TO prm_interaction_feedback_transitions_old;
+        CREATE TABLE prm_interaction_feedback_transitions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            interaction_id TEXT NOT NULL UNIQUE,
+            feedback_action TEXT NOT NULL CHECK(feedback_action IN (
+                'useful',
+                'partial',
+                'miss',
+                'wrong_sources',
+                'too_general',
+                'wrong_project',
+                'no_useful_action',
+                'too_long',
+                'weak_evidence',
+                'wrong_priority',
+                'too_shallow',
+                'applied'
+            )),
+            useful_label TEXT NOT NULL CHECK(useful_label IN ('yes', 'partial', 'no')),
+            recorded_at TEXT NOT NULL,
+            FOREIGN KEY(interaction_id) REFERENCES prm_interaction_ledger(interaction_id) ON DELETE RESTRICT
+        );
+        INSERT INTO prm_interaction_feedback_transitions (
+            id,
+            interaction_id,
+            feedback_action,
+            useful_label,
+            recorded_at
+        )
+        SELECT
+            id,
+            interaction_id,
+            feedback_action,
+            useful_label,
+            recorded_at
+        FROM prm_interaction_feedback_transitions_old;
+        DROP TABLE prm_interaction_feedback_transitions_old;
+        """
+    )
+
+
 def get_db_path() -> Path:
     raw_path = os.environ.get("AGENT_DB_PATH", DEFAULT_DB_PATH)
     path = Path(raw_path)
@@ -843,6 +910,7 @@ def run_migrations() -> Path:
         connection.execute("PRAGMA journal_mode = WAL;")
         connection.executescript(schema_sql)
         _ensure_personal_memory_source_card(connection)
+        _ensure_prm_feedback_transition_actions(connection)
         _verify_canonical_idea_thread_schema(connection)
         _verify_personal_memory_schema(connection)
         try:

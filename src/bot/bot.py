@@ -222,6 +222,13 @@ def _handle_callback(callback: dict[str, Any], *, token: str, owner_chat_id: str
         return
     data = str(callback.get("data") or "")
     answer = "Готово"
+    callback_acknowledged = False
+    if callback_id and runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
+        try:
+            _telegram_answer_callback(token, callback_id, "Принято")
+            callback_acknowledged = True
+        except Exception:
+            LOGGER.warning("Failed to answer callback query id=%s", callback_id, exc_info=True)
     try:
         if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
             if not data.startswith(("prma:", "prmc:")):
@@ -237,7 +244,7 @@ def _handle_callback(callback: dict[str, Any], *, token: str, owner_chat_id: str
     except Exception:
         LOGGER.warning("Callback handling failed data=%s", data, exc_info=True)
         answer = "Не смог обработать действие"
-    if callback_id:
+    if callback_id and not callback_acknowledged:
         try:
             _telegram_answer_callback(token, callback_id, answer)
         except Exception:

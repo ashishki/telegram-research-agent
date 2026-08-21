@@ -85,6 +85,26 @@ def test_single_archive_source_is_enough_to_report_archive_presence():
     assert contract["result_summary"]["direct_count"] == 1
 
 
+def test_promotions_and_model_comparisons_do_not_become_actionable_agent_eval_evidence():
+    ranked = rank_archive_items(QUERY, [
+        {"archive_document_id": "promo", "snippet": "Agent evals, quality gates and tool calling. Промокод AGENT25, регистрация на вебинар.", "matched_query_variant": "agent evals"},
+        {"archive_document_id": "event", "snippet": "Переносимый evals harness для агентов в проде. Ведущие эфира расскажут подробнее.", "matched_query_variant": "agent evals"},
+        {"archive_document_id": "benchmark", "snippet": "Agentic LLM Benchmark измеряет качество, стоимость и скорость по анализу ошибок агентных архитектур.", "matched_query_variant": "agent evals"},
+        {"archive_document_id": "comparison", "snippet": "Сравнение Kimi Agent vs Gemini по метрике дизайна.", "matched_query_variant": "agent evals"},
+    ])
+
+    contract = build_archive_response_contract(
+        question=QUERY, archive_items=ranked, primary_intent="archive_to_action", response_contract_id="archive_research.v2",
+    )
+
+    assert contract["result_summary"]["direct_count"] == 0
+    assert contract["result_summary"]["actionable_count"] == 0
+    assert contract["applicability"] == []
+    assert {item["source_role"] for item in ranked} == {
+        "announcement_or_promotion", "benchmark_context", "model_comparison",
+    }
+
+
 def test_telegram_keyboard_depends_on_intent():
     archive_codes = select_post_answer_action_codes({
         "primary_intent": "archive_lookup", "result_summary": {"direct_count": 0, "partial_count": 0, "adjacent_count": 1}

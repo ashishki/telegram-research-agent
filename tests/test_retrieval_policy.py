@@ -1,14 +1,14 @@
 from assistant.retrieval_policy import build_query_rewrites, infer_job_type, select_retrieval_policy
 
 
-def test_named_project_decision_uses_measured_fallback_vector_policy():
+def test_named_project_decision_uses_hybrid_fusion_for_source_selection():
     policy = select_retrieval_policy(
         "Что из материалов про agent reliability применимо к Agent-Runtime-Grid?",
         project_name="Agent-Runtime-Grid",
     )
 
     assert policy.job_type == "named_project_decision"
-    assert policy.vector_policy == "fallback_on_fts_miss"
+    assert policy.vector_policy == "always"
     assert policy.require_project_name is True
 
 

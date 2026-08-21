@@ -65,6 +65,19 @@ _QUERY_STOPWORDS = {
     "what", "in", "my", "archive", "about", "from", "this", "now", "apply", "applicable", "find",
 }
 _LABEL_WEIGHT = {"direct": 4, "partial": 3, "adjacent": 2, "unrelated": 1}
+_PROMOTION_MARKERS = (
+    "промокод", "скидк", "регистрац", "вебинар", "эфир", "спикер", "ведущие", "курс",
+    "promo code", "discount", "register", "webinar", "speakers",
+)
+_MODEL_COMPARISON_MARKERS = (
+    "vs gemini", "vs gpt", "vs claude", "vs kimi", "сравнени", "model comparison",
+)
+_PRACTICE_MARKERS = (
+    "harness", "fixture", "gold label", "tool-call correctness", "tool call correctness",
+    "task success", "groundedness", "judge calibration", "quality gate", "regression",
+    "тестовый набор", "регресс", "корректность вызова", "успешност задачи", "калибров",
+)
+_BENCHMARK_MARKERS = ("benchmark", "бенчмарк", "качество", "стоимост", "скорост", "error analysis", "анализ ошибок")
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,6 +93,20 @@ class RelevanceDecision:
             "directness_score": round(self.score, 4),
             "relevance_reason": self.reason,
             "matched_relevance_terms": list(self.matched_terms),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SourceRoleDecision:
+    role: str
+    supports_action: bool
+    reason: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "source_role": self.role,
+            "supports_action": self.supports_action,
+            "source_role_reason": self.reason,
         }
 
 
@@ -163,10 +190,43 @@ def rank_archive_items(question: str, items: Sequence[Mapping[str, Any]]) -> lis
     enriched: list[tuple[int, dict[str, Any]]] = []
     for index, item in enumerate(items):
         decision = classify_archive_relevance(question, item)
-        row = {**dict(item), **decision.to_dict(), "original_candidate_position": index + 1}
+        role = classify_archive_source_role(item)
+        label = _effective_relevance_label(decision.label, role)
+        row = {
+            **dict(item),
+            **decision.to_dict(),
+            **role.to_dict(),
+            "relevance_label": label,
+            "original_candidate_position": index + 1,
+        }
         enriched.append((index, row))
     enriched.sort(key=lambda pair: _sort_key(pair[1], original_index=pair[0]), reverse=True)
     return [{**row, "display_rank": rank} for rank, (_index, row) in enumerate(enriched, start=1)]
+
+
+def classify_archive_source_role(item: Mapping[str, Any]) -> SourceRoleDecision:
+    """Classify whether a post can support an actionable archive conclusion."""
+
+    text = _evidence_text(item).casefold()
+    if _contains_any(text, _PROMOTION_MARKERS):
+        return SourceRoleDecision("announcement_or_promotion", False, "promotional_or_event_announcement")
+    if _contains_any(text, _MODEL_COMPARISON_MARKERS):
+        return SourceRoleDecision("model_comparison", False, "model_comparison_is_not_agent_eval_practice")
+    if _contains_any(text, _PRACTICE_MARKERS):
+        return SourceRoleDecision("practical_evidence", True, "concrete_evaluation_practice")
+    if _contains_any(text, _BENCHMARK_MARKERS):
+        return SourceRoleDecision("benchmark_context", False, "benchmark_context_without_replayable_practice")
+    return SourceRoleDecision("commentary", False, "topic_mention_without_actionable_practice")
+
+
+def _effective_relevance_label(label: str, role: SourceRoleDecision) -> str:
+    if label != "direct":
+        return label
+    if role.role == "practical_evidence":
+        return "direct"
+    if role.role == "benchmark_context":
+        return "partial"
+    return "adjacent"
 
 
 def _sort_key(item: Mapping[str, Any], *, original_index: int) -> tuple[float, ...]:
@@ -224,6 +284,10 @@ def _matching_markers(value: str, markers: Sequence[str]) -> list[str]:
         elif clean in tokens or any(token.startswith(clean) for token in tokens):
             result.append(marker)
     return _unique(result)
+
+
+def _contains_any(value: str, markers: Sequence[str]) -> bool:
+    return any(marker in value for marker in markers)
 
 
 def _significant_tokens(value: object) -> list[str]:

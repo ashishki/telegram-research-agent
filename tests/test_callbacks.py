@@ -355,7 +355,7 @@ class TestIdeaCallbacks(unittest.TestCase):
         send_mock.assert_called_once_with(
             "token", "12345", "Черновик готов.", parse_mode=None, reply_markup={"inline_keyboard": []}
         )
-        answer_mock.assert_called_once_with("token", "callback-1", "Готово")
+        answer_mock.assert_called_once_with("token", "callback-1", "Принято")
 
     def test_run_bot_dispatches_transcribed_voice_feedback(self):
         settings = self._settings_with_idea()

@@ -95,6 +95,8 @@ def record_feedback_transition(db_path: str | Path, *, interaction_id: str, acti
                 (interaction_id, action, useful_label, now),
             )
         except sqlite3.IntegrityError:
+            if not _feedback_transition_exists(connection, interaction_id):
+                return {"status": "schema_incompatible", "write_performed": False}
             return {"status": "already_recorded", "write_performed": False}
         connection.execute(
             "UPDATE prm_interaction_ledger SET useful_label = ?, feedback_transitioned_at = ? WHERE interaction_id = ?",
@@ -261,6 +263,14 @@ def _iso(value: datetime) -> str:
 
 def _expired(value: str) -> bool:
     return datetime.fromisoformat(value.replace("Z", "+00:00")) <= datetime.now(timezone.utc)
+
+
+def _feedback_transition_exists(connection: sqlite3.Connection, interaction_id: str) -> bool:
+    row = connection.execute(
+        "SELECT 1 FROM prm_interaction_feedback_transitions WHERE interaction_id = ? LIMIT 1",
+        (interaction_id,),
+    ).fetchone()
+    return row is not None
 
 
 def _prune_expired(connection: sqlite3.Connection, *, now: datetime | None = None) -> None:

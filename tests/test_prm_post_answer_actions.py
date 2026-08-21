@@ -2,6 +2,8 @@ import os
 import sqlite3
 import tempfile
 
+import pytest
+
 from assistant.prm_post_answer_actions import (
     PRM_ACTION_PREFIX,
     PRM_CONFIRM_PREFIX,
@@ -10,6 +12,11 @@ from assistant.prm_post_answer_actions import (
     handle_post_answer_callback,
 )
 from db.migrate import run_migrations
+
+
+@pytest.fixture(autouse=True)
+def _isolated_private_trace_root(tmp_path, monkeypatch):
+    monkeypatch.setattr("assistant.prm_private_traces._TRACE_ROOT", tmp_path / "private_traces")
 
 
 def _answer(*, project_name: str = "") -> dict:

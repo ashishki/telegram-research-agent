@@ -92,9 +92,13 @@ def _synthesize_archive_answer(
 ) -> str | None:
     contract = _mapping(payload.get("archive_contract"))
     summary = _mapping(contract.get("result_summary"))
+    if primary_intent == "archive_to_action" and int(summary.get("actionable_count") or 0) == 0:
+        return None
     findings = [
         {
             "relevance": item.get("relevance_label"),
+            "source_role": item.get("source_role"),
+            "supports_action": item.get("supports_action"),
             "summary": item.get("summary"),
             "source": item.get("source_url"),
             "reason": item.get("relevance_reason"),

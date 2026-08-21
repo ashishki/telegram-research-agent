@@ -72,8 +72,9 @@ def build_archive_response_contract(
     adjacent = [_finding(item) for item in archive_items if item.get("relevance_label") == "adjacent"]
     unrelated_count = sum(1 for item in archive_items if item.get("relevance_label") == "unrelated")
     direct_answer = _direct_answer(question, direct=direct, partial=partial, adjacent=adjacent)
+    actionable = [finding for finding in direct if finding.get("supports_action")]
     applicability = (
-        _applicability([*direct, *partial], explicit_project=explicit_project)
+        _applicability(actionable, explicit_project=explicit_project)
         if primary_intent == "archive_to_action"
         else []
     )
@@ -98,6 +99,7 @@ def build_archive_response_contract(
             "adjacent_count": len(adjacent),
             "unrelated_count": unrelated_count,
             "selected_count": len(direct) + len(partial) + len(adjacent),
+            "actionable_count": len(actionable),
         },
         "direct_findings": direct[:4],
         "partial_findings": partial[:3],
@@ -140,6 +142,9 @@ def _finding(item: Mapping[str, Any]) -> dict[str, Any]:
         "directness_score": float(item.get("directness_score") or 0.0),
         "relevance_reason": str(item.get("relevance_reason") or ""),
         "matched_query_variant": str(item.get("matched_query_variant") or ""),
+        "source_role": str(item.get("source_role") or "commentary"),
+        "supports_action": bool(item.get("supports_action")),
+        "source_role_reason": str(item.get("source_role_reason") or ""),
     }
 
 
@@ -215,6 +220,8 @@ def _limitations(
     result: list[str] = []
     if not direct:
         result.append("Прямое совпадение не найдено; частичные и смежные материалы не считаются ответом на точный запрос.")
+    elif not any(item.get("supports_action") for item in direct):
+        result.append("Прямые тематические упоминания не содержат достаточно конкретной практики для рекомендации действия.")
     if adjacent:
         result.append("Смежный материал показывает контекст, но не доказывает наличие конкретной практики оценки агентов.")
     if external_verification_required:

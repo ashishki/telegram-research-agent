@@ -14,8 +14,14 @@ from db.prm19_dogfood_receipts import (
     PRM19DogfoodReceiptValidationError,
     export_interaction_aggregate,
     list_interaction_receipts,
+    record_feedback_transition,
     record_interaction_receipt,
 )
+
+
+@pytest.fixture(autouse=True)
+def _isolated_private_trace_root(tmp_path, monkeypatch):
+    monkeypatch.setattr("assistant.prm_private_traces._TRACE_ROOT", tmp_path / "private_traces")
 
 
 def _answer() -> dict:
@@ -68,6 +74,99 @@ def test_feedback_transition_updates_same_interaction_once(monkeypatch):
     assert replay["status"] == "needs_confirmation"
     assert transition_count == 1
     assert useful_label == "yes"
+
+
+def test_feedback_transition_reports_legacy_check_drift_without_migration():
+    with tempfile.TemporaryDirectory() as tmp:
+        db_path = os.path.join(tmp, "memory.db")
+        with sqlite3.connect(db_path) as connection:
+            connection.executescript(
+                """
+                CREATE TABLE prm_interaction_ledger (
+                    interaction_id TEXT PRIMARY KEY,
+                    chat_id_hash TEXT NOT NULL,
+                    surface TEXT NOT NULL,
+                    input_kind TEXT NOT NULL,
+                    answer_status TEXT NOT NULL,
+                    source_count INTEGER NOT NULL,
+                    evidence_classes_json TEXT NOT NULL,
+                    external_verification_status TEXT NOT NULL,
+                    selected_professional_lens TEXT NOT NULL DEFAULT 'unknown',
+                    selected_project TEXT NOT NULL DEFAULT 'unknown',
+                    primary_workflow TEXT NOT NULL DEFAULT 'unknown',
+                    useful_label TEXT NOT NULL DEFAULT 'unknown',
+                    feedback_transitioned_at TEXT,
+                    receipt_status TEXT NOT NULL DEFAULT 'recorded',
+                    created_at TEXT NOT NULL,
+                    expires_at TEXT NOT NULL
+                );
+                CREATE TABLE prm_interaction_feedback_transitions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    interaction_id TEXT NOT NULL UNIQUE,
+                    feedback_action TEXT NOT NULL CHECK(feedback_action IN ('useful', 'wrong_priority', 'too_shallow', 'applied')),
+                    useful_label TEXT NOT NULL CHECK(useful_label IN ('yes', 'partial', 'no')),
+                    recorded_at TEXT NOT NULL
+                );
+                INSERT INTO prm_interaction_ledger (
+                    interaction_id, chat_id_hash, surface, input_kind, answer_status,
+                    source_count, evidence_classes_json, external_verification_status,
+                    created_at, expires_at
+                ) VALUES (
+                    'ctx12345', 'a', 'telegram', 'text', 'supported',
+                    1, '[]', 'unknown', '2026-08-17T00:00:00Z', '2999-01-01T00:00:00Z'
+                );
+                """
+            )
+
+        result = record_feedback_transition(db_path, interaction_id="ctx12345", action_code="ws")
+        with sqlite3.connect(db_path) as connection:
+            transition_count = connection.execute("SELECT count(*) FROM prm_interaction_feedback_transitions").fetchone()[0]
+            useful_label = connection.execute(
+                "SELECT useful_label FROM prm_interaction_ledger WHERE interaction_id = 'ctx12345'"
+            ).fetchone()[0]
+
+    assert result == {"status": "schema_incompatible", "write_performed": False}
+    assert transition_count == 0
+    assert useful_label == "unknown"
+
+
+def test_migration_rebuilds_prm_feedback_transition_reason_actions(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmp:
+        db_path = os.path.join(tmp, "memory.db")
+        monkeypatch.setenv("AGENT_DB_PATH", db_path)
+        with sqlite3.connect(db_path) as connection:
+            connection.execute(
+                """
+                CREATE TABLE prm_interaction_feedback_transitions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    interaction_id TEXT NOT NULL UNIQUE,
+                    feedback_action TEXT NOT NULL CHECK(feedback_action IN ('useful', 'wrong_priority', 'too_shallow', 'applied')),
+                    useful_label TEXT NOT NULL CHECK(useful_label IN ('yes', 'partial', 'no')),
+                    recorded_at TEXT NOT NULL
+                )
+                """
+            )
+        run_migrations()
+        context_id = build_post_answer_actions(_answer(), db_path=db_path, chat_id="42")["context_id"]
+
+        result = handle_post_answer_callback(db_path, f"{PRM_ACTION_PREFIX}:{context_id}:m", chat_id="42")
+        with sqlite3.connect(db_path) as connection:
+            table_sql = connection.execute(
+                "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'prm_interaction_feedback_transitions'"
+            ).fetchone()[0]
+            transition = connection.execute(
+                "SELECT feedback_action, useful_label FROM prm_interaction_feedback_transitions WHERE interaction_id = ?",
+                (context_id,),
+            ).fetchone()
+            ledger_label = connection.execute(
+                "SELECT useful_label FROM prm_interaction_ledger WHERE interaction_id = ?",
+                (context_id,),
+            ).fetchone()[0]
+
+    assert result["status"] == "needs_reason"
+    assert "'wrong_sources'" in table_sql
+    assert transition == ("partial", "partial")
+    assert ledger_label == "partial"
 
 
 def test_owner_review_and_aggregate_are_private_and_scoped(monkeypatch):
