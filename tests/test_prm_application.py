@@ -49,7 +49,8 @@ def test_application_returns_intent_specific_archive_contract(monkeypatch):
 def test_archive_to_action_uses_bounded_research_plan(monkeypatch):
     payload = _payload()
     payload["archive_candidate_pool"] = [
-        {**payload["archive_evidence"]["items"][0], "source_role": "practical_evidence", "supports_action": True},
+        {**payload["archive_evidence"]["items"][0], "source_role": "practical_evidence", "supports_action": True,
+         "retrieval_mode": "hybrid_fts_vector"},
         {"archive_document_id": "promo", "snippet": "Agent evals webinar registration", "source_url": "https://t.me/example/2", "source_role": "announcement_or_promotion", "supports_action": False},
     ]
     monkeypatch.setattr("prm.application.answer_memory_research", lambda *args, **kwargs: payload)
@@ -68,6 +69,7 @@ def test_archive_to_action_uses_bounded_research_plan(monkeypatch):
 
     assert result.payload["research_plan"]["candidate_count"] == 2
     assert result.payload["archive_evidence"]["items"][0]["archive_document_id"] == "tg:1"
+    assert result.payload["archive_evidence"]["items"][0]["retrieval_mode"] == "hybrid_fts_vector"
     assert result.payload["research_plan"]["gap_check"] == {}
 
 

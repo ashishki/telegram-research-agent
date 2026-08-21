@@ -2156,7 +2156,7 @@ def _archive_candidate_pool(result: Mapping[str, Any]) -> list[dict[str, Any]]:
     fields = (
         "archive_document_id", "post_archive_document_id", "post_id", "posted_at", "channel_username", "source_url",
         "snippet", "summary", "matched_query_variant", "relevance_label", "directness_score", "source_role",
-        "supports_action", "source_role_reason", "fusion_score", "semantic_score",
+        "supports_action", "source_role_reason", "fusion_score", "semantic_score", "retrieval_mode",
     )
     return [
         {key: item[key] for key in fields if key in item}

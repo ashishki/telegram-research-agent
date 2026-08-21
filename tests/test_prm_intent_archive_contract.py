@@ -35,6 +35,12 @@ def test_word_now_alone_does_not_require_external_verification():
     assert route.reason == "archive_to_action"
 
 
+def test_archive_practices_question_routes_to_action_research():
+    route = decide_route("Что в моём архиве есть про RAG retrieval и какие практики стоит применить?")
+
+    assert route.primary_intent == "archive_to_action"
+
+
 def test_explicit_external_benchmark_routes_to_current_fact():
     route = decide_route("Что сейчас известно про новый внешний benchmark?")
     assert route.primary_intent == "current_fact_verification"
@@ -60,6 +66,7 @@ def test_weak_retrieval_reports_no_direct_matches():
     assert contract["result_summary"]["direct_count"] == 0
     assert "Прямых материалов" in contract["direct_answer"]
     assert contract["adjacent_findings"]
+    assert all("оценки агентов" not in item for item in contract["limitations"])
 
 
 def test_archive_answer_does_not_render_decision_risk_template():

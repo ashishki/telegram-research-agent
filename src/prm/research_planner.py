@@ -11,13 +11,17 @@ from llm.client import LLMClient
 
 _MAX_PROMPT_CANDIDATES = 12
 _MAX_SELECTED = 8
+_MAX_CONTEXT_ONLY_SELECTED = 3
 
 
 def plan_archive_evidence(candidates: Sequence[Mapping[str, Any]], *, question: str) -> dict[str, Any]:
     """Select a cited, bounded evidence set; provider use is opt-in and best-effort."""
 
     ranked = _ranked(candidates)
-    fallback = ranked[:_MAX_SELECTED]
+    actionable = [item for item in ranked if bool(item.get("supports_action"))]
+    # Context can clarify a no-answer, but it must not drown out the absence of
+    # replayable evidence with a long list of weak topical matches.
+    fallback = (actionable[:_MAX_SELECTED] if actionable else ranked[:_MAX_CONTEXT_ONLY_SELECTED])
     result = {
         "schema_version": "prm_archive_research_plan.v1",
         "candidate_count": len(ranked),
@@ -86,12 +90,9 @@ def assess_research_gaps(candidates: Sequence[Mapping[str, Any]], *, question: s
         missing.append("direct_topic_evidence")
     if not actionable:
         missing.append("replayable_practice")
-        if _is_agent_eval_question(question):
-            queries.extend((
-                "agent evals harness regression fixture",
-                "agent evals tool-call correctness task success",
-                "agent evals failure analysis gold labels",
-            ))
+        topic_queries = _topic_gap_queries(question)
+        if topic_queries:
+            queries.extend(topic_queries)
         else:
             topic = " ".join(str(question or "").split())[:180]
             queries.extend((f"{topic} case study implementation", f"{topic} failure mode checklist"))
@@ -161,6 +162,32 @@ def _llm_enabled() -> bool:
 def _is_agent_eval_question(question: str) -> bool:
     lowered = str(question or "").casefold()
     return ("agent" in lowered or "агент" in lowered) and ("eval" in lowered or "оцен" in lowered)
+
+
+def _topic_gap_queries(question: str) -> tuple[str, ...]:
+    """Return bounded local search hypotheses for known practical research jobs."""
+
+    lowered = str(question or "").casefold()
+    if _is_agent_eval_question(lowered):
+        return (
+            "agent evals harness regression fixture",
+            "agent evals tool-call correctness task success",
+            "agent evals failure analysis gold labels",
+        )
+    if "instruction following" in lowered or "следован" in lowered and ("инструкц" in lowered or "instruction" in lowered):
+        return (
+            "instruction following agent evaluation benchmark",
+            "instruction following tool use constraint compliance",
+            "instruction following regression test harness",
+        )
+    if "rag" in lowered or "retrieval" in lowered or "поиск по базе" in lowered:
+        return (
+            "RAG retrieval evaluation retrieval quality",
+            "RAG retrieval failure analysis relevance citation",
+            "RAG retrieval regression test set",
+        )
+    topic = " ".join(str(question or "").split())[:180]
+    return (f"{topic} case study implementation", f"{topic} failure mode checklist")
 
 
 def _unique(values: Sequence[str]) -> list[str]:

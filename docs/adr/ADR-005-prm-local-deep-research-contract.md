@@ -28,7 +28,9 @@ For `archive_to_action`, use this bounded flow:
 4. `synthesise`: rank the gathered pool deterministically. If the existing
    provider-egress switches are enabled, a model receives at most 12 cited
    excerpts and may select at most eight supplied source IDs. It cannot add
-   facts, URLs, or actions. A deterministic role-aware fallback is mandatory.
+   facts, URLs, or actions. A deterministic role-aware fallback is mandatory;
+   when no source supports an action, it exposes at most three clearly marked
+   context sources rather than presenting a long weak-match list as evidence.
 5. `verify`: retain archive response contracts, source-role gates, claim
    verification, and final-answer verification.
 
@@ -44,7 +46,7 @@ they must not export raw corpus text.
 | Candidate pool | maximum 32 local rows |
 | Provider context | maximum 12 cited excerpts, 320 characters each |
 | Provider authority | choose supplied IDs only |
-| Visible evidence | maximum 8 selected sources |
+| Visible evidence | maximum 8 actionable sources or 3 context-only sources |
 | Additional search | one local gap-search wave within request budget |
 | External embeddings | not used |
 | Hosted vector service | not used |
