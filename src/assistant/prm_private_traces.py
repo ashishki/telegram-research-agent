@@ -90,6 +90,9 @@ def build_private_interaction_receipt(answer: Mapping[str, Any], *, interaction_
     route = _safe_mapping(answer.get("route_decision"))
     contract = _safe_mapping(answer.get("archive_contract"))
     result_summary = _safe_mapping(contract.get("result_summary"))
+    research_plan = _safe_mapping(answer.get("research_plan"))
+    gap_check = _safe_mapping(research_plan.get("gap_check"))
+    post_search = _safe_mapping(gap_check.get("post_search"))
     body = _clean(answer.get("answer") or answer.get("direct_answer") or "")
     candidate_trace = _archive_candidate_trace(archive.get("items"))
     source_groups = [
@@ -130,6 +133,18 @@ def build_private_interaction_receipt(answer: Mapping[str, Any], *, interaction_
             "source_group_count": int(evidence_summary.get("source_group_count") or 0),
             "direct_rate": float(evidence_summary.get("direct_rate") or 0.0),
             "relevant_rate": float(evidence_summary.get("relevant_rate") or 0.0),
+        },
+        "research_plan": {
+            "candidate_count": max(0, int(research_plan.get("candidate_count") or 0)),
+            "selected_count": max(0, int(research_plan.get("selected_count") or 0)),
+            "selection_mode": _clean(research_plan.get("selection_mode"))[:64],
+            "provider_egress": bool(research_plan.get("provider_egress")),
+            "gap_status": _clean(gap_check.get("status"))[:64],
+            "gap_search_performed": bool(gap_check.get("gap_search_performed")),
+            "missing_evidence": [
+                _clean(value)[:64] for value in gap_check.get("missing_evidence") or [] if _clean(value)
+            ][:6],
+            "post_search_status": _clean(post_search.get("status"))[:64],
         },
         "render": {
             "mode": _clean(answer.get("render_mode")) or "telegram_answer",

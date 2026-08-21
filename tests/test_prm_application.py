@@ -46,6 +46,31 @@ def test_application_returns_intent_specific_archive_contract(monkeypatch):
     assert "Главный риск" not in result.text
 
 
+def test_archive_to_action_uses_bounded_research_plan(monkeypatch):
+    payload = _payload()
+    payload["archive_candidate_pool"] = [
+        {**payload["archive_evidence"]["items"][0], "source_role": "practical_evidence", "supports_action": True},
+        {"archive_document_id": "promo", "snippet": "Agent evals webinar registration", "source_url": "https://t.me/example/2", "source_role": "announcement_or_promotion", "supports_action": False},
+    ]
+    monkeypatch.setattr("prm.application.answer_memory_research", lambda *args, **kwargs: payload)
+    monkeypatch.setattr("prm.application.build_research_facade", lambda **kwargs: SimpleNamespace())
+    monkeypatch.setattr("prm.application.synthesize_answer", lambda *args, **kwargs: None)
+    monkeypatch.setattr("prm.application.plan_archive_evidence", lambda *args, **kwargs: {
+        "selected_evidence_ids": ["tg:1"], "candidate_count": 2, "selected_count": 1,
+        "selection_mode": "deterministic_role_rank", "provider_egress": False,
+        "items": [payload["archive_candidate_pool"][0]],
+    })
+
+    result = PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:")).answer(OperatorRequest(
+        query="Что в моём архиве есть про agent evals и что из этого реально применимо сейчас?",
+        mode="auto",
+    ))
+
+    assert result.payload["research_plan"]["candidate_count"] == 2
+    assert result.payload["archive_evidence"]["items"][0]["archive_document_id"] == "tg:1"
+    assert result.payload["research_plan"]["gap_check"] == {}
+
+
 def test_ambiguous_project_clarifies(monkeypatch):
     called = False
 

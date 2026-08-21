@@ -1,8 +1,8 @@
 # Architecture
 
 Status: current
-Version: 2.0
-Last updated: 2026-08-16
+Version: 2.1
+Last updated: 2026-08-21
 
 ## Product boundary
 
@@ -82,6 +82,22 @@ retrieved evidence
 ```
 
 Current-fact requests fail closed until an approved external verification path runs. Repeated Telegram commentary is not automatically independent evidence.
+
+### Local deep research contract
+
+`archive_to_action` uses a bounded five-phase contract:
+
+```text
+plan -> gather -> gap-check -> synthesise -> verify
+```
+
+`plan` creates phrase-preserving local queries. `gather` pools up to 32 local
+archive candidates. `gap-check` identifies missing direct or replayable-practice
+evidence and may spend one additional bounded archive search on targeted local
+queries. `synthesise` sees at most 12 cited excerpts and selects at most eight
+sources. `verify` retains the existing answer and claim gates. No phase sends
+the raw corpus, starts a container, runs live web search, or mutates canonical
+archive data.
 
 ### Durable actions
 

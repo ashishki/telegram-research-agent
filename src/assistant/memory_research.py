@@ -34,8 +34,10 @@ from assistant.professional_workflows import (
 )
 from assistant.professional_personalization import infer_professional_lens, rerank_for_professional_lens
 from assistant.rag_context_pack import build_rag_context_pack, render_rag_context_pack
+from assistant.archive_relevance import rank_archive_items
 from assistant.retrieval_policy import build_query_rewrites, select_retrieval_policy
 from config.settings import Settings
+from prm.research_planner import assess_research_gaps
 
 
 MEMORY_RESEARCH_SCHEMA_VERSION = "memory_research_answer.v1"
@@ -51,6 +53,7 @@ PROJECT_LABELS = {
 
 _HARD_MAX_TOOL_CALLS = 8
 _HARD_MAX_ARCHIVE_SOURCES = 10
+_HARD_MAX_ARCHIVE_CANDIDATES = 32
 _HARD_MAX_LINKED_SOURCES = 5
 _HARD_MAX_RETRIES = 1
 _HARD_MAX_TIMEOUT_SECONDS = 60
@@ -308,6 +311,7 @@ class ResearchTimeWindow:
 class MemoryResearchBudget:
     max_tool_calls: int = 4
     max_archive_sources: int = 5
+    max_archive_candidates: int = 16
     max_linked_sources: int = 3
     max_retries: int = 0
     timeout_seconds: int = 30
@@ -323,6 +327,7 @@ class MemoryResearchBudget:
         return {
             "max_tool_calls": int(self.max_tool_calls),
             "max_archive_sources": int(self.max_archive_sources),
+            "max_archive_candidates": int(self.max_archive_candidates),
             "max_linked_sources": int(self.max_linked_sources),
             "max_retries": int(self.max_retries),
             "timeout_seconds": int(self.timeout_seconds),
@@ -350,6 +355,7 @@ def answer_memory_research(
     linked_source_fixtures: Mapping[str, Mapping[str, Any]] | None = None,
     project_context_fixtures: Sequence[Mapping[str, Any]] | None = None,
     operator_context: Mapping[str, Any] | None = None,
+    research_intent: str = "",
     now: datetime | None = None,
 ) -> dict[str, Any]:
     clean_question = _clean_text(question)
@@ -372,10 +378,40 @@ def answer_memory_research(
         week_label=week_label,
         project_name=project_name,
         limit=bounded_limit,
+        candidate_limit=max(bounded_limit, min(_HARD_MAX_ARCHIVE_CANDIDATES, int(active_budget.max_archive_candidates or bounded_limit))),
         tool_calls=tool_calls,
         budget=active_budget,
         time_window=time_window,
     )
+    gap_check = {"status": "not_requested", "missing_evidence": [], "query_variants": []}
+    if str(research_intent or "") == "archive_to_action":
+        gap_check = assess_research_gaps(
+            [item for item in archive_result.get("items") or [] if isinstance(item, Mapping)],
+            question=clean_question,
+        )
+        gap_variants = [str(item) for item in gap_check.get("query_variants") or [] if str(item).strip()]
+        if gap_variants and len(tool_calls) < active_budget.max_tool_calls:
+            gap_result = _call_archive_search(
+                active_facade,
+                clean_archive_query,
+                week_label=week_label,
+                project_name=project_name,
+                limit=bounded_limit,
+                candidate_limit=max(bounded_limit, min(_HARD_MAX_ARCHIVE_CANDIDATES, int(active_budget.max_archive_candidates or bounded_limit))),
+                tool_calls=tool_calls,
+                budget=active_budget,
+                time_window=time_window,
+                extra_query_variants=gap_variants,
+            )
+            archive_result = _merge_archive_results(archive_result, gap_result, query=clean_archive_query)
+            gap_check = {
+                **gap_check,
+                "gap_search_performed": True,
+                "post_search": assess_research_gaps(
+                    [item for item in archive_result.get("items") or [] if isinstance(item, Mapping)],
+                    question=clean_question,
+                ),
+            }
     curated_result = _call_curated_search(
         active_facade,
         clean_question,
@@ -413,7 +449,7 @@ def answer_memory_research(
         budget=active_budget,
     )
 
-    archive_evidence = _archive_evidence(archive_result, max_items=bounded_limit, time_window=time_window)
+    archive_evidence = _archive_evidence(archive_result, question=clean_question, max_items=bounded_limit, time_window=time_window)
     linked_evidence = _linked_evidence(linked_result, max_items=active_budget.max_linked_sources)
     curated_evidence = _curated_evidence(curated_result, max_items=bounded_limit)
     professional_lens = infer_professional_lens(clean_question)
@@ -601,6 +637,8 @@ def answer_memory_research(
         "time_window": time_window.to_dict(),
         "direct_answer": direct_answer,
         "archive_evidence": archive_evidence,
+        "archive_candidate_pool": _archive_candidate_pool(archive_result),
+        "research_gap_check": gap_check,
         "curated_memory": curated_evidence,
         "linked_source_evidence": linked_evidence,
         "approach_comparison": comparison,
@@ -1467,9 +1505,11 @@ def _call_archive_search(
     week_label: str | None,
     project_name: str | None,
     limit: int,
+    candidate_limit: int,
     tool_calls: list[dict[str, Any]],
     budget: MemoryResearchBudget,
     time_window: ResearchTimeWindow,
+    extra_query_variants: Sequence[str] = (),
 ) -> dict[str, Any]:
     if len(tool_calls) >= budget.max_tool_calls or not hasattr(facade, "search_telegram_archive"):
         return {"status": "skipped", "query": query, "items": [], "message": "Archive search skipped by planner limit."}
@@ -1495,7 +1535,7 @@ def _call_archive_search(
         job_type=retrieval_policy.job_type,
         max_variants=_MAX_ARCHIVE_QUERY_VARIANTS,
     )
-    query_variants = _unique([*policy_variants, *legacy_variants])[:_MAX_ARCHIVE_QUERY_VARIANTS]
+    query_variants = _unique([*extra_query_variants, *policy_variants, *legacy_variants])[:_MAX_ARCHIVE_QUERY_VARIANTS]
     logged_filters = {key: value for key, value in filters.items() if key != "vector_index_path"}
     if "vector_index_path" in filters:
         logged_filters["vector_index_path_configured"] = True
@@ -1509,6 +1549,7 @@ def _call_archive_search(
                 "project_name_hint": project_name,
                 "retrieval_policy": retrieval_policy.to_dict(),
                 "limit": limit,
+                "candidate_limit": candidate_limit,
                 "time_window": time_window.to_dict(),
             },
         }
@@ -1518,12 +1559,13 @@ def _call_archive_search(
     seen: set[str] = set()
     attempts: list[dict[str, Any]] = []
     failures: list[str] = []
+    per_variant_limit = max(1, min(16, (candidate_limit + max(1, len(query_variants)) - 1) // max(1, len(query_variants))))
     for variant in query_variants:
-        remaining = max(0, int(limit or 0) - len(items))
+        remaining = max(0, int(candidate_limit or 0) - len(items))
         if remaining <= 0:
             break
         try:
-            result = dict(facade.search_telegram_archive(variant, filters=filters, limit=remaining))
+            result = dict(facade.search_telegram_archive(variant, filters=filters, limit=min(remaining, per_variant_limit)))
         except Exception as exc:
             attempts.append({"query": variant, "status": "invalid", "item_count": 0})
             failures.append(type(exc).__name__)
@@ -1549,8 +1591,10 @@ def _call_archive_search(
             seen.add(key)
             item.setdefault("matched_query_variant", variant)
             items.append(item)
-            if len(items) >= limit:
+            if len(items) >= candidate_limit:
                 break
+
+    items = rank_archive_items(query, items)
 
     if items:
         status = "ok"
@@ -1574,13 +1618,35 @@ def _call_archive_search(
         "retrieval_policy": retrieval_policy.to_dict(),
         "time_window": time_window.to_dict(),
         "project_name_hint": project_name,
-        "items": items[:limit],
+        "items": items[:candidate_limit],
         "retrieval_mode": (
             "hybrid_local_vector_archive_query_planner"
             if budget.allow_vector_retrieval
             else "sqlite_fts_archive_query_planner"
         ),
         "message": message,
+    }
+
+
+def _merge_archive_results(first: Mapping[str, Any], second: Mapping[str, Any], *, query: str) -> dict[str, Any]:
+    combined = [
+        *[dict(item) for item in first.get("items") or [] if isinstance(item, Mapping)],
+        *[dict(item) for item in second.get("items") or [] if isinstance(item, Mapping)],
+    ]
+    deduplicated: dict[str, dict[str, Any]] = {}
+    for item in combined:
+        deduplicated.setdefault(_archive_item_identity(item), item)
+    items = rank_archive_items(query, list(deduplicated.values()))[:_HARD_MAX_ARCHIVE_CANDIDATES]
+    return {
+        **dict(first),
+        "status": "ok" if items else str(second.get("status") or first.get("status") or "insufficient_evidence"),
+        "items": items,
+        "query_variants": _unique([*_strings(first.get("query_variants")), *_strings(second.get("query_variants"))]),
+        "attempted_queries": [
+            *[dict(item) for item in first.get("attempted_queries") or [] if isinstance(item, Mapping)],
+            *[dict(item) for item in second.get("attempted_queries") or [] if isinstance(item, Mapping)],
+        ],
+        "gap_search_performed": True,
     }
 
 
@@ -2064,8 +2130,8 @@ def _call_linked_sources(
     )
 
 
-def _archive_evidence(result: Mapping[str, Any], *, max_items: int, time_window: ResearchTimeWindow) -> dict[str, Any]:
-    items = [dict(item) for item in result.get("items") or [] if isinstance(item, Mapping)][:max_items]
+def _archive_evidence(result: Mapping[str, Any], *, question: str, max_items: int, time_window: ResearchTimeWindow) -> dict[str, Any]:
+    items = rank_archive_items(question, [dict(item) for item in result.get("items") or [] if isinstance(item, Mapping)])[:max_items]
     source_refs = _unique(
         [
             str(item.get("source_url") or item.get("telegram_url") or item.get("message_url") or item.get("archive_document_id") or "")
@@ -2082,6 +2148,21 @@ def _archive_evidence(result: Mapping[str, Any], *, max_items: int, time_window:
         "source_refs": source_refs,
         "items": items,
     }
+
+
+def _archive_candidate_pool(result: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Keep a bounded local candidate pool for the application-level reranker."""
+
+    fields = (
+        "archive_document_id", "post_archive_document_id", "post_id", "posted_at", "channel_username", "source_url",
+        "snippet", "summary", "matched_query_variant", "relevance_label", "directness_score", "source_role",
+        "supports_action", "source_role_reason", "fusion_score", "semantic_score",
+    )
+    return [
+        {key: item[key] for key in fields if key in item}
+        for item in result.get("items") or []
+        if isinstance(item, Mapping)
+    ][:_HARD_MAX_ARCHIVE_CANDIDATES]
 
 
 def _curated_evidence(result: Mapping[str, Any], *, max_items: int) -> dict[str, Any]:
@@ -2754,6 +2835,8 @@ def _budget_refusal(question: str, budget: MemoryResearchBudget) -> tuple[str, s
         return ("tool_budget_refused", f"max_tool_calls must be between 1 and {_HARD_MAX_TOOL_CALLS}.")
     if budget.max_archive_sources < 1 or budget.max_archive_sources > _HARD_MAX_ARCHIVE_SOURCES:
         return ("source_budget_refused", f"max_archive_sources must be between 1 and {_HARD_MAX_ARCHIVE_SOURCES}.")
+    if budget.max_archive_candidates < 1 or budget.max_archive_candidates > _HARD_MAX_ARCHIVE_CANDIDATES:
+        return ("candidate_budget_refused", f"max_archive_candidates must be between 1 and {_HARD_MAX_ARCHIVE_CANDIDATES}.")
     if budget.max_linked_sources < 1 or budget.max_linked_sources > _HARD_MAX_LINKED_SOURCES:
         return ("linked_source_budget_refused", f"max_linked_sources must be between 1 and {_HARD_MAX_LINKED_SOURCES}.")
     if budget.max_retries < 0 or budget.max_retries > _HARD_MAX_RETRIES:

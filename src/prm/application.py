@@ -14,6 +14,7 @@ from config.settings import Settings
 from prm.archive_contract import ARCHIVE_RESPONSE_INTENTS, apply_archive_response_contract
 from prm.contracts import AssistantResult, OperatorRequest
 from prm.presentation import render_payload, render_project_clarification
+from prm.research_planner import plan_archive_evidence
 from prm.research_facade import build_research_facade
 from prm.routing import decide_route
 from prm.synthesis import synthesize_answer
@@ -65,7 +66,8 @@ class PersonalResearchAssistant:
 
         budget = MemoryResearchBudget(
             max_tool_calls=4,
-            max_archive_sources=5 if route.mode == "brief" else 4,
+            max_archive_sources=8 if route.primary_intent == "archive_to_action" else (5 if route.mode == "brief" else 4),
+            max_archive_candidates=32 if route.primary_intent == "archive_to_action" else 16,
             max_linked_sources=3,
             max_retries=0,
             timeout_seconds=30,
@@ -88,9 +90,10 @@ class PersonalResearchAssistant:
             project_name=route.project_name if route.project_context_required else "",
             settings=self.settings,
             facade=facade,
-            limit=5 if route.mode == "brief" else 4,
+            limit=8 if route.primary_intent == "archive_to_action" else (5 if route.mode == "brief" else 4),
             budget=budget,
             operator_context=context_payload,
+            research_intent=route.primary_intent,
         )
         payload = {
             **dict(payload),
@@ -99,6 +102,20 @@ class PersonalResearchAssistant:
             "response_contract_id": route.response_contract_id,
             "route_decision": route_payload,
         }
+        if route.primary_intent == "archive_to_action":
+            candidates = payload.get("archive_candidate_pool") or _mapping(payload.get("archive_evidence")).get("items") or []
+            plan = plan_archive_evidence(
+                [item for item in candidates if isinstance(item, Mapping)],
+                question=request.query,
+            )
+            payload = {
+                **payload,
+                "archive_evidence": {**_mapping(payload.get("archive_evidence")), "items": plan["items"]},
+                "research_plan": {
+                    **{key: value for key, value in plan.items() if key != "items"},
+                    "gap_check": _mapping(payload.get("research_gap_check")),
+                },
+            }
         payload = _apply_route_boundaries(payload, route_payload)
         if route.primary_intent in ARCHIVE_RESPONSE_INTENTS:
             payload = apply_archive_response_contract(

@@ -66,6 +66,11 @@ explicit human approval.
 - External embedding APIs require explicit data-egress approval.
 - Assistant answers must support `insufficient_evidence` instead of filling
   gaps from model background.
+- `archive_to_action` may use a second local archive-search wave only after a
+  deterministic gap check identifies missing direct or replayable-practice
+  evidence. It remains bounded by the request tool-call and candidate limits.
+- Any provider reranker receives only cited excerpts from the bounded candidate
+  pool, may select source IDs only, and has a deterministic local fallback.
 
 ### Assistant Tooling
 
