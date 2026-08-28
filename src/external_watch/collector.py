@@ -9,6 +9,7 @@ from .adapters import AdapterError, canonical_hash, parse_html_document, parse_l
 from .fetch import FetchError, safe_fetch
 from .profile import load_confirmed_utd_profile
 from .relevance import classify
+from .selection import select_candidates
 from .store import ShadowStore
 
 SOURCE_URLS = {
@@ -23,6 +24,7 @@ class ShadowRunResult:
     enabled: bool
     profile_loaded: bool
     changes: tuple[dict[str, Any], ...]
+    candidates: tuple[dict[str, Any], ...]
     source_status: Mapping[str, str]
 
 
@@ -34,10 +36,10 @@ class ShadowCollector:
 
     def run_once(self) -> ShadowRunResult:
         if not self.enabled:
-            return ShadowRunResult(False, False, (), {})
+            return ShadowRunResult(False, False, (), (), {})
         profile = load_confirmed_utd_profile(self.prm_db)
         if not profile or profile.get("paused"):
-            return ShadowRunResult(True, bool(profile), (), {})
+            return ShadowRunResult(True, bool(profile), (), (), {})
         selected = set(profile.get("categories") or []) - set(profile.get("muted_sources") or [])
         sources = []
         if selected & {"program", "career", "ai", "spouse_family"}:
@@ -46,8 +48,8 @@ class ShadowCollector:
             sources.append("isso")
         if "benefits" in selected:
             sources.append("basic_needs")
-        changes = []
-        status = {}
+        changes: list[dict[str, Any]] = []
+        status: dict[str, str] = {}
         for source in sources:
             try:
                 fetched = safe_fetch(SOURCE_URLS[source])
@@ -63,4 +65,5 @@ class ShadowCollector:
                 code = getattr(exc, "code", "schema_drift")
                 self.store.health(source, "error", error_code=code, detail=str(exc)[:500])
                 status[source] = code
-        return ShadowRunResult(True, True, tuple(changes), status)
+        candidates = select_candidates(changes, profile)
+        return ShadowRunResult(True, True, tuple(changes), tuple(candidates), status)
