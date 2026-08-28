@@ -1,4 +1,4 @@
-# ADR-005: Intent-first archive answers
+# ADR-006: Intent-first archive answers
 
 - Status: proposed for operator smoke
 - Date: 2026-08-16

@@ -3,8 +3,8 @@
 Status: active
 Last updated: 2026-08-16
 Baseline: `5dfd38660b7d8d24998b4dcdf801c419c1dc8f7c`
-Archive ref: archive-pre-prm-retrofit-2026-08-16
-Active ref: refactor-prm-repository-retrofit
+Archive ref: origin/archive/pre-prm-retrofit-2026-08-16
+Active ref: master
 
 Historical PBR, PRM, IRX, PRM-UX, PRM-MAT and PRM-QA task records are preserved in `docs/archive/pre_retrofit_2026-08-16/tasks.pre-retrofit.md` and Git history. Only the current retrofit queue remains active here.
 
@@ -14,7 +14,8 @@ Historical PBR, PRM, IRX, PRM-UX, PRM-MAT and PRM-QA task records are preserved 
 RFX-0 -> RFX-1 -> RFX-2 -> RFX-3 -> RFX-4
 RFX-2 -> RFX-5
 RFX-3/RFX-4/RFX-5 -> RFX-6 -> RFX-7
-RFX-7 -> RFX-8 -> RFX-9 -> RFX-10
+RFX-7 -> RFX-8 -> RFX-9
+RFX-7 -> RFX-10 -> UTD-P0
 ```
 
 ### RFX-0: Freeze Baseline And Inventory
@@ -233,7 +234,7 @@ Acceptance-Criteria:
   - "Every deleted Python module has zero active imports, a named replacement and green focused PRM plus legacy compatibility checks."
 
 Verification:
-  - python tools/test_tiers.py focused-prm
+  - python3 tools/test_tiers.py focused-prm
 
 Files:
   - src/
@@ -245,7 +246,7 @@ Owner:      codex
 Phase:      review
 Type:       compliance:evidence
 Depends-On: RFX-7
-Status:     in_progress
+Status:     implemented_with_residual_human_gate
 
 Objective: |
   Perform a fresh architecture, privacy, test-boundary and repository-truth review and record remaining debt without overstating operator value.
@@ -260,3 +261,30 @@ Files:
   - docs/retrofit/RFX_DEEP_REVIEW.md
   - docs/EVIDENCE_INDEX.md
   - docs/IMPLEMENTATION_JOURNAL.md
+
+### UTD-P0: External Watch Readiness
+
+Owner:      codex + human operator
+Phase:      preparation
+Type:       compliance:evidence
+Depends-On: RFX-10
+Status:     implemented_with_residual_human_gate
+
+Objective: |
+  Specify a confirmed, source-bounded external-watch capability and prepare a
+  privacy-safe fixture/evaluation intake without starting a collector.
+
+Acceptance-Criteria:
+  - "ADR-008, a validated 50-slot 35/15 evaluation inventory, and a documented
+    real-source intake process exist; no fixture inventory is represented as
+    shadow-ready or launch-ready before operator evidence."
+
+Verification:
+  - python3 tools/validate_external_watch_eval.py --manifest evals/external_watch/manifest.v1.json --json
+  - PYTHONPATH=src python3 -m pytest tests/test_external_watch_eval_manifest.py -q
+
+Files:
+  - docs/adr/ADR-008-confirmed-external-watch.md
+  - docs/external_watch_p0_readiness.md
+  - evals/external_watch/manifest.v1.json
+  - tools/validate_external_watch_eval.py

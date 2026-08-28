@@ -1,22 +1,21 @@
 # Implementation Contract
 
-Status: immutable after ADR approval; changes require a new ADR under
-`docs/adr/`.
+Status: current operating contract. Changes to an accepted decision require a
+new ADR under `docs/adr/`.
 
-Version: 4.0-proposed
+Version: 4.1
 
-Effective date: proposed 2026-07-26
+Effective date: 2026-08-28
 
 ## Product Authority
 
-The proposed product center is Personal Telegram Research Memory + Grounded
-Assistant. Weekly reports are derived secondary projections. The report-centered
-v3 contract is superseded only after
-`docs/adr/ADR-001-product-pivot-to-personal-research-memory.md` is accepted by
-the human operator.
-
-Until acceptance, implementation tasks that change product direction require
-explicit human approval.
+The current product center is Personal Telegram Research Memory + Grounded
+Assistant. Weekly reports are derived secondary projections. ADR-001 records
+the original product-pivot proposal; its formal acceptance remains an operator
+decision. The active operating boundary is nevertheless constrained by the
+accepted implementation slices and current architecture: a task may not expand
+the product surface, start dogfood, or add external egress without the specific
+operator approval and ADR required for that change.
 
 ## Universal Rules
 

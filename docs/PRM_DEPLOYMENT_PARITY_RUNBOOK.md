@@ -11,17 +11,8 @@ This runbook performs no deploy, restart, migration, database write, Telegram se
 
 ## Expected repository state
 
-Candidate branch:
-
-```text
-agent/intent-first-archive-answers
-```
-
-Target base:
-
-```text
-master
-```
+Candidate and target branch: `master`. Record a specific candidate SHA in the
+private receipt; a historical feature branch is not a deployment target.
 
 The active repository template expects a PRM assistant entrypoint equivalent to:
 
@@ -48,9 +39,7 @@ git log -1 --format='%H %cI %s'
 Compare local and remote refs without changing local refs:
 
 ```bash
-git ls-remote origin \
-  refs/heads/master \
-  refs/heads/agent/intent-first-archive-answers
+git ls-remote origin refs/heads/master
 ```
 
 Record:

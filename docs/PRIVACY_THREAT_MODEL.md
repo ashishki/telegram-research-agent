@@ -37,6 +37,9 @@ Last updated: 2026-08-11
 | answer context contains uncited claims or a raw corpus dump | PRM-25 context pack admits only cited bounded excerpts; it excludes raw fields and records safe exclusion reasons |
 | vector index silently persists private corpus embeddings | PRM-27 allows only the ADR-004 local SQLite sidecar under `data/vector/`, with canonical DB read-only, no provider egress, git ignore, redacted receipts, and FTS fallback; any external embedding or hosted vector backend still requires a new approval |
 | deletion cannot be honored | retention/deletion path required before dogfood |
+| a confirmed watch is mistaken for permission to poll/notify | `watch_topic` remains non-executable; ADR-008 requires exact confirmed scope, a separate sidecar, feature flag and timer approval |
+| external source failure is treated as a cancelled item | stale/fetch failure blocks change notification and records source health only |
+| UTD fixtures expose institutional or operator data | raw captures remain local; committed fixtures are minimized/sanitized and manifest validation rejects private-data claims |
 
 ## Provider Egress Rule
 

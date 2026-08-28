@@ -19,3 +19,16 @@ Created:
 The retrofit uses a strangler boundary: active PRM interfaces move to a compact application service while report-era and historical commands remain explicit compatibility surfaces until caller migration and operator smoke evidence permit deletion.
 
 No runtime behavior, production data, provider boundary or installed systemd unit was changed by the documentation-consolidation step.
+
+## 2026-08-28 — UTD external-watch P0 preparation and retrofit review
+
+Completed the repository-owned preparation only: ADR-008, a sanitized
+50-slot evaluation inventory, a no-I/O manifest validator, and the RFX deep
+review. No UTD endpoint was called, no collector/timer/sidecar was created,
+no Telegram message was sent, and no canonical database was changed.
+
+The review corrected stale branch/ref documentation, an ADR-005 filename
+collision, and the focused-test tier's reference to a removed test module.
+RFX-8 operator smoke evidence, runtime parity evidence, real sanitized source
+samples, independent fixture labels, P1 approval, and all dogfood/release
+claims remain human-owned gates.

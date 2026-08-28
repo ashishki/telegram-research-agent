@@ -16,6 +16,6 @@ The retrofit follows these rules:
 
 Canonical retrofit artifacts:
 
-- `docs/retrofit/RFX_TASKS.md`
-- `docs/retrofit/DEPENDENCY_INVENTORY.md`
-- `docs/retrofit/DEEP_REVIEW.md`
+- `docs/tasks.md`
+- `docs/retrofit/RFX_REPOSITORY_RETROFIT.md`
+- `docs/retrofit/RFX_DEEP_REVIEW.md`

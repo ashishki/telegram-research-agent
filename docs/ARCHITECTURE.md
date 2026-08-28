@@ -83,6 +83,11 @@ retrieved evidence
 
 Current-fact requests fail closed until an approved external verification path runs. Repeated Telegram commentary is not automatically independent evidence.
 
+External watch is not a current runtime capability. Confirmed `watch_topic`
+memory is durable intent only; it cannot authorize polling, external fetches,
+or notifications. ADR-008 specifies a future source-bounded sidecar subject to
+separate operator evidence and approval.
+
 ### Local deep research contract
 
 `archive_to_action` uses a bounded five-phase contract:

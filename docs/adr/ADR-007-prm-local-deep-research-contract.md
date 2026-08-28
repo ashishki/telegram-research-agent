@@ -1,4 +1,4 @@
-# ADR-005: PRM Local Deep Research Contract
+# ADR-007: PRM Local Deep Research Contract
 
 Status: accepted_for_manual_runtime
 Date: 2026-08-21

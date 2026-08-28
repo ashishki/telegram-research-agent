@@ -2,9 +2,9 @@
 
 Status: active
 Last updated: 2026-08-16
-Repository baseline: `5dfd38660b7d8d24998b4dcdf801c419c1dc8f7c`
-Active branch: `refactor/prm-repository-retrofit`
-Archive branch: `archive/pre-prm-retrofit-2026-08-16`
+Repository retrofit baseline: `5dfd38660b7d8d24998b4dcdf801c419c1dc8f7c`
+Active integration branch: `master`
+Archive ref: `origin/archive/pre-prm-retrofit-2026-08-16`
 
 ## Product
 
@@ -28,10 +28,10 @@ RFX repository retrofit. Follow `docs/tasks.md` in dependency order. Do not add 
 ## Verification
 
 ```bash
-python tools/test_tiers.py focused-prm
-python tools/test_tiers.py retrofit-boundaries
-python tools/prm_mat_eval.py --check safety
-python tools/playbook_validate.py --root . --check tasks --check references
+python3 tools/test_tiers.py focused-prm
+python3 tools/test_tiers.py retrofit-boundaries
+PYTHONPATH=src python3 tools/prm_mat_eval.py --check safety
+python3 tools/playbook_validate.py --root . --check tasks --check references
 git diff --check
 ```
 
