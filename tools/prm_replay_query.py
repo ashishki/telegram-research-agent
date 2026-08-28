@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Replay one PRM archive query without provider egress or durable writes.
 
-Fixture mode is suitable for public regression tests.  Local DB mode exercises
+Fixture mode is suitable for public regression tests. Local DB mode exercises
 the active application boundary but stores the detailed receipt only under the
 private gitignored eval directory.
 """
@@ -30,9 +30,12 @@ from prm.presentation import render_payload  # noqa: E402
 from prm.routing import decide_route  # noqa: E402
 
 DEFAULT_PRIVATE_ROOT = PROJECT_ROOT / "data" / "evals" / "private" / "prm_replay"
+DEFAULT_QUERY = "Что в архиве есть про agent evals и что из этого применимо?"
 
 
-def replay_fixture(query: str, fixture: Mapping[str, Any]) -> dict[str, Any]:
+def _fixture_replay_parts(
+    query: str, fixture: Mapping[str, Any]
+) -> tuple[Any, list[dict[str, Any]], dict[str, Any], str]:
     route = decide_route(query)
     candidates = [item for item in fixture.get("items") or [] if isinstance(item, Mapping)]
     ranked = rank_archive_items(query, candidates)
@@ -51,6 +54,11 @@ def replay_fixture(query: str, fixture: Mapping[str, Any]) -> dict[str, Any]:
         },
         mode="research",
     )
+    return route, ranked, contract, rendered
+
+
+def replay_fixture(query: str, fixture: Mapping[str, Any]) -> dict[str, Any]:
+    route, ranked, contract, rendered = _fixture_replay_parts(query, fixture)
     summary = dict(contract["result_summary"])
     return {
         "schema_version": "prm_private_replay.v1",
@@ -93,6 +101,32 @@ def replay_fixture(query: str, fixture: Mapping[str, Any]) -> dict[str, Any]:
             "telegram_messages_sent": False,
             "durable_writes": False,
             "public_report_allowed": False,
+        },
+    }
+
+
+def replay_query(
+    query: str,
+    *,
+    fixture: Sequence[Mapping[str, Any]] | Mapping[str, Any],
+) -> dict[str, Any]:
+    """Backward-compatible public fixture replay for the focused regression suite."""
+
+    payload: Mapping[str, Any]
+    if isinstance(fixture, Mapping):
+        payload = fixture
+    else:
+        payload = {"items": list(fixture)}
+    route, ranked, contract, rendered = _fixture_replay_parts(query, payload)
+    trace = replay_fixture(query, payload)
+    return {
+        **trace,
+        "route": route.to_dict(),
+        "candidates": [dict(item) for item in ranked],
+        "archive_contract": contract,
+        "render": {
+            "decision_template_rendered": False,
+            "answer_chars": len(rendered),
         },
     }
 
@@ -150,6 +184,7 @@ def public_summary(trace: Mapping[str, Any]) -> dict[str, Any]:
         "adjacent_count": int(summary.get("adjacent_count") or 0),
         "answer_chars": int(trace.get("answer_chars") or 0),
         "privacy": {
+            "contains_query": False,
             "contains_raw_query": False,
             "contains_raw_answer": False,
             "contains_source_urls": False,
