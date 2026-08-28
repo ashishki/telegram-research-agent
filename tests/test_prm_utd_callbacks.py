@@ -30,7 +30,18 @@ def test_existing_prm_callback_namespace_is_unchanged(monkeypatch) -> None:
     assert calls == [("local.db", "prma:c123:n", "42")]
 
 
+def test_utd_watch_feedback_namespace_routes_to_sidecar(monkeypatch) -> None:
+    calls = []
+    def fake_feedback(path, callback_data):
+        calls.append((path, callback_data)); return {"message": "Записал", "action": "useful"}
+    monkeypatch.setattr(callbacks, "handle_utd_watch_feedback_callback", fake_feedback)
+    monkeypatch.setenv("UTD_WATCH_SIDECAR_DB", "/tmp/utd-shadow.db")
+    result = callbacks.handle_prm_post_answer_callback(SimpleNamespace(db_path="local.db"), "utdw:key:useful", chat_id="42")
+    assert result["action"] == "useful"
+    assert calls == [("/tmp/utd-shadow.db", "utdw:key:useful")]
+
+
 def test_active_bot_accepts_only_prm_and_utd_safe_callback_namespaces() -> None:
-    assert _PRM_CALLBACK_PREFIXES == ("prma:", "prmc:", "utdp:", "utdc:")
+    assert _PRM_CALLBACK_PREFIXES == ("prma:", "prmc:", "utdp:", "utdc:", "utdw:")
     with pytest.raises(ValueError):
         callbacks.handle_prm_post_answer_callback(SimpleNamespace(db_path="local.db"), "idea:1:done", chat_id="42")
