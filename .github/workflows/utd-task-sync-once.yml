@@ -1,0 +1,56 @@
+name: UTD task truth sync once
+
+on:
+  push:
+    paths:
+      - '.github/workflows/utd-task-sync-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: true
+      - name: Sync exact UTD task statuses
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('docs/tasks.md')
+          text=p.read_text(encoding='utf-8')
+          replacements={
+          '''### UTD-2: Sanitized Primary-source Contract Capture\n\nOwner:      human operator\nPhase:      evidence\nType:       eval:gate privacy\nDepends-On: UTD-P0\nStatus:     planned''': '''### UTD-2: Sanitized Primary-source Contract Capture\n\nOwner:      human operator\nPhase:      evidence\nType:       eval:gate privacy\nDepends-On: UTD-P0\nStatus:     implemented''',
+          '''### UTD-3: Operator Evaluation Labels And Relevance Policy\n\nOwner:      human operator + codex\nPhase:      evaluation\nType:       eval:gate\nDepends-On: UTD-P0\nStatus:     planned''': '''### UTD-3: Operator Evaluation Labels And Relevance Policy\n\nOwner:      human operator + codex\nPhase:      evaluation\nType:       eval:gate\nDepends-On: UTD-P0\nStatus:     implemented_with_residual_human_gate''',
+          '''### UTD-4: Source-bounded Shadow Collector\n\nOwner:      codex\nPhase:      implementation\nType:       tool:call eval:gate\nDepends-On: UTD-DR-1\nStatus:     blocked_pending_operator_approval''': '''### UTD-4: Source-bounded Shadow Collector\n\nOwner:      codex\nPhase:      implementation\nType:       tool:call eval:gate\nDepends-On: UTD-DR-1\nStatus:     implemented_with_residual_human_gate''',
+          }
+          for old,new in replacements.items():
+              count=text.count(old)
+              if count != 1:
+                  raise SystemExit(f'exact task block match failed count={count}: {old.splitlines()[0]}')
+              text=text.replace(old,new)
+          marker='''Files:\n  - tests/fixtures/external_watch/\n  - evals/external_watch/manifest.v1.json\n  - docs/external_watch_p0_readiness.md\n\n### UTD-3:'''
+          replacement='''Notes: |\n  Real sanitized Calendar/Localist, ISSO and Basic Needs source-contract fixtures\n  were captured on 2026-08-28 and validated. The manifest now records\n  live_source_samples_verified=true; launch_ready remains false.\n\nFiles:\n  - tests/fixtures/external_watch/\n  - evals/external_watch/manifest.v1.json\n  - docs/external_watch_p0_readiness.md\n  - docs/audit/UTD-2_REAL_SOURCE_CAPTURE_2026-08-28.md\n\n### UTD-3:'''
+          if text.count(marker) != 1: raise SystemExit('UTD-2 notes insertion marker mismatch')
+          text=text.replace(marker,replacement)
+          marker='''Files:\n  - evals/external_watch/\n  - docs/adr/ADR-008-confirmed-external-watch.md\n\n### UTD-4:'''
+          replacement='''Notes: |\n  Deterministic relevance, negative controls, capped shadow selection and all-50\n  proposed policy outcomes are implemented. All 50 review_status values remain\n  pending_operator because model-authored proposals do not substitute for the\n  human operator's notify/ignore/ambiguous judgments.\n\nFiles:\n  - evals/external_watch/\n  - docs/adr/ADR-008-confirmed-external-watch.md\n  - src/external_watch/relevance.py\n  - src/external_watch/selection.py\n  - tools/utd_policy_eval.py\n\n### UTD-4:'''
+          if text.count(marker) != 1: raise SystemExit('UTD-3 notes insertion marker mismatch')
+          text=text.replace(marker,replacement)
+          marker='''Files:\n  - src/external_watch/\n  - systemd/telegram-utd-watch-shadow.service\n  - systemd/telegram-utd-watch-shadow.timer\n  - tests/\n\n### UTD-5:'''
+          replacement='''Notes: |\n  Operator-approved bounded real-source probes succeeded without production DB\n  use or Telegram delivery. Final live snapshot: 102 source items, 32 relevant\n  changes, five capped shadow candidates (three urgent), followed by zero\n  changes/candidates on the second identical poll. The systemd timer is a\n  disabled template and has not been enabled. UTD-5 quality metrics remain\n  blocked on genuine human labels.\n\nFiles:\n  - src/external_watch/\n  - systemd/telegram-utd-watch-shadow.service\n  - systemd/telegram-utd-watch-shadow.timer\n  - tests/\n  - docs/audit/UTD-4_SHADOW_PROBE_RESULT_2026-08-28.md\n\n### UTD-5:'''
+          if text.count(marker) != 1: raise SystemExit('UTD-4 notes insertion marker mismatch')
+          text=text.replace(marker,replacement)
+          p.write_text(text,encoding='utf-8')
+          PY
+          rm .github/workflows/utd-task-sync-once.yml
+          python tools/playbook_validate.py --root . --check tasks --check references
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/tasks.md .github/workflows/utd-task-sync-once.yml
+          git commit -m 'docs(utd): sync source, policy, and shadow task truth'
+          git push origin HEAD:master
