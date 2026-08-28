@@ -1,0 +1,22 @@
+{
+  "schema_version": "utd_source_fixture.v1",
+  "source": "calendar",
+  "kind": "localist_json",
+  "contains_private_data": false,
+  "sanitized": true,
+  "canonical_url": "https://calendar.utdallas.edu/",
+  "captured_at": null,
+  "content": {
+    "synthetic_example": true,
+    "event": {
+      "id": "example-event-id",
+      "title": "Synthetic UTD event",
+      "status": "live",
+      "updated_at": "2026-08-28T00:00:00Z"
+    },
+    "instance": {
+      "start": "2026-09-01T12:00:00-05:00",
+      "end": "2026-09-01T13:00:00-05:00"
+    }
+  }
+}
