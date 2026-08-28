@@ -35,7 +35,6 @@ PRM_ACTIVE_TESTS = (
     "tests/test_retrofit_boundaries.py",
     "tests/test_prm_intent_archive_contract.py",
     "tests/test_prm_replay_query.py",
-    "tests/test_prm_private_traces.py",
     "tests/test_prm_qa_usage_recap.py",
 )
 

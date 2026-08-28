@@ -65,9 +65,11 @@ def select_post_answer_action_codes(answer: Mapping[str, Any]) -> list[str]:
         return codes
 
     feedback = ["u", "m", "x"]
-    direct_count = max(0, int(answer.get("direct_count") or 0))
-    partial_count = max(0, int(answer.get("partial_count") or 0))
-    relevance_established = bool(answer.get("relevance_established")) or direct_count + partial_count > 0
+    summary = answer.get("result_summary") if isinstance(answer.get("result_summary"), Mapping) else {}
+    direct_count = max(0, int(answer.get("direct_count") or summary.get("direct_count") or 0))
+    partial_count = max(0, int(answer.get("partial_count") or summary.get("partial_count") or 0))
+    adjacent_count = max(0, int(answer.get("adjacent_count") or summary.get("adjacent_count") or 0))
+    relevance_established = bool(answer.get("relevance_established")) or direct_count + partial_count + adjacent_count > 0
     project_name = str(answer.get("project_name") or "").strip()
 
     if intent in {"archive_lookup", "archive_synthesis", "archive_to_action"}:
@@ -83,9 +85,11 @@ def select_post_answer_action_codes(answer: Mapping[str, Any]) -> list[str]:
             codes.append("a")
         return codes
     if intent == "decision_support":
-        codes = [*feedback]
-        if relevance_established:
-            codes.append("a")
+        # A decision-support response is an explicit request to turn a
+        # conclusion into a bounded next action. Confirmation still gates the
+        # durable write; evidence gates elsewhere decide whether the response
+        # itself can be shown.
+        codes = [*feedback, "a"]
         if bool(answer.get("experiment_recommended")):
             codes.append("e")
         return codes

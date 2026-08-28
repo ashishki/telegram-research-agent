@@ -500,6 +500,7 @@ class TestMemoryResearch(unittest.TestCase):
             "Что было полезного для моих проектов в последние пару недель?",
             archive_query="eval gates",
             facade=_FakeFacade(),
+            now=datetime(2026, 8, 11, 12, 0, tzinfo=timezone.utc),
         )
 
         self.assertEqual(result["status"], "ok")
