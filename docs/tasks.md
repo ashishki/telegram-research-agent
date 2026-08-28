@@ -297,37 +297,53 @@ Owner:      codex + human operator
 Phase:      product-contract
 Type:       tool:schema privacy
 Depends-On: UTD-P0
-Status:     planned
+Status:     implemented_with_residual_human_gate
 
 Objective: |
   Define one confirmation-gated UTD profile and typed watch proposal inside the
-  existing PRM Telegram bot. The profile must express the operator's programme,
-  academic/career goals, AI/engineering interests, eligible audiences, spouse
-  and family context, notification limits, timezone, and review/expiry date
-  without silently creating durable preferences or external monitoring.
+  existing PRM Telegram bot. The profile expresses programme, academic/career
+  goals, AI/engineering interests, eligible audiences, spouse/family context,
+  notification limits, timezone, and review/expiry without silently enabling
+  durable preferences beyond exact confirmation or external monitoring.
 
 Acceptance-Criteria:
-  - "The bot can show a human-readable draft of its UTD scope before any save:
-    sources, filters, positive/negative terms, programme/career relevance,
+  - "The bot shows a human-readable draft and watch preview before save with
+    source families, positive/negative filters, programme/career relevance,
     spouse/family eligibility, America/Chicago timezone, cadence, daily cap,
     expiry and pause/mute choices."
-  - "A profile or watch is persisted only through the existing exact
-    confirmation flow; unconfirmed chat text and a single feedback click do not
-    mutate the profile."
+  - "Canonical profile/watch intent is persisted only through the existing exact
+    confirmation flow; cancelled and expired draft payloads are scrubbed."
   - "The active UI remains one bot: UTD ASK/WATCH complements archive AI
-    research and does not create a second Telegram bot or a report timer."
+    research; explicit archive wording retains the existing PRM archive route."
+  - "The isolated OpenAI adapter remains local-first/default-deny and requires
+    separate explicit gates for provider egress and archive-context egress."
 
 Verification:
-  - focused tests for proposal rendering, exact confirmation, expiry, pause,
-    mute, spouse/family eligibility and no-write cancellation
-  - privacy review confirms no programme/family details enter public fixtures,
-    ordinary logs or provider prompts
+  - PYTHONPATH=src python3 -m pytest tests/test_utd_profile.py tests/test_utd_ux_fixtures.py tests/test_prm_utd_dispatch.py tests/test_prm_utd_callbacks.py tests/test_openai_provider.py -q
+  - python3 tools/test_tiers.py focused-prm
+  - docs/audit/UTD-1_FOCUSED_SAFETY_REVIEW.md
+
+Notes: |
+  UTD-1 introduces no live UTD fetch, timer, Telegram notification, dogfood run,
+  production DB migration or external web job. UTD-2 and UTD-3 remain operator
+  evidence work. UTD-DR-1 remains planned until UTD-1/2/3 are all complete.
 
 Files:
+  - src/assistant/utd_profile.py
+  - src/assistant/utd_profile_schema.py
+  - src/assistant/utd_profile_store.py
   - src/assistant/pi_memory.py
-  - src/assistant/prm_post_answer_actions.py
   - src/bot/prm_handlers.py
-  - tests/
+  - src/bot/callbacks.py
+  - src/bot/bot.py
+  - src/llm/openai_provider.py
+  - tests/test_utd_profile.py
+  - tests/test_utd_ux_fixtures.py
+  - tests/test_prm_utd_dispatch.py
+  - tests/test_prm_utd_callbacks.py
+  - tests/test_openai_provider.py
+  - tests/fixtures/utd_ux_cases.json
+  - docs/audit/UTD-1_FOCUSED_SAFETY_REVIEW.md
 
 ### UTD-2: Sanitized Primary-source Contract Capture
 
