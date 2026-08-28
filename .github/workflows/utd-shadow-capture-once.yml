@@ -1,0 +1,35 @@
+name: UTD shadow capture once
+
+on:
+  push:
+    paths:
+      - '.github/workflows/utd-shadow-capture-once.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.10'
+      - name: Capture allowlisted public UTD evidence
+        run: python tools/utd_capture_once.py utd-capture
+      - name: Validate sanitized fixtures
+        run: |
+          for f in utd-capture/*.fixture.json; do
+            python tools/utd_evidence_review.py validate-fixture "$f"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: utd-sanitized-source-capture
+          path: utd-capture/
+          if-no-files-found: error
+          retention-days: 1
