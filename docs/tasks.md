@@ -324,9 +324,10 @@ Verification:
   - docs/audit/UTD-1_FOCUSED_SAFETY_REVIEW.md
 
 Notes: |
-  UTD-1 introduces no live UTD fetch, timer, Telegram notification, dogfood run,
-  production DB migration or external web job. UTD-2 and UTD-3 remain operator
-  evidence work. UTD-DR-1 remains planned until UTD-1/2/3 are all complete.
+  UTD-1 remains the confirmed one-bot profile/watch contract. Subsequent work has
+  added sanitized live source evidence and a bounded shadow collector without
+  changing UTD-1 confirmation semantics, production DB boundaries or Telegram
+  delivery. Human evaluation labels remain a later quality gate.
 
 Files:
   - src/assistant/utd_profile.py
@@ -473,7 +474,7 @@ Owner:      human operator + codex
 Phase:      validation
 Type:       eval:gate
 Depends-On: UTD-4
-Status:     blocked_pending_shadow_evidence
+Status:     blocked_pending_human_quality_labels
 
 Objective: |
   Review two to three weeks of shadow observations before any notification is
@@ -490,6 +491,12 @@ Acceptance-Criteria:
 
 Verification:
   - private shadow metrics receipt and operator approval for limited delivery
+
+Notes: |
+  Bounded technical shadow evidence now exists: the final live probe saw 102
+  source items, 32 relevant changes and five capped predicted candidates, then
+  zero changes/candidates on an identical second poll. This does not establish
+  precision/recall or delivery readiness; those require genuine human labels.
 
 Files:
   - data/evals/private/
