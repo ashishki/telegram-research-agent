@@ -1,0 +1,49 @@
+{
+  "schema_version": "utd_source_fixture.v1",
+  "source": "calendar",
+  "kind": "localist_json",
+  "contains_private_data": false,
+  "sanitized": true,
+  "canonical_url": "https://calendar.utdallas.edu/api/2/events",
+  "captured_at": "2026-08-28T17:19:16.857497+00:00",
+  "transport": {
+    "status": 200,
+    "content_type": "application/json",
+    "headers": {
+      "date": "Fri, 28 Aug 2026 17:19:18 GMT",
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "max-age=600, public",
+      "etag": "W/\"5087d22ca3dd9dbe76019a781a68b6b6\""
+    }
+  },
+  "content": {
+    "page": {"current": 1, "size": 10, "total": 26},
+    "date": {"first": "2026-08-28", "last": "2026-09-11"},
+    "events": [
+      {"event": {
+        "id": 49277395432862,
+        "title": "Fall 2026 Late Registration 1st 8-week Session",
+        "url": null,
+        "status": "live",
+        "updated_at": "2026-08-28T05:37:58-05:00",
+        "event_instances": [{"event_instance": {"id": 49277395446182, "event_id": 49277395432862, "start": "2026-08-28T00:00:00-05:00", "end": null, "all_day": true}}],
+        "filters": {"event_target_audience": [], "event_topic": [{"name": "Academic Calendar", "id": 30645184540580}], "event_types": []},
+        "departments": [{"id": 31183827849438, "name": "Office of the Registrar"}]
+      }},
+      {"event": {
+        "id": 53781090487622,
+        "title": "S.T.A.R.S. – Supportive Tabletop Alliance for Recreation and Socialization",
+        "url": "https://counseling.utdallas.edu/services/groups-workshops/",
+        "status": "live",
+        "updated_at": "2026-08-28T06:30:13-05:00",
+        "event_instances": [{"event_instance": {"id": 53781100342182, "event_id": 53781090487622, "start": "2026-08-28T00:01:00-05:00", "end": "2026-08-28T23:50:00-05:00", "all_day": false}}],
+        "filters": {
+          "event_target_audience": [{"name": "Graduate Students", "id": 31183754496379}, {"name": "International Students", "id": 31183755788251}, {"name": "Undergraduate Students", "id": 30645182542582}],
+          "event_topic": [{"name": "Health & Wellness", "id": 30645184544720}, {"name": "Welcoming & Belonging", "id": 31183768375409}, {"name": "Campus Life", "id": 31183808546369}],
+          "event_types": [{"name": "Campus & Community", "id": 30645180660610}]
+        },
+        "departments": [{"id": 31183828254494, "name": "Student Counseling Center"}]
+      }}
+    ]
+  }
+}

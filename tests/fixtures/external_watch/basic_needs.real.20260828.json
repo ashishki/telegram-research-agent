@@ -1,0 +1,11 @@
+{
+  "schema_version": "utd_source_fixture.v1",
+  "source": "basic_needs",
+  "kind": "html_excerpt",
+  "contains_private_data": false,
+  "sanitized": true,
+  "canonical_url": "https://basicneeds.utdallas.edu/resource-hub/",
+  "captured_at": "2026-08-28T17:19:16.857497+00:00",
+  "transport": {"status": 200, "content_type": "text/html", "headers": {"date": "Fri, 28 Aug 2026 17:19:18 GMT", "content-type": "text/html; charset=UTF-8", "last-modified": "Fri, 28 Aug 2026 17:13:10 GMT", "cache-control": "max-age=3232, must-revalidate"}},
+  "content": {"excerpt_lines": ["Basic Needs Resource Hub - The University of Texas at Dallas", "This webpage compiles on- and off-campus resources that may help fulfill your basic needs.", "This resource list is for the convenience of our Comet community and does not represent the BNRC’s sponsorship, endorsement or approval of any agency or service. Students should exercise their own good judgment when evaluating the provided information. All costs are at the student’s own expense.", "This resource list also includes many off-campus resources, such as government agencies and nonprofit organizations. Some off-campus resources may have eligibility requirements.", "For international students, we recommend that you utilize on-campus resources whenever possible and consult the International Students and Scholars Office (ISSO) for further guidance on nonprofit resources and eligibility for government benefits.", "All currently enrolled students can visit the Comet Cupboard once per week and choose up to six food and personal care items."], "excerpt_truncated": true}
+}

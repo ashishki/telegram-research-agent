@@ -1,0 +1,11 @@
+{
+  "schema_version": "utd_source_fixture.v1",
+  "source": "isso",
+  "kind": "html_excerpt",
+  "contains_private_data": false,
+  "sanitized": true,
+  "canonical_url": "https://isso.utdallas.edu/",
+  "captured_at": "2026-08-28T17:19:16.857497+00:00",
+  "transport": {"status": 200, "content_type": "text/html", "headers": {"date": "Fri, 28 Aug 2026 17:19:18 GMT", "content-type": "text/html; charset=UTF-8", "last-modified": "Fri, 28 Aug 2026 16:52:42 GMT", "cache-control": "max-age=2004, must-revalidate"}},
+  "content": {"excerpt_lines": ["International Students and Scholars Office", "Serving our international students, scholars and visitors, campus units and university administration through accurate and prompt immigration services, programming, advocacy, and outreach.", "F-1 Resources", "J-1 Resources", "International Student Success", "Financial Requirements", "Pre/Post Arrival Resources", "Employment and Internships", "F-1 Employment", "J-1 Employment", "Maintain F-1 Status", "Maintain J-1 Status", "F-1 Transfer Out", "J-1 Transfer Out"], "excerpt_truncated": false}
+}
