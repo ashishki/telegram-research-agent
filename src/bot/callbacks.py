@@ -2,8 +2,17 @@ import logging
 import sqlite3
 from datetime import datetime, timezone
 
+from assistant.prm_post_answer_actions import (
+    PRM_ACTION_PREFIX,
+    PRM_CONFIRM_PREFIX,
+    handle_post_answer_callback,
+)
+from assistant.utd_profile import (
+    UTD_CONFIRM_PREFIX,
+    UTD_DRAFT_PREFIX,
+    handle_utd_profile_callback,
+)
 from config.settings import Settings
-from assistant.prm_post_answer_actions import PRM_ACTION_PREFIX, PRM_CONFIRM_PREFIX, handle_post_answer_callback
 from db.artifact_feedback import record_artifact_feedback
 
 
@@ -47,12 +56,24 @@ def build_idea_feedback_markup(triage_id: int) -> dict:
     return {
         "inline_keyboard": [
             [
-                {"text": "✅ сделал", "callback_data": f"{IDEA_CALLBACK_PREFIX}:{triage_id}:done"},
-                {"text": "🕒 позже", "callback_data": f"{IDEA_CALLBACK_PREFIX}:{triage_id}:later"},
+                {
+                    "text": "✅ сделал",
+                    "callback_data": f"{IDEA_CALLBACK_PREFIX}:{triage_id}:done",
+                },
+                {
+                    "text": "🕒 позже",
+                    "callback_data": f"{IDEA_CALLBACK_PREFIX}:{triage_id}:later",
+                },
             ],
             [
-                {"text": "⛔ отказал", "callback_data": f"{IDEA_CALLBACK_PREFIX}:{triage_id}:reject"},
-                {"text": "🧠 интересно", "callback_data": f"{IDEA_CALLBACK_PREFIX}:{triage_id}:interesting"},
+                {
+                    "text": "⛔ отказал",
+                    "callback_data": f"{IDEA_CALLBACK_PREFIX}:{triage_id}:reject",
+                },
+                {
+                    "text": "🧠 интересно",
+                    "callback_data": f"{IDEA_CALLBACK_PREFIX}:{triage_id}:interesting",
+                },
             ],
         ]
     }
@@ -67,7 +88,9 @@ def build_artifact_feedback_markup(week_label: str, artifact_type: str) -> dict:
     def _button(text: str, action_code: str) -> dict:
         return {
             "text": text,
-            "callback_data": f"{ARTIFACT_CALLBACK_PREFIX}:{clean_week}:{type_code}:{action_code}",
+            "callback_data": (
+                f"{ARTIFACT_CALLBACK_PREFIX}:{clean_week}:{type_code}:{action_code}"
+            ),
         }
 
     return {
@@ -109,7 +132,11 @@ def _project_name_from_title(title: str | None) -> str | None:
         return None
     import re
 
-    match = re.match(r"\[(?:Implement|Build)\]\s+(.+?)\s+[—–-]\s+", str(title).strip(), re.IGNORECASE)
+    match = re.match(
+        r"\[(?:Implement|Build)\]\s+(.+?)\s+[—–-]\s+",
+        str(title).strip(),
+        re.IGNORECASE,
+    )
     if not match:
         return None
     value = match.group(1).strip()
@@ -260,9 +287,18 @@ def record_callback(settings: Settings, callback_data: str) -> str:
     raise ValueError("Unsupported callback")
 
 
-def handle_prm_post_answer_callback(settings: Settings, callback_data: str, *, chat_id: str) -> dict:
-    """Handle only the isolated PRM proposal/confirmation callback namespace."""
+def handle_prm_post_answer_callback(
+    settings: Settings,
+    callback_data: str,
+    *,
+    chat_id: str,
+) -> dict:
+    """Handle isolated PRM answer actions and UTD draft/confirmation namespaces."""
 
-    if not callback_data.startswith((f"{PRM_ACTION_PREFIX}:", f"{PRM_CONFIRM_PREFIX}:")):
-        raise ValueError("Unsupported PRM callback")
-    return handle_post_answer_callback(settings.db_path, callback_data, chat_id=chat_id)
+    if callback_data.startswith(
+        (f"{UTD_DRAFT_PREFIX}:", f"{UTD_CONFIRM_PREFIX}:")
+    ):
+        return handle_utd_profile_callback(settings.db_path, callback_data, chat_id=chat_id)
+    if callback_data.startswith((f"{PRM_ACTION_PREFIX}:", f"{PRM_CONFIRM_PREFIX}:")):
+        return handle_post_answer_callback(settings.db_path, callback_data, chat_id=chat_id)
+    raise ValueError("Unsupported PRM callback")

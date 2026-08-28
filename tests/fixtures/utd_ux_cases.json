@@ -1,0 +1,11 @@
+{
+  "schema_version": "utd_ux_fixtures.v1",
+  "privacy": "synthetic_public",
+  "cases": [
+    {"id":"deadline","question":"Есть ли актуальный UTD deadline для регистрации по программе?","expected_category":"program","expected_phrase":"primary-source","forbidden_claim":"September 1"},
+    {"id":"benefit","question":"Есть ли у студентов UTD benefit или скидка на питание?","expected_category":"benefits","expected_phrase":"eligibility","forbidden_claim":"гарантирован"},
+    {"id":"spouse_event","question":"Подходит ли это UTD событие для spouse или семьи?","expected_category":"spouse_family","expected_phrase":"явной eligibility","forbidden_claim":"точно подходит"},
+    {"id":"career_event","question":"Когда следующий UTD career fair для internships?","expected_category":"career","expected_phrase":"registration status","forbidden_claim":"завтра"},
+    {"id":"ai_research","question":"Какие AI research события сейчас есть в UT Dallas?","expected_category":"ai","expected_phrase":"официальной страницы","forbidden_claim":"сегодня в 18:00"}
+  ]
+}

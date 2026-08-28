@@ -7,19 +7,51 @@ import os
 from typing import Any, Mapping
 
 from assistant.prm_post_answer_actions import build_post_answer_actions
+from assistant.utd_profile import (
+    is_utd_profile_intent,
+    is_utd_question,
+    render_utd_question_preview,
+    start_utd_profile_onboarding,
+)
 from bot.telegram_delivery import _send_text_internal
 from config.settings import Settings
 from prm.application import PersonalResearchAssistant
 from prm.contracts import OperatorRequest
 
 LOGGER = logging.getLogger(__name__)
-PRM_SAFE_COMMANDS = frozenset({"/start", "/help", "/auto", "/auto_voice", "/research", "/brief", "/chat", "/status", "/refresh", "/reactions"})
+PRM_SAFE_COMMANDS = frozenset(
+    {
+        "/start",
+        "/help",
+        "/auto",
+        "/auto_voice",
+        "/research",
+        "/brief",
+        "/chat",
+        "/utd",
+        "/status",
+        "/refresh",
+        "/reactions",
+    }
+)
 
 
-def send_message(token: str, chat_id: str, text: str, parse_mode: str | None = None, escape_markdown: bool = False, reply_markup: dict | None = None) -> None:
+def send_message(
+    token: str,
+    chat_id: str,
+    text: str,
+    parse_mode: str | None = None,
+    escape_markdown: bool = False,
+    reply_markup: dict | None = None,
+) -> None:
     del escape_markdown
     try:
-        kwargs: dict[str, object] = {"chat_id": chat_id, "text": text, "token": token, "parse_mode": parse_mode}
+        kwargs: dict[str, object] = {
+            "chat_id": chat_id,
+            "text": text,
+            "token": token,
+            "parse_mode": parse_mode,
+        }
         if reply_markup is not None:
             kwargs["reply_markup"] = reply_markup
         _send_text_internal(**kwargs)
@@ -30,22 +62,58 @@ def send_message(token: str, chat_id: str, text: str, parse_mode: str | None = N
 def dispatch_prm_command(chat_id: str, text: str, settings: Settings) -> None:
     command, args = _split_command(text)
     if command not in PRM_SAFE_COMMANDS:
-        send_message(_token(), chat_id, "Эта команда не входит в активный PRM-интерфейс. Используй обычный вопрос или /help.")
+        send_message(
+            _token(),
+            chat_id,
+            "Эта команда не входит в активный интерфейс. Используй обычный вопрос или /help.",
+        )
         return
     if command in {"/start", "/help"}:
         send_message(_token(), chat_id, _help_text())
         return
+    if command == "/utd":
+        _start_utd_profile(chat_id, settings=settings, seed_text=args)
+        return
     if command in {"/status", "/refresh", "/reactions"}:
         _delegate_safe_ops(command, chat_id, args, settings)
         return
-    mode = {"/research": "research", "/brief": "brief", "/chat": "chat"}.get(command, "auto")
+    content_commands = {"/auto", "/auto_voice", "/research", "/brief", "/chat"}
+    if command in content_commands and is_utd_profile_intent(args):
+        _start_utd_profile(chat_id, settings=settings, seed_text=args)
+        return
+    if (
+        command in content_commands
+        and is_utd_question(args)
+        and not _explicit_archive_request(args)
+    ):
+        send_message(
+            _token(),
+            chat_id,
+            render_utd_question_preview(args, db_path=settings.db_path),
+        )
+        return
+
+    mode = {"/research": "research", "/brief": "brief", "/chat": "chat"}.get(
+        command, "auto"
+    )
     input_kind = "voice_transcript" if command == "/auto_voice" else "text"
     if not args:
-        send_message(_token(), chat_id, "Напиши вопрос после команды или просто отправь обычное сообщение.")
+        send_message(
+            _token(),
+            chat_id,
+            "Напиши вопрос после команды или просто отправь обычное сообщение.",
+        )
         return
     assistant = PersonalResearchAssistant(settings=settings)
     try:
-        result = assistant.answer(OperatorRequest(query=args, mode=mode, chat_id=chat_id, input_kind=input_kind))  # type: ignore[arg-type]
+        result = assistant.answer(
+            OperatorRequest(
+                query=args,
+                mode=mode,
+                chat_id=chat_id,
+                input_kind=input_kind,
+            )
+        )  # type: ignore[arg-type]
     except Exception as exc:
         LOGGER.warning("PRM request failed command=%s", command, exc_info=True)
         send_message(_token(), chat_id, f"Не смог обработать запрос: {type(exc).__name__}")
@@ -54,18 +122,40 @@ def dispatch_prm_command(chat_id: str, text: str, settings: Settings) -> None:
     _send_chunks(chat_id, result.text, reply_markup=markup)
 
 
+def _start_utd_profile(chat_id: str, *, settings: Settings, seed_text: str) -> None:
+    result = start_utd_profile_onboarding(
+        settings.db_path,
+        chat_id=chat_id,
+        seed_text=seed_text,
+    )
+    send_message(
+        _token(),
+        chat_id,
+        str(result.get("message") or "UTD-черновик недоступен."),
+        reply_markup=result.get("reply_markup"),
+    )
+
+
 def _delegate_safe_ops(command: str, chat_id: str, args: str, settings: Settings) -> None:
     from bot import legacy_handlers
 
-    handler_name = {"/status": "handle_status", "/refresh": "handle_refresh", "/reactions": "handle_reactions"}[command]
+    handler_name = {
+        "/status": "handle_status",
+        "/refresh": "handle_refresh",
+        "/reactions": "handle_reactions",
+    }[command]
     handler = getattr(legacy_handlers, handler_name, None)
     if handler is None:
-        send_message(_token(), chat_id, "Операционная команда пока недоступна в текущей сборке.")
+        send_message(
+            _token(), chat_id, "Операционная команда пока недоступна в текущей сборке."
+        )
         return
     handler(chat_id, args, settings)
 
 
-def _post_answer_markup(payload: Mapping[str, Any], *, settings: Settings, chat_id: str) -> dict | None:
+def _post_answer_markup(
+    payload: Mapping[str, Any], *, settings: Settings, chat_id: str
+) -> dict | None:
     gate = _mapping(payload.get("answer_gate"))
     if not bool(gate.get("allow_answer", True)):
         return None
@@ -87,7 +177,8 @@ def _post_answer_markup(payload: Mapping[str, Any], *, settings: Settings, chat_
             "direct_answer": payload.get("direct_answer"),
             "source_refs": source_refs,
             "project_name": project.get("project_name"),
-            "answer_status": professional.get("answer_status") or contract.get("answer_status"),
+            "answer_status": professional.get("answer_status")
+            or contract.get("answer_status"),
             "source_count": len(source_refs),
             "direct_count": direct_count,
             "partial_count": partial_count,
@@ -113,10 +204,21 @@ def _post_answer_markup(payload: Mapping[str, Any], *, settings: Settings, chat_
     return bundle.get("reply_markup") if isinstance(bundle, Mapping) else None
 
 
-def _send_chunks(chat_id: str, text: str, *, reply_markup: dict | None, limit: int = 3400) -> None:
+def _send_chunks(
+    chat_id: str,
+    text: str,
+    *,
+    reply_markup: dict | None,
+    limit: int = 3400,
+) -> None:
     chunks = _split_telegram_text(text, limit=limit)
     for index, chunk in enumerate(chunks):
-        send_message(_token(), chat_id, chunk, reply_markup=reply_markup if index == len(chunks) - 1 else None)
+        send_message(
+            _token(),
+            chat_id,
+            chunk,
+            reply_markup=reply_markup if index == len(chunks) - 1 else None,
+        )
 
 
 def _split_telegram_text(text: str, *, limit: int = 3400) -> list[str]:
@@ -164,6 +266,11 @@ def _bounded_pieces(paragraph: str, *, limit: int) -> list[str]:
     return result
 
 
+def _explicit_archive_request(text: str) -> bool:
+    normalized = " ".join(str(text or "").casefold().split())
+    return any(marker in normalized for marker in ("в архиве", "по архиву", "archive"))
+
+
 def _split_command(text: str) -> tuple[str, str]:
     clean = str(text or "").strip()
     if not clean.startswith("/"):
@@ -179,15 +286,20 @@ def _token() -> str:
 
 def _help_text() -> str:
     return (
-        "Я ищу по твоему Telegram-архиву и сначала отвечаю на сам вопрос.\n\n"
-        "Прямые совпадения, частичные и смежные материалы показываются отдельно. "
-        "Проектная привязка и внешняя проверка включаются только когда ты их явно просишь.\n\n"
-        "Примеры:\n"
+        "Я один помощник для двух связанных задач.\n\n"
+        "AI-архив: ищу по твоему Telegram-архиву, отделяю прямые совпадения от "
+        "смежных материалов и помогаю применить найденное к проектам. Просто задай вопрос.\n\n"
+        "UTD / Dallas: понимаю вопросы про программу, карьеру, AI-события, ISSO, "
+        "benefits и spouse/family. На этапе UTD-1 live-источники и уведомления выключены: "
+        "я честно показываю границу и не придумываю свежие даты или eligibility.\n\n"
+        "Чтобы собрать персональный scope, напиши: «Настроить мой UTD-профиль». "
+        "Сначала будет черновик и полный preview; ничего постоянного не сохранится без "
+        "отдельного подтверждения.\n\n"
+        "Примеры обычных сообщений:\n"
         "• Что в архиве есть про agent evals?\n"
-        "• Что из найденного применимо сейчас?\n"
-        "• Как это связано с Eval-Ground-Truth-Lab?\n"
-        "• Что сейчас известно про внешний benchmark?\n\n"
-        "После релевантного ответа можно показать ещё, уточнить поиск или сохранить заметку."
+        "• Что из найденного применимо к моему проекту?\n"
+        "• Есть ли актуальный UTD deadline для моей программы?\n"
+        "• Подходит ли это UTD-событие супруге?"
     )
 
 
