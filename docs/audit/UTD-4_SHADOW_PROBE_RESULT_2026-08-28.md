@@ -48,6 +48,10 @@ The final second pass demonstrates idempotency on the same live source state. Ca
 
 `tools/utd_policy_eval.py` gives every one of the 50 manifest scenarios a deterministic **proposed** `notify`, `ignore` or `ambiguous` outcome while explicitly setting `human_labels_added=false` and `holdouts_used_for_tuning=false`. This is implementation evidence only. It does not change `review_status=pending_operator` and is not represented as human/gold evaluation evidence.
 
+## Post-probe cleanup
+
+The temporary GitHub Actions workflows used only for one-shot source capture and bounded shadow probing were removed after evidence collection. No UTD GitHub Actions workflow remains that automatically performs public source capture or shadow polling. The systemd shadow timer remains a checked-in disabled template and was never enabled or started.
+
 ## Decision
 
 UTD-4 collector implementation and bounded real-source verification are complete. The collector remains non-deployed and the systemd timer remains a disabled template. UTD-5 precision/recall or notification-readiness claims remain blocked on real human review labels; Telegram delivery remains out of scope until the later delivery gate and review are satisfied.
