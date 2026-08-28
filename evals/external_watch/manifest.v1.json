@@ -2,7 +2,7 @@
   "schema_version": "external_watch_eval_manifest.v1",
   "contains_private_data": false,
   "launch_ready": false,
-  "live_source_samples_verified": false,
+  "live_source_samples_verified": true,
   "cases": [
     {"id":"dev-01","source":"calendar","split":"development","scenario":"new","review_status":"pending_operator"},
     {"id":"dev-02","source":"calendar","split":"development","scenario":"updated","review_status":"pending_operator"},
