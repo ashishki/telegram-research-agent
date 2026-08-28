@@ -1,5 +1,6 @@
 name: UTD shadow collector probe once
 
+# Re-run after isolating the shadow profile reader from assistant/LLM imports.
 on:
   push:
     paths:
