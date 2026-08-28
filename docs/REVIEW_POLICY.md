@@ -39,8 +39,8 @@ that model/effort selection, record the mismatch and do not represent the
 review as Terra/high. The review remains read-only unless a separate approved
 fix task is started; it cannot approve human gates or completion.
 
-Status: proposed
-Last updated: 2026-08-14
+Status: current
+Last updated: 2026-08-28
 Playbook SHA: 965612aa463fca1a35a55104633d0e09da33d615
 Historical retrofit pin: 5583eca96c4d2d480b5574ed78bea63e0b07ebf0 (stale)
 
@@ -107,6 +107,54 @@ For token control, ordinary block review should inspect the accumulated diff,
 task evidence, changed tests, and relevant contracts for the block. It should
 not reread all historical IRX material unless a concrete reference or failure
 requires it.
+
+## UTD Assistant Deep-review Gates
+
+UTD work uses **batched** deep reviews at phase boundaries. Do not run a full
+deep review after every small task or UI copy change. A focused test critic and
+ordinary task verification remain sufficient inside a phase unless an immediate
+safety trigger below applies.
+
+| Gate | Runs after | Required before | Review focus |
+| --- | --- | --- | --- |
+| `UTD-DR-1` | UTD-1 profile/watch UX, UTD-2 source-contract capture, and UTD-3 labelled relevance policy | UTD-4 shadow collector | one-bot contract, explicit confirmation, programme/career/family scope, source/eval truth, privacy and no-notification boundary |
+| `UTD-DR-2` | UTD-4 shadow collector and UTD-5 shadow-quality evidence | UTD-6 Telegram delivery | source safety, diff/idempotency, stale/429 behavior, precision/recall, duplicate and urgency controls, kill switch, delivery-ready UX |
+| `UTD-DR-3` | UTD-6 controlled delivery and UTD-7 feedback-calibration evidence | any expansion of sources, caps, autonomy, dogfood claim, or retention change | real usefulness, notification burden, spouse/family eligibility, feedback proposals, privacy receipts and residual-risk decision |
+
+An immediate review is still required before continuing if a UTD change would:
+
+- enable real source polling, Telegram delivery, provider egress, or a timer;
+- create a durable profile/watch write path or alter its confirmation semantics;
+- change sidecar retention, source allowlists, SSRF/redirect protections, or
+  handling of credentials/12twenty email;
+- make a dogfood/release claim, alter notification caps, or add an external
+  source family.
+
+Each UTD deep review is recorded under `docs/audit/` with changed scope,
+evidence, UX findings, privacy findings, corrections, verification, and
+unresolved operator approvals. It is read-only and cannot substitute for an
+operator approval or private labels.
+
+### UX is a release-quality input, not a polish pass
+
+Every UTD deep review must inspect these operator-facing flows using sanitized
+fixtures or private operator evidence, never raw personal data:
+
+1. **ASK:** a UTD question returns a brief answer first, primary source links,
+   freshness/status in plain language, and a truthful fail-closed boundary.
+2. **WATCH:** the bot shows an understandable preview before confirmation:
+   what it watches, why it matches programme/career/family context, cadence,
+   timezone, cap, expiry and how to pause/mute.
+3. **NOTIFICATION:** an alert explains why it is relevant, distinguishes a
+   deadline/cancellation from an opportunity, avoids technical internals, and
+   exposes useful/not useful, mute and pause without surprise profile changes.
+4. **One-bot coherence:** AI archive research and UTD assistance remain
+   distinguishable by wording/source but feel like one assistant; no second bot,
+   duplicate timer messages, report-era jargon, or competing notification paths.
+
+The reviewer must record concrete UX friction and correct P0/P1 issues before
+the next phase. A technically correct collector that produces noisy, unclear,
+or ineligible notifications does not pass a deep-review gate.
 
 Privacy review is required for:
 

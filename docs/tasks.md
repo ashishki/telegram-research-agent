@@ -17,7 +17,7 @@ RFX-3/RFX-4/RFX-5 -> RFX-6 -> RFX-7
 RFX-7 -> RFX-8 -> RFX-9
 RFX-7 -> RFX-10 -> UTD-P0
 UTD-P0 -> UTD-1 / UTD-2 / UTD-3
-UTD-1 / UTD-2 / UTD-3 -> UTD-4 -> UTD-5 -> UTD-6 -> UTD-7
+UTD-1 / UTD-2 / UTD-3 -> UTD-DR-1 -> UTD-4 -> UTD-5 -> UTD-DR-2 -> UTD-6 -> UTD-7 -> UTD-DR-3
 ```
 
 ### RFX-0: Freeze Baseline And Inventory
@@ -397,7 +397,7 @@ Files:
 Owner:      codex
 Phase:      implementation
 Type:       tool:call eval:gate
-Depends-On: UTD-1, UTD-2, UTD-3
+Depends-On: UTD-DR-1
 Status:     blocked_pending_operator_approval
 
 Objective: |
@@ -460,7 +460,7 @@ Files:
 Owner:      codex + human operator
 Phase:      controlled-delivery
 Type:       agent:harness privacy
-Depends-On: UTD-5
+Depends-On: UTD-DR-2
 Status:     blocked_pending_delivery_approval
 
 Objective: |
@@ -520,3 +520,87 @@ Verification:
 Files:
   - data/evals/private/
   - docs/audit/
+
+### UTD-DR-1: Profile, Source And Relevance Deep Review
+
+Owner:      codex + human operator
+Phase:      deep-review
+Type:       compliance:evidence
+Depends-On: UTD-1, UTD-2, UTD-3
+Status:     planned
+
+Objective: |
+  Review the whole profile/source/evaluation phase before any collector exists.
+  Confirm that one-bot UTD UX is understandable and that source/relevance scope
+  is evidence-backed rather than inferred from generic university assumptions.
+
+Acceptance-Criteria:
+  - "The review records profile/watch preview UX, programme/career/family and
+    spouse eligibility controls, source-contract evidence, 50-case labels,
+    privacy findings, unresolved approvals and corrections."
+  - "The review confirms no collector, polling, notification, provider egress
+    or second bot was introduced during the preparation phase."
+
+Verification:
+  - docs/audit/UTD_DEEP_REVIEW_1_<date>.md
+  - focused UX/confirmation tests and evaluation-manifest validation
+
+Files:
+  - docs/audit/
+  - docs/REVIEW_POLICY.md
+
+### UTD-DR-2: Shadow Collector And Delivery UX Deep Review
+
+Owner:      codex + human operator
+Phase:      deep-review
+Type:       compliance:evidence
+Depends-On: UTD-4, UTD-5
+Status:     blocked_pending_shadow_evidence
+
+Objective: |
+  Review the complete shadow phase before Telegram delivery. Treat relevance,
+  alert burden and clarity as product-quality gates equal to fetch correctness.
+
+Acceptance-Criteria:
+  - "The review verifies source safety, stale/failure behavior, idempotency,
+    precision/recall, urgency/duplicate caps, kill switch and no-send shadow
+    boundary."
+  - "The review walks through sanitized ASK, WATCH and notification-preview
+    flows for programme, career, benefits and spouse/family scenarios; unclear
+    or noisy flows are corrected before delivery approval."
+
+Verification:
+  - docs/audit/UTD_DEEP_REVIEW_2_<date>.md
+  - private shadow receipt and operator delivery decision
+
+Files:
+  - docs/audit/
+  - data/evals/private/
+
+### UTD-DR-3: Controlled Delivery And Calibration Deep Review
+
+Owner:      codex + human operator
+Phase:      deep-review
+Type:       compliance:evidence
+Depends-On: UTD-6, UTD-7
+Status:     blocked_pending_live_feedback
+
+Objective: |
+  Review controlled delivery only after enough real feedback exists. Decide
+  whether to keep, narrow, expand or pause sources and notification policies;
+  do not convert usage into a dogfood/release claim automatically.
+
+Acceptance-Criteria:
+  - "The review records usefulness, duplicate/noise burden, mute/pause use,
+    spouse/family eligibility accuracy, source health, privacy and all proposed
+    profile changes."
+  - "Any expansion of source families, delivery caps, autonomy, retention or
+    dogfood status remains a separate explicit operator decision."
+
+Verification:
+  - docs/audit/UTD_DEEP_REVIEW_3_<date>.md
+  - private aggregate feedback receipt
+
+Files:
+  - docs/audit/
+  - data/evals/private/
