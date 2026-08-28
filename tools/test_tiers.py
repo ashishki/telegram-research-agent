@@ -41,6 +41,7 @@ PRM_ACTIVE_TESTS = (
     "tests/test_prm_utd_dispatch.py",
     "tests/test_prm_utd_callbacks.py",
     "tests/test_openai_provider.py",
+    "tests/test_utd_evidence_review.py",
 )
 
 LEGACY_COMPAT_TESTS = (
@@ -104,7 +105,7 @@ class TestTier:
 TEST_TIERS = {
     "focused-prm": TestTier(
         "focused-prm",
-        "Active PRM request-to-answer, UTD-1 safety, intent-contract and retrofit tests.",
+        "Active PRM request-to-answer, UTD safety, intent-contract and retrofit tests.",
         (TierCommand((*PYTEST, *PRM_ACTIVE_TESTS, "-q"), env=(("PYTHONPATH", "src"),)),),
     ),
     "retrofit-boundaries": TestTier(
