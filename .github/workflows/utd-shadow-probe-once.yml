@@ -1,6 +1,6 @@
 name: UTD shadow collector probe once
 
-# Re-run after tightening profile-aware relevance.
+# Re-run after adding capped shadow candidate selection.
 on:
   push:
     paths:
