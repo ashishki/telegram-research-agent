@@ -285,7 +285,11 @@ def _handle_callback(
     data = str(callback.get("data") or "")
     answer = "Готово"
     callback_acknowledged = False
-    if callback_id and runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
+    if (
+        callback_id
+        and runtime_mode == BOT_RUNTIME_PRM_ASSISTANT
+        and data.startswith(_PRM_CALLBACK_PREFIXES)
+    ):
         try:
             _telegram_answer_callback(token, callback_id, "Принято")
             callback_acknowledged = True
