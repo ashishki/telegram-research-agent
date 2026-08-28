@@ -351,7 +351,7 @@ Owner:      human operator
 Phase:      evidence
 Type:       eval:gate privacy
 Depends-On: UTD-P0
-Status:     planned
+Status:     implemented
 
 Objective: |
   Capture the minimum real UTD source evidence needed to implement source-
@@ -371,10 +371,16 @@ Verification:
   - private operator capture receipt; minimized public fixtures only after
     manual sanitation and manifest validation
 
+Notes: |
+  Real sanitized Calendar/Localist, ISSO and Basic Needs source-contract fixtures
+  were captured on 2026-08-28 and validated. The manifest now records
+  live_source_samples_verified=true; launch_ready remains false.
+
 Files:
   - tests/fixtures/external_watch/
   - evals/external_watch/manifest.v1.json
   - docs/external_watch_p0_readiness.md
+  - docs/audit/UTD-2_REAL_SOURCE_CAPTURE_2026-08-28.md
 
 ### UTD-3: Operator Evaluation Labels And Relevance Policy
 
@@ -382,7 +388,7 @@ Owner:      human operator + codex
 Phase:      evaluation
 Type:       eval:gate
 Depends-On: UTD-P0
-Status:     planned
+Status:     implemented_with_residual_human_gate
 
 Objective: |
   Turn the 50-case inventory into a reviewed, source-grounded evaluation set
@@ -404,9 +410,18 @@ Verification:
   - python3 tools/validate_external_watch_eval.py --manifest evals/external_watch/manifest.v1.json --json
   - private operator sign-off on labels and high-urgency cases
 
+Notes: |
+  Deterministic relevance, negative controls, capped shadow selection and all-50
+  proposed policy outcomes are implemented. All 50 review_status values remain
+  pending_operator because model-authored proposals do not substitute for the
+  human operator's notify/ignore/ambiguous judgments.
+
 Files:
   - evals/external_watch/
   - docs/adr/ADR-008-confirmed-external-watch.md
+  - src/external_watch/relevance.py
+  - src/external_watch/selection.py
+  - tools/utd_policy_eval.py
 
 ### UTD-4: Source-bounded Shadow Collector
 
@@ -414,7 +429,7 @@ Owner:      codex
 Phase:      implementation
 Type:       tool:call eval:gate
 Depends-On: UTD-DR-1
-Status:     blocked_pending_operator_approval
+Status:     implemented_with_residual_human_gate
 
 Objective: |
   Implement a separate, feature-flagged, source-allowlisted UTD sidecar
@@ -437,11 +452,20 @@ Verification:
     idempotency and restore tests; all 50 eval cases scored locally
   - explicit operator approval recorded before any real source polling
 
+Notes: |
+  Operator-approved bounded real-source probes succeeded without production DB
+  use or Telegram delivery. Final live snapshot: 102 source items, 32 relevant
+  changes, five capped shadow candidates (three urgent), followed by zero
+  changes/candidates on the second identical poll. The systemd timer is a
+  disabled template and has not been enabled. UTD-5 quality metrics remain
+  blocked on genuine human labels.
+
 Files:
   - src/external_watch/
   - systemd/telegram-utd-watch-shadow.service
   - systemd/telegram-utd-watch-shadow.timer
   - tests/
+  - docs/audit/UTD-4_SHADOW_PROBE_RESULT_2026-08-28.md
 
 ### UTD-5: Shadow Quality Review And Notification Gate
 
