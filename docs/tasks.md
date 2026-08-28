@@ -508,7 +508,7 @@ Owner:      codex + human operator
 Phase:      controlled-delivery
 Type:       agent:harness privacy
 Depends-On: UTD-DR-2
-Status:     blocked_pending_delivery_approval
+Status:     implemented_default_off_pending_live_enablement
 
 Objective: |
   Deliver UTD answers and low-volume notifications through the existing PRM
@@ -546,7 +546,7 @@ Owner:      human operator + codex
 Phase:      iteration
 Type:       eval:gate
 Depends-On: UTD-6
-Status:     blocked_pending_live_feedback
+Status:     implemented_pending_live_feedback
 
 Objective: |
   Improve the confirmed UTD scope from repeated, explicit feedback while

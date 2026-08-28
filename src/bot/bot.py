@@ -22,7 +22,7 @@ from .voice import VoiceTranscriptionUnavailable, transcribe_telegram_voice
 
 LOGGER = logging.getLogger(__name__)
 BOT_API_BASE = "https://api.telegram.org"
-_PRM_CALLBACK_PREFIXES = ("prma:", "prmc:", "utdp:", "utdc:")
+_PRM_CALLBACK_PREFIXES = ("prma:", "prmc:", "utdp:", "utdc:", "utdw:")
 
 
 class _BotState:

@@ -1,4 +1,5 @@
 import logging
+import os
 import sqlite3
 from datetime import datetime, timezone
 
@@ -13,6 +14,7 @@ from assistant.utd_profile import (
     handle_utd_profile_callback,
 )
 from config.settings import Settings
+from external_watch.delivery import FEEDBACK_PREFIX as UTD_WATCH_FEEDBACK_PREFIX, handle_feedback_callback as handle_utd_watch_feedback_callback
 from db.artifact_feedback import record_artifact_feedback
 
 
@@ -295,6 +297,9 @@ def handle_prm_post_answer_callback(
 ) -> dict:
     """Handle isolated PRM answer actions and UTD draft/confirmation namespaces."""
 
+    if callback_data.startswith(f"{UTD_WATCH_FEEDBACK_PREFIX}:"):
+        sidecar = os.environ.get("UTD_WATCH_SIDECAR_DB", "data/private/utd_watch_shadow.db")
+        return handle_utd_watch_feedback_callback(sidecar, callback_data)
     if callback_data.startswith(
         (f"{UTD_DRAFT_PREFIX}:", f"{UTD_CONFIRM_PREFIX}:")
     ):
