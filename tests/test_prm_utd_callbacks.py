@@ -41,6 +41,15 @@ def test_utd_watch_feedback_namespace_routes_to_sidecar(monkeypatch) -> None:
     assert calls == [("/tmp/utd-shadow.db", "utdw:key:useful")]
 
 
+def test_utd_watch_feedback_uses_the_collector_sidecar_default(monkeypatch) -> None:
+    calls = []
+    monkeypatch.delenv("UTD_WATCH_SIDECAR_DB", raising=False)
+    monkeypatch.delenv("UTD_SHADOW_DB", raising=False)
+    monkeypatch.setattr(callbacks, "handle_utd_watch_feedback_callback", lambda path, data: calls.append((path, data)) or {"action": "useful"})
+    callbacks.handle_prm_post_answer_callback(SimpleNamespace(db_path="local.db"), "utdw:key:useful", chat_id="42")
+    assert calls == [("data/utd_shadow.db", "utdw:key:useful")]
+
+
 def test_active_bot_accepts_only_prm_and_utd_safe_callback_namespaces() -> None:
     assert _PRM_CALLBACK_PREFIXES == ("prma:", "prmc:", "utdp:", "utdc:", "utdw:")
     with pytest.raises(ValueError):

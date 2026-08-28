@@ -5,12 +5,13 @@ import argparse
 import json
 import os
 from .collector import ShadowCollector
+from .delivery import default_sidecar_db
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--prm-db", default=os.environ.get("PRM_DB_PATH", "data/agent.db"))
-    parser.add_argument("--sidecar-db", default=os.environ.get("UTD_SHADOW_DB", "data/utd_shadow.db"))
+    parser.add_argument("--sidecar-db", default=default_sidecar_db())
     parser.add_argument("--enable-shadow", action="store_true")
     args = parser.parse_args()
     result = ShadowCollector(prm_db=args.prm_db, sidecar_db=args.sidecar_db, enabled=args.enable_shadow).run_once()
