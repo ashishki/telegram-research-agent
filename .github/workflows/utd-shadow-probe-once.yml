@@ -1,0 +1,69 @@
+name: UTD shadow collector probe once
+
+on:
+  push:
+    paths:
+      - '.github/workflows/utd-shadow-probe-once.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.10'
+      - name: Create ephemeral confirmed-profile DB
+        run: |
+          mkdir -p tmp
+          python - <<'PY'
+          import json, sqlite3
+          db=sqlite3.connect('tmp/prm.db')
+          db.execute('CREATE TABLE personal_memory_events(id INTEGER PRIMARY KEY, event_type TEXT NOT NULL, object_type TEXT NOT NULL, metadata_json TEXT NOT NULL)')
+          profile={
+            'capability':'utd_profile_preview_watch',
+            'schema_version':'utd_profile.v1',
+            'categories':['program','career','ai','isso','benefits','spouse_family'],
+            'paused':False,
+            'muted_sources':[],
+            'frequency':'daily_digest',
+            'daily_cap':5,
+            'timezone':'America/Chicago',
+            'expires_at':'2026-12-26T23:59:59+00:00'
+          }
+          db.execute('INSERT INTO personal_memory_events(event_type,object_type,metadata_json) VALUES(?,?,?)', ('saved','watch_topic',json.dumps(profile)))
+          db.commit(); db.close()
+          PY
+      - name: Run real source-bounded shadow collector twice
+        env:
+          PYTHONPATH: src
+        run: |
+          python -m external_watch.cli --enable-shadow --prm-db tmp/prm.db --sidecar-db tmp/shadow.db > tmp/run1.json
+          python -m external_watch.cli --enable-shadow --prm-db tmp/prm.db --sidecar-db tmp/shadow.db > tmp/run2.json
+      - name: Build aggregate-only receipt
+        run: |
+          python - <<'PY'
+          import json, sqlite3
+          r1=json.load(open('tmp/run1.json')); r2=json.load(open('tmp/run2.json'))
+          db=sqlite3.connect('tmp/shadow.db')
+          health=[{'source':r[0],'status':r[1],'error_code':r[2]} for r in db.execute('SELECT source,status,error_code FROM source_health ORDER BY source')]
+          item_count=db.execute('SELECT COUNT(*) FROM items').fetchone()[0]
+          change_count=db.execute('SELECT COUNT(*) FROM changes').fetchone()[0]
+          relevant_count=db.execute("SELECT COUNT(*) FROM changes WHERE json_extract(relevance_json, '$.relevant') = 1").fetchone()[0]
+          receipt={'schema_version':'utd_shadow_probe_receipt.v1','run1':r1,'run2':r2,'source_health':health,'sidecar_item_count':item_count,'sidecar_change_count':change_count,'relevant_change_count':relevant_count,'production_prm_db_used':False,'telegram_delivery':False,'provider_egress':False,'timer_enabled':False}
+          open('tmp/shadow-probe-receipt.json','w').write(json.dumps(receipt,indent=2,sort_keys=True)+'\n')
+          print(json.dumps(receipt,sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: utd-shadow-probe-receipt
+          path: tmp/shadow-probe-receipt.json
+          if-no-files-found: error
+          retention-days: 1
