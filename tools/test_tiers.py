@@ -46,6 +46,8 @@ PRM_ACTIVE_TESTS = (
     "tests/test_external_watch_fetch_safety.py",
     "tests/test_external_watch_profile.py",
     "tests/test_external_watch_relevance.py",
+    "tests/test_external_watch_selection.py",
+    "tests/test_utd_policy_eval.py",
 )
 
 LEGACY_COMPAT_TESTS = (
@@ -69,6 +71,7 @@ RETROFIT_TESTS = (
     "tests/test_external_watch_fetch_safety.py",
     "tests/test_external_watch_profile.py",
     "tests/test_external_watch_relevance.py",
+    "tests/test_external_watch_selection.py",
 )
 
 FAST_CONTRACT_TESTS = (
