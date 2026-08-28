@@ -5,9 +5,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
 
-from assistant.utd_profile_store import load_confirmed_utd_profile
 from .adapters import AdapterError, canonical_hash, parse_html_document, parse_localist
 from .fetch import FetchError, safe_fetch
+from .profile import load_confirmed_utd_profile
 from .relevance import classify
 from .store import ShadowStore
 
