@@ -1,6 +1,6 @@
 name: UTD shadow collector probe once
 
-# Re-run after isolating the shadow profile reader from assistant/LLM imports.
+# Re-run after tightening profile-aware relevance.
 on:
   push:
     paths:
@@ -31,6 +31,9 @@ jobs:
           profile={
             'capability':'utd_profile_preview_watch',
             'schema_version':'utd_profile.v1',
+            'program':'MS Financial Technology and Analytics',
+            'career_goals':'AI internships; applied AI roles',
+            'ai_interests':'agentic systems; RAG; evals; machine learning',
             'categories':['program','career','ai','isso','benefits','spouse_family'],
             'paused':False,
             'muted_sources':[],
@@ -58,7 +61,10 @@ jobs:
           item_count=db.execute('SELECT COUNT(*) FROM items').fetchone()[0]
           change_count=db.execute('SELECT COUNT(*) FROM changes').fetchone()[0]
           relevant_count=db.execute("SELECT COUNT(*) FROM changes WHERE json_extract(relevance_json, '$.relevant') = 1").fetchone()[0]
-          receipt={'schema_version':'utd_shadow_probe_receipt.v1','run1':r1,'run2':r2,'source_health':health,'sidecar_item_count':item_count,'sidecar_change_count':change_count,'relevant_change_count':relevant_count,'production_prm_db_used':False,'telegram_delivery':False,'provider_egress':False,'timer_enabled':False}
+          categories={}
+          for (raw,) in db.execute("SELECT relevance_json FROM changes WHERE json_extract(relevance_json, '$.relevant') = 1"):
+            for category in json.loads(raw).get('categories',[]): categories[category]=categories.get(category,0)+1
+          receipt={'schema_version':'utd_shadow_probe_receipt.v1','run1':r1,'run2':r2,'source_health':health,'sidecar_item_count':item_count,'sidecar_change_count':change_count,'relevant_change_count':relevant_count,'relevant_by_category':categories,'production_prm_db_used':False,'telegram_delivery':False,'provider_egress':False,'timer_enabled':False}
           open('tmp/shadow-probe-receipt.json','w').write(json.dumps(receipt,indent=2,sort_keys=True)+'\n')
           print(json.dumps(receipt,sort_keys=True))
           PY
