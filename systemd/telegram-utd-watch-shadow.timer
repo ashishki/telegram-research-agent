@@ -1,0 +1,12 @@
+[Unit]
+Description=Periodic UTD shadow watch timer (disabled template)
+
+[Timer]
+OnBootSec=10m
+OnUnitActiveSec=30m
+RandomizedDelaySec=120
+Persistent=false
+Unit=telegram-utd-watch-shadow.service
+
+[Install]
+WantedBy=timers.target

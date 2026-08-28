@@ -1,0 +1,17 @@
+[Unit]
+Description=UTD source-bounded shadow watch (NO Telegram delivery)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/telegram-research-agent
+Environment=PYTHONPATH=/srv/telegram-research-agent/src
+# Disabled template. Do not enable until an explicit deployment approval records
+# the concrete PRM DB path, sidecar path and rollback/kill-switch procedure.
+ExecStart=/usr/bin/python3 -m external_watch.cli --enable-shadow --prm-db data/agent.db --sidecar-db data/utd_shadow.db
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/telegram-research-agent/data

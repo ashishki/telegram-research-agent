@@ -42,6 +42,8 @@ PRM_ACTIVE_TESTS = (
     "tests/test_prm_utd_callbacks.py",
     "tests/test_openai_provider.py",
     "tests/test_utd_evidence_review.py",
+    "tests/test_external_watch_shadow.py",
+    "tests/test_external_watch_fetch_safety.py",
 )
 
 LEGACY_COMPAT_TESTS = (
@@ -61,6 +63,8 @@ RETROFIT_TESTS = (
     "tests/test_prm_intent_archive_contract.py",
     "tests/test_prm_utd_dispatch.py",
     "tests/test_prm_utd_callbacks.py",
+    "tests/test_external_watch_shadow.py",
+    "tests/test_external_watch_fetch_safety.py",
 )
 
 FAST_CONTRACT_TESTS = (
@@ -105,12 +109,12 @@ class TestTier:
 TEST_TIERS = {
     "focused-prm": TestTier(
         "focused-prm",
-        "Active PRM request-to-answer, UTD safety, intent-contract and retrofit tests.",
+        "Active PRM request-to-answer, UTD safety/shadow, intent-contract and retrofit tests.",
         (TierCommand((*PYTEST, *PRM_ACTIVE_TESTS, "-q"), env=(("PYTHONPATH", "src"),)),),
     ),
     "retrofit-boundaries": TestTier(
         "retrofit-boundaries",
-        "Fast structural checks for application, bot, UTD and CLI boundaries.",
+        "Fast structural checks for application, bot, UTD shadow and CLI boundaries.",
         (TierCommand((*PYTEST, *RETROFIT_TESTS, "-q"), env=(("PYTHONPATH", "src"),)),),
     ),
     "legacy-compat": TestTier(

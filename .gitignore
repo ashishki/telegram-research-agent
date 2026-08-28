@@ -1,6 +1,9 @@
 data/agent.db
 data/agent.db-wal
 data/agent.db-shm
+data/utd_shadow.db
+data/utd_shadow.db-wal
+data/utd_shadow.db-shm
 data/backups/
 data/events/
 data/output/**
