@@ -162,7 +162,8 @@ def handle_utd_profile_callback(
                 "profile_persisted": True,
                 "message": (
                     "UTD-профиль сохранён как подтверждённое намерение. "
-                    "Live-сбор, таймеры, модель и Telegram-уведомления не включены."
+                    "Само сохранение профиля не включает live-сбор, таймеры, модель или "
+                    "Telegram-уведомления; это отдельный deployment gate с kill switch."
                 ),
             }
         return {**result, "profile_persisted": False}
@@ -291,9 +292,10 @@ def render_utd_question_preview(text: str, *, db_path: str | Path | None = None)
         "UTD ASK — безопасный preview\n\n"
         f"Распознано: {category_label}. {profile_line}\n"
         f"{caution}\n\n"
-        "Live UTD-источники в UTD-1 выключены, поэтому я не придумываю дату, статус, "
-        "льготу или eligibility. Сейчас можно настроить профиль и увидеть watch-preview; "
-        "обычные вопросы по твоему AI-архиву продолжают работать как раньше."
+        "Этот ASK preview сам не запускает live fetch и не делает eligibility-выводы. "
+        "Live UTD-источники/watch работают отдельно: только confirmed profile, allowlisted official "
+        "sources, delivery gate, receipts и kill switch. Обычные вопросы по твоему "
+        "AI-архиву продолжают работать как раньше."
     )
 
 

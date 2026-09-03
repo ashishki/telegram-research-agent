@@ -10,7 +10,7 @@ import hashlib
 import json
 import os
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 from zoneinfo import ZoneInfo
@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS watch_feedback(
 FEEDBACK_PREFIX = "utdw"
 _ALLOWED_FEEDBACK = {"useful", "noise", "more", "less", "mute", "pause"}
 _UTD_TIMEZONE = ZoneInfo("America/Chicago")
+_FEEDBACK_PAUSE_WINDOW = timedelta(hours=24)
 
 
 def default_sidecar_db(env: Mapping[str, str] | None = None) -> str:
@@ -277,6 +278,33 @@ class DeliveryStore:
             count += len(items) if isinstance(items, list) else 1
         return count
 
+    def ordinary_digest_delivered_today(self, *, now: datetime | None = None) -> bool:
+        """Return whether a non-urgent digest has already been sent today.
+
+        Frequent polling should not turn ordinary UTD matches into multiple
+        newsletter-like messages. Urgent candidates still use their own
+        candidate-level idempotency and daily cap.
+        """
+        local_day = (now or datetime.now(timezone.utc)).astimezone(_UTD_TIMEZONE).date()
+        with sqlite3.connect(self.path) as db:
+            rows = db.execute(
+                "SELECT delivered_at,payload_json FROM delivery_receipts WHERE change_type='daily_digest'"
+            ).fetchall()
+        for delivered_at, raw_payload in rows:
+            try:
+                delivered_day = datetime.fromisoformat(str(delivered_at).replace("Z", "+00:00")).astimezone(_UTD_TIMEZONE).date()
+            except ValueError:
+                continue
+            if delivered_day != local_day:
+                continue
+            try:
+                payload = json.loads(str(raw_payload))
+            except (TypeError, json.JSONDecodeError):
+                payload = {}
+            if isinstance(payload, dict) and not payload.get("digest_component"):
+                return True
+        return False
+
     def record_feedback(self, key: str, action: str) -> str:
         if action not in _ALLOWED_FEEDBACK:
             raise ValueError("Unsupported watch feedback")
@@ -286,6 +314,26 @@ class DeliveryStore:
             db.execute("INSERT OR IGNORE INTO watch_feedback(delivery_key,action,recorded_at) VALUES(?,?,?)", (key, action, _now()))
             db.commit()
         return action
+
+    def paused_until(self, *, now: datetime | None = None) -> str:
+        """Return a sidecar-only temporary delivery pause timestamp, if active."""
+        current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+        with sqlite3.connect(self.path) as db:
+            row = db.execute(
+                "SELECT recorded_at FROM watch_feedback WHERE action='pause' ORDER BY recorded_at DESC LIMIT 1"
+            ).fetchone()
+        if row is None:
+            return ""
+        try:
+            recorded_at = datetime.fromisoformat(str(row[0]).replace("Z", "+00:00"))
+        except ValueError:
+            return ""
+        if recorded_at.tzinfo is None:
+            recorded_at = recorded_at.replace(tzinfo=timezone.utc)
+        until = recorded_at.astimezone(timezone.utc) + _FEEDBACK_PAUSE_WINDOW
+        if until <= current:
+            return ""
+        return until.isoformat().replace("+00:00", "Z")
 
     def feedback_summary(self) -> dict[str, Any]:
         with sqlite3.connect(self.path) as db:
@@ -305,6 +353,7 @@ class DeliveryStore:
             "feedback": counts,
             "rated": rated,
             "observed_precision": (counts.get("useful", 0) / rated) if rated else None,
+            "paused_until": self.paused_until(),
         }
 
 
@@ -326,6 +375,17 @@ def deliver_candidates(
         from bot.telegram_delivery import send_text
         sender = send_text
     store = DeliveryStore(sidecar_db)
+    paused_until = store.paused_until()
+    if paused_until:
+        return {
+            "enabled": True,
+            "sent": 0,
+            "duplicates_blocked": 0,
+            "daily_cap_blocked": 0,
+            "ordinary_digest_blocked": 0,
+            "suppressed_by_pause": len(candidates),
+            "paused_until": paused_until,
+        }
     sent = 0
     duplicates = 0
     daily_cap = 5
@@ -354,8 +414,16 @@ def deliver_candidates(
         store.record_delivery(key, candidate, message_id)
         sent += 1
     remaining -= min(len(urgent), remaining)
+    ordinary_digest_blocked = 0
     if remaining and ordinary:
-        digest_items = [dict(candidate) for _, candidate in ordinary[:remaining]]
+        if store.ordinary_digest_delivered_today():
+            ordinary_digest_blocked = len(ordinary)
+            ordinary = []
+        else:
+            ordinary_digest_blocked = max(0, len(ordinary) - remaining)
+            ordinary = ordinary[:remaining]
+    if remaining and ordinary:
+        digest_items = [dict(candidate) for _, candidate in ordinary]
         digest = _build_daily_digest(digest_items)
         key = delivery_key(digest)
         if store.already_delivered(key):
@@ -368,13 +436,16 @@ def deliver_candidates(
                 parse_mode=None,
                 reply_markup=build_feedback_markup(key),
             )
-            store.record_digest(key, digest, ordinary[:remaining], message_id)
+            store.record_digest(key, digest, ordinary, message_id)
             sent += 1
     return {
         "enabled": True,
         "sent": sent,
         "duplicates_blocked": duplicates,
         "daily_cap_blocked": daily_cap_blocked,
+        "ordinary_digest_blocked": ordinary_digest_blocked,
+        "suppressed_by_pause": 0,
+        "paused_until": "",
     }
 
 
@@ -423,6 +494,6 @@ def handle_feedback_callback(sidecar_db: str | Path, callback_data: str) -> dict
         "more": "Записал: больше такого.",
         "less": "Записал: меньше такого.",
         "mute": "Записал feedback mute; источник не будет молча отключён без подтверждения профиля.",
-        "pause": "Записал feedback pause; постоянная пауза требует подтверждения профиля.",
+        "pause": "Поставил sidecar-паузу UTD-уведомлений на 24 часа. Подтверждённый профиль не изменён.",
     }
     return {"message": messages[recorded], "action": recorded}

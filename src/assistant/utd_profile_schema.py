@@ -127,8 +127,10 @@ def render_utd_watch_preview(draft: Mapping[str, Any]) -> str:
         f"Expiry/review: {normalized['expires_at']}\n"
         f"Состояние: {state}\n"
         f"Muted source families: {', '.join(normalized['muted_sources']) or 'нет'}\n\n"
-        "Граница UTD-1: live fetch = off; timers = off; Telegram delivery = off; "
-        "provider egress = off. Подтверждение сохранит только профиль и preview-watch intent."
+        "Граница: этот profile preview сам не делает live fetch, не запускает timer, "
+        "не отправляет Telegram delivery и не включает provider egress. Runtime watch "
+        "управляется отдельным deployment gate и kill switch. Подтверждение сохраняет "
+        "только персональный UTD scope."
     )
 
 

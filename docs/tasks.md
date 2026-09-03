@@ -1,7 +1,7 @@
 # Active Task Graph
 
 Status: active
-Last updated: 2026-08-28
+Last updated: 2026-09-03
 Baseline: `5dfd38660b7d8d24998b4dcdf801c419c1dc8f7c`
 Archive ref: origin/archive/pre-prm-retrofit-2026-08-16
 Active ref: master
@@ -508,7 +508,7 @@ Owner:      codex + human operator
 Phase:      controlled-delivery
 Type:       agent:harness privacy
 Depends-On: UTD-DR-2
-Status:     implemented_default_off_pending_live_enablement
+Status:     implemented_live_timer_enabled_pending_profile_confirmation
 
 Objective: |
   Deliver UTD answers and low-volume notifications through the existing PRM
@@ -531,8 +531,9 @@ Acceptance-Criteria:
 Verification:
   - end-to-end tests for proposal/confirm/pause/mute/expire, stale evidence,
     duplicate retry, source-link audit and kill switch
-  - explicit operator delivery approval; this is not PRM-19 dogfood unless
-    separately approved as such
+  - explicit operator delivery approval recorded on 2026-09-03; timer is
+    enabled but fail-closes until the operator confirms the UTD profile
+  - this is not PRM-19 dogfood unless separately approved as such
 
 Files:
   - src/prm/

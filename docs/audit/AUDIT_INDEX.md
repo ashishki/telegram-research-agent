@@ -91,3 +91,12 @@ These files remain preserved for human reference, but they are no longer part of
   correction: self-answer-resistant Eval V2 generation, real runtime route
   evaluator, rendered-answer claim verification, pre-synthesis approved claim
   ledger, project-decision synthesis, and primary-source ledger integration.
+- `PRM_PRODUCT_UX_JUDGE_2026-09-03.md` - advisory 50-case/200-turn product UX
+  judge run with `gpt-5.6-terra` medium reasoning; deterministic failures,
+  provider failures, privacy violations, notification noise, and unsafe
+  overconfidence are zero, while residual style/cognitive-load warnings remain
+  human-review items.
+- `UTD_LIVE_DOGFOOD_START_2026-09-03.md` - controlled UTD live watch timer
+  enablement receipt for the existing `prm-assistant` bot: delivery is gated,
+  sidecar-receipted, kill-switchable, and fail-closed until the operator
+  confirms the UTD profile draft.

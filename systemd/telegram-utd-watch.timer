@@ -1,0 +1,12 @@
+[Unit]
+Description=Periodic UTD confirmed-source watch timer
+
+[Timer]
+OnBootSec=15m
+OnUnitActiveSec=45m
+RandomizedDelaySec=180
+Persistent=false
+Unit=telegram-utd-watch.service
+
+[Install]
+WantedBy=timers.target
