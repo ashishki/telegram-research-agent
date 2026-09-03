@@ -28,6 +28,7 @@ PRM_ACTIVE_TESTS = (
     "tests/test_reaction_fast_lane.py",
     "tests/test_prm_post_answer_actions.py",
     "tests/test_prm_qa_dataset_eval.py",
+    "tests/test_prm_product_ux_eval.py",
     "tests/test_callbacks.py",
     "tests/test_prm_application.py",
     "tests/test_prm_bot_dispatch.py",
