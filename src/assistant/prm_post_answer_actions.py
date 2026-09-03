@@ -76,6 +76,8 @@ def select_post_answer_action_codes(answer: Mapping[str, Any]) -> list[str]:
         if not relevance_established:
             return [*feedback, "q"]
         codes = [*feedback, "o", "q"]
+        if intent == "archive_to_action":
+            codes.append("w")
         if project_name:
             codes.append("p")
         return codes

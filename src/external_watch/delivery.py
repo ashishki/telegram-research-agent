@@ -96,7 +96,8 @@ def render_candidate(candidate: Mapping[str, Any]) -> str:
     title = str(payload.get("title") or payload.get("name") or "UTD update").strip()
     url = str(payload.get("url") or payload.get("canonical_url") or "").strip()
     change = str(candidate.get("change_type") or "updated")
-    categories = ", ".join(str(x) for x in rel.get("categories") or [])
+    category_values = [str(x) for x in rel.get("categories") or [] if str(x)]
+    categories = ", ".join(category_values)
     reason = str(rel.get("reason") or "").strip()
     urgency = "Срочно. " if rel.get("urgent") else ""
     digest_items = candidate.get("digest_items")
@@ -106,17 +107,106 @@ def render_candidate(candidate: Mapping[str, Any]) -> str:
             item_payload = item.get("payload") if isinstance(item, Mapping) else {}
             item_title = str((item_payload or {}).get("title") or "UTD update").strip()
             item_url = str((item_payload or {}).get("url") or "").strip()
-            lines.append(f"{index}. {item_title}{f' — {item_url}' if item_url else ''}")
-        lines.append("Почему тебе: совпадает с подтверждённым UTD scope.")
+            item_when = _candidate_time(item_payload or {})
+            when_suffix = f" · {item_when}" if item_when else ""
+            lines.append(f"{index}. {item_title}{when_suffix}{f' — {item_url}' if item_url else ''}")
+        lines.append("Почему тебе: это дневной digest по подтверждённому UTD scope, не лента всех новостей.")
         return "\n".join(lines)
-    lines = [f"{urgency}{title}", f"Изменение: {change}."]
-    if reason:
-        lines.append(f"Почему тебе: {reason}")
+    lines = [f"{urgency}{title}", f"Что изменилось: {_human_change(change)}."]
+    when = _candidate_time(payload)
+    if when:
+        lines.append(f"Когда: {when}")
+    human_reason = _human_reason(reason, categories=categories)
+    if human_reason:
+        lines.append(f"Почему тебе: {human_reason}")
     elif categories:
-        lines.append(f"Почему тебе: {categories}.")
+        lines.append(f"Почему тебе: совпадает с подтверждённым scope: {categories}.")
+    next_step = _candidate_next_step(category_values, change=change, urgent=bool(rel.get("urgent")))
+    if next_step:
+        lines.append(f"Что сделать: {next_step}")
+    checked_at = _format_timestamp(payload.get("updated_at"))
+    if checked_at:
+        lines.append(f"Источник проверен: {checked_at}")
     if url:
         lines.append(f"Источник: {url}")
     return "\n".join(lines)
+
+
+def _human_change(change: str) -> str:
+    return {
+        "new": "новое релевантное событие или ресурс",
+        "updated": "официальная страница изменилась",
+        "cancelled": "событие отменено или статус стал inactive",
+        "reinstated": "событие снова активно",
+        "daily_digest": "подборка релевантных изменений за день",
+    }.get(str(change or "").casefold(), str(change or "updated"))
+
+
+def _candidate_time(payload: Mapping[str, Any]) -> str:
+    instance = payload.get("instance") if isinstance(payload.get("instance"), Mapping) else {}
+    start = str(instance.get("start") or payload.get("start") or payload.get("start_at") or payload.get("date") or "").strip()
+    end = str(instance.get("end") or payload.get("end") or payload.get("end_at") or "").strip()
+    start_dt = _parse_timestamp(start)
+    end_dt = _parse_timestamp(end)
+    if start_dt and end_dt:
+        if start_dt.date() == end_dt.date():
+            return f"{start_dt:%Y-%m-%d}, {start_dt:%H:%M}–{end_dt:%H:%M} CT"
+        return f"{_format_local_dt(start_dt)} — {_format_local_dt(end_dt)}"
+    if start_dt:
+        return _format_local_dt(start_dt)
+    if start and end:
+        return f"{start} — {end}"
+    return start
+
+
+def _human_reason(reason: str, *, categories: str) -> str:
+    clean = " ".join(str(reason or "").replace("_", " ").split())
+    if not clean:
+        return ""
+    lowered = clean.casefold()
+    if lowered.startswith("synthetic ") or "confirmed scope" in lowered:
+        return f"совпадает с твоим подтверждённым UTD scope: {categories or 'UTD'}."
+    return clean
+
+
+def _candidate_next_step(categories: Sequence[str], *, change: str, urgent: bool) -> str:
+    lowered = {item.casefold() for item in categories}
+    prefix = "сегодня " if urgent or str(change).casefold() in {"cancelled", "reinstated"} else ""
+    if "program" in lowered:
+        return f"{prefix}открой источник и проверь, касается ли срок твоей программы."
+    if "career" in lowered:
+        return f"{prefix}проверь регистрацию и добавь событие в календарь, если оно подходит под internship search."
+    if "ai" in lowered:
+        return f"{prefix}открой страницу события и реши, стоит ли идти по теме AI/research."
+    if "isso" in lowered:
+        return f"{prefix}сверься с ISSO page; не принимай immigration-решение по уведомлению."
+    if "benefits" in lowered:
+        return f"{prefix}проверь eligibility на странице ресурса перед действием."
+    if "spouse_family" in lowered:
+        return f"{prefix}проверь, явно ли указана spouse/family eligibility."
+    return f"{prefix}открой источник и реши, нужно ли действие."
+
+
+def _format_timestamp(value: object) -> str:
+    parsed = _parse_timestamp(value)
+    return _format_local_dt(parsed) if parsed is not None else ""
+
+
+def _parse_timestamp(value: object) -> datetime | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(_UTD_TIMEZONE)
+
+
+def _format_local_dt(value: datetime) -> str:
+    return value.strftime("%Y-%m-%d, %H:%M CT")
 
 
 class DeliveryStore:

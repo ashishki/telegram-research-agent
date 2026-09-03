@@ -1,4 +1,4 @@
-from external_watch.delivery import DeliveryStore, deliver_candidates, delivery_enabled, handle_feedback_callback
+from external_watch.delivery import DeliveryStore, deliver_candidates, delivery_enabled, handle_feedback_callback, render_candidate
 
 
 def _candidate():
@@ -9,6 +9,32 @@ def test_delivery_is_triple_gated(tmp_path):
     env={"UTD_WATCH_DELIVERY_ENABLED":"1","UTD_WATCH_KILL_SWITCH":"1"}
     assert not delivery_enabled(explicit=True, env=env)
     assert not delivery_enabled(explicit=False, env={"UTD_WATCH_DELIVERY_ENABLED":"1"})
+
+
+def test_notification_copy_is_human_readable_and_actionable():
+    text = render_candidate(
+        {
+            "source": "calendar",
+            "item_key": "program:deadline",
+            "change_type": "updated",
+            "payload": {
+                "title": "Late Registration deadline",
+                "url": "https://calendar.utdallas.edu/event/deadline",
+                "instance": {"start": "2026-09-08T15:00:00-05:00"},
+            },
+            "relevance": {
+                "relevant": True,
+                "urgent": False,
+                "categories": ["program"],
+                "reason": "synthetic_program_match_for_confirmed_scope",
+            },
+        }
+    )
+    assert "Что изменилось: официальная страница изменилась." in text
+    assert "Когда: 2026-09-08, 15:00 CT" in text
+    assert "Почему тебе: совпадает с твоим подтверждённым UTD scope: program." in text
+    assert "Что сделать: открой источник и проверь, касается ли срок твоей программы." in text
+    assert "synthetic" not in text
 
 
 def test_delivery_receipt_blocks_duplicate_and_feedback(tmp_path):

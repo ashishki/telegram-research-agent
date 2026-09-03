@@ -83,6 +83,43 @@ def test_archive_answer_does_not_render_decision_risk_template():
     assert "Что применимо сейчас" in text
 
 
+def test_direct_only_followup_hides_partial_and_adjacent_materials():
+    contract = build_archive_response_contract(
+        question="В архиве по теме agent evals. Уточнение: покажи только прямые находки",
+        archive_items=rank_archive_items(QUERY, [_items()[1]]),
+        primary_intent="archive_lookup",
+        response_contract_id="archive_lookup.v2",
+    )
+    direct_only = __import__("prm.archive_contract", fromlist=["_direct_only_contract"])._direct_only_contract(
+        contract,
+        question="В архиве по теме agent evals. Уточнение: покажи только прямые находки",
+    )
+    text = render_payload(
+        {"response_contract_id": "archive_lookup.v2", "archive_contract": direct_only},
+        mode="research",
+    )
+    assert "Частичные совпадения" not in text
+    assert "Смежные материалы" not in text
+    assert "Фильтр direct-only включён" in text
+
+
+def test_compact_archive_followup_returns_next_step_without_full_source_dump():
+    contract = build_archive_response_contract(
+        question="В архиве по теме agent evals. Уточнение: коротко: какой следующий шаг?",
+        archive_items=rank_archive_items(QUERY, [_items()[1]]),
+        primary_intent="archive_lookup",
+        response_contract_id="archive_lookup.v2",
+    )
+    compact = {**contract, "view": {"compact": True}}
+    text = render_payload(
+        {"response_contract_id": "archive_lookup.v2", "archive_contract": compact},
+        mode="research",
+    )
+    assert text.startswith("Коротко:")
+    assert "Следующий шаг:" in text
+    assert "Источники" not in text
+
+
 def test_single_archive_source_is_enough_to_report_archive_presence():
     contract = build_archive_response_contract(
         question=QUERY, archive_items=rank_archive_items(QUERY, [_items()[0]]),
@@ -116,9 +153,13 @@ def test_telegram_keyboard_depends_on_intent():
     archive_codes = select_post_answer_action_codes({
         "primary_intent": "archive_lookup", "result_summary": {"direct_count": 0, "partial_count": 0, "adjacent_count": 1}
     })
+    action_codes = select_post_answer_action_codes({
+        "primary_intent": "archive_to_action", "result_summary": {"direct_count": 1, "partial_count": 0, "adjacent_count": 0}
+    })
     decision_codes = select_post_answer_action_codes({"primary_intent": "decision_support"})
     assert "e" not in archive_codes and "a" not in archive_codes and "w" not in archive_codes
     assert "q" in archive_codes and "o" in archive_codes
+    assert "w" in action_codes
     assert "a" in decision_codes
 
 

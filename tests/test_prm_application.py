@@ -87,3 +87,26 @@ def test_ambiguous_project_clarifies(monkeypatch):
     assert result.mode == "project_clarify"
     assert "К какому проекту" in result.text
     assert called is False
+
+
+def test_free_text_memory_action_does_not_run_archive_search_or_write(monkeypatch):
+    called = False
+
+    def fail(*args, **kwargs):
+        nonlocal called
+        called = True
+        raise AssertionError("free-text memory action must not run archive search")
+
+    monkeypatch.setattr("prm.application.answer_memory_research", fail)
+    assistant = PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:"))
+    result = assistant.answer(
+        OperatorRequest(query="сохрани заметку, но сначала покажи что именно сохранишь")
+    )
+
+    assert result.status == "needs_confirmation"
+    assert result.route["primary_intent"] == "memory_action"
+    assert result.payload["write_performed"] is False
+    assert result.payload["answer_gate"]["allow_answer"] is False
+    assert "не делаю durable-запись" in result.text
+    assert "Сохранить" in result.text
+    assert called is False

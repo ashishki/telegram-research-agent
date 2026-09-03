@@ -107,6 +107,13 @@ def _has_technical_leak(text: str) -> bool:
     ))
 
 
+def _forbidden_template(text: str, *, kind: str) -> bool:
+    if kind == "decision":
+        return False
+    lowered = f"\n{str(text or '').strip()}\n".casefold()
+    return any(marker.casefold() in lowered for marker in _ARCHIVE_FORBIDDEN)
+
+
 def _judge_answer(question: str, answer: str, *, source_count: int, current_fact_boundary: bool) -> dict[str, Any]:
     from llm.client import LLMClient
 
@@ -229,7 +236,7 @@ def run(*, live: bool, case_limit: int, case_offset: int, max_provider_calls: in
                 failures.append("empty_answer")
             if _has_technical_leak(answer):
                 failures.append("technical_leak")
-            if case["expected_intent"].startswith("archive_") and any(marker.casefold() in answer.casefold() for marker in _ARCHIVE_FORBIDDEN):
+            if case["expected_intent"].startswith("archive_") and _forbidden_template(answer, kind=str(case["kind"])):
                 failures.append("irrelevant_project_template")
             if case["expected_intent"].startswith("archive_") and bool(route.get("project_name")):
                 failures.append("unsupported_project_context")

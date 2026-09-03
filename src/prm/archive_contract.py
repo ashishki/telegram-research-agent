@@ -30,6 +30,13 @@ def apply_archive_response_contract(
         explicit_project=str(route.get("project_name") or ""),
         external_verification_required=bool(route.get("external_verification_required")),
     )
+    if _direct_only_requested(question):
+        contract = _direct_only_contract(contract, question=question)
+    if _compact_requested(question):
+        contract = {
+            **contract,
+            "view": {**_mapping(contract.get("view")), "compact": True},
+        }
     result.update(
         {
             "question": question,
@@ -91,6 +98,7 @@ def build_archive_response_contract(
         "response_contract_id": response_contract_id if response_contract_id in ARCHIVE_RESPONSE_CONTRACTS else "archive_research.v2",
         "primary_intent": primary_intent,
         "question_scope": "local_archive",
+        "question": question,
         "direct_answer": direct_answer,
         "answer_status": answer_status,
         "result_summary": {
@@ -116,6 +124,10 @@ def build_archive_response_contract(
         "external_verification": {
             "required": bool(external_verification_required),
             "triggered_by_word_now_alone": False,
+        },
+        "view": {
+            "direct_only": False,
+            "compact": False,
         },
         "write_performed": False,
     }
@@ -155,7 +167,7 @@ def _direct_answer(
     partial: Sequence[Mapping[str, Any]],
     adjacent: Sequence[Mapping[str, Any]],
 ) -> str:
-    topic = "agent evals" if "agent" in question.casefold() and ("eval" in question.casefold() or "оцен" in question.casefold()) else "запрошенной теме"
+    topic = _topic_label(question)
     if direct:
         suffix = "материал" if len(direct) == 1 else "материала" if len(direct) < 5 else "материалов"
         return f"В архиве найдено {len(direct)} прямых {suffix} по теме {topic}. Смежные источники отделены ниже и не выдаются за прямые."
@@ -165,6 +177,51 @@ def _direct_answer(
         suffix = "материал" if len(adjacent) == 1 else "материала" if len(adjacent) < 5 else "материалов"
         return f"Прямых материалов именно про {topic} я не нашёл. Есть {len(adjacent)} смежных {suffix}, но они не содержат прямой практики по запрошенной теме."
     return f"Прямых или смежных материалов по теме {topic} в текущей выдаче не найдено. Я не буду додумывать содержимое архива."
+
+
+def _direct_only_contract(contract: Mapping[str, Any], *, question: str) -> dict[str, Any]:
+    result = dict(contract)
+    summary = _mapping(result.get("result_summary"))
+    direct_count = int(summary.get("direct_count") or 0)
+    result["view"] = {**_mapping(result.get("view")), "direct_only": True}
+    result["partial_findings"] = []
+    result["adjacent_findings"] = []
+    result["applicability"] = _mappings(result.get("applicability")) if direct_count else []
+    result["sources"] = [
+        item for item in _mappings(result.get("sources")) if str(item.get("relevance_label") or "") == "direct"
+    ]
+    topic = _topic_label(question)
+    if direct_count:
+        suffix = "находку" if direct_count == 1 else "находки" if direct_count < 5 else "находок"
+        result["direct_answer"] = f"Показываю только прямые находки: {direct_count} {suffix} по теме {topic}."
+    else:
+        result["direct_answer"] = (
+            f"Прямых находок по теме {topic} нет. Частичные и смежные совпадения не показываю, "
+            "потому что ты попросил только прямые."
+        )
+    limitations = _strings(result.get("limitations"))
+    direct_only_limit = "Фильтр direct-only включён: partial/adjacent совпадения скрыты из ответа."
+    result["limitations"] = [direct_only_limit, *[item for item in limitations if item != direct_only_limit]][:3]
+    return result
+
+
+def _direct_only_requested(question: str) -> bool:
+    lowered = str(question or "").casefold()
+    return any(marker in lowered for marker in ("только прям", "прямые находки", "direct only", "only direct"))
+
+
+def _compact_requested(question: str) -> bool:
+    lowered = str(question or "").casefold()
+    return any(marker in lowered for marker in ("коротко", "кратко", "одним абзацем", "next step", "следующий шаг"))
+
+
+def _topic_label(question: str) -> str:
+    lowered = str(question or "").casefold()
+    return (
+        "agent evals"
+        if "agent" in lowered and ("eval" in lowered or "оцен" in lowered)
+        else "запрошенной теме"
+    )
 
 
 def _applicability(findings: Sequence[Mapping[str, Any]], *, explicit_project: str) -> list[dict[str, Any]]:
@@ -281,3 +338,9 @@ def _mappings(value: Any) -> list[Mapping[str, Any]]:
     if not isinstance(value, (list, tuple)):
         return []
     return [item for item in value if isinstance(item, Mapping)]
+
+
+def _strings(value: Any) -> list[str]:
+    if not isinstance(value, (list, tuple)):
+        return []
+    return [str(item).strip() for item in value if str(item).strip()]

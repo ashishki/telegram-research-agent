@@ -38,6 +38,8 @@ def render_project_clarification(project_names: Sequence[str] = ()) -> str:
 
 
 def _render_archive_contract(contract: Mapping[str, Any]) -> str:
+    if bool(_mapping(contract.get("view")).get("compact")):
+        return _render_archive_contract_compact(contract)
     summary = _mapping(contract.get("result_summary"))
     direct = _mappings(contract.get("direct_findings"))
     partial = _mappings(contract.get("partial_findings"))
@@ -84,6 +86,30 @@ def _render_archive_contract(contract: Mapping[str, Any]) -> str:
         lines.extend(["", "Ограничения", *[f"- {item}" for item in limitations[:3]]])
     lines.extend(["", "Источники", *(_archive_source_lines(sources) or ["- локальных источников нет"])])
     return _compact(lines)
+
+
+def _render_archive_contract_compact(contract: Mapping[str, Any]) -> str:
+    summary = _mapping(contract.get("result_summary"))
+    direct_count = int(summary.get("direct_count") or 0)
+    partial_count = int(summary.get("partial_count") or 0)
+    adjacent_count = int(summary.get("adjacent_count") or 0)
+    applicability = _mappings(contract.get("applicability"))
+    refinements = _strings(contract.get("search_refinements"))
+    if applicability:
+        next_step = _text(applicability[0].get("recommendation"))
+    elif direct_count:
+        next_step = "выбери одну прямую находку и сохрани её как заметку или watch-topic."
+    elif partial_count or adjacent_count:
+        next_step = "уточнить запрос до конкретной практики или разрешить показать partial/adjacent совпадения."
+    else:
+        next_step = "переформулировать тему; в текущей локальной выдаче нет достаточной опоры."
+    refine = f" Уточнение: {'; '.join(refinements[:3])}." if refinements else ""
+    return _compact(
+        [
+            f"Коротко: {_text(contract.get('direct_answer'))}",
+            f"Следующий шаг: {next_step}{refine}",
+        ]
+    )
 
 
 def _render_research(payload: Mapping[str, Any]) -> str:

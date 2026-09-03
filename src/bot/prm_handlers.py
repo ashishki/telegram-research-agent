@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import logging
 import os
+import hashlib
+from datetime import datetime, timedelta, timezone
 from typing import Any, Mapping
 
 from assistant.prm_post_answer_actions import build_post_answer_actions
@@ -34,6 +36,9 @@ PRM_SAFE_COMMANDS = frozenset(
         "/reactions",
     }
 )
+_PRM_DIALOG_TTL = timedelta(minutes=20)
+_MAX_PRM_DIALOGS = 200
+_PRM_DIALOG_STATE: dict[str, dict[str, Any]] = {}
 
 
 def send_message(
@@ -104,11 +109,13 @@ def dispatch_prm_command(chat_id: str, text: str, settings: Settings) -> None:
             "Напиши вопрос после команды или просто отправь обычное сообщение.",
         )
         return
+    dialog = _resolve_prm_dialog_query(chat_id, args, mode=mode)
+    effective_args = str(dialog.get("effective_query") or args)
     assistant = PersonalResearchAssistant(settings=settings)
     try:
         result = assistant.answer(
             OperatorRequest(
-                query=args,
+                query=effective_args,
                 mode=mode,
                 chat_id=chat_id,
                 input_kind=input_kind,
@@ -120,6 +127,16 @@ def dispatch_prm_command(chat_id: str, text: str, settings: Settings) -> None:
         return
     markup = _post_answer_markup(result.payload, settings=settings, chat_id=chat_id)
     _send_chunks(chat_id, result.text, reply_markup=markup)
+    result_status = str(getattr(result, "status", "ok") or "ok")
+    result_mode = str(getattr(result, "mode", mode) or mode)
+    if result_status == "ok" and result_mode in {"research", "brief"}:
+        result_route = _mapping(getattr(result, "route", {}))
+        _remember_prm_dialog(
+            chat_id,
+            effective_args,
+            mode=result_mode,
+            topic=str(result_route.get("retrieval_query") or ""),
+        )
 
 
 def _start_utd_profile(chat_id: str, *, settings: Settings, seed_text: str) -> None:
@@ -278,6 +295,178 @@ def _split_command(text: str) -> tuple[str, str]:
     parts = clean.split(maxsplit=1)
     command = parts[0].split("@", 1)[0].casefold()
     return command, parts[1].strip() if len(parts) > 1 else ""
+
+
+def _resolve_prm_dialog_query(
+    chat_id: str,
+    query: str,
+    *,
+    mode: str,
+    now: datetime | None = None,
+) -> dict[str, str | bool]:
+    clean = _clean_operator_text(query)
+    if mode not in {"auto", "research", "brief"}:
+        return {
+            "used": False,
+            "question": clean,
+            "previous_question": "",
+            "effective_query": clean,
+        }
+    entry = _active_prm_dialog(_prm_dialog_key(chat_id), now=now)
+    previous = str(entry.get("last_query") or "")
+    previous_topic = str(entry.get("last_topic") or "").strip()
+    if previous and _is_prm_research_followup(clean):
+        if previous_topic:
+            effective = _clean_operator_text(
+                f"В архиве по теме {previous_topic}. Уточнение: {clean}"
+            )[:900]
+        else:
+            effective = _clean_operator_text(f"{previous}. Уточнение: {clean}")[:900]
+        return {
+            "used": True,
+            "question": clean,
+            "previous_question": previous,
+            "effective_query": effective,
+        }
+    return {
+        "used": False,
+        "question": clean,
+        "previous_question": previous,
+        "effective_query": clean,
+    }
+
+
+def _remember_prm_dialog(
+    chat_id: str,
+    effective_query: str,
+    *,
+    mode: str,
+    topic: str = "",
+) -> None:
+    if mode not in {"research", "brief"}:
+        return
+    clean = _clean_operator_text(effective_query)
+    if not clean:
+        return
+    key = _prm_dialog_key(chat_id)
+    if len(_PRM_DIALOG_STATE) >= _MAX_PRM_DIALOGS and key not in _PRM_DIALOG_STATE:
+        oldest = next(iter(_PRM_DIALOG_STATE))
+        _PRM_DIALOG_STATE.pop(oldest, None)
+    _PRM_DIALOG_STATE[key] = {
+        "last_query": clean[:700],
+        "last_topic": _clean_operator_text(topic)[:240],
+        "mode": mode,
+        "updated_at": datetime.now(timezone.utc),
+    }
+
+
+def _active_prm_dialog(key: str, *, now: datetime | None = None) -> dict[str, Any]:
+    entry = _PRM_DIALOG_STATE.get(key)
+    if not isinstance(entry, Mapping):
+        return {}
+    updated_at = entry.get("updated_at")
+    timestamp = now or datetime.now(timezone.utc)
+    if not isinstance(updated_at, datetime) or timestamp - updated_at > _PRM_DIALOG_TTL:
+        _PRM_DIALOG_STATE.pop(key, None)
+        return {}
+    return dict(entry)
+
+
+def _is_prm_research_followup(query: str) -> bool:
+    clean = _clean_operator_text(query)
+    lowered = clean.casefold()
+    if not clean or len(clean) > 110:
+        return False
+    strong_followup_markers = (
+        "а примен",
+        "применимо это",
+        "из этого",
+        "собери из этого",
+        "покажи только",
+        "только прям",
+        "коротко",
+        "кратко",
+        "сохрани",
+        "запомни",
+        "следи",
+        "watch",
+        "save",
+        "next step",
+    )
+    if any(lowered.startswith(marker) for marker in strong_followup_markers):
+        return not _contains_new_topic_request(lowered)
+    if _contains_prm_research_anchor(lowered):
+        return False
+    followup_markers = (
+        "а ",
+        "и ",
+        "почему",
+        "зачем",
+        "покажи только",
+        "только прям",
+        "прямые",
+        "подробнее",
+        "разверни",
+        "сравни",
+        "коротко",
+        "следующий шаг",
+        "какой следующий шаг",
+        "сохрани",
+        "запомни",
+        "следи",
+        "watch",
+        "save",
+        "why",
+        "what else",
+        "next step",
+    )
+    if any(lowered.startswith(marker) for marker in followup_markers):
+        return True
+    token_count = len([token for token in lowered.replace("?", " ").split() if token])
+    return token_count <= 5 and lowered.endswith("?")
+
+
+def _contains_new_topic_request(lowered: str) -> bool:
+    return any(
+        marker in lowered
+        for marker in (
+            "в архиве",
+            "мой архив",
+            "моём архиве",
+            "utd",
+            "dallas",
+            "isso",
+        )
+    )
+
+
+def _contains_prm_research_anchor(lowered: str) -> bool:
+    anchors = (
+        "в архиве",
+        "мой архив",
+        "моём архиве",
+        "telegram",
+        "телеграм",
+        "utd",
+        "dallas",
+        "isso",
+        "ai ",
+        "ии",
+        "rag",
+        "раг",
+        "eval",
+        "vector",
+        "вектор",
+    )
+    return any(anchor in lowered for anchor in anchors)
+
+
+def _prm_dialog_key(chat_id: str) -> str:
+    return hashlib.sha256(f"prm.active-dialog.v1:{chat_id}".encode("utf-8")).hexdigest()[:24]
+
+
+def _clean_operator_text(value: object) -> str:
+    return " ".join(str(value or "").split())
 
 
 def _token() -> str:

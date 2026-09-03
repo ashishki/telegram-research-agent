@@ -45,6 +45,8 @@ class PersonalResearchAssistant:
                 text="Уточни: найти материалы в архиве, собрать бриф или задать свободный вопрос?",
                 route=route_payload,
             )
+        if route.primary_intent == "memory_action":
+            return self._memory_action_guidance(request, route_payload)
 
         context = build_operator_context(
             chat_id=request.chat_id,
@@ -192,6 +194,46 @@ class PersonalResearchAssistant:
             route=route,
         )
 
+    def _memory_action_guidance(
+        self, request: OperatorRequest, route: Mapping[str, Any]
+    ) -> AssistantResult:
+        interaction_id = build_operator_context(
+            chat_id=request.chat_id,
+            query=request.query,
+            requested_mode="research",
+            input_kind=request.input_kind,
+            project_name=str(route.get("project_name") or ""),
+        ).interaction_id
+        text = _render_memory_action_guidance(request.query)
+        payload = {
+            "status": "needs_confirmation",
+            "question": request.query,
+            "primary_intent": "memory_action",
+            "response_contract_id": route.get("response_contract_id") or "archive_research.v2",
+            "route_decision": dict(route),
+            "answer_gate": {
+                "allow_answer": False,
+                "reason": "free_text_memory_action_requires_explicit_preview_confirmation",
+            },
+            "write_performed": False,
+            "requires_confirmation": True,
+            "profile_mutation_from_feedback": False,
+        }
+        return AssistantResult(
+            interaction_id=interaction_id,
+            status="needs_confirmation",
+            mode="research",
+            text=text,
+            payload=payload,
+            operator_context={
+                "interaction_id": interaction_id,
+                "input_kind": request.input_kind,
+                "primary_intent": "memory_action",
+                "response_contract_id": payload["response_contract_id"],
+            },
+            route=route,
+        )
+
 
 def _apply_route_boundaries(payload: Mapping[str, Any], route: Mapping[str, Any]) -> dict[str, Any]:
     result = dict(payload)
@@ -215,3 +257,29 @@ def _env_enabled(name: str) -> bool:
 
 def _mapping(value: Any) -> dict[str, Any]:
     return dict(value) if isinstance(value, Mapping) else {}
+
+
+def _render_memory_action_guidance(query: str) -> str:
+    lowered = str(query or "").casefold()
+    wants_watch = any(marker in lowered for marker in ("следи", "наблюдай", "watch"))
+    if wants_watch:
+        action = "следить за темой"
+        button = "«Следить»"
+        detail = (
+            "Если это про последний ответ, используй кнопку под ним. "
+            "Если кнопки нет — задай тему как обычный вопрос, я сначала покажу найденные "
+            "источники и только потом предложу безопасное действие."
+        )
+    else:
+        action = "сохранить память"
+        button = "«Сохранить»"
+        detail = (
+            "Если это про последний ответ, используй кнопку под ним. "
+            "Так я покажу черновик заметки и отдельную кнопку подтверждения."
+        )
+    return (
+        f"Я могу {action}, но не делаю durable-запись из свободного follow-up без preview.\n\n"
+        f"Нажми {button} под релевантным ответом. До подтверждения это только черновик; "
+        "профиль и память автоматически не меняются.\n\n"
+        f"{detail}"
+    )

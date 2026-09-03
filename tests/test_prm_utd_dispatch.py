@@ -54,5 +54,35 @@ def test_explicit_archive_utd_question_keeps_existing_archive_route(monkeypatch,
     assert sent == ["archive result"]
 
 
+def test_prm_active_handler_resolves_short_followups_from_volatile_context() -> None:
+    prm_handlers._PRM_DIALOG_STATE.clear()
+    prm_handlers._remember_prm_dialog(
+        "42",
+        "Что в моём архиве было про agent evals и что мне с этим делать?",
+        mode="research",
+        topic="agent evals",
+    )
+
+    resolved = prm_handlers._resolve_prm_dialog_query(
+        "42",
+        "покажи только прямые находки",
+        mode="auto",
+    )
+
+    assert resolved["used"] is True
+    assert resolved["effective_query"].startswith("В архиве по теме agent evals.")
+    assert "Уточнение: покажи только прямые находки" in resolved["effective_query"]
+
+    project_followup = prm_handlers._resolve_prm_dialog_query(
+        "42",
+        "а применимо это к проекту telegram-research-agent?",
+        mode="auto",
+    )
+
+    assert project_followup["used"] is True
+    assert "agent evals" in project_followup["effective_query"]
+    assert "telegram-research-agent" in project_followup["effective_query"]
+
+
 def test_utd_command_is_part_of_active_prm_surface() -> None:
     assert "/utd" in prm_handlers.PRM_SAFE_COMMANDS
