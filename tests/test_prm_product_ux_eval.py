@@ -84,6 +84,13 @@ def test_product_ux_redacts_provider_payload_surfaces():
     assert "123456:ABC" not in rendered
     assert "t.me/private_channel" not in rendered
     assert "/srv/openclaw-you" not in rendered
+    assert "[REDACTED_PATH]" in rendered
+
+
+def test_product_ux_redaction_preserves_hash_like_public_receipts():
+    module = _module("prm_product_ux_eval_hash_redact")
+    digest = "4669425482fe9a0ac8662d2cea7caed6ce74b12a464092e470bfda23a67be32f"
+    assert module.redact_text_for_judge(digest) == digest
 
 
 def test_product_ux_simulates_utd_notification_with_feedback_controls():

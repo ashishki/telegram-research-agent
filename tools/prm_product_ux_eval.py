@@ -88,6 +88,7 @@ _SENSITIVE_JSON_ID_KEY_RE = re.compile(
 _PHONE_RE = re.compile(r"(?<![A-Za-z0-9])(?:\+?\d[\s().-]?){8,16}\d(?![A-Za-z0-9])")
 _TELEGRAM_HANDLE_RE = re.compile(r"(?<![\w.])@[A-Za-z0-9_]{5,32}\b")
 _URL_RE = re.compile(r"https?://[^\s)\]>\"']+", re.IGNORECASE)
+_ABS_PATH_RE = re.compile(r"(?<![\w.])/(?:[A-Za-z0-9._-]+/){2,}[A-Za-z0-9._-]+")
 _WHITESPACE_RE = re.compile(r"\s+")
 
 _TECHNICAL_LEAK_MARKERS = (
@@ -1994,6 +1995,7 @@ def redact_text_for_judge(text: str) -> str:
     redacted = _TELEGRAM_HANDLE_RE.sub("[REDACTED_TELEGRAM_HANDLE]", redacted)
     redacted = _PHONE_RE.sub("[REDACTED_PHONE]", redacted)
     redacted = redacted.replace(str(PROJECT_ROOT), "[REDACTED_PROJECT_ROOT]")
+    redacted = _ABS_PATH_RE.sub("[REDACTED_PATH]", redacted)
     redacted = _URL_RE.sub(_redact_url, redacted)
     return redacted
 
