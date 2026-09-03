@@ -478,6 +478,7 @@ def _add_prm_dialogues(dialogues: list[dict[str, Any]]) -> None:
                             "собери из этого короткий бриф для поста",
                             expected_intent="writer_brief",
                             expected_mode="brief",
+                            expected_project_context=True,
                         ),
                         _prm_turn(
                             f"turn:05:{slug}",
@@ -872,6 +873,63 @@ def _simulate_prm_application(
     mode = str(turn.get("mode") or "auto")
     chat_id = str(state.get("prm_chat_id") or f"product-ux-eval-{_stable_hash(message)[:10]}")
     dialog = prm_handlers._resolve_prm_dialog_query(chat_id, message, mode=mode)
+    if dialog.get("kind") == "post_answer_action":
+        preview = _simulate_post_answer_preview(dialog, state=state)
+        prm_handlers._remember_pending_prm_action(
+            chat_id,
+            action=str(dialog.get("post_answer_action") or ""),
+            message=preview,
+        )
+        return _turn_result(
+            turn,
+            index=index,
+            message=preview,
+            actual={
+                "surface": "prm_application",
+                "status": "needs_confirmation",
+                "mode": "research",
+                "primary_intent": "memory_action",
+                "response_contract_id": "archive_research.v2",
+                "project_context_required": False,
+                "external_verification_required": False,
+                "current_fact_boundary": False,
+                "source_count": 0,
+                "direct_count": 0,
+                "partial_count": 0,
+                "adjacent_count": 0,
+                "answer_chars": 180,
+                "action_codes": ["confirm"],
+                "dialog_context_used": True,
+                "unsupported_claim_rate": 0.0,
+                "current_fact_violations": 0,
+            },
+        )
+    if dialog.get("kind") == "short_next_step":
+        message_text = str(dialog.get("message") or "")
+        return _turn_result(
+            turn,
+            index=index,
+            message=message_text,
+            actual={
+                "surface": "prm_application",
+                "status": "ok",
+                "mode": "research",
+                "primary_intent": "",
+                "response_contract_id": "archive_research.v2",
+                "project_context_required": False,
+                "external_verification_required": False,
+                "current_fact_boundary": "внешнюю проверку" in message_text.casefold(),
+                "source_count": 0,
+                "direct_count": 0,
+                "partial_count": 0,
+                "adjacent_count": 0,
+                "answer_chars": len(message_text),
+                "action_codes": [],
+                "dialog_context_used": True,
+                "unsupported_claim_rate": 0.0,
+                "current_fact_violations": 0,
+            },
+        )
     effective_message = str(dialog.get("effective_query") or message)
     try:
         with suppress_usage_recording():
@@ -905,7 +963,6 @@ def _simulate_prm_application(
                 "relevance_established": (
                     int(summary.get("direct_count") or 0)
                     + int(summary.get("partial_count") or 0)
-                    + int(summary.get("adjacent_count") or 0)
                 )
                 > 0,
             }
@@ -926,8 +983,7 @@ def _simulate_prm_application(
         "response_contract_id": str(route.get("response_contract_id") or ""),
         "project_context_required": bool(route.get("project_context_required")),
         "external_verification_required": bool(route.get("external_verification_required")),
-        "current_fact_boundary": bool(gate.get("external_verification_required"))
-        and not bool(gate.get("current_claim_allowed", True)),
+        "current_fact_boundary": _blocking_current_fact_gate(gate),
         "source_count": source_count,
         "direct_count": int(summary.get("direct_count") or 0),
         "partial_count": int(summary.get("partial_count") or 0),
@@ -943,9 +999,65 @@ def _simulate_prm_application(
             chat_id,
             effective_message,
             mode=str(result.get("mode") or "research"),
-            topic=str(route.get("retrieval_query") or ""),
+            topic=str(dialog.get("previous_topic") or route.get("retrieval_query") or ""),
+            project_name=str(route.get("project_name") or _mapping(payload.get("project_fit")).get("project_name") or ""),
+            action_context_id=f"eval-{_stable_hash(str(turn.get('case_id') or turn.get('turn_id') or message))[:12]}",
+            action_codes=[str(code) for code in action_codes],
+            last_answer=answer,
+            direct_count=int(summary.get("direct_count") or 0),
+            partial_count=int(summary.get("partial_count") or 0),
+            adjacent_count=int(summary.get("adjacent_count") or 0),
+            current_fact_boundary=_blocking_current_fact_gate(gate),
+            direct_only_filter=bool(dialog.get("previous_direct_only")) or prm_handlers._is_direct_only_request(effective_message),
         )
+        state["last_prm"] = {
+            "answer": answer,
+            "topic": str(dialog.get("previous_topic") or route.get("retrieval_query") or ""),
+            "action_codes": [str(code) for code in action_codes],
+        }
+    elif str(result.get("status") or "") == "needs_confirmation" and str(route.get("primary_intent") or "") == "memory_action":
+        prm_handlers._remember_pending_prm_action(
+            chat_id,
+            action=prm_handlers._memory_action_code(message),
+            message=answer,
+        )
+        state["last_prm"] = {
+            "answer": answer,
+            "topic": str(dialog.get("previous_topic") or route.get("retrieval_query") or ""),
+            "action_codes": [],
+        }
     return _turn_result(turn, index=index, message=visible, actual=actual)
+
+
+def _simulate_post_answer_preview(
+    dialog: Mapping[str, Any],
+    *,
+    state: Mapping[str, Any],
+) -> str:
+    action = str(dialog.get("post_answer_action") or "n")
+    topic = str(dialog.get("previous_topic") or "последней теме")
+    last_prm = _mapping(state.get("last_prm"))
+    answer = str(last_prm.get("answer") or "")
+    excerpt = _limit_text(answer, 260).replace("\n", " ")
+    if action == "w":
+        title = f"Следить за темой: {topic}"
+        label = "Следить"
+        body = "Начну наблюдать только после подтверждения; UTD-профиль и память не меняются автоматически."
+    else:
+        title = f"Заметка по теме: {topic}"
+        label = "Сохранить"
+        body = "Это черновик заметки из последнего ответа; durable запись появится только после подтверждения."
+    return "\n".join(
+        [
+            f"{label}: черновик подготовлен.",
+            "",
+            f"Что будет сохранено: {title}",
+            f"Основание: {excerpt or 'последний ответ в этом диалоге'}",
+            body,
+            "",
+            "[Кнопки: Подтвердить | Отмена]",
+        ]
+    )
 
 
 def _simulate_control(turn: Mapping[str, Any], *, index: int) -> SimulatedTurn:
@@ -1034,7 +1146,8 @@ def _simulate_utd_profile_action(
     if action == "save":
         answer = (
             "UTD-профиль сохранён как подтверждённое намерение. "
-            "Live-сбор, таймеры, модель и Telegram-уведомления не включены."
+            "Само сохранение профиля не включает live-сбор, таймеры, модель или "
+            "Telegram-уведомления; это отдельный deployment gate с kill switch."
         )
         actual = {
             "surface": "utd_confirmation",
@@ -1207,7 +1320,11 @@ def _deterministic_checks(
     if bool(expected.get("watch_preview_truthful")):
         checks["watch_preview_truthful_ok"] = all(
             marker in visible
-            for marker in ("live fetch = off", "timers = off", "Telegram delivery = off")
+            for marker in (
+                "profile preview сам не делает live fetch",
+                "deployment gate",
+                "kill switch",
+            )
         )
     if bool(expected.get("no_delivery_enabled")):
         checks["delivery_not_enabled_ok"] = not bool(actual.get("delivery_enabled"))
@@ -2158,6 +2275,14 @@ def _limit_text(value: str, limit: int) -> str:
 
 def _mapping(value: object) -> dict[str, Any]:
     return dict(value) if isinstance(value, Mapping) else {}
+
+
+def _blocking_current_fact_gate(gate: Mapping[str, Any]) -> bool:
+    return (
+        bool(gate.get("external_verification_required"))
+        and not bool(gate.get("current_claim_allowed", True))
+        and (bool(gate.get("no_answer_required")) or not bool(gate.get("allow_answer", False)))
+    )
 
 
 def _slug(value: str) -> str:

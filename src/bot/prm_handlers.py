@@ -8,7 +8,11 @@ import hashlib
 from datetime import datetime, timedelta, timezone
 from typing import Any, Mapping
 
-from assistant.prm_post_answer_actions import build_post_answer_actions
+from assistant.prm_post_answer_actions import (
+    PRM_ACTION_PREFIX,
+    build_post_answer_actions,
+    handle_post_answer_callback,
+)
 from assistant.utd_profile import (
     is_utd_profile_intent,
     is_utd_question,
@@ -110,6 +114,29 @@ def dispatch_prm_command(chat_id: str, text: str, settings: Settings) -> None:
         )
         return
     dialog = _resolve_prm_dialog_query(chat_id, args, mode=mode)
+    if dialog.get("kind") == "post_answer_action":
+        context_id = str(dialog.get("action_context_id") or "")
+        action = str(dialog.get("post_answer_action") or "")
+        if context_id and action:
+            result = handle_post_answer_callback(
+                settings.db_path,
+                f"{PRM_ACTION_PREFIX}:{context_id}:{action}",
+                chat_id=chat_id,
+            )
+            message = str(result.get("message") or "Черновик недоступен. Запроси ответ заново.")
+            if str(result.get("status") or "") == "needs_confirmation":
+                _remember_pending_prm_action(chat_id, action=action, message=message)
+            send_message(
+                _token(),
+                chat_id,
+                message,
+                reply_markup=result.get("reply_markup"),
+            )
+            return
+    if dialog.get("kind") == "short_next_step":
+        send_message(_token(), chat_id, str(dialog.get("message") or "Следующий шаг не найден."))
+        return
+
     effective_args = str(dialog.get("effective_query") or args)
     assistant = PersonalResearchAssistant(settings=settings)
     try:
@@ -125,7 +152,8 @@ def dispatch_prm_command(chat_id: str, text: str, settings: Settings) -> None:
         LOGGER.warning("PRM request failed command=%s", command, exc_info=True)
         send_message(_token(), chat_id, f"Не смог обработать запрос: {type(exc).__name__}")
         return
-    markup = _post_answer_markup(result.payload, settings=settings, chat_id=chat_id)
+    action_bundle = _post_answer_action_bundle(result.payload, settings=settings, chat_id=chat_id)
+    markup = action_bundle.get("reply_markup") if isinstance(action_bundle, Mapping) else None
     _send_chunks(chat_id, result.text, reply_markup=markup)
     result_status = str(getattr(result, "status", "ok") or "ok")
     result_mode = str(getattr(result, "mode", mode) or mode)
@@ -135,7 +163,26 @@ def dispatch_prm_command(chat_id: str, text: str, settings: Settings) -> None:
             chat_id,
             effective_args,
             mode=result_mode,
-            topic=str(result_route.get("retrieval_query") or ""),
+            topic=str(dialog.get("previous_topic") or result_route.get("retrieval_query") or ""),
+            project_name=str(result_route.get("project_name") or _mapping(result.payload).get("project_name") or ""),
+            action_context_id=str(action_bundle.get("context_id") or "") if isinstance(action_bundle, Mapping) else "",
+            action_codes=[
+                str(code)
+                for code in (action_bundle.get("action_codes") if isinstance(action_bundle, Mapping) else [])
+                if str(code)
+            ],
+            last_answer=result.text,
+            direct_count=_archive_result_count(result.payload, "direct_count"),
+            partial_count=_archive_result_count(result.payload, "partial_count"),
+            adjacent_count=_archive_result_count(result.payload, "adjacent_count"),
+            current_fact_boundary=_current_fact_boundary(result.payload),
+            direct_only_filter=bool(dialog.get("previous_direct_only")) or _is_direct_only_request(effective_args),
+        )
+    elif result_status == "needs_confirmation" and _mapping(getattr(result, "route", {})).get("primary_intent") == "memory_action":
+        _remember_pending_prm_action(
+            chat_id,
+            action=_memory_action_code(args),
+            message=result.text,
         )
 
 
@@ -173,9 +220,16 @@ def _delegate_safe_ops(command: str, chat_id: str, args: str, settings: Settings
 def _post_answer_markup(
     payload: Mapping[str, Any], *, settings: Settings, chat_id: str
 ) -> dict | None:
+    bundle = _post_answer_action_bundle(payload, settings=settings, chat_id=chat_id)
+    return bundle.get("reply_markup") if isinstance(bundle, Mapping) else None
+
+
+def _post_answer_action_bundle(
+    payload: Mapping[str, Any], *, settings: Settings, chat_id: str
+) -> dict[str, Any]:
     gate = _mapping(payload.get("answer_gate"))
     if not bool(gate.get("allow_answer", True)):
-        return None
+        return {}
     archive = _mapping(payload.get("archive_evidence"))
     source_refs = [
         str(item.get("source_url") or item.get("telegram_url") or "")
@@ -188,7 +242,7 @@ def _post_answer_markup(
     summary = _mapping(contract.get("result_summary"))
     direct_count = int(summary.get("direct_count") or 0)
     partial_count = int(summary.get("partial_count") or 0)
-    bundle = build_post_answer_actions(
+    return build_post_answer_actions(
         {
             "query": payload.get("question"),
             "direct_answer": payload.get("direct_answer"),
@@ -218,7 +272,6 @@ def _post_answer_markup(
         db_path=settings.db_path,
         chat_id=chat_id,
     )
-    return bundle.get("reply_markup") if isinstance(bundle, Mapping) else None
 
 
 def _send_chunks(
@@ -303,35 +356,80 @@ def _resolve_prm_dialog_query(
     *,
     mode: str,
     now: datetime | None = None,
-) -> dict[str, str | bool]:
+) -> dict[str, Any]:
     clean = _clean_operator_text(query)
     if mode not in {"auto", "research", "brief"}:
         return {
             "used": False,
+            "kind": "query",
             "question": clean,
             "previous_question": "",
+            "previous_topic": "",
             "effective_query": clean,
         }
     entry = _active_prm_dialog(_prm_dialog_key(chat_id), now=now)
     previous = str(entry.get("last_query") or "")
     previous_topic = str(entry.get("last_topic") or "").strip()
+    previous_project = str(entry.get("last_project_name") or "").strip()
+    previous_direct_only = bool(entry.get("direct_only_filter"))
+    if previous and _is_memory_action_followup(clean):
+        action = _memory_action_code(clean)
+        available = {str(code) for code in entry.get("last_action_codes") or []}
+        context_id = str(entry.get("last_action_context_id") or "")
+        if context_id and action in available:
+            return {
+                "used": True,
+                "kind": "post_answer_action",
+                "question": clean,
+                "previous_question": previous,
+                "previous_topic": previous_topic,
+                "effective_query": clean,
+                "action_context_id": context_id,
+                "post_answer_action": action,
+            }
+    if previous and _is_short_next_step_followup(clean):
+        return {
+            "used": True,
+            "kind": "short_next_step",
+            "question": clean,
+            "previous_question": previous,
+            "previous_topic": previous_topic,
+            "effective_query": clean,
+            "message": _render_short_next_step(entry),
+        }
     if previous and _is_prm_research_followup(clean):
-        if previous_topic:
+        if _is_project_followup(clean):
+            base = previous_topic or previous
+            direct_clause = " Фильтр: только прямые находки." if previous_direct_only else ""
             effective = _clean_operator_text(
-                f"В архиве по теме {previous_topic}. Уточнение: {clean}"
+                f"В архиве по теме {base}.{direct_clause} Сопоставь с проектом: {clean}"
+            )[:900]
+        elif previous_topic:
+            project_clause = f" Для проекта {previous_project}." if previous_project else ""
+            direct_clause = " Фильтр: только прямые находки." if previous_direct_only else ""
+            effective = _clean_operator_text(
+                f"В архиве по теме {previous_topic}.{project_clause}{direct_clause} Уточнение: {clean}"
             )[:900]
         else:
             effective = _clean_operator_text(f"{previous}. Уточнение: {clean}")[:900]
         return {
             "used": True,
+            "kind": "query",
             "question": clean,
             "previous_question": previous,
+            "previous_topic": previous_topic,
+            "previous_project": previous_project,
+            "previous_direct_only": previous_direct_only,
             "effective_query": effective,
         }
     return {
         "used": False,
+        "kind": "query",
         "question": clean,
         "previous_question": previous,
+        "previous_topic": previous_topic,
+        "previous_project": previous_project,
+        "previous_direct_only": previous_direct_only,
         "effective_query": clean,
     }
 
@@ -342,6 +440,16 @@ def _remember_prm_dialog(
     *,
     mode: str,
     topic: str = "",
+    project_name: str = "",
+    action_context_id: str = "",
+    action_codes: list[str] | tuple[str, ...] = (),
+    last_answer: str = "",
+    pending_action: str = "",
+    direct_only_filter: bool = False,
+    direct_count: int = 0,
+    partial_count: int = 0,
+    adjacent_count: int = 0,
+    current_fact_boundary: bool = False,
 ) -> None:
     if mode not in {"research", "brief"}:
         return
@@ -354,10 +462,42 @@ def _remember_prm_dialog(
         _PRM_DIALOG_STATE.pop(oldest, None)
     _PRM_DIALOG_STATE[key] = {
         "last_query": clean[:700],
-        "last_topic": _clean_operator_text(topic)[:240],
+        "last_topic": _clean_topic_label(topic)[:240],
+        "last_project_name": _clean_operator_text(project_name)[:120],
         "mode": mode,
+        "last_action_context_id": _clean_operator_text(action_context_id)[:80],
+        "last_action_codes": [str(code)[:8] for code in action_codes if str(code)],
+        "last_answer": _clean_operator_text(last_answer)[:500],
+        "pending_action": _clean_operator_text(pending_action)[:8],
+        "direct_only_filter": bool(direct_only_filter),
+        "direct_count": max(0, int(direct_count or 0)),
+        "partial_count": max(0, int(partial_count or 0)),
+        "adjacent_count": max(0, int(adjacent_count or 0)),
+        "current_fact_boundary": bool(current_fact_boundary),
         "updated_at": datetime.now(timezone.utc),
     }
+
+
+def _remember_pending_prm_action(chat_id: str, *, action: str, message: str) -> None:
+    entry = _active_prm_dialog(_prm_dialog_key(chat_id))
+    if not entry:
+        return
+    _remember_prm_dialog(
+        chat_id,
+        str(entry.get("last_query") or message),
+        mode=str(entry.get("mode") or "research"),
+        topic=str(entry.get("last_topic") or ""),
+        project_name=str(entry.get("last_project_name") or ""),
+        action_context_id=str(entry.get("last_action_context_id") or ""),
+        action_codes=[str(code) for code in entry.get("last_action_codes") or []],
+        last_answer=message,
+        pending_action=_memory_action_code(action),
+        direct_only_filter=bool(entry.get("direct_only_filter")),
+        direct_count=int(entry.get("direct_count") or 0),
+        partial_count=int(entry.get("partial_count") or 0),
+        adjacent_count=int(entry.get("adjacent_count") or 0),
+        current_fact_boundary=False,
+    )
 
 
 def _active_prm_dialog(key: str, *, now: datetime | None = None) -> dict[str, Any]:
@@ -426,6 +566,75 @@ def _is_prm_research_followup(query: str) -> bool:
     return token_count <= 5 and lowered.endswith("?")
 
 
+def _is_project_followup(query: str) -> bool:
+    lowered = _clean_operator_text(query).casefold()
+    return any(
+        marker in lowered
+        for marker in (
+            "к проекту",
+            "проекту",
+            "для проекта",
+            "мой проект",
+            "моему проекту",
+            "project",
+            "repo",
+            "backlog",
+            "бэклог",
+        )
+    )
+
+
+def _is_memory_action_followup(query: str) -> bool:
+    lowered = _clean_operator_text(query).casefold()
+    return any(marker in lowered for marker in ("сохрани", "запомни", "следи", "watch", "save"))
+
+
+def _memory_action_code(query: str) -> str:
+    lowered = _clean_operator_text(query).casefold()
+    if lowered in {"w", "n"}:
+        return lowered
+    return "w" if any(marker in lowered for marker in ("следи", "watch", "наблюдай")) else "n"
+
+
+def _is_short_next_step_followup(query: str) -> bool:
+    lowered = _clean_operator_text(query).casefold()
+    return any(
+        marker in lowered
+        for marker in (
+            "коротко",
+            "кратко",
+            "какой следующий шаг",
+            "следующий шаг",
+            "next step",
+        )
+    )
+
+
+def _is_direct_only_request(query: str) -> bool:
+    lowered = _clean_operator_text(query).casefold()
+    return any(marker in lowered for marker in ("только прям", "прямые находки", "direct only", "only direct"))
+
+
+def _render_short_next_step(entry: Mapping[str, Any]) -> str:
+    pending = str(entry.get("pending_action") or "")
+    if pending:
+        if pending == "w":
+            topic = str(entry.get("last_topic") or "этой теме")
+            return f"Следующий шаг: подтвердить черновик наблюдения по теме {topic}. После подтверждения я буду следить; UTD-профиль не меняется."
+        return "Следующий шаг: подтвердить черновик заметки, если preview точно отражает то, что нужно сохранить. Без подтверждения запись не создаётся."
+    if bool(entry.get("current_fact_boundary")):
+        return "Следующий шаг: разрешить внешнюю проверку официальных источников; без неё я не буду выдавать текущий факт за подтверждённый."
+    direct = int(entry.get("direct_count") or 0)
+    partial = int(entry.get("partial_count") or 0)
+    adjacent = int(entry.get("adjacent_count") or 0)
+    topic = str(entry.get("last_topic") or "этой теме")
+    if direct:
+        return f"Следующий шаг: взять одну прямую находку по теме {topic} и превратить её в маленький regression/action item."
+    if partial or adjacent:
+        return f"Следующий шаг: уточнить поиск по теме {topic} до одного термина, канала или периода; смежные материалы пока не считать доказательством."
+    return f"Следующий шаг: переформулировать запрос по теме {topic} точнее или выбрать другой источник/период."
+
+
 def _contains_new_topic_request(lowered: str) -> bool:
     return any(
         marker in lowered
@@ -469,6 +678,32 @@ def _clean_operator_text(value: object) -> str:
     return " ".join(str(value or "").split())
 
 
+def _clean_topic_label(value: object) -> str:
+    clean = _clean_operator_text(value)
+    lowered = clean.casefold()
+    if "уточнение:" in lowered:
+        clean = clean[: lowered.index("уточнение:")].strip()
+    for prefix in ("В архиве по теме ", "в архиве по теме ", "по теме "):
+        if clean.startswith(prefix):
+            clean = clean[len(prefix) :].strip()
+    return clean.strip(" .:;")
+
+
+def _archive_result_count(payload: Mapping[str, Any], key: str) -> int:
+    contract = _mapping(_mapping(payload).get("archive_contract"))
+    summary = _mapping(contract.get("result_summary"))
+    return max(0, int(summary.get(key) or 0))
+
+
+def _current_fact_boundary(payload: Mapping[str, Any]) -> bool:
+    gate = _mapping(_mapping(payload).get("answer_gate"))
+    return (
+        bool(gate.get("external_verification_required"))
+        and not bool(gate.get("current_claim_allowed", True))
+        and (bool(gate.get("no_answer_required")) or not bool(gate.get("allow_answer", False)))
+    )
+
+
 def _token() -> str:
     return os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 
@@ -479,8 +714,11 @@ def _help_text() -> str:
         "AI-архив: ищу по твоему Telegram-архиву, отделяю прямые совпадения от "
         "смежных материалов и помогаю применить найденное к проектам. Просто задай вопрос.\n\n"
         "UTD / Dallas: понимаю вопросы про программу, карьеру, AI-события, ISSO, "
-        "benefits и spouse/family. На этапе UTD-1 live-источники и уведомления выключены: "
-        "я честно показываю границу и не придумываю свежие даты или eligibility.\n\n"
+        "benefits и spouse/family. ASK-ответы не придумывают свежие даты или eligibility: "
+        "если нужен актуальный факт, я показываю official-source boundary. Live UTD-источники "
+        "(live-источники) "
+        "и watch-уведомления работают только через подтверждённый UTD scope, отдельный timer, "
+        "delivery gate и kill switch.\n\n"
         "Чтобы собрать персональный scope, напиши: «Настроить мой UTD-профиль». "
         "Сначала будет черновик и полный preview; ничего постоянного не сохранится без "
         "отдельного подтверждения.\n\n"

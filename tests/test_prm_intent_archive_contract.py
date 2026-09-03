@@ -41,6 +41,40 @@ def test_archive_practices_question_routes_to_action_research():
     assert route.primary_intent == "archive_to_action"
 
 
+def test_project_followup_with_unconfigured_project_still_routes_to_project_mapping():
+    route = decide_route(
+        "В архиве по теме AI adoption. Сопоставь с проектом: "
+        "а применимо это к проекту Workflow-to-Agent-Studio?"
+    )
+
+    assert route.primary_intent == "project_mapping"
+    assert route.project_context_required is True
+    assert route.project_name == "Workflow-to-Agent-Studio"
+
+
+def test_ai_adoption_query_does_not_treat_pet_adoption_as_relevant():
+    ranked = rank_archive_items(
+        "Что в моём архиве было про AI adoption?",
+        [
+            {
+                "archive_document_id": "pet",
+                "snippet": "Vetland Adoption Center helps pets, dogs and cats find families.",
+                "matched_query_variant": "AI adoption",
+            },
+            {
+                "archive_document_id": "ai",
+                "snippet": "Enterprise AI adoption needs rollout metrics, workflow owners and automation guardrails.",
+                "matched_query_variant": "AI adoption",
+            },
+        ],
+    )
+
+    by_id = {item["archive_document_id"]: item for item in ranked}
+    assert by_id["pet"]["relevance_label"] == "unrelated"
+    assert by_id["pet"]["relevance_reason"] == "non_ai_adoption_context"
+    assert by_id["ai"]["relevance_label"] in {"direct", "partial", "adjacent"}
+
+
 def test_explicit_external_benchmark_routes_to_current_fact():
     route = decide_route("Что сейчас известно про новый внешний benchmark?")
     assert route.primary_intent == "current_fact_verification"
@@ -167,4 +201,26 @@ def test_feedback_actions_are_not_shown_before_relevance_is_established():
     codes = select_post_answer_action_codes({
         "primary_intent": "archive_lookup", "result_summary": {"direct_count": 0, "partial_count": 0, "adjacent_count": 0}
     })
+    assert codes == ["u", "m", "x", "q"]
+
+
+def test_brief_without_relevance_offers_refine_not_save():
+    codes = select_post_answer_action_codes({
+        "primary_intent": "writer_brief",
+        "direct_count": 0,
+        "partial_count": 0,
+        "adjacent_count": 0,
+    })
+
+    assert codes == ["u", "m", "x", "q"]
+
+
+def test_project_mapping_without_relevance_offers_refine_not_project_save():
+    codes = select_post_answer_action_codes({
+        "primary_intent": "project_mapping",
+        "direct_count": 0,
+        "partial_count": 0,
+        "adjacent_count": 0,
+    })
+
     assert codes == ["u", "m", "x", "q"]

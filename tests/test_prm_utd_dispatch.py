@@ -82,6 +82,86 @@ def test_prm_active_handler_resolves_short_followups_from_volatile_context() -> 
     assert project_followup["used"] is True
     assert "agent evals" in project_followup["effective_query"]
     assert "telegram-research-agent" in project_followup["effective_query"]
+    assert "Проверь" not in project_followup["effective_query"]
+
+
+def test_free_text_save_followup_uses_existing_confirmation_preview(monkeypatch, tmp_path) -> None:
+    prm_handlers._PRM_DIALOG_STATE.clear()
+    prm_handlers._remember_prm_dialog(
+        "42",
+        "Что в моём архиве было про agent evals и что мне с этим делать?",
+        mode="research",
+        topic="agent evals",
+        action_context_id="ctx123",
+        action_codes=["n", "w"],
+        last_answer="В архиве найдено 1 прямое совпадение.",
+        direct_count=1,
+    )
+    sent = []
+    calls = []
+
+    class ForbiddenAssistant:
+        def __init__(self, *args, **kwargs): raise AssertionError("free-text save follow-up must not rerun archive search")
+
+    def fake_callback(db_path, callback_data, *, chat_id):
+        calls.append((db_path, callback_data, chat_id))
+        return {"message": "Сохранить заметку: черновик подготовлен.", "reply_markup": {"inline_keyboard": []}}
+
+    monkeypatch.setattr(prm_handlers, "PersonalResearchAssistant", ForbiddenAssistant)
+    monkeypatch.setattr(prm_handlers, "handle_post_answer_callback", fake_callback)
+    monkeypatch.setattr(prm_handlers, "send_message", lambda _token, _chat, text, **kwargs: sent.append((text, kwargs.get("reply_markup"))))
+
+    prm_handlers.dispatch_prm_command("42", "/auto сохрани заметку, но сначала покажи что именно сохранишь", _settings(tmp_path))
+
+    assert calls == [(str(tmp_path / "memory.db"), "prma:ctx123:n", "42")]
+    assert sent == [("Сохранить заметку: черновик подготовлен.", {"inline_keyboard": []})]
+
+
+def test_short_next_step_followup_does_not_rerun_archive_search(monkeypatch, tmp_path) -> None:
+    prm_handlers._PRM_DIALOG_STATE.clear()
+    prm_handlers._remember_prm_dialog(
+        "42",
+        "Что в моём архиве было про agent evals и что мне с этим делать?",
+        mode="research",
+        topic="agent evals",
+        direct_count=0,
+        adjacent_count=1,
+    )
+    sent = []
+
+    class ForbiddenAssistant:
+        def __init__(self, *args, **kwargs): raise AssertionError("short next step must not rerun archive search")
+
+    monkeypatch.setattr(prm_handlers, "PersonalResearchAssistant", ForbiddenAssistant)
+    monkeypatch.setattr(prm_handlers, "send_message", lambda _token, _chat, text, **_kwargs: sent.append(text))
+
+    prm_handlers.dispatch_prm_command("42", "/auto коротко: какой следующий шаг?", _settings(tmp_path))
+
+    assert len(sent) == 1
+    assert sent[0].startswith("Следующий шаг:")
+    assert "agent evals" in sent[0]
+
+
+def test_short_next_step_after_watch_preview_points_to_confirmation() -> None:
+    prm_handlers._PRM_DIALOG_STATE.clear()
+    prm_handlers._remember_prm_dialog(
+        "42",
+        "что сейчас самое новое во внешних источниках про agent evals?",
+        mode="research",
+        topic="agent evals",
+        current_fact_boundary=True,
+    )
+    prm_handlers._remember_pending_prm_action("42", action="w", message="Следить: черновик подготовлен.")
+
+    resolved = prm_handlers._resolve_prm_dialog_query(
+        "42",
+        "коротко: какой следующий шаг?",
+        mode="auto",
+    )
+
+    assert resolved["kind"] == "short_next_step"
+    assert "подтвердить черновик наблюдения" in resolved["message"]
+    assert "agent evals" in resolved["message"]
 
 
 def test_utd_command_is_part_of_active_prm_surface() -> None:

@@ -217,6 +217,14 @@ def _compact_requested(question: str) -> bool:
 
 def _topic_label(question: str) -> str:
     lowered = str(question or "").casefold()
+    if "rag" in lowered and "retrieval" in lowered:
+        return "RAG retrieval"
+    if "ai adoption" in lowered or ("ai" in lowered and "adoption" in lowered):
+        return "AI adoption"
+    if "llm agents" in lowered or "llm agent" in lowered:
+        return "LLM agents"
+    if "prompt engineering" in lowered or ("prompt" in lowered and "engineering" in lowered):
+        return "prompt engineering"
     return (
         "agent evals"
         if "agent" in lowered and ("eval" in lowered or "оцен" in lowered)

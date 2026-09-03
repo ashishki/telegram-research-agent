@@ -61,8 +61,8 @@ _ADJACENT_AGENT_TERMS = (
 )
 _QUERY_STOPWORDS = {
     "что", "есть", "было", "моем", "моём", "архиве", "архива", "про", "какие", "материалы",
-    "из", "этого", "реально", "применимо", "сейчас", "найди", "покажи", "мне", "мой", "для",
-    "what", "in", "my", "archive", "about", "from", "this", "now", "apply", "applicable", "find",
+    "из", "этого", "этим", "делать", "сделать", "реально", "применимо", "сейчас", "найди", "покажи", "мне", "мой", "для",
+    "what", "in", "my", "archive", "about", "from", "this", "now", "do", "with", "apply", "applicable", "find",
 }
 _LABEL_WEIGHT = {"direct": 4, "partial": 3, "adjacent": 2, "unrelated": 1}
 _PROMOTION_MARKERS = (
@@ -78,6 +78,47 @@ _PRACTICE_MARKERS = (
     "тестовый набор", "регресс", "корректность вызова", "успешност задачи", "калибров",
 )
 _BENCHMARK_MARKERS = ("benchmark", "бенчмарк", "качество", "стоимост", "скорост", "error analysis", "анализ ошибок")
+_AI_ADOPTION_EVIDENCE_MARKERS = (
+    "ai",
+    "llm",
+    "genai",
+    "artificial intelligence",
+    "automation",
+    "automate",
+    "workflow",
+    "enterprise",
+    "rollout",
+    "copilot",
+    "agent",
+    "model",
+    "productivity",
+    "внедрен",
+    "автоматизац",
+    "нейросет",
+    "модель",
+    "агент",
+    "рабоч",
+    "команд",
+)
+_NON_AI_ADOPTION_MARKERS = (
+    "pet",
+    "pets",
+    "dog",
+    "dogs",
+    "cat",
+    "cats",
+    "animal",
+    "animals",
+    "shelter",
+    "rescue",
+    "adoption center",
+    "vetland",
+    "питом",
+    "животн",
+    "приют",
+    "собак",
+    "кошк",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -168,6 +209,12 @@ def classify_archive_relevance(question: str, item: Mapping[str, Any]) -> Releva
             )
         return RelevanceDecision("unrelated", 0.05, "no_agent_eval_support", ())
 
+    if _is_ai_adoption_query(question_lowered):
+        if _contains_any(lowered, _NON_AI_ADOPTION_MARKERS):
+            return RelevanceDecision("unrelated", 0.03, "non_ai_adoption_context", ())
+        if not _contains_any(lowered, _AI_ADOPTION_EVIDENCE_MARKERS):
+            return RelevanceDecision("unrelated", 0.05, "ai_adoption_context_missing", ())
+
     query_terms = _significant_tokens(question)
     evidence_terms = set(_tokens(lowered))
     if not query_terms:
@@ -254,6 +301,13 @@ def _is_agent_eval_query(lowered: str) -> bool:
     has_agent = bool(_matching_markers(lowered, _AGENT_TERMS))
     has_eval = bool(_matching_markers(lowered, _EVAL_TERMS))
     return has_agent and has_eval
+
+
+def _is_ai_adoption_query(lowered: str) -> bool:
+    if "ai adoption" in lowered or "ai rollout" in lowered or "enterprise ai" in lowered:
+        return True
+    tokens = set(_tokens(lowered))
+    return "adoption" in tokens and bool(tokens & {"ai", "llm", "genai"})
 
 
 def _evidence_text(item: Mapping[str, Any]) -> str:

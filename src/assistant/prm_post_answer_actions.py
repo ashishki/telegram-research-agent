@@ -82,6 +82,8 @@ def select_post_answer_action_codes(answer: Mapping[str, Any]) -> list[str]:
             codes.append("p")
         return codes
     if intent == "project_mapping":
+        if not relevance_established:
+            return [*feedback, "q"]
         codes = [*feedback, "n", "p"]
         if relevance_established:
             codes.append("a")
@@ -98,7 +100,7 @@ def select_post_answer_action_codes(answer: Mapping[str, Any]) -> list[str]:
     if intent == "current_fact_verification":
         return [*feedback, "q"]
     if intent == "writer_brief":
-        return [*feedback, "n"]
+        return [*feedback, "n"] if relevance_established else [*feedback, "q"]
     if intent == "memory_action":
         return [*feedback, "n"]
     return [*feedback, "n"] if relevance_established else [*feedback, "q"]

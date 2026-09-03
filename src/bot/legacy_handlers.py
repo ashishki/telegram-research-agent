@@ -1604,9 +1604,7 @@ def _render_telegram_research_response(payload: Mapping[str, Any], *, local_text
         or bool(_safe_mapping(professional_answer.get("external_verification")).get("required"))
     )
     answer_gate = _safe_mapping(payload.get("answer_gate"))
-    current_fact_boundary = bool(answer_gate.get("external_verification_required")) and not bool(
-        answer_gate.get("current_claim_allowed", True)
-    )
+    current_fact_boundary = _telegram_hard_current_fact_boundary(answer_gate)
     if current_fact_boundary:
         return _render_telegram_answer_first_research(payload)
     if professional_verification_required:
@@ -1718,9 +1716,7 @@ def _render_telegram_answer_first_research(payload: Mapping[str, Any]) -> str:
     ]
     source_lines = [_public_telegram_text(line) for line in _telegram_public_source_lines(archive, linked)]
     source_lines = [line for line in source_lines if line]
-    current_fact = bool(answer_gate.get("external_verification_required")) and not bool(
-        answer_gate.get("current_claim_allowed", True)
-    )
+    current_fact = _telegram_hard_current_fact_boundary(answer_gate)
     source_count = len(_safe_mapping_list(archive.get("items"))) + len(_safe_mapping_list(linked.get("items")))
 
     lines: list[str] = []
@@ -1729,18 +1725,16 @@ def _render_telegram_answer_first_research(payload: Mapping[str, Any]) -> str:
             "Я не могу подтвердить текущий факт по локальному архиву.",
             "Внешняя проверка не запускалась, поэтому не буду выдавать архивный контекст за актуальный ответ.",
             "",
-            "Что есть в архиве",
+            "Что известно сейчас",
             (
-                f"Найдено {source_count} релевантных источника; это только исторический контекст."
+                f"- В локальном архиве найдено источников: {source_count}. Это исторический контекст, не актуальный ответ."
                 if source_count
-                else "Релевантных локальных источников не найдено."
+                else "- Релевантных локальных источников не найдено."
             ),
             "",
-            "Что нужно для точного ответа",
-            "Нужна отдельная разрешённая внешняя проверка актуального факта.",
-            "",
-            "Источники из архива",
-            *(source_lines or ["- локальных источников нет"]),
+            "Следующий шаг",
+            "- Разрешить отдельную проверку официальных источников.",
+            "- Или спросить «что было в архиве про …», если нужен исторический контекст.",
         ])
         return _telegram_report_without_technical_metrics("\n".join(lines))
     lines.extend(["Короткий вывод", _telegram_public_answer_summary(payload)])
@@ -2140,15 +2134,21 @@ def _telegram_rag_llm_synthesis_should_run(payload: Mapping[str, Any]) -> bool:
     if not _telegram_rag_llm_synthesis_allowed() or _telegram_rag_source_count(payload) <= 0:
         return False
     answer_gate = _safe_mapping(payload.get("answer_gate"))
-    current_fact_boundary = bool(answer_gate.get("external_verification_required")) and not bool(
-        answer_gate.get("current_claim_allowed", True)
-    )
+    current_fact_boundary = _telegram_hard_current_fact_boundary(answer_gate)
     if current_fact_boundary:
         return False
     policy = _safe_mapping(payload.get("retrieval_policy"))
     if str(policy.get("job_type") or "") in {"current_fact", "ambiguous_project"}:
         return False
     return True
+
+
+def _telegram_hard_current_fact_boundary(answer_gate: Mapping[str, Any]) -> bool:
+    return (
+        bool(answer_gate.get("external_verification_required"))
+        and not bool(answer_gate.get("current_claim_allowed", True))
+        and (bool(answer_gate.get("no_answer_required")) or not bool(answer_gate.get("allow_answer", False)))
+    )
 
 
 def _synthesize_telegram_rag_answer(payload: Mapping[str, Any], *, mode: str) -> str:

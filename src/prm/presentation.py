@@ -8,14 +8,15 @@ from prm.archive_contract import ARCHIVE_RESPONSE_CONTRACTS
 
 
 def render_payload(payload: Mapping[str, Any], *, mode: str) -> str:
+    gate = _mapping(payload.get("answer_gate"))
+    if _blocking_current_fact_gate(gate):
+        return _render_current_boundary(payload)
+
     contract_id = str(payload.get("response_contract_id") or "")
     archive_contract = _mapping(payload.get("archive_contract"))
     if contract_id in ARCHIVE_RESPONSE_CONTRACTS and archive_contract:
         return _render_archive_contract(archive_contract)
 
-    gate = _mapping(payload.get("answer_gate"))
-    if bool(gate.get("external_verification_required")) and not bool(gate.get("current_claim_allowed", True)):
-        return _render_current_boundary(payload)
     decision = _mapping(payload.get("project_decision"))
     project_fit = _mapping(payload.get("project_fit"))
     if contract_id == "decision_support.v2" and decision and str(project_fit.get("project_name") or "").strip():
@@ -98,7 +99,7 @@ def _render_archive_contract_compact(contract: Mapping[str, Any]) -> str:
     if applicability:
         next_step = _text(applicability[0].get("recommendation"))
     elif direct_count:
-        next_step = "выбери одну прямую находку и сохрани её как заметку или watch-topic."
+        next_step = "выбери одну прямую находку и сохрани её как заметку или тему наблюдения."
     elif partial_count or adjacent_count:
         next_step = "уточнить запрос до конкретной практики или разрешить показать partial/adjacent совпадения."
     else:
@@ -143,25 +144,38 @@ def _render_research(payload: Mapping[str, Any]) -> str:
 def _render_brief(payload: Mapping[str, Any]) -> str:
     professional = _mapping(payload.get("professional_answer"))
     workflow = _mapping(professional.get("workflow_section"))
-    cases = _findings(professional, payload)[:3]
+    direct_only_without_direct = _direct_only_without_direct_support(payload)
+    if direct_only_without_direct:
+        cases: list[str] = []
+        thesis = "По фильтру «только прямые» в локальном архиве нет прямой опоры; готовый бриф делать рано."
+        action = "Либо разрешить partial/adjacent материалы как фон, либо уточнить один термин, канал или период."
+        source_lines: list[str] = []
+    else:
+        cases = [_short_public_text(item, 210) for item in _findings(professional, payload)[:2]]
+        thesis = _short_public_text(
+            _text(workflow.get("thesis")) or _text(professional.get("short_answer")) or _text(payload.get("direct_answer")),
+            360,
+        )
+        action = _localize_action_text(
+            _text(workflow.get("practical_conclusion")) or _text(professional.get("recommended_action"))
+        )
+        source_lines = _source_lines(payload)[:3]
     lines = [
-        "Тезис",
-        _text(workflow.get("thesis")) or _text(professional.get("short_answer")) or _text(payload.get("direct_answer")),
+        "Короткий бриф",
+        thesis or "В локальном архиве недостаточно опоры для уверенного брифа.",
         "",
-        "Кейсы",
+        "Опора из архива",
         *(cases or ["- Сильный кейс в локальном архиве не найден."]),
         "",
-        "Контраргумент",
-        _text(workflow.get("counterargument")) or "Повтор Telegram-сигнала не является независимым подтверждением.",
+        "Угол для поста",
+        action or "Подать как осторожную гипотезу из локального архива, не как текущий факт.",
         "",
-        "Практический вывод",
-        _text(workflow.get("practical_conclusion")) or _text(professional.get("recommended_action")) or "Проверить первоисточник перед сильным публичным утверждением.",
-        "",
-        "Что проверить",
-        "Свежесть, первичность и независимость источников.",
+        "Граница",
+        "- Это бриф из локального архива; свежая внешняя проверка не запускалась.",
+        "- Перед фактологичным постом проверь первоисточник.",
         "",
         "Источники",
-        *(_source_lines(payload) or ["- локальных источников нет"]),
+        *(source_lines or ["- локальных источников нет"]),
     ]
     return _compact(lines)
 
@@ -169,23 +183,35 @@ def _render_brief(payload: Mapping[str, Any]) -> str:
 def _render_project_mapping(payload: Mapping[str, Any]) -> str:
     professional = _mapping(payload.get("professional_answer"))
     project = _mapping(payload.get("project_fit"))
-    findings = _findings(professional, payload)
-    action = _text(professional.get("recommended_action")) or _first_step(payload)
+    direct_only_without_direct = _direct_only_without_direct_support(payload)
+    if direct_only_without_direct:
+        findings: list[str] = []
+        action = "Либо разрешить partial/adjacent материалы как фон, либо уточнить запрос до одного прямого источника."
+        name = _text(project.get("project_name")) or "проекта"
+        relation = f"Для {name}: по direct-only фильтру прямой архивной опоры нет; применимость оценивать не по чему."
+        source_lines: list[str] = []
+    else:
+        findings = [_short_public_text(item, 220) for item in _findings(professional, payload)[:2]]
+        action = _localize_action_text(_text(professional.get("recommended_action")) or _first_step(payload))
+        relation = _short_public_text(_project_relation(project), 320)
+        source_lines = _source_lines(payload)[:3]
     return _compact(
         [
-            _text(professional.get("short_answer")) or _text(payload.get("direct_answer")) or "Недостаточно данных.",
+            "Короткий вывод",
+            relation or "Проектная связь по локальному архиву не доказана.",
             "",
-            "Что найдено в архиве",
+            "Опора из архива",
             *(findings or ["- Прямых находок нет."]),
             "",
-            "Связь с проектом",
-            _project_relation(project),
-            "",
             "Небольшой следующий шаг",
-            action or "Сначала уточнить проектную связь на одном источнике.",
+            action or "Оставить как сигнал для наблюдения до повторных архивных или первоисточниковых доказательств.",
+            "",
+            "Граница",
+            "- Это проектная гипотеза по локальному архиву, не доказанное изменение backlog.",
+            "- Сохранение и наблюдение включаются только после отдельного подтверждения.",
             "",
             "Источники",
-            *(_source_lines(payload) or ["- локальных источников нет"]),
+            *(source_lines or ["- локальных источников нет"]),
         ]
     )
 
@@ -232,19 +258,23 @@ def _render_project_decision(payload: Mapping[str, Any]) -> str:
 
 
 def _render_current_boundary(payload: Mapping[str, Any]) -> str:
+    source_count = _archive_context_count(payload)
+    archive_line = (
+        f"В локальном архиве есть {source_count} похожих материалов, но это исторический контекст, не актуальный ответ."
+        if source_count
+        else "Релевантного локального исторического контекста нет."
+    )
     return _compact(
         [
             "Я не могу подтвердить актуальный внешний факт по локальному архиву.",
             "Внешняя проверка не запускалась, поэтому архивный контекст не выдаётся за текущую истину.",
             "",
-            "Что есть в архиве",
-            *(_findings({}, payload) or ["- Релевантного исторического контекста нет."]),
+            "Что известно сейчас",
+            f"- {archive_line}",
             "",
-            "Что нужно для точного ответа",
-            "Отдельно разрешить проверку официального первоисточника.",
-            "",
-            "Источники из архива",
-            *(_source_lines(payload) or ["- локальных источников нет"]),
+            "Следующий шаг",
+            "- Разрешить отдельную проверку официальных источников.",
+            "- Или спросить «что было в архиве про …», если нужен исторический контекст.",
         ]
     )
 
@@ -269,6 +299,26 @@ def _human_relevance_reason(value: str) -> str:
         "partial_topic_coverage": "частичное покрытие темы",
         "weak_topic_overlap": "слабое тематическое пересечение",
     }.get(value, "")
+
+
+def _short_public_text(value: str, limit: int) -> str:
+    clean = " ".join(str(value or "").split())
+    if len(clean) <= limit:
+        return clean
+    cut = clean[: max(0, limit - 3)].rstrip()
+    boundary = cut.rfind(" ")
+    if boundary >= int(limit * 0.55):
+        cut = cut[:boundary]
+    return cut.rstrip(" ,;:") + "..."
+
+
+def _localize_action_text(value: str) -> str:
+    clean = _short_public_text(value, 260)
+    if clean == "Fetch or approve linked-source reading later if live freshness matters.":
+        return "Если нужна актуальность, отдельно разрешить проверку первоисточников; без неё держать бриф как архивный контекст."
+    if clean == "Keep this as a watch signal until repeated archive or linked-source evidence appears.":
+        return "Оставить как сигнал для наблюдения до повторных архивных или первоисточниковых доказательств."
+    return clean
 
 
 def _archive_source_lines(sources: Sequence[Mapping[str, Any]]) -> list[str]:
@@ -318,6 +368,34 @@ def _source_lines(payload: Mapping[str, Any]) -> list[str]:
         url = _text(item.get("source_url") or item.get("telegram_url"))
         result.append(f"- {date} @{channel}" + (f": {url}" if url else ""))
     return result
+
+
+def _archive_context_count(payload: Mapping[str, Any]) -> int:
+    archive = _mapping(payload.get("archive_evidence"))
+    linked = _mapping(payload.get("linked_source_evidence"))
+    return len(_mappings(archive.get("items"))) + len(_mappings(linked.get("items")))
+
+
+def _direct_only_without_direct_support(payload: Mapping[str, Any]) -> bool:
+    question = _text(payload.get("question")).casefold()
+    if not any(marker in question for marker in ("только прям", "прямые находки", "direct only", "only direct")):
+        return False
+    return _archive_label_count(payload, "direct") == 0
+
+
+def _archive_label_count(payload: Mapping[str, Any], label: str) -> int:
+    archive = _mapping(payload.get("archive_evidence"))
+    evidence = _mapping(payload.get("evidence_quality"))
+    items = [*_mappings(archive.get("items")), *_mappings(evidence.get("items"))]
+    return sum(1 for item in items if _text(item.get("relevance_label")) == label)
+
+
+def _blocking_current_fact_gate(gate: Mapping[str, Any]) -> bool:
+    return (
+        bool(gate.get("external_verification_required"))
+        and not bool(gate.get("current_claim_allowed", True))
+        and (bool(gate.get("no_answer_required")) or not bool(gate.get("allow_answer", False)))
+    )
 
 
 def _project_relation(project: Mapping[str, Any]) -> str:

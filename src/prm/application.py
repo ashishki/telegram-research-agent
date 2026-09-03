@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from typing import Any, Mapping
 
 from assistant.claim_ledger import claim_ledger_public_summary, verify_answer_against_evidence
@@ -104,6 +105,7 @@ class PersonalResearchAssistant:
             "response_contract_id": route.response_contract_id,
             "route_decision": route_payload,
         }
+        payload = _preserve_requested_project_identity(payload, route_payload)
         if route.primary_intent == "archive_to_action":
             candidates = payload.get("archive_candidate_pool") or _mapping(payload.get("archive_evidence")).get("items") or []
             plan = plan_archive_evidence(
@@ -145,8 +147,7 @@ class PersonalResearchAssistant:
         verification = verify_answer_against_evidence(
             final_text,
             evidence_items,
-            current_fact_required=bool(gate.get("external_verification_required"))
-            and not bool(gate.get("current_claim_allowed", True)),
+            current_fact_required=_blocking_current_fact_gate(gate),
             project_name=(
                 str(_mapping(payload.get("project_fit")).get("project_name") or "")
                 if route.project_context_required
@@ -251,6 +252,31 @@ def _apply_route_boundaries(payload: Mapping[str, Any], route: Mapping[str, Any]
     return result
 
 
+def _preserve_requested_project_identity(payload: Mapping[str, Any], route: Mapping[str, Any]) -> dict[str, Any]:
+    requested = str(route.get("project_name") or "").strip()
+    if not requested or not bool(route.get("project_context_required")):
+        return dict(payload)
+    project = _mapping(payload.get("project_fit"))
+    current = str(project.get("project_name") or "").strip()
+    if current == requested:
+        return dict(payload)
+    guidance = (
+        f"Проект {requested} указан пользователем. Я не подменяю его"
+        + (f" на {current}" if current else "")
+        + "; применимость ниже — только слабая архивная гипотеза."
+    )
+    return {
+        **dict(payload),
+        "project_fit": {
+            **project,
+            "project_name": requested,
+            "relevance_label": "explicit_project_identity_preserved",
+            "guidance": guidance,
+            "inferred_project_name": current or None,
+        },
+    }
+
+
 def _env_enabled(name: str) -> bool:
     return os.environ.get(name, "").strip().casefold() in {"1", "true", "yes", "approved"}
 
@@ -259,27 +285,58 @@ def _mapping(value: Any) -> dict[str, Any]:
     return dict(value) if isinstance(value, Mapping) else {}
 
 
+def _blocking_current_fact_gate(gate: Mapping[str, Any]) -> bool:
+    return (
+        bool(gate.get("external_verification_required"))
+        and not bool(gate.get("current_claim_allowed", True))
+        and (bool(gate.get("no_answer_required")) or not bool(gate.get("allow_answer", False)))
+    )
+
+
 def _render_memory_action_guidance(query: str) -> str:
     lowered = str(query or "").casefold()
     wants_watch = any(marker in lowered for marker in ("следи", "наблюдай", "watch"))
+    subject = _memory_action_subject(query)
     if wants_watch:
-        action = "следить за темой"
-        button = "«Следить»"
-        detail = (
-            "Если это про последний ответ, используй кнопку под ним. "
-            "Если кнопки нет — задай тему как обычный вопрос, я сначала покажу найденные "
-            "источники и только потом предложу безопасное действие."
+        title = "Черновик наблюдения"
+        body = (
+            "Буду следить только после явного подтверждения темы. "
+            "UTD-профиль, источники и память автоматически не меняются."
         )
+        next_step = "Чтобы сделать это точнее, задай тему как обычный вопрос или используй кнопку «Следить» под релевантным ответом."
     else:
-        action = "сохранить память"
-        button = "«Сохранить»"
-        detail = (
-            "Если это про последний ответ, используй кнопку под ним. "
-            "Так я покажу черновик заметки и отдельную кнопку подтверждения."
+        title = "Черновик заметки"
+        body = (
+            "Это preview из свободного follow-up. Durable запись появится только после отдельного подтверждения; "
+            "профиль и память автоматически не меняются."
         )
-    return (
-        f"Я могу {action}, но не делаю durable-запись из свободного follow-up без preview.\n\n"
-        f"Нажми {button} под релевантным ответом. До подтверждения это только черновик; "
-        "профиль и память автоматически не меняются.\n\n"
-        f"{detail}"
+        next_step = "Если это про последний ответ в Telegram, безопаснее использовать кнопку «Сохранить» под ним: там уже есть найденные источники."
+    return "\n\n".join(
+        [
+            f"{title}: запись не создана.",
+            "Что будет сохранено после подтверждения:\n"
+            f"- Тема: {subject}\n"
+            "- Основание: только этот текстовый запрос; без локальных источников это не считается подтверждённым фактом.",
+            body,
+            f"Следующий шаг: {next_step}",
+        ]
     )
+
+
+def _memory_action_subject(query: str) -> str:
+    clean = " ".join(str(query or "").split())
+    if not clean:
+        return "не указана"
+    match = re.search(
+        r"В архиве по теме (?P<topic>.+?)\.(?: Для проекта (?P<project>.+?)\.)? Уточнение:",
+        clean,
+        flags=re.IGNORECASE,
+    )
+    if match is not None:
+        topic = str(match.group("topic") or "").strip(" .:;")
+        project = str(match.group("project") or "").strip(" .:;")
+        if topic and project:
+            return f"{topic} для проекта {project}"[:220]
+        if topic:
+            return topic[:220]
+    return clean[:220]

@@ -1018,13 +1018,13 @@ class TestHandlers(unittest.TestCase):
         )
 
         self.assertTrue(rendered.startswith("Я не могу подтвердить текущий факт"))
-        self.assertIn("Что есть в архиве", rendered)
-        self.assertIn("Что нужно для точного ответа", rendered)
+        self.assertIn("Что известно сейчас", rendered)
+        self.assertIn("Следующий шаг", rendered)
         self.assertIn("Внешняя проверка не запускалась", rendered)
-        self.assertIn("Источники из архива", rendered)
-        self.assertIn("Historical archive note.", rendered)
-        self.assertIn("https://t.me/archive/1", rendered)
-        self.assertLess(rendered.index("Что есть в архиве"), rendered.index("Historical archive note."))
+        self.assertIn("Это исторический контекст, не актуальный ответ.", rendered)
+        self.assertNotIn("Источники из архива", rendered)
+        self.assertNotIn("Historical archive note.", rendered)
+        self.assertNotIn("https://t.me/archive/1", rendered)
         self.assertNotIn("Old archive context says", rendered)
 
     def test_handle_research_can_send_llm_synthesis_after_local_rag(self):

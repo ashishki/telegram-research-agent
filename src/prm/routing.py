@@ -172,9 +172,9 @@ _TOPIC_STOPWORDS = {
     "для", "есть", "из", "или", "как", "какие", "какой", "материал", "материалы", "мне",
     "мой", "моего", "моем", "моём", "моему", "на", "найди", "не", "покажи", "по", "про",
     "реально", "сейчас", "сохраненных", "сохранённых", "сохраненные", "сохранённые", "тогда",
-    "у", "что", "этого", "этом", "этих", "это", "применимо", "применить", "подходит",
+    "у", "что", "этого", "этим", "этом", "этих", "это", "делать", "сделать", "применимо", "применить", "подходит",
     "about", "and", "archive", "current", "find", "for", "from", "in", "latest", "materials",
-    "my", "now", "of", "project", "repo", "saved", "show", "the", "this", "today", "use", "what",
+    "do", "my", "now", "of", "project", "repo", "saved", "show", "the", "this", "today", "use", "what",
     "which", "with",
 }
 
@@ -443,12 +443,13 @@ def decide_route(query: str, *, requested_mode: RequestMode = "auto", explicit_p
 
 
 def find_named_project(query: str) -> str:
-    lowered = str(query or "").casefold()
+    raw = str(query or "")
+    lowered = raw.casefold()
     for name, aliases in _project_names():
         candidates = (name, *aliases)
         if any(candidate and candidate.casefold() in lowered for candidate in candidates):
             return name
-    return ""
+    return _project_name_after_marker(raw)
 
 
 def _project_names() -> Iterable[tuple[str, tuple[str, ...]]]:
@@ -462,6 +463,21 @@ def _project_names() -> Iterable[tuple[str, tuple[str, ...]]]:
         aliases = tuple(str(value).strip() for value in item.get("aliases") or [] if str(value).strip())
         if name:
             yield name, aliases
+
+
+def _project_name_after_marker(query: str) -> str:
+    match = re.search(
+        r"(?:к|для|backlog|бэклог)\s+(?:моему\s+|моего\s+|мой\s+)?(?:проекту|проекта|проект|project|repo)?\s*[:—-]?\s*([A-Za-z0-9][A-Za-z0-9_.-]{2,80})",
+        str(query or ""),
+        flags=re.IGNORECASE,
+    )
+    if match is None:
+        return ""
+    candidate = match.group(1).strip(" .,:;?!()[]{}")
+    lowered = candidate.casefold()
+    if lowered in {"project", "repo", "backlog", "проект", "проекта", "проекту"}:
+        return ""
+    return candidate[:80]
 
 
 def _research_intent(
@@ -524,6 +540,14 @@ def _retrieval_query(query: str) -> str:
 
 
 def _canonical_topic_phrase(lowered: str) -> str:
+    if "rag" in lowered and "retrieval" in lowered:
+        return "RAG retrieval"
+    if "ai adoption" in lowered or ("ai" in lowered and "adoption" in lowered):
+        return "AI adoption"
+    if "llm agents" in lowered or "llm agent" in lowered:
+        return "LLM agents"
+    if "prompt engineering" in lowered or ("prompt" in lowered and "engineering" in lowered):
+        return "prompt engineering"
     if re.search(r"\bagent[\s_-]+evals?\b", lowered):
         return "agent evals"
     if re.search(r"\bagent[\s_-]+evaluations?\b", lowered):
