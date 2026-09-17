@@ -25,9 +25,22 @@ Telegram text or voice
 
 ## Current maturity
 
-Manual private-alpha. Engineering regression evidence exists; operator usefulness still requires a controlled 15-20 question smoke session and later longitudinal use. No public release or production-value claim is made.
-Operator production tests are optional and operator-controlled. Release readiness is not claimed.
-PRM-19 dogfood gates are tracked in `docs/prm19_dogfood_plan.md`.
+Manual private-alpha. Engineering regression evidence exists; operator usefulness
+still requires a controlled 15–20-question smoke session and longitudinal
+feedback. No public release or production-value claim is made.
+
+The active workstream is UTD (University/Personal external watch) within the
+same Telegram assistant. Its bounded live timer is enabled, but it fails closed:
+it cannot fetch approved sources or send an alert until the operator confirms a
+UTD profile draft in Telegram. Delivery is then limited to confirmed official
+sources, a relevance-ranked candidate set, a daily cap, receipts, and a kill
+switch. This is not PRM-19 dogfood.
+
+PRM archive research remains available for operator-controlled manual testing.
+PRM-19 requires separate explicit dogfood-start approval; PRM-20 requires real
+PRM-19 evidence and separate approval for compatibility cleanup. Details and
+the exact next step are in [the active task queue](docs/tasks.md) and the
+[UTD enablement receipt](docs/audit/UTD_LIVE_DOGFOOD_START_2026-09-03.md).
 
 ## Daily use
 
@@ -76,6 +89,8 @@ The complete historical pytest suite is intentionally not part of the normal loo
 - [Operator quickstart](docs/operator_quickstart.md)
 - [Current architecture](docs/ARCHITECTURE.md)
 - [Active retrofit tasks](docs/tasks.md)
+- [Current operating model](docs/PRODUCT_OPERATING_MODEL.md)
+- [Current evidence index](docs/EVIDENCE_INDEX.md)
 - [Implementation contract](docs/IMPLEMENTATION_CONTRACT.md)
 - [Privacy threat model](docs/PRIVACY_THREAT_MODEL.md)
 - [Repository retrofit plan](docs/retrofit/RFX_REPOSITORY_RETROFIT.md)

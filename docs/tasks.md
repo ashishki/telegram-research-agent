@@ -1,12 +1,31 @@
 # Active Task Graph
 
 Status: active
-Last updated: 2026-09-03
+Last updated: 2026-09-17
 Baseline: `5dfd38660b7d8d24998b4dcdf801c419c1dc8f7c`
 Archive ref: origin/archive/pre-prm-retrofit-2026-08-16
 Active ref: master
 
 Historical PBR, PRM, IRX, PRM-UX, PRM-MAT and PRM-QA task records are preserved in `docs/archive/pre_retrofit_2026-08-16/tasks.pre-retrofit.md` and Git history. Only the current retrofit queue remains active here.
+
+## Current Stop Point
+
+The PRM assistant and local archive/RAG path are available for manual,
+operator-controlled testing. PRM-19 has not started and no release claim is
+authorized. It needs explicit human dogfood-start approval; PRM-20 additionally
+needs real PRM-19 evidence and explicit approval for any compatibility cleanup.
+
+The active implementation is UTD-6/UTD-7. The controlled UTD watch timer was
+enabled on 2026-09-03, but it fails closed while no confirmed UTD profile exists:
+no source poll or Telegram delivery occurs. The immediate operator action is to
+review and explicitly confirm (or decline/edit) the UTD profile draft through
+the existing UTD Telegram handler. Only after confirmation may the timer poll
+the allowlisted official sources and send policy-capped, receipt-backed alerts.
+This controlled UTD delivery is not PRM-19 dogfood.
+
+See `docs/audit/UTD_LIVE_DOGFOOD_START_2026-09-03.md` for the enablement
+receipt and `docs/audit/PRM_PRODUCT_UX_JUDGE_2026-09-03.md` for the latest
+advisory UX evaluation.
 
 ## Dependency graph
 

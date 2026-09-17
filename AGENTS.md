@@ -1,7 +1,7 @@
 # Codex Handoff
 
 Status: active
-Last updated: 2026-08-12
+Last updated: 2026-09-17
 
 ## Product Direction
 
@@ -137,29 +137,20 @@ external embeddings, hosted vector service, release claim, or dogfood start.
 
 ## Current Next Task
 
-PRM-24's 50 generated seed gold labels were operator-approved on 2026-08-11
-under `operator-approval-2026-08-11-all-50-generated-gold`; PRM-26 accepted the
-no-vector path under `operator-approval-2026-08-11-no-vector-prm28-path`; PRM-28
-implemented the no-vector answer gate; PRM-27 local vector sidecar is
-implemented under `operator-approval-2026-08-11-full-stack-local-vector-telegram-llm`.
-This approves only the local gitignored sidecar, hybrid retrieval flags, and
-manual `prm-assistant` runtime activation for user testing. It does not approve
-external embeddings, hosted vector services, live research, production
-migrations, canonical DB writes, compatibility cleanup, PRM-19 dogfood, or
-release claims, except for the bounded 2026-08-12 manual archive refresh
-and weekly archive-refresh timer explicitly recorded above. The
-post-PRM28 PRM-18 receipt has deterministic local
-stop-ship blockers clear, but it remains blocked on explicit dogfood-start
-approval. Do not start PRM-19 dogfood until the human operator explicitly
-approves dogfood start. Do not start PRM-20 cleanup/archive work until PRM-19 dogfood evidence
-exists and the human operator approves any compatibility archive/delete/move.
-Do not restart legacy bot/report timers as PRM dogfood. Do not start
-`prm-assistant` as dogfood without the same explicit approval. The currently
-running `telegram-prm-assistant.service` must be treated as a manual test
-runtime, not dogfood evidence. The
-PRM-18A..PRM-18C deep review boundary is recorded at
-`docs/audit/PRM_DEEP_REVIEW_PRM18A_18C_2026-08-03.md`.
-PRM-21 records the future polished-assistant contract. PRM-22 and PRM-23 are
-implemented fixture-first only; do not treat them as dogfood evidence or as
-approval for web research, durable production cache writes, production DB
-writes, or external vector/backend adoption.
+The PRM assistant, local archive/RAG path, and approved local vector sidecar
+are available for manual operator testing. PRM-19 has not started: it requires
+explicit human dogfood-start approval. PRM-20 remains blocked until real
+PRM-19 evidence exists and the operator separately approves any compatibility
+archive/delete/move work. Do not restart legacy bot/report timers as PRM
+dogfood, and do not make a release claim.
+
+The active workstream is UTD controlled watch delivery. The bounded
+`telegram-utd-watch.timer` was enabled on 2026-09-03, but fails closed until
+the operator confirms the UTD profile draft in the existing Telegram UTD
+handler. Before confirmation it must not poll sources or send alerts. After
+confirmation it may use only allowlisted official sources and the existing
+receipt-backed, relevance-ranked, capped, kill-switchable delivery path. This
+is not PRM-19 dogfood and does not authorize profile auto-mutation, external
+embeddings/hosted vectors, unrestricted research, production migrations,
+canonical archive writes, or university-system actions. See
+`docs/audit/UTD_LIVE_DOGFOOD_START_2026-09-03.md`.

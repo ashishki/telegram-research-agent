@@ -1,7 +1,7 @@
 # Evidence Index
 
 Status: active
-Last updated: 2026-08-16
+Last updated: 2026-09-17
 
 Historical evidence is preserved in `docs/archive/pre_retrofit_2026-08-16/EVIDENCE_INDEX.pre-retrofit.md` and Git history.
 
@@ -18,6 +18,8 @@ Historical evidence is preserved in `docs/archive/pre_retrofit_2026-08-16/EVIDEN
   duplicate filenames were renamed without changing their decisions.
 - public regression reports: `evals/prm_qa/`;
 - operator usefulness: not yet proven; controlled smoke review remains required.
+- active delivery state: the UTD timer is enabled but fail-closed pending an
+  operator-confirmed UTD profile; this is not PRM-19 dogfood.
 
 ## Retrofit evidence
 
@@ -32,6 +34,8 @@ Historical evidence is preserved in `docs/archive/pre_retrofit_2026-08-16/EVIDEN
 | Retrofit boundary tests | local 2026-08-28 verification | see RFX deep review |
 | MAT safety | local 2026-08-28 verification | see RFX deep review |
 | Playbook validation | local 2026-08-28 verification | see RFX deep review |
+| UTD controlled live-watch enablement | `docs/audit/UTD_LIVE_DOGFOOD_START_2026-09-03.md` | enabled; no source polling or delivery before profile confirmation |
+| PRM product UX advisory judge | `docs/audit/PRM_PRODUCT_UX_JUDGE_2026-09-03.md` | 50 cases / 200 turns; human review remains for style and cognitive load |
 
 ## Evidence rules
 

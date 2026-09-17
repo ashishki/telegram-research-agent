@@ -3,7 +3,7 @@
 > 2026-08-13 planning note: current runtime statements below are historical/local runtime receipts, not PRM-MAT operator-validation evidence. The proposed mature request, durability, freshness and approval boundaries are in `docs/prm_mature_product_contract.md`.
 
 Status: active handoff
-Last updated: 2026-08-12
+Last updated: 2026-09-17
 
 ## Current Truth
 
@@ -25,6 +25,16 @@ Personalization. It is a minimum-sufficient product UX phase over the existing
 local PRM/RAG substrate. It must not be treated as approval for new vector
 backends, external embeddings, unrestricted web research, legacy report
 automation, or release claims.
+
+The current delivery workstream is UTD, a confirmation-gated external-watch
+surface inside the existing assistant. Since 2026-09-03 its dedicated live
+timer has been enabled, while delivery remains fail-closed because no confirmed
+UTD profile is present. Until the operator explicitly confirms the onboarding
+draft, the runtime does not poll the allowlisted official sources and cannot
+send Telegram alerts. Confirmation does not start PRM-19 dogfood or authorize
+automatic profile changes, university-system actions, unrestricted research, or
+a release claim. The receipt is
+`docs/audit/UTD_LIVE_DOGFOOD_START_2026-09-03.md`.
 
 Runtime freeze recorded on 2026-07-29:
 
