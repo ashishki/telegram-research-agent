@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import uuid
+from dataclasses import dataclass
 from pathlib import Path
 from urllib import parse, request
 
@@ -33,6 +34,15 @@ class VoiceTranscriptionError(RuntimeError):
 
 class VoiceTranscriptionUnavailable(VoiceTranscriptionError):
     pass
+
+
+@dataclass(frozen=True, slots=True)
+class _VerifiedTelegramVoiceAttachment:
+    """A local file whose resource identity came from Telegram ``getFile`` flow."""
+
+    local_path: str
+    file_id: str
+    audio_bytes: bytes
 
 
 def transcribe_telegram_voice(
@@ -87,12 +97,11 @@ def transcribe_telegram_voice(
         resource_ref=voice_resource_ref,
     )
     try:
-        return transcribe_audio_file(
-            local_path,
+        return _transcribe_verified_telegram_audio(
+            _verified_telegram_voice_attachment(local_path=local_path, file_id=file_id),
             transcription_authorization=transcription_authorization,
             owner_ref=owner_ref,
             connection_ref=connection_ref,
-            resource_ref=voice_resource_ref,
         )
     finally:
         _delete_local_file(local_path)
@@ -106,6 +115,27 @@ def transcribe_audio_file(
     connection_ref: str | None = None,
     resource_ref: str | None = None,
 ) -> str:
+    """Reject unverified local paths; only the Telegram wrapper can upload audio.
+
+    A caller-supplied path plus a caller-supplied resource label does not prove
+    that the label identifies the bytes about to leave the process.  PA-15 can
+    add other ingress-specific verified bindings; PA-02 deliberately has none.
+    """
+    del local_path, transcription_authorization, owner_ref, connection_ref, resource_ref
+    raise VoiceTranscriptionUnavailable(
+        "Direct local audio transcription requires a verified attachment binding"
+    )
+
+
+def _transcribe_verified_telegram_audio(
+    attachment: _VerifiedTelegramVoiceAttachment,
+    *,
+    transcription_authorization: AuthorizationDecision | None = None,
+    owner_ref: str | None = None,
+    connection_ref: str | None = None,
+) -> str:
+    """Upload only the immutable resource/path pair created by the wrapper."""
+    resource_ref = attachment.file_id
     if not _voice_transcription_authorized(
         transcription_authorization,
         owner_ref=owner_ref,
@@ -114,10 +144,6 @@ def transcribe_audio_file(
     ):
         raise VoiceTranscriptionUnavailable("Voice transcription requires an active capability grant")
     api_key = _require_openai_transcription_key()
-
-    path = Path(local_path)
-    if not path.exists():
-        raise VoiceTranscriptionError(f"Voice file does not exist: {path}")
 
     model = (
         os.environ.get("VOICE_TRANSCRIPTION_MODEL", "").strip()
@@ -132,7 +158,18 @@ def transcribe_audio_file(
     fields = {"model": model}
     if language:
         fields["language"] = language
-    body, boundary = _build_multipart_body(fields=fields, file_field="file", path=path)
+    _require_voice_transcription_authorization(
+        transcription_authorization,
+        owner_ref=owner_ref,
+        connection_ref=connection_ref,
+        resource_ref=resource_ref,
+    )
+    body, boundary = _build_multipart_body(
+        fields=fields,
+        file_field="file",
+        file_name=Path(attachment.local_path).name,
+        file_bytes=attachment.audio_bytes,
+    )
     http_request = request.Request(
         endpoint,
         data=body,
@@ -142,17 +179,15 @@ def transcribe_audio_file(
         },
         method="POST",
     )
-    _require_voice_transcription_authorization(
-        transcription_authorization,
-        owner_ref=owner_ref,
-        connection_ref=connection_ref,
-        resource_ref=resource_ref,
-    )
     try:
         with request.urlopen(http_request, timeout=120) as response:
             payload = response.read().decode("utf-8")
     except Exception as exc:
-        LOGGER.warning("OpenAI voice transcription failed path=%s", path.name, exc_info=True)
+        LOGGER.warning(
+            "OpenAI voice transcription failed path=%s",
+            Path(attachment.local_path).name,
+            exc_info=True,
+        )
         raise VoiceTranscriptionError("OpenAI voice transcription failed") from exc
 
     try:
@@ -304,6 +339,25 @@ def _download_telegram_voice(
     return str(dest_path)
 
 
+def _verified_telegram_voice_attachment(
+    *,
+    local_path: str,
+    file_id: str,
+) -> _VerifiedTelegramVoiceAttachment:
+    """Freeze the just-downloaded bytes with their Telegram attachment identity."""
+
+    path = Path(local_path)
+    try:
+        audio_bytes = path.read_bytes()
+    except OSError as exc:
+        raise VoiceTranscriptionError("Downloaded Telegram voice file is unavailable") from exc
+    return _VerifiedTelegramVoiceAttachment(
+        local_path=str(path),
+        file_id=file_id,
+        audio_bytes=audio_bytes,
+    )
+
+
 def _get_telegram_file_path(
     *,
     token: str,
@@ -335,7 +389,13 @@ def _get_telegram_file_path(
     return file_path
 
 
-def _build_multipart_body(*, fields: dict[str, str], file_field: str, path: Path) -> tuple[bytes, str]:
+def _build_multipart_body(
+    *,
+    fields: dict[str, str],
+    file_field: str,
+    file_name: str,
+    file_bytes: bytes,
+) -> tuple[bytes, str]:
     boundary = f"----telegram-research-{uuid.uuid4().hex}"
     body = bytearray()
 
@@ -348,11 +408,11 @@ def _build_multipart_body(*, fields: dict[str, str], file_field: str, path: Path
     body.extend(f"--{boundary}\r\n".encode("utf-8"))
     body.extend(
         (
-            f'Content-Disposition: form-data; name="{file_field}"; filename="{path.name}"\r\n'
+            f'Content-Disposition: form-data; name="{file_field}"; filename="{file_name}"\r\n'
             "Content-Type: audio/ogg\r\n\r\n"
         ).encode("utf-8")
     )
-    body.extend(path.read_bytes())
+    body.extend(file_bytes)
     body.extend(b"\r\n")
     body.extend(f"--{boundary}--\r\n".encode("utf-8"))
     return bytes(body), boundary
