@@ -79,3 +79,48 @@ def test_forwarding_preserves_arguments_and_exit_code(tmp_path):
         assert bridge.main(['feature_workflow', '--root', '.', 'plan', '--task', 'PA-00']) == 17
         assert run.call_args.args[0] == [bridge.sys.executable, str(upstream / 'tools/feature_workflow.py'), '--root', '.', 'plan', '--task', 'PA-00']
         assert 'shell' not in run.call_args.kwargs
+
+
+def test_verifier_literal_is_loaded_without_running_initializer(tmp_path):
+    upstream, _ = fixture(tmp_path)
+    (upstream / 'tools').mkdir()
+    marker = tmp_path / 'installer-ran'
+    code = 'def main():\n    return 23\n'
+    source = 'from pathlib import Path\n' + f'Path({str(marker)!r}).write_text("bad")\n'
+    source += 'def verify_project_script():\n    return ' + repr(code) + '\n'
+    (upstream / 'tools/init_playbook_project.py').write_text(source)
+    assert bridge.load_generated_verifier(upstream).main() == 23
+    assert not marker.exists()
+
+
+def test_verifier_nonliteral_generation_fails_closed(tmp_path):
+    upstream, _ = fixture(tmp_path)
+    (upstream / 'tools').mkdir()
+    (upstream / 'tools/init_playbook_project.py').write_text(
+        'def verify_project_script():\n    return generate_unreviewed_code()\n'
+    )
+    with patch.object(bridge, 'ROOT', tmp_path), patch.object(bridge, 'verified_upstream', return_value=upstream):
+        assert bridge.main(['verify_project']) == 2
+
+
+def test_verifier_template_symlink_fails_closed(tmp_path):
+    upstream, _ = fixture(tmp_path)
+    (upstream / 'tools').mkdir()
+    outside = tmp_path / 'outside.py'
+    outside.write_text('def verify_project_script():\n    return "def main(): return 0"\n')
+    (upstream / 'tools/init_playbook_project.py').symlink_to(outside)
+    with patch.object(bridge, 'ROOT', tmp_path), patch.object(bridge, 'verified_upstream', return_value=upstream):
+        assert bridge.main(['verify_project']) == 2
+
+
+def test_generated_verifier_receives_exact_args_and_restores_argv(tmp_path):
+    upstream, _ = fixture(tmp_path)
+    (upstream / 'tools').mkdir()
+    code = 'import sys\ndef main():\n    return 29 if sys.argv[1:] == ["--root", "."] else 1\n'
+    (upstream / 'tools/init_playbook_project.py').write_text(
+        'def verify_project_script():\n    return ' + repr(code) + '\n'
+    )
+    previous = bridge.sys.argv
+    with patch.object(bridge, 'ROOT', tmp_path), patch.object(bridge, 'verified_upstream', return_value=upstream):
+        assert bridge.main(['verify_project', '--root', '.']) == 29
+    assert bridge.sys.argv is previous

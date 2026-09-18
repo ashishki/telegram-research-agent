@@ -2,9 +2,11 @@
 """Run the pinned development-only Playbook; never fetch or enable runtime tools."""
 from __future__ import annotations
 
+import ast
 import json
 import subprocess
 import sys
+from types import ModuleType
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -59,6 +61,33 @@ def verified_upstream(root: Path) -> Path:
     return upstream
 
 
+def load_generated_verifier(upstream: Path) -> ModuleType:
+    """Load only the literal verifier from the already verified pinned kit.
+
+    Do not import or execute the initializer: it is an installer, not a runtime
+    dependency. Refuse changed template shapes rather than evaluating code.
+    """
+    source_path = upstream / 'tools/init_playbook_project.py'
+    if source_path.is_symlink() or not source_path.is_file():
+        raise ValueError('Pinned verifier template is missing or symlinked')
+    tree = ast.parse(source_path.read_text(encoding='utf-8'), filename=str(source_path))
+    functions = [node for node in tree.body
+                 if isinstance(node, ast.FunctionDef) and node.name == 'verify_project_script']
+    if len(functions) != 1 or len(functions[0].body) != 1:
+        raise ValueError('Unexpected pinned verifier template shape')
+    returned = functions[0].body[0]
+    if not (isinstance(returned, ast.Return) and isinstance(returned.value, ast.Constant)
+            and isinstance(returned.value.value, str)):
+        raise ValueError('Verifier template must be a literal string, not executable generation')
+    source = returned.value.value
+    module = ModuleType('_pinned_playbook_generated_verifier')
+    module.__file__ = str(source_path) + '::verify_project_script'
+    exec(compile(source, module.__file__, 'exec'), module.__dict__)
+    if not callable(getattr(module, 'main', None)):
+        raise ValueError('Pinned verifier template has no callable entrypoint')
+    return module
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     if not argv or argv[0] in {'-h', '--help'}:
@@ -74,12 +103,20 @@ def main(argv: list[str] | None = None) -> int:
         if name == '--check-pin':
             print('Playbook pin verified; no model, hook or application runtime enabled.')
             return 0
+        if name == 'verify_project':
+            verifier = load_generated_verifier(upstream)
+            previous_argv = sys.argv
+            try:
+                sys.argv = ['tools/verify_project.py', *args]
+                return int(verifier.main())
+            finally:
+                sys.argv = previous_argv
         script = upstream / 'tools' / (name + '.py')
         if not script.is_file() or script.is_symlink():
             raise ValueError('Pinned tool is missing or symlinked')
         return subprocess.run([sys.executable, str(script), *args], cwd=ROOT,
                               check=False).returncode
-    except (OSError, ValueError, KeyError, subprocess.TimeoutExpired) as exc:
+    except (OSError, ValueError, KeyError, SyntaxError, subprocess.TimeoutExpired) as exc:
         print('Playbook blocked: ' + str(exc), file=sys.stderr)
         return 2
 
