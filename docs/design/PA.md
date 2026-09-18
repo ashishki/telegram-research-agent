@@ -77,26 +77,47 @@ PA-00 makes the existing durable Telegram callback path safe without pretending
 that it already implements full natural-language confirmation. Its additive
 `summary_json` binding is `prm_post_answer_action_binding.v1` and contains:
 
-- `source_result_id`, the freshly generated `context_id` for this answer;
-- `source_result_version`, a canonical SHA-256 digest of title, query, body,
-  source refs, bounded evidence, primary intent, response contract, project
-  value and offered action codes;
+- `context_kind="prm"` and `source_result_id`, the freshly generated
+  `context_id` for this answer;
+- `source_snapshot`, the bounded answer fields used by a proposal: title,
+  query, body, source refs, bounded evidence, primary intent, response
+  contract, project value and offered action codes; and
+- `source_result_version`, SHA-256 of the UTF-8 encoding of that snapshot with
+  `json.dumps(..., ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+  allow_nan=False)`. Lists retain the source-result order after bounded
+  de-duplication; the digest is recomputed from `source_snapshot` in
+  `_load_context`, and downstream proposal construction uses that validated
+  snapshot rather than mutable duplicate summary fields;
 - optional `source_project_ref={origin: answer.project_name, value: ...}`; it
   is a display/provenance value, never an authorization input; and
-- offered action codes, chat/actor hash and expiry. The callback validates its
-  requested action against those codes and the row before proposal/confirmation
-  work.
+- offered action codes, `owner_chat_id_hash`, `actor_id_hash` and expiry. The
+  callback validates its requested action against those codes and the row before
+  proposal/confirmation work.
+
+PA-00 is deliberately private-owner only: message dispatch propagates the
+Telegram `actor_id` to registration, and controls render only when a positive
+private `actor_id == chat_id == owner_chat_id` is available. Callback handling
+compares both persisted hashes with the incoming chat/actor; a group, absent
+identity or mismatch returns unavailable and performs no write. This limitation
+must remain explicit until a separately designed multi-actor model exists.
 
 `_register_context` is the only creator, immediately after a rendered answer;
-`_load_context` validates schema, ID equality, digest, allowed action, chat,
-actor and expiry before the callback path can use it. A missing, malformed,
-pre-binding or tampered binding returns the same fail-closed unavailable result
-and performs no write. This is JSON-additive: PA-00 adds no table migration.
-Pre-change and partially-created rows therefore fail closed under the new code.
-Rollback disables newly rendered action controls and cancels unconfirmed rows
-created with this binding before an old handler is deployed; confirmed receipts
-remain intact. Do not deploy that rollback while such pending rows could be
-accepted by an old handler.
+`_load_context` validates context kind/schema, ID equality, canonical digest,
+offered action, chat, actor and expiry before the callback path can use it.
+The same offered-action validation runs for draft and confirmation callbacks.
+A missing, malformed, pre-binding or tampered binding returns the same
+fail-closed unavailable result and performs no write. Legacy natural-language
+save/watch selection must not call `handle_post_answer_callback` in PA-00; it
+asks for the current inline action instead. The no-reroute test instruments the
+application/search entrypoint and requires zero calls for an old callback.
+
+This is JSON-additive: PA-00 adds no table migration. Only `context_kind=prm`
+rows receive/require this binding; the shared UTD draft representation is not
+rewritten. Pre-change and partially-created PRM rows fail closed under the new
+code. PA-00 owns the rollback procedure: disable newly rendered PRM controls
+and cancel only unconfirmed bound PRM rows before an old handler is deployed;
+confirmed receipts and UTD drafts remain intact. Do not deploy that rollback
+while such pending PRM rows could be accepted by an old handler.
 
 PA-03 owns the complete plain-language `yes` state: it adds an explicit current
 confirmation reference to `ConversationState`, clears it on an independent
