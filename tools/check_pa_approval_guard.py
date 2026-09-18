@@ -56,7 +56,7 @@ def main() -> int:
             print(output, end='')
             raise ValueError('Unexpected validation result; only exact missing-approval rejection is expected')
         print(f'Expected approval guard verified for {len(task_ids)} planned tasks.')
-        print('PLANNING CHECK ONLY: implementation remains blocked until real design approval; project verifier is unchanged.')
+        print('PLANNING CHECK ONLY: formal programme progression remains blocked until real design approval; project verifier is unchanged.')
         return 0
     except Exception as exc:
         print('PA approval guard check failed: ' + str(exc), file=sys.stderr)

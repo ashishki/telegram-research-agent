@@ -2,8 +2,8 @@
 
 Updated: 2026-09-18
 Workstream: PA — full Personal AI Assistant
-Scope completed in this publication: PA-00 local technical implementation and
-verification; high-risk slice acceptance is still pending.
+Scope completed in this publication: PA-00 local technical implementation,
+verification and human high-risk slice acceptance.
 Baseline: cc105b0024b3e7aa6768ee29acc105b4c682376c
 Playbook: d570163ab17ec3b4245187c778f1e8d89af9690f
 
@@ -14,10 +14,10 @@ natural conversation, real archive/web AI search, beautiful weekly/topic
 briefings, subscriptions, mail/calendar/Canvas, confirmed actions, memory,
 multimodality, model-quality/cost controls and reliable operations.
 
-No PA implementation task is accepted yet. PA-00 has focused technical evidence
-at `docs/verification/PA-00-technical-evidence-2026-09-18.md`; PA-01 must not
-start until the human high-risk PA-00 acceptance is explicit. The paired design
-is `docs/design/PA.md` and `docs/design/PA.design.json`. Its mechanical
+PA-00 is accepted by the human operator, with focused technical evidence at
+`docs/verification/PA-00-technical-evidence-2026-09-18.md`. PA-01 must not
+start until the separate formal feature-design gate is satisfied. The paired
+design is `docs/design/PA.md` and `docs/design/PA.design.json`. Its mechanical
 `review_required` status is preserved because the approval recorder refused the
 historical STOP_SHIP review artifact; do not hand-edit that Playbook state.
 
@@ -37,11 +37,15 @@ python tools/check_personal_assistant_plan.py
 python tools/feature_workflow.py --root . plan --task PA-00
 ```
 
-Inspect the PA-00 evidence and request/record its high-risk human acceptance
-without overwriting preserved Playbook review history. Once accepted, select
-PA-01 and continue through the assigned programme after each applicable gate;
-do not ask again for already-assigned safe steps. Stop only at genuine safety,
-scope, credential, exact-design or human release/acceptance gates.
+Inspect the PA-00 evidence, including the already-recorded high-risk human
+acceptance, without overwriting preserved Playbook review history. Do not start
+PA-01 while the separate formal feature-design gate remains `review_required`.
+Resolve that gate only through its approved workflow or a fresh explicit owner
+instruction that changes the review constraint; do not hand-edit state. Once
+the gate is satisfied, select PA-01 and continue through the assigned programme
+after each applicable gate; do not ask again for already-assigned safe steps.
+Stop only at genuine safety, scope, credential, exact-design or human
+release/acceptance gates.
 
 PA-00 must first reproduce/diagnose the baseline failure:
 `tests/test_prm_product_ux_eval.py::test_product_ux_keeps_project_context_for_confirmation_followups`.

@@ -1,6 +1,6 @@
 # Active Personal Assistant Task Graph
 
-Status: active programme; PA-00 has local technical evidence and awaits human high-risk slice acceptance.
+Status: active programme; PA-00 has local technical evidence and recorded human high-risk slice acceptance; formal feature-design approval remains required before PA-01.
 Updated: 2026-09-18
 Feature: PA • Mode: standard • Planning depth: designed_slices
 

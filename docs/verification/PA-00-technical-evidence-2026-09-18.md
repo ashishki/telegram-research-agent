@@ -1,7 +1,8 @@
 # PA-00 technical evidence — 2026-09-18
 
-Status: local technical verification complete; not a human high-risk slice
-acceptance, runtime permission, release, or live-action claim.
+Status: locally verified and accepted by the human operator as PA-00; this is
+not a formal Playbook design approval, runtime permission, release, or
+live-action claim.
 
 ## Authority and baseline
 
@@ -9,9 +10,11 @@ The operator gave exact design/start approval in this conversation after the
 design candidate and the one requested independent Astra/xhigh review. The
 Playbook approval recorder was also attempted, but correctly refused to write
 an approval while the preserved design-review artifact remained STOP_SHIP. No
-approval artifact or Playbook state was edited by hand. The operator's direct
-instruction authorized PA-00 implementation; a separate human high-risk slice
-acceptance is still required before PA-01.
+approval artifact or Playbook state was edited by hand. The operator then gave
+the explicit human high-risk slice acceptance: `принимаю PA-00` (2026-09-18,
+this conversation). That accepts PA-00's bounded technical result only; it
+does not override the separately preserved formal feature-design gate for
+PA-01 and later slices.
 
 The historical GitHub run `35328205490` (302 passed / 1 failed) remains
 reference-only. The focused baseline at `fb5d5717e82e36d8d5ac0085746e5fa864fcc70a`
@@ -76,8 +79,21 @@ The broad historical full-pytest suite was not run. The next independent Deep
 Review remains batched at the declared foundation boundary (PA-00..PA-02), in
 line with the operator's one-review instruction and the review policy.
 
+## CI/CD disposition
+
+GitHub CI run `35365165416` at `a426671` failed only because its raw task and
+reference validator reported the exact expected 19
+`TASK_DESIGN_APPROVAL_REQUIRED` errors for the preserved `review_required`
+PA design. The paired Playbook-adoption run `35365165275` passed by checking
+that this was the exact and only rejection. CI now calls the same
+`tools/check_pa_approval_guard.py` gate: in this planned state it rejects any
+additional or different error, and after real formal design approval it
+delegates to the unmodified upstream validator. Locally, that guard, PA-plan
+validation, the bridge/guard tests and whitespace check pass. No remote result
+for the corrective CI commit is claimed in this receipt.
+
 ## Remaining gate
 
-PA-00 is technically ready for the required human high-risk slice acceptance.
-Do not start PA-01 until that acceptance is explicit and can be recorded
-without overwriting the preserved review history.
+PA-00's required human high-risk acceptance is recorded above. Do not start
+PA-01 until the separately preserved formal feature-design gate can be
+satisfied without overwriting review history.

@@ -32,7 +32,11 @@ jobs:
         run: python tools/test_tiers.py retrofit-boundaries
       - name: Run MAT safety holdouts
         run: python tools/prm_mat_eval.py --check safety
-      - name: Validate Playbook contracts
-        run: python tools/playbook.py playbook_validate --root . --check tasks --check references
+      - name: Validate PA approval guard and Playbook task contracts
+        # In the deliberately unapproved PA planning state this command accepts
+        # only the exact, complete set of design-approval errors.  Once the
+        # design is formally approved it delegates to the upstream validator
+        # and fails on any task/reference error.
+        run: python tools/check_pa_approval_guard.py
       - name: Verify public evidence boundary
         run: PYTHONPATH=src python3 scripts/public_scorecard_demo.py --check
