@@ -1,201 +1,77 @@
-# Project Brief
+# Project Brief — Personal AI Assistant
 
-Project: `telegram-research-agent`
-
+Project: telegram-research-agent
 Mode: Standard
+Status: draft; owner-requested direction recorded, exact new-design approval pending.
+Updated: 2026-09-18
+Current Playbook: d570163ab17ec3b4245187c778f1e8d89af9690f.
 
-Last updated: 2026-08-12
+This is the current project-level intake read by Feature Workflow. It supersedes
+the old archive-only target, preserved byte-for-byte in
+`docs/PROJECT_BRIEF.before-pa-20260918.md`. No previous approval marker is reused.
+Feature brief: `docs/PERSONAL_ASSISTANT_BRIEF.md`.
+Full requirements: `docs/PERSONAL_ASSISTANT_SPEC.md`.
 
-Historical Playbook SHA: `5583eca96c4d2d480b5574ed78bea63e0b07ebf0` (stale; retained for prior evidence)
+## Problem and user
 
-Current planning Playbook SHA: `965612aa463fca1a35a55104633d0e09da33d615`
+One private operator needs understandable answers, research, weekly priorities
+and controlled actions across Telegram reading, public web, projects and
+selected personal mail/calendar/university sources. Current workaround is
+manual search across separate tools and reconstruction of context. Useful
+existing archive/evidence work is preserved; users should not memorize modes.
 
-PRM-UX planning inspection:
+## Complete desired outcome
 
-- target repo SHA: `82c0c527ffdd797aab716a2d1079cd6849caa208`;
-- Playbook checkout SHA: `965612aa463fca1a35a55104633d0e09da33d615`;
-- the Playbook SHA above remains the retrofit baseline pin and is stale
-  relative to the current Playbook checkout inspected for PRM-UX planning.
+Chat / real AI Search / beautiful weekly and topical Briefs / Watch / confirmed
+Act in one conversation. Briefs share one versioned evidence object across
+Telegram, private mobile HTML, PDF and Markdown. Add selected mail/calendar,
+permitted Canvas Academic Inbox, managed memory, voice/images/documents,
+quality-first models, transparent budget and dependable recovery. The owner
+explicitly requested the full result rather than an MVP-only scope.
 
-## 1. Project
+## Evidence from the beginning
 
-- **Project name:** telegram-research-agent
-- **One-sentence summary:** A private Telegram archive memory and grounded
-  assistant for one operator's AI, engineering, product, market, and career
-  research.
-- **Why this project exists:** The operator reads many Telegram channels and
-  needs the accumulated corpus to answer concrete work and life questions with
-  source links, not just produce weekly reports.
-- **What success looks like in v1:** The operator asks real professional
-  questions in Telegram and gets useful, cited, freshness-aware, answer-first
-  responses from the retained archive and approved context, with optional
-  confirmation-gated saving into durable knowledge objects and at least one
-  bounded next action when evidence supports it.
+PA-00 reproduces current focused CI and diagnoses its known confirmation-context
+evaluation failure. PA-01 binds concrete interfaces and acceptance scenarios.
+Existing regression tiers are floors; each new capability needs exact positive,
+negative and recovery tests wired into project verification. Retrieval quality,
+claim support, useful versus wrong refusals, relevance, delivery, latency and
+cost per successful task are measured separately. Proposed numerical targets
+are in spec section 13, not claimed as current results.
 
-## 1b. Problem Fit And Adoption Reality
+Actual rendered Telegram/HTML/PDF inspection and owner usefulness are required.
+Model judging is advisory. Full completion includes real authorized provider
+integration; fixtures alone do not establish a working connection or release.
+No source-access blocker is hidden or used to cancel unrelated safe work.
 
-- **Concrete operational pain:** W29 reports omitted all useful reaction
-  personalization despite 7 detected personal reactions, forced manual source
-  verification, and exposed a large Atlas instead of an answerable memory.
-- **Current workaround:** The operator manually searches Telegram, opens
-  generated HTML/JSON, inspects repo artifacts, and asks separate tools to
-  recover source posts or validate claims.
-- **Why existing process is insufficient:** Weekly artifacts are projections,
-  not a queryable memory; curated-only retrieval hides posts without Knowledge
-  Atoms; manual verification does not scale across thousands of retained posts.
-- **First operator who feels the pain:** The private repo owner/operator.
-- **What would make v1 not worth adopting:** The assistant cannot retrieve
-  known retained posts with Telegram links, especially reacted posts, within a
-  short interactive loop.
-- **Adoption proof metric:** The technical floor is a human-approved query set
-  retrieving exact Telegram source links from the canonical archive without
-  requiring Knowledge Atoms. The PRM-UX product floor adds real operator labels
-  showing that normal Telegram questions are useful or partially useful, source
-  supported, mobile-readable, and professionally actionable.
-- **Claims out of bounds before evidence:** full-archive RAG shipped,
-  assistant reliability proven, dogfood success, portfolio value, vector search
-  superiority, production readiness, autonomous preference learning.
-- **Work AI will not replace:** Human approval of saved memory, permanent
-  preferences, project decisions, external verification conclusions, and final
-  task completion.
-- **Service delta:** Less manual search time, better source recovery, explicit
-  no-answer behavior, lower false confidence, and more usable project/career
-  recall.
+## Shape and scope
 
-## 1c. Evidence Plan From Day 1
+One assistant, modular monolith, shared application boundary and a durable job
+worker. Reuse canonical SQLite archive/source identities, evidence controls and
+confirmed actions. Do not restart the old report pipeline or build a second bot.
+No mandatory new vector service, microservice platform or multi-agent fan-out
+without measured benefit. Do not enable unrestricted autonomous browsing/writes.
 
-- **First proof metric:** Known-item hit@10 and citation precision on a
-  human-approved subset of the 50-query retrieval set.
-- **Evaluation dataset source:** Candidate queries drafted in
-  `evals/retrieval/query_set_candidate.jsonl` and PRM-24 product RAG
-  candidates in `evals/retrieval/product_rag_candidate.jsonl`; gold labels
-  require human approval and source IDs or explicit no-answer expectations.
-- **Minimum eval set size for v1:** 50 candidate queries; a meaningful
-  human-approved subset before PRM-3 completion.
-- **Known failure slices:** exact phrase, semantic topic, cases, comparison,
-  freshness, project/life application, distractors, no-answer, duplicates,
-  reposts, missing URLs, unstable external facts.
-- **Human review owner and budget:** private operator; initial budget 50-100
-  minutes to approve query labels and expected evidence.
-- **LLM judge:** advisory only until calibrated against human labels.
-- **Release gate:** manual approval plus deterministic Playbook validation,
-  task-specific retrieval/generation/tool evaluation, PRM-UX real-question
-  usefulness evidence, and explicit PRM-19 dogfood-start approval.
+## Resources and authority
 
-## 2. Users And Workflows
+The owner is willing to provide available access and any models. Exact accounts,
+OAuth scope, private-data/model egress, retention, budgets, live schedules and
+external effects still require explicit bounded authority. No key=consent,
+no unlimited spend and no borrowed institutional permission. Source text is
+untrusted data, not agent instructions. Payments, coursework submission, course
+registration, broad destructive operations and self-expanded rights are excluded.
 
-- **Primary user:** one private operator.
-- **Main workflow 1:** Ask exact or conceptual questions over the Telegram
-  archive and receive cited results.
-- **Main workflow 2:** Save useful answers as Knowledge Notes, Watch Topics,
-  project context, decisions, or experiments after confirmation.
-- **Main workflow 3:** Review secondary weekly projections derived from actual
-  queries, reactions, saved notes, watch topics, projects, and experiments.
-- **Main workflow 4:** Use professional lenses and active project context to
-  turn research into portfolio, career, product, writing, or learning actions.
+This publication is documentation/development tooling only. The PA feature
+registry is review_required. The human approves the exact design through the
+current hash-bound workflow; the agent cannot manufacture provenance. New live
+accounts/services/timers/production migrations/releases are separate decisions.
 
-## 3. Scope
+## Planning and implementation
 
-In scope for v1:
-
-- full retained Telegram text archive search;
-- selective enrichment for reacted, repeatedly retrieved, saved, watched, or
-  project-relevant posts;
-- one assistant entrypoint with bounded read-only search tools;
-- explicit insufficient-evidence behavior;
-- confirmation-gated writes to curated memory;
-- privacy, cost, rollback, and evaluation contracts.
-
-Out of scope:
-
-- public SaaS or multi-user architecture;
-- automatic product builds or purchases;
-- broad filesystem mutation through assistant tools;
-- full archive LLM backfill;
-- vector database before FTS baseline evaluation;
-- generic cross-domain memory platform;
-- automatic permanent preference changes.
-
-## 4. AI Scope
-
-- **Where AI may be needed:** query interpretation, evidence synthesis,
-  selective extraction, comparison, contradiction surfacing, and optional
-  external verification summarization.
-- **Where AI is not wanted:** canonical storage, FTS indexing, permissions,
-  data retention, write confirmation, cost limits, rollback, and eval scoring
-  where deterministic checks are possible.
-- **Minimum sufficient shape expected:** local deterministic archive search
-  plus bounded tool-use assistant; Agentic profile stays ON because current and
-  target assistant behavior can plan up to a small number of read-only tools.
-- **Retrieval need:** RAG profile ON.
-- **Tool-use need:** Tool-Use profile ON for bounded read-only and
-  confirmation-gated proposal tools.
-- **Planning profile:** OFF; persisted plans are not the user product.
-- **Compliance profile:** OFF; no named regulatory framework is selected.
-
-## 5. Human Approval Boundaries
-
-Human approval is required for:
-
-- product pivot ADR acceptance;
-- gold query labels;
-- external data egress for embeddings or web verification storage;
-- permanent preferences/profile/config changes;
-- saved Knowledge Notes, Watch Topics, project links, decisions, actions, and
-  experiments;
-- vector backend selection;
-- dogfood start and final success claim.
-
-## 6. Risk And Error Cost
-
-The main risk is private-data misuse or false confidence: the assistant may
-cite weak Telegram claims as truth, hide insufficient evidence, or leak raw
-corpus text to providers/logs. The system must preserve provenance, separate
-Telegram evidence from model background and external verification, and expose
-unknown states honestly.
-
-## 7. Data
-
-- **Primary data sources:** local SQLite `raw_posts` and `posts`, Telegram
-  source URLs, reactions, feedback, generated reports, and curated knowledge
-  artifacts.
-- **Observed local volume during retrofit:** 3,477 `raw_posts`, 3,477 `posts`,
-  3,477 `posts_fts`, 1,346 `knowledge_atoms`, 1,290 `idea_threads`.
-- **Sensitive data:** private Telegram corpus, operator reactions, feedback,
-  project context, Telegram session and provider secrets.
-- **Retention:** preserve canonical archive unless explicit deletion policy
-  applies; generated private reports remain ignored.
-
-## 8. Integrations
-
-- Telegram via Telethon and bot APIs.
-- SQLite local database.
-- LLM provider via existing `src/llm/client.py`.
-- Demand-to-MVP Radar remains a secondary integration.
-- External web/research skills are disabled until trust records pass.
-
-## 9. Runtime And Operations
-
-Runtime tier: T1. The product uses bounded local scripts, bot process, and
-systemd-style scheduled jobs. It does not require a persistent privileged T3
-agent runtime.
-
-## 10. Model And Cost Expectations
-
-- Cost sensitivity: medium.
-- Latency sensitivity: high for interactive archive search, medium for
-  background enrichment.
-- Default model path: no model for FTS search; cheap bounded model for
-  extraction; stronger model only for synthesis that passes evidence gates.
-- Budget overruns require human approval.
-
-## 11. Success Metrics
-
-- **Retrieval quality:** known-item hit@10, MRR, citation precision,
-  no-answer accuracy, freshness handling, duplicate top-10 rate.
-- **Generation quality:** faithfulness, relevance, citation correctness,
-  unsupported-claim rate, human correction rate, usefulness score.
-- **Operations:** index freshness, p95 local retrieval latency, cost per useful
-  answer, queue failure receipts.
-- **Dogfood:** 30 real questions over four weeks and evidence that the operator
-  wants to continue using the product.
+Standard governance; proposed depth designed_slices; direct implementation,
+independent risk-targeted Role Runner reviews and small verified commits.
+The whole programme is PA-00..PA-18, with scopes/dependencies/rollback in
+`docs/design/PA.design.json`. Current next action is `docs/CODEX_PROMPT.md`.
+Preserve original implementation/privacy/academic boundaries unless a later
+explicit decision changes the relevant boundary; a target specification does
+not itself widen runtime permissions.

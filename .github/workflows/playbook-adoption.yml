@@ -32,10 +32,13 @@ jobs:
         run: python tools/check_personal_assistant_plan.py
       - name: Verify unapproved design remains blocked (planning only)
         run: python tools/check_pa_approval_guard.py
+      - name: Validate actual delivery and readiness bindings
+        run: python tools/playbook.py playbook_validate --root . --check delivery --check readiness
       - name: Current workflow entrypoints smoke
         run: |
           python tools/feature_workflow.py --help
           python tools/run_codex_role.py --help
           python tools/render_slice_context.py --help
+          python tools/verify_project.py --help
       - name: Whitespace diff check
         run: git diff --check HEAD^ HEAD
