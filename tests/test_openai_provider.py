@@ -9,7 +9,13 @@ import pytest
 
 import llm.openai_provider as openai_provider
 from llm.openai_provider import CONTEXT_EGRESS_ENABLE_ENV, OPENAI_TERRA_MODEL, PROVIDER_ENABLE_ENV, ProviderEgressDenied, ProviderEgressOutcomeUnknown, complete_with_provider
-from prm.capabilities import AuthorizationRequest, CapabilityGrant, CapabilityRegistry, ProviderPolicy
+from prm.capabilities import (
+    AuthorizationRequest,
+    CapabilityGrant,
+    CapabilityRegistry,
+    ProviderPolicy,
+    commit_transport_reservations,
+)
 
 
 class _FakeResponses:
@@ -99,6 +105,84 @@ def _registry_and_request(
         operation_ref=operation_ref,
     )
     return CapabilityRegistry((grant,)), request
+
+
+def _compound_registry_and_requests(*, operation_ref: str):
+    """Build the one PA-02 text/context operation group in one registry."""
+
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    text_grant = CapabilityGrant(
+        grant_id="grant_synthetic_compound_text",
+        owner_ref="owner_synthetic_primary",
+        connection_ref=SYNTHETIC_OPENAI_CONNECTION,
+        capability="model.generate",
+        resource_refs=("resource_conversation",),
+        operations=("model_egress",),
+        data_classes=("user_provided",),
+        purpose="answer.request",
+        provider_policy=ProviderPolicy(("provider_openai",), maximum_request_count=2),
+        issued_at=now - timedelta(minutes=1),
+        expires_at=now + timedelta(hours=1),
+        revision=1,
+    )
+    context_grant = CapabilityGrant(
+        grant_id="grant_synthetic_compound_context",
+        owner_ref="owner_synthetic_primary",
+        connection_ref=SYNTHETIC_OPENAI_CONNECTION,
+        capability="model.context_egress",
+        resource_refs=("resource_archive",),
+        operations=("model_egress",),
+        data_classes=("private_archive",),
+        purpose="answer.context",
+        provider_policy=ProviderPolicy(("provider_openai",), maximum_request_count=2),
+        issued_at=now - timedelta(minutes=1),
+        expires_at=now + timedelta(hours=1),
+        revision=1,
+    )
+    registry = CapabilityRegistry((text_grant, context_grant))
+    text_request = AuthorizationRequest(
+        owner_ref="owner_synthetic_primary",
+        capability="model.generate",
+        resource_ref="resource_conversation",
+        operation="model_egress",
+        data_class="user_provided",
+        provider_ref="provider_openai",
+        purpose="answer.request",
+        connection_ref=SYNTHETIC_OPENAI_CONNECTION,
+        expected_grant_revision=1,
+        operation_ref=operation_ref,
+    )
+    context_request = AuthorizationRequest(
+        owner_ref="owner_synthetic_primary",
+        capability="model.context_egress",
+        resource_ref="resource_archive",
+        operation="model_egress",
+        data_class="private_archive",
+        provider_ref="provider_openai",
+        purpose="answer.context",
+        connection_ref=SYNTHETIC_OPENAI_CONNECTION,
+        expected_grant_revision=1,
+        operation_ref=operation_ref,
+    )
+    return registry, text_request, context_request
+
+
+def test_one_registry_reserves_and_commits_only_the_exact_openai_operation_group() -> None:
+    registry, text_request, context_request = _compound_registry_and_requests(
+        operation_ref="operation_synthetic_group_registry_001"
+    )
+    text = registry.authorize_and_reserve(text_request)
+    context = registry.authorize_and_reserve(context_request)
+
+    assert text.allowed is True
+    assert context.allowed is True
+    assert registry.authorize_and_reserve(text_request).reason == "operation_in_progress"
+    assert text.reservation is not None
+    assert context.reservation is not None
+    assert commit_transport_reservations((text.reservation,)) is False
+    assert text.reservation.current is True
+    assert context.reservation.current is True
+    assert commit_transport_reservations((text.reservation, context.reservation)) is True
 
 
 def test_local_search_is_default_and_performs_no_provider_call() -> None:
@@ -299,16 +383,9 @@ def test_abandoned_text_and_context_decisions_cannot_transport_after_rereservati
     monkeypatch.setenv(CONTEXT_EGRESS_ENABLE_ENV, "true")
     monkeypatch.setenv("OPENAI_API_KEY", SYNTHETIC_OPENAI_KEY)
     operation_ref = "operation_synthetic_context_release_001"
-    text_registry, text_request = _registry_and_request(operation_ref=operation_ref)
-    context_registry, context_request = _registry_and_request(
-        capability="model.context_egress",
-        resource_ref="resource_archive",
-        data_class="private_archive",
-        purpose="answer.context",
-        operation_ref=operation_ref,
-    )
-    first_text = text_registry.authorize_and_reserve(text_request)
-    first_context = context_registry.authorize_and_reserve(context_request)
+    registry, text_request, context_request = _compound_registry_and_requests(operation_ref=operation_ref)
+    first_text = registry.authorize_and_reserve(text_request)
+    first_context = registry.authorize_and_reserve(context_request)
     scope = {
         "owner_ref": "owner_synthetic_primary",
         "connection_ref": SYNTHETIC_OPENAI_CONNECTION,
@@ -333,8 +410,8 @@ def test_abandoned_text_and_context_decisions_cannot_transport_after_rereservati
             **scope,
         )
 
-    retry_text = text_registry.authorize_and_reserve(text_request)
-    retry_context = context_registry.authorize_and_reserve(context_request)
+    retry_text = registry.authorize_and_reserve(text_request)
+    retry_context = registry.authorize_and_reserve(context_request)
     assert retry_text.allowed is True
     assert retry_context.allowed is True
     monkeypatch.setenv(PROVIDER_ENABLE_ENV, "true")
@@ -475,16 +552,9 @@ def test_committed_text_and_context_reservations_cannot_reopen_before_transport(
     monkeypatch.setenv(CONTEXT_EGRESS_ENABLE_ENV, "true")
     monkeypatch.setenv("OPENAI_API_KEY", SYNTHETIC_OPENAI_KEY)
     operation_ref = "operation_synthetic_committed_context_001"
-    text_registry, text_request = _registry_and_request(operation_ref=operation_ref)
-    context_registry, context_request = _registry_and_request(
-        capability="model.context_egress",
-        resource_ref="resource_archive",
-        data_class="private_archive",
-        purpose="answer.context",
-        operation_ref=operation_ref,
-    )
-    authorization = text_registry.authorize_and_reserve(text_request)
-    context_authorization = context_registry.authorize_and_reserve(context_request)
+    registry, text_request, context_request = _compound_registry_and_requests(operation_ref=operation_ref)
+    authorization = registry.authorize_and_reserve(text_request)
+    context_authorization = registry.authorize_and_reserve(context_request)
     committed = Barrier(2)
     release_transport = Event()
     original_commit = openai_provider._commit_transport_authorizations
@@ -531,8 +601,8 @@ def test_committed_text_and_context_reservations_cannot_reopen_before_transport(
     assert context_authorization.reservation is not None
     authorization.reservation.abandon_before_transport()
     context_authorization.reservation.abandon_before_transport()
-    assert text_registry.authorize_and_reserve(text_request).reason == "operation_in_progress"
-    assert context_registry.authorize_and_reserve(context_request).reason == "operation_in_progress"
+    assert registry.authorize_and_reserve(text_request).reason == "operation_in_progress"
+    assert registry.authorize_and_reserve(context_request).reason == "operation_in_progress"
     release_transport.set()
     thread.join(timeout=5)
 
@@ -602,18 +672,16 @@ def test_context_egress_requires_second_explicit_gate(monkeypatch) -> None:
     assert request["model"] == OPENAI_TERRA_MODEL and "private context" not in repr(request["input"])
     assert result.receipt.context_egress_performed is False
     monkeypatch.setenv(CONTEXT_EGRESS_ENABLE_ENV, "true"); client2 = _FakeClient()
+    registry, text_request, context_request = _compound_registry_and_requests(
+        operation_ref="operation_synthetic_context_positive_001"
+    )
     result2 = complete_with_provider(
         "Question",
         provider="openai",
         allow_provider_egress=True,
         allow_context_egress=True,
-        authorization=_authorization(),
-        context_authorization=_authorization(
-            capability="model.context_egress",
-            resource_ref="resource_archive",
-            data_class="private_archive",
-            purpose="answer.context",
-        ),
+        authorization=registry.authorize_and_reserve(text_request),
+        context_authorization=registry.authorize_and_reserve(context_request),
         local_context=[{
             "title": "approved",
             "summary": "approved context",
@@ -628,6 +696,41 @@ def test_context_egress_requires_second_explicit_gate(monkeypatch) -> None:
     assert "approved context" in repr(client2.responses.calls[0]["input"])
     assert "archive:synthetic-approved-1" in repr(client2.responses.calls[0]["input"])
     assert result2.receipt.context_egress_performed is True
+
+
+def test_context_egress_rejects_same_ref_from_independent_registry_domains(monkeypatch) -> None:
+    monkeypatch.setenv(PROVIDER_ENABLE_ENV, "true")
+    monkeypatch.setenv(CONTEXT_EGRESS_ENABLE_ENV, "true")
+    monkeypatch.setenv("OPENAI_API_KEY", SYNTHETIC_OPENAI_KEY)
+    client = _FakeClient()
+
+    with pytest.raises(ProviderEgressDenied):
+        complete_with_provider(
+            "Question",
+            provider="openai",
+            allow_provider_egress=True,
+            allow_context_egress=True,
+            authorization=_authorization(operation_ref="operation_synthetic_cross_registry_001"),
+            context_authorization=_authorization(
+                capability="model.context_egress",
+                resource_ref="resource_archive",
+                data_class="private_archive",
+                purpose="answer.context",
+                operation_ref="operation_synthetic_cross_registry_001",
+            ),
+            local_context=[{
+                "title": "approved",
+                "text": "must-not-cross-registry-egress",
+                "source_ref": "archive:synthetic-cross-registry-1",
+            }],
+            client=client,
+            owner_ref="owner_synthetic_primary",
+            connection_ref=SYNTHETIC_OPENAI_CONNECTION,
+            resource_ref="resource_conversation",
+            context_resource_ref="resource_archive",
+        )
+
+    assert client.responses.calls == []
 
 
 def test_context_transport_rejects_a_reservation_for_the_query_purpose(monkeypatch) -> None:
@@ -690,19 +793,17 @@ def test_context_transport_omits_raw_uncited_malformed_or_oversized_context(monk
     monkeypatch.setenv(CONTEXT_EGRESS_ENABLE_ENV, "true")
     monkeypatch.setenv("OPENAI_API_KEY", SYNTHETIC_OPENAI_KEY)
     client = _FakeClient()
+    registry, text_request, context_request = _compound_registry_and_requests(
+        operation_ref="operation_synthetic_invalid_context_001"
+    )
 
     result = complete_with_provider(
         "Question",
         provider="openai",
         allow_provider_egress=True,
         allow_context_egress=True,
-        authorization=_authorization(),
-        context_authorization=_authorization(
-            capability="model.context_egress",
-            resource_ref="resource_archive",
-            data_class="private_archive",
-            purpose="answer.context",
-        ),
+        authorization=registry.authorize_and_reserve(text_request),
+        context_authorization=registry.authorize_and_reserve(context_request),
         local_context=local_context,
         client=client,
         owner_ref="owner_synthetic_primary",
@@ -728,16 +829,9 @@ def test_context_transport_blocks_unknown_outcome_retry_until_explicit_reconcili
 
     client = SimpleNamespace(responses=SimpleNamespace(create=raise_after_capture))
     operation_ref = "operation_synthetic_unknown_001"
-    text_registry, text_request = _registry_and_request(operation_ref=operation_ref)
-    context_registry, context_request = _registry_and_request(
-        capability="model.context_egress",
-        resource_ref="resource_archive",
-        data_class="private_archive",
-        purpose="answer.context",
-        operation_ref=operation_ref,
-    )
-    authorization = text_registry.authorize_and_reserve(text_request)
-    context_authorization = context_registry.authorize_and_reserve(context_request)
+    registry, text_request, context_request = _compound_registry_and_requests(operation_ref=operation_ref)
+    authorization = registry.authorize_and_reserve(text_request)
+    context_authorization = registry.authorize_and_reserve(context_request)
     scope = {
         "owner_ref": "owner_synthetic_primary",
         "connection_ref": SYNTHETIC_OPENAI_CONNECTION,
@@ -771,12 +865,11 @@ def test_context_transport_blocks_unknown_outcome_retry_until_explicit_reconcili
     assert receipt.context_egress_performed is False
     assert receipt.delivery_outcome == "unknown"
 
-    retry_authorization = text_registry.authorize_and_reserve(text_request)
-    retry_context_authorization = context_registry.authorize_and_reserve(context_request)
+    retry_authorization = registry.authorize_and_reserve(text_request)
+    retry_context_authorization = registry.authorize_and_reserve(context_request)
     assert retry_authorization.reason == "operation_outcome_unknown"
     assert retry_context_authorization.reason == "operation_outcome_unknown"
 
-    assert text_registry.reconcile_unknown_operation(operation_ref, delivery_outcome="not_delivered")
-    assert context_registry.reconcile_unknown_operation(operation_ref, delivery_outcome="not_delivered")
-    assert text_registry.authorize_and_reserve(text_request).allowed is True
-    assert context_registry.authorize_and_reserve(context_request).allowed is True
+    assert registry.reconcile_unknown_operation(operation_ref, delivery_outcome="not_delivered")
+    assert registry.authorize_and_reserve(text_request).allowed is True
+    assert registry.authorize_and_reserve(context_request).allowed is True

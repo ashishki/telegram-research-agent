@@ -358,6 +358,66 @@ class AuthorizationDecision:
         }
 
 
+@dataclass(slots=True)
+class _OperationGroup:
+    """One in-memory, same-registry compound transport idempotency group.
+
+    PA-02 currently has exactly one compound transport shape: OpenAI's text
+    request plus its optional private-archive context.  The key may reserve
+    those two *different* sealed scopes together, but never a duplicate scope
+    or an unrelated third scope.  Keeping the group in the registry gives the
+    adapter one atomic local authority boundary instead of stitching together
+    two independently idempotent calls.
+    """
+
+    owner_ref: str
+    connection_ref: str | None
+    provider_ref: str | None
+    state: Literal["reserved", "committed", "accepted", "unknown"]
+    members: dict[int, "BudgetReservation"]
+
+    def can_join(self, request: AuthorizationRequest) -> bool:
+        if self.state != "reserved" or len(self.members) >= 2:
+            return False
+        if (
+            request.owner_ref != self.owner_ref
+            or request.connection_ref != self.connection_ref
+            or request.provider_ref != self.provider_ref
+        ):
+            return False
+        existing_kinds = {_openai_compound_member_kind(member._request) for member in self.members.values()}
+        candidate_kind = _openai_compound_member_kind(request)
+        return candidate_kind is not None and existing_kinds == ({"text"} if candidate_kind == "context" else {"context"})
+
+
+def _openai_compound_member_kind(request: AuthorizationRequest) -> Literal["text", "context"] | None:
+    """Classify the only PA-02 compound-operation participants.
+
+    This closed mapping makes a shared ``operation_ref`` fail closed for any
+    second reservation other than the text/context pair that can reach one
+    OpenAI request. Future multi-step transports need an explicit new group
+    contract rather than silently inheriting this exception.
+    """
+
+    if (
+        request.provider_ref == "provider_openai"
+        and request.operation == "model_egress"
+        and request.capability == "model.generate"
+        and request.data_class == "user_provided"
+        and request.purpose == "answer.request"
+    ):
+        return "text"
+    if (
+        request.provider_ref == "provider_openai"
+        and request.operation == "model_egress"
+        and request.capability == "model.context_egress"
+        and request.data_class == "private_archive"
+        and request.purpose == "answer.context"
+    ):
+        return "context"
+    return None
+
+
 class BudgetReservation:
     """One registry-bound egress slot, revalidated exactly at consumption."""
 
@@ -409,6 +469,16 @@ class BudgetReservation:
     @property
     def operation_ref(self) -> str | None:
         return self._request.operation_ref
+
+    @property
+    def registry(self) -> "CapabilityRegistry":
+        """The registry that owns this sealed reservation.
+
+        Adapters use identity only to refuse compound transport assembled from
+        independent in-memory idempotency domains; they never inspect grants.
+        """
+
+        return self._registry
 
     def matches(
         self,
@@ -463,6 +533,12 @@ def commit_transport_reservations(reservations: Sequence[BudgetReservation]) -> 
     with ExitStack() as stack:
         for reservation in unique_reservations:
             stack.enter_context(reservation._lock)
+        reservations_by_registry: dict[CapabilityRegistry, tuple[BudgetReservation, ...]] = {}
+        for reservation in unique_reservations:
+            reservations_by_registry.setdefault(reservation._registry, ())
+            reservations_by_registry[reservation._registry] += (reservation,)
+        for registry in sorted(reservations_by_registry, key=id):
+            stack.enter_context(registry._lock)
         if any(
             reservation._consumed
             or reservation._abandoned
@@ -470,9 +546,16 @@ def commit_transport_reservations(reservations: Sequence[BudgetReservation]) -> 
             for reservation in unique_reservations
         ):
             return False
+        if any(
+            not registry._transport_group_is_complete(group_reservations)
+            for registry, group_reservations in reservations_by_registry.items()
+        ):
+            return False
         for reservation in unique_reservations:
             reservation._consumed = True
             reservation._transport_committed = True
+        for registry, group_reservations in reservations_by_registry.items():
+            registry._mark_transport_groups_committed(group_reservations)
     return True
 
 
@@ -487,7 +570,7 @@ class CapabilityRegistry:
     def __init__(self, grants: Sequence[CapabilityGrant]) -> None:
         self._grants_by_id = {grant.grant_id: grant for grant in grants}
         self._reserved_counts: dict[tuple[str, int], int] = {}
-        self._operation_states: dict[str, Literal["reserved", "accepted", "unknown"]] = {}
+        self._operation_groups: dict[str, _OperationGroup] = {}
         self._lock = RLock()
         grant_ids = [grant.grant_id for grant in grants]
         if len(set(grant_ids)) != len(grant_ids):
@@ -545,36 +628,56 @@ class CapabilityRegistry:
             if not decision.allowed or decision.grant_ref is None or decision.grant_revision is None:
                 return decision
             grant = self._grants_by_id[decision.grant_ref]
-            if request.operation_ref is not None and request.operation_ref in self._operation_states:
-                return _deny(request, _operation_state_denial(self._operation_states[request.operation_ref]), grant)
+            group = None
+            if request.operation_ref is not None:
+                group = self._operation_groups.get(request.operation_ref)
+                if group is not None:
+                    if group.state != "reserved":
+                        return _deny(request, _operation_state_denial(group.state), grant)
+                    if not group.can_join(replace(
+                        request,
+                        grant_ref=grant.grant_id,
+                        expected_grant_revision=grant.revision,
+                    )):
+                        return _deny(request, "operation_in_progress", grant)
             key = (grant.grant_id, grant.revision)
             used = self._reserved_counts.get(key, 0)
             if used >= grant.provider_policy.maximum_request_count:
                 return _deny(request, "grant_budget_exhausted", grant)
             self._reserved_counts[key] = used + 1
-            if request.operation_ref is not None:
-                self._operation_states[request.operation_ref] = "reserved"
-        return AuthorizationDecision(
-            allowed=True,
-            reason="allowed",
-            grant_ref=decision.grant_ref,
-            grant_revision=decision.grant_revision,
-            owner_ref=decision.owner_ref,
-            connection_ref=decision.connection_ref,
-            resource_ref=decision.resource_ref,
-            capability=decision.capability,
-            operation=decision.operation,
-            data_class=decision.data_class,
-            provider_ref=decision.provider_ref,
-            purpose=decision.purpose,
-            operation_ref=decision.operation_ref,
-            reservation=BudgetReservation(
+            reservation = BudgetReservation(
                 registry=self,
                 request=request,
                 grant_ref=grant.grant_id,
                 grant_revision=grant.revision,
-            ),
-        )
+            )
+            if request.operation_ref is not None:
+                if group is None:
+                    group = _OperationGroup(
+                        owner_ref=reservation._request.owner_ref,
+                        connection_ref=reservation._request.connection_ref,
+                        provider_ref=reservation._request.provider_ref,
+                        state="reserved",
+                        members={},
+                    )
+                    self._operation_groups[request.operation_ref] = group
+                group.members[id(reservation)] = reservation
+            return AuthorizationDecision(
+                allowed=True,
+                reason="allowed",
+                grant_ref=decision.grant_ref,
+                grant_revision=decision.grant_revision,
+                owner_ref=decision.owner_ref,
+                connection_ref=decision.connection_ref,
+                resource_ref=decision.resource_ref,
+                capability=decision.capability,
+                operation=decision.operation,
+                data_class=decision.data_class,
+                provider_ref=decision.provider_ref,
+                purpose=decision.purpose,
+                operation_ref=decision.operation_ref,
+                reservation=reservation,
+            )
 
     def reconcile_unknown_operation(
         self,
@@ -592,12 +695,13 @@ class CapabilityRegistry:
         if not _is_opaque_ref(operation_ref):
             raise ValueError("invalid operation_ref")
         with self._lock:
-            if self._operation_states.get(operation_ref) != "unknown":
+            group = self._operation_groups.get(operation_ref)
+            if group is None or group.state != "unknown":
                 return False
             if delivery_outcome == "not_delivered":
-                del self._operation_states[operation_ref]
+                del self._operation_groups[operation_ref]
             else:
-                self._operation_states[operation_ref] = "accepted"
+                group.state = "accepted"
             return True
 
     def authorize(self, request: AuthorizationRequest, *, now: datetime | None = None) -> AuthorizationDecision:
@@ -606,12 +710,46 @@ class CapabilityRegistry:
 
     def _reservation_is_current(self, reservation: BudgetReservation) -> bool:
         with self._lock:
+            operation_ref = reservation._request.operation_ref
+            if operation_ref is not None:
+                group = self._operation_groups.get(operation_ref)
+                if group is None or group.state != "reserved" or group.members.get(id(reservation)) is not reservation:
+                    return False
             decision = self._authorize_unlocked(reservation._request, moment=datetime.now(timezone.utc))
             return bool(
                 decision.allowed
                 and decision.grant_ref == reservation.grant_ref
                 and decision.grant_revision == reservation.grant_revision
             )
+
+    def _transport_group_is_complete(self, reservations: Sequence[BudgetReservation]) -> bool:
+        """Require a transport to commit every current member of its group."""
+
+        offered = {id(reservation): reservation for reservation in reservations}
+        with self._lock:
+            for reservation in reservations:
+                operation_ref = reservation._request.operation_ref
+                if operation_ref is None:
+                    continue
+                group = self._operation_groups.get(operation_ref)
+                if (
+                    group is None
+                    or group.state != "reserved"
+                    or group.members.get(id(reservation)) is not reservation
+                    or set(group.members) - set(offered)
+                ):
+                    return False
+        return True
+
+    def _mark_transport_groups_committed(self, reservations: Sequence[BudgetReservation]) -> None:
+        """Close each already-validated operation group against late joins."""
+
+        for reservation in reservations:
+            operation_ref = reservation._request.operation_ref
+            if operation_ref is None:
+                continue
+            group = self._operation_groups[operation_ref]
+            group.state = "committed"
 
     def _record_operation_outcome(
         self,
@@ -622,16 +760,32 @@ class CapabilityRegistry:
         if operation_ref is None:
             return
         with self._lock:
-            if self._operation_states.get(operation_ref) == "reserved":
-                self._operation_states[operation_ref] = outcome
+            group = self._operation_groups.get(operation_ref)
+            if group is not None and group.state == "committed" and group.members.get(id(reservation)) is reservation:
+                group.state = outcome
 
     def _abandon_operation(self, reservation: BudgetReservation) -> None:
         operation_ref = reservation._request.operation_ref
         if operation_ref is None:
             return
         with self._lock:
-            if self._operation_states.get(operation_ref) == "reserved":
-                del self._operation_states[operation_ref]
+            group = self._operation_groups.get(operation_ref)
+            if group is not None and group.state == "reserved" and group.members.get(id(reservation)) is reservation:
+                # Context is optional for the one PA-02 compound shape. If it
+                # is rejected before transport, detach only that sealed member
+                # so the independently authorized text request can still make
+                # its no-context call. Abandoning text (or an unpaired
+                # context) invalidates the entire operation instead.
+                if (
+                    _openai_compound_member_kind(reservation._request) == "context"
+                    and any(
+                        _openai_compound_member_kind(member._request) == "text"
+                        for member in group.members.values()
+                    )
+                ):
+                    del group.members[id(reservation)]
+                else:
+                    del self._operation_groups[operation_ref]
 
     def _authorize_unlocked(self, request: AuthorizationRequest, *, moment: datetime) -> AuthorizationDecision:
         candidates = [grant for grant in self._grants_by_id.values() if grant.owner_ref == request.owner_ref]
@@ -900,9 +1054,10 @@ def _is_opaque_ref(value: object) -> bool:
     return isinstance(value, str) and bool(_OPAQUE_REF.fullmatch(value))
 
 
-def _operation_state_denial(state: Literal["reserved", "accepted", "unknown"]) -> str:
+def _operation_state_denial(state: Literal["reserved", "committed", "accepted", "unknown"]) -> str:
     return {
         "reserved": "operation_in_progress",
+        "committed": "operation_in_progress",
         "accepted": "operation_already_delivered",
         "unknown": "operation_outcome_unknown",
     }[state]

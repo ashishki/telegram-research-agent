@@ -166,6 +166,11 @@ def complete_with_provider(
         connection_ref=active_connection_ref,
         resource_ref=context_resource_ref,
     )
+    if include_context and not _shares_operation_registry(authorization, context_authorization):
+        _abandon_before_transport(authorization, context_authorization)
+        raise ProviderEgressDenied(
+            "OpenAI text and context egress require one registry-bound operation group."
+        )
     request_input = _request_input(
         clean_query,
         local_context=validated_context if include_context else None,
@@ -281,6 +286,21 @@ def _commit_transport_authorizations(
         if decision is not None and decision.reservation is not None
     ]
     return len(reservations) == len(authorizations) and commit_transport_reservations(reservations)
+
+
+def _shares_operation_registry(
+    authorization: AuthorizationDecision | None,
+    context_authorization: AuthorizationDecision | None,
+) -> bool:
+    """Refuse text/context decisions joined only by caller-controlled strings."""
+
+    return bool(
+        authorization is not None
+        and context_authorization is not None
+        and authorization.reservation is not None
+        and context_authorization.reservation is not None
+        and authorization.reservation.registry is context_authorization.reservation.registry
+    )
 
 
 def _record_transport_outcome(

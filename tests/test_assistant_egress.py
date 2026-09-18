@@ -74,6 +74,43 @@ def _decision(
     return CapabilityRegistry((grant,)).authorize_and_reserve(request, now=NOW)
 
 
+def _compound_openai_decisions(*, operation_ref: str):
+    """Reserve OpenAI text/context in the single PA-02 operation registry."""
+
+    text_grant = make_grant(
+        grant_id="grant_synthetic_compound_text",
+        connection_ref=OWNER_SCOPE["connection_ref"],
+    )
+    context_grant = make_grant(
+        grant_id="grant_synthetic_compound_context",
+        capability="model.context_egress",
+        resource_ref="resource_archive",
+        data_class="private_archive",
+        purpose="answer.context",
+        connection_ref=OWNER_SCOPE["connection_ref"],
+    )
+    registry = CapabilityRegistry((text_grant, context_grant))
+    text = registry.authorize_and_reserve(
+        make_request(
+            connection_ref=OWNER_SCOPE["connection_ref"],
+            operation_ref=operation_ref,
+        ),
+        now=NOW,
+    )
+    context = registry.authorize_and_reserve(
+        make_request(
+            capability="model.context_egress",
+            resource_ref="resource_archive",
+            data_class="private_archive",
+            purpose="answer.context",
+            connection_ref=OWNER_SCOPE["connection_ref"],
+            operation_ref=operation_ref,
+        ),
+        now=NOW,
+    )
+    return registry, text, context
+
+
 def _reserved_decision_with_registry(*, capability="model.generate", resource_ref="resource_conversation"):
     grant = make_grant(
         capability=capability,
@@ -865,11 +902,8 @@ def test_private_context_needs_its_own_data_class_grant(monkeypatch):
     assert result.receipt.context_egress_performed is False
     assert "private synthetic context" not in repr(client.responses.calls[0]["input"])
 
-    context_decision = _decision(
-        capability="model.context_egress",
-        resource_ref="resource_archive",
-        data_class="private_archive",
-        purpose="answer.context",
+    _registry, text_decision, context_decision = _compound_openai_decisions(
+        operation_ref="operation_synthetic_private_context_001"
     )
     client_with_context = _FakeClient()
     result_with_context = complete_with_provider(
@@ -877,7 +911,7 @@ def test_private_context_needs_its_own_data_class_grant(monkeypatch):
         provider="openai",
         allow_provider_egress=True,
         allow_context_egress=True,
-        authorization=_decision(),
+        authorization=text_decision,
         context_authorization=context_decision,
         context_resource_ref="resource_archive",
         local_context=[{

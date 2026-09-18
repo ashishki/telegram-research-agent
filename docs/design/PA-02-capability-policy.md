@@ -26,12 +26,15 @@ wrong-owner/connection/resource/operation/data-class/purpose/provider/revision
 or fallback-forbidden request is denied. A reservation remains spent after an
 adapter error or unknown outcome. OpenAI model/context egress additionally
 requires the same opaque `operation_ref` on its text and optional context
-decisions. The in-memory registry holds that key as reserved, accepted or
-unknown: a duplicate or unknown key is denied even when a grant budget exceeds
-one. Only explicit `not_delivered` reconciliation can reopen an unknown key;
-`delivered` leaves it blocked. Automatic client and SDK retries are disabled
-for this boundary. PA-13 must supply durable reconciliation before a live path
-can outlast this in-memory guard.
+decisions **in one `CapabilityRegistry`**. That registry admits only the
+closed text/context pair for this operation: a duplicate, unrelated, or
+independent-registry scope cannot join. The in-memory operation group is
+reserved, committed, accepted or unknown; a duplicate, committed, accepted or
+unknown key is denied even when a grant budget exceeds one. Only explicit
+`not_delivered` reconciliation can reopen an unknown group; `delivered` leaves
+it blocked. Automatic client and SDK retries are disabled for this boundary.
+PA-13 must supply durable reconciliation before a live path can outlast this
+in-memory guard.
 
 Adapter authorization is matched against the reservation's sealed original
 request, including owner, connection, resource, capability, operation, data
@@ -42,9 +45,14 @@ Every deny before a provider call permanently invalidates its exact reservation
 before releasing only its in-memory operation-key hold; a later reservation for
 the key cannot reactivate the stale one, and its conservative grant budget is
 never refunded. Immediately before an OpenAI request, every reservation whose
-data can enter that request is atomically committed as a group. A committed
-reservation cannot be abandoned or release its key during an in-flight request;
-only a wholly uncommitted group can be invalidated before transport.
+data can enter that request is atomically committed as a group. The transport
+supplies every current group member or fails before network I/O; commit changes
+the group state before the provider call, so a late context reservation cannot
+join. A committed reservation cannot be abandoned or release its key during an
+in-flight request. If the optional context is rejected before transport
+(including malformed local evidence), only its sealed context member is
+invalidated and the separately authorized text member may make a no-context
+call; abandoning text invalidates the whole group.
 
 The final adapter check obtains its expected purpose from the closed
 `TRANSPORT_PURPOSES` table, not from a category or caller argument:
@@ -121,7 +129,9 @@ The PA-02 tests prove no-consent/key-only denial before fake client/network use;
 scope/provider/revision/revoke/expiry/fallback failure; current-state
 revalidation after reservation; cross-owner/connection/resource substitution
 and cross-purpose transport substitution denial; one-use budget accounting; no automatic retry after unknown provider
-outcome even with a larger grant budget; archive-context separation; direct local-path vision denial before a
+outcome even with a larger grant budget; the positive same-registry OpenAI
+text/context group, rejection of an independent-registry pair and incomplete
+group commit, archive-context separation; direct local-path vision denial before a
 read/provider call; and all three real voice transport layers (`getFile`, file
 download, transcription) with separate matching synthetic reservations. Voice
 tests also prove raw download bytes never create a local staging file. Result
