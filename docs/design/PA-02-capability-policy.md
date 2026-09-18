@@ -48,14 +48,16 @@ reconciliation. This slice never represents either as complete.
 | OpenAI archive context | exact owner/connection/archive resource plus a distinct `model.context_egress`, `provider_openai`, `private_archive` reservation | existing context switch; absent/invalid context grant omits context rather than leaking it |
 | Telegram voice download | exact owner/connection/file resource plus two distinct `media.voice_download`, `read`, `provider_telegram`, `user_provided` reservations: one each for `getFile` and file download | none |
 | OpenAI transcription | `media.transcribe`, `model_egress`, `provider_openai`, `user_provided` reservation, exactly bound to the Telegram attachment ID returned by the two authorized Telegram reads | the raw voice bytes remain in the request memory only; no PA-02 local media file is created |
+| PA result Telegram delivery | exact authenticated private owner/chat tuple plus an `assistant.result_delivery`, `deliver`, `provider_telegram`, `private_archive` reservation for every rendered Telegram chunk | no runtime delivery grant source exists in PA-02, so an omitted, expired, revoked or mismatched decision suppresses the final send; bot token/private chat are not consent |
 
 PA-02 applies this boundary only to the explicit transports in the table:
 Anthropic text, OpenAI text/context, Telegram voice `getFile`/file download,
-and OpenAI transcription. Existing Telegram update/delivery behavior and other
-pre-existing non-LLM HTTP paths are ambient platform behavior, not evidence
-that PA-02 has granted or enforced every external side effect. Their exact
-inventory and enforcement remain for the bounded slices that own those paths;
-they must not inherit PA-02 completion claims.
+OpenAI transcription, and final PA-result Telegram delivery. Telegram update
+ingress, non-PRM handler sends and other pre-existing non-LLM HTTP paths are
+ambient platform behavior, not evidence that PA-02 has granted or enforced
+every external side effect. Their exact inventory and enforcement remain for
+the bounded slices that own those paths; they must not inherit PA-02 completion
+claims.
 
 The public scope formatter lists capability, resources, operations, data
 classes and permitted providers and explicitly says that a provider key is not
@@ -73,6 +75,8 @@ and cross-purpose transport substitution denial; one-use budget accounting; no a
 outcome; archive-context separation; direct local-path vision denial before a
 read/provider call; and all three real voice transport layers (`getFile`, file
 download, transcription) with separate matching synthetic reservations. Voice
-tests also prove raw download bytes never create a local staging file. Existing
+tests also prove raw download bytes never create a local staging file. Result
+delivery tests prove a revoked/missing/mismatched decision reaches no fake
+Telegram sender. Existing
 LLM, OpenAI adapter, synthesis and voice tests now pass a matching synthetic
 authorization only for their fake transport paths. No fixture calls a provider.

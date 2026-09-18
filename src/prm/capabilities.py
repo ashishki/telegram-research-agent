@@ -49,6 +49,7 @@ TRANSPORT_PURPOSES: dict[tuple[str, str, str], str] = {
     ("provider_openai", "model.context_egress", "model_egress"): "answer.context",
     ("provider_telegram", "media.voice_download", "read"): "voice.transcription",
     ("provider_openai", "media.transcribe", "model_egress"): "voice.transcription",
+    ("provider_telegram", "assistant.result_delivery", "deliver"): "answer.delivery",
 }
 
 

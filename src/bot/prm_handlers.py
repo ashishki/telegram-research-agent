@@ -6,9 +6,9 @@ import logging
 import os
 import hashlib
 from datetime import datetime, timedelta, timezone
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
-from assistant.prm_post_answer_actions import build_post_answer_actions
+from assistant.prm_post_answer_actions import build_post_answer_actions, canonical_private_owner_id
 from assistant.utd_profile import (
     is_utd_profile_intent,
     is_utd_question,
@@ -18,7 +18,13 @@ from assistant.utd_profile import (
 from bot.telegram_delivery import _send_text_internal
 from config.settings import Settings
 from prm.application import PersonalResearchAssistant
-from prm.capabilities import describe_current_capability_scope
+from prm.capabilities import (
+    AuthorizationDecision,
+    CapabilityDenied,
+    describe_current_capability_scope,
+    require_authorized_operation,
+    transport_purpose,
+)
 from prm.contracts import OperatorRequest
 
 LOGGER = logging.getLogger(__name__)
@@ -41,6 +47,9 @@ PRM_SAFE_COMMANDS = frozenset(
 _PRM_DIALOG_TTL = timedelta(minutes=20)
 _MAX_PRM_DIALOGS = 200
 _PRM_DIALOG_STATE: dict[str, dict[str, Any]] = {}
+TELEGRAM_PROVIDER_REF = "provider_telegram"
+RESULT_DELIVERY_CAPABILITY = "assistant.result_delivery"
+RESULT_DELIVERY_DATA_CLASS = "private_archive"
 
 
 def send_message(
@@ -73,6 +82,7 @@ def dispatch_prm_command(
     *,
     actor_id: str | None = None,
     owner_chat_id: str | None = None,
+    delivery_authorizations: Sequence[AuthorizationDecision] = (),
 ) -> None:
     command, args = _split_command(text)
     if command not in PRM_SAFE_COMMANDS:
@@ -169,7 +179,14 @@ def dispatch_prm_command(
         owner_chat_id=owner_chat_id,
     )
     markup = action_bundle.get("reply_markup") if isinstance(action_bundle, Mapping) else None
-    _send_chunks(chat_id, result.text, reply_markup=markup)
+    _send_chunks(
+        chat_id,
+        result.text,
+        reply_markup=markup,
+        actor_id=actor_id,
+        owner_chat_id=owner_chat_id,
+        delivery_authorizations=delivery_authorizations,
+    )
     result_status = str(getattr(result, "status", "ok") or "ok")
     result_mode = str(getattr(result, "mode", mode) or mode)
     if result_status == "ok" and result_mode in {"research", "brief"}:
@@ -304,16 +321,68 @@ def _send_chunks(
     text: str,
     *,
     reply_markup: dict | None,
+    actor_id: str | None = None,
+    owner_chat_id: str | None = None,
+    delivery_authorizations: Sequence[AuthorizationDecision] = (),
     limit: int = 3400,
 ) -> None:
+    """Deliver a PA answer only through exact one-use Telegram grants.
+
+    PA-02 has no runtime grant source, therefore omitted decisions deny the
+    final Telegram side effect rather than treating a bot token or a private
+    chat as consent. A later slice can supply fresh decisions from its approved
+    source; it must supply one for every transport chunk.
+    """
+
+    delivery_owner_ref = _private_delivery_owner_ref(chat_id, actor_id, owner_chat_id)
     chunks = _split_telegram_text(text, limit=limit)
+    if delivery_owner_ref is None or len(delivery_authorizations) < len(chunks):
+        LOGGER.warning("PRM result delivery denied before Telegram send")
+        return
+    decisions = iter(delivery_authorizations)
     for index, chunk in enumerate(chunks):
+        decision = next(decisions, None)
+        if decision is None:
+            LOGGER.warning("PRM result delivery denied before Telegram send")
+            return
+        try:
+            require_authorized_operation(
+                decision,
+                capability=RESULT_DELIVERY_CAPABILITY,
+                operation="deliver",
+                provider_ref=TELEGRAM_PROVIDER_REF,
+                data_class=RESULT_DELIVERY_DATA_CLASS,
+                owner_ref=delivery_owner_ref,
+                connection_ref=decision.connection_ref,
+                resource_ref=chat_id,
+                purpose=transport_purpose(
+                    provider_ref=TELEGRAM_PROVIDER_REF,
+                    capability=RESULT_DELIVERY_CAPABILITY,
+                    operation="deliver",
+                ),
+            )
+        except CapabilityDenied:
+            LOGGER.warning("PRM result delivery denied before Telegram send")
+            return
         send_message(
             _token(),
             chat_id,
             chunk,
             reply_markup=reply_markup if index == len(chunks) - 1 else None,
         )
+
+
+def _private_delivery_owner_ref(
+    chat_id: str,
+    actor_id: str | None,
+    owner_chat_id: str | None,
+) -> str | None:
+    """Map the authenticated private Telegram tuple to a policy owner ref."""
+
+    values = tuple(canonical_private_owner_id(value) for value in (chat_id, actor_id, owner_chat_id))
+    if any(value is None for value in values) or len(set(values)) != 1:
+        return None
+    return f"owner_telegram_{values[0]}"
 
 
 def _split_telegram_text(text: str, *, limit: int = 3400) -> list[str]:

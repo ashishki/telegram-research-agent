@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
+from bot import prm_handlers
 from bot.voice import VoiceTranscriptionUnavailable, transcribe_audio_file, transcribe_telegram_voice
 import llm.client as anthropic_client
 from llm.openai_provider import OpenAIProviderError, ProviderEgressDenied, complete_with_provider
@@ -65,6 +66,36 @@ def _reserved_decision_with_registry(*, capability="model.generate", resource_re
     )
 
 
+def _delivery_decision(
+    *,
+    registry: CapabilityRegistry | None = None,
+    purpose: str = "answer.delivery",
+):
+    grant = make_grant(
+        grant_id="grant_synthetic_delivery",
+        owner_ref="owner_telegram_42",
+        capability="assistant.result_delivery",
+        resource_ref="42",
+        operation="deliver",
+        data_class="private_archive",
+        providers=("provider_telegram",),
+        purpose=purpose,
+    )
+    active_registry = registry or CapabilityRegistry((grant,))
+    return active_registry, grant, active_registry.authorize_and_reserve(
+        make_request(
+            owner_ref="owner_telegram_42",
+            capability="assistant.result_delivery",
+            resource_ref="42",
+            operation="deliver",
+            data_class="private_archive",
+            provider_ref="provider_telegram",
+            purpose=purpose,
+        ),
+        now=NOW,
+    )
+
+
 def test_configured_provider_switch_without_grant_makes_no_text_egress(monkeypatch):
     client = _FakeClient()
     monkeypatch.setenv("PRM_OPENAI_PROVIDER_ENABLED", "true")
@@ -103,6 +134,73 @@ def test_anthropic_text_client_uses_only_a_matching_provider_grant():
         assert anthropic_client.complete(
             prompt="Synthetic question", authorization=decision, **OWNER_SCOPE
         ) == "synthetic answer"
+
+
+def test_prm_result_delivery_requires_a_fresh_private_owner_grant_before_fake_telegram_send(monkeypatch):
+    sent: list[str] = []
+    _registry, _grant, decision = _delivery_decision()
+    monkeypatch.setattr(prm_handlers, "send_message", lambda _token, _chat, text, **_kwargs: sent.append(text))
+
+    prm_handlers._send_chunks(
+        "42",
+        "private synthetic archive result",
+        reply_markup=None,
+        actor_id="42",
+        owner_chat_id="42",
+        delivery_authorizations=(decision,),
+    )
+
+    assert sent == ["private synthetic archive result"]
+
+
+def test_prm_result_delivery_rechecks_revocation_before_fake_telegram_send(monkeypatch):
+    sent: list[str] = []
+    registry, grant, decision = _delivery_decision()
+    registry.revoke_grant(grant.grant_id)
+    monkeypatch.setattr(prm_handlers, "send_message", lambda _token, _chat, text, **_kwargs: sent.append(text))
+
+    prm_handlers._send_chunks(
+        "42",
+        "private synthetic archive result",
+        reply_markup=None,
+        actor_id="42",
+        owner_chat_id="42",
+        delivery_authorizations=(decision,),
+    )
+
+    assert sent == []
+
+
+def test_prm_result_delivery_rejects_another_purpose_before_fake_telegram_send(monkeypatch):
+    sent: list[str] = []
+    _registry, _grant, decision = _delivery_decision(purpose="answer.request")
+    monkeypatch.setattr(prm_handlers, "send_message", lambda _token, _chat, text, **_kwargs: sent.append(text))
+
+    prm_handlers._send_chunks(
+        "42",
+        "private synthetic archive result",
+        reply_markup=None,
+        actor_id="42",
+        owner_chat_id="42",
+        delivery_authorizations=(decision,),
+    )
+
+    assert sent == []
+
+
+def test_prm_result_delivery_default_denies_before_fake_telegram_send(monkeypatch):
+    sent: list[str] = []
+    monkeypatch.setattr(prm_handlers, "send_message", lambda _token, _chat, text, **_kwargs: sent.append(text))
+
+    prm_handlers._send_chunks(
+        "42",
+        "private synthetic archive result",
+        reply_markup=None,
+        actor_id="42",
+        owner_chat_id="42",
+    )
+
+    assert sent == []
 
 
 def test_private_context_needs_its_own_data_class_grant(monkeypatch):

@@ -41,7 +41,7 @@ def test_utd_question_fails_closed_without_entering_prm_research(monkeypatch, tm
     assert "Свежие UTD-источники" in sent[0]
 
 
-def test_explicit_archive_utd_question_keeps_existing_archive_route(monkeypatch, tmp_path) -> None:
+def test_explicit_archive_utd_question_keeps_route_but_denies_result_delivery_without_grant(monkeypatch, tmp_path) -> None:
     sent = []; requests = []
     class FakeAssistant:
         def __init__(self, *, settings): self.settings = settings
@@ -49,9 +49,15 @@ def test_explicit_archive_utd_question_keeps_existing_archive_route(monkeypatch,
             requests.append(request); return SimpleNamespace(text="archive result", payload={"answer_gate": {"allow_answer": False}})
     monkeypatch.setattr(prm_handlers, "PersonalResearchAssistant", FakeAssistant)
     monkeypatch.setattr(prm_handlers, "send_message", lambda _token, _chat, text, **_kwargs: sent.append(text))
-    prm_handlers.dispatch_prm_command("42", "/auto Что в архиве есть про UTD и AI research?", _settings(tmp_path))
+    prm_handlers.dispatch_prm_command(
+        "42",
+        "/auto Что в архиве есть про UTD и AI research?",
+        _settings(tmp_path),
+        actor_id="42",
+        owner_chat_id="42",
+    )
     assert len(requests) == 1
-    assert sent == ["archive result"]
+    assert sent == []
 
 
 def test_prm_active_handler_resolves_short_followups_from_volatile_context() -> None:
