@@ -84,7 +84,13 @@ started; no model/provider was called by these fixtures.
 
 ## Remaining gates and next command
 
-Record the scoped commit and publication SHA after this evidence is committed.
+The scoped implementation commit is
+`2c51c19ebbe450c10466c215cd22cc71d21b5bfb`
+(`feat(pa02): enforce capability-bound egress`) and was pushed to
+`origin/docs/personal-assistant-blueprint-playbook-20260918`. Its 17 files are
+the policy code, exact adapter integrations, tests/tier wiring, PA-02 design,
+handoff and this evidence; neither pre-existing untracked local file was staged.
+
 Do not mark PA-02 complete until its accumulated foundation Deep Review and any
 required human acceptance are recorded. The next implementation slice is PA-03:
 `python3 tools/feature_workflow.py --root . plan --task PA-03`. Its

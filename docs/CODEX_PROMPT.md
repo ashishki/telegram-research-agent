@@ -5,7 +5,7 @@ Workstream: PA — full Personal AI Assistant
 Scope completed in this publication: PA-00 local technical implementation and
 human high-risk slice acceptance; PA-01 contract/acceptance foundation is
 published at `9b0fa37` with receipt `f91b83b`; PA-02 local default-deny
-capability-policy implementation is in progress.
+capability-policy implementation is published at `2c51c19`.
 Baseline: cc105b0024b3e7aa6768ee29acc105b4c682376c
 Playbook: d570163ab17ec3b4245187c778f1e8d89af9690f
 
