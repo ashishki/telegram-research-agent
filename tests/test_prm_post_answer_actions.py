@@ -10,8 +10,8 @@ from assistant.prm_post_answer_actions import (
     _CONTEXTS,
     _claim_context_for_confirmation,
     _clear_confirmation_lock,
-    build_post_answer_actions,
-    handle_post_answer_callback,
+    build_post_answer_actions as _build_post_answer_actions,
+    handle_post_answer_callback as _handle_post_answer_callback,
 )
 from db.migrate import run_migrations
 
@@ -28,6 +28,43 @@ def _answer(*, project_name: str = "") -> dict:
         "source_refs": ["https://t.me/example/1"],
         "project_name": project_name,
     }
+
+
+def test_post_answer_controls_require_private_owner_actor_binding(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmp:
+        db_path = os.path.join(tmp, "memory.db")
+        monkeypatch.setenv("AGENT_DB_PATH", db_path)
+        run_migrations()
+
+        missing = _build_post_answer_actions(_answer(), db_path=db_path, chat_id="42")
+        group = _build_post_answer_actions(
+            _answer(), db_path=db_path, chat_id="-10042", actor_id="42", owner_chat_id="42"
+        )
+        bound = _build_post_answer_actions(
+            _answer(), db_path=db_path, chat_id="42", actor_id="42", owner_chat_id="42"
+        )
+        rejected = _handle_post_answer_callback(
+            db_path, f"{PRM_ACTION_PREFIX}:{bound['context_id']}:n", chat_id="42", actor_id="42"
+        )
+
+    assert missing["reply_markup"] is None
+    assert group["reply_markup"] is None
+    assert bound["reply_markup"] is not None
+    assert rejected["status"] == "action_unavailable"
+
+
+def build_post_answer_actions(answer, *, db_path, chat_id):
+    """Use the exact synthetic private tuple required by PA-00."""
+    return _build_post_answer_actions(
+        answer, db_path=db_path, chat_id=chat_id, actor_id=chat_id, owner_chat_id=chat_id
+    )
+
+
+def handle_post_answer_callback(db_path, callback_data, *, chat_id, actor_id=None):
+    return _handle_post_answer_callback(
+        db_path, callback_data, chat_id=chat_id,
+        actor_id=actor_id if actor_id is not None else chat_id, owner_chat_id=chat_id,
+    )
 
 
 def test_action_markup_relevant_and_bounded(monkeypatch):
@@ -282,8 +319,8 @@ def test_group_context_and_other_actor_are_fail_closed(monkeypatch):
             db_path, f"{PRM_ACTION_PREFIX}:{context_id}:n", chat_id="42", actor_id="42"
         )
 
-        assert group == {"context_id": None, "reply_markup": None}
-        assert denied["status"] == "expired"
+        assert group == {"context_id": None, "reply_markup": None, "action_codes": []}
+        assert denied["status"] == "action_unavailable"
         assert allowed["status"] == "needs_confirmation"
 
 

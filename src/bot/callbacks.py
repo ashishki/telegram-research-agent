@@ -301,7 +301,8 @@ def handle_prm_post_answer_callback(
     callback_data: str,
     *,
     chat_id: str,
-    actor_id: str = "",
+    actor_id: str | None = None,
+    owner_chat_id: str | None = None,
 ) -> dict:
     """Handle isolated PRM answer actions and UTD draft/confirmation namespaces."""
 
@@ -321,7 +322,11 @@ def handle_prm_post_answer_callback(
     if callback_data.startswith(f"{UTD_SUBSCRIPTION_PREFIX}:"):
         return handle_utd_subscription_callback(settings.db_path, callback_data, chat_id=chat_id)
     if callback_data.startswith((f"{PRM_ACTION_PREFIX}:", f"{PRM_CONFIRM_PREFIX}:")):
-        if actor_id:
-            return handle_post_answer_callback(settings.db_path, callback_data, chat_id=chat_id, actor_id=actor_id)
-        return handle_post_answer_callback(settings.db_path, callback_data, chat_id=chat_id)
+        return handle_post_answer_callback(
+            settings.db_path,
+            callback_data,
+            chat_id=chat_id,
+            actor_id=actor_id,
+            owner_chat_id=owner_chat_id,
+        )
     raise ValueError("Unsupported PRM callback")

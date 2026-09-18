@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import secrets
 import sqlite3
 from datetime import datetime, timedelta, timezone
@@ -42,6 +43,8 @@ _CONTEXTS: dict[str, dict[str, Any]] = {}
 _PROPOSAL_TTL = timedelta(minutes=30)
 _CONFIRMATION_LOCK_TTL = timedelta(minutes=2)
 _CONFIRMATION_LOCK_KEY = "__confirmation_lock__"
+_CANONICAL_PRIVATE_OWNER_ID = re.compile(r"[1-9][0-9]{0,18}\Z")
+_MAX_PRIVATE_OWNER_ID = 9_223_372_036_854_775_807
 
 _SHORT_LABELS = {
     "u": "👍 Полезно",
@@ -115,9 +118,18 @@ def build_post_answer_actions(
 ) -> dict[str, Any]:
     """Register a bounded answer context and return only relevant safe actions."""
 
+    private_tuple = _private_owner_tuple(chat_id, actor_id, owner_chat_id)
+    if private_tuple is None:
+        return {"context_id": None, "reply_markup": None, "action_codes": []}
     action_codes = select_post_answer_action_codes(answer)
     traced_answer = {**dict(answer), "keyboard_action_ids": action_codes}
-    context_id = _register_context(traced_answer, db_path=db_path, chat_id=chat_id)
+    context_id = _register_context(
+        traced_answer,
+        db_path=db_path,
+        chat_id=private_tuple[0],
+        actor_id=private_tuple[1],
+        owner_chat_id=private_tuple[2],
+    )
     if context_id is None:
         return {"context_id": None, "reply_markup": None}
     intent = str(answer.get("primary_intent") or "").strip()
@@ -136,11 +148,24 @@ def build_post_answer_actions(
     }
 
 
-def handle_post_answer_callback(db_path: str, callback_data: str, *, chat_id: str, actor_id: str = "") -> dict[str, Any]:
+def handle_post_answer_callback(
+    db_path: str,
+    callback_data: str,
+    *,
+    chat_id: str,
+    actor_id: str | None = None,
+    owner_chat_id: str | None = None,
+) -> dict[str, Any]:
     """Draft or confirm a proposal. No callback is a write unless it is `prmc`."""
 
-    prefix, context_id, action = _parse_callback(callback_data)
-    context = _load_context(db_path, context_id, chat_id, actor_id)
+    private_tuple = _private_owner_tuple(chat_id, actor_id, owner_chat_id)
+    if private_tuple is None:
+        return _unavailable_action()
+    try:
+        prefix, context_id, action = _parse_callback(callback_data)
+    except (TypeError, ValueError):
+        return _unavailable_action()
+    context = _load_context(db_path, context_id, *private_tuple)
     if context is None:
         return {"status": "expired", "write_performed": False, "message": "Действие устарело. Запроси ответ заново."}
     if str(context.get("_status") or "") == "confirmed":
@@ -276,7 +301,10 @@ def _followup_result(context: Mapping[str, Any], action: str) -> dict[str, Any]:
     }
 
 
-def _register_context(answer: Mapping[str, Any], *, db_path: str | Path | None, chat_id: str) -> str | None:
+def _register_context(
+    answer: Mapping[str, Any], *, db_path: str | Path | None, chat_id: str,
+    actor_id: str, owner_chat_id: str,
+) -> str | None:
     # Telegram group IDs are negative.  A group callback does not identify a
     # single proposal owner on this legacy surface, so durable PRM actions are
     # deliberately unavailable there until the actor identity is carried from
@@ -296,7 +324,8 @@ def _register_context(answer: Mapping[str, Any], *, db_path: str | Path | None, 
         "direct_count": max(0, int(answer.get("direct_count") or 0)),
         "partial_count": max(0, int(answer.get("partial_count") or 0)),
         "allowed_actions": [str(code) for code in answer.get("keyboard_action_ids") or [] if str(code) in _ACTION_TYPES],
-        "actor_hash": _chat_hash(chat_id),
+        "actor_hash": _chat_hash(actor_id),
+        "owner_chat_id_hash": _chat_hash(owner_chat_id),
         "proposals": {},
     }
     now = datetime.now(timezone.utc)
@@ -329,7 +358,9 @@ def _register_context(answer: Mapping[str, Any], *, db_path: str | Path | None, 
     return context_id
 
 
-def _load_context(db_path: str | Path, context_id: str, chat_id: str, actor_id: str = "") -> dict[str, Any] | None:
+def _load_context(
+    db_path: str | Path, context_id: str, chat_id: str, actor_id: str, owner_chat_id: str,
+) -> dict[str, Any] | None:
     if not chat_id:
         return None
     try:
@@ -356,7 +387,10 @@ def _load_context(db_path: str | Path, context_id: str, chat_id: str, actor_id: 
             _delete_context(db_path, context_id)
         return None
     context = json.loads(str(row[1]))
-    if actor_id and str(context.get("actor_hash") or "") != _chat_hash(actor_id):
+    if (
+        str(context.get("actor_hash") or "") != _chat_hash(actor_id)
+        or str(context.get("owner_chat_id_hash") or "") != _chat_hash(owner_chat_id)
+    ):
         return None
     context["proposals"] = proposals
     context["_status"] = str(row[4])
@@ -431,6 +465,27 @@ def _mark_receipt_status(db_path: str | Path, context_id: str, status: str) -> N
 
 def _chat_hash(chat_id: str) -> str:
     return hashlib.sha256(f"prm.post-answer.v1:{chat_id}".encode()).hexdigest()
+
+
+def canonical_private_owner_id(value: object) -> str | None:
+    """Return one safe Telegram private-owner ID spelling or None."""
+
+    if not isinstance(value, str) or not _CANONICAL_PRIVATE_OWNER_ID.fullmatch(value):
+        return None
+    return value if int(value) <= _MAX_PRIVATE_OWNER_ID else None
+
+
+def _private_owner_tuple(
+    chat_id: object, actor_id: object, owner_chat_id: object,
+) -> tuple[str, str, str] | None:
+    values = tuple(canonical_private_owner_id(value) for value in (chat_id, actor_id, owner_chat_id))
+    if None in values or len(set(values)) != 1:
+        return None
+    return values  # type: ignore[return-value]
+
+
+def _unavailable_action() -> dict[str, Any]:
+    return {"status": "action_unavailable", "write_performed": False, "message": "Действие недоступно. Запроси ответ заново."}
 
 
 def _confirmation_lock_value(proposals: Mapping[str, Any]) -> str | None:

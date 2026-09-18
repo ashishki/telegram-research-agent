@@ -325,7 +325,11 @@ def _handle_callback(
             else:
                 chat_id = callback_chat_id
                 result = handle_prm_post_answer_callback(
-                    settings, data, chat_id=chat_id, actor_id=str((callback.get("from") or {}).get("id") or "")
+                    settings,
+                    data,
+                    chat_id=chat_id,
+                    actor_id=str((callback.get("from") or {}).get("id") or ""),
+                    owner_chat_id=owner_chat_id,
                 )
                 message = str(result.get("message") or "")
                 if message:

@@ -21,13 +21,13 @@ def test_utd_callback_namespace_routes_to_utd_handler(monkeypatch) -> None:
 
 def test_existing_prm_callback_namespace_is_unchanged(monkeypatch) -> None:
     calls = []
-    def fake_prm(db_path, callback_data, *, chat_id):
-        calls.append((db_path, callback_data, chat_id)); return {"status": "needs_confirmation"}
+    def fake_prm(db_path, callback_data, *, chat_id, actor_id=None, owner_chat_id=None):
+        calls.append((db_path, callback_data, chat_id, actor_id, owner_chat_id)); return {"status": "needs_confirmation"}
     monkeypatch.setattr(callbacks, "handle_post_answer_callback", fake_prm)
     settings = SimpleNamespace(db_path="local.db")
     result = callbacks.handle_prm_post_answer_callback(settings, "prma:c123:n", chat_id="42")
     assert result == {"status": "needs_confirmation"}
-    assert calls == [("local.db", "prma:c123:n", "42")]
+    assert calls == [("local.db", "prma:c123:n", "42", None, None)]
 
 
 def test_utd_watch_feedback_namespace_routes_to_sidecar(monkeypatch) -> None:
