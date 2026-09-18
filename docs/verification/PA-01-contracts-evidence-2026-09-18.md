@@ -83,6 +83,14 @@ the commands above are the exact current-diff result.
 
 ## Remaining gates and next command
 
+The scoped PA-01 implementation commit is
+`9b0fa37fb9193a5ad215de3dfac2a3c39bcf4c3b`
+(`feat(pa01): add assistant contract foundation`) and was pushed to
+`origin/docs/personal-assistant-blueprint-playbook-20260918`. Its changed-file
+set is the six schemas, one synthetic corpus, one contract test, the PA-01
+design/coverage record, task/registry/tier wiring, and this evidence; it does
+not include either pre-existing untracked local file.
+
 PA-01 still needs the applicable human acceptance/review evidence before any
 status is represented as completed. The preserved formal approval recorder
 still needs a valid resolution that does not overwrite historic review state.
