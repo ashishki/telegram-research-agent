@@ -83,7 +83,9 @@ configured owner. This applies to `prma`/`prmc`, not UTD prefixes. PRM invalid
 callback validation precedes its generic Telegram acknowledgement and produces
 no follow-up message or durable write. `encode_utd_proposal_state` and
 `decode_utd_proposal_state` are mandatory for every UTD profile/subscription
-state transition.
+state transition; their canonical-schema integration test executes every
+transition. The facade's one pure PRM validation result is retained through the
+acknowledgement decision, never recomputed by transport.
 Legacy PRM markup receives no authenticated actor/owner tuple and must render
 no control. Initial offered action codes alone are valid; dynamic `c`, `n1`–`n5`,
 feedback-reason and confirmation codes require their exact issued, persisted

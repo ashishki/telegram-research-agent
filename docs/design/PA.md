@@ -167,8 +167,8 @@ callback handler (not merely a helper) to prove this. A malformed callback
 parse or malformed row JSON is caught at that boundary and returns that same
 unavailable result rather than raising.
 
-Transport first calls the pure PRM validation result and only then acknowledges
-Telegram. An invalid PRM callback gets the generic acknowledgement “Action
+Transport calls the callback facade once, retains its pure validation result,
+and only then acknowledges Telegram. An invalid PRM callback gets the generic acknowledgement “Action
 unavailable” and no follow-up `send_message`; this acknowledgement is the sole
 network effect and is not a durable write. A valid callback may then receive an
 acknowledgement and execute its validated mutation/rendering. UTD callbacks keep
@@ -212,8 +212,9 @@ their clean-schema incompatibility without a migration: `utd_state` in their
 malformed or mismatched `utd_state`/table status (including untagged legacy
 `pending`) fails closed without a write. Required callers: onboarding, draft
 load/save/discard, profile preview/confirm/cancel, subscription
-start/claim/finish/cancel. This permits a real UTD-path drain fixture; the
-shared drain blocks old UTD code until active mapped rows are gone.
+start/claim/finish/cancel. A canonical-schema integration test executes every
+transition. This permits a real UTD-path drain fixture; the shared drain blocks
+old UTD code until active mapped rows are gone.
 
 This is JSON-additive: PA-00 adds no table migration. Only `context_kind=prm`
 rows receive/require this binding; the shared UTD draft representation is not
