@@ -23,7 +23,7 @@ _ACTION_TYPES = {
     "a": ("action", "Создать действие"),
     "e": ("experiment", "Создать эксперимент"),
     "o": ("followup_more", "Показать ещё"),
-    "q": ("followup_refine", "Уточнить поиск"),
+    "q": ("followup_refine", "Уточнить: термин, канал, период"),
     "u": ("feedback", "Полезно"),
     "m": ("feedback_reason_prompt", "Частично"),
     "x": ("feedback_reason_prompt", "Мимо"),
@@ -52,7 +52,7 @@ _SHORT_LABELS = {
     "a": "Сохранить действие",
     "e": "Сохранить эксперимент",
     "o": "Показать ещё",
-    "q": "Уточнить поиск",
+    "q": "Уточнить: термин, канал, период",
     "w": "Следить",
 }
 
@@ -160,7 +160,7 @@ def handle_post_answer_callback(db_path: str, callback_data: str, *, chat_id: st
         if selected_index and selected_index > len(context.get("evidence_items") or []):
             return {"status": "invalid_selection", "write_performed": False, "message": "Этот пункт не относится к текущей версии ответа."}
         if selected_index and not context["proposals"].get("__selection_open__"):
-            return {"status": "selection_required", "write_performed": False, "message": "Сначала выбери пункт через preview."}
+            return {"status": "selection_required", "write_performed": False, "message": "Сначала выбери пункт через предпросмотр."}
         proposal_type, label = _ACTION_TYPES["n" if _selected_item_index(action) else action]
         if proposal_type in {"followup_more", "followup_refine"}:
             return _followup_result(context, action)
@@ -534,7 +534,7 @@ def _select_item_result(context_id: str, context: Mapping[str, Any]) -> dict[str
     return {
         "status": "select_item",
         "write_performed": False,
-        "message": "Выбери точный пункт из этой версии ответа перед preview.",
+        "message": "Выбери точный пункт из этой версии ответа перед предпросмотром.",
         "reply_markup": {"inline_keyboard": rows},
     }
 
@@ -542,7 +542,7 @@ def _select_item_result(context_id: str, context: Mapping[str, Any]) -> dict[str
 def _render_proposal_preview(label: str, proposal: Mapping[str, Any]) -> str:
     refs = ", ".join(str(ref) for ref in proposal.get("source_refs") or []) or "нет"
     return "\n".join((
-        f"{label}: preview, запись не создана.",
+        f"{label}: предпросмотр, запись не создана.",
         f"Тип: {proposal.get('object_type')}",
         f"Заголовок: {proposal.get('title')}",
         f"Текст: {proposal.get('body')}",

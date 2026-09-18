@@ -7,7 +7,7 @@ import pytest
 import sys
 
 from bot.telegram_delivery import TelegramAmbiguousDelivery, TelegramKnownRejection, _send_text_internal, _telegram_request
-from external_watch.delivery import DeliveryStore, KnownDeliveryFailure, deliver_candidates, deliver_outbox_item, delivery_enabled, delivery_key, handle_feedback_callback, render_candidate, render_on_demand_edition
+from external_watch.delivery import DeliveryStore, KnownDeliveryFailure, build_feedback_markup, deliver_candidates, deliver_outbox_item, delivery_enabled, delivery_key, handle_feedback_callback, render_candidate, render_on_demand_edition
 from external_watch.selection import select_candidates
 from external_watch.store import ShadowStore
 from external_watch.adapters import canonical_hash
@@ -15,7 +15,7 @@ from external_watch.adapters import canonical_hash
 
 def test_on_demand_edition_is_deduplicated_bounded_and_distinguishes_health():
     events = [{"event_id":"a","repost_family_id":"same","title":"One","canonical_url":"https://calendar.utdallas.edu/a"}, {"event_id":"b","repost_family_id":"same","title":"Repost"}]
-    assert render_on_demand_edition(events, source_health={"calendar":"healthy"}).count("Значимость (анализ):") == 1
+    assert render_on_demand_edition(events, source_health={"calendar":"healthy"}).count("Почему это может быть полезно:") == 1
     assert "Новых релевантных" in render_on_demand_edition([], source_health={"calendar":"healthy"})
     assert "недоступны" in render_on_demand_edition([], source_health={"calendar":"error"})
     assert "Покрытие источников не указано" in render_on_demand_edition([])
@@ -67,7 +67,11 @@ def _confirmed_subscription_for_delivery_fixtures(monkeypatch):
 
 
 def _candidate():
-    return {"source":"calendar","item_key":"42:7","change_type":"updated","payload":{"title":"AI Career Fair","url":"https://calendar.utdallas.edu/event/x"},"relevance":{"relevant":True,"urgent":False,"score":9,"categories":["career","ai"],"reason":"AI career match"}}
+    return {"source":"calendar","item_key":"42:7","change_type":"updated","payload":{"title":"AI Career Fair","change_summary":"открыта регистрация на ярмарку вакансий","url":"https://calendar.utdallas.edu/event/x"},"relevance":{"relevant":True,"urgent":False,"score":9,"categories":["career","ai"],"reason":"AI career match"}}
+
+
+def _candidate_payload(**updates):
+    return {**_candidate()["payload"], **updates}
 
 
 def test_delivery_is_triple_gated(tmp_path):
@@ -181,6 +185,7 @@ def test_notification_copy_is_human_readable_and_actionable():
             "change_type": "updated",
             "payload": {
                 "title": "Late Registration deadline",
+                "change_summary": "срок поздней регистрации перенесён на 8 сентября",
                 "url": "https://calendar.utdallas.edu/event/deadline",
                 "instance": {"start": "2026-09-08T15:00:00-05:00"},
             },
@@ -192,28 +197,49 @@ def test_notification_copy_is_human_readable_and_actionable():
             },
         }
     )
-    assert "Что изменилось: официальная страница изменилась." in text
+    assert "Что изменилось: срок поздней регистрации перенесён на 8 сентября." in text
     assert "Когда: 2026-09-08, 15:00 CT" in text
-    assert "Почему тебе: совпадает с твоим подтверждённым UTD scope: program." in text
+    assert "Почему тебе: совпадает с твоими подтверждёнными темами: программа." in text
     assert "Что сделать: открой источник и проверь, касается ли срок твоей программы." in text
     assert "synthetic" not in text
 
 
+def test_updated_notification_without_a_change_summary_is_withheld():
+    candidate = _candidate()
+    candidate["payload"] = {key: value for key, value in candidate["payload"].items() if key != "change_summary"}
+
+    assert render_candidate(candidate) == ""
+
+
+def test_notification_keeps_primary_feedback_compact_and_reveals_settings_on_request(tmp_path):
+    key = "compact-feedback"
+    labels = [button["text"] for row in build_feedback_markup(key)["inline_keyboard"] for button in row]
+    assert labels == ["👍 Полезно", "👎 Шум", "Настроить уведомления"]
+
+    store = DeliveryStore(tmp_path / "shadow.db")
+    store.record_delivery(key, _candidate(), None)
+    result = handle_feedback_callback(tmp_path / "shadow.db", f"utdw:{key}:settings")
+    settings_labels = [button["text"] for row in result["reply_markup"]["inline_keyboard"] for button in row]
+    assert result["action"] == "settings"
+    assert settings_labels == ["Больше похожего", "Меньше похожего", "Источник неинтересен", "Пауза на 24 ч"]
+    assert store.feedback_summary()["feedback"] == {}
+
+
 def test_final_renderer_requires_primary_source_and_is_telegram_bounded():
-    assert render_candidate({**_candidate(), "payload": {"title": "missing source"}}) == ""
-    huge = {**_candidate(), "payload": {"title": "x" * 10000, "url": "https://calendar.utdallas.edu/event/x"}}
+    assert render_candidate({**_candidate(), "payload": _candidate_payload(title="missing source", url="")}) == ""
+    huge = {**_candidate(), "payload": _candidate_payload(title="x" * 10000, url="https://calendar.utdallas.edu/event/x")}
     text = render_candidate(huge, depth="deep")
     assert text and len(text) <= 4096 and "https://calendar.utdallas.edu/event/x" in text
     assert "Source:" in render_candidate(_candidate(), language="en", depth="standard")
 
 
 def test_final_renderer_withholds_off_policy_links_for_alerts_and_digests():
-    off_policy = {**_candidate(), "payload": {"title": "Off policy", "url": "https://tracker.example/redirect"}}
+    off_policy = {**_candidate(), "payload": _candidate_payload(title="Off policy", url="https://tracker.example/redirect")}
     assert render_candidate(off_policy) == ""
     assert render_candidate({"payload": {"title": "digest"}, "digest_items": [off_policy]})
     # No allowed component remains, so delivery cannot create a digest outbox.
     assert render_candidate({"payload": {"title": "digest"}, "digest_items": [off_policy]}).count("https://") == 0
-    isso = {**_candidate(), "payload": {"title": "ISSO", "url": "https://isso.utdallas.edu/advising"}}
+    isso = {**_candidate(), "payload": _candidate_payload(title="ISSO", url="https://isso.utdallas.edu/advising")}
     assert "https://isso.utdallas.edu/advising" in render_candidate(isso)
 
 
@@ -230,7 +256,7 @@ def test_english_alert_and_digest_explain_relevance_change_and_action_without_ru
     assert "Why it matters to you:" in alert and "What to do:" in alert and "Source: https://" in alert
     digest = render_candidate({"payload": {"title": "ignored"}, "digest_items": [urgent]}, language="en")
     assert "What changed: the event was cancelled" in digest
-    assert "Relevant to your confirmed scope:" in digest and "Source: https://" in digest
+    assert "Relevant to your confirmed topics:" in digest and "Source: https://" in digest
     assert not any(word in digest for word in ("Почему", "Источник", "Что изменилось")) and len(digest) <= 4096
 
 
@@ -246,7 +272,7 @@ def test_english_delivery_sender_payload_and_feedback_acknowledgement_are_englis
 
 
 def test_digest_uses_canonical_url_for_text_and_component_receipt(tmp_path):
-    item = {**_candidate(), "payload": {"title": "Canonical", "url": "https://tracking.example/redirect", "canonical_url": "https://calendar.utdallas.edu/event/canonical"}}
+    item = {**_candidate(), "payload": _candidate_payload(title="Canonical", url="https://tracking.example/redirect", canonical_url="https://calendar.utdallas.edu/event/canonical")}
     sent = []
     result = deliver_candidates([item], sidecar_db=tmp_path / "shadow.db", token="t", chat_id="1", explicit_enable=True, env={"UTD_WATCH_DELIVERY_ENABLED": "1"}, sender=lambda **kwargs: sent.append(kwargs) or 1)
     assert result["sent"] == 1 and "https://calendar.utdallas.edu/event/canonical" in sent[0]["text"] and "tracking.example" not in sent[0]["text"]
@@ -425,7 +451,7 @@ def test_partial_chunk_rejection_is_ambiguous_and_never_replayed(monkeypatch, tm
         raise AssertionError("a failure after the first accepted chunk must be ambiguous")
 
     db = tmp_path / "outbox.db"
-    candidate = {**_candidate(), "payload": {"title": "x" * 4100, "url": "https://calendar.utdallas.edu/event/x"}}
+    candidate = {**_candidate(), "payload": _candidate_payload(title="x" * 4100, url="https://calendar.utdallas.edu/event/x")}
     key = delivery_key(candidate)
     store = DeliveryStore(db)
     assert store.enqueue_outbox(key, candidate)
@@ -481,11 +507,11 @@ def test_ordinary_candidates_are_one_digest_and_each_item_is_idempotent(tmp_path
     env={"UTD_WATCH_DELIVERY_ENABLED":"1"}
     db=tmp_path/"shadow.db"
     first = deliver_candidates(
-        [_candidate(), {**_candidate(), "item_key":"43:8", "payload":{"title":"Career workshop", "url":"https://calendar.utdallas.edu/event/workshop"}}],
+        [_candidate(), {**_candidate(), "item_key":"43:8", "payload":_candidate_payload(title="Career workshop", url="https://calendar.utdallas.edu/event/workshop")}],
         sidecar_db=db, token="t", chat_id="1", explicit_enable=True, env=env, sender=sender,
     )
     follow_up = deliver_candidates(
-        [{**_candidate(), "item_key":"43:8", "payload":{"title":"Career workshop", "url":"https://calendar.utdallas.edu/event/workshop"}}],
+        [{**_candidate(), "item_key":"43:8", "payload":_candidate_payload(title="Career workshop", url="https://calendar.utdallas.edu/event/workshop")}],
         sidecar_db=db, token="t", chat_id="1", explicit_enable=True, env=env, sender=sender,
     )
     assert first["sent"] == 1

@@ -174,6 +174,7 @@ class PersonalResearchAssistant:
         )
         final_publication_allowed = publication_allowed
         if not publication_allowed:
+            empty_next_step = _empty_evidence_next_step(route_payload)
             # Preserve a useful answer without presenting unchecked synthesis as
             # fact.  This path is local-only and shows the selected excerpts
             # with their actual source URLs.
@@ -181,6 +182,7 @@ class PersonalResearchAssistant:
                 evidence_items,
                 boundary=str(payload.get("mixed_current_boundary") or ""),
                 local_only=bool(payload.get("mixed_current_boundary")),
+                empty_next_step=empty_next_step,
             )
             verification = verify_answer_against_evidence(
                 final_text,
@@ -198,7 +200,7 @@ class PersonalResearchAssistant:
                 else _final_answer_publication_allowed(verification, gate)
             )
             if not final_publication_allowed:
-                final_text = "Не удалось собрать проверяемый источник-атрибутированный ответ. Уточни запрос или источник."
+                final_text = _render_terminal_empty_answer(empty_next_step)
                 verification = verify_answer_against_evidence(
                     final_text,
                     evidence_items,
@@ -294,7 +296,7 @@ class PersonalResearchAssistant:
             interaction_id=str(context.get("interaction_id") or ""),
             status="provider_egress_required",
             mode="chat",
-            text="Свободный LLM-ответ отключён в этом режиме. Используй локальный архивный вопрос; внешний режим требует отдельного утверждённого capability.",
+            text="Свободный AI-ответ сейчас выключен. Задай вопрос по локальному архиву; внешний режим требует отдельного разрешения. Ничего не было отправлено.",
             operator_context=context,
             route=route,
         )
@@ -430,7 +432,11 @@ def _mixed_archive_fallback_allowed(verification: Mapping[str, Any]) -> bool:
 
 
 def _render_verified_evidence_fallback(
-    evidence_items: list[Mapping[str, Any]], *, boundary: str = "", local_only: bool = False
+    evidence_items: list[Mapping[str, Any]],
+    *,
+    boundary: str = "",
+    local_only: bool = False,
+    empty_next_step: str = "",
 ) -> str:
     lines = ["Я не публикую свободный пересказ: финальная проверка не подтвердила все фактические формулировки."]
     if boundary:
@@ -448,8 +454,32 @@ def _render_verified_evidence_fallback(
         if span and url.startswith("https://") and (not local_only or (url.startswith("https://t.me/") and local_provenance)):
             lines.append(f"- {span}\n  Источник: {url}")
     if len(lines) == 1:
-        lines.append("Подходящего проверяемого фрагмента в выбранных источниках нет.")
+        lines.extend(
+            (
+                "Прямых проверяемых находок в выбранной локальной выдаче нет.",
+                f"Следующий шаг: {empty_next_step or 'уточни термин, источник или период; либо попроси показать частичные и смежные совпадения.'}",
+            )
+        )
     return "\n".join(lines)
+
+
+def _empty_evidence_next_step(route: Mapping[str, Any]) -> str:
+    intent = str(route.get("primary_intent") or "")
+    mode = str(route.get("mode") or "")
+    if intent == "writer_brief" or mode == "brief":
+        return "уточни термин, источник или период; либо разреши частичные и смежные материалы как фон для осторожного брифа."
+    if intent in {"project_mapping", "decision_support"}:
+        return "уточни термин или период; либо попроси показать частичные и смежные материалы, прежде чем связывать вывод с проектом."
+    if intent == "archive_lookup":
+        return "назови один термин, канал или период; либо попроси показать частичные и смежные совпадения."
+    return "уточни термин, источник или период; либо попроси показать частичные и смежные совпадения."
+
+
+def _render_terminal_empty_answer(next_step: str) -> str:
+    """Keep a no-evidence terminal answer useful without inventing a claim."""
+    # Keep this as the verifier's established non-factual refusal shape: a
+    # second imperative sentence would be classified as an unsupported claim.
+    return f"Не удалось собрать проверяемый ответ: {next_step}"
 
 
 def _env_enabled(name: str) -> bool:
@@ -481,7 +511,7 @@ def _render_memory_action_guidance(query: str) -> str:
     else:
         title = "Черновик заметки"
         body = (
-            "Это preview из свободного follow-up. Durable запись появится только после отдельного подтверждения; "
+            "Это предпросмотр из свободного продолжения диалога. Постоянная запись появится только после отдельного подтверждения; "
             "профиль и память автоматически не меняются."
         )
         next_step = "Если это про последний ответ в Telegram, безопаснее использовать кнопку «Сохранить» под ним: там уже есть найденные источники."

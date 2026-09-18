@@ -18,11 +18,11 @@ DEFAULT_DAILY_CAP = 5
 
 _CATEGORY_LABELS = {
     "program": "программа и академические сроки",
-    "career": "карьера",
-    "ai": "AI / engineering",
+    "career": "карьера и стажировки",
+    "ai": "AI и инженерные исследования",
     "isso": "ISSO и статус",
-    "benefits": "benefits / basic needs",
-    "spouse_family": "супруга / семья",
+    "benefits": "льготы и базовые потребности",
+    "spouse_family": "семья",
 }
 _CATEGORY_CODES = {
     "pg": "program",
@@ -37,7 +37,7 @@ _SHORT_LABELS = {
     "career": "Карьера",
     "ai": "AI",
     "isso": "ISSO",
-    "benefits": "Benefits",
+    "benefits": "Льготы",
     "spouse_family": "Семья",
 }
 _SOURCE_FAMILIES = {
@@ -45,14 +45,14 @@ _SOURCE_FAMILIES = {
     "career": "публичные события и материалы UTD Career Center",
     "ai": "публичные AI/engineering/research события UTD",
     "isso": "публичные страницы и объявления ISSO",
-    "benefits": "публичные Basic Needs и benefit-ресурсы UTD",
-    "spouse_family": "публичные события с явно указанной spouse/family eligibility",
+    "benefits": "публичные ресурсы базовой поддержки и льгот UTD",
+    "spouse_family": "публичные события с явно указанной доступностью для семьи",
 }
 _FREQUENCIES = ("daily_digest", "weekly_digest", "urgent_only")
 _FREQUENCY_LABELS = {
-    "daily_digest": "один дневной digest",
-    "weekly_digest": "один недельный digest",
-    "urgent_only": "только подтверждённо срочное",
+    "daily_digest": "одна ежедневная сводка",
+    "weekly_digest": "одна еженедельная сводка",
+    "urgent_only": "только подтверждённо срочные уведомления",
 }
 _CAP_VALUES = (5, 3, 1)
 _EXPIRY_VALUES = (120, 90, 30, 180)
@@ -82,13 +82,18 @@ def is_utd_question(text: str) -> bool:
 def render_utd_onboarding(draft: Mapping[str, Any]) -> str:
     normalized = _normalize_draft(draft)
     selected = ", ".join(_CATEGORY_LABELS[item] for item in normalized["categories"])
+    details = []
+    if "program" in normalized["categories"]:
+        details.append(f"Программа: {normalized['program']}")
+    if "career" in normalized["categories"]:
+        details.append(f"Карьера: {normalized['career_goals']}")
+    if "ai" in normalized["categories"]:
+        details.append(f"AI-фокус: {normalized['ai_interests']}")
     return (
-        "Что тебе важно в UTD: программа, карьера, AI, ISSO, benefits или spouse/family?\n\n"
+        "Что тебе важно в UTD: программа, карьера, AI, ISSO, льготы или семья?\n\n"
         f"Сейчас выбрано: {selected or 'ничего'}.\n"
-        f"Программа: {normalized['program']}\n"
-        f"Карьера: {normalized['career_goals']}\n"
-        f"AI: {normalized['ai_interests']}\n\n"
-        "Это только локальный черновик на 30 минут. Кнопки меняют preview, но не профиль. "
+        f"{chr(10).join(details) if details else 'Выбери хотя бы одну тему.'}\n\n"
+        "Это только локальный черновик на 30 минут. Кнопки меняют предпросмотр, но не профиль. "
         "Постоянная запись появится только после отдельной кнопки подтверждения."
     )
 
@@ -96,44 +101,37 @@ def render_utd_onboarding(draft: Mapping[str, Any]) -> str:
 def render_utd_watch_preview(draft: Mapping[str, Any]) -> str:
     normalized = _normalize_draft(draft)
     sources = _selected_sources(normalized)
-    source_lines = [
-        f"• {source}{' — muted' if category in normalized['muted_sources'] else ''}"
-        for category, source in sources.items()
-    ]
     categories = ", ".join(_CATEGORY_LABELS[item] for item in normalized["categories"])
-    positives = ", ".join(_positive_terms(normalized))
-    negatives = ", ".join(_negative_terms())
-    state = (
-        "scope будет сохранён в паузе; runtime не сможет его использовать"
-        if normalized["paused"]
-        else "активный scope может быть использован только уже отдельно включённым runtime"
-    )
-    return (
-        "UTD WATCH — preview перед сохранением\n\n"
-        f"Что важно: {categories or 'ничего не выбрано'}\n"
-        f"Программа: {normalized['program']}\n"
-        f"Карьерный фокус: {normalized['career_goals']}\n"
-        f"AI-фокус: {normalized['ai_interests']}\n"
-        f"Аудитория: {normalized['audience_context']}\n\n"
-        "Источники (source families в scope; preview не проверяет их runtime-состояние):\n"
-        f"{chr(10).join(source_lines) if source_lines else '• нет выбранных источников'}\n\n"
-        f"Позитивные фильтры: {positives}\n"
-        f"Негативные фильтры: {negatives}\n"
-        "Spouse/family: подходит только событие с явно указанной eligibility; "
-        "догадки запрещены.\n\n"
-        f"Timezone: {UTD_TIMEZONE}\n"
-        f"Частота: {_FREQUENCY_LABELS[normalized['frequency']]}\n"
-        f"Язык/глубина/период: {normalized['language']} / {normalized['depth']} / {normalized['period']}\n"
-        f"Расписание: {normalized['schedule']}; quiet: {normalized['quiet_hours']['start']}–{normalized['quiet_hours']['end']}\n"
-        f"Исключения: {', '.join(normalized['exclusions']) or 'нет'}\n"
-        f"Лимит: не более {normalized['daily_cap']} элементов в день\n"
-        f"Expiry/review: {normalized['expires_at']}\n"
-        f"Состояние: {state}; pause/mute/unsubscribe — отдельные lifecycle-действия.\n"
-        f"Muted source families: {', '.join(normalized['muted_sources']) or 'нет'}\n\n"
-        "Граница: этот profile preview сам не делает live fetch, не запускает timer, "
-        "не отправляет Telegram delivery и не включает provider egress. Подтверждение "
-        "не включает runtime, но отдельный уже включённый runtime может прочитать активный "
-        "scope на следующем запуске; его kill switch и delivery-gates обязательны."
+    source_labels = ", ".join(_SHORT_LABELS[item] for item in sources) or "нет"
+    muted = ", ".join(_SHORT_LABELS[item] for item in normalized["muted_sources"]) or "нет"
+    focus_lines = [f"• Темы: {categories or 'ничего не выбрано'}"]
+    if "program" in normalized["categories"]:
+        focus_lines.append(f"• Программа: {normalized['program']}")
+    if "career" in normalized["categories"]:
+        focus_lines.append(f"• Карьера: {normalized['career_goals']}")
+    if "ai" in normalized["categories"]:
+        focus_lines.append(f"• AI-фокус: {normalized['ai_interests']}")
+    focus_lines.append(f"• Аудитория: {normalized['audience_context']}")
+    delivery_state = "Уведомления будут на паузе после сохранения." if normalized["paused"] else "Уведомления сейчас выключены."
+    return "\n".join(
+        (
+            "UTD — проверь перед сохранением",
+            "",
+            "Ты настроил:",
+            *focus_lines,
+            "",
+            "Доставка:",
+            f"• {delivery_state}",
+            f"• {_FREQUENCY_LABELS[normalized['frequency']]} в {normalized['schedule']} ({UTD_TIMEZONE})",
+            f"• Тишина: {normalized['quiet_hours']['start']}–{normalized['quiet_hours']['end']}; до {normalized['daily_cap']} элементов в день",
+            f"• Пересмотреть настройки через {normalized['review_after_days']} дн.",
+            "",
+            f"Источники по темам: {source_labels}. Не показывать: {muted}.",
+            "Не присылать прошедшие, повторяющиеся события и варианты без явно указанной доступности для семьи.",
+            "",
+            "Граница: этот предпросмотр не проверяет внешние страницы и не отправляет уведомления. "
+            "Подтверждение сохраняет только настройки; оно не включает уведомления.",
+        )
     )
 
 
@@ -161,17 +159,19 @@ def _default_draft(now: datetime) -> dict[str, Any]:
         or "моя программа UTD",
         "career_goals": os.environ.get(
             "UTD_CAREER_INTERESTS",
-            "internships, on-campus opportunities и AI/engineering career events",
+            "стажировки, возможности на кампусе и карьерные события по AI/инженерии",
         ).strip(),
         "ai_interests": os.environ.get(
             "UTD_AI_INTERESTS",
-            "applied AI, agentic systems, RAG, evals и engineering research",
+            "прикладной AI, агентные системы, RAG, оценка моделей и инженерные исследования",
         ).strip(),
         "audience_context": os.environ.get(
             "UTD_AUDIENCE_CONTEXT",
-            "student; spouse/family only when eligibility is explicit",
+            "студент; для семьи — только при явно указанной доступности",
         ).strip(),
-        "categories": list(_CATEGORY_LABELS),
+        # A watch scope can be sensitive and noisy.  Never preselect it: each
+        # category, especially ISSO and family, is an explicit operator choice.
+        "categories": [],
         "frequency": "daily_digest",
         "daily_cap": DEFAULT_DAILY_CAP,
         "review_after_days": DEFAULT_EXPIRY_DAYS,
@@ -245,6 +245,8 @@ def _apply_draft_action(draft: dict[str, Any], action: str, now: datetime) -> No
         categories = list(draft.get("categories") or [])
         if category in categories:
             categories.remove(category)
+            muted = [item for item in draft.get("muted_sources") or [] if item != category]
+            draft["muted_sources"] = [item for item in _CATEGORY_LABELS if item in muted]
         else:
             categories.append(category)
         draft["categories"] = [item for item in _CATEGORY_LABELS if item in categories]
@@ -265,6 +267,8 @@ def _apply_draft_action(draft: dict[str, Any], action: str, now: datetime) -> No
         return
     if action in {"mi", "mf"}:
         source = "isso" if action == "mi" else "spouse_family"
+        if source not in (draft.get("categories") or []):
+            return
         muted = list(draft.get("muted_sources") or [])
         if source in muted:
             muted.remove(source)
@@ -303,7 +307,7 @@ def _onboarding_markup(context_id: str, draft: Mapping[str, Any]) -> dict[str, A
             ],
             [
                 {
-                    "text": f"Expiry: {normalized['review_after_days']} дн.",
+                    "text": f"Пересмотр: {normalized['review_after_days']} дн.",
                     "callback_data": f"{UTD_DRAFT_PREFIX}:{context_id}:ex",
                 },
                 {
@@ -313,25 +317,7 @@ def _onboarding_markup(context_id: str, draft: Mapping[str, Any]) -> dict[str, A
             ],
             [
                 {
-                    "text": (
-                        "Mute ISSO: да"
-                        if "isso" in normalized["muted_sources"]
-                        else "Mute ISSO: нет"
-                    ),
-                    "callback_data": f"{UTD_DRAFT_PREFIX}:{context_id}:mi",
-                },
-                {
-                    "text": (
-                        "Mute family: да"
-                        if "spouse_family" in normalized["muted_sources"]
-                        else "Mute family: нет"
-                    ),
-                    "callback_data": f"{UTD_DRAFT_PREFIX}:{context_id}:mf",
-                },
-            ],
-            [
-                {
-                    "text": "Показать preview",
+                    "text": "Показать предпросмотр",
                     "callback_data": f"{UTD_DRAFT_PREFIX}:{context_id}:pv",
                 },
                 {
@@ -341,6 +327,19 @@ def _onboarding_markup(context_id: str, draft: Mapping[str, Any]) -> dict[str, A
             ],
         ]
     )
+    source_controls = []
+    for category, action, label in (("isso", "mi", "ISSO"), ("spouse_family", "mf", "для семьи")):
+        if category not in normalized["categories"]:
+            continue
+        source_controls.append(
+            {
+                "text": f"{'Включить' if category in normalized['muted_sources'] else 'Отключить'} {label}",
+                "callback_data": f"{UTD_DRAFT_PREFIX}:{context_id}:{action}",
+            }
+        )
+    if source_controls:
+        # These secondary controls appear only after the corresponding opt-in.
+        rows.insert(-1, source_controls)
     return {"inline_keyboard": rows}
 
 
@@ -371,7 +370,7 @@ def _normalize_draft(raw: Mapping[str, Any]) -> dict[str, Any]:
         "ai_interests": _bounded(raw.get("ai_interests"), "AI / engineering"),
         "audience_context": _bounded(
             raw.get("audience_context"),
-            "student; spouse/family only when eligibility is explicit",
+            "студент; для семьи — только при явно указанной доступности",
         ),
         "categories": categories,
         "frequency": frequency,

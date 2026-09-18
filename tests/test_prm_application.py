@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from prm.application import PersonalResearchAssistant, _final_answer_publication_allowed, _render_verified_evidence_fallback
+from prm.application import PersonalResearchAssistant, _final_answer_publication_allowed, _render_terminal_empty_answer, _render_verified_evidence_fallback
 from assistant.claim_ledger import verify_answer_against_evidence
 from prm.contracts import AssistantResult, OperatorRequest
 from prm.presentation import render_payload
@@ -64,7 +64,7 @@ def test_explicit_topic_edition_is_application_path_without_fetch_send_or_write(
         checked_at="2026-09-17T10:00:00Z", source_health={"calendar": "healthy"},
     )
     assert result.mode == "brief" and "AI Career Fair" in result.text
-    assert "Значимость (анализ):" in result.text
+    assert "Почему это может быть полезно:" in result.text
     assert result.payload["write_performed"] is False
     assert result.payload["automatic_job_created"] is False
     assert result.payload["notification_sent"] is False
@@ -86,7 +86,7 @@ def test_topic_edition_rejects_invalid_window_and_ranks_relevant_events():
     ]
     ranked = assistant.render_topic_edition(OperatorRequest(query="x", mode="brief"), topic_id="x", items=items, window_start="2026-09-17T00:00:00Z", window_end="2026-09-17T23:00:00Z", checked_at="2026-09-17T10:00:00Z", source_health={"calendar":"healthy"})
     assert ranked.text.index("High") < ranked.text.index("Low")
-    assert "Ai" in ranked.text and "Career" in ranked.text and "https://calendar.utdallas.edu/high" in ranked.text
+    assert "AI и исследования" in ranked.text and "карьера" in ranked.text and "https://calendar.utdallas.edu/high" in ranked.text
 
 
 def test_archive_to_action_uses_bounded_research_plan(monkeypatch):
@@ -147,7 +147,7 @@ def test_free_text_memory_action_does_not_run_archive_search_or_write(monkeypatc
     assert result.payload["answer_gate"]["allow_answer"] is False
     assert "Черновик заметки" in result.text
     assert "запись не создана" in result.text
-    assert "Durable запись появится только после отдельного подтверждения" in result.text
+    assert "Постоянная запись появится только после отдельного подтверждения" in result.text
     assert called is False
 
 
@@ -250,9 +250,17 @@ def test_mixed_fallback_rejects_external_telegram_url_without_archive_provenance
 
 def test_terminal_refusal_is_recognized_as_nonfactual_after_fallback_failure():
     verification = verify_answer_against_evidence(
-        "Не удалось собрать проверяемый источник-атрибутированный ответ. Уточни запрос или источник.",
+        "Не удалось собрать проверяемый ответ. Уточни запрос или источник.",
         [],
     )
+    assert verification["claim_count"] == 0
+
+
+def test_terminal_empty_answer_keeps_a_contextual_next_step_without_factual_claims():
+    rendered = _render_terminal_empty_answer("назови один термин, канал или период.")
+    verification = verify_answer_against_evidence(rendered, [])
+
+    assert "назови один термин" in rendered
     assert verification["claim_count"] == 0
     assert _final_answer_publication_allowed(verification, {}) is True
 

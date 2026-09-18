@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from assistant.utd_profile import UTD_CONFIRM_PREFIX, UTD_DRAFT_PREFIX, build_utd_subscription_cancel_proposal, confirm_utd_subscription_cancel, handle_utd_profile_callback, handle_utd_subscription_callback, load_confirmed_utd_profile, start_utd_profile_onboarding, start_utd_subscription_cancel, start_utd_subscription_pause
-from assistant.utd_profile_schema import render_utd_watch_preview
+from assistant.utd_profile_schema import _apply_draft_action, _default_draft, render_utd_onboarding, render_utd_watch_preview
 from external_watch.subscription import subscription_effect
 from external_watch.profile import load_confirmed_utd_profile as load_runtime_utd_profile
 
@@ -19,12 +19,17 @@ def _init_db(path: Path) -> None:
         """)
 
 
+def _select_program(db: Path, context_id: str, now: datetime) -> None:
+    result = handle_utd_profile_callback(db, f"{UTD_DRAFT_PREFIX}:{context_id}:pg", chat_id="42", now=now)
+    assert result["status"] == "draft_updated"
+
+
 def test_preview_confirm_pause_mute_and_expiry(tmp_path: Path) -> None:
     db = tmp_path / "m.db"; _init_db(db); now = datetime(2026,8,28,12,tzinfo=timezone.utc)
     started = start_utd_profile_onboarding(db, chat_id="42", seed_text="программа=Graduate analytics; карьера=internships; AI=agent systems; exclude=football, parking; schedule=10:30; quiet=21:00-07:00", now=now)
     assert started["profile_persisted"] is False
     cid = started["context_id"]
-    for action in ("ps", "mf"):
+    for action in ("sf", "ps", "mf"):
         handle_utd_profile_callback(db, f"{UTD_DRAFT_PREFIX}:{cid}:{action}", chat_id="42", now=now)
     preview = handle_utd_profile_callback(db, f"{UTD_DRAFT_PREFIX}:{cid}:pv", chat_id="42", now=now)
     meta = preview["proposal"]["metadata"]
@@ -42,14 +47,56 @@ def test_preview_confirm_pause_mute_and_expiry(tmp_path: Path) -> None:
 def test_confirmation_copy_truthfully_describes_existing_runtime_effect(tmp_path: Path) -> None:
     db = tmp_path / "m.db"; _init_db(db); now = datetime(2026, 8, 28, 12, tzinfo=timezone.utc)
     preview_text = render_utd_watch_preview({"expires_at": "2026-12-01T00:00:00Z"})
-    assert "уже отдельно включённым runtime" in preview_text
+    assert "Уведомления сейчас выключены" in preview_text
+    assert "не проверяет внешние страницы" in preview_text
     cid = start_utd_profile_onboarding(db, chat_id="42", now=now)["context_id"]
+    _select_program(db, cid, now)
     handle_utd_profile_callback(db, f"{UTD_DRAFT_PREFIX}:{cid}:pv", chat_id="42", now=now)
     saved = handle_utd_profile_callback(db, f"{UTD_CONFIRM_PREFIX}:{cid}:save", chat_id="42", now=now)
-    assert "не запускает runtime" in saved["message"] and "может быть прочитан" in saved["message"]
+    assert "Уведомления сейчас выключены" in saved["message"]
+    assert "не запускает поиск" in saved["message"]
     profile = load_runtime_utd_profile(db, now=now)
     assert subscription_effect(profile, now=now, runtime_enabled=False)["reason"] == "runtime_disabled"
     assert subscription_effect(profile, now=now, runtime_enabled=True)["collect"] is True
+
+
+def test_onboarding_starts_with_no_scope_and_requires_an_explicit_category(tmp_path: Path) -> None:
+    db = tmp_path / "m.db"; _init_db(db); now = datetime(2026, 8, 28, 12, tzinfo=timezone.utc)
+    started = start_utd_profile_onboarding(db, chat_id="42", now=now)
+    cid = started["context_id"]
+
+    assert "Сейчас выбрано: ничего." in started["message"]
+    initial_labels = [button["text"] for row in started["reply_markup"]["inline_keyboard"] for button in row]
+    assert not any("Скрыть" in label or "Отключить" in label for label in initial_labels)
+    assert handle_utd_profile_callback(db, f"{UTD_DRAFT_PREFIX}:{cid}:pv", chat_id="42", now=now)["status"] == "needs_category_selection"
+    _select_program(db, cid, now)
+    assert handle_utd_profile_callback(db, f"{UTD_DRAFT_PREFIX}:{cid}:pv", chat_id="42", now=now)["status"] == "needs_confirmation"
+
+
+def test_isso_and_family_secondary_controls_appear_only_after_opt_in(tmp_path: Path) -> None:
+    db = tmp_path / "m.db"; _init_db(db); now = datetime(2026, 8, 28, 12, tzinfo=timezone.utc)
+    cid = start_utd_profile_onboarding(db, chat_id="42", now=now)["context_id"]
+
+    enabled = handle_utd_profile_callback(db, f"{UTD_DRAFT_PREFIX}:{cid}:is", chat_id="42", now=now)
+    labels = [button["text"] for row in enabled["reply_markup"]["inline_keyboard"] for button in row]
+    assert "Отключить ISSO" in labels and not any("семь" in label.casefold() and "Отключить" in label for label in labels)
+    muted = handle_utd_profile_callback(db, f"{UTD_DRAFT_PREFIX}:{cid}:mi", chat_id="42", now=now)
+    muted_labels = [button["text"] for row in muted["reply_markup"]["inline_keyboard"] for button in row]
+    assert "Включить ISSO" in muted_labels
+
+
+def test_preview_hides_deselected_ai_focus_and_uses_plain_language() -> None:
+    now = datetime(2026, 8, 28, 12, tzinfo=timezone.utc)
+    draft = _default_draft(now)
+    _apply_draft_action(draft, "ai", now)
+    _apply_draft_action(draft, "ai", now)
+    onboarding = render_utd_onboarding(draft)
+    preview = render_utd_watch_preview(draft)
+
+    assert "AI-фокус" not in onboarding
+    assert "AI-фокус" not in preview
+    assert "Уведомления сейчас выключены" in preview
+    assert not any(marker in preview.casefold() for marker in ("runtime", "provider egress", "kill switch", "delivery-gates"))
 
 
 def test_international_student_question_does_not_match_career_internship_marker() -> None:
@@ -74,6 +121,7 @@ def test_cancel_and_expiry_scrub_draft_payload(tmp_path: Path) -> None:
 def test_confirmed_unsubscribe_appends_tombstone_and_blocks_profile(tmp_path: Path) -> None:
     db = tmp_path / "m.db"; _init_db(db); now = datetime(2026, 8, 28, 12, tzinfo=timezone.utc)
     cid = start_utd_profile_onboarding(db, chat_id="42", now=now)["context_id"]
+    _select_program(db, cid, now)
     handle_utd_profile_callback(db, f"{UTD_DRAFT_PREFIX}:{cid}:pv", chat_id="42", now=now)
     handle_utd_profile_callback(db, f"{UTD_CONFIRM_PREFIX}:{cid}:save", chat_id="42", now=now)
     cancel = build_utd_subscription_cancel_proposal(db)
@@ -86,6 +134,7 @@ def test_confirmed_unsubscribe_appends_tombstone_and_blocks_profile(tmp_path: Pa
 def test_unsubscribe_callback_is_chat_bound_and_revision_bound(tmp_path: Path) -> None:
     db = tmp_path / "m.db"; _init_db(db); now = datetime(2026, 8, 28, 12, tzinfo=timezone.utc)
     cid = start_utd_profile_onboarding(db, chat_id="42", now=now)["context_id"]
+    _select_program(db, cid, now)
     handle_utd_profile_callback(db, f"{UTD_DRAFT_PREFIX}:{cid}:pv", chat_id="42", now=now)
     handle_utd_profile_callback(db, f"{UTD_CONFIRM_PREFIX}:{cid}:save", chat_id="42", now=now)
     preview = start_utd_subscription_cancel(db, chat_id="42", now=now)
@@ -99,6 +148,7 @@ def test_unsubscribe_callback_is_chat_bound_and_revision_bound(tmp_path: Path) -
 def test_unsubscribe_rejects_a_stale_profile_revision(tmp_path: Path) -> None:
     db = tmp_path / "m.db"; _init_db(db); now = datetime(2026, 8, 28, 12, tzinfo=timezone.utc)
     cid = start_utd_profile_onboarding(db, chat_id="42", now=now)["context_id"]
+    _select_program(db, cid, now)
     preview_profile = handle_utd_profile_callback(db, f"{UTD_DRAFT_PREFIX}:{cid}:pv", chat_id="42", now=now)
     saved = handle_utd_profile_callback(db, f"{UTD_CONFIRM_PREFIX}:{cid}:save", chat_id="42", now=now)
     cancel = build_utd_subscription_cancel_proposal(db)
@@ -118,6 +168,7 @@ def test_unsubscribe_rejects_a_stale_profile_revision(tmp_path: Path) -> None:
 def test_confirmed_pause_is_visible_lifecycle_action_and_blocks_profile(tmp_path: Path) -> None:
     db = tmp_path / "m.db"; _init_db(db); now = datetime(2026, 8, 28, 12, tzinfo=timezone.utc)
     cid = start_utd_profile_onboarding(db, chat_id="42", now=now)["context_id"]
+    _select_program(db, cid, now)
     handle_utd_profile_callback(db, f"{UTD_DRAFT_PREFIX}:{cid}:pv", chat_id="42", now=now)
     saved = handle_utd_profile_callback(db, f"{UTD_CONFIRM_PREFIX}:{cid}:save", chat_id="42", now=now)
     assert saved["reply_markup"]["inline_keyboard"][0][0]["callback_data"] == "utds:pause:preview"
@@ -132,6 +183,7 @@ def test_confirmation_claim_prevents_cancel_race_for_profile_pause_and_unsubscri
     import assistant.utd_profile as utd
     db = tmp_path / "m.db"; _init_db(db); now = datetime(2026, 8, 28, 12, tzinfo=timezone.utc)
     profile_context = start_utd_profile_onboarding(db, chat_id="42", now=now)["context_id"]
+    _select_program(db, profile_context, now)
     handle_utd_profile_callback(db, f"{UTD_DRAFT_PREFIX}:{profile_context}:pv", chat_id="42", now=now)
     assert utd._claim_utd_preview(db, context_id=profile_context, chat_id="42", now=now)
     assert handle_utd_profile_callback(db, f"{UTD_DRAFT_PREFIX}:{profile_context}:cx", chat_id="42", now=now)["status"] == "expired"

@@ -118,12 +118,25 @@ def build_feedback_markup(key: str, *, language: str = "ru") -> dict[str, Any]:
                 {"text": "👎 Noise" if english else "👎 Шум", "callback_data": f"{FEEDBACK_PREFIX}:{key}:noise{suffix}"},
             ],
             [
-                {"text": "More like this" if english else "Больше такого", "callback_data": f"{FEEDBACK_PREFIX}:{key}:more{suffix}"},
-                {"text": "Less like this" if english else "Меньше такого", "callback_data": f"{FEEDBACK_PREFIX}:{key}:less{suffix}"},
+                {"text": "Adjust notifications" if english else "Настроить уведомления", "callback_data": f"{FEEDBACK_PREFIX}:{key}:settings{suffix}"},
+            ],
+        ]
+    }
+
+
+def build_feedback_settings_markup(key: str, *, language: str = "ru") -> dict[str, Any]:
+    """Expose secondary controls only after the user explicitly asks for them."""
+    english = language == "en"
+    suffix = ":en" if english else ""
+    return {
+        "inline_keyboard": [
+            [
+                {"text": "More like this" if english else "Больше похожего", "callback_data": f"{FEEDBACK_PREFIX}:{key}:more{suffix}"},
+                {"text": "Less like this" if english else "Меньше похожего", "callback_data": f"{FEEDBACK_PREFIX}:{key}:less{suffix}"},
             ],
             [
-                {"text": "Mute source", "callback_data": f"{FEEDBACK_PREFIX}:{key}:mute{suffix}"},
-                {"text": "Pause" if english else "Пауза", "callback_data": f"{FEEDBACK_PREFIX}:{key}:pause{suffix}"},
+                {"text": "Mute source" if english else "Источник неинтересен", "callback_data": f"{FEEDBACK_PREFIX}:{key}:mute{suffix}"},
+                {"text": "Pause 24h" if english else "Пауза на 24 ч", "callback_data": f"{FEEDBACK_PREFIX}:{key}:pause{suffix}"},
             ],
         ]
     }
@@ -136,7 +149,7 @@ def render_candidate(candidate: Mapping[str, Any], *, language: str = "ru", dept
     url = _source_url(payload)
     change = str(candidate.get("change_type") or "updated")
     category_values = [str(x) for x in rel.get("categories") or [] if str(x)]
-    categories = ", ".join(category_values)
+    categories = _display_categories(category_values)
     reason = str(rel.get("reason") or "").strip()
     urgency = "Срочно. " if rel.get("urgent") else ""
     digest_items = candidate.get("digest_items")
@@ -152,17 +165,28 @@ def render_candidate(candidate: Mapping[str, Any], *, language: str = "ru", dept
             item_when = _candidate_time(item_payload or {})
             when_suffix = f" · {item_when}" if item_when else ""
             item_rel = item.get("relevance") if isinstance(item, Mapping) and isinstance(item.get("relevance"), Mapping) else {}
-            item_categories = ", ".join(str(value) for value in item_rel.get("categories") or [] if str(value))
-            item_change = _human_change_en(str(item.get("change_type") or "updated")) if english else _human_change(str(item.get("change_type") or "updated"))
-            relevance_line = (f"Relevant to your confirmed scope: {item_categories or 'UTD'}." if english else f"Почему тебе: совпадает с подтверждённым scope: {item_categories or 'UTD'}.")
+            item_category_values = [str(value) for value in item_rel.get("categories") or [] if str(value)]
+            item_categories = _display_categories(item_category_values)
+            item_change = _meaningful_change_summary(
+                item_payload or {}, str(item.get("change_type") or "updated"), english=english
+            )
+            if not item_change:
+                # A source timestamp alone is not a user-relevant change.
+                continue
+            relevance_line = (f"Relevant to your confirmed topics: {item_categories or 'UTD'}." if english else f"Почему тебе: совпадает с твоими подтверждёнными темами: {item_categories or 'UTD'}.")
             label = "What changed" if english else "Что изменилось"
             lines.append(f"{index}. {item_title}{when_suffix}\n{label}: {item_change}. {relevance_line}{f' Source: {item_url}' if english else f' Источник: {item_url}'}")
-        lines.append("Why you received this: daily digest for your confirmed UTD scope, not a general news feed." if english else "Почему тебе: это дневной digest по подтверждённому UTD scope, не лента всех новостей.")
+        lines.append("Why you received this: daily digest for your confirmed UTD scope, not a general news feed." if english else "Почему тебе: это дневная подборка по твоим подтверждённым темам UTD, не лента всех новостей.")
         return _bounded_text("\n".join(lines), TELEGRAM_TEXT_LIMIT)
     if not url or len(url) > 2048:
         return ""
+    change_summary = _meaningful_change_summary(payload, change, english=language == "en")
+    if not change_summary:
+        # Do not turn an opaque source refresh into a notification.  A producer
+        # must provide a bounded, human-readable change summary for updates.
+        return ""
     if language == "en":
-        lines = [f"{'Urgent. ' if rel.get('urgent') else ''}{title}", f"What changed: {_human_change_en(change)}."]
+        lines = [f"{'Urgent. ' if rel.get('urgent') else ''}{title}", f"What changed: {change_summary}."]
         if reason or categories:
             lines.append(f"Why it matters to you: {_human_reason_en(reason, categories=categories)}")
         next_step = _candidate_next_step_en(category_values, change=change, urgent=bool(rel.get("urgent")))
@@ -172,7 +196,7 @@ def render_candidate(candidate: Mapping[str, Any], *, language: str = "ru", dept
             lines.append("Details: " + _bounded_text(str(payload.get("material_text") or "").strip(), 700 if depth == "deep" else 300))
         lines.append(f"Source: {url}")
         return _bounded_text("\n".join(lines), TELEGRAM_TEXT_LIMIT)
-    lines = [f"{urgency}{title}", f"Что изменилось: {_human_change(change)}."]
+    lines = [f"{urgency}{title}", f"Что изменилось: {change_summary}."]
     when = _candidate_time(payload)
     if when:
         lines.append(f"Когда: {when}")
@@ -255,8 +279,10 @@ def render_on_demand_edition(events: Sequence[Mapping[str, Any]], *, source_heal
         if publication and publication != update:
             event_lines.append(f"   Опубликовано: {publication}; это не новая публикация только из-за обновления/репоста.")
         relevance = payload.get("relevance") if isinstance(payload.get("relevance"), Mapping) else {}
-        reason = str(relevance.get("reason") or "нет объяснения релевантности в данных источника").strip()
-        event_lines.append(f"   Значимость (анализ): {reason}.")
+        category_values = [str(value) for value in relevance.get("categories") or [] if str(value)]
+        categories = _display_categories(category_values)
+        reason = _human_reason(str(relevance.get("reason") or "").strip(), categories=categories)
+        event_lines.append(f"   Почему это может быть полезно: {reason or 'совпадает с выбранной темой.'}")
         if detail_event_id:
             detail = str(payload.get("change_summary") or payload.get("material_text") or "").strip()
             if detail:
@@ -289,8 +315,8 @@ def _bounded_text(value: str, limit: int) -> str:
 def _edition_category(payload: Mapping[str, Any]) -> str:
     relevance = payload.get("relevance") if isinstance(payload.get("relevance"), Mapping) else {}
     categories = relevance.get("categories") or payload.get("categories") or []
-    label = str(categories[0]) if isinstance(categories, Sequence) and not isinstance(categories, (str, bytes)) and categories else "Другие изменения"
-    return "\n" + label.replace("_", " ").capitalize()
+    values = [str(value) for value in categories] if isinstance(categories, Sequence) and not isinstance(categories, (str, bytes)) else []
+    return "\n" + (_display_categories(values[:1]) or "Другие изменения")
 
 
 def _edition_change(change: str) -> str:
@@ -317,6 +343,34 @@ def _human_change_en(change: str) -> str:
     }.get(str(change or "").casefold(), str(change or "updated"))
 
 
+_DISPLAY_CATEGORY_LABELS = {
+    "program": "программа",
+    "career": "карьера",
+    "ai": "AI и исследования",
+    "isso": "ISSO",
+    "benefits": "льготы и поддержка",
+    "spouse_family": "семья",
+}
+
+
+def _display_categories(categories: Sequence[str]) -> str:
+    return ", ".join(_DISPLAY_CATEGORY_LABELS.get(str(item), str(item)) for item in categories if str(item))
+
+
+def _meaningful_change_summary(payload: Mapping[str, Any], change: str, *, english: bool) -> str:
+    """Return an explicit change diff; never claim a generic page refresh is useful."""
+
+    normalized = str(change or "").casefold()
+    if normalized in {"cancelled", "reinstated"}:
+        return _human_change_en(normalized) if english else _human_change(normalized)
+    explicit = " ".join(str(payload.get("change_summary") or "").split()).strip(" .")
+    if explicit:
+        return _bounded_text(explicit, 500)
+    if normalized == "new":
+        return _human_change_en(normalized) if english else _human_change(normalized)
+    return ""
+
+
 def _candidate_time(payload: Mapping[str, Any]) -> str:
     instance = payload.get("instance") if isinstance(payload.get("instance"), Mapping) else {}
     start = str(instance.get("start") or payload.get("start") or payload.get("start_at") or payload.get("date") or "").strip()
@@ -339,8 +393,8 @@ def _human_reason(reason: str, *, categories: str) -> str:
     if not clean:
         return ""
     lowered = clean.casefold()
-    if lowered.startswith("synthetic ") or "confirmed scope" in lowered:
-        return f"совпадает с твоим подтверждённым UTD scope: {categories or 'UTD'}."
+    if lowered.startswith("synthetic ") or "confirmed scope" in lowered or lowered.endswith(" match") or clean.isascii():
+        return f"совпадает с твоими подтверждёнными темами: {categories or 'UTD'}."
     return clean
 
 
@@ -357,15 +411,15 @@ def _candidate_next_step(categories: Sequence[str], *, change: str, urgent: bool
     if "program" in lowered:
         return f"{prefix}открой источник и проверь, касается ли срок твоей программы."
     if "career" in lowered:
-        return f"{prefix}проверь регистрацию и добавь событие в календарь, если оно подходит под internship search."
+        return f"{prefix}проверь регистрацию и добавь событие в календарь, если оно подходит для поиска стажировки."
     if "ai" in lowered:
-        return f"{prefix}открой страницу события и реши, стоит ли идти по теме AI/research."
+        return f"{prefix}открой страницу события и реши, стоит ли участвовать по теме AI или исследований."
     if "isso" in lowered:
-        return f"{prefix}сверься с ISSO page; не принимай immigration-решение по уведомлению."
+        return f"{prefix}сверься с официальной страницей ISSO; не принимай иммиграционное решение только по уведомлению."
     if "benefits" in lowered:
-        return f"{prefix}проверь eligibility на странице ресурса перед действием."
+        return f"{prefix}проверь условия доступности на странице ресурса перед действием."
     if "spouse_family" in lowered:
-        return f"{prefix}проверь, явно ли указана spouse/family eligibility."
+        return f"{prefix}проверь, явно ли указана доступность для семьи."
     return f"{prefix}открой источник и реши, нужно ли действие."
 
 
@@ -684,6 +738,12 @@ class DeliveryStore:
             db.execute("INSERT OR IGNORE INTO watch_feedback(delivery_key,action,recorded_at) VALUES(?,?,?)", (key, action, _now()))
             db.commit()
         return action
+
+    def has_delivery_receipt(self, key: str) -> bool:
+        with sqlite3.connect(self.path) as db:
+            return db.execute(
+                "SELECT 1 FROM delivery_receipts WHERE delivery_key=?", (key,)
+            ).fetchone() is not None
 
     def paused_until(self, *, now: datetime | None = None) -> str:
         """Return a sidecar-only temporary delivery pause timestamp, if active."""
@@ -1058,15 +1118,25 @@ def handle_feedback_callback(sidecar_db: str | Path, callback_data: str) -> dict
         raise ValueError("Unsupported watch callback")
     key, action = parts[1], parts[2]
     store = DeliveryStore(sidecar_db)
+    if action == "settings":
+        if not store.has_delivery_receipt(key):
+            raise ValueError("Unknown delivery receipt")
+        english = len(parts) == 4
+        return {
+            "message": "Notification settings for this update:" if english else "Настройки для этого уведомления:",
+            "action": action,
+            "settings_opened": True,
+            "reply_markup": build_feedback_settings_markup(key, language="en" if english else "ru"),
+        }
     recorded = store.record_feedback(key, action)
     messages = {
         "useful": "Записал: полезно.",
         "noise": "Записал: это шум.",
         "more": "Записал: больше такого.",
         "less": "Записал: меньше такого.",
-        "mute": "Записал feedback mute; источник не будет молча отключён без подтверждения профиля.",
-        "pause": "Поставил sidecar-паузу UTD-уведомлений на 24 часа. Подтверждённый профиль не изменён.",
+        "mute": "Записал: источник неинтересен. Он не будет отключён автоматически без подтверждения профиля.",
+        "pause": "Приостановил UTD-уведомления на 24 часа. Подтверждённый профиль не изменён.",
     }
     if len(parts) == 4:
-        messages = {"useful": "Recorded: useful.", "noise": "Recorded: noise.", "more": "Recorded: more like this.", "less": "Recorded: less like this.", "mute": "Recorded mute feedback; the source is not silently disabled without profile confirmation.", "pause": "UTD notification sidecar paused for 24 hours; the confirmed profile was not changed."}
+        messages = {"useful": "Recorded: useful.", "noise": "Recorded: noise.", "more": "Recorded: more like this.", "less": "Recorded: less like this.", "mute": "Recorded: this source is not useful. It is not disabled without profile confirmation.", "pause": "UTD notifications paused for 24 hours; the confirmed profile was not changed."}
     return {"message": messages[recorded], "action": recorded}

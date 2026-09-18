@@ -16,4 +16,4 @@ def test_synthetic_utd_ux_cases_fail_closed_without_live_sources() -> None:
         assert classify_utd_question(case["question"]) == case["expected_category"]
         assert case["expected_phrase"] in answer
         assert case["forbidden_claim"] not in answer
-        assert "Live UTD-источники" in answer
+        assert "Свежие UTD-источники" in answer

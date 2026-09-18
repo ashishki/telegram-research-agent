@@ -66,7 +66,18 @@ def start_utd_profile_onboarding(
         return _unavailable("Локальная PRM-база недоступна; UTD-черновик не создан.")
 
     draft = _default_draft(current)
-    draft.update(_parse_seed(seed_text))
+    seed = _parse_seed(seed_text)
+    draft.update(seed)
+    # A field supplied in the start message is an explicit selection; defaults
+    # are not.  This keeps the blank onboarding safe without discarding a
+    # concise operator-provided setup request.
+    selected_from_seed = [
+        category
+        for field, category in (("program", "program"), ("career_goals", "career"), ("ai_interests", "ai"))
+        if field in seed
+    ]
+    if selected_from_seed:
+        draft["categories"] = selected_from_seed
     context_id = f"u{secrets.token_hex(5)}"
     try:
         with sqlite3.connect(db_file) as connection:
@@ -141,7 +152,7 @@ def handle_utd_profile_callback(
                 "status": "missing_preview",
                 "profile_persisted": False,
                 "write_performed": False,
-                "message": "Сначала открой preview, затем подтверждай сохранение.",
+                "message": "Сначала открой предпросмотр, затем подтверждай сохранение.",
             }
         proposal = proposal_result.get("proposal")
         confirmation = proposal_result.get("confirmation")
@@ -156,7 +167,7 @@ def handle_utd_profile_callback(
                 _finish_utd_preview_claim(db_path, context_id=context_id, status="confirmed")
             return {**recovered, "profile_persisted": bool(recovered.get("persisted"))}
         if not _claim_utd_preview(db_path, context_id=context_id, chat_id=chat_id, now=current):
-            return {"status": "expired", "profile_persisted": False, "write_performed": False, "message": "Preview уже отменён или подтверждается; открой новый."}
+            return {"status": "expired", "profile_persisted": False, "write_performed": False, "message": "Предпросмотр уже отменён или подтверждается; открой новый."}
         result = confirm_memory_proposal(
             db_path,
             {
@@ -172,11 +183,9 @@ def handle_utd_profile_callback(
                 **result,
                 "profile_persisted": True,
                 "message": (
-                    "UTD-профиль сохранён как подтверждённый scope. Само это действие "
-                    "не запускает runtime, таймеры, модель или Telegram-уведомления. Но если "
-                    "отдельно включённый runtime уже существует, активный scope может быть "
-                    "прочитан на его следующем запуске; kill switch и остальные delivery-gates "
-                    "всё равно проверяются."
+                    "Профиль UTD сохранён. Уведомления сейчас выключены. "
+                    "Сохранение профиля само по себе не запускает поиск, расписание или отправку. "
+                    "Когда уведомления будут отдельно включены, они будут использовать эти подтверждённые настройки."
                 ),
                 "reply_markup": {
                     "inline_keyboard": [
@@ -190,7 +199,7 @@ def handle_utd_profile_callback(
 
     if action == "cx":
         if not _cancel_utd_preview(db_path, context_id=context_id, chat_id=chat_id):
-            return {"status": "expired", "profile_persisted": False, "write_performed": False, "message": "Preview уже подтверждается; отмена не изменила профиль."}
+            return {"status": "expired", "profile_persisted": False, "write_performed": False, "message": "Предпросмотр уже подтверждается; отмена не изменила профиль."}
         return {
             "status": "cancelled",
             "profile_persisted": False,
@@ -198,6 +207,14 @@ def handle_utd_profile_callback(
             "message": "UTD-черновик отменён. Постоянный профиль не изменён.",
         }
     if action == "pv":
+        if not _normalize_draft(draft)["categories"]:
+            return {
+                "status": "needs_category_selection",
+                "profile_persisted": False,
+                "write_performed": False,
+                "message": "Сначала выбери хотя бы одну тему. ISSO и семья включаются только по явному выбору.",
+                "reply_markup": _onboarding_markup(context_id, draft),
+            }
         proposal_result = build_utd_watch_proposal(draft)
         proposals = {"utd_profile": proposal_result}
         _save_draft(db_path, context_id, draft=draft, proposals=proposals, status="previewed")
@@ -250,6 +267,8 @@ def handle_utd_profile_callback(
 
 def build_utd_watch_proposal(draft: Mapping[str, Any]) -> dict[str, Any]:
     normalized = _normalize_draft(draft)
+    if not normalized["categories"]:
+        raise ValueError("UTD profile requires at least one explicitly selected category")
     metadata = {
         "capability": "utd_profile_preview_watch",
         "profile_schema_version": UTD_PROFILE_SCHEMA_VERSION,
@@ -283,7 +302,7 @@ def build_utd_watch_proposal(draft: Mapping[str, Any]) -> dict[str, Any]:
     return build_memory_proposal(
         "watch_topic",
         {
-            "title": "UTD profile and preview watch",
+            "title": "Профиль UTD и предпросмотр уведомлений",
             "body": render_utd_watch_preview(normalized),
             "rationale": (
                 "Operator-confirmed UTD relevance scope only; this event is not permission "
@@ -337,9 +356,9 @@ def confirm_utd_subscription_cancel(db_path: str | Path, proposal_result: Mappin
     proposal = proposal_result.get("proposal") if isinstance(proposal_result, Mapping) else None
     confirmation = proposal_result.get("confirmation") if isinstance(proposal_result, Mapping) else None
     if not isinstance(proposal, Mapping) or not isinstance(confirmation, Mapping):
-        return {"status": "confirmation_required", "persisted": False, "message": "Сначала открой точный preview отмены."}
+        return {"status": "confirmation_required", "persisted": False, "message": "Сначала открой точный предпросмотр отмены."}
     if not _subscription_target_is_current(db_path, proposal):
-        return {"status": "stale_subscription", "persisted": False, "write_performed": False, "message": "Профиль уже изменён. Открой новый preview перед подтверждением."}
+        return {"status": "stale_subscription", "persisted": False, "write_performed": False, "message": "Профиль уже изменён. Открой новый предпросмотр перед подтверждением."}
     return confirm_memory_proposal(db_path, {
         "proposal": proposal, "confirmation_token": confirmation.get("token"),
         "confirmed_by": "telegram_operator", "confirmed_at": _iso(_as_utc(now)),
@@ -365,9 +384,9 @@ def confirm_utd_subscription_pause(db_path: str | Path, proposal_result: Mapping
     proposal = proposal_result.get("proposal") if isinstance(proposal_result, Mapping) else None
     confirmation = proposal_result.get("confirmation") if isinstance(proposal_result, Mapping) else None
     if not isinstance(proposal, Mapping) or not isinstance(confirmation, Mapping):
-        return {"status": "confirmation_required", "persisted": False, "message": "Сначала открой точный preview паузы."}
+        return {"status": "confirmation_required", "persisted": False, "message": "Сначала открой точный предпросмотр паузы."}
     if not _subscription_target_is_current(db_path, proposal):
-        return {"status": "stale_subscription", "persisted": False, "write_performed": False, "message": "Профиль уже изменён. Открой новый preview перед подтверждением."}
+        return {"status": "stale_subscription", "persisted": False, "write_performed": False, "message": "Профиль уже изменён. Открой новый предпросмотр перед подтверждением."}
     return confirm_memory_proposal(db_path, {"proposal": proposal, "confirmation_token": confirmation.get("token"), "confirmed_by": "telegram_operator", "confirmed_at": _iso(_as_utc(now))})
 
 
@@ -389,13 +408,30 @@ def _start_utd_subscription_preview(db_path: str | Path, *, chat_id: str, action
     try:
         with sqlite3.connect(db_path) as connection:
             if not _draft_schema_ready(connection):
-                return _unavailable("Таблица безопасных confirmation preview недоступна.")
+                return _unavailable("Таблица безопасного предпросмотра подтверждения недоступна.")
             connection.execute("""INSERT INTO prm_post_answer_proposals (context_id, chat_id_hash, summary_json, proposals_json, created_at, expires_at, status) VALUES (?, ?, ?, ?, ?, ?, ?)""", (context_id, _chat_hash(chat_id), json.dumps({"kind": "utd_subscription_lifecycle", "action": action, "target_event_id": proposal["proposal"]["metadata"]["subscription_target_event_id"]}, sort_keys=True), json.dumps({action: proposal}, sort_keys=True), _iso(current), _iso(current + UTD_DRAFT_TTL), "previewed"))
             connection.commit()
     except sqlite3.Error:
-        return _unavailable("Не смог сохранить безопасный preview отмены.")
-    label = "паузу" if action == "pause" else "отмену"
-    return {**proposal, "context_id": context_id, "message": f"Preview {label} готов. Подтвердите именно это действие; оно не затронет более новую ревизию профиля.", "reply_markup": {"inline_keyboard": [[{"text": f"Подтвердить {label}", "callback_data": f"{UTD_SUBSCRIPTION_PREFIX}:{context_id}:confirm"}, {"text": "Не выполнять", "callback_data": f"{UTD_SUBSCRIPTION_PREFIX}:{context_id}:cancel"}]]}}
+        return _unavailable("Не смог сохранить безопасный предпросмотр отмены.")
+    label = "паузу" if action == "pause" else "отмену подписки"
+    message = (
+        "Нужно подтверждение паузы. Уведомления остановятся; подтверждённый профиль останется сохранённым."
+        if action == "pause"
+        else "Нужно подтверждение отмены подписки. Подтверждённый профиль и будущие уведомления будут отключены."
+    )
+    return {
+        **proposal,
+        "context_id": context_id,
+        "message": message + " Это действие не затронет более новую версию профиля.",
+        "reply_markup": {
+            "inline_keyboard": [
+                [
+                    {"text": f"Подтвердить {label}", "callback_data": f"{UTD_SUBSCRIPTION_PREFIX}:{context_id}:confirm"},
+                    {"text": "Не выполнять", "callback_data": f"{UTD_SUBSCRIPTION_PREFIX}:{context_id}:cancel"},
+                ]
+            ]
+        },
+    }
 
 
 def handle_utd_subscription_callback(db_path: str | Path, callback_data: str, *, chat_id: str, now: datetime | None = None) -> dict[str, Any]:
@@ -410,13 +446,13 @@ def handle_utd_subscription_callback(db_path: str | Path, callback_data: str, *,
         with sqlite3.connect(db_path) as connection:
             row = connection.execute("SELECT chat_id_hash, summary_json, proposals_json, expires_at, status FROM prm_post_answer_proposals WHERE context_id = ?", (parts[1],)).fetchone()
             if row is None or row[0] != _chat_hash(chat_id):
-                return {"status": "expired", "persisted": False, "message": "Preview истёк или принадлежит другому чату."}
+                return {"status": "expired", "persisted": False, "message": "Предпросмотр истёк или принадлежит другому чату."}
             if datetime.fromisoformat(str(row[3]).replace("Z", "+00:00")) <= current or row[4] not in {"previewed", "confirming"}:
-                return {"status": "expired", "persisted": False, "message": "Preview уже не действителен; открой новый."}
+                return {"status": "expired", "persisted": False, "message": "Предпросмотр уже не действителен; открой новый."}
             if parts[2] == "cancel":
                 cursor = connection.execute("UPDATE prm_post_answer_proposals SET summary_json='{}', proposals_json='{}', status='cancelled' WHERE context_id=? AND status='previewed'", (parts[1],))
                 connection.commit()
-                return {"status": "cancelled", "persisted": False, "write_performed": False, "message": "Отмена подписки не подтверждена; профиль не изменён."} if cursor.rowcount else {"status": "expired", "persisted": False, "message": "Preview уже подтверждается; отмена не изменила профиль."}
+                return {"status": "cancelled", "persisted": False, "write_performed": False, "message": "Отмена подписки не подтверждена; профиль не изменён."} if cursor.rowcount else {"status": "expired", "persisted": False, "message": "Предпросмотр уже подтверждается; отмена не изменила профиль."}
             action = ""
             try:
                 summary = json.loads(str(row[1]))
@@ -425,7 +461,7 @@ def handle_utd_subscription_callback(db_path: str | Path, callback_data: str, *,
             except json.JSONDecodeError:
                 proposal = None
         if row[4] == "previewed" and not _claim_utd_preview(db_path, context_id=parts[1], chat_id=chat_id, now=current):
-            return {"status": "expired", "persisted": False, "message": "Preview уже отменён или подтверждается; открой новый."}
+            return {"status": "expired", "persisted": False, "message": "Предпросмотр уже отменён или подтверждается; открой новый."}
         result = (confirm_utd_subscription_pause if action == "pause" else confirm_utd_subscription_cancel)(db_path, proposal if isinstance(proposal, Mapping) else {}, now=current)
         if result.get("persisted"):
             _finish_utd_preview_claim(db_path, context_id=parts[1], status="confirmed")
@@ -433,7 +469,7 @@ def handle_utd_subscription_callback(db_path: str | Path, callback_data: str, *,
             _finish_utd_preview_claim(db_path, context_id=parts[1], status="previewed")
         return result
     except (sqlite3.Error, ValueError):
-        return {"status": "expired", "persisted": False, "message": "Preview отмены недоступен; открой новый."}
+        return {"status": "expired", "persisted": False, "message": "Предпросмотр отмены недоступен; открой новый."}
 
 
 def _claim_utd_preview(db_path: str | Path, *, context_id: str, chat_id: str, now: datetime) -> bool:
@@ -480,30 +516,29 @@ def render_utd_question_preview(text: str, *, db_path: str | Path | None = None)
     profile = load_confirmed_utd_profile(db_path) if db_path is not None else None
     selected = bool(profile and category in profile.get("categories", []))
     if selected and bool(profile.get("paused")):
-        profile_line = "Этот тип есть в подтверждённом профиле, но весь scope на паузе."
+        profile_line = "Этот тип есть в подтверждённом профиле, но уведомления поставлены на паузу."
     elif selected and category in profile.get("muted_sources", []):
-        profile_line = "Этот тип есть в профиле, но соответствующая source family muted."
+        profile_line = "Этот тип есть в профиле, но его источник скрыт."
     elif selected:
-        profile_line = "Этот тип включён в подтверждённый scope; мониторинг всё равно выключен."
+        profile_line = "Этот тип включён в подтверждённый профиль; уведомления сейчас выключены."
     else:
         profile_line = "Этот тип пока не включён в подтверждённый профиль."
     category_label = _CATEGORY_LABELS[category]
     caution = {
-        "program": "Актуальный deadline требует свежей primary-source страницы.",
-        "benefits": "Benefit или экономию нельзя обещать без актуальных eligibility и условий.",
-        "spouse_family": "Событие нельзя считать доступным супруге/семье без явной eligibility.",
-        "career": "Карьерное событие требует свежей даты, аудитории и registration status.",
-        "ai": "AI/research событие требует свежей даты и официальной страницы организатора.",
+        "program": "Для актуального срока нужна свежая официальная страница.",
+        "benefits": "Нельзя обещать льготу или экономию без актуальных условий доступности.",
+        "spouse_family": "Нельзя считать событие доступным семье без явного указания условий.",
+        "career": "Для карьерного события нужны свежие дата, аудитория и условия регистрации.",
+        "ai": "Для AI/исследовательского события нужны свежая дата и официальная страница организатора.",
         "isso": "ISSO-информация требует свежей официальной страницы и даты обновления.",
     }[category]
     return (
-        "UTD ASK — безопасный preview\n\n"
+        "UTD — безопасный предпросмотр\n\n"
         f"Распознано: {category_label}. {profile_line}\n"
         f"{caution}\n\n"
-        "Этот ASK preview сам не запускает live fetch и не делает eligibility-выводы. "
-        "Live UTD-источники/watch работают отдельно: только confirmed profile, allowlisted official "
-        "sources, delivery gate, receipts и kill switch. Обычные вопросы по твоему "
-        "AI-архиву продолжают работать как раньше."
+        "Свежие UTD-источники сейчас не проверялись, поэтому я не называю дату, доступность или "
+        "условия как факт. Этот вопрос не меняет профиль и не включает уведомления. Обычные вопросы "
+        "по твоему AI-архиву продолжают работать как раньше."
     )
 
 

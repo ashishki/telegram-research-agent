@@ -15,7 +15,7 @@ def test_help_describes_one_archive_and_utd_assistant() -> None:
     assert "AI-архив" in text
     assert "UTD / Dallas" in text
     assert "Настроить мой UTD-профиль" in text
-    assert "live-источники" in text
+    assert "Свежие UTD-источники" in text
 
 
 def test_natural_language_starts_confirmation_gated_utd_draft(monkeypatch, tmp_path) -> None:
@@ -37,8 +37,8 @@ def test_utd_question_fails_closed_without_entering_prm_research(monkeypatch, tm
     monkeypatch.setattr(prm_handlers, "send_message", lambda _token, _chat, text, **_kwargs: sent.append(text))
     prm_handlers.dispatch_prm_command("42", "/research Когда следующий UTD career fair?", _settings(tmp_path))
     assert len(sent) == 1
-    assert "UTD ASK — безопасный preview" in sent[0]
-    assert "Live UTD-источники" in sent[0]
+    assert "UTD — безопасный предпросмотр" in sent[0]
+    assert "Свежие UTD-источники" in sent[0]
 
 
 def test_explicit_archive_utd_question_keeps_existing_archive_route(monkeypatch, tmp_path) -> None:
