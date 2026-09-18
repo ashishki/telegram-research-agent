@@ -51,7 +51,9 @@ The approved-design candidate is now explicit: PA-00 makes the existing durable
 callback bind an additive `prm_post_answer_action_binding.v1` source snapshot
 (PRM context kind/ID, canonical SHA-256 source snapshot, optional project
 provenance, offered action codes, private owner chat/actor hashes and expiry),
-never mutable `last_project_name`. PA-00 controls render only for
+never mutable `last_project_name`. One pure snapshot canonicalizer is used for
+registration and validation; a non-finite/non-serializable value renders no
+control and writes neither context nor receipt. PA-00 controls render only for
 `actor_id == chat_id == owner_chat_id`; the shared ID predicate accepts only
 canonical positive ASCII decimals `[1-9][0-9]{0,18}` at most `9223372036854775807`.
 Every Telegram text/voice, compatibility-dispatch and callback ingress must
@@ -59,8 +61,10 @@ carry that authenticated tuple unchanged, while a missing/invalid tuple renders
 no controls. Callbacks validate binding
 and requested action for both draft and confirmation without rerouting/searching.
 Rejected parse/identity/row/schema/digest/expiry/action cases are read-only: no
-row, receipt or memory mutation and no expiry cleanup. Legacy text selection
-asks for the inline callback. PA-00's
+row, receipt or memory mutation and no expiry cleanup, including malformed parse
+or row JSON at the outer callback handler. Legacy text selection asks for the
+inline callback without consulting `_PRM_DIALOG_STATE` or transforming its last
+project/topic/action fields. PA-00's
 `read_prm_rollback_drain(db_path, *, owner_chat_id, now=None)` is
 owner-restricted/read-only, derives both established PRM and UTD owner hashes,
 returns only status/UTC-now/count-only classifications, fails closed for
@@ -75,6 +79,7 @@ ref must be cleared on a new topic or cancellation; PA-13 applies the same
 invariant to provider writes. PA-00 must register and run
 `test_post_answer_controls_require_private_owner_actor_binding`,
 `test_post_answer_context_binds_canonical_snapshot_and_project_ref`,
+the text/embedded-transcript/completed-voice/compatibility/callback matrix
 `test_prm_entrypoints_propagate_private_owner_identity_or_render_no_controls`,
 `test_post_answer_callback_preserves_bound_source_without_reroute`,
 `test_post_answer_context_rejects_expired_wrong_chat_actor_or_tampered_binding`,

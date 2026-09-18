@@ -85,9 +85,13 @@ that it already implements full natural-language confirmation. Its additive
 - `source_result_version`, SHA-256 of the UTF-8 encoding of that snapshot with
   `json.dumps(..., ensure_ascii=False, sort_keys=True, separators=(",", ":"),
   allow_nan=False)`. Lists retain the source-result order after bounded
-  de-duplication; the digest is recomputed from `source_snapshot` in
-  `_load_context`, and downstream proposal construction uses that validated
-  snapshot rather than mutable duplicate summary fields;
+  de-duplication; one pure `canonicalize_prm_action_snapshot(answer)` routine
+  builds the snapshot and digest during registration and recomputes/validates it
+  during loading, and downstream proposal construction uses only that validated
+  snapshot rather than mutable duplicate summary fields. A `TypeError`,
+  `ValueError`, non-finite value or non-serializable source returns no controls
+  while still rendering the answer; it creates neither a context row nor a
+  receipt; and
 - optional `source_project_ref={origin: answer.project_name, value: ...}`; it
   is a display/provenance value, never an authorization input; and
 - offered action codes, `owner_chat_id_hash`, `actor_id_hash` and expiry. The
@@ -116,6 +120,13 @@ identity propagation matrix is part of PA-00's implementation scope:
 | Telegram inline callback in `bot.bot._handle_callback` | callback message `chat.id`, callback `from.id`, configured owner chat ID -> `bot.callbacks.handle_prm_post_answer_callback` -> PRM action handler | reject before proposal work unless all three equal; UTD namespaces retain their separate existing contract |
 | direct/unit/CLI call with no authenticated tuple | none | it may exercise read-only answer rendering, but must neither register nor accept a PRM post-answer control |
 
+`test_prm_entrypoints_propagate_private_owner_identity_or_render_no_controls`
+is a parameterized matrix over text, embedded transcript, completed voice
+transcript, compatibility dispatch and inline callback, each with positive,
+absent, group, malformed, noncanonical and out-of-range IDs. It proves the
+complete tuple reaches registration/callback unchanged on the one allowed path,
+and that every other cell renders no control or returns unavailable.
+
 The registration and callback interfaces therefore carry all three fields:
 `build_post_answer_actions(..., chat_id, actor_id, owner_chat_id)` and
 `handle_prm_post_answer_callback(..., chat_id, actor_id, owner_chat_id)`.
@@ -137,12 +148,18 @@ zero `INSERT`, `UPDATE` or `DELETE` statements in
 `prm_post_answer_proposals`, makes no memory/receipt write, and does not clean
 up expired contexts on this callback path. Expiry cleanup is a separately
 authorized maintenance concern, not an invalid-input side effect. Tests snapshot
-the row and memory/receipt counts before each rejected case to prove this.
+the row and memory/receipt counts before each rejected case and trace the outer
+callback handler (not merely a helper) to prove this. A malformed callback
+parse or malformed row JSON is caught at that boundary and returns that same
+unavailable result rather than raising.
 
 Legacy natural-language save/watch selection must not call
 `handle_post_answer_callback` in PA-00 and must not synthesize an actor ID; it
-asks for the current inline action instead. The no-reroute test instruments the
-application/search entrypoint and requires zero calls for an old callback.
+asks for the current inline action instead. This denial is independent of
+`_PRM_DIALOG_STATE`: it does not read or transform `last_project_name`,
+`last_topic` or `last_action_context_id` into a callback. The no-reroute test
+instruments the application/search entrypoint and requires zero calls for an
+old callback.
 
 This is JSON-additive: PA-00 adds no table migration. Only `context_kind=prm`
 rows receive/require this binding; the shared UTD draft representation is not
@@ -251,7 +268,10 @@ In this checkout the supported direct focused invocation is
 `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q ...`;
 `python` is not assumed to exist. Registry `{python}` means the resolved
 `sys.executable`. PA-00 records its exact path/version and both environment
-values in the before/after receipt.
+values in the before/after receipt. That fresh receipt separately records the
+then-current HEAD, active bot runtime mode and the evaluator's synthetic action
+context IDs; it preserves the historical `cc105…` run only as a baseline
+reference and never presents evaluator simulation as Telegram callback evidence.
 
 Independent product/program design review precedes exact human approval.
 Slice/Test Critic/privacy reviews follow risk; full review is batched at phase
