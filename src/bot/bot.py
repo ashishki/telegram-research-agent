@@ -292,6 +292,27 @@ def _handle_callback(
     runtime_mode: str,
 ) -> None:
     callback_id = str(callback.get("id") or "")
+    data = str(callback.get("data") or "")
+    if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT and data.startswith(("prma:", "prmc:")):
+        callback_chat_id = str((((callback.get("message") or {}).get("chat") or {}).get("id")) or "")
+        result = handle_prm_post_answer_callback(
+            settings,
+            data,
+            chat_id=callback_chat_id,
+            actor_id=str((callback.get("from") or {}).get("id") or ""),
+            owner_chat_id=owner_chat_id,
+        )
+        unavailable = str(result.get("status") or "") in {
+            "action_unavailable", "expired", "action_not_available", "missing_proposal",
+            "invalid_selection", "selection_required",
+        }
+        if callback_id:
+            _telegram_answer_callback(token, callback_id, "Action unavailable" if unavailable else "Принято")
+        if not unavailable:
+            message = str(result.get("message") or "")
+            if message:
+                send_message(token, callback_chat_id, message, parse_mode=None, reply_markup=result.get("reply_markup"))
+        return
     if not _is_authorized_callback(callback, owner_chat_id):
         if callback_id:
             _telegram_answer_callback(token, callback_id, "Not authorized")
@@ -301,7 +322,6 @@ def _handle_callback(
         if callback_id:
             _telegram_answer_callback(token, callback_id, "PRM доступен только в личном чате владельца")
         return
-    data = str(callback.get("data") or "")
     english_feedback = data.startswith("utdw:") and data.endswith(":en")
     answer = "Готово"
     callback_acknowledged = False

@@ -531,11 +531,12 @@ class TestIdeaCallbacks(unittest.TestCase):
         def stop_after_first_poll(state):
             state.stop_requested = True
 
-        with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "token", "TELEGRAM_OWNER_CHAT_ID": "12345"}, clear=False), patch.object(bot_runtime, "_install_signal_handlers", side_effect=stop_after_first_poll), patch.object(bot_runtime, "_telegram_get_updates", return_value=[update]), patch.object(bot_runtime, "handle_prm_post_answer_callback") as action_mock, patch.object(bot_runtime, "_telegram_answer_callback") as answer_mock:
+        with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "token", "TELEGRAM_OWNER_CHAT_ID": "12345"}, clear=False), patch.object(bot_runtime, "_install_signal_handlers", side_effect=stop_after_first_poll), patch.object(bot_runtime, "_telegram_get_updates", return_value=[update]), patch.object(bot_runtime, "handle_prm_post_answer_callback", return_value={"status": "action_unavailable"}) as action_mock, patch.object(bot_runtime, "_telegram_answer_callback") as answer_mock, patch.object(bot_runtime, "send_message") as send_mock:
             bot_runtime.run_bot(settings, runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT)
 
-        action_mock.assert_not_called()
-        answer_mock.assert_called_once_with("token", "callback-group", "PRM доступен только в личном чате владельца")
+        action_mock.assert_called_once_with(settings, "prma:opaque:n", chat_id="-10077", actor_id="12345", owner_chat_id="12345")
+        answer_mock.assert_called_once_with("token", "callback-group", "Action unavailable")
+        send_mock.assert_not_called()
 
     def test_run_bot_voice_without_transcript_runs_transcription(self):
         settings = self._settings_with_idea()
