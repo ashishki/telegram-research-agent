@@ -72,6 +72,11 @@ unavailable data and blocks an old handler until no unexpired nonterminal row
 in either namespace remains; it never changes shared UTD rows. Its PA-00 test
 must create a real UTD-path row and prove both blocker detection and SELECT-only
 SQL tracing.
+Legacy PRM markup receives no authenticated actor/owner tuple and must render
+no control. Initial offered action codes alone are valid; dynamic `c`, `n1`–`n5`,
+feedback-reason and confirmation codes require their exact issued, persisted
+parent transition, otherwise they fail read-only. The focused tier's existing
+callbacks/UTD callback/UTD dispatch tests are PA-00 scope, not bypassed.
 Use `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest` for
 direct PA-00 focused tests and record the resolved Python/version. Full
 plain-language “yes” is PA-03 work, where an exact current visible confirmation

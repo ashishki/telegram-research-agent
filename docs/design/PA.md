@@ -133,7 +133,10 @@ The registration and callback interfaces therefore carry all three fields:
 The callback handler compares both persisted hashes with the incoming tuple; a
 group, absent identity or mismatch returns unavailable and performs no write.
 This limitation must remain explicit until a separately designed multi-actor
-model exists.
+model exists. The legacy `bot.legacy_handlers._prm_post_answer_markup` is an
+intentional no-controls path in PA-00: it has no authenticated actor/owner
+tuple, so it may render its answer but receives `reply_markup=None` from the
+shared builder.
 
 `_register_context` is the only creator, immediately after a rendered answer.
 The callback pipeline has an explicit read-only validation phase: parse prefix,
@@ -160,6 +163,26 @@ asks for the current inline action instead. This denial is independent of
 `last_topic` or `last_action_context_id` into a callback. The no-reroute test
 instruments the application/search entrypoint and requires zero calls for an
 old callback.
+
+Initial `offered_action_codes` authorize only the buttons rendered with the
+answer. A non-initial callback code is accepted solely through the following
+server-bound dynamic state machine, stored under reserved `proposals_json`
+keys after the full immutable binding/identity validation:
+
+- a valid initially offered `n` with more than one bound evidence item records
+  a selection-open state and issues only `n1` through the actual bounded item
+  count; a child code requires that state, index and parent `n` offer;
+- a valid initially offered `m` or `x` records its exact reason-parent and
+  issues the displayed reason codes; each reason requires that issued parent;
+- a valid selection or proposal preview records the exact `c` cancel issuance;
+  `c` requires that issuance, current ready/pending state and no confirmation
+  lock; and
+- `prmc:<context>:<action>` requires the exact proposal/token created by a
+  valid preceding action; it cannot create a proposal itself.
+
+No other dynamic code is accepted. A forged, stale or cross-transition `c`,
+`n1`–`n5`, reason, or confirmation fails read-only as unavailable. The action
+tests cover every positive transition and a forged transition before its parent.
 
 This is JSON-additive: PA-00 adds no table migration. Only `context_kind=prm`
 rows receive/require this binding; the shared UTD draft representation is not
@@ -264,14 +287,13 @@ failures for required semantic test-first changes. Split an oversized slice by
 revising the registry and approval as necessary, not by silently exceeding its
 budget.
 
-In this checkout the supported direct focused invocation is
-`PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q ...`;
-`python` is not assumed to exist. Registry `{python}` means the resolved
-`sys.executable`. PA-00 records its exact path/version and both environment
-values in the before/after receipt. That fresh receipt separately records the
-then-current HEAD, active bot runtime mode and the evaluator's synthetic action
-context IDs; it preserves the historical `cc105…` run only as a baseline
-reference and never presents evaluator simulation as Telegram callback evidence.
+PA-00's receipt records the resolved interpreter/environment, then-current
+HEAD, active bot runtime mode and evaluator synthetic context IDs; the historic
+`cc105…` run is reference-only, never Telegram evidence.
+PA-00's actual focused-tier blast radius includes `test_callbacks.py`,
+`test_prm_utd_callbacks.py`, and `test_prm_utd_dispatch.py`; their existing
+expectations are corrected, not bypassed; the registry includes them and the
+legacy markup caller within `files<=18`.
 
 Independent product/program design review precedes exact human approval.
 Slice/Test Critic/privacy reviews follow risk; full review is batched at phase
