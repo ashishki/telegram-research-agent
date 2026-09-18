@@ -2,8 +2,11 @@
 import importlib.util
 import json
 from pathlib import Path
+import subprocess
+import sys
 from unittest.mock import patch
 
+ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = Path(__file__).resolve().parents[1] / 'tools/playbook.py'
 spec = importlib.util.spec_from_file_location('pinned_playbook_bridge', MODULE_PATH)
 bridge = importlib.util.module_from_spec(spec)
@@ -124,3 +127,17 @@ def test_generated_verifier_receives_exact_args_and_restores_argv(tmp_path):
     with patch.object(bridge, 'ROOT', tmp_path), patch.object(bridge, 'verified_upstream', return_value=upstream):
         assert bridge.main(['verify_project', '--root', '.']) == 29
     assert bridge.sys.argv is previous
+
+
+def test_renderer_entrypoint_uses_pinned_role_set():
+    result = subprocess.run(
+        [sys.executable, str(ROOT / 'tools/render_codex_exec_prompt.py'), '--help'],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+    assert 'product_design_review' in result.stdout
+    assert 'program_design_review' in result.stdout
