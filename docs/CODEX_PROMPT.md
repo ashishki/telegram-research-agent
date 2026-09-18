@@ -71,6 +71,9 @@ see `docs/PRM_SEARCH_NEWS_EVAL.md` for planned independent evaluation.
 - `docs/PRM_INTENT_AND_ANSWER_CONTRACT.md` — archive-first intent semantics;
 - `docs/PRIVACY_THREAT_MODEL.md` — actual privacy/egress changes;
 - `docs/IMPLEMENTATION_CONTRACT.md` — persistent/compatibility boundaries.
+- `docs/UTD_ACADEMIC_INBOX_RESEARCH_HANDOFF.md` — research-only handoff for a
+  possible UTD mail/Canvas/public-source inbox; it grants no account, runtime
+  or egress authority.
 
 The UTD timer receipt from 2026-09-03 is historical. Current deployed SHA,
 profile confirmation, archive/index freshness and service state were not

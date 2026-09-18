@@ -2,7 +2,7 @@
 
 Status: current
 Version: 2.1
-Last updated: 2026-09-17
+Last updated: 2026-09-18
 
 ## Product boundary
 
@@ -90,6 +90,12 @@ profile confirmation were not observed by the 2026-09-17 audit. A general saved
 `watch_topic` remains durable intent only; the specific UTD capability and
 separate runtime permissions govern polling and notifications. Existing
 delivery is best-effort receipt deduplication, not proven exactly-once.
+
+`docs/UTD_ACADEMIC_INBOX_RESEARCH_HANDOFF.md` records an optional future
+read-only Academic Inbox research direction (mail, Canvas and selected public
+UTD context). It is deliberately outside the active watch: no connector,
+credential flow, storage, source permission or runtime is implemented or
+authorized by that document.
 
 The general search/news evolution in ADR-009 and
 `docs/PRM_SEARCH_NEWS_PLAN.md` is implemented locally: archive-grounded answers,

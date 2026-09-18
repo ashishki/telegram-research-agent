@@ -43,6 +43,11 @@ bounded timer enablement, failing closed until profile confirmation. The
 existing official-source, daily-cap, receipt and kill-switch boundaries remain;
 the new task queue does not extend those permissions. This is not PRM-19 dogfood.
 
+An optional UTD Academic Inbox (read-only university email, Canvas and public
+UTD context) is documented as a **research-only** handoff. It is not connected,
+does not expand the current watch, and cannot access personal accounts without
+separate approval: [research handoff](docs/UTD_ACADEMIC_INBOX_RESEARCH_HANDOFF.md).
+
 PRM archive research remains available for operator-controlled manual testing.
 PRM-19 requires separate explicit dogfood-start approval; PRM-20 requires real
 PRM-19 evidence and separate approval for compatibility cleanup. Details and
@@ -102,6 +107,7 @@ The complete historical pytest suite is intentionally not part of the normal loo
 - [PRM-SN pilot and rollback packet](docs/PRM_SEARCH_NEWS_PILOT_PACKET.md)
 - [Visual UX-evaluation packet](docs/PRM_VISUAL_EVAL.md)
 - [Local combat-evaluation evidence](docs/audit/PRM_COMBAT_EVAL_2026-09-18.md)
+- [UTD Academic Inbox research handoff](docs/UTD_ACADEMIC_INBOX_RESEARCH_HANDOFF.md)
 - [Implementation contract](docs/IMPLEMENTATION_CONTRACT.md)
 - [Privacy threat model](docs/PRIVACY_THREAT_MODEL.md)
 - [Repository retrofit plan](docs/retrofit/RFX_REPOSITORY_RETROFIT.md)

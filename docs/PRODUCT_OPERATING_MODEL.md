@@ -3,7 +3,7 @@
 > 2026-08-13 planning note: current runtime statements below are historical/local runtime receipts, not PRM-MAT operator-validation evidence. The proposed mature request, durability, freshness and approval boundaries are in `docs/prm_mature_product_contract.md`.
 
 Status: active handoff
-Last updated: 2026-09-17
+Last updated: 2026-09-18
 
 ## Current Truth
 
@@ -35,6 +35,12 @@ send Telegram alerts. Confirmation does not start PRM-19 dogfood or authorize
 automatic profile changes, university-system actions, unrestricted research, or
 a release claim. The receipt is
 `docs/audit/UTD_LIVE_DOGFOOD_START_2026-09-03.md`.
+
+`docs/UTD_ACADEMIC_INBOX_RESEARCH_HANDOFF.md` is a research-only proposal for
+an optional read-only inbox over university email, Canvas and selected public
+UTD sources. It has no confirmed profile, OAuth connection, collection,
+delivery, timer or authority in the present operating model. It must not be
+treated as an extension of the current UTD public-watch permission.
 
 Runtime freeze recorded on 2026-07-29:
 

@@ -1,7 +1,7 @@
 # Privacy Threat Model
 
 Status: draft
-Last updated: 2026-08-11
+Last updated: 2026-09-18
 
 ## Assets
 
@@ -40,6 +40,8 @@ Last updated: 2026-08-11
 | a confirmed watch is mistaken for permission to poll/notify | `watch_topic` remains non-executable; ADR-008 requires exact confirmed scope, a separate sidecar, feature flag and timer approval |
 | external source failure is treated as a cancelled item | stale/fetch failure blocks change notification and records source health only |
 | UTD fixtures expose institutional or operator data | raw captures remain local; committed fixtures are minimized/sanitized and manifest validation rejects private-data claims |
+| a public UTD watch is mistaken for consent to read mail or Canvas | Academic Inbox requires a distinct, explicit OAuth consent and profile; existing UTD watch scopes, timers and receipts never grant it |
+| OAuth token, email body, attachment, Canvas grade or submission enters Git/logs/model prompts | secrets remain outside Git and application records keep only opaque references; default processing is local/minimized, attachments/grades/submissions are excluded and provider egress needs a separate ADR/consent |
 
 ## Provider Egress Rule
 
@@ -77,6 +79,17 @@ answer. It must not receive broad archive dumps, full database exports, uncited
 raw Telegram corpus, provider payload logs, or durable chat transcript writes.
 If the operator omits the egress switch, LLM-backed surfaces must remain
 local-only or refuse before provider invocation.
+
+## Academic Inbox Boundary
+
+The optional UTD Academic Inbox is a research direction only; its full handoff
+is `docs/UTD_ACADEMIC_INBOX_RESEARCH_HANDOFF.md`. No current PRM/UTD consent
+authorizes access to university email or Canvas. A future implementation must
+use a separate confirmed consent, least-privilege read scope, secret reference,
+derived gitignored sidecar, retention/revocation path and synthetic fixture
+suite before it processes an account. It must not fetch attachments, grades,
+submissions or broad historical mail by default, and it must not send personal
+academic data to a provider/model without a separate explicit approval and ADR.
 
 ## External Verification Rule
 

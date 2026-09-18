@@ -20,6 +20,9 @@
 - `PRM_SEARCH_NEWS_PILOT_PACKET.md` — reviewable, non-authorizing pilot/rollback packet;
 - `PRM_VISUAL_EVAL.md` — synthetic visual screens and redacted model-judge packet;
 - `audit/PRM_COMBAT_EVAL_2026-09-18.md` — final local product-claim evaluation evidence;
+- `UTD_ACADEMIC_INBOX_RESEARCH_HANDOFF.md` — research-only design and guardrails
+  for a possible read-only UTD email/Canvas/public-source Academic Inbox; it
+  is not an implementation or runtime approval;
 - `EVIDENCE_INDEX.md` — current evidence only;
 - `IMPLEMENTATION_JOURNAL.md` — current phase journal;
 - `REVIEW_POLICY.md` — review and approval boundaries.
