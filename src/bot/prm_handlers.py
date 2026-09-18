@@ -59,8 +59,27 @@ def send_message(
     parse_mode: str | None = None,
     escape_markdown: bool = False,
     reply_markup: dict | None = None,
+    delivery_authorization: AuthorizationDecision | None = None,
+    actor_id: str | None = None,
+    owner_chat_id: str | None = None,
 ) -> None:
+    """Send PA-originated Telegram content only with a current grant.
+
+    Calls from text, voice and UTD/callback paths share this single final-send
+    boundary.  PA-02 intentionally has no live grant source, so an omitted
+    decision denies before the Telegram transport rather than treating a token
+    or private chat as authority.
+    """
+
     del escape_markdown
+    if not _require_prm_delivery_authorization(
+        token=token,
+        chat_id=chat_id,
+        authorization=delivery_authorization,
+        actor_id=actor_id,
+        owner_chat_id=owner_chat_id,
+    ):
+        return
     try:
         kwargs: dict[str, object] = {
             "chat_id": chat_id,
@@ -72,7 +91,7 @@ def send_message(
             kwargs["reply_markup"] = reply_markup
         _send_text_internal(**kwargs)
     except Exception:
-        LOGGER.warning("Failed to send PRM Telegram message chat_id=%s", chat_id, exc_info=True)
+        LOGGER.warning("Failed to send PRM Telegram message")
 
 
 def dispatch_prm_command(
@@ -335,14 +354,8 @@ def _send_chunks(
     """
 
     delivery_owner_ref = _private_delivery_owner_ref(chat_id, actor_id, owner_chat_id)
-    token = _token()
-    delivery_connection_ref = _telegram_connection_ref(token)
     chunks = _split_telegram_text(text, limit=limit)
-    if (
-        delivery_owner_ref is None
-        or delivery_connection_ref is None
-        or len(delivery_authorizations) < len(chunks)
-    ):
+    if delivery_owner_ref is None or len(delivery_authorizations) < len(chunks):
         LOGGER.warning("PRM result delivery denied before Telegram send")
         return
     decisions = iter(delivery_authorizations)
@@ -351,30 +364,14 @@ def _send_chunks(
         if decision is None:
             LOGGER.warning("PRM result delivery denied before Telegram send")
             return
-        try:
-            require_authorized_operation(
-                decision,
-                capability=RESULT_DELIVERY_CAPABILITY,
-                operation="deliver",
-                provider_ref=TELEGRAM_PROVIDER_REF,
-                data_class=RESULT_DELIVERY_DATA_CLASS,
-                owner_ref=delivery_owner_ref,
-                connection_ref=delivery_connection_ref,
-                resource_ref=chat_id,
-                purpose=transport_purpose(
-                    provider_ref=TELEGRAM_PROVIDER_REF,
-                    capability=RESULT_DELIVERY_CAPABILITY,
-                    operation="deliver",
-                ),
-            )
-        except CapabilityDenied:
-            LOGGER.warning("PRM result delivery denied before Telegram send")
-            return
         send_message(
-            token,
+            _token(),
             chat_id,
             chunk,
             reply_markup=reply_markup if index == len(chunks) - 1 else None,
+            delivery_authorization=decision,
+            actor_id=actor_id,
+            owner_chat_id=owner_chat_id,
         )
 
 
@@ -389,6 +386,41 @@ def _private_delivery_owner_ref(
     if any(value is None for value in values) or len(set(values)) != 1:
         return None
     return f"owner_telegram_{values[0]}"
+
+
+def _require_prm_delivery_authorization(
+    *,
+    token: str,
+    chat_id: str,
+    authorization: AuthorizationDecision | None,
+    actor_id: str | None,
+    owner_chat_id: str | None,
+) -> bool:
+    delivery_owner_ref = _private_delivery_owner_ref(chat_id, actor_id, owner_chat_id)
+    delivery_connection_ref = _telegram_connection_ref(token)
+    if delivery_owner_ref is None or delivery_connection_ref is None:
+        LOGGER.warning("PRM result delivery denied before Telegram send")
+        return False
+    try:
+        require_authorized_operation(
+            authorization,
+            capability=RESULT_DELIVERY_CAPABILITY,
+            operation="deliver",
+            provider_ref=TELEGRAM_PROVIDER_REF,
+            data_class=RESULT_DELIVERY_DATA_CLASS,
+            owner_ref=delivery_owner_ref,
+            connection_ref=delivery_connection_ref,
+            resource_ref=chat_id,
+            purpose=transport_purpose(
+                provider_ref=TELEGRAM_PROVIDER_REF,
+                capability=RESULT_DELIVERY_CAPABILITY,
+                operation="deliver",
+            ),
+        )
+    except CapabilityDenied:
+        LOGGER.warning("PRM result delivery denied before Telegram send")
+        return False
+    return True
 
 
 def _telegram_connection_ref(token: str) -> str | None:

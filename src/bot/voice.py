@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import re
+import hashlib
 import uuid
 from dataclasses import dataclass
 from urllib import parse, request
@@ -27,6 +28,7 @@ TELEGRAM_PROVIDER_REF = "provider_telegram"
 OPENAI_PROVIDER_REF = "provider_openai"
 VOICE_DOWNLOAD_CAPABILITY = "media.voice_download"
 VOICE_TRANSCRIPTION_CAPABILITY = "media.transcribe"
+OPENAI_TRANSCRIPTIONS_ENDPOINT = "https://api.openai.com/v1/audio/transcriptions"
 
 
 class VoiceTranscriptionError(RuntimeError):
@@ -35,6 +37,14 @@ class VoiceTranscriptionError(RuntimeError):
 
 class VoiceTranscriptionUnavailable(VoiceTranscriptionError):
     pass
+
+
+class _RejectRedirects(request.HTTPRedirectHandler):
+    """Never follow a transcription redirect to a different recipient."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[no-untyped-def]
+        del req, fp, code, msg, headers, newurl
+        return None
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +69,12 @@ def transcribe_telegram_voice(
     """Download and transcribe a Telegram voice attachment without disk staging."""
     if not token:
         raise VoiceTranscriptionError("Telegram bot token is missing")
+    del connection_ref
+    telegram_connection_ref = _telegram_connection_ref(token)
+    if telegram_connection_ref is None:
+        raise VoiceTranscriptionUnavailable("Telegram voice download requires a configured connection")
+    api_key = _require_openai_transcription_key()
+    openai_connection_ref = _openai_connection_ref(api_key)
     _require_safe_telegram_attachment_id(file_id)
     # The resource is the received Telegram attachment.  Do not allow a caller
     # to substitute an unrelated label for the file that will cross Telegram
@@ -67,24 +83,22 @@ def transcribe_telegram_voice(
     if not _voice_transcription_authorized(
         transcription_authorization,
         owner_ref=owner_ref,
-        connection_ref=connection_ref,
+        connection_ref=openai_connection_ref,
         resource_ref=voice_resource_ref,
     ):
         raise VoiceTranscriptionUnavailable("Voice transcription requires an active capability grant")
     if not _voice_download_authorized(
         download_authorization,
         owner_ref=owner_ref,
-        connection_ref=connection_ref,
+        connection_ref=telegram_connection_ref,
         resource_ref=voice_resource_ref,
     ) or not _voice_download_authorized(
         download_file_authorization,
         owner_ref=owner_ref,
-        connection_ref=connection_ref,
+        connection_ref=telegram_connection_ref,
         resource_ref=voice_resource_ref,
     ):
         raise VoiceTranscriptionUnavailable("Each Telegram voice request requires an active capability grant")
-    _require_openai_transcription_key()
-
     # ``media_dir`` remains an accepted compatibility argument, but PA-02 never
     # stages raw user audio on disk.  The bound bytes live only for this request.
     del media_dir
@@ -95,14 +109,14 @@ def transcribe_telegram_voice(
         get_file_authorization=download_authorization,
         download_file_authorization=download_file_authorization,
         owner_ref=owner_ref,
-        connection_ref=connection_ref,
+        connection_ref=telegram_connection_ref,
         resource_ref=voice_resource_ref,
     )
     return _transcribe_verified_telegram_audio(
         attachment,
         transcription_authorization=transcription_authorization,
         owner_ref=owner_ref,
-        connection_ref=connection_ref,
+        connection_ref=openai_connection_ref,
     )
 
 
@@ -134,15 +148,17 @@ def _transcribe_verified_telegram_audio(
     connection_ref: str | None = None,
 ) -> str:
     """Upload only the immutable resource/path pair created by the wrapper."""
+    del connection_ref
     resource_ref = attachment.file_id
+    api_key = _require_openai_transcription_key()
+    openai_connection_ref = _openai_connection_ref(api_key)
     if not _voice_transcription_authorized(
         transcription_authorization,
         owner_ref=owner_ref,
-        connection_ref=connection_ref,
+        connection_ref=openai_connection_ref,
         resource_ref=resource_ref,
     ):
         raise VoiceTranscriptionUnavailable("Voice transcription requires an active capability grant")
-    api_key = _require_openai_transcription_key()
 
     model = (
         os.environ.get("VOICE_TRANSCRIPTION_MODEL", "").strip()
@@ -150,9 +166,6 @@ def _transcribe_verified_telegram_audio(
         or DEFAULT_TRANSCRIPTION_MODEL
     )
     language = os.environ.get("VOICE_TRANSCRIPTION_LANGUAGE", "").strip()
-    endpoint = os.environ.get("OPENAI_AUDIO_TRANSCRIPTIONS_URL", "").strip() or (
-        "https://api.openai.com/v1/audio/transcriptions"
-    )
 
     fields = {"model": model}
     if language:
@@ -160,7 +173,7 @@ def _transcribe_verified_telegram_audio(
     _require_voice_transcription_authorization(
         transcription_authorization,
         owner_ref=owner_ref,
-        connection_ref=connection_ref,
+        connection_ref=openai_connection_ref,
         resource_ref=resource_ref,
     )
     body, boundary = _build_multipart_body(
@@ -170,7 +183,7 @@ def _transcribe_verified_telegram_audio(
         file_bytes=attachment.audio_bytes,
     )
     http_request = request.Request(
-        endpoint,
+        OPENAI_TRANSCRIPTIONS_ENDPOINT,
         data=body,
         headers={
             "Authorization": f"Bearer {api_key}",
@@ -179,7 +192,7 @@ def _transcribe_verified_telegram_audio(
         method="POST",
     )
     try:
-        with request.urlopen(http_request, timeout=120) as response:
+        with _open_openai_transcription_request(http_request, timeout=120) as response:
             payload = response.read().decode("utf-8")
     except Exception:
         LOGGER.warning("OpenAI voice transcription failed")
@@ -194,6 +207,39 @@ def _transcribe_verified_telegram_audio(
     if not text:
         raise VoiceTranscriptionError("OpenAI transcription response did not include text")
     return text
+
+
+def _open_openai_transcription_request(http_request: request.Request, *, timeout: int):
+    """Allow one fixed OpenAI endpoint and reject all redirect destinations."""
+
+    parsed = parse.urlsplit(http_request.full_url)
+    expected = parse.urlsplit(OPENAI_TRANSCRIPTIONS_ENDPOINT)
+    if (
+        parsed.scheme != expected.scheme
+        or parsed.netloc != expected.netloc
+        or parsed.path != expected.path
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise VoiceTranscriptionError("OpenAI transcription endpoint is not approved")
+    return request.build_opener(_RejectRedirects()).open(http_request, timeout=timeout)
+
+
+def _telegram_connection_ref(token: str) -> str | None:
+    return _credential_connection_ref("telegram", token)
+
+
+def _openai_connection_ref(api_key: str) -> str | None:
+    return _credential_connection_ref("openai", api_key)
+
+
+def _credential_connection_ref(provider: str, credential: str) -> str | None:
+    """Return an opaque in-memory ref for exactly one configured credential."""
+
+    clean_credential = str(credential or "").strip()
+    if not clean_credential:
+        return None
+    return f"connection_{provider}_{hashlib.sha256(clean_credential.encode('utf-8')).hexdigest()[:32]}"
 
 
 def _require_openai_transcription_key() -> str:
@@ -324,21 +370,24 @@ def _download_telegram_voice(
 ) -> _VerifiedTelegramVoiceAttachment:
     # Kept in the private helper signature for compatibility; raw user audio is
     # deliberately never written there or to any other local path.
-    del media_dir
+    del media_dir, connection_ref
+    telegram_connection_ref = _telegram_connection_ref(token)
+    if telegram_connection_ref is None:
+        raise VoiceTranscriptionUnavailable("Telegram voice download requires a configured connection")
     _require_safe_telegram_attachment_id(file_id)
     file_path = _get_telegram_file_path(
         token=token,
         file_id=file_id,
         authorization=get_file_authorization,
         owner_ref=owner_ref,
-        connection_ref=connection_ref,
+        connection_ref=telegram_connection_ref,
         resource_ref=resource_ref,
     )
     url = f"{TELEGRAM_FILE_BASE}/bot{token}/{file_path}"
     _require_voice_download_authorization(
         download_file_authorization,
         owner_ref=owner_ref,
-        connection_ref=connection_ref,
+        connection_ref=telegram_connection_ref,
         resource_ref=resource_ref,
     )
     try:
@@ -370,11 +419,15 @@ def _get_telegram_file_path(
     connection_ref: str | None,
     resource_ref: str | None,
 ) -> str:
+    del connection_ref
+    telegram_connection_ref = _telegram_connection_ref(token)
+    if telegram_connection_ref is None:
+        raise VoiceTranscriptionUnavailable("Telegram voice download requires a configured connection")
     url = f"{BOT_API_BASE}/bot{token}/getFile?file_id={parse.quote(file_id, safe='')}"
     _require_voice_download_authorization(
         authorization,
         owner_ref=owner_ref,
-        connection_ref=connection_ref,
+        connection_ref=telegram_connection_ref,
         resource_ref=resource_ref,
     )
     try:

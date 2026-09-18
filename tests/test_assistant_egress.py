@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
+from bot import bot as bot_runtime
 from bot import prm_handlers
 from bot.voice import VoiceTranscriptionUnavailable, transcribe_audio_file, transcribe_telegram_voice
 import llm.client as anthropic_client
@@ -145,7 +146,11 @@ def test_anthropic_text_client_uses_only_a_matching_provider_grant():
 def test_prm_result_delivery_requires_a_fresh_private_owner_grant_before_fake_telegram_send(monkeypatch):
     sent: list[str] = []
     _registry, _grant, decision = _delivery_decision()
-    monkeypatch.setattr(prm_handlers, "send_message", lambda _token, _chat, text, **_kwargs: sent.append(text))
+    monkeypatch.setattr(
+        prm_handlers,
+        "_send_text_internal",
+        lambda **kwargs: sent.append(str(kwargs["text"])),
+    )
     monkeypatch.setattr(prm_handlers, "_token", lambda: SYNTHETIC_TELEGRAM_TOKEN)
 
     prm_handlers._send_chunks(
@@ -164,7 +169,11 @@ def test_prm_result_delivery_rechecks_revocation_before_fake_telegram_send(monke
     sent: list[str] = []
     registry, grant, decision = _delivery_decision()
     registry.revoke_grant(grant.grant_id)
-    monkeypatch.setattr(prm_handlers, "send_message", lambda _token, _chat, text, **_kwargs: sent.append(text))
+    monkeypatch.setattr(
+        prm_handlers,
+        "_send_text_internal",
+        lambda **kwargs: sent.append(str(kwargs["text"])),
+    )
     monkeypatch.setattr(prm_handlers, "_token", lambda: SYNTHETIC_TELEGRAM_TOKEN)
 
     prm_handlers._send_chunks(
@@ -182,7 +191,11 @@ def test_prm_result_delivery_rechecks_revocation_before_fake_telegram_send(monke
 def test_prm_result_delivery_rejects_another_purpose_before_fake_telegram_send(monkeypatch):
     sent: list[str] = []
     _registry, _grant, decision = _delivery_decision(purpose="answer.request")
-    monkeypatch.setattr(prm_handlers, "send_message", lambda _token, _chat, text, **_kwargs: sent.append(text))
+    monkeypatch.setattr(
+        prm_handlers,
+        "_send_text_internal",
+        lambda **kwargs: sent.append(str(kwargs["text"])),
+    )
     monkeypatch.setattr(prm_handlers, "_token", lambda: SYNTHETIC_TELEGRAM_TOKEN)
 
     prm_handlers._send_chunks(
@@ -200,7 +213,11 @@ def test_prm_result_delivery_rejects_another_purpose_before_fake_telegram_send(m
 def test_prm_result_delivery_rejects_another_telegram_connection_before_fake_sender(monkeypatch):
     sent: list[str] = []
     _registry, _grant, decision = _delivery_decision(connection_ref="connection_telegram_other")
-    monkeypatch.setattr(prm_handlers, "send_message", lambda _token, _chat, text, **_kwargs: sent.append(text))
+    monkeypatch.setattr(
+        prm_handlers,
+        "_send_text_internal",
+        lambda **kwargs: sent.append(str(kwargs["text"])),
+    )
     monkeypatch.setattr(prm_handlers, "_token", lambda: SYNTHETIC_TELEGRAM_TOKEN)
 
     prm_handlers._send_chunks(
@@ -217,7 +234,11 @@ def test_prm_result_delivery_rejects_another_telegram_connection_before_fake_sen
 
 def test_prm_result_delivery_default_denies_before_fake_telegram_send(monkeypatch):
     sent: list[str] = []
-    monkeypatch.setattr(prm_handlers, "send_message", lambda _token, _chat, text, **_kwargs: sent.append(text))
+    monkeypatch.setattr(
+        prm_handlers,
+        "_send_text_internal",
+        lambda **kwargs: sent.append(str(kwargs["text"])),
+    )
     monkeypatch.setattr(prm_handlers, "_token", lambda: SYNTHETIC_TELEGRAM_TOKEN)
 
     prm_handlers._send_chunks(
@@ -227,6 +248,53 @@ def test_prm_result_delivery_default_denies_before_fake_telegram_send(monkeypatc
         actor_id="42",
         owner_chat_id="42",
     )
+
+    assert sent == []
+
+
+def test_shared_prm_sender_default_denies_voice_or_utd_text_before_fake_telegram_send(monkeypatch):
+    sent: list[str] = []
+    monkeypatch.setattr(
+        prm_handlers,
+        "_send_text_internal",
+        lambda **kwargs: sent.append(str(kwargs["text"])),
+    )
+
+    prm_handlers.send_message(
+        SYNTHETIC_TELEGRAM_TOKEN,
+        "42",
+        "voice-or-utd status",
+        actor_id="42",
+        owner_chat_id="42",
+    )
+
+    assert sent == []
+
+
+def test_prm_voice_polling_ingress_cannot_reach_the_fake_telegram_sender_without_delivery_grant(
+    monkeypatch,
+):
+    sent: list[str] = []
+    update = {
+        "update_id": 1,
+        "message": {"chat": {"id": 42}, "from": {"id": 42}, "voice": {"file_id": "voice-1"}},
+    }
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", SYNTHETIC_TELEGRAM_TOKEN)
+    monkeypatch.setenv("TELEGRAM_OWNER_CHAT_ID", "42")
+    monkeypatch.setattr(bot_runtime, "_install_signal_handlers", lambda state: setattr(state, "stop_requested", True))
+    monkeypatch.setattr(bot_runtime, "_telegram_get_updates", lambda **_kwargs: [update])
+    monkeypatch.setattr(
+        bot_runtime,
+        "transcribe_telegram_voice",
+        lambda **_kwargs: (_ for _ in ()).throw(VoiceTranscriptionUnavailable("synthetic unavailable")),
+    )
+    monkeypatch.setattr(
+        prm_handlers,
+        "_send_text_internal",
+        lambda **kwargs: sent.append(str(kwargs["text"])),
+    )
+
+    bot_runtime.run_bot(SimpleNamespace(), runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT)
 
     assert sent == []
 

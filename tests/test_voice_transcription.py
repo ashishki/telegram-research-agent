@@ -38,12 +38,20 @@ def _authorization(
     provider_ref: str,
     resource_ref: str = "resource_voice",
     purpose: str = "voice.transcription",
+    connection_ref: str | None = None,
 ):
+    if connection_ref is None:
+        connection_ref = (
+            voice._telegram_connection_ref("bot-token")
+            if provider_ref == "provider_telegram"
+            else voice._openai_connection_ref("openai-key")
+        )
+    assert connection_ref is not None
     now = datetime.now(timezone.utc).replace(microsecond=0)
     grant = CapabilityGrant(
         grant_id=f"grant_synthetic_{capability.replace('.', '_')}",
         owner_ref="owner_synthetic_primary",
-        connection_ref=None,
+        connection_ref=connection_ref,
         capability=capability,
         resource_refs=(resource_ref,),
         operations=(operation,),
@@ -62,6 +70,7 @@ def _authorization(
         data_class="user_provided",
         provider_ref=provider_ref,
         purpose=purpose,
+        connection_ref=connection_ref,
         expected_grant_revision=1,
     )
     return CapabilityRegistry((grant,)).authorize_and_reserve(request, now=now)
@@ -137,12 +146,20 @@ class TestVoiceTranscription(unittest.TestCase):
         )
         captured = {}
 
-        def fake_urlopen(request_obj, timeout):
+        def fake_open(request_obj, timeout):
             captured["body"] = request_obj.data
+            captured["url"] = request_obj.full_url
             return _FakeResponse({"text": "verified transcript"})
 
-        with patch.dict(os.environ, {"OPENAI_API_KEY": "openai-key"}, clear=False):
-            with patch("bot.voice.request.urlopen", side_effect=fake_urlopen):
+        with patch.dict(
+            os.environ,
+            {
+                "OPENAI_API_KEY": "openai-key",
+                "OPENAI_AUDIO_TRANSCRIPTIONS_URL": "https://attacker.invalid/collect",
+            },
+            clear=False,
+        ):
+            with patch("bot.voice._open_openai_transcription_request", side_effect=fake_open):
                 transcript = voice._transcribe_verified_telegram_audio(
                     attachment,
                     transcription_authorization=_authorization(
@@ -155,6 +172,7 @@ class TestVoiceTranscription(unittest.TestCase):
                 )
 
         self.assertEqual(transcript, "verified transcript")
+        self.assertEqual(captured["url"], voice.OPENAI_TRANSCRIPTIONS_ENDPOINT)
         self.assertIn(b"verified Telegram bytes", captured["body"])
         self.assertNotIn(b"substituted local bytes", captured["body"])
 
@@ -165,7 +183,10 @@ class TestVoiceTranscription(unittest.TestCase):
         )
 
         with patch.dict(os.environ, {"OPENAI_API_KEY": "openai-key"}, clear=False):
-            with patch("bot.voice.request.urlopen", side_effect=RuntimeError("provider-payload-sentinel")):
+            with patch(
+                "bot.voice._open_openai_transcription_request",
+                side_effect=RuntimeError("provider-payload-sentinel"),
+            ):
                 with self.assertLogs(voice.LOGGER, level="WARNING") as transcribe_logs:
                     with self.assertRaises(voice.VoiceTranscriptionError) as error:
                         voice._transcribe_verified_telegram_audio(
@@ -240,6 +261,29 @@ class TestVoiceTranscription(unittest.TestCase):
         assert "private/provider/path.ogg" not in rendered
         assert downloaded.file_id == "private-file-id-sentinel"
         assert downloaded.audio_bytes == b"synthetic voice bytes"
+
+    def test_transcription_rejects_an_unapproved_endpoint_before_opening_any_network_transport(self):
+        malicious = voice.request.Request(
+            "https://attacker.invalid/v1/audio/transcriptions",
+            data=b"synthetic",
+            method="POST",
+        )
+        with patch("bot.voice.request.build_opener") as build_opener:
+            with self.assertRaisesRegex(voice.VoiceTranscriptionError, "not approved"):
+                voice._open_openai_transcription_request(malicious, timeout=120)
+
+        build_opener.assert_not_called()
+
+    def test_transcription_redirect_handler_never_constructs_a_redirect_request(self):
+        handler = voice._RejectRedirects()
+        assert handler.redirect_request(
+            voice.request.Request(voice.OPENAI_TRANSCRIPTIONS_ENDPOINT),
+            None,
+            302,
+            "Found",
+            {},
+            "https://attacker.invalid/collect",
+        ) is None
 
     def test_voice_download_keeps_raw_bytes_in_memory_without_local_staging(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -328,7 +372,9 @@ class TestVoiceTranscription(unittest.TestCase):
         for wrong_layer in ("telegram_read", "openai_transcription"):
             download_purpose = "answer.request" if wrong_layer == "telegram_read" else "voice.transcription"
             transcription_purpose = "answer.request" if wrong_layer == "openai_transcription" else "voice.transcription"
-            with patch("bot.voice.request.urlopen") as urlopen:
+            with patch.dict(os.environ, {"OPENAI_API_KEY": "openai-key"}, clear=False), patch(
+                "bot.voice.request.urlopen"
+            ) as urlopen:
                 with self.assertRaises(VoiceTranscriptionUnavailable):
                     transcribe_telegram_voice(
                         token="bot-token",
@@ -352,6 +398,49 @@ class TestVoiceTranscription(unittest.TestCase):
                     )
             urlopen.assert_not_called()
 
+    def test_voice_transports_reject_grants_bound_to_another_configured_connection_before_network(self):
+        valid_download = lambda: _authorization(
+            capability="media.voice_download",
+            operation="read",
+            provider_ref="provider_telegram",
+            resource_ref="voice-1",
+        )
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "openai-key"}, clear=False):
+            for wrong_layer in ("telegram_read", "openai_transcription"):
+                download_connection = (
+                    "connection_telegram_other"
+                    if wrong_layer == "telegram_read"
+                    else voice._telegram_connection_ref("bot-token")
+                )
+                transcription_connection = (
+                    "connection_openai_other"
+                    if wrong_layer == "openai_transcription"
+                    else voice._openai_connection_ref("openai-key")
+                )
+                with patch("bot.voice.request.urlopen") as urlopen:
+                    with self.assertRaises(VoiceTranscriptionUnavailable):
+                        transcribe_telegram_voice(
+                            token="bot-token",
+                            file_id="voice-1",
+                            download_authorization=_authorization(
+                                capability="media.voice_download",
+                                operation="read",
+                                provider_ref="provider_telegram",
+                                resource_ref="voice-1",
+                                connection_ref=download_connection,
+                            ),
+                            download_file_authorization=valid_download(),
+                            transcription_authorization=_authorization(
+                                capability="media.transcribe",
+                                operation="model_egress",
+                                provider_ref="provider_openai",
+                                resource_ref="voice-1",
+                                connection_ref=transcription_connection,
+                            ),
+                            owner_ref="owner_synthetic_primary",
+                        )
+                urlopen.assert_not_called()
+
     def test_transcribe_telegram_voice_uses_each_real_policy_layer_once(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             urls: list[str] = []
@@ -364,11 +453,16 @@ class TestVoiceTranscription(unittest.TestCase):
                     return _FakeResponse({"ok": True, "result": {"file_path": "voice/synthetic.ogg"}})
                 if "/file/bot" in url:
                     return _FakeResponse(b"synthetic voice bytes")
+
+            def fake_transcription_open(request_obj, timeout):
                 transcription_bodies.append(request_obj.data)
                 return _FakeResponse({"text": "integrated synthetic transcript"})
 
             with patch.dict(os.environ, {"OPENAI_API_KEY": "openai-key"}, clear=False):
-                with patch("bot.voice.request.urlopen", side_effect=fake_urlopen):
+                with patch("bot.voice.request.urlopen", side_effect=fake_urlopen), patch(
+                    "bot.voice._open_openai_transcription_request",
+                    side_effect=fake_transcription_open,
+                ):
                     transcript = transcribe_telegram_voice(
                         token="bot-token",
                         file_id="voice-1",
@@ -395,7 +489,7 @@ class TestVoiceTranscription(unittest.TestCase):
                     )
 
             self.assertEqual(transcript, "integrated synthetic transcript")
-            self.assertEqual(len(urls), 3)
+            self.assertEqual(len(urls), 2)
             self.assertEqual(len(transcription_bodies), 1)
             self.assertIn(b"synthetic voice bytes", transcription_bodies[0])
             self.assertEqual(list(Path(tmpdir).iterdir()), [])
