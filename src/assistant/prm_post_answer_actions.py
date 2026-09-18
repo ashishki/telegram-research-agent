@@ -7,6 +7,7 @@ import json
 import re
 import secrets
 import sqlite3
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Mapping
@@ -45,6 +46,31 @@ _CONFIRMATION_LOCK_TTL = timedelta(minutes=2)
 _CONFIRMATION_LOCK_KEY = "__confirmation_lock__"
 _CANONICAL_PRIVATE_OWNER_ID = re.compile(r"[1-9][0-9]{0,18}\Z")
 _MAX_PRIVATE_OWNER_ID = 9_223_372_036_854_775_807
+_CONTEXT_ID = re.compile(r"[0-9a-f]{10}\Z")
+
+
+@dataclass(frozen=True)
+class UnavailablePrmAction:
+    """A deliberately detail-free result for a rejected PRM control."""
+
+
+@dataclass(frozen=True)
+class ValidatedPrmAction:
+    """Immutable, read-only validation output consumed by one CAS application."""
+
+    prefix: str
+    context_id: str
+    action: str
+    chat_id: str
+    actor_id: str
+    owner_chat_id: str
+    status: str
+    expires_at: str
+    summary_json: str
+    proposals_json: str
+    summary_fingerprint: str
+    proposals_fingerprint: str
+    source_snapshot_json: str
 
 _SHORT_LABELS = {
     "u": "👍 Полезно",
@@ -156,133 +182,417 @@ def handle_post_answer_callback(
     actor_id: str | None = None,
     owner_chat_id: str | None = None,
 ) -> dict[str, Any]:
-    """Draft or confirm a proposal. No callback is a write unless it is `prmc`."""
+    """Validate once without writes, then apply that exact bound transition."""
+
+    validated = validate_prm_post_answer_callback(
+        db_path,
+        callback_data,
+        chat_id=chat_id,
+        actor_id=actor_id,
+        owner_chat_id=owner_chat_id,
+    )
+    if isinstance(validated, UnavailablePrmAction):
+        return _unavailable_action()
+    return apply_validated_prm_action(db_path, validated)
+
+
+def validate_prm_post_answer_callback(
+    db_path: str | Path,
+    callback_data: str,
+    *,
+    chat_id: str,
+    actor_id: str | None = None,
+    owner_chat_id: str | None = None,
+) -> ValidatedPrmAction | UnavailablePrmAction:
+    """Purely validate a PRM callback against one immutable persisted context."""
 
     private_tuple = _private_owner_tuple(chat_id, actor_id, owner_chat_id)
     if private_tuple is None:
-        return _unavailable_action()
+        return UnavailablePrmAction()
     try:
         prefix, context_id, action = _parse_callback(callback_data)
     except (TypeError, ValueError):
+        return UnavailablePrmAction()
+    if not _CONTEXT_ID.fullmatch(context_id):
+        return UnavailablePrmAction()
+    row = _read_prm_validation_row(db_path, context_id)
+    if row is None:
+        return UnavailablePrmAction()
+    stored_chat_hash, summary_json, proposals_json, expires_at, status = row
+    if stored_chat_hash != _chat_hash(private_tuple[0]) or status not in {"ready", "pending", "confirmed"}:
+        return UnavailablePrmAction()
+    try:
+        context = json.loads(summary_json)
+        proposals = json.loads(proposals_json)
+        expiry = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return UnavailablePrmAction()
+    if not isinstance(context, dict) or not isinstance(proposals, dict) or expiry.tzinfo is None:
+        return UnavailablePrmAction()
+    if expiry <= datetime.now(timezone.utc) and _confirmation_lock_value(proposals) is None:
+        return UnavailablePrmAction()
+    if not _valid_prm_binding(context, context_id):
+        return UnavailablePrmAction()
+    if (
+        context.get("actor_hash") != _chat_hash(private_tuple[1])
+        or context.get("owner_chat_id_hash") != _chat_hash(private_tuple[2])
+    ):
+        return UnavailablePrmAction()
+    snapshot = context["prm_post_answer_action_binding"]["source_snapshot"]
+    if not isinstance(snapshot, Mapping) or not _validated_transition_allowed(prefix, action, snapshot, proposals, status):
+        return UnavailablePrmAction()
+    try:
+        snapshot_json = json.dumps(snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    except (TypeError, ValueError):
+        return UnavailablePrmAction()
+    return ValidatedPrmAction(
+        prefix=prefix,
+        context_id=context_id,
+        action=action,
+        chat_id=private_tuple[0],
+        actor_id=private_tuple[1],
+        owner_chat_id=private_tuple[2],
+        status=status,
+        expires_at=expires_at,
+        summary_json=summary_json,
+        proposals_json=proposals_json,
+        summary_fingerprint=_fingerprint(summary_json),
+        proposals_fingerprint=_fingerprint(proposals_json),
+        source_snapshot_json=snapshot_json,
+    )
+
+
+def apply_validated_prm_action(
+    db_path: str | Path, validated: ValidatedPrmAction,
+) -> dict[str, Any]:
+    """Consume one validated transition with a status/expiry/fingerprint CAS."""
+
+    if not isinstance(validated, ValidatedPrmAction):
         return _unavailable_action()
-    context = _load_context(db_path, context_id, *private_tuple)
-    if context is None:
-        return {"status": "expired", "write_performed": False, "message": "Действие устарело. Запроси ответ заново."}
-    if str(context.get("_status") or "") == "confirmed":
-        return {"status": "already_confirmed", "write_performed": False, "message": "Этот черновик уже подтверждён; новая запись не создаётся."}
-    if _confirmation_locked(context):
-        if prefix != PRM_CONFIRM_PREFIX:
-            return {"status": "confirmation_in_progress", "write_performed": False, "message": "Подтверждение уже выполняется; повтори проверку статуса."}
-    if prefix == PRM_ACTION_PREFIX:
-        if action == "c":
-            if not _delete_context(db_path, context_id):
-                return {"status": "confirmation_in_progress", "write_performed": False, "message": "Подтверждение уже началось; повтори запрос статуса."}
-            return {"status": "cancelled", "write_performed": False, "message": "Черновик отменён. Запись не создана."}
-        if not _action_allowed(context, action):
-            return {"status": "action_not_available", "write_performed": False, "message": "Это действие не предлагалось для текущей версии ответа."}
-        if action == "n" and len(context.get("evidence_items") or []) > 1:
-            context["proposals"]["__selection_open__"] = True
-            _save_proposals(db_path, context_id, context["proposals"])
-            return _select_item_result(context_id, context)
-        selected_index = _selected_item_index(action)
-        if selected_index and selected_index > len(context.get("evidence_items") or []):
-            return {"status": "invalid_selection", "write_performed": False, "message": "Этот пункт не относится к текущей версии ответа."}
-        if selected_index and not context["proposals"].get("__selection_open__"):
-            return {"status": "selection_required", "write_performed": False, "message": "Сначала выбери пункт через предпросмотр."}
-        proposal_type, label = _ACTION_TYPES["n" if _selected_item_index(action) else action]
-        if proposal_type in {"followup_more", "followup_refine"}:
-            return _followup_result(context, action)
-        if proposal_type == "feedback_reason_prompt":
-            context["proposals"]["__reason_parent__"] = action
-            _save_proposals(db_path, context_id, context["proposals"])
-            try:
-                record_feedback_transition(db_path, interaction_id=context_id, action_code=action)
-            except sqlite3.Error:
-                pass
-            update_private_interaction_feedback(context_id, feedback="partial" if action == "m" else "miss")
-            reason_rows = [
-                [
-                    {"text": _ACTION_TYPES["ws"][1], "callback_data": f"{PRM_ACTION_PREFIX}:{context_id}:ws"},
-                    {"text": _ACTION_TYPES["og"][1], "callback_data": f"{PRM_ACTION_PREFIX}:{context_id}:og"},
-                ],
-                [
-                    {"text": _ACTION_TYPES["wp"][1], "callback_data": f"{PRM_ACTION_PREFIX}:{context_id}:wp"},
-                    {"text": _ACTION_TYPES["na"][1], "callback_data": f"{PRM_ACTION_PREFIX}:{context_id}:na"},
-                ],
-                [
-                    {"text": _ACTION_TYPES["lg"][1], "callback_data": f"{PRM_ACTION_PREFIX}:{context_id}:lg"},
-                    {"text": _ACTION_TYPES["we"][1], "callback_data": f"{PRM_ACTION_PREFIX}:{context_id}:we"},
-                ],
-            ]
-            return {
-                "status": "needs_reason",
-                "write_performed": False,
-                "message": "Уточни причину, чтобы следующая итерация была полезнее.",
-                "reply_markup": {"inline_keyboard": reason_rows},
-            }
-        if proposal_type in {"feedback", "feedback_reason"}:
-            try:
-                record_feedback_transition(db_path, interaction_id=context_id, action_code=action)
-            except sqlite3.Error:
-                pass
-            update_private_interaction_feedback(
-                context_id,
-                feedback=_feedback_label(action),
-                reason=label if proposal_type == "feedback_reason" else "",
-            )
-        if proposal_type == "feedback_reason":
-            return {
-                "status": "recorded",
-                "write_performed": False,
-                "message": "Записал причину обратной связи.",
-            }
-        if proposal_type == "feedback" and str(context.get("primary_intent") or ""):
-            return {
-                "status": "recorded",
-                "write_performed": False,
-                "message": "Оценку записал.",
-            }
-        proposal_result = context["proposals"].get(action)
-        if not isinstance(proposal_result, Mapping):
-            proposal_result = build_memory_proposal(proposal_type, _proposal_args(context, action))
-            proposal_result["confirmation"]["token"] = f"{PRM_CONFIRM_PREFIX}-{secrets.token_urlsafe(24)}"
-            context["proposals"][action] = proposal_result
-            _save_proposals(db_path, context_id, context["proposals"])
-        confirm_data = f"{PRM_CONFIRM_PREFIX}:{context_id}:{action}"
-        return {
-            "status": "needs_confirmation",
-            "write_performed": False,
-            "proposal": proposal_result["proposal"],
-            "message": _render_proposal_preview(label, proposal_result["proposal"]),
-            "reply_markup": {"inline_keyboard": [[
-                {"text": "Подтвердить", "callback_data": confirm_data},
-                {"text": "Отменить", "callback_data": f"{PRM_ACTION_PREFIX}:{context_id}:c"},
-            ]]},
-        }
-    proposal_result = context["proposals"].get(action)
-    if not isinstance(proposal_result, Mapping):
-        return {"status": "missing_proposal", "write_performed": False, "message": "Сначала выбери действие ещё раз."}
-    claim_id = _claim_context_for_confirmation(db_path, context_id, chat_id)
-    if claim_id is None:
-        return {"status": "confirmation_in_progress", "write_performed": False, "message": "Подтверждение уже выполняется; повтори проверку статуса."}
+    if validated.prefix == PRM_CONFIRM_PREFIX:
+        return _apply_validated_confirmation(db_path, validated)
+    try:
+        context, proposals = _validated_context_and_proposals(validated)
+        with sqlite3.connect(db_path) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            if not _validated_row_is_current(connection, validated):
+                connection.rollback()
+                return _unavailable_action()
+            if validated.status == "confirmed":
+                connection.rollback()
+                return _unavailable_action()
+            action = validated.action
+            if action in {"o", "q"}:
+                connection.rollback()
+                return _followup_result(context, action)
+            if action == "c":
+                if not _cas_prm_context(
+                    connection, validated, proposals=proposals, next_status="cancelled",
+                ):
+                    connection.rollback()
+                    return _unavailable_action()
+                connection.commit()
+                return {"status": "cancelled", "write_performed": False, "message": "Черновик отменён. Запись не создана."}
+            if action == "n" and len(context["evidence_items"]) > 1:
+                issued = [f"n{index}" for index in range(1, len(context["evidence_items"]) + 1)]
+                proposals["__selection__"] = {"parent": "n", "issued_codes": issued}
+                proposals["__cancel_issued_for__"] = {"kind": "selection", "parent": "n"}
+                if not _cas_prm_context(connection, validated, proposals=proposals, next_status="pending"):
+                    connection.rollback()
+                    return _unavailable_action()
+                connection.commit()
+                return _select_item_result(validated.context_id, context)
+            proposal_type, label = _ACTION_TYPES["n" if _selected_item_index(action) else action]
+            if proposal_type == "feedback_reason_prompt":
+                proposals["__feedback_reason__"] = {
+                    "parent": action,
+                    "issued_codes": ["ws", "og", "wp", "na", "lg", "we"],
+                }
+                if not _cas_prm_context(connection, validated, proposals=proposals, next_status="pending"):
+                    connection.rollback()
+                    return _unavailable_action()
+                connection.commit()
+                _record_validated_feedback(db_path, validated.context_id, action, label)
+                return _reason_prompt_result(validated.context_id)
+            if proposal_type == "feedback_reason":
+                proposals["__feedback_recorded__"] = action
+                if not _cas_prm_context(connection, validated, proposals=proposals, next_status="pending"):
+                    connection.rollback()
+                    return _unavailable_action()
+                connection.commit()
+                _record_validated_feedback(db_path, validated.context_id, action, label)
+                return {"status": "recorded", "write_performed": False, "message": "Записал причину обратной связи."}
+            if proposal_type == "feedback" and context["primary_intent"]:
+                proposals["__feedback_recorded__"] = action
+                if not _cas_prm_context(connection, validated, proposals=proposals, next_status="pending"):
+                    connection.rollback()
+                    return _unavailable_action()
+                connection.commit()
+                _record_validated_feedback(db_path, validated.context_id, action, label)
+                return {"status": "recorded", "write_performed": False, "message": "Оценку записал."}
+            proposal_result = proposals.get(action)
+            if not isinstance(proposal_result, Mapping):
+                proposal_result = build_memory_proposal(proposal_type, _proposal_args(context, action))
+                proposal_result["confirmation"]["token"] = f"{PRM_CONFIRM_PREFIX}-{secrets.token_urlsafe(24)}"
+                proposals[action] = proposal_result
+            proposals["__cancel_issued_for__"] = {"kind": "preview", "parent": action}
+            if not _cas_prm_context(connection, validated, proposals=proposals, next_status="pending"):
+                connection.rollback()
+                return _unavailable_action()
+            connection.commit()
+    except (KeyError, TypeError, ValueError, sqlite3.Error):
+        return _unavailable_action()
+    if proposal_type == "feedback":
+        _record_validated_feedback(db_path, validated.context_id, action, label)
+    proposal = proposal_result.get("proposal") if isinstance(proposal_result, Mapping) else None
+    if not isinstance(proposal, Mapping):
+        return _unavailable_action()
+    return {
+        "status": "needs_confirmation",
+        "write_performed": False,
+        "proposal": proposal,
+        "message": _render_proposal_preview(label, proposal),
+        "reply_markup": {"inline_keyboard": [[
+            {"text": "Подтвердить", "callback_data": f"{PRM_CONFIRM_PREFIX}:{validated.context_id}:{action}"},
+            {"text": "Отменить", "callback_data": f"{PRM_ACTION_PREFIX}:{validated.context_id}:c"},
+        ]]},
+    }
+
+
+def _read_prm_validation_row(
+    db_path: str | Path, context_id: str,
+) -> tuple[str, str, str, str, str] | None:
+    """Read exactly one context through SQLite's read-only connection mode."""
+
+    try:
+        database_uri = f"{Path(db_path).resolve().as_uri()}?mode=ro"
+        with sqlite3.connect(database_uri, uri=True) as connection:
+            row = connection.execute(
+                "SELECT chat_id_hash, summary_json, proposals_json, expires_at, status "
+                "FROM prm_post_answer_proposals WHERE context_id = ?",
+                (context_id,),
+            ).fetchone()
+    except (OSError, sqlite3.Error):
+        return None
+    if row is None or len(row) != 5 or any(not isinstance(value, str) for value in row):
+        return None
+    return row
+
+
+def _validated_transition_allowed(
+    prefix: str,
+    action: str,
+    snapshot: Mapping[str, Any],
+    proposals: Mapping[str, Any],
+    status: str,
+) -> bool:
+    """Accept only the initial offer or an exact server-issued child state."""
+
+    if prefix == PRM_CONFIRM_PREFIX:
+        proposal = proposals.get(action)
+        confirmation = proposal.get("confirmation") if isinstance(proposal, Mapping) else None
+        return (
+            status in {"ready", "pending", "confirmed"}
+            and action != "c"
+            and isinstance(proposal, Mapping)
+            and isinstance(proposal.get("proposal"), Mapping)
+            and isinstance(confirmation, Mapping)
+            and isinstance(confirmation.get("token"), str)
+            and bool(confirmation.get("token"))
+        )
+    if prefix != PRM_ACTION_PREFIX or status == "confirmed":
+        return False
+    if action == "c":
+        issued = proposals.get("__cancel_issued_for__")
+        return (
+            status in {"ready", "pending"}
+            and isinstance(issued, Mapping)
+            and issued.get("kind") in {"selection", "preview"}
+            and isinstance(issued.get("parent"), str)
+            and _confirmation_lock_value(proposals) is None
+        )
+    selected_index = _selected_item_index(action)
+    if selected_index:
+        selection = proposals.get("__selection__")
+        issued_codes = selection.get("issued_codes") if isinstance(selection, Mapping) else None
+        return (
+            isinstance(selection, Mapping)
+            and selection.get("parent") == "n"
+            and isinstance(issued_codes, list)
+            and action in issued_codes
+            and selected_index <= len(snapshot.get("evidence_items") or [])
+        )
+    if _ACTION_TYPES.get(action, ("", ""))[0] == "feedback_reason":
+        reason = proposals.get("__feedback_reason__")
+        issued_codes = reason.get("issued_codes") if isinstance(reason, Mapping) else None
+        return (
+            isinstance(reason, Mapping)
+            and reason.get("parent") in {"m", "x"}
+            and isinstance(issued_codes, list)
+            and action in issued_codes
+        )
+    offered = snapshot.get("offered_action_codes")
+    return isinstance(offered, list) and action in offered
+
+
+def _validated_context_and_proposals(
+    validated: ValidatedPrmAction,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    snapshot = json.loads(validated.source_snapshot_json)
+    proposals = json.loads(validated.proposals_json)
+    if not isinstance(snapshot, dict) or not isinstance(proposals, dict):
+        raise ValueError("validated PRM payload is malformed")
+    return {
+        **snapshot,
+        "allowed_actions": snapshot["offered_action_codes"],
+        "proposals": proposals,
+    }, proposals
+
+
+def _validated_row_is_current(
+    connection: sqlite3.Connection, validated: ValidatedPrmAction,
+) -> bool:
+    row = connection.execute(
+        "SELECT chat_id_hash, summary_json, proposals_json, expires_at, status "
+        "FROM prm_post_answer_proposals WHERE context_id = ?",
+        (validated.context_id,),
+    ).fetchone()
+    if row is None or len(row) != 5:
+        return False
+    chat_hash, summary_json, proposals_json, expires_at, status = row
+    if not all(isinstance(value, str) for value in row):
+        return False
+    return (
+        chat_hash == _chat_hash(validated.chat_id)
+        and status == validated.status
+        and expires_at == validated.expires_at
+        and _fingerprint(summary_json) == validated.summary_fingerprint
+        and _fingerprint(proposals_json) == validated.proposals_fingerprint
+    )
+
+
+def _cas_prm_context(
+    connection: sqlite3.Connection,
+    validated: ValidatedPrmAction,
+    *,
+    proposals: Mapping[str, Any],
+    next_status: str,
+) -> bool:
+    payload = json.dumps(proposals, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    cursor = connection.execute(
+        "UPDATE prm_post_answer_proposals SET proposals_json = ?, status = ? "
+        "WHERE context_id = ? AND chat_id_hash = ? AND summary_json = ? "
+        "AND proposals_json = ? AND status = ? AND expires_at = ?",
+        (
+            payload,
+            next_status,
+            validated.context_id,
+            _chat_hash(validated.chat_id),
+            validated.summary_json,
+            validated.proposals_json,
+            validated.status,
+            validated.expires_at,
+        ),
+    )
+    return bool(cursor.rowcount)
+
+
+def _apply_validated_confirmation(
+    db_path: str | Path, validated: ValidatedPrmAction,
+) -> dict[str, Any]:
+    """Claim the exact preview by CAS before the confirmation-gated memory write."""
+
+    try:
+        _context, proposals = _validated_context_and_proposals(validated)
+        proposal_result = proposals.get(validated.action)
+        proposal = proposal_result.get("proposal") if isinstance(proposal_result, Mapping) else None
+        confirmation = proposal_result.get("confirmation") if isinstance(proposal_result, Mapping) else None
+        token = confirmation.get("token") if isinstance(confirmation, Mapping) else None
+        if not isinstance(proposal, Mapping) or not isinstance(token, str) or not token:
+            return _unavailable_action()
+        with sqlite3.connect(db_path) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            if not _validated_row_is_current(connection, validated):
+                connection.rollback()
+                return _unavailable_action()
+            if validated.status == "confirmed":
+                connection.rollback()
+                return {"status": "already_confirmed", "write_performed": False, "message": "Этот черновик уже подтверждён; новая запись не создаётся."}
+            existing_lock = _confirmation_lock_value(proposals)
+            if existing_lock is not None and not _stale_confirmation_lock(existing_lock):
+                connection.rollback()
+                return {"status": "confirmation_in_progress", "write_performed": False, "message": "Подтверждение уже выполняется; повтори проверку статуса."}
+            claim_id = f"{_iso(datetime.now(timezone.utc))}:{secrets.token_hex(12)}"
+            proposals[_CONFIRMATION_LOCK_KEY] = claim_id
+            if not _cas_prm_context(connection, validated, proposals=proposals, next_status="pending"):
+                connection.rollback()
+                return _unavailable_action()
+            connection.commit()
+    except (KeyError, TypeError, ValueError, sqlite3.Error):
+        return _unavailable_action()
     try:
         result = confirm_memory_proposal(
             db_path,
             {
-                "proposal": proposal_result["proposal"],
-                "confirmation_token": proposal_result["confirmation"]["token"],
-                "expected_confirmation_token": proposal_result["confirmation"]["token"],
+                "proposal": proposal,
+                "confirmation_token": token,
+                "expected_confirmation_token": token,
                 "confirmed_by": "telegram_operator",
             },
         )
     except Exception:
-        _clear_confirmation_lock(db_path, context_id, claim_id)
-        raise
+        _clear_confirmation_lock(db_path, validated.context_id, claim_id)
+        return _unavailable_action()
     if result.get("persisted"):
-        _mark_confirmed(db_path, context_id, claim_id)
+        _mark_confirmed(db_path, validated.context_id, claim_id)
         return {**result, "message": "Сохранено. Запись можно использовать в следующих исследованиях."}
-    _clear_confirmation_lock(db_path, context_id, claim_id)
+    _clear_confirmation_lock(db_path, validated.context_id, claim_id)
     return result
+
+
+def _stale_confirmation_lock(value: str) -> bool:
+    marker = value.split("Z", 1)[0]
+    if "Z" not in value:
+        return False
+    try:
+        claimed_at = datetime.fromisoformat(f"{marker}+00:00")
+    except ValueError:
+        return False
+    return claimed_at <= datetime.now(timezone.utc) - _CONFIRMATION_LOCK_TTL
+
+
+def _record_validated_feedback(
+    db_path: str | Path, context_id: str, action: str, label: str,
+) -> None:
+    try:
+        record_feedback_transition(str(db_path), interaction_id=context_id, action_code=action)
+    except sqlite3.Error:
+        pass
+    update_private_interaction_feedback(
+        context_id,
+        feedback=_feedback_label(action),
+        reason=label if _ACTION_TYPES.get(action, ("", ""))[0] == "feedback_reason" else "",
+    )
+
+
+def _reason_prompt_result(context_id: str) -> dict[str, Any]:
+    codes = (("ws", "og"), ("wp", "na"), ("lg", "we"))
+    return {
+        "status": "needs_reason",
+        "write_performed": False,
+        "message": "Уточни причину, чтобы следующая итерация была полезнее.",
+        "reply_markup": {"inline_keyboard": [
+            [
+                {"text": _ACTION_TYPES[left][1], "callback_data": f"{PRM_ACTION_PREFIX}:{context_id}:{left}"},
+                {"text": _ACTION_TYPES[right][1], "callback_data": f"{PRM_ACTION_PREFIX}:{context_id}:{right}"},
+            ]
+            for left, right in codes
+        ]},
+    }
+
+
+def _fingerprint(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
 def _followup_result(context: Mapping[str, Any], action: str) -> dict[str, Any]:

@@ -85,7 +85,7 @@ def test_feedback_transition_updates_same_interaction_once(monkeypatch):
             ).fetchone()[0]
 
     assert first["status"] == "needs_confirmation"
-    assert replay["status"] == "action_not_available"
+    assert replay["status"] == "action_unavailable"
     assert transition_count == 1
     assert useful_label == "yes"
 
@@ -196,7 +196,7 @@ def test_owner_review_and_aggregate_are_private_and_scoped(monkeypatch):
         aggregate = export_interaction_aggregate(db_path)
 
     assert len(rows) == 1
-    assert rejected["status"] == "action_not_available"
+    assert rejected["status"] == "action_unavailable"
     assert rows[0]["useful_label"] == "unknown"
     assert "chat_id_hash" not in rows[0]
     assert aggregate == {

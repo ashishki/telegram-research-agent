@@ -1,3 +1,4 @@
+import json
 import os
 import sqlite3
 import tempfile
@@ -10,8 +11,11 @@ from assistant.prm_post_answer_actions import (
     _CONTEXTS,
     _claim_context_for_confirmation,
     _clear_confirmation_lock,
+    UnavailablePrmAction,
+    apply_validated_prm_action,
     build_post_answer_actions as _build_post_answer_actions,
     handle_post_answer_callback as _handle_post_answer_callback,
+    validate_prm_post_answer_callback,
 )
 from db.migrate import run_migrations
 
@@ -75,7 +79,135 @@ def test_post_answer_snapshot_rejects_invalid_counts_and_tampering(monkeypatch):
         )
 
     assert invalid["reply_markup"] is None
-    assert rejected["status"] == "expired"
+    assert rejected["status"] == "action_unavailable"
+
+
+def test_post_answer_context_binds_canonical_snapshot_and_project_ref(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmp:
+        db_path = os.path.join(tmp, "memory.db")
+        monkeypatch.setenv("AGENT_DB_PATH", db_path)
+        run_migrations()
+        bound = _build_post_answer_actions(
+            {
+                **_answer(project_name="telegram-research-agent"),
+                "title": "  Result\n title  ",
+                "query": "  evidence   binding ",
+                "keyboard_action_ids": ["n", "n", "unknown", "u"],
+            },
+            db_path=db_path,
+            chat_id="42",
+            actor_id="42",
+            owner_chat_id="42",
+        )
+        with sqlite3.connect(db_path) as connection:
+            summary = json.loads(connection.execute(
+                "SELECT summary_json FROM prm_post_answer_proposals WHERE context_id = ?", (bound["context_id"],)
+            ).fetchone()[0])
+
+    snapshot = summary["prm_post_answer_action_binding"]["source_snapshot"]
+    assert set(snapshot) == {
+        "title", "query", "body", "source_refs", "evidence_items", "project_name",
+        "primary_intent", "response_contract_id", "direct_count", "partial_count", "offered_action_codes",
+    }
+    assert snapshot["title"] == "Result title"
+    assert snapshot["query"] == "evidence binding"
+    assert snapshot["offered_action_codes"] == bound["action_codes"]
+    assert summary["prm_post_answer_action_binding"]["source_project_ref"] == {
+        "origin": "telegram-research-agent", "value": "telegram-research-agent",
+    }
+
+
+def test_invalid_prm_action_context_is_read_only_before_rejection(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmp:
+        db_path = os.path.join(tmp, "memory.db")
+        monkeypatch.setenv("AGENT_DB_PATH", db_path)
+        run_migrations()
+        bound = _build_post_answer_actions(
+            _answer(), db_path=db_path, chat_id="42", actor_id="42", owner_chat_id="42"
+        )
+        with sqlite3.connect(db_path) as connection:
+            connection.execute(
+                "UPDATE prm_post_answer_proposals SET summary_json = '{}' WHERE context_id = ?",
+                (bound["context_id"],),
+            )
+            before = connection.execute(
+                "SELECT summary_json, proposals_json, status FROM prm_post_answer_proposals WHERE context_id = ?",
+                (bound["context_id"],),
+            ).fetchone()
+            memory_before = connection.execute("SELECT count(*) FROM personal_memory_events").fetchone()[0]
+            receipts_before = connection.execute("SELECT count(*) FROM prm_interaction_ledger").fetchone()[0]
+
+        result = _handle_post_answer_callback(
+            db_path, f"{PRM_ACTION_PREFIX}:{bound['context_id']}:n", chat_id="42", actor_id="42", owner_chat_id="42"
+        )
+        with sqlite3.connect(db_path) as connection:
+            after = connection.execute(
+                "SELECT summary_json, proposals_json, status FROM prm_post_answer_proposals WHERE context_id = ?",
+                (bound["context_id"],),
+            ).fetchone()
+            memory_after = connection.execute("SELECT count(*) FROM personal_memory_events").fetchone()[0]
+            receipts_after = connection.execute("SELECT count(*) FROM prm_interaction_ledger").fetchone()[0]
+
+    assert result["status"] == "action_unavailable"
+    assert after == before
+    assert memory_after == memory_before
+    assert receipts_after == receipts_before
+
+
+def test_validated_prm_action_cas_rejects_stale_row(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmp:
+        db_path = os.path.join(tmp, "memory.db")
+        monkeypatch.setenv("AGENT_DB_PATH", db_path)
+        run_migrations()
+        bound = _build_post_answer_actions(
+            _answer(), db_path=db_path, chat_id="42", actor_id="42", owner_chat_id="42"
+        )
+        validated = validate_prm_post_answer_callback(
+            db_path, f"{PRM_ACTION_PREFIX}:{bound['context_id']}:n", chat_id="42", actor_id="42", owner_chat_id="42"
+        )
+        with sqlite3.connect(db_path) as connection:
+            connection.execute(
+                "UPDATE prm_post_answer_proposals SET proposals_json = json_set(proposals_json, '$.__other_transition__', 1) WHERE context_id = ?",
+                (bound["context_id"],),
+            )
+            before = connection.execute(
+                "SELECT proposals_json, status FROM prm_post_answer_proposals WHERE context_id = ?", (bound["context_id"],)
+            ).fetchone()
+        result = apply_validated_prm_action(db_path, validated)
+        with sqlite3.connect(db_path) as connection:
+            after = connection.execute(
+                "SELECT proposals_json, status FROM prm_post_answer_proposals WHERE context_id = ?", (bound["context_id"],)
+            ).fetchone()
+
+    assert not isinstance(validated, UnavailablePrmAction)
+    assert result["status"] == "action_unavailable"
+    assert after == before
+
+
+def test_dynamic_post_answer_codes_require_issued_bound_transition(monkeypatch):
+    answer = {
+        **_answer(),
+        "archive_evidence": {"items": [
+            {"source_url": "https://t.me/example/1", "snippet": "Первый пункт."},
+            {"source_url": "https://t.me/example/2", "snippet": "Второй пункт."},
+        ]},
+    }
+    with tempfile.TemporaryDirectory() as tmp:
+        db_path = os.path.join(tmp, "memory.db")
+        monkeypatch.setenv("AGENT_DB_PATH", db_path)
+        run_migrations()
+        context_id = build_post_answer_actions(answer, db_path=db_path, chat_id="42")["context_id"]
+        forged_selection = handle_post_answer_callback(db_path, f"{PRM_ACTION_PREFIX}:{context_id}:n2", chat_id="42")
+        forged_cancel = handle_post_answer_callback(db_path, f"{PRM_ACTION_PREFIX}:{context_id}:c", chat_id="42")
+        forged_reason = handle_post_answer_callback(db_path, f"{PRM_ACTION_PREFIX}:{context_id}:ws", chat_id="42")
+        chooser = handle_post_answer_callback(db_path, f"{PRM_ACTION_PREFIX}:{context_id}:n", chat_id="42")
+        preview = handle_post_answer_callback(db_path, f"{PRM_ACTION_PREFIX}:{context_id}:n2", chat_id="42")
+        confirmed = handle_post_answer_callback(db_path, f"{PRM_CONFIRM_PREFIX}:{context_id}:n2", chat_id="42")
+
+    assert {result["status"] for result in (forged_selection, forged_cancel, forged_reason)} == {"action_unavailable"}
+    assert chooser["status"] == "select_item"
+    assert preview["status"] == "needs_confirmation"
+    assert confirmed["write_performed"] is True
 
 
 def build_post_answer_actions(answer, *, db_path, chat_id):
@@ -146,7 +278,7 @@ def test_save_second_item_uses_exact_answer_version_and_full_preview(monkeypatch
         assert preview["proposal"]["body"] == "Второй точный пункт."
         assert preview["proposal"]["source_refs"] == ["https://t.me/example/2"]
         assert "Текст: Второй точный пункт." in preview["message"]
-        assert forged["status"] == "invalid_selection"
+        assert forged["status"] == "action_unavailable"
         assert forged["write_performed"] is False
         assert confirmed["write_performed"] is True
 
@@ -189,8 +321,8 @@ def test_forged_or_unselected_item_callback_cannot_draft(monkeypatch):
         direct_item = handle_post_answer_callback(db_path, f"{PRM_ACTION_PREFIX}:{context_id}:n2", chat_id="42")
         forged_action = handle_post_answer_callback(db_path, f"{PRM_ACTION_PREFIX}:{context_id}:p", chat_id="42")
 
-        assert direct_item["status"] == "selection_required"
-        assert forged_action["status"] == "action_not_available"
+        assert direct_item["status"] == "action_unavailable"
+        assert forged_action["status"] == "action_unavailable"
         assert direct_item["write_performed"] is False
         assert forged_action["write_performed"] is False
 
@@ -225,7 +357,7 @@ def test_restart_and_chat_isolation(monkeypatch):
         drafted = handle_post_answer_callback(db_path, f"{PRM_ACTION_PREFIX}:{context_id}:n", chat_id="42")
         repeated = handle_post_answer_callback(db_path, f"{PRM_ACTION_PREFIX}:{context_id}:n", chat_id="42")
 
-        assert wrong_chat["status"] == "expired"
+        assert wrong_chat["status"] == "action_unavailable"
         assert drafted["status"] == "needs_confirmation"
         assert repeated["proposal"] == drafted["proposal"]
 
@@ -246,9 +378,9 @@ def test_expired_context_cannot_draft_or_confirm(monkeypatch):
                 "SELECT count(*) FROM prm_post_answer_proposals WHERE context_id = ?", (context_id,)
             ).fetchone()[0]
 
-        assert result["status"] == "expired"
+        assert result["status"] == "action_unavailable"
         assert result["write_performed"] is False
-        assert confirm["status"] == "expired"
+        assert confirm["status"] == "action_unavailable"
         assert confirm["write_performed"] is False
         assert remaining == 1
 
@@ -259,12 +391,14 @@ def test_cancelled_context_cannot_be_confirmed(monkeypatch):
         monkeypatch.setenv("AGENT_DB_PATH", db_path)
         run_migrations()
         context_id = build_post_answer_actions(_answer(), db_path=db_path, chat_id="42")["context_id"]
+        preview = handle_post_answer_callback(db_path, f"{PRM_ACTION_PREFIX}:{context_id}:n", chat_id="42")
         cancelled = handle_post_answer_callback(db_path, f"{PRM_ACTION_PREFIX}:{context_id}:c", chat_id="42")
         confirm = handle_post_answer_callback(db_path, f"{PRM_CONFIRM_PREFIX}:{context_id}:n", chat_id="42")
 
+        assert preview["status"] == "needs_confirmation"
         assert cancelled["status"] == "cancelled"
         assert cancelled["write_performed"] is False
-        assert confirm["status"] == "expired"
+        assert confirm["status"] == "action_unavailable"
 
 
 def test_confirmation_idempotent(monkeypatch):
