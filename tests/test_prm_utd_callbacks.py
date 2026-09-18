@@ -51,6 +51,6 @@ def test_utd_watch_feedback_uses_the_collector_sidecar_default(monkeypatch) -> N
 
 
 def test_active_bot_accepts_only_prm_and_utd_safe_callback_namespaces() -> None:
-    assert _PRM_CALLBACK_PREFIXES == ("prma:", "prmc:", "utdp:", "utdc:", "utdw:")
+    assert _PRM_CALLBACK_PREFIXES == ("prma:", "prmc:", "utdp:", "utdc:", "utdw:", "utds:")
     with pytest.raises(ValueError):
         callbacks.handle_prm_post_answer_callback(SimpleNamespace(db_path="local.db"), "idea:1:done", chat_id="42")

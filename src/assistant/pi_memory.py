@@ -73,7 +73,7 @@ def confirm_memory_proposal(db_path: str | Path, args: Mapping[str, Any]) -> dic
         raise ValueError("proposal is required")
     proposal = normalize_memory_proposal(raw_proposal)
     supplied_token = _clean_required(args.get("confirmation_token"), "confirmation_token")
-    expected_token = confirmation_token_for_proposal(proposal)
+    expected_token = _optional_string(args.get("expected_confirmation_token")) or confirmation_token_for_proposal(proposal)
     if supplied_token != expected_token:
         return {
             "status": "confirmation_required",
@@ -100,6 +100,10 @@ def confirm_memory_proposal(db_path: str | Path, args: Mapping[str, Any]) -> dic
                 "schema_missing",
                 "personal_memory_events schema is not initialized; run canonical migrations before confirmed saves.",
             )
+        # Serialize final precondition validation and append.  Lifecycle
+        # proposals carry an exact source revision in metadata, so a profile
+        # edit cannot slip between the caller's preview check and this write.
+        connection.execute("BEGIN IMMEDIATE")
         existing = _existing_confirmation(connection, proposal_id, token_hash)
         if existing:
             return {
@@ -121,7 +125,7 @@ def confirm_memory_proposal(db_path: str | Path, args: Mapping[str, Any]) -> dic
             return _not_persisted("invalid_target", invalid_target)
         cursor = connection.execute(
             """
-            INSERT INTO personal_memory_events (
+            INSERT OR IGNORE INTO personal_memory_events (
                 memory_id,
                 object_type,
                 event_type,
@@ -167,6 +171,27 @@ def confirm_memory_proposal(db_path: str | Path, args: Mapping[str, Any]) -> dic
                 ),
             ),
         )
+        if not cursor.rowcount:
+            # A stale Telegram confirmation lease may be recovered by another
+            # process.  The canonical unique key is the arbitration point: a
+            # loser returns the already-persisted receipt, never an error or a
+            # second append-only event.
+            existing = _existing_confirmation(connection, proposal_id, token_hash)
+            if existing:
+                return {
+                    "status": "already_confirmed",
+                    "persisted": True,
+                    "write_performed": False,
+                    "memory_id": str(existing["memory_id"]),
+                    "event_id": int(existing["id"]),
+                    "event_type": str(existing["event_type"]),
+                    "object_type": str(existing["object_type"]),
+                    "operation": proposal["operation"],
+                    "append_only": True,
+                    "rollback_of_event_id": existing["rollback_of_event_id"],
+                    "confirmation_receipt": json.loads(str(existing["confirmation_receipt_json"])),
+                    "message": "Proposal was already confirmed; no new memory event was appended.",
+                }
         connection.commit()
         event_id = int(cursor.lastrowid)
 
@@ -346,6 +371,10 @@ def _invalid_target_reason(connection: sqlite3.Connection, proposal: Mapping[str
         return "target_memory_id does not exist; edit, delete, and rollback require an existing memory object."
     if str(target["object_type"]) != object_type:
         return "target_memory_id belongs to a different memory object_type."
+    metadata = proposal.get("metadata") if isinstance(proposal.get("metadata"), Mapping) else {}
+    expected_revision = metadata.get("subscription_target_event_id")
+    if expected_revision is not None and expected_revision != target["id"]:
+        return "subscription target revision changed; open a new pause or cancellation preview."
     if operation != "rollback":
         return None
     target_event_id = proposal.get("target_event_id")

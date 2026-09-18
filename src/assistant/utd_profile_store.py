@@ -24,7 +24,8 @@ def load_confirmed_utd_profile(
         with sqlite3.connect(f"file:{Path(db_path)}?mode=ro", uri=True) as connection:
             rows = connection.execute(
                 """
-                SELECT event_type, metadata_json
+                SELECT memory_id, event_type, metadata_json, confirmation_token_hash,
+                       confirmation_receipt_json
                 FROM personal_memory_events
                 WHERE object_type = 'watch_topic'
                 ORDER BY id DESC
@@ -32,14 +33,24 @@ def load_confirmed_utd_profile(
             ).fetchall()
     except sqlite3.Error:
         return None
-    for event_type, metadata_json in rows:
+    seen_memory_ids: set[str] = set()
+    for memory_id, event_type, metadata_json, event_token_hash, raw_receipt in rows:
+        if str(memory_id) in seen_memory_ids:
+            continue
+        seen_memory_ids.add(str(memory_id))
         try:
             metadata = json.loads(str(metadata_json))
         except (TypeError, json.JSONDecodeError):
             continue
         if metadata.get("capability") != "utd_profile_preview_watch":
             continue
-        if str(event_type) in {"deleted", "rolled_back"}:
+        if str(event_type) not in {"created", "edited"}:
+            return None
+        try:
+            receipt = json.loads(str(raw_receipt))
+        except (TypeError, json.JSONDecodeError):
+            return None
+        if receipt.get("confirmation_token_hash") != event_token_hash:
             return None
         try:
             expires_at = datetime.fromisoformat(

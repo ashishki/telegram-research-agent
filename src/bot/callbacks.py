@@ -10,7 +10,11 @@ from assistant.prm_post_answer_actions import (
 from assistant.utd_profile import (
     UTD_CONFIRM_PREFIX,
     UTD_DRAFT_PREFIX,
+    UTD_SUBSCRIPTION_PREFIX,
+    handle_utd_subscription_callback,
     handle_utd_profile_callback,
+    start_utd_subscription_cancel,
+    start_utd_subscription_pause,
 )
 from config.settings import Settings
 from external_watch.delivery import (
@@ -297,6 +301,7 @@ def handle_prm_post_answer_callback(
     callback_data: str,
     *,
     chat_id: str,
+    actor_id: str = "",
 ) -> dict:
     """Handle isolated PRM answer actions and UTD draft/confirmation namespaces."""
 
@@ -307,6 +312,16 @@ def handle_prm_post_answer_callback(
         (f"{UTD_DRAFT_PREFIX}:", f"{UTD_CONFIRM_PREFIX}:")
     ):
         return handle_utd_profile_callback(settings.db_path, callback_data, chat_id=chat_id)
+    if callback_data == f"{UTD_SUBSCRIPTION_PREFIX}:cancel:preview":
+        return start_utd_subscription_cancel(settings.db_path, chat_id=chat_id)
+    if callback_data == f"{UTD_SUBSCRIPTION_PREFIX}:pause:preview":
+        return start_utd_subscription_pause(settings.db_path, chat_id=chat_id)
+    if callback_data == f"{UTD_SUBSCRIPTION_PREFIX}:cancel:confirm":
+        return handle_utd_subscription_callback(settings.db_path, callback_data, chat_id=chat_id)
+    if callback_data.startswith(f"{UTD_SUBSCRIPTION_PREFIX}:"):
+        return handle_utd_subscription_callback(settings.db_path, callback_data, chat_id=chat_id)
     if callback_data.startswith((f"{PRM_ACTION_PREFIX}:", f"{PRM_CONFIRM_PREFIX}:")):
+        if actor_id:
+            return handle_post_answer_callback(settings.db_path, callback_data, chat_id=chat_id, actor_id=actor_id)
         return handle_post_answer_callback(settings.db_path, callback_data, chat_id=chat_id)
     raise ValueError("Unsupported PRM callback")

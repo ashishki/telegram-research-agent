@@ -104,9 +104,9 @@ def render_utd_watch_preview(draft: Mapping[str, Any]) -> str:
     positives = ", ".join(_positive_terms(normalized))
     negatives = ", ".join(_negative_terms())
     state = (
-        "scope сохранён в паузе; мониторинг выключен"
+        "scope будет сохранён в паузе; runtime не сможет его использовать"
         if normalized["paused"]
-        else "scope готов к сохранению; мониторинг выключен"
+        else "активный scope может быть использован только уже отдельно включённым runtime"
     )
     return (
         "UTD WATCH — preview перед сохранением\n\n"
@@ -115,7 +115,7 @@ def render_utd_watch_preview(draft: Mapping[str, Any]) -> str:
         f"Карьерный фокус: {normalized['career_goals']}\n"
         f"AI-фокус: {normalized['ai_interests']}\n"
         f"Аудитория: {normalized['audience_context']}\n\n"
-        "Источники (только названия будущих source families; сейчас не подключены):\n"
+        "Источники (source families в scope; preview не проверяет их runtime-состояние):\n"
         f"{chr(10).join(source_lines) if source_lines else '• нет выбранных источников'}\n\n"
         f"Позитивные фильтры: {positives}\n"
         f"Негативные фильтры: {negatives}\n"
@@ -123,14 +123,17 @@ def render_utd_watch_preview(draft: Mapping[str, Any]) -> str:
         "догадки запрещены.\n\n"
         f"Timezone: {UTD_TIMEZONE}\n"
         f"Частота: {_FREQUENCY_LABELS[normalized['frequency']]}\n"
+        f"Язык/глубина/период: {normalized['language']} / {normalized['depth']} / {normalized['period']}\n"
+        f"Расписание: {normalized['schedule']}; quiet: {normalized['quiet_hours']['start']}–{normalized['quiet_hours']['end']}\n"
+        f"Исключения: {', '.join(normalized['exclusions']) or 'нет'}\n"
         f"Лимит: не более {normalized['daily_cap']} элементов в день\n"
         f"Expiry/review: {normalized['expires_at']}\n"
-        f"Состояние: {state}\n"
+        f"Состояние: {state}; pause/mute/unsubscribe — отдельные lifecycle-действия.\n"
         f"Muted source families: {', '.join(normalized['muted_sources']) or 'нет'}\n\n"
         "Граница: этот profile preview сам не делает live fetch, не запускает timer, "
-        "не отправляет Telegram delivery и не включает provider egress. Runtime watch "
-        "управляется отдельным deployment gate и kill switch. Подтверждение сохраняет "
-        "только персональный UTD scope."
+        "не отправляет Telegram delivery и не включает provider egress. Подтверждение "
+        "не включает runtime, но отдельный уже включённый runtime может прочитать активный "
+        "scope на следующем запуске; его kill switch и delivery-gates обязательны."
     )
 
 
@@ -175,10 +178,17 @@ def _default_draft(now: datetime) -> dict[str, Any]:
         "expires_at": _iso(now + timedelta(days=DEFAULT_EXPIRY_DAYS)),
         "paused": False,
         "muted_sources": [],
+        "exclusions": [],
+        "language": "ru",
+        "depth": "brief",
+        "period": "daily",
+        "schedule": "09:00",
+        "quiet_hours": {"start": "22:00", "end": "08:00"},
+        "subscription_status": "active",
     }
 
 
-def _parse_seed(seed_text: str) -> dict[str, str]:
+def _parse_seed(seed_text: str) -> dict[str, Any]:
     text = str(seed_text or "").strip()
     if text.casefold().startswith("/utd"):
         text = text.split(maxsplit=1)[1] if len(text.split(maxsplit=1)) == 2 else ""
@@ -194,15 +204,37 @@ def _parse_seed(seed_text: str) -> dict[str, str]:
         "аудитория": "audience_context",
         "audience": "audience_context",
         "семья": "audience_context",
+        "исключить": "exclusions",
+        "exclude": "exclusions",
+        "язык": "language",
+        "language": "language",
+        "глубина": "depth",
+        "depth": "depth",
+        "период": "period",
+        "period": "period",
+        "расписание": "schedule",
+        "schedule": "schedule",
+        "quiet": "quiet_hours",
     }
-    parsed: dict[str, str] = {}
+    parsed: dict[str, Any] = {}
     for part in text.split(";"):
         if "=" not in part:
             continue
         key, value = part.split("=", 1)
         field = aliases.get(key.strip().casefold())
         clean_value = " ".join(value.split())[:240]
-        if field and clean_value:
+        if not field or not clean_value:
+            continue
+        if field == "exclusions":
+            parsed[field] = [item.strip()[:120] for item in clean_value.split(",") if item.strip()][:12]
+        elif field == "quiet_hours" and "-" in clean_value:
+            start, end = (part.strip() for part in clean_value.split("-", 1))
+            if _valid_hhmm(start) and _valid_hhmm(end):
+                parsed[field] = {"start": start, "end": end}
+        elif field == "schedule":
+            if _valid_hhmm(clean_value):
+                parsed[field] = clean_value
+        else:
             parsed[field] = clean_value
     return parsed
 
@@ -329,6 +361,9 @@ def _normalize_draft(raw: Mapping[str, Any]) -> dict[str, Any]:
     review_after_days = int(raw.get("review_after_days") or DEFAULT_EXPIRY_DAYS)
     if review_after_days not in _EXPIRY_VALUES:
         review_after_days = DEFAULT_EXPIRY_DAYS
+    schedule = _valid_hhmm(raw.get("schedule")) or "09:00"
+    quiet = raw.get("quiet_hours") if isinstance(raw.get("quiet_hours"), Mapping) else {}
+    quiet_hours = {"start": _valid_hhmm(quiet.get("start")) or "22:00", "end": _valid_hhmm(quiet.get("end")) or "08:00"}
     return {
         "schema_version": UTD_PROFILE_SCHEMA_VERSION,
         "program": _bounded(raw.get("program"), "моя программа UTD"),
@@ -345,6 +380,13 @@ def _normalize_draft(raw: Mapping[str, Any]) -> dict[str, Any]:
         "expires_at": _canonical_timestamp(raw.get("expires_at")),
         "paused": bool(raw.get("paused")),
         "muted_sources": muted,
+        "exclusions": [str(value)[:120] for value in raw.get("exclusions") or [] if str(value).strip()][:12],
+        "language": str(raw.get("language") or "ru") if str(raw.get("language") or "ru") in {"ru", "en"} else "ru",
+        "depth": str(raw.get("depth") or "brief") if str(raw.get("depth") or "brief") in {"brief", "standard", "deep"} else "brief",
+        "period": str(raw.get("period") or "daily") if str(raw.get("period") or "daily") in {"daily", "weekly"} else "daily",
+        "schedule": schedule,
+        "quiet_hours": quiet_hours,
+        "subscription_status": str(raw.get("subscription_status") or "active") if str(raw.get("subscription_status") or "active") in {"active", "paused", "cancelled"} else "active",
     }
 
 
@@ -418,3 +460,14 @@ def _iso(value: datetime) -> str:
 def _bounded(value: object, fallback: str, limit: int = 240) -> str:
     clean = " ".join(str(value or "").split())[:limit]
     return clean or fallback
+
+
+def _valid_hhmm(value: object) -> str | None:
+    text = str(value or "")
+    if len(text) != 5 or text[2] != ":":
+        return None
+    try:
+        hour, minute = (int(part) for part in text.split(":"))
+    except ValueError:
+        return None
+    return text if 0 <= hour <= 23 and 0 <= minute <= 59 else None

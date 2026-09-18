@@ -48,6 +48,8 @@ from assistant.utd_profile_store import (
     load_confirmed_utd_profile,
 )
 
+UTD_SUBSCRIPTION_PREFIX = "utds"
+
 
 def start_utd_profile_onboarding(
     db_path: str | Path,
@@ -146,6 +148,15 @@ def handle_utd_profile_callback(
         if not isinstance(proposal, Mapping) or not isinstance(confirmation, Mapping):
             raise ValueError("Invalid UTD proposal state")
         _assert_non_executable_proposal(proposal)
+        # A crash after the durable claim is safely resumable with the exact
+        # proposal/token; the append-only confirmation remains idempotent.
+        if status in {"confirmed", "confirming"}:
+            recovered = confirm_memory_proposal(db_path, {"proposal": proposal, "confirmation_token": confirmation.get("token"), "confirmed_by": "telegram_operator", "confirmed_at": _iso(current)})
+            if recovered.get("persisted"):
+                _finish_utd_preview_claim(db_path, context_id=context_id, status="confirmed")
+            return {**recovered, "profile_persisted": bool(recovered.get("persisted"))}
+        if not _claim_utd_preview(db_path, context_id=context_id, chat_id=chat_id, now=current):
+            return {"status": "expired", "profile_persisted": False, "write_performed": False, "message": "Preview уже отменён или подтверждается; открой новый."}
         result = confirm_memory_proposal(
             db_path,
             {
@@ -156,20 +167,30 @@ def handle_utd_profile_callback(
             },
         )
         if result.get("persisted"):
-            _set_draft_status(db_path, context_id, "confirmed")
+            _finish_utd_preview_claim(db_path, context_id=context_id, status="confirmed")
             return {
                 **result,
                 "profile_persisted": True,
                 "message": (
-                    "UTD-профиль сохранён как подтверждённое намерение. "
-                    "Само сохранение профиля не включает live-сбор, таймеры, модель или "
-                    "Telegram-уведомления; это отдельный deployment gate с kill switch."
+                    "UTD-профиль сохранён как подтверждённый scope. Само это действие "
+                    "не запускает runtime, таймеры, модель или Telegram-уведомления. Но если "
+                    "отдельно включённый runtime уже существует, активный scope может быть "
+                    "прочитан на его следующем запуске; kill switch и остальные delivery-gates "
+                    "всё равно проверяются."
                 ),
+                "reply_markup": {
+                    "inline_keyboard": [
+                        [{"text": "Поставить UTD-подписку на паузу", "callback_data": f"{UTD_SUBSCRIPTION_PREFIX}:pause:preview"}],
+                        [{"text": "Отменить UTD-подписку", "callback_data": f"{UTD_SUBSCRIPTION_PREFIX}:cancel:preview"}],
+                    ]
+                },
             }
+        _finish_utd_preview_claim(db_path, context_id=context_id, status="previewed")
         return {**result, "profile_persisted": False}
 
     if action == "cx":
-        _set_draft_status(db_path, context_id, "cancelled")
+        if not _cancel_utd_preview(db_path, context_id=context_id, chat_id=chat_id):
+            return {"status": "expired", "profile_persisted": False, "write_performed": False, "message": "Preview уже подтверждается; отмена не изменила профиль."}
         return {
             "status": "cancelled",
             "profile_persisted": False,
@@ -247,6 +268,13 @@ def build_utd_watch_proposal(draft: Mapping[str, Any]) -> dict[str, Any]:
         "expires_at": normalized["expires_at"],
         "paused": normalized["paused"],
         "muted_sources": normalized["muted_sources"],
+        "exclusions": normalized["exclusions"],
+        "language": normalized["language"],
+        "depth": normalized["depth"],
+        "period": normalized["period"],
+        "schedule": normalized["schedule"],
+        "quiet_hours": normalized["quiet_hours"],
+        "subscription_status": normalized["subscription_status"],
         "monitoring_authorized": False,
         "delivery_authorized": False,
         "provider_egress_authorized": False,
@@ -265,6 +293,186 @@ def build_utd_watch_proposal(draft: Mapping[str, Any]) -> dict[str, Any]:
             "metadata": metadata,
         },
     )
+
+
+def build_utd_subscription_cancel_proposal(db_path: str | Path) -> dict[str, Any]:
+    """Prepare, but never persist, an exact revision-bound unsubscribe tombstone."""
+    path = Path(db_path)
+    if not path.exists():
+        return {"status": "unavailable", "persisted": False, "message": "Подписка не найдена."}
+    try:
+        with sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True) as connection:
+            rows = connection.execute(
+                "SELECT id,memory_id,event_type,title,metadata_json FROM personal_memory_events "
+                "WHERE object_type='watch_topic' ORDER BY id DESC"
+            ).fetchall()
+    except sqlite3.Error:
+        return {"status": "unavailable", "persisted": False, "message": "Подписка не найдена."}
+    seen_memory_ids: set[str] = set()
+    for event_id, memory_id, event_type, title, raw_metadata in rows:
+        memory_id = str(memory_id)
+        if memory_id in seen_memory_ids:
+            continue
+        seen_memory_ids.add(memory_id)
+        try:
+            metadata = json.loads(str(raw_metadata))
+        except (TypeError, json.JSONDecodeError):
+            continue
+        if metadata.get("capability") != "utd_profile_preview_watch":
+            continue
+        if str(event_type) not in {"created", "edited"}:
+            return {"status": "not_found", "persisted": False, "message": "Активная UTD-подписка не найдена."}
+        metadata = {**metadata, "subscription_status": "cancelled", "cancellation_reason": "operator_confirmed_unsubscribe", "subscription_target_event_id": int(event_id), "subscription_target_memory_id": memory_id}
+        return build_memory_proposal("watch_topic", {
+            "operation": "delete", "target_memory_id": memory_id, "title": str(title),
+            "body": "UTD subscription cancelled; queued sends must remain blocked.",
+            "rationale": "Explicit unsubscribe; no collection or delivery may continue.",
+            "source_refs": [], "metadata": metadata,
+        })
+    return {"status": "not_found", "persisted": False, "message": "Активная UTD-подписка не найдена."}
+
+
+def confirm_utd_subscription_cancel(db_path: str | Path, proposal_result: Mapping[str, Any], *, now: datetime | None = None) -> dict[str, Any]:
+    """Persist only a caller-confirmed, still-current unsubscribe proposal."""
+    proposal = proposal_result.get("proposal") if isinstance(proposal_result, Mapping) else None
+    confirmation = proposal_result.get("confirmation") if isinstance(proposal_result, Mapping) else None
+    if not isinstance(proposal, Mapping) or not isinstance(confirmation, Mapping):
+        return {"status": "confirmation_required", "persisted": False, "message": "Сначала открой точный preview отмены."}
+    if not _subscription_target_is_current(db_path, proposal):
+        return {"status": "stale_subscription", "persisted": False, "write_performed": False, "message": "Профиль уже изменён. Открой новый preview перед подтверждением."}
+    return confirm_memory_proposal(db_path, {
+        "proposal": proposal, "confirmation_token": confirmation.get("token"),
+        "confirmed_by": "telegram_operator", "confirmed_at": _iso(_as_utc(now)),
+    })
+
+
+def build_utd_subscription_pause_proposal(db_path: str | Path) -> dict[str, Any]:
+    """Prepare an exact revision-bound pause edit, without persisting it."""
+    cancel = build_utd_subscription_cancel_proposal(db_path)
+    source = cancel.get("proposal") if isinstance(cancel, Mapping) else None
+    if not isinstance(source, Mapping):
+        return cancel
+    metadata = source.get("metadata") if isinstance(source.get("metadata"), Mapping) else {}
+    return build_memory_proposal("watch_topic", {
+        "operation": "edit", "target_memory_id": source.get("target_memory_id"), "title": source.get("title"),
+        "body": "UTD subscription paused; collection and queued delivery remain blocked until a newly confirmed active profile.",
+        "rationale": "Explicit pause; no collection or delivery may continue.", "source_refs": [],
+        "metadata": {**metadata, "subscription_status": "paused", "paused": True, "pause_reason": "operator_confirmed_pause"},
+    })
+
+
+def confirm_utd_subscription_pause(db_path: str | Path, proposal_result: Mapping[str, Any], *, now: datetime | None = None) -> dict[str, Any]:
+    proposal = proposal_result.get("proposal") if isinstance(proposal_result, Mapping) else None
+    confirmation = proposal_result.get("confirmation") if isinstance(proposal_result, Mapping) else None
+    if not isinstance(proposal, Mapping) or not isinstance(confirmation, Mapping):
+        return {"status": "confirmation_required", "persisted": False, "message": "Сначала открой точный preview паузы."}
+    if not _subscription_target_is_current(db_path, proposal):
+        return {"status": "stale_subscription", "persisted": False, "write_performed": False, "message": "Профиль уже изменён. Открой новый preview перед подтверждением."}
+    return confirm_memory_proposal(db_path, {"proposal": proposal, "confirmation_token": confirmation.get("token"), "confirmed_by": "telegram_operator", "confirmed_at": _iso(_as_utc(now))})
+
+
+def start_utd_subscription_cancel(db_path: str | Path, *, chat_id: str, now: datetime | None = None) -> dict[str, Any]:
+    """Persist an expiring, chat-bound preview; it is not the unsubscribe itself."""
+    return _start_utd_subscription_preview(db_path, chat_id=chat_id, action="unsubscribe", now=now)
+
+
+def start_utd_subscription_pause(db_path: str | Path, *, chat_id: str, now: datetime | None = None) -> dict[str, Any]:
+    return _start_utd_subscription_preview(db_path, chat_id=chat_id, action="pause", now=now)
+
+
+def _start_utd_subscription_preview(db_path: str | Path, *, chat_id: str, action: str, now: datetime | None = None) -> dict[str, Any]:
+    current = _as_utc(now)
+    proposal = build_utd_subscription_cancel_proposal(db_path) if action == "unsubscribe" else build_utd_subscription_pause_proposal(db_path)
+    if proposal.get("status") != "needs_confirmation" or not chat_id:
+        return proposal
+    context_id = f"s{secrets.token_hex(5)}"
+    try:
+        with sqlite3.connect(db_path) as connection:
+            if not _draft_schema_ready(connection):
+                return _unavailable("Таблица безопасных confirmation preview недоступна.")
+            connection.execute("""INSERT INTO prm_post_answer_proposals (context_id, chat_id_hash, summary_json, proposals_json, created_at, expires_at, status) VALUES (?, ?, ?, ?, ?, ?, ?)""", (context_id, _chat_hash(chat_id), json.dumps({"kind": "utd_subscription_lifecycle", "action": action, "target_event_id": proposal["proposal"]["metadata"]["subscription_target_event_id"]}, sort_keys=True), json.dumps({action: proposal}, sort_keys=True), _iso(current), _iso(current + UTD_DRAFT_TTL), "previewed"))
+            connection.commit()
+    except sqlite3.Error:
+        return _unavailable("Не смог сохранить безопасный preview отмены.")
+    label = "паузу" if action == "pause" else "отмену"
+    return {**proposal, "context_id": context_id, "message": f"Preview {label} готов. Подтвердите именно это действие; оно не затронет более новую ревизию профиля.", "reply_markup": {"inline_keyboard": [[{"text": f"Подтвердить {label}", "callback_data": f"{UTD_SUBSCRIPTION_PREFIX}:{context_id}:confirm"}, {"text": "Не выполнять", "callback_data": f"{UTD_SUBSCRIPTION_PREFIX}:{context_id}:cancel"}]]}}
+
+
+def handle_utd_subscription_callback(db_path: str | Path, callback_data: str, *, chat_id: str, now: datetime | None = None) -> dict[str, Any]:
+    """Confirm/cancel only the exact persisted unsubscribe preview for its chat."""
+    parts = str(callback_data or "").split(":")
+    if len(parts) == 3 and parts[0] == UTD_SUBSCRIPTION_PREFIX and parts[2] == "preview" and parts[1] in {"pause", "cancel"}:
+        return (start_utd_subscription_pause if parts[1] == "pause" else start_utd_subscription_cancel)(db_path, chat_id=chat_id, now=now)
+    if len(parts) != 3 or parts[0] != UTD_SUBSCRIPTION_PREFIX or not parts[1] or parts[2] not in {"confirm", "cancel"} or len(callback_data) > 64:
+        raise ValueError("Unsupported UTD subscription callback")
+    current = _as_utc(now)
+    try:
+        with sqlite3.connect(db_path) as connection:
+            row = connection.execute("SELECT chat_id_hash, summary_json, proposals_json, expires_at, status FROM prm_post_answer_proposals WHERE context_id = ?", (parts[1],)).fetchone()
+            if row is None or row[0] != _chat_hash(chat_id):
+                return {"status": "expired", "persisted": False, "message": "Preview истёк или принадлежит другому чату."}
+            if datetime.fromisoformat(str(row[3]).replace("Z", "+00:00")) <= current or row[4] not in {"previewed", "confirming"}:
+                return {"status": "expired", "persisted": False, "message": "Preview уже не действителен; открой новый."}
+            if parts[2] == "cancel":
+                cursor = connection.execute("UPDATE prm_post_answer_proposals SET summary_json='{}', proposals_json='{}', status='cancelled' WHERE context_id=? AND status='previewed'", (parts[1],))
+                connection.commit()
+                return {"status": "cancelled", "persisted": False, "write_performed": False, "message": "Отмена подписки не подтверждена; профиль не изменён."} if cursor.rowcount else {"status": "expired", "persisted": False, "message": "Preview уже подтверждается; отмена не изменила профиль."}
+            action = ""
+            try:
+                summary = json.loads(str(row[1]))
+                action = summary.get("action") if summary.get("kind") == "utd_subscription_lifecycle" else ""
+                proposal = json.loads(str(row[2])).get(action)
+            except json.JSONDecodeError:
+                proposal = None
+        if row[4] == "previewed" and not _claim_utd_preview(db_path, context_id=parts[1], chat_id=chat_id, now=current):
+            return {"status": "expired", "persisted": False, "message": "Preview уже отменён или подтверждается; открой новый."}
+        result = (confirm_utd_subscription_pause if action == "pause" else confirm_utd_subscription_cancel)(db_path, proposal if isinstance(proposal, Mapping) else {}, now=current)
+        if result.get("persisted"):
+            _finish_utd_preview_claim(db_path, context_id=parts[1], status="confirmed")
+        else:
+            _finish_utd_preview_claim(db_path, context_id=parts[1], status="previewed")
+        return result
+    except (sqlite3.Error, ValueError):
+        return {"status": "expired", "persisted": False, "message": "Preview отмены недоступен; открой новый."}
+
+
+def _claim_utd_preview(db_path: str | Path, *, context_id: str, chat_id: str, now: datetime) -> bool:
+    with sqlite3.connect(db_path) as connection:
+        cursor = connection.execute("UPDATE prm_post_answer_proposals SET status='confirming' WHERE context_id=? AND chat_id_hash=? AND status='previewed' AND expires_at > ?", (context_id, _chat_hash(chat_id), _iso(now)))
+        return bool(cursor.rowcount)
+
+
+def _finish_utd_preview_claim(db_path: str | Path, *, context_id: str, status: str) -> None:
+    with sqlite3.connect(db_path) as connection:
+        connection.execute("UPDATE prm_post_answer_proposals SET status=? WHERE context_id=? AND status='confirming'", (status, context_id))
+
+
+def _cancel_utd_preview(db_path: str | Path, *, context_id: str, chat_id: str) -> bool:
+    with sqlite3.connect(db_path) as connection:
+        cursor = connection.execute("UPDATE prm_post_answer_proposals SET summary_json='{}', proposals_json='{}', status='cancelled' WHERE context_id=? AND chat_id_hash=? AND status IN ('draft', 'previewed')", (context_id, _chat_hash(chat_id)))
+        return bool(cursor.rowcount)
+
+
+def _subscription_target_is_current(db_path: str | Path, proposal: Mapping[str, Any]) -> bool:
+    metadata = proposal.get("metadata")
+    if not isinstance(metadata, Mapping):
+        return False
+    target_memory_id = str(metadata.get("subscription_target_memory_id") or "")
+    target_event_id = metadata.get("subscription_target_event_id")
+    if not target_memory_id or not isinstance(target_event_id, int) or proposal.get("target_memory_id") != target_memory_id:
+        return False
+    try:
+        with sqlite3.connect(f"file:{Path(db_path).resolve()}?mode=ro", uri=True) as connection:
+            row = connection.execute("SELECT id,event_type,metadata_json FROM personal_memory_events WHERE memory_id=? ORDER BY id DESC LIMIT 1", (target_memory_id,)).fetchone()
+    except sqlite3.Error:
+        return False
+    if row is None or int(row[0]) != target_event_id or str(row[1]) not in {"created", "edited"}:
+        return False
+    try:
+        current_metadata = json.loads(str(row[2]))
+    except (TypeError, json.JSONDecodeError):
+        return False
+    return current_metadata.get("capability") == "utd_profile_preview_watch"
 
 
 def render_utd_question_preview(text: str, *, db_path: str | Path | None = None) -> str:
