@@ -156,7 +156,15 @@ def _call_and_verify(
         project_name=project_name,
     )
     metrics = _mapping(verification.get("metrics"))
-    if int(metrics.get("current_fact_violations") or 0) or float(metrics.get("unsupported_claim_rate") or 0.0) > 0.6:
+    # Publication is an allow decision, not a diagnostic.  A generated answer
+    # with any unsupported factual clause, an unverified tail, or a citation
+    # that does not bind to its selected span falls back to deterministic text.
+    if (
+        int(metrics.get("current_fact_violations") or 0)
+        or not bool(verification.get("verification_complete"))
+        or float(metrics.get("unsupported_claim_rate") or 0.0) > 0.0
+        or (int(metrics.get("claim_count") or 0) > 0 and float(metrics.get("citation_integrity") or 0.0) < 1.0)
+    ):
         return None
     return answer
 

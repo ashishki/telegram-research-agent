@@ -17,7 +17,7 @@ from assistant.operator_context import build_operator_context, validate_operator
 from assistant.claim_ledger import verify_answer_against_evidence, claim_ledger_public_summary
 from assistant.project_context import load_project_descriptors
 from assistant.prm_chat_display import render_prm_chat_answer
-from assistant.prm_refresh_receipt import build_refresh_receipt, render_refresh_receipt
+from assistant.prm_refresh_receipt import build_archive_health_receipt, build_refresh_receipt, render_refresh_receipt
 from db.reaction_fast_lane import build_reaction_fast_lane_receipt, build_reaction_preference_proposal, render_operator_reaction_receipt
 from assistant.memory_research import (
     MemoryResearchBudget,
@@ -179,6 +179,15 @@ def _with_db(settings: Settings) -> sqlite3.Connection:
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON;")
     connection.execute("PRAGMA journal_mode = WAL;")
+    return connection
+
+
+def _with_readonly_db(settings: Settings) -> sqlite3.Connection:
+    """Open a projection-only SQLite connection without WAL or schema writes."""
+
+    db_path = Path(settings.db_path)
+    connection = sqlite3.connect(f"file:{db_path.resolve()}?mode=ro", uri=True)
+    connection.row_factory = sqlite3.Row
     return connection
 
 
@@ -700,7 +709,7 @@ def _load_topics_summary(connection: sqlite3.Connection) -> str:
 
 
 def handle_start(chat_id: str, args: str, settings: Settings) -> None:
-    del args, settings
+    del args
     lines = [
         "Hermes",
         "",
@@ -743,12 +752,12 @@ def handle_prm_start(chat_id: str, args: str, settings: Settings) -> None:
 def handle_refresh(chat_id: str, args: str, settings: Settings) -> None:
     """Show a read-only refresh orchestration receipt; never starts a routine."""
 
-    del args, settings
+    del args
     owner_chat_id = os.environ.get("TELEGRAM_OWNER_CHAT_ID", "").strip()
     if not owner_chat_id or str(chat_id) != owner_chat_id:
         send_message(_get_bot_token(), chat_id, "Обновление доступно только владельцу. Ничего не запускалось.", parse_mode=None)
         return
-    receipt = build_refresh_receipt()
+    receipt = build_archive_health_receipt(settings.db_path)
     send_message(_get_bot_token(), chat_id, render_refresh_receipt(receipt), parse_mode=None)
 
 
@@ -2732,7 +2741,7 @@ def handle_run_mvp_weekly(chat_id: str, args: str, settings: Settings) -> None:
 
 def handle_status(chat_id: str, args: str, settings: Settings) -> None:
     del args
-    with _with_db(settings) as connection:
+    with _with_readonly_db(settings) as connection:
         raw_posts_count = connection.execute("SELECT COUNT(*) FROM raw_posts").fetchone()[0]
         posts_count = connection.execute("SELECT COUNT(*) FROM posts").fetchone()[0]
         topics_count = connection.execute("SELECT COUNT(*) FROM topics").fetchone()[0]

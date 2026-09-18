@@ -85,6 +85,44 @@ def test_prm_active_handler_resolves_short_followups_from_volatile_context() -> 
     assert "Проверь" not in project_followup["effective_query"]
 
 
+def test_new_topic_replaces_volatile_topic_and_last_week_followup_keeps_it() -> None:
+    prm_handlers._PRM_DIALOG_STATE.clear()
+    prm_handlers._remember_prm_dialog("42", "В архиве по теме Topic A", mode="research", topic="Topic A")
+    new_topic = prm_handlers._resolve_prm_dialog_query("42", "В архиве по теме Topic B", mode="auto")
+    assert new_topic["used"] is False
+    assert new_topic["effective_query"] == "В архиве по теме Topic B"
+
+    prm_handlers._remember_prm_dialog("42", new_topic["effective_query"], mode="research", topic="Topic B")
+    followup = prm_handlers._resolve_prm_dialog_query("42", "за прошлую неделю", mode="auto")
+    assert followup["used"] is True
+    assert "Topic B" in followup["effective_query"]
+    assert "за прошлую неделю" in followup["effective_query"]
+
+
+def test_live_dispatch_persists_explicit_replacement_topic_for_week_followup(monkeypatch, tmp_path) -> None:
+    prm_handlers._PRM_DIALOG_STATE.clear()
+    prm_handlers._remember_prm_dialog("42", "В архиве по теме Topic A", mode="research", topic="Topic A")
+
+    class FakeAssistant:
+        def __init__(self, *, settings): pass
+        def answer(self, request):
+            return SimpleNamespace(
+                text="Topic B result",
+                payload={"answer_gate": {"allow_answer": False}},
+                status="ok",
+                mode="research",
+                route={"retrieval_query": "Topic B"},
+            )
+
+    monkeypatch.setattr(prm_handlers, "PersonalResearchAssistant", FakeAssistant)
+    monkeypatch.setattr(prm_handlers, "send_message", lambda *_args, **_kwargs: None)
+    prm_handlers.dispatch_prm_command("42", "/research В архиве по теме Topic B", _settings(tmp_path))
+    followup = prm_handlers._resolve_prm_dialog_query("42", "за прошлую неделю", mode="auto")
+
+    assert "Topic B" in followup["effective_query"]
+    assert "Topic A" not in followup["effective_query"]
+
+
 def test_free_text_save_followup_uses_existing_confirmation_preview(monkeypatch, tmp_path) -> None:
     prm_handlers._PRM_DIALOG_STATE.clear()
     prm_handlers._remember_prm_dialog(
@@ -103,8 +141,8 @@ def test_free_text_save_followup_uses_existing_confirmation_preview(monkeypatch,
     class ForbiddenAssistant:
         def __init__(self, *args, **kwargs): raise AssertionError("free-text save follow-up must not rerun archive search")
 
-    def fake_callback(db_path, callback_data, *, chat_id):
-        calls.append((db_path, callback_data, chat_id))
+    def fake_callback(db_path, callback_data, *, chat_id, actor_id):
+        calls.append((db_path, callback_data, chat_id, actor_id))
         return {"message": "Сохранить заметку: черновик подготовлен.", "reply_markup": {"inline_keyboard": []}}
 
     monkeypatch.setattr(prm_handlers, "PersonalResearchAssistant", ForbiddenAssistant)
@@ -113,7 +151,7 @@ def test_free_text_save_followup_uses_existing_confirmation_preview(monkeypatch,
 
     prm_handlers.dispatch_prm_command("42", "/auto сохрани заметку, но сначала покажи что именно сохранишь", _settings(tmp_path))
 
-    assert calls == [(str(tmp_path / "memory.db"), "prma:ctx123:n", "42")]
+    assert calls == [(str(tmp_path / "memory.db"), "prma:ctx123:n", "42", "42")]
     assert sent == [("Сохранить заметку: черновик подготовлен.", {"inline_keyboard": []})]
 
 
@@ -160,9 +198,18 @@ def test_short_next_step_after_watch_preview_points_to_confirmation() -> None:
     )
 
     assert resolved["kind"] == "short_next_step"
-    assert "подтвердить черновик наблюдения" in resolved["message"]
+    assert "подтвердить черновик темы наблюдения" in resolved["message"]
     assert "agent evals" in resolved["message"]
+    assert "сохранит только подтверждённую тему" in resolved["message"]
+    assert "буду следить" not in resolved["message"]
 
 
 def test_utd_command_is_part_of_active_prm_surface() -> None:
     assert "/utd" in prm_handlers.PRM_SAFE_COMMANDS
+
+
+def test_help_does_not_promise_watch_monitoring_or_delivery() -> None:
+    rendered = prm_handlers._help_text()
+
+    assert "сохранение темы само по себе не включает мониторинг, уведомления или доставку" in rendered
+    assert "watch-уведомления работают" not in rendered

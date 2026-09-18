@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from assistant.memory_research import (
     MemoryResearchBudget,
     _archive_query_variants,
+    _resolve_time_window,
     answer_memory_research,
     render_memory_research_answer,
     render_memory_research_brief,
@@ -466,6 +467,16 @@ class TestMemoryResearch(unittest.TestCase):
         self.assertIn("В локальном архиве за 2026-07-28–2026-08-11 не нашёл релевантных постов", rendered)
         self.assertNotIn("Old model launch", rendered)
         self.assertNotIn("2026-05-22", rendered)
+
+    def test_previous_calendar_week_is_strict_and_dst_independent(self):
+        window = _resolve_time_window(
+            "Что было за прошлую неделю?",
+            now=datetime(2026, 3, 30, 10, 0, tzinfo=timezone.utc),
+        )
+        self.assertTrue(window.requested)
+        self.assertTrue(window.strict)
+        self.assertEqual(window.date_from, "2026-03-23T00:00:00Z")
+        self.assertEqual(window.date_to, "2026-03-30T00:00:00Z")
 
     def test_memory_research_keeps_recent_hits_inside_requested_window(self):
         result = answer_memory_research(

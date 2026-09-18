@@ -103,6 +103,11 @@ _CURRENT_MARKERS = (
     "latest",
     "current fact",
     "current price",
+    "current ceo",
+    "current version",
+    "текущий ceo",
+    "текущий руковод",
+    "текущая версия",
     "today",
 )
 _EXPLICIT_EXTERNAL_MARKERS = (
@@ -220,6 +225,24 @@ def decide_route(query: str, *, requested_mode: RequestMode = "auto", explicit_p
             reason_codes=("empty_query",),
         )
 
+    # Current factual questions retain their verification boundary even when a
+    # user asks through chat/freeform wording.
+    if current_required:
+        return _decision(
+            mode="research",
+            reason="current_external_fact",
+            confidence=0.98,
+            project=project,
+            retrieval_query=_retrieval_query(clean),
+            intent="current_fact_verification",
+            contract="current_fact.v2",
+            archive_scope=archive_scope,
+            project_context_required=bool(project),
+            current_required=True,
+            decision_requested=False,
+            reason_codes=("current_external_fact",),
+        )
+
     if requested_mode == "chat":
         return _decision(
             mode="chat",
@@ -321,7 +344,7 @@ def decide_route(query: str, *, requested_mode: RequestMode = "auto", explicit_p
             decision_requested=False,
             reason_codes=("writer_marker",),
         )
-    if _contains_any(lowered, _CHAT_MARKERS):
+    if _contains_any(lowered, _CHAT_MARKERS) and not current_required:
         return _decision(
             mode="chat",
             reason="freeform_request",
@@ -506,8 +529,15 @@ def _research_intent(
 
 def _requires_current_fact_verification(lowered: str, *, archive_scope: bool) -> bool:
     explicit_external = _contains_any(lowered, _EXPLICIT_EXTERNAL_MARKERS)
+    role_or_version_question = bool(re.search(r"\b(who\s+is|what\s+version|ceo|version)\b", lowered)) or bool(
+        re.search(r"(кто\s+(такой|сейчас|является).{0,24}(ceo|руковод|директор)|какая\s+версия)", lowered)
+    )
+    if role_or_version_question:
+        return True
     if archive_scope:
-        return explicit_external
+        # A lone "now" remains archive-scoped, but a concrete current-fact
+        # request (price/latest/today) may coexist with an archive question.
+        return explicit_external or _contains_any(lowered, _CURRENT_MARKERS)
     if explicit_external:
         return True
     if _contains_any(lowered, _CURRENT_MARKERS):

@@ -122,6 +122,7 @@ def dispatch_prm_command(chat_id: str, text: str, settings: Settings) -> None:
                 settings.db_path,
                 f"{PRM_ACTION_PREFIX}:{context_id}:{action}",
                 chat_id=chat_id,
+                actor_id=chat_id,
             )
             message = str(result.get("message") or "Черновик недоступен. Запроси ответ заново.")
             if str(result.get("status") or "") == "needs_confirmation":
@@ -163,14 +164,21 @@ def dispatch_prm_command(chat_id: str, text: str, settings: Settings) -> None:
             chat_id,
             effective_args,
             mode=result_mode,
-            topic=str(dialog.get("previous_topic") or result_route.get("retrieval_query") or ""),
+            # A prior topic belongs only to a composed follow-up.  For a new
+            # explicit query, preserve the answered route so the next short
+            # follow-up cannot resurrect Topic A over Topic B.
+            topic=str(
+                (dialog.get("previous_topic") if bool(dialog.get("used")) else "")
+                or result_route.get("retrieval_query")
+                or effective_args
+            ),
             project_name=str(result_route.get("project_name") or _mapping(result.payload).get("project_name") or ""),
             action_context_id=str(action_bundle.get("context_id") or "") if isinstance(action_bundle, Mapping) else "",
-            action_codes=[
-                str(code)
-                for code in (action_bundle.get("action_codes") if isinstance(action_bundle, Mapping) else [])
-                if str(code)
-            ],
+                action_codes=[
+                    str(code)
+                    for code in ((action_bundle.get("action_codes") or []) if isinstance(action_bundle, Mapping) else [])
+                    if str(code)
+                ],
             last_answer=result.text,
             direct_count=_archive_result_count(result.payload, "direct_count"),
             partial_count=_archive_result_count(result.payload, "partial_count"),
@@ -532,6 +540,9 @@ def _is_prm_research_followup(query: str) -> bool:
         "watch",
         "save",
         "next step",
+        "за прошл",
+        "за последн",
+        "last week",
     )
     if any(lowered.startswith(marker) for marker in strong_followup_markers):
         return not _contains_new_topic_request(lowered)
@@ -559,6 +570,9 @@ def _is_prm_research_followup(query: str) -> bool:
         "why",
         "what else",
         "next step",
+        "за прошл",
+        "за последн",
+        "last week",
     )
     if any(lowered.startswith(marker) for marker in followup_markers):
         return True
@@ -620,7 +634,7 @@ def _render_short_next_step(entry: Mapping[str, Any]) -> str:
     if pending:
         if pending == "w":
             topic = str(entry.get("last_topic") or "этой теме")
-            return f"Следующий шаг: подтвердить черновик наблюдения по теме {topic}. После подтверждения я буду следить; UTD-профиль не меняется."
+            return f"Следующий шаг: подтвердить черновик темы наблюдения {topic}, если preview точен. Это сохранит только подтверждённую тему; UTD-профиль не меняется."
         return "Следующий шаг: подтвердить черновик заметки, если preview точно отражает то, что нужно сохранить. Без подтверждения запись не создаётся."
     if bool(entry.get("current_fact_boundary")):
         return "Следующий шаг: разрешить внешнюю проверку официальных источников; без неё я не буду выдавать текущий факт за подтверждённый."
@@ -716,9 +730,8 @@ def _help_text() -> str:
         "UTD / Dallas: понимаю вопросы про программу, карьеру, AI-события, ISSO, "
         "benefits и spouse/family. ASK-ответы не придумывают свежие даты или eligibility: "
         "если нужен актуальный факт, я показываю official-source boundary. Live UTD-источники "
-        "(live-источники) "
-        "и watch-уведомления работают только через подтверждённый UTD scope, отдельный timer, "
-        "delivery gate и kill switch.\n\n"
+        "(live-источники) доступны только через отдельно подтверждённый UTD scope; "
+        "сохранение темы само по себе не включает мониторинг, уведомления или доставку.\n\n"
         "Чтобы собрать персональный scope, напиши: «Настроить мой UTD-профиль». "
         "Сначала будет черновик и полный preview; ничего постоянного не сохранится без "
         "отдельного подтверждения.\n\n"

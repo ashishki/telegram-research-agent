@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
-from prm.application import PersonalResearchAssistant
+from prm.application import PersonalResearchAssistant, _final_answer_publication_allowed, _render_verified_evidence_fallback
+from assistant.claim_ledger import verify_answer_against_evidence
 from prm.contracts import AssistantResult, OperatorRequest
 from prm.presentation import render_payload
 
@@ -43,8 +44,49 @@ def test_application_returns_intent_specific_archive_contract(monkeypatch):
     assert result.route["primary_intent"] == "archive_to_action"
     assert result.route["project_context_required"] is False
     assert result.payload["response_contract_id"] == "archive_research.v2"
-    assert result.text.startswith("В архиве найдено 1 прямых")
-    assert "Главный риск" not in result.text
+    assert result.text.startswith("Я не публикую свободный пересказ")
+    assert "Agent evals use task success and groundedness." in result.text
+    assert "https://t.me/example/1" in result.text
+    assert result.payload["final_answer_publication"]["fallback_used"] is True
+
+
+def test_explicit_topic_edition_is_application_path_without_fetch_send_or_write():
+    assistant = PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:"))
+    result = assistant.render_topic_edition(
+        OperatorRequest(query="что нового по AI events", mode="brief"),
+        topic_id="ai-events",
+        items=[{
+            "source": "calendar", "event_id": "42", "url": "https://calendar.utdallas.edu/event/42",
+            "title": "AI Career Fair", "updated_at": "2026-09-17T09:30:00Z",
+            "material_text": "Registration deadline was moved.",
+        }],
+        window_start="2026-09-17T00:00:00Z", window_end="2026-09-17T23:59:59Z",
+        checked_at="2026-09-17T10:00:00Z", source_health={"calendar": "healthy"},
+    )
+    assert result.mode == "brief" and "AI Career Fair" in result.text
+    assert "Значимость (анализ):" in result.text
+    assert result.payload["write_performed"] is False
+    assert result.payload["automatic_job_created"] is False
+    assert result.payload["notification_sent"] is False
+    repeat = assistant.render_topic_edition(
+        OperatorRequest(query="что нового по AI events", mode="brief"), topic_id="ai-events",
+        items=[{"source":"calendar", "event_id":"42", "url":"https://calendar.utdallas.edu/event/42", "title":"AI Career Fair", "updated_at":"2026-09-17T09:30:00Z"}],
+        window_start="2026-09-17T00:00:00Z", window_end="2026-09-17T23:59:59Z", checked_at="2026-09-17T10:00:00Z", source_health={"calendar":"healthy"},
+    )
+    assert repeat.interaction_id == result.interaction_id
+
+
+def test_topic_edition_rejects_invalid_window_and_ranks_relevant_events():
+    assistant = PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:"))
+    invalid = assistant.render_topic_edition(OperatorRequest(query="x", mode="brief"), topic_id="x", items=[], window_start="bad", window_end="also-bad", checked_at="2026-09-17T10:00:00Z", source_health={"calendar":"healthy"})
+    assert invalid.status == "invalid_edition_window" and "некорректно" in invalid.text and "нет" not in invalid.text
+    items = [
+        {"source":"calendar", "event_id":"low", "url":"https://calendar.utdallas.edu/low", "title":"Low", "updated_at":"2026-09-17T09:00:00Z", "relevance":{"relevant":True,"score":1,"categories":["career"],"reason":"low"}},
+        {"source":"calendar", "event_id":"high", "url":"https://calendar.utdallas.edu/high", "title":"High", "updated_at":"2026-09-17T09:00:00Z", "relevance":{"relevant":True,"score":9,"categories":["ai"],"reason":"high"}},
+    ]
+    ranked = assistant.render_topic_edition(OperatorRequest(query="x", mode="brief"), topic_id="x", items=items, window_start="2026-09-17T00:00:00Z", window_end="2026-09-17T23:00:00Z", checked_at="2026-09-17T10:00:00Z", source_health={"calendar":"healthy"})
+    assert ranked.text.index("High") < ranked.text.index("Low")
+    assert "Ai" in ranked.text and "Career" in ranked.text and "https://calendar.utdallas.edu/high" in ranked.text
 
 
 def test_archive_to_action_uses_bounded_research_plan(monkeypatch):
@@ -57,20 +99,15 @@ def test_archive_to_action_uses_bounded_research_plan(monkeypatch):
     monkeypatch.setattr("prm.application.answer_memory_research", lambda *args, **kwargs: payload)
     monkeypatch.setattr("prm.application.build_research_facade", lambda **kwargs: SimpleNamespace())
     monkeypatch.setattr("prm.application.synthesize_answer", lambda *args, **kwargs: None)
-    monkeypatch.setattr("prm.application.plan_archive_evidence", lambda *args, **kwargs: {
-        "selected_evidence_ids": ["tg:1"], "candidate_count": 2, "selected_count": 1,
-        "selection_mode": "deterministic_role_rank", "provider_egress": False,
-        "items": [payload["archive_candidate_pool"][0]],
-    })
+    monkeypatch.setattr("prm.application.plan_archive_evidence", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("provider-capable planner must remain disabled")))
 
     result = PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:")).answer(OperatorRequest(
         query="Что в моём архиве есть про agent evals и что из этого реально применимо сейчас?",
         mode="auto",
     ))
 
-    assert result.payload["research_plan"]["candidate_count"] == 2
-    assert result.payload["archive_evidence"]["items"][0]["archive_document_id"] == "tg:1"
-    assert result.payload["archive_evidence"]["items"][0]["retrieval_mode"] == "hybrid_fts_vector"
+    assert result.payload["research_plan"]["status"] == "local_planner_disabled"
+    assert result.payload["research_plan"]["provider_egress"] is False
     assert result.payload["research_plan"]["gap_check"] == {}
 
 
@@ -177,6 +214,74 @@ def test_current_fact_boundary_precedes_archive_contract_renderer():
     assert "https://t.me/archive/1" not in rendered
 
 
+def test_current_fact_publication_predicate_does_not_bypass_an_unsupported_value():
+    verification = verify_answer_against_evidence(
+        "Текущая цена Nvidia равна 900.",
+        [],
+        current_fact_required=True,
+    )
+    assert _final_answer_publication_allowed(
+        verification,
+        {"external_verification_required": True, "current_claim_allowed": False, "allow_answer": False},
+    ) is False
+
+
+def test_fallback_normalizes_unicode_sentence_boundaries_before_reverification():
+    evidence = [{
+        "source_url": "https://example.invalid/right",
+        "support_span": "Первый факт подтвержден。 Второй факт подтвержден！",
+    }]
+    fallback = _render_verified_evidence_fallback(evidence)
+    verification = verify_answer_against_evidence(fallback, evidence)
+    assert "；" not in fallback  # the renderer uses an ASCII separator consistently
+    assert "。 " not in fallback
+    assert verification["claim_count"] == 1
+
+
+def test_mixed_fallback_rejects_external_telegram_url_without_archive_provenance():
+    rendered = _render_verified_evidence_fallback(
+        [{"source_url": "https://t.me/external/7", "support_span": "External Telegram claim."}],
+        boundary="Текущий факт требует проверки.",
+        local_only=True,
+    )
+
+    assert "External Telegram claim" not in rendered
+
+
+def test_terminal_refusal_is_recognized_as_nonfactual_after_fallback_failure():
+    verification = verify_answer_against_evidence(
+        "Не удалось собрать проверяемый источник-атрибутированный ответ. Уточни запрос или источник.",
+        [],
+    )
+    assert verification["claim_count"] == 0
+    assert _final_answer_publication_allowed(verification, {}) is True
+
+
+def test_mixed_archive_and_current_question_keeps_archive_part_without_claiming_current_fact(monkeypatch):
+    monkeypatch.setattr("prm.application.answer_memory_research", lambda *args, **kwargs: _payload())
+    monkeypatch.setattr("prm.application.build_research_facade", lambda **kwargs: SimpleNamespace())
+    monkeypatch.setattr("prm.application.synthesize_answer", lambda *args, **kwargs: None)
+    result = PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:")).answer(
+        OperatorRequest(query="Что в моём архиве про agent evals и какая сейчас текущая цена Nvidia?", mode="auto")
+    )
+    assert result.route["primary_intent"] == "current_fact_verification"
+    assert result.payload["answer_gate"]["allow_answer"] is True
+    assert result.status == "partial_needs_external_verification"
+    assert result.text.startswith("Я не публикую свободный пересказ")
+    assert "Agent evals use task success and groundedness." in result.text
+
+
+def test_explicit_brief_current_fact_is_fail_closed(monkeypatch):
+    monkeypatch.setattr("prm.application.answer_memory_research", lambda *args, **kwargs: _payload())
+    monkeypatch.setattr("prm.application.build_research_facade", lambda **kwargs: SimpleNamespace())
+    result = PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:")).answer(
+        OperatorRequest(query="какая текущая цена Nvidia сегодня?", mode="brief")
+    )
+    assert result.status == "needs_external_verification"
+    assert "Внешняя проверка не запускалась" in result.text
+    assert "Agent evals" not in result.text
+
+
 def test_explicit_project_name_is_not_replaced_by_downstream_project_fit(monkeypatch):
     payload = _payload()
     payload["project_fit"] = {
@@ -198,4 +303,4 @@ def test_explicit_project_name_is_not_replaced_by_downstream_project_fit(monkeyp
     assert result.route["project_name"] == "Workflow-to-Agent-Studio"
     assert result.payload["project_fit"]["project_name"] == "Workflow-to-Agent-Studio"
     assert "AI_workflow_playbook" in result.payload["project_fit"]["inferred_project_name"]
-    assert "Workflow-to-Agent-Studio" in result.text
+    assert result.payload["final_answer_publication"]["fallback_used"] is True

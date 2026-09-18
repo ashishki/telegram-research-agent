@@ -283,6 +283,7 @@ _RELATIVE_WINDOW_RE = re.compile(
     re.IGNORECASE,
 )
 _TODAY_WINDOW_RE = re.compile(r"\b(today|сегодня)\b", re.IGNORECASE)
+_PREVIOUS_WEEK_RE = re.compile(r"\b(?:прошл(?:ая|ую|ой)\s+недел[яюиь]?|last\s+week)\b", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -1378,6 +1379,16 @@ def _resolve_time_window(question: str, *, now: datetime | None = None) -> Resea
             date_to_exclusive=today + timedelta(days=1),
             days=days,
             source=_clean_text(relative.group(0)),
+        )
+
+    previous_week = _PREVIOUS_WEEK_RE.search(lowered)
+    if previous_week:
+        start_of_this_week = today - timedelta(days=today.weekday())
+        return _time_window_from_dates(
+            date_from=start_of_this_week - timedelta(days=7),
+            date_to_exclusive=start_of_this_week,
+            days=7,
+            source=_clean_text(previous_week.group(0)),
         )
 
     if _TODAY_WINDOW_RE.search(lowered):

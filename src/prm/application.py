@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import os
 import re
-from typing import Any, Mapping
+import hashlib
+from typing import Any, Mapping, Sequence
 
 from assistant.claim_ledger import claim_ledger_public_summary, verify_answer_against_evidence
 from assistant.memory_research import MemoryResearchBudget, answer_memory_research
@@ -12,11 +13,15 @@ from assistant.operator_context import build_operator_context, validate_operator
 from assistant.pi_chat import answer_pi_chat
 from assistant.prm_chat_display import render_prm_chat_answer
 from config.settings import Settings
+from external_watch.delivery import render_on_demand_edition
+from external_watch.editions import project_edition
+from external_watch.selection import rank_edition_events
 from prm.archive_contract import ARCHIVE_RESPONSE_INTENTS, apply_archive_response_contract
 from prm.contracts import AssistantResult, OperatorRequest
 from prm.presentation import render_payload, render_project_clarification
 from prm.research_planner import plan_archive_evidence
 from prm.research_facade import build_research_facade
+from prm.request_plan import build_request_plan
 from prm.routing import decide_route
 from prm.synthesis import synthesize_answer
 
@@ -30,6 +35,7 @@ class PersonalResearchAssistant:
     def answer(self, request: OperatorRequest) -> AssistantResult:
         route = decide_route(request.query, requested_mode=request.mode, explicit_project=request.project_name)
         route_payload = route.to_dict()
+        request_plan = build_request_plan(request.query, route_payload)
         if route.mode == "project_clarify":
             return AssistantResult(
                 interaction_id="",
@@ -87,6 +93,7 @@ class PersonalResearchAssistant:
             question=request.query,
             project_context_required=route.project_context_required,
         )
+        mixed_archive_current = route.archive_scope and route.external_verification_required
         payload = answer_memory_research(
             request.query,
             archive_query=route.retrieval_query,
@@ -96,32 +103,35 @@ class PersonalResearchAssistant:
             limit=8 if route.primary_intent == "archive_to_action" else (5 if route.mode == "brief" else 4),
             budget=budget,
             operator_context=context_payload,
-            research_intent=route.primary_intent,
+            # Preserve a requested archive portion even when the same message
+            # also asks for a current external fact which is unavailable.
+            research_intent="archive_lookup" if mixed_archive_current else route.primary_intent,
         )
         payload = {
             **dict(payload),
             "question": request.query,
-            "primary_intent": route.primary_intent,
-            "response_contract_id": route.response_contract_id,
+            "primary_intent": "archive_lookup" if mixed_archive_current else route.primary_intent,
+            "response_contract_id": "archive_research.v2" if mixed_archive_current else route.response_contract_id,
             "route_decision": route_payload,
+            "request_plan": request_plan,
+            "primary_source_verification": request_plan["primary_source_fixture_verification"],
         }
         payload = _preserve_requested_project_identity(payload, route_payload)
         if route.primary_intent == "archive_to_action":
-            candidates = payload.get("archive_candidate_pool") or _mapping(payload.get("archive_evidence")).get("items") or []
-            plan = plan_archive_evidence(
-                [item for item in candidates if isinstance(item, Mapping)],
-                question=request.query,
-            )
+            # This PRM-SN goal permits no provider egress.  Do not call a
+            # planner whose optional environment capability could reach one;
+            # preserve the already local candidate ordering and expose the
+            # restriction explicitly.
             payload = {
                 **payload,
-                "archive_evidence": {**_mapping(payload.get("archive_evidence")), "items": plan["items"]},
                 "research_plan": {
-                    **{key: value for key, value in plan.items() if key != "items"},
+                    "status": "local_planner_disabled",
                     "gap_check": _mapping(payload.get("research_gap_check")),
+                    "provider_egress": False,
                 },
             }
-        payload = _apply_route_boundaries(payload, route_payload)
-        if route.primary_intent in ARCHIVE_RESPONSE_INTENTS:
+        payload = _apply_route_boundaries(payload, route_payload, mixed_archive_current=mixed_archive_current)
+        if route.primary_intent in ARCHIVE_RESPONSE_INTENTS or mixed_archive_current:
             payload = apply_archive_response_contract(
                 payload,
                 question=request.query,
@@ -129,20 +139,25 @@ class PersonalResearchAssistant:
             )
 
         deterministic = render_payload(payload, mode=route.mode)
+        local_archive_evidence = {
+            (str(item.get("source_url") or ""), str(item.get("snippet") or ""))
+            for item in _mapping(payload.get("archive_evidence")).get("items") or []
+            if isinstance(item, Mapping) and str(item.get("archive_document_id") or "")
+        }
         evidence_items = [
-            item
+            {
+                **dict(item),
+                "local_archive_provenance": (
+                    str(item.get("source_url") or ""),
+                    str(item.get("support_span") or item.get("snippet") or ""),
+                ) in local_archive_evidence,
+            }
             for item in _mapping(payload.get("evidence_quality")).get("items") or []
             if isinstance(item, Mapping)
         ]
-        synthesized = synthesize_answer(
-            payload,
-            deterministic_fallback=deterministic,
-            mode=route.mode,
-            evidence_items=evidence_items,
-            primary_intent=route.primary_intent,
-            response_contract_id=route.response_contract_id,
-        )
-        final_text = synthesized or deterministic
+        # No synthesis capability is invoked in this assigned local-only
+        # implementation, regardless of environment flags.
+        final_text = deterministic
         gate = _mapping(payload.get("answer_gate"))
         verification = verify_answer_against_evidence(
             final_text,
@@ -154,14 +169,62 @@ class PersonalResearchAssistant:
                 else ""
             ),
         )
+        publication_allowed = _final_answer_publication_allowed(
+            verification, gate, response_contract_id=str(payload.get("response_contract_id") or route.response_contract_id)
+        )
+        final_publication_allowed = publication_allowed
+        if not publication_allowed:
+            # Preserve a useful answer without presenting unchecked synthesis as
+            # fact.  This path is local-only and shows the selected excerpts
+            # with their actual source URLs.
+            final_text = _render_verified_evidence_fallback(
+                evidence_items,
+                boundary=str(payload.get("mixed_current_boundary") or ""),
+                local_only=bool(payload.get("mixed_current_boundary")),
+            )
+            verification = verify_answer_against_evidence(
+                final_text,
+                evidence_items,
+                # The mixed fallback contains only attributed local archive
+                # excerpts plus a current-fact boundary; it does not publish a
+                # current claim and may remain useful while verification is
+                # still required for that separate part.
+                current_fact_required=_blocking_current_fact_gate(gate) and not bool(payload.get("mixed_current_boundary")),
+                project_name="",
+            )
+            final_publication_allowed = (
+                _mixed_archive_fallback_allowed(verification)
+                if bool(payload.get("mixed_current_boundary"))
+                else _final_answer_publication_allowed(verification, gate)
+            )
+            if not final_publication_allowed:
+                final_text = "Не удалось собрать проверяемый источник-атрибутированный ответ. Уточни запрос или источник."
+                verification = verify_answer_against_evidence(
+                    final_text,
+                    evidence_items,
+                    current_fact_required=_blocking_current_fact_gate(gate),
+                    project_name="",
+                )
+                final_publication_allowed = _final_answer_publication_allowed(verification, gate)
         payload = {
             **dict(payload),
             "rendered_final_answer": final_text,
             "rendered_final_answer_verification": verification,
+            "final_answer_publication": {
+                "allowed": final_publication_allowed,
+                "fallback_used": not publication_allowed,
+                "reason": "verified" if final_publication_allowed else "final_claim_verification_incomplete_or_unsupported",
+            },
         }
         return AssistantResult(
             interaction_id=context.interaction_id,
-            status=str(payload.get("status") or "ok"),
+            status=(
+                "partial_needs_external_verification"
+                if bool(payload.get("mixed_current_boundary"))
+                else "needs_external_verification"
+                if _blocking_current_fact_gate(gate)
+                else str(payload.get("status") or "ok")
+            ),
             mode=route.mode,  # type: ignore[arg-type]
             text=final_text,
             payload=payload,
@@ -174,23 +237,64 @@ class PersonalResearchAssistant:
             route=route_payload,
         )
 
-    def _chat(self, request: OperatorRequest, context: Mapping[str, Any], route: Mapping[str, Any]) -> AssistantResult:
-        if not _env_enabled("PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS"):
-            return AssistantResult(
-                interaction_id=str(context.get("interaction_id") or ""),
-                status="provider_egress_required",
-                mode="chat",
-                text="Свободный LLM-ответ отключён. Используй обычный вопрос для локального поиска или явно разреши provider egress.",
-                operator_context=context,
-                route=route,
+    def render_topic_edition(
+        self,
+        request: OperatorRequest,
+        *,
+        topic_id: str,
+        items: Sequence[Mapping[str, Any]],
+        window_start: str,
+        window_end: str,
+        checked_at: str,
+        source_health: Mapping[str, str] | None = None,
+        detail_event_id: str = "",
+        prior_events: Sequence[Mapping[str, Any]] = (),
+    ) -> AssistantResult:
+        """Render caller-supplied, already-authorized items without fetching or sending.
+
+        This is the application seam for an explicit topic-edition request.
+        Collection, durable edition state, scheduling and Telegram transport are
+        intentionally absent: those become separate, confirmation-gated work.
+        """
+        edition = project_edition(
+            items,
+            topic_id=topic_id,
+            window_start=window_start,
+            window_end=window_end,
+            checked_at=checked_at,
+            prior_events=prior_events,
+        )
+        if not bool(edition["window"]["valid"]):
+            text = "Окно выпуска некорректно; новости не проверялись. Укажи начало и конец в ISO-времени."
+            status = "invalid_edition_window"
+        else:
+            text = render_on_demand_edition(
+                rank_edition_events(edition["events"]), source_health=source_health, detail_event_id=detail_event_id
             )
-        result = answer_pi_chat(request.query, settings=self.settings)
+            status = "ok" if edition["events"] else "no_news_or_source_unavailable"
+        return AssistantResult(
+            interaction_id=hashlib.sha256(f"{request.chat_id}\x1f{request.query}\x1f{edition['edition_id']}".encode()).hexdigest()[:24],
+            status=status,
+            mode="brief",
+            text=text,
+            payload={
+                "edition": edition,
+                "source_health": dict(source_health or {}),
+                "detail_event_id": detail_event_id,
+                "write_performed": False,
+                "automatic_job_created": False,
+                "notification_sent": False,
+            },
+            operator_context={"input_kind": request.input_kind, "topic_id": topic_id, "ephemeral": True},
+            route={"mode": "brief", "primary_intent": "topic_edition", "topic_id": topic_id},
+        )
+
+    def _chat(self, request: OperatorRequest, context: Mapping[str, Any], route: Mapping[str, Any]) -> AssistantResult:
         return AssistantResult(
             interaction_id=str(context.get("interaction_id") or ""),
-            status=str(result.get("status") or "ok"),
+            status="provider_egress_required",
             mode="chat",
-            text=render_prm_chat_answer(result, mode="llm-approved"),
-            payload=result,
+            text="Свободный LLM-ответ отключён в этом режиме. Используй локальный архивный вопрос; внешний режим требует отдельного утверждённого capability.",
             operator_context=context,
             route=route,
         )
@@ -236,19 +340,26 @@ class PersonalResearchAssistant:
         )
 
 
-def _apply_route_boundaries(payload: Mapping[str, Any], route: Mapping[str, Any]) -> dict[str, Any]:
+def _apply_route_boundaries(
+    payload: Mapping[str, Any], route: Mapping[str, Any], *, mixed_archive_current: bool = False
+) -> dict[str, Any]:
     result = dict(payload)
-    if str(route.get("primary_intent") or "") == "current_fact_verification":
+    if bool(route.get("external_verification_required")):
         gate = _mapping(result.get("answer_gate"))
         result["answer_gate"] = {
             **gate,
             "status": "needs_external_verification",
             "reason": gate.get("reason") or "current_external_fact_required",
-            "allow_answer": False,
+            "allow_answer": bool(mixed_archive_current),
             "current_claim_allowed": False,
-            "no_answer_required": True,
+            "no_answer_required": not mixed_archive_current,
             "external_verification_required": True,
         }
+        if mixed_archive_current:
+            result["mixed_current_boundary"] = (
+                "Текущий внешний факт не подтверждён: внешняя проверка не запускалась; "
+                "ниже — только архивная часть вопроса."
+            )
     return result
 
 
@@ -277,6 +388,70 @@ def _preserve_requested_project_identity(payload: Mapping[str, Any], route: Mapp
     }
 
 
+def _final_answer_publication_allowed(
+    verification: Mapping[str, Any], gate: Mapping[str, Any], *, response_contract_id: str = ""
+) -> bool:
+    """Whether rendered factual text is safe to publish as an answer."""
+    metrics = _mapping(verification.get("metrics"))
+    if not bool(verification.get("verification_complete", True)):
+        return False
+    if int(metrics.get("current_fact_violations") or 0):
+        return False
+    if float(metrics.get("unsupported_claim_rate") or 0.0) > 0.0:
+        return False
+    factual = [
+        claim for claim in verification.get("claims") or []
+        if isinstance(claim, Mapping) and str(claim.get("claim_type") or "") != "boundary"
+    ]
+    if _blocking_current_fact_gate(gate):
+        # A useful current-fact boundary is publishable only when the verifier
+        # actually extracted no factual claim.  Do not let the route bypass an
+        # unsupported current value should a renderer regress.
+        return not factual and any(
+            isinstance(claim, Mapping) and str(claim.get("claim_type") or "") == "boundary"
+            for claim in verification.get("claims") or []
+        )
+    return all(
+        bool(claim.get("evidence_refs"))
+        and all(str(status) == "supported" for status in _mapping(claim.get("citation_support")).values())
+        for claim in factual
+    )
+
+
+def _mixed_archive_fallback_allowed(verification: Mapping[str, Any]) -> bool:
+    """Allow cited local excerpts while preserving a separate current boundary."""
+
+    metrics = _mapping(verification.get("metrics"))
+    return (
+        bool(verification.get("verification_complete", True))
+        and float(metrics.get("unsupported_claim_rate") or 0.0) == 0.0
+        and int(metrics.get("current_fact_violations") or 0) == 0
+    )
+
+
+def _render_verified_evidence_fallback(
+    evidence_items: list[Mapping[str, Any]], *, boundary: str = "", local_only: bool = False
+) -> str:
+    lines = ["Я не публикую свободный пересказ: финальная проверка не подтвердила все фактические формулировки."]
+    if boundary:
+        lines.append(boundary)
+    for item in evidence_items[:3]:
+        span = " ".join(str(item.get("support_span") or item.get("snippet") or "").split())[:300]
+        span = re.sub(r"[.!?。！？]+\s+", "; ", span)
+        url = str(item.get("source_url") or "").strip()
+        # Mixed-current fallback is an archive view: never make an arbitrary
+        # HTTPS source survive as local evidence.
+        # In mixed mode provenance is established only by the application’s
+        # URL match against canonical archive evidence, not a caller-supplied
+        # identifier on an otherwise external Telegram item.
+        local_provenance = bool(item.get("local_archive_provenance"))
+        if span and url.startswith("https://") and (not local_only or (url.startswith("https://t.me/") and local_provenance)):
+            lines.append(f"- {span}\n  Источник: {url}")
+    if len(lines) == 1:
+        lines.append("Подходящего проверяемого фрагмента в выбранных источниках нет.")
+    return "\n".join(lines)
+
+
 def _env_enabled(name: str) -> bool:
     return os.environ.get(name, "").strip().casefold() in {"1", "true", "yes", "approved"}
 
@@ -289,7 +464,6 @@ def _blocking_current_fact_gate(gate: Mapping[str, Any]) -> bool:
     return (
         bool(gate.get("external_verification_required"))
         and not bool(gate.get("current_claim_allowed", True))
-        and (bool(gate.get("no_answer_required")) or not bool(gate.get("allow_answer", False)))
     )
 
 

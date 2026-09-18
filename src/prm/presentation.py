@@ -15,7 +15,9 @@ def render_payload(payload: Mapping[str, Any], *, mode: str) -> str:
     contract_id = str(payload.get("response_contract_id") or "")
     archive_contract = _mapping(payload.get("archive_contract"))
     if contract_id in ARCHIVE_RESPONSE_CONTRACTS and archive_contract:
-        return _render_archive_contract(archive_contract)
+        text = _render_archive_contract(archive_contract)
+        boundary = _text(payload.get("mixed_current_boundary"))
+        return f"{boundary}\n\n{text}" if boundary else text
 
     decision = _mapping(payload.get("project_decision"))
     project_fit = _mapping(payload.get("project_fit"))
@@ -285,7 +287,8 @@ def _finding_line(item: Mapping[str, Any]) -> str:
     summary = _text(item.get("summary"))
     reason = _human_relevance_reason(_text(item.get("relevance_reason")))
     suffix = f" — {reason}" if reason else ""
-    return f"- {date} @{channel}: {summary}{suffix}"
+    url = _text(item.get("source_url"))
+    return f"- {date} @{channel}: {summary}{suffix}" + (f"\n  Источник: {url}" if url else "")
 
 
 def _human_relevance_reason(value: str) -> str:
@@ -328,6 +331,9 @@ def _archive_source_lines(sources: Sequence[Mapping[str, Any]]) -> list[str]:
         channel = _text(item.get("channel_username")) or "источник"
         url = _text(item.get("source_url"))
         label = _localized_relevance_label(_text(item.get("relevance_label")))
+        # Finding lines already contain claim→source edges.  Keep the source
+        # inventory readable without presenting a second detached citation as
+        # evidence for the preceding unrelated sentence.
         result.append(f"- {date} @{channel} [{label}]" + (f": {url}" if url else ""))
     return result
 
