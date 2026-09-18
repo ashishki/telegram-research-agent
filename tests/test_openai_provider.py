@@ -182,6 +182,12 @@ def test_one_registry_reserves_and_commits_only_the_exact_openai_operation_group
     assert commit_transport_reservations((text.reservation,)) is False
     assert text.reservation.current is True
     assert context.reservation.current is True
+    other_registry, _, other_context_request = _compound_registry_and_requests(
+        operation_ref="operation_synthetic_group_registry_001"
+    )
+    other_context = other_registry.authorize_and_reserve(other_context_request)
+    assert other_context.reservation is not None
+    assert commit_transport_reservations((text.reservation, other_context.reservation)) is False
     assert commit_transport_reservations((text.reservation, context.reservation)) is True
 
 

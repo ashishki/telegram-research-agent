@@ -530,6 +530,14 @@ def commit_transport_reservations(reservations: Sequence[BudgetReservation]) -> 
     unique_reservations = tuple(sorted({id(item): item for item in reservations}.values(), key=id))
     if not unique_reservations:
         return False
+    operation_registries: dict[str, CapabilityRegistry] = {}
+    for reservation in unique_reservations:
+        operation_ref = reservation.operation_ref
+        if operation_ref is None:
+            continue
+        existing_registry = operation_registries.setdefault(operation_ref, reservation._registry)
+        if existing_registry is not reservation._registry:
+            return False
     with ExitStack() as stack:
         for reservation in unique_reservations:
             stack.enter_context(reservation._lock)
