@@ -52,15 +52,21 @@ callback bind an additive `prm_post_answer_action_binding.v1` source snapshot
 (PRM context kind/ID, canonical SHA-256 source snapshot, optional project
 provenance, offered action codes, private owner chat/actor hashes and expiry),
 never mutable `last_project_name`. PA-00 controls render only for
-`actor_id == chat_id == owner_chat_id`; every Telegram text/voice,
-compatibility-dispatch and callback ingress must carry that authenticated tuple
-unchanged, while a missing tuple renders no controls. Callbacks validate binding
+`actor_id == chat_id == owner_chat_id`; the shared ID predicate accepts only
+canonical positive ASCII decimals `[1-9][0-9]{0,18}` at most `9223372036854775807`.
+Every Telegram text/voice, compatibility-dispatch and callback ingress must
+carry that authenticated tuple unchanged, while a missing/invalid tuple renders
+no controls. Callbacks validate binding
 and requested action for both draft and confirmation without rerouting/searching.
 Rejected parse/identity/row/schema/digest/expiry/action cases are read-only: no
 row, receipt or memory mutation and no expiry cleanup. Legacy text selection
-asks for the inline callback. PA-00's rollback drain report is
-owner-restricted/read-only and blocks an old handler until no unexpired
-ready/pending row remains; it never changes shared UTD rows. Full
+asks for the inline callback. PA-00's
+`read_prm_rollback_drain(db_path, *, owner_chat_id, now=None)` is
+owner-restricted/read-only, returns only status/UTC-now/count-only
+classifications, fails closed for unavailable data and blocks an old handler
+until no unexpired ready/pending row remains; it never changes shared UTD rows.
+Use `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest` for
+direct PA-00 focused tests and record the resolved Python/version. Full
 plain-language “yes” is PA-03 work, where an exact current visible confirmation
 ref must be cleared on a new topic or cancellation; PA-13 applies the same
 invariant to provider writes. PA-00 must register and run

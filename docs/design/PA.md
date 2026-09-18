@@ -98,7 +98,16 @@ PA-00 is deliberately private-owner only: controls render only when a positive
 private `actor_id == chat_id == owner_chat_id` is available. `owner_chat_id`
 comes only from the already-required `TELEGRAM_OWNER_CHAT_ID` startup boundary;
 it is passed as data, not read again from a callback or inferred from a stored
-row. The identity propagation matrix is part of PA-00's implementation scope:
+row. PA-00 defines one shared
+`canonical_private_owner_id(value) -> str | None` helper for registration,
+callback, polling and compatibility dispatch. It accepts only an ASCII decimal
+string matching `[1-9][0-9]{0,18}` whose integer value is at most
+`9223372036854775807`, and returns that unchanged canonical string; it rejects
+zero, negatives, `+`/whitespace/leading zero forms, non-numeric values and
+out-of-range values. Equality is tested only between three non-`None` canonical
+values. The tests exercise that predicate at registration, callback, Telegram
+text/embedded-transcript/completed-voice paths and compatibility dispatch. The
+identity propagation matrix is part of PA-00's implementation scope:
 
 | ingress | authenticated identity propagated | action-control behavior |
 | --- | --- | --- |
@@ -147,7 +156,18 @@ selector is exactly `chat_id_hash = :owner_chat_id_hash AND status IN
 ('ready','pending') AND expires_at > :now`; the report is read-only, exposes
 only count/status/classification, and treats any returned row (including an
 unrecognised or UTD-shaped one) as a blocker rather than deleting or changing
-it. The order is: stop rendering new PRM controls; keep the PA-00 handler in
+it. The callable is
+`read_prm_rollback_drain(db_path, *, owner_chat_id, now=None) -> dict`, located
+with the PRM action store. It first canonicalizes the owner, treats a missing
+database/table, bad owner or SQL/JSON error as
+`{status: "unavailable", blocker_count: null}` and forbids rollback. For a
+valid read it returns only `status="blocked"|"clear"`, supplied UTC `now`,
+`blocker_count`, and count-only `classifications` of
+`prm_binding_v1`, `legacy_or_unknown`, and `utd_or_unknown`; it never emits a
+raw chat ID, context ID or payload. Its SQLite connection is read-only and may
+execute only the selector/metadata `SELECT`s. A trace-callback test proves no
+non-`SELECT` statement occurs, including for UTD-shaped and unavailable rows.
+The order is: stop rendering new PRM controls; keep the PA-00 handler in
 fail-closed drain mode; wait for/cancel only through a valid current user
 action until the report is zero; independently capture the zero report; only
 then activate an old handler. There is no automatic `DELETE`, generic
@@ -215,6 +235,12 @@ them to its executable verification list/project verifier; show intended
 failures for required semantic test-first changes. Split an oversized slice by
 revising the registry and approval as necessary, not by silently exceeding its
 budget.
+
+In this checkout the supported direct focused invocation is
+`PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q ...`;
+`python` is not assumed to exist. Registry `{python}` means the resolved
+`sys.executable`. PA-00 records its exact path/version and both environment
+values in the before/after receipt.
 
 Independent product/program design review precedes exact human approval.
 Slice/Test Critic/privacy reviews follow risk; full review is batched at phase
