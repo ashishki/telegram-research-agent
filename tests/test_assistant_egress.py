@@ -9,6 +9,7 @@ from unittest.mock import patch
 import pytest
 
 from bot import bot as bot_runtime
+from bot import legacy_handlers
 from bot import prm_handlers
 from bot.voice import VoiceTranscriptionUnavailable, transcribe_audio_file, transcribe_telegram_voice
 import llm.client as anthropic_client
@@ -101,6 +102,29 @@ def _delivery_decision(
         ),
         now=NOW,
     )
+
+
+def _utd_draft_decision():
+    grant = make_grant(
+        grant_id="grant_synthetic_utd_draft",
+        owner_ref="owner_telegram_42",
+        capability="assistant.utd_draft",
+        resource_ref="42",
+        operation="write",
+        data_class="user_provided",
+        providers=("provider_local",),
+        purpose="utd.draft",
+    )
+    request = make_request(
+        owner_ref="owner_telegram_42",
+        capability="assistant.utd_draft",
+        resource_ref="42",
+        operation="write",
+        data_class="user_provided",
+        provider_ref="provider_local",
+        purpose="utd.draft",
+    )
+    return CapabilityRegistry((grant,)).authorize_and_reserve(request, now=NOW)
 
 
 def test_configured_provider_switch_without_grant_makes_no_text_egress(monkeypatch):
@@ -269,6 +293,65 @@ def test_shared_prm_sender_default_denies_voice_or_utd_text_before_fake_telegram
     )
 
     assert sent == []
+
+
+def test_private_privacy_route_delivers_actual_default_deny_scope_only_with_a_delivery_grant(monkeypatch, tmp_path):
+    sent: list[str] = []
+    _registry, _grant, decision = _delivery_decision()
+    monkeypatch.setattr(prm_handlers, "_token", lambda: SYNTHETIC_TELEGRAM_TOKEN)
+    monkeypatch.setattr(
+        prm_handlers,
+        "_send_text_internal",
+        lambda **kwargs: sent.append(str(kwargs["text"])),
+    )
+
+    prm_handlers.dispatch_prm_command(
+        "42",
+        "/privacy",
+        SimpleNamespace(db_path=str(tmp_path / "synthetic.db")),
+        actor_id="42",
+        owner_chat_id="42",
+        delivery_authorizations=(decision,),
+    )
+
+    assert len(sent) == 1
+    assert "нет активных разрешений" in sent[0]
+
+
+def test_utd_draft_requires_local_write_reservation_before_onboarding(monkeypatch, tmp_path):
+    started: list[str] = []
+    monkeypatch.setattr(
+        prm_handlers,
+        "start_utd_profile_onboarding",
+        lambda _db_path, *, chat_id, seed_text: started.append(f"{chat_id}:{seed_text}") or {"message": "draft"},
+    )
+    monkeypatch.setattr(prm_handlers, "_token", lambda: SYNTHETIC_TELEGRAM_TOKEN)
+
+    prm_handlers.dispatch_prm_command(
+        "42",
+        "/utd Настроить мой UTD-профиль",
+        SimpleNamespace(db_path=str(tmp_path / "synthetic.db")),
+        actor_id="42",
+        owner_chat_id="42",
+        utd_draft_authorization=_utd_draft_decision(),
+    )
+
+    assert started == ["42:Настроить мой UTD-профиль"]
+
+
+def test_pa_safe_ops_deny_before_ungated_legacy_handler_dispatch(monkeypatch, tmp_path):
+    legacy_call = []
+    monkeypatch.setattr(legacy_handlers, "handle_status", lambda *_args: legacy_call.append("status"))
+
+    prm_handlers.dispatch_prm_command(
+        "42",
+        "/status",
+        SimpleNamespace(db_path=str(tmp_path / "synthetic.db")),
+        actor_id="42",
+        owner_chat_id="42",
+    )
+
+    assert legacy_call == []
 
 
 def test_prm_voice_polling_ingress_cannot_reach_the_fake_telegram_sender_without_delivery_grant(

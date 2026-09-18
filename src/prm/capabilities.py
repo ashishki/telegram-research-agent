@@ -50,6 +50,7 @@ TRANSPORT_PURPOSES: dict[tuple[str, str, str], str] = {
     ("provider_telegram", "media.voice_download", "read"): "voice.transcription",
     ("provider_openai", "media.transcribe", "model_egress"): "voice.transcription",
     ("provider_telegram", "assistant.result_delivery", "deliver"): "answer.delivery",
+    ("provider_local", "assistant.utd_draft", "write"): "utd.draft",
 }
 
 

@@ -18,15 +18,15 @@ def test_help_describes_one_archive_and_utd_assistant() -> None:
     assert "Свежие UTD-источники" in text
 
 
-def test_natural_language_starts_confirmation_gated_utd_draft(monkeypatch, tmp_path) -> None:
+def test_natural_language_denies_utd_draft_before_local_write_without_grant(monkeypatch, tmp_path) -> None:
     sent = []; started = []
     def fake_start(db_path, *, chat_id, seed_text):
         started.append(seed_text); return {"message": "draft only", "reply_markup": {"inline_keyboard": []}}
     monkeypatch.setattr(prm_handlers, "start_utd_profile_onboarding", fake_start)
     monkeypatch.setattr(prm_handlers, "send_message", lambda _token, _chat, text, **kwargs: sent.append((text, kwargs.get("reply_markup"))))
     prm_handlers.dispatch_prm_command("42", "/auto Настроить мой UTD-профиль", _settings(tmp_path))
-    assert started == ["Настроить мой UTD-профиль"]
-    assert sent == [("draft only", {"inline_keyboard": []})]
+    assert started == []
+    assert sent == []
 
 
 def test_utd_question_fails_closed_without_entering_prm_research(monkeypatch, tmp_path) -> None:
@@ -206,7 +206,7 @@ def test_utd_command_is_part_of_active_prm_surface() -> None:
     assert "/utd" in prm_handlers.PRM_SAFE_COMMANDS
 
 
-def test_privacy_command_shows_only_the_actual_default_deny_scope(monkeypatch, tmp_path) -> None:
+def test_privacy_command_builds_only_the_actual_default_deny_scope(monkeypatch, tmp_path) -> None:
     sent = []
 
     class ForbiddenAssistant:
@@ -228,6 +228,8 @@ def test_privacy_command_shows_only_the_actual_default_deny_scope(monkeypatch, t
         owner_chat_id="42",
     )
 
+    # The fake sender isolates rendering only. Delivery itself has an explicit
+    # grant-backed assertion in the PA-02 egress suite.
     assert len(sent) == 1
     assert "нет активных разрешений" in sent[0]
     assert "заблокированы" in sent[0]

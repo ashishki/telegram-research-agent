@@ -50,6 +50,8 @@ _PRM_DIALOG_STATE: dict[str, dict[str, Any]] = {}
 TELEGRAM_PROVIDER_REF = "provider_telegram"
 RESULT_DELIVERY_CAPABILITY = "assistant.result_delivery"
 RESULT_DELIVERY_DATA_CLASS = "private_archive"
+UTD_DRAFT_CAPABILITY = "assistant.utd_draft"
+LOCAL_PROVIDER_REF = "provider_local"
 
 
 def send_message(
@@ -102,6 +104,7 @@ def dispatch_prm_command(
     actor_id: str | None = None,
     owner_chat_id: str | None = None,
     delivery_authorizations: Sequence[AuthorizationDecision] = (),
+    utd_draft_authorization: AuthorizationDecision | None = None,
 ) -> None:
     command, args = _split_command(text)
     if command not in PRM_SAFE_COMMANDS:
@@ -121,10 +124,24 @@ def dispatch_prm_command(
         # PA-02 has no durable grant source yet. Rendering the empty registry is
         # intentional: it shows the exact default-deny scope without creating,
         # persisting, or pretending to revoke a connection.
-        send_message(_token(), chat_id, describe_current_capability_scope(()))
+        send_message(
+            _token(),
+            chat_id,
+            describe_current_capability_scope(()),
+            delivery_authorization=_first_delivery_authorization(delivery_authorizations),
+            actor_id=actor_id,
+            owner_chat_id=owner_chat_id,
+        )
         return
     if command == "/utd":
-        _start_utd_profile(chat_id, settings=settings, seed_text=args)
+        _start_utd_profile(
+            chat_id,
+            settings=settings,
+            seed_text=args,
+            authorization=utd_draft_authorization,
+            actor_id=actor_id,
+            owner_chat_id=owner_chat_id,
+        )
         return
     if command in {"/status", "/refresh", "/reactions"}:
         _delegate_safe_ops(command, chat_id, args, settings)
@@ -244,7 +261,22 @@ def dispatch_prm_command(
         )
 
 
-def _start_utd_profile(chat_id: str, *, settings: Settings, seed_text: str) -> None:
+def _start_utd_profile(
+    chat_id: str,
+    *,
+    settings: Settings,
+    seed_text: str,
+    authorization: AuthorizationDecision | None = None,
+    actor_id: str | None = None,
+    owner_chat_id: str | None = None,
+) -> None:
+    if not _require_utd_draft_authorization(
+        chat_id=chat_id,
+        authorization=authorization,
+        actor_id=actor_id,
+        owner_chat_id=owner_chat_id,
+    ):
+        return
     result = start_utd_profile_onboarding(
         settings.db_path,
         chat_id=chat_id,
@@ -259,20 +291,11 @@ def _start_utd_profile(chat_id: str, *, settings: Settings, seed_text: str) -> N
 
 
 def _delegate_safe_ops(command: str, chat_id: str, args: str, settings: Settings) -> None:
-    from bot import legacy_handlers
-
-    handler_name = {
-        "/status": "handle_status",
-        "/refresh": "handle_refresh",
-        "/reactions": "handle_reactions",
-    }[command]
-    handler = getattr(legacy_handlers, handler_name, None)
-    if handler is None:
-        send_message(
-            _token(), chat_id, "Операционная команда пока недоступна в текущей сборке."
-        )
-        return
-    handler(chat_id, args, settings)
+    # Legacy handlers own their historical Telegram sends and have no PA-02
+    # capability boundary.  Do not route PA ingress through them until their
+    # exact operations/receipts receive a separately scoped implementation.
+    del command, chat_id, args, settings
+    LOGGER.warning("PA operation denied before legacy dispatch")
 
 
 def _post_answer_markup(
@@ -386,6 +409,45 @@ def _private_delivery_owner_ref(
     if any(value is None for value in values) or len(set(values)) != 1:
         return None
     return f"owner_telegram_{values[0]}"
+
+
+def _first_delivery_authorization(
+    authorizations: Sequence[AuthorizationDecision],
+) -> AuthorizationDecision | None:
+    return authorizations[0] if authorizations else None
+
+
+def _require_utd_draft_authorization(
+    *,
+    chat_id: str,
+    authorization: AuthorizationDecision | None,
+    actor_id: str | None,
+    owner_chat_id: str | None,
+) -> bool:
+    owner_ref = _private_delivery_owner_ref(chat_id, actor_id, owner_chat_id)
+    if owner_ref is None:
+        LOGGER.warning("UTD draft denied before local write")
+        return False
+    try:
+        require_authorized_operation(
+            authorization,
+            capability=UTD_DRAFT_CAPABILITY,
+            operation="write",
+            provider_ref=LOCAL_PROVIDER_REF,
+            data_class="user_provided",
+            owner_ref=owner_ref,
+            connection_ref=None,
+            resource_ref=chat_id,
+            purpose=transport_purpose(
+                provider_ref=LOCAL_PROVIDER_REF,
+                capability=UTD_DRAFT_CAPABILITY,
+                operation="write",
+            ),
+        )
+    except CapabilityDenied:
+        LOGGER.warning("UTD draft denied before local write")
+        return False
+    return True
 
 
 def _require_prm_delivery_authorization(

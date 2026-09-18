@@ -59,6 +59,18 @@ every external side effect. Their exact inventory and enforcement remain for
 the bounded slices that own those paths; they must not inherit PA-02 completion
 claims.
 
+The active PA `/status`, `/refresh` and `/reactions` routes do not delegate to
+their historical legacy handlers because those handlers have no PA-02 final-send
+decision. They fail closed before that dispatch until an owning slice gives the
+legacy operations a bounded capability/receipt contract. Similarly, PA `/utd`
+must consume an exact `assistant.utd_draft` / `write` / `provider_local` /
+`user_provided` / `utd.draft` decision bound to the authenticated private owner
+and chat before it creates an onboarding draft. PA-02 has no runtime source for
+either decision. The private `/privacy` renderer is observable in a synthetic
+grant-backed delivery path only; without a current delivery decision its actual
+Telegram send is suppressed. These are default-deny boundaries, not claims that
+the deferred operations or a live permission UI have been enabled.
+
 The public scope formatter lists capability, resources, operations, data
 classes and permitted providers and explicitly says that a provider key is not
 consent. It deliberately does not expose credential values or raw source data.
