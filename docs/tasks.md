@@ -71,6 +71,7 @@ Acceptance-Criteria:
   - Conversation, evidence, grant, report and action contracts are specific and preserve existing source identities.
   - Design approval is exact and human-issued; useful positives, failures and adversarial cases exist before capability implementation.
 Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_assistant_contracts.py
   - python tools/test_tiers.py fast-contract
 Context-Refs:
   - docs/design/PA.md

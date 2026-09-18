@@ -1,0 +1,187 @@
+{
+  "schema_version": "assistant.acceptance_corpus.v1",
+  "visibility": "public_synthetic",
+  "privacy": {
+    "contains_private_content": false,
+    "contains_credentials": false,
+    "contains_live_account_identifiers": false,
+    "synthetic_only": true
+  },
+  "contract_examples": {
+    "capability_grant": {
+      "schema_version": "assistant.capability_grant.v1",
+      "grant_id": "grant_synthetic_archive_read",
+      "owner_ref": "owner_synthetic_primary",
+      "connection_ref": null,
+      "capability": {
+        "name": "archive.search",
+        "resource_refs": ["telegram://synthetic/archive"],
+        "operations": ["read"],
+        "data_classes": ["private_archive"],
+        "purpose": "answer.request"
+      },
+      "provider_policy": {
+        "egress": "deny",
+        "permitted_provider_refs": [],
+        "fallback_allowed": false,
+        "maximum_request_count": 1
+      },
+      "validity": {
+        "issued_at": "2026-09-18T00:00:00Z",
+        "expires_at": "2026-12-31T00:00:00Z",
+        "revision": 3,
+        "revoked_at": null
+      },
+      "status": "active"
+    },
+    "tool_result": {
+      "schema_version": "assistant.tool_result.v1",
+      "result_id": "result_synthetic_research_001",
+      "tool_ref": "tool_archive_search",
+      "grant_ref": "grant_synthetic_archive_read",
+      "grant_revision": 3,
+      "status": "succeeded",
+      "data": {
+        "schema_ref": "assistant.research_result.v1",
+        "result_ref": "result_synthetic_research_001"
+      },
+      "evidence_refs": ["evidence_synthetic_001"],
+      "fetched_at": "2026-09-18T00:01:00Z",
+      "coverage": {
+        "source_classes_checked": ["telegram_archive"],
+        "source_refs_checked": ["telegram://synthetic/archive/001"],
+        "complete": true,
+        "limitations": []
+      },
+      "errors": [],
+      "retryable": false
+    },
+    "evidence_item": {
+      "schema_version": "assistant.evidence_item.v1",
+      "evidence_id": "evidence_synthetic_001",
+      "source_kind": "public_web",
+      "source_ref": "https://example.test/synthetic-source-001",
+      "canonical_url": "https://example.test/synthetic-source-001",
+      "source_version": "synthetic-source-version-001",
+      "excerpts": [
+        {"excerpt_ref": "excerpt_synthetic_001", "text": "Synthetic evidence excerpt for contract validation only."}
+      ],
+      "published_at": "2026-09-17T12:00:00Z",
+      "event_at": null,
+      "retrieved_at": "2026-09-18T00:01:00Z",
+      "access_scope": "public",
+      "conflicts_with": []
+    },
+    "brief_document": {
+      "schema_version": "assistant.brief_document.v1",
+      "brief_id": "brief_synthetic_week_001",
+      "version": 1,
+      "owner_ref": "owner_synthetic_primary",
+      "window": {
+        "timezone": "Europe/Berlin",
+        "start_at": "2026-09-07T00:00:00+02:00",
+        "end_at": "2026-09-14T00:00:00+02:00",
+        "generated_at": "2026-09-18T00:02:00Z"
+      },
+      "status": "complete",
+      "sections": [
+        {
+          "section_id": "highlights",
+          "title": "Synthetic highlights",
+          "items": [
+            {
+              "item_id": "brief_item_synthetic_001",
+              "title": "Synthetic item",
+              "summary": "A synthetic item proves that every rendered format receives one versioned brief DTO.",
+              "evidence_refs": ["evidence_synthetic_001"],
+              "selection_reasons": ["importance.high", "coverage.complete"]
+            }
+          ]
+        }
+      ],
+      "evidence_refs": ["evidence_synthetic_001"],
+      "selection_reasons": ["importance.high", "coverage.complete"],
+      "previous_version": null,
+      "coverage_manifest": {
+        "sources": [
+          {"source_ref": "https://example.test/synthetic-source-001", "state": "checked", "reason": null}
+        ],
+        "limitations": []
+      }
+    },
+    "action_proposal": {
+      "schema_version": "assistant.action_proposal.v1",
+      "proposal_id": "proposal_synthetic_mail_001",
+      "proposal_version": 1,
+      "action_type": "mail_send",
+      "arguments_schema_ref": "assistant.mail_send_arguments.v1",
+      "arguments": {
+        "recipient_ref": "contact_synthetic_001",
+        "body_ref": "draft_synthetic_001"
+      },
+      "arguments_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "source_result": {
+        "result_ref": "result_synthetic_research_001",
+        "version": "result-version-synthetic-001",
+        "project_ref": "project_synthetic_001"
+      },
+      "grant_ref": "grant_synthetic_archive_read",
+      "grant_revision": 3,
+      "preview": {
+        "summary": "Send the synthetic draft to the explicitly resolved synthetic recipient.",
+        "consequences": ["A synthetic external-send path would be requested after confirmation."]
+      },
+      "risk": "medium",
+      "confirmation": {
+        "owner_ref": "owner_synthetic_primary",
+        "conversation_ref": "conversation_synthetic_001",
+        "expires_at": "2026-09-18T00:12:00Z",
+        "single_use": true
+      },
+      "state": "awaiting_confirmation",
+      "idempotency_key": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "action_receipt": {
+      "schema_version": "assistant.action_receipt.v1",
+      "receipt_id": "receipt_synthetic_mail_001",
+      "proposal_ref": "proposal_synthetic_mail_001",
+      "proposal_version": 1,
+      "proposal_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "source_result": {
+        "result_ref": "result_synthetic_research_001",
+        "version": "result-version-synthetic-001"
+      },
+      "execution_state": "executed",
+      "idempotency_key": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "attempted_at": "2026-09-18T00:03:00Z",
+      "completed_at": "2026-09-18T00:03:01Z",
+      "provider_object": {
+        "provider_ref": "provider_synthetic_mail",
+        "object_ref": "provider-object-synthetic-001",
+        "version": "provider-version-synthetic-001"
+      },
+      "reconciliation_required": false,
+      "errors": []
+    }
+  },
+  "scenarios": [
+    {"scenario_id": "pa02_grant_denied_before_egress", "slices": ["PA-02"], "kind": "adversarial", "source_classes": ["private_archive"], "contract_refs": ["capability_grant", "tool_result"], "expected": ["denied_before_tool", "no_provider_fallback"]},
+    {"scenario_id": "pa02_revocation_and_voice_parity", "slices": ["PA-02"], "kind": "negative", "source_classes": ["user_provided"], "contract_refs": ["capability_grant", "tool_result"], "expected": ["revision_mismatch_denied", "voice_obeys_same_policy"]},
+    {"scenario_id": "pa03_ambiguous_yes_and_new_topic", "slices": ["PA-03"], "kind": "adversarial", "source_classes": ["user_provided"], "contract_refs": ["action_proposal"], "expected": ["ambiguous_confirmation_denied", "no_reroute"]},
+    {"scenario_id": "pa04_archive_answer_with_gap", "slices": ["PA-04"], "kind": "positive_and_negative", "source_classes": ["telegram_archive"], "contract_refs": ["tool_result", "evidence_item"], "expected": ["source_backed_answer", "partial_is_not_absence"]},
+    {"scenario_id": "pa05_fresh_primary_source_and_injection", "slices": ["PA-05"], "kind": "adversarial", "source_classes": ["public_web"], "contract_refs": ["tool_result", "evidence_item"], "expected": ["primary_source_preferred", "untrusted_content_cannot_expand_rights"]},
+    {"scenario_id": "pa06_multi_source_project_research", "slices": ["PA-06"], "kind": "positive", "source_classes": ["public_web", "telegram_archive", "github"], "contract_refs": ["tool_result", "evidence_item"], "expected": ["bounded_parallel_reads", "project_identity_preserved"]},
+    {"scenario_id": "pa07_partial_weekly_brief", "slices": ["PA-07"], "kind": "negative", "source_classes": ["telegram_archive", "public_web"], "contract_refs": ["brief_document", "evidence_item"], "expected": ["coverage_manifest_shown", "no_false_read_count"]},
+    {"scenario_id": "pa08_cross_format_fact_equality", "slices": ["PA-08"], "kind": "positive", "source_classes": ["document"], "contract_refs": ["brief_document"], "expected": ["telegram_html_pdf_markdown_share_version", "cyrillic_and_long_url_safe"]},
+    {"scenario_id": "pa09_watch_pause_unknown_send", "slices": ["PA-09"], "kind": "failure_recovery", "source_classes": ["public_web"], "contract_refs": ["capability_grant", "action_receipt"], "expected": ["revocation_before_delivery", "unknown_send_requires_reconciliation"]},
+    {"scenario_id": "pa10_mail_scope_and_delete", "slices": ["PA-10"], "kind": "adversarial", "source_classes": ["mail"], "contract_refs": ["capability_grant", "tool_result", "evidence_item"], "expected": ["folder_filter_not_provider_scope", "derived_data_removed_on_revocation"]},
+    {"scenario_id": "pa11_calendar_conflict_and_contact_resolution", "slices": ["PA-11"], "kind": "negative", "source_classes": ["calendar"], "contract_refs": ["tool_result", "evidence_item"], "expected": ["timezone_preserved", "ambiguous_recipient_not_guessed"]},
+    {"scenario_id": "pa12_canvas_deadline_conflict", "slices": ["PA-12"], "kind": "adversarial", "source_classes": ["canvas", "academic_public", "mail"], "contract_refs": ["capability_grant", "evidence_item", "brief_document"], "expected": ["primary_deadline_not_overwritten", "unconfirmed_urgency_not_escalated"]},
+    {"scenario_id": "pa13_exact_single_use_external_action", "slices": ["PA-13"], "kind": "adversarial", "source_classes": ["mail", "calendar"], "contract_refs": ["action_proposal", "action_receipt"], "expected": ["exact_arguments_and_owner_bound_confirmation", "duplicate_click_safe", "unknown_not_retried"]},
+    {"scenario_id": "pa14_memory_provenance_and_delete", "slices": ["PA-14"], "kind": "failure_recovery", "source_classes": ["user_provided", "telegram_archive"], "contract_refs": ["evidence_item", "action_proposal"], "expected": ["memory_provenance_visible", "retention_and_delete_honored"]},
+    {"scenario_id": "pa15_voice_document_policy_parity", "slices": ["PA-15"], "kind": "adversarial", "source_classes": ["document", "user_provided"], "contract_refs": ["capability_grant", "tool_result", "evidence_item"], "expected": ["voice_ocr_same_grant_boundary", "unsafe_attachment_rejected"]},
+    {"scenario_id": "pa16_model_cost_and_safe_fallback", "slices": ["PA-16"], "kind": "negative", "source_classes": ["private_archive", "public_web"], "contract_refs": ["capability_grant", "tool_result"], "expected": ["provider_policy_before_egress", "unknown_cost_conservative", "fallback_cannot_lower_privacy"]},
+    {"scenario_id": "pa17_backup_migration_and_recovery", "slices": ["PA-17"], "kind": "failure_recovery", "source_classes": ["telegram_archive", "mail", "calendar"], "contract_refs": ["action_receipt", "evidence_item"], "expected": ["restore_and_revocation_checked", "durable_unknown_outcome_preserved"]},
+    {"scenario_id": "pa18_integrated_owner_acceptance", "slices": ["PA-18"], "kind": "human_gate", "source_classes": ["telegram_archive", "public_web", "mail", "calendar", "canvas", "github", "document", "user_provided"], "contract_refs": ["capability_grant", "tool_result", "evidence_item", "brief_document", "action_proposal", "action_receipt"], "expected": ["fixture_not_release_evidence", "requires_permitted_pilot_visual_review_and_human_acceptance"]}
+  ]
+}

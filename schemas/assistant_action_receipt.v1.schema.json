@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://telegram-research-agent.local/schemas/assistant_action_receipt.v1.schema.json",
+  "title": "ActionReceipt v1",
+  "description": "A durable execution observation. Unknown is not converted to failed and requires reconciliation before retry.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "receipt_id", "proposal_ref", "proposal_version", "proposal_hash", "source_result", "execution_state", "idempotency_key", "attempted_at", "completed_at", "provider_object", "reconciliation_required", "errors"],
+  "properties": {
+    "schema_version": {"const": "assistant.action_receipt.v1"},
+    "receipt_id": {"type": "string", "pattern": "^receipt_[a-z0-9_-]{3,120}$"},
+    "proposal_ref": {"type": "string", "pattern": "^proposal_[a-z0-9_-]{3,120}$"},
+    "proposal_version": {"type": "integer", "minimum": 1},
+    "proposal_hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "source_result": {"type": "object", "additionalProperties": false, "required": ["result_ref", "version"], "properties": {"result_ref": {"type": "string", "pattern": "^result_[a-z0-9_-]{3,120}$"}, "version": {"type": "string", "minLength": 1, "maxLength": 256}}},
+    "execution_state": {"type": "string", "enum": ["executed", "not_executed", "failed", "unknown"]},
+    "idempotency_key": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "attempted_at": {"type": "string", "format": "date-time"},
+    "completed_at": {"type": ["string", "null"], "format": "date-time"},
+    "provider_object": {"type": ["object", "null"], "additionalProperties": false, "required": ["provider_ref", "object_ref", "version"], "properties": {"provider_ref": {"type": "string", "pattern": "^provider_[a-z0-9_.-]{3,120}$"}, "object_ref": {"type": "string", "minLength": 1, "maxLength": 512}, "version": {"type": ["string", "null"], "maxLength": 256}}},
+    "reconciliation_required": {"type": "boolean"},
+    "errors": {"type": "array", "maxItems": 16, "items": {"type": "object", "additionalProperties": false, "required": ["code", "safe_message"], "properties": {"code": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{2,120}$"}, "safe_message": {"type": "string", "minLength": 1, "maxLength": 500}}}}
+  },
+  "allOf": [
+    {"if": {"properties": {"execution_state": {"const": "executed"}}, "required": ["execution_state"]}, "then": {"properties": {"completed_at": {"type": "string"}, "provider_object": {"type": "object"}, "reconciliation_required": {"const": false}}}},
+    {"if": {"properties": {"execution_state": {"const": "unknown"}}, "required": ["execution_state"]}, "then": {"properties": {"completed_at": {"type": "null"}, "reconciliation_required": {"const": true}}}}
+  ]
+}

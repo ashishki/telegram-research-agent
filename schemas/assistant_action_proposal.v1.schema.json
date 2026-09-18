@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://telegram-research-agent.local/schemas/assistant_action_proposal.v1.schema.json",
+  "title": "ActionProposal v1",
+  "description": "A pending exact action. This record alone is never execution authority; PA-13 owns confirmation and execution.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "proposal_id", "proposal_version", "action_type", "arguments_schema_ref", "arguments", "arguments_hash", "source_result", "grant_ref", "grant_revision", "preview", "risk", "confirmation", "state", "idempotency_key"],
+  "properties": {
+    "schema_version": {"const": "assistant.action_proposal.v1"},
+    "proposal_id": {"type": "string", "pattern": "^proposal_[a-z0-9_-]{3,120}$"},
+    "proposal_version": {"type": "integer", "minimum": 1},
+    "action_type": {"type": "string", "enum": ["mail_send", "calendar_create", "calendar_update", "watch_create", "memory_write"]},
+    "arguments_schema_ref": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{2,160}$"},
+    "arguments": {"type": "object", "minProperties": 1, "maxProperties": 32, "propertyNames": {"pattern": "^[a-z][a-z0-9_]{0,80}$"}},
+    "arguments_hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "source_result": {"type": "object", "additionalProperties": false, "required": ["result_ref", "version", "project_ref"], "properties": {"result_ref": {"type": "string", "pattern": "^result_[a-z0-9_-]{3,120}$"}, "version": {"type": "string", "minLength": 1, "maxLength": 256}, "project_ref": {"type": ["string", "null"], "maxLength": 256}}},
+    "grant_ref": {"type": "string", "pattern": "^grant_[a-z0-9_-]{3,120}$"},
+    "grant_revision": {"type": "integer", "minimum": 1},
+    "preview": {"type": "object", "additionalProperties": false, "required": ["summary", "consequences"], "properties": {"summary": {"type": "string", "minLength": 1, "maxLength": 2000}, "consequences": {"type": "array", "maxItems": 16, "items": {"type": "string", "minLength": 1, "maxLength": 500}}}},
+    "risk": {"type": "string", "enum": ["low", "medium", "high", "prohibited"]},
+    "confirmation": {"type": "object", "additionalProperties": false, "required": ["owner_ref", "conversation_ref", "expires_at", "single_use"], "properties": {"owner_ref": {"type": "string", "pattern": "^owner_[a-z0-9_-]{3,120}$"}, "conversation_ref": {"type": "string", "pattern": "^conversation_[a-z0-9_-]{3,120}$"}, "expires_at": {"type": "string", "format": "date-time"}, "single_use": {"const": true}}},
+    "state": {"type": "string", "enum": ["draft", "awaiting_confirmation", "cancelled", "expired"]},
+    "idempotency_key": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"}
+  }
+}
