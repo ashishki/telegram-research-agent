@@ -54,7 +54,8 @@ that it already implements full natural-language confirmation. Its additive
   binding field must be byte-for-byte equal; there is no second result ID;
 - `source_snapshot` with exactly `title`, `query`, `body`, `source_refs`,
   `evidence_items`, `project_name`, `primary_intent`, `response_contract_id`,
-  `direct_count`, `partial_count`, and `offered_action_codes`. Text is
+  `direct_count`, `partial_count`, and `offered_action_codes`. Counts are
+  non-boolean integers `0..1000000`; text is
   whitespace-normalized and bounded (240, 220, 240, 240, 64, 64 respectively);
   refs are first-seen exact HTTPS strings <=512 chars (max 5), evidence is
   first-seen `(HTTPS <=512-char URL, normalized <=400-char snippet)` pairs
@@ -73,8 +74,9 @@ that it already implements full natural-language confirmation. Its additive
   `ValueError`, non-finite value or non-serializable source returns no controls
   while still rendering the answer; it creates neither a context row nor a
   receipt; and
-- optional `source_project_ref={origin: answer.project_name, value: ...}`; it
-  is a display/provenance value, never an authorization input; and
+- optional `source_project_ref={origin: answer.project_name, value:
+  source_snapshot.project_name}` only when that nonempty bounded snapshot field
+  exists; it is an exact copy for display/provenance, never authority; and
 - offered action codes, `owner_chat_id_hash`, `actor_id_hash` and expiry. The
   callback validates its requested action against those codes and the row before
   proposal/confirmation work.
@@ -193,7 +195,11 @@ their clean-schema incompatibility without a migration: `utd_state` in their
 `summary_json` is authoritative, while table status maps `draft -> ready`,
 `previewed|confirming -> pending`, `confirmed -> confirmed`, and
 `cancelled|expired -> cancelled`. `encode_utd_proposal_state` and
-`decode_utd_proposal_state` atomically maintain that pair; missing, malformed or
+`decode_utd_proposal_state` atomically maintain that pair in
+`assistant.utd_profile_store` only. `utd_profile.py` invokes this storage API
+but performs no direct proposal-state SQL. Typed `UtdTransitionResult(applied|
+unavailable)` owns `BEGIN IMMEDIATE`/commit-or-rollback; callers cannot nest or
+partially own its transaction. Missing, malformed or
 mismatched state/status (including untagged `pending`) fails closed without a
 write. `transition_utd_proposal(conn, context_id, expected, next)` begins one
 transaction, decodes the current pair, and conditionally updates both encoded
@@ -255,12 +261,6 @@ topic/cancellation and requires an exact matching visible proposal. PA-13 adds
 the corresponding provider-write confirmation and reconciliation. Thus PA-00
 tests callback/source integrity and denies unsafe legacy text action selection;
 it does not claim that natural-language confirmation is already shipped.
-
-## Product constraints
-
-Natural language preserves context; briefs are source-identical and visually
-inspected. Public-watch never authorizes mail/Canvas. Failed delivery is not
-success. Changes default off; production migration/restore needs approval.
 
 ## Vertical slices and acceptance
 

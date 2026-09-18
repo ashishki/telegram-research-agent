@@ -52,7 +52,9 @@ callback bind an additive `prm_post_answer_action_binding.v1` source snapshot
 (PRM context kind/ID, canonical SHA-256 source snapshot, optional project
 provenance, offered action codes, private owner chat/actor hashes and expiry),
 never mutable `last_project_name`. One pure snapshot canonicalizer is used for
-registration and validation; a non-finite/non-serializable value renders no
+registration and validation; its counts are non-boolean integers in
+`0..1000000`, and its optional project reference is only an exact bounded copy
+of canonical `project_name`. A non-finite/non-serializable value renders no
 control and writes neither context nor receipt. PA-00 controls render only for
 `actor_id == chat_id == owner_chat_id`; the shared ID predicate accepts only
 canonical positive ASCII decimals `[1-9][0-9]{0,18}` at most `9223372036854775807`.
