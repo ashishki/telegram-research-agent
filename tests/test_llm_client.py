@@ -180,6 +180,28 @@ class TestLLMClient(unittest.TestCase):
 
         self.assertEqual(calls, 1)
 
+    def test_text_completion_redacts_provider_exception_from_logs_and_error_chain(self):
+        mock_client = SimpleNamespace(
+            messages=SimpleNamespace(
+                create=lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("provider-payload-sentinel"))
+            )
+        )
+        with patch.object(client, "_get_client", return_value=mock_client):
+            with self.assertLogs(client.LOGGER, level="WARNING") as logs:
+                with self.assertRaises(client.LLMError) as error:
+                    client.complete(
+                        prompt="private-prompt-sentinel",
+                        category="test",
+                        authorization=self.text_authorization,
+                        **AUTH_SCOPE,
+                    )
+
+        assert "provider-payload-sentinel" not in str(error.exception)
+        assert error.exception.__cause__ is None
+        rendered = "\n".join(logs.output)
+        assert "provider-payload-sentinel" not in rendered
+        assert "private-prompt-sentinel" not in rendered
+
     def test_complete_with_receipt_honors_single_attempt_budget(self):
         calls = 0
 

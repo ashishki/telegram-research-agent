@@ -10,7 +10,7 @@ import pytest
 
 from bot.voice import VoiceTranscriptionUnavailable, transcribe_audio_file, transcribe_telegram_voice
 import llm.client as anthropic_client
-from llm.openai_provider import ProviderEgressDenied, complete_with_provider
+from llm.openai_provider import OpenAIProviderError, ProviderEgressDenied, complete_with_provider
 from tests.test_assistant_permissions import NOW, make_grant, make_request
 from prm.capabilities import CapabilityRegistry
 
@@ -175,6 +175,27 @@ def test_openai_adapter_rejects_cross_owner_or_resource_substitution(monkeypatch
                 **substituted_scope,
             )
         assert client.responses.calls == []
+
+
+def test_openai_adapter_redacts_provider_exception_chain(monkeypatch):
+    def raise_provider_error(**_kwargs):
+        raise RuntimeError("provider-payload-sentinel")
+
+    client = SimpleNamespace(responses=SimpleNamespace(create=raise_provider_error))
+    monkeypatch.setenv("PRM_OPENAI_PROVIDER_ENABLED", "true")
+
+    with pytest.raises(OpenAIProviderError) as error:
+        complete_with_provider(
+            "private-prompt-sentinel",
+            provider="openai",
+            allow_provider_egress=True,
+            authorization=_decision(),
+            client=client,
+            **OWNER_SCOPE,
+        )
+
+    assert "provider-payload-sentinel" not in str(error.value)
+    assert error.value.__cause__ is None
 
 
 def test_voice_adapter_binds_download_and_transcription_to_actual_file_resource():

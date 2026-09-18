@@ -152,10 +152,10 @@ def complete_with_provider(
                 resource_ref=context_resource_ref or "",
             )
         response = active_client.responses.create(model=model, input=request_input)
-    except CapabilityDenied as exc:
-        raise ProviderEgressDenied("OpenAI provider egress requires an active matching capability grant.") from exc
-    except Exception as exc:  # provider SDK exceptions are intentionally isolated here
-        raise OpenAIProviderError("OpenAI Responses API call failed") from exc
+    except CapabilityDenied:
+        raise ProviderEgressDenied("OpenAI provider egress requires an active matching capability grant.") from None
+    except Exception:  # provider SDK exceptions are intentionally isolated here
+        raise OpenAIProviderError("OpenAI Responses API call failed") from None
 
     return ProviderResult(
         status="ok",

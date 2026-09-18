@@ -286,11 +286,11 @@ def complete_with_receipt(
             max_tokens=max_tokens,
             messages=[{"role": "user", "content": prompt}],
         )
-    except CapabilityDenied as exc:
-        raise LLMError("Anthropic completion requires an active capability grant") from exc
-    except Exception as exc:
-        LOGGER.exception("Anthropic completion has unknown outcome after one attempt")
-        raise LLMError("Anthropic completion failed") from exc
+    except CapabilityDenied:
+        raise LLMError("Anthropic completion requires an active capability grant") from None
+    except Exception:
+        LOGGER.warning("Anthropic completion has unknown outcome after one attempt")
+        raise LLMError("Anthropic completion failed") from None
 
     text = _extract_text(response)
     duration_ms = int((time.time() - start_time) * 1000)
