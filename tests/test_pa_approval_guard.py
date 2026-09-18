@@ -24,3 +24,8 @@ def test_other_errors_warnings_and_missing_results_fail():
     assert not module.expected_rejection(1, message().replace('TASK_DESIGN_APPROVAL_REQUIRED', 'TASK_SCHEMA_ERROR'), {'PA-00'})
     assert not module.expected_rejection(1, message() + 'warning: unexpected\n', {'PA-00'})
     assert not module.expected_rejection(1, '', {'PA-00'})
+
+
+def test_captured_stdout_summary_before_stderr_diagnostics():
+    error, summary = message().strip().splitlines()
+    assert module.expected_rejection(1, summary + '\n' + error + '\n', {'PA-00'})

@@ -26,7 +26,7 @@ def expected_rejection(returncode: int, output: str, task_ids: set[str]) -> bool
         and all(matches)
         and {match.group(1) for match in matches if match} == task_ids
         and len(lines) == len(errors) + 1
-        and lines[-1] == f'playbook_validate: errors={len(task_ids)} warnings=0'
+        and f'playbook_validate: errors={len(task_ids)} warnings=0' in lines
     )
 
 
