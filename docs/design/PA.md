@@ -123,11 +123,10 @@ identity propagation matrix is part of PA-00's implementation scope:
 | direct/unit/CLI call with no authenticated tuple | none | it may exercise read-only answer rendering, but must neither register nor accept a PRM post-answer control |
 
 `test_prm_entrypoints_propagate_private_owner_identity_or_render_no_controls`
-is a parameterized matrix over text, embedded transcript, completed voice
-transcript, compatibility dispatch and inline callback, each with positive,
-absent, group, malformed, noncanonical and out-of-range IDs. It proves the
-complete tuple reaches registration/callback unchanged on the one allowed path,
-and that every other cell renders no control or returns unavailable.
+is a matrix over text, embedded/completed-voice transcript, compatibility
+dispatch and inline callback, with positive, absent, group, malformed,
+noncanonical and out-of-range IDs. It proves unchanged propagation only on the
+allowed path; every other cell has no control or is unavailable.
 
 The registration and callback interfaces therefore carry all three fields:
 `build_post_answer_actions(..., chat_id, actor_id, owner_chat_id)` and
@@ -150,7 +149,7 @@ intentional no-controls path in PA-00: it has no authenticated actor/owner
 tuple, so it may render its answer but receives `reply_markup=None` from the
 shared builder.
 
-`_register_context` is the only creator, immediately after a rendered answer.
+`_register_context` is the only creator after a rendered answer.
 The callback pipeline has an explicit read-only validation phase: parse prefix,
 context ID and action; load one row; validate private identity, row status and
 expiry, binding schema/context ID, canonical digest, offered action, and the
@@ -174,7 +173,9 @@ unavailable” and no follow-up `send_message`; this acknowledgement is the sole
 network effect and is not a durable write. A valid callback may then receive an
 acknowledgement and execute its validated mutation/rendering. UTD callbacks keep
 their established acknowledgement behavior. Transport tests prove this ordering
-and the absence of database/memory/receipt writes on invalid PRM input.
+and the absence of database/memory/receipt writes on invalid PRM input;
+`test_handle_callback_validates_prm_before_acknowledgement` names the
+`bot.bot._handle_callback` boundary.
 
 Legacy natural-language save/watch selection must not call
 `handle_post_answer_callback` in PA-00 and must not synthesize an actor ID; it
