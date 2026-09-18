@@ -18,39 +18,18 @@ tested external-watch delivery. Preserve archive research; redesign current
 chat/synthesis gates and heuristic dialogue intentionally. Diagnose the
 handoff's baseline CI failure first.
 
-## Shape and responsibilities
+## Architecture contract
 
-Use a modular monolith, bounded adapters and a durable long-work worker: no
-second bot, duplicate source database or unjustified platform migration.
-`src/prm/` modules follow working slices, never empty frameworks.
-
-Request flow:
-message -> ConversationState -> task understanding -> bounded plan -> permission
-check -> typed tool results -> evidence/objects -> answer or ActionProposal ->
-verification -> delivery receipt. Permission checks also run before data
-leaves the system and immediately before an external write/send. The model
-chooses among explicitly available tools; it never grants its own authority.
-
-## Interfaces and invariants
-
-- ConversationState: topic, refs, versioned drafts/results, memory, proposal
-  and jobs. A compressed summary is not write authority.
-- CapabilityGrant: owner/account/resource/operation/data/provider, expiry and
-  revision. Mail read is not mail write; voice is not an egress exception.
-- ToolResult/EvidenceItem: status, sources/versions, time, coverage and bounded
-  evidence; distinguish absent, inaccessible, stale and partial.
-- ResearchResult: useful answer, claim-evidence mapping, gaps and next steps.
-- BriefDocument: immutable version, period/timezone, sections, reasons,
-  evidence and coverage. All renderers use it; reformatting never updates facts.
-- AcademicActionCandidate: obligation/opportunity, source, deadline precision,
-  importance/applicability/confidence, lifecycle. Local done != Canvas submit.
-- ActionProposal/Confirmation/Receipt: exact arguments/versions, source,
-  one-use owner/conversation/content binding, provider result and reconciliation.
-- WatchSubscription/Job: grant revision, schedule, quiet hours, cap, lifecycle,
-  checkpoints, lease and retries. Unknown send != failed send.
-
-All schemas versioned, account identity preserved even for one operator,
-cache/index derived and revocable. No unbounded raw-corpus or mail export.
+Use a modular monolith with bounded adapters and a durable work worker: no
+second bot, duplicate source database or platform migration. Flow is message ->
+ConversationState -> bounded plan -> permission check -> typed evidence/object
+result -> answer/ActionProposal -> verification/receipt; checks run before data
+egress and again before external write/send, and the model never grants itself
+authority. Versioned types cover ConversationState (summary is not authority),
+CapabilityGrant (mail-read != write), evidence/result coverage, immutable
+source-identical BriefDocument, academic lifecycle, one-use proposal/receipt and
+lease/retry WatchSubscription. Preserve account identity, revocable derived
+cache/index and bounded corpus/mail output.
 
 ### Confirmation-context invariant
 
@@ -167,15 +146,21 @@ callback handler (not merely a helper) to prove this. A malformed callback
 parse or malformed row JSON is caught at that boundary and returns that same
 unavailable result rather than raising.
 
-Transport calls the callback facade once, retains its pure validation result,
-and only then acknowledges Telegram. An invalid PRM callback gets the generic acknowledgement “Action
-unavailable” and no follow-up `send_message`; this acknowledgement is the sole
-network effect and is not a durable write. A valid callback may then receive an
-acknowledgement and execute its validated mutation/rendering. UTD callbacks keep
-their established acknowledgement behavior. Transport tests prove this ordering
-and the absence of database/memory/receipt writes on invalid PRM input;
-`test_handle_callback_validates_prm_before_acknowledgement` names the
-`bot.bot._handle_callback` boundary.
+`validate_prm_post_answer_callback(...) -> ValidatedPrmAction | Unavailable` is
+pure/read-only. Its immutable result holds context/action, canonical source
+snapshot, row status/expiry, and SHA-256 fingerprints of the stored
+`summary_json` and `proposals_json`. `apply_validated_prm_action(db_path,
+validated) -> AppliedAction | Unavailable` never reparses callback data: in one
+transaction it conditionally rereads/updates exactly that context only when
+status, expiry and both fingerprints still match, then performs its one allowed
+proposal/receipt/status mutation. A failed compare-and-swap returns unavailable
+with no durable write; success consumes the bound transition once. Transport
+validates once: invalid -> acknowledge “Action unavailable” and no follow-up;
+valid -> apply CAS -> acknowledge/render only on success, otherwise the same
+unavailable acknowledgement. Thus no mutation follows acknowledgement for a
+different row state. UTD keeps its separate acknowledgement contract.
+`test_handle_callback_validates_prm_before_acknowledgement` covers
+`bot.bot._handle_callback`, stale validation and malformed callback/row JSON.
 
 Legacy natural-language save/watch never calls `handle_post_answer_callback` or
 synthesizes an actor ID. Without a valid control it says: “This action is
@@ -208,13 +193,19 @@ their clean-schema incompatibility without a migration: `utd_state` in their
 `summary_json` is authoritative, while table status maps `draft -> ready`,
 `previewed|confirming -> pending`, `confirmed -> confirmed`, and
 `cancelled|expired -> cancelled`. `encode_utd_proposal_state` and
-`decode_utd_proposal_state` atomically maintain that pair; any missing,
-malformed or mismatched `utd_state`/table status (including untagged legacy
-`pending`) fails closed without a write. Required callers: onboarding, draft
-load/save/discard, profile preview/confirm/cancel, subscription
-start/claim/finish/cancel. A canonical-schema integration test executes every
-transition. This permits a real UTD-path drain fixture; the shared drain blocks
-old UTD code until active mapped rows are gone.
+`decode_utd_proposal_state` atomically maintain that pair; missing, malformed or
+mismatched state/status (including untagged `pending`) fails closed without a
+write. `transition_utd_proposal(conn, context_id, expected, next)` begins one
+transaction, decodes the current pair, and conditionally updates both encoded
+JSON and mapped status only where the exact expected logical state, mapped
+status and prior JSON fingerprint still match. Allowed transitions are
+`draft -> previewed|cancelled`; `previewed -> confirming|cancelled|expired`;
+`confirming -> confirmed|cancelled|expired`; terminal states have none. All
+onboarding, draft load/save/discard, profile preview/confirm/cancel and
+subscription start/claim/finish/cancel call that codec/guard. A canonical-schema
+integration test executes every transition and races confirm/cancel: exactly one
+CAS wins. This permits a real UTD-path drain fixture; shared drain blocks old
+UTD code until active mapped rows are gone.
 
 This is JSON-additive: PA-00 adds no table migration. Only `context_kind=prm`
 rows receive/require this binding; the shared UTD draft representation is not

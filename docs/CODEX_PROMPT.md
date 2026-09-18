@@ -85,7 +85,10 @@ no follow-up message or durable write. `encode_utd_proposal_state` and
 `decode_utd_proposal_state` are mandatory for every UTD profile/subscription
 state transition; their canonical-schema integration test executes every
 transition. The facade's one pure PRM validation result is retained through the
-acknowledgement decision, never recomputed by transport.
+acknowledgement decision, never recomputed by transport. The immutable result
+includes status/expiry/summary/proposals fingerprints and is consumed once by
+transactional CAS; UTD transitions CAS expected logical state, mapped status and
+prior JSON fingerprint, so concurrent confirm/cancel has exactly one winner.
 Legacy PRM markup receives no authenticated actor/owner tuple and must render
 no control. Initial offered action codes alone are valid; dynamic `c`, `n1`–`n5`,
 feedback-reason and confirmation codes require their exact issued, persisted
@@ -114,7 +117,8 @@ the text/embedded-transcript/completed-voice/compatibility/callback matrix
 `test_post_answer_context_rejects_expired_wrong_chat_actor_or_tampered_binding`,
 `test_invalid_prm_action_context_is_read_only_before_rejection`,
 `test_prm_rollback_drain_is_owner_restricted_and_never_mutates_utd_rows`, and
-`test_plain_language_action_selection_rejects_stale_or_cross_topic_context`.
+`test_plain_language_action_selection_rejects_stale_or_cross_topic_context`,
+plus stale PRM validation-result and concurrent UTD confirm/cancel CAS tests.
 Record the interpreter/environment, exact HEAD, active entrypoints,
 classification (evaluator, application, or both), before/after direct result,
 focused-tier result and any infrastructure-only blocker. Invoke the focused tier
