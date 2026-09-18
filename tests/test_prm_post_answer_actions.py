@@ -53,6 +53,31 @@ def test_post_answer_controls_require_private_owner_actor_binding(monkeypatch):
     assert rejected["status"] == "action_unavailable"
 
 
+def test_post_answer_snapshot_rejects_invalid_counts_and_tampering(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmp:
+        db_path = os.path.join(tmp, "memory.db")
+        monkeypatch.setenv("AGENT_DB_PATH", db_path)
+        run_migrations()
+
+        invalid = _build_post_answer_actions(
+            {**_answer(), "direct_count": True}, db_path=db_path, chat_id="42", actor_id="42", owner_chat_id="42"
+        )
+        bound = _build_post_answer_actions(
+            _answer(), db_path=db_path, chat_id="42", actor_id="42", owner_chat_id="42"
+        )
+        with sqlite3.connect(db_path) as connection:
+            connection.execute(
+                "UPDATE prm_post_answer_proposals SET summary_json = json_set(summary_json, '$.project_name', 'tampered') WHERE context_id = ?",
+                (bound["context_id"],),
+            )
+        rejected = _handle_post_answer_callback(
+            db_path, f"{PRM_ACTION_PREFIX}:{bound['context_id']}:n", chat_id="42", actor_id="42", owner_chat_id="42"
+        )
+
+    assert invalid["reply_markup"] is None
+    assert rejected["status"] == "expired"
+
+
 def build_post_answer_actions(answer, *, db_path, chat_id):
     """Use the exact synthetic private tuple required by PA-00."""
     return _build_post_answer_actions(

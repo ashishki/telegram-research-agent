@@ -312,18 +312,21 @@ def _register_context(
     if db_path is None or not chat_id or str(chat_id).startswith("-") or not Path(db_path).exists():
         return None
     context_id = secrets.token_hex(5)
+    snapshot = canonicalize_prm_action_snapshot(answer)
+    if snapshot is None:
+        return None
+    encoded_snapshot = json.dumps(snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False)
     context = {
-        "title": _bounded_text(answer.get("title") or "PRM research"),
-        "query": _bounded_text(answer.get("query") or "", 220),
-        "body": _bounded_text(answer.get("body") or answer.get("direct_answer") or ""),
-        "source_refs": [str(ref) for ref in answer.get("source_refs") or [] if str(ref).startswith("https://")][:5],
-        "evidence_items": _bounded_evidence_items(answer.get("archive_evidence")),
-        "project_name": _bounded_text(answer.get("project_name") or ""),
-        "primary_intent": _bounded_text(answer.get("primary_intent") or "", 64),
-        "response_contract_id": _bounded_text(answer.get("response_contract_id") or "", 64),
-        "direct_count": max(0, int(answer.get("direct_count") or 0)),
-        "partial_count": max(0, int(answer.get("partial_count") or 0)),
-        "allowed_actions": [str(code) for code in answer.get("keyboard_action_ids") or [] if str(code) in _ACTION_TYPES],
+        **snapshot,
+        "allowed_actions": snapshot["offered_action_codes"],
+        "context_kind": "prm",
+        "prm_post_answer_action_binding": {
+            "version": "prm_post_answer_action_binding.v1",
+            "source_result_id": context_id,
+            "source_snapshot": snapshot,
+            "source_result_version": hashlib.sha256(encoded_snapshot.encode("utf-8")).hexdigest(),
+            **({"source_project_ref": {"origin": snapshot["project_name"], "value": snapshot["project_name"]}} if snapshot["project_name"] else {}),
+        },
         "actor_hash": _chat_hash(actor_id),
         "owner_chat_id_hash": _chat_hash(owner_chat_id),
         "proposals": {},
@@ -371,20 +374,29 @@ def _load_context(
             ).fetchone()
     except sqlite3.Error:
         return None
-    proposals = json.loads(str(row[2])) if row is not None else {}
+    if row is None:
+        return None
+    try:
+        proposals = json.loads(str(row[2]))
+        expires_at = datetime.fromisoformat(str(row[3]).replace("Z", "+00:00"))
+        context = json.loads(str(row[1]))
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None
+    if not isinstance(proposals, dict) or not isinstance(context, dict):
+        return None
     # A process may stop after claiming confirmation and before recording the
     # append-only event.  Retain that exact proposal for confirmation recovery;
     # ordinary expired drafts are still deleted below.
     locked = _confirmation_lock_value(proposals) is not None
-    expired = row is not None and not locked and datetime.fromisoformat(str(row[3]).replace("Z", "+00:00")) <= datetime.now(timezone.utc)
+    expired = not locked and expires_at <= datetime.now(timezone.utc)
     if (
-        row is None
-        or row[0] != _chat_hash(chat_id)
+        row[0] != _chat_hash(chat_id)
         or row[4] == "cancelled"
         or expired
     ):
         return None
-    context = json.loads(str(row[1]))
+    if not _valid_prm_binding(context, context_id):
+        return None
     if (
         str(context.get("actor_hash") or "") != _chat_hash(actor_id)
         or str(context.get("owner_chat_id_hash") or "") != _chat_hash(owner_chat_id)
@@ -579,6 +591,112 @@ def _bounded_evidence_items(value: object) -> list[dict[str, str]]:
         if len(result) >= 5:
             break
     return result
+
+
+def canonicalize_prm_action_snapshot(answer: Mapping[str, Any]) -> dict[str, Any] | None:
+    """Build the only bounded immutable answer representation for an action."""
+
+    if not isinstance(answer, Mapping):
+        return None
+    try:
+        def scalar(key: str, limit: int, *, fallback: str | None = None) -> str | None:
+            value = answer.get(key) if key in answer else (answer.get(fallback) if fallback else None)
+            if value is None:
+                return ""
+            return _bounded_text(value, limit) if isinstance(value, str) else None
+
+        title = scalar("title", 240)
+        query = scalar("query", 220)
+        body = scalar("body", 240, fallback="direct_answer")
+        project_name = scalar("project_name", 240)
+        intent = scalar("primary_intent", 64)
+        contract = scalar("response_contract_id", 64)
+        if None in {title, query, body, project_name, intent, contract}:
+            return None
+        counts: dict[str, int] = {}
+        for key in ("direct_count", "partial_count"):
+            value = answer.get(key, 0)
+            if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 1_000_000:
+                return None
+            counts[key] = value
+        raw_refs = answer.get("source_refs", [])
+        if not isinstance(raw_refs, (list, tuple)):
+            return None
+        refs: list[str] = []
+        for raw in raw_refs:
+            if not isinstance(raw, str):
+                return None
+            if raw.startswith("https://") and len(raw) <= 512 and raw not in refs:
+                refs.append(raw)
+            if len(refs) == 5:
+                break
+        if "evidence_items" in answer:
+            evidence = answer["evidence_items"]
+        else:
+            evidence = _bounded_evidence_items(answer.get("archive_evidence"))
+        if not isinstance(evidence, (list, tuple)) or any(not isinstance(item, Mapping) for item in evidence):
+            return None
+        normalized_evidence: list[dict[str, str]] = []
+        for item in evidence:
+            url = item.get("source_url")
+            snippet = item.get("snippet")
+            if not isinstance(url, str) or not url.startswith("https://") or len(url) > 512 or not isinstance(snippet, str):
+                return None
+            pair = {"source_url": url, "snippet": _bounded_text(snippet, 400)}
+            if pair["snippet"] and pair not in normalized_evidence:
+                normalized_evidence.append(pair)
+            if len(normalized_evidence) == 5:
+                break
+        raw_codes = answer.get("offered_action_codes", answer.get("keyboard_action_ids", []))
+        if not isinstance(raw_codes, (list, tuple)):
+            return None
+        action_codes: list[str] = []
+        for code in raw_codes:
+            if not isinstance(code, str):
+                return None
+            if code in _ACTION_TYPES and code not in action_codes:
+                action_codes.append(code)
+            if len(action_codes) == 20:
+                break
+        return {
+            "title": title or "PRM research", "query": query or "", "body": body or "",
+            "source_refs": refs, "evidence_items": normalized_evidence,
+            "project_name": project_name or "", "primary_intent": intent or "",
+            "response_contract_id": contract or "", **counts,
+            "offered_action_codes": action_codes,
+        }
+    except (TypeError, ValueError, UnicodeError):
+        return None
+
+
+def _valid_prm_binding(context: Mapping[str, Any], context_id: str) -> bool:
+    binding = context.get("prm_post_answer_action_binding")
+    if not isinstance(binding, Mapping) or context.get("context_kind") != "prm":
+        return False
+    snapshot = binding.get("source_snapshot")
+    if not isinstance(snapshot, Mapping) or binding.get("source_result_id") != context_id:
+        return False
+    canonical = canonicalize_prm_action_snapshot(snapshot)
+    if canonical is None:
+        return False
+    if dict(snapshot) != canonical:
+        return False
+    encoded = json.dumps(canonical, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    expected_binding: dict[str, Any] = {
+        "version": "prm_post_answer_action_binding.v1",
+        "source_result_id": context_id,
+        "source_snapshot": canonical,
+        "source_result_version": hashlib.sha256(encoded.encode("utf-8")).hexdigest(),
+    }
+    if canonical["project_name"]:
+        expected_binding["source_project_ref"] = {
+            "origin": canonical["project_name"], "value": canonical["project_name"],
+        }
+    if dict(binding) != expected_binding:
+        return False
+    if context.get("allowed_actions") != canonical["offered_action_codes"]:
+        return False
+    return all(context.get(key) == value for key, value in canonical.items())
 
 
 def _select_item_result(context_id: str, context: Mapping[str, Any]) -> dict[str, Any]:
