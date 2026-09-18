@@ -7,9 +7,10 @@
   "implementation_ready_requires_no_scaffold_placeholders": true,
   "release_ready_requires_current_verification": true,
   "notes": [
-    "This retrofit is documentation and planning only.",
-    "The product pivot ADR is proposed, not accepted.",
-    "Implementation work is blocked until the human approves the brief, ADR, first proof metric, and gold-query process.",
-    "No full-archive assistant search or RAG release claim is verified yet."
+    "PA scope is a new full product design; existing alpha implementation is not erased.",
+    "Specification and pinned development tooling are published; exact PA design is review_required.",
+    "No PA product capability, live account, paid call, service, timer or production migration was enabled by this change.",
+    "Baseline focused CI has one known UX evaluation failure; PA-00 must diagnose it.",
+    "Full product readiness requires current project tests, independent review and real authorized operator evidence."
   ]
 }
