@@ -72,6 +72,7 @@ def make_request(
     owner_ref: str = "owner_synthetic_primary",
     connection_ref: str | None = None,
     purpose: str = "answer.request",
+    operation_ref: str | None = None,
 ) -> AuthorizationRequest:
     return AuthorizationRequest(
         owner_ref=owner_ref,
@@ -83,6 +84,7 @@ def make_request(
         purpose=purpose,
         connection_ref=connection_ref,
         expected_grant_revision=expected_revision,
+        operation_ref=operation_ref,
         is_fallback=is_fallback,
     )
 

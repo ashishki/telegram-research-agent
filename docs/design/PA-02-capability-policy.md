@@ -13,7 +13,8 @@ is bound to the owner, optional connection, exact capability, explicit resource
 references, operation, data class, purpose, provider policy, validity window,
 revision and revocation. `AuthorizationRequest` contains only that metadata:
 never prompts, source text, payloads, keys, tokens, account IDs, or provider
-responses. A missing grant is a denial.
+responses. An optional `operation_ref` is an opaque, caller-issued idempotency
+key, never a prompt or payload. A missing grant is a denial.
 
 `CapabilityRegistry.authorize()` is a read-only preflight for UI/planning.
 `authorize_and_reserve()` rechecks the current grant and reserves one budgeted
@@ -23,9 +24,14 @@ them against the registry immediately before it consumes the reservation and
 makes a transport call. A revoked, expired, future,
 wrong-owner/connection/resource/operation/data-class/purpose/provider/revision
 or fallback-forbidden request is denied. A reservation remains spent after an
-adapter error or unknown outcome. Automatic client and SDK retries are disabled
-for this boundary: PA-13 must reconcile that outcome before a caller can obtain
-another valid budgeted decision.
+adapter error or unknown outcome. OpenAI model/context egress additionally
+requires the same opaque `operation_ref` on its text and optional context
+decisions. The in-memory registry holds that key as reserved, accepted or
+unknown: a duplicate or unknown key is denied even when a grant budget exceeds
+one. Only explicit `not_delivered` reconciliation can reopen an unknown key;
+`delivered` leaves it blocked. Automatic client and SDK retries are disabled
+for this boundary. PA-13 must supply durable reconciliation before a live path
+can outlast this in-memory guard.
 
 The final adapter check obtains its expected purpose from the closed
 `TRANSPORT_PURPOSES` table, not from a category or caller argument:
@@ -49,8 +55,8 @@ complete.
 | --- | --- | --- |
 | Anthropic text client | exact owner/resource plus `model.generate`, `provider_anthropic`, declared data class and one-use reservation; its non-null connection ref must equal the opaque SHA-256 derivative of the exact Anthropic credential loaded for the transport | none; a configured API key is insufficient and a caller-supplied connection label cannot authorize a different active credential |
 | Direct local-path vision | denied before temporary storage, a file read or provider call; PA-15 must supply an immutable ingress-verified attachment binding before vision can egress | a configured API key or a `model.vision` reservation cannot bind arbitrary caller-selected bytes |
-| OpenAI text adapter | exact owner/resource plus `model.generate`, `provider_openai`, `user_provided`, one-use reservation; its non-null connection ref must equal the opaque SHA-256 derivative of the exact OpenAI credential loaded for the transport | existing adapter enable plus per-call switch still restrict execution but never authorize it; a caller-supplied connection label cannot authorize a different active credential |
-| OpenAI archive context | exact owner/archive resource plus a distinct `model.context_egress`, `provider_openai`, `private_archive` reservation bound to that same non-null active OpenAI credential ref | existing context switch; absent/invalid context grant omits context rather than leaking it |
+| OpenAI text adapter | exact owner/resource plus `model.generate`, `provider_openai`, `user_provided`, one-use reservation and opaque operation ref; its non-null connection ref must equal the opaque SHA-256 derivative of the exact OpenAI credential loaded for the transport | existing adapter enable plus per-call switch still restrict execution but never authorize it; a caller-supplied connection label cannot authorize a different active credential |
+| OpenAI archive context | exact owner/archive resource plus a distinct `model.context_egress`, `provider_openai`, `private_archive` reservation bound to that same non-null active OpenAI credential ref and operation ref | existing context switch; absent/invalid context grant omits context rather than leaking it; a transport exception returns a non-durable receipt with an `unknown` delivery outcome and blocks that operation ref until reconciliation |
 | Telegram voice download | exact owner/file resource plus two distinct `media.voice_download`, `read`, `provider_telegram`, `user_provided` reservations: one each for `getFile` and file download; connection ref must equal an opaque derivative of the exact bot token used | no token or derivative is logged, returned or published |
 | OpenAI transcription | `media.transcribe`, `model_egress`, `provider_openai`, `user_provided` reservation, exactly bound to the Telegram attachment ID returned by the two authorized Telegram reads; connection ref must equal an opaque derivative of the exact OpenAI credential used | egress accepts only the fixed HTTPS `api.openai.com/v1/audio/transcriptions` endpoint; endpoint overrides, query/fragment variants and HTTP redirects are denied, and raw voice bytes remain in request memory only |
 | PA-originated Telegram delivery | exact authenticated private owner/chat tuple plus an `assistant.result_delivery`, `deliver`, `provider_telegram`, `private_archive` reservation for every rendered Telegram chunk/message **and callback acknowledgement**; its connection ref must equal an opaque bounded SHA-256 derivative of the exact bot token used for that call | one shared sender/ack boundary covers PRM text/result, UTD/callback text, callback acknowledgement and PRM voice status. The active ingress may create at most eight in-memory, one-use decisions for a single equal private chat/actor/owner tuple, valid for two minutes and bound to the exact receiving bot token. It can only return that inbound turn's response to the same chat: it is not persisted, displayed as an active consent grant, usable for provider egress/read/background work/third-party delivery, or reusable after process loss. An omitted, expired, revoked or owner/resource/purpose/connection-mismatched decision suppresses the final send or acknowledgement; the token and its derivative are never logged, returned or published, and bot token/private chat are not consent |
@@ -102,7 +108,7 @@ The PA-02 tests prove no-consent/key-only denial before fake client/network use;
 scope/provider/revision/revoke/expiry/fallback failure; current-state
 revalidation after reservation; cross-owner/connection/resource substitution
 and cross-purpose transport substitution denial; one-use budget accounting; no automatic retry after unknown provider
-outcome; archive-context separation; direct local-path vision denial before a
+outcome even with a larger grant budget; archive-context separation; direct local-path vision denial before a
 read/provider call; and all three real voice transport layers (`getFile`, file
 download, transcription) with separate matching synthetic reservations. Voice
 tests also prove raw download bytes never create a local staging file. Result

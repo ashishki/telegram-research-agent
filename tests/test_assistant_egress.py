@@ -54,6 +54,7 @@ def _decision(
     resource_ref="resource_conversation",
     data_class="user_provided",
     purpose="answer.request",
+    operation_ref="operation_synthetic_openai_001",
 ):
     grant = make_grant(
         capability=capability,
@@ -68,6 +69,7 @@ def _decision(
         data_class=data_class,
         purpose=purpose,
         connection_ref=OWNER_SCOPE["connection_ref"],
+        operation_ref=operation_ref,
     )
     return CapabilityRegistry((grant,)).authorize_and_reserve(request, now=NOW)
 

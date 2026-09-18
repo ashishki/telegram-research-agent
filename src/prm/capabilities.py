@@ -300,6 +300,7 @@ class AuthorizationRequest:
     connection_ref: str | None = None
     expected_grant_revision: int | None = None
     grant_ref: str | None = None
+    operation_ref: str | None = None
     is_fallback: bool = False
 
     def __post_init__(self) -> None:
@@ -312,6 +313,8 @@ class AuthorizationRequest:
             raise ValueError("invalid provider_ref")
         if self.grant_ref is not None and not _is_opaque_ref(self.grant_ref):
             raise ValueError("invalid grant_ref")
+        if self.operation_ref is not None and not _is_opaque_ref(self.operation_ref):
+            raise ValueError("invalid operation_ref")
         if not _CAPABILITY.fullmatch(self.capability):
             raise ValueError("invalid capability")
         if self.operation not in _OPERATIONS or self.data_class not in _DATA_CLASSES:
@@ -334,6 +337,7 @@ class AuthorizationDecision:
     data_class: str
     provider_ref: str | None
     purpose: str
+    operation_ref: str | None = None
     reservation: "BudgetReservation | None" = None
 
     def to_public_dict(self) -> dict[str, object]:
@@ -384,6 +388,20 @@ class BudgetReservation:
             self._consumed = True
             return True
 
+    def record_delivery_outcome(self, outcome: Literal["accepted", "unknown"]) -> None:
+        """Record a non-durable transport outcome for this operation reference."""
+
+        self._registry._record_operation_outcome(self, outcome)
+
+    def abandon_before_transport(self) -> None:
+        """Release an in-flight operation reference when no transport occurred."""
+
+        self._registry._abandon_operation(self)
+
+    @property
+    def operation_ref(self) -> str | None:
+        return self._request.operation_ref
+
     @property
     def available(self) -> bool:
         with self._lock:
@@ -406,6 +424,7 @@ class CapabilityRegistry:
     def __init__(self, grants: Sequence[CapabilityGrant]) -> None:
         self._grants_by_id = {grant.grant_id: grant for grant in grants}
         self._reserved_counts: dict[tuple[str, int], int] = {}
+        self._operation_states: dict[str, Literal["reserved", "accepted", "unknown"]] = {}
         self._lock = RLock()
         grant_ids = [grant.grant_id for grant in grants]
         if len(set(grant_ids)) != len(grant_ids):
@@ -463,11 +482,15 @@ class CapabilityRegistry:
             if not decision.allowed or decision.grant_ref is None or decision.grant_revision is None:
                 return decision
             grant = self._grants_by_id[decision.grant_ref]
+            if request.operation_ref is not None and request.operation_ref in self._operation_states:
+                return _deny(request, _operation_state_denial(self._operation_states[request.operation_ref]), grant)
             key = (grant.grant_id, grant.revision)
             used = self._reserved_counts.get(key, 0)
             if used >= grant.provider_policy.maximum_request_count:
                 return _deny(request, "grant_budget_exhausted", grant)
             self._reserved_counts[key] = used + 1
+            if request.operation_ref is not None:
+                self._operation_states[request.operation_ref] = "reserved"
         return AuthorizationDecision(
             allowed=True,
             reason="allowed",
@@ -481,6 +504,7 @@ class CapabilityRegistry:
             data_class=decision.data_class,
             provider_ref=decision.provider_ref,
             purpose=decision.purpose,
+            operation_ref=decision.operation_ref,
             reservation=BudgetReservation(
                 registry=self,
                 request=request,
@@ -488,6 +512,30 @@ class CapabilityRegistry:
                 grant_revision=grant.revision,
             ),
         )
+
+    def reconcile_unknown_operation(
+        self,
+        operation_ref: str,
+        *,
+        delivery_outcome: Literal["delivered", "not_delivered"],
+    ) -> bool:
+        """Resolve an unknown operation before a caller may reuse its key.
+
+        This in-memory PA-02 primitive neither performs reconciliation nor
+        persists it. A caller may reopen a key only after establishing
+        ``not_delivered``; a delivered operation remains blocked.
+        """
+
+        if not _is_opaque_ref(operation_ref):
+            raise ValueError("invalid operation_ref")
+        with self._lock:
+            if self._operation_states.get(operation_ref) != "unknown":
+                return False
+            if delivery_outcome == "not_delivered":
+                del self._operation_states[operation_ref]
+            else:
+                self._operation_states[operation_ref] = "accepted"
+            return True
 
     def authorize(self, request: AuthorizationRequest, *, now: datetime | None = None) -> AuthorizationDecision:
         with self._lock:
@@ -501,6 +549,26 @@ class CapabilityRegistry:
                 and decision.grant_ref == reservation.grant_ref
                 and decision.grant_revision == reservation.grant_revision
             )
+
+    def _record_operation_outcome(
+        self,
+        reservation: BudgetReservation,
+        outcome: Literal["accepted", "unknown"],
+    ) -> None:
+        operation_ref = reservation._request.operation_ref
+        if operation_ref is None:
+            return
+        with self._lock:
+            if self._operation_states.get(operation_ref) == "reserved":
+                self._operation_states[operation_ref] = outcome
+
+    def _abandon_operation(self, reservation: BudgetReservation) -> None:
+        operation_ref = reservation._request.operation_ref
+        if operation_ref is None:
+            return
+        with self._lock:
+            if self._operation_states.get(operation_ref) == "reserved":
+                del self._operation_states[operation_ref]
 
     def _authorize_unlocked(self, request: AuthorizationRequest, *, moment: datetime) -> AuthorizationDecision:
         candidates = [grant for grant in self._grants_by_id.values() if grant.owner_ref == request.owner_ref]
@@ -571,6 +639,7 @@ class CapabilityRegistry:
                 data_class=request.data_class,
                 provider_ref=request.provider_ref,
                 purpose=request.purpose,
+                operation_ref=request.operation_ref,
             )
         return state_denial or _deny(request, "no_matching_grant")
 
@@ -752,6 +821,7 @@ def _deny(request: AuthorizationRequest, reason: str, grant: CapabilityGrant | N
         data_class=request.data_class,
         provider_ref=request.provider_ref,
         purpose=request.purpose,
+        operation_ref=request.operation_ref,
     )
 
 
@@ -763,3 +833,11 @@ def _utc(value: datetime) -> datetime:
 
 def _is_opaque_ref(value: object) -> bool:
     return isinstance(value, str) and bool(_OPAQUE_REF.fullmatch(value))
+
+
+def _operation_state_denial(state: Literal["reserved", "accepted", "unknown"]) -> str:
+    return {
+        "reserved": "operation_in_progress",
+        "accepted": "operation_already_delivered",
+        "unknown": "operation_outcome_unknown",
+    }[state]

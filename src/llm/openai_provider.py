@@ -11,7 +11,7 @@ import os
 import hashlib
 import re
 from dataclasses import dataclass
-from typing import Any, Mapping, Protocol, Sequence
+from typing import Any, Literal, Mapping, Protocol, Sequence
 
 from prm.capabilities import (
     AuthorizationDecision,
@@ -56,6 +56,13 @@ class _OpenAIClient(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class ProviderReceipt:
+    """A non-durable provider attempt receipt.
+
+    ``*_performed`` means the adapter received an accepted provider response;
+    when ``delivery_outcome`` is ``unknown``, the attempted fields—not the
+    false performed fields—are the conservative egress record.
+    """
+
     provider: str
     model: str | None
     external_call_performed: bool
@@ -141,6 +148,10 @@ def complete_with_provider(
         resource_ref=resource_ref,
     ):
         raise ProviderEgressDenied("OpenAI provider egress requires an active matching capability grant.")
+    if _matching_operation_ref(authorization, context_authorization) is None:
+        raise ProviderEgressDenied(
+            "OpenAI provider egress requires matching opaque operation references."
+        )
 
     validated_context = _validated_cited_context(local_context)
     context_requested = validated_context is not None and _env_enabled(CONTEXT_EGRESS_ENABLE_ENV) and allow_context_egress
@@ -188,10 +199,12 @@ def complete_with_provider(
                 ),
             )
     except CapabilityDenied:
+        _abandon_before_transport(authorization, context_authorization)
         raise ProviderEgressDenied("OpenAI provider egress requires an active matching capability grant.") from None
     try:
         response = active_client.responses.create(model=model, input=request_input)
     except Exception:  # a request may have reached the provider before its error
+        _record_transport_outcome(authorization, context_authorization, "unknown")
         raise ProviderEgressOutcomeUnknown(
             ProviderReceipt(
                 provider=OPENAI_PROVIDER,
@@ -204,6 +217,8 @@ def complete_with_provider(
                 delivery_outcome="unknown",
             )
         ) from None
+
+    _record_transport_outcome(authorization, context_authorization, "accepted")
 
     return ProviderResult(
         status="ok",
@@ -243,6 +258,46 @@ def _request_input(
         )
     messages.append({"role": "user", "content": query})
     return messages
+
+
+def _matching_operation_ref(
+    authorization: AuthorizationDecision | None,
+    context_authorization: AuthorizationDecision | None,
+) -> str | None:
+    if (
+        authorization is None
+        or authorization.reservation is None
+        or authorization.operation_ref is None
+        or authorization.reservation.operation_ref != authorization.operation_ref
+    ):
+        return None
+    if context_authorization is not None:
+        if (
+            context_authorization.reservation is None
+            or context_authorization.operation_ref != authorization.operation_ref
+            or context_authorization.reservation.operation_ref != authorization.operation_ref
+        ):
+            return None
+    return authorization.operation_ref
+
+
+def _record_transport_outcome(
+    authorization: AuthorizationDecision | None,
+    context_authorization: AuthorizationDecision | None,
+    outcome: Literal["accepted", "unknown"],
+) -> None:
+    for decision in (authorization, context_authorization):
+        if decision is not None and decision.reservation is not None:
+            decision.reservation.record_delivery_outcome(outcome)
+
+
+def _abandon_before_transport(
+    authorization: AuthorizationDecision | None,
+    context_authorization: AuthorizationDecision | None,
+) -> None:
+    for decision in (authorization, context_authorization):
+        if decision is not None and decision.reservation is not None:
+            decision.reservation.abandon_before_transport()
 
 
 def _validated_cited_context(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from types import SimpleNamespace
 from datetime import datetime, timedelta, timezone
 
@@ -29,6 +30,7 @@ def _authorization(
     data_class="user_provided",
     purpose="answer.request",
     connection_ref=SYNTHETIC_OPENAI_CONNECTION,
+    operation_ref="operation_synthetic_openai_001",
 ):
     now = datetime.now(timezone.utc).replace(microsecond=0)
     grant = CapabilityGrant(
@@ -55,8 +57,47 @@ def _authorization(
         purpose=purpose,
         connection_ref=connection_ref,
         expected_grant_revision=1,
+        operation_ref=operation_ref,
     )
     return CapabilityRegistry((grant,)).authorize_and_reserve(request, now=now)
+
+
+def _registry_and_request(
+    *,
+    capability="model.generate",
+    resource_ref="resource_conversation",
+    data_class="user_provided",
+    purpose="answer.request",
+    operation_ref="operation_synthetic_openai_001",
+):
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    grant = CapabilityGrant(
+        grant_id=f"grant_synthetic_retry_{capability.replace('.', '_')}",
+        owner_ref="owner_synthetic_primary",
+        connection_ref=SYNTHETIC_OPENAI_CONNECTION,
+        capability=capability,
+        resource_refs=(resource_ref,),
+        operations=("model_egress",),
+        data_classes=(data_class,),
+        purpose=purpose,
+        provider_policy=ProviderPolicy(("provider_openai",), maximum_request_count=2),
+        issued_at=now - timedelta(minutes=1),
+        expires_at=now + timedelta(hours=1),
+        revision=1,
+    )
+    request = AuthorizationRequest(
+        owner_ref="owner_synthetic_primary",
+        capability=capability,
+        resource_ref=resource_ref,
+        operation="model_egress",
+        data_class=data_class,
+        provider_ref="provider_openai",
+        purpose=purpose,
+        connection_ref=SYNTHETIC_OPENAI_CONNECTION,
+        expected_grant_revision=1,
+        operation_ref=operation_ref,
+    )
+    return CapabilityRegistry((grant,)), request
 
 
 def test_local_search_is_default_and_performs_no_provider_call() -> None:
@@ -70,6 +111,73 @@ def test_provider_call_requires_environment_and_per_call_gate(monkeypatch) -> No
     with pytest.raises(ProviderEgressDenied): complete_with_provider("Use provider", provider="openai", allow_provider_egress=True, client=_FakeClient())
     monkeypatch.setenv(PROVIDER_ENABLE_ENV, "true")
     with pytest.raises(ProviderEgressDenied): complete_with_provider("Use provider", provider="openai", allow_provider_egress=False, client=_FakeClient())
+
+
+def test_provider_requires_matching_opaque_operation_references_before_fake_call(monkeypatch) -> None:
+    monkeypatch.setenv(PROVIDER_ENABLE_ENV, "true")
+    monkeypatch.setenv(CONTEXT_EGRESS_ENABLE_ENV, "true")
+    monkeypatch.setenv("OPENAI_API_KEY", SYNTHETIC_OPENAI_KEY)
+
+    missing_ref_client = _FakeClient()
+    with pytest.raises(ProviderEgressDenied):
+        complete_with_provider(
+            "Question",
+            provider="openai",
+            allow_provider_egress=True,
+            authorization=_authorization(operation_ref=None),
+            owner_ref="owner_synthetic_primary",
+            connection_ref=SYNTHETIC_OPENAI_CONNECTION,
+            resource_ref="resource_conversation",
+            client=missing_ref_client,
+        )
+
+    mismatched_ref_client = _FakeClient()
+    with pytest.raises(ProviderEgressDenied):
+        complete_with_provider(
+            "Question",
+            provider="openai",
+            allow_provider_egress=True,
+            allow_context_egress=True,
+            authorization=_authorization(operation_ref="operation_synthetic_openai_001"),
+            context_authorization=_authorization(
+                capability="model.context_egress",
+                resource_ref="resource_archive",
+                data_class="private_archive",
+                purpose="answer.context",
+                operation_ref="operation_synthetic_openai_002",
+            ),
+            local_context=[{
+                "title": "approved",
+                "text": "private-context-sentinel",
+                "source_ref": "archive:synthetic-approved-1",
+            }],
+            owner_ref="owner_synthetic_primary",
+            connection_ref=SYNTHETIC_OPENAI_CONNECTION,
+            resource_ref="resource_conversation",
+            context_resource_ref="resource_archive",
+            client=mismatched_ref_client,
+        )
+
+    assert missing_ref_client.responses.calls == []
+    assert mismatched_ref_client.responses.calls == []
+
+    forged_ref_client = _FakeClient()
+    with pytest.raises(ProviderEgressDenied):
+        complete_with_provider(
+            "Question",
+            provider="openai",
+            allow_provider_egress=True,
+            authorization=replace(
+                _authorization(operation_ref="operation_synthetic_openai_001"),
+                operation_ref="operation_synthetic_openai_002",
+            ),
+            owner_ref="owner_synthetic_primary",
+            connection_ref=SYNTHETIC_OPENAI_CONNECTION,
+            resource_ref="resource_conversation",
+            client=forged_ref_client,
+        )
+
+    assert forged_ref_client.responses.calls == []
 
 
 def test_provider_transport_rejects_a_grant_for_another_active_credential_before_fake_call(monkeypatch) -> None:
@@ -246,7 +354,7 @@ def test_context_transport_omits_raw_uncited_malformed_or_oversized_context(monk
     assert private_marker not in repr(client.responses.calls[0]["input"])
 
 
-def test_context_transport_reports_unknown_outcome_without_automatic_retry(monkeypatch) -> None:
+def test_context_transport_blocks_unknown_outcome_retry_until_explicit_reconciliation(monkeypatch) -> None:
     monkeypatch.setenv(PROVIDER_ENABLE_ENV, "true")
     monkeypatch.setenv(CONTEXT_EGRESS_ENABLE_ENV, "true")
     monkeypatch.setenv("OPENAI_API_KEY", SYNTHETIC_OPENAI_KEY)
@@ -257,13 +365,17 @@ def test_context_transport_reports_unknown_outcome_without_automatic_retry(monke
         raise TimeoutError("synthetic unknown outcome")
 
     client = SimpleNamespace(responses=SimpleNamespace(create=raise_after_capture))
-    authorization = _authorization()
-    context_authorization = _authorization(
+    operation_ref = "operation_synthetic_unknown_001"
+    text_registry, text_request = _registry_and_request(operation_ref=operation_ref)
+    context_registry, context_request = _registry_and_request(
         capability="model.context_egress",
         resource_ref="resource_archive",
         data_class="private_archive",
         purpose="answer.context",
+        operation_ref=operation_ref,
     )
+    authorization = text_registry.authorize_and_reserve(text_request)
+    context_authorization = context_registry.authorize_and_reserve(context_request)
     scope = {
         "owner_ref": "owner_synthetic_primary",
         "connection_ref": SYNTHETIC_OPENAI_CONNECTION,
@@ -297,22 +409,12 @@ def test_context_transport_reports_unknown_outcome_without_automatic_retry(monke
     assert receipt.context_egress_performed is False
     assert receipt.delivery_outcome == "unknown"
 
-    retry_client = _FakeClient()
-    with pytest.raises(ProviderEgressDenied):
-        complete_with_provider(
-            "Question",
-            provider="openai",
-            allow_provider_egress=True,
-            allow_context_egress=True,
-            authorization=authorization,
-            context_authorization=context_authorization,
-            local_context=[{
-                "title": "approved",
-                "text": "private-context-sentinel",
-                "source_ref": "archive:synthetic-approved-1",
-            }],
-            client=retry_client,
-            **scope,
-        )
+    retry_authorization = text_registry.authorize_and_reserve(text_request)
+    retry_context_authorization = context_registry.authorize_and_reserve(context_request)
+    assert retry_authorization.reason == "operation_outcome_unknown"
+    assert retry_context_authorization.reason == "operation_outcome_unknown"
 
-    assert retry_client.responses.calls == []
+    assert text_registry.reconcile_unknown_operation(operation_ref, delivery_outcome="not_delivered")
+    assert context_registry.reconcile_unknown_operation(operation_ref, delivery_outcome="not_delivered")
+    assert text_registry.authorize_and_reserve(text_request).allowed is True
+    assert context_registry.authorize_and_reserve(context_request).allowed is True
