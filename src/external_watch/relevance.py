@@ -35,6 +35,9 @@ def classify(item: Mapping[str, Any], profile: Mapping[str, Any]) -> dict[str, A
     selected = set(profile.get("categories") or [])
     muted = set(profile.get("muted_sources") or [])
     text = _haystack(item)
+    exclusions = [" ".join(str(value).casefold().split()) for value in profile.get("exclusions") or []]
+    if any(exclusion and exclusion in text for exclusion in exclusions):
+        return {"relevant": False, "categories": [], "reason": "profile_exclusion", "urgent": False, "score": 0}
     matched: list[str] = []
     score = 0
     reasons: list[str] = []

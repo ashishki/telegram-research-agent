@@ -5,6 +5,7 @@ from pathlib import Path
 from external_watch.adapters import canonical_hash, parse_localist
 from external_watch.relevance import classify
 from external_watch.store import ShadowStore
+from external_watch.delivery import DeliveryStore
 
 ROOT = Path(__file__).parents[1]
 
@@ -47,10 +48,18 @@ def test_sidecar_is_idempotent_and_cancel_reinstate_safe(tmp_path):
     first = store.apply_success("calendar", [active], {active["item_key"]: canonical_hash(active)}, relevant)
     second = store.apply_success("calendar", [active], {active["item_key"]: canonical_hash(active)}, relevant)
     assert [x["change_type"] for x in first] == ["new"]
-    assert second == []
+    with sqlite3.connect(tmp_path / "shadow.db") as db:
+        assert db.execute("SELECT COUNT(*) FROM pending_delivery_candidates").fetchone()[0] == 1
+    assert store.pending_candidates() == first
+    DeliveryStore(tmp_path / "shadow.db").acknowledge_pending_candidate(first[0])
+    assert store.pending_candidates() == []
+    # A durable latest-change replay closes the crash window between source
+    # state commit and outbox enqueue; delivery-key idempotency absorbs it.
+    assert [x["change_type"] for x in second] == ["new"]
 
     cancelled = {**active, "status": "cancelled"}
     third = store.apply_success("calendar", [cancelled], {active["item_key"]: canonical_hash(cancelled)}, relevant)
+    DeliveryStore(tmp_path / "shadow.db").acknowledge_pending_candidate(third[0])
     fourth = store.apply_success("calendar", [active], {active["item_key"]: canonical_hash(active)}, relevant)
     assert [x["change_type"] for x in third] == ["cancelled"]
     assert [x["change_type"] for x in fourth] == ["reinstated"]

@@ -29,18 +29,32 @@ def load_confirmed_utd_profile(db_path: str | Path | None, *, now: datetime | No
     try:
         with sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True) as db:
             rows = db.execute(
-                "SELECT event_type, metadata_json FROM personal_memory_events WHERE object_type='watch_topic' ORDER BY id DESC"
+                "SELECT id, memory_id, event_type, metadata_json, confirmation_token_hash, confirmation_receipt_json FROM personal_memory_events WHERE object_type='watch_topic' ORDER BY id DESC"
             ).fetchall()
     except sqlite3.Error:
         return None
-    for event_type, metadata_json in rows:
+    seen_memory_ids: set[str] = set()
+    for event_id, memory_id, event_type, metadata_json, event_token_hash, confirmation_receipt_json in rows:
+        if str(memory_id) in seen_memory_ids:
+            continue
+        seen_memory_ids.add(str(memory_id))
         try:
             metadata = json.loads(str(metadata_json))
         except (TypeError, json.JSONDecodeError):
             continue
         if metadata.get("capability") != "utd_profile_preview_watch":
             continue
-        if str(event_type) in {"deleted", "rolled_back"}:
+        # A delete is the latest revision for this exact profile object.  Never
+        # fall through to an older active row and accidentally re-enable it.
+        if str(event_type) not in {"created", "edited"}:
+            return None
+        try:
+            receipt = json.loads(str(confirmation_receipt_json))
+        except (TypeError, json.JSONDecodeError):
+            return None
+        if (not receipt.get("confirmation_token_hash") or receipt.get("confirmation_token_hash") != event_token_hash or not str(metadata.get("profile_schema_version") or "").startswith("utd_profile.")):
+            # This is the newest UTD-shaped object. Falling back to an older
+            # active profile would silently revive a superseded subscription.
             return None
         try:
             expires_at = datetime.fromisoformat(str(metadata.get("expires_at") or "").replace("Z", "+00:00"))
@@ -48,5 +62,5 @@ def load_confirmed_utd_profile(db_path: str | Path | None, *, now: datetime | No
             return None
         if _utc(expires_at) <= _utc(now):
             return None
-        return metadata
+        return {**metadata, "subscription_confirmed": True, "subscription_memory_id": str(memory_id), "subscription_event_id": int(event_id)}
     return None

@@ -351,11 +351,20 @@ class TestIdeaCallbacks(unittest.TestCase):
         ) as answer_mock:
             bot_runtime.run_bot(settings, runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT)
 
-        action_mock.assert_called_once_with(settings, "prma:opaque:n", chat_id="12345")
+        action_mock.assert_called_once_with(settings, "prma:opaque:n", chat_id="12345", actor_id="12345")
         send_mock.assert_called_once_with(
             "token", "12345", "Черновик готов.", parse_mode=None, reply_markup={"inline_keyboard": []}
         )
         answer_mock.assert_called_once_with("token", "callback-1", "Принято")
+
+    def test_run_bot_prm_english_feedback_callback_uses_english_toast(self):
+        settings = self._settings_with_idea()
+        update = {"update_id": 100, "callback_query": {"id": "callback-1", "from": {"id": 12345}, "message": {"chat": {"id": 12345}}, "data": "utdw:key:useful:en"}}
+        def stop_after_first_poll(state): state.stop_requested = True
+        with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "token", "TELEGRAM_OWNER_CHAT_ID": "12345"}, clear=False), patch.object(bot_runtime, "_install_signal_handlers", side_effect=stop_after_first_poll), patch.object(bot_runtime, "_telegram_get_updates", return_value=[update]), patch.object(bot_runtime, "handle_prm_post_answer_callback", return_value={"message": "Recorded: useful.", "reply_markup": {"inline_keyboard": []}}), patch.object(bot_runtime, "send_message") as send_mock, patch.object(bot_runtime, "_telegram_answer_callback") as answer_mock:
+            bot_runtime.run_bot(settings, runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT)
+        answer_mock.assert_called_once_with("token", "callback-1", "Recorded")
+        send_mock.assert_called_once_with("token", "12345", "Recorded: useful.", parse_mode=None, reply_markup={"inline_keyboard": []})
 
     def test_run_bot_dispatches_transcribed_voice_feedback(self):
         settings = self._settings_with_idea()
@@ -496,6 +505,31 @@ class TestIdeaCallbacks(unittest.TestCase):
             settings=settings,
             runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT,
         )
+
+    def test_run_bot_prm_safe_drops_owner_sender_message_in_group(self):
+        settings = self._settings_with_idea()
+        update = {"update_id": 105, "message": {"chat": {"id": -10077}, "from": {"id": 12345}, "text": "private archive?"}}
+
+        def stop_after_first_poll(state):
+            state.stop_requested = True
+
+        with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "token", "TELEGRAM_OWNER_CHAT_ID": "12345"}, clear=False), patch.object(bot_runtime, "_install_signal_handlers", side_effect=stop_after_first_poll), patch.object(bot_runtime, "_telegram_get_updates", return_value=[update]), patch.object(bot_runtime, "dispatch_command") as dispatch_mock:
+            bot_runtime.run_bot(settings, runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT)
+
+        dispatch_mock.assert_not_called()
+
+    def test_run_bot_prm_safe_drops_owner_callback_in_group(self):
+        settings = self._settings_with_idea()
+        update = {"update_id": 106, "callback_query": {"id": "callback-group", "from": {"id": 12345}, "message": {"chat": {"id": -10077}}, "data": "prma:opaque:n"}}
+
+        def stop_after_first_poll(state):
+            state.stop_requested = True
+
+        with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "token", "TELEGRAM_OWNER_CHAT_ID": "12345"}, clear=False), patch.object(bot_runtime, "_install_signal_handlers", side_effect=stop_after_first_poll), patch.object(bot_runtime, "_telegram_get_updates", return_value=[update]), patch.object(bot_runtime, "handle_prm_post_answer_callback") as action_mock, patch.object(bot_runtime, "_telegram_answer_callback") as answer_mock:
+            bot_runtime.run_bot(settings, runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT)
+
+        action_mock.assert_not_called()
+        answer_mock.assert_called_once_with("token", "callback-group", "PRM доступен только в личном чате владельца")
 
     def test_run_bot_voice_without_transcript_runs_transcription(self):
         settings = self._settings_with_idea()

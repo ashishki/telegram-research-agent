@@ -2,12 +2,20 @@ import json
 import logging
 import uuid
 from pathlib import Path
-from urllib import parse, request
+from urllib import error, parse, request
 
 
 LOGGER = logging.getLogger(__name__)
 BOT_API_BASE = "https://api.telegram.org"
 MESSAGE_CHUNK_SIZE = 4000
+
+
+class TelegramKnownRejection(RuntimeError):
+    """Telegram returned a complete negative API response before acceptance."""
+
+
+class TelegramAmbiguousDelivery(RuntimeError):
+    """A multi-part delivery failed after Telegram accepted at least one part."""
 
 
 def _chunk_text(text: str, chunk_size: int = MESSAGE_CHUNK_SIZE) -> list[str]:
@@ -39,11 +47,18 @@ def _chunk_text(text: str, chunk_size: int = MESSAGE_CHUNK_SIZE) -> list[str]:
 
 def _telegram_request(url: str, data: bytes, headers: dict[str, str]) -> dict:
     http_request = request.Request(url, data=data, headers=headers, method="POST")
-    with request.urlopen(http_request, timeout=60) as response:
-        payload = response.read().decode("utf-8")
+    try:
+        with request.urlopen(http_request, timeout=60) as response:
+            payload = response.read().decode("utf-8")
+    except error.HTTPError as exc:
+        # HTTP response proves Telegram rejected the request before acceptance;
+        # it is safe for the outbox's bounded deferred retry policy.
+        if 400 <= int(exc.code) < 500:
+            raise TelegramKnownRejection(f"Telegram HTTP rejection: {exc.code}") from exc
+        raise
     decoded = json.loads(payload)
     if not decoded.get("ok"):
-        raise RuntimeError(f"Telegram API returned error: {decoded!r}")
+        raise TelegramKnownRejection(f"Telegram API returned error: {decoded!r}")
     return decoded
 
 
@@ -72,11 +87,18 @@ def _send_text_internal(
         if reply_markup and index == len(chunks) - 1:
             payload_dict["reply_markup"] = json.dumps(reply_markup, ensure_ascii=False)
         payload = parse.urlencode(payload_dict).encode("utf-8")
-        response = _telegram_request(
-            url=url,
-            data=payload,
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-        )
+        try:
+            response = _telegram_request(
+                url=url,
+                data=payload,
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+        except Exception as exc:
+            # A later chunk failure does not prove the earlier accepted chunk
+            # was undone. The outbox must reconcile instead of replaying it.
+            if index:
+                raise TelegramAmbiguousDelivery("Telegram multi-chunk delivery is ambiguous") from exc
+            raise
         result = response.get("result") if isinstance(response, dict) else None
         if isinstance(result, dict) and result.get("message_id") is not None:
             last_message_id = int(result["message_id"])

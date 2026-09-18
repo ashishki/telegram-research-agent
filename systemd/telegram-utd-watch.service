@@ -10,14 +10,18 @@ Group=oc_you
 WorkingDirectory=/srv/openclaw-you/workspace/telegram-research-agent
 EnvironmentFile=/srv/openclaw-you/.env
 Environment=PYTHONPATH=/srv/openclaw-you/workspace/telegram-research-agent/src
-# Dogfood-approved live delivery gate. Still fails closed unless:
+# Template only; actual state is operator-observed separately. Each oneshot
+# invocation reads its controls from EnvironmentFile, so a changed kill switch
+# is observed by the next timer run without this template forcing it back.
+# Delivery still fails closed unless:
 # - --enable-delivery is present below;
 # - TELEGRAM_BOT_TOKEN and TELEGRAM_OWNER_CHAT_ID are present in EnvironmentFile;
 # - UTD_WATCH_KILL_SWITCH is not 1;
 # - a confirmed, unexpired UTD watch profile exists in the PRM DB.
-Environment=UTD_WATCH_DELIVERY_ENABLED=1
-Environment=UTD_WATCH_KILL_SWITCH=0
-Environment=UTD_WATCH_SIDECAR_DB=/srv/openclaw-you/workspace/telegram-research-agent/data/utd_shadow.db
+# EnvironmentFile must provide UTD_WATCH_DELIVERY_ENABLED,
+# UTD_WATCH_KILL_SWITCH and UTD_WATCH_SIDECAR_DB when an operator separately
+# authorizes a run. Missing values keep delivery disabled / use the safe local
+# default sidecar path; this repository change does not reload or start a unit.
 ExecStart=/srv/openclaw-you/venv/bin/python3 -m external_watch.live --enable-shadow --enable-delivery
 NoNewPrivileges=true
 PrivateTmp=true

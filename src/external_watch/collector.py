@@ -1,6 +1,7 @@
 """Feature-flagged source-bounded UTD shadow collector. No delivery path."""
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
@@ -11,6 +12,7 @@ from .profile import load_confirmed_utd_profile
 from .relevance import classify
 from .selection import select_candidates
 from .store import ShadowStore
+from .subscription import subscription_effect
 
 SOURCE_URLS = {
     "calendar": "https://calendar.utdallas.edu/api/2/events?days=14&pp=100&page=1",
@@ -38,7 +40,8 @@ class ShadowCollector:
         if not self.enabled:
             return ShadowRunResult(False, False, (), (), {})
         profile = load_confirmed_utd_profile(self.prm_db)
-        if not profile or profile.get("paused"):
+        effect = subscription_effect(profile, runtime_enabled=self.enabled, kill_switch=os.environ.get("UTD_WATCH_KILL_SWITCH", "").strip() == "1")
+        if not effect["collect"]:
             return ShadowRunResult(True, bool(profile), (), (), {})
         selected = set(profile.get("categories") or []) - set(profile.get("muted_sources") or [])
         sources = []
@@ -48,7 +51,7 @@ class ShadowCollector:
             sources.append("isso")
         if "benefits" in selected:
             sources.append("basic_needs")
-        changes: list[dict[str, Any]] = []
+        changes: list[dict[str, Any]] = self.store.pending_candidates()
         status: dict[str, str] = {}
         for source in sources:
             try:
@@ -59,7 +62,7 @@ class ShadowCollector:
                     items = parse_html_document(fetched.body, source=source, canonical_url=SOURCE_URLS[source])
                 rel = {str(item["item_key"]): classify(item, profile) for item in items}
                 hashes = {str(item["item_key"]): canonical_hash(item) for item in items}
-                changes.extend(self.store.apply_success(source, items, hashes, rel))
+                changes.extend(self.store.apply_success(source, items, hashes, rel, profile_binding=profile))
                 status[source] = "ok"
             except (FetchError, AdapterError) as exc:
                 code = getattr(exc, "code", "schema_drift")

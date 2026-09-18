@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,6 +23,11 @@ CREATE TABLE IF NOT EXISTS changes(
  change_type TEXT NOT NULL, observed_at TEXT NOT NULL, payload_json TEXT NOT NULL,
  relevance_json TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS pending_delivery_candidates(
+ delivery_key TEXT PRIMARY KEY,
+ candidate_json TEXT NOT NULL,
+ created_at TEXT NOT NULL
+);
 """
 
 
@@ -41,7 +47,21 @@ class ShadowStore:
             db.execute("INSERT INTO source_health(source,status,checked_at,error_code,detail) VALUES(?,?,?,?,?) ON CONFLICT(source) DO UPDATE SET status=excluded.status,checked_at=excluded.checked_at,error_code=excluded.error_code,detail=excluded.detail", (source, status, _now(), error_code, detail))
             db.commit()
 
-    def apply_success(self, source: str, items: list[Mapping[str, Any]], hashes: Mapping[str, str], relevance: Mapping[str, Mapping[str, Any]]) -> list[dict[str, Any]]:
+    def pending_candidates(self) -> list[dict[str, Any]]:
+        """Recovery handoff available even when the next source fetch fails."""
+        with sqlite3.connect(self.path) as db:
+            rows = db.execute("SELECT candidate_json FROM pending_delivery_candidates ORDER BY created_at, delivery_key").fetchall()
+        recovered: list[dict[str, Any]] = []
+        for (raw,) in rows:
+            try:
+                candidate = json.loads(str(raw))
+            except (TypeError, json.JSONDecodeError):
+                continue
+            if isinstance(candidate, dict):
+                recovered.append(candidate)
+        return recovered
+
+    def apply_success(self, source: str, items: list[Mapping[str, Any]], hashes: Mapping[str, str], relevance: Mapping[str, Mapping[str, Any]], *, profile_binding: Mapping[str, Any] | None = None) -> list[dict[str, Any]]:
         now = _now()
         seen = {str(x["item_key"]) for x in items}
         changes = []
@@ -67,8 +87,17 @@ class ShadowStore:
                 db.execute("INSERT INTO items(source,item_key,payload_hash,payload_json,state,first_seen,last_seen) VALUES(?,?,?,?,?,?,?) ON CONFLICT(source,item_key) DO UPDATE SET payload_hash=excluded.payload_hash,payload_json=excluded.payload_json,state=excluded.state,last_seen=excluded.last_seen", (source, key, digest, payload, state, now, now))
                 if change != "unchanged":
                     rec = {"source": source, "item_key": key, "change_type": change, "payload": dict(item), "relevance": rel}
+                    if profile_binding:
+                        rec.update({key: value for key, value in profile_binding.items() if key in {"subscription_memory_id", "subscription_event_id"}})
                     changes.append(rec)
                     db.execute("INSERT INTO changes(source,item_key,change_type,observed_at,payload_json,relevance_json) VALUES(?,?,?,?,?,?)", (source, key, change, now, payload, json.dumps(rel, ensure_ascii=False, sort_keys=True)))
+                    if rel.get("relevant") and change != "disappeared":
+                        # This queue record is committed with the source item
+                        # and change record. Delivery may later coalesce it
+                        # into a digest, but a crash cannot lose the handoff.
+                        material = "|".join((source, key, change, json.dumps(dict(item), sort_keys=True, ensure_ascii=False, separators=(",", ":"))))
+                        delivery_key = hashlib.sha256(material.encode("utf-8")).hexdigest()[:24]
+                        db.execute("INSERT OR IGNORE INTO pending_delivery_candidates(delivery_key,candidate_json,created_at) VALUES(?,?,?)", (delivery_key, json.dumps(rec, ensure_ascii=False, sort_keys=True), now))
             for key, (_, old_payload, old_state) in previous.items():
                 if key in seen or old_state == "disappeared":
                     continue
@@ -79,4 +108,16 @@ class ShadowStore:
                 db.execute("INSERT INTO changes(source,item_key,change_type,observed_at,payload_json,relevance_json) VALUES(?,?,?,?,?,?)", (source, key, "disappeared", now, old_payload, json.dumps(rel, ensure_ascii=False, sort_keys=True)))
             db.commit()
         self.health(source, "ok")
-        return changes
+        # Pending records, rather than a lossy projection of `changes`, are
+        # the recovery boundary: they retain the profile revision binding.
+        with sqlite3.connect(self.path) as db:
+            rows = db.execute("SELECT candidate_json FROM pending_delivery_candidates ORDER BY created_at, delivery_key").fetchall()
+        replay = []
+        for (candidate_json,) in rows:
+            try:
+                candidate = json.loads(str(candidate_json))
+            except (TypeError, json.JSONDecodeError):
+                continue
+            if isinstance(candidate, dict):
+                replay.append(candidate)
+        return replay

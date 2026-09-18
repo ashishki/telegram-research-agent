@@ -11,6 +11,7 @@ from typing import Sequence
 from .calibration import calibration_report
 from .collector import ShadowCollector
 from .delivery import DeliveryStore, default_sidecar_db, deliver_candidates
+from .profile import load_confirmed_utd_profile
 
 
 def _default_prm_db() -> str:
@@ -49,12 +50,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 2
     run = ShadowCollector(prm_db=args.prm_db, sidecar_db=sidecar, enabled=args.enable_shadow).run_once()
-    delivery = deliver_candidates(
+    profile = load_confirmed_utd_profile(args.prm_db)
+    delivery = {"enabled": False, "sent": 0, "duplicates_blocked": 0, "daily_cap_blocked": 0, "suppressed_by_subscription": "unconfirmed"} if profile is None else deliver_candidates(
         run.candidates,
         sidecar_db=sidecar,
         token=os.environ.get("TELEGRAM_BOT_TOKEN", "").strip(),
         chat_id=os.environ.get("TELEGRAM_OWNER_CHAT_ID", "").strip(),
         explicit_enable=args.enable_delivery,
+        subscription=profile,
+        profile_db=args.prm_db,
     )
     output = {
         "shadow_enabled": run.enabled,

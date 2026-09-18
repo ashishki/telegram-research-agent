@@ -22,7 +22,7 @@ from .voice import VoiceTranscriptionUnavailable, transcribe_telegram_voice
 
 LOGGER = logging.getLogger(__name__)
 BOT_API_BASE = "https://api.telegram.org"
-_PRM_CALLBACK_PREFIXES = ("prma:", "prmc:", "utdp:", "utdc:", "utdw:")
+_PRM_CALLBACK_PREFIXES = ("prma:", "prmc:", "utdp:", "utdc:", "utdw:", "utds:")
 
 
 class _BotState:
@@ -205,6 +205,11 @@ def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_LEGACY) -> No
             if message is None or not _is_authorized_message(message, owner_chat_id):
                 continue
             chat_id = str((message.get("chat") or {}).get("id", owner_chat_id))
+            # PRM answers can contain private archive excerpts.  Sender-based
+            # owner authorization is retained for legacy operations, but the
+            # PRM surface is deliberately private-chat-only.
+            if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT and chat_id != owner_chat_id:
+                continue
             text = str(message.get("text") or "").strip()
             if text:
                 command = (
@@ -282,13 +287,20 @@ def _handle_callback(
         if callback_id:
             _telegram_answer_callback(token, callback_id, "Not authorized")
         return
+    callback_chat_id = str((((callback.get("message") or {}).get("chat") or {}).get("id")) or "")
+    if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT and callback_chat_id != owner_chat_id:
+        if callback_id:
+            _telegram_answer_callback(token, callback_id, "PRM доступен только в личном чате владельца")
+        return
     data = str(callback.get("data") or "")
+    english_feedback = data.startswith("utdw:") and data.endswith(":en")
     answer = "Готово"
     callback_acknowledged = False
     if (
         callback_id
         and runtime_mode == BOT_RUNTIME_PRM_ASSISTANT
         and data.startswith(_PRM_CALLBACK_PREFIXES)
+        and not english_feedback
     ):
         try:
             _telegram_answer_callback(token, callback_id, "Принято")
@@ -302,12 +314,9 @@ def _handle_callback(
             if not data.startswith(_PRM_CALLBACK_PREFIXES):
                 answer = "PRM safe mode: legacy callbacks are disabled."
             else:
-                chat_id = str(
-                    (((callback.get("message") or {}).get("chat") or {}).get("id"))
-                    or owner_chat_id
-                )
+                chat_id = callback_chat_id
                 result = handle_prm_post_answer_callback(
-                    settings, data, chat_id=chat_id
+                    settings, data, chat_id=chat_id, actor_id=str((callback.get("from") or {}).get("id") or "")
                 )
                 message = str(result.get("message") or "")
                 if message:
@@ -318,11 +327,13 @@ def _handle_callback(
                         parse_mode=None,
                         reply_markup=result.get("reply_markup"),
                     )
+                if english_feedback:
+                    answer = "Recorded"
         else:
             answer = record_callback(settings, data)
     except Exception:
         LOGGER.warning("Callback handling failed data=%s", data, exc_info=True)
-        answer = "Не смог обработать действие"
+        answer = "Could not record feedback" if english_feedback else "Не смог обработать действие"
     if callback_id and not callback_acknowledged:
         try:
             _telegram_answer_callback(token, callback_id, answer)
