@@ -10,14 +10,6 @@ One conversation unifies Chat, archive/web AI Search, Briefs, Watch and
 confirmed Act. `docs/PERSONAL_ASSISTANT_SPEC.md` remains authoritative; this is
 not an MVP plan.
 
-## Current system and reuse
-
-`src/prm/` remains the application seam; `src/bot/` is transport/presentation.
-Reuse SQLite archive identity, evidence/citation, saved-action confirmation and
-tested external-watch delivery. Preserve archive research; redesign current
-chat/synthesis gates and heuristic dialogue intentionally. Diagnose the
-handoff's baseline CI failure first.
-
 ## Architecture contract
 
 Use a modular monolith with bounded adapters and a durable work worker: no
@@ -161,6 +153,11 @@ validates once: invalid -> acknowledge “Action unavailable” and no follow-up
 valid -> apply CAS -> acknowledge/render only on success, otherwise the same
 unavailable acknowledgement. Thus no mutation follows acknowledgement for a
 different row state. UTD keeps its separate acknowledgement contract.
+`bot._handle_callback` first classifies the prefix: for `prma`/`prmc`, malformed
+data, missing message/chat, wrong owner, group, absent or noncanonical identity
+all enter that validation result rather than an earlier transport denial. Each
+gets exactly one `Action unavailable` acknowledgement, no follow-up and no
+durable write. Only non-PRM/UTD prefixes retain existing acknowledgement paths.
 `test_handle_callback_validates_prm_before_acknowledgement` covers
 `bot.bot._handle_callback`, stale validation and malformed callback/row JSON.
 
@@ -206,11 +203,15 @@ transaction, decodes the current pair, and conditionally updates both encoded
 JSON and mapped status only where the exact expected logical state, mapped
 status and prior JSON fingerprint still match. Allowed transitions are
 `draft -> previewed|cancelled`; `previewed -> confirming|cancelled|expired`;
-`confirming -> confirmed|cancelled|expired`; terminal states have none. All
+`confirming -> confirmed|previewed|cancelled|expired`; terminal states have none. All
 onboarding, draft load/save/discard, profile preview/confirm/cancel and
 subscription start/claim/finish/cancel call that codec/guard. A canonical-schema
 integration test executes every transition and races confirm/cancel: exactly one
-CAS wins. This permits a real UTD-path drain fixture; shared drain blocks old
+CAS wins. A provider-confirm known-no-write failure transitions
+`confirming -> previewed` by CAS so the exact preview can be retried. Timeout,
+crash or ambiguous provider outcome leaves `confirming` locked: no retry occurs
+until explicit reconciliation establishes confirmed, cancelled, or known-no-write
+previewed. Recovery tests cover both outcomes. This permits a real UTD-path drain fixture; shared drain blocks old
 UTD code until active mapped rows are gone.
 
 This is JSON-additive: PA-00 adds no table migration. Only `context_kind=prm`
