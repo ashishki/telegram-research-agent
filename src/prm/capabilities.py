@@ -360,7 +360,7 @@ class AuthorizationDecision:
 class BudgetReservation:
     """One registry-bound egress slot, revalidated exactly at consumption."""
 
-    __slots__ = ("grant_ref", "grant_revision", "_registry", "_request", "_consumed", "_lock")
+    __slots__ = ("grant_ref", "grant_revision", "_registry", "_request", "_consumed", "_abandoned", "_lock")
 
     def __init__(
         self,
@@ -379,11 +379,12 @@ class BudgetReservation:
         self.grant_ref = grant_ref
         self.grant_revision = grant_revision
         self._consumed = False
+        self._abandoned = False
         self._lock = RLock()
 
     def consume(self) -> bool:
         with self._lock:
-            if self._consumed or not self._registry._reservation_is_current(self):
+            if self._consumed or self._abandoned or not self._registry._reservation_is_current(self):
                 return False
             self._consumed = True
             return True
@@ -394,8 +395,12 @@ class BudgetReservation:
         self._registry._record_operation_outcome(self, outcome)
 
     def abandon_before_transport(self) -> None:
-        """Release an in-flight operation reference when no transport occurred."""
+        """Permanently invalidate this unused slot, then release its key hold."""
 
+        with self._lock:
+            if self._abandoned:
+                return
+            self._abandoned = True
         self._registry._abandon_operation(self)
 
     @property
@@ -433,12 +438,12 @@ class BudgetReservation:
     @property
     def available(self) -> bool:
         with self._lock:
-            return not self._consumed
+            return not self._consumed and not self._abandoned
 
     @property
     def current(self) -> bool:
         with self._lock:
-            return not self._consumed and self._registry._reservation_is_current(self)
+            return not self._consumed and not self._abandoned and self._registry._reservation_is_current(self)
 
 
 class CapabilityRegistry:

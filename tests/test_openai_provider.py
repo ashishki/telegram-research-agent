@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from threading import Barrier, Thread
 from types import SimpleNamespace
 from datetime import datetime, timedelta, timezone
 
@@ -259,8 +260,167 @@ def test_provider_releases_operation_key_after_pretransport_ref_denial(monkeypat
             client=client,
         )
 
+    retry_authorization = registry.authorize_and_reserve(request)
     assert client.responses.calls == []
-    assert registry.authorize_and_reserve(request).allowed is True
+    assert retry_authorization.allowed is True
+
+    stale_client = _FakeClient()
+    with pytest.raises(ProviderEgressDenied):
+        complete_with_provider(
+            "Question",
+            provider="openai",
+            allow_provider_egress=True,
+            authorization=authorization,
+            owner_ref="owner_synthetic_primary",
+            connection_ref=SYNTHETIC_OPENAI_CONNECTION,
+            resource_ref="resource_conversation",
+            client=stale_client,
+        )
+
+    retry_client = _FakeClient()
+    result = complete_with_provider(
+        "Question",
+        provider="openai",
+        allow_provider_egress=True,
+        authorization=retry_authorization,
+        owner_ref="owner_synthetic_primary",
+        connection_ref=SYNTHETIC_OPENAI_CONNECTION,
+        resource_ref="resource_conversation",
+        client=retry_client,
+    )
+
+    assert stale_client.responses.calls == []
+    assert result.status == "ok"
+    assert len(retry_client.responses.calls) == 1
+
+
+def test_abandoned_text_and_context_decisions_cannot_transport_after_rereservation(monkeypatch) -> None:
+    monkeypatch.delenv(PROVIDER_ENABLE_ENV, raising=False)
+    monkeypatch.setenv(CONTEXT_EGRESS_ENABLE_ENV, "true")
+    monkeypatch.setenv("OPENAI_API_KEY", SYNTHETIC_OPENAI_KEY)
+    operation_ref = "operation_synthetic_context_release_001"
+    text_registry, text_request = _registry_and_request(operation_ref=operation_ref)
+    context_registry, context_request = _registry_and_request(
+        capability="model.context_egress",
+        resource_ref="resource_archive",
+        data_class="private_archive",
+        purpose="answer.context",
+        operation_ref=operation_ref,
+    )
+    first_text = text_registry.authorize_and_reserve(text_request)
+    first_context = context_registry.authorize_and_reserve(context_request)
+    scope = {
+        "owner_ref": "owner_synthetic_primary",
+        "connection_ref": SYNTHETIC_OPENAI_CONNECTION,
+        "resource_ref": "resource_conversation",
+        "context_resource_ref": "resource_archive",
+    }
+
+    with pytest.raises(ProviderEgressDenied):
+        complete_with_provider(
+            "Question",
+            provider="openai",
+            allow_provider_egress=True,
+            allow_context_egress=True,
+            authorization=first_text,
+            context_authorization=first_context,
+            local_context=[{
+                "title": "approved",
+                "text": "private-context-sentinel",
+                "source_ref": "archive:synthetic-approved-1",
+            }],
+            client=_FakeClient(),
+            **scope,
+        )
+
+    retry_text = text_registry.authorize_and_reserve(text_request)
+    retry_context = context_registry.authorize_and_reserve(context_request)
+    assert retry_text.allowed is True
+    assert retry_context.allowed is True
+    monkeypatch.setenv(PROVIDER_ENABLE_ENV, "true")
+
+    stale_client = _FakeClient()
+    with pytest.raises(ProviderEgressDenied):
+        complete_with_provider(
+            "Question",
+            provider="openai",
+            allow_provider_egress=True,
+            allow_context_egress=True,
+            authorization=first_text,
+            context_authorization=first_context,
+            local_context=[{
+                "title": "approved",
+                "text": "private-context-sentinel",
+                "source_ref": "archive:synthetic-approved-1",
+            }],
+            client=stale_client,
+            **scope,
+        )
+
+    retry_client = _FakeClient()
+    result = complete_with_provider(
+        "Question",
+        provider="openai",
+        allow_provider_egress=True,
+        allow_context_egress=True,
+        authorization=retry_text,
+        context_authorization=retry_context,
+        local_context=[{
+            "title": "approved",
+            "text": "private-context-sentinel",
+            "source_ref": "archive:synthetic-approved-1",
+        }],
+        client=retry_client,
+        **scope,
+    )
+
+    assert stale_client.responses.calls == []
+    assert result.receipt.context_egress_performed is True
+    assert len(retry_client.responses.calls) == 1
+    assert "private-context-sentinel" in repr(retry_client.responses.calls[0]["input"])
+
+
+def test_abandoned_decision_cannot_race_a_fresh_reservation_to_transport(monkeypatch) -> None:
+    monkeypatch.setenv(PROVIDER_ENABLE_ENV, "true")
+    monkeypatch.setenv("OPENAI_API_KEY", SYNTHETIC_OPENAI_KEY)
+    registry, request = _registry_and_request(operation_ref="operation_synthetic_race_001")
+    stale_authorization = registry.authorize_and_reserve(request)
+    assert stale_authorization.reservation is not None
+    stale_authorization.reservation.abandon_before_transport()
+    fresh_authorization = registry.authorize_and_reserve(request)
+    barrier = Barrier(3)
+    outcomes: dict[str, str] = {}
+    clients = {"stale": _FakeClient(), "fresh": _FakeClient()}
+
+    def attempt(label, authorization):
+        barrier.wait()
+        try:
+            complete_with_provider(
+                "Question",
+                provider="openai",
+                allow_provider_egress=True,
+                authorization=authorization,
+                owner_ref="owner_synthetic_primary",
+                connection_ref=SYNTHETIC_OPENAI_CONNECTION,
+                resource_ref="resource_conversation",
+                client=clients[label],
+            )
+        except ProviderEgressDenied:
+            outcomes[label] = "denied"
+        else:
+            outcomes[label] = "ok"
+
+    stale_thread = Thread(target=attempt, args=("stale", stale_authorization))
+    fresh_thread = Thread(target=attempt, args=("fresh", fresh_authorization))
+    stale_thread.start()
+    fresh_thread.start()
+    barrier.wait()
+    stale_thread.join()
+    fresh_thread.join()
+
+    assert outcomes == {"stale": "denied", "fresh": "ok"}
+    assert clients["stale"].responses.calls == []
+    assert len(clients["fresh"].responses.calls) == 1
 
 
 def test_provider_transport_rejects_a_grant_for_another_active_credential_before_fake_call(monkeypatch) -> None:

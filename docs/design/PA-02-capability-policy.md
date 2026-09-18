@@ -38,8 +38,10 @@ request, including owner, connection, resource, capability, operation, data
 class, provider, purpose, grant revision and operation ref. The duplicated
 fields on a public `AuthorizationDecision` are diagnostic metadata only: a
 copied or relabelled decision cannot change the request that reaches transport.
-Every deny before a provider call abandons only its in-memory operation-key
-hold; its conservative grant budget reservation is never refunded.
+Every deny before a provider call permanently invalidates its exact reservation
+before releasing only its in-memory operation-key hold; a later reservation for
+the key cannot reactivate the stale one, and its conservative grant budget is
+never refunded.
 
 The final adapter check obtains its expected purpose from the closed
 `TRANSPORT_PURPOSES` table, not from a category or caller argument:
