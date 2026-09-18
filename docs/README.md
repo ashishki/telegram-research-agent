@@ -18,6 +18,7 @@
 - `prompts/prm_search_news_implementer.md` — end-to-end goal over all twelve PRM-SN tasks and five engineering reviews;
 - `audit/PRM_SN_INTEGRATED_REPLAY_2026-09-17.md` — final fixture-only replay and residual gates;
 - `PRM_SEARCH_NEWS_PILOT_PACKET.md` — reviewable, non-authorizing pilot/rollback packet;
+- `PRM_VISUAL_EVAL.md` — synthetic visual screens and redacted model-judge packet;
 - `EVIDENCE_INDEX.md` — current evidence only;
 - `IMPLEMENTATION_JOURNAL.md` — current phase journal;
 - `REVIEW_POLICY.md` — review and approval boundaries.
