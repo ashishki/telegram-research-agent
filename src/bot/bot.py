@@ -11,12 +11,8 @@ from typing import Any
 from urllib import parse, request
 
 from config.settings import Settings
-from assistant.prm_post_answer_actions import UnavailablePrmAction
 from .callbacks import (
-    apply_validated_prm_post_answer_callback,
-    handle_prm_post_answer_callback,
     record_callback,
-    validate_prm_post_answer_callback,
 )
 from .prm_handlers import (
     consume_private_reply_authorization,
@@ -34,6 +30,9 @@ from .voice import VoiceTranscriptionUnavailable, transcribe_telegram_voice
 
 LOGGER = logging.getLogger(__name__)
 BOT_API_BASE = "https://api.telegram.org"
+
+# Kept as a parser-facing namespace inventory for legacy tests and adapters.
+# PA-02 denies every one before validation, row access or mutation.
 _PRM_CALLBACK_PREFIXES = ("prma:", "prmc:", "utdp:", "utdc:", "utdw:", "utds:")
 
 
@@ -415,97 +414,24 @@ def _handle_callback(
             owner_chat_id=owner_chat_id,
         )
 
-    if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT and data.startswith(("prma:", "prmc:")):
-        validated = validate_prm_post_answer_callback(
-            settings,
-            data,
-            chat_id=callback_chat_id,
-            actor_id=str((callback.get("from") or {}).get("id") or ""),
-            owner_chat_id=owner_chat_id,
-        )
-        if isinstance(validated, UnavailablePrmAction):
-            acknowledge_callback("Action unavailable")
-            return
-        result = apply_validated_prm_post_answer_callback(settings, validated)
-        unavailable = str(result.get("status") or "") in {
-            "action_unavailable", "expired", "action_not_available", "missing_proposal",
-            "invalid_selection", "selection_required",
-        }
-        acknowledge_callback("Action unavailable" if unavailable else "Принято")
-        if not unavailable:
-            message = str(result.get("message") or "")
-            if message:
-                send_message(
-                    token,
-                    callback_chat_id,
-                    message,
-                    parse_mode=None,
-                    reply_markup=result.get("reply_markup"),
-                    delivery_authorization=next_callback_decision(),
-                    actor_id=callback_actor_id,
-                    owner_chat_id=owner_chat_id,
-                )
+    if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
+        # A callback can name an already persisted PRM/UTD proposal, but the
+        # PA-02 return envelope only authorizes a bounded reply. It grants no
+        # local mutation authority. Do not validate, load or apply any callback
+        # action until its owning slice supplies an exact write capability.
+        acknowledge_callback("Action unavailable")
         return
     if not _is_authorized_callback(callback, owner_chat_id):
         acknowledge_callback("Not authorized")
         return
-    if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT and callback_chat_id != owner_chat_id:
-        acknowledge_callback("PRM доступен только в личном чате владельца")
-        return
-    if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT and data.startswith(
-        ("utdp:", "utdc:", "utdw:", "utds:")
-    ):
-        # UTD callback namespaces mutate durable draft/profile/watch state.
-        # PA-02 deliberately has no callback-specific local-write authority,
-        # so do not hand the action to their legacy mutation facade.
-        acknowledge_callback("Action unavailable")
-        return
     english_feedback = data.startswith("utdw:") and data.endswith(":en")
     answer = "Готово"
-    callback_acknowledged = False
-    if (
-        callback_id
-        and runtime_mode == BOT_RUNTIME_PRM_ASSISTANT
-        and data.startswith(_PRM_CALLBACK_PREFIXES)
-        and not english_feedback
-    ):
-        try:
-            callback_acknowledged = acknowledge_callback("Принято")
-        except Exception:
-            LOGGER.warning("Failed to answer callback query")
     try:
-        if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
-            if not data.startswith(_PRM_CALLBACK_PREFIXES):
-                answer = "PRM safe mode: legacy callbacks are disabled."
-            else:
-                chat_id = callback_chat_id
-                result = handle_prm_post_answer_callback(
-                    settings,
-                    data,
-                    chat_id=chat_id,
-                    actor_id=callback_actor_id,
-                    owner_chat_id=owner_chat_id,
-                )
-                message = str(result.get("message") or "")
-                if message:
-                    send_message(
-                        token,
-                        chat_id,
-                        message,
-                        parse_mode=None,
-                        reply_markup=result.get("reply_markup"),
-                        delivery_authorization=next_callback_decision(),
-                        actor_id=callback_actor_id,
-                        owner_chat_id=owner_chat_id,
-                    )
-                if english_feedback:
-                    answer = "Recorded"
-        else:
-            answer = record_callback(settings, data)
+        answer = record_callback(settings, data)
     except Exception:
         LOGGER.warning("Callback handling failed")
         answer = "Could not record feedback" if english_feedback else "Не смог обработать действие"
-    if callback_id and not callback_acknowledged:
+    if callback_id:
         try:
             acknowledge_callback(answer)
         except Exception:

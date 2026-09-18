@@ -395,11 +395,6 @@ def test_pa_runtime_callback_failure_logs_no_callback_identifier_or_data(monkeyp
     callback_data = "prma:private-context:n"
     monkeypatch.setattr(
         bot_runtime,
-        "validate_prm_post_answer_callback",
-        lambda *_args, **_kwargs: bot_runtime.UnavailablePrmAction(),
-    )
-    monkeypatch.setattr(
-        bot_runtime,
         "_telegram_answer_callback",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError(f"{token}:{callback_id}:{callback_data}")),
     )
@@ -657,7 +652,7 @@ def test_prm_runtime_denies_all_utd_callback_mutations_before_the_legacy_facade(
     acknowledgements: list[str] = []
     monkeypatch.setattr(
         bot_runtime,
-        "handle_prm_post_answer_callback",
+        "record_callback",
         lambda _settings, data, **_kwargs: mutations.append(data),
     )
     monkeypatch.setattr(
@@ -683,16 +678,78 @@ def test_prm_runtime_denies_all_utd_callback_mutations_before_the_legacy_facade(
     assert acknowledgements == ["Action unavailable"]
 
 
-def test_prm_callback_followup_uses_the_same_private_return_envelope(monkeypatch, tmp_path):
-    sent: list[str] = []
-    monkeypatch.setattr(prm_handlers, "_send_text_internal", lambda **kwargs: sent.append(str(kwargs["text"])))
-    monkeypatch.setattr(bot_runtime, "validate_prm_post_answer_callback", lambda *_args, **_kwargs: object())
+def test_pa_runtime_prm_callback_does_not_mutate_a_preexisting_proposal_or_receipt(
+    monkeypatch,
+    tmp_path,
+):
+    """PA-02 cannot consume an old action context without a local-write grant."""
+
+    db_path = str(tmp_path / "memory.db")
+    monkeypatch.setenv("AGENT_DB_PATH", db_path)
+    run_migrations()
+    with sqlite3.connect(db_path) as connection:
+        connection.execute(
+            "INSERT INTO prm_post_answer_proposals "
+            "(context_id, chat_id_hash, summary_json, created_at, expires_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            ("a1b2c3d4e5", "0" * 64, '{"synthetic":"before"}', "2026-09-18T00:00:00Z", "2099-01-01T00:00:00Z"),
+        )
+        before = connection.execute(
+            "SELECT summary_json, proposals_json, status, receipt_status "
+            "FROM prm_post_answer_proposals WHERE context_id = ?",
+            ("a1b2c3d4e5",),
+        ).fetchone()
+
+    acknowledgements: list[str] = []
     monkeypatch.setattr(
         bot_runtime,
-        "apply_validated_prm_post_answer_callback",
-        lambda *_args, **_kwargs: {"status": "ok", "message": "Synthetic callback follow-up."},
+        "record_callback",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("PA callback must not reach a mutable facade")),
     )
-    monkeypatch.setattr(bot_runtime, "_telegram_answer_callback", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        bot_runtime,
+        "_telegram_answer_callback",
+        lambda _token, _callback_id, text: acknowledgements.append(text),
+    )
+
+    bot_runtime._handle_callback(
+        {
+            "id": "callback-existing-proposal",
+            "from": {"id": 42},
+            "message": {"chat": {"id": 42}},
+            "data": "prma:a1b2c3d4e5:n",
+        },
+        token=SYNTHETIC_TELEGRAM_TOKEN,
+        owner_chat_id="42",
+        settings=SimpleNamespace(db_path=db_path),
+        runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT,
+    )
+
+    with sqlite3.connect(db_path) as connection:
+        after = connection.execute(
+            "SELECT summary_json, proposals_json, status, receipt_status "
+            "FROM prm_post_answer_proposals WHERE context_id = ?",
+            ("a1b2c3d4e5",),
+        ).fetchone()
+        assert connection.execute("SELECT count(*) FROM prm_interaction_ledger").fetchone()[0] == 0
+    assert after == before
+    assert acknowledgements == ["Action unavailable"]
+
+
+def test_prm_callback_denies_before_the_mutable_callback_facade(monkeypatch, tmp_path):
+    sent: list[str] = []
+    acknowledgements: list[str] = []
+    monkeypatch.setattr(prm_handlers, "_send_text_internal", lambda **kwargs: sent.append(str(kwargs["text"])))
+    monkeypatch.setattr(
+        bot_runtime,
+        "record_callback",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("PA callback must not reach a mutable facade")),
+    )
+    monkeypatch.setattr(
+        bot_runtime,
+        "_telegram_answer_callback",
+        lambda _token, _callback_id, text: acknowledgements.append(text),
+    )
 
     bot_runtime._handle_callback(
         {
@@ -707,16 +764,12 @@ def test_prm_callback_followup_uses_the_same_private_return_envelope(monkeypatch
         runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT,
     )
 
-    assert sent == ["Synthetic callback follow-up."]
+    assert sent == []
+    assert acknowledgements == ["Action unavailable"]
 
 
 def test_prm_callback_acknowledgement_needs_an_exact_private_reply_envelope(monkeypatch, tmp_path):
     acknowledgements: list[tuple[str, str, str]] = []
-    monkeypatch.setattr(
-        bot_runtime,
-        "validate_prm_post_answer_callback",
-        lambda *_args, **_kwargs: bot_runtime.UnavailablePrmAction(),
-    )
     monkeypatch.setattr(
         bot_runtime,
         "_telegram_answer_callback",
@@ -741,11 +794,6 @@ def test_prm_callback_acknowledgement_needs_an_exact_private_reply_envelope(monk
 
 def test_prm_callback_acknowledgement_uses_an_exact_private_reply_envelope(monkeypatch, tmp_path):
     acknowledgements: list[tuple[str, str, str]] = []
-    monkeypatch.setattr(
-        bot_runtime,
-        "validate_prm_post_answer_callback",
-        lambda *_args, **_kwargs: bot_runtime.UnavailablePrmAction(),
-    )
     monkeypatch.setattr(
         bot_runtime,
         "_telegram_answer_callback",

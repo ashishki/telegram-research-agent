@@ -72,9 +72,10 @@ must consume an exact `assistant.utd_draft` / `write` / `provider_local` /
 `user_provided` / `utd.draft` decision bound to the authenticated private owner
 and chat before it creates an onboarding draft. PA-02 supplies no runtime
 source for that decision, so UTD onboarding fails closed before a local write.
-Its `utdp:`, `utdc:`, `utds:` and `utdw:` callbacks likewise fail closed before
-their legacy mutation facade; a later owning slice must design and check an
-exact callback-specific authority immediately before each write. The private
+All PA callback namespaces, including `prma:`, `prmc:`, `utdp:`, `utdc:`,
+`utds:` and `utdw:`, likewise fail closed before callback validation, row load
+or mutation; a later owning slice must design and check an exact
+callback-specific authority immediately before each write. The private
 `/privacy` renderer uses the return envelope only to display the empty
 durable-grant registry; it does not create a durable grant or mistake the
 envelope for account/provider consent. Without a matching current delivery
