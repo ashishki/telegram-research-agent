@@ -1,80 +1,66 @@
-# Codex Handoff
+# Current Session Handoff
 
-Status: local PRM-SN implementation complete; human pilot decision pending
-Last updated: 2026-09-18
-Audited code baseline: `cee8baae3b8a41f571bd689f2dadf7e6e981863f`
-Active integration branch: `master`
+Updated: 2026-09-18
+Workstream: PA — full Personal AI Assistant
+Scope completed in this publication: specification and development-method integration only.
+Baseline: cc105b0024b3e7aa6768ee29acc105b4c682376c
+Playbook: d570163ab17ec3b4245187c778f1e8d89af9690f
 
-## Product and current task
+## Goal
 
-One personal Telegram bot: archive research, useful grounded answers, controlled
-public verification and topic news. UTD remains a specific watch scenario.
-The owner assigned and the repository completed the end-to-end PRM-SN goal:
-all twelve implementation tasks, DR-1 through DR-5, fixes, integrated local
-checks and a concrete pilot packet. The exact final engineering evidence is
-`docs/audit/PRM_SN_INTEGRATED_REPLAY_2026-09-17.md` and
-`docs/audit/PRM_SN_DR5_2026-09-17.md`.
+Implement the complete `docs/PERSONAL_ASSISTANT_SPEC.md`, not a minimal demo:
+natural conversation, real archive/web AI search, beautiful weekly/topic
+briefings, subscriptions, mail/calendar/Canvas, confirmed actions, memory,
+multimodality, model-quality/cost controls and reliable operations.
 
-`docs/tasks.md` is the task graph. `docs/PRM_SEARCH_NEWS_PLAN.md` supplies detailed
-scope and rollback. ADR-009 supersedes the old RFX-only instruction for explicitly
-assigned PRM-SN work; it does not waive privacy, runtime or human release gates.
-Existing RFX/UTD statuses are preserved. Do not resume the first old planned RFX
-or UTD task instead of the PRM-SN goal. Cards are bounded steps inside one goal;
-continue through the assigned phases after engineering review, without a new
-permission request per card. That local Definition of Done is now met; the next
-step is not implementation but a separately approved human pilot decision.
+No PA implementation task is completed yet. The paired design is
+`docs/design/PA.md` and `docs/design/PA.design.json`, status review_required.
+The owner approved preparing/publishing this direction and updating Playbook,
+not the final hash of a design the owner has not yet reviewed. Do not self-approve.
 
-## Working boundaries
+## Next session
 
-- Implement directly in a separate local branch/copy; preserve existing working
-  documentation and unrelated untracked files. Do not reset the user's tree.
-- Use inspected synthetic/public fixtures, fake providers/search/Telegram and
-  disposable DBs. Inspect imports and I/O before running checks.
-- Do not change real DBs, `.env`, profiles, subscriptions, services, timers or
-  production migrations. No live ingestion, bot-provider jobs, external
-  embeddings, backfill, legacy cleanup or release/dogfood claims.
-- A task assignment may include bounded read-only Codex exec review of code and
-  synthetic evidence. That is not permission to send the private archive.
-- Record task-specific evidence and status only as assigned; commit/push/merge
-  require explicit scope. Human remains final completion authority.
-
-## Review and completion
-
-Use `docs/REVIEW_POLICY.md` and `docs/PRM_SEARCH_NEWS_DEEP_REVIEW.md`.
-A fresh exec reviewer requests `gpt-5.6-terra`, reasoning `high`, read-only;
-record the exact command, reviewed SHA/diff and observed effective model/effort.
-The reviewer does not fix code or approve human gates.
-
-Focused critics cover individual changes. The accumulated first-phase gate
-`PRM-SN-DR-1` runs after PRM-SN-1A/1B/1C; equivalent gates separate all five
-phases. Immediate review applies before continuing through changed write,
-confirmation, egress, schema, source-safety or delivery boundaries. Fix P0/P1,
-re-verify the changed scope, and preserve unresolved evidence gaps. A task
-critic or fixture PASS does not close a phase or authorize production.
-
-For future PRM-SN maintenance, use the affected claim/synthesis/application/
-intent tests after I/O preflight; add only meaningful missing regressions and
-positive controls.
-For docs/task edits, the deterministic validator is read-only with these checks:
+Follow `docs/prompts/personal_assistant_implementer.md`. Preserve the branch and
+all historical state. First establish Git identity and initialize only the
+pinned development submodule, then run:
 
 ```bash
-python3 tools/playbook_validate.py --root . --check tasks --check references
-git diff --check
+git status --short
+git branch --show-current
+git rev-parse HEAD
+git submodule update --init --checkout -- .playbook/upstream
+python tools/playbook.py --check-pin
+python tools/check_personal_assistant_plan.py
+python tools/feature_workflow.py --root . plan --task PA-00
 ```
 
-Do not run the full pytest suite. Preserve historical/advisory labels as such;
-see `docs/PRM_SEARCH_NEWS_EVAL.md` for planned independent evaluation.
+Inspect resulting planning recommendation and design through the current
+Playbook review/approval workflow. High-risk design approval is interactive and
+hash-bound. Once authorized, select the first dependency-ready PA slice and
+continue through the assigned programme after each applicable gate; do not ask
+again for already-assigned safe steps. Stop only at genuine safety, scope,
+credential, exact-design or human release/acceptance gates.
 
-## Read on demand
+PA-00 must first reproduce/diagnose the baseline failure:
+`tests/test_prm_product_ux_eval.py::test_product_ux_keeps_project_context_for_confirmation_followups`.
+Baseline GitHub run 35328205490 failed with 302 passed and 1 failed. This is not
+proof that a live bot loses context; distinguish evaluator from application.
+Do not remove the test or change expected results merely to green CI.
 
-- `docs/audit/PRM_SEARCH_NEWS_BASELINE_2026-09-17.md` — verified defects and limits;
-- `docs/PRM_INTENT_AND_ANSWER_CONTRACT.md` — archive-first intent semantics;
-- `docs/PRIVACY_THREAT_MODEL.md` — actual privacy/egress changes;
-- `docs/IMPLEMENTATION_CONTRACT.md` — persistent/compatibility boundaries.
-- `docs/UTD_ACADEMIC_INBOX_RESEARCH_HANDOFF.md` — research-only handoff for a
-  possible UTD mail/Canvas/public-source inbox; it grants no account, runtime
-  or egress authority.
+## Boundaries and evidence
 
-The UTD timer receipt from 2026-09-03 is historical. Current deployed SHA,
-profile confirmation, archive/index freshness and service state were not
-observed in the audit; never infer them from this handoff.
+No .env, production database, account, subscription, service or timer was
+changed by this planning publication. No independent model review or real-user
+pilot is claimed. The submodule is development tooling, not an application
+runtime or authorization to install external skills/hooks. Existing archive
+and UTD data permissions remain separate from future connectors.
+
+`docs/tasks.md` is the active PA queue. Historic PRM-SN/RFX/UTD statuses remain
+in `docs/tasks.before-pa-20260918.md`; do not restart that queue. Current
+architecture docs describe existing implementation; PA design describes the
+future target. Specific checks in the slice registry are regression floors;
+add and wire new acceptance tests before accepting any new feature.
+
+Read `docs/PLAYBOOK_ADOPTION.md` for verification commands, token discipline,
+review routing and rollback. Record fresh evidence in `docs/verification/` and
+private machine receipts under `.playbook-artifacts/`. Keep the handoff short.
