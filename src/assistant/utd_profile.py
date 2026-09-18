@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import secrets
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -40,12 +40,12 @@ from assistant.utd_profile_schema import (
     render_utd_watch_preview,
 )
 from assistant.utd_profile_store import (
-    _chat_hash,
-    _draft_schema_ready,
     _load_draft,
     _save_draft,
-    _set_draft_status,
+    create_utd_proposal,
     load_confirmed_utd_profile,
+    load_utd_proposal,
+    transition_utd_context,
 )
 
 UTD_SUBSCRIPTION_PREFIX = "utds"
@@ -79,36 +79,17 @@ def start_utd_profile_onboarding(
     if selected_from_seed:
         draft["categories"] = selected_from_seed
     context_id = f"u{secrets.token_hex(5)}"
-    try:
-        with sqlite3.connect(db_file) as connection:
-            if not _draft_schema_ready(connection):
-                return _unavailable(
-                    "Таблица безопасных PRM-черновиков недоступна; профиль не сохранён."
-                )
-            connection.execute(
-                """
-                INSERT INTO prm_post_answer_proposals (
-                    context_id, chat_id_hash, summary_json, proposals_json,
-                    created_at, expires_at, status
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    context_id,
-                    _chat_hash(chat_id),
-                    json.dumps(
-                        {"kind": "utd_profile_draft", "draft": draft},
-                        ensure_ascii=False,
-                        sort_keys=True,
-                    ),
-                    "{}",
-                    _iso(current),
-                    _iso(current + UTD_DRAFT_TTL),
-                    "draft",
-                ),
-            )
-            connection.commit()
-    except sqlite3.Error:
+    created = create_utd_proposal(
+        db_file,
+        context_id=context_id,
+        chat_id=chat_id,
+        summary={"kind": "utd_profile_draft", "draft": draft},
+        proposals={},
+        created_at=_iso(current),
+        expires_at=_iso(current + UTD_DRAFT_TTL),
+        state="draft",
+    )
+    if not created.applied:
         return _unavailable("Не смог создать локальный UTD-черновик; профиль не сохранён.")
 
     return {
@@ -164,7 +145,7 @@ def handle_utd_profile_callback(
         if status in {"confirmed", "confirming"}:
             recovered = confirm_memory_proposal(db_path, {"proposal": proposal, "confirmation_token": confirmation.get("token"), "confirmed_by": "telegram_operator", "confirmed_at": _iso(current)})
             if recovered.get("persisted"):
-                _finish_utd_preview_claim(db_path, context_id=context_id, status="confirmed")
+                _finish_utd_preview_claim(db_path, context_id=context_id, chat_id=chat_id, status="confirmed")
             return {**recovered, "profile_persisted": bool(recovered.get("persisted"))}
         if not _claim_utd_preview(db_path, context_id=context_id, chat_id=chat_id, now=current):
             return {"status": "expired", "profile_persisted": False, "write_performed": False, "message": "Предпросмотр уже отменён или подтверждается; открой новый."}
@@ -178,7 +159,7 @@ def handle_utd_profile_callback(
             },
         )
         if result.get("persisted"):
-            _finish_utd_preview_claim(db_path, context_id=context_id, status="confirmed")
+            _finish_utd_preview_claim(db_path, context_id=context_id, chat_id=chat_id, status="confirmed")
             return {
                 **result,
                 "profile_persisted": True,
@@ -194,11 +175,13 @@ def handle_utd_profile_callback(
                     ]
                 },
             }
-        _finish_utd_preview_claim(db_path, context_id=context_id, status="previewed")
+        _finish_utd_preview_claim(db_path, context_id=context_id, chat_id=chat_id, status="previewed")
         return {**result, "profile_persisted": False}
 
     if action == "cx":
-        if not _cancel_utd_preview(db_path, context_id=context_id, chat_id=chat_id):
+        if status not in {"draft", "previewed"} or not _cancel_utd_preview(
+            db_path, context_id=context_id, chat_id=chat_id, expected=status,
+        ):
             return {"status": "expired", "profile_persisted": False, "write_performed": False, "message": "Предпросмотр уже подтверждается; отмена не изменила профиль."}
         return {
             "status": "cancelled",
@@ -217,7 +200,12 @@ def handle_utd_profile_callback(
             }
         proposal_result = build_utd_watch_proposal(draft)
         proposals = {"utd_profile": proposal_result}
-        _save_draft(db_path, context_id, draft=draft, proposals=proposals, status="previewed")
+        transition = _save_draft(
+            db_path, context_id, chat_id=chat_id, expected=status,
+            draft=draft, proposals=proposals, state="previewed",
+        )
+        if not transition.applied:
+            return {"status": "expired", "profile_persisted": False, "write_performed": False, "message": "Предпросмотр уже изменён; открой новый."}
         return {
             "status": "needs_confirmation",
             "profile_persisted": False,
@@ -246,6 +234,15 @@ def handle_utd_profile_callback(
             },
         }
     if action == "back":
+        if status == "previewed":
+            transition = _save_draft(
+                db_path, context_id, chat_id=chat_id, expected="previewed",
+                draft=draft, proposals={}, state="draft",
+            )
+            if not transition.applied:
+                return {"status": "expired", "profile_persisted": False, "write_performed": False, "message": "Предпросмотр уже изменён; открой новый."}
+        elif status != "draft":
+            return {"status": "expired", "profile_persisted": False, "write_performed": False, "message": "Предпросмотр уже подтверждается; открой новый."}
         return {
             "status": "draft_updated",
             "profile_persisted": status == "confirmed",
@@ -255,7 +252,12 @@ def handle_utd_profile_callback(
         }
 
     _apply_draft_action(draft, action, current)
-    _save_draft(db_path, context_id, draft=draft, proposals={}, status="draft")
+    transition = _save_draft(
+        db_path, context_id, chat_id=chat_id, expected=status,
+        draft=draft, proposals={}, state="draft",
+    )
+    if not transition.applied:
+        return {"status": "expired", "profile_persisted": False, "write_performed": False, "message": "Черновик уже изменён; начни настройку заново."}
     return {
         "status": "draft_updated",
         "profile_persisted": False,
@@ -405,13 +407,21 @@ def _start_utd_subscription_preview(db_path: str | Path, *, chat_id: str, action
     if proposal.get("status") != "needs_confirmation" or not chat_id:
         return proposal
     context_id = f"s{secrets.token_hex(5)}"
-    try:
-        with sqlite3.connect(db_path) as connection:
-            if not _draft_schema_ready(connection):
-                return _unavailable("Таблица безопасного предпросмотра подтверждения недоступна.")
-            connection.execute("""INSERT INTO prm_post_answer_proposals (context_id, chat_id_hash, summary_json, proposals_json, created_at, expires_at, status) VALUES (?, ?, ?, ?, ?, ?, ?)""", (context_id, _chat_hash(chat_id), json.dumps({"kind": "utd_subscription_lifecycle", "action": action, "target_event_id": proposal["proposal"]["metadata"]["subscription_target_event_id"]}, sort_keys=True), json.dumps({action: proposal}, sort_keys=True), _iso(current), _iso(current + UTD_DRAFT_TTL), "previewed"))
-            connection.commit()
-    except sqlite3.Error:
+    created = create_utd_proposal(
+        db_path,
+        context_id=context_id,
+        chat_id=chat_id,
+        summary={
+            "kind": "utd_subscription_lifecycle",
+            "action": action,
+            "target_event_id": proposal["proposal"]["metadata"]["subscription_target_event_id"],
+        },
+        proposals={action: proposal},
+        created_at=_iso(current),
+        expires_at=_iso(current + UTD_DRAFT_TTL),
+        state="previewed",
+    )
+    if not created.applied:
         return _unavailable("Не смог сохранить безопасный предпросмотр отмены.")
     label = "паузу" if action == "pause" else "отмену подписки"
     message = (
@@ -442,51 +452,65 @@ def handle_utd_subscription_callback(db_path: str | Path, callback_data: str, *,
     if len(parts) != 3 or parts[0] != UTD_SUBSCRIPTION_PREFIX or not parts[1] or parts[2] not in {"confirm", "cancel"} or len(callback_data) > 64:
         raise ValueError("Unsupported UTD subscription callback")
     current = _as_utc(now)
+    stored = load_utd_proposal(db_path, context_id=parts[1], chat_id=chat_id, now=current)
+    if stored is None or stored.summary.get("kind") != "utd_subscription_lifecycle":
+        return {"status": "expired", "persisted": False, "message": "Предпросмотр истёк или принадлежит другому чату."}
+    if stored.logical_state not in {"previewed", "confirming"}:
+        return {"status": "expired", "persisted": False, "message": "Предпросмотр уже не действителен; открой новый."}
+    if parts[2] == "cancel":
+        if stored.logical_state != "previewed" or not _cancel_utd_preview(
+            db_path, context_id=parts[1], chat_id=chat_id, expected="previewed",
+        ):
+            return {"status": "expired", "persisted": False, "message": "Предпросмотр уже подтверждается; отмена не изменила профиль."}
+        return {"status": "cancelled", "persisted": False, "write_performed": False, "message": "Отмена подписки не подтверждена; профиль не изменён."}
+    action = str(stored.summary.get("action") or "")
+    proposal = stored.proposals.get(action)
+    if stored.logical_state == "previewed" and not _claim_utd_preview(db_path, context_id=parts[1], chat_id=chat_id, now=current):
+        return {"status": "expired", "persisted": False, "message": "Предпросмотр уже отменён или подтверждается; открой новый."}
     try:
-        with sqlite3.connect(db_path) as connection:
-            row = connection.execute("SELECT chat_id_hash, summary_json, proposals_json, expires_at, status FROM prm_post_answer_proposals WHERE context_id = ?", (parts[1],)).fetchone()
-            if row is None or row[0] != _chat_hash(chat_id):
-                return {"status": "expired", "persisted": False, "message": "Предпросмотр истёк или принадлежит другому чату."}
-            if datetime.fromisoformat(str(row[3]).replace("Z", "+00:00")) <= current or row[4] not in {"previewed", "confirming"}:
-                return {"status": "expired", "persisted": False, "message": "Предпросмотр уже не действителен; открой новый."}
-            if parts[2] == "cancel":
-                cursor = connection.execute("UPDATE prm_post_answer_proposals SET summary_json='{}', proposals_json='{}', status='cancelled' WHERE context_id=? AND status='previewed'", (parts[1],))
-                connection.commit()
-                return {"status": "cancelled", "persisted": False, "write_performed": False, "message": "Отмена подписки не подтверждена; профиль не изменён."} if cursor.rowcount else {"status": "expired", "persisted": False, "message": "Предпросмотр уже подтверждается; отмена не изменила профиль."}
-            action = ""
-            try:
-                summary = json.loads(str(row[1]))
-                action = summary.get("action") if summary.get("kind") == "utd_subscription_lifecycle" else ""
-                proposal = json.loads(str(row[2])).get(action)
-            except json.JSONDecodeError:
-                proposal = None
-        if row[4] == "previewed" and not _claim_utd_preview(db_path, context_id=parts[1], chat_id=chat_id, now=current):
-            return {"status": "expired", "persisted": False, "message": "Предпросмотр уже отменён или подтверждается; открой новый."}
         result = (confirm_utd_subscription_pause if action == "pause" else confirm_utd_subscription_cancel)(db_path, proposal if isinstance(proposal, Mapping) else {}, now=current)
         if result.get("persisted"):
-            _finish_utd_preview_claim(db_path, context_id=parts[1], status="confirmed")
+            _finish_utd_preview_claim(db_path, context_id=parts[1], chat_id=chat_id, status="confirmed")
         else:
-            _finish_utd_preview_claim(db_path, context_id=parts[1], status="previewed")
+            _finish_utd_preview_claim(db_path, context_id=parts[1], chat_id=chat_id, status="previewed")
         return result
     except (sqlite3.Error, ValueError):
+        _finish_utd_preview_claim(db_path, context_id=parts[1], chat_id=chat_id, status="previewed")
         return {"status": "expired", "persisted": False, "message": "Предпросмотр отмены недоступен; открой новый."}
 
 
 def _claim_utd_preview(db_path: str | Path, *, context_id: str, chat_id: str, now: datetime) -> bool:
-    with sqlite3.connect(db_path) as connection:
-        cursor = connection.execute("UPDATE prm_post_answer_proposals SET status='confirming' WHERE context_id=? AND chat_id_hash=? AND status='previewed' AND expires_at > ?", (context_id, _chat_hash(chat_id), _iso(now)))
-        return bool(cursor.rowcount)
+    stored = load_utd_proposal(db_path, context_id=context_id, chat_id=chat_id, now=now)
+    if stored is None or stored.logical_state != "previewed" or stored.expires_at <= now:
+        return False
+    return transition_utd_context(
+        db_path, context_id=context_id, chat_id=chat_id, expected="previewed", next_state="confirming",
+    ).applied
 
 
-def _finish_utd_preview_claim(db_path: str | Path, *, context_id: str, status: str) -> None:
-    with sqlite3.connect(db_path) as connection:
-        connection.execute("UPDATE prm_post_answer_proposals SET status=? WHERE context_id=? AND status='confirming'", (status, context_id))
+def _finish_utd_preview_claim(
+    db_path: str | Path, *, context_id: str, chat_id: str, status: str,
+) -> None:
+    transition_utd_context(
+        db_path, context_id=context_id, chat_id=chat_id, expected="confirming", next_state=status,
+    )
 
 
-def _cancel_utd_preview(db_path: str | Path, *, context_id: str, chat_id: str) -> bool:
-    with sqlite3.connect(db_path) as connection:
-        cursor = connection.execute("UPDATE prm_post_answer_proposals SET summary_json='{}', proposals_json='{}', status='cancelled' WHERE context_id=? AND chat_id_hash=? AND status IN ('draft', 'previewed')", (context_id, _chat_hash(chat_id)))
-        return bool(cursor.rowcount)
+def _cancel_utd_preview(
+    db_path: str | Path, *, context_id: str, chat_id: str, expected: str,
+) -> bool:
+    stored = load_utd_proposal(db_path, context_id=context_id, chat_id=chat_id, now=datetime.min.replace(tzinfo=timezone.utc))
+    if stored is None or stored.logical_state != expected:
+        return False
+    return transition_utd_context(
+        db_path,
+        context_id=context_id,
+        chat_id=chat_id,
+        expected=expected,
+        next_state="cancelled",
+        summary={"kind": stored.summary["kind"]},
+        proposals={},
+    ).applied
 
 
 def _subscription_target_is_current(db_path: str | Path, proposal: Mapping[str, Any]) -> bool:
