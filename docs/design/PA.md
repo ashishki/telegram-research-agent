@@ -94,30 +94,66 @@ that it already implements full natural-language confirmation. Its additive
   callback validates its requested action against those codes and the row before
   proposal/confirmation work.
 
-PA-00 is deliberately private-owner only: message dispatch propagates the
-Telegram `actor_id` to registration, and controls render only when a positive
-private `actor_id == chat_id == owner_chat_id` is available. Callback handling
-compares both persisted hashes with the incoming chat/actor; a group, absent
-identity or mismatch returns unavailable and performs no write. This limitation
-must remain explicit until a separately designed multi-actor model exists.
+PA-00 is deliberately private-owner only: controls render only when a positive
+private `actor_id == chat_id == owner_chat_id` is available. `owner_chat_id`
+comes only from the already-required `TELEGRAM_OWNER_CHAT_ID` startup boundary;
+it is passed as data, not read again from a callback or inferred from a stored
+row. The identity propagation matrix is part of PA-00's implementation scope:
 
-`_register_context` is the only creator, immediately after a rendered answer;
-`_load_context` validates context kind/schema, ID equality, canonical digest,
-offered action, chat, actor and expiry before the callback path can use it.
-The same offered-action validation runs for draft and confirmation callbacks.
-A missing, malformed, pre-binding or tampered binding returns the same
-fail-closed unavailable result and performs no write. Legacy natural-language
-save/watch selection must not call `handle_post_answer_callback` in PA-00; it
+| ingress | authenticated identity propagated | action-control behavior |
+| --- | --- | --- |
+| Telegram text, embedded transcript, and completed voice transcript in `bot.bot` | message `chat.id`, message `from.id`, configured owner chat ID -> `bot.handlers.dispatch_command` -> `bot.prm_handlers.dispatch_prm_command` -> `_post_answer_action_bundle` -> registration | controls only after all three equal; ordinary answer remains available without controls otherwise |
+| Compatibility `bot.handlers.dispatch_command` callers | explicit `actor_id` and `owner_chat_id` keyword inputs forwarded unchanged | a missing/incomplete tuple is a safe no-controls answer; it must not synthesize `actor_id=chat_id` |
+| Telegram inline callback in `bot.bot._handle_callback` | callback message `chat.id`, callback `from.id`, configured owner chat ID -> `bot.callbacks.handle_prm_post_answer_callback` -> PRM action handler | reject before proposal work unless all three equal; UTD namespaces retain their separate existing contract |
+| direct/unit/CLI call with no authenticated tuple | none | it may exercise read-only answer rendering, but must neither register nor accept a PRM post-answer control |
+
+The registration and callback interfaces therefore carry all three fields:
+`build_post_answer_actions(..., chat_id, actor_id, owner_chat_id)` and
+`handle_prm_post_answer_callback(..., chat_id, actor_id, owner_chat_id)`.
+The callback handler compares both persisted hashes with the incoming tuple; a
+group, absent identity or mismatch returns unavailable and performs no write.
+This limitation must remain explicit until a separately designed multi-actor
+model exists.
+
+`_register_context` is the only creator, immediately after a rendered answer.
+The callback pipeline has an explicit read-only validation phase: parse prefix,
+context ID and action; load one row; validate private identity, row status and
+expiry, binding schema/context ID, canonical digest, offered action, and the
+requested draft/confirmation action. Only after every check succeeds may a
+separate mutation phase create a proposal, claim a confirmation, record a
+receipt, cancel a valid context, or update status. A missing row, bad parse,
+malformed/pre-binding/tampered binding, expired context, wrong chat/actor/owner
+or unoffered action returns the same fail-closed unavailable result. It makes
+zero `INSERT`, `UPDATE` or `DELETE` statements in
+`prm_post_answer_proposals`, makes no memory/receipt write, and does not clean
+up expired contexts on this callback path. Expiry cleanup is a separately
+authorized maintenance concern, not an invalid-input side effect. Tests snapshot
+the row and memory/receipt counts before each rejected case to prove this.
+
+Legacy natural-language save/watch selection must not call
+`handle_post_answer_callback` in PA-00 and must not synthesize an actor ID; it
 asks for the current inline action instead. The no-reroute test instruments the
 application/search entrypoint and requires zero calls for an old callback.
 
 This is JSON-additive: PA-00 adds no table migration. Only `context_kind=prm`
 rows receive/require this binding; the shared UTD draft representation is not
 rewritten. Pre-change and partially-created PRM rows fail closed under the new
-code. PA-00 owns the rollback procedure: disable newly rendered PRM controls
-and cancel only unconfirmed bound PRM rows before an old handler is deployed;
-confirmed receipts and UTD drafts remain intact. Do not deploy that rollback
-while such pending PRM rows could be accepted by an old handler.
+code.
+
+PA-00 has no destructive shared-table rollback. A rollback to a pre-PA-00 PRM
+handler is prohibited until a read-only, owner-restricted drain report proves
+there are no unexpired rows for that owner in `ready` or `pending` state. Its
+selector is exactly `chat_id_hash = :owner_chat_id_hash AND status IN
+('ready','pending') AND expires_at > :now`; the report is read-only, exposes
+only count/status/classification, and treats any returned row (including an
+unrecognised or UTD-shaped one) as a blocker rather than deleting or changing
+it. The order is: stop rendering new PRM controls; keep the PA-00 handler in
+fail-closed drain mode; wait for/cancel only through a valid current user
+action until the report is zero; independently capture the zero report; only
+then activate an old handler. There is no automatic `DELETE`, generic
+`UPDATE`, or UTD selector in this procedure. Confirmed receipts and all UTD
+drafts are preserved. PA-00 tests the report's private-owner restriction and
+that a UTD row cannot be modified by its query.
 
 PA-03 owns the complete plain-language `yes` state: it adds an explicit current
 confirmation reference to `ConversationState`, clears it on an independent

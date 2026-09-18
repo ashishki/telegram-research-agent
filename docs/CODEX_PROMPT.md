@@ -52,16 +52,26 @@ callback bind an additive `prm_post_answer_action_binding.v1` source snapshot
 (PRM context kind/ID, canonical SHA-256 source snapshot, optional project
 provenance, offered action codes, private owner chat/actor hashes and expiry),
 never mutable `last_project_name`. PA-00 controls render only for
-`actor_id == chat_id == owner_chat_id`; callbacks validate that binding and the
-requested action for both draft and confirmation without rerouting/searching.
-Legacy text selection asks for the inline callback. Full plain-language “yes” is
-PA-03 work, where an exact current visible confirmation ref must be cleared on a
-new topic or cancellation; PA-13 applies the same invariant to provider writes.
-PA-00 must register and run `test_post_answer_controls_require_private_owner_actor_binding`,
+`actor_id == chat_id == owner_chat_id`; every Telegram text/voice,
+compatibility-dispatch and callback ingress must carry that authenticated tuple
+unchanged, while a missing tuple renders no controls. Callbacks validate binding
+and requested action for both draft and confirmation without rerouting/searching.
+Rejected parse/identity/row/schema/digest/expiry/action cases are read-only: no
+row, receipt or memory mutation and no expiry cleanup. Legacy text selection
+asks for the inline callback. PA-00's rollback drain report is
+owner-restricted/read-only and blocks an old handler until no unexpired
+ready/pending row remains; it never changes shared UTD rows. Full
+plain-language “yes” is PA-03 work, where an exact current visible confirmation
+ref must be cleared on a new topic or cancellation; PA-13 applies the same
+invariant to provider writes. PA-00 must register and run
+`test_post_answer_controls_require_private_owner_actor_binding`,
 `test_post_answer_context_binds_canonical_snapshot_and_project_ref`,
+`test_prm_entrypoints_propagate_private_owner_identity_or_render_no_controls`,
 `test_post_answer_callback_preserves_bound_source_without_reroute`,
 `test_post_answer_context_rejects_expired_wrong_chat_actor_or_tampered_binding`,
-and `test_plain_language_action_selection_rejects_stale_or_cross_topic_context`.
+`test_invalid_prm_action_context_is_read_only_before_rejection`,
+`test_prm_rollback_drain_is_owner_restricted_and_never_mutates_utd_rows`, and
+`test_plain_language_action_selection_rejects_stale_or_cross_topic_context`.
 Record the interpreter/environment, exact HEAD, active entrypoints,
 classification (evaluator, application, or both), before/after direct result,
 focused-tier result and any infrastructure-only blocker.
