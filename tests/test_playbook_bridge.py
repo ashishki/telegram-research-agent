@@ -141,3 +141,26 @@ def test_renderer_entrypoint_uses_pinned_role_set():
     assert result.returncode == 0, result.stderr
     assert 'product_design_review' in result.stdout
     assert 'program_design_review' in result.stdout
+
+
+def test_renderer_proxy_exports_pinned_design_marker_parser():
+    result = subprocess.run(
+        [
+            sys.executable,
+            '-c',
+            (
+                'import sys; '
+                'sys.path.insert(0, "tools"); '
+                'import render_codex_exec_prompt as renderer; '
+                'assert "product_design_review" in renderer.DESIGN_REVIEW_ROLES; '
+                'assert renderer.parse_required_marker('
+                '"product_design_review", "PRODUCT_DESIGN_REVIEW: PASS\\n")["verdict"] == "PASS"'
+            ),
+        ],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
