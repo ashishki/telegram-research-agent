@@ -350,62 +350,14 @@ class TestLLMClient(unittest.TestCase):
             count = connection.execute("SELECT COUNT(*) FROM llm_usage").fetchone()[0]
         self.assertEqual(count, 0)
 
-    def test_complete_vision_returns_text(self):
-        response = SimpleNamespace(
-            content=[SimpleNamespace(type="text", text="diagram with service boundaries")],
-            usage=SimpleNamespace(input_tokens=10, output_tokens=7),
-        )
-        mock_client = SimpleNamespace(messages=SimpleNamespace(create=lambda **_: response))
-        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as image_file:
-            image_file.write(b"fake image bytes")
-            image_path = image_file.name
-
-        try:
-            with patch.object(client, "_get_client", return_value=mock_client):
-                result = client.complete_vision(
-                    prompt="analyze",
-                    image_path=image_path,
-                    model="claude-haiku-4-5",
-                    authorization=self.vision_authorization,
-                    **AUTH_SCOPE,
-                )
-        finally:
-            os.unlink(image_path)
-
-        self.assertEqual(result, "diagram with service boundaries")
-
-    def test_complete_vision_logs_no_private_image_path_or_provider_exception(self):
-        response = SimpleNamespace(
-            content=[SimpleNamespace(type="text", text="safe vision result")],
-            usage=SimpleNamespace(input_tokens=1, output_tokens=1),
-        )
-        mock_client = SimpleNamespace(messages=SimpleNamespace(create=lambda **_kwargs: response))
+    def test_complete_vision_rejects_direct_local_path_before_read_or_provider_egress(self):
+        mock_client = SimpleNamespace(messages=SimpleNamespace(create=lambda **_: self.fail("provider must not run")))
         with tempfile.NamedTemporaryFile(prefix="private-image-path-sentinel-", suffix=".jpg") as image_file:
             image_file.write(b"synthetic image bytes")
             image_file.flush()
             with patch.object(client, "_get_client", return_value=mock_client):
-                with self.assertLogs(client.LOGGER, level="DEBUG") as logs:
-                    assert client.complete_vision(
-                        prompt="synthetic vision prompt",
-                        image_path=image_file.name,
-                        authorization=self.vision_authorization,
-                        **AUTH_SCOPE,
-                    ) == "safe vision result"
-
-        assert "private-image-path-sentinel" not in "\n".join(logs.output)
-
-    def test_complete_vision_redacts_provider_exception(self):
-        mock_client = SimpleNamespace(
-            messages=SimpleNamespace(
-                create=lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("provider-payload-sentinel"))
-            )
-        )
-        with tempfile.NamedTemporaryFile(prefix="private-image-path-sentinel-", suffix=".jpg") as image_file:
-            image_file.write(b"synthetic image bytes")
-            image_file.flush()
-            with patch.object(client, "_get_client", return_value=mock_client):
-                with self.assertLogs(client.LOGGER, level="WARNING") as logs:
-                    with self.assertRaises(client.LLMError) as error:
+                with patch("builtins.open") as open_file:
+                    with self.assertRaisesRegex(client.LLMError, "ingress-verified attachment"):
                         client.complete_vision(
                             prompt="synthetic vision prompt",
                             image_path=image_file.name,
@@ -413,9 +365,7 @@ class TestLLMClient(unittest.TestCase):
                             **AUTH_SCOPE,
                         )
 
-        assert "provider-payload-sentinel" not in str(error.exception)
-        assert "provider-payload-sentinel" not in "\n".join(logs.output)
-        assert "private-image-path-sentinel" not in "\n".join(logs.output)
+        open_file.assert_not_called()
 
     def test_feedback_intake_strategist_model_route_and_override(self):
         with patch.dict(os.environ, {}, clear=True):

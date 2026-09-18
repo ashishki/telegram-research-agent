@@ -2,11 +2,8 @@ import json
 import logging
 import os
 import re
-import stat
-import tempfile
 import uuid
 from dataclasses import dataclass
-from pathlib import Path
 from urllib import parse, request
 
 from bot.telegram_delivery import BOT_API_BASE
@@ -24,8 +21,6 @@ LOGGER = logging.getLogger(__name__)
 TELEGRAM_FILE_BASE = "https://api.telegram.org/file"
 DEFAULT_TRANSCRIPTION_MODEL = "whisper-1"
 DEFAULT_MAX_VOICE_BYTES = 24 * 1024 * 1024
-VOICE_MEDIA_DIR_PREFIX = "telegram-research-agent-voice-"
-VOICE_MEDIA_FILE_PREFIX = "voice-"
 VOICE_ATTACHMENT_ID_PATTERN = re.compile(r"[A-Za-z0-9_-]{1,512}")
 TELEGRAM_PROVIDER_REF = "provider_telegram"
 OPENAI_PROVIDER_REF = "provider_openai"
@@ -43,9 +38,8 @@ class VoiceTranscriptionUnavailable(VoiceTranscriptionError):
 
 @dataclass(frozen=True, slots=True)
 class _VerifiedTelegramVoiceAttachment:
-    """A local file whose resource identity came from Telegram ``getFile`` flow."""
+    """Immutable bytes bound to the Telegram attachment read that returned them."""
 
-    local_path: str
     file_id: str
     audio_bytes: bytes
 
@@ -61,7 +55,7 @@ def transcribe_telegram_voice(
     owner_ref: str | None = None,
     connection_ref: str | None = None,
 ) -> str:
-    """Download a Telegram voice file, transcribe it, and remove local audio."""
+    """Download and transcribe a Telegram voice attachment without disk staging."""
     if not token:
         raise VoiceTranscriptionError("Telegram bot token is missing")
     _require_safe_telegram_attachment_id(file_id)
@@ -90,25 +84,25 @@ def transcribe_telegram_voice(
         raise VoiceTranscriptionUnavailable("Each Telegram voice request requires an active capability grant")
     _require_openai_transcription_key()
 
-    local_path = _download_telegram_voice(
+    # ``media_dir`` remains an accepted compatibility argument, but PA-02 never
+    # stages raw user audio on disk.  The bound bytes live only for this request.
+    del media_dir
+    attachment = _download_telegram_voice(
         token=token,
         file_id=file_id,
-        media_dir=media_dir,
+        media_dir=None,
         get_file_authorization=download_authorization,
         download_file_authorization=download_file_authorization,
         owner_ref=owner_ref,
         connection_ref=connection_ref,
         resource_ref=voice_resource_ref,
     )
-    try:
-        return _transcribe_verified_telegram_audio(
-            _verified_telegram_voice_attachment(local_path=local_path, file_id=file_id),
-            transcription_authorization=transcription_authorization,
-            owner_ref=owner_ref,
-            connection_ref=connection_ref,
-        )
-    finally:
-        _delete_local_file(local_path)
+    return _transcribe_verified_telegram_audio(
+        attachment,
+        transcription_authorization=transcription_authorization,
+        owner_ref=owner_ref,
+        connection_ref=connection_ref,
+    )
 
 
 def transcribe_audio_file(
@@ -171,7 +165,7 @@ def _transcribe_verified_telegram_audio(
     body, boundary = _build_multipart_body(
         fields=fields,
         file_field="file",
-        file_name=Path(attachment.local_path).name,
+        file_name="voice.ogg",
         file_bytes=attachment.audio_bytes,
     )
     http_request = request.Request(
@@ -306,7 +300,10 @@ def _download_telegram_voice(
     owner_ref: str | None,
     connection_ref: str | None,
     resource_ref: str | None,
-) -> str:
+) -> _VerifiedTelegramVoiceAttachment:
+    # Kept in the private helper signature for compatibility; raw user audio is
+    # deliberately never written there or to any other local path.
+    del media_dir
     _require_safe_telegram_attachment_id(file_id)
     file_path = _get_telegram_file_path(
         token=token,
@@ -332,14 +329,8 @@ def _download_telegram_voice(
     max_bytes = int(os.environ.get("TELEGRAM_VOICE_MAX_BYTES", DEFAULT_MAX_VOICE_BYTES))
     if len(data) > max_bytes:
         raise VoiceTranscriptionError(f"Telegram voice file is too large: {len(data)} bytes")
-    dest_dir = _create_private_voice_directory(media_dir)
-    try:
-        dest_path = _write_private_voice_file(dest_dir, data)
-    except OSError:
-        _delete_private_voice_directory(dest_dir)
-        raise VoiceTranscriptionError("Telegram voice file could not be stored") from None
     LOGGER.info("Downloaded Telegram voice bytes=%d", len(data))
-    return str(dest_path)
+    return _VerifiedTelegramVoiceAttachment(file_id=file_id, audio_bytes=data)
 
 
 def _require_safe_telegram_attachment_id(file_id: str) -> None:
@@ -347,89 +338,6 @@ def _require_safe_telegram_attachment_id(file_id: str) -> None:
 
     if not isinstance(file_id, str) or not VOICE_ATTACHMENT_ID_PATTERN.fullmatch(file_id):
         raise VoiceTranscriptionError("Telegram voice attachment identifier is invalid")
-
-
-def _create_private_voice_directory(media_dir: str | None) -> Path:
-    """Create a fresh, owner-private directory for one downloaded attachment."""
-
-    configured_dir = (media_dir or os.environ.get("TELEGRAM_VOICE_MEDIA_DIR", "")).strip()
-    if configured_dir:
-        parent = Path(configured_dir)
-        _ensure_private_voice_parent(parent)
-        dest_dir = Path(tempfile.mkdtemp(prefix=VOICE_MEDIA_DIR_PREFIX, dir=str(parent)))
-    else:
-        # ``mkdtemp`` chooses a randomized directory below the platform's secure
-        # temporary area instead of a predictable shared /tmp path.
-        dest_dir = Path(tempfile.mkdtemp(prefix=VOICE_MEDIA_DIR_PREFIX))
-    _ensure_private_voice_directory(dest_dir)
-    return dest_dir
-
-
-def _ensure_private_voice_parent(parent: Path) -> None:
-    """Create or validate an explicitly configured parent without following links."""
-
-    try:
-        parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-        metadata = parent.lstat()
-        if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISDIR(metadata.st_mode):
-            raise OSError("voice media parent is not a directory")
-        os.chmod(parent, 0o700)
-        _ensure_private_voice_directory(parent)
-    except OSError:
-        raise VoiceTranscriptionError("Telegram voice media directory is not private") from None
-
-
-def _ensure_private_voice_directory(directory: Path) -> None:
-    metadata = directory.stat()
-    if not stat.S_ISDIR(metadata.st_mode):
-        raise OSError("voice media path is not a directory")
-    if metadata.st_mode & 0o077:
-        raise OSError("voice media directory permissions are not private")
-    geteuid = getattr(os, "geteuid", None)
-    if geteuid is not None and metadata.st_uid != geteuid():
-        raise OSError("voice media directory is not owned by this process")
-
-
-def _write_private_voice_file(dest_dir: Path, data: bytes) -> Path:
-    """Write raw audio once to a randomized, identifier-free 0600 file."""
-
-    descriptor, raw_path = tempfile.mkstemp(
-        prefix=VOICE_MEDIA_FILE_PREFIX,
-        suffix=".ogg",
-        dir=str(dest_dir),
-    )
-    dest_path = Path(raw_path)
-    try:
-        os.fchmod(descriptor, 0o600)
-        with os.fdopen(descriptor, "wb") as voice_file:
-            descriptor = -1
-            written = voice_file.write(data)
-            if written != len(data):
-                raise OSError("incomplete voice file write")
-    except OSError:
-        if descriptor >= 0:
-            os.close(descriptor)
-        raise
-    return dest_path
-
-
-def _verified_telegram_voice_attachment(
-    *,
-    local_path: str,
-    file_id: str,
-) -> _VerifiedTelegramVoiceAttachment:
-    """Freeze the just-downloaded bytes with their Telegram attachment identity."""
-
-    path = Path(local_path)
-    try:
-        audio_bytes = path.read_bytes()
-    except OSError:
-        raise VoiceTranscriptionError("Downloaded Telegram voice file is unavailable") from None
-    return _VerifiedTelegramVoiceAttachment(
-        local_path=str(path),
-        file_id=file_id,
-        audio_bytes=audio_bytes,
-    )
 
 
 def _get_telegram_file_path(
@@ -493,32 +401,3 @@ def _build_multipart_body(
     body.extend(b"\r\n")
     body.extend(f"--{boundary}--\r\n".encode("utf-8"))
     return bytes(body), boundary
-
-
-def _delete_local_file(local_path: str) -> None:
-    path = Path(local_path)
-    try:
-        path.unlink(missing_ok=True)
-    except Exception:
-        LOGGER.warning("Failed to delete local Telegram voice file")
-        return
-    _delete_private_voice_directory(path.parent)
-
-
-def _delete_private_voice_directory(directory: Path) -> None:
-    """Remove only the randomized per-attachment directory we created."""
-
-    if not directory.name.startswith(VOICE_MEDIA_DIR_PREFIX):
-        return
-    try:
-        _ensure_private_voice_directory(directory)
-        for child in directory.iterdir():
-            child_metadata = child.lstat()
-            if not (stat.S_ISREG(child_metadata.st_mode) or stat.S_ISLNK(child_metadata.st_mode)):
-                raise OSError("private voice directory contains an unexpected entry")
-            child.unlink()
-        directory.rmdir()
-    except FileNotFoundError:
-        return
-    except OSError:
-        LOGGER.warning("Failed to delete local Telegram voice directory")

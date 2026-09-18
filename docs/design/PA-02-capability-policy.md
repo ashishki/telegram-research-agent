@@ -33,11 +33,12 @@ reconciliation. This slice never represents either as complete.
 
 | Boundary | Required grant before a request | Additional non-authority switches |
 | --- | --- | --- |
-| Anthropic text/vision client | exact owner/connection/resource plus `model.generate`/`model.vision`, `provider_anthropic`, declared data class, one-use reservation | none; a configured API key is insufficient |
+| Anthropic text client | exact owner/connection/resource plus `model.generate`, `provider_anthropic`, declared data class, one-use reservation | none; a configured API key is insufficient |
+| Direct local-path vision | denied before a file read or provider call; PA-15 must supply an immutable ingress-verified attachment binding before vision can egress | a configured API key or a `model.vision` reservation cannot bind arbitrary caller-selected bytes |
 | OpenAI text adapter | exact owner/connection/resource plus `model.generate`, `provider_openai`, `user_provided`, one-use reservation | existing adapter enable plus per-call switch still restrict execution but never authorize it |
 | OpenAI archive context | exact owner/connection/archive resource plus a distinct `model.context_egress`, `provider_openai`, `private_archive` reservation | existing context switch; absent/invalid context grant omits context rather than leaking it |
 | Telegram voice download | exact owner/connection/file resource plus two distinct `media.voice_download`, `read`, `provider_telegram`, `user_provided` reservations: one each for `getFile` and file download | none |
-| OpenAI transcription | `media.transcribe`, `model_egress`, `provider_openai`, `user_provided` reservation | API key supplies transport credentials only |
+| OpenAI transcription | `media.transcribe`, `model_egress`, `provider_openai`, `user_provided` reservation, exactly bound to the Telegram attachment ID returned by the two authorized Telegram reads | the raw voice bytes remain in the request memory only; no PA-02 local media file is created |
 
 The public scope formatter lists capability, resources, operations, data
 classes and permitted providers and explicitly says that a provider key is not
@@ -52,8 +53,9 @@ The PA-02 tests prove no-consent/key-only denial before fake client/network use;
 scope/provider/revision/revoke/expiry/fallback failure; current-state
 revalidation after reservation; cross-owner/connection/resource substitution
 denial; one-use budget accounting; no automatic retry after unknown provider
-outcome; archive-context separation; and all three real voice transport layers
-(`getFile`, file download, transcription) with separate matching synthetic
-reservations. Existing LLM, OpenAI adapter, synthesis and voice tests now pass a
-matching synthetic authorization only for their fake transport paths. No fixture
-calls a provider.
+outcome; archive-context separation; direct local-path vision denial before a
+read/provider call; and all three real voice transport layers (`getFile`, file
+download, transcription) with separate matching synthetic reservations. Voice
+tests also prove raw download bytes never create a local staging file. Existing
+LLM, OpenAI adapter, synthesis and voice tests now pass a matching synthetic
+authorization only for their fake transport paths. No fixture calls a provider.

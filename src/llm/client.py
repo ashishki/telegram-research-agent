@@ -1,6 +1,5 @@
 import json
 import logging
-import mimetypes
 import os
 import sqlite3
 import time
@@ -25,7 +24,6 @@ USAGE_RECORDING_SQLITE_TIMEOUT_SECONDS = 0.05
 USAGE_RECORDING_SQLITE_BUSY_TIMEOUT_MS = 50
 ANTHROPIC_PROVIDER_REF = "provider_anthropic"
 TEXT_CAPABILITY = "model.generate"
-VISION_CAPABILITY = "model.vision"
 
 # Model routing by task category.
 # Override any entry via env var: LLM_MODEL_DIGEST, LLM_MODEL_BOT_ASK, etc.
@@ -333,78 +331,24 @@ def complete_vision(
     connection_ref: str | None = None,
     resource_ref: str | None = None,
 ) -> str:
-    if not _has_matching_egress_grant(
+    """Deny direct file-path vision egress until PA-15 binds ingress bytes.
+
+    A matching grant authorizes one exact resource, not an arbitrary local path
+    selected by a caller.  PA-02 has no immutable image attachment binding, so
+    it must not read or send the supplied file at all.
+    """
+
+    del (
+        prompt,
+        image_path,
+        model,
         authorization,
-        capability=VISION_CAPABILITY,
-        data_class=data_class,
-        owner_ref=owner_ref,
-        connection_ref=connection_ref,
-        resource_ref=resource_ref,
-    ):
-        raise LLMError("Anthropic vision requires an active capability grant")
-    client = _get_client()
-    selected_model = model or _get_model("photo_analysis")
-    media_type = mimetypes.guess_type(image_path)[0] or "image/jpeg"
-
-    with open(image_path, "rb") as image_file:
-        image_payload = image_file.read()
-
-    start_time = time.time()
-    try:
-        require_authorized_egress(
-            authorization,
-            capability=VISION_CAPABILITY,
-            provider_ref=ANTHROPIC_PROVIDER_REF,
-            data_class=data_class,
-            owner_ref=owner_ref or "",
-            connection_ref=connection_ref,
-            resource_ref=resource_ref or "",
-        )
-        LOGGER.debug("Anthropic vision request model=%s attempt=1", selected_model)
-        response = client.messages.create(
-            model=selected_model,
-            max_tokens=150,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": media_type,
-                                "data": __import__("base64").standard_b64encode(image_payload).decode("utf-8"),
-                            },
-                        },
-                        {"type": "text", "text": prompt},
-                    ],
-                }
-            ],
-        )
-    except CapabilityDenied:
-        raise LLMError("Anthropic vision requires an active capability grant") from None
-    except Exception:
-        LOGGER.warning("Anthropic vision has unknown outcome after one attempt")
-        raise LLMError("Anthropic vision completion failed") from None
-
-    text = _extract_text(response)
-    duration_ms = int((time.time() - start_time) * 1000)
-    input_tokens = getattr(getattr(response, "usage", None), "input_tokens", 0)
-    output_tokens = getattr(getattr(response, "usage", None), "output_tokens", 0)
-    est_cost_usd = estimate_cost_usd(
-        model=selected_model,
-        input_tokens=input_tokens,
-        output_tokens=output_tokens,
+        data_class,
+        owner_ref,
+        connection_ref,
+        resource_ref,
     )
-    _record_usage("photo_analysis", selected_model, input_tokens, output_tokens, duration_ms)
-    LOGGER.debug(
-        "vision model=%s input_tokens=%s output_tokens=%s est_cost_usd=%.8f",
-        selected_model,
-        input_tokens,
-        output_tokens,
-        est_cost_usd,
-    )
-    return text
+    raise LLMError("Direct local vision requires an ingress-verified attachment binding")
 
 
 def _strip_code_fence(text: str) -> str:

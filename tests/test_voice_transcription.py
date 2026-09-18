@@ -1,6 +1,5 @@
 import json
 import os
-import stat
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -92,61 +91,26 @@ class TestVoiceTranscription(unittest.TestCase):
         multipart_body.assert_not_called()
         urlopen.assert_not_called()
 
-    def test_transcribe_telegram_voice_deletes_local_audio_after_transcription(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            voice_path = Path(tmpdir) / "voice.ogg"
-            voice_path.write_bytes(b"fake audio")
-
-            with patch.dict(os.environ, {"OPENAI_API_KEY": "openai-key"}, clear=False):
-                with patch("bot.voice._download_telegram_voice", return_value=str(voice_path)):
-                    with patch("bot.voice._transcribe_verified_telegram_audio", return_value="voice transcript"):
-                        transcript = transcribe_telegram_voice(
-                            token="bot-token",
-                            file_id="voice-1",
-                            download_authorization=_authorization(
-                                capability="media.voice_download",
-                                operation="read",
-                                provider_ref="provider_telegram",
-                                resource_ref="voice-1",
-                            ),
-                            download_file_authorization=_authorization(
-                                capability="media.voice_download",
-                                operation="read",
-                                provider_ref="provider_telegram",
-                                resource_ref="voice-1",
-                            ),
-                            transcription_authorization=_authorization(
-                                capability="media.transcribe",
-                                operation="model_egress",
-                                provider_ref="provider_openai",
-                                resource_ref="voice-1",
-                            ),
-                            owner_ref="owner_synthetic_primary",
-                            connection_ref=None,
-                        )
-
-            self.assertEqual(transcript, "voice transcript")
-            self.assertFalse(voice_path.exists())
-
-    def test_verified_telegram_attachment_keeps_the_downloaded_bytes_bound_to_its_file_id(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            voice_path = Path(tmpdir) / "voice.ogg"
-            voice_path.write_bytes(b"verified Telegram bytes")
-            attachment = voice._verified_telegram_voice_attachment(
-                local_path=str(voice_path),
-                file_id="voice-1",
-            )
-            voice_path.write_bytes(b"substituted local bytes")
-            captured = {}
-
-            def fake_urlopen(request_obj, timeout):
-                captured["body"] = request_obj.data
-                return _FakeResponse({"text": "verified transcript"})
-
-            with patch.dict(os.environ, {"OPENAI_API_KEY": "openai-key"}, clear=False):
-                with patch("bot.voice.request.urlopen", side_effect=fake_urlopen):
-                    transcript = voice._transcribe_verified_telegram_audio(
-                        attachment,
+    def test_transcribe_telegram_voice_uses_only_the_in_memory_bound_attachment(self):
+        attachment = voice._VerifiedTelegramVoiceAttachment(file_id="voice-1", audio_bytes=b"fake audio")
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "openai-key"}, clear=False):
+            with patch("bot.voice._download_telegram_voice", return_value=attachment):
+                with patch("bot.voice._transcribe_verified_telegram_audio", return_value="voice transcript"):
+                    transcript = transcribe_telegram_voice(
+                        token="bot-token",
+                        file_id="voice-1",
+                        download_authorization=_authorization(
+                            capability="media.voice_download",
+                            operation="read",
+                            provider_ref="provider_telegram",
+                            resource_ref="voice-1",
+                        ),
+                        download_file_authorization=_authorization(
+                            capability="media.voice_download",
+                            operation="read",
+                            provider_ref="provider_telegram",
+                            resource_ref="voice-1",
+                        ),
                         transcription_authorization=_authorization(
                             capability="media.transcribe",
                             operation="model_egress",
@@ -154,42 +118,65 @@ class TestVoiceTranscription(unittest.TestCase):
                             resource_ref="voice-1",
                         ),
                         owner_ref="owner_synthetic_primary",
+                        connection_ref=None,
                     )
 
-            self.assertEqual(transcript, "verified transcript")
-            self.assertIn(b"verified Telegram bytes", captured["body"])
-            self.assertNotIn(b"substituted local bytes", captured["body"])
+        self.assertEqual(transcript, "voice transcript")
+
+    def test_verified_telegram_attachment_keeps_the_downloaded_bytes_bound_to_its_file_id(self):
+        attachment = voice._VerifiedTelegramVoiceAttachment(
+            file_id="voice-1",
+            audio_bytes=b"verified Telegram bytes",
+        )
+        captured = {}
+
+        def fake_urlopen(request_obj, timeout):
+            captured["body"] = request_obj.data
+            return _FakeResponse({"text": "verified transcript"})
+
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "openai-key"}, clear=False):
+            with patch("bot.voice.request.urlopen", side_effect=fake_urlopen):
+                transcript = voice._transcribe_verified_telegram_audio(
+                    attachment,
+                    transcription_authorization=_authorization(
+                        capability="media.transcribe",
+                        operation="model_egress",
+                        provider_ref="provider_openai",
+                        resource_ref="voice-1",
+                    ),
+                    owner_ref="owner_synthetic_primary",
+                )
+
+        self.assertEqual(transcript, "verified transcript")
+        self.assertIn(b"verified Telegram bytes", captured["body"])
+        self.assertNotIn(b"substituted local bytes", captured["body"])
 
     def test_voice_failures_and_download_logs_redact_attachment_identifiers_and_provider_payloads(self):
-        with tempfile.TemporaryDirectory(prefix="private-local-path-sentinel-") as tmpdir:
-            voice_path = Path(tmpdir) / "private-file-id-sentinel.ogg"
-            voice_path.write_bytes(b"voice bytes")
-            attachment = voice._verified_telegram_voice_attachment(
-                local_path=str(voice_path),
-                file_id="private-file-id-sentinel",
-            )
+        attachment = voice._VerifiedTelegramVoiceAttachment(
+            file_id="private-file-id-sentinel",
+            audio_bytes=b"voice bytes",
+        )
 
-            with patch.dict(os.environ, {"OPENAI_API_KEY": "openai-key"}, clear=False):
-                with patch("bot.voice.request.urlopen", side_effect=RuntimeError("provider-payload-sentinel")):
-                    with self.assertLogs(voice.LOGGER, level="WARNING") as transcribe_logs:
-                        with self.assertRaises(voice.VoiceTranscriptionError) as error:
-                            voice._transcribe_verified_telegram_audio(
-                                attachment,
-                                transcription_authorization=_authorization(
-                                    capability="media.transcribe",
-                                    operation="model_egress",
-                                    provider_ref="provider_openai",
-                                    resource_ref="private-file-id-sentinel",
-                                ),
-                                owner_ref="owner_synthetic_primary",
-                            )
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "openai-key"}, clear=False):
+            with patch("bot.voice.request.urlopen", side_effect=RuntimeError("provider-payload-sentinel")):
+                with self.assertLogs(voice.LOGGER, level="WARNING") as transcribe_logs:
+                    with self.assertRaises(voice.VoiceTranscriptionError) as error:
+                        voice._transcribe_verified_telegram_audio(
+                            attachment,
+                            transcription_authorization=_authorization(
+                                capability="media.transcribe",
+                                operation="model_egress",
+                                provider_ref="provider_openai",
+                                resource_ref="private-file-id-sentinel",
+                            ),
+                            owner_ref="owner_synthetic_primary",
+                        )
 
-            rendered = "\n".join(transcribe_logs.output)
-            assert "provider-payload-sentinel" not in str(error.exception)
-            assert "private-file-id-sentinel" not in str(error.exception)
-            assert "provider-payload-sentinel" not in rendered
-            assert "private-file-id-sentinel" not in rendered
-            assert "private-local-path-sentinel" not in rendered
+        rendered = "\n".join(transcribe_logs.output)
+        assert "provider-payload-sentinel" not in str(error.exception)
+        assert "private-file-id-sentinel" not in str(error.exception)
+        assert "provider-payload-sentinel" not in rendered
+        assert "private-file-id-sentinel" not in rendered
 
     def test_telegram_error_response_and_download_log_redact_private_values(self):
         response_payload = {"ok": False, "private_provider_payload": "provider-payload-sentinel"}
@@ -240,14 +227,14 @@ class TestVoiceTranscription(unittest.TestCase):
                         connection_ref=None,
                         resource_ref="private-file-id-sentinel",
                     )
-            voice._delete_local_file(downloaded)
 
         rendered = "\n".join(download_logs.output)
         assert "private-file-id-sentinel" not in rendered
-        assert "private-local-path-sentinel" not in rendered
         assert "private/provider/path.ogg" not in rendered
+        assert downloaded.file_id == "private-file-id-sentinel"
+        assert downloaded.audio_bytes == b"synthetic voice bytes"
 
-    def test_voice_download_uses_private_identifier_free_randomized_storage(self):
+    def test_voice_download_keeps_raw_bytes_in_memory_without_local_staging(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             def fake_urlopen(request_obj, timeout):
                 url = getattr(request_obj, "full_url", str(request_obj))
@@ -277,15 +264,9 @@ class TestVoiceTranscription(unittest.TestCase):
                     resource_ref="private-file-id-sentinel",
                 )
 
-            downloaded_path = Path(downloaded)
-            self.assertEqual(stat.S_IMODE(downloaded_path.stat().st_mode), 0o600)
-            self.assertEqual(stat.S_IMODE(downloaded_path.parent.stat().st_mode), 0o700)
-            self.assertTrue(downloaded_path.name.startswith("voice-"))
-            self.assertNotIn("private-file-id-sentinel", downloaded_path.name)
-            self.assertEqual(downloaded_path.read_bytes(), b"synthetic voice bytes")
-            voice._delete_local_file(downloaded)
-            self.assertFalse(downloaded_path.exists())
-            self.assertFalse(downloaded_path.parent.exists())
+            self.assertEqual(downloaded.file_id, "private-file-id-sentinel")
+            self.assertEqual(downloaded.audio_bytes, b"synthetic voice bytes")
+            self.assertEqual(list(Path(tmpdir).iterdir()), [])
 
     def test_voice_download_rejects_an_unsafe_attachment_id_before_network_or_storage(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -303,57 +284,6 @@ class TestVoiceTranscription(unittest.TestCase):
                     )
             urlopen.assert_not_called()
             self.assertEqual(list(Path(tmpdir).iterdir()), [])
-
-    def test_voice_download_removes_partial_file_and_private_directory_after_write_failure(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            def fake_urlopen(request_obj, timeout):
-                url = getattr(request_obj, "full_url", str(request_obj))
-                if "getFile?" in url:
-                    return _FakeResponse({"ok": True, "result": {"file_path": "voice/synthetic.ogg"}})
-                return _FakeResponse(b"synthetic voice bytes")
-
-            def write_partial_then_fail(dest_dir, data):
-                partial = dest_dir / "voice-partial.ogg"
-                partial.write_bytes(data[:1])
-                raise OSError("synthetic write failure")
-
-            with patch("bot.voice.request.urlopen", side_effect=fake_urlopen):
-                with patch("bot.voice._write_private_voice_file", side_effect=write_partial_then_fail):
-                    with self.assertRaisesRegex(voice.VoiceTranscriptionError, "could not be stored"):
-                        voice._download_telegram_voice(
-                            token="bot-token",
-                            file_id="voice-1",
-                            media_dir=tmpdir,
-                            get_file_authorization=_authorization(
-                                capability="media.voice_download",
-                                operation="read",
-                                provider_ref="provider_telegram",
-                                resource_ref="voice-1",
-                            ),
-                            download_file_authorization=_authorization(
-                                capability="media.voice_download",
-                                operation="read",
-                                provider_ref="provider_telegram",
-                                resource_ref="voice-1",
-                            ),
-                            owner_ref="owner_synthetic_primary",
-                            connection_ref=None,
-                            resource_ref="voice-1",
-                        )
-            self.assertEqual(list(Path(tmpdir).iterdir()), [])
-
-    def test_voice_cleanup_failure_is_redacted_and_does_not_raise(self):
-        with tempfile.TemporaryDirectory(prefix="private-local-path-sentinel-") as tmpdir:
-            local_path = Path(tmpdir) / "private-file-id-sentinel.ogg"
-            local_path.write_bytes(b"voice bytes")
-            with patch.object(Path, "unlink", side_effect=OSError("private-provider-payload-sentinel")):
-                with self.assertLogs(voice.LOGGER, level="WARNING") as logs:
-                    voice._delete_local_file(str(local_path))
-
-        rendered = "\n".join(logs.output)
-        self.assertNotIn("private-local-path-sentinel", rendered)
-        self.assertNotIn("private-file-id-sentinel", rendered)
-        self.assertNotIn("private-provider-payload-sentinel", rendered)
 
     def test_transcribe_telegram_voice_requires_a_reservation_for_each_telegram_call(self):
         download_authorization = _authorization(
