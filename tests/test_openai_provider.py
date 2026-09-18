@@ -144,7 +144,11 @@ def test_context_egress_requires_second_explicit_gate(monkeypatch) -> None:
             data_class="private_archive",
             purpose="answer.context",
         ),
-        local_context=[{"title":"approved","summary":"approved context"}],
+        local_context=[{
+            "title": "approved",
+            "summary": "approved context",
+            "source_ref": "archive:synthetic-approved-1",
+        }],
         client=client2,
         owner_ref="owner_synthetic_primary",
         connection_ref=SYNTHETIC_OPENAI_CONNECTION,
@@ -152,6 +156,7 @@ def test_context_egress_requires_second_explicit_gate(monkeypatch) -> None:
         context_resource_ref="resource_archive",
     )
     assert "approved context" in repr(client2.responses.calls[0]["input"])
+    assert "archive:synthetic-approved-1" in repr(client2.responses.calls[0]["input"])
     assert result2.receipt.context_egress_performed is True
 
 
@@ -173,7 +178,11 @@ def test_context_transport_rejects_a_reservation_for_the_query_purpose(monkeypat
             data_class="private_archive",
             purpose="answer.request",
         ),
-        local_context=[{"title": "private", "text": "must-not-egress"}],
+        local_context=[{
+            "title": "private",
+            "text": "must-not-egress",
+            "source_ref": "archive:synthetic-private-1",
+        }],
         client=client,
         owner_ref="owner_synthetic_primary",
         connection_ref=SYNTHETIC_OPENAI_CONNECTION,
@@ -184,3 +193,54 @@ def test_context_transport_rejects_a_reservation_for_the_query_purpose(monkeypat
     assert result.receipt.context_egress_performed is False
     assert len(client.responses.calls) == 1
     assert "must-not-egress" not in repr(client.responses.calls[0]["input"])
+
+
+@pytest.mark.parametrize(
+    ("local_context", "private_marker"),
+    [
+        ("raw-context-sentinel", "raw-context-sentinel"),
+        ([{"title": "uncited-sentinel", "text": "uncited context"}], "uncited-sentinel"),
+        ([{
+            "title": "malformed-sentinel",
+            "text": {"not": "text"},
+            "source_ref": "archive:malformed-1",
+        }], "malformed-sentinel"),
+        ([
+            {
+                "title": "aggregate-context-sentinel" if index == 0 else "approved",
+                "text": "x" * 1_200,
+                "source_ref": f"archive:{index}-" + "r" * 485,
+            }
+            for index in range(8)
+        ], "aggregate-context-sentinel"),
+    ],
+)
+def test_context_transport_omits_raw_uncited_malformed_or_oversized_context(monkeypatch, local_context, private_marker) -> None:
+    monkeypatch.setenv(PROVIDER_ENABLE_ENV, "true")
+    monkeypatch.setenv(CONTEXT_EGRESS_ENABLE_ENV, "true")
+    monkeypatch.setenv("OPENAI_API_KEY", SYNTHETIC_OPENAI_KEY)
+    client = _FakeClient()
+
+    result = complete_with_provider(
+        "Question",
+        provider="openai",
+        allow_provider_egress=True,
+        allow_context_egress=True,
+        authorization=_authorization(),
+        context_authorization=_authorization(
+            capability="model.context_egress",
+            resource_ref="resource_archive",
+            data_class="private_archive",
+            purpose="answer.context",
+        ),
+        local_context=local_context,
+        client=client,
+        owner_ref="owner_synthetic_primary",
+        connection_ref=SYNTHETIC_OPENAI_CONNECTION,
+        resource_ref="resource_conversation",
+        context_resource_ref="resource_archive",
+    )
+
+    assert result.receipt.context_egress_performed is False
+    assert len(client.responses.calls) == 1
+    assert private_marker not in repr(client.responses.calls[0]["input"])

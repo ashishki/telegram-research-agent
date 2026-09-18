@@ -852,7 +852,11 @@ def test_private_context_needs_its_own_data_class_grant(monkeypatch):
         authorization=_decision(),
         context_authorization=None,
         **OWNER_SCOPE,
-        local_context=[{"title": "synthetic", "text": "private synthetic context"}],
+        local_context=[{
+            "title": "synthetic",
+            "text": "private synthetic context",
+            "source_ref": "archive:synthetic-private-1",
+        }],
         client=client,
     )
 
@@ -874,7 +878,11 @@ def test_private_context_needs_its_own_data_class_grant(monkeypatch):
         authorization=_decision(),
         context_authorization=context_decision,
         context_resource_ref="resource_archive",
-        local_context=[{"title": "synthetic", "text": "private synthetic context"}],
+        local_context=[{
+            "title": "synthetic",
+            "text": "private synthetic context",
+            "source_ref": "archive:synthetic-private-1",
+        }],
         client=client_with_context,
         **OWNER_SCOPE,
     )

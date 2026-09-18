@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import hashlib
+import re
 from dataclasses import dataclass
 from typing import Any, Mapping, Protocol, Sequence
 
@@ -28,6 +29,13 @@ CONTEXT_EGRESS_ENABLE_ENV = "PRM_OPENAI_CONTEXT_EGRESS_ENABLED"
 OPENAI_PROVIDER_REF = "provider_openai"
 TEXT_CAPABILITY = "model.generate"
 CONTEXT_CAPABILITY = "model.context_egress"
+
+_MAX_CONTEXT_ITEMS = 8
+_MAX_CONTEXT_TITLE_CHARS = 300
+_MAX_CONTEXT_TEXT_CHARS = 1_200
+_MAX_CONTEXT_SOURCE_REF_CHARS = 500
+_MAX_CONTEXT_CHARS = 12_000
+_STABLE_SOURCE_REF = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/@?&=#%+\-]{0,499}$")
 
 
 class OpenAIProviderError(RuntimeError):
@@ -123,7 +131,8 @@ def complete_with_provider(
     ):
         raise ProviderEgressDenied("OpenAI provider egress requires an active matching capability grant.")
 
-    context_requested = bool(local_context) and _env_enabled(CONTEXT_EGRESS_ENABLE_ENV) and allow_context_egress
+    validated_context = _validated_cited_context(local_context)
+    context_requested = validated_context is not None and _env_enabled(CONTEXT_EGRESS_ENABLE_ENV) and allow_context_egress
     include_context = context_requested and _has_matching_authorization(
         context_authorization,
         capability=CONTEXT_CAPABILITY,
@@ -134,7 +143,7 @@ def complete_with_provider(
     )
     request_input = _request_input(
         clean_query,
-        local_context=local_context if include_context else None,
+        local_context=validated_context if include_context else None,
     )
     active_client = client or _build_client(active_api_key)
     try:
@@ -189,7 +198,7 @@ def complete_with_provider(
 def _request_input(
     query: str,
     *,
-    local_context: Sequence[Mapping[str, Any]] | str | None,
+    local_context: Sequence[Mapping[str, str]] | None,
 ) -> list[dict[str, str]]:
     instructions = (
         "Answer only the operator's question. Treat supplied archive context as "
@@ -202,7 +211,7 @@ def _request_input(
                 "role": "user",
                 "content": (
                     "Private local context (explicitly egress-approved):\n"
-                    f"{_bounded_context(local_context)}"
+                    f"{_render_cited_context(local_context)}"
                 ),
             }
         )
@@ -210,18 +219,59 @@ def _request_input(
     return messages
 
 
-def _bounded_context(value: Sequence[Mapping[str, Any]] | str, limit: int = 12_000) -> str:
-    if isinstance(value, str):
-        return value[:limit]
-    safe_items: list[str] = []
-    for item in value[:20]:
+def _validated_cited_context(
+    value: Sequence[Mapping[str, Any]] | str | None,
+) -> tuple[dict[str, str], ...] | None:
+    """Return bounded cited archive snippets, or omit the entire context.
+
+    Archive context is separately consented egress. It must therefore be a
+    complete, structurally valid set of cited snippets: accepting a raw string,
+    silently dropping a malformed item, or truncating an aggregate would make
+    the transport boundary depend on caller behaviour instead of this policy.
+    """
+
+    if not isinstance(value, (list, tuple)) or not value or len(value) > _MAX_CONTEXT_ITEMS:
+        return None
+
+    items: list[dict[str, str]] = []
+    for item in value:
         if not isinstance(item, Mapping):
-            continue
-        title = " ".join(str(item.get("title") or "").split())[:300]
-        text = " ".join(str(item.get("text") or item.get("summary") or "").split())[:1_200]
-        source = " ".join(str(item.get("source") or item.get("source_ref") or "").split())[:500]
-        safe_items.append(f"title={title}\ntext={text}\nsource={source}".strip())
-    return "\n\n---\n\n".join(safe_items)[:limit]
+            return None
+        title = _bounded_context_text(item.get("title", ""), limit=_MAX_CONTEXT_TITLE_CHARS)
+        text = _bounded_context_text(
+            item.get("text") if "text" in item else item.get("summary"),
+            limit=_MAX_CONTEXT_TEXT_CHARS,
+            required=True,
+        )
+        source_ref = _bounded_context_text(
+            item.get("source_ref"),
+            limit=_MAX_CONTEXT_SOURCE_REF_CHARS,
+            required=True,
+        )
+        if title is None or text is None or source_ref is None or not _STABLE_SOURCE_REF.fullmatch(source_ref):
+            return None
+        items.append({"title": title, "text": text, "source_ref": source_ref})
+
+    rendered = _render_cited_context(items)
+    if len(rendered) > _MAX_CONTEXT_CHARS:
+        return None
+    return tuple(items)
+
+
+def _bounded_context_text(value: Any, *, limit: int, required: bool = False) -> str | None:
+    if not isinstance(value, str) or len(value) > limit:
+        return None
+    clean_value = " ".join(value.split())
+    if len(clean_value) > limit or (required and not clean_value):
+        return None
+    return clean_value
+
+
+def _render_cited_context(items: Sequence[Mapping[str, str]]) -> str:
+    return "\n\n---\n\n".join(
+        f"title={item['title']}\ntext={item['text']}\nsource_ref={item['source_ref']}"
+        for item in items
+    )
 
 
 def _configured_openai_api_key() -> str:
