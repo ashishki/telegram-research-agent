@@ -216,11 +216,16 @@ def test_expired_context_cannot_draft_or_confirm(monkeypatch):
 
         result = handle_post_answer_callback(db_path, f"{PRM_ACTION_PREFIX}:{context_id}:n", chat_id="42")
         confirm = handle_post_answer_callback(db_path, f"{PRM_CONFIRM_PREFIX}:{context_id}:n", chat_id="42")
+        with sqlite3.connect(db_path) as connection:
+            remaining = connection.execute(
+                "SELECT count(*) FROM prm_post_answer_proposals WHERE context_id = ?", (context_id,)
+            ).fetchone()[0]
 
         assert result["status"] == "expired"
         assert result["write_performed"] is False
         assert confirm["status"] == "expired"
         assert confirm["write_performed"] is False
+        assert remaining == 1
 
 
 def test_cancelled_context_cannot_be_confirmed(monkeypatch):

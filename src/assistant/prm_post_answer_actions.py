@@ -383,8 +383,6 @@ def _load_context(
         or row[4] == "cancelled"
         or expired
     ):
-        if expired:
-            _delete_context(db_path, context_id)
         return None
     context = json.loads(str(row[1]))
     if (
