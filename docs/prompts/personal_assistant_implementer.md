@@ -36,11 +36,18 @@ case when test-first is required; implement the smallest complete user journey;
 run new tests plus the existing regression floor; wire new tests into project
 verification. Current registry commands alone do not prove new features.
 
-Use direct implementation, independent read-only risk reviews and scoped
-corrections. Four feature review roles use the pinned Role Runner. No nested
-implementation process, no self-review, no child commit/push/approval. Record
-requested and observed model; do not assume a hardcoded example model exists.
-Limit correction loops as declared; unresolved real blockers remain explicit.
+Use direct implementation in the current session's default Codex
+model/reasoning mode, independent read-only risk reviews and scoped
+corrections. The implementer never self-reviews. Each independent reviewer is
+a fresh separate process requested as `gpt-5.6-terra` with `high` reasoning.
+Use `tools/run_codex_role.py run` for any review role supported by the pinned
+Role Runner; use fresh read-only `codex exec` for all other prescribed review
+roles. Reviewers do not commit, push or fix their own findings. The implementer
+or a separate scoped fix agent fixes P0/P1; a fresh independent reviewer then
+rechecks the changed scope before a dependent slice proceeds. Deep Review runs
+at the declared phase boundaries, not after every small patch, except for an
+immediate safety trigger. Record requested and observed model/effort. Limit
+correction loops as declared; unresolved real blockers remain explicit.
 
 Commit/push only scoped, verified changes with honest evidence and the
 applicable human authority. High-risk acceptance and live gates remain human.

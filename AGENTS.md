@@ -29,10 +29,19 @@ another user's work, force-push, or rerun completed historical tasks. The old
 instructions and task states are preserved in `*.before-pa-20260918.md` files;
 read them only when resolving a specific historical boundary.
 
-Use Codex Direct for implementation. Independent review is read-only and
-risk-targeted; the four Feature Workflow review roles use the pinned Role
-Runner. No child commits, pushes, fixes its own reviewed work, or grants human
-completion authority. Use actual available model IDs; record observed identity.
+Use Codex Direct for implementation in the active session's current default
+Codex model/reasoning mode; do not pin or override the primary implementer
+model for this programme. Independent reviewers run as fresh, separate,
+read-only processes on `gpt-5.6-terra` with `high` reasoning. Route every role
+supported by Playbook Role Runner through
+`tools/run_codex_role.py run`; invoke every other prescribed review role with
+a fresh read-only `codex exec`. The implementer must not review its own work.
+Reviewers neither commit/push nor fix their own findings; the implementer or a
+separate scoped fix agent fixes P0/P1 findings, then an independent reviewer
+rechecks the changed scope. Deep Review is accumulated at the declared phase
+boundaries, not after every small patch, unless an immediate safety trigger
+applies. No child grants human completion authority. Record requested and
+observed model/effort and reviewed SHA/diff.
 
 ## Verification
 

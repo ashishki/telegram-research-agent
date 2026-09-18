@@ -46,14 +46,23 @@ python tools/feature_workflow.py --root . plan --task PA-00
 python tools/feature_workflow.py --root . review --task PA-00 --feature-id PA --role auto
 ```
 
-Inspect prompts and policy before invoking a paid reviewer. Supply the actually
-available approved model/effort to Role Runner. For example, after the model
-variable is set by the operator:
+Inspect prompts and policy before invoking a reviewer. The primary implementer
+uses the current session's default Codex model/reasoning mode and does not
+self-review. Every independent reviewer is a fresh, separate, read-only
+process requested as `gpt-5.6-terra` with `high` reasoning. For a role supported
+by Role Runner, use the runner directly:
 
 ```bash
 python tools/run_codex_role.py run --root . --task PA-00 --feature-id PA \
-  --role program_design_review --model "$REVIEW_MODEL" --reasoning-effort high
+  --role program_design_review --model gpt-5.6-terra --reasoning-effort high
 ```
+
+For any other prescribed review role, start a fresh read-only `codex exec`
+instead; never silently substitute it for a Role Runner-supported role. A
+reviewer does not edit, commit, push or fix its findings. The implementer or a
+separate scoped fix agent fixes P0/P1, then a new independent reviewer rechecks
+the affected diff/evidence. Record the requested and observed model/effort,
+exact command, inputs, reviewed SHA/diff and artifact hash.
 
 No review is claimed by rendering a prompt. Design approval is the existing
 interactive hash-bound human flow; the registry remains review_required now.
@@ -85,12 +94,13 @@ full requirements and historic snapshots are on-demand/never-by-default.
 This avoids repeatedly injecting the old 10KB handoff and full task history.
 Do not truncate away requirements or security obligations to make a packet small.
 
-Use targeted task tests, independent focused reviewers and accumulated phase
-reviews. Do not fan out all reviewers after every cosmetic edit. Stable context
-prefix, changing diff/evidence suffix; receipts are references rather than
-repeated log dumps. Cost-per-accepted-task must include fixes, review and tests.
-The owner reports upstream savings; no quantitative saving in this repo has
-yet been measured. Runtime model efficiency is separately designed in
+Use targeted task tests, independent focused reviewers and accumulated Deep
+Review at the declared PA phase boundaries. Do not fan out Deep Review after
+every cosmetic edit; immediate safety triggers remain exceptions. Stable
+context prefix, changing diff/evidence suffix; receipts are references rather
+than repeated log dumps. Cost-per-accepted-task must include fixes, review and
+tests. The owner reports upstream savings; no quantitative saving in this repo
+has yet been measured. Runtime model efficiency is separately designed in
 `docs/COST_ARCHITECTURE.md`.
 
 ## Verification and evidence boundaries

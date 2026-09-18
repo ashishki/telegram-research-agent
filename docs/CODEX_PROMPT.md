@@ -64,3 +64,20 @@ add and wire new acceptance tests before accepting any new feature.
 Read `docs/PLAYBOOK_ADOPTION.md` for verification commands, token discipline,
 review routing and rollback. Record fresh evidence in `docs/verification/` and
 private machine receipts under `.playbook-artifacts/`. Keep the handoff short.
+
+## Reviewer execution contract
+
+The primary implementer uses the current session's default Codex
+model/reasoning mode; it does not self-pin and must not review its own changes.
+Every independent reviewer is a fresh, separate, read-only process using
+`gpt-5.6-terra` with `high` reasoning. Use
+`python3 tools/run_codex_role.py run` for each role supported by the Playbook
+Role Runner; use a fresh read-only `codex exec` for every other required review
+role. Reviewers do not alter code or fix their own findings. The implementer or
+a separate scoped fix agent resolves P0/P1 findings, and an independent
+reviewer rechecks the affected evidence before dependent work proceeds.
+
+Batch Deep Review at the PA phase boundaries in `docs/REVIEW_POLICY.md`, rather
+than after each small change, unless an immediate safety boundary requires it.
+Record the requested and observed reviewer model/effort, command, SHA/diff,
+scope, findings and recheck result.
