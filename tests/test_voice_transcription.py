@@ -30,14 +30,14 @@ class _FakeResponse:
         return json.dumps(self.payload).encode("utf-8")
 
 
-def _authorization(*, capability: str, operation: str, provider_ref: str):
-    now = datetime(2026, 9, 18, tzinfo=timezone.utc)
+def _authorization(*, capability: str, operation: str, provider_ref: str, resource_ref: str = "resource_voice"):
+    now = datetime.now(timezone.utc).replace(microsecond=0)
     grant = CapabilityGrant(
         grant_id=f"grant_synthetic_{capability.replace('.', '_')}",
         owner_ref="owner_synthetic_primary",
         connection_ref=None,
         capability=capability,
-        resource_refs=("resource_voice",),
+        resource_refs=(resource_ref,),
         operations=(operation,),
         data_classes=("user_provided",),
         purpose="voice.transcription",
@@ -49,7 +49,7 @@ def _authorization(*, capability: str, operation: str, provider_ref: str):
     request = AuthorizationRequest(
         owner_ref="owner_synthetic_primary",
         capability=capability,
-        resource_ref="resource_voice",
+        resource_ref=resource_ref,
         operation=operation,
         data_class="user_provided",
         provider_ref=provider_ref,
@@ -89,6 +89,9 @@ class TestVoiceTranscription(unittest.TestCase):
                             operation="model_egress",
                             provider_ref="provider_openai",
                         ),
+                        owner_ref="owner_synthetic_primary",
+                        connection_ref=None,
+                        resource_ref="resource_voice",
                     )
 
         self.assertEqual(transcript, "Полезный отчет, target=actions.")
@@ -116,15 +119,93 @@ class TestVoiceTranscription(unittest.TestCase):
                                 operation="read",
                                 provider_ref="provider_telegram",
                             ),
+                            download_file_authorization=_authorization(
+                                capability="media.voice_download",
+                                operation="read",
+                                provider_ref="provider_telegram",
+                            ),
                             transcription_authorization=_authorization(
                                 capability="media.transcribe",
                                 operation="model_egress",
                                 provider_ref="provider_openai",
                             ),
+                            owner_ref="owner_synthetic_primary",
+                            connection_ref=None,
+                            resource_ref="resource_voice",
                         )
 
             self.assertEqual(transcript, "voice transcript")
             self.assertFalse(voice_path.exists())
+
+    def test_transcribe_telegram_voice_requires_a_reservation_for_each_telegram_call(self):
+        download_authorization = _authorization(
+            capability="media.voice_download",
+            operation="read",
+            provider_ref="provider_telegram",
+            resource_ref="voice-1",
+        )
+        transcription_authorization = _authorization(
+            capability="media.transcribe",
+            operation="model_egress",
+            provider_ref="provider_openai",
+            resource_ref="voice-1",
+        )
+
+        with patch("bot.voice.request.urlopen") as urlopen:
+            with self.assertRaises(VoiceTranscriptionUnavailable):
+                transcribe_telegram_voice(
+                    token="bot-token",
+                    file_id="voice-1",
+                    download_authorization=download_authorization,
+                    transcription_authorization=transcription_authorization,
+                    owner_ref="owner_synthetic_primary",
+                )
+
+        urlopen.assert_not_called()
+
+    def test_transcribe_telegram_voice_uses_each_real_policy_layer_once(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            urls: list[str] = []
+
+            def fake_urlopen(request_obj, timeout):
+                url = getattr(request_obj, "full_url", str(request_obj))
+                urls.append(url)
+                if "getFile?" in url:
+                    return _FakeResponse({"ok": True, "result": {"file_path": "voice/synthetic.ogg"}})
+                if "/file/bot" in url:
+                    return _FakeResponse(b"synthetic voice bytes")
+                return _FakeResponse({"text": "integrated synthetic transcript"})
+
+            with patch.dict(os.environ, {"OPENAI_API_KEY": "openai-key"}, clear=False):
+                with patch("bot.voice.request.urlopen", side_effect=fake_urlopen):
+                    transcript = transcribe_telegram_voice(
+                        token="bot-token",
+                        file_id="voice-1",
+                        media_dir=tmpdir,
+                        download_authorization=_authorization(
+                            capability="media.voice_download",
+                            operation="read",
+                            provider_ref="provider_telegram",
+                            resource_ref="voice-1",
+                        ),
+                        download_file_authorization=_authorization(
+                            capability="media.voice_download",
+                            operation="read",
+                            provider_ref="provider_telegram",
+                            resource_ref="voice-1",
+                        ),
+                        transcription_authorization=_authorization(
+                            capability="media.transcribe",
+                            operation="model_egress",
+                            provider_ref="provider_openai",
+                            resource_ref="voice-1",
+                        ),
+                        owner_ref="owner_synthetic_primary",
+                    )
+
+            self.assertEqual(transcript, "integrated synthetic transcript")
+            self.assertEqual(len(urls), 3)
+            self.assertEqual(list(Path(tmpdir).iterdir()), [])
 
 
 if __name__ == "__main__":

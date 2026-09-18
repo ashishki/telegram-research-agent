@@ -38,6 +38,9 @@ def synthesis_allowed(authorization: AuthorizationDecision | None = None) -> boo
             capability="model.generate",
             provider_ref="provider_anthropic",
             data_class="private_archive",
+            owner_ref=authorization.owner_ref if authorization is not None else "",
+            connection_ref=authorization.connection_ref if authorization is not None else None,
+            resource_ref=authorization.resource_ref if authorization is not None else "",
         )
     )
 
@@ -166,6 +169,9 @@ def _call_and_verify(
             max_attempts=1,
             authorization=authorization,
             data_class="private_archive",
+            owner_ref=authorization.owner_ref if authorization is not None else None,
+            connection_ref=authorization.connection_ref if authorization is not None else None,
+            resource_ref=authorization.resource_ref if authorization is not None else None,
         ).strip()
     except Exception:
         return None

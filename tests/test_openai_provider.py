@@ -17,7 +17,7 @@ class _FakeClient:
 
 
 def _authorization(*, capability="model.generate", resource_ref="resource_conversation", data_class="user_provided"):
-    now = datetime(2026, 9, 18, tzinfo=timezone.utc)
+    now = datetime.now(timezone.utc).replace(microsecond=0)
     grant = CapabilityGrant(
         grant_id=f"grant_synthetic_{capability.replace('.', '_')}",
         owner_ref="owner_synthetic_primary",
@@ -66,6 +66,9 @@ def test_context_egress_requires_second_explicit_gate(monkeypatch) -> None:
         allow_provider_egress=True,
         allow_context_egress=True,
         authorization=_authorization(),
+        owner_ref="owner_synthetic_primary",
+        connection_ref=None,
+        resource_ref="resource_conversation",
         local_context=[{"title":"private title","text":"private context"}],
         client=client,
     )
@@ -86,6 +89,10 @@ def test_context_egress_requires_second_explicit_gate(monkeypatch) -> None:
         ),
         local_context=[{"title":"approved","summary":"approved context"}],
         client=client2,
+        owner_ref="owner_synthetic_primary",
+        connection_ref=None,
+        resource_ref="resource_conversation",
+        context_resource_ref="resource_archive",
     )
     assert "approved context" in repr(client2.responses.calls[0]["input"])
     assert result2.receipt.context_egress_performed is True

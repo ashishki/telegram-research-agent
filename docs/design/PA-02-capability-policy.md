@@ -15,12 +15,15 @@ responses. A missing grant is a denial.
 
 `CapabilityRegistry.authorize()` is a read-only preflight for UI/planning.
 `authorize_and_reserve()` rechecks the current grant and reserves one budgeted
-adapter operation. The returned reservation is consumed exactly once by the
-adapter immediately before its external request. A revoked, expired, future,
-wrong-owner/resource/operation/data-class/purpose/provider/revision or
-fallback-forbidden request is denied. A reservation remains spent after an
-adapter error or unknown outcome, so a retry needs explicit reconciliation and
-another valid budgeted decision; it cannot silently duplicate an effect.
+adapter operation. The returned reservation retains its exact owner,
+connection, resource, grant ID and revision, and the adapter rechecks all of
+them against the registry immediately before it consumes the reservation and
+makes a transport call. A revoked, expired, future,
+wrong-owner/connection/resource/operation/data-class/purpose/provider/revision
+or fallback-forbidden request is denied. A reservation remains spent after an
+adapter error or unknown outcome. Automatic client and SDK retries are disabled
+for this boundary: PA-13 must reconcile that outcome before a caller can obtain
+another valid budgeted decision.
 
 The only implemented budget is the grant's bounded request count. PA-16 owns
 measured monetary/model routing budgets, and PA-13 owns durable external action
@@ -30,21 +33,27 @@ reconciliation. This slice never represents either as complete.
 
 | Boundary | Required grant before a request | Additional non-authority switches |
 | --- | --- | --- |
-| Anthropic text/vision client | exact `model.generate`/`model.vision`, `provider_anthropic`, declared data class, one-use reservation | none; a configured API key is insufficient |
-| OpenAI text adapter | `model.generate`, `provider_openai`, `user_provided`, one-use reservation | existing adapter enable plus per-call switch still restrict execution but never authorize it |
-| OpenAI archive context | a distinct `model.context_egress`, `provider_openai`, `private_archive` reservation | existing context switch; absent/invalid context grant omits context rather than leaking it |
-| Telegram voice download | `media.voice_download`, `read`, `provider_telegram`, `user_provided` reservation | none |
+| Anthropic text/vision client | exact owner/connection/resource plus `model.generate`/`model.vision`, `provider_anthropic`, declared data class, one-use reservation | none; a configured API key is insufficient |
+| OpenAI text adapter | exact owner/connection/resource plus `model.generate`, `provider_openai`, `user_provided`, one-use reservation | existing adapter enable plus per-call switch still restrict execution but never authorize it |
+| OpenAI archive context | exact owner/connection/archive resource plus a distinct `model.context_egress`, `provider_openai`, `private_archive` reservation | existing context switch; absent/invalid context grant omits context rather than leaking it |
+| Telegram voice download | exact owner/connection/file resource plus two distinct `media.voice_download`, `read`, `provider_telegram`, `user_provided` reservations: one each for `getFile` and file download | none |
 | OpenAI transcription | `media.transcribe`, `model_egress`, `provider_openai`, `user_provided` reservation | API key supplies transport credentials only |
 
-The public scope description lists capability, resources, operations, data
+The public scope formatter lists capability, resources, operations, data
 classes and permitted providers and explicitly says that a provider key is not
 consent. It deliberately does not expose credential values or raw source data.
+It is a contract helper only: PA-02 intentionally has no durable grant source
+or live operator route, so this does not claim that an account-facing permission
+screen has been delivered.
 
 ## Verification floor
 
 The PA-02 tests prove no-consent/key-only denial before fake client/network use;
-scope/provider/revision/revoke/expiry/fallback failure; a one-use budget
-reservation; archive-context separation; and both Telegram download and model
-transcription denial before network. Existing LLM, OpenAI adapter, synthesis and
-voice tests now pass a matching synthetic authorization only for their fake
-transport paths. No fixture calls a provider.
+scope/provider/revision/revoke/expiry/fallback failure; current-state
+revalidation after reservation; cross-owner/connection/resource substitution
+denial; one-use budget accounting; no automatic retry after unknown provider
+outcome; archive-context separation; and all three real voice transport layers
+(`getFile`, file download, transcription) with separate matching synthetic
+reservations. Existing LLM, OpenAI adapter, synthesis and voice tests now pass a
+matching synthetic authorization only for their fake transport paths. No fixture
+calls a provider.

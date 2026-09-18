@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -12,6 +13,12 @@ import llm.client as anthropic_client
 from llm.openai_provider import ProviderEgressDenied, complete_with_provider
 from tests.test_assistant_permissions import NOW, make_grant, make_request
 from prm.capabilities import CapabilityRegistry
+
+OWNER_SCOPE = {
+    "owner_ref": "owner_synthetic_primary",
+    "connection_ref": None,
+    "resource_ref": "resource_conversation",
+}
 
 
 class _FakeResponses:
@@ -32,6 +39,14 @@ def _decision(*, capability="model.generate", resource_ref="resource_conversatio
     grant = make_grant(capability=capability, resource_ref=resource_ref, data_class=data_class)
     request = make_request(capability=capability, resource_ref=resource_ref, data_class=data_class)
     return CapabilityRegistry((grant,)).authorize_and_reserve(request, now=NOW)
+
+
+def _reserved_decision_with_registry(*, capability="model.generate", resource_ref="resource_conversation"):
+    grant = make_grant(capability=capability, resource_ref=resource_ref)
+    registry = CapabilityRegistry((grant,))
+    return registry, grant, registry.authorize_and_reserve(
+        make_request(capability=capability, resource_ref=resource_ref), now=NOW
+    )
 
 
 def test_configured_provider_switch_without_grant_makes_no_text_egress(monkeypatch):
@@ -69,7 +84,9 @@ def test_anthropic_text_client_uses_only_a_matching_provider_grant():
     decision = CapabilityRegistry((grant,)).authorize_and_reserve(request, now=NOW)
 
     with patch.object(anthropic_client, "_get_client", return_value=fake_client):
-        assert anthropic_client.complete(prompt="Synthetic question", authorization=decision) == "synthetic answer"
+        assert anthropic_client.complete(
+            prompt="Synthetic question", authorization=decision, **OWNER_SCOPE
+        ) == "synthetic answer"
 
 
 def test_private_context_needs_its_own_data_class_grant(monkeypatch):
@@ -84,6 +101,7 @@ def test_private_context_needs_its_own_data_class_grant(monkeypatch):
         allow_context_egress=True,
         authorization=_decision(),
         context_authorization=None,
+        **OWNER_SCOPE,
         local_context=[{"title": "synthetic", "text": "private synthetic context"}],
         client=client,
     )
@@ -104,12 +122,109 @@ def test_private_context_needs_its_own_data_class_grant(monkeypatch):
         allow_context_egress=True,
         authorization=_decision(),
         context_authorization=context_decision,
+        context_resource_ref="resource_archive",
         local_context=[{"title": "synthetic", "text": "private synthetic context"}],
         client=client_with_context,
+        **OWNER_SCOPE,
     )
 
     assert result_with_context.receipt.context_egress_performed is True
     assert "private synthetic context" in repr(client_with_context.responses.calls[0]["input"])
+
+
+@pytest.mark.parametrize("change", ["revoke", "expire", "revision"])
+def test_openai_adapter_rechecks_current_grant_state_before_transport(monkeypatch, change):
+    registry, grant, decision = _reserved_decision_with_registry()
+    if change == "revoke":
+        registry.revoke_grant(grant.grant_id)
+    elif change == "expire":
+        registry.expire_grant(grant.grant_id)
+    else:
+        registry.replace_grant(replace(grant, revision=grant.revision + 1))
+    client = _FakeClient()
+    monkeypatch.setenv("PRM_OPENAI_PROVIDER_ENABLED", "true")
+
+    with pytest.raises(ProviderEgressDenied):
+        complete_with_provider(
+            "Synthetic question",
+            provider="openai",
+            allow_provider_egress=True,
+            authorization=decision,
+            client=client,
+            **OWNER_SCOPE,
+        )
+
+    assert client.responses.calls == []
+
+
+def test_openai_adapter_rejects_cross_owner_or_resource_substitution(monkeypatch):
+    monkeypatch.setenv("PRM_OPENAI_PROVIDER_ENABLED", "true")
+    for substituted_scope in (
+        {**OWNER_SCOPE, "owner_ref": "owner_synthetic_other"},
+        {**OWNER_SCOPE, "connection_ref": "connection_synthetic_other"},
+        {**OWNER_SCOPE, "resource_ref": "resource_other"},
+    ):
+        client = _FakeClient()
+        with pytest.raises(ProviderEgressDenied):
+            complete_with_provider(
+                "Synthetic question",
+                provider="openai",
+                allow_provider_egress=True,
+                authorization=_decision(),
+                client=client,
+                **substituted_scope,
+            )
+        assert client.responses.calls == []
+
+
+def test_voice_adapter_binds_download_and_transcription_to_actual_file_resource():
+    download_grant = make_grant(
+        capability="media.voice_download",
+        resource_ref="resource_alpha",
+        operation="read",
+        providers=("provider_telegram",),
+        purpose="voice.transcription",
+    )
+    transcription_grant = make_grant(
+        grant_id="grant_synthetic_transcription",
+        capability="media.transcribe",
+        resource_ref="resource_alpha",
+        operation="model_egress",
+        providers=("provider_openai",),
+        purpose="voice.transcription",
+    )
+    download_authorization = CapabilityRegistry((download_grant,)).authorize_and_reserve(
+        make_request(
+            capability="media.voice_download",
+            resource_ref="resource_alpha",
+            operation="read",
+            provider_ref="provider_telegram",
+            purpose="voice.transcription",
+        ),
+        now=NOW,
+    )
+    transcription_authorization = CapabilityRegistry((transcription_grant,)).authorize_and_reserve(
+        make_request(
+            capability="media.transcribe",
+            resource_ref="resource_alpha",
+            operation="model_egress",
+            provider_ref="provider_openai",
+            purpose="voice.transcription",
+        ),
+        now=NOW,
+    )
+
+    with patch("bot.voice.request.urlopen") as urlopen:
+        with pytest.raises(VoiceTranscriptionUnavailable):
+            transcribe_telegram_voice(
+                token="synthetic-bot-token",
+                file_id="resource_beta",
+                download_authorization=download_authorization,
+                transcription_authorization=transcription_authorization,
+                owner_ref="owner_synthetic_primary",
+            )
+
+    urlopen.assert_not_called()
 
 
 def test_voice_download_and_transcription_fail_before_network_without_separate_grants(tmp_path):

@@ -69,6 +69,10 @@ def complete_with_provider(
     allow_context_egress: bool = False,
     authorization: AuthorizationDecision | None = None,
     context_authorization: AuthorizationDecision | None = None,
+    owner_ref: str | None = None,
+    connection_ref: str | None = None,
+    resource_ref: str | None = None,
+    context_resource_ref: str | None = None,
     model: str = OPENAI_TERRA_MODEL,
     client: _OpenAIClient | None = None,
 ) -> ProviderResult:
@@ -98,43 +102,58 @@ def complete_with_provider(
             ),
         )
 
-    try:
-        require_authorized_egress(
-            authorization,
-            capability=TEXT_CAPABILITY,
-            provider_ref=OPENAI_PROVIDER_REF,
-            data_class="user_provided",
-        )
-    except CapabilityDenied as exc:
-        raise ProviderEgressDenied("OpenAI provider egress requires an active matching capability grant.") from exc
-
     if not (_env_enabled(PROVIDER_ENABLE_ENV) and allow_provider_egress):
         raise ProviderEgressDenied(
             "OpenAI provider egress requires PRM_OPENAI_PROVIDER_ENABLED=true "
             "and allow_provider_egress=True."
         )
+    if not _has_matching_authorization(
+        authorization,
+        capability=TEXT_CAPABILITY,
+        data_class="user_provided",
+        owner_ref=owner_ref,
+        connection_ref=connection_ref,
+        resource_ref=resource_ref,
+    ):
+        raise ProviderEgressDenied("OpenAI provider egress requires an active matching capability grant.")
 
     context_requested = bool(local_context) and _env_enabled(CONTEXT_EGRESS_ENABLE_ENV) and allow_context_egress
-    include_context = context_requested and is_authorized_egress(
+    include_context = context_requested and _has_matching_authorization(
         context_authorization,
         capability=CONTEXT_CAPABILITY,
-        provider_ref=OPENAI_PROVIDER_REF,
         data_class="private_archive",
+        owner_ref=owner_ref,
+        connection_ref=connection_ref,
+        resource_ref=context_resource_ref,
     )
-    if include_context:
-        require_authorized_egress(
-            context_authorization,
-            capability=CONTEXT_CAPABILITY,
-            provider_ref=OPENAI_PROVIDER_REF,
-            data_class="private_archive",
-        )
     request_input = _request_input(
         clean_query,
         local_context=local_context if include_context else None,
     )
     active_client = client or _build_client()
     try:
+        require_authorized_egress(
+            authorization,
+            capability=TEXT_CAPABILITY,
+            provider_ref=OPENAI_PROVIDER_REF,
+            data_class="user_provided",
+            owner_ref=owner_ref or "",
+            connection_ref=connection_ref,
+            resource_ref=resource_ref or "",
+        )
+        if include_context:
+            require_authorized_egress(
+                context_authorization,
+                capability=CONTEXT_CAPABILITY,
+                provider_ref=OPENAI_PROVIDER_REF,
+                data_class="private_archive",
+                owner_ref=owner_ref or "",
+                connection_ref=connection_ref,
+                resource_ref=context_resource_ref or "",
+            )
         response = active_client.responses.create(model=model, input=request_input)
+    except CapabilityDenied as exc:
+        raise ProviderEgressDenied("OpenAI provider egress requires an active matching capability grant.") from exc
     except Exception as exc:  # provider SDK exceptions are intentionally isolated here
         raise OpenAIProviderError("OpenAI Responses API call failed") from exc
 
@@ -197,7 +216,31 @@ def _build_client() -> _OpenAIClient:
         from openai import OpenAI
     except ImportError as exc:
         raise OpenAIProviderError("The openai package is not installed") from exc
-    return OpenAI(api_key=api_key)
+    return OpenAI(api_key=api_key, max_retries=0)
+
+
+def _has_matching_authorization(
+    authorization: AuthorizationDecision | None,
+    *,
+    capability: str,
+    data_class: str,
+    owner_ref: str | None,
+    connection_ref: str | None,
+    resource_ref: str | None,
+) -> bool:
+    return bool(
+        owner_ref
+        and resource_ref
+        and is_authorized_egress(
+            authorization,
+            capability=capability,
+            provider_ref=OPENAI_PROVIDER_REF,
+            data_class=data_class,
+            owner_ref=owner_ref,
+            connection_ref=connection_ref,
+            resource_ref=resource_ref,
+        )
+    )
 
 
 def _extract_output_text(response: Any) -> str:

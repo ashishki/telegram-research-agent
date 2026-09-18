@@ -9,6 +9,8 @@ from bot.telegram_delivery import BOT_API_BASE
 from prm.capabilities import (
     AuthorizationDecision,
     CapabilityDenied,
+    is_authorized_egress,
+    is_authorized_operation,
     require_authorized_egress,
     require_authorized_operation,
 )
@@ -39,20 +41,57 @@ def transcribe_telegram_voice(
     file_id: str,
     media_dir: str | None = None,
     download_authorization: AuthorizationDecision | None = None,
+    download_file_authorization: AuthorizationDecision | None = None,
     transcription_authorization: AuthorizationDecision | None = None,
+    owner_ref: str | None = None,
+    connection_ref: str | None = None,
+    resource_ref: str | None = None,
 ) -> str:
     """Download a Telegram voice file, transcribe it, and remove local audio."""
-    _require_voice_download_authorization(download_authorization)
-    _require_voice_transcription_authorization(transcription_authorization)
-    _require_openai_transcription_key()
     if not token:
         raise VoiceTranscriptionError("Telegram bot token is missing")
     if not file_id:
         raise VoiceTranscriptionError("Telegram voice file_id is missing")
+    voice_resource_ref = resource_ref or file_id
+    if not _voice_transcription_authorized(
+        transcription_authorization,
+        owner_ref=owner_ref,
+        connection_ref=connection_ref,
+        resource_ref=voice_resource_ref,
+    ):
+        raise VoiceTranscriptionUnavailable("Voice transcription requires an active capability grant")
+    if not _voice_download_authorized(
+        download_authorization,
+        owner_ref=owner_ref,
+        connection_ref=connection_ref,
+        resource_ref=voice_resource_ref,
+    ) or not _voice_download_authorized(
+        download_file_authorization,
+        owner_ref=owner_ref,
+        connection_ref=connection_ref,
+        resource_ref=voice_resource_ref,
+    ):
+        raise VoiceTranscriptionUnavailable("Each Telegram voice request requires an active capability grant")
+    _require_openai_transcription_key()
 
-    local_path = _download_telegram_voice(token=token, file_id=file_id, media_dir=media_dir)
+    local_path = _download_telegram_voice(
+        token=token,
+        file_id=file_id,
+        media_dir=media_dir,
+        get_file_authorization=download_authorization,
+        download_file_authorization=download_file_authorization,
+        owner_ref=owner_ref,
+        connection_ref=connection_ref,
+        resource_ref=voice_resource_ref,
+    )
     try:
-        return transcribe_audio_file(local_path, transcription_authorization=transcription_authorization)
+        return transcribe_audio_file(
+            local_path,
+            transcription_authorization=transcription_authorization,
+            owner_ref=owner_ref,
+            connection_ref=connection_ref,
+            resource_ref=voice_resource_ref,
+        )
     finally:
         _delete_local_file(local_path)
 
@@ -61,8 +100,17 @@ def transcribe_audio_file(
     local_path: str,
     *,
     transcription_authorization: AuthorizationDecision | None = None,
+    owner_ref: str | None = None,
+    connection_ref: str | None = None,
+    resource_ref: str | None = None,
 ) -> str:
-    _require_voice_transcription_authorization(transcription_authorization)
+    if not _voice_transcription_authorized(
+        transcription_authorization,
+        owner_ref=owner_ref,
+        connection_ref=connection_ref,
+        resource_ref=resource_ref,
+    ):
+        raise VoiceTranscriptionUnavailable("Voice transcription requires an active capability grant")
     api_key = _require_openai_transcription_key()
 
     path = Path(local_path)
@@ -92,6 +140,12 @@ def transcribe_audio_file(
         },
         method="POST",
     )
+    _require_voice_transcription_authorization(
+        transcription_authorization,
+        owner_ref=owner_ref,
+        connection_ref=connection_ref,
+        resource_ref=resource_ref,
+    )
     try:
         with request.urlopen(http_request, timeout=120) as response:
             payload = response.read().decode("utf-8")
@@ -117,7 +171,13 @@ def _require_openai_transcription_key() -> str:
     return api_key
 
 
-def _require_voice_download_authorization(authorization: AuthorizationDecision | None) -> None:
+def _require_voice_download_authorization(
+    authorization: AuthorizationDecision | None,
+    *,
+    owner_ref: str | None,
+    connection_ref: str | None,
+    resource_ref: str | None,
+) -> None:
     try:
         require_authorized_operation(
             authorization,
@@ -125,30 +185,109 @@ def _require_voice_download_authorization(authorization: AuthorizationDecision |
             operation="read",
             provider_ref=TELEGRAM_PROVIDER_REF,
             data_class="user_provided",
+            owner_ref=owner_ref or "",
+            connection_ref=connection_ref,
+            resource_ref=resource_ref or "",
         )
     except CapabilityDenied as exc:
         raise VoiceTranscriptionUnavailable("Voice download requires an active capability grant") from exc
 
 
-def _require_voice_transcription_authorization(authorization: AuthorizationDecision | None) -> None:
+def _voice_download_authorized(
+    authorization: AuthorizationDecision | None,
+    *,
+    owner_ref: str | None,
+    connection_ref: str | None,
+    resource_ref: str | None,
+) -> bool:
+    return bool(
+        owner_ref
+        and resource_ref
+        and is_authorized_operation(
+            authorization,
+            capability=VOICE_DOWNLOAD_CAPABILITY,
+            operation="read",
+            provider_ref=TELEGRAM_PROVIDER_REF,
+            data_class="user_provided",
+            owner_ref=owner_ref,
+            connection_ref=connection_ref,
+            resource_ref=resource_ref,
+        )
+    )
+
+
+def _voice_transcription_authorized(
+    authorization: AuthorizationDecision | None,
+    *,
+    owner_ref: str | None,
+    connection_ref: str | None,
+    resource_ref: str | None,
+) -> bool:
+    return bool(
+        owner_ref
+        and resource_ref
+        and is_authorized_egress(
+            authorization,
+            capability=VOICE_TRANSCRIPTION_CAPABILITY,
+            provider_ref=OPENAI_PROVIDER_REF,
+            data_class="user_provided",
+            owner_ref=owner_ref,
+            connection_ref=connection_ref,
+            resource_ref=resource_ref,
+        )
+    )
+
+
+def _require_voice_transcription_authorization(
+    authorization: AuthorizationDecision | None,
+    *,
+    owner_ref: str | None,
+    connection_ref: str | None,
+    resource_ref: str | None,
+) -> None:
     try:
         require_authorized_egress(
             authorization,
             capability=VOICE_TRANSCRIPTION_CAPABILITY,
             provider_ref=OPENAI_PROVIDER_REF,
             data_class="user_provided",
+            owner_ref=owner_ref or "",
+            connection_ref=connection_ref,
+            resource_ref=resource_ref or "",
         )
     except CapabilityDenied as exc:
         raise VoiceTranscriptionUnavailable("Voice transcription requires an active capability grant") from exc
 
 
-def _download_telegram_voice(*, token: str, file_id: str, media_dir: str | None) -> str:
-    file_path = _get_telegram_file_path(token=token, file_id=file_id)
+def _download_telegram_voice(
+    *,
+    token: str,
+    file_id: str,
+    media_dir: str | None,
+    get_file_authorization: AuthorizationDecision | None,
+    download_file_authorization: AuthorizationDecision | None,
+    owner_ref: str | None,
+    connection_ref: str | None,
+    resource_ref: str | None,
+) -> str:
+    file_path = _get_telegram_file_path(
+        token=token,
+        file_id=file_id,
+        authorization=get_file_authorization,
+        owner_ref=owner_ref,
+        connection_ref=connection_ref,
+        resource_ref=resource_ref,
+    )
+    url = f"{TELEGRAM_FILE_BASE}/bot{token}/{file_path}"
+    _require_voice_download_authorization(
+        download_file_authorization,
+        owner_ref=owner_ref,
+        connection_ref=connection_ref,
+        resource_ref=resource_ref,
+    )
     dest_dir = Path(media_dir or os.environ.get("TELEGRAM_VOICE_MEDIA_DIR", "") or DEFAULT_VOICE_MEDIA_DIR)
     dest_dir.mkdir(parents=True, exist_ok=True)
     dest_path = dest_dir / f"{file_id}_{uuid.uuid4().hex[:8]}.ogg"
-
-    url = f"{TELEGRAM_FILE_BASE}/bot{token}/{file_path}"
     try:
         with request.urlopen(url, timeout=60) as response:
             data = response.read()
@@ -163,8 +302,22 @@ def _download_telegram_voice(*, token: str, file_id: str, media_dir: str | None)
     return str(dest_path)
 
 
-def _get_telegram_file_path(*, token: str, file_id: str) -> str:
+def _get_telegram_file_path(
+    *,
+    token: str,
+    file_id: str,
+    authorization: AuthorizationDecision | None,
+    owner_ref: str | None,
+    connection_ref: str | None,
+    resource_ref: str | None,
+) -> str:
     url = f"{BOT_API_BASE}/bot{token}/getFile?file_id={parse.quote(file_id, safe='')}"
+    _require_voice_download_authorization(
+        authorization,
+        owner_ref=owner_ref,
+        connection_ref=connection_ref,
+        resource_ref=resource_ref,
+    )
     try:
         with request.urlopen(url, timeout=30) as response:
             payload = response.read().decode("utf-8")

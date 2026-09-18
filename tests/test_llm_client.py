@@ -40,8 +40,15 @@ from db.migrate import run_migrations  # noqa: E402
 from prm.capabilities import AuthorizationRequest, CapabilityGrant, CapabilityRegistry, ProviderPolicy  # noqa: E402
 
 
+AUTH_SCOPE = {
+    "owner_ref": "owner_synthetic_primary",
+    "connection_ref": None,
+    "resource_ref": "resource_conversation",
+}
+
+
 def _authorization(*, capability: str = "model.generate"):
-    now = datetime(2026, 9, 18, tzinfo=timezone.utc)
+    now = datetime.now(timezone.utc).replace(microsecond=0)
     grant = CapabilityGrant(
         grant_id=f"grant_synthetic_{capability.replace('.', '_')}",
         owner_ref="owner_synthetic_primary",
@@ -84,6 +91,14 @@ class TestLLMClient(unittest.TestCase):
         client.set_usage_db_path("")
         os.unlink(self.db_path)
 
+    def test_get_client_disables_sdk_retries_for_a_granted_transport(self):
+        constructed = object()
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "synthetic-key"}, clear=True):
+            with patch.object(client, "Anthropic", return_value=constructed) as anthropic:
+                assert client._get_client() is constructed
+
+        anthropic.assert_called_once_with(api_key="synthetic-key", max_retries=0)
+
     def test_complete_records_llm_usage_row(self):
         response = SimpleNamespace(
             content=[SimpleNamespace(type="text", text="hello world")],
@@ -93,7 +108,10 @@ class TestLLMClient(unittest.TestCase):
 
         with patch.dict(os.environ, {"AGENT_DB_PATH": self.db_path}, clear=False):
             with patch.object(client, "_get_client", return_value=mock_client):
-                result = client.complete(prompt="hi", category="test", model="claude-haiku-4-5", authorization=self.text_authorization)
+                result = client.complete(
+                    prompt="hi", category="test", model="claude-haiku-4-5",
+                    authorization=self.text_authorization, **AUTH_SCOPE,
+                )
 
         self.assertEqual(result, "hello world")
         with sqlite3.connect(self.db_path) as connection:
@@ -125,6 +143,7 @@ class TestLLMClient(unittest.TestCase):
                     category="test",
                     model="claude-haiku-4-5",
                     authorization=self.text_authorization,
+                    **AUTH_SCOPE,
                 )
 
         self.assertEqual(receipt.text, "receipt text")
@@ -138,37 +157,28 @@ class TestLLMClient(unittest.TestCase):
         with self.assertRaises(FrozenInstanceError):
             receipt.text = "changed"
 
-    def test_complete_with_receipt_reports_successful_retry_attempt_count(self):
-        response = SimpleNamespace(
-            content=[SimpleNamespace(type="text", text="retried")],
-            usage=SimpleNamespace(input_tokens=10, output_tokens=5),
-        )
+    def test_complete_with_receipt_does_not_retry_an_unknown_provider_outcome(self):
         calls = 0
 
         def create(**_kwargs):
             nonlocal calls
             calls += 1
-            if calls == 1:
-                raise RuntimeError("temporary failure")
-            return response
+            raise RuntimeError("temporary failure")
 
         mock_client = SimpleNamespace(messages=SimpleNamespace(create=create))
         with patch.dict(os.environ, {"AGENT_DB_PATH": self.db_path}, clear=False):
-            with (
-                patch.object(client, "_get_client", return_value=mock_client),
-                patch.object(client, "_should_retry", return_value=True),
-                patch.object(client.time, "sleep"),
-            ):
-                receipt = client.complete_with_receipt(
-                    prompt="retry",
-                    category="test",
-                    model="claude-haiku-4-5",
-                    authorization=self.text_authorization,
-                )
+            with patch.object(client, "_get_client", return_value=mock_client):
+                with self.assertRaises(client.LLMError):
+                    client.complete_with_receipt(
+                        prompt="retry",
+                        category="test",
+                        model="claude-haiku-4-5",
+                        max_attempts=3,
+                        authorization=self.text_authorization,
+                        **AUTH_SCOPE,
+                    )
 
-        self.assertEqual(receipt.text, "retried")
-        self.assertEqual(receipt.attempts, 2)
-        self.assertTrue(receipt.usage_recorded)
+        self.assertEqual(calls, 1)
 
     def test_complete_with_receipt_honors_single_attempt_budget(self):
         calls = 0
@@ -181,7 +191,6 @@ class TestLLMClient(unittest.TestCase):
         mock_client = SimpleNamespace(messages=SimpleNamespace(create=create))
         with (
             patch.object(client, "_get_client", return_value=mock_client),
-            patch.object(client, "_should_retry", return_value=True),
             patch.object(client.time, "sleep") as sleep_mock,
         ):
             with self.assertRaises(client.LLMError):
@@ -191,6 +200,7 @@ class TestLLMClient(unittest.TestCase):
                     model="claude-haiku-4-5",
                     max_attempts=1,
                     authorization=self.text_authorization,
+                    **AUTH_SCOPE,
                 )
 
         self.assertEqual(calls, 1)
@@ -212,6 +222,7 @@ class TestLLMClient(unittest.TestCase):
                 category="test",
                 model="requested-model",
                 authorization=self.text_authorization,
+                **AUTH_SCOPE,
             )
 
         self.assertEqual(receipt.model, "provider-resolved-model")
@@ -237,6 +248,7 @@ class TestLLMClient(unittest.TestCase):
                 category="test",
                 model="claude-haiku-4-5",
                 authorization=self.text_authorization,
+                **AUTH_SCOPE,
             )
 
         self.assertEqual(result, "exact string")
@@ -248,6 +260,7 @@ class TestLLMClient(unittest.TestCase):
             model="claude-haiku-4-5",
             authorization=self.text_authorization,
             data_class="user_provided",
+            **AUTH_SCOPE,
         )
 
     def test_complete_records_llm_usage_row_with_set_usage_db_path(self):
@@ -265,6 +278,7 @@ class TestLLMClient(unittest.TestCase):
                     category="test",
                     model="claude-haiku-4-5",
                     authorization=self.text_authorization,
+                    **AUTH_SCOPE,
                 )
 
         self.assertEqual(result, "hello world")
@@ -301,6 +315,7 @@ class TestLLMClient(unittest.TestCase):
                         category="test",
                         model="claude-haiku-4-5",
                         authorization=self.text_authorization,
+                        **AUTH_SCOPE,
                     )
                     elapsed = time.monotonic() - started_at
         finally:
@@ -330,6 +345,7 @@ class TestLLMClient(unittest.TestCase):
                     image_path=image_path,
                     model="claude-haiku-4-5",
                     authorization=self.vision_authorization,
+                    **AUTH_SCOPE,
                 )
         finally:
             os.unlink(image_path)

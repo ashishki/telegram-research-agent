@@ -8,10 +8,10 @@ can authorize a request to use it.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 import re
-from threading import Lock
+from threading import RLock
 from typing import Literal, Sequence
 
 
@@ -121,6 +121,7 @@ class AuthorizationRequest:
     data_class: DataClass
     provider_ref: str | None
     purpose: str
+    connection_ref: str | None = None
     expected_grant_revision: int | None = None
     grant_ref: str | None = None
     is_fallback: bool = False
@@ -129,6 +130,8 @@ class AuthorizationRequest:
         for name, value in (("owner_ref", self.owner_ref), ("resource_ref", self.resource_ref), ("purpose", self.purpose)):
             if not _is_opaque_ref(value):
                 raise ValueError(f"invalid {name}")
+        if self.connection_ref is not None and not _is_opaque_ref(self.connection_ref):
+            raise ValueError("invalid connection_ref")
         if self.provider_ref is not None and not _is_opaque_ref(self.provider_ref):
             raise ValueError("invalid provider_ref")
         if self.grant_ref is not None and not _is_opaque_ref(self.grant_ref):
@@ -147,6 +150,9 @@ class AuthorizationDecision:
     reason: str
     grant_ref: str | None
     grant_revision: int | None
+    owner_ref: str
+    connection_ref: str | None
+    resource_ref: str
     capability: str
     operation: str
     data_class: str
@@ -172,19 +178,32 @@ class AuthorizationDecision:
 
 
 class BudgetReservation:
-    """One egress slot reserved by a registry and consumable exactly once."""
+    """One registry-bound egress slot, revalidated exactly at consumption."""
 
-    __slots__ = ("grant_ref", "grant_revision", "_consumed", "_lock")
+    __slots__ = ("grant_ref", "grant_revision", "_registry", "_request", "_consumed", "_lock")
 
-    def __init__(self, *, grant_ref: str, grant_revision: int) -> None:
+    def __init__(
+        self,
+        *,
+        registry: "CapabilityRegistry",
+        request: AuthorizationRequest,
+        grant_ref: str,
+        grant_revision: int,
+    ) -> None:
+        self._registry = registry
+        self._request = replace(
+            request,
+            grant_ref=grant_ref,
+            expected_grant_revision=grant_revision,
+        )
         self.grant_ref = grant_ref
         self.grant_revision = grant_revision
         self._consumed = False
-        self._lock = Lock()
+        self._lock = RLock()
 
     def consume(self) -> bool:
         with self._lock:
-            if self._consumed:
+            if self._consumed or not self._registry._reservation_is_current(self):
                 return False
             self._consumed = True
             return True
@@ -194,18 +213,62 @@ class BudgetReservation:
         with self._lock:
             return not self._consumed
 
+    @property
+    def current(self) -> bool:
+        with self._lock:
+            return not self._consumed and self._registry._reservation_is_current(self)
+
 
 class CapabilityRegistry:
-    """Immutable grant lookup. No grant is equivalent to a denied request."""
+    """Current grant lookup. No grant is equivalent to a denied request.
+
+    PA-02 stores grants in memory only, but a reserved decision is never a
+    durable grant snapshot: an adapter rechecks current revoke, expiry and
+    revision state immediately before its transport call.
+    """
 
     def __init__(self, grants: Sequence[CapabilityGrant]) -> None:
-        self._grants = tuple(grants)
-        self._grants_by_id = {grant.grant_id: grant for grant in self._grants}
+        self._grants_by_id = {grant.grant_id: grant for grant in grants}
         self._reserved_counts: dict[tuple[str, int], int] = {}
-        self._budget_lock = Lock()
-        grant_ids = [grant.grant_id for grant in self._grants]
+        self._lock = RLock()
+        grant_ids = [grant.grant_id for grant in grants]
         if len(set(grant_ids)) != len(grant_ids):
             raise ValueError("grant IDs must be unique")
+
+    def replace_grant(self, grant: CapabilityGrant) -> None:
+        """Atomically publish a strictly newer revision of an existing grant."""
+
+        with self._lock:
+            current = self._grants_by_id.get(grant.grant_id)
+            if current is None:
+                raise KeyError("cannot replace an unknown grant")
+            if grant.revision <= current.revision:
+                raise ValueError("replacement grant revision must increase")
+            self._grants_by_id[grant.grant_id] = grant
+
+    def revoke_grant(self, grant_ref: str, *, revoked_at: datetime | None = None) -> None:
+        """Atomically revoke an existing grant without exposing its contents."""
+
+        with self._lock:
+            current = self._grants_by_id.get(grant_ref)
+            if current is None:
+                raise KeyError("cannot revoke an unknown grant")
+            self._grants_by_id[grant_ref] = replace(
+                current,
+                revoked_at=_utc(revoked_at or datetime.now(timezone.utc)),
+            )
+
+    def expire_grant(self, grant_ref: str, *, expires_at: datetime | None = None) -> None:
+        """Atomically expire an existing grant for deterministic local revocation tests."""
+
+        with self._lock:
+            current = self._grants_by_id.get(grant_ref)
+            if current is None:
+                raise KeyError("cannot expire an unknown grant")
+            self._grants_by_id[grant_ref] = replace(
+                current,
+                expires_at=_utc(expires_at or datetime.now(timezone.utc)),
+            )
 
     def authorize_and_reserve(
         self,
@@ -215,17 +278,16 @@ class CapabilityRegistry:
     ) -> AuthorizationDecision:
         """Authorize and reserve one provider-operation slot without a network call.
 
-        Reservations are intentionally consumed even when an adapter later
-        reports an unknown outcome.  That conservative accounting prevents an
-        automatic retry from silently exceeding the confirmed grant budget.
+        Reservations are intentionally spent after a real attempt, including an
+        unknown outcome. Automatic retries are not authorized by this method.
         """
 
-        decision = self.authorize(request, now=now)
-        if not decision.allowed or decision.grant_ref is None or decision.grant_revision is None:
-            return decision
-        grant = self._grants_by_id[decision.grant_ref]
-        key = (grant.grant_id, grant.revision)
-        with self._budget_lock:
+        with self._lock:
+            decision = self._authorize_unlocked(request, moment=_utc(now or datetime.now(timezone.utc)))
+            if not decision.allowed or decision.grant_ref is None or decision.grant_revision is None:
+                return decision
+            grant = self._grants_by_id[decision.grant_ref]
+            key = (grant.grant_id, grant.revision)
             used = self._reserved_counts.get(key, 0)
             if used >= grant.provider_policy.maximum_request_count:
                 return _deny(request, "grant_budget_exhausted", grant)
@@ -235,62 +297,99 @@ class CapabilityRegistry:
             reason="allowed",
             grant_ref=decision.grant_ref,
             grant_revision=decision.grant_revision,
+            owner_ref=decision.owner_ref,
+            connection_ref=decision.connection_ref,
+            resource_ref=decision.resource_ref,
             capability=decision.capability,
             operation=decision.operation,
             data_class=decision.data_class,
             provider_ref=decision.provider_ref,
             purpose=decision.purpose,
-            reservation=BudgetReservation(grant_ref=grant.grant_id, grant_revision=grant.revision),
+            reservation=BudgetReservation(
+                registry=self,
+                request=request,
+                grant_ref=grant.grant_id,
+                grant_revision=grant.revision,
+            ),
         )
 
     def authorize(self, request: AuthorizationRequest, *, now: datetime | None = None) -> AuthorizationDecision:
-        moment = _utc(now or datetime.now(timezone.utc))
-        candidates = [grant for grant in self._grants if grant.owner_ref == request.owner_ref]
+        with self._lock:
+            return self._authorize_unlocked(request, moment=_utc(now or datetime.now(timezone.utc)))
+
+    def _reservation_is_current(self, reservation: BudgetReservation) -> bool:
+        with self._lock:
+            decision = self._authorize_unlocked(reservation._request, moment=datetime.now(timezone.utc))
+            return bool(
+                decision.allowed
+                and decision.grant_ref == reservation.grant_ref
+                and decision.grant_revision == reservation.grant_revision
+            )
+
+    def _authorize_unlocked(self, request: AuthorizationRequest, *, moment: datetime) -> AuthorizationDecision:
+        candidates = [grant for grant in self._grants_by_id.values() if grant.owner_ref == request.owner_ref]
         if request.grant_ref is not None:
             candidates = [grant for grant in candidates if grant.grant_id == request.grant_ref]
         if not candidates:
             return _deny(request, "no_matching_grant")
 
-        # A deterministic reason is more useful than a generic denial, but it
-        # never includes request content, credentials, or provider responses.
-        for grant in candidates:
+        capability_matches = [grant for grant in candidates if grant.capability == request.capability]
+        if not capability_matches:
+            return _deny(request, "capability_not_granted")
+        connection_matches = [grant for grant in capability_matches if grant.connection_ref == request.connection_ref]
+        if not connection_matches:
+            return _deny(request, "connection_not_granted", capability_matches[0])
+        resource_matches = [grant for grant in connection_matches if request.resource_ref in grant.resource_refs]
+        if not resource_matches:
+            return _deny(request, "resource_not_granted", connection_matches[0])
+        operation_matches = [grant for grant in resource_matches if request.operation in grant.operations]
+        if not operation_matches:
+            return _deny(request, "operation_not_granted", resource_matches[0])
+        data_matches = [grant for grant in operation_matches if request.data_class in grant.data_classes]
+        if not data_matches:
+            return _deny(request, "data_class_not_granted", operation_matches[0])
+        purpose_matches = [grant for grant in data_matches if request.purpose == grant.purpose]
+        if not purpose_matches:
+            return _deny(request, "purpose_not_granted", data_matches[0])
+        fallback_matches = [
+            grant for grant in purpose_matches if not request.is_fallback or grant.provider_policy.fallback_allowed
+        ]
+        if not fallback_matches:
+            return _deny(request, "fallback_not_granted", purpose_matches[0])
+        if request.operation == "model_egress" and request.provider_ref is None:
+            return _deny(request, "provider_required", fallback_matches[0])
+        provider_matches = [
+            grant
+            for grant in fallback_matches
+            if request.provider_ref is None or request.provider_ref in grant.provider_policy.permitted_provider_refs
+        ]
+        if not provider_matches:
+            return _deny(request, "provider_not_permitted", fallback_matches[0])
+
+        state_denial: AuthorizationDecision | None = None
+        for grant in provider_matches:
             state = grant.state_at(moment)
-            if state == "revoked":
-                return _deny(request, "grant_revoked", grant)
-            if state == "expired":
-                return _deny(request, "grant_expired", grant)
-            if state == "not_yet_valid":
-                return _deny(request, "grant_not_yet_valid", grant)
-            if request.expected_grant_revision is not None and request.expected_grant_revision != grant.revision:
-                return _deny(request, "grant_revision_mismatch", grant)
-            if request.capability != grant.capability:
+            if state != "active":
+                state_denial = _deny(request, f"grant_{state}", grant)
                 continue
-            if request.resource_ref not in grant.resource_refs:
-                return _deny(request, "resource_not_granted", grant)
-            if request.operation not in grant.operations:
-                return _deny(request, "operation_not_granted", grant)
-            if request.data_class not in grant.data_classes:
-                return _deny(request, "data_class_not_granted", grant)
-            if request.purpose != grant.purpose:
-                return _deny(request, "purpose_not_granted", grant)
-            if request.is_fallback and not grant.provider_policy.fallback_allowed:
-                return _deny(request, "fallback_not_granted", grant)
-            if request.provider_ref is not None and request.provider_ref not in grant.provider_policy.permitted_provider_refs:
-                return _deny(request, "provider_not_permitted", grant)
-            if request.operation == "model_egress" and request.provider_ref is None:
-                return _deny(request, "provider_required", grant)
+            if request.expected_grant_revision is not None and request.expected_grant_revision != grant.revision:
+                state_denial = _deny(request, "grant_revision_mismatch", grant)
+                continue
             return AuthorizationDecision(
                 allowed=True,
                 reason="allowed",
                 grant_ref=grant.grant_id,
                 grant_revision=grant.revision,
+                owner_ref=request.owner_ref,
+                connection_ref=request.connection_ref,
+                resource_ref=request.resource_ref,
                 capability=request.capability,
                 operation=request.operation,
                 data_class=request.data_class,
                 provider_ref=request.provider_ref,
                 purpose=request.purpose,
             )
-        return _deny(request, "capability_not_granted")
+        return state_denial or _deny(request, "no_matching_grant")
 
 
 def is_authorized_egress(
@@ -299,6 +398,9 @@ def is_authorized_egress(
     capability: str,
     provider_ref: str,
     data_class: str,
+    owner_ref: str,
+    connection_ref: str | None,
+    resource_ref: str,
 ) -> bool:
     """Check a prior decision immediately before an external request."""
 
@@ -308,6 +410,9 @@ def is_authorized_egress(
         operation="model_egress",
         provider_ref=provider_ref,
         data_class=data_class,
+        owner_ref=owner_ref,
+        connection_ref=connection_ref,
+        resource_ref=resource_ref,
     )
 
 
@@ -318,18 +423,24 @@ def is_authorized_operation(
     operation: str,
     provider_ref: str,
     data_class: str,
+    owner_ref: str,
+    connection_ref: str | None,
+    resource_ref: str,
 ) -> bool:
     """Check an authorization immediately before an adapter operation."""
 
     return bool(
         decision is not None
         and decision.allowed
+        and decision.owner_ref == owner_ref
+        and decision.connection_ref == connection_ref
+        and decision.resource_ref == resource_ref
         and decision.capability == capability
         and decision.operation == operation
         and decision.provider_ref == provider_ref
         and decision.data_class == data_class
         and decision.reservation is not None
-        and decision.reservation.available
+        and decision.reservation.current
     )
 
 
@@ -339,12 +450,18 @@ def require_authorized_egress(
     capability: str,
     provider_ref: str,
     data_class: str,
+    owner_ref: str,
+    connection_ref: str | None,
+    resource_ref: str,
 ) -> None:
     if not is_authorized_egress(
         decision,
         capability=capability,
         provider_ref=provider_ref,
         data_class=data_class,
+        owner_ref=owner_ref,
+        connection_ref=connection_ref,
+        resource_ref=resource_ref,
     ):
         raise CapabilityDenied("An active capability grant is required before provider egress")
     assert decision is not None and decision.reservation is not None
@@ -359,6 +476,9 @@ def require_authorized_operation(
     operation: str,
     provider_ref: str,
     data_class: str,
+    owner_ref: str,
+    connection_ref: str | None,
+    resource_ref: str,
 ) -> None:
     if not is_authorized_operation(
         decision,
@@ -366,6 +486,9 @@ def require_authorized_operation(
         operation=operation,
         provider_ref=provider_ref,
         data_class=data_class,
+        owner_ref=owner_ref,
+        connection_ref=connection_ref,
+        resource_ref=resource_ref,
     ):
         raise CapabilityDenied("An active capability grant is required before provider operation")
     assert decision is not None and decision.reservation is not None
@@ -396,6 +519,9 @@ def _deny(request: AuthorizationRequest, reason: str, grant: CapabilityGrant | N
         reason=reason,
         grant_ref=grant.grant_id if grant else None,
         grant_revision=grant.revision if grant else None,
+        owner_ref=request.owner_ref,
+        connection_ref=request.connection_ref,
+        resource_ref=request.resource_ref,
         capability=request.capability,
         operation=request.operation,
         data_class=request.data_class,

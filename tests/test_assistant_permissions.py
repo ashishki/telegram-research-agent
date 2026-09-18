@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -17,7 +18,7 @@ from prm.capabilities import (
 )
 
 
-NOW = datetime(2026, 9, 18, tzinfo=timezone.utc)
+NOW = datetime.now(timezone.utc).replace(microsecond=0)
 
 
 def make_grant(
@@ -32,16 +33,20 @@ def make_grant(
     expires_at: datetime | None = None,
     fallback_allowed: bool = False,
     maximum_request_count: int = 1,
+    grant_id: str = "grant_synthetic_001",
+    owner_ref: str = "owner_synthetic_primary",
+    connection_ref: str | None = None,
+    purpose: str = "answer.request",
 ) -> CapabilityGrant:
     return CapabilityGrant(
-        grant_id="grant_synthetic_001",
-        owner_ref="owner_synthetic_primary",
-        connection_ref=None,
+        grant_id=grant_id,
+        owner_ref=owner_ref,
+        connection_ref=connection_ref,
         capability=capability,
         resource_refs=(resource_ref,),
         operations=(operation,),
         data_classes=(data_class,),
-        purpose="answer.request",
+        purpose=purpose,
         provider_policy=ProviderPolicy(
             providers,
             fallback_allowed=fallback_allowed,
@@ -63,15 +68,19 @@ def make_request(
     provider_ref: str = "provider_openai",
     expected_revision: int | None = 3,
     is_fallback: bool = False,
+    owner_ref: str = "owner_synthetic_primary",
+    connection_ref: str | None = None,
+    purpose: str = "answer.request",
 ) -> AuthorizationRequest:
     return AuthorizationRequest(
-        owner_ref="owner_synthetic_primary",
+        owner_ref=owner_ref,
         capability=capability,
         resource_ref=resource_ref,
         operation=operation,
         data_class=data_class,
         provider_ref=provider_ref,
-        purpose="answer.request",
+        purpose=purpose,
+        connection_ref=connection_ref,
         expected_grant_revision=expected_revision,
         is_fallback=is_fallback,
     )
@@ -133,6 +142,9 @@ def test_budget_reservation_is_conservative_and_single_use_at_egress():
         capability="model.generate",
         provider_ref="provider_openai",
         data_class="user_provided",
+        owner_ref="owner_synthetic_primary",
+        connection_ref=None,
+        resource_ref="resource_conversation",
     )
     with pytest.raises(CapabilityDenied):
         require_authorized_egress(
@@ -140,7 +152,46 @@ def test_budget_reservation_is_conservative_and_single_use_at_egress():
             capability="model.generate",
             provider_ref="provider_openai",
             data_class="user_provided",
+            owner_ref="owner_synthetic_primary",
+            connection_ref=None,
+            resource_ref="resource_conversation",
         )
+
+
+@pytest.mark.parametrize("change", ["revoke", "expire", "revision"])
+def test_reserved_decision_rechecks_current_grant_state_before_consumption(change):
+    grant = make_grant()
+    registry = CapabilityRegistry((grant,))
+    decision = registry.authorize_and_reserve(make_request(), now=NOW)
+
+    if change == "revoke":
+        registry.revoke_grant(grant.grant_id)
+    elif change == "expire":
+        registry.expire_grant(grant.grant_id)
+    else:
+        registry.replace_grant(replace(grant, revision=grant.revision + 1))
+
+    with pytest.raises(CapabilityDenied):
+        require_authorized_egress(
+            decision,
+            capability="model.generate",
+            provider_ref="provider_openai",
+            data_class="user_provided",
+            owner_ref="owner_synthetic_primary",
+            connection_ref=None,
+            resource_ref="resource_conversation",
+        )
+
+
+def test_matching_active_grant_is_not_masked_by_unrelated_revoked_grant_order():
+    unrelated_revoked = make_grant(
+        grant_id="grant_synthetic_unrelated",
+        capability="model.vision",
+        revoked_at=NOW - timedelta(seconds=1),
+    )
+    decision = CapabilityRegistry((unrelated_revoked, make_grant())).authorize(make_request(), now=NOW)
+
+    assert decision.allowed is True
 
 
 def test_permission_description_states_real_scope_and_never_calls_a_key_consent():

@@ -11,7 +11,12 @@ from typing import Any
 from anthropic import APIConnectionError, APIStatusError, APITimeoutError, Anthropic, RateLimitError
 
 from llm.router import estimate_cost_usd
-from prm.capabilities import AuthorizationDecision, CapabilityDenied, require_authorized_egress
+from prm.capabilities import (
+    AuthorizationDecision,
+    CapabilityDenied,
+    is_authorized_egress,
+    require_authorized_egress,
+)
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_MODEL_PROVIDER = "claude-haiku-4-5"
@@ -147,7 +152,9 @@ def _get_client() -> Anthropic:
     api_key = os.environ.get("LLM_API_KEY", "") or os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key:
         raise LLMError("LLM_API_KEY or ANTHROPIC_API_KEY is not set")
-    return Anthropic(api_key=api_key)
+    # A grant pays for one observable transport attempt.  Disable SDK retries:
+    # an unknown result needs reconciliation and a fresh authorization.
+    return Anthropic(api_key=api_key, max_retries=0)
 
 
 def _get_model(category: str = "unknown") -> str:
@@ -174,6 +181,30 @@ def _extract_text(response: Any) -> str:
     return "".join(text_parts).strip()
 
 
+def _has_matching_egress_grant(
+    authorization: AuthorizationDecision | None,
+    *,
+    capability: str,
+    data_class: str,
+    owner_ref: str | None,
+    connection_ref: str | None,
+    resource_ref: str | None,
+) -> bool:
+    return bool(
+        owner_ref
+        and resource_ref
+        and is_authorized_egress(
+            authorization,
+            capability=capability,
+            provider_ref=ANTHROPIC_PROVIDER_REF,
+            data_class=data_class,
+            owner_ref=owner_ref,
+            connection_ref=connection_ref,
+            resource_ref=resource_ref,
+        )
+    )
+
+
 def complete(
     prompt: str,
     system: str = "",
@@ -183,6 +214,9 @@ def complete(
     max_attempts: int | None = None,
     authorization: AuthorizationDecision | None = None,
     data_class: str = "user_provided",
+    owner_ref: str | None = None,
+    connection_ref: str | None = None,
+    resource_ref: str | None = None,
 ) -> str:
     receipt_kwargs: dict[str, Any] = {
         "prompt": prompt,
@@ -192,6 +226,9 @@ def complete(
         "model": model,
         "authorization": authorization,
         "data_class": data_class,
+        "owner_ref": owner_ref,
+        "connection_ref": connection_ref,
+        "resource_ref": resource_ref,
     }
     if max_attempts is not None:
         receipt_kwargs["max_attempts"] = max_attempts
@@ -207,91 +244,82 @@ def complete_with_receipt(
     max_attempts: int | None = None,
     authorization: AuthorizationDecision | None = None,
     data_class: str = "user_provided",
+    owner_ref: str | None = None,
+    connection_ref: str | None = None,
+    resource_ref: str | None = None,
 ) -> LLMCompletionReceipt:
+    if not _has_matching_egress_grant(
+        authorization,
+        capability=TEXT_CAPABILITY,
+        data_class=data_class,
+        owner_ref=owner_ref,
+        connection_ref=connection_ref,
+        resource_ref=resource_ref,
+    ):
+        raise LLMError("Anthropic completion requires an active capability grant")
+    # Keep the public argument for compatibility, but do not turn a granted
+    # request into multiple provider calls.  PA-13 owns reconciliation before a
+    # caller can request another reservation after an unknown outcome.
+    del max_attempts
+    client = _get_client()
+    selected_model = model or _get_model(category)
+    start_time = time.time()
     try:
         require_authorized_egress(
             authorization,
             capability=TEXT_CAPABILITY,
             provider_ref=ANTHROPIC_PROVIDER_REF,
             data_class=data_class,
+            owner_ref=owner_ref or "",
+            connection_ref=connection_ref,
+            resource_ref=resource_ref or "",
+        )
+        LOGGER.debug(
+            "Anthropic completion request model=%s prompt_length=%s max_tokens=%s attempt=1",
+            selected_model,
+            len(prompt),
+            max_tokens,
+        )
+        response = client.messages.create(
+            model=selected_model,
+            system=system,
+            max_tokens=max_tokens,
+            messages=[{"role": "user", "content": prompt}],
         )
     except CapabilityDenied as exc:
         raise LLMError("Anthropic completion requires an active capability grant") from exc
-    client = _get_client()
-    selected_model = model or _get_model(category)
-    attempt_limit = MAX_RETRIES if max_attempts is None else max(1, min(int(max_attempts), MAX_RETRIES))
-    attempt = 0
+    except Exception as exc:
+        LOGGER.exception("Anthropic completion has unknown outcome after one attempt")
+        raise LLMError("Anthropic completion failed") from exc
 
-    while True:
-        attempt += 1
-        start_time = time.time()
-        try:
-            LOGGER.debug(
-                "Anthropic completion request model=%s prompt_length=%s max_tokens=%s attempt=%s",
-                selected_model,
-                len(prompt),
-                max_tokens,
-                attempt,
-            )
-            response = client.messages.create(
-                model=selected_model,
-                system=system,
-                max_tokens=max_tokens,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            text = _extract_text(response)
-            duration_ms = int((time.time() - start_time) * 1000)
-            actual_model = str(getattr(response, "model", None) or selected_model)
-            input_tokens = getattr(getattr(response, "usage", None), "input_tokens", 0)
-            output_tokens = getattr(getattr(response, "usage", None), "output_tokens", 0)
-            est_cost_usd = estimate_cost_usd(
-                model=actual_model,
-                input_tokens=input_tokens,
-                output_tokens=output_tokens,
-            )
-            usage_recorded = _record_usage(
-                category,
-                actual_model,
-                input_tokens,
-                output_tokens,
-                duration_ms,
-            )
-            LOGGER.debug(
-                "model=%s input_tokens=%s output_tokens=%s est_cost_usd=%.8f",
-                actual_model,
-                input_tokens,
-                output_tokens,
-                est_cost_usd,
-            )
-            LOGGER.debug(
-                "Anthropic completion response model=%s response_length=%s",
-                actual_model,
-                len(text),
-            )
-            return LLMCompletionReceipt(
-                text=text,
-                model=actual_model,
-                input_tokens=input_tokens,
-                output_tokens=output_tokens,
-                estimated_cost_usd=est_cost_usd,
-                duration_ms=duration_ms,
-                attempts=attempt,
-                usage_recorded=usage_recorded,
-            )
-        except Exception as exc:
-            if attempt >= attempt_limit or not _should_retry(exc):
-                LOGGER.exception("Anthropic completion failed after %s attempt(s)", attempt)
-                raise LLMError("Anthropic completion failed") from exc
-
-            delay = 2 ** (attempt - 1)
-            remaining_attempts = attempt_limit - attempt
-            LOGGER.warning(
-                "Anthropic completion retrying in %s second(s) after %s remaining_attempts=%s",
-                delay,
-                exc.__class__.__name__,
-                remaining_attempts,
-            )
-            time.sleep(delay)
+    text = _extract_text(response)
+    duration_ms = int((time.time() - start_time) * 1000)
+    actual_model = str(getattr(response, "model", None) or selected_model)
+    input_tokens = getattr(getattr(response, "usage", None), "input_tokens", 0)
+    output_tokens = getattr(getattr(response, "usage", None), "output_tokens", 0)
+    est_cost_usd = estimate_cost_usd(
+        model=actual_model,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+    )
+    usage_recorded = _record_usage(category, actual_model, input_tokens, output_tokens, duration_ms)
+    LOGGER.debug(
+        "model=%s input_tokens=%s output_tokens=%s est_cost_usd=%.8f",
+        actual_model,
+        input_tokens,
+        output_tokens,
+        est_cost_usd,
+    )
+    return LLMCompletionReceipt(
+        text=text,
+        model=actual_model,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        estimated_cost_usd=est_cost_usd,
+        duration_ms=duration_ms,
+        attempts=1,
+        usage_recorded=usage_recorded,
+    )
 
 
 def complete_vision(
@@ -301,86 +329,82 @@ def complete_vision(
     *,
     authorization: AuthorizationDecision | None = None,
     data_class: str = "user_provided",
+    owner_ref: str | None = None,
+    connection_ref: str | None = None,
+    resource_ref: str | None = None,
 ) -> str:
+    if not _has_matching_egress_grant(
+        authorization,
+        capability=VISION_CAPABILITY,
+        data_class=data_class,
+        owner_ref=owner_ref,
+        connection_ref=connection_ref,
+        resource_ref=resource_ref,
+    ):
+        raise LLMError("Anthropic vision requires an active capability grant")
+    client = _get_client()
+    selected_model = model or _get_model("photo_analysis")
+    media_type = mimetypes.guess_type(image_path)[0] or "image/jpeg"
+
+    with open(image_path, "rb") as image_file:
+        image_payload = image_file.read()
+
+    start_time = time.time()
     try:
         require_authorized_egress(
             authorization,
             capability=VISION_CAPABILITY,
             provider_ref=ANTHROPIC_PROVIDER_REF,
             data_class=data_class,
+            owner_ref=owner_ref or "",
+            connection_ref=connection_ref,
+            resource_ref=resource_ref or "",
+        )
+        LOGGER.debug("Anthropic vision request model=%s image_path=%s attempt=1", selected_model, image_path)
+        response = client.messages.create(
+            model=selected_model,
+            max_tokens=150,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": media_type,
+                                "data": __import__("base64").standard_b64encode(image_payload).decode("utf-8"),
+                            },
+                        },
+                        {"type": "text", "text": prompt},
+                    ],
+                }
+            ],
         )
     except CapabilityDenied as exc:
         raise LLMError("Anthropic vision requires an active capability grant") from exc
-    client = _get_client()
-    selected_model = model or _get_model("photo_analysis")
-    attempt = 0
-    media_type = mimetypes.guess_type(image_path)[0] or "image/jpeg"
+    except Exception as exc:
+        LOGGER.exception("Anthropic vision has unknown outcome after one attempt")
+        raise LLMError("Anthropic vision completion failed") from exc
 
-    with open(image_path, "rb") as image_file:
-        image_payload = image_file.read()
-
-    while True:
-        attempt += 1
-        start_time = time.time()
-        try:
-            LOGGER.debug(
-                "Anthropic vision request model=%s image_path=%s attempt=%s",
-                selected_model,
-                image_path,
-                attempt,
-            )
-            response = client.messages.create(
-                model=selected_model,
-                max_tokens=150,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "image",
-                                "source": {
-                                    "type": "base64",
-                                    "media_type": media_type,
-                                    "data": __import__("base64").standard_b64encode(image_payload).decode("utf-8"),
-                                },
-                            },
-                            {"type": "text", "text": prompt},
-                        ],
-                    }
-                ],
-            )
-            text = _extract_text(response)
-            duration_ms = int((time.time() - start_time) * 1000)
-            input_tokens = getattr(getattr(response, "usage", None), "input_tokens", 0)
-            output_tokens = getattr(getattr(response, "usage", None), "output_tokens", 0)
-            est_cost_usd = estimate_cost_usd(
-                model=selected_model,
-                input_tokens=input_tokens,
-                output_tokens=output_tokens,
-            )
-            _record_usage("photo_analysis", selected_model, input_tokens, output_tokens, duration_ms)
-            LOGGER.debug(
-                "vision model=%s input_tokens=%s output_tokens=%s est_cost_usd=%.8f",
-                selected_model,
-                input_tokens,
-                output_tokens,
-                est_cost_usd,
-            )
-            return text
-        except Exception as exc:
-            if attempt >= MAX_RETRIES or not _should_retry(exc):
-                LOGGER.exception("Anthropic vision completion failed after %s attempt(s)", attempt)
-                raise LLMError("Anthropic vision completion failed") from exc
-
-            delay = 2 ** (attempt - 1)
-            remaining_attempts = MAX_RETRIES - attempt
-            LOGGER.warning(
-                "Anthropic vision completion retrying in %s second(s) after %s remaining_attempts=%s",
-                delay,
-                exc.__class__.__name__,
-                remaining_attempts,
-            )
-            time.sleep(delay)
+    text = _extract_text(response)
+    duration_ms = int((time.time() - start_time) * 1000)
+    input_tokens = getattr(getattr(response, "usage", None), "input_tokens", 0)
+    output_tokens = getattr(getattr(response, "usage", None), "output_tokens", 0)
+    est_cost_usd = estimate_cost_usd(
+        model=selected_model,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+    )
+    _record_usage("photo_analysis", selected_model, input_tokens, output_tokens, duration_ms)
+    LOGGER.debug(
+        "vision model=%s input_tokens=%s output_tokens=%s est_cost_usd=%.8f",
+        selected_model,
+        input_tokens,
+        output_tokens,
+        est_cost_usd,
+    )
+    return text
 
 
 def _strip_code_fence(text: str) -> str:
@@ -404,6 +428,9 @@ def complete_json(
     max_attempts: int | None = None,
     authorization: AuthorizationDecision | None = None,
     data_class: str = "user_provided",
+    owner_ref: str | None = None,
+    connection_ref: str | None = None,
+    resource_ref: str | None = None,
 ) -> dict[str, Any] | list[Any]:
     response_text = _strip_code_fence(
         complete(
@@ -415,6 +442,9 @@ def complete_json(
             max_attempts=max_attempts,
             authorization=authorization,
             data_class=data_class,
+            owner_ref=owner_ref,
+            connection_ref=connection_ref,
+            resource_ref=resource_ref,
         )
     )
     try:
@@ -439,6 +469,9 @@ class LLMClient:
         max_attempts: int | None = None,
         authorization: AuthorizationDecision | None = None,
         data_class: str = "user_provided",
+        owner_ref: str | None = None,
+        connection_ref: str | None = None,
+        resource_ref: str | None = None,
     ) -> str:
         return complete(
             prompt=prompt,
@@ -449,6 +482,9 @@ class LLMClient:
             max_attempts=max_attempts,
             authorization=authorization,
             data_class=data_class,
+            owner_ref=owner_ref,
+            connection_ref=connection_ref,
+            resource_ref=resource_ref,
         )
 
     @staticmethod
@@ -461,6 +497,9 @@ class LLMClient:
         max_attempts: int | None = None,
         authorization: AuthorizationDecision | None = None,
         data_class: str = "user_provided",
+        owner_ref: str | None = None,
+        connection_ref: str | None = None,
+        resource_ref: str | None = None,
     ) -> LLMCompletionReceipt:
         return complete_with_receipt(
             prompt=prompt,
@@ -471,6 +510,9 @@ class LLMClient:
             max_attempts=max_attempts,
             authorization=authorization,
             data_class=data_class,
+            owner_ref=owner_ref,
+            connection_ref=connection_ref,
+            resource_ref=resource_ref,
         )
 
     @staticmethod
@@ -483,6 +525,9 @@ class LLMClient:
         max_attempts: int | None = None,
         authorization: AuthorizationDecision | None = None,
         data_class: str = "user_provided",
+        owner_ref: str | None = None,
+        connection_ref: str | None = None,
+        resource_ref: str | None = None,
     ) -> dict[str, Any] | list[Any]:
         return complete_json(
             prompt=prompt,
@@ -493,6 +538,9 @@ class LLMClient:
             max_attempts=max_attempts,
             authorization=authorization,
             data_class=data_class,
+            owner_ref=owner_ref,
+            connection_ref=connection_ref,
+            resource_ref=resource_ref,
         )
 
     @staticmethod
@@ -503,6 +551,9 @@ class LLMClient:
         *,
         authorization: AuthorizationDecision | None = None,
         data_class: str = "user_provided",
+        owner_ref: str | None = None,
+        connection_ref: str | None = None,
+        resource_ref: str | None = None,
     ) -> str:
         return complete_vision(
             prompt=prompt,
@@ -510,4 +561,7 @@ class LLMClient:
             model=model,
             authorization=authorization,
             data_class=data_class,
+            owner_ref=owner_ref,
+            connection_ref=connection_ref,
+            resource_ref=resource_ref,
         )
