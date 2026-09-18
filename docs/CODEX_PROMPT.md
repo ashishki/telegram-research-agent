@@ -62,9 +62,12 @@ Rejected parse/identity/row/schema/digest/expiry/action cases are read-only: no
 row, receipt or memory mutation and no expiry cleanup. Legacy text selection
 asks for the inline callback. PA-00's
 `read_prm_rollback_drain(db_path, *, owner_chat_id, now=None)` is
-owner-restricted/read-only, returns only status/UTC-now/count-only
-classifications, fails closed for unavailable data and blocks an old handler
-until no unexpired ready/pending row remains; it never changes shared UTD rows.
+owner-restricted/read-only, derives both established PRM and UTD owner hashes,
+returns only status/UTC-now/count-only classifications, fails closed for
+unavailable data and blocks an old handler until no unexpired nonterminal row
+in either namespace remains; it never changes shared UTD rows. Its PA-00 test
+must create a real UTD-path row and prove both blocker detection and SELECT-only
+SQL tracing.
 Use `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest` for
 direct PA-00 focused tests and record the resolved Python/version. Full
 plain-language “yes” is PA-03 work, where an exact current visible confirmation

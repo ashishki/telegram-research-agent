@@ -151,23 +151,34 @@ code.
 
 PA-00 has no destructive shared-table rollback. A rollback to a pre-PA-00 PRM
 handler is prohibited until a read-only, owner-restricted drain report proves
-there are no unexpired rows for that owner in `ready` or `pending` state. Its
-selector is exactly `chat_id_hash = :owner_chat_id_hash AND status IN
-('ready','pending') AND expires_at > :now`; the report is read-only, exposes
-only count/status/classification, and treats any returned row (including an
-unrecognised or UTD-shaped one) as a blocker rather than deleting or changing
-it. The callable is
+there are no unexpired active rows for that owner in either established hash
+namespace. The report canonicalizes the raw owner once, calculates
+`:prm_owner_hash` with the current `prm.post-answer.v1` algorithm and
+`:utd_owner_hash` by invoking the current `assistant.utd_profile_store._chat_hash`
+helper (therefore using the configured `PI_SAVE_CONFIRMATION_SECRET` without
+exposing it), then selects exactly
+`chat_id_hash IN (:prm_owner_hash, :utd_owner_hash) AND expires_at > :now AND
+status NOT IN ('confirmed','cancelled','expired')`. It is deliberately
+conservative: any returned legacy, malformed or unknown row is a blocker. Its
+only classification is derived from `summary_json`: `prm_binding_v1` when
+`context_kind="prm"`; `legacy_prm_candidate` when the old PRM
+`primary_intent`/`allowed_actions` shape is present; `utd_profile` or
+`utd_subscription` for their current `kind` values; otherwise `unknown`.
+Every classification is a rollback blocker rather than a mutation target. The
+callable is
 `read_prm_rollback_drain(db_path, *, owner_chat_id, now=None) -> dict`, located
 with the PRM action store. It first canonicalizes the owner, treats a missing
 database/table, bad owner or SQL/JSON error as
 `{status: "unavailable", blocker_count: null}` and forbids rollback. For a
 valid read it returns only `status="blocked"|"clear"`, supplied UTC `now`,
 `blocker_count`, and count-only `classifications` of
-`prm_binding_v1`, `legacy_or_unknown`, and `utd_or_unknown`; it never emits a
-raw chat ID, context ID or payload. Its SQLite connection is read-only and may
-execute only the selector/metadata `SELECT`s. A trace-callback test proves no
-non-`SELECT` statement occurs, including for UTD-shaped and unavailable rows.
-The order is: stop rendering new PRM controls; keep the PA-00 handler in
+`prm_binding_v1`, `legacy_prm_candidate`, `utd_profile`, `utd_subscription`,
+and `unknown`; it never emits a raw chat ID, context ID or payload. Its SQLite
+connection is read-only and may execute only the selector/metadata `SELECT`s.
+A trace-callback test creates a genuine UTD row through its current onboarding
+path/hash, then proves it is a blocker and that no non-`SELECT` statement
+occurs, including for unavailable rows. The order is: stop rendering new PRM
+controls; keep the PA-00 handler in
 fail-closed drain mode; wait for/cancel only through a valid current user
 action until the report is zero; independently capture the zero report; only
 then activate an old handler. There is no automatic `DELETE`, generic
