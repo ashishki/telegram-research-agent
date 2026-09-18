@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 import llm.openai_provider as openai_provider
-from llm.openai_provider import CONTEXT_EGRESS_ENABLE_ENV, OPENAI_TERRA_MODEL, PROVIDER_ENABLE_ENV, ProviderEgressDenied, complete_with_provider
+from llm.openai_provider import CONTEXT_EGRESS_ENABLE_ENV, OPENAI_TERRA_MODEL, PROVIDER_ENABLE_ENV, ProviderEgressDenied, ProviderEgressOutcomeUnknown, complete_with_provider
 from prm.capabilities import AuthorizationRequest, CapabilityGrant, CapabilityRegistry, ProviderPolicy
 
 
@@ -244,3 +244,75 @@ def test_context_transport_omits_raw_uncited_malformed_or_oversized_context(monk
     assert result.receipt.context_egress_performed is False
     assert len(client.responses.calls) == 1
     assert private_marker not in repr(client.responses.calls[0]["input"])
+
+
+def test_context_transport_reports_unknown_outcome_without_automatic_retry(monkeypatch) -> None:
+    monkeypatch.setenv(PROVIDER_ENABLE_ENV, "true")
+    monkeypatch.setenv(CONTEXT_EGRESS_ENABLE_ENV, "true")
+    monkeypatch.setenv("OPENAI_API_KEY", SYNTHETIC_OPENAI_KEY)
+    captured_calls: list[dict] = []
+
+    def raise_after_capture(**kwargs):
+        captured_calls.append(kwargs)
+        raise TimeoutError("synthetic unknown outcome")
+
+    client = SimpleNamespace(responses=SimpleNamespace(create=raise_after_capture))
+    authorization = _authorization()
+    context_authorization = _authorization(
+        capability="model.context_egress",
+        resource_ref="resource_archive",
+        data_class="private_archive",
+        purpose="answer.context",
+    )
+    scope = {
+        "owner_ref": "owner_synthetic_primary",
+        "connection_ref": SYNTHETIC_OPENAI_CONNECTION,
+        "resource_ref": "resource_conversation",
+        "context_resource_ref": "resource_archive",
+    }
+
+    with pytest.raises(ProviderEgressOutcomeUnknown) as error:
+        complete_with_provider(
+            "Question",
+            provider="openai",
+            allow_provider_egress=True,
+            allow_context_egress=True,
+            authorization=authorization,
+            context_authorization=context_authorization,
+            local_context=[{
+                "title": "approved",
+                "text": "private-context-sentinel",
+                "source_ref": "archive:synthetic-approved-1",
+            }],
+            client=client,
+            **scope,
+        )
+
+    receipt = error.value.receipt
+    assert len(captured_calls) == 1
+    assert "private-context-sentinel" in repr(captured_calls[0]["input"])
+    assert receipt.external_call_attempted is True
+    assert receipt.context_egress_attempted is True
+    assert receipt.external_call_performed is False
+    assert receipt.context_egress_performed is False
+    assert receipt.delivery_outcome == "unknown"
+
+    retry_client = _FakeClient()
+    with pytest.raises(ProviderEgressDenied):
+        complete_with_provider(
+            "Question",
+            provider="openai",
+            allow_provider_egress=True,
+            allow_context_egress=True,
+            authorization=authorization,
+            context_authorization=context_authorization,
+            local_context=[{
+                "title": "approved",
+                "text": "private-context-sentinel",
+                "source_ref": "archive:synthetic-approved-1",
+            }],
+            client=retry_client,
+            **scope,
+        )
+
+    assert retry_client.responses.calls == []

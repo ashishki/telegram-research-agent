@@ -61,6 +61,17 @@ class ProviderReceipt:
     external_call_performed: bool
     context_egress_performed: bool
     local_search_default: bool
+    external_call_attempted: bool = False
+    context_egress_attempted: bool = False
+    delivery_outcome: str = "not_attempted"
+
+
+class ProviderEgressOutcomeUnknown(OpenAIProviderError):
+    """A request may have reached a provider, but its delivery is unknown."""
+
+    def __init__(self, receipt: ProviderReceipt) -> None:
+        super().__init__("OpenAI Responses API outcome is unknown; do not retry automatically")
+        self.receipt = receipt
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,11 +187,23 @@ def complete_with_provider(
                     operation="model_egress",
                 ),
             )
-        response = active_client.responses.create(model=model, input=request_input)
     except CapabilityDenied:
         raise ProviderEgressDenied("OpenAI provider egress requires an active matching capability grant.") from None
-    except Exception:  # provider SDK exceptions are intentionally isolated here
-        raise OpenAIProviderError("OpenAI Responses API call failed") from None
+    try:
+        response = active_client.responses.create(model=model, input=request_input)
+    except Exception:  # a request may have reached the provider before its error
+        raise ProviderEgressOutcomeUnknown(
+            ProviderReceipt(
+                provider=OPENAI_PROVIDER,
+                model=model,
+                external_call_performed=False,
+                context_egress_performed=False,
+                local_search_default=False,
+                external_call_attempted=True,
+                context_egress_attempted=include_context,
+                delivery_outcome="unknown",
+            )
+        ) from None
 
     return ProviderResult(
         status="ok",
@@ -191,6 +214,9 @@ def complete_with_provider(
             external_call_performed=True,
             context_egress_performed=include_context,
             local_search_default=False,
+            external_call_attempted=True,
+            context_egress_attempted=include_context,
+            delivery_outcome="accepted",
         ),
     )
 
