@@ -10,6 +10,7 @@ import signal
 from typing import Any
 from urllib import parse, request
 
+from assistant.utd_profile import is_utd_profile_intent
 from config.settings import Settings
 from assistant.prm_post_answer_actions import UnavailablePrmAction
 from .callbacks import (
@@ -18,7 +19,13 @@ from .callbacks import (
     record_callback,
     validate_prm_post_answer_callback,
 )
-from .prm_handlers import dispatch_prm_command, send_message
+from .prm_handlers import (
+    dispatch_prm_command,
+    issue_private_reply_authorizations,
+    issue_private_utd_draft_authorization,
+    send_message,
+)
+from prm.capabilities import AuthorizationDecision
 from .runtime import (
     BOT_RUNTIME_LEGACY,
     BOT_RUNTIME_PRM_ASSISTANT,
@@ -113,12 +120,22 @@ def dispatch_command(
     runtime_mode: str = BOT_RUNTIME_LEGACY,
     actor_id: str | None = None,
     owner_chat_id: str | None = None,
+    delivery_authorizations: tuple[AuthorizationDecision, ...] = (),
+    utd_draft_authorization: AuthorizationDecision | None = None,
 ) -> None:
     """Stable patch point and explicit compatibility dispatcher."""
 
     mode = normalize_bot_runtime_mode(runtime_mode)
     if mode == BOT_RUNTIME_PRM_ASSISTANT:
-        dispatch_prm_command(chat_id, text, settings, actor_id=actor_id, owner_chat_id=owner_chat_id)
+        prm_kwargs: dict[str, object] = {
+            "actor_id": actor_id,
+            "owner_chat_id": owner_chat_id,
+        }
+        if delivery_authorizations:
+            prm_kwargs["delivery_authorizations"] = delivery_authorizations
+        if utd_draft_authorization is not None:
+            prm_kwargs["utd_draft_authorization"] = utd_draft_authorization
+        dispatch_prm_command(chat_id, text, settings, **prm_kwargs)
         return
     legacy = import_module("bot.legacy_handlers")
     legacy.dispatch_command(
@@ -169,6 +186,21 @@ def _voice_failed_message(runtime_mode: str) -> str:
     return "Не смог распознать голосовое. Отправь сообщение текстом."
 
 
+def _prm_command_requests_utd_draft(command_text: str) -> bool:
+    """Keep the local-draft decision as narrow as the incoming command."""
+
+    clean = str(command_text or "").strip()
+    if not clean.startswith("/"):
+        return False
+    parts = clean.split(maxsplit=1)
+    command = parts[0].split("@", 1)[0].casefold()
+    args = parts[1].strip() if len(parts) > 1 else ""
+    return command == "/utd" or (
+        command in {"/auto", "/auto_voice", "/research", "/brief", "/chat"}
+        and is_utd_profile_intent(args)
+    )
+
+
 def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_LEGACY) -> None:
     runtime_mode = normalize_bot_runtime_mode(runtime_mode)
     token, owner_chat_id = _load_bot_env()
@@ -217,8 +249,34 @@ def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_LEGACY) -> No
             # PRM answers can contain private archive excerpts.  Sender-based
             # owner authorization is retained for legacy operations, but the
             # PRM surface is deliberately private-chat-only.
-            if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT and chat_id != owner_chat_id:
+            if (
+                runtime_mode == BOT_RUNTIME_PRM_ASSISTANT
+                and (chat_id != owner_chat_id or actor_id != owner_chat_id)
+            ):
                 continue
+            delivery_authorizations = (
+                issue_private_reply_authorizations(
+                    token=token,
+                    chat_id=chat_id,
+                    actor_id=actor_id,
+                    owner_chat_id=owner_chat_id,
+                )
+                if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT
+                else ()
+            )
+
+            def utd_draft_authorization_for(command_text: str) -> AuthorizationDecision | None:
+                if (
+                    runtime_mode != BOT_RUNTIME_PRM_ASSISTANT
+                    or not _prm_command_requests_utd_draft(command_text)
+                ):
+                    return None
+                return issue_private_utd_draft_authorization(
+                    chat_id=chat_id,
+                    actor_id=actor_id,
+                    owner_chat_id=owner_chat_id,
+                )
+
             text = str(message.get("text") or "").strip()
             if text:
                 command = (
@@ -234,6 +292,8 @@ def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_LEGACY) -> No
                         runtime_mode=runtime_mode,
                         actor_id=actor_id,
                         owner_chat_id=owner_chat_id,
+                        delivery_authorizations=delivery_authorizations,
+                        utd_draft_authorization=utd_draft_authorization_for(command),
                     )
                 else:
                     dispatch_command(chat_id=chat_id, text=command, settings=settings)
@@ -250,6 +310,8 @@ def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_LEGACY) -> No
                         runtime_mode=runtime_mode,
                         actor_id=actor_id,
                         owner_chat_id=owner_chat_id,
+                        delivery_authorizations=delivery_authorizations,
+                        utd_draft_authorization=utd_draft_authorization_for(command),
                     )
                 else:
                     dispatch_command(chat_id=chat_id, text=command, settings=settings)
@@ -257,18 +319,39 @@ def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_LEGACY) -> No
             if not message.get("voice"):
                 continue
 
-            send_message(token, chat_id, _voice_received_message(runtime_mode))
+            send_message(
+                token,
+                chat_id,
+                _voice_received_message(runtime_mode),
+                delivery_authorization=delivery_authorizations[0] if delivery_authorizations else None,
+                actor_id=actor_id,
+                owner_chat_id=owner_chat_id,
+            )
             try:
                 transcript = transcribe_telegram_voice(
                     token=token,
                     file_id=str((message.get("voice") or {}).get("file_id") or ""),
                 )
             except VoiceTranscriptionUnavailable:
-                send_message(token, chat_id, _voice_unavailable_message(runtime_mode))
+                send_message(
+                    token,
+                    chat_id,
+                    _voice_unavailable_message(runtime_mode),
+                    delivery_authorization=delivery_authorizations[1] if len(delivery_authorizations) > 1 else None,
+                    actor_id=actor_id,
+                    owner_chat_id=owner_chat_id,
+                )
                 continue
             except Exception:
                 LOGGER.warning("Voice transcription failed chat_id=%s", chat_id, exc_info=True)
-                send_message(token, chat_id, _voice_failed_message(runtime_mode))
+                send_message(
+                    token,
+                    chat_id,
+                    _voice_failed_message(runtime_mode),
+                    delivery_authorization=delivery_authorizations[1] if len(delivery_authorizations) > 1 else None,
+                    actor_id=actor_id,
+                    owner_chat_id=owner_chat_id,
+                )
                 continue
             command = _voice_text_command(transcript, runtime_mode=runtime_mode)
             if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
@@ -279,6 +362,8 @@ def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_LEGACY) -> No
                     runtime_mode=runtime_mode,
                     actor_id=actor_id,
                     owner_chat_id=owner_chat_id,
+                    delivery_authorizations=delivery_authorizations[1:],
+                    utd_draft_authorization=utd_draft_authorization_for(command),
                 )
             else:
                 dispatch_command(chat_id=chat_id, text=command, settings=settings)
@@ -299,8 +384,19 @@ def _handle_callback(
 ) -> None:
     callback_id = str(callback.get("id") or "")
     data = str(callback.get("data") or "")
+    callback_chat_id = str((((callback.get("message") or {}).get("chat") or {}).get("id")) or "")
+    callback_actor_id = str((callback.get("from") or {}).get("id") or "")
+    callback_delivery_authorizations = (
+        issue_private_reply_authorizations(
+            token=token,
+            chat_id=callback_chat_id,
+            actor_id=callback_actor_id,
+            owner_chat_id=owner_chat_id,
+        )
+        if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT
+        else ()
+    )
     if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT and data.startswith(("prma:", "prmc:")):
-        callback_chat_id = str((((callback.get("message") or {}).get("chat") or {}).get("id")) or "")
         validated = validate_prm_post_answer_callback(
             settings,
             data,
@@ -322,13 +418,21 @@ def _handle_callback(
         if not unavailable:
             message = str(result.get("message") or "")
             if message:
-                send_message(token, callback_chat_id, message, parse_mode=None, reply_markup=result.get("reply_markup"))
+                send_message(
+                    token,
+                    callback_chat_id,
+                    message,
+                    parse_mode=None,
+                    reply_markup=result.get("reply_markup"),
+                    delivery_authorization=callback_delivery_authorizations[0] if callback_delivery_authorizations else None,
+                    actor_id=callback_actor_id,
+                    owner_chat_id=owner_chat_id,
+                )
         return
     if not _is_authorized_callback(callback, owner_chat_id):
         if callback_id:
             _telegram_answer_callback(token, callback_id, "Not authorized")
         return
-    callback_chat_id = str((((callback.get("message") or {}).get("chat") or {}).get("id")) or "")
     if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT and callback_chat_id != owner_chat_id:
         if callback_id:
             _telegram_answer_callback(token, callback_id, "PRM доступен только в личном чате владельца")
@@ -359,7 +463,7 @@ def _handle_callback(
                     settings,
                     data,
                     chat_id=chat_id,
-                    actor_id=str((callback.get("from") or {}).get("id") or ""),
+                    actor_id=callback_actor_id,
                     owner_chat_id=owner_chat_id,
                 )
                 message = str(result.get("message") or "")
@@ -370,6 +474,9 @@ def _handle_callback(
                         message,
                         parse_mode=None,
                         reply_markup=result.get("reply_markup"),
+                        delivery_authorization=callback_delivery_authorizations[0] if callback_delivery_authorizations else None,
+                        actor_id=callback_actor_id,
+                        owner_chat_id=owner_chat_id,
                     )
                 if english_feedback:
                     answer = "Recorded"

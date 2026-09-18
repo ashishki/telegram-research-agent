@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import hashlib
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Mapping, Sequence
 
@@ -20,7 +21,11 @@ from config.settings import Settings
 from prm.application import PersonalResearchAssistant
 from prm.capabilities import (
     AuthorizationDecision,
+    AuthorizationRequest,
+    CapabilityGrant,
+    CapabilityRegistry,
     CapabilityDenied,
+    ProviderPolicy,
     describe_current_capability_scope,
     require_authorized_operation,
     transport_purpose,
@@ -52,6 +57,7 @@ RESULT_DELIVERY_CAPABILITY = "assistant.result_delivery"
 RESULT_DELIVERY_DATA_CLASS = "private_archive"
 UTD_DRAFT_CAPABILITY = "assistant.utd_draft"
 LOCAL_PROVIDER_REF = "provider_local"
+MAX_EPHEMERAL_REPLY_SENDS = 8
 
 
 def send_message(
@@ -68,9 +74,8 @@ def send_message(
     """Send PA-originated Telegram content only with a current grant.
 
     Calls from text, voice and UTD/callback paths share this single final-send
-    boundary.  PA-02 intentionally has no live grant source, so an omitted
-    decision denies before the Telegram transport rather than treating a token
-    or private chat as authority.
+    boundary. An omitted decision denies before the Telegram transport rather
+    than treating a token or private chat as authority.
     """
 
     del escape_markdown
@@ -107,31 +112,40 @@ def dispatch_prm_command(
     utd_draft_authorization: AuthorizationDecision | None = None,
 ) -> None:
     command, args = _split_command(text)
-    if command not in PRM_SAFE_COMMANDS:
+
+    def send_private_reply(
+        message: str,
+        *,
+        reply_markup: dict | None = None,
+    ) -> None:
+        """Use one turn-bound return-envelope decision for a short reply."""
+
         send_message(
             _token(),
             chat_id,
-            "Эта команда не входит в активный интерфейс. Используй обычный вопрос или /help.",
-        )
-        return
-    if command in {"/start", "/help"}:
-        send_message(_token(), chat_id, _help_text())
-        return
-    if command == "/privacy":
-        if actor_id != chat_id or owner_chat_id != chat_id:
-            send_message(_token(), chat_id, "Сведения о правах недоступны для этого чата.")
-            return
-        # PA-02 has no durable grant source yet. Rendering the empty registry is
-        # intentional: it shows the exact default-deny scope without creating,
-        # persisting, or pretending to revoke a connection.
-        send_message(
-            _token(),
-            chat_id,
-            describe_current_capability_scope(()),
+            message,
+            reply_markup=reply_markup,
             delivery_authorization=_first_delivery_authorization(delivery_authorizations),
             actor_id=actor_id,
             owner_chat_id=owner_chat_id,
         )
+
+    if command not in PRM_SAFE_COMMANDS:
+        send_private_reply(
+            "Эта команда не входит в активный интерфейс. Используй обычный вопрос или /help.",
+        )
+        return
+    if command in {"/start", "/help"}:
+        send_private_reply(_help_text())
+        return
+    if command == "/privacy":
+        if actor_id != chat_id or owner_chat_id != chat_id:
+            send_private_reply("Сведения о правах недоступны для этого чата.")
+            return
+        # PA-02 has no durable grant source yet. Rendering the empty registry is
+        # intentional: it shows the exact default-deny scope without creating,
+        # persisting, or pretending to revoke a connection.
+        send_private_reply(describe_current_capability_scope(()))
         return
     if command == "/utd":
         _start_utd_profile(
@@ -139,6 +153,7 @@ def dispatch_prm_command(
             settings=settings,
             seed_text=args,
             authorization=utd_draft_authorization,
+            delivery_authorization=_first_delivery_authorization(delivery_authorizations),
             actor_id=actor_id,
             owner_chat_id=owner_chat_id,
         )
@@ -148,18 +163,22 @@ def dispatch_prm_command(
         return
     content_commands = {"/auto", "/auto_voice", "/research", "/brief", "/chat"}
     if command in content_commands and is_utd_profile_intent(args):
-        _start_utd_profile(chat_id, settings=settings, seed_text=args)
+        _start_utd_profile(
+            chat_id,
+            settings=settings,
+            seed_text=args,
+            authorization=utd_draft_authorization,
+            delivery_authorization=_first_delivery_authorization(delivery_authorizations),
+            actor_id=actor_id,
+            owner_chat_id=owner_chat_id,
+        )
         return
     if (
         command in content_commands
         and is_utd_question(args)
         and not _explicit_archive_request(args)
     ):
-        send_message(
-            _token(),
-            chat_id,
-            render_utd_question_preview(args, db_path=settings.db_path),
-        )
+        send_private_reply(render_utd_question_preview(args, db_path=settings.db_path))
         return
 
     mode = {"/research": "research", "/brief": "brief", "/chat": "chat"}.get(
@@ -167,29 +186,21 @@ def dispatch_prm_command(
     )
     input_kind = "voice_transcript" if command == "/auto_voice" else "text"
     if not args:
-        send_message(
-            _token(),
-            chat_id,
-            "Напиши вопрос после команды или просто отправь обычное сообщение.",
-        )
+        send_private_reply("Напиши вопрос после команды или просто отправь обычное сообщение.")
         return
     if _is_memory_action_followup(args):
-        send_message(
-            _token(),
-            chat_id,
-            "Это действие недоступно. Отправь запрос заново, чтобы получить новую кнопку действия.",
+        send_private_reply(
+            "Это действие недоступно. Отправь запрос заново, чтобы получить новую кнопку действия."
         )
         return
     dialog = _resolve_prm_dialog_query(chat_id, args, mode=mode)
     if dialog.get("kind") == "post_answer_action":
-        send_message(
-            _token(),
-            chat_id,
-            "Это действие недоступно. Отправь запрос заново, чтобы получить новую кнопку действия.",
+        send_private_reply(
+            "Это действие недоступно. Отправь запрос заново, чтобы получить новую кнопку действия."
         )
         return
     if dialog.get("kind") == "short_next_step":
-        send_message(_token(), chat_id, str(dialog.get("message") or "Следующий шаг не найден."))
+        send_private_reply(str(dialog.get("message") or "Следующий шаг не найден."))
         return
 
     effective_args = str(dialog.get("effective_query") or args)
@@ -205,7 +216,7 @@ def dispatch_prm_command(
         )  # type: ignore[arg-type]
     except Exception as exc:
         LOGGER.warning("PRM request failed command=%s", command, exc_info=True)
-        send_message(_token(), chat_id, f"Не смог обработать запрос: {type(exc).__name__}")
+        send_private_reply(f"Не смог обработать запрос: {type(exc).__name__}")
         return
     action_bundle = _post_answer_action_bundle(
         result.payload,
@@ -267,6 +278,7 @@ def _start_utd_profile(
     settings: Settings,
     seed_text: str,
     authorization: AuthorizationDecision | None = None,
+    delivery_authorization: AuthorizationDecision | None = None,
     actor_id: str | None = None,
     owner_chat_id: str | None = None,
 ) -> None:
@@ -287,6 +299,9 @@ def _start_utd_profile(
         chat_id,
         str(result.get("message") or "UTD-черновик недоступен."),
         reply_markup=result.get("reply_markup"),
+        delivery_authorization=delivery_authorization,
+        actor_id=actor_id,
+        owner_chat_id=owner_chat_id,
     )
 
 
@@ -370,10 +385,10 @@ def _send_chunks(
 ) -> None:
     """Deliver a PA answer only through exact one-use Telegram grants.
 
-    PA-02 has no runtime grant source, therefore omitted decisions deny the
-    final Telegram side effect rather than treating a bot token or a private
-    chat as consent. A later slice can supply fresh decisions from its approved
-    source; it must supply one for every transport chunk.
+    Omitted decisions deny the final Telegram side effect rather than treating
+    a bot token or a private chat as consent. Runtime ingress supplies only a
+    short-lived, exact private return envelope, one decision per transport
+    chunk.
     """
 
     delivery_owner_ref = _private_delivery_owner_ref(chat_id, actor_id, owner_chat_id)
@@ -409,6 +424,99 @@ def _private_delivery_owner_ref(
     if any(value is None for value in values) or len(set(values)) != 1:
         return None
     return f"owner_telegram_{values[0]}"
+
+
+def issue_private_reply_authorizations(
+    *,
+    token: str,
+    chat_id: str,
+    actor_id: str | None,
+    owner_chat_id: str | None,
+    maximum_send_count: int = MAX_EPHEMERAL_REPLY_SENDS,
+) -> tuple[AuthorizationDecision, ...]:
+    """Mint bounded in-memory return-envelope decisions for one inbound turn.
+
+    This is not a durable grant source and grants no read, provider-egress,
+    background-job, connection-management, or third-party send authority. It
+    can only return a response to the authenticated private Telegram tuple over
+    the exact bot connection that received the turn.
+    """
+
+    owner_ref = _private_delivery_owner_ref(chat_id, actor_id, owner_chat_id)
+    connection_ref = _telegram_connection_ref(token)
+    if owner_ref is None or connection_ref is None or maximum_send_count < 1:
+        return ()
+    now = datetime.now(timezone.utc)
+    grant = CapabilityGrant(
+        grant_id=f"grant_ephemeral_reply_{uuid.uuid4().hex}",
+        owner_ref=owner_ref,
+        connection_ref=connection_ref,
+        capability=RESULT_DELIVERY_CAPABILITY,
+        resource_refs=(chat_id,),
+        operations=("deliver",),
+        data_classes=(RESULT_DELIVERY_DATA_CLASS,),
+        purpose="answer.delivery",
+        provider_policy=ProviderPolicy(
+            (TELEGRAM_PROVIDER_REF,),
+            maximum_request_count=maximum_send_count,
+        ),
+        issued_at=now,
+        expires_at=now + timedelta(minutes=2),
+        revision=1,
+    )
+    request = AuthorizationRequest(
+        owner_ref=owner_ref,
+        connection_ref=connection_ref,
+        capability=RESULT_DELIVERY_CAPABILITY,
+        resource_ref=chat_id,
+        operation="deliver",
+        data_class=RESULT_DELIVERY_DATA_CLASS,
+        provider_ref=TELEGRAM_PROVIDER_REF,
+        purpose="answer.delivery",
+        expected_grant_revision=1,
+    )
+    registry = CapabilityRegistry((grant,))
+    return tuple(registry.authorize_and_reserve(request, now=now) for _ in range(maximum_send_count))
+
+
+def issue_private_utd_draft_authorization(
+    *,
+    chat_id: str,
+    actor_id: str | None,
+    owner_chat_id: str | None,
+) -> AuthorizationDecision | None:
+    """Mint the one local draft write permitted by an authenticated `/utd` turn."""
+
+    owner_ref = _private_delivery_owner_ref(chat_id, actor_id, owner_chat_id)
+    if owner_ref is None:
+        return None
+    now = datetime.now(timezone.utc)
+    grant = CapabilityGrant(
+        grant_id=f"grant_ephemeral_utd_{uuid.uuid4().hex}",
+        owner_ref=owner_ref,
+        connection_ref=None,
+        capability=UTD_DRAFT_CAPABILITY,
+        resource_refs=(chat_id,),
+        operations=("write",),
+        data_classes=("user_provided",),
+        purpose="utd.draft",
+        provider_policy=ProviderPolicy((LOCAL_PROVIDER_REF,)),
+        issued_at=now,
+        expires_at=now + timedelta(minutes=2),
+        revision=1,
+    )
+    request = AuthorizationRequest(
+        owner_ref=owner_ref,
+        connection_ref=None,
+        capability=UTD_DRAFT_CAPABILITY,
+        resource_ref=chat_id,
+        operation="write",
+        data_class="user_provided",
+        provider_ref=LOCAL_PROVIDER_REF,
+        purpose="utd.draft",
+        expected_grant_revision=1,
+    )
+    return CapabilityRegistry((grant,)).authorize_and_reserve(request, now=now)
 
 
 def _first_delivery_authorization(

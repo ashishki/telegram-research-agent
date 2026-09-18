@@ -1,8 +1,10 @@
 # PA-02 — capability policy and egress boundary
 
 Status: local, synthetic implementation only. The policy is default-deny and
-does not enable a provider, obtain consent, create a grant, start a service, or
-change a production database.
+does not enable a provider, obtain account/provider consent, start a service,
+or change a production database. Its only runtime authority is a bounded,
+non-persistent return envelope created from an already authenticated private
+Telegram update; it is not a stored grant or connection consent record.
 
 ## Decision model
 
@@ -48,7 +50,7 @@ reconciliation. This slice never represents either as complete.
 | OpenAI archive context | exact owner/connection/archive resource plus a distinct `model.context_egress`, `provider_openai`, `private_archive` reservation | existing context switch; absent/invalid context grant omits context rather than leaking it |
 | Telegram voice download | exact owner/file resource plus two distinct `media.voice_download`, `read`, `provider_telegram`, `user_provided` reservations: one each for `getFile` and file download; connection ref must equal an opaque derivative of the exact bot token used | no token or derivative is logged, returned or published |
 | OpenAI transcription | `media.transcribe`, `model_egress`, `provider_openai`, `user_provided` reservation, exactly bound to the Telegram attachment ID returned by the two authorized Telegram reads; connection ref must equal an opaque derivative of the exact OpenAI credential used | egress accepts only the fixed HTTPS `api.openai.com/v1/audio/transcriptions` endpoint; endpoint overrides, query/fragment variants and HTTP redirects are denied, and raw voice bytes remain in request memory only |
-| PA-originated Telegram delivery | exact authenticated private owner/chat tuple plus an `assistant.result_delivery`, `deliver`, `provider_telegram`, `private_archive` reservation for every rendered Telegram chunk/message; its connection ref must equal an opaque bounded SHA-256 derivative of the exact bot token used for that send | one shared sender covers PRM text/result, UTD/callback text and PRM voice status. No runtime delivery grant source exists in PA-02, so an omitted, expired, revoked or owner/resource/purpose/connection-mismatched decision suppresses the final send; the token and its derivative are never logged, returned or published, and bot token/private chat are not consent |
+| PA-originated Telegram delivery | exact authenticated private owner/chat tuple plus an `assistant.result_delivery`, `deliver`, `provider_telegram`, `private_archive` reservation for every rendered Telegram chunk/message; its connection ref must equal an opaque bounded SHA-256 derivative of the exact bot token used for that send | one shared sender covers PRM text/result, UTD/callback text and PRM voice status. The active ingress may create at most eight in-memory, one-use decisions for a single equal private chat/actor/owner tuple, valid for two minutes and bound to the exact receiving bot token. It can only return that inbound turn's response to the same chat: it is not persisted, displayed as an active consent grant, usable for provider egress/read/background work/third-party delivery, or reusable after process loss. An omitted, expired, revoked or owner/resource/purpose/connection-mismatched decision suppresses the final send; the token and its derivative are never logged, returned or published, and bot token/private chat are not consent |
 
 PA-02 applies this boundary only to the explicit transports in the table:
 Anthropic text, OpenAI text/context, Telegram voice `getFile`/file download,
@@ -65,11 +67,16 @@ decision. They fail closed before that dispatch until an owning slice gives the
 legacy operations a bounded capability/receipt contract. Similarly, PA `/utd`
 must consume an exact `assistant.utd_draft` / `write` / `provider_local` /
 `user_provided` / `utd.draft` decision bound to the authenticated private owner
-and chat before it creates an onboarding draft. PA-02 has no runtime source for
-either decision. The private `/privacy` renderer is observable in a synthetic
-grant-backed delivery path only; without a current delivery decision its actual
-Telegram send is suppressed. These are default-deny boundaries, not claims that
-the deferred operations or a live permission UI have been enabled.
+and chat before it creates an onboarding draft. The same active private ingress
+may supply one in-memory, two-minute local-draft decision for that one turn;
+it creates neither a durable capability record nor provider/account consent,
+and cannot authorize a delivery, read, provider egress, background action or
+another chat. The private `/privacy` renderer uses the return envelope only to
+display the empty durable-grant registry; it does not create a durable grant or
+mistake the envelope for account/provider consent. Without a matching current
+delivery decision its actual Telegram send is suppressed. These are
+default-deny boundaries, not claims that the deferred operations or a live
+permission UI have been enabled.
 
 The public scope formatter lists capability, resources, operations, data
 classes and permitted providers and explicitly says that a provider key is not
@@ -90,7 +97,9 @@ download, transcription) with separate matching synthetic reservations. Voice
 tests also prove raw download bytes never create a local staging file. Result
 delivery tests prove a revoked/missing/mismatched decision reaches no fake
 Telegram sender, including a reservation bound to another configured bot
-connection; a real synthetic PRM voice polling ingress proves its status sends
-reach the same default-deny gate. Existing
+connection. Synthetic private text, voice and callback ingress prove the
+bounded return envelope reaches that same final gate, while group/mismatched
+identity ingress receives no envelope or send; `/privacy` shows default deny
+without creating a durable grant. Existing
 LLM, OpenAI adapter, synthesis and voice tests now pass a matching synthetic
 authorization only for their fake transport paths. No fixture calls a provider.

@@ -359,9 +359,13 @@ class TestIdeaCallbacks(unittest.TestCase):
             settings, "prma:opaque:n", chat_id="12345", actor_id="12345", owner_chat_id="12345"
         )
         action_mock.assert_called_once_with(settings, validate_mock.return_value)
-        send_mock.assert_called_once_with(
-            "token", "12345", "Черновик готов.", parse_mode=None, reply_markup={"inline_keyboard": []}
-        )
+        send_mock.assert_called_once()
+        self.assertEqual(send_mock.call_args.args, ("token", "12345", "Черновик готов."))
+        self.assertEqual(send_mock.call_args.kwargs["parse_mode"], None)
+        self.assertEqual(send_mock.call_args.kwargs["reply_markup"], {"inline_keyboard": []})
+        self.assertEqual(send_mock.call_args.kwargs["actor_id"], "12345")
+        self.assertEqual(send_mock.call_args.kwargs["owner_chat_id"], "12345")
+        self.assertTrue(send_mock.call_args.kwargs["delivery_authorization"].allowed)
         answer_mock.assert_called_once_with("token", "callback-1", "Принято")
 
     def test_handle_callback_validates_prm_before_acknowledgement(self):
@@ -403,7 +407,13 @@ class TestIdeaCallbacks(unittest.TestCase):
         with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "token", "TELEGRAM_OWNER_CHAT_ID": "12345"}, clear=False), patch.object(bot_runtime, "_install_signal_handlers", side_effect=stop_after_first_poll), patch.object(bot_runtime, "_telegram_get_updates", return_value=[update]), patch.object(bot_runtime, "handle_prm_post_answer_callback", return_value={"message": "Recorded: useful.", "reply_markup": {"inline_keyboard": []}}), patch.object(bot_runtime, "send_message") as send_mock, patch.object(bot_runtime, "_telegram_answer_callback") as answer_mock:
             bot_runtime.run_bot(settings, runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT)
         answer_mock.assert_called_once_with("token", "callback-1", "Recorded")
-        send_mock.assert_called_once_with("token", "12345", "Recorded: useful.", parse_mode=None, reply_markup={"inline_keyboard": []})
+        send_mock.assert_called_once()
+        self.assertEqual(send_mock.call_args.args, ("token", "12345", "Recorded: useful."))
+        self.assertEqual(send_mock.call_args.kwargs["parse_mode"], None)
+        self.assertEqual(send_mock.call_args.kwargs["reply_markup"], {"inline_keyboard": []})
+        self.assertEqual(send_mock.call_args.kwargs["actor_id"], "12345")
+        self.assertEqual(send_mock.call_args.kwargs["owner_chat_id"], "12345")
+        self.assertTrue(send_mock.call_args.kwargs["delivery_authorization"].allowed)
 
     def test_run_bot_dispatches_transcribed_voice_feedback(self):
         settings = self._settings_with_idea()
@@ -469,14 +479,15 @@ class TestIdeaCallbacks(unittest.TestCase):
         ) as dispatch_mock:
             bot_runtime.run_bot(settings, runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT)
 
-        dispatch_mock.assert_called_once_with(
-            chat_id="12345",
-            text="/auto_voice Too shallow target=eval-gates.",
-            settings=settings,
-            runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT,
-            actor_id="12345",
-            owner_chat_id="12345",
-        )
+        dispatch_mock.assert_called_once()
+        self.assertEqual(dispatch_mock.call_args.kwargs["chat_id"], "12345")
+        self.assertEqual(dispatch_mock.call_args.kwargs["text"], "/auto_voice Too shallow target=eval-gates.")
+        self.assertIs(dispatch_mock.call_args.kwargs["settings"], settings)
+        self.assertEqual(dispatch_mock.call_args.kwargs["runtime_mode"], bot_runtime.BOT_RUNTIME_PRM_ASSISTANT)
+        self.assertEqual(dispatch_mock.call_args.kwargs["actor_id"], "12345")
+        self.assertEqual(dispatch_mock.call_args.kwargs["owner_chat_id"], "12345")
+        self.assertEqual(len(dispatch_mock.call_args.kwargs["delivery_authorizations"]), 8)
+        self.assertIsNone(dispatch_mock.call_args.kwargs["utd_draft_authorization"])
 
     def test_run_bot_prm_safe_dispatches_completed_voice_with_owner_tuple(self):
         settings = self._settings_with_idea()
@@ -495,14 +506,15 @@ class TestIdeaCallbacks(unittest.TestCase):
         with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "token", "TELEGRAM_OWNER_CHAT_ID": "12345"}, clear=False), patch.object(bot_runtime, "_install_signal_handlers", side_effect=stop_after_first_poll), patch.object(bot_runtime, "_telegram_get_updates", return_value=[update]), patch.object(bot_runtime, "transcribe_telegram_voice", return_value="completed private voice"), patch.object(bot_runtime, "dispatch_command") as dispatch_mock, patch.object(bot_runtime, "send_message"):
             bot_runtime.run_bot(settings, runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT)
 
-        dispatch_mock.assert_called_once_with(
-            chat_id="12345",
-            text="/auto_voice completed private voice",
-            settings=settings,
-            runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT,
-            actor_id="12345",
-            owner_chat_id="12345",
-        )
+        dispatch_mock.assert_called_once()
+        self.assertEqual(dispatch_mock.call_args.kwargs["chat_id"], "12345")
+        self.assertEqual(dispatch_mock.call_args.kwargs["text"], "/auto_voice completed private voice")
+        self.assertIs(dispatch_mock.call_args.kwargs["settings"], settings)
+        self.assertEqual(dispatch_mock.call_args.kwargs["runtime_mode"], bot_runtime.BOT_RUNTIME_PRM_ASSISTANT)
+        self.assertEqual(dispatch_mock.call_args.kwargs["actor_id"], "12345")
+        self.assertEqual(dispatch_mock.call_args.kwargs["owner_chat_id"], "12345")
+        self.assertEqual(len(dispatch_mock.call_args.kwargs["delivery_authorizations"]), 7)
+        self.assertIsNone(dispatch_mock.call_args.kwargs["utd_draft_authorization"])
 
     def test_run_bot_dispatches_plain_text_to_hermes_chat(self):
         settings = self._settings_with_idea()
@@ -566,14 +578,15 @@ class TestIdeaCallbacks(unittest.TestCase):
         ) as dispatch_mock:
             bot_runtime.run_bot(settings, runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT)
 
-        dispatch_mock.assert_called_once_with(
-            chat_id="12345",
-            text="/auto Что мне делать с weekly workbook?",
-            settings=settings,
-            runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT,
-            actor_id="12345",
-            owner_chat_id="12345",
-        )
+        dispatch_mock.assert_called_once()
+        self.assertEqual(dispatch_mock.call_args.kwargs["chat_id"], "12345")
+        self.assertEqual(dispatch_mock.call_args.kwargs["text"], "/auto Что мне делать с weekly workbook?")
+        self.assertIs(dispatch_mock.call_args.kwargs["settings"], settings)
+        self.assertEqual(dispatch_mock.call_args.kwargs["runtime_mode"], bot_runtime.BOT_RUNTIME_PRM_ASSISTANT)
+        self.assertEqual(dispatch_mock.call_args.kwargs["actor_id"], "12345")
+        self.assertEqual(dispatch_mock.call_args.kwargs["owner_chat_id"], "12345")
+        self.assertEqual(len(dispatch_mock.call_args.kwargs["delivery_authorizations"]), 8)
+        self.assertIsNone(dispatch_mock.call_args.kwargs["utd_draft_authorization"])
 
     def test_run_bot_prm_safe_drops_owner_sender_message_in_group(self):
         settings = self._settings_with_idea()

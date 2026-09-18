@@ -354,7 +354,7 @@ def test_pa_safe_ops_deny_before_ungated_legacy_handler_dispatch(monkeypatch, tm
     assert legacy_call == []
 
 
-def test_prm_voice_polling_ingress_cannot_reach_the_fake_telegram_sender_without_delivery_grant(
+def test_prm_private_voice_ingress_uses_its_bounded_return_envelope_at_the_final_sender(
     monkeypatch,
 ):
     sent: list[str] = []
@@ -379,7 +379,140 @@ def test_prm_voice_polling_ingress_cannot_reach_the_fake_telegram_sender_without
 
     bot_runtime.run_bot(SimpleNamespace(), runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT)
 
-    assert sent == []
+    assert len(sent) == 2
+    assert "Распознаю" in sent[0]
+    assert "обычное текстовое сообщение" in sent[1]
+
+
+def test_private_return_envelope_is_exactly_bound_and_not_issued_for_another_actor():
+    decisions = prm_handlers.issue_private_reply_authorizations(
+        token=SYNTHETIC_TELEGRAM_TOKEN,
+        chat_id="42",
+        actor_id="42",
+        owner_chat_id="42",
+        maximum_send_count=2,
+    )
+
+    assert len(decisions) == 2
+    assert all(decision.allowed for decision in decisions)
+    assert all(decision.owner_ref == "owner_telegram_42" for decision in decisions)
+    assert all(decision.resource_ref == "42" for decision in decisions)
+    assert all(decision.capability == "assistant.result_delivery" for decision in decisions)
+    assert all(decision.purpose == "answer.delivery" for decision in decisions)
+    assert prm_handlers.issue_private_reply_authorizations(
+        token=SYNTHETIC_TELEGRAM_TOKEN,
+        chat_id="42",
+        actor_id="43",
+        owner_chat_id="42",
+    ) == ()
+    assert prm_handlers.issue_private_utd_draft_authorization(
+        chat_id="42",
+        actor_id="43",
+        owner_chat_id="42",
+    ) is None
+
+
+def test_prm_private_text_ingress_renders_default_deny_privacy_without_a_durable_grant(
+    monkeypatch,
+    tmp_path,
+):
+    sent: list[str] = []
+    update = {
+        "update_id": 2,
+        "message": {"chat": {"id": 42}, "from": {"id": 42}, "text": "/privacy"},
+    }
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", SYNTHETIC_TELEGRAM_TOKEN)
+    monkeypatch.setenv("TELEGRAM_OWNER_CHAT_ID", "42")
+    monkeypatch.setattr(bot_runtime, "_install_signal_handlers", lambda state: setattr(state, "stop_requested", True))
+    monkeypatch.setattr(bot_runtime, "_telegram_get_updates", lambda **_kwargs: [update])
+    monkeypatch.setattr(
+        prm_handlers,
+        "_send_text_internal",
+        lambda **kwargs: sent.append(str(kwargs["text"])),
+    )
+
+    bot_runtime.run_bot(
+        SimpleNamespace(db_path=str(tmp_path / "synthetic.db")),
+        runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT,
+    )
+
+    assert len(sent) == 1
+    assert "нет активных разрешений" in sent[0]
+
+
+def test_prm_private_utd_command_gets_the_one_local_draft_decision_only_when_requested(
+    monkeypatch,
+    tmp_path,
+):
+    dispatched: list[dict] = []
+    update = {
+        "update_id": 21,
+        "message": {"chat": {"id": 42}, "from": {"id": 42}, "text": "/utd Мой профиль"},
+    }
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", SYNTHETIC_TELEGRAM_TOKEN)
+    monkeypatch.setenv("TELEGRAM_OWNER_CHAT_ID", "42")
+    monkeypatch.setattr(bot_runtime, "_install_signal_handlers", lambda state: setattr(state, "stop_requested", True))
+    monkeypatch.setattr(bot_runtime, "_telegram_get_updates", lambda **_kwargs: [update])
+    monkeypatch.setattr(bot_runtime, "dispatch_command", lambda **kwargs: dispatched.append(kwargs))
+
+    bot_runtime.run_bot(
+        SimpleNamespace(db_path=str(tmp_path / "synthetic.db")),
+        runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT,
+    )
+
+    assert len(dispatched) == 1
+    authorization = dispatched[0]["utd_draft_authorization"]
+    assert authorization is not None and authorization.allowed
+    assert authorization.capability == "assistant.utd_draft"
+    assert authorization.operation == "write"
+    assert authorization.purpose == "utd.draft"
+
+
+def test_prm_callback_followup_uses_the_same_private_return_envelope(monkeypatch, tmp_path):
+    sent: list[str] = []
+    monkeypatch.setattr(prm_handlers, "_send_text_internal", lambda **kwargs: sent.append(str(kwargs["text"])))
+    monkeypatch.setattr(bot_runtime, "validate_prm_post_answer_callback", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr(
+        bot_runtime,
+        "apply_validated_prm_post_answer_callback",
+        lambda *_args, **_kwargs: {"status": "ok", "message": "Synthetic callback follow-up."},
+    )
+    monkeypatch.setattr(bot_runtime, "_telegram_answer_callback", lambda *_args, **_kwargs: None)
+
+    bot_runtime._handle_callback(
+        {
+            "id": "callback-1",
+            "from": {"id": 42},
+            "message": {"chat": {"id": 42}},
+            "data": "prma:opaque:n",
+        },
+        token=SYNTHETIC_TELEGRAM_TOKEN,
+        owner_chat_id="42",
+        settings=SimpleNamespace(db_path=str(tmp_path / "synthetic.db")),
+        runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT,
+    )
+
+    assert sent == ["Synthetic callback follow-up."]
+
+
+def test_prm_rejects_private_chat_with_a_mismatched_sender_before_dispatch(monkeypatch, tmp_path):
+    dispatched: list[str] = []
+    update = {
+        "update_id": 3,
+        "message": {"chat": {"id": 42}, "from": {"id": 43}, "text": "/privacy"},
+    }
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", SYNTHETIC_TELEGRAM_TOKEN)
+    monkeypatch.setenv("TELEGRAM_OWNER_CHAT_ID", "42")
+    monkeypatch.setattr(bot_runtime, "_install_signal_handlers", lambda state: setattr(state, "stop_requested", True))
+    monkeypatch.setattr(bot_runtime, "_telegram_get_updates", lambda **_kwargs: [update])
+    monkeypatch.setattr(bot_runtime, "dispatch_command", lambda **kwargs: dispatched.append(str(kwargs["text"])))
+
+    bot_runtime.run_bot(
+        SimpleNamespace(db_path=str(tmp_path / "synthetic.db")),
+        runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT,
+    )
+
+    assert dispatched == []
 
 
 def test_private_context_needs_its_own_data_class_grant(monkeypatch):
