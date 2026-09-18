@@ -116,6 +116,13 @@ def dispatch_prm_command(
             "Напиши вопрос после команды или просто отправь обычное сообщение.",
         )
         return
+    if _is_memory_action_followup(args):
+        send_message(
+            _token(),
+            chat_id,
+            "Это действие недоступно. Отправь запрос заново, чтобы получить новую кнопку действия.",
+        )
+        return
     dialog = _resolve_prm_dialog_query(chat_id, args, mode=mode)
     if dialog.get("kind") == "post_answer_action":
         send_message(

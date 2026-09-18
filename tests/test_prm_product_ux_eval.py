@@ -119,7 +119,7 @@ def test_product_ux_simulates_utd_notification_with_feedback_controls():
     assert result["deterministic_summary"]["failed_turns"] == 0
 
 
-def test_product_ux_keeps_project_context_for_confirmation_followups():
+def test_product_ux_denies_legacy_free_text_actions_without_context_fabrication():
     module = _module("prm_product_ux_eval_project_followup")
     specs = module.build_case_index(
         module.build_corpus(), include_one_turn_cases=False, dialogue_window_turns=4
@@ -131,9 +131,10 @@ def test_product_ux_keeps_project_context_for_confirmation_followups():
         for turn in result["turns"]
         if turn["turn_id"] in {"turn:06:agent_evals", "turn:07:agent_evals"}
     ]
-    assert all(turn["expected"]["project_context_required"] is True for turn in confirmation_turns)
-    assert all(turn["actual"]["project_context_required"] is True for turn in confirmation_turns)
-    assert all("project_context_ok" not in turn["failure_codes"] for turn in confirmation_turns)
+    assert all(turn["expected"]["project_context_required"] is False for turn in confirmation_turns)
+    assert all(turn["actual"]["status"] == "action_unavailable" for turn in confirmation_turns)
+    assert all(turn["actual"]["action_codes"] == [] for turn in confirmation_turns)
+    assert all(turn["actual"]["dialog_context_used"] is False for turn in confirmation_turns)
 
 
 def test_product_ux_preview_and_pause_feedback_use_contract_markers():

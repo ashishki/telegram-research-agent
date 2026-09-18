@@ -511,16 +511,10 @@ def _add_prm_dialogues(dialogues: list[dict[str, Any]]) -> None:
                         _prm_turn(
                             f"turn:06:{slug}",
                             "сохрани заметку, но сначала покажи что именно сохранишь",
-                            expected_intent="memory_action",
-                            expected_project_context=True,
-                            expects_confirmation=True,
                         ),
                         _prm_turn(
                             f"turn:07:{slug}",
                             "следи за этой темой, но без автомутации профиля",
-                            expected_intent="memory_action",
-                            expected_project_context=True,
-                            expects_confirmation=True,
                         ),
                         _prm_turn(
                             f"turn:08:{slug}",
@@ -1005,23 +999,32 @@ def _simulate_prm_application(
         )
     mode = str(turn.get("mode") or "auto")
     chat_id = str(state.get("prm_chat_id") or f"product-ux-eval-{_stable_hash(message)[:10]}")
-    dialog = prm_handlers._resolve_prm_dialog_query(chat_id, message, mode=mode)
-    if dialog.get("kind") == "post_answer_action":
-        preview = _simulate_post_answer_preview(dialog, state=state)
-        prm_handlers._remember_pending_prm_action(
-            chat_id,
-            action=str(dialog.get("post_answer_action") or ""),
-            message=preview,
-        )
+    if prm_handlers._is_memory_action_followup(message):
         return _turn_result(
             turn,
             index=index,
-            message=preview,
+            message="Это действие недоступно. Отправь запрос заново, чтобы получить новую кнопку действия.",
+            actual={
+                "surface": "prm_application", "status": "action_unavailable", "mode": "research",
+                "primary_intent": "", "response_contract_id": "archive_research.v2",
+                "project_context_required": False, "external_verification_required": False,
+                "current_fact_boundary": False, "source_count": 0, "direct_count": 0,
+                "partial_count": 0, "adjacent_count": 0, "answer_chars": 87,
+                "action_codes": [], "dialog_context_used": False,
+                "unsupported_claim_rate": 0.0, "current_fact_violations": 0,
+            },
+        )
+    dialog = prm_handlers._resolve_prm_dialog_query(chat_id, message, mode=mode)
+    if dialog.get("kind") == "post_answer_action":
+        return _turn_result(
+            turn,
+            index=index,
+            message="Это действие недоступно. Отправь запрос заново, чтобы получить новую кнопку действия.",
             actual={
                 "surface": "prm_application",
-                "status": "needs_confirmation",
+                "status": "action_unavailable",
                 "mode": "research",
-                "primary_intent": "memory_action",
+                "primary_intent": "",
                 "response_contract_id": "archive_research.v2",
                 "project_context_required": False,
                 "external_verification_required": False,
@@ -1030,9 +1033,9 @@ def _simulate_prm_application(
                 "direct_count": 0,
                 "partial_count": 0,
                 "adjacent_count": 0,
-                "answer_chars": 180,
-                "action_codes": ["confirm"],
-                "dialog_context_used": True,
+                "answer_chars": 87,
+                "action_codes": [],
+                "dialog_context_used": False,
                 "unsupported_claim_rate": 0.0,
                 "current_fact_violations": 0,
             },
