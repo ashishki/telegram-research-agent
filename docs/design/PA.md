@@ -177,13 +177,11 @@ and the absence of database/memory/receipt writes on invalid PRM input;
 `test_handle_callback_validates_prm_before_acknowledgement` names the
 `bot.bot._handle_callback` boundary.
 
-Legacy natural-language save/watch selection must not call
-`handle_post_answer_callback` in PA-00 and must not synthesize an actor ID; it
-asks for the current inline action instead. This denial is independent of
-`_PRM_DIALOG_STATE`: it does not read or transform `last_project_name`,
-`last_topic` or `last_action_context_id` into a callback. The no-reroute test
-instruments the application/search entrypoint and requires zero calls for an
-old callback.
+Legacy natural-language save/watch never calls `handle_post_answer_callback` or
+synthesizes an actor ID. Without a valid control it says: “This action is
+unavailable. Run the request again to receive a new action button.” It never
+reads `_PRM_DIALOG_STATE` or turns its last project/topic/context into a
+callback; the no-reroute test requires zero application/search calls.
 
 Initial `offered_action_codes` authorize only the buttons rendered with the
 answer. A non-initial callback code is accepted solely through the following
@@ -209,13 +207,13 @@ The existing UTD flows share this table but are not PRM bindings. PA-00 repairs
 their clean-schema incompatibility without a migration: `utd_state` in their
 `summary_json` is authoritative, while table status maps `draft -> ready`,
 `previewed|confirming -> pending`, `confirmed -> confirmed`, and
-`cancelled|expired -> cancelled`. Every UTD read/write/claim derives or updates
-that pair atomically through `encode_utd_proposal_state` and
-`decode_utd_proposal_state`; untagged legacy pending rows fail closed. Required
-callers are onboarding, `_load_draft`/`_save_draft`/discard, profile
-preview-confirm-cancel, and subscription start/claim/finish/cancel. This permits a
-real UTD-path drain fixture under the canonical schema. The shared rollback
-drain blocks old UTD code until such active mapped rows are gone.
+`cancelled|expired -> cancelled`. `encode_utd_proposal_state` and
+`decode_utd_proposal_state` atomically maintain that pair; any missing,
+malformed or mismatched `utd_state`/table status (including untagged legacy
+`pending`) fails closed without a write. Required callers: onboarding, draft
+load/save/discard, profile preview/confirm/cancel, subscription
+start/claim/finish/cancel. This permits a real UTD-path drain fixture; the
+shared drain blocks old UTD code until active mapped rows are gone.
 
 This is JSON-additive: PA-00 adds no table migration. Only `context_kind=prm`
 rows receive/require this binding; the shared UTD draft representation is not
@@ -266,23 +264,11 @@ the corresponding provider-write confirmation and reconciliation. Thus PA-00
 tests callback/source integrity and denies unsafe legacy text action selection;
 it does not claim that natural-language confirmation is already shipped.
 
-## UX and briefs
+## Product constraints
 
-Natural language preserves context; brief outputs remain source-identical and
-visually inspected before acceptance.
-
-## Academic integration
-
-Public-watch never authorizes mail/Canvas; unsupported access and uncertainty
-stay explicit.
-
-## Failure and recovery
-
-Test grants, failures and recovery; failed delivery is never success.
-
-## Migration and rollback
-
-Changes default off; production migration/restore needs separate approval.
+Natural language preserves context; briefs are source-identical and visually
+inspected. Public-watch never authorizes mail/Canvas. Failed delivery is not
+success. Changes default off; production migration/restore needs approval.
 
 ## Vertical slices and acceptance
 

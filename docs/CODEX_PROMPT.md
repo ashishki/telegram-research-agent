@@ -93,6 +93,10 @@ The evaluator must deny free-text legacy action selection without fabricating a
 preview/callback/`eval-*` context, while a separate immutable bound-inline
 fixture covers project provenance. `test_interaction_ledger.py` passes the same
 explicit synthetic private tuple as production; chat-only controls stay denied.
+When no valid inline control exists, free-text action denial tells the user to
+run the request again for a new action button; it must not point to a nonexistent
+current control. UTD decoding accepts only a matching encoded `utd_state` and
+table status; missing, malformed or mismatched pairs fail closed without a write.
 Use `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest` for
 the direct PA-00 command, which explicitly includes
 `test_product_ux_keeps_project_context_for_confirmation_followups`; record the
@@ -111,7 +115,8 @@ the text/embedded-transcript/completed-voice/compatibility/callback matrix
 `test_plain_language_action_selection_rejects_stale_or_cross_topic_context`.
 Record the interpreter/environment, exact HEAD, active entrypoints,
 classification (evaluator, application, or both), before/after direct result,
-focused-tier result and any infrastructure-only blocker.
+focused-tier result and any infrastructure-only blocker. Invoke the focused tier
+with the same `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` environment.
 
 ## Boundaries and evidence
 
