@@ -157,6 +157,43 @@ def test_invalid_prm_action_context_is_read_only_before_rejection(monkeypatch):
     assert receipts_after == receipts_before
 
 
+def test_post_answer_context_rejects_expired_wrong_chat_actor_or_tampered_binding(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmp:
+        db_path = os.path.join(tmp, "memory.db")
+        monkeypatch.setenv("AGENT_DB_PATH", db_path)
+        run_migrations()
+        bound = _build_post_answer_actions(
+            _answer(), db_path=db_path, chat_id="42", actor_id="42", owner_chat_id="42"
+        )
+        callback = f"{PRM_ACTION_PREFIX}:{bound['context_id']}:n"
+        wrong_chat = _handle_post_answer_callback(
+            db_path, callback, chat_id="43", actor_id="43", owner_chat_id="43"
+        )
+        wrong_actor = _handle_post_answer_callback(
+            db_path, callback, chat_id="42", actor_id="43", owner_chat_id="42"
+        )
+        with sqlite3.connect(db_path) as connection:
+            connection.execute(
+                "UPDATE prm_post_answer_proposals SET expires_at = '2000-01-01T00:00:00Z' WHERE context_id = ?",
+                (bound["context_id"],),
+            )
+        expired = _handle_post_answer_callback(
+            db_path, callback, chat_id="42", actor_id="42", owner_chat_id="42"
+        )
+        with sqlite3.connect(db_path) as connection:
+            connection.execute(
+                "UPDATE prm_post_answer_proposals SET expires_at = '2999-01-01T00:00:00Z', "
+                "summary_json = json_set(summary_json, '$.prm_post_answer_action_binding.source_result_version', 'tampered') "
+                "WHERE context_id = ?",
+                (bound["context_id"],),
+            )
+        tampered = _handle_post_answer_callback(
+            db_path, callback, chat_id="42", actor_id="42", owner_chat_id="42"
+        )
+
+    assert {result["status"] for result in (wrong_chat, wrong_actor, expired, tampered)} == {"action_unavailable"}
+
+
 def test_validated_prm_action_cas_rejects_stale_row(monkeypatch):
     with tempfile.TemporaryDirectory() as tmp:
         db_path = os.path.join(tmp, "memory.db")

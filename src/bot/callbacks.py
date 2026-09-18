@@ -5,7 +5,11 @@ from datetime import datetime, timezone
 from assistant.prm_post_answer_actions import (
     PRM_ACTION_PREFIX,
     PRM_CONFIRM_PREFIX,
+    UnavailablePrmAction,
+    ValidatedPrmAction,
+    apply_validated_prm_action,
     handle_post_answer_callback,
+    validate_prm_post_answer_callback as _validate_prm_post_answer_callback,
 )
 from assistant.utd_profile import (
     UTD_CONFIRM_PREFIX,
@@ -330,3 +334,32 @@ def handle_prm_post_answer_callback(
             owner_chat_id=owner_chat_id,
         )
     raise ValueError("Unsupported PRM callback")
+
+
+def validate_prm_post_answer_callback(
+    settings: Settings,
+    callback_data: str,
+    *,
+    chat_id: str,
+    actor_id: str | None = None,
+    owner_chat_id: str | None = None,
+) -> ValidatedPrmAction | UnavailablePrmAction:
+    """Expose PRM's pure callback validation to the Telegram transport."""
+
+    if not callback_data.startswith((f"{PRM_ACTION_PREFIX}:", f"{PRM_CONFIRM_PREFIX}:")):
+        return UnavailablePrmAction()
+    return _validate_prm_post_answer_callback(
+        settings.db_path,
+        callback_data,
+        chat_id=chat_id,
+        actor_id=actor_id,
+        owner_chat_id=owner_chat_id,
+    )
+
+
+def apply_validated_prm_post_answer_callback(
+    settings: Settings, validated: ValidatedPrmAction,
+) -> dict:
+    """Apply exactly the immutable result returned by the transport validation."""
+
+    return apply_validated_prm_action(settings.db_path, validated)

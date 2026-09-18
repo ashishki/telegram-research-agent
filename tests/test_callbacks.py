@@ -340,7 +340,11 @@ class TestIdeaCallbacks(unittest.TestCase):
             return_value=[update],
         ), patch.object(
             bot_runtime,
-            "handle_prm_post_answer_callback",
+            "validate_prm_post_answer_callback",
+            return_value=object(),
+        ) as validate_mock, patch.object(
+            bot_runtime,
+            "apply_validated_prm_post_answer_callback",
             return_value={"message": "Черновик готов.", "reply_markup": {"inline_keyboard": []}},
         ) as action_mock, patch.object(
             bot_runtime,
@@ -351,13 +355,46 @@ class TestIdeaCallbacks(unittest.TestCase):
         ) as answer_mock:
             bot_runtime.run_bot(settings, runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT)
 
-        action_mock.assert_called_once_with(
+        validate_mock.assert_called_once_with(
             settings, "prma:opaque:n", chat_id="12345", actor_id="12345", owner_chat_id="12345"
         )
+        action_mock.assert_called_once_with(settings, validate_mock.return_value)
         send_mock.assert_called_once_with(
             "token", "12345", "Черновик готов.", parse_mode=None, reply_markup={"inline_keyboard": []}
         )
         answer_mock.assert_called_once_with("token", "callback-1", "Принято")
+
+    def test_handle_callback_validates_prm_before_acknowledgement(self):
+        from assistant.prm_post_answer_actions import UnavailablePrmAction
+
+        settings = self._settings_with_idea()
+        update = {
+            "update_id": 100,
+            "callback_query": {
+                "id": "callback-invalid",
+                "from": {"id": 12345},
+                "message": {"chat": {"id": 12345}},
+                "data": "prma:not-a-context:n",
+            },
+        }
+        events = []
+
+        def stop_after_first_poll(state):
+            state.stop_requested = True
+
+        def validate(*_args, **_kwargs):
+            events.append("validate")
+            return UnavailablePrmAction()
+
+        def acknowledge(*_args):
+            events.append("ack")
+
+        with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "token", "TELEGRAM_OWNER_CHAT_ID": "12345"}, clear=False), patch.object(bot_runtime, "_install_signal_handlers", side_effect=stop_after_first_poll), patch.object(bot_runtime, "_telegram_get_updates", return_value=[update]), patch.object(bot_runtime, "validate_prm_post_answer_callback", side_effect=validate), patch.object(bot_runtime, "apply_validated_prm_post_answer_callback") as apply_mock, patch.object(bot_runtime, "_telegram_answer_callback", side_effect=acknowledge), patch.object(bot_runtime, "send_message") as send_mock:
+            bot_runtime.run_bot(settings, runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT)
+
+        assert events == ["validate", "ack"]
+        apply_mock.assert_not_called()
+        send_mock.assert_not_called()
 
     def test_run_bot_prm_english_feedback_callback_uses_english_toast(self):
         settings = self._settings_with_idea()
@@ -435,6 +472,32 @@ class TestIdeaCallbacks(unittest.TestCase):
         dispatch_mock.assert_called_once_with(
             chat_id="12345",
             text="/auto_voice Too shallow target=eval-gates.",
+            settings=settings,
+            runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT,
+            actor_id="12345",
+            owner_chat_id="12345",
+        )
+
+    def test_run_bot_prm_safe_dispatches_completed_voice_with_owner_tuple(self):
+        settings = self._settings_with_idea()
+        update = {
+            "update_id": 102,
+            "message": {
+                "chat": {"id": 12345},
+                "from": {"id": 12345},
+                "voice": {"file_id": "voice-1"},
+            },
+        }
+
+        def stop_after_first_poll(state):
+            state.stop_requested = True
+
+        with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "token", "TELEGRAM_OWNER_CHAT_ID": "12345"}, clear=False), patch.object(bot_runtime, "_install_signal_handlers", side_effect=stop_after_first_poll), patch.object(bot_runtime, "_telegram_get_updates", return_value=[update]), patch.object(bot_runtime, "transcribe_telegram_voice", return_value="completed private voice"), patch.object(bot_runtime, "dispatch_command") as dispatch_mock, patch.object(bot_runtime, "send_message"):
+            bot_runtime.run_bot(settings, runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT)
+
+        dispatch_mock.assert_called_once_with(
+            chat_id="12345",
+            text="/auto_voice completed private voice",
             settings=settings,
             runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT,
             actor_id="12345",
@@ -531,10 +594,12 @@ class TestIdeaCallbacks(unittest.TestCase):
         def stop_after_first_poll(state):
             state.stop_requested = True
 
-        with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "token", "TELEGRAM_OWNER_CHAT_ID": "12345"}, clear=False), patch.object(bot_runtime, "_install_signal_handlers", side_effect=stop_after_first_poll), patch.object(bot_runtime, "_telegram_get_updates", return_value=[update]), patch.object(bot_runtime, "handle_prm_post_answer_callback", return_value={"status": "action_unavailable"}) as action_mock, patch.object(bot_runtime, "_telegram_answer_callback") as answer_mock, patch.object(bot_runtime, "send_message") as send_mock:
+        from assistant.prm_post_answer_actions import UnavailablePrmAction
+        with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "token", "TELEGRAM_OWNER_CHAT_ID": "12345"}, clear=False), patch.object(bot_runtime, "_install_signal_handlers", side_effect=stop_after_first_poll), patch.object(bot_runtime, "_telegram_get_updates", return_value=[update]), patch.object(bot_runtime, "validate_prm_post_answer_callback", return_value=UnavailablePrmAction()) as validation_mock, patch.object(bot_runtime, "apply_validated_prm_post_answer_callback") as action_mock, patch.object(bot_runtime, "_telegram_answer_callback") as answer_mock, patch.object(bot_runtime, "send_message") as send_mock:
             bot_runtime.run_bot(settings, runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT)
 
-        action_mock.assert_called_once_with(settings, "prma:opaque:n", chat_id="-10077", actor_id="12345", owner_chat_id="12345")
+        validation_mock.assert_called_once_with(settings, "prma:opaque:n", chat_id="-10077", actor_id="12345", owner_chat_id="12345")
+        action_mock.assert_not_called()
         answer_mock.assert_called_once_with("token", "callback-group", "Action unavailable")
         send_mock.assert_not_called()
 

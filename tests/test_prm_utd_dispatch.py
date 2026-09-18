@@ -123,7 +123,7 @@ def test_live_dispatch_persists_explicit_replacement_topic_for_week_followup(mon
     assert "Topic A" not in followup["effective_query"]
 
 
-def test_free_text_save_followup_requires_a_current_inline_control(monkeypatch, tmp_path) -> None:
+def test_plain_language_action_selection_rejects_stale_or_cross_topic_context(monkeypatch, tmp_path) -> None:
     prm_handlers._PRM_DIALOG_STATE.clear()
     prm_handlers._remember_prm_dialog(
         "42",

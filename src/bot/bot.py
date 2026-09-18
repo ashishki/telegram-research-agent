@@ -11,7 +11,13 @@ from typing import Any
 from urllib import parse, request
 
 from config.settings import Settings
-from .callbacks import handle_prm_post_answer_callback, record_callback
+from assistant.prm_post_answer_actions import UnavailablePrmAction
+from .callbacks import (
+    apply_validated_prm_post_answer_callback,
+    handle_prm_post_answer_callback,
+    record_callback,
+    validate_prm_post_answer_callback,
+)
 from .prm_handlers import dispatch_prm_command, send_message
 from .runtime import (
     BOT_RUNTIME_LEGACY,
@@ -295,13 +301,18 @@ def _handle_callback(
     data = str(callback.get("data") or "")
     if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT and data.startswith(("prma:", "prmc:")):
         callback_chat_id = str((((callback.get("message") or {}).get("chat") or {}).get("id")) or "")
-        result = handle_prm_post_answer_callback(
+        validated = validate_prm_post_answer_callback(
             settings,
             data,
             chat_id=callback_chat_id,
             actor_id=str((callback.get("from") or {}).get("id") or ""),
             owner_chat_id=owner_chat_id,
         )
+        if isinstance(validated, UnavailablePrmAction):
+            if callback_id:
+                _telegram_answer_callback(token, callback_id, "Action unavailable")
+            return
+        result = apply_validated_prm_post_answer_callback(settings, validated)
         unavailable = str(result.get("status") or "") in {
             "action_unavailable", "expired", "action_not_available", "missing_proposal",
             "invalid_selection", "selection_required",

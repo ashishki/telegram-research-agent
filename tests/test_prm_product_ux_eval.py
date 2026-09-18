@@ -119,7 +119,7 @@ def test_product_ux_simulates_utd_notification_with_feedback_controls():
     assert result["deterministic_summary"]["failed_turns"] == 0
 
 
-def test_product_ux_denies_legacy_free_text_actions_without_context_fabrication():
+def test_product_ux_keeps_project_context_for_confirmation_followups():
     module = _module("prm_product_ux_eval_project_followup")
     specs = module.build_case_index(
         module.build_corpus(), include_one_turn_cases=False, dialogue_window_turns=4
@@ -135,6 +135,23 @@ def test_product_ux_denies_legacy_free_text_actions_without_context_fabrication(
     assert all(turn["actual"]["status"] == "action_unavailable" for turn in confirmation_turns)
     assert all(turn["actual"]["action_codes"] == [] for turn in confirmation_turns)
     assert all(turn["actual"]["dialog_context_used"] is False for turn in confirmation_turns)
+
+
+def test_product_ux_uses_declared_bound_inline_project_provenance_only():
+    module = _module("prm_product_ux_eval_bound_inline")
+    spec = next(
+        item for item in module.build_case_index(
+            module.build_corpus(), include_one_turn_cases=True, dialogue_window_turns=4
+        )
+        if item["case_id"] == "judge:one:prm:bound_inline:project_provenance"
+    )
+    result = module.simulate_judge_case(spec)
+    turn = result["turns"][0]
+
+    assert turn["actual"]["status"] == "bound_inline"
+    assert turn["actual"]["project_context_required"] is True
+    assert turn["actual"]["action_codes"] == ["n", "p"]
+    assert turn["actual"]["dialog_context_used"] is False
 
 
 def test_product_ux_preview_and_pause_feedback_use_contract_markers():

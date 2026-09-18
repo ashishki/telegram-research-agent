@@ -392,6 +392,35 @@ def _add_prm_one_turn_cases(cases: list[dict[str, Any]]) -> None:
             },
         }
     )
+    cases.append(
+        {
+            "case_id": "one:prm:bound_inline:project_provenance",
+            "surface": "prm_application",
+            "message": "inline control fixture",
+            "bound_inline_source": {
+                "title": "Связанный вывод",
+                "query": "agent evaluation",
+                "body": "Точный сохранённый вывод из ответа.",
+                "source_refs": ["https://t.me/example/agent-evals"],
+                "evidence_items": [{
+                    "source_url": "https://t.me/example/agent-evals",
+                    "snippet": "Точный сохранённый вывод из ответа.",
+                }],
+                "project_name": "telegram-research-agent",
+                "primary_intent": "archive_to_action",
+                "response_contract_id": "archive_research.v2",
+                "direct_count": 1,
+                "partial_count": 0,
+                "offered_action_codes": ["n", "p"],
+            },
+            "expected": {
+                "surface": "prm_application",
+                "primary_intent": "archive_to_action",
+                "mode": "research",
+                "project_context_required": True,
+            },
+        }
+    )
 
 
 def _add_utd_one_turn_cases(cases: list[dict[str, Any]]) -> None:
@@ -940,7 +969,7 @@ def _simulate_prm_application(
     state: Mapping[str, Any],
     assistant_cache: dict[str, Any],
 ) -> SimulatedTurn:
-    from assistant.prm_post_answer_actions import select_post_answer_action_codes
+    from assistant.prm_post_answer_actions import canonicalize_prm_action_snapshot, select_post_answer_action_codes
     from bot import prm_handlers
     from config.settings import load_settings
     from llm.client import suppress_usage_recording
@@ -952,6 +981,33 @@ def _simulate_prm_application(
         assistant = PersonalResearchAssistant(settings=load_settings())
         assistant_cache["assistant"] = assistant
     message = str(turn.get("message") or "")
+    bound_source = turn.get("bound_inline_source")
+    if isinstance(bound_source, Mapping):
+        snapshot = canonicalize_prm_action_snapshot(bound_source)
+        if snapshot is None:
+            return _turn_result(
+                turn,
+                index=index,
+                message="Bound inline source is unavailable.",
+                actual={"surface": "prm_application", "status": "action_unavailable"},
+            )
+        return _turn_result(
+            turn,
+            index=index,
+            message=snapshot["body"],
+            actual={
+                "surface": "prm_application", "status": "bound_inline", "mode": "research",
+                "primary_intent": snapshot["primary_intent"],
+                "response_contract_id": snapshot["response_contract_id"],
+                "project_context_required": bool(snapshot["project_name"]),
+                "external_verification_required": False, "current_fact_boundary": False,
+                "source_count": len(snapshot["source_refs"]), "direct_count": snapshot["direct_count"],
+                "partial_count": snapshot["partial_count"], "adjacent_count": 0,
+                "answer_chars": len(snapshot["body"]), "action_codes": snapshot["offered_action_codes"],
+                "dialog_context_used": False, "unsupported_claim_rate": 0.0,
+                "current_fact_violations": 0,
+            },
+        )
     if str(turn.get("synthetic_fixture") or "") == "positive_topic_edition":
         result = assistant.render_topic_edition(
             OperatorRequest(query=message, mode="brief", chat_id="product-ux-edition"),
