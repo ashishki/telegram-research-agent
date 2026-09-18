@@ -12,7 +12,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 import re
 from threading import RLock
-from typing import Literal, Sequence
+from typing import Any, Literal, Mapping, Sequence
 
 
 GrantOperation = Literal["read", "prepare", "deliver", "write", "delete", "model_egress"]
@@ -35,10 +35,17 @@ _DATA_CLASSES = {
 }
 _OPAQUE_REF = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:/@+-]{0,511}$")
 _CAPABILITY = re.compile(r"^[a-z][a-z0-9_.-]{2,80}$")
+_GRANT_REF = re.compile(r"^grant_[a-z0-9_-]{3,120}$")
+_OWNER_REF = re.compile(r"^owner_[a-z0-9_-]{3,120}$")
+_CONNECTION_REF = re.compile(r"^connection_[a-z0-9_-]{3,120}$")
 
 
 class CapabilityDenied(RuntimeError):
     """Raised only by an adapter after a policy decision has denied egress."""
+
+
+class CapabilityGrantDocumentError(ValueError):
+    """A versioned grant document is malformed or unsafe to interpret."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,6 +53,7 @@ class ProviderPolicy:
     permitted_provider_refs: tuple[str, ...]
     fallback_allowed: bool = False
     maximum_request_count: int = 1
+    egress_allowed: bool = True
 
     def __post_init__(self) -> None:
         if len(self.permitted_provider_refs) > 16:
@@ -58,6 +66,10 @@ class ProviderPolicy:
             raise ValueError("maximum request count must be an integer")
         if not 0 <= self.maximum_request_count <= 100000:
             raise ValueError("maximum request count is out of range")
+        if not isinstance(self.egress_allowed, bool):
+            raise ValueError("egress_allowed must be boolean")
+        if not self.egress_allowed and self.permitted_provider_refs:
+            raise ValueError("denied egress cannot permit providers")
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,6 +120,156 @@ class CapabilityGrant:
         if _utc(self.issued_at) > moment:
             return "not_yet_valid"
         return "active"
+
+
+def decode_capability_grant_document(
+    document: Mapping[str, Any],
+    *,
+    now: datetime | None = None,
+) -> CapabilityGrant:
+    """Decode the PA-01 ``assistant.capability_grant.v1`` contract fail-closed.
+
+    This is the sole bridge from the versioned public contract into PA-02's
+    runtime type.  It accepts only the complete v1 shape and verifies that the
+    declared status agrees with its validity/revocation timestamps at ``now``.
+    It never reads credentials, a database or an account.
+    """
+
+    if not isinstance(document, Mapping) or set(document) != {
+        "schema_version",
+        "grant_id",
+        "owner_ref",
+        "connection_ref",
+        "capability",
+        "provider_policy",
+        "validity",
+        "status",
+    }:
+        raise CapabilityGrantDocumentError("grant document has an invalid shape")
+    if document.get("schema_version") != "assistant.capability_grant.v1":
+        raise CapabilityGrantDocumentError("unsupported grant schema version")
+
+    grant_id = _document_string(document.get("grant_id"), pattern=_GRANT_REF)
+    owner_ref = _document_string(document.get("owner_ref"), pattern=_OWNER_REF)
+    connection_value = document.get("connection_ref")
+    connection_ref = (
+        None
+        if connection_value is None
+        else _document_string(connection_value, pattern=_CONNECTION_REF)
+    )
+    capability = _document_mapping(document.get("capability"), required={
+        "name", "resource_refs", "operations", "data_classes", "purpose"
+    })
+    provider_policy = _document_mapping(document.get("provider_policy"), required={
+        "egress", "permitted_provider_refs", "fallback_allowed", "maximum_request_count"
+    })
+    validity = _document_mapping(document.get("validity"), required={
+        "issued_at", "expires_at", "revision", "revoked_at"
+    })
+
+    capability_name = _document_string(capability.get("name"), pattern=_CAPABILITY)
+    resource_refs = _document_string_list(capability.get("resource_refs"), maximum=32)
+    operations = _document_string_list(capability.get("operations"), maximum=8, allowed=_OPERATIONS)
+    data_classes = _document_string_list(capability.get("data_classes"), maximum=8, allowed=_DATA_CLASSES)
+    purpose = _document_string(capability.get("purpose"), pattern=_CAPABILITY)
+
+    egress = provider_policy.get("egress")
+    if egress not in {"allow", "deny"}:
+        raise CapabilityGrantDocumentError("grant egress policy is invalid")
+    providers = _document_string_list(
+        provider_policy.get("permitted_provider_refs"),
+        maximum=16,
+        pattern=re.compile(r"^provider_[a-z0-9_.-]{3,120}$"),
+        allow_empty=egress == "deny",
+    )
+    if (egress == "allow" and not providers) or (egress == "deny" and providers):
+        raise CapabilityGrantDocumentError("grant egress/provider policy is inconsistent")
+    fallback_allowed = provider_policy.get("fallback_allowed")
+    maximum_request_count = provider_policy.get("maximum_request_count")
+    if not isinstance(fallback_allowed, bool):
+        raise CapabilityGrantDocumentError("grant fallback policy is invalid")
+    if (
+        not isinstance(maximum_request_count, int)
+        or isinstance(maximum_request_count, bool)
+        or not 0 <= maximum_request_count <= 100000
+    ):
+        raise CapabilityGrantDocumentError("grant request budget is invalid")
+
+    issued_at = _document_timestamp(validity.get("issued_at"))
+    expires_value = validity.get("expires_at")
+    expires_at = None if expires_value is None else _document_timestamp(expires_value)
+    revoked_value = validity.get("revoked_at")
+    revoked_at = None if revoked_value is None else _document_timestamp(revoked_value)
+    revision = validity.get("revision")
+    if not isinstance(revision, int) or isinstance(revision, bool) or revision < 1:
+        raise CapabilityGrantDocumentError("grant revision is invalid")
+
+    status = document.get("status")
+    if status not in {"active", "revoked", "expired"}:
+        raise CapabilityGrantDocumentError("grant status is invalid")
+    grant = CapabilityGrant(
+        grant_id=grant_id,
+        owner_ref=owner_ref,
+        connection_ref=connection_ref,
+        capability=capability_name,
+        resource_refs=tuple(resource_refs),
+        operations=tuple(operations),
+        data_classes=tuple(data_classes),
+        purpose=purpose,
+        provider_policy=ProviderPolicy(
+            tuple(providers),
+            fallback_allowed=fallback_allowed,
+            maximum_request_count=maximum_request_count,
+            egress_allowed=egress == "allow",
+        ),
+        issued_at=issued_at,
+        expires_at=expires_at,
+        revision=revision,
+        revoked_at=revoked_at,
+    )
+    if grant.state_at(_utc(now or datetime.now(timezone.utc))) != status:
+        raise CapabilityGrantDocumentError("grant status does not match validity state")
+    return grant
+
+
+def _document_mapping(value: object, *, required: set[str]) -> Mapping[str, Any]:
+    if not isinstance(value, Mapping) or set(value) != required:
+        raise CapabilityGrantDocumentError("grant nested object has an invalid shape")
+    return value
+
+
+def _document_string(value: object, *, pattern: re.Pattern[str] | None = None) -> str:
+    if not isinstance(value, str) or not value or len(value) > 512:
+        raise CapabilityGrantDocumentError("grant string field is invalid")
+    if pattern is not None and not pattern.fullmatch(value):
+        raise CapabilityGrantDocumentError("grant string field has an invalid format")
+    return value
+
+
+def _document_string_list(
+    value: object,
+    *,
+    maximum: int,
+    allowed: set[str] | None = None,
+    pattern: re.Pattern[str] | None = None,
+    allow_empty: bool = False,
+) -> list[str]:
+    if not isinstance(value, list) or (not value and not allow_empty) or len(value) > maximum:
+        raise CapabilityGrantDocumentError("grant list field is invalid")
+    values = [_document_string(item, pattern=pattern) for item in value]
+    if len(set(values)) != len(values) or (allowed is not None and not set(values) <= allowed):
+        raise CapabilityGrantDocumentError("grant list values are invalid")
+    return values
+
+
+def _document_timestamp(value: object) -> datetime:
+    if not isinstance(value, str):
+        raise CapabilityGrantDocumentError("grant timestamp is invalid")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise CapabilityGrantDocumentError("grant timestamp is invalid") from exc
+    return _utc(parsed)
 
 
 @dataclass(frozen=True, slots=True)
@@ -358,13 +520,20 @@ class CapabilityRegistry:
             return _deny(request, "fallback_not_granted", purpose_matches[0])
         if request.operation == "model_egress" and request.provider_ref is None:
             return _deny(request, "provider_required", fallback_matches[0])
-        provider_matches = [
+        egress_matches = [
             grant
             for grant in fallback_matches
+            if request.operation != "model_egress" or grant.provider_policy.egress_allowed
+        ]
+        if not egress_matches:
+            return _deny(request, "egress_denied", fallback_matches[0])
+        provider_matches = [
+            grant
+            for grant in egress_matches
             if request.provider_ref is None or request.provider_ref in grant.provider_policy.permitted_provider_refs
         ]
         if not provider_matches:
-            return _deny(request, "provider_not_permitted", fallback_matches[0])
+            return _deny(request, "provider_not_permitted", egress_matches[0])
 
         state_denial: AuthorizationDecision | None = None
         for grant in provider_matches:
@@ -511,6 +680,27 @@ def describe_grant_scope(grant: CapabilityGrant) -> str:
         f"Permitted providers: {providers}\n"
         "Ключ провайдера сам по себе не является согласием."
     )
+
+
+def describe_current_capability_scope(
+    grants: Sequence[CapabilityGrant],
+    *,
+    now: datetime | None = None,
+) -> str:
+    """Render the currently enforceable scope without inventing a grant source."""
+
+    moment = _utc(now or datetime.now(timezone.utc))
+    active = [grant for grant in grants if grant.state_at(moment) == "active"]
+    if not active:
+        return (
+            "Права и приватность\n"
+            "Сейчас нет активных разрешений: внешние модели, голосовая загрузка и "
+            "передача материалов провайдерам заблокированы.\n"
+            "Ключ провайдера сам по себе не является согласием.\n"
+            "Подключение, выдача и отзыв разрешений появятся только после отдельного "
+            "подтверждённого источника grants; этот бот его пока не создаёт."
+        )
+    return "\n\n".join(describe_grant_scope(grant) for grant in active)
 
 
 def _deny(request: AuthorizationRequest, reason: str, grant: CapabilityGrant | None = None) -> AuthorizationDecision:

@@ -118,20 +118,22 @@ class TestVoiceTranscription(unittest.TestCase):
                                 capability="media.voice_download",
                                 operation="read",
                                 provider_ref="provider_telegram",
+                                resource_ref="voice-1",
                             ),
                             download_file_authorization=_authorization(
                                 capability="media.voice_download",
                                 operation="read",
                                 provider_ref="provider_telegram",
+                                resource_ref="voice-1",
                             ),
                             transcription_authorization=_authorization(
                                 capability="media.transcribe",
                                 operation="model_egress",
                                 provider_ref="provider_openai",
+                                resource_ref="voice-1",
                             ),
                             owner_ref="owner_synthetic_primary",
                             connection_ref=None,
-                            resource_ref="resource_voice",
                         )
 
             self.assertEqual(transcript, "voice transcript")

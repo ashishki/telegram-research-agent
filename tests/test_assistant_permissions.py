@@ -13,6 +13,7 @@ from prm.capabilities import (
     CapabilityRegistry,
     CapabilityDenied,
     ProviderPolicy,
+    describe_current_capability_scope,
     describe_grant_scope,
     require_authorized_egress,
 )
@@ -200,4 +201,12 @@ def test_permission_description_states_real_scope_and_never_calls_a_key_consent(
     assert "model.generate" in description
     assert "resource_conversation" in description
     assert "provider_openai" in description
+    assert "Ключ провайдера сам по себе не является согласием." in description
+
+
+def test_empty_permission_description_is_an_explicit_default_deny_boundary():
+    description = describe_current_capability_scope(())
+
+    assert "нет активных разрешений" in description
+    assert "заблокированы" in description
     assert "Ключ провайдера сам по себе не является согласием." in description

@@ -45,14 +45,16 @@ def transcribe_telegram_voice(
     transcription_authorization: AuthorizationDecision | None = None,
     owner_ref: str | None = None,
     connection_ref: str | None = None,
-    resource_ref: str | None = None,
 ) -> str:
     """Download a Telegram voice file, transcribe it, and remove local audio."""
     if not token:
         raise VoiceTranscriptionError("Telegram bot token is missing")
     if not file_id:
         raise VoiceTranscriptionError("Telegram voice file_id is missing")
-    voice_resource_ref = resource_ref or file_id
+    # The resource is the received Telegram attachment.  Do not allow a caller
+    # to substitute an unrelated label for the file that will cross Telegram
+    # and OpenAI boundaries.
+    voice_resource_ref = file_id
     if not _voice_transcription_authorized(
         transcription_authorization,
         owner_ref=owner_ref,

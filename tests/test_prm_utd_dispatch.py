@@ -200,6 +200,54 @@ def test_utd_command_is_part_of_active_prm_surface() -> None:
     assert "/utd" in prm_handlers.PRM_SAFE_COMMANDS
 
 
+def test_privacy_command_shows_only_the_actual_default_deny_scope(monkeypatch, tmp_path) -> None:
+    sent = []
+
+    class ForbiddenAssistant:
+        def __init__(self, *args, **kwargs):
+            raise AssertionError("permission explanation must not enter PRM research")
+
+    monkeypatch.setattr(prm_handlers, "PersonalResearchAssistant", ForbiddenAssistant)
+    monkeypatch.setattr(
+        prm_handlers,
+        "send_message",
+        lambda _token, _chat, text, **_kwargs: sent.append(text),
+    )
+
+    prm_handlers.dispatch_prm_command(
+        "42",
+        "/privacy",
+        _settings(tmp_path),
+        actor_id="42",
+        owner_chat_id="42",
+    )
+
+    assert len(sent) == 1
+    assert "нет активных разрешений" in sent[0]
+    assert "заблокированы" in sent[0]
+    assert "Ключ провайдера сам по себе не является согласием." in sent[0]
+
+
+def test_privacy_command_does_not_disclose_scope_across_actor_or_owner_boundary(monkeypatch, tmp_path) -> None:
+    sent = []
+    monkeypatch.setattr(
+        prm_handlers,
+        "send_message",
+        lambda _token, _chat, text, **_kwargs: sent.append(text),
+    )
+
+    prm_handlers.dispatch_prm_command(
+        "42",
+        "/privacy",
+        _settings(tmp_path),
+        actor_id="43",
+        owner_chat_id="42",
+    )
+
+    assert sent == ["Сведения о правах недоступны для этого чата."]
+    assert "нет активных разрешений" not in sent[0]
+
+
 def test_help_does_not_promise_watch_monitoring_or_delivery() -> None:
     rendered = prm_handlers._help_text()
 

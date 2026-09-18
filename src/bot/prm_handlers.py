@@ -18,6 +18,7 @@ from assistant.utd_profile import (
 from bot.telegram_delivery import _send_text_internal
 from config.settings import Settings
 from prm.application import PersonalResearchAssistant
+from prm.capabilities import describe_current_capability_scope
 from prm.contracts import OperatorRequest
 
 LOGGER = logging.getLogger(__name__)
@@ -32,6 +33,7 @@ PRM_SAFE_COMMANDS = frozenset(
         "/chat",
         "/utd",
         "/status",
+        "/privacy",
         "/refresh",
         "/reactions",
     }
@@ -82,6 +84,15 @@ def dispatch_prm_command(
         return
     if command in {"/start", "/help"}:
         send_message(_token(), chat_id, _help_text())
+        return
+    if command == "/privacy":
+        if actor_id != chat_id or owner_chat_id != chat_id:
+            send_message(_token(), chat_id, "Сведения о правах недоступны для этого чата.")
+            return
+        # PA-02 has no durable grant source yet. Rendering the empty registry is
+        # intentional: it shows the exact default-deny scope without creating,
+        # persisting, or pretending to revoke a connection.
+        send_message(_token(), chat_id, describe_current_capability_scope(()))
         return
     if command == "/utd":
         _start_utd_profile(chat_id, settings=settings, seed_text=args)
@@ -741,6 +752,8 @@ def _help_text() -> str:
         "Чтобы собрать персональный scope, напиши: «Настроить мой UTD-профиль». "
         "Сначала будет черновик и полный предпросмотр; ничего постоянного не сохранится без "
         "отдельного подтверждения.\n\n"
+        "Команда /privacy показывает действующие границы прав. Если активных прав нет, "
+        "внешние модели и передача материалов заблокированы.\n\n"
         "Примеры обычных сообщений:\n"
         "• Что в архиве есть про agent evals?\n"
         "• Что из найденного применимо к моему проекту?\n"
