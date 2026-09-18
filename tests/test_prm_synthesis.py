@@ -1,4 +1,36 @@
 from prm.synthesis import synthesize_answer
+from datetime import datetime, timedelta, timezone
+
+from prm.capabilities import AuthorizationRequest, CapabilityGrant, CapabilityRegistry, ProviderPolicy
+
+
+def _archive_synthesis_authorization():
+    now = datetime(2026, 9, 18, tzinfo=timezone.utc)
+    grant = CapabilityGrant(
+        grant_id="grant_synthetic_archive_synthesis",
+        owner_ref="owner_synthetic_primary",
+        connection_ref=None,
+        capability="model.generate",
+        resource_refs=("resource_archive",),
+        operations=("model_egress",),
+        data_classes=("private_archive",),
+        purpose="answer.request",
+        provider_policy=ProviderPolicy(("provider_anthropic",)),
+        issued_at=now - timedelta(minutes=1),
+        expires_at=now + timedelta(hours=1),
+        revision=1,
+    )
+    request = AuthorizationRequest(
+        owner_ref="owner_synthetic_primary",
+        capability="model.generate",
+        resource_ref="resource_archive",
+        operation="model_egress",
+        data_class="private_archive",
+        provider_ref="provider_anthropic",
+        purpose="answer.request",
+        expected_grant_revision=1,
+    )
+    return CapabilityRegistry((grant,)).authorize_and_reserve(request, now=now)
 
 
 def test_synthesis_rejects_diagnostic_fallback_markers(monkeypatch):
@@ -32,6 +64,7 @@ def test_synthesis_rejects_diagnostic_fallback_markers(monkeypatch):
                 "source_url": "https://t.me/example/1",
             }
         ],
+        authorization=_archive_synthesis_authorization(),
     )
 
     assert result is None

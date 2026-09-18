@@ -5,6 +5,7 @@ import tempfile
 import time
 import types
 import unittest
+from datetime import datetime, timedelta, timezone
 from dataclasses import FrozenInstanceError
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -36,6 +37,36 @@ _install_stub(
 
 import llm.client as client  # noqa: E402
 from db.migrate import run_migrations  # noqa: E402
+from prm.capabilities import AuthorizationRequest, CapabilityGrant, CapabilityRegistry, ProviderPolicy  # noqa: E402
+
+
+def _authorization(*, capability: str = "model.generate"):
+    now = datetime(2026, 9, 18, tzinfo=timezone.utc)
+    grant = CapabilityGrant(
+        grant_id=f"grant_synthetic_{capability.replace('.', '_')}",
+        owner_ref="owner_synthetic_primary",
+        connection_ref=None,
+        capability=capability,
+        resource_refs=("resource_conversation",),
+        operations=("model_egress",),
+        data_classes=("user_provided",),
+        purpose="answer.request",
+        provider_policy=ProviderPolicy(("provider_anthropic",)),
+        issued_at=now - timedelta(minutes=1),
+        expires_at=now + timedelta(hours=1),
+        revision=1,
+    )
+    request = AuthorizationRequest(
+        owner_ref="owner_synthetic_primary",
+        capability=capability,
+        resource_ref="resource_conversation",
+        operation="model_egress",
+        data_class="user_provided",
+        provider_ref="provider_anthropic",
+        purpose="answer.request",
+        expected_grant_revision=1,
+    )
+    return CapabilityRegistry((grant,)).authorize_and_reserve(request, now=now)
 
 
 class TestLLMClient(unittest.TestCase):
@@ -46,6 +77,8 @@ class TestLLMClient(unittest.TestCase):
         client.set_usage_db_path("")
         with patch.dict(os.environ, {"AGENT_DB_PATH": self.db_path}):
             run_migrations()
+        self.text_authorization = _authorization()
+        self.vision_authorization = _authorization(capability="model.vision")
 
     def tearDown(self) -> None:
         client.set_usage_db_path("")
@@ -60,7 +93,7 @@ class TestLLMClient(unittest.TestCase):
 
         with patch.dict(os.environ, {"AGENT_DB_PATH": self.db_path}, clear=False):
             with patch.object(client, "_get_client", return_value=mock_client):
-                result = client.complete(prompt="hi", category="test", model="claude-haiku-4-5")
+                result = client.complete(prompt="hi", category="test", model="claude-haiku-4-5", authorization=self.text_authorization)
 
         self.assertEqual(result, "hello world")
         with sqlite3.connect(self.db_path) as connection:
@@ -91,6 +124,7 @@ class TestLLMClient(unittest.TestCase):
                     prompt="hi",
                     category="test",
                     model="claude-haiku-4-5",
+                    authorization=self.text_authorization,
                 )
 
         self.assertEqual(receipt.text, "receipt text")
@@ -129,6 +163,7 @@ class TestLLMClient(unittest.TestCase):
                     prompt="retry",
                     category="test",
                     model="claude-haiku-4-5",
+                    authorization=self.text_authorization,
                 )
 
         self.assertEqual(receipt.text, "retried")
@@ -155,6 +190,7 @@ class TestLLMClient(unittest.TestCase):
                     category="test",
                     model="claude-haiku-4-5",
                     max_attempts=1,
+                    authorization=self.text_authorization,
                 )
 
         self.assertEqual(calls, 1)
@@ -175,6 +211,7 @@ class TestLLMClient(unittest.TestCase):
                 prompt="audit actual model",
                 category="test",
                 model="requested-model",
+                authorization=self.text_authorization,
             )
 
         self.assertEqual(receipt.model, "provider-resolved-model")
@@ -199,6 +236,7 @@ class TestLLMClient(unittest.TestCase):
                 max_tokens=99,
                 category="test",
                 model="claude-haiku-4-5",
+                authorization=self.text_authorization,
             )
 
         self.assertEqual(result, "exact string")
@@ -208,6 +246,8 @@ class TestLLMClient(unittest.TestCase):
             max_tokens=99,
             category="test",
             model="claude-haiku-4-5",
+            authorization=self.text_authorization,
+            data_class="user_provided",
         )
 
     def test_complete_records_llm_usage_row_with_set_usage_db_path(self):
@@ -220,7 +260,12 @@ class TestLLMClient(unittest.TestCase):
 
         with patch.dict(os.environ, {}, clear=True):
             with patch.object(client, "_get_client", return_value=mock_client):
-                result = client.complete(prompt="hi", category="test", model="claude-haiku-4-5")
+                result = client.complete(
+                    prompt="hi",
+                    category="test",
+                    model="claude-haiku-4-5",
+                    authorization=self.text_authorization,
+                )
 
         self.assertEqual(result, "hello world")
         with sqlite3.connect(self.db_path) as connection:
@@ -251,7 +296,12 @@ class TestLLMClient(unittest.TestCase):
             with patch.dict(os.environ, {"AGENT_DB_PATH": self.db_path}, clear=False):
                 with patch.object(client, "_get_client", return_value=mock_client):
                     started_at = time.monotonic()
-                    result = client.complete(prompt="hi", category="test", model="claude-haiku-4-5")
+                    result = client.complete(
+                        prompt="hi",
+                        category="test",
+                        model="claude-haiku-4-5",
+                        authorization=self.text_authorization,
+                    )
                     elapsed = time.monotonic() - started_at
         finally:
             locker.rollback()
@@ -275,7 +325,12 @@ class TestLLMClient(unittest.TestCase):
 
         try:
             with patch.object(client, "_get_client", return_value=mock_client):
-                result = client.complete_vision(prompt="analyze", image_path=image_path, model="claude-haiku-4-5")
+                result = client.complete_vision(
+                    prompt="analyze",
+                    image_path=image_path,
+                    model="claude-haiku-4-5",
+                    authorization=self.vision_authorization,
+                )
         finally:
             os.unlink(image_path)
 

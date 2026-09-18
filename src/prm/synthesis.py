@@ -9,6 +9,7 @@ from typing import Any, Mapping, Sequence
 from assistant.claim_ledger import verify_answer_against_evidence
 from llm.client import LLMClient
 from prm.archive_contract import ARCHIVE_RESPONSE_CONTRACTS
+from prm.capabilities import AuthorizationDecision, is_authorized_egress
 
 _FORBIDDEN_USER_MARKERS = (
     "The local research path found grounded evidence",
@@ -25,11 +26,20 @@ _ARCHIVE_FORBIDDEN_SECTIONS = (
 )
 
 
-def synthesis_allowed() -> bool:
+def synthesis_allowed(authorization: AuthorizationDecision | None = None) -> bool:
     enabled = os.environ.get("PRM_TELEGRAM_RAG_LLM_SYNTHESIS", "").strip().casefold()
     egress = os.environ.get("PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS", "").strip().casefold()
     accepted = {"1", "true", "yes", "approved"}
-    return enabled in accepted and egress in accepted
+    return (
+        enabled in accepted
+        and egress in accepted
+        and is_authorized_egress(
+            authorization,
+            capability="model.generate",
+            provider_ref="provider_anthropic",
+            data_class="private_archive",
+        )
+    )
 
 
 def synthesize_answer(
@@ -40,8 +50,9 @@ def synthesize_answer(
     evidence_items: Sequence[Mapping[str, Any]],
     primary_intent: str = "",
     response_contract_id: str = "",
+    authorization: AuthorizationDecision | None = None,
 ) -> str | None:
-    if not synthesis_allowed():
+    if not synthesis_allowed(authorization):
         return None
     gate = _mapping(payload.get("answer_gate"))
     if bool(gate.get("external_verification_required")) and not bool(gate.get("current_claim_allowed", True)):
@@ -53,6 +64,7 @@ def synthesize_answer(
             deterministic_fallback=deterministic_fallback,
             evidence_items=evidence_items,
             primary_intent=primary_intent,
+            authorization=authorization,
         )
 
     ledger = _mapping(payload.get("claim_ledger"))
@@ -80,6 +92,7 @@ def synthesize_answer(
         prompt,
         evidence_items=evidence_items,
         project_name=str(_mapping(payload.get("project_fit")).get("project_name") or ""),
+        authorization=authorization,
     )
 
 
@@ -89,6 +102,7 @@ def _synthesize_archive_answer(
     deterministic_fallback: str,
     evidence_items: Sequence[Mapping[str, Any]],
     primary_intent: str,
+    authorization: AuthorizationDecision | None,
 ) -> str | None:
     contract = _mapping(payload.get("archive_contract"))
     summary = _mapping(contract.get("result_summary"))
@@ -121,7 +135,12 @@ def _synthesize_archive_answer(
         f"limitations: {json.dumps(contract.get('limitations') or [], ensure_ascii=False)}\n"
         f"fallback_contract: {deterministic_fallback[:2600]}"
     )
-    answer = _call_and_verify(prompt, evidence_items=evidence_items, project_name="")
+    answer = _call_and_verify(
+        prompt,
+        evidence_items=evidence_items,
+        project_name="",
+        authorization=authorization,
+    )
     if not answer:
         return None
     if any(marker.casefold() in answer.casefold() for marker in _ARCHIVE_FORBIDDEN_SECTIONS):
@@ -136,6 +155,7 @@ def _call_and_verify(
     *,
     evidence_items: Sequence[Mapping[str, Any]],
     project_name: str,
+    authorization: AuthorizationDecision | None,
 ) -> str | None:
     try:
         answer = LLMClient.complete(
@@ -144,6 +164,8 @@ def _call_and_verify(
             category="bot_ask",
             max_tokens=900,
             max_attempts=1,
+            authorization=authorization,
+            data_class="private_archive",
         ).strip()
     except Exception:
         return None

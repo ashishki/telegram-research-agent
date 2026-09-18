@@ -81,6 +81,8 @@ RETROFIT_TESTS = (
 
 FAST_CONTRACT_TESTS = (
     "tests/test_assistant_contracts.py",
+    "tests/test_assistant_permissions.py",
+    "tests/test_assistant_egress.py",
     "tests/test_core_boundaries.py",
     "tests/test_delivery_health.py",
     "tests/test_cost_stats.py",

@@ -96,6 +96,7 @@ Acceptance-Criteria:
   - Revocation, forbidden fallback, changed grant revision and no-consent cases deny the operation without leaking data.
   - Permission UI explains actual scope; a configured key is never interpreted as universal consent.
 Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_assistant_permissions.py tests/test_assistant_egress.py tests/test_llm_client.py tests/test_openai_provider.py tests/test_voice_transcription.py tests/test_prm_synthesis.py
   - python tools/test_tiers.py fast-contract
 Context-Refs:
   - docs/design/PA.md

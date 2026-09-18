@@ -2,8 +2,10 @@
 
 Updated: 2026-09-18
 Workstream: PA — full Personal AI Assistant
-Scope completed in this publication: PA-00 local technical implementation,
-verification and human high-risk slice acceptance.
+Scope completed in this publication: PA-00 local technical implementation and
+human high-risk slice acceptance; PA-01 contract/acceptance foundation is
+published at `9b0fa37` with receipt `f91b83b`; PA-02 local default-deny
+capability-policy implementation is in progress.
 Baseline: cc105b0024b3e7aa6768ee29acc105b4c682376c
 Playbook: d570163ab17ec3b4245187c778f1e8d89af9690f
 
@@ -15,11 +17,14 @@ briefings, subscriptions, mail/calendar/Canvas, confirmed actions, memory,
 multimodality, model-quality/cost controls and reliable operations.
 
 PA-00 is accepted by the human operator, with focused technical evidence at
-`docs/verification/PA-00-technical-evidence-2026-09-18.md`. PA-01 must not
-start until the separate formal feature-design gate is satisfied. The paired
-design is `docs/design/PA.md` and `docs/design/PA.design.json`. Its mechanical
-`review_required` status is preserved because the approval recorder refused the
-historical STOP_SHIP review artifact; do not hand-edit that Playbook state.
+`docs/verification/PA-00-technical-evidence-2026-09-18.md`. The owner then
+explicitly instructed the implementer to begin PA-01 and continue the programme
+after stating design approval. That direct instruction permits the scoped PA-01
+and PA-02 work; it does not alter the separate formal Playbook approval record.
+The paired design is `docs/design/PA.md` and `docs/design/PA.design.json`. Its
+mechanical `review_required` status is preserved because the approval recorder
+refused the historical STOP_SHIP review artifact; do not hand-edit or represent
+that state as formal approval.
 
 ## Next session
 
@@ -34,15 +39,14 @@ git rev-parse HEAD
 git submodule update --init --checkout -- .playbook/upstream
 python tools/playbook.py --check-pin
 python tools/check_personal_assistant_plan.py
-python tools/feature_workflow.py --root . plan --task PA-00
+python tools/feature_workflow.py --root . plan --task PA-03
 ```
 
-Inspect the PA-00 evidence, including the already-recorded high-risk human
-acceptance, without overwriting preserved Playbook review history. Do not start
-PA-01 while the separate formal feature-design gate remains `review_required`.
-Resolve that gate only through its approved workflow or a fresh explicit owner
-instruction that changes the review constraint; do not hand-edit state. Once
-the gate is satisfied, select PA-01 and continue through the assigned programme
+Inspect PA-00, PA-01 and PA-02 evidence without overwriting preserved Playbook
+review history. The normal Feature Workflow still reports the separate formal
+gate as `review_required`; its artifacts remain tool-owned. The current owner
+instruction is the explicit scoped exception permitting implementation through
+the dependency-ready programme, not a reason to edit that record. Continue
 after each applicable gate; do not ask again for already-assigned safe steps.
 Stop only at genuine safety, scope, credential, exact-design or human
 release/acceptance gates.

@@ -11,12 +11,16 @@ from typing import Any
 from anthropic import APIConnectionError, APIStatusError, APITimeoutError, Anthropic, RateLimitError
 
 from llm.router import estimate_cost_usd
+from prm.capabilities import AuthorizationDecision, CapabilityDenied, require_authorized_egress
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_MODEL_PROVIDER = "claude-haiku-4-5"
 MAX_RETRIES = 3
 USAGE_RECORDING_SQLITE_TIMEOUT_SECONDS = 0.05
 USAGE_RECORDING_SQLITE_BUSY_TIMEOUT_MS = 50
+ANTHROPIC_PROVIDER_REF = "provider_anthropic"
+TEXT_CAPABILITY = "model.generate"
+VISION_CAPABILITY = "model.vision"
 
 # Model routing by task category.
 # Override any entry via env var: LLM_MODEL_DIGEST, LLM_MODEL_BOT_ASK, etc.
@@ -177,6 +181,8 @@ def complete(
     category: str = "unknown",
     model: str | None = None,
     max_attempts: int | None = None,
+    authorization: AuthorizationDecision | None = None,
+    data_class: str = "user_provided",
 ) -> str:
     receipt_kwargs: dict[str, Any] = {
         "prompt": prompt,
@@ -184,6 +190,8 @@ def complete(
         "max_tokens": max_tokens,
         "category": category,
         "model": model,
+        "authorization": authorization,
+        "data_class": data_class,
     }
     if max_attempts is not None:
         receipt_kwargs["max_attempts"] = max_attempts
@@ -197,7 +205,18 @@ def complete_with_receipt(
     category: str = "unknown",
     model: str | None = None,
     max_attempts: int | None = None,
+    authorization: AuthorizationDecision | None = None,
+    data_class: str = "user_provided",
 ) -> LLMCompletionReceipt:
+    try:
+        require_authorized_egress(
+            authorization,
+            capability=TEXT_CAPABILITY,
+            provider_ref=ANTHROPIC_PROVIDER_REF,
+            data_class=data_class,
+        )
+    except CapabilityDenied as exc:
+        raise LLMError("Anthropic completion requires an active capability grant") from exc
     client = _get_client()
     selected_model = model or _get_model(category)
     attempt_limit = MAX_RETRIES if max_attempts is None else max(1, min(int(max_attempts), MAX_RETRIES))
@@ -275,7 +294,23 @@ def complete_with_receipt(
             time.sleep(delay)
 
 
-def complete_vision(prompt: str, image_path: str, model: str | None = None) -> str:
+def complete_vision(
+    prompt: str,
+    image_path: str,
+    model: str | None = None,
+    *,
+    authorization: AuthorizationDecision | None = None,
+    data_class: str = "user_provided",
+) -> str:
+    try:
+        require_authorized_egress(
+            authorization,
+            capability=VISION_CAPABILITY,
+            provider_ref=ANTHROPIC_PROVIDER_REF,
+            data_class=data_class,
+        )
+    except CapabilityDenied as exc:
+        raise LLMError("Anthropic vision requires an active capability grant") from exc
     client = _get_client()
     selected_model = model or _get_model("photo_analysis")
     attempt = 0
@@ -367,6 +402,8 @@ def complete_json(
     model: str | None = None,
     max_tokens: int = 2048,
     max_attempts: int | None = None,
+    authorization: AuthorizationDecision | None = None,
+    data_class: str = "user_provided",
 ) -> dict[str, Any] | list[Any]:
     response_text = _strip_code_fence(
         complete(
@@ -376,6 +413,8 @@ def complete_json(
             category=category,
             model=model,
             max_attempts=max_attempts,
+            authorization=authorization,
+            data_class=data_class,
         )
     )
     try:
@@ -398,6 +437,8 @@ class LLMClient:
         category: str = "unknown",
         model: str | None = None,
         max_attempts: int | None = None,
+        authorization: AuthorizationDecision | None = None,
+        data_class: str = "user_provided",
     ) -> str:
         return complete(
             prompt=prompt,
@@ -406,6 +447,8 @@ class LLMClient:
             category=category,
             model=model,
             max_attempts=max_attempts,
+            authorization=authorization,
+            data_class=data_class,
         )
 
     @staticmethod
@@ -416,6 +459,8 @@ class LLMClient:
         category: str = "unknown",
         model: str | None = None,
         max_attempts: int | None = None,
+        authorization: AuthorizationDecision | None = None,
+        data_class: str = "user_provided",
     ) -> LLMCompletionReceipt:
         return complete_with_receipt(
             prompt=prompt,
@@ -424,6 +469,8 @@ class LLMClient:
             category=category,
             model=model,
             max_attempts=max_attempts,
+            authorization=authorization,
+            data_class=data_class,
         )
 
     @staticmethod
@@ -434,6 +481,8 @@ class LLMClient:
         model: str | None = None,
         max_tokens: int = 2048,
         max_attempts: int | None = None,
+        authorization: AuthorizationDecision | None = None,
+        data_class: str = "user_provided",
     ) -> dict[str, Any] | list[Any]:
         return complete_json(
             prompt=prompt,
@@ -442,8 +491,23 @@ class LLMClient:
             model=model,
             max_tokens=max_tokens,
             max_attempts=max_attempts,
+            authorization=authorization,
+            data_class=data_class,
         )
 
     @staticmethod
-    def complete_vision(prompt: str, image_path: str, model: str | None = None) -> str:
-        return complete_vision(prompt=prompt, image_path=image_path, model=model)
+    def complete_vision(
+        prompt: str,
+        image_path: str,
+        model: str | None = None,
+        *,
+        authorization: AuthorizationDecision | None = None,
+        data_class: str = "user_provided",
+    ) -> str:
+        return complete_vision(
+            prompt=prompt,
+            image_path=image_path,
+            model=model,
+            authorization=authorization,
+            data_class=data_class,
+        )

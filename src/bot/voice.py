@@ -6,6 +6,12 @@ from pathlib import Path
 from urllib import parse, request
 
 from bot.telegram_delivery import BOT_API_BASE
+from prm.capabilities import (
+    AuthorizationDecision,
+    CapabilityDenied,
+    require_authorized_egress,
+    require_authorized_operation,
+)
 
 
 LOGGER = logging.getLogger(__name__)
@@ -13,6 +19,10 @@ TELEGRAM_FILE_BASE = "https://api.telegram.org/file"
 DEFAULT_VOICE_MEDIA_DIR = "/tmp/telegram-research-agent-voice"
 DEFAULT_TRANSCRIPTION_MODEL = "whisper-1"
 DEFAULT_MAX_VOICE_BYTES = 24 * 1024 * 1024
+TELEGRAM_PROVIDER_REF = "provider_telegram"
+OPENAI_PROVIDER_REF = "provider_openai"
+VOICE_DOWNLOAD_CAPABILITY = "media.voice_download"
+VOICE_TRANSCRIPTION_CAPABILITY = "media.transcribe"
 
 
 class VoiceTranscriptionError(RuntimeError):
@@ -28,8 +38,12 @@ def transcribe_telegram_voice(
     token: str,
     file_id: str,
     media_dir: str | None = None,
+    download_authorization: AuthorizationDecision | None = None,
+    transcription_authorization: AuthorizationDecision | None = None,
 ) -> str:
     """Download a Telegram voice file, transcribe it, and remove local audio."""
+    _require_voice_download_authorization(download_authorization)
+    _require_voice_transcription_authorization(transcription_authorization)
     _require_openai_transcription_key()
     if not token:
         raise VoiceTranscriptionError("Telegram bot token is missing")
@@ -38,12 +52,17 @@ def transcribe_telegram_voice(
 
     local_path = _download_telegram_voice(token=token, file_id=file_id, media_dir=media_dir)
     try:
-        return transcribe_audio_file(local_path)
+        return transcribe_audio_file(local_path, transcription_authorization=transcription_authorization)
     finally:
         _delete_local_file(local_path)
 
 
-def transcribe_audio_file(local_path: str) -> str:
+def transcribe_audio_file(
+    local_path: str,
+    *,
+    transcription_authorization: AuthorizationDecision | None = None,
+) -> str:
+    _require_voice_transcription_authorization(transcription_authorization)
     api_key = _require_openai_transcription_key()
 
     path = Path(local_path)
@@ -96,6 +115,31 @@ def _require_openai_transcription_key() -> str:
     if not api_key:
         raise VoiceTranscriptionUnavailable("OPENAI_API_KEY is not set")
     return api_key
+
+
+def _require_voice_download_authorization(authorization: AuthorizationDecision | None) -> None:
+    try:
+        require_authorized_operation(
+            authorization,
+            capability=VOICE_DOWNLOAD_CAPABILITY,
+            operation="read",
+            provider_ref=TELEGRAM_PROVIDER_REF,
+            data_class="user_provided",
+        )
+    except CapabilityDenied as exc:
+        raise VoiceTranscriptionUnavailable("Voice download requires an active capability grant") from exc
+
+
+def _require_voice_transcription_authorization(authorization: AuthorizationDecision | None) -> None:
+    try:
+        require_authorized_egress(
+            authorization,
+            capability=VOICE_TRANSCRIPTION_CAPABILITY,
+            provider_ref=OPENAI_PROVIDER_REF,
+            data_class="user_provided",
+        )
+    except CapabilityDenied as exc:
+        raise VoiceTranscriptionUnavailable("Voice transcription requires an active capability grant") from exc
 
 
 def _download_telegram_voice(*, token: str, file_id: str, media_dir: str | None) -> str:

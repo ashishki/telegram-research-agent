@@ -11,11 +11,21 @@ import os
 from dataclasses import dataclass
 from typing import Any, Mapping, Protocol, Sequence
 
+from prm.capabilities import (
+    AuthorizationDecision,
+    CapabilityDenied,
+    is_authorized_egress,
+    require_authorized_egress,
+)
+
 LOCAL_PROVIDER = "local"
 OPENAI_PROVIDER = "openai"
 OPENAI_TERRA_MODEL = "gpt-5.6-terra"
 PROVIDER_ENABLE_ENV = "PRM_OPENAI_PROVIDER_ENABLED"
 CONTEXT_EGRESS_ENABLE_ENV = "PRM_OPENAI_CONTEXT_EGRESS_ENABLED"
+OPENAI_PROVIDER_REF = "provider_openai"
+TEXT_CAPABILITY = "model.generate"
+CONTEXT_CAPABILITY = "model.context_egress"
 
 
 class OpenAIProviderError(RuntimeError):
@@ -57,6 +67,8 @@ def complete_with_provider(
     provider: str | None = None,
     allow_provider_egress: bool = False,
     allow_context_egress: bool = False,
+    authorization: AuthorizationDecision | None = None,
+    context_authorization: AuthorizationDecision | None = None,
     model: str = OPENAI_TERRA_MODEL,
     client: _OpenAIClient | None = None,
 ) -> ProviderResult:
@@ -86,14 +98,36 @@ def complete_with_provider(
             ),
         )
 
+    try:
+        require_authorized_egress(
+            authorization,
+            capability=TEXT_CAPABILITY,
+            provider_ref=OPENAI_PROVIDER_REF,
+            data_class="user_provided",
+        )
+    except CapabilityDenied as exc:
+        raise ProviderEgressDenied("OpenAI provider egress requires an active matching capability grant.") from exc
+
     if not (_env_enabled(PROVIDER_ENABLE_ENV) and allow_provider_egress):
         raise ProviderEgressDenied(
             "OpenAI provider egress requires PRM_OPENAI_PROVIDER_ENABLED=true "
             "and allow_provider_egress=True."
         )
 
-    include_context = bool(local_context) and _env_enabled(CONTEXT_EGRESS_ENABLE_ENV)
-    include_context = include_context and allow_context_egress
+    context_requested = bool(local_context) and _env_enabled(CONTEXT_EGRESS_ENABLE_ENV) and allow_context_egress
+    include_context = context_requested and is_authorized_egress(
+        context_authorization,
+        capability=CONTEXT_CAPABILITY,
+        provider_ref=OPENAI_PROVIDER_REF,
+        data_class="private_archive",
+    )
+    if include_context:
+        require_authorized_egress(
+            context_authorization,
+            capability=CONTEXT_CAPABILITY,
+            provider_ref=OPENAI_PROVIDER_REF,
+            data_class="private_archive",
+        )
     request_input = _request_input(
         clean_query,
         local_context=local_context if include_context else None,
