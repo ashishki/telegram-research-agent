@@ -8,6 +8,7 @@ can authorize a request to use it.
 
 from __future__ import annotations
 
+from contextlib import ExitStack
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 import re
@@ -360,7 +361,7 @@ class AuthorizationDecision:
 class BudgetReservation:
     """One registry-bound egress slot, revalidated exactly at consumption."""
 
-    __slots__ = ("grant_ref", "grant_revision", "_registry", "_request", "_consumed", "_abandoned", "_lock")
+    __slots__ = ("grant_ref", "grant_revision", "_registry", "_request", "_consumed", "_abandoned", "_transport_committed", "_lock")
 
     def __init__(
         self,
@@ -380,6 +381,7 @@ class BudgetReservation:
         self.grant_revision = grant_revision
         self._consumed = False
         self._abandoned = False
+        self._transport_committed = False
         self._lock = RLock()
 
     def consume(self) -> bool:
@@ -387,6 +389,7 @@ class BudgetReservation:
             if self._consumed or self._abandoned or not self._registry._reservation_is_current(self):
                 return False
             self._consumed = True
+            self._transport_committed = True
             return True
 
     def record_delivery_outcome(self, outcome: Literal["accepted", "unknown"]) -> None:
@@ -398,7 +401,7 @@ class BudgetReservation:
         """Permanently invalidate this unused slot, then release its key hold."""
 
         with self._lock:
-            if self._abandoned:
+            if self._abandoned or self._transport_committed:
                 return
             self._abandoned = True
         self._registry._abandon_operation(self)
@@ -444,6 +447,33 @@ class BudgetReservation:
     def current(self) -> bool:
         with self._lock:
             return not self._consumed and not self._abandoned and self._registry._reservation_is_current(self)
+
+
+def commit_transport_reservations(reservations: Sequence[BudgetReservation]) -> bool:
+    """Atomically commit every sealed reservation needed for one transport.
+
+    A committed reservation cannot later be abandoned to reopen its operation
+    key. Callers must provide every reservation whose data may reach the same
+    provider request, so a compound text/context call commits as one boundary.
+    """
+
+    unique_reservations = tuple(sorted({id(item): item for item in reservations}.values(), key=id))
+    if not unique_reservations:
+        return False
+    with ExitStack() as stack:
+        for reservation in unique_reservations:
+            stack.enter_context(reservation._lock)
+        if any(
+            reservation._consumed
+            or reservation._abandoned
+            or not reservation._registry._reservation_is_current(reservation)
+            for reservation in unique_reservations
+        ):
+            return False
+        for reservation in unique_reservations:
+            reservation._consumed = True
+            reservation._transport_committed = True
+    return True
 
 
 class CapabilityRegistry:

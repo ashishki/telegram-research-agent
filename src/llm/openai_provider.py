@@ -15,9 +15,8 @@ from typing import Any, Literal, Mapping, Protocol, Sequence
 
 from prm.capabilities import (
     AuthorizationDecision,
-    CapabilityDenied,
+    commit_transport_reservations,
     is_authorized_egress,
-    require_authorized_egress,
     transport_purpose,
 )
 
@@ -176,43 +175,23 @@ def complete_with_provider(
     except OpenAIProviderError:
         _abandon_before_transport(authorization, context_authorization)
         raise
-    try:
-        require_authorized_egress(
-            authorization,
-            capability=TEXT_CAPABILITY,
-            provider_ref=OPENAI_PROVIDER_REF,
-            data_class="user_provided",
-            owner_ref=owner_ref or "",
-            connection_ref=active_connection_ref,
-            resource_ref=resource_ref or "",
-            purpose=transport_purpose(
-                provider_ref=OPENAI_PROVIDER_REF,
-                capability=TEXT_CAPABILITY,
-                operation="model_egress",
-            ),
-        )
-        if include_context:
-            require_authorized_egress(
-                context_authorization,
-                capability=CONTEXT_CAPABILITY,
-                provider_ref=OPENAI_PROVIDER_REF,
-                data_class="private_archive",
-                owner_ref=owner_ref or "",
-                connection_ref=active_connection_ref,
-                resource_ref=context_resource_ref or "",
-                purpose=transport_purpose(
-                    provider_ref=OPENAI_PROVIDER_REF,
-                    capability=CONTEXT_CAPABILITY,
-                    operation="model_egress",
-                ),
-            )
-    except CapabilityDenied:
+    transport_authorizations = [authorization]
+    if include_context:
+        assert context_authorization is not None
+        transport_authorizations.append(context_authorization)
+    else:
+        _abandon_before_transport(None, context_authorization)
+    if not _commit_transport_authorizations(transport_authorizations):
         _abandon_before_transport(authorization, context_authorization)
-        raise ProviderEgressDenied("OpenAI provider egress requires an active matching capability grant.") from None
+        raise ProviderEgressDenied("OpenAI provider egress requires an active matching capability grant.")
     try:
         response = active_client.responses.create(model=model, input=request_input)
     except Exception:  # a request may have reached the provider before its error
-        _record_transport_outcome(authorization, context_authorization, "unknown")
+        _record_transport_outcome(
+            authorization,
+            context_authorization if include_context else None,
+            "unknown",
+        )
         raise ProviderEgressOutcomeUnknown(
             ProviderReceipt(
                 provider=OPENAI_PROVIDER,
@@ -226,7 +205,11 @@ def complete_with_provider(
             )
         ) from None
 
-    _record_transport_outcome(authorization, context_authorization, "accepted")
+    _record_transport_outcome(
+        authorization,
+        context_authorization if include_context else None,
+        "accepted",
+    )
 
     return ProviderResult(
         status="ok",
@@ -287,6 +270,17 @@ def _matching_operation_ref(
         ):
             return None
     return authorization.operation_ref
+
+
+def _commit_transport_authorizations(
+    authorizations: Sequence[AuthorizationDecision | None],
+) -> bool:
+    reservations = [
+        decision.reservation
+        for decision in authorizations
+        if decision is not None and decision.reservation is not None
+    ]
+    return len(reservations) == len(authorizations) and commit_transport_reservations(reservations)
 
 
 def _record_transport_outcome(

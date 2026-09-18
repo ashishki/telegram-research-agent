@@ -41,7 +41,10 @@ copied or relabelled decision cannot change the request that reaches transport.
 Every deny before a provider call permanently invalidates its exact reservation
 before releasing only its in-memory operation-key hold; a later reservation for
 the key cannot reactivate the stale one, and its conservative grant budget is
-never refunded.
+never refunded. Immediately before an OpenAI request, every reservation whose
+data can enter that request is atomically committed as a group. A committed
+reservation cannot be abandoned or release its key during an in-flight request;
+only a wholly uncommitted group can be invalidated before transport.
 
 The final adapter check obtains its expected purpose from the closed
 `TRANSPORT_PURPOSES` table, not from a category or caller argument:

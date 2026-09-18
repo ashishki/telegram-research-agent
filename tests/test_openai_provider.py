@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from threading import Barrier, Thread
+from threading import Barrier, Event, Thread
 from types import SimpleNamespace
 from datetime import datetime, timedelta, timezone
 
@@ -421,6 +421,125 @@ def test_abandoned_decision_cannot_race_a_fresh_reservation_to_transport(monkeyp
     assert outcomes == {"stale": "denied", "fresh": "ok"}
     assert clients["stale"].responses.calls == []
     assert len(clients["fresh"].responses.calls) == 1
+
+
+def test_committed_text_reservation_cannot_reopen_before_transport(monkeypatch) -> None:
+    monkeypatch.setenv(PROVIDER_ENABLE_ENV, "true")
+    monkeypatch.setenv("OPENAI_API_KEY", SYNTHETIC_OPENAI_KEY)
+    registry, request = _registry_and_request(operation_ref="operation_synthetic_committed_text_001")
+    authorization = registry.authorize_and_reserve(request)
+    committed = Barrier(2)
+    release_transport = Event()
+    original_commit = openai_provider._commit_transport_authorizations
+    client = _FakeClient()
+    errors: list[BaseException] = []
+
+    def pause_after_commit(authorizations):
+        result = original_commit(authorizations)
+        committed.wait()
+        assert release_transport.wait(timeout=5)
+        return result
+
+    def transport() -> None:
+        try:
+            complete_with_provider(
+                "Question",
+                provider="openai",
+                allow_provider_egress=True,
+                authorization=authorization,
+                owner_ref="owner_synthetic_primary",
+                connection_ref=SYNTHETIC_OPENAI_CONNECTION,
+                resource_ref="resource_conversation",
+                client=client,
+            )
+        except BaseException as error:
+            errors.append(error)
+
+    monkeypatch.setattr(openai_provider, "_commit_transport_authorizations", pause_after_commit)
+    thread = Thread(target=transport)
+    thread.start()
+    committed.wait()
+    assert authorization.reservation is not None
+    authorization.reservation.abandon_before_transport()
+    assert registry.authorize_and_reserve(request).reason == "operation_in_progress"
+    release_transport.set()
+    thread.join(timeout=5)
+
+    assert thread.is_alive() is False
+    assert errors == []
+    assert len(client.responses.calls) == 1
+
+
+def test_committed_text_and_context_reservations_cannot_reopen_before_transport(monkeypatch) -> None:
+    monkeypatch.setenv(PROVIDER_ENABLE_ENV, "true")
+    monkeypatch.setenv(CONTEXT_EGRESS_ENABLE_ENV, "true")
+    monkeypatch.setenv("OPENAI_API_KEY", SYNTHETIC_OPENAI_KEY)
+    operation_ref = "operation_synthetic_committed_context_001"
+    text_registry, text_request = _registry_and_request(operation_ref=operation_ref)
+    context_registry, context_request = _registry_and_request(
+        capability="model.context_egress",
+        resource_ref="resource_archive",
+        data_class="private_archive",
+        purpose="answer.context",
+        operation_ref=operation_ref,
+    )
+    authorization = text_registry.authorize_and_reserve(text_request)
+    context_authorization = context_registry.authorize_and_reserve(context_request)
+    committed = Barrier(2)
+    release_transport = Event()
+    original_commit = openai_provider._commit_transport_authorizations
+    client = _FakeClient()
+    errors: list[BaseException] = []
+    scope = {
+        "owner_ref": "owner_synthetic_primary",
+        "connection_ref": SYNTHETIC_OPENAI_CONNECTION,
+        "resource_ref": "resource_conversation",
+        "context_resource_ref": "resource_archive",
+    }
+
+    def pause_after_commit(authorizations):
+        result = original_commit(authorizations)
+        committed.wait()
+        assert release_transport.wait(timeout=5)
+        return result
+
+    def transport() -> None:
+        try:
+            complete_with_provider(
+                "Question",
+                provider="openai",
+                allow_provider_egress=True,
+                allow_context_egress=True,
+                authorization=authorization,
+                context_authorization=context_authorization,
+                local_context=[{
+                    "title": "approved",
+                    "text": "private-context-commit-sentinel",
+                    "source_ref": "archive:synthetic-approved-1",
+                }],
+                client=client,
+                **scope,
+            )
+        except BaseException as error:
+            errors.append(error)
+
+    monkeypatch.setattr(openai_provider, "_commit_transport_authorizations", pause_after_commit)
+    thread = Thread(target=transport)
+    thread.start()
+    committed.wait()
+    assert authorization.reservation is not None
+    assert context_authorization.reservation is not None
+    authorization.reservation.abandon_before_transport()
+    context_authorization.reservation.abandon_before_transport()
+    assert text_registry.authorize_and_reserve(text_request).reason == "operation_in_progress"
+    assert context_registry.authorize_and_reserve(context_request).reason == "operation_in_progress"
+    release_transport.set()
+    thread.join(timeout=5)
+
+    assert thread.is_alive() is False
+    assert errors == []
+    assert len(client.responses.calls) == 1
+    assert "private-context-commit-sentinel" in repr(client.responses.calls[0]["input"])
 
 
 def test_provider_transport_rejects_a_grant_for_another_active_credential_before_fake_call(monkeypatch) -> None:
