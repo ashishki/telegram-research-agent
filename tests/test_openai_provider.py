@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
+import llm.openai_provider as openai_provider
 from llm.openai_provider import CONTEXT_EGRESS_ENABLE_ENV, OPENAI_TERRA_MODEL, PROVIDER_ENABLE_ENV, ProviderEgressDenied, complete_with_provider
 from prm.capabilities import AuthorizationRequest, CapabilityGrant, CapabilityRegistry, ProviderPolicy
 
@@ -16,18 +17,24 @@ class _FakeClient:
     def __init__(self): self.responses = _FakeResponses()
 
 
+SYNTHETIC_OPENAI_KEY = "synthetic-openai-key"
+SYNTHETIC_OPENAI_CONNECTION = openai_provider._openai_connection_ref(SYNTHETIC_OPENAI_KEY)
+assert SYNTHETIC_OPENAI_CONNECTION is not None
+
+
 def _authorization(
     *,
     capability="model.generate",
     resource_ref="resource_conversation",
     data_class="user_provided",
     purpose="answer.request",
+    connection_ref=SYNTHETIC_OPENAI_CONNECTION,
 ):
     now = datetime.now(timezone.utc).replace(microsecond=0)
     grant = CapabilityGrant(
         grant_id=f"grant_synthetic_{capability.replace('.', '_')}",
         owner_ref="owner_synthetic_primary",
-        connection_ref=None,
+        connection_ref=connection_ref,
         capability=capability,
         resource_refs=(resource_ref,),
         operations=("model_egress",),
@@ -46,6 +53,7 @@ def _authorization(
         data_class=data_class,
         provider_ref="provider_openai",
         purpose=purpose,
+        connection_ref=connection_ref,
         expected_grant_revision=1,
     )
     return CapabilityRegistry((grant,)).authorize_and_reserve(request, now=now)
@@ -64,8 +72,50 @@ def test_provider_call_requires_environment_and_per_call_gate(monkeypatch) -> No
     with pytest.raises(ProviderEgressDenied): complete_with_provider("Use provider", provider="openai", allow_provider_egress=False, client=_FakeClient())
 
 
+def test_provider_transport_rejects_a_grant_for_another_active_credential_before_fake_call(monkeypatch) -> None:
+    granted_connection_ref = openai_provider._openai_connection_ref("synthetic-openai-grant-a")
+    assert granted_connection_ref is not None
+    client = _FakeClient()
+    monkeypatch.setenv(PROVIDER_ENABLE_ENV, "true")
+    monkeypatch.setenv("OPENAI_API_KEY", "synthetic-openai-credential-b")
+
+    with pytest.raises(ProviderEgressDenied):
+        complete_with_provider(
+            "Question",
+            provider="openai",
+            allow_provider_egress=True,
+            authorization=_authorization(connection_ref=granted_connection_ref),
+            owner_ref="owner_synthetic_primary",
+            connection_ref=granted_connection_ref,
+            resource_ref="resource_conversation",
+            client=client,
+        )
+
+    assert client.responses.calls == []
+
+
+def test_provider_transport_rejects_a_null_connection_ref_before_fake_call(monkeypatch) -> None:
+    client = _FakeClient()
+    monkeypatch.setenv(PROVIDER_ENABLE_ENV, "true")
+    monkeypatch.setenv("OPENAI_API_KEY", SYNTHETIC_OPENAI_KEY)
+
+    with pytest.raises(ProviderEgressDenied):
+        complete_with_provider(
+            "Question",
+            provider="openai",
+            allow_provider_egress=True,
+            authorization=_authorization(connection_ref=None),
+            owner_ref="owner_synthetic_primary",
+            connection_ref=None,
+            resource_ref="resource_conversation",
+            client=client,
+        )
+
+    assert client.responses.calls == []
+
+
 def test_context_egress_requires_second_explicit_gate(monkeypatch) -> None:
-    monkeypatch.setenv(PROVIDER_ENABLE_ENV, "true"); monkeypatch.delenv(CONTEXT_EGRESS_ENABLE_ENV, raising=False); client = _FakeClient()
+    monkeypatch.setenv(PROVIDER_ENABLE_ENV, "true"); monkeypatch.setenv("OPENAI_API_KEY", SYNTHETIC_OPENAI_KEY); monkeypatch.delenv(CONTEXT_EGRESS_ENABLE_ENV, raising=False); client = _FakeClient()
     result = complete_with_provider(
         "Question",
         provider="openai",
@@ -73,7 +123,7 @@ def test_context_egress_requires_second_explicit_gate(monkeypatch) -> None:
         allow_context_egress=True,
         authorization=_authorization(),
         owner_ref="owner_synthetic_primary",
-        connection_ref=None,
+        connection_ref=SYNTHETIC_OPENAI_CONNECTION,
         resource_ref="resource_conversation",
         local_context=[{"title":"private title","text":"private context"}],
         client=client,
@@ -97,7 +147,7 @@ def test_context_egress_requires_second_explicit_gate(monkeypatch) -> None:
         local_context=[{"title":"approved","summary":"approved context"}],
         client=client2,
         owner_ref="owner_synthetic_primary",
-        connection_ref=None,
+        connection_ref=SYNTHETIC_OPENAI_CONNECTION,
         resource_ref="resource_conversation",
         context_resource_ref="resource_archive",
     )
@@ -108,6 +158,7 @@ def test_context_egress_requires_second_explicit_gate(monkeypatch) -> None:
 def test_context_transport_rejects_a_reservation_for_the_query_purpose(monkeypatch) -> None:
     monkeypatch.setenv(PROVIDER_ENABLE_ENV, "true")
     monkeypatch.setenv(CONTEXT_EGRESS_ENABLE_ENV, "true")
+    monkeypatch.setenv("OPENAI_API_KEY", SYNTHETIC_OPENAI_KEY)
     client = _FakeClient()
 
     result = complete_with_provider(
@@ -125,7 +176,7 @@ def test_context_transport_rejects_a_reservation_for_the_query_purpose(monkeypat
         local_context=[{"title": "private", "text": "must-not-egress"}],
         client=client,
         owner_ref="owner_synthetic_primary",
-        connection_ref=None,
+        connection_ref=SYNTHETIC_OPENAI_CONNECTION,
         resource_ref="resource_conversation",
         context_resource_ref="resource_archive",
     )

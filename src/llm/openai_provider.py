@@ -8,6 +8,7 @@ explicitly enable the provider and separately opt in to context egress.
 from __future__ import annotations
 
 import os
+import hashlib
 from dataclasses import dataclass
 from typing import Any, Mapping, Protocol, Sequence
 
@@ -108,12 +109,16 @@ def complete_with_provider(
             "OpenAI provider egress requires PRM_OPENAI_PROVIDER_ENABLED=true "
             "and allow_provider_egress=True."
         )
+    active_api_key = _configured_openai_api_key()
+    active_connection_ref = _openai_connection_ref(active_api_key)
+    if active_connection_ref is None or connection_ref != active_connection_ref:
+        raise ProviderEgressDenied("OpenAI provider egress requires an active matching capability grant.")
     if not _has_matching_authorization(
         authorization,
         capability=TEXT_CAPABILITY,
         data_class="user_provided",
         owner_ref=owner_ref,
-        connection_ref=connection_ref,
+        connection_ref=active_connection_ref,
         resource_ref=resource_ref,
     ):
         raise ProviderEgressDenied("OpenAI provider egress requires an active matching capability grant.")
@@ -124,14 +129,14 @@ def complete_with_provider(
         capability=CONTEXT_CAPABILITY,
         data_class="private_archive",
         owner_ref=owner_ref,
-        connection_ref=connection_ref,
+        connection_ref=active_connection_ref,
         resource_ref=context_resource_ref,
     )
     request_input = _request_input(
         clean_query,
         local_context=local_context if include_context else None,
     )
-    active_client = client or _build_client()
+    active_client = client or _build_client(active_api_key)
     try:
         require_authorized_egress(
             authorization,
@@ -139,7 +144,7 @@ def complete_with_provider(
             provider_ref=OPENAI_PROVIDER_REF,
             data_class="user_provided",
             owner_ref=owner_ref or "",
-            connection_ref=connection_ref,
+            connection_ref=active_connection_ref,
             resource_ref=resource_ref or "",
             purpose=transport_purpose(
                 provider_ref=OPENAI_PROVIDER_REF,
@@ -154,7 +159,7 @@ def complete_with_provider(
                 provider_ref=OPENAI_PROVIDER_REF,
                 data_class="private_archive",
                 owner_ref=owner_ref or "",
-                connection_ref=connection_ref,
+                connection_ref=active_connection_ref,
                 resource_ref=context_resource_ref or "",
                 purpose=transport_purpose(
                     provider_ref=OPENAI_PROVIDER_REF,
@@ -219,8 +224,21 @@ def _bounded_context(value: Sequence[Mapping[str, Any]] | str, limit: int = 12_0
     return "\n\n---\n\n".join(safe_items)[:limit]
 
 
-def _build_client() -> _OpenAIClient:
-    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+def _configured_openai_api_key() -> str:
+    return os.environ.get("OPENAI_API_KEY", "").strip()
+
+
+def _openai_connection_ref(api_key: str) -> str | None:
+    """Return the opaque ref for the exact OpenAI credential in use."""
+
+    clean_api_key = str(api_key or "").strip()
+    if not clean_api_key:
+        return None
+    return f"connection_openai_{hashlib.sha256(clean_api_key.encode('utf-8')).hexdigest()[:32]}"
+
+
+def _build_client(api_key: str | None = None) -> _OpenAIClient:
+    api_key = str(api_key or _configured_openai_api_key()).strip()
     if not api_key:
         raise OpenAIProviderError("OPENAI_API_KEY is not set")
     try:

@@ -608,7 +608,7 @@ class TestIdeaCallbacks(unittest.TestCase):
 
         validation_mock.assert_called_once_with(settings, "prma:opaque:n", chat_id="-10077", actor_id="12345", owner_chat_id="12345")
         action_mock.assert_not_called()
-        answer_mock.assert_called_once_with("token", "callback-group", "Action unavailable")
+        answer_mock.assert_not_called()
         send_mock.assert_not_called()
 
     def test_run_bot_voice_without_transcript_runs_transcription(self):
@@ -734,7 +734,7 @@ class TestIdeaCallbacks(unittest.TestCase):
         dispatch_mock.assert_not_called()
         self.assertEqual(send_message_mock.call_count, 2)
         fallback_message = send_message_mock.call_args_list[-1].args[2]
-        self.assertIn("OPENAI_API_KEY", fallback_message)
+        self.assertIn("политике доступа", fallback_message)
         self.assertIn("обычное текстовое сообщение", fallback_message)
         self.assertNotIn("/feedback", fallback_message)
 

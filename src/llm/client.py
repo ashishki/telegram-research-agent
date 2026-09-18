@@ -1,4 +1,5 @@
 import json
+import hashlib
 import logging
 import os
 import sqlite3
@@ -147,8 +148,21 @@ def _record_usage(task_type: str, model: str, input_tokens: int, output_tokens: 
         return False
 
 
-def _get_client() -> Anthropic:
-    api_key = os.environ.get("LLM_API_KEY", "") or os.environ.get("ANTHROPIC_API_KEY", "")
+def _configured_anthropic_api_key() -> str:
+    return (os.environ.get("LLM_API_KEY", "") or os.environ.get("ANTHROPIC_API_KEY", "")).strip()
+
+
+def _anthropic_connection_ref(api_key: str) -> str | None:
+    """Return the opaque ref for the exact Anthropic credential in use."""
+
+    clean_api_key = str(api_key or "").strip()
+    if not clean_api_key:
+        return None
+    return f"connection_anthropic_{hashlib.sha256(clean_api_key.encode('utf-8')).hexdigest()[:32]}"
+
+
+def _get_client(api_key: str | None = None) -> Anthropic:
+    api_key = str(api_key or _configured_anthropic_api_key()).strip()
     if not api_key:
         raise LLMError("LLM_API_KEY or ANTHROPIC_API_KEY is not set")
     # A grant pays for one observable transport attempt.  Disable SDK retries:
@@ -252,12 +266,16 @@ def complete_with_receipt(
     connection_ref: str | None = None,
     resource_ref: str | None = None,
 ) -> LLMCompletionReceipt:
+    active_api_key = _configured_anthropic_api_key()
+    active_connection_ref = _anthropic_connection_ref(active_api_key)
+    if active_connection_ref is None or connection_ref != active_connection_ref:
+        raise LLMError("Anthropic completion requires an active matching capability grant")
     if not _has_matching_egress_grant(
         authorization,
         capability=TEXT_CAPABILITY,
         data_class=data_class,
         owner_ref=owner_ref,
-        connection_ref=connection_ref,
+        connection_ref=active_connection_ref,
         resource_ref=resource_ref,
     ):
         raise LLMError("Anthropic completion requires an active capability grant")
@@ -265,7 +283,7 @@ def complete_with_receipt(
     # request into multiple provider calls.  PA-13 owns reconciliation before a
     # caller can request another reservation after an unknown outcome.
     del max_attempts
-    client = _get_client()
+    client = _get_client(active_api_key)
     selected_model = model or _get_model(category)
     start_time = time.time()
     try:
@@ -275,7 +293,7 @@ def complete_with_receipt(
             provider_ref=ANTHROPIC_PROVIDER_REF,
             data_class=data_class,
             owner_ref=owner_ref or "",
-            connection_ref=connection_ref,
+            connection_ref=active_connection_ref,
             resource_ref=resource_ref or "",
             purpose=transport_purpose(
                 provider_ref=ANTHROPIC_PROVIDER_REF,

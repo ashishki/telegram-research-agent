@@ -41,9 +41,13 @@ from db.migrate import run_migrations  # noqa: E402
 from prm.capabilities import AuthorizationRequest, CapabilityGrant, CapabilityRegistry, ProviderPolicy  # noqa: E402
 
 
+SYNTHETIC_ANTHROPIC_KEY = "synthetic-anthropic-key"
+SYNTHETIC_ANTHROPIC_CONNECTION = client._anthropic_connection_ref(SYNTHETIC_ANTHROPIC_KEY)
+assert SYNTHETIC_ANTHROPIC_CONNECTION is not None
+
 AUTH_SCOPE = {
     "owner_ref": "owner_synthetic_primary",
-    "connection_ref": None,
+    "connection_ref": SYNTHETIC_ANTHROPIC_CONNECTION,
     "resource_ref": "resource_conversation",
 }
 
@@ -53,7 +57,7 @@ def _authorization(*, capability: str = "model.generate", purpose: str = "answer
     grant = CapabilityGrant(
         grant_id=f"grant_synthetic_{capability.replace('.', '_')}",
         owner_ref="owner_synthetic_primary",
-        connection_ref=None,
+        connection_ref=SYNTHETIC_ANTHROPIC_CONNECTION,
         capability=capability,
         resource_refs=("resource_conversation",),
         operations=("model_egress",),
@@ -72,6 +76,7 @@ def _authorization(*, capability: str = "model.generate", purpose: str = "answer
         data_class="user_provided",
         provider_ref="provider_anthropic",
         purpose=purpose,
+        connection_ref=SYNTHETIC_ANTHROPIC_CONNECTION,
         expected_grant_revision=1,
     )
     return CapabilityRegistry((grant,)).authorize_and_reserve(request, now=now)
@@ -82,6 +87,12 @@ class TestLLMClient(unittest.TestCase):
         self.tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
         self.tmp.close()
         self.db_path = self.tmp.name
+        self.credential_env = patch.dict(
+            os.environ,
+            {"ANTHROPIC_API_KEY": SYNTHETIC_ANTHROPIC_KEY},
+            clear=False,
+        )
+        self.credential_env.start()
         client.set_usage_db_path("")
         with patch.dict(os.environ, {"AGENT_DB_PATH": self.db_path}):
             run_migrations()
@@ -89,6 +100,7 @@ class TestLLMClient(unittest.TestCase):
         self.vision_authorization = _authorization(capability="model.vision")
 
     def tearDown(self) -> None:
+        self.credential_env.stop()
         client.set_usage_db_path("")
         os.unlink(self.db_path)
 
@@ -110,6 +122,73 @@ class TestLLMClient(unittest.TestCase):
                     prompt="Synthetic question",
                     authorization=_authorization(purpose="answer.context"),
                     **AUTH_SCOPE,
+                )
+
+        fake_transport.assert_not_called()
+
+    def test_text_transport_rejects_a_grant_for_another_active_credential_before_provider_call(self):
+        granted_key = "synthetic-anthropic-grant-a"
+        active_key = "synthetic-anthropic-credential-b"
+        granted_connection_ref = client._anthropic_connection_ref(granted_key)
+        assert granted_connection_ref is not None
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        grant = CapabilityGrant(
+            grant_id="grant_synthetic_anthropic_connection_a",
+            owner_ref="owner_synthetic_primary",
+            connection_ref=granted_connection_ref,
+            capability="model.generate",
+            resource_refs=("resource_conversation",),
+            operations=("model_egress",),
+            data_classes=("user_provided",),
+            purpose="answer.request",
+            provider_policy=ProviderPolicy(("provider_anthropic",)),
+            issued_at=now - timedelta(minutes=1),
+            expires_at=now + timedelta(hours=1),
+            revision=1,
+        )
+        decision = CapabilityRegistry((grant,)).authorize_and_reserve(
+            AuthorizationRequest(
+                owner_ref="owner_synthetic_primary",
+                connection_ref=granted_connection_ref,
+                capability="model.generate",
+                resource_ref="resource_conversation",
+                operation="model_egress",
+                data_class="user_provided",
+                provider_ref="provider_anthropic",
+                purpose="answer.request",
+                expected_grant_revision=1,
+            ),
+            now=now,
+        )
+        fake_transport = unittest.mock.Mock()
+        fake_client = SimpleNamespace(messages=SimpleNamespace(create=fake_transport))
+
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": active_key}, clear=False), patch.object(
+            client, "_get_client", return_value=fake_client
+        ):
+            with self.assertRaises(client.LLMError):
+                client.complete(
+                    prompt="Synthetic question",
+                    authorization=decision,
+                    owner_ref="owner_synthetic_primary",
+                    connection_ref=granted_connection_ref,
+                    resource_ref="resource_conversation",
+                )
+
+        fake_transport.assert_not_called()
+
+    def test_text_transport_rejects_a_null_connection_ref_before_provider_call(self):
+        fake_transport = unittest.mock.Mock()
+        fake_client = SimpleNamespace(messages=SimpleNamespace(create=fake_transport))
+
+        with patch.object(client, "_get_client", return_value=fake_client):
+            with self.assertRaises(client.LLMError):
+                client.complete(
+                    prompt="Synthetic question",
+                    authorization=self.text_authorization,
+                    owner_ref="owner_synthetic_primary",
+                    connection_ref=None,
+                    resource_ref="resource_conversation",
                 )
 
         fake_transport.assert_not_called()
@@ -308,7 +387,7 @@ class TestLLMClient(unittest.TestCase):
         mock_client = SimpleNamespace(messages=SimpleNamespace(create=lambda **_: response))
         client.set_usage_db_path(self.db_path)
 
-        with patch.dict(os.environ, {}, clear=True):
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": SYNTHETIC_ANTHROPIC_KEY}, clear=True):
             with patch.object(client, "_get_client", return_value=mock_client):
                 result = client.complete(
                     prompt="hi",

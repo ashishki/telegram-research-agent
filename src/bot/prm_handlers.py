@@ -101,6 +101,25 @@ def send_message(
         LOGGER.warning("Failed to send PRM Telegram message")
 
 
+def consume_private_reply_authorization(
+    *,
+    token: str,
+    chat_id: str,
+    authorization: AuthorizationDecision | None,
+    actor_id: str | None,
+    owner_chat_id: str | None,
+) -> bool:
+    """Consume the exact-private decision before any PA Telegram response."""
+
+    return _require_prm_delivery_authorization(
+        token=token,
+        chat_id=chat_id,
+        authorization=authorization,
+        actor_id=actor_id,
+        owner_chat_id=owner_chat_id,
+    )
+
+
 def dispatch_prm_command(
     chat_id: str,
     text: str,

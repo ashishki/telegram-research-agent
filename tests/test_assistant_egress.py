@@ -13,6 +13,7 @@ from bot import legacy_handlers
 from bot import prm_handlers
 from bot.voice import VoiceTranscriptionUnavailable, transcribe_audio_file, transcribe_telegram_voice
 import llm.client as anthropic_client
+import llm.openai_provider as openai_provider
 from llm.openai_provider import OpenAIProviderError, ProviderEgressDenied, complete_with_provider
 from tests.test_assistant_permissions import NOW, make_grant, make_request
 from prm.capabilities import CapabilityRegistry
@@ -23,6 +24,11 @@ OWNER_SCOPE = {
     "resource_ref": "resource_conversation",
 }
 SYNTHETIC_TELEGRAM_TOKEN = "synthetic-telegram-token"
+SYNTHETIC_OPENAI_KEY = "synthetic-openai-key"
+SYNTHETIC_OPENAI_CONNECTION = openai_provider._openai_connection_ref(SYNTHETIC_OPENAI_KEY)
+assert SYNTHETIC_OPENAI_CONNECTION is not None
+
+OWNER_SCOPE["connection_ref"] = SYNTHETIC_OPENAI_CONNECTION
 
 
 class _FakeResponses:
@@ -51,21 +57,32 @@ def _decision(
         resource_ref=resource_ref,
         data_class=data_class,
         purpose=purpose,
+        connection_ref=OWNER_SCOPE["connection_ref"],
     )
     request = make_request(
         capability=capability,
         resource_ref=resource_ref,
         data_class=data_class,
         purpose=purpose,
+        connection_ref=OWNER_SCOPE["connection_ref"],
     )
     return CapabilityRegistry((grant,)).authorize_and_reserve(request, now=NOW)
 
 
 def _reserved_decision_with_registry(*, capability="model.generate", resource_ref="resource_conversation"):
-    grant = make_grant(capability=capability, resource_ref=resource_ref)
+    grant = make_grant(
+        capability=capability,
+        resource_ref=resource_ref,
+        connection_ref=OWNER_SCOPE["connection_ref"],
+    )
     registry = CapabilityRegistry((grant,))
     return registry, grant, registry.authorize_and_reserve(
-        make_request(capability=capability, resource_ref=resource_ref), now=NOW
+        make_request(
+            capability=capability,
+            resource_ref=resource_ref,
+            connection_ref=OWNER_SCOPE["connection_ref"],
+        ),
+        now=NOW,
     )
 
 
@@ -162,14 +179,23 @@ def test_anthropic_text_client_uses_only_a_matching_provider_grant():
         usage=SimpleNamespace(input_tokens=1, output_tokens=1),
     )
     fake_client = SimpleNamespace(messages=SimpleNamespace(create=lambda **_kwargs: response))
-    grant = make_grant(providers=("provider_anthropic",))
-    request = make_request(provider_ref="provider_anthropic")
+    synthetic_key = "synthetic-anthropic-key"
+    connection_ref = anthropic_client._anthropic_connection_ref(synthetic_key)
+    assert connection_ref is not None
+    grant = make_grant(providers=("provider_anthropic",), connection_ref=connection_ref)
+    request = make_request(provider_ref="provider_anthropic", connection_ref=connection_ref)
     decision = CapabilityRegistry((grant,)).authorize_and_reserve(request, now=NOW)
 
-    with patch.object(anthropic_client, "_get_client", return_value=fake_client):
-        assert anthropic_client.complete(
-            prompt="Synthetic question", authorization=decision, **OWNER_SCOPE
-        ) == "synthetic answer"
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setenv("ANTHROPIC_API_KEY", synthetic_key)
+        with patch.object(anthropic_client, "_get_client", return_value=fake_client):
+            assert anthropic_client.complete(
+                prompt="Synthetic question",
+                authorization=decision,
+                owner_ref=OWNER_SCOPE["owner_ref"],
+                connection_ref=connection_ref,
+                resource_ref=OWNER_SCOPE["resource_ref"],
+            ) == "synthetic answer"
 
 
 def test_prm_result_delivery_requires_a_fresh_private_owner_grant_before_fake_telegram_send(monkeypatch):
@@ -568,6 +594,66 @@ def test_prm_callback_followup_uses_the_same_private_return_envelope(monkeypatch
     assert sent == ["Synthetic callback follow-up."]
 
 
+def test_prm_callback_acknowledgement_needs_an_exact_private_reply_envelope(monkeypatch, tmp_path):
+    acknowledgements: list[tuple[str, str, str]] = []
+    monkeypatch.setattr(
+        bot_runtime,
+        "validate_prm_post_answer_callback",
+        lambda *_args, **_kwargs: bot_runtime.UnavailablePrmAction(),
+    )
+    monkeypatch.setattr(
+        bot_runtime,
+        "_telegram_answer_callback",
+        lambda token, callback_id, text: acknowledgements.append((token, callback_id, text)),
+    )
+
+    bot_runtime._handle_callback(
+        {
+            "id": "callback-mismatched",
+            "from": {"id": 43},
+            "message": {"chat": {"id": 42}},
+            "data": "prma:opaque:n",
+        },
+        token=SYNTHETIC_TELEGRAM_TOKEN,
+        owner_chat_id="42",
+        settings=SimpleNamespace(db_path=str(tmp_path / "synthetic.db")),
+        runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT,
+    )
+
+    assert acknowledgements == []
+
+
+def test_prm_callback_acknowledgement_uses_an_exact_private_reply_envelope(monkeypatch, tmp_path):
+    acknowledgements: list[tuple[str, str, str]] = []
+    monkeypatch.setattr(
+        bot_runtime,
+        "validate_prm_post_answer_callback",
+        lambda *_args, **_kwargs: bot_runtime.UnavailablePrmAction(),
+    )
+    monkeypatch.setattr(
+        bot_runtime,
+        "_telegram_answer_callback",
+        lambda token, callback_id, text: acknowledgements.append((token, callback_id, text)),
+    )
+
+    bot_runtime._handle_callback(
+        {
+            "id": "callback-private",
+            "from": {"id": 42},
+            "message": {"chat": {"id": 42}},
+            "data": "prma:opaque:n",
+        },
+        token=SYNTHETIC_TELEGRAM_TOKEN,
+        owner_chat_id="42",
+        settings=SimpleNamespace(db_path=str(tmp_path / "synthetic.db")),
+        runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT,
+    )
+
+    assert acknowledgements == [
+        (SYNTHETIC_TELEGRAM_TOKEN, "callback-private", "Action unavailable")
+    ]
+
+
 def test_prm_rejects_private_chat_with_a_mismatched_sender_before_dispatch(monkeypatch, tmp_path):
     dispatched: list[str] = []
     update = {
@@ -592,6 +678,7 @@ def test_private_context_needs_its_own_data_class_grant(monkeypatch):
     client = _FakeClient()
     monkeypatch.setenv("PRM_OPENAI_PROVIDER_ENABLED", "true")
     monkeypatch.setenv("PRM_OPENAI_CONTEXT_EGRESS_ENABLED", "true")
+    monkeypatch.setenv("OPENAI_API_KEY", SYNTHETIC_OPENAI_KEY)
 
     result = complete_with_provider(
         "Synthetic question",

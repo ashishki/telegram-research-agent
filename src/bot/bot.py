@@ -19,6 +19,7 @@ from .callbacks import (
     validate_prm_post_answer_callback,
 )
 from .prm_handlers import (
+    consume_private_reply_authorization,
     dispatch_prm_command,
     issue_private_reply_authorizations,
     send_message,
@@ -90,6 +91,34 @@ def _telegram_answer_callback(token: str, callback_query_id: str, text: str) -> 
         decoded = json.loads(response.read().decode("utf-8"))
     if not decoded.get("ok"):
         raise RuntimeError(f"Telegram API returned error: {decoded!r}")
+
+
+def _answer_prm_callback(
+    token: str,
+    callback_query_id: str,
+    text: str,
+    *,
+    delivery_authorization: AuthorizationDecision | None,
+    chat_id: str,
+    actor_id: str | None,
+    owner_chat_id: str | None,
+) -> bool:
+    """Acknowledge a PA callback only through its inbound reply envelope."""
+
+    if not consume_private_reply_authorization(
+        token=token,
+        chat_id=chat_id,
+        authorization=delivery_authorization,
+        actor_id=actor_id,
+        owner_chat_id=owner_chat_id,
+    ):
+        return False
+    try:
+        _telegram_answer_callback(token, callback_query_id, text)
+    except Exception:
+        LOGGER.warning("Failed to acknowledge PRM callback")
+        return False
+    return True
 
 
 def _extract_message(update: dict[str, Any]) -> dict[str, Any] | None:
@@ -169,7 +198,7 @@ def _voice_received_message(runtime_mode: str) -> str:
 def _voice_unavailable_message(runtime_mode: str) -> str:
     if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
         return (
-            "Голосовое распознавание недоступно: OPENAI_API_KEY не настроен. "
+            "Голосовое распознавание недоступно по текущей политике доступа. "
             "Отправь обычное текстовое сообщение."
         )
     return (
@@ -363,6 +392,28 @@ def _handle_callback(
         if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT
         else ()
     )
+
+    callback_decisions = iter(callback_delivery_authorizations)
+
+    def next_callback_decision() -> AuthorizationDecision | None:
+        return next(callback_decisions, None)
+
+    def acknowledge_callback(text: str) -> bool:
+        if not callback_id:
+            return False
+        if runtime_mode != BOT_RUNTIME_PRM_ASSISTANT:
+            _telegram_answer_callback(token, callback_id, text)
+            return True
+        return _answer_prm_callback(
+            token,
+            callback_id,
+            text,
+            delivery_authorization=next_callback_decision(),
+            chat_id=callback_chat_id,
+            actor_id=callback_actor_id,
+            owner_chat_id=owner_chat_id,
+        )
+
     if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT and data.startswith(("prma:", "prmc:")):
         validated = validate_prm_post_answer_callback(
             settings,
@@ -372,16 +423,14 @@ def _handle_callback(
             owner_chat_id=owner_chat_id,
         )
         if isinstance(validated, UnavailablePrmAction):
-            if callback_id:
-                _telegram_answer_callback(token, callback_id, "Action unavailable")
+            acknowledge_callback("Action unavailable")
             return
         result = apply_validated_prm_post_answer_callback(settings, validated)
         unavailable = str(result.get("status") or "") in {
             "action_unavailable", "expired", "action_not_available", "missing_proposal",
             "invalid_selection", "selection_required",
         }
-        if callback_id:
-            _telegram_answer_callback(token, callback_id, "Action unavailable" if unavailable else "Принято")
+        acknowledge_callback("Action unavailable" if unavailable else "Принято")
         if not unavailable:
             message = str(result.get("message") or "")
             if message:
@@ -391,18 +440,16 @@ def _handle_callback(
                     message,
                     parse_mode=None,
                     reply_markup=result.get("reply_markup"),
-                    delivery_authorization=callback_delivery_authorizations[0] if callback_delivery_authorizations else None,
+                    delivery_authorization=next_callback_decision(),
                     actor_id=callback_actor_id,
                     owner_chat_id=owner_chat_id,
                 )
         return
     if not _is_authorized_callback(callback, owner_chat_id):
-        if callback_id:
-            _telegram_answer_callback(token, callback_id, "Not authorized")
+        acknowledge_callback("Not authorized")
         return
     if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT and callback_chat_id != owner_chat_id:
-        if callback_id:
-            _telegram_answer_callback(token, callback_id, "PRM доступен только в личном чате владельца")
+        acknowledge_callback("PRM доступен только в личном чате владельца")
         return
     if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT and data.startswith(
         ("utdp:", "utdc:", "utdw:", "utds:")
@@ -410,8 +457,7 @@ def _handle_callback(
         # UTD callback namespaces mutate durable draft/profile/watch state.
         # PA-02 deliberately has no callback-specific local-write authority,
         # so do not hand the action to their legacy mutation facade.
-        if callback_id:
-            _telegram_answer_callback(token, callback_id, "Action unavailable")
+        acknowledge_callback("Action unavailable")
         return
     english_feedback = data.startswith("utdw:") and data.endswith(":en")
     answer = "Готово"
@@ -423,8 +469,7 @@ def _handle_callback(
         and not english_feedback
     ):
         try:
-            _telegram_answer_callback(token, callback_id, "Принято")
-            callback_acknowledged = True
+            callback_acknowledged = acknowledge_callback("Принято")
         except Exception:
             LOGGER.warning(
                 "Failed to answer callback query id=%s", callback_id, exc_info=True
@@ -450,7 +495,7 @@ def _handle_callback(
                         message,
                         parse_mode=None,
                         reply_markup=result.get("reply_markup"),
-                        delivery_authorization=callback_delivery_authorizations[0] if callback_delivery_authorizations else None,
+                        delivery_authorization=next_callback_decision(),
                         actor_id=callback_actor_id,
                         owner_chat_id=owner_chat_id,
                     )
@@ -463,7 +508,7 @@ def _handle_callback(
         answer = "Could not record feedback" if english_feedback else "Не смог обработать действие"
     if callback_id and not callback_acknowledged:
         try:
-            _telegram_answer_callback(token, callback_id, answer)
+            acknowledge_callback(answer)
         except Exception:
             LOGGER.warning(
                 "Failed to answer callback query id=%s", callback_id, exc_info=True
