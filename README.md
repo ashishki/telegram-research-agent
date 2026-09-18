@@ -29,12 +29,19 @@ Manual private-alpha. Engineering regression evidence exists; operator usefulnes
 still requires a controlled 15–20-question smoke session and longitudinal
 feedback. No public release or production-value claim is made.
 
-The active workstream is UTD (University/Personal external watch) within the
-same Telegram assistant. Its bounded live timer is enabled, but it fails closed:
-it cannot fetch approved sources or send an alert until the operator confirms a
-UTD profile draft in Telegram. Delivery is then limited to confirmed official
-sources, a relevance-ranked candidate set, a daily cap, receipts, and a kill
-switch. This is not PRM-19 dogfood.
+Personal Search and News is implemented locally in this same bot: final-answer
+integrity, dialogue continuity, controlled public verification, on-demand topic
+editions, and confirmation-gated subscriptions with bounded delivery. All five
+engineering gates have passed on fixture-only evidence. The implementation is
+ready for a separate human pilot decision, not a production/release claim; see
+the [integrated replay](docs/audit/PRM_SN_INTEGRATED_REPLAY_2026-09-17.md) and
+[pilot/rollback packet](docs/PRM_SEARCH_NEWS_PILOT_PACKET.md).
+
+UTD remains a specific external-watch scenario. The 2026-09-03 receipt records
+bounded timer enablement, failing closed until profile confirmation. The
+2026-09-17 audit did not observe the current service or profile state. Its
+existing official-source, daily-cap, receipt and kill-switch boundaries remain;
+the new task queue does not extend those permissions. This is not PRM-19 dogfood.
 
 PRM archive research remains available for operator-controlled manual testing.
 PRM-19 requires separate explicit dogfood-start approval; PRM-20 requires real
@@ -91,6 +98,8 @@ The complete historical pytest suite is intentionally not part of the normal loo
 - [Active retrofit tasks](docs/tasks.md)
 - [Current operating model](docs/PRODUCT_OPERATING_MODEL.md)
 - [Current evidence index](docs/EVIDENCE_INDEX.md)
+- [PRM-SN integrated replay](docs/audit/PRM_SN_INTEGRATED_REPLAY_2026-09-17.md)
+- [PRM-SN pilot and rollback packet](docs/PRM_SEARCH_NEWS_PILOT_PACKET.md)
 - [Implementation contract](docs/IMPLEMENTATION_CONTRACT.md)
 - [Privacy threat model](docs/PRIVACY_THREAT_MODEL.md)
 - [Repository retrofit plan](docs/retrofit/RFX_REPOSITORY_RETROFIT.md)

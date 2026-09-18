@@ -6,26 +6,40 @@ Baseline: `5dfd38660b7d8d24998b4dcdf801c419c1dc8f7c`
 Archive ref: origin/archive/pre-prm-retrofit-2026-08-16
 Active ref: master
 
-Historical PBR, PRM, IRX, PRM-UX, PRM-MAT and PRM-QA task records are preserved in `docs/archive/pre_retrofit_2026-08-16/tasks.pre-retrofit.md` and Git history. Only the current retrofit queue remains active here.
+Historical PBR, PRM, IRX, PRM-UX, PRM-MAT and PRM-QA task records are preserved in `docs/archive/pre_retrofit_2026-08-16/tasks.pre-retrofit.md` and Git history. The PRM-SN implementation queue is registered below; existing RFX/UTD records and statuses remain preserved.
 
 ## Current Stop Point
 
-The PRM assistant and local archive/RAG path are available for manual,
-operator-controlled testing. PRM-19 has not started and no release claim is
-authorized. It needs explicit human dogfood-start approval; PRM-20 additionally
-needs real PRM-19 evidence and explicit approval for any compatibility cleanup.
+The owner requested registration of the personal search/news plan on 2026-09-17.
+The launch prompt assigns one end-to-end goal over all twelve PRM-SN tasks and
+DR-1 through DR-5, starting at the first unfinished task (currently PRM-SN-1A).
+Use `docs/prompts/prm_search_news_implementer.md`; after engineering gates,
+continue within that goal without asking for each next card. This documentation
+change does not itself start implementation, review, a pilot or runtime jobs.
+See ADR-009,
+`docs/PRM_SEARCH_NEWS_PLAN.md` and `docs/PRM_SEARCH_NEWS_DEEP_REVIEW.md`.
 
-The active implementation is UTD-6/UTD-7. The controlled UTD watch timer was
-enabled on 2026-09-03, but it fails closed while no confirmed UTD profile exists:
-no source poll or Telegram delivery occurs. The immediate operator action is to
-review and explicitly confirm (or decline/edit) the UTD profile draft through
-the existing UTD Telegram handler. Only after confirmation may the timer poll
-the allowlisted official sources and send policy-capped, receipt-backed alerts.
-This controlled UTD delivery is not PRM-19 dogfood.
+The PRM-SN lane preserves one bot and treats UTD as a specific watch scope.
+The 2026-09-03 UTD receipt records timer enablement pending profile confirmation;
+current service/profile state was not observed in the 2026-09-17 audit. Existing
+UTD permissions and task statuses are unchanged. PRM-19/20 and live rollout
+still require their separate approvals and evidence. The historical RFX-only
+feature freeze does not block an explicitly assigned bounded PRM-SN task.
 
-See `docs/audit/UTD_LIVE_DOGFOOD_START_2026-09-03.md` for the enablement
-receipt and `docs/audit/PRM_PRODUCT_UX_JUDGE_2026-09-03.md` for the latest
-advisory UX evaluation.
+## Personal Search And News dependencies
+
+```text
+PRM-SN-1A -> PRM-SN-1B -> PRM-SN-1C -> PRM-SN-DR-1
+  -> PRM-SN-2A -> PRM-SN-2B -> PRM-SN-2C -> PRM-SN-DR-2
+  -> PRM-SN-3A -> PRM-SN-3B -> PRM-SN-DR-3
+  -> PRM-SN-4A -> PRM-SN-4B -> PRM-SN-DR-4
+  -> PRM-SN-5A -> PRM-SN-5B -> PRM-SN-DR-5
+  -> separately approved manual pilot -> PRM-SN-DR-PILOT
+  -> separately approved expanded rollout
+```
+
+Immediate deep reviews for changed safety boundaries apply inside these phases.
+A task critic is not a completed phase review. No gate is marked passed here.
 
 ## Dependency graph
 
@@ -38,6 +52,701 @@ RFX-7 -> RFX-10 -> UTD-P0
 UTD-P0 -> UTD-1 / UTD-2 / UTD-3
 UTD-1 / UTD-2 / UTD-3 -> UTD-DR-1 -> UTD-4 -> UTD-5 -> UTD-DR-2 -> UTD-6 -> UTD-7 -> UTD-DR-3
 ```
+
+## Personal Search And News task records
+
+### PRM-SN-1A: Final Citation Integrity And Verification Completeness
+
+Owner:      codex
+Phase:      search-news-answer
+Type:       rag:generation eval:gate
+Depends-On: none
+Status:     implemented
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: not_required
+Correction-Budget: 2
+
+Objective: |
+  Bind visible final-answer citations to the selected evidence and make incomplete verification explicit before publication.
+
+Acceptance-Criteria:
+  - "Wrong or absent URLs cannot receive an invented citation-precision pass; lexical matching never silently replaces the visible source."
+  - "Short factual text and unverified tail content yield explicit incomplete handling and a useful source-attributed fallback."
+  - "Paired useful answers, boundaries and recommendations remain usable; publish actual before/after outputs and do not claim semantic accuracy is solved."
+
+Verification:
+  - After I/O preflight, run with fake providers/Telegram and disposable DBs: PYTHONPATH=src python3 -m pytest tests/test_claim_ledger.py tests/test_prm_synthesis.py tests/test_prm_application.py tests/test_prm_intent_archive_contract.py -q
+  - Record before/after outputs, meaningful new regression assertions, limitations and rollback; no live measurement claim.
+
+Context-Refs:
+  - docs/PRM_SEARCH_NEWS_PLAN.md
+  - docs/PRM_SEARCH_NEWS_EVAL.md
+  - docs/PRM_SEARCH_NEWS_DEEP_REVIEW.md
+  - docs/audit/PRM_SEARCH_NEWS_BASELINE_2026-09-17.md
+
+Files:
+  - src/assistant/claim_ledger.py
+  - src/prm/synthesis.py
+  - src/prm/application.py
+
+Notes: |
+  Detailed scope and rollback are in PRM_SEARCH_NEWS_PLAN. Listing this task does not assign it.
+  Focused critic findings roll into the phase gate; immediate safety triggers apply before dependency progress.
+
+### PRM-SN-1B: Key Claim Support And Safe Publication
+
+Owner:      codex
+Phase:      search-news-answer
+Type:       rag:generation eval:gate
+Depends-On: PRM-SN-1A
+Status:     implemented
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: not_required
+Correction-Budget: 2
+
+Objective: |
+  Reject unsupported key numbers, dates, units, negations, actors and quotations while preserving useful supported answers.
+
+Acceptance-Criteria:
+  - "Synthetic critical mutations do not publish as verified facts, including mutations with the correct source URL."
+  - "Source facts, inference and recommendations have explicit evidence scope; lexical overlap is not semantic entailment."
+  - "Report false accepts and false refusals on paired positives; uncertain free paraphrases use a useful attributed fallback, not an invented semantic verifier."
+
+Verification:
+  - After I/O preflight, run with fake providers/Telegram and disposable DBs: PYTHONPATH=src python3 -m pytest tests/test_claim_ledger.py tests/test_prm_synthesis.py tests/test_prm_application.py -q
+  - Record before/after outputs, meaningful new regression assertions, limitations and rollback; no live measurement claim.
+
+Context-Refs:
+  - docs/PRM_SEARCH_NEWS_PLAN.md
+  - docs/PRM_SEARCH_NEWS_EVAL.md
+  - docs/PRM_SEARCH_NEWS_DEEP_REVIEW.md
+  - docs/audit/PRM_SEARCH_NEWS_BASELINE_2026-09-17.md
+
+Files:
+  - src/assistant/claim_ledger.py
+  - src/prm/synthesis.py
+  - src/prm/application.py
+
+Notes: |
+  Detailed scope and rollback are in PRM_SEARCH_NEWS_PLAN. Listing this task does not assign it.
+  Focused critic findings roll into the phase gate; immediate safety triggers apply before dependency progress.
+
+### PRM-SN-1C: Direct Answers And Mixed-query Partial Results
+
+Owner:      codex
+Phase:      search-news-answer
+Type:       rag:generation eval:gate
+Depends-On: PRM-SN-1B
+Status:     implemented
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: not_required
+Correction-Budget: 2
+
+Objective: |
+  Return a compact useful first answer and preserve archive findings when current external verification is unavailable.
+
+Acceptance-Criteria:
+  - "Archive-scoped applicability now does not trigger web or an implicit project."
+  - "Mixed archive/current request retains the supported local answer and the precise external gap; dispatch never iterates missing action_codes."
+  - "Final Telegram text has nearby sources and useful follow-up, checked end-to-end with a fake sender."
+
+Verification:
+  - After I/O preflight, run with fake providers/Telegram and disposable DBs: PYTHONPATH=src python3 -m pytest tests/test_prm_application.py tests/test_prm_bot_dispatch.py tests/test_prm_intent_archive_contract.py -q
+  - Record before/after outputs, meaningful new regression assertions, limitations and rollback; no live measurement claim.
+
+Context-Refs:
+  - docs/PRM_SEARCH_NEWS_PLAN.md
+  - docs/PRM_SEARCH_NEWS_EVAL.md
+  - docs/PRM_SEARCH_NEWS_DEEP_REVIEW.md
+  - docs/audit/PRM_SEARCH_NEWS_BASELINE_2026-09-17.md
+
+Files:
+  - src/prm/application.py
+  - src/prm/presentation.py
+  - src/bot/prm_handlers.py
+
+Notes: |
+  Detailed scope and rollback are in PRM_SEARCH_NEWS_PLAN. Listing this task does not assign it.
+  Focused critic findings roll into the phase gate; immediate safety triggers apply before dependency progress.
+
+### PRM-SN-DR-1: Phase 1 Deep Review
+
+Owner:      read-only reviewer + human operator
+Phase:      deep-review
+Type:       compliance:evidence eval:gate
+Depends-On: PRM-SN-1A, PRM-SN-1B, PRM-SN-1C
+Status:     implemented
+Risk-Level: high
+Critic-Required: required
+Correction-Budget: 2
+
+Objective: |
+  Review the accumulated phase diff: Final answers, claim support, citation integrity, completeness and useful mixed responses.
+
+Acceptance-Criteria:
+  - "Fresh read-only Codex exec requests gpt-5.6-terra/high; exact command, reviewed SHA/diff and observed model/effort evidence are recorded."
+  - "P0/P1 and mandatory evidence gaps are corrected and re-verified before the dependent phase; useful positive cases and final user output are inspected."
+  - "The verdict is limited to demonstrated engineering scope; independent human labels, runtime, pilot and release gates are not fabricated or self-approved."
+
+Verification:
+  - Follow docs/PRM_SEARCH_NEWS_DEEP_REVIEW.md; inspect accumulated phase tests and perform only justified safe re-verification.
+  - Record sanitised review, fixes, remaining risks and final diff identity under docs/audit/; do not create a placeholder PASS receipt.
+
+Context-Refs:
+  - docs/REVIEW_POLICY.md
+  - docs/PRM_SEARCH_NEWS_DEEP_REVIEW.md
+  - docs/PRM_SEARCH_NEWS_PLAN.md
+  - docs/PRM_SEARCH_NEWS_EVAL.md
+
+Files:
+  - docs/audit/
+  - docs/tasks.md
+
+Notes: |
+  Under the assigned end-to-end goal, a passed engineering review opens the next
+  local phase without another permission request. It never permits production.
+  For DR-5, a manual pilot still requires separate approval of the concrete packet.
+
+### PRM-SN-2A: Typed Volatile Follow-up Context
+
+Owner:      codex
+Phase:      search-news-dialogue
+Type:       agent:harness eval:gate privacy
+Depends-On: PRM-SN-DR-1
+Status:     implemented
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: not_required
+Correction-Budget: 2
+
+Objective: |
+  Keep topic, evidence item selection and filters in explicit temporary state, with real date-window updates.
+
+Acceptance-Criteria:
+  - "Topic A then new B then more continues B; direct-only and last-week filters actually apply."
+  - "Expired or restarted sessions honestly request missing context and do not create durable memory."
+  - "Period boundaries, empty windows and timezone/DST behavior have deterministic fixture checks."
+
+Verification:
+  - After I/O preflight, run with fake providers/Telegram and disposable DBs: PYTHONPATH=src python3 -m pytest tests/test_prm_bot_dispatch.py tests/test_memory_research.py -q
+  - Record before/after outputs, meaningful new regression assertions, limitations and rollback; no live measurement claim.
+
+Context-Refs:
+  - docs/PRM_SEARCH_NEWS_PLAN.md
+  - docs/PRM_SEARCH_NEWS_EVAL.md
+  - docs/PRM_SEARCH_NEWS_DEEP_REVIEW.md
+  - docs/audit/PRM_SEARCH_NEWS_BASELINE_2026-09-17.md
+
+Files:
+  - src/bot/prm_handlers.py
+  - src/assistant/memory_research.py
+  - src/prm/contracts.py
+
+Notes: |
+  Detailed scope and rollback are in PRM_SEARCH_NEWS_PLAN. Listing this task does not assign it.
+  Focused critic findings roll into the phase gate; immediate safety triggers apply before dependency progress.
+
+### PRM-SN-2B: Exact Item Save Preview And Confirmation
+
+Owner:      codex
+Phase:      search-news-dialogue
+Type:       agent:harness eval:gate privacy
+Depends-On: PRM-SN-2A
+Status:     implemented
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: not_required
+Correction-Budget: 2
+
+Objective: |
+  Resolve save the second item against the exact answer version and show the full proposed object and effect before confirmation.
+
+Acceptance-Criteria:
+  - "Confirm/cancel/repeat/expiry/cross-chat/old-version behavior preserves ownership and creates at most one intended canonical object."
+  - "Saved topic wording never promises an executable subscription; proposal and receipt retention are explicit."
+  - "Changed confirmation or persistent-write semantics receive immediate review before dependent work."
+
+Verification:
+  - After I/O preflight, run with fake providers/Telegram and disposable DBs: PYTHONPATH=src python3 -m pytest tests/test_prm_post_answer_actions.py tests/test_prm_bot_dispatch.py -q
+  - Record before/after outputs, meaningful new regression assertions, limitations and rollback; no live measurement claim.
+
+Context-Refs:
+  - docs/PRM_SEARCH_NEWS_PLAN.md
+  - docs/PRM_SEARCH_NEWS_EVAL.md
+  - docs/PRM_SEARCH_NEWS_DEEP_REVIEW.md
+  - docs/audit/PRM_SEARCH_NEWS_BASELINE_2026-09-17.md
+
+Files:
+  - src/assistant/prm_post_answer_actions.py
+  - src/assistant/pi_memory.py
+  - src/bot/prm_handlers.py
+
+Notes: |
+  Detailed scope and rollback are in PRM_SEARCH_NEWS_PLAN. Listing this task does not assign it.
+  Focused critic findings roll into the phase gate; immediate safety triggers apply before dependency progress.
+
+### PRM-SN-2C: Archive Refresh And Index Health Visibility
+
+Owner:      codex
+Phase:      search-news-dialogue
+Type:       agent:harness eval:gate privacy
+Depends-On: PRM-SN-2B
+Status:     implemented
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: not_required
+Correction-Budget: 2
+
+Objective: |
+  Expose last refresh success, attempt, partial/error and archive/index coverage without executing a refresh from status.
+
+Acceptance-Criteria:
+  - "Healthy no-new-data, stale data, partial refresh and source failure are distinguishable in user-visible status."
+  - "Reading status never starts ingestion, migrations or index building; timestamps represent actual coverage, not status request time."
+  - "New derived receipt persistence, if required, is fixture-only and receives immediate schema/retention review."
+
+Verification:
+  - After I/O preflight, run with fake providers/Telegram and disposable DBs: PYTHONPATH=src python3 -m pytest tests/test_prm_refresh_receipt.py -q
+  - Record before/after outputs, meaningful new regression assertions, limitations and rollback; no live measurement claim.
+
+Context-Refs:
+  - docs/PRM_SEARCH_NEWS_PLAN.md
+  - docs/PRM_SEARCH_NEWS_EVAL.md
+  - docs/PRM_SEARCH_NEWS_DEEP_REVIEW.md
+  - docs/audit/PRM_SEARCH_NEWS_BASELINE_2026-09-17.md
+
+Files:
+  - src/assistant/prm_refresh_receipt.py
+  - src/bot/legacy_handlers.py
+  - src/main.py
+
+Notes: |
+  Detailed scope and rollback are in PRM_SEARCH_NEWS_PLAN. Listing this task does not assign it.
+  Focused critic findings roll into the phase gate; immediate safety triggers apply before dependency progress.
+
+### PRM-SN-DR-2: Phase 2 Deep Review
+
+Owner:      read-only reviewer + human operator
+Phase:      deep-review
+Type:       compliance:evidence eval:gate
+Depends-On: PRM-SN-2A, PRM-SN-2B, PRM-SN-2C
+Status:     implemented
+Risk-Level: high
+Critic-Required: required
+Correction-Budget: 2
+
+Objective: |
+  Review the accumulated phase diff: Dialogue isolation, date filters, exact confirmation, callbacks and archive health.
+
+Acceptance-Criteria:
+  - "Fresh read-only Codex exec requests gpt-5.6-terra/high; exact command, reviewed SHA/diff and observed model/effort evidence are recorded."
+  - "P0/P1 and mandatory evidence gaps are corrected and re-verified before the dependent phase; useful positive cases and final user output are inspected."
+  - "The verdict is limited to demonstrated engineering scope; independent human labels, runtime, pilot and release gates are not fabricated or self-approved."
+
+Verification:
+  - Follow docs/PRM_SEARCH_NEWS_DEEP_REVIEW.md; inspect accumulated phase tests and perform only justified safe re-verification.
+  - Record sanitised review, fixes, remaining risks and final diff identity under docs/audit/; do not create a placeholder PASS receipt.
+
+Context-Refs:
+  - docs/REVIEW_POLICY.md
+  - docs/PRM_SEARCH_NEWS_DEEP_REVIEW.md
+  - docs/PRM_SEARCH_NEWS_PLAN.md
+  - docs/PRM_SEARCH_NEWS_EVAL.md
+
+Files:
+  - docs/audit/
+  - docs/tasks.md
+
+Notes: |
+  Under the assigned end-to-end goal, a passed engineering review opens the next
+  local phase without another permission request. It never permits production.
+  For DR-5, a manual pilot still requires separate approval of the concrete packet.
+
+### PRM-SN-3A: Request Plan And Separate Search Permissions
+
+Owner:      codex
+Phase:      search-news-verification
+Type:       agent:harness eval:gate privacy
+Depends-On: PRM-SN-DR-2
+Status:     implemented
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: not_required
+Correction-Budget: 2
+
+Objective: |
+  Model archive, public verification and private-context permissions separately in a bounded request plan.
+
+Acceptance-Criteria:
+  - "Archive now stays local; current price requires current evidence; mixed tasks retain independent useful parts."
+  - "Public query construction removes private archive/profile context and has executable call/time/cost limits."
+  - "Consent-preview and egress-boundary changes receive immediate review; no actual mode is enabled."
+
+Verification:
+  - After I/O preflight, run with fake providers/Telegram and disposable DBs: PYTHONPATH=src python3 -m pytest tests/test_prm_intent_archive_contract.py tests/test_primary_source_verification.py -q
+  - Record before/after outputs, meaningful new regression assertions, limitations and rollback; no live measurement claim.
+
+Context-Refs:
+  - docs/PRM_SEARCH_NEWS_PLAN.md
+  - docs/PRM_SEARCH_NEWS_EVAL.md
+  - docs/PRM_SEARCH_NEWS_DEEP_REVIEW.md
+  - docs/audit/PRM_SEARCH_NEWS_BASELINE_2026-09-17.md
+
+Files:
+  - src/prm/routing.py
+  - src/prm/application.py
+  - src/assistant/primary_source_verification.py
+
+Notes: |
+  Detailed scope and rollback are in PRM_SEARCH_NEWS_PLAN. Listing this task does not assign it.
+  Focused critic findings roll into the phase gate; immediate safety triggers apply before dependency progress.
+
+### PRM-SN-3B: Primary-source Verification In The Answer Path
+
+Owner:      codex
+Phase:      search-news-verification
+Type:       agent:harness eval:gate privacy
+Depends-On: PRM-SN-3A
+Status:     implemented
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: not_required
+Correction-Budget: 2
+
+Objective: |
+  Connect bounded discovery and primary-source reading to versioned evidence and the final-answer publication contract.
+
+Acceptance-Criteria:
+  - "Search snippets remain candidates; one sufficient authoritative primary source can support the answer."
+  - "Provenance and dates, conflicting/unavailable pages, injection, unsafe URLs/redirects and budget exhaustion are checked with fake transport."
+  - "No private-context leakage or live provider call; partial answers and disabled capability rollback are usable."
+
+Verification:
+  - After I/O preflight, run with fake providers/Telegram and disposable DBs: PYTHONPATH=src python3 -m pytest tests/test_primary_source_verification.py tests/test_external_watch_fetch_safety.py tests/test_prm_application.py -q
+  - Record before/after outputs, meaningful new regression assertions, limitations and rollback; no live measurement claim.
+
+Context-Refs:
+  - docs/PRM_SEARCH_NEWS_PLAN.md
+  - docs/PRM_SEARCH_NEWS_EVAL.md
+  - docs/PRM_SEARCH_NEWS_DEEP_REVIEW.md
+  - docs/audit/PRM_SEARCH_NEWS_BASELINE_2026-09-17.md
+
+Files:
+  - src/assistant/primary_source_verification.py
+  - src/prm/application.py
+  - src/llm/openai_provider.py
+
+Notes: |
+  Detailed scope and rollback are in PRM_SEARCH_NEWS_PLAN. Listing this task does not assign it.
+  Focused critic findings roll into the phase gate; immediate safety triggers apply before dependency progress.
+
+### PRM-SN-DR-3: Phase 3 Deep Review
+
+Owner:      read-only reviewer + human operator
+Phase:      deep-review
+Type:       compliance:evidence eval:gate
+Depends-On: PRM-SN-3A, PRM-SN-3B
+Status:     implemented
+Risk-Level: high
+Critic-Required: required
+Correction-Budget: 2
+
+Objective: |
+  Review the accumulated phase diff: Primary-source verification, public/private egress separation and enforced budgets.
+
+Acceptance-Criteria:
+  - "Fresh read-only Codex exec requests gpt-5.6-terra/high; exact command, reviewed SHA/diff and observed model/effort evidence are recorded."
+  - "P0/P1 and mandatory evidence gaps are corrected and re-verified before the dependent phase; useful positive cases and final user output are inspected."
+  - "The verdict is limited to demonstrated engineering scope; independent human labels, runtime, pilot and release gates are not fabricated or self-approved."
+
+Verification:
+  - Follow docs/PRM_SEARCH_NEWS_DEEP_REVIEW.md; inspect accumulated phase tests and perform only justified safe re-verification.
+  - Record sanitised review, fixes, remaining risks and final diff identity under docs/audit/; do not create a placeholder PASS receipt.
+
+Context-Refs:
+  - docs/REVIEW_POLICY.md
+  - docs/PRM_SEARCH_NEWS_DEEP_REVIEW.md
+  - docs/PRM_SEARCH_NEWS_PLAN.md
+  - docs/PRM_SEARCH_NEWS_EVAL.md
+
+Files:
+  - docs/audit/
+  - docs/tasks.md
+
+Notes: |
+  Under the assigned end-to-end goal, a passed engineering review opens the next
+  local phase without another permission request. It never permits production.
+  For DR-5, a manual pilot still requires separate approval of the concrete packet.
+
+### PRM-SN-4A: Shared Topics And Versioned News Events
+
+Owner:      codex
+Phase:      search-news-editions
+Type:       agent:harness eval:gate privacy
+Depends-On: PRM-SN-DR-3
+Status:     implemented
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: not_required
+Correction-Budget: 2
+
+Objective: |
+  Define general topics and edition windows with event identity and material updates; retain UTD as one source adapter scope.
+
+Acceptance-Criteria:
+  - "Publication, event, update, fetch and check times remain distinct; repost families do not become independent new events."
+  - "Cosmetic changes, disappearance from a bounded window and genuine corrections have different outcomes."
+  - "Topic creation starts no collector; any derived schema/retention change has immediate review and no production migration."
+
+Verification:
+  - After I/O preflight, run with fake providers/Telegram and disposable DBs: PYTHONPATH=src python3 -m pytest tests/test_external_watch_shadow.py tests/test_external_watch_selection.py -q
+  - Record before/after outputs, meaningful new regression assertions, limitations and rollback; no live measurement claim.
+
+Context-Refs:
+  - docs/PRM_SEARCH_NEWS_PLAN.md
+  - docs/PRM_SEARCH_NEWS_EVAL.md
+  - docs/PRM_SEARCH_NEWS_DEEP_REVIEW.md
+  - docs/audit/PRM_SEARCH_NEWS_BASELINE_2026-09-17.md
+
+Files:
+  - src/external_watch/adapters.py
+  - src/external_watch/store.py
+  - src/external_watch/selection.py
+
+Notes: |
+  Detailed scope and rollback are in PRM_SEARCH_NEWS_PLAN. Listing this task does not assign it.
+  Focused critic findings roll into the phase gate; immediate safety triggers apply before dependency progress.
+
+### PRM-SN-4B: Useful On-demand Topic Digest
+
+Owner:      codex
+Phase:      search-news-editions
+Type:       agent:harness eval:gate privacy
+Depends-On: PRM-SN-4A
+Status:     implemented
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: not_required
+Correction-Budget: 2
+
+Objective: |
+  Produce a useful compact multi-section edition before any subscription, with changes since the prior delivered edition.
+
+Acceptance-Criteria:
+  - "Each event appears once; significance is labelled analysis, sources support facts, and irrelevant filler is omitted."
+  - "Healthy no-news and failed-source coverage are distinguishable; an old repost is never presented as new."
+  - "The actual plain-text Telegram renderer respects message limits and supports detail requests; no automatic job or notification is created."
+
+Verification:
+  - After I/O preflight, run with fake providers/Telegram and disposable DBs: PYTHONPATH=src python3 -m pytest tests/test_prm_application.py tests/test_external_watch_selection.py tests/test_external_watch_delivery.py -q
+  - Record before/after outputs, meaningful new regression assertions, limitations and rollback; no live measurement claim.
+
+Context-Refs:
+  - docs/PRM_SEARCH_NEWS_PLAN.md
+  - docs/PRM_SEARCH_NEWS_EVAL.md
+  - docs/PRM_SEARCH_NEWS_DEEP_REVIEW.md
+  - docs/audit/PRM_SEARCH_NEWS_BASELINE_2026-09-17.md
+
+Files:
+  - src/prm/application.py
+  - src/prm/presentation.py
+  - src/external_watch/selection.py
+  - src/external_watch/delivery.py
+
+Notes: |
+  Detailed scope and rollback are in PRM_SEARCH_NEWS_PLAN. Listing this task does not assign it.
+  Focused critic findings roll into the phase gate; immediate safety triggers apply before dependency progress.
+
+### PRM-SN-DR-4: Phase 4 Deep Review
+
+Owner:      read-only reviewer + human operator
+Phase:      deep-review
+Type:       compliance:evidence eval:gate
+Depends-On: PRM-SN-4A, PRM-SN-4B
+Status:     implemented
+Risk-Level: high
+Critic-Required: required
+Correction-Budget: 2
+
+Objective: |
+  Review the accumulated phase diff: Useful on-demand editions, event novelty, corrections and actual Telegram rendering.
+
+Acceptance-Criteria:
+  - "Fresh read-only Codex exec requests gpt-5.6-terra/high; exact command, reviewed SHA/diff and observed model/effort evidence are recorded."
+  - "P0/P1 and mandatory evidence gaps are corrected and re-verified before the dependent phase; useful positive cases and final user output are inspected."
+  - "The verdict is limited to demonstrated engineering scope; independent human labels, runtime, pilot and release gates are not fabricated or self-approved."
+
+Verification:
+  - Follow docs/PRM_SEARCH_NEWS_DEEP_REVIEW.md; inspect accumulated phase tests and perform only justified safe re-verification.
+  - Record sanitised review, fixes, remaining risks and final diff identity under docs/audit/; do not create a placeholder PASS receipt.
+
+Context-Refs:
+  - docs/REVIEW_POLICY.md
+  - docs/PRM_SEARCH_NEWS_DEEP_REVIEW.md
+  - docs/PRM_SEARCH_NEWS_PLAN.md
+  - docs/PRM_SEARCH_NEWS_EVAL.md
+
+Files:
+  - docs/audit/
+  - docs/tasks.md
+
+Notes: |
+  Under the assigned end-to-end goal, a passed engineering review opens the next
+  local phase without another permission request. It never permits production.
+  For DR-5, a manual pilot still requires separate approval of the concrete packet.
+
+### PRM-SN-5A: Transactional Delivery Outbox And Unknown Sends
+
+Owner:      codex
+Phase:      search-news-subscriptions
+Type:       agent:harness eval:gate privacy
+Depends-On: PRM-SN-DR-4
+Status:     implemented
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: not_required
+Correction-Budget: 2
+
+Objective: |
+  Persist pending work atomically with source changes and reserve delivery/quota with bounded attempts and explicit unknown results.
+
+Acceptance-Criteria:
+  - "Race, timeout before/after acceptance, crash/restart, daily caps and partial sends neither silently lose pending work nor cause a local reservation double-send."
+  - "Known failures retry within policy; ambiguous Telegram acceptance remains unknown and is not blindly resent or called exactly-once."
+  - "Immediate schema/write/delivery review precedes dependent work; rollback pauses sends and retains compatible receipts."
+
+Verification:
+  - After I/O preflight, run with fake providers/Telegram and disposable DBs: PYTHONPATH=src python3 -m pytest tests/test_external_watch_shadow.py tests/test_external_watch_delivery.py -q
+  - Record before/after outputs, meaningful new regression assertions, limitations and rollback; no live measurement claim.
+
+Context-Refs:
+  - docs/PRM_SEARCH_NEWS_PLAN.md
+  - docs/PRM_SEARCH_NEWS_EVAL.md
+  - docs/PRM_SEARCH_NEWS_DEEP_REVIEW.md
+  - docs/audit/PRM_SEARCH_NEWS_BASELINE_2026-09-17.md
+
+Files:
+  - src/external_watch/store.py
+  - src/external_watch/live.py
+  - src/external_watch/delivery.py
+
+Notes: |
+  Detailed scope and rollback are in PRM_SEARCH_NEWS_PLAN. Listing this task does not assign it.
+  Focused critic findings roll into the phase gate; immediate safety triggers apply before dependency progress.
+
+### PRM-SN-5B: Confirmed Subscription And Bounded Pilot Packet
+
+Owner:      codex
+Phase:      search-news-subscriptions
+Type:       agent:harness eval:gate privacy
+Depends-On: PRM-SN-5A
+Status:     implemented
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: not_required
+Correction-Budget: 2
+
+Objective: |
+  Provide exact subscription preview, scheduling controls and a concrete pilot packet without enabling runtime.
+
+Acceptance-Criteria:
+  - "Preview includes topics, exclusions, sources, language/depth, period, timezone, schedule, cap, quiet hours, expiry, pause/mute/unsubscribe and the real activation effect."
+  - "Unconfirmed, expired or cancelled subscriptions cannot poll/send; kill controls and consent are rechecked before collection and delivery."
+  - "DST, unsubscribe during queued send, disabled runtime and rollback are fixture-tested; a specific SHA/source/budget/duration pilot packet is prepared, not launched."
+
+Verification:
+  - After I/O preflight, run with fake providers/Telegram and disposable DBs: PYTHONPATH=src python3 -m pytest tests/test_external_watch_profile.py tests/test_external_watch_delivery.py tests/test_prm_utd_callbacks.py -q
+  - Record before/after outputs, meaningful new regression assertions, limitations and rollback; no live measurement claim.
+
+Context-Refs:
+  - docs/PRM_SEARCH_NEWS_PLAN.md
+  - docs/PRM_SEARCH_NEWS_EVAL.md
+  - docs/PRM_SEARCH_NEWS_DEEP_REVIEW.md
+  - docs/audit/PRM_SEARCH_NEWS_BASELINE_2026-09-17.md
+
+Files:
+  - src/external_watch/profile.py
+  - src/external_watch/live.py
+  - src/external_watch/delivery.py
+  - src/assistant/utd_profile_schema.py
+  - src/bot/callbacks.py
+
+Notes: |
+  Detailed scope and rollback are in PRM_SEARCH_NEWS_PLAN. Listing this task does not assign it.
+  Focused critic findings roll into the phase gate; immediate safety triggers apply before dependency progress.
+
+### PRM-SN-DR-5: Phase 5 Deep Review
+
+Owner:      read-only reviewer + human operator
+Phase:      deep-review
+Type:       compliance:evidence eval:gate
+Depends-On: PRM-SN-5A, PRM-SN-5B
+Status:     implemented
+Risk-Level: high
+Critic-Required: required
+Correction-Budget: 2
+
+Objective: |
+  Review the accumulated phase diff: Subscription effect, outbox/quota/unknown delivery, controls and rollback.
+
+Acceptance-Criteria:
+  - "Fresh read-only Codex exec requests gpt-5.6-terra/high; exact command, reviewed SHA/diff and observed model/effort evidence are recorded."
+  - "P0/P1 and mandatory evidence gaps are corrected and re-verified before the dependent phase; useful positive cases and final user output are inspected."
+  - "The verdict is limited to demonstrated engineering scope; independent human labels, runtime, pilot and release gates are not fabricated or self-approved."
+
+Verification:
+  - Follow docs/PRM_SEARCH_NEWS_DEEP_REVIEW.md; inspect accumulated phase tests and perform only justified safe re-verification.
+  - Record sanitised review, fixes, remaining risks and final diff identity under docs/audit/; do not create a placeholder PASS receipt.
+
+Context-Refs:
+  - docs/REVIEW_POLICY.md
+  - docs/PRM_SEARCH_NEWS_DEEP_REVIEW.md
+  - docs/PRM_SEARCH_NEWS_PLAN.md
+  - docs/PRM_SEARCH_NEWS_EVAL.md
+
+Files:
+  - docs/audit/
+  - docs/tasks.md
+
+Notes: |
+  Under the assigned end-to-end goal, a passed engineering review opens the next
+  local phase without another permission request. It never permits production.
+  For DR-5, a manual pilot still requires separate approval of the concrete packet.
+
+### PRM-SN-DR-PILOT: Observed Pilot Evidence Review
+
+Owner:      human operator + read-only reviewer
+Phase:      live-evidence-review
+Type:       compliance:evidence eval:gate privacy
+Depends-On: PRM-SN-DR-5
+Status:     blocked_pending_approved_pilot_evidence
+Risk-Level: high
+Critic-Required: required
+Runtime-Verification: required
+
+Objective: |
+  Assess actual separately approved pilot evidence before any expanded rollout.
+
+Acceptance-Criteria:
+  - "Explicit pilot scope/start permission and real operator observations exist; fixtures and LLM labels do not substitute for them."
+  - "Usefulness, notification noise/duplicates, source health, latency, full cost per successful result, receipts and rollback are evaluated with denominators."
+  - "The fresh Terra/high reviewer records provenance, corrections and limits; expanded sources/caps/autonomy and release remain separate human decisions."
+
+Verification:
+  - Review the approved pilot packet, minimised actual receipts and owner labels under the privacy scope; record absent evidence instead of inventing it.
+
+Context-Refs:
+  - docs/PRM_SEARCH_NEWS_DEEP_REVIEW.md
+  - docs/PRM_SEARCH_NEWS_EVAL.md
+
+Files:
+  - docs/audit/
+  - docs/tasks.md
+
+## Preserved RFX And UTD records
 
 ### RFX-0: Freeze Baseline And Inventory
 

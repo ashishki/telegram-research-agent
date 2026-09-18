@@ -2,7 +2,7 @@
 
 Status: current
 Version: 2.1
-Last updated: 2026-08-21
+Last updated: 2026-09-17
 
 ## Product boundary
 
@@ -83,10 +83,21 @@ retrieved evidence
 
 Current-fact requests fail closed until an approved external verification path runs. Repeated Telegram commentary is not automatically independent evidence.
 
-External watch is not a current runtime capability. Confirmed `watch_topic`
-memory is durable intent only; it cannot authorize polling, external fetches,
-or notifications. ADR-008 specifies a future source-bounded sidecar subject to
-separate operator evidence and approval.
+Source-bounded external watch is implemented in `src/external_watch/`, with a
+collector, confirmed-profile loader, change store, selection and delivery.
+The 2026-09-03 receipt records bounded UTD timer enablement; current runtime and
+profile confirmation were not observed by the 2026-09-17 audit. A general saved
+`watch_topic` remains durable intent only; the specific UTD capability and
+separate runtime permissions govern polling and notifications. Existing
+delivery is best-effort receipt deduplication, not proven exactly-once.
+
+The general search/news evolution in ADR-009 and
+`docs/PRM_SEARCH_NEWS_PLAN.md` is implemented locally: archive-grounded answers,
+controlled verification, request editions and confirmation-gated subscriptions.
+It remains default-off for live external work and requires a separate human
+pilot decision; it is not a general web-search or news-subscription runtime.
+The final local evidence is in
+`docs/audit/PRM_SN_INTEGRATED_REPLAY_2026-09-17.md`.
 
 ### Local deep research contract
 

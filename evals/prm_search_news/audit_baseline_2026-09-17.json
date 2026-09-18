@@ -1,0 +1,234 @@
+{
+  "schema_version": "prm_search_news.audit_baseline.v1",
+  "audited_sha": "cee8baae3b8a41f571bd689f2dadf7e6e981863f",
+  "observed_date": "2026-09-17",
+  "evidence_kind": "synthetic_local_probes",
+  "labels": "model_authored_not_independent_human",
+  "runtime_observed": false,
+  "provider_called": false,
+  "telegram_called": false,
+  "synthetic_evidence": {
+    "source_ref": "https://example.invalid/source-a",
+    "text": "Orion service does not retain private messages and costs 20 dollars per month."
+  },
+  "claim_probes": {
+    "valid": {
+      "answer": "Orion service costs 20 dollars per month.",
+      "extracted": 1,
+      "metrics": {
+        "schema_version": "prm_claim_grounding_metrics.v1",
+        "claim_count": 1,
+        "supported_claim_rate": 1.0,
+        "partial_claim_rate": 0.0,
+        "unsupported_claim_rate": 0.0,
+        "citation_completeness": 1.0,
+        "citation_precision": 1.0,
+        "current_fact_violations": 0,
+        "technical_leaks": 0
+      },
+      "accepted_by_synthesis": true
+    },
+    "number_changed": {
+      "answer": "Orion service costs 900 dollars per month.",
+      "extracted": 1,
+      "metrics": {
+        "schema_version": "prm_claim_grounding_metrics.v1",
+        "claim_count": 1,
+        "supported_claim_rate": 1.0,
+        "partial_claim_rate": 0.0,
+        "unsupported_claim_rate": 0.0,
+        "citation_completeness": 1.0,
+        "citation_precision": 1.0,
+        "current_fact_violations": 0,
+        "technical_leaks": 0
+      },
+      "accepted_by_synthesis": true
+    },
+    "negation_changed": {
+      "answer": "Orion service does retain private messages.",
+      "extracted": 1,
+      "metrics": {
+        "schema_version": "prm_claim_grounding_metrics.v1",
+        "claim_count": 1,
+        "supported_claim_rate": 1.0,
+        "partial_claim_rate": 0.0,
+        "unsupported_claim_rate": 0.0,
+        "citation_completeness": 1.0,
+        "citation_precision": 1.0,
+        "current_fact_violations": 0,
+        "technical_leaks": 0
+      },
+      "accepted_by_synthesis": true
+    },
+    "subject_changed": {
+      "answer": "Atlas service does not retain private messages.",
+      "extracted": 1,
+      "metrics": {
+        "schema_version": "prm_claim_grounding_metrics.v1",
+        "claim_count": 1,
+        "supported_claim_rate": 1.0,
+        "partial_claim_rate": 0.0,
+        "unsupported_claim_rate": 0.0,
+        "citation_completeness": 1.0,
+        "citation_precision": 1.0,
+        "current_fact_violations": 0,
+        "technical_leaks": 0
+      },
+      "accepted_by_synthesis": true
+    },
+    "wrong_citation": {
+      "answer": "Orion service costs 20 dollars per month. https://example.invalid/wrong-source",
+      "extracted": 1,
+      "metrics": {
+        "schema_version": "prm_claim_grounding_metrics.v1",
+        "claim_count": 1,
+        "supported_claim_rate": 1.0,
+        "partial_claim_rate": 0.0,
+        "unsupported_claim_rate": 0.0,
+        "citation_completeness": 1.0,
+        "citation_precision": 1.0,
+        "current_fact_violations": 0,
+        "technical_leaks": 0
+      },
+      "accepted_by_synthesis": true
+    },
+    "short_claim": {
+      "answer": "Цена 900 долларов.",
+      "extracted": 0,
+      "metrics": {
+        "schema_version": "prm_claim_grounding_metrics.v1",
+        "claim_count": 0,
+        "supported_claim_rate": 1.0,
+        "partial_claim_rate": 0.0,
+        "unsupported_claim_rate": 0.0,
+        "citation_completeness": 1.0,
+        "citation_precision": 0.0,
+        "current_fact_violations": 0,
+        "technical_leaks": 0
+      },
+      "accepted_by_synthesis": true
+    },
+    "unrelated": {
+      "answer": "Zebras migrate across southern plains during winter.",
+      "extracted": 1,
+      "metrics": {
+        "schema_version": "prm_claim_grounding_metrics.v1",
+        "claim_count": 1,
+        "supported_claim_rate": 0.0,
+        "partial_claim_rate": 0.0,
+        "unsupported_claim_rate": 1.0,
+        "citation_completeness": 0.0,
+        "citation_precision": 0.0,
+        "current_fact_violations": 0,
+        "technical_leaks": 0
+      },
+      "accepted_by_synthesis": false
+    }
+  },
+  "claim_tail": {
+    "schema_version": "prm_answer_claim_verification.v1",
+    "claim_extraction_source": "rendered_final_answer",
+    "claim_count": 2,
+    "claims": [
+      {
+        "claim_id": "claim:dc249934803b",
+        "claim_text": "Orion service costs 20 dollars per month in fixture variant 0",
+        "claim_type": "source_fact",
+        "freshness": "fresh",
+        "support_status": "supported",
+        "evidence_refs": [
+          "https://example.invalid/source-a"
+        ],
+        "independent_source_groups": [
+          "g1"
+        ],
+        "confidence": "low",
+        "project_relevance": "unknown",
+        "operator_action_relevance": "evidence",
+        "entailment_verdict": "entailed",
+        "exact_evidence_snippets": [
+          {
+            "evidence_id": "fixture:A",
+            "source_url": "https://example.invalid/source-a",
+            "support_span": "Orion service does not retain private messages and costs 20 dollars per month."
+          }
+        ]
+      },
+      {
+        "claim_id": "claim:f2e17e240a23",
+        "claim_text": "Zebras migrate across southern plains during winter",
+        "claim_type": "source_fact",
+        "freshness": "unknown",
+        "support_status": "unsupported",
+        "evidence_refs": [],
+        "independent_source_groups": [],
+        "confidence": "none",
+        "project_relevance": "unknown",
+        "operator_action_relevance": "evidence",
+        "entailment_verdict": "not_entailed",
+        "exact_evidence_snippets": []
+      }
+    ],
+    "metrics": {
+      "schema_version": "prm_claim_grounding_metrics.v1",
+      "claim_count": 2,
+      "supported_claim_rate": 0.5,
+      "partial_claim_rate": 0.0,
+      "unsupported_claim_rate": 0.5,
+      "citation_completeness": 0.5,
+      "citation_precision": 1.0,
+      "current_fact_violations": 0,
+      "technical_leaks": 0
+    }
+  },
+  "threshold_60pct": {
+    "accepted": true,
+    "metrics": {
+      "schema_version": "prm_claim_grounding_metrics.v1",
+      "claim_count": 5,
+      "supported_claim_rate": 0.4,
+      "partial_claim_rate": 0.0,
+      "unsupported_claim_rate": 0.6,
+      "citation_completeness": 0.4,
+      "citation_precision": 1.0,
+      "current_fact_violations": 0,
+      "technical_leaks": 0
+    }
+  },
+  "delivery_failure": {
+    "first_changes": 1,
+    "next_changes": 0,
+    "receipt_count": 0
+  },
+  "delivery_race": {
+    "sender_calls": 2,
+    "stored_deliveries": 1
+  },
+  "week_filter": {
+    "requested": false,
+    "strict": false,
+    "date_from": "",
+    "date_to": "",
+    "label": "",
+    "days": 0,
+    "source": ""
+  },
+  "dispatch": {
+    "exception": "TypeError",
+    "message": "'NoneType' object is not iterable",
+    "messages_before_exception": [
+      "Я не могу подтвердить актуальный внешний факт по локальному архиву.\nВнешняя проверка не запускалась, поэтому архивный контекст не выдаётся за текущую истину.\n\nЧто известно сейчас\n- В локальном архиве есть 2 похожих материалов, но это исторический контекст, не актуальный ответ.\n\nСледующий шаг\n- Разрешить отдельную проверку официальных источников.\n- Или спросить «что было в архиве про …», если нужен исторический контекст."
+    ]
+  },
+  "tests": {
+    "focused": {
+      "passed": 73,
+      "seconds": 4.96
+    },
+    "actions": {
+      "passed": 18,
+      "seconds": 16.03
+    }
+  },
+  "scope": "Prior audit observations, copied without rerunning product tests; no private archive or host data."
+}

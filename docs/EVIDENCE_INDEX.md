@@ -7,7 +7,10 @@ Historical evidence is preserved in `docs/archive/pre_retrofit_2026-08-16/EVIDEN
 
 ## Current baseline
 
-- repository: `5dfd38660b7d8d24998b4dcdf801c419c1dc8f7c`;
+- latest audited code: `cee8baae3b8a41f571bd689f2dadf7e6e981863f`;
+- search/news audit: `docs/audit/PRM_SEARCH_NEWS_BASELINE_2026-09-17.md`;
+- task registration (not implementation/review): `docs/audit/PRM_SEARCH_NEWS_TASK_REGISTRATION_2026-09-17.md`;
+- retrofit baseline: `5dfd38660b7d8d24998b4dcdf801c419c1dc8f7c`;
 - archive: preserved as the remote pre-retrofit archive branch (discover with
   `git branch -r`); it is intentionally not a workspace path;
 - active integration ref: `master`;
@@ -18,8 +21,10 @@ Historical evidence is preserved in `docs/archive/pre_retrofit_2026-08-16/EVIDEN
   duplicate filenames were renamed without changing their decisions.
 - public regression reports: `evals/prm_qa/`;
 - operator usefulness: not yet proven; controlled smoke review remains required.
-- active delivery state: the UTD timer is enabled but fail-closed pending an
-  operator-confirmed UTD profile; this is not PRM-19 dogfood.
+- historical delivery receipt: UTD timer enabled on 2026-09-03 pending profile
+  confirmation; current service/profile state was not observed by this audit.
+- PRM-SN task/review registration is documentation, not implementation,
+  a completed Terra review, or permission to start dogfood.
 
 ## Retrofit evidence
 

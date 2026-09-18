@@ -5,6 +5,30 @@ Last updated: 2026-09-17
 
 ## Product Direction
 
+The current planned workstream is one personal Telegram assistant for archive
+research, controlled public verification and topic news digests. UTD remains a
+specific watch scenario. The owner requested registration of this implementation
+queue on 2026-09-17; this does not start implementation or authorize live jobs.
+See `docs/adr/ADR-009-personal-search-and-news.md` and the `PRM-SN` tasks in
+`docs/tasks.md`. The owner clarified that the launch prompt must pursue one
+end-to-end implementation goal. When assigned, it covers all twelve PRM-SN
+tasks and engineering gates DR-1 through DR-5, starting at the first unfinished
+task; registration alone still does not start it.
+
+Use `docs/CODEX_PROMPT.md` for current scope and
+`docs/PRM_SEARCH_NEWS_DEEP_REVIEW.md` for phase review gates. Implement directly;
+an independently invoked `codex exec` reviewer is read-only, uses
+`gpt-5.6-terra` with `high` reasoning, and cannot approve human/runtime gates.
+Record observed model/effort, not only requested flags. Do not start a reviewer
+or implementation merely because the task is listed as planned.
+
+## Historical Implementation Context
+
+The following dated recap is historical context, not proof of today's effective
+runtime flags, archive freshness, profile confirmation or service health. Verify
+active call paths when relevant; the audit baseline is
+`docs/audit/PRM_SEARCH_NEWS_BASELINE_2026-09-17.md`.
+
 The repository is being retrofitted from a weekly-report-centered Telegram
 intelligence system into Personal Telegram Research Memory + Grounded Assistant.
 HEAD contains corrective PRM implementation slices through PRM-7 and PRM-9
@@ -137,20 +161,16 @@ external embeddings, hosted vector service, release claim, or dogfood start.
 
 ## Current Next Task
 
-The PRM assistant, local archive/RAG path, and approved local vector sidecar
-are available for manual operator testing. PRM-19 has not started: it requires
-explicit human dogfood-start approval. PRM-20 remains blocked until real
-PRM-19 evidence exists and the operator separately approves any compatibility
-archive/delete/move work. Do not restart legacy bot/report timers as PRM
-dogfood, and do not make a release claim.
+Use `docs/prompts/prm_search_news_implementer.md` for one end-to-end goal:
+all twelve PRM-SN tasks, independent phase reviews and corrections, integrated
+local verification, and a concrete pilot packet. Start with PRM-SN-1A if still
+unimplemented. Under that assigned goal, continue after each passed engineering
+gate without asking permission for the next already-assigned phase. Do not stop
+at one card or one review. Immediate safety triggers apply inside phases.
+Existing RFX/UTD statuses and human/runtime gates remain separate.
 
-The active workstream is UTD controlled watch delivery. The bounded
-`telegram-utd-watch.timer` was enabled on 2026-09-03, but fails closed until
-the operator confirms the UTD profile draft in the existing Telegram UTD
-handler. Before confirmation it must not poll sources or send alerts. After
-confirmation it may use only allowlisted official sources and the existing
-receipt-backed, relevance-ranked, capped, kill-switchable delivery path. This
-is not PRM-19 dogfood and does not authorize profile auto-mutation, external
-embeddings/hosted vectors, unrestricted research, production migrations,
-canonical archive writes, or university-system actions. See
-`docs/audit/UTD_LIVE_DOGFOOD_START_2026-09-03.md`.
+The 2026-09-03 receipt records bounded UTD timer enablement pending profile
+confirmation. Its current service/profile state was not observed by the
+2026-09-17 audit. Preserve those scoped permissions; this queue does not widen
+sources, notifications or autonomy. PRM-19 and PRM-20 still require their
+separate human approvals/evidence. Do not start legacy timers or claim release.

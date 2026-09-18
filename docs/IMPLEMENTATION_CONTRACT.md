@@ -3,11 +3,20 @@
 Status: current operating contract. Changes to an accepted decision require a
 new ADR under `docs/adr/`.
 
-Version: 4.1
+Version: 4.2
 
-Effective date: 2026-08-28
+Effective date: 2026-09-17
 
 ## Product Authority
+
+ADR-009 registers the owner-requested Personal Search And News task queue.
+An explicitly assigned PRM-SN scope permits its local implementation and
+included review; it is not blocked by the historical RFX-only instruction.
+The standard launch prompt assigns one end-to-end goal over all twelve tasks
+and five engineering phase gates. The implementer proceeds after passed gates
+without a new authorization per card. An individually assigned narrow task
+remains narrow. Neither form authorizes live jobs, private-data egress,
+production migrations or release. Existing human/runtime gates remain in force.
 
 The current product center is Personal Telegram Research Memory + Grounded
 Assistant. Weekly reports are derived secondary projections. ADR-001 records

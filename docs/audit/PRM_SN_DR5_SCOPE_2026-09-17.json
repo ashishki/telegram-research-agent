@@ -1,0 +1,24 @@
+{
+  "purpose": "Machine-reproducible, sanitized scope inventory for the PRM-SN DR-5 engineering review; not pilot authorization.",
+  "base_sha": "cee8baae3b8a41f571bd689f2dadf7e6e981863f",
+  "code_test_diff_sha256": "d0fecb9273c769a56c3ff081fe3b410eb7389b3c1f58933c5fde3300d7b0ce52",
+  "derivation": "{ git diff --no-ext-diff -- src tests systemd; while IFS= read -r file; do git diff --no-index -- /dev/null \"$file\" || true; done < <(git ls-files --others --exclude-standard src tests systemd | rg -v '(^|/)__pycache__/|\\.pyc$' | sort); } | sha256sum",
+  "included_changed_source_and_tests": [
+    "src/assistant/claim_ledger.py", "src/assistant/memory_research.py", "src/assistant/pi_memory.py", "src/assistant/primary_source_verification.py", "src/assistant/prm_post_answer_actions.py", "src/assistant/prm_refresh_receipt.py", "src/assistant/utd_profile.py", "src/assistant/utd_profile_schema.py", "src/assistant/utd_profile_store.py", "src/bot/bot.py", "src/bot/callbacks.py", "src/bot/legacy_handlers.py", "src/bot/prm_handlers.py", "src/bot/telegram_delivery.py", "src/external_watch/collector.py", "src/external_watch/delivery.py", "src/external_watch/editions.py", "src/external_watch/live.py", "src/external_watch/profile.py", "src/external_watch/relevance.py", "src/external_watch/selection.py", "src/external_watch/store.py", "src/external_watch/subscription.py", "src/prm/application.py", "src/prm/presentation.py", "src/prm/request_plan.py", "src/prm/routing.py", "src/prm/synthesis.py",
+    "tests/test_callbacks.py", "tests/test_claim_ledger.py", "tests/test_external_watch_delivery.py", "tests/test_external_watch_profile.py", "tests/test_external_watch_selection.py", "tests/test_external_watch_shadow.py", "tests/test_external_watch_subscription.py", "tests/test_memory_research.py", "tests/test_primary_source_verification.py", "tests/test_prm_application.py", "tests/test_prm_post_answer_actions.py", "tests/test_prm_refresh_receipt.py", "tests/test_prm_request_plan.py", "tests/test_prm_utd_callbacks.py", "tests/test_prm_utd_dispatch.py", "tests/test_utd_profile.py"
+  ],
+  "reviewed_active_path_context_not_changed": [
+    "systemd/telegram-utd-watch.timer", "systemd/telegram-utd-watch-shadow.service", "systemd/telegram-utd-watch-shadow.timer", "src/bot/telegram_delivery.py", "src/assistant/pi_memory.py"
+  ],
+  "included_changed_runtime_templates": ["systemd/telegram-utd-watch.service"],
+  "evidence_classification": {
+    "implemented_fixture_evidence": "Focused pytest only, fake sender/providers and disposable SQLite databases.",
+    "not_observed": ["runtime/service state", "human labels", "pilot data", "Telegram delivery", "provider or private-data egress", "production database migration"],
+    "authorization": "None granted by this manifest."
+  },
+  "focused_runner_receipt": {
+    "command": "PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/test_external_watch_shadow.py tests/test_external_watch_delivery.py tests/test_external_watch_profile.py tests/test_external_watch_subscription.py tests/test_utd_profile.py tests/test_prm_utd_callbacks.py tests/test_prm_application.py -q",
+    "result": "72 callback/delivery/profile tests passed in 20.36s; git diff --check passed",
+    "execution_boundary": "Local fixture-only verification; no live unit, timer, collection or delivery invoked."
+  }
+}

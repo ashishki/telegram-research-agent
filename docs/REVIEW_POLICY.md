@@ -1,5 +1,29 @@
 # Review Policy
 
+## Personal Search And News Phase Gates
+
+The owner-requested `PRM-SN` queue is registered on 2026-09-17. The standard
+launch prompt assigns all twelve local tasks and five engineering reviews as
+one end-to-end goal, with automatic continuation after passed gates inside
+that assigned scope. Its five
+engineering gates, immediate triggers, bounded reviewer packet, command and
+receipt requirements are specified in `docs/PRM_SEARCH_NEWS_DEEP_REVIEW.md`.
+This applies the existing Playbook mechanism to the new phases; it does not
+replace its checklist, reporting format or human completion authority.
+
+- `PRM-SN-DR-1`: final answers, evidence and publication, before phase 2.
+- `PRM-SN-DR-2`: dialogue, confirmed memory and archive health, before phase 3.
+- `PRM-SN-DR-3`: public verification and egress boundaries, before phase 4.
+- `PRM-SN-DR-4`: useful on-demand editions and event novelty, before phase 5.
+- `PRM-SN-DR-5`: subscriptions, outbox and delivery, before a separately approved pilot.
+- `PRM-SN-DR-PILOT`: actual approved pilot evidence, before any expanded rollout.
+
+Use a fresh read-only `codex exec` reviewer with `gpt-5.6-terra` and `high`
+reasoning when that review is included in the assigned task. Fix P0/P1 findings
+and re-verify changed scope before a dependent phase. A focused task critic is
+not a completed phase gate. Requested flags alone do not prove effective
+model/effort. Listing a planned gate neither runs it nor authorizes production.
+
 ## PRM-MAT review boundary
 
 PRM-MAT-0 through PRM-MAT-16 require evidence-backed review; risky tasks require critic/holdout/property checks as declared in `docs/tasks.md`. PRM-MAT-17 needs explicit bounded smoke approval; PRM-MAT-18 needs explicit four-week validation-start approval. No fixture, local runtime receipt or LLM judge substitutes for operator labels.

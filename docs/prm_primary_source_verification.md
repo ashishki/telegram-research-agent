@@ -12,22 +12,20 @@ The first verification slice supports gated fetches for:
 - official vendor announcements;
 - arXiv/research metadata.
 
-Live fetch is disabled unless both operator approval fields are true and runtime
-`allow_live_fetch=True` is supplied. Tests use fake transport.
+This implementation is fixture-only: live fetch has no callable runtime path.
+Tests use declarative fixture responses, and only an explicitly approved
+trusted-host list (or built-in GitHub/arXiv classification) can select one.
 
 Safety controls:
 
 - HTTPS only;
 - no credentials in URL;
 - private/loopback/link-local/reserved IP rejection;
-- DNS/IP safety check for live fetch;
-- redirect limit;
-- timeout;
 - response-size cap;
 - content-type allowlist;
 - fetched-at timestamp;
 - content hash;
-- private gitignored cache TTL;
+- optional caller-supplied fixture cache TTL; it is never proof for claims;
 - no third-party code execution.
 
 `www.*` is not automatically official. Official relation must be explicit.
