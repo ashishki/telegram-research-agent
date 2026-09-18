@@ -182,18 +182,14 @@ def _transcribe_verified_telegram_audio(
     try:
         with request.urlopen(http_request, timeout=120) as response:
             payload = response.read().decode("utf-8")
-    except Exception as exc:
-        LOGGER.warning(
-            "OpenAI voice transcription failed path=%s",
-            Path(attachment.local_path).name,
-            exc_info=True,
-        )
-        raise VoiceTranscriptionError("OpenAI voice transcription failed") from exc
+    except Exception:
+        LOGGER.warning("OpenAI voice transcription failed")
+        raise VoiceTranscriptionError("OpenAI voice transcription failed") from None
 
     try:
         decoded = json.loads(payload)
-    except json.JSONDecodeError as exc:
-        raise VoiceTranscriptionError("OpenAI transcription response was not JSON") from exc
+    except json.JSONDecodeError:
+        raise VoiceTranscriptionError("OpenAI transcription response was not JSON") from None
 
     text = str(decoded.get("text") or "").strip()
     if not text:
@@ -328,14 +324,14 @@ def _download_telegram_voice(
     try:
         with request.urlopen(url, timeout=60) as response:
             data = response.read()
-    except Exception as exc:
-        raise VoiceTranscriptionError("Telegram voice download failed") from exc
+    except Exception:
+        raise VoiceTranscriptionError("Telegram voice download failed") from None
 
     max_bytes = int(os.environ.get("TELEGRAM_VOICE_MAX_BYTES", DEFAULT_MAX_VOICE_BYTES))
     if len(data) > max_bytes:
         raise VoiceTranscriptionError(f"Telegram voice file is too large: {len(data)} bytes")
     dest_path.write_bytes(data)
-    LOGGER.info("Downloaded Telegram voice file path=%s bytes=%d", dest_path.name, len(data))
+    LOGGER.info("Downloaded Telegram voice bytes=%d", len(data))
     return str(dest_path)
 
 
@@ -349,8 +345,8 @@ def _verified_telegram_voice_attachment(
     path = Path(local_path)
     try:
         audio_bytes = path.read_bytes()
-    except OSError as exc:
-        raise VoiceTranscriptionError("Downloaded Telegram voice file is unavailable") from exc
+    except OSError:
+        raise VoiceTranscriptionError("Downloaded Telegram voice file is unavailable") from None
     return _VerifiedTelegramVoiceAttachment(
         local_path=str(path),
         file_id=file_id,
@@ -377,12 +373,15 @@ def _get_telegram_file_path(
     try:
         with request.urlopen(url, timeout=30) as response:
             payload = response.read().decode("utf-8")
-    except Exception as exc:
-        raise VoiceTranscriptionError("Telegram getFile failed") from exc
-    decoded = json.loads(payload)
-    if not decoded.get("ok"):
-        raise VoiceTranscriptionError(f"Telegram getFile returned an error: {decoded!r}")
-    result = decoded.get("result") if isinstance(decoded, dict) else None
+    except Exception:
+        raise VoiceTranscriptionError("Telegram getFile failed") from None
+    try:
+        decoded = json.loads(payload)
+    except json.JSONDecodeError:
+        raise VoiceTranscriptionError("Telegram getFile response was not JSON") from None
+    if not isinstance(decoded, dict) or decoded.get("ok") is not True:
+        raise VoiceTranscriptionError("Telegram getFile returned an error")
+    result = decoded.get("result")
     file_path = str((result or {}).get("file_path") or "").strip()
     if not file_path:
         raise VoiceTranscriptionError("Telegram getFile response did not include file_path")
@@ -422,4 +421,4 @@ def _delete_local_file(local_path: str) -> None:
     try:
         Path(local_path).unlink(missing_ok=True)
     except Exception:
-        LOGGER.warning("Failed to delete local Telegram voice file path=%s", local_path, exc_info=True)
+        LOGGER.warning("Failed to delete local Telegram voice file")

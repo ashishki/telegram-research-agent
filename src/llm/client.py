@@ -360,7 +360,7 @@ def complete_vision(
             connection_ref=connection_ref,
             resource_ref=resource_ref or "",
         )
-        LOGGER.debug("Anthropic vision request model=%s image_path=%s attempt=1", selected_model, image_path)
+        LOGGER.debug("Anthropic vision request model=%s attempt=1", selected_model)
         response = client.messages.create(
             model=selected_model,
             max_tokens=150,
@@ -381,11 +381,11 @@ def complete_vision(
                 }
             ],
         )
-    except CapabilityDenied as exc:
-        raise LLMError("Anthropic vision requires an active capability grant") from exc
-    except Exception as exc:
-        LOGGER.exception("Anthropic vision has unknown outcome after one attempt")
-        raise LLMError("Anthropic vision completion failed") from exc
+    except CapabilityDenied:
+        raise LLMError("Anthropic vision requires an active capability grant") from None
+    except Exception:
+        LOGGER.warning("Anthropic vision has unknown outcome after one attempt")
+        raise LLMError("Anthropic vision completion failed") from None
 
     text = _extract_text(response)
     duration_ms = int((time.time() - start_time) * 1000)

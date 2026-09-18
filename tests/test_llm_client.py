@@ -352,6 +352,49 @@ class TestLLMClient(unittest.TestCase):
 
         self.assertEqual(result, "diagram with service boundaries")
 
+    def test_complete_vision_logs_no_private_image_path_or_provider_exception(self):
+        response = SimpleNamespace(
+            content=[SimpleNamespace(type="text", text="safe vision result")],
+            usage=SimpleNamespace(input_tokens=1, output_tokens=1),
+        )
+        mock_client = SimpleNamespace(messages=SimpleNamespace(create=lambda **_kwargs: response))
+        with tempfile.NamedTemporaryFile(prefix="private-image-path-sentinel-", suffix=".jpg") as image_file:
+            image_file.write(b"synthetic image bytes")
+            image_file.flush()
+            with patch.object(client, "_get_client", return_value=mock_client):
+                with self.assertLogs(client.LOGGER, level="DEBUG") as logs:
+                    assert client.complete_vision(
+                        prompt="synthetic vision prompt",
+                        image_path=image_file.name,
+                        authorization=self.vision_authorization,
+                        **AUTH_SCOPE,
+                    ) == "safe vision result"
+
+        assert "private-image-path-sentinel" not in "\n".join(logs.output)
+
+    def test_complete_vision_redacts_provider_exception(self):
+        mock_client = SimpleNamespace(
+            messages=SimpleNamespace(
+                create=lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("provider-payload-sentinel"))
+            )
+        )
+        with tempfile.NamedTemporaryFile(prefix="private-image-path-sentinel-", suffix=".jpg") as image_file:
+            image_file.write(b"synthetic image bytes")
+            image_file.flush()
+            with patch.object(client, "_get_client", return_value=mock_client):
+                with self.assertLogs(client.LOGGER, level="WARNING") as logs:
+                    with self.assertRaises(client.LLMError) as error:
+                        client.complete_vision(
+                            prompt="synthetic vision prompt",
+                            image_path=image_file.name,
+                            authorization=self.vision_authorization,
+                            **AUTH_SCOPE,
+                        )
+
+        assert "provider-payload-sentinel" not in str(error.exception)
+        assert "provider-payload-sentinel" not in "\n".join(logs.output)
+        assert "private-image-path-sentinel" not in "\n".join(logs.output)
+
     def test_feedback_intake_strategist_model_route_and_override(self):
         with patch.dict(os.environ, {}, clear=True):
             self.assertEqual(client._get_model("feedback_intake_strategist"), "claude-opus-4-8")
