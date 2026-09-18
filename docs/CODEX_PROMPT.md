@@ -5,7 +5,8 @@ Workstream: PA — full Personal AI Assistant
 Scope completed in this publication: PA-00 local technical implementation and
 human high-risk slice acceptance; PA-01 contract/acceptance foundation is
 published at `9b0fa37` with receipt `f91b83b`; PA-02 local default-deny
-capability-policy implementation is published at `2c51c19`.
+capability-policy implementation is published at `2c51c19`; Astra review
+remediation is at `7019000` and awaits fresh Terra/high recheck.
 Baseline: cc105b0024b3e7aa6768ee29acc105b4c682376c
 Playbook: d570163ab17ec3b4245187c778f1e8d89af9690f
 
@@ -39,7 +40,9 @@ git rev-parse HEAD
 git submodule update --init --checkout -- .playbook/upstream
 python tools/playbook.py --check-pin
 python tools/check_personal_assistant_plan.py
-python tools/feature_workflow.py --root . plan --task PA-03
+python3 tools/run_codex_role.py run --root . --task PA-02 --feature-id PA \
+  --slice-id PA-02 --role slice_review --model gpt-5.6-terra \
+  --reasoning-effort high
 ```
 
 Inspect PA-00, PA-01 and PA-02 evidence without overwriting preserved Playbook
@@ -50,6 +53,14 @@ the dependency-ready programme, not a reason to edit that record. Continue
 after each applicable gate; do not ask again for already-assigned safe steps.
 Stop only at genuine safety, scope, credential, exact-design or human
 release/acceptance gates.
+
+The first PA-02 implementation review ran as a fresh Astra/high Role Runner
+slice review at `24a2d86` and found four P1 egress defects. Remediation is
+`7019000`; focused PA-02 tests passed `40`, and fast-contract passed `415`.
+The next safe action is the requested fresh Terra/high recheck of that changed
+scope, then the mandatory boundary privacy/Test Critic evidence. Do not begin
+PA-03 until P0/P1 are clear; its Feature Workflow planning record is already
+tool-generated and remains separate from the mechanical design status.
 
 PA-00 must first reproduce/diagnose the baseline failure:
 `tests/test_prm_product_ux_eval.py::test_product_ux_keeps_project_context_for_confirmation_followups`.
