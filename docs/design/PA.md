@@ -77,11 +77,20 @@ PA-00 makes the existing durable Telegram callback path safe without pretending
 that it already implements full natural-language confirmation. Its additive
 `summary_json` binding is `prm_post_answer_action_binding.v1` and contains:
 
-- `context_kind="prm"` and `source_result_id`, the freshly generated
-  `context_id` for this answer;
-- `source_snapshot`, the bounded answer fields used by a proposal: title,
-  query, body, source refs, bounded evidence, primary intent, response
-  contract, project value and offered action codes; and
+- `context_kind="prm"` and required `source_result_id`, the exact lowercase
+  10-hex `context_id` table key for this answer. Callback ID, row key and
+  binding field must be byte-for-byte equal; there is no second result ID;
+- `source_snapshot` with exactly `title`, `query`, `body`, `source_refs`,
+  `evidence_items`, `project_name`, `primary_intent`, `response_contract_id`,
+  `direct_count`, `partial_count`, and `offered_action_codes`. Text is
+  whitespace-normalized and bounded (240, 220, 240, 240, 64, 64 respectively);
+  refs are first-seen exact HTTPS strings <=512 chars (max 5), evidence is
+  first-seen `(HTTPS <=512-char URL, normalized <=400-char snippet)` pairs
+  (max 5), and offered
+  recognized codes are first-seen (max 20). Missing scalar/list values become
+  `""`/`[]`/`0`; unknown keys are excluded; booleans, non-integral/non-finite
+  numbers or non-serializable values reject controls. V1 has no date field;
+  source URL/value text is not otherwise normalized; and
 - `source_result_version`, SHA-256 of the UTF-8 encoding of that snapshot with
   `json.dumps(..., ensure_ascii=False, sort_keys=True, separators=(",", ":"),
   allow_nan=False)`. Lists retain the source-result order after bounded
@@ -184,6 +193,15 @@ No other dynamic code is accepted. A forged, stale or cross-transition `c`,
 `n1`–`n5`, reason, or confirmation fails read-only as unavailable. The action
 tests cover every positive transition and a forged transition before its parent.
 
+The existing UTD flows share this table but are not PRM bindings. PA-00 repairs
+their clean-schema incompatibility without a migration: `utd_state` in their
+`summary_json` is authoritative, while table status maps `draft -> ready`,
+`previewed|confirming -> pending`, `confirmed -> confirmed`, and
+`cancelled|expired -> cancelled`. Every UTD read/write/claim derives or updates
+that pair atomically; untagged legacy pending rows fail closed. This permits a
+real UTD-path drain fixture under the canonical schema. The shared rollback
+drain blocks old UTD code until such active mapped rows are gone.
+
 This is JSON-additive: PA-00 adds no table migration. Only `context_kind=prm`
 rows receive/require this binding; the shared UTD draft representation is not
 rewritten. Pre-change and partially-created PRM rows fail closed under the new
@@ -235,42 +253,28 @@ it does not claim that natural-language confirmation is already shipped.
 
 ## UX and briefs
 
-Natural language, object-aware followups and clean topic changes are required.
-A greeting is not an archive query; shorten means shorten the selected result.
-Show truthful progress, cancellation and understandable connection/error state.
-Weekly brief starts with what matters, actions and genuinely useful changes,
-not 40 links. Personal relevance must have a reason. Do not invent read counts.
-Telegram overview targets 1–2 screens; details unfold. Private mobile HTML is
-accessible/light-dark; PDF has readable Cyrillic, hierarchy, sources and proper
-page breaks. Visual inspection of real renderings is an acceptance gate.
+Natural language preserves selected objects and topic changes. Briefs explain
+relevance and actions, not link volume or invented read counts. Telegram is
+1–2 screens; private HTML/PDF/Markdown remain source-identical, accessible and
+visually inspected (including Cyrillic/page breaks) before acceptance.
 
 ## Academic integration
 
-Implement the original `docs/UTD_ACADEMIC_INBOX_RESEARCH_HANDOFF.md` as a
-subject module on common connectors, permissions, briefing and jobs. No reuse
-of public-watch consent for private mail/Canvas. Verify institution policy and
-provider scopes. Selected mail plus permitted assignments/events/announcements
-come first; unsupported institution access remains an external blocker, not a
-fake implemented connector. Preserve conflicting dates, unclear deadlines,
-eligibility uncertainty and source versus local completion state.
+Implement the original handoff on common connectors/grants; public-watch
+consent never authorizes mail/Canvas. Unsupported access stays an explicit
+blocker. Preserve date/eligibility uncertainty and local-versus-source state.
 
 ## Failure and recovery
 
-Test revoked grants while queued, expired confirmation, duplicate updates,
-changed recipient/time, provider timeout, 429, injection in every source type,
-missing/stale source, restart, DST and disk/restore failures. Never convert a
-failed delivery into a visible-success state. Return useful partial answers;
-make unavailable source coverage explicit. Finalized writes are not rolled
-back by forgetting a conversation.
+Test grant revocation, expiry, duplicates, timeout/429, injection, stale data,
+restart/DST and restore. Failed delivery is never success; partial coverage is
+explicit; finalized writes are not undone by forgetting a conversation.
 
 ## Migration and rollback
 
-Additive changes and measured rerouting, no rewrite of the archive or restart
-of completed PRM-SN work. Rehearse migrations/backup restore on disposable
-copies; production requires separate approval. New capabilities default off
-until configured/granted. Each slice registry entry declares its own rollback.
-Old report timers remain off. Read-only/archive fallback survives new-feature
-outages. Avoid legacy handler growth; extract shared delivery only with tests.
+Changes are additive and default off. Rehearse migration/restore on copies;
+production needs separate approval. Old timers stay off and archive fallback
+survives outages.
 
 ## Vertical slices and acceptance
 
@@ -286,7 +290,7 @@ are regression floors; each code slice registers exact acceptance tests and
 intended semantic failures before implementation. PA-00 records interpreter,
 HEAD, runtime mode and evaluator IDs; historic `cc105…` is reference-only. Its
 scope includes the affected callbacks/UTD/ledger tests and legacy markup within
-`files<=18`.
+`files<=22`.
 
 Independent product/program design review precedes exact human approval.
 Slice/Test Critic/privacy reviews follow risk; full review is batched at phase

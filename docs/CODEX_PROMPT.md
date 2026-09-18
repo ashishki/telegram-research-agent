@@ -72,6 +72,11 @@ unavailable data and blocks an old handler until no unexpired nonterminal row
 in either namespace remains; it never changes shared UTD rows. Its PA-00 test
 must create a real UTD-path row and prove both blocker detection and SELECT-only
 SQL tracing.
+The binding's `source_result_id`, table key and callback context ID are the same
+canonical lowercase 10-hex value. UTD clean-schema compatibility is PA-00 work:
+logical `utd_state` maps draft/previewed/confirming/confirmed/cancelled-or-expired
+to ready/pending/pending/confirmed/cancelled without a migration; untagged
+legacy pending rows fail closed.
 Legacy PRM markup receives no authenticated actor/owner tuple and must render
 no control. Initial offered action codes alone are valid; dynamic `c`, `n1`–`n5`,
 feedback-reason and confirmation codes require their exact issued, persisted
