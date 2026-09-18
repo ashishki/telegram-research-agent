@@ -123,7 +123,7 @@ def test_live_dispatch_persists_explicit_replacement_topic_for_week_followup(mon
     assert "Topic A" not in followup["effective_query"]
 
 
-def test_free_text_save_followup_uses_existing_confirmation_preview(monkeypatch, tmp_path) -> None:
+def test_free_text_save_followup_requires_a_current_inline_control(monkeypatch, tmp_path) -> None:
     prm_handlers._PRM_DIALOG_STATE.clear()
     prm_handlers._remember_prm_dialog(
         "42",
@@ -136,23 +136,15 @@ def test_free_text_save_followup_uses_existing_confirmation_preview(monkeypatch,
         direct_count=1,
     )
     sent = []
-    calls = []
-
     class ForbiddenAssistant:
         def __init__(self, *args, **kwargs): raise AssertionError("free-text save follow-up must not rerun archive search")
 
-    def fake_callback(db_path, callback_data, *, chat_id, actor_id):
-        calls.append((db_path, callback_data, chat_id, actor_id))
-        return {"message": "Сохранить заметку: черновик подготовлен.", "reply_markup": {"inline_keyboard": []}}
-
     monkeypatch.setattr(prm_handlers, "PersonalResearchAssistant", ForbiddenAssistant)
-    monkeypatch.setattr(prm_handlers, "handle_post_answer_callback", fake_callback)
     monkeypatch.setattr(prm_handlers, "send_message", lambda _token, _chat, text, **kwargs: sent.append((text, kwargs.get("reply_markup"))))
 
     prm_handlers.dispatch_prm_command("42", "/auto сохрани заметку, но сначала покажи что именно сохранишь", _settings(tmp_path))
 
-    assert calls == [(str(tmp_path / "memory.db"), "prma:ctx123:n", "42", "42")]
-    assert sent == [("Сохранить заметку: черновик подготовлен.", {"inline_keyboard": []})]
+    assert sent == [("Это действие недоступно. Отправь запрос заново, чтобы получить новую кнопку действия.", None)]
 
 
 def test_short_next_step_followup_does_not_rerun_archive_search(monkeypatch, tmp_path) -> None:

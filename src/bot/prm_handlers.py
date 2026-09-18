@@ -8,11 +8,7 @@ import hashlib
 from datetime import datetime, timedelta, timezone
 from typing import Any, Mapping
 
-from assistant.prm_post_answer_actions import (
-    PRM_ACTION_PREFIX,
-    build_post_answer_actions,
-    handle_post_answer_callback,
-)
+from assistant.prm_post_answer_actions import build_post_answer_actions
 from assistant.utd_profile import (
     is_utd_profile_intent,
     is_utd_question,
@@ -115,25 +111,12 @@ def dispatch_prm_command(chat_id: str, text: str, settings: Settings) -> None:
         return
     dialog = _resolve_prm_dialog_query(chat_id, args, mode=mode)
     if dialog.get("kind") == "post_answer_action":
-        context_id = str(dialog.get("action_context_id") or "")
-        action = str(dialog.get("post_answer_action") or "")
-        if context_id and action:
-            result = handle_post_answer_callback(
-                settings.db_path,
-                f"{PRM_ACTION_PREFIX}:{context_id}:{action}",
-                chat_id=chat_id,
-                actor_id=chat_id,
-            )
-            message = str(result.get("message") or "Черновик недоступен. Запроси ответ заново.")
-            if str(result.get("status") or "") == "needs_confirmation":
-                _remember_pending_prm_action(chat_id, action=action, message=message)
-            send_message(
-                _token(),
-                chat_id,
-                message,
-                reply_markup=result.get("reply_markup"),
-            )
-            return
+        send_message(
+            _token(),
+            chat_id,
+            "Это действие недоступно. Отправь запрос заново, чтобы получить новую кнопку действия.",
+        )
+        return
     if dialog.get("kind") == "short_next_step":
         send_message(_token(), chat_id, str(dialog.get("message") or "Следующий шаг не найден."))
         return
