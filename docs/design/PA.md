@@ -73,6 +73,38 @@ context; it does not rerun search or route a later answer. The source project
 label may be displayed when present, but it must come from that immutable
 source, not from mutable dialogue state.
 
+PA-00 makes the existing durable Telegram callback path safe without pretending
+that it already implements full natural-language confirmation. Its additive
+`summary_json` binding is `prm_post_answer_action_binding.v1` and contains:
+
+- `source_result_id`, the freshly generated `context_id` for this answer;
+- `source_result_version`, a canonical SHA-256 digest of title, query, body,
+  source refs, bounded evidence, primary intent, response contract, project
+  value and offered action codes;
+- optional `source_project_ref={origin: answer.project_name, value: ...}`; it
+  is a display/provenance value, never an authorization input; and
+- offered action codes, chat/actor hash and expiry. The callback validates its
+  requested action against those codes and the row before proposal/confirmation
+  work.
+
+`_register_context` is the only creator, immediately after a rendered answer;
+`_load_context` validates schema, ID equality, digest, allowed action, chat,
+actor and expiry before the callback path can use it. A missing, malformed,
+pre-binding or tampered binding returns the same fail-closed unavailable result
+and performs no write. This is JSON-additive: PA-00 adds no table migration.
+Pre-change and partially-created rows therefore fail closed under the new code.
+Rollback disables newly rendered action controls and cancels unconfirmed rows
+created with this binding before an old handler is deployed; confirmed receipts
+remain intact. Do not deploy that rollback while such pending rows could be
+accepted by an old handler.
+
+PA-03 owns the complete plain-language `yes` state: it adds an explicit current
+confirmation reference to `ConversationState`, clears it on an independent
+topic/cancellation and requires an exact matching visible proposal. PA-13 adds
+the corresponding provider-write confirmation and reconciliation. Thus PA-00
+tests callback/source integrity and denies unsafe legacy text action selection;
+it does not claim that natural-language confirmation is already shipped.
+
 ## UX and briefs
 
 Natural language, object-aware followups and clean topic changes are required.
@@ -116,14 +148,16 @@ outages. Avoid legacy handler growth; extract shared delivery only with tests.
 
 The 19 entries in `PA.design.json` are the dependency/scope registry, mirrored
 by task IDs PA-00..PA-18 in `docs/tasks.md`. PA-00 first classifies the baseline
-as evaluator, active dispatch, or both and proves the confirmation-context
-invariant with named dispatch-level positive and denial tests; it does not
-preserve a stale project merely to satisfy the old corpus. The existing commands
-are regression floors, NOT sufficient feature evidence. Before starting each
-code slice, register exact new acceptance test functions and add them to its
-executable verification list/project verifier; show intended failures for
-required semantic test-first changes. Split an oversized slice by revising the
-registry and approval as necessary, not by silently exceeding its budget.
+as evaluator, active dispatch, or both and proves the callback/source invariant
+with named positive and denial tests; it does not preserve a stale project merely
+to satisfy the old corpus. Those test functions are planned test-first work in
+PA-00, not evidence that exists before human design approval. The existing
+commands are regression floors, NOT sufficient feature evidence. Before
+starting each code slice, register exact new acceptance test functions and add
+them to its executable verification list/project verifier; show intended
+failures for required semantic test-first changes. Split an oversized slice by
+revising the registry and approval as necessary, not by silently exceeding its
+budget.
 
 Independent product/program design review precedes exact human approval.
 Slice/Test Critic/privacy reviews follow risk; full review is batched at phase

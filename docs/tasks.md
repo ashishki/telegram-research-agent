@@ -30,11 +30,12 @@ Objective: Reproduce current focused CI, diagnose the confirmation-context failu
 Acceptance-Criteria:
   - Current HEAD and active entrypoints are recorded; historical runtime observations are not treated as current.
   - The diagnosis explicitly classifies evaluator behavior, active dispatch behavior, or both; it records the affected entrypoints, changed-file count, exact interpreter/environment and before/after receipt.
-  - A confirmation binds its source result/version, action code, chat/owner and expiry (plus an optional source-project ref), never mutable last-topic/project state; it does not reroute or search.
-  - `test_product_ux_confirmation_uses_bound_action_context` proves the bound positive path, while `test_post_answer_callback_preserves_bound_source_without_reroute` and `test_post_answer_callback_denies_stale_wrong_chat_or_topic_context` prove dispatch-level preservation and denial.
+  - The existing durable callback uses additive `prm_post_answer_action_binding.v1`: context ID, canonical source-version digest, optional `{origin: answer.project_name, value}` provenance, offered action codes, chat/actor and expiry. It validates all binding fields and the requested action before it can create or confirm a proposal; missing/pre-binding/tampered rows fail closed without a write or reroute.
+  - `test_post_answer_context_binds_immutable_source_and_project_ref` proves the bound positive path after mutable dialog changes; `test_post_answer_callback_preserves_bound_source_without_reroute`, `test_post_answer_context_rejects_expired_wrong_chat_actor_or_tampered_binding`, and `test_plain_language_action_selection_rejects_stale_or_cross_topic_context` prove preservation and denial.
+  - These named tests are introduced test-first within PA-00 after design approval. Complete natural-language `yes` confirmation belongs to PA-03 and provider-write confirmation to PA-13; PA-00 must deny unsafe legacy text action selection rather than claim either later capability.
   - The direct regression and focused CI are green, or an exact unresolved blocker is reported without weakening the acceptance contract.
 Verification:
-  - python -m pytest -q tests/test_prm_product_ux_eval.py::test_product_ux_confirmation_uses_bound_action_context tests/test_prm_bot_dispatch.py::test_post_answer_callback_preserves_bound_source_without_reroute tests/test_prm_bot_dispatch.py::test_post_answer_callback_denies_stale_wrong_chat_or_topic_context
+  - python -m pytest -q tests/test_prm_post_answer_actions.py::test_post_answer_context_binds_immutable_source_and_project_ref tests/test_prm_bot_dispatch.py::test_post_answer_callback_preserves_bound_source_without_reroute tests/test_prm_post_answer_actions.py::test_post_answer_context_rejects_expired_wrong_chat_actor_or_tampered_binding tests/test_prm_bot_dispatch.py::test_plain_language_action_selection_rejects_stale_or_cross_topic_context
   - python tools/test_tiers.py focused-prm
 Context-Refs:
   - docs/design/PA.md
@@ -106,7 +107,7 @@ Slice-ID: PA-03
 Objective: Provide authorized model-backed dialogue with object-aware followups, topic changes and cancellation.
 Acceptance-Criteria:
   - Greeting/editing/general conversation does not fall into archive search; mixed requests use appropriate tools.
-  - Shorten/new topic/second item/ambiguous yes/restart cases preserve the intended object and never execute a stale proposal.
+  - Shorten/new topic/second item/ambiguous yes/restart cases preserve the intended object. A plain `yes` resolves only one current visible confirmation ref; a new topic, cancellation, expiry, actor/chat mismatch or changed proposal never executes a stale proposal.
 Verification:
   - python tools/test_tiers.py focused-prm
 Context-Refs:
