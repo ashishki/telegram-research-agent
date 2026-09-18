@@ -1,5 +1,6 @@
 import json
 import os
+import stat
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -245,6 +246,114 @@ class TestVoiceTranscription(unittest.TestCase):
         assert "private-file-id-sentinel" not in rendered
         assert "private-local-path-sentinel" not in rendered
         assert "private/provider/path.ogg" not in rendered
+
+    def test_voice_download_uses_private_identifier_free_randomized_storage(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            def fake_urlopen(request_obj, timeout):
+                url = getattr(request_obj, "full_url", str(request_obj))
+                if "getFile?" in url:
+                    return _FakeResponse({"ok": True, "result": {"file_path": "voice/synthetic.ogg"}})
+                return _FakeResponse(b"synthetic voice bytes")
+
+            with patch("bot.voice.request.urlopen", side_effect=fake_urlopen):
+                downloaded = voice._download_telegram_voice(
+                    token="bot-token",
+                    file_id="private-file-id-sentinel",
+                    media_dir=tmpdir,
+                    get_file_authorization=_authorization(
+                        capability="media.voice_download",
+                        operation="read",
+                        provider_ref="provider_telegram",
+                        resource_ref="private-file-id-sentinel",
+                    ),
+                    download_file_authorization=_authorization(
+                        capability="media.voice_download",
+                        operation="read",
+                        provider_ref="provider_telegram",
+                        resource_ref="private-file-id-sentinel",
+                    ),
+                    owner_ref="owner_synthetic_primary",
+                    connection_ref=None,
+                    resource_ref="private-file-id-sentinel",
+                )
+
+            downloaded_path = Path(downloaded)
+            self.assertEqual(stat.S_IMODE(downloaded_path.stat().st_mode), 0o600)
+            self.assertEqual(stat.S_IMODE(downloaded_path.parent.stat().st_mode), 0o700)
+            self.assertTrue(downloaded_path.name.startswith("voice-"))
+            self.assertNotIn("private-file-id-sentinel", downloaded_path.name)
+            self.assertEqual(downloaded_path.read_bytes(), b"synthetic voice bytes")
+            voice._delete_local_file(downloaded)
+            self.assertFalse(downloaded_path.exists())
+            self.assertFalse(downloaded_path.parent.exists())
+
+    def test_voice_download_rejects_an_unsafe_attachment_id_before_network_or_storage(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch("bot.voice.request.urlopen") as urlopen:
+                with self.assertRaisesRegex(voice.VoiceTranscriptionError, "identifier is invalid"):
+                    voice._download_telegram_voice(
+                        token="bot-token",
+                        file_id="../private-file-id-sentinel",
+                        media_dir=tmpdir,
+                        get_file_authorization=None,
+                        download_file_authorization=None,
+                        owner_ref="owner_synthetic_primary",
+                        connection_ref=None,
+                        resource_ref="../private-file-id-sentinel",
+                    )
+            urlopen.assert_not_called()
+            self.assertEqual(list(Path(tmpdir).iterdir()), [])
+
+    def test_voice_download_removes_partial_file_and_private_directory_after_write_failure(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            def fake_urlopen(request_obj, timeout):
+                url = getattr(request_obj, "full_url", str(request_obj))
+                if "getFile?" in url:
+                    return _FakeResponse({"ok": True, "result": {"file_path": "voice/synthetic.ogg"}})
+                return _FakeResponse(b"synthetic voice bytes")
+
+            def write_partial_then_fail(dest_dir, data):
+                partial = dest_dir / "voice-partial.ogg"
+                partial.write_bytes(data[:1])
+                raise OSError("synthetic write failure")
+
+            with patch("bot.voice.request.urlopen", side_effect=fake_urlopen):
+                with patch("bot.voice._write_private_voice_file", side_effect=write_partial_then_fail):
+                    with self.assertRaisesRegex(voice.VoiceTranscriptionError, "could not be stored"):
+                        voice._download_telegram_voice(
+                            token="bot-token",
+                            file_id="voice-1",
+                            media_dir=tmpdir,
+                            get_file_authorization=_authorization(
+                                capability="media.voice_download",
+                                operation="read",
+                                provider_ref="provider_telegram",
+                                resource_ref="voice-1",
+                            ),
+                            download_file_authorization=_authorization(
+                                capability="media.voice_download",
+                                operation="read",
+                                provider_ref="provider_telegram",
+                                resource_ref="voice-1",
+                            ),
+                            owner_ref="owner_synthetic_primary",
+                            connection_ref=None,
+                            resource_ref="voice-1",
+                        )
+            self.assertEqual(list(Path(tmpdir).iterdir()), [])
+
+    def test_voice_cleanup_failure_is_redacted_and_does_not_raise(self):
+        with tempfile.TemporaryDirectory(prefix="private-local-path-sentinel-") as tmpdir:
+            local_path = Path(tmpdir) / "private-file-id-sentinel.ogg"
+            local_path.write_bytes(b"voice bytes")
+            with patch.object(Path, "unlink", side_effect=OSError("private-provider-payload-sentinel")):
+                with self.assertLogs(voice.LOGGER, level="WARNING") as logs:
+                    voice._delete_local_file(str(local_path))
+
+        rendered = "\n".join(logs.output)
+        self.assertNotIn("private-local-path-sentinel", rendered)
+        self.assertNotIn("private-file-id-sentinel", rendered)
+        self.assertNotIn("private-provider-payload-sentinel", rendered)
 
     def test_transcribe_telegram_voice_requires_a_reservation_for_each_telegram_call(self):
         download_authorization = _authorization(
