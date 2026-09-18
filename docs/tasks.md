@@ -1,6 +1,6 @@
 # Active Personal Assistant Task Graph
 
-Status: planned programme; no product implementation started by this documentation change.
+Status: active programme; PA-00 has local technical evidence and awaits human high-risk slice acceptance.
 Updated: 2026-09-18
 Feature: PA • Mode: standard • Planning depth: designed_slices
 
@@ -18,7 +18,7 @@ Completed/accepted statuses require concrete code, focused tests, applicable mod
 Owner: codex
 Phase: foundation
 Type: eval:gate
-Status: planned
+Status: in_progress
 Depends-On: none
 Risk-Level: high
 Critic-Required: required
@@ -30,7 +30,7 @@ Objective: Reproduce current focused CI, diagnose the confirmation-context failu
 Acceptance-Criteria:
   - Current HEAD and active entrypoints are recorded; historical runtime observations are not treated as current.
   - The diagnosis explicitly classifies evaluator behavior, active dispatch behavior, or both; it records the affected entrypoints, changed-file count, exact interpreter/environment, then-current HEAD, active bot runtime mode, evaluator synthetic action context IDs and before/after receipt. The historic `cc105…` CI record remains a reference, not runtime proof.
-  - The evaluator splits the historical scenario: free-text save/watch from dialogue state is denied as requiring the current inline control and does not fabricate a preview, callback, retrieval call or `eval-*` context; a separate declared immutable bound-inline fixture verifies source-project provenance. The retained historical regression test proves both branches rather than retaining stale dialogue context merely to pass.
+  - The evaluator splits the historical scenario: free-text save/watch from dialogue state is denied as requiring the current inline control and does not fabricate a preview, callback, retrieval call or `eval-*` context; a separate declared immutable bound-inline fixture verifies source-project provenance. The retained historical regression name covers the denied branch; the bound-inline case is separately declared rather than retaining stale dialogue context merely to pass.
   - The existing durable callback uses additive `prm_post_answer_action_binding.v1`: `context_kind=prm`, required `source_result_id` equal byte-for-byte to the lowercase 10-hex row/callback `context_id`, exact canonical SHA-256 source snapshot, optional `{origin: answer.project_name, value}` provenance, offered action codes, private owner chat/actor hashes and expiry. Every Telegram text/voice, compatibility-dispatch and callback ingress either propagates the authenticated `(chat_id, actor_id, owner_chat_id)` unchanged or renders no controls. The shared canonical ID helper accepts only `[1-9][0-9]{0,18}` at most `9223372036854775807`, and controls require three equal canonical positive IDs; no path synthesizes an actor ID.
   - Exact tuple boundaries are `bot.bot.dispatch_command`, `bot.handlers.dispatch_command`, `bot.prm_handlers.dispatch_prm_command`, `_post_answer_action_bundle`, and `handle_prm_post_answer_callback`, each with explicit nullable `actor_id`/`owner_chat_id` input and no-controls default. `run_bot` is the only source of Telegram sender plus configured owner. This rule covers only `prma`/`prmc`; UTD callback prefixes retain their separate contract.
   - One pure snapshot canonicalizer is used at registration and load with the exact PA design keys/bounds/deduplication/absent-value rules. Non-finite/non-serializable source input renders the answer without controls, context or receipt. `validate_prm_post_answer_callback` returns immutable `ValidatedPrmAction` or unavailable after read-only parse/action, row, tuple, status/expiry, schema, digest and offer checks. `apply_validated_prm_action` never reparses: one transaction consumes the result only if context/status/expiry/summary-json/proposals-json fingerprints still match. Missing/pre-binding/tampered/expired/mismatched rows—including malformed callback or row JSON—fail closed without a write, receipt, expiry cleanup or reroute; stale validation also fails without a write.
@@ -44,12 +44,13 @@ Acceptance-Criteria:
   - These named tests are introduced test-first within PA-00 after design approval. Complete natural-language `yes` confirmation belongs to PA-03 and provider-write confirmation to PA-13; PA-00 must deny unsafe legacy text action selection with a safe re-run instruction rather than claim either later capability.
   - The direct regression and focused CI are green, or an exact unresolved blocker is reported without weakening the acceptance contract.
 Verification:
-  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_prm_product_ux_eval.py::test_product_ux_keeps_project_context_for_confirmation_followups tests/test_prm_product_ux_eval.py::test_product_ux_legacy_free_text_action_is_denied_without_preview tests/test_prm_post_answer_actions.py::test_post_answer_controls_require_private_owner_actor_binding tests/test_prm_post_answer_actions.py::test_post_answer_context_binds_canonical_snapshot_and_project_ref tests/test_prm_post_answer_actions.py::test_post_answer_context_rejects_expired_wrong_chat_actor_or_tampered_binding tests/test_prm_post_answer_actions.py::test_invalid_prm_action_context_is_read_only_before_rejection tests/test_prm_post_answer_actions.py::test_prm_rollback_drain_is_owner_restricted_and_never_mutates_utd_rows tests/test_prm_post_answer_actions.py::test_dynamic_post_answer_codes_require_issued_bound_transition tests/test_prm_bot_dispatch.py::test_prm_entrypoints_propagate_private_owner_identity_or_render_no_controls tests/test_prm_bot_dispatch.py::test_post_answer_callback_preserves_bound_source_without_reroute tests/test_prm_bot_dispatch.py::test_plain_language_action_selection_rejects_stale_or_cross_topic_context tests/test_callbacks.py::TestIdeaCallbacks::test_run_bot_prm_safe_routes_only_post_answer_callbacks tests/test_callbacks.py::TestIdeaCallbacks::test_handle_callback_validates_prm_before_acknowledgement tests/test_prm_utd_callbacks.py tests/test_prm_utd_dispatch.py tests/test_utd_profile.py tests/test_interaction_ledger.py
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_prm_product_ux_eval.py tests/test_prm_post_answer_actions.py tests/test_interaction_ledger.py tests/test_utd_profile.py tests/test_prm_utd_callbacks.py tests/test_prm_utd_dispatch.py tests/test_prm_bot_dispatch.py tests/test_callbacks.py::TestIdeaCallbacks::test_run_bot_prm_safe_routes_only_post_answer_callbacks tests/test_callbacks.py::TestIdeaCallbacks::test_handle_callback_validates_prm_before_acknowledgement tests/test_callbacks.py::TestIdeaCallbacks::test_run_bot_prm_safe_dispatches_transcribed_voice_as_auto tests/test_callbacks.py::TestIdeaCallbacks::test_run_bot_prm_safe_dispatches_completed_voice_with_owner_tuple tests/test_callbacks.py::TestIdeaCallbacks::test_run_bot_prm_safe_dispatches_plain_text_as_auto tests/test_callbacks.py::TestIdeaCallbacks::test_run_bot_prm_safe_drops_owner_callback_in_group
   - PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python tools/test_tiers.py focused-prm
   - The PA-00 CAS extension additionally runs `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_prm_post_answer_actions.py::test_validated_prm_action_cas_rejects_stale_row tests/test_utd_profile.py::test_utd_state_transitions_use_guarded_cas_on_canonical_schema`; together with the preceding direct command this is the registry `confirmation_context` set.
 Context-Refs:
   - docs/design/PA.md
   - docs/IMPLEMENTATION_CONTRACT.md
+  - docs/verification/PA-00-technical-evidence-2026-09-18.md
 Design-Refs:
   - docs/design/PA.design.json
 
