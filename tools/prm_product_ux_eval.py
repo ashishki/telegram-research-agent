@@ -103,6 +103,11 @@ _TECHNICAL_LEAK_MARKERS = (
     "traceback",
     "/srv/",
     "sqlite",
+    "provider egress",
+    "kill switch",
+    "delivery-gates",
+    "deployment gate",
+    "runtime",
 )
 
 PRM_TOPICS = (
@@ -246,7 +251,7 @@ ACTION_LABELS = {
     "a": "Сохранить действие",
     "e": "Сохранить эксперимент",
     "o": "Показать ещё",
-    "q": "Уточнить поиск",
+    "q": "Уточнить: термин, канал, период",
 }
 
 
@@ -319,6 +324,7 @@ def build_corpus() -> dict[str, Any]:
     _add_prm_dialogues(dialogues)
     _add_utd_dialogues(dialogues)
     _add_notification_dialogues(dialogues)
+    _add_lifecycle_dialogues(dialogues)
     return {
         "schema_version": CORPUS_SCHEMA_VERSION,
         "description": (
@@ -372,6 +378,20 @@ def _add_prm_one_turn_cases(cases: list[dict[str, Any]]) -> None:
                 ),
             ]
         )
+    cases.append(
+        {
+            "case_id": "one:prm:brief:positive_topic_edition",
+            "surface": "prm_application",
+            "message": "Собери недельный UTD brief по AI-событиям",
+            "synthetic_fixture": "positive_topic_edition",
+            "visual_priority": True,
+            "expected": {
+                "surface": "prm_application",
+                "primary_intent": "topic_edition",
+                "mode": "brief",
+            },
+        }
+    )
 
 
 def _add_utd_one_turn_cases(cases: list[dict[str, Any]]) -> None:
@@ -542,7 +562,7 @@ def _add_utd_dialogues(dialogues: list[dict[str, Any]]) -> None:
                         {
                             "turn_id": "turn:03:preview",
                             "surface": "utd_profile_action",
-                            "message": "Показать preview",
+                            "message": "Показать предпросмотр",
                             "utd_action": "pv",
                             "expected": {
                                 "surface": "utd_watch_preview",
@@ -614,7 +634,7 @@ def _add_utd_dialogues(dialogues: list[dict[str, Any]]) -> None:
 
 def _add_notification_dialogues(dialogues: list[dict[str, Any]]) -> None:
     categories = list(UTD_QUESTIONS)
-    actions = ("more", "less", "mute", "pause")
+    actions = ("settings", "more", "less", "mute", "pause")
     for index in range(20):
         category = categories[index % len(categories)]
         action = actions[index % len(actions)]
@@ -642,7 +662,8 @@ def _add_notification_dialogues(dialogues: list[dict[str, Any]]) -> None:
                         "feedback_action": action,
                         "expected": {
                             "surface": "utd_feedback",
-                            "feedback_recorded": True,
+                            "feedback_recorded": action != "settings",
+                            "settings_opened": action == "settings",
                             "no_profile_auto_mutation": True,
                         },
                     },
@@ -683,6 +704,45 @@ def _add_notification_dialogues(dialogues: list[dict[str, Any]]) -> None:
                 ],
             }
         )
+
+
+def _add_lifecycle_dialogues(dialogues: list[dict[str, Any]]) -> None:
+    dialogues.append(
+        {
+            "dialogue_id": "dialogue:utd:lifecycle:01",
+            "turns": [
+                {
+                    "turn_id": "turn:01:pause_preview",
+                    "surface": "utd_profile_action",
+                    "message": "Поставить уведомления на паузу",
+                    "utd_action": "lifecycle_pause_preview",
+                    "visual_priority": True,
+                    "expected": {"surface": "utd_lifecycle_preview", "confirmation_gated": True},
+                },
+                {
+                    "turn_id": "turn:02:pause_confirmed",
+                    "surface": "utd_profile_action",
+                    "message": "Подтвердить паузу",
+                    "utd_action": "lifecycle_pause_confirmed",
+                    "expected": {"surface": "utd_lifecycle_confirmation", "confirmation_gated": True},
+                },
+                {
+                    "turn_id": "turn:03:unsubscribe_preview",
+                    "surface": "utd_profile_action",
+                    "message": "Отменить подписку",
+                    "utd_action": "lifecycle_cancel_preview",
+                    "expected": {"surface": "utd_lifecycle_preview", "confirmation_gated": True},
+                },
+                {
+                    "turn_id": "turn:04:unsubscribe_cancelled",
+                    "surface": "utd_profile_action",
+                    "message": "Не выполнять",
+                    "utd_action": "lifecycle_cancelled",
+                    "expected": {"surface": "utd_lifecycle_confirmation", "confirmation_gated": True},
+                },
+            ],
+        }
+    )
 
 
 def _expected_utd_category(category: str, question_index: int) -> str:
@@ -898,6 +958,51 @@ def _simulate_prm_application(
         assistant = PersonalResearchAssistant(settings=load_settings())
         assistant_cache["assistant"] = assistant
     message = str(turn.get("message") or "")
+    if str(turn.get("synthetic_fixture") or "") == "positive_topic_edition":
+        result = assistant.render_topic_edition(
+            OperatorRequest(query=message, mode="brief", chat_id="product-ux-edition"),
+            topic_id="ai-events",
+            items=[
+                {
+                    "source": "calendar",
+                    "event_id": "visual-ai-seminar",
+                    "url": "https://calendar.utdallas.edu/event/visual-ai-seminar",
+                    "title": "Applied AI seminar",
+                    "updated_at": "2026-09-17T09:30:00Z",
+                    "material_text": "Registration opened for the seminar.",
+                    "relevance": {"relevant": True, "score": 9, "categories": ["ai"], "reason": "совпадает с интересом к AI-исследованиям"},
+                }
+            ],
+            window_start="2026-09-15T00:00:00Z",
+            window_end="2026-09-21T23:59:59Z",
+            checked_at="2026-09-17T10:00:00Z",
+            source_health={"calendar": "healthy"},
+        )
+        answer = result.text
+        return _turn_result(
+            turn,
+            index=index,
+            message=answer,
+            actual={
+                "surface": "prm_application",
+                "status": result.status,
+                "mode": result.mode,
+                "primary_intent": "topic_edition",
+                "response_contract_id": "topic_edition.v1",
+                "project_context_required": False,
+                "external_verification_required": False,
+                "current_fact_boundary": False,
+                "source_count": 1,
+                "direct_count": 1,
+                "partial_count": 0,
+                "adjacent_count": 0,
+                "answer_chars": len(answer),
+                "action_codes": [],
+                "dialog_context_used": False,
+                "unsupported_claim_rate": 0.0,
+                "current_fact_violations": 0,
+            },
+        )
     mode = str(turn.get("mode") or "auto")
     chat_id = str(state.get("prm_chat_id") or f"product-ux-eval-{_stable_hash(message)[:10]}")
     dialog = prm_handlers._resolve_prm_dialog_query(chat_id, message, mode=mode)
@@ -1074,7 +1179,7 @@ def _simulate_post_answer_preview(
     else:
         title = f"Заметка по теме: {topic}"
         label = "Сохранить"
-        body = "Это черновик заметки из последнего ответа; durable запись появится только после подтверждения."
+        body = "Это черновик заметки из последнего ответа; постоянная запись появится только после подтверждения."
     return "\n".join(
         [
             f"{label}: черновик подготовлен.",
@@ -1153,6 +1258,18 @@ def _simulate_utd_profile_action(
         draft = _default_draft(_utc_now_dt())
         state["utd_draft"] = draft
     action = str(turn.get("utd_action") or "")
+    if action in {"lifecycle_pause_preview", "lifecycle_cancel_preview"}:
+        pause = action == "lifecycle_pause_preview"
+        label = "паузу" if pause else "отмену подписки"
+        answer = (
+            f"Нужно подтверждение: {label}. "
+            + ("Уведомления остановятся до новой настройки; профиль останется сохранённым." if pause else "Профиль и будущие уведомления будут отключены.")
+        )
+        markup = {"inline_keyboard": [[{"text": f"Подтвердить {label}", "callback_data": "utds:u_eval:confirm"}, {"text": "Не выполнять", "callback_data": "utds:u_eval:cancel"}]]}
+        return _turn_result(turn, index=index, message=_with_markup(answer, markup), actual={"surface": "utd_lifecycle_preview", "status": "needs_confirmation", "profile_persisted": not pause, "delivery_enabled": False})
+    if action in {"lifecycle_pause_confirmed", "lifecycle_cancelled"}:
+        answer = "Пауза подтверждена. Уведомления остановлены; профиль не изменён." if action == "lifecycle_pause_confirmed" else "Отмена не подтверждена. Профиль и настройки не изменены."
+        return _turn_result(turn, index=index, message=answer, actual={"surface": "utd_lifecycle_confirmation", "status": "confirmed" if action == "lifecycle_pause_confirmed" else "cancelled", "profile_persisted": action == "lifecycle_pause_confirmed", "delivery_enabled": False})
     if action == "pv":
         answer = render_utd_watch_preview(draft)
         markup = {
@@ -1173,9 +1290,8 @@ def _simulate_utd_profile_action(
         return _turn_result(turn, index=index, message=_with_markup(answer, markup), actual=actual)
     if action == "save":
         answer = (
-            "UTD-профиль сохранён как подтверждённое намерение. "
-            "Само сохранение профиля не включает live-сбор, таймеры, модель или "
-            "Telegram-уведомления; это отдельный deployment gate с kill switch."
+            "Профиль UTD сохранён. Уведомления сейчас выключены. "
+            "Сохранение профиля само по себе не запускает поиск, расписание или отправку."
         )
         actual = {
             "surface": "utd_confirmation",
@@ -1267,11 +1383,17 @@ def _simulate_utd_feedback(
         "surface": "utd_feedback",
         "status": str(result.get("action") or ""),
         "feedback_action": str(result.get("action") or ""),
-        "feedback_recorded": True,
+        "feedback_recorded": str(result.get("action") or "") != "settings",
+        "settings_opened": bool(result.get("settings_opened")),
         "profile_persisted": False,
         "profile_auto_mutated": False,
     }
-    return _turn_result(turn, index=index, message=str(result.get("message") or ""), actual=actual)
+    return _turn_result(
+        turn,
+        index=index,
+        message=_with_markup(str(result.get("message") or ""), result.get("reply_markup")),
+        actual=actual,
+    )
 
 
 def _turn_result(
@@ -1328,7 +1450,7 @@ def _deterministic_checks(
         checks["utd_category_ok"] = str(actual.get("utd_category") or "") == expected_category
     if bool(expected.get("requires_fresh_source_boundary")):
         checks["fresh_source_boundary_ok"] = (
-            "Live UTD-источники" in visible
+            "Свежие UTD-источники" in visible
             or "official" in visible.casefold()
             or "primary-source" in visible.casefold()
         )
@@ -1349,10 +1471,9 @@ def _deterministic_checks(
         checks["watch_preview_truthful_ok"] = all(
             marker in visible
             for marker in (
-                "live fetch",
-                "не запускает timer",
-                "не отправляет Telegram delivery",
-                "kill switch",
+                "не проверяет внешние страницы",
+                "не отправляет уведомления",
+                "не включает уведомления",
             )
         )
     if bool(expected.get("no_delivery_enabled")):
@@ -1365,8 +1486,10 @@ def _deterministic_checks(
         checks["feedback_controls_ok"] = "Полезно" in visible and "Шум" in visible
     if bool(expected.get("feedback_recorded")):
         checks["feedback_recorded_ok"] = bool(actual.get("feedback_recorded")) and (
-            "Записал" in visible or "Поставил sidecar-паузу" in visible
+            "Записал" in visible or "Приостановил UTD-уведомления" in visible
         )
+    if bool(expected.get("settings_opened")):
+        checks["settings_opened_ok"] = bool(actual.get("settings_opened")) and "Настройки" in visible
     if bool(expected.get("no_profile_auto_mutation")):
         checks["no_profile_auto_mutation_ok"] = not bool(actual.get("profile_auto_mutated")) and not (
             "профиль обнов" in visible.casefold()
@@ -1407,6 +1530,14 @@ def _synthetic_candidate(turn: Mapping[str, Any]) -> dict[str, Any]:
         "change_type": change_type,
         "payload": {
             "title": title,
+            "change_summary": {
+                "program": "обновлён срок регистрации для студентов программы",
+                "career": "добавлена регистрация на карьерный воркшоп",
+                "ai": "открыта регистрация на AI-семинар",
+                "isso": "обновлены условия участия в консультации ISSO",
+                "benefits": "уточнены часы и условия получения поддержки",
+                "spouse_family": "явно добавлена доступность для семьи",
+            }.get(category, "опубликовано новое релевантное изменение"),
             "url": f"https://calendar.utdallas.edu/event/{_slug(category)}-{_slug(change_type)}",
             "instance": {
                 "start": "2026-09-08T15:00:00-05:00",

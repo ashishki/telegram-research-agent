@@ -141,17 +141,33 @@ def test_product_ux_preview_and_pause_feedback_use_contract_markers():
     preview = module._turn_result(
         {"expected": {"watch_preview_truthful": True}},
         index=1,
-        message="live fetch; не запускает timer; не отправляет Telegram delivery; kill switch",
+        message="предпросмотр не проверяет внешние страницы, не отправляет уведомления и не включает уведомления",
         actual={},
     )
     feedback = module._turn_result(
         {"expected": {"feedback_recorded": True}},
         index=1,
-        message="Поставил sidecar-паузу UTD-уведомлений на 24 часа.",
+        message="Приостановил UTD-уведомления на 24 часа.",
         actual={"feedback_recorded": True},
     )
     assert not preview.failure_codes
     assert not feedback.failure_codes
+
+
+def test_product_ux_has_a_positive_rendered_topic_brief_for_visual_review():
+    module = _module("prm_product_ux_eval_topic_brief")
+    corpus = module.build_corpus()
+    spec = next(
+        item
+        for item in module.build_case_index(corpus, include_one_turn_cases=True, dialogue_window_turns=4)
+        if item["case_id"] == "judge:one:prm:brief:positive_topic_edition"
+    )
+    result = module.simulate_judge_case(spec)
+    turn = result["turns"][0]
+    assert turn["deterministic_checks"]["mode_ok"] is True
+    assert turn["deterministic_checks"]["primary_intent_ok"] is True
+    assert "Applied AI seminar" in turn["assistant_visible_message"]
+    assert result["deterministic_summary"]["failed_turns"] == 0
 
 
 def test_product_ux_fake_judge_report_records_advisory_metrics(tmp_path):

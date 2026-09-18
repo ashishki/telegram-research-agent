@@ -60,7 +60,13 @@ def select_cases(*, cases_per_surface: int) -> list[dict[str, Any]]:
         ]
         # Prefer a multi-turn slice where it exists: visual judgement needs
         # context as well as one attractive isolated bubble.
-        matches.sort(key=lambda case: (case.get("case_type") != "dialogue_window", str(case.get("case_id") or "")))
+        matches.sort(
+            key=lambda case: (
+                not any(bool(turn.get("visual_priority")) for turn in case.get("turns") or [] if isinstance(turn, Mapping)),
+                case.get("case_type") != "dialogue_window",
+                str(case.get("case_id") or ""),
+            )
+        )
         chosen = 0
         for case in matches:
             case_id = str(case.get("case_id") or "")
