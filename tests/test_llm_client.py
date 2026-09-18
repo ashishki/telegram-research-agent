@@ -36,6 +36,7 @@ _install_stub(
 )
 
 import llm.client as client  # noqa: E402
+import llm.vision as vision  # noqa: E402
 from db.migrate import run_migrations  # noqa: E402
 from prm.capabilities import AuthorizationRequest, CapabilityGrant, CapabilityRegistry, ProviderPolicy  # noqa: E402
 
@@ -366,6 +367,14 @@ class TestLLMClient(unittest.TestCase):
                         )
 
         open_file.assert_not_called()
+
+    def test_analyze_photo_denies_unbound_bytes_before_tempfile_or_provider_egress(self):
+        with patch("tempfile.NamedTemporaryFile") as temp_file:
+            with patch("llm.client.LLMClient.complete_vision") as complete_vision:
+                assert vision.analyze_photo(b"private-image-bytes", "image/png") is None
+
+        temp_file.assert_not_called()
+        complete_vision.assert_not_called()
 
     def test_feedback_intake_strategist_model_route_and_override(self):
         with patch.dict(os.environ, {}, clear=True):

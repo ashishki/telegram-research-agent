@@ -1,12 +1,3 @@
-import base64
-import logging
-import os
-import tempfile
-
-from llm.client import LLMClient
-
-
-LOGGER = logging.getLogger(__name__)
 CATEGORY = "photo_analysis"
 
 SYSTEM_PROMPT = (
@@ -25,32 +16,13 @@ MAX_IMAGE_BYTES = 5 * 1024 * 1024  # 5 MB — Anthropic limit
 
 
 def analyze_photo(image_bytes: bytes, mime_type: str = "image/jpeg") -> str | None:
-    """Return a Russian description of the image, or None if not technically relevant."""
-    if not image_bytes or len(image_bytes) > MAX_IMAGE_BYTES:
-        return None
+    """Fail closed until PA-15 provides an ingress-verified image binding.
 
-    suffix = ".jpg"
-    if mime_type == "image/png":
-        suffix = ".png"
-    elif mime_type == "image/webp":
-        suffix = ".webp"
+    The prior path wrote arbitrary image bytes to ``delete=False`` storage and
+    passed a caller-selected path to the model adapter. PA-02 cannot prove that
+    a vision grant names those exact bytes, so it makes neither local nor
+    provider side effects. PA-15 owns verified attachment lifecycle work.
+    """
 
-    tmp_path = ""
-    try:
-        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp_file:
-            tmp_file.write(image_bytes)
-            tmp_path = tmp_file.name
-        text = LLMClient.complete_vision(
-            prompt=f"{SYSTEM_PROMPT}\n\n{USER_PROMPT}",
-            image_path=tmp_path,
-        ).strip()
-    except Exception:
-        LOGGER.warning("Vision API call failed", exc_info=True)
-        return None
-    finally:
-        if tmp_path and os.path.exists(tmp_path):
-            os.unlink(tmp_path)
-
-    if not text or text.upper().startswith(SKIP_MARKER):
-        return None
-    return text
+    del image_bytes, mime_type
+    return None

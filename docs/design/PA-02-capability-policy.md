@@ -34,7 +34,7 @@ reconciliation. This slice never represents either as complete.
 | Boundary | Required grant before a request | Additional non-authority switches |
 | --- | --- | --- |
 | Anthropic text client | exact owner/connection/resource plus `model.generate`, `provider_anthropic`, declared data class, one-use reservation | none; a configured API key is insufficient |
-| Direct local-path vision | denied before a file read or provider call; PA-15 must supply an immutable ingress-verified attachment binding before vision can egress | a configured API key or a `model.vision` reservation cannot bind arbitrary caller-selected bytes |
+| Direct local-path vision | denied before temporary storage, a file read or provider call; PA-15 must supply an immutable ingress-verified attachment binding before vision can egress | a configured API key or a `model.vision` reservation cannot bind arbitrary caller-selected bytes |
 | OpenAI text adapter | exact owner/connection/resource plus `model.generate`, `provider_openai`, `user_provided`, one-use reservation | existing adapter enable plus per-call switch still restrict execution but never authorize it |
 | OpenAI archive context | exact owner/connection/archive resource plus a distinct `model.context_egress`, `provider_openai`, `private_archive` reservation | existing context switch; absent/invalid context grant omits context rather than leaking it |
 | Telegram voice download | exact owner/connection/file resource plus two distinct `media.voice_download`, `read`, `provider_telegram`, `user_provided` reservations: one each for `getFile` and file download | none |
