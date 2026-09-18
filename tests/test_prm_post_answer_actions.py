@@ -2,6 +2,7 @@ import json
 import os
 import sqlite3
 import tempfile
+from datetime import datetime, timezone
 
 import pytest
 
@@ -15,8 +16,10 @@ from assistant.prm_post_answer_actions import (
     apply_validated_prm_action,
     build_post_answer_actions as _build_post_answer_actions,
     handle_post_answer_callback as _handle_post_answer_callback,
+    read_prm_rollback_drain,
     validate_prm_post_answer_callback,
 )
+from assistant.utd_profile import start_utd_profile_onboarding
 from db.migrate import run_migrations
 
 
@@ -208,6 +211,51 @@ def test_dynamic_post_answer_codes_require_issued_bound_transition(monkeypatch):
     assert chooser["status"] == "select_item"
     assert preview["status"] == "needs_confirmation"
     assert confirmed["write_performed"] is True
+
+
+def test_prm_rollback_drain_is_owner_restricted_and_never_mutates_utd_rows(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmp:
+        db_path = os.path.join(tmp, "memory.db")
+        monkeypatch.setenv("AGENT_DB_PATH", db_path)
+        run_migrations()
+        bound = _build_post_answer_actions(
+            _answer(), db_path=db_path, chat_id="42", actor_id="42", owner_chat_id="42"
+        )
+        utd = start_utd_profile_onboarding(db_path, chat_id="42", now=datetime.now(timezone.utc))
+        with sqlite3.connect(db_path) as connection:
+            before = connection.execute(
+                "SELECT context_id, summary_json, proposals_json, status FROM prm_post_answer_proposals ORDER BY context_id"
+            ).fetchall()
+
+        statements: list[str] = []
+        real_connect = sqlite3.connect
+
+        def traced_connect(*args, **kwargs):
+            connection = real_connect(*args, **kwargs)
+            connection.set_trace_callback(statements.append)
+            return connection
+
+        monkeypatch.setattr("assistant.prm_post_answer_actions.sqlite3.connect", traced_connect)
+        report = read_prm_rollback_drain(db_path, owner_chat_id="42", now=datetime.now(timezone.utc))
+        wrong_owner = read_prm_rollback_drain(db_path, owner_chat_id="43", now=datetime.now(timezone.utc))
+        with real_connect(db_path) as connection:
+            after = connection.execute(
+                "SELECT context_id, summary_json, proposals_json, status FROM prm_post_answer_proposals ORDER BY context_id"
+            ).fetchall()
+
+    assert bound["context_id"] and utd["context_id"]
+    assert report["status"] == "blocked"
+    assert report["blocker_count"] == 2
+    assert report["classifications"] == {
+        "prm_binding_v1": 1,
+        "legacy_prm_candidate": 0,
+        "utd_profile": 1,
+        "utd_subscription": 0,
+        "unknown": 0,
+    }
+    assert wrong_owner["status"] == "clear"
+    assert after == before
+    assert statements and all(statement.lstrip().upper().startswith("SELECT") for statement in statements)
 
 
 def build_post_answer_actions(answer, *, db_path, chat_id):

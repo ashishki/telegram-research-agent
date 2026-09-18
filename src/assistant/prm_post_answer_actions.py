@@ -14,6 +14,8 @@ from typing import Any, Mapping
 
 from assistant.pi_memory import build_memory_proposal, confirm_memory_proposal
 from assistant.prm_private_traces import update_private_interaction_feedback, write_private_interaction_receipt
+from assistant.utd_profile_store import _chat_hash as _utd_chat_hash
+from assistant.utd_profile_store import decode_utd_proposal_state
 from db.prm19_dogfood_receipts import record_feedback_transition, record_interaction_receipt
 
 PRM_ACTION_PREFIX = "prma"
@@ -802,6 +804,114 @@ def _private_owner_tuple(
     if None in values or len(set(values)) != 1:
         return None
     return values  # type: ignore[return-value]
+
+
+def read_prm_rollback_drain(
+    db_path: str | Path,
+    *,
+    owner_chat_id: object,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Return a count-only, read-only rollback block report for one owner.
+
+    This intentionally does not repair, expire, or remove any row.  An old
+    handler can be considered only after this report is ``clear``.
+    """
+
+    current = now or datetime.now(timezone.utc)
+    if current.tzinfo is None:
+        return _unavailable_drain(current)
+    current = current.astimezone(timezone.utc)
+    owner = canonical_private_owner_id(owner_chat_id)
+    path = Path(db_path)
+    if owner is None or not path.exists():
+        return _unavailable_drain(current)
+    classifications = {
+        "prm_binding_v1": 0,
+        "legacy_prm_candidate": 0,
+        "utd_profile": 0,
+        "utd_subscription": 0,
+        "unknown": 0,
+    }
+    try:
+        database_uri = f"{path.resolve().as_uri()}?mode=ro"
+        with sqlite3.connect(database_uri, uri=True) as connection:
+            table = connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'prm_post_answer_proposals'"
+            ).fetchone()
+            if table is None:
+                return _unavailable_drain(current)
+            hashes = tuple(dict.fromkeys((_chat_hash(owner), _utd_chat_hash(owner))))
+            placeholders = ", ".join("?" for _hash in hashes)
+            rows = connection.execute(
+                "SELECT context_id, chat_id_hash, summary_json, proposals_json, expires_at, status "
+                f"FROM prm_post_answer_proposals WHERE chat_id_hash IN ({placeholders})",
+                hashes,
+            ).fetchall()
+    except (OSError, sqlite3.Error):
+        return _unavailable_drain(current)
+    for row in rows:
+        if not _classify_rollback_row(row, current, classifications):
+            return _unavailable_drain(current)
+    blocker_count = sum(classifications.values())
+    return {
+        "status": "blocked" if blocker_count else "clear",
+        "now": _iso(current),
+        "blocker_count": blocker_count,
+        "classifications": classifications,
+    }
+
+
+def _classify_rollback_row(
+    row: object,
+    now: datetime,
+    classifications: dict[str, int],
+) -> bool:
+    if not isinstance(row, tuple) or len(row) != 6 or any(not isinstance(value, str) for value in row):
+        return False
+    context_id, _chat_id_hash, summary_json, proposals_json, expires_at_text, status = row
+    try:
+        summary = json.loads(summary_json)
+        proposals = json.loads(proposals_json)
+        expires_at = datetime.fromisoformat(expires_at_text.replace("Z", "+00:00"))
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return False
+    if not isinstance(summary, dict) or not isinstance(proposals, dict) or expires_at.tzinfo is None:
+        return False
+    expires_at = expires_at.astimezone(timezone.utc)
+    if summary.get("context_kind") == "prm":
+        if not _CONTEXT_ID.fullmatch(context_id) or not _valid_prm_binding(summary, context_id):
+            return False
+        if status not in {"ready", "pending", "confirmed", "cancelled"}:
+            return False
+        if _confirmation_lock_value(proposals) is not None or (status in {"ready", "pending"} and expires_at > now):
+            classifications["prm_binding_v1"] += 1
+        return True
+    kind = summary.get("kind")
+    if kind in {"utd_profile_draft", "utd_subscription_lifecycle"}:
+        decoded = decode_utd_proposal_state(summary_json, status)
+        if decoded is None:
+            return False
+        _decoded_summary, state = decoded
+        if state == "confirming" or (state in {"draft", "previewed"} and expires_at > now):
+            classifications["utd_profile" if kind == "utd_profile_draft" else "utd_subscription"] += 1
+        return True
+    if "primary_intent" in summary or "allowed_actions" in summary:
+        if status not in {"ready", "pending", "confirmed", "cancelled"}:
+            return False
+        if status in {"ready", "pending"} and expires_at > now:
+            classifications["legacy_prm_candidate"] += 1
+        return True
+    return False
+
+
+def _unavailable_drain(now: datetime) -> dict[str, Any]:
+    return {
+        "status": "unavailable",
+        "now": _iso(now.astimezone(timezone.utc)),
+        "blocker_count": None,
+        "classifications": {},
+    }
 
 
 def _unavailable_action() -> dict[str, Any]:
