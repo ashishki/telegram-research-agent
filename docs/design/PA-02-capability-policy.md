@@ -67,16 +67,17 @@ decision. They fail closed before that dispatch until an owning slice gives the
 legacy operations a bounded capability/receipt contract. Similarly, PA `/utd`
 must consume an exact `assistant.utd_draft` / `write` / `provider_local` /
 `user_provided` / `utd.draft` decision bound to the authenticated private owner
-and chat before it creates an onboarding draft. The same active private ingress
-may supply one in-memory, two-minute local-draft decision for that one turn;
-it creates neither a durable capability record nor provider/account consent,
-and cannot authorize a delivery, read, provider egress, background action or
-another chat. The private `/privacy` renderer uses the return envelope only to
-display the empty durable-grant registry; it does not create a durable grant or
-mistake the envelope for account/provider consent. Without a matching current
-delivery decision its actual Telegram send is suppressed. These are
-default-deny boundaries, not claims that the deferred operations or a live
-permission UI have been enabled.
+and chat before it creates an onboarding draft. PA-02 supplies no runtime
+source for that decision, so UTD onboarding fails closed before a local write.
+Its `utdp:`, `utdc:`, `utds:` and `utdw:` callbacks likewise fail closed before
+their legacy mutation facade; a later owning slice must design and check an
+exact callback-specific authority immediately before each write. The private
+`/privacy` renderer uses the return envelope only to display the empty
+durable-grant registry; it does not create a durable grant or mistake the
+envelope for account/provider consent. Without a matching current delivery
+decision its actual Telegram send is suppressed. These are default-deny
+boundaries, not claims that the deferred operations or a live permission UI
+have been enabled.
 
 The public scope formatter lists capability, resources, operations, data
 classes and permitted providers and explicitly says that a provider key is not

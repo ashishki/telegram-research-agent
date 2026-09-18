@@ -10,7 +10,6 @@ import signal
 from typing import Any
 from urllib import parse, request
 
-from assistant.utd_profile import is_utd_profile_intent
 from config.settings import Settings
 from assistant.prm_post_answer_actions import UnavailablePrmAction
 from .callbacks import (
@@ -22,7 +21,6 @@ from .callbacks import (
 from .prm_handlers import (
     dispatch_prm_command,
     issue_private_reply_authorizations,
-    issue_private_utd_draft_authorization,
     send_message,
 )
 from prm.capabilities import AuthorizationDecision
@@ -186,21 +184,6 @@ def _voice_failed_message(runtime_mode: str) -> str:
     return "Не смог распознать голосовое. Отправь сообщение текстом."
 
 
-def _prm_command_requests_utd_draft(command_text: str) -> bool:
-    """Keep the local-draft decision as narrow as the incoming command."""
-
-    clean = str(command_text or "").strip()
-    if not clean.startswith("/"):
-        return False
-    parts = clean.split(maxsplit=1)
-    command = parts[0].split("@", 1)[0].casefold()
-    args = parts[1].strip() if len(parts) > 1 else ""
-    return command == "/utd" or (
-        command in {"/auto", "/auto_voice", "/research", "/brief", "/chat"}
-        and is_utd_profile_intent(args)
-    )
-
-
 def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_LEGACY) -> None:
     runtime_mode = normalize_bot_runtime_mode(runtime_mode)
     token, owner_chat_id = _load_bot_env()
@@ -264,19 +247,6 @@ def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_LEGACY) -> No
                 if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT
                 else ()
             )
-
-            def utd_draft_authorization_for(command_text: str) -> AuthorizationDecision | None:
-                if (
-                    runtime_mode != BOT_RUNTIME_PRM_ASSISTANT
-                    or not _prm_command_requests_utd_draft(command_text)
-                ):
-                    return None
-                return issue_private_utd_draft_authorization(
-                    chat_id=chat_id,
-                    actor_id=actor_id,
-                    owner_chat_id=owner_chat_id,
-                )
-
             text = str(message.get("text") or "").strip()
             if text:
                 command = (
@@ -293,7 +263,6 @@ def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_LEGACY) -> No
                         actor_id=actor_id,
                         owner_chat_id=owner_chat_id,
                         delivery_authorizations=delivery_authorizations,
-                        utd_draft_authorization=utd_draft_authorization_for(command),
                     )
                 else:
                     dispatch_command(chat_id=chat_id, text=command, settings=settings)
@@ -311,7 +280,6 @@ def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_LEGACY) -> No
                         actor_id=actor_id,
                         owner_chat_id=owner_chat_id,
                         delivery_authorizations=delivery_authorizations,
-                        utd_draft_authorization=utd_draft_authorization_for(command),
                     )
                 else:
                     dispatch_command(chat_id=chat_id, text=command, settings=settings)
@@ -363,7 +331,6 @@ def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_LEGACY) -> No
                     actor_id=actor_id,
                     owner_chat_id=owner_chat_id,
                     delivery_authorizations=delivery_authorizations[1:],
-                    utd_draft_authorization=utd_draft_authorization_for(command),
                 )
             else:
                 dispatch_command(chat_id=chat_id, text=command, settings=settings)
@@ -436,6 +403,15 @@ def _handle_callback(
     if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT and callback_chat_id != owner_chat_id:
         if callback_id:
             _telegram_answer_callback(token, callback_id, "PRM доступен только в личном чате владельца")
+        return
+    if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT and data.startswith(
+        ("utdp:", "utdc:", "utdw:", "utds:")
+    ):
+        # UTD callback namespaces mutate durable draft/profile/watch state.
+        # PA-02 deliberately has no callback-specific local-write authority,
+        # so do not hand the action to their legacy mutation facade.
+        if callback_id:
+            _telegram_answer_callback(token, callback_id, "Action unavailable")
         return
     english_feedback = data.startswith("utdw:") and data.endswith(":en")
     answer = "Готово"

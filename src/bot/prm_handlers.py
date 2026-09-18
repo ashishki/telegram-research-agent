@@ -479,46 +479,6 @@ def issue_private_reply_authorizations(
     return tuple(registry.authorize_and_reserve(request, now=now) for _ in range(maximum_send_count))
 
 
-def issue_private_utd_draft_authorization(
-    *,
-    chat_id: str,
-    actor_id: str | None,
-    owner_chat_id: str | None,
-) -> AuthorizationDecision | None:
-    """Mint the one local draft write permitted by an authenticated `/utd` turn."""
-
-    owner_ref = _private_delivery_owner_ref(chat_id, actor_id, owner_chat_id)
-    if owner_ref is None:
-        return None
-    now = datetime.now(timezone.utc)
-    grant = CapabilityGrant(
-        grant_id=f"grant_ephemeral_utd_{uuid.uuid4().hex}",
-        owner_ref=owner_ref,
-        connection_ref=None,
-        capability=UTD_DRAFT_CAPABILITY,
-        resource_refs=(chat_id,),
-        operations=("write",),
-        data_classes=("user_provided",),
-        purpose="utd.draft",
-        provider_policy=ProviderPolicy((LOCAL_PROVIDER_REF,)),
-        issued_at=now,
-        expires_at=now + timedelta(minutes=2),
-        revision=1,
-    )
-    request = AuthorizationRequest(
-        owner_ref=owner_ref,
-        connection_ref=None,
-        capability=UTD_DRAFT_CAPABILITY,
-        resource_ref=chat_id,
-        operation="write",
-        data_class="user_provided",
-        provider_ref=LOCAL_PROVIDER_REF,
-        purpose="utd.draft",
-        expected_grant_revision=1,
-    )
-    return CapabilityRegistry((grant,)).authorize_and_reserve(request, now=now)
-
-
 def _first_delivery_authorization(
     authorizations: Sequence[AuthorizationDecision],
 ) -> AuthorizationDecision | None:

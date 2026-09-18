@@ -104,7 +104,7 @@ def _delivery_decision(
     )
 
 
-def _utd_draft_decision():
+def _utd_draft_decision_with_registry():
     grant = make_grant(
         grant_id="grant_synthetic_utd_draft",
         owner_ref="owner_telegram_42",
@@ -124,7 +124,12 @@ def _utd_draft_decision():
         provider_ref="provider_local",
         purpose="utd.draft",
     )
-    return CapabilityRegistry((grant,)).authorize_and_reserve(request, now=NOW)
+    registry = CapabilityRegistry((grant,))
+    return registry, grant, registry.authorize_and_reserve(request, now=NOW)
+
+
+def _utd_draft_decision():
+    return _utd_draft_decision_with_registry()[2]
 
 
 def test_configured_provider_switch_without_grant_makes_no_text_egress(monkeypatch):
@@ -339,6 +344,39 @@ def test_utd_draft_requires_local_write_reservation_before_onboarding(monkeypatc
     assert started == ["42:Настроить мой UTD-профиль"]
 
 
+@pytest.mark.parametrize("change", ["revoke", "expire", "revision", "wrong_owner"])
+def test_utd_draft_rechecks_current_authorization_before_any_local_write(
+    monkeypatch,
+    tmp_path,
+    change,
+):
+    started: list[str] = []
+    registry, grant, decision = _utd_draft_decision_with_registry()
+    if change == "revoke":
+        registry.revoke_grant(grant.grant_id)
+    elif change == "expire":
+        registry.expire_grant(grant.grant_id)
+    elif change == "revision":
+        registry.replace_grant(replace(grant, revision=grant.revision + 1))
+    monkeypatch.setattr(
+        prm_handlers,
+        "start_utd_profile_onboarding",
+        lambda *_args, **_kwargs: started.append("must-not-write"),
+    )
+    chat_id = "43" if change == "wrong_owner" else "42"
+
+    prm_handlers.dispatch_prm_command(
+        chat_id,
+        "/utd Настроить мой UTD-профиль",
+        SimpleNamespace(db_path=str(tmp_path / "synthetic.db")),
+        actor_id=chat_id,
+        owner_chat_id=chat_id,
+        utd_draft_authorization=decision,
+    )
+
+    assert started == []
+
+
 def test_pa_safe_ops_deny_before_ungated_legacy_handler_dispatch(monkeypatch, tmp_path):
     legacy_call = []
     monkeypatch.setattr(legacy_handlers, "handle_status", lambda *_args: legacy_call.append("status"))
@@ -405,11 +443,6 @@ def test_private_return_envelope_is_exactly_bound_and_not_issued_for_another_act
         actor_id="43",
         owner_chat_id="42",
     ) == ()
-    assert prm_handlers.issue_private_utd_draft_authorization(
-        chat_id="42",
-        actor_id="43",
-        owner_chat_id="42",
-    ) is None
 
 
 def test_prm_private_text_ingress_renders_default_deny_privacy_without_a_durable_grant(
@@ -440,11 +473,11 @@ def test_prm_private_text_ingress_renders_default_deny_privacy_without_a_durable
     assert "нет активных разрешений" in sent[0]
 
 
-def test_prm_private_utd_command_gets_the_one_local_draft_decision_only_when_requested(
+def test_prm_private_utd_command_denies_without_a_runtime_local_write_authorization(
     monkeypatch,
     tmp_path,
 ):
-    dispatched: list[dict] = []
+    started: list[str] = []
     update = {
         "update_id": 21,
         "message": {"chat": {"id": 42}, "from": {"id": 42}, "text": "/utd Мой профиль"},
@@ -453,19 +486,59 @@ def test_prm_private_utd_command_gets_the_one_local_draft_decision_only_when_req
     monkeypatch.setenv("TELEGRAM_OWNER_CHAT_ID", "42")
     monkeypatch.setattr(bot_runtime, "_install_signal_handlers", lambda state: setattr(state, "stop_requested", True))
     monkeypatch.setattr(bot_runtime, "_telegram_get_updates", lambda **_kwargs: [update])
-    monkeypatch.setattr(bot_runtime, "dispatch_command", lambda **kwargs: dispatched.append(kwargs))
+    monkeypatch.setattr(
+        prm_handlers,
+        "start_utd_profile_onboarding",
+        lambda _db_path, *, chat_id, seed_text: started.append(f"{chat_id}:{seed_text}"),
+    )
 
     bot_runtime.run_bot(
         SimpleNamespace(db_path=str(tmp_path / "synthetic.db")),
         runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT,
     )
 
-    assert len(dispatched) == 1
-    authorization = dispatched[0]["utd_draft_authorization"]
-    assert authorization is not None and authorization.allowed
-    assert authorization.capability == "assistant.utd_draft"
-    assert authorization.operation == "write"
-    assert authorization.purpose == "utd.draft"
+    assert started == []
+
+
+@pytest.mark.parametrize("callback_data", [
+    "utdp:synthetic:preview",
+    "utdc:synthetic:confirm",
+    "utds:cancel:confirm",
+    "utdw:synthetic:useful",
+])
+def test_prm_runtime_denies_all_utd_callback_mutations_before_the_legacy_facade(
+    monkeypatch,
+    tmp_path,
+    callback_data,
+):
+    mutations: list[str] = []
+    acknowledgements: list[str] = []
+    monkeypatch.setattr(
+        bot_runtime,
+        "handle_prm_post_answer_callback",
+        lambda _settings, data, **_kwargs: mutations.append(data),
+    )
+    monkeypatch.setattr(
+        bot_runtime,
+        "_telegram_answer_callback",
+        lambda _token, _callback_id, text: acknowledgements.append(text),
+    )
+
+    bot_runtime._handle_callback(
+        {
+            "id": "callback-utd",
+            "from": {"id": 42},
+            "message": {"chat": {"id": 42}},
+            "data": callback_data,
+        },
+        token=SYNTHETIC_TELEGRAM_TOKEN,
+        owner_chat_id="42",
+        settings=SimpleNamespace(db_path=str(tmp_path / "synthetic.db")),
+        runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT,
+    )
+
+    assert mutations == []
+    assert acknowledgements == ["Action unavailable"]
 
 
 def test_prm_callback_followup_uses_the_same_private_return_envelope(monkeypatch, tmp_path):
