@@ -6,28 +6,23 @@ approval has not been recorded. Never manufacture that approval.
 
 ## Product outcome
 
-One natural conversation unifies Chat, archive/web AI Search, attractive weekly
-and topical Briefs, controlled Watch and confirmed Act. The full requirements
-are `docs/PERSONAL_ASSISTANT_SPEC.md`; this compact map is not a replacement
-for them. Do not stop after the first useful slice or declare an MVP the target.
+One conversation unifies Chat, archive/web AI Search, Briefs, Watch and
+confirmed Act. `docs/PERSONAL_ASSISTANT_SPEC.md` remains authoritative; this is
+not an MVP plan.
 
 ## Current system and reuse
 
 `src/prm/` remains the application seam; `src/bot/` is transport/presentation.
-Reuse SQLite archive identity, evidence/citation contracts, saved-action
-confirmation and tested external-watch delivery behavior. Existing archive
-research must continue to work. Current free chat/synthesis gates and heuristic
-short-lived dialogue need intentional redesign, not accidental flag changes.
-The baseline CI failure is identified in the current handoff; diagnose first.
+Reuse SQLite archive identity, evidence/citation, saved-action confirmation and
+tested external-watch delivery. Preserve archive research; redesign current
+chat/synthesis gates and heuristic dialogue intentionally. Diagnose the
+handoff's baseline CI failure first.
 
 ## Shape and responsibilities
 
-Use a modular monolith with bounded capability adapters and a durable worker
-for long/repeated work. No second bot, duplicated source-of-truth database or
-unjustified microservice/vector-platform migration. New logical modules under
-`src/prm/` may cover conversation, policy/capabilities, research, briefs,
-connectors, actions, jobs and academic rules. Do not create empty frameworks
-in advance of working vertical slices.
+Use a modular monolith, bounded adapters and a durable long-work worker: no
+second bot, duplicate source database or unjustified platform migration.
+`src/prm/` modules follow working slices, never empty frameworks.
 
 Request flow:
 message -> ConversationState -> task understanding -> bounded plan -> permission
@@ -38,23 +33,21 @@ chooses among explicitly available tools; it never grants its own authority.
 
 ## Interfaces and invariants
 
-- ConversationState: topic, object refs, versioned drafts/results, memory refs,
-  pending proposal and jobs. A compressed summary is not write authority.
+- ConversationState: topic, refs, versioned drafts/results, memory, proposal
+  and jobs. A compressed summary is not write authority.
 - CapabilityGrant: owner/account/resource/operation/data/provider, expiry and
   revision. Mail read is not mail write; voice is not an egress exception.
-- ToolResult/EvidenceItem: status, sources/versions, timestamps, coverage and
-  bounded evidence; distinguish absent, inaccessible, stale and partial.
+- ToolResult/EvidenceItem: status, sources/versions, time, coverage and bounded
+  evidence; distinguish absent, inaccessible, stale and partial.
 - ResearchResult: useful answer, claim-evidence mapping, gaps and next steps.
-- BriefDocument: immutable report version, period/timezone, sections, selection
-  reasons, evidence and coverage. Telegram/HTML/PDF/Markdown use this SAME
-  object. Reformatting does not silently regenerate or update facts.
+- BriefDocument: immutable version, period/timezone, sections, reasons,
+  evidence and coverage. All renderers use it; reformatting never updates facts.
 - AcademicActionCandidate: obligation/opportunity, source, deadline precision,
   importance/applicability/confidence, lifecycle. Local done != Canvas submit.
-- ActionProposal/Confirmation/ActionReceipt: exact arguments/versions, source
-  result/version and optional project reference, one-use approval bound to
-  owner/conversation/content, actual provider result and reconciliation.
+- ActionProposal/Confirmation/Receipt: exact arguments/versions, source,
+  one-use owner/conversation/content binding, provider result and reconciliation.
 - WatchSubscription/Job: grant revision, schedule, quiet hours, cap, lifecycle,
-  checkpoints, lease and bounded retries. Unknown send != failed send.
+  checkpoints, lease and retries. Unknown send != failed send.
 
 All schemas versioned, account identity preserved even for one operator,
 cache/index derived and revocable. No unbounded raw-corpus or mail export.
@@ -139,6 +132,16 @@ and that every other cell renders no control or returns unavailable.
 The registration and callback interfaces therefore carry all three fields:
 `build_post_answer_actions(..., chat_id, actor_id, owner_chat_id)` and
 `handle_prm_post_answer_callback(..., chat_id, actor_id, owner_chat_id)`.
+The tuple-bearing transport signatures are
+`bot.bot.dispatch_command(..., actor_id=None, owner_chat_id=None)`,
+`bot.handlers.dispatch_command(..., actor_id=None, owner_chat_id=None)`,
+`bot.prm_handlers.dispatch_prm_command(..., actor_id=None, owner_chat_id=None)`,
+and `_post_answer_action_bundle(..., actor_id=None, owner_chat_id=None)`.
+`run_bot` alone extracts the Telegram sender plus configured owner and passes
+them unchanged; omitted tuple defaults mean answer-without-controls. The
+callback facade is `handle_prm_post_answer_callback(..., chat_id, actor_id=None,
+owner_chat_id=None)`: this rule applies only to `prma`/`prmc`; `utdp`/`utdc`/
+`utdw`/`utds` keep their existing separate contracts.
 The callback handler compares both persisted hashes with the incoming tuple; a
 group, absent identity or mismatch returns unavailable and performs no write.
 This limitation must remain explicit until a separately designed multi-actor
@@ -164,6 +167,14 @@ the row and memory/receipt counts before each rejected case and trace the outer
 callback handler (not merely a helper) to prove this. A malformed callback
 parse or malformed row JSON is caught at that boundary and returns that same
 unavailable result rather than raising.
+
+Transport first calls the pure PRM validation result and only then acknowledges
+Telegram. An invalid PRM callback gets the generic acknowledgement “Action
+unavailable” and no follow-up `send_message`; this acknowledgement is the sole
+network effect and is not a durable write. A valid callback may then receive an
+acknowledgement and execute its validated mutation/rendering. UTD callbacks keep
+their established acknowledgement behavior. Transport tests prove this ordering
+and the absence of database/memory/receipt writes on invalid PRM input.
 
 Legacy natural-language save/watch selection must not call
 `handle_post_answer_callback` in PA-00 and must not synthesize an actor ID; it
@@ -198,7 +209,10 @@ their clean-schema incompatibility without a migration: `utd_state` in their
 `summary_json` is authoritative, while table status maps `draft -> ready`,
 `previewed|confirming -> pending`, `confirmed -> confirmed`, and
 `cancelled|expired -> cancelled`. Every UTD read/write/claim derives or updates
-that pair atomically; untagged legacy pending rows fail closed. This permits a
+that pair atomically through `encode_utd_proposal_state` and
+`decode_utd_proposal_state`; untagged legacy pending rows fail closed. Required
+callers are onboarding, `_load_draft`/`_save_draft`/discard, profile
+preview-confirm-cancel, and subscription start/claim/finish/cancel. This permits a
 real UTD-path drain fixture under the canonical schema. The shared rollback
 drain blocks old UTD code until such active mapped rows are gone.
 
@@ -253,28 +267,21 @@ it does not claim that natural-language confirmation is already shipped.
 
 ## UX and briefs
 
-Natural language preserves selected objects and topic changes. Briefs explain
-relevance and actions, not link volume or invented read counts. Telegram is
-1–2 screens; private HTML/PDF/Markdown remain source-identical, accessible and
-visually inspected (including Cyrillic/page breaks) before acceptance.
+Natural language preserves context; brief outputs remain source-identical and
+visually inspected before acceptance.
 
 ## Academic integration
 
-Implement the original handoff on common connectors/grants; public-watch
-consent never authorizes mail/Canvas. Unsupported access stays an explicit
-blocker. Preserve date/eligibility uncertainty and local-versus-source state.
+Public-watch never authorizes mail/Canvas; unsupported access and uncertainty
+stay explicit.
 
 ## Failure and recovery
 
-Test grant revocation, expiry, duplicates, timeout/429, injection, stale data,
-restart/DST and restore. Failed delivery is never success; partial coverage is
-explicit; finalized writes are not undone by forgetting a conversation.
+Test grants, failures and recovery; failed delivery is never success.
 
 ## Migration and rollback
 
-Changes are additive and default off. Rehearse migration/restore on copies;
-production needs separate approval. Old timers stay off and archive fallback
-survives outages.
+Changes default off; production migration/restore needs separate approval.
 
 ## Vertical slices and acceptance
 

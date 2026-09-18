@@ -77,6 +77,13 @@ canonical lowercase 10-hex value. UTD clean-schema compatibility is PA-00 work:
 logical `utd_state` maps draft/previewed/confirming/confirmed/cancelled-or-expired
 to ready/pending/pending/confirmed/cancelled without a migration; untagged
 legacy pending rows fail closed.
+The exact tuple-bearing boundaries are bot/compatibility/PRM dispatch,
+post-answer bundle and PRM callback facade; only `run_bot` supplies sender plus
+configured owner. This applies to `prma`/`prmc`, not UTD prefixes. PRM invalid
+callback validation precedes its generic Telegram acknowledgement and produces
+no follow-up message or durable write. `encode_utd_proposal_state` and
+`decode_utd_proposal_state` are mandatory for every UTD profile/subscription
+state transition.
 Legacy PRM markup receives no authenticated actor/owner tuple and must render
 no control. Initial offered action codes alone are valid; dynamic `c`, `n1`–`n5`,
 feedback-reason and confirmation codes require their exact issued, persisted
