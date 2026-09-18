@@ -146,6 +146,7 @@ def test_budget_reservation_is_conservative_and_single_use_at_egress():
         owner_ref="owner_synthetic_primary",
         connection_ref=None,
         resource_ref="resource_conversation",
+        purpose="answer.request",
     )
     with pytest.raises(CapabilityDenied):
         require_authorized_egress(
@@ -156,6 +157,7 @@ def test_budget_reservation_is_conservative_and_single_use_at_egress():
             owner_ref="owner_synthetic_primary",
             connection_ref=None,
             resource_ref="resource_conversation",
+            purpose="answer.request",
         )
 
 
@@ -181,6 +183,7 @@ def test_reserved_decision_rechecks_current_grant_state_before_consumption(chang
             owner_ref="owner_synthetic_primary",
             connection_ref=None,
             resource_ref="resource_conversation",
+            purpose="answer.request",
         )
 
 

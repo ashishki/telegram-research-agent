@@ -16,7 +16,13 @@ class _FakeClient:
     def __init__(self): self.responses = _FakeResponses()
 
 
-def _authorization(*, capability="model.generate", resource_ref="resource_conversation", data_class="user_provided"):
+def _authorization(
+    *,
+    capability="model.generate",
+    resource_ref="resource_conversation",
+    data_class="user_provided",
+    purpose="answer.request",
+):
     now = datetime.now(timezone.utc).replace(microsecond=0)
     grant = CapabilityGrant(
         grant_id=f"grant_synthetic_{capability.replace('.', '_')}",
@@ -26,7 +32,7 @@ def _authorization(*, capability="model.generate", resource_ref="resource_conver
         resource_refs=(resource_ref,),
         operations=("model_egress",),
         data_classes=(data_class,),
-        purpose="answer.request",
+        purpose=purpose,
         provider_policy=ProviderPolicy(("provider_openai",)),
         issued_at=now - timedelta(minutes=1),
         expires_at=now + timedelta(hours=1),
@@ -39,7 +45,7 @@ def _authorization(*, capability="model.generate", resource_ref="resource_conver
         operation="model_egress",
         data_class=data_class,
         provider_ref="provider_openai",
-        purpose="answer.request",
+        purpose=purpose,
         expected_grant_revision=1,
     )
     return CapabilityRegistry((grant,)).authorize_and_reserve(request, now=now)
@@ -86,6 +92,7 @@ def test_context_egress_requires_second_explicit_gate(monkeypatch) -> None:
             capability="model.context_egress",
             resource_ref="resource_archive",
             data_class="private_archive",
+            purpose="answer.context",
         ),
         local_context=[{"title":"approved","summary":"approved context"}],
         client=client2,
@@ -96,3 +103,33 @@ def test_context_egress_requires_second_explicit_gate(monkeypatch) -> None:
     )
     assert "approved context" in repr(client2.responses.calls[0]["input"])
     assert result2.receipt.context_egress_performed is True
+
+
+def test_context_transport_rejects_a_reservation_for_the_query_purpose(monkeypatch) -> None:
+    monkeypatch.setenv(PROVIDER_ENABLE_ENV, "true")
+    monkeypatch.setenv(CONTEXT_EGRESS_ENABLE_ENV, "true")
+    client = _FakeClient()
+
+    result = complete_with_provider(
+        "Question",
+        provider="openai",
+        allow_provider_egress=True,
+        allow_context_egress=True,
+        authorization=_authorization(),
+        context_authorization=_authorization(
+            capability="model.context_egress",
+            resource_ref="resource_archive",
+            data_class="private_archive",
+            purpose="answer.request",
+        ),
+        local_context=[{"title": "private", "text": "must-not-egress"}],
+        client=client,
+        owner_ref="owner_synthetic_primary",
+        connection_ref=None,
+        resource_ref="resource_conversation",
+        context_resource_ref="resource_archive",
+    )
+
+    assert result.receipt.context_egress_performed is False
+    assert len(client.responses.calls) == 1
+    assert "must-not-egress" not in repr(client.responses.calls[0]["input"])

@@ -16,6 +16,7 @@ from prm.capabilities import (
     CapabilityDenied,
     is_authorized_egress,
     require_authorized_egress,
+    transport_purpose,
 )
 
 LOCAL_PROVIDER = "local"
@@ -140,6 +141,11 @@ def complete_with_provider(
             owner_ref=owner_ref or "",
             connection_ref=connection_ref,
             resource_ref=resource_ref or "",
+            purpose=transport_purpose(
+                provider_ref=OPENAI_PROVIDER_REF,
+                capability=TEXT_CAPABILITY,
+                operation="model_egress",
+            ),
         )
         if include_context:
             require_authorized_egress(
@@ -150,6 +156,11 @@ def complete_with_provider(
                 owner_ref=owner_ref or "",
                 connection_ref=connection_ref,
                 resource_ref=context_resource_ref or "",
+                purpose=transport_purpose(
+                    provider_ref=OPENAI_PROVIDER_REF,
+                    capability=CONTEXT_CAPABILITY,
+                    operation="model_egress",
+                ),
             )
         response = active_client.responses.create(model=model, input=request_input)
     except CapabilityDenied:
@@ -239,6 +250,11 @@ def _has_matching_authorization(
             owner_ref=owner_ref,
             connection_ref=connection_ref,
             resource_ref=resource_ref,
+            purpose=transport_purpose(
+                provider_ref=OPENAI_PROVIDER_REF,
+                capability=capability,
+                operation="model_egress",
+            ),
         )
     )
 

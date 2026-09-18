@@ -25,6 +25,15 @@ adapter error or unknown outcome. Automatic client and SDK retries are disabled
 for this boundary: PA-13 must reconcile that outcome before a caller can obtain
 another valid budgeted decision.
 
+The final adapter check obtains its expected purpose from the closed
+`TRANSPORT_PURPOSES` table, not from a category or caller argument:
+Anthropic/OpenAI query egress is `answer.request`; OpenAI private archive
+context is `answer.context`; and both authorized Telegram voice reads and the
+matching OpenAI transcription are `voice.transcription`. An unknown
+provider/capability/operation tuple has no mapping and fails closed. This means
+a syntactically valid reservation for one purpose cannot be repurposed by an
+adapter transport for another purpose.
+
 The only implemented budget is the grant's bounded request count. PA-16 owns
 measured monetary/model routing budgets, and PA-13 owns durable external action
 reconciliation. This slice never represents either as complete.
@@ -40,6 +49,14 @@ reconciliation. This slice never represents either as complete.
 | Telegram voice download | exact owner/connection/file resource plus two distinct `media.voice_download`, `read`, `provider_telegram`, `user_provided` reservations: one each for `getFile` and file download | none |
 | OpenAI transcription | `media.transcribe`, `model_egress`, `provider_openai`, `user_provided` reservation, exactly bound to the Telegram attachment ID returned by the two authorized Telegram reads | the raw voice bytes remain in the request memory only; no PA-02 local media file is created |
 
+PA-02 applies this boundary only to the explicit transports in the table:
+Anthropic text, OpenAI text/context, Telegram voice `getFile`/file download,
+and OpenAI transcription. Existing Telegram update/delivery behavior and other
+pre-existing non-LLM HTTP paths are ambient platform behavior, not evidence
+that PA-02 has granted or enforced every external side effect. Their exact
+inventory and enforcement remain for the bounded slices that own those paths;
+they must not inherit PA-02 completion claims.
+
 The public scope formatter lists capability, resources, operations, data
 classes and permitted providers and explicitly says that a provider key is not
 consent. It deliberately does not expose credential values or raw source data.
@@ -52,7 +69,7 @@ screen has been delivered.
 The PA-02 tests prove no-consent/key-only denial before fake client/network use;
 scope/provider/revision/revoke/expiry/fallback failure; current-state
 revalidation after reservation; cross-owner/connection/resource substitution
-denial; one-use budget accounting; no automatic retry after unknown provider
+and cross-purpose transport substitution denial; one-use budget accounting; no automatic retry after unknown provider
 outcome; archive-context separation; direct local-path vision denial before a
 read/provider call; and all three real voice transport layers (`getFile`, file
 download, transcription) with separate matching synthetic reservations. Voice

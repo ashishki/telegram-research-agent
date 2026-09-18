@@ -39,6 +39,18 @@ _GRANT_REF = re.compile(r"^grant_[a-z0-9_-]{3,120}$")
 _OWNER_REF = re.compile(r"^owner_[a-z0-9_-]{3,120}$")
 _CONNECTION_REF = re.compile(r"^connection_[a-z0-9_-]{3,120}$")
 
+# Each PA-02 transport has one exact, adapter-selected purpose. The mapping is
+# keyed by the actual provider/capability/operation tuple rather than a
+# caller-controlled category, so a reservation for a different purpose cannot
+# be consumed when that transport is attempted.
+TRANSPORT_PURPOSES: dict[tuple[str, str, str], str] = {
+    ("provider_anthropic", "model.generate", "model_egress"): "answer.request",
+    ("provider_openai", "model.generate", "model_egress"): "answer.request",
+    ("provider_openai", "model.context_egress", "model_egress"): "answer.context",
+    ("provider_telegram", "media.voice_download", "read"): "voice.transcription",
+    ("provider_openai", "media.transcribe", "model_egress"): "voice.transcription",
+}
+
 
 class CapabilityDenied(RuntimeError):
     """Raised only by an adapter after a policy decision has denied egress."""
@@ -570,6 +582,7 @@ def is_authorized_egress(
     owner_ref: str,
     connection_ref: str | None,
     resource_ref: str,
+    purpose: str,
 ) -> bool:
     """Check a prior decision immediately before an external request."""
 
@@ -582,6 +595,7 @@ def is_authorized_egress(
         owner_ref=owner_ref,
         connection_ref=connection_ref,
         resource_ref=resource_ref,
+        purpose=purpose,
     )
 
 
@@ -595,6 +609,7 @@ def is_authorized_operation(
     owner_ref: str,
     connection_ref: str | None,
     resource_ref: str,
+    purpose: str,
 ) -> bool:
     """Check an authorization immediately before an adapter operation."""
 
@@ -608,6 +623,7 @@ def is_authorized_operation(
         and decision.operation == operation
         and decision.provider_ref == provider_ref
         and decision.data_class == data_class
+        and decision.purpose == purpose
         and decision.reservation is not None
         and decision.reservation.current
     )
@@ -622,6 +638,7 @@ def require_authorized_egress(
     owner_ref: str,
     connection_ref: str | None,
     resource_ref: str,
+    purpose: str,
 ) -> None:
     if not is_authorized_egress(
         decision,
@@ -631,6 +648,7 @@ def require_authorized_egress(
         owner_ref=owner_ref,
         connection_ref=connection_ref,
         resource_ref=resource_ref,
+        purpose=purpose,
     ):
         raise CapabilityDenied("An active capability grant is required before provider egress")
     assert decision is not None and decision.reservation is not None
@@ -648,6 +666,7 @@ def require_authorized_operation(
     owner_ref: str,
     connection_ref: str | None,
     resource_ref: str,
+    purpose: str,
 ) -> None:
     if not is_authorized_operation(
         decision,
@@ -658,6 +677,7 @@ def require_authorized_operation(
         owner_ref=owner_ref,
         connection_ref=connection_ref,
         resource_ref=resource_ref,
+        purpose=purpose,
     ):
         raise CapabilityDenied("An active capability grant is required before provider operation")
     assert decision is not None and decision.reservation is not None
@@ -680,6 +700,19 @@ def describe_grant_scope(grant: CapabilityGrant) -> str:
         f"Permitted providers: {providers}\n"
         "Ключ провайдера сам по себе не является согласием."
     )
+
+
+def transport_purpose(*, provider_ref: str, capability: str, operation: str) -> str:
+    """Return the PA-02 purpose bound to an implemented adapter transport.
+
+    Unknown transports fail closed: a grant document alone never creates an
+    adapter-side purpose mapping.
+    """
+
+    try:
+        return TRANSPORT_PURPOSES[(provider_ref, capability, operation)]
+    except KeyError as exc:
+        raise CapabilityDenied("No purpose mapping exists for this provider operation") from exc
 
 
 def describe_current_capability_scope(

@@ -31,7 +31,14 @@ class _FakeResponse:
         return json.dumps(self.payload).encode("utf-8")
 
 
-def _authorization(*, capability: str, operation: str, provider_ref: str, resource_ref: str = "resource_voice"):
+def _authorization(
+    *,
+    capability: str,
+    operation: str,
+    provider_ref: str,
+    resource_ref: str = "resource_voice",
+    purpose: str = "voice.transcription",
+):
     now = datetime.now(timezone.utc).replace(microsecond=0)
     grant = CapabilityGrant(
         grant_id=f"grant_synthetic_{capability.replace('.', '_')}",
@@ -41,7 +48,7 @@ def _authorization(*, capability: str, operation: str, provider_ref: str, resour
         resource_refs=(resource_ref,),
         operations=(operation,),
         data_classes=("user_provided",),
-        purpose="voice.transcription",
+        purpose=purpose,
         provider_policy=ProviderPolicy((provider_ref,)),
         issued_at=now - timedelta(minutes=1),
         expires_at=now + timedelta(hours=1),
@@ -54,7 +61,7 @@ def _authorization(*, capability: str, operation: str, provider_ref: str, resour
         operation=operation,
         data_class="user_provided",
         provider_ref=provider_ref,
-        purpose="voice.transcription",
+        purpose=purpose,
         expected_grant_revision=1,
     )
     return CapabilityRegistry((grant,)).authorize_and_reserve(request, now=now)
@@ -310,6 +317,40 @@ class TestVoiceTranscription(unittest.TestCase):
                 )
 
         urlopen.assert_not_called()
+
+    def test_voice_transports_reject_reservations_for_another_purpose_before_network(self):
+        valid_download = lambda: _authorization(
+            capability="media.voice_download",
+            operation="read",
+            provider_ref="provider_telegram",
+            resource_ref="voice-1",
+        )
+        for wrong_layer in ("telegram_read", "openai_transcription"):
+            download_purpose = "answer.request" if wrong_layer == "telegram_read" else "voice.transcription"
+            transcription_purpose = "answer.request" if wrong_layer == "openai_transcription" else "voice.transcription"
+            with patch("bot.voice.request.urlopen") as urlopen:
+                with self.assertRaises(VoiceTranscriptionUnavailable):
+                    transcribe_telegram_voice(
+                        token="bot-token",
+                        file_id="voice-1",
+                        download_authorization=_authorization(
+                            capability="media.voice_download",
+                            operation="read",
+                            provider_ref="provider_telegram",
+                            resource_ref="voice-1",
+                            purpose=download_purpose,
+                        ),
+                        download_file_authorization=valid_download(),
+                        transcription_authorization=_authorization(
+                            capability="media.transcribe",
+                            operation="model_egress",
+                            provider_ref="provider_openai",
+                            resource_ref="voice-1",
+                            purpose=transcription_purpose,
+                        ),
+                        owner_ref="owner_synthetic_primary",
+                    )
+            urlopen.assert_not_called()
 
     def test_transcribe_telegram_voice_uses_each_real_policy_layer_once(self):
         with tempfile.TemporaryDirectory() as tmpdir:

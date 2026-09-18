@@ -9,7 +9,7 @@ from typing import Any, Mapping, Sequence
 from assistant.claim_ledger import verify_answer_against_evidence
 from llm.client import LLMClient
 from prm.archive_contract import ARCHIVE_RESPONSE_CONTRACTS
-from prm.capabilities import AuthorizationDecision, is_authorized_egress
+from prm.capabilities import AuthorizationDecision, is_authorized_egress, transport_purpose
 
 _FORBIDDEN_USER_MARKERS = (
     "The local research path found grounded evidence",
@@ -41,6 +41,11 @@ def synthesis_allowed(authorization: AuthorizationDecision | None = None) -> boo
             owner_ref=authorization.owner_ref if authorization is not None else "",
             connection_ref=authorization.connection_ref if authorization is not None else None,
             resource_ref=authorization.resource_ref if authorization is not None else "",
+            purpose=transport_purpose(
+                provider_ref="provider_anthropic",
+                capability="model.generate",
+                operation="model_egress",
+            ),
         )
     )
 

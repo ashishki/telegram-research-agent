@@ -14,6 +14,7 @@ from prm.capabilities import (
     is_authorized_operation,
     require_authorized_egress,
     require_authorized_operation,
+    transport_purpose,
 )
 
 
@@ -219,6 +220,11 @@ def _require_voice_download_authorization(
             owner_ref=owner_ref or "",
             connection_ref=connection_ref,
             resource_ref=resource_ref or "",
+            purpose=transport_purpose(
+                provider_ref=TELEGRAM_PROVIDER_REF,
+                capability=VOICE_DOWNLOAD_CAPABILITY,
+                operation="read",
+            ),
         )
     except CapabilityDenied as exc:
         raise VoiceTranscriptionUnavailable("Voice download requires an active capability grant") from exc
@@ -243,6 +249,11 @@ def _voice_download_authorized(
             owner_ref=owner_ref,
             connection_ref=connection_ref,
             resource_ref=resource_ref,
+            purpose=transport_purpose(
+                provider_ref=TELEGRAM_PROVIDER_REF,
+                capability=VOICE_DOWNLOAD_CAPABILITY,
+                operation="read",
+            ),
         )
     )
 
@@ -265,6 +276,11 @@ def _voice_transcription_authorized(
             owner_ref=owner_ref,
             connection_ref=connection_ref,
             resource_ref=resource_ref,
+            purpose=transport_purpose(
+                provider_ref=OPENAI_PROVIDER_REF,
+                capability=VOICE_TRANSCRIPTION_CAPABILITY,
+                operation="model_egress",
+            ),
         )
     )
 
@@ -285,6 +301,11 @@ def _require_voice_transcription_authorization(
             owner_ref=owner_ref or "",
             connection_ref=connection_ref,
             resource_ref=resource_ref or "",
+            purpose=transport_purpose(
+                provider_ref=OPENAI_PROVIDER_REF,
+                capability=VOICE_TRANSCRIPTION_CAPABILITY,
+                operation="model_egress",
+            ),
         )
     except CapabilityDenied as exc:
         raise VoiceTranscriptionUnavailable("Voice transcription requires an active capability grant") from exc

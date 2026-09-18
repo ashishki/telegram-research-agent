@@ -15,6 +15,7 @@ from prm.capabilities import (
     CapabilityDenied,
     is_authorized_egress,
     require_authorized_egress,
+    transport_purpose,
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -199,6 +200,11 @@ def _has_matching_egress_grant(
             owner_ref=owner_ref,
             connection_ref=connection_ref,
             resource_ref=resource_ref,
+            purpose=transport_purpose(
+                provider_ref=ANTHROPIC_PROVIDER_REF,
+                capability=capability,
+                operation="model_egress",
+            ),
         )
     )
 
@@ -271,6 +277,11 @@ def complete_with_receipt(
             owner_ref=owner_ref or "",
             connection_ref=connection_ref,
             resource_ref=resource_ref or "",
+            purpose=transport_purpose(
+                provider_ref=ANTHROPIC_PROVIDER_REF,
+                capability=TEXT_CAPABILITY,
+                operation="model_egress",
+            ),
         )
         LOGGER.debug(
             "Anthropic completion request model=%s prompt_length=%s max_tokens=%s attempt=1",

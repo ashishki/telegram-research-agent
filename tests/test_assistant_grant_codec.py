@@ -116,4 +116,5 @@ def test_decoder_preserves_revocation_and_revision_for_reservation_revalidation(
             owner_ref="owner_synthetic_primary",
             connection_ref=None,
             resource_ref="resource_conversation",
+            purpose="answer.request",
         )

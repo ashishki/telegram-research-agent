@@ -48,7 +48,7 @@ AUTH_SCOPE = {
 }
 
 
-def _authorization(*, capability: str = "model.generate"):
+def _authorization(*, capability: str = "model.generate", purpose: str = "answer.request"):
     now = datetime.now(timezone.utc).replace(microsecond=0)
     grant = CapabilityGrant(
         grant_id=f"grant_synthetic_{capability.replace('.', '_')}",
@@ -58,7 +58,7 @@ def _authorization(*, capability: str = "model.generate"):
         resource_refs=("resource_conversation",),
         operations=("model_egress",),
         data_classes=("user_provided",),
-        purpose="answer.request",
+        purpose=purpose,
         provider_policy=ProviderPolicy(("provider_anthropic",)),
         issued_at=now - timedelta(minutes=1),
         expires_at=now + timedelta(hours=1),
@@ -71,7 +71,7 @@ def _authorization(*, capability: str = "model.generate"):
         operation="model_egress",
         data_class="user_provided",
         provider_ref="provider_anthropic",
-        purpose="answer.request",
+        purpose=purpose,
         expected_grant_revision=1,
     )
     return CapabilityRegistry((grant,)).authorize_and_reserve(request, now=now)
@@ -99,6 +99,20 @@ class TestLLMClient(unittest.TestCase):
                 assert client._get_client() is constructed
 
         anthropic.assert_called_once_with(api_key="synthetic-key", max_retries=0)
+
+    def test_text_transport_rejects_a_reservation_for_another_purpose_before_provider_call(self):
+        fake_transport = unittest.mock.Mock()
+        fake_client = SimpleNamespace(messages=SimpleNamespace(create=fake_transport))
+
+        with patch.object(client, "_get_client", return_value=fake_client):
+            with self.assertRaises(client.LLMError):
+                client.complete(
+                    prompt="Synthetic question",
+                    authorization=_authorization(purpose="answer.context"),
+                    **AUTH_SCOPE,
+                )
+
+        fake_transport.assert_not_called()
 
     def test_complete_records_llm_usage_row(self):
         response = SimpleNamespace(

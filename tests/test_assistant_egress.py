@@ -35,9 +35,25 @@ class _FakeClient:
         self.responses = _FakeResponses()
 
 
-def _decision(*, capability="model.generate", resource_ref="resource_conversation", data_class="user_provided"):
-    grant = make_grant(capability=capability, resource_ref=resource_ref, data_class=data_class)
-    request = make_request(capability=capability, resource_ref=resource_ref, data_class=data_class)
+def _decision(
+    *,
+    capability="model.generate",
+    resource_ref="resource_conversation",
+    data_class="user_provided",
+    purpose="answer.request",
+):
+    grant = make_grant(
+        capability=capability,
+        resource_ref=resource_ref,
+        data_class=data_class,
+        purpose=purpose,
+    )
+    request = make_request(
+        capability=capability,
+        resource_ref=resource_ref,
+        data_class=data_class,
+        purpose=purpose,
+    )
     return CapabilityRegistry((grant,)).authorize_and_reserve(request, now=NOW)
 
 
@@ -113,6 +129,7 @@ def test_private_context_needs_its_own_data_class_grant(monkeypatch):
         capability="model.context_egress",
         resource_ref="resource_archive",
         data_class="private_archive",
+        purpose="answer.context",
     )
     client_with_context = _FakeClient()
     result_with_context = complete_with_provider(
