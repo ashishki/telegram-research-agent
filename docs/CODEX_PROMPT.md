@@ -78,7 +78,9 @@ feedback-reason and confirmation codes require their exact issued, persisted
 parent transition, otherwise they fail read-only. The focused tier's existing
 callbacks/UTD callback/UTD dispatch tests are PA-00 scope, not bypassed.
 Use `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest` for
-direct PA-00 focused tests and record the resolved Python/version. Full
+the direct PA-00 command, which explicitly includes
+`test_product_ux_keeps_project_context_for_confirmation_followups`; record the
+resolved Python/version. Full
 plain-language “yes” is PA-03 work, where an exact current visible confirmation
 ref must be cleared on a new topic or cancellation; PA-13 applies the same
 invariant to provider writes. PA-00 must register and run
