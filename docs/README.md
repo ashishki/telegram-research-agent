@@ -19,6 +19,7 @@
 - `audit/PRM_SN_INTEGRATED_REPLAY_2026-09-17.md` — final fixture-only replay and residual gates;
 - `PRM_SEARCH_NEWS_PILOT_PACKET.md` — reviewable, non-authorizing pilot/rollback packet;
 - `PRM_VISUAL_EVAL.md` — synthetic visual screens and redacted model-judge packet;
+- `audit/PRM_COMBAT_EVAL_2026-09-18.md` — final local product-claim evaluation evidence;
 - `EVIDENCE_INDEX.md` — current evidence only;
 - `IMPLEMENTATION_JOURNAL.md` — current phase journal;
 - `REVIEW_POLICY.md` — review and approval boundaries.

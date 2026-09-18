@@ -101,6 +101,7 @@ The complete historical pytest suite is intentionally not part of the normal loo
 - [PRM-SN integrated replay](docs/audit/PRM_SN_INTEGRATED_REPLAY_2026-09-17.md)
 - [PRM-SN pilot and rollback packet](docs/PRM_SEARCH_NEWS_PILOT_PACKET.md)
 - [Visual UX-evaluation packet](docs/PRM_VISUAL_EVAL.md)
+- [Local combat-evaluation evidence](docs/audit/PRM_COMBAT_EVAL_2026-09-18.md)
 - [Implementation contract](docs/IMPLEMENTATION_CONTRACT.md)
 - [Privacy threat model](docs/PRIVACY_THREAT_MODEL.md)
 - [Repository retrofit plan](docs/retrofit/RFX_REPOSITORY_RETROFIT.md)

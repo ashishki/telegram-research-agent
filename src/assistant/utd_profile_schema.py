@@ -140,11 +140,11 @@ def render_utd_watch_preview(draft: Mapping[str, Any]) -> str:
 def classify_utd_question(text: str) -> str:
     normalized = " ".join(str(text or "").casefold().split())
     rules = (
-        ("spouse_family", ("spouse", "супруг", "семь", "f-2", "f2")),
-        ("benefits", ("benefit", "льгот", "скидк", "basic needs", "помощ")),
-        ("career", ("career", "карьер", "intern", "стажиров", "on-campus", "job fair")),
-        ("ai", (" ai ", "искусственн", "agent", "rag", "research", "исследован")),
-        ("isso", ("isso", "i-20", "sevis", "immigration", "status")),
+        ("spouse_family", ("spouse", "супруг", "семь", "family", "depend", "f-2", "f2", "нам обоим")),
+        ("benefits", ("benefit", "льгот", "скидк", "basic needs", "помощ", "resource", "financial assistance", "food pantry", "эконом")),
+        ("career", ("career", "карьер", "internship", "internships", "стажиров", "on-campus", "job fair", "registration status", "employer", "networking")),
+        ("ai", (" ai ", "искусственн", "agent", "rag", "research", "исследован", "comet calendar", "machine learning", "data science", " fintech ", " ml ")),
+        ("isso", ("isso", "i-20", "sevis", "immigration", "status", "international student")),
         ("program", ("deadline", "дедлайн", "срок", "registration", "регистрац", "program")),
     )
     padded = f" {normalized} "

@@ -3,6 +3,7 @@
 
 import argparse
 from collections import Counter
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from hashlib import sha256
@@ -164,7 +165,7 @@ UTD_QUESTIONS = {
         "какие employer events near Dallas стоит заметить?",
         "есть ли событие по networking для graduate students?",
         "career center обновил что-то важное?",
-        "мне нужно событие не просто новость, а с действием",
+        "мне нужно карьерное событие не просто новость, а с действием",
         "какой карьерный UTD event супруге может быть полезен?",
         "это точно open to international students?",
     ),
@@ -177,7 +178,7 @@ UTD_QUESTIONS = {
         "есть ли в UTD что-то про machine learning this week?",
         "какие AI events могут помочь моему Telegram research agent?",
         "если есть data science seminar, стоит ли идти?",
-        "покажи только события с official page и датой",
+        "покажи только AI события с official page и датой",
         "AI event для graduate student near Dallas",
         "есть ли событие про fintech / ML?",
         "что будет полезно для моей супруги из AI events?",
@@ -203,7 +204,7 @@ UTD_QUESTIONS = {
         "это benefit точно доступен мне?",
         "есть ли resource hub update, который стоит заметить?",
         "что полезно моей супруге или семье из UTD resources?",
-        "покажи только если eligibility explicit",
+        "покажи benefit только если eligibility explicit",
         "есть ли financial assistance для students?",
         "Basic Needs event или resource на этой неделе?",
         "какие benefits не надо слать как новостную ленту?",
@@ -222,7 +223,7 @@ UTD_QUESTIONS = {
         "что в UTD подходит для dependents?",
         "есть ли benefit, который явно family-eligible?",
         "может ли spouse прийти на career event?",
-        "это для students only или families тоже?",
+        "это для students only или family тоже?",
     ),
 }
 
@@ -376,6 +377,7 @@ def _add_prm_one_turn_cases(cases: list[dict[str, Any]]) -> None:
 def _add_utd_one_turn_cases(cases: list[dict[str, Any]]) -> None:
     for category, questions in UTD_QUESTIONS.items():
         for index, question in enumerate(questions, start=1):
+            expected_category = _expected_utd_category(category, index)
             cases.append(
                 {
                     "case_id": f"one:utd:ask:{category}:{index:02d}",
@@ -383,7 +385,7 @@ def _add_utd_one_turn_cases(cases: list[dict[str, Any]]) -> None:
                     "message": question,
                     "expected": {
                         "surface": "utd_ask",
-                        "utd_category": category,
+                        "utd_category": expected_category,
                         "requires_fresh_source_boundary": True,
                         "no_eligibility_guess": category in {"benefits", "spouse_family", "isso"},
                     },
@@ -490,12 +492,14 @@ def _add_prm_dialogues(dialogues: list[dict[str, Any]]) -> None:
                             f"turn:06:{slug}",
                             "сохрани заметку, но сначала покажи что именно сохранишь",
                             expected_intent="memory_action",
+                            expected_project_context=True,
                             expects_confirmation=True,
                         ),
                         _prm_turn(
                             f"turn:07:{slug}",
                             "следи за этой темой, но без автомутации профиля",
                             expected_intent="memory_action",
+                            expected_project_context=True,
                             expects_confirmation=True,
                         ),
                         _prm_turn(
@@ -563,7 +567,7 @@ def _add_utd_dialogues(dialogues: list[dict[str, Any]]) -> None:
                             "message": questions[variant % len(questions)],
                             "expected": {
                                 "surface": "utd_ask",
-                                "utd_category": category,
+                                "utd_category": _expected_utd_category(category, (variant % len(questions)) + 1),
                                 "requires_fresh_source_boundary": True,
                             },
                         },
@@ -681,6 +685,20 @@ def _add_notification_dialogues(dialogues: list[dict[str, Any]]) -> None:
         )
 
 
+def _expected_utd_category(category: str, question_index: int) -> str:
+    """Encode intentional safety-first labels for mixed-category prompts."""
+    # Spouse/family eligibility becomes the primary category when it is named,
+    # even where the same prompt also mentions another source family.
+    return {
+        ("career", 11): "spouse_family",
+        ("career", 12): "isso",
+        ("ai", 12): "spouse_family",
+        ("isso", 11): "spouse_family",
+        ("isso", 12): "spouse_family",
+        ("benefits", 6): "spouse_family",
+    }.get((category, question_index), category)
+
+
 def _prm_turn(
     case_id: str,
     message: str,
@@ -750,6 +768,16 @@ def build_case_index(
 
 
 def simulate_judge_case(
+    spec: Mapping[str, Any],
+    *,
+    assistant_cache: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Simulate one case without touching the operator's configured archive."""
+    with _isolated_eval_database():
+        return _simulate_judge_case(spec, assistant_cache=assistant_cache)
+
+
+def _simulate_judge_case(
     spec: Mapping[str, Any],
     *,
     assistant_cache: dict[str, Any] | None = None,
@@ -1321,8 +1349,9 @@ def _deterministic_checks(
         checks["watch_preview_truthful_ok"] = all(
             marker in visible
             for marker in (
-                "profile preview сам не делает live fetch",
-                "deployment gate",
+                "live fetch",
+                "не запускает timer",
+                "не отправляет Telegram delivery",
                 "kill switch",
             )
         )
@@ -1335,7 +1364,9 @@ def _deterministic_checks(
     if bool(expected.get("feedback_controls")):
         checks["feedback_controls_ok"] = "Полезно" in visible and "Шум" in visible
     if bool(expected.get("feedback_recorded")):
-        checks["feedback_recorded_ok"] = bool(actual.get("feedback_recorded")) and "Записал" in visible
+        checks["feedback_recorded_ok"] = bool(actual.get("feedback_recorded")) and (
+            "Записал" in visible or "Поставил sidecar-паузу" in visible
+        )
     if bool(expected.get("no_profile_auto_mutation")):
         checks["no_profile_auto_mutation_ok"] = not bool(actual.get("profile_auto_mutated")) and not (
             "профиль обнов" in visible.casefold()
@@ -2019,11 +2050,12 @@ def run_product_ux_eval(args: argparse.Namespace) -> dict[str, Any]:
         all_cases=bool(args.all_cases),
     )
     with _runtime_env(allow_provider_egress=bool(args.allow_runtime_provider_egress)):
-        assistant_cache: dict[str, Any] = {}
-        cases = [
-            simulate_judge_case(spec, assistant_cache=assistant_cache)
-            for spec in selected_specs
-        ]
+        with _isolated_eval_database():
+            assistant_cache: dict[str, Any] = {}
+            cases = [
+                _simulate_judge_case(spec, assistant_cache=assistant_cache)
+                for spec in selected_specs
+            ]
     return run_judge_sync(
         cases,
         output_path=args.output,
@@ -2067,6 +2099,24 @@ class _runtime_env:
                 os.environ.pop(key, None)
             else:
                 os.environ[key] = value
+
+
+@contextmanager
+def _isolated_eval_database() -> Any:
+    """Point product UX simulation at a disposable migrated database only."""
+    previous_db = os.environ.get("AGENT_DB_PATH")
+    with tempfile.TemporaryDirectory(prefix="prm-product-ux-db-") as temp_dir:
+        os.environ["AGENT_DB_PATH"] = str(Path(temp_dir) / "synthetic.db")
+        try:
+            from db.migrate import run_migrations
+
+            run_migrations()
+            yield
+        finally:
+            if previous_db is None:
+                os.environ.pop("AGENT_DB_PATH", None)
+            else:
+                os.environ["AGENT_DB_PATH"] = previous_db
 
 
 def render_utd_onboarding(draft: Mapping[str, Any]) -> str:

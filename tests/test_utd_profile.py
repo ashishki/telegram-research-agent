@@ -52,6 +52,12 @@ def test_confirmation_copy_truthfully_describes_existing_runtime_effect(tmp_path
     assert subscription_effect(profile, now=now, runtime_enabled=True)["collect"] is True
 
 
+def test_international_student_question_does_not_match_career_internship_marker() -> None:
+    from assistant.utd_profile_schema import classify_utd_question
+
+    assert classify_utd_question("что мне нельзя пропустить как international student?") == "isso"
+
+
 def test_cancel_and_expiry_scrub_draft_payload(tmp_path: Path) -> None:
     db = tmp_path / "m.db"; _init_db(db); now = datetime(2026,8,28,12,tzinfo=timezone.utc)
     cid = start_utd_profile_onboarding(db, chat_id="42", now=now)["context_id"]

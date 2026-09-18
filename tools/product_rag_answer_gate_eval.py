@@ -58,12 +58,19 @@ def main(argv: list[str] | None = None) -> int:
     metrics = report["metrics"]
     assert isinstance(dataset, dict)
     assert isinstance(metrics, dict)
+    try:
+        display_output = str(output_path.resolve().relative_to(root))
+    except ValueError:
+        # Callers commonly keep ephemeral evaluation artifacts outside the
+        # checkout. Their absolute location is valid and must not turn an
+        # otherwise successful evaluation into a CLI failure.
+        display_output = str(output_path.resolve())
     print(
         "product_rag_answer_gate_eval: "
         f"rows={dataset['row_count']} "
         f"no_answer_accuracy={metrics['no_answer_accuracy']} "
         f"external_verification_boundary_accuracy={metrics['external_verification_boundary_accuracy']} "
-        f"output={output_path.resolve().relative_to(root)}"
+        f"output={display_output}"
     )
     return 0
 

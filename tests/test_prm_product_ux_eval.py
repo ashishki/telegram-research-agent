@@ -119,6 +119,41 @@ def test_product_ux_simulates_utd_notification_with_feedback_controls():
     assert result["deterministic_summary"]["failed_turns"] == 0
 
 
+def test_product_ux_keeps_project_context_for_confirmation_followups():
+    module = _module("prm_product_ux_eval_project_followup")
+    specs = module.build_case_index(
+        module.build_corpus(), include_one_turn_cases=False, dialogue_window_turns=4
+    )
+    spec = next(item for item in specs if item["case_id"] == "judge:dialogue:prm:agent_evals:01:turns_005_008")
+    result = module.simulate_judge_case(spec)
+    confirmation_turns = [
+        turn
+        for turn in result["turns"]
+        if turn["turn_id"] in {"turn:06:agent_evals", "turn:07:agent_evals"}
+    ]
+    assert all(turn["expected"]["project_context_required"] is True for turn in confirmation_turns)
+    assert all(turn["actual"]["project_context_required"] is True for turn in confirmation_turns)
+    assert all("project_context_ok" not in turn["failure_codes"] for turn in confirmation_turns)
+
+
+def test_product_ux_preview_and_pause_feedback_use_contract_markers():
+    module = _module("prm_product_ux_eval_markers")
+    preview = module._turn_result(
+        {"expected": {"watch_preview_truthful": True}},
+        index=1,
+        message="live fetch; не запускает timer; не отправляет Telegram delivery; kill switch",
+        actual={},
+    )
+    feedback = module._turn_result(
+        {"expected": {"feedback_recorded": True}},
+        index=1,
+        message="Поставил sidecar-паузу UTD-уведомлений на 24 часа.",
+        actual={"feedback_recorded": True},
+    )
+    assert not preview.failure_codes
+    assert not feedback.failure_codes
+
+
 def test_product_ux_fake_judge_report_records_advisory_metrics(tmp_path):
     module = _module("prm_product_ux_eval_fake_judge")
     case = {
