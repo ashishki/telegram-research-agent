@@ -20,6 +20,7 @@ OWNER_SCOPE = {
     "connection_ref": None,
     "resource_ref": "resource_conversation",
 }
+SYNTHETIC_TELEGRAM_TOKEN = "synthetic-telegram-token"
 
 
 class _FakeResponses:
@@ -70,7 +71,10 @@ def _delivery_decision(
     *,
     registry: CapabilityRegistry | None = None,
     purpose: str = "answer.delivery",
+    connection_ref: str | None = None,
 ):
+    active_connection_ref = connection_ref or prm_handlers._telegram_connection_ref(SYNTHETIC_TELEGRAM_TOKEN)
+    assert active_connection_ref is not None
     grant = make_grant(
         grant_id="grant_synthetic_delivery",
         owner_ref="owner_telegram_42",
@@ -80,6 +84,7 @@ def _delivery_decision(
         data_class="private_archive",
         providers=("provider_telegram",),
         purpose=purpose,
+        connection_ref=active_connection_ref,
     )
     active_registry = registry or CapabilityRegistry((grant,))
     return active_registry, grant, active_registry.authorize_and_reserve(
@@ -91,6 +96,7 @@ def _delivery_decision(
             data_class="private_archive",
             provider_ref="provider_telegram",
             purpose=purpose,
+            connection_ref=active_connection_ref,
         ),
         now=NOW,
     )
@@ -140,6 +146,7 @@ def test_prm_result_delivery_requires_a_fresh_private_owner_grant_before_fake_te
     sent: list[str] = []
     _registry, _grant, decision = _delivery_decision()
     monkeypatch.setattr(prm_handlers, "send_message", lambda _token, _chat, text, **_kwargs: sent.append(text))
+    monkeypatch.setattr(prm_handlers, "_token", lambda: SYNTHETIC_TELEGRAM_TOKEN)
 
     prm_handlers._send_chunks(
         "42",
@@ -158,6 +165,7 @@ def test_prm_result_delivery_rechecks_revocation_before_fake_telegram_send(monke
     registry, grant, decision = _delivery_decision()
     registry.revoke_grant(grant.grant_id)
     monkeypatch.setattr(prm_handlers, "send_message", lambda _token, _chat, text, **_kwargs: sent.append(text))
+    monkeypatch.setattr(prm_handlers, "_token", lambda: SYNTHETIC_TELEGRAM_TOKEN)
 
     prm_handlers._send_chunks(
         "42",
@@ -175,6 +183,25 @@ def test_prm_result_delivery_rejects_another_purpose_before_fake_telegram_send(m
     sent: list[str] = []
     _registry, _grant, decision = _delivery_decision(purpose="answer.request")
     monkeypatch.setattr(prm_handlers, "send_message", lambda _token, _chat, text, **_kwargs: sent.append(text))
+    monkeypatch.setattr(prm_handlers, "_token", lambda: SYNTHETIC_TELEGRAM_TOKEN)
+
+    prm_handlers._send_chunks(
+        "42",
+        "private synthetic archive result",
+        reply_markup=None,
+        actor_id="42",
+        owner_chat_id="42",
+        delivery_authorizations=(decision,),
+    )
+
+    assert sent == []
+
+
+def test_prm_result_delivery_rejects_another_telegram_connection_before_fake_sender(monkeypatch):
+    sent: list[str] = []
+    _registry, _grant, decision = _delivery_decision(connection_ref="connection_telegram_other")
+    monkeypatch.setattr(prm_handlers, "send_message", lambda _token, _chat, text, **_kwargs: sent.append(text))
+    monkeypatch.setattr(prm_handlers, "_token", lambda: SYNTHETIC_TELEGRAM_TOKEN)
 
     prm_handlers._send_chunks(
         "42",
@@ -191,6 +218,7 @@ def test_prm_result_delivery_rejects_another_purpose_before_fake_telegram_send(m
 def test_prm_result_delivery_default_denies_before_fake_telegram_send(monkeypatch):
     sent: list[str] = []
     monkeypatch.setattr(prm_handlers, "send_message", lambda _token, _chat, text, **_kwargs: sent.append(text))
+    monkeypatch.setattr(prm_handlers, "_token", lambda: SYNTHETIC_TELEGRAM_TOKEN)
 
     prm_handlers._send_chunks(
         "42",

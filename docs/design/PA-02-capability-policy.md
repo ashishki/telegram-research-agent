@@ -48,7 +48,7 @@ reconciliation. This slice never represents either as complete.
 | OpenAI archive context | exact owner/connection/archive resource plus a distinct `model.context_egress`, `provider_openai`, `private_archive` reservation | existing context switch; absent/invalid context grant omits context rather than leaking it |
 | Telegram voice download | exact owner/connection/file resource plus two distinct `media.voice_download`, `read`, `provider_telegram`, `user_provided` reservations: one each for `getFile` and file download | none |
 | OpenAI transcription | `media.transcribe`, `model_egress`, `provider_openai`, `user_provided` reservation, exactly bound to the Telegram attachment ID returned by the two authorized Telegram reads | the raw voice bytes remain in the request memory only; no PA-02 local media file is created |
-| PA result Telegram delivery | exact authenticated private owner/chat tuple plus an `assistant.result_delivery`, `deliver`, `provider_telegram`, `private_archive` reservation for every rendered Telegram chunk | no runtime delivery grant source exists in PA-02, so an omitted, expired, revoked or mismatched decision suppresses the final send; bot token/private chat are not consent |
+| PA result Telegram delivery | exact authenticated private owner/chat tuple plus an `assistant.result_delivery`, `deliver`, `provider_telegram`, `private_archive` reservation for every rendered Telegram chunk; its connection ref must equal an opaque bounded SHA-256 derivative of the exact bot token used for that send | no runtime delivery grant source exists in PA-02, so an omitted, expired, revoked or owner/resource/purpose/connection-mismatched decision suppresses the final send; the token and its derivative are never logged, returned or published, and bot token/private chat are not consent |
 
 PA-02 applies this boundary only to the explicit transports in the table:
 Anthropic text, OpenAI text/context, Telegram voice `getFile`/file download,
@@ -77,6 +77,7 @@ read/provider call; and all three real voice transport layers (`getFile`, file
 download, transcription) with separate matching synthetic reservations. Voice
 tests also prove raw download bytes never create a local staging file. Result
 delivery tests prove a revoked/missing/mismatched decision reaches no fake
-Telegram sender. Existing
+Telegram sender, including a reservation bound to another configured bot
+connection. Existing
 LLM, OpenAI adapter, synthesis and voice tests now pass a matching synthetic
 authorization only for their fake transport paths. No fixture calls a provider.

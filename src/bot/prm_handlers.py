@@ -335,8 +335,14 @@ def _send_chunks(
     """
 
     delivery_owner_ref = _private_delivery_owner_ref(chat_id, actor_id, owner_chat_id)
+    token = _token()
+    delivery_connection_ref = _telegram_connection_ref(token)
     chunks = _split_telegram_text(text, limit=limit)
-    if delivery_owner_ref is None or len(delivery_authorizations) < len(chunks):
+    if (
+        delivery_owner_ref is None
+        or delivery_connection_ref is None
+        or len(delivery_authorizations) < len(chunks)
+    ):
         LOGGER.warning("PRM result delivery denied before Telegram send")
         return
     decisions = iter(delivery_authorizations)
@@ -353,7 +359,7 @@ def _send_chunks(
                 provider_ref=TELEGRAM_PROVIDER_REF,
                 data_class=RESULT_DELIVERY_DATA_CLASS,
                 owner_ref=delivery_owner_ref,
-                connection_ref=decision.connection_ref,
+                connection_ref=delivery_connection_ref,
                 resource_ref=chat_id,
                 purpose=transport_purpose(
                     provider_ref=TELEGRAM_PROVIDER_REF,
@@ -365,7 +371,7 @@ def _send_chunks(
             LOGGER.warning("PRM result delivery denied before Telegram send")
             return
         send_message(
-            _token(),
+            token,
             chat_id,
             chunk,
             reply_markup=reply_markup if index == len(chunks) - 1 else None,
@@ -383,6 +389,21 @@ def _private_delivery_owner_ref(
     if any(value is None for value in values) or len(set(values)) != 1:
         return None
     return f"owner_telegram_{values[0]}"
+
+
+def _telegram_connection_ref(token: str) -> str | None:
+    """Bind the policy connection ref to the exact configured bot token.
+
+    The token is never returned, logged or stored.  Only a bounded opaque
+    digest-derived connection reference participates in the in-memory grant
+    comparison, so a reservation for another Telegram bot cannot authorize this
+    transport.
+    """
+
+    clean_token = str(token or "").strip()
+    if not clean_token:
+        return None
+    return f"connection_telegram_{hashlib.sha256(clean_token.encode('utf-8')).hexdigest()[:32]}"
 
 
 def _split_telegram_text(text: str, *, limit: int = 3400) -> list[str]:
