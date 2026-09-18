@@ -1,3 +1,4 @@
+import sqlite3
 from types import SimpleNamespace
 
 from assistant.prm_post_answer_actions import PRM_ACTION_PREFIX, build_post_answer_actions
@@ -19,7 +20,7 @@ def test_active_registry_contains_only_prm_commands():
     assert {"/auto", "/research", "/brief", "/chat"}.issubset(PRM_SAFE_COMMANDS)
 
 
-def test_prm_entrypoints_propagate_private_owner_identity_or_render_no_controls(monkeypatch, tmp_path):
+def test_prm_entrypoints_do_not_register_post_answer_state_during_pa02(monkeypatch, tmp_path):
     db_path = str(tmp_path / "memory.db")
     monkeypatch.setenv("AGENT_DB_PATH", db_path)
     run_migrations()
@@ -48,11 +49,16 @@ def test_prm_entrypoints_propagate_private_owner_identity_or_render_no_controls(
     monkeypatch.setattr(bot_runtime, "dispatch_prm_command", lambda *args, **kwargs: forwarded.append((args, kwargs)))
     bot_runtime.dispatch_command("42", "/research agent evals", settings, runtime_mode=BOT_RUNTIME_PRM_ASSISTANT, actor_id="42", owner_chat_id="42")
 
-    assert valid["reply_markup"] is not None
+    # A private tuple identifies a recipient; it is not PA-02 authority to
+    # persist an answer-derived action context or receipt.
+    assert valid["reply_markup"] is None
     assert absent["reply_markup"] is None
     assert malformed["reply_markup"] is None
     assert group["reply_markup"] is None
     assert legacy is None
+    with sqlite3.connect(db_path) as connection:
+        assert connection.execute("SELECT count(*) FROM prm_post_answer_proposals").fetchone()[0] == 0
+        assert connection.execute("SELECT count(*) FROM prm_interaction_ledger").fetchone()[0] == 0
     assert [kwargs for _args, kwargs in forwarded] == [
         {"actor_id": "42", "owner_chat_id": "42"},
         {"actor_id": "42", "owner_chat_id": "42"},

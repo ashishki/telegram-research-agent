@@ -82,6 +82,12 @@ decision its actual Telegram send is suppressed. These are default-deny
 boundaries, not claims that the deferred operations or a live permission UI
 have been enabled.
 
+The same envelope is not local persistence authority. PA-02 therefore creates
+no active post-answer proposal context, interaction receipt or action keyboard:
+an undeliverable, expired, revoked or mismatched return decision must not leave
+an answer-derived durable record. PA-13 must introduce and enforce its own
+exact local-write/confirmation authority before that action surface returns.
+
 The public scope formatter lists capability, resources, operations, data
 classes and permitted providers and explicitly says that a provider key is not
 consent. It deliberately does not expose credential values or raw source data.

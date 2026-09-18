@@ -234,7 +234,9 @@ def dispatch_prm_command(
             )
         )  # type: ignore[arg-type]
     except Exception as exc:
-        LOGGER.warning("PRM request failed command=%s", command, exc_info=True)
+        # Model, archive and provider exceptions can carry request-derived
+        # content.  Keep the normal PA log metadata-only.
+        LOGGER.warning("PRM request failed")
         send_private_reply(f"Не смог обработать запрос: {type(exc).__name__}")
         return
     action_bundle = _post_answer_action_bundle(
@@ -342,7 +344,20 @@ def _post_answer_markup(
 def _post_answer_action_bundle(
     payload: Mapping[str, Any], *, settings: Settings, chat_id: str,
     actor_id: str | None = None, owner_chat_id: str | None = None,
+    persistence_authorized: bool = False,
 ) -> dict[str, Any]:
+    """Build durable action state only after its owning slice grants a write.
+
+    The PA-02 private reply envelope authorizes a bounded Telegram response,
+    not local retention.  In particular, it cannot be used to store an
+    answer-derived action snapshot or interaction receipt before a response
+    might be denied.  PA-13 will supply an explicit, confirmation-bound local
+    persistence authority if it enables this surface.  Until then all active
+    PA callers receive no post-answer controls and make no durable write here.
+    """
+
+    if not persistence_authorized:
+        return {"context_id": None, "reply_markup": None, "action_codes": []}
     gate = _mapping(payload.get("answer_gate"))
     if not bool(gate.get("allow_answer", True)):
         return {}

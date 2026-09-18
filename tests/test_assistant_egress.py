@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+import sqlite3
 from dataclasses import replace
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -16,6 +18,7 @@ import llm.client as anthropic_client
 import llm.openai_provider as openai_provider
 from llm.openai_provider import OpenAIProviderError, ProviderEgressDenied, complete_with_provider
 from tests.test_assistant_permissions import NOW, make_grant, make_request
+from db.migrate import run_migrations
 from prm.capabilities import CapabilityRegistry
 
 OWNER_SCOPE = {
@@ -305,6 +308,119 @@ def test_prm_result_delivery_default_denies_before_fake_telegram_send(monkeypatc
     )
 
     assert sent == []
+
+
+@pytest.mark.parametrize("delivery_state", ["missing", "revoked"])
+def test_pa02_denied_delivery_never_persists_post_answer_context_or_receipt(
+    monkeypatch,
+    tmp_path,
+    delivery_state,
+):
+    """A return envelope is not authority to retain an answer-derived action."""
+
+    db_path = str(tmp_path / "memory.db")
+    monkeypatch.setenv("AGENT_DB_PATH", db_path)
+    run_migrations()
+
+    class FakeAssistant:
+        def __init__(self, *, settings):
+            del settings
+
+        def answer(self, request):
+            del request
+            return SimpleNamespace(
+                text="private synthetic archive result",
+                payload={
+                    "answer_gate": {"allow_answer": True},
+                    "question": "private synthetic question",
+                    "direct_answer": "private synthetic archive result",
+                    "archive_evidence": {"items": []},
+                    "archive_contract": {"result_summary": {"direct_count": 1, "partial_count": 0}},
+                    "primary_intent": "archive_lookup",
+                },
+                status="ok",
+                mode="research",
+                route={"retrieval_query": "private synthetic question"},
+            )
+
+    monkeypatch.setattr(prm_handlers, "PersonalResearchAssistant", FakeAssistant)
+    delivery_authorizations = ()
+    if delivery_state == "revoked":
+        registry, grant, decision = _delivery_decision()
+        registry.revoke_grant(grant.grant_id)
+        delivery_authorizations = (decision,)
+
+    prm_handlers.dispatch_prm_command(
+        "42",
+        "/research private synthetic question",
+        SimpleNamespace(db_path=db_path),
+        actor_id="42",
+        owner_chat_id="42",
+        delivery_authorizations=delivery_authorizations,
+    )
+
+    with sqlite3.connect(db_path) as connection:
+        assert connection.execute("SELECT count(*) FROM prm_post_answer_proposals").fetchone()[0] == 0
+        assert connection.execute("SELECT count(*) FROM prm_interaction_ledger").fetchone()[0] == 0
+
+
+def test_pa_runtime_voice_failure_logs_no_telegram_or_provider_identifiers(monkeypatch, caplog):
+    update = {
+        "update_id": 1,
+        "message": {"chat": {"id": 424242}, "from": {"id": 424242}, "voice": {"file_id": "voice-private"}},
+    }
+    token = "synthetic-telegram-token-secret"
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", token)
+    monkeypatch.setenv("TELEGRAM_OWNER_CHAT_ID", "424242")
+    monkeypatch.setattr(bot_runtime, "_install_signal_handlers", lambda state: setattr(state, "stop_requested", True))
+    monkeypatch.setattr(bot_runtime, "_telegram_get_updates", lambda **_kwargs: [update])
+    monkeypatch.setattr(bot_runtime, "send_message", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        bot_runtime,
+        "transcribe_telegram_voice",
+        lambda **_kwargs: (_ for _ in ()).throw(RuntimeError(f"{token}:424242:voice-private")),
+    )
+
+    with caplog.at_level(logging.WARNING, logger="bot.bot"):
+        bot_runtime.run_bot(SimpleNamespace(), runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT)
+
+    assert "Voice transcription failed" in caplog.text
+    for private_value in (token, "424242", "voice-private"):
+        assert private_value not in caplog.text
+
+
+def test_pa_runtime_callback_failure_logs_no_callback_identifier_or_data(monkeypatch, tmp_path, caplog):
+    token = "synthetic-telegram-token-secret"
+    callback_id = "callback-private-id"
+    callback_data = "prma:private-context:n"
+    monkeypatch.setattr(
+        bot_runtime,
+        "validate_prm_post_answer_callback",
+        lambda *_args, **_kwargs: bot_runtime.UnavailablePrmAction(),
+    )
+    monkeypatch.setattr(
+        bot_runtime,
+        "_telegram_answer_callback",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError(f"{token}:{callback_id}:{callback_data}")),
+    )
+
+    with caplog.at_level(logging.WARNING, logger="bot.bot"):
+        bot_runtime._handle_callback(
+            {
+                "id": callback_id,
+                "from": {"id": 42},
+                "message": {"chat": {"id": 42}},
+                "data": callback_data,
+            },
+            token=token,
+            owner_chat_id="42",
+            settings=SimpleNamespace(db_path=str(tmp_path / "synthetic.db")),
+            runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT,
+        )
+
+    assert "Failed to acknowledge PRM callback" in caplog.text
+    for private_value in (token, callback_id, callback_data, "42"):
+        assert private_value not in caplog.text
 
 
 def test_shared_prm_sender_default_denies_voice_or_utd_text_before_fake_telegram_send(monkeypatch):

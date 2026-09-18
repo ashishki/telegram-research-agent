@@ -225,17 +225,16 @@ def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_LEGACY) -> No
     state = _BotState()
     _install_signal_handlers(state)
     offset: int | None = None
-    LOGGER.info(
-        "Telegram polling started owner_chat_id=%s runtime_mode=%s",
-        owner_chat_id,
-        runtime_mode,
-    )
+    LOGGER.info("Telegram polling started runtime_mode=%s", runtime_mode)
 
     while True:
         try:
             updates = _telegram_get_updates(token=token, offset=offset)
         except Exception:
-            LOGGER.warning("Telegram getUpdates failed", exc_info=True)
+            # Provider exceptions can include a request URL (and therefore a
+            # bot credential) or response metadata.  Do not attach them to
+            # the ordinary PA runtime log.
+            LOGGER.warning("Telegram getUpdates failed")
             if state.stop_requested:
                 break
             continue
@@ -340,7 +339,9 @@ def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_LEGACY) -> No
                 )
                 continue
             except Exception:
-                LOGGER.warning("Voice transcription failed chat_id=%s", chat_id, exc_info=True)
+                # A provider exception may contain attachment, account or
+                # transport details.  The reply is intentionally generic too.
+                LOGGER.warning("Voice transcription failed")
                 send_message(
                     token,
                     chat_id,
@@ -471,9 +472,7 @@ def _handle_callback(
         try:
             callback_acknowledged = acknowledge_callback("Принято")
         except Exception:
-            LOGGER.warning(
-                "Failed to answer callback query id=%s", callback_id, exc_info=True
-            )
+            LOGGER.warning("Failed to answer callback query")
     try:
         if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
             if not data.startswith(_PRM_CALLBACK_PREFIXES):
@@ -504,15 +503,13 @@ def _handle_callback(
         else:
             answer = record_callback(settings, data)
     except Exception:
-        LOGGER.warning("Callback handling failed data=%s", data, exc_info=True)
+        LOGGER.warning("Callback handling failed")
         answer = "Could not record feedback" if english_feedback else "Не смог обработать действие"
     if callback_id and not callback_acknowledged:
         try:
             acknowledge_callback(answer)
         except Exception:
-            LOGGER.warning(
-                "Failed to answer callback query id=%s", callback_id, exc_info=True
-            )
+            LOGGER.warning("Failed to answer callback query")
 
 
 def _embedded_voice_transcript(message: dict[str, Any]) -> str:
