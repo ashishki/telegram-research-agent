@@ -64,7 +64,14 @@ def send_message(
         LOGGER.warning("Failed to send PRM Telegram message chat_id=%s", chat_id, exc_info=True)
 
 
-def dispatch_prm_command(chat_id: str, text: str, settings: Settings) -> None:
+def dispatch_prm_command(
+    chat_id: str,
+    text: str,
+    settings: Settings,
+    *,
+    actor_id: str | None = None,
+    owner_chat_id: str | None = None,
+) -> None:
     command, args = _split_command(text)
     if command not in PRM_SAFE_COMMANDS:
         send_message(
@@ -136,7 +143,13 @@ def dispatch_prm_command(chat_id: str, text: str, settings: Settings) -> None:
         LOGGER.warning("PRM request failed command=%s", command, exc_info=True)
         send_message(_token(), chat_id, f"Не смог обработать запрос: {type(exc).__name__}")
         return
-    action_bundle = _post_answer_action_bundle(result.payload, settings=settings, chat_id=chat_id)
+    action_bundle = _post_answer_action_bundle(
+        result.payload,
+        settings=settings,
+        chat_id=chat_id,
+        actor_id=actor_id,
+        owner_chat_id=owner_chat_id,
+    )
     markup = action_bundle.get("reply_markup") if isinstance(action_bundle, Mapping) else None
     _send_chunks(chat_id, result.text, reply_markup=markup)
     result_status = str(getattr(result, "status", "ok") or "ok")
@@ -216,7 +229,8 @@ def _post_answer_markup(
 
 
 def _post_answer_action_bundle(
-    payload: Mapping[str, Any], *, settings: Settings, chat_id: str
+    payload: Mapping[str, Any], *, settings: Settings, chat_id: str,
+    actor_id: str | None = None, owner_chat_id: str | None = None,
 ) -> dict[str, Any]:
     gate = _mapping(payload.get("answer_gate"))
     if not bool(gate.get("allow_answer", True)):
@@ -262,6 +276,8 @@ def _post_answer_action_bundle(
         },
         db_path=settings.db_path,
         chat_id=chat_id,
+        actor_id=actor_id,
+        owner_chat_id=owner_chat_id,
     )
 
 

@@ -109,7 +109,10 @@ def select_post_answer_action_codes(answer: Mapping[str, Any]) -> list[str]:
     return [*feedback, "n"] if relevance_established else [*feedback, "q"]
 
 
-def build_post_answer_actions(answer: Mapping[str, Any], *, db_path: str | Path | None = None, chat_id: str = "") -> dict[str, Any]:
+def build_post_answer_actions(
+    answer: Mapping[str, Any], *, db_path: str | Path | None = None, chat_id: str = "",
+    actor_id: str | None = None, owner_chat_id: str | None = None,
+) -> dict[str, Any]:
     """Register a bounded answer context and return only relevant safe actions."""
 
     action_codes = select_post_answer_action_codes(answer)

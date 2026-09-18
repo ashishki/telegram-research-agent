@@ -14,10 +14,13 @@ from .prm_handlers import PRM_SAFE_COMMANDS, dispatch_prm_command, send_message
 from .runtime import BOT_RUNTIME_LEGACY, BOT_RUNTIME_MODES, BOT_RUNTIME_PRM_ASSISTANT, normalize_bot_runtime_mode
 
 
-def dispatch_command(chat_id: str, text: str, settings: Settings, *, runtime_mode: str = BOT_RUNTIME_LEGACY) -> None:
+def dispatch_command(
+    chat_id: str, text: str, settings: Settings, *, runtime_mode: str = BOT_RUNTIME_LEGACY,
+    actor_id: str | None = None, owner_chat_id: str | None = None,
+) -> None:
     mode = normalize_bot_runtime_mode(runtime_mode)
     if mode == BOT_RUNTIME_PRM_ASSISTANT:
-        dispatch_prm_command(chat_id, text, settings)
+        dispatch_prm_command(chat_id, text, settings, actor_id=actor_id, owner_chat_id=owner_chat_id)
         return
     _legacy().dispatch_command(chat_id=chat_id, text=text, settings=settings, runtime_mode=BOT_RUNTIME_LEGACY)
 

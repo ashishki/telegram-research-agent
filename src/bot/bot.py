@@ -105,12 +105,14 @@ def dispatch_command(
     settings: Settings,
     *,
     runtime_mode: str = BOT_RUNTIME_LEGACY,
+    actor_id: str | None = None,
+    owner_chat_id: str | None = None,
 ) -> None:
     """Stable patch point and explicit compatibility dispatcher."""
 
     mode = normalize_bot_runtime_mode(runtime_mode)
     if mode == BOT_RUNTIME_PRM_ASSISTANT:
-        dispatch_prm_command(chat_id, text, settings)
+        dispatch_prm_command(chat_id, text, settings, actor_id=actor_id, owner_chat_id=owner_chat_id)
         return
     legacy = import_module("bot.legacy_handlers")
     legacy.dispatch_command(
@@ -205,6 +207,7 @@ def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_LEGACY) -> No
             if message is None or not _is_authorized_message(message, owner_chat_id):
                 continue
             chat_id = str((message.get("chat") or {}).get("id", owner_chat_id))
+            actor_id = str((message.get("from") or {}).get("id") or "")
             # PRM answers can contain private archive excerpts.  Sender-based
             # owner authorization is retained for legacy operations, but the
             # PRM surface is deliberately private-chat-only.
@@ -223,6 +226,8 @@ def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_LEGACY) -> No
                         text=command,
                         settings=settings,
                         runtime_mode=runtime_mode,
+                        actor_id=actor_id,
+                        owner_chat_id=owner_chat_id,
                     )
                 else:
                     dispatch_command(chat_id=chat_id, text=command, settings=settings)
@@ -237,6 +242,8 @@ def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_LEGACY) -> No
                         text=command,
                         settings=settings,
                         runtime_mode=runtime_mode,
+                        actor_id=actor_id,
+                        owner_chat_id=owner_chat_id,
                     )
                 else:
                     dispatch_command(chat_id=chat_id, text=command, settings=settings)
@@ -264,6 +271,8 @@ def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_LEGACY) -> No
                     text=command,
                     settings=settings,
                     runtime_mode=runtime_mode,
+                    actor_id=actor_id,
+                    owner_chat_id=owner_chat_id,
                 )
             else:
                 dispatch_command(chat_id=chat_id, text=command, settings=settings)

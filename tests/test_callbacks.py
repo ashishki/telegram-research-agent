@@ -435,6 +435,8 @@ class TestIdeaCallbacks(unittest.TestCase):
             text="/auto_voice Too shallow target=eval-gates.",
             settings=settings,
             runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT,
+            actor_id="12345",
+            owner_chat_id="12345",
         )
 
     def test_run_bot_dispatches_plain_text_to_hermes_chat(self):
@@ -504,6 +506,8 @@ class TestIdeaCallbacks(unittest.TestCase):
             text="/auto Что мне делать с weekly workbook?",
             settings=settings,
             runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT,
+            actor_id="12345",
+            owner_chat_id="12345",
         )
 
     def test_run_bot_prm_safe_drops_owner_sender_message_in_group(self):
