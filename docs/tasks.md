@@ -29,8 +29,12 @@ Slice-ID: PA-00
 Objective: Reproduce current focused CI, diagnose the confirmation-context failure and correct its actual cause without weakening acceptance.
 Acceptance-Criteria:
   - Current HEAD and active entrypoints are recorded; historical runtime observations are not treated as current.
-  - The specific regression has a meaningful negative/positive test and focused CI is green or an exact unresolved blocker is reported.
+  - The diagnosis explicitly classifies evaluator behavior, active dispatch behavior, or both; it records the affected entrypoints, changed-file count, exact interpreter/environment and before/after receipt.
+  - A confirmation binds its source result/version, action code, chat/owner and expiry (plus an optional source-project ref), never mutable last-topic/project state; it does not reroute or search.
+  - `test_product_ux_confirmation_uses_bound_action_context` proves the bound positive path, while `test_post_answer_callback_preserves_bound_source_without_reroute` and `test_post_answer_callback_denies_stale_wrong_chat_or_topic_context` prove dispatch-level preservation and denial.
+  - The direct regression and focused CI are green, or an exact unresolved blocker is reported without weakening the acceptance contract.
 Verification:
+  - python -m pytest -q tests/test_prm_product_ux_eval.py::test_product_ux_confirmation_uses_bound_action_context tests/test_prm_bot_dispatch.py::test_post_answer_callback_preserves_bound_source_without_reroute tests/test_prm_bot_dispatch.py::test_post_answer_callback_denies_stale_wrong_chat_or_topic_context
   - python tools/test_tiers.py focused-prm
 Context-Refs:
   - docs/design/PA.md

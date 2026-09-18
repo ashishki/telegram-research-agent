@@ -50,13 +50,28 @@ chooses among explicitly available tools; it never grants its own authority.
   object. Reformatting does not silently regenerate or update facts.
 - AcademicActionCandidate: obligation/opportunity, source, deadline precision,
   importance/applicability/confidence, lifecycle. Local done != Canvas submit.
-- ActionProposal/Confirmation/ActionReceipt: exact arguments/versions, one-use
-  approval bound to owner/content, actual provider result and reconciliation.
+- ActionProposal/Confirmation/ActionReceipt: exact arguments/versions, source
+  result/version and optional project reference, one-use approval bound to
+  owner/conversation/content, actual provider result and reconciliation.
 - WatchSubscription/Job: grant revision, schedule, quiet hours, cap, lifecycle,
   checkpoints, lease and bounded retries. Unknown send != failed send.
 
 All schemas versioned, account identity preserved even for one operator,
 cache/index derived and revocable. No unbounded raw-corpus or mail export.
+
+### Confirmation-context invariant
+
+An action preview and its confirmation bind to an immutable source result and
+version, action code, chat/owner, expiry, and optional source-project reference.
+They never obtain authority or project meaning from `last_project_name`,
+`last_topic`, or a freshly routed query. A plain-language “yes” is accepted
+only while exactly one matching preview remains current in that conversation;
+an explicit new topic, expiry, chat/actor mismatch, changed proposal, or missing
+source makes it ambiguous and it must fail closed or ask the operator to choose.
+An old inline callback may show a new preview only from its server-bound source
+context; it does not rerun search or route a later answer. The source project
+label may be displayed when present, but it must come from that immutable
+source, not from mutable dialogue state.
 
 ## UX and briefs
 
@@ -100,12 +115,15 @@ outages. Avoid legacy handler growth; extract shared delivery only with tests.
 ## Vertical slices and acceptance
 
 The 19 entries in `PA.design.json` are the dependency/scope registry, mirrored
-by task IDs PA-00..PA-18 in `docs/tasks.md`. The existing commands are regression
-floors, NOT sufficient feature evidence. Before starting each code slice,
-register exact new acceptance test functions and add them to its executable
-verification list/project verifier; show intended failures for required
-semantic test-first changes. Split an oversized slice by revising the registry
-and approval as necessary, not by silently exceeding its budget.
+by task IDs PA-00..PA-18 in `docs/tasks.md`. PA-00 first classifies the baseline
+as evaluator, active dispatch, or both and proves the confirmation-context
+invariant with named dispatch-level positive and denial tests; it does not
+preserve a stale project merely to satisfy the old corpus. The existing commands
+are regression floors, NOT sufficient feature evidence. Before starting each
+code slice, register exact new acceptance test functions and add them to its
+executable verification list/project verifier; show intended failures for
+required semantic test-first changes. Split an oversized slice by revising the
+registry and approval as necessary, not by silently exceeding its budget.
 
 Independent product/program design review precedes exact human approval.
 Slice/Test Critic/privacy reviews follow risk; full review is batched at phase

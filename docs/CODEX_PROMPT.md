@@ -47,6 +47,19 @@ Baseline GitHub run 35328205490 failed with 302 passed and 1 failed. This is not
 proof that a live bot loses context; distinguish evaluator from application.
 Do not remove the test or change expected results merely to green CI.
 
+The approved-design candidate is now explicit: confirmation binds the exact
+source result/version, action code, chat/owner and expiry (plus an optional
+source-project reference), never a mutable `last_project_name`. A new topic,
+expired/missing source, changed proposal or mismatched chat/actor makes plain
+text confirmation fail closed; an old callback may only render a fresh preview
+from its stored source and must not reroute or search. PA-00 must register and
+run `test_product_ux_confirmation_uses_bound_action_context`,
+`test_post_answer_callback_preserves_bound_source_without_reroute`, and
+`test_post_answer_callback_denies_stale_wrong_chat_or_topic_context`, then
+record the interpreter/environment, exact HEAD, active entrypoints,
+classification (evaluator, application, or both), before/after direct result,
+focused-tier result and any infrastructure-only blocker.
+
 ## Boundaries and evidence
 
 No .env, production database, account, subscription, service or timer was
