@@ -274,26 +274,19 @@ outages. Avoid legacy handler growth; extract shared delivery only with tests.
 
 ## Vertical slices and acceptance
 
-The 19 entries in `PA.design.json` are the dependency/scope registry, mirrored
-by task IDs PA-00..PA-18 in `docs/tasks.md`. PA-00 first classifies the baseline
-as evaluator, active dispatch, or both and proves the callback/source invariant
-with named positive and denial tests; it does not preserve a stale project merely
-to satisfy the old corpus. Those test functions are planned test-first work in
-PA-00, not evidence that exists before human design approval. The existing
-commands are regression floors, NOT sufficient feature evidence. Before
-starting each code slice, register exact new acceptance test functions and add
-them to its executable verification list/project verifier; show intended
-failures for required semantic test-first changes. Split an oversized slice by
-revising the registry and approval as necessary, not by silently exceeding its
-budget.
+`PA.design.json` is the dependency/scope registry for PA-00..18. PA-00
+classifies the baseline as evaluator, dispatch, or both. Its evaluator has two
+separate cases: free-text save/watch is denied without inventing a preview,
+callback, retrieval call or `eval-*` ID; a declared immutable bound-inline
+fixture checks project provenance. It never preserves stale dialogue merely to
+satisfy the old corpus. The direct handler tests prove the real callback path.
 
-PA-00's receipt records the resolved interpreter/environment, then-current
-HEAD, active bot runtime mode and evaluator synthetic context IDs; the historic
-`cc105…` run is reference-only, never Telegram evidence.
-PA-00's actual focused-tier blast radius includes `test_callbacks.py`,
-`test_prm_utd_callbacks.py`, and `test_prm_utd_dispatch.py`; their existing
-expectations are corrected, not bypassed; the registry includes them and the
-legacy markup caller within `files<=18`.
+These are planned test-first tests, not pre-approval evidence. Existing commands
+are regression floors; each code slice registers exact acceptance tests and
+intended semantic failures before implementation. PA-00 records interpreter,
+HEAD, runtime mode and evaluator IDs; historic `cc105…` is reference-only. Its
+scope includes the affected callbacks/UTD/ledger tests and legacy markup within
+`files<=18`.
 
 Independent product/program design review precedes exact human approval.
 Slice/Test Critic/privacy reviews follow risk; full review is batched at phase

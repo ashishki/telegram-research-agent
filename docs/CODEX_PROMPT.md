@@ -77,6 +77,10 @@ no control. Initial offered action codes alone are valid; dynamic `c`, `n1`–`n
 feedback-reason and confirmation codes require their exact issued, persisted
 parent transition, otherwise they fail read-only. The focused tier's existing
 callbacks/UTD callback/UTD dispatch tests are PA-00 scope, not bypassed.
+The evaluator must deny free-text legacy action selection without fabricating a
+preview/callback/`eval-*` context, while a separate immutable bound-inline
+fixture covers project provenance. `test_interaction_ledger.py` passes the same
+explicit synthetic private tuple as production; chat-only controls stay denied.
 Use `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest` for
 the direct PA-00 command, which explicitly includes
 `test_product_ux_keeps_project_context_for_confirmation_followups`; record the
