@@ -329,7 +329,11 @@ def complete_with_receipt(
         input_tokens=input_tokens,
         output_tokens=output_tokens,
     )
-    usage_recorded = _record_usage(category, actual_model, input_tokens, output_tokens, duration_ms)
+    # PA-02 grants model egress only; they do not authorize a durable local
+    # telemetry write.  PA-16 owns an explicit cost/telemetry capability and
+    # receipt model, so successful provider completion remains non-persistent
+    # here even when a legacy usage database path happens to be configured.
+    usage_recorded = False
     LOGGER.debug(
         "model=%s input_tokens=%s output_tokens=%s est_cost_usd=%.8f",
         actual_model,

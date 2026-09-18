@@ -36,9 +36,12 @@ provider/capability/operation tuple has no mapping and fails closed. This means
 a syntactically valid reservation for one purpose cannot be repurposed by an
 adapter transport for another purpose.
 
-The only implemented budget is the grant's bounded request count. PA-16 owns
-measured monetary/model routing budgets, and PA-13 owns durable external action
-reconciliation. This slice never represents either as complete.
+The only implemented budget is the grant's bounded request count. PA-02 does
+not persist `llm_usage` or cost telemetry after a model call: model egress does
+not imply an ungranted durable local write. PA-16 owns an explicit
+cost/telemetry capability and measured routing budgets, and PA-13 owns durable
+external-action reconciliation. This slice never represents either as
+complete.
 
 ## Adapter application
 
@@ -103,6 +106,8 @@ bounded return envelope reaches the final send/ack gate, while
 group/mismatched identity ingress receives no envelope, send or callback
 network acknowledgement; `/privacy` shows default deny without creating a
 durable grant. Credential-A/credential-B and null-connection substitutions for
-both text-model adapters reach no fake provider transport. Existing
+both text-model adapters reach no fake provider transport; valid, denied,
+revoked and revision-stale model decisions leave the configured synthetic usage
+database unchanged. Existing
 LLM, OpenAI adapter, synthesis and voice tests now pass a matching synthetic
 authorization only for their fake transport paths. No fixture calls a provider.

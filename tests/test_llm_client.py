@@ -6,7 +6,7 @@ import time
 import types
 import unittest
 from datetime import datetime, timedelta, timezone
-from dataclasses import FrozenInstanceError
+from dataclasses import FrozenInstanceError, replace
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -193,7 +193,58 @@ class TestLLMClient(unittest.TestCase):
 
         fake_transport.assert_not_called()
 
-    def test_complete_records_llm_usage_row(self):
+    def test_revoked_or_revision_stale_text_reservation_cannot_write_usage(self):
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        for change in ("revoke", "revision"):
+            with self.subTest(change=change):
+                grant = CapabilityGrant(
+                    grant_id=f"grant_synthetic_usage_{change}",
+                    owner_ref="owner_synthetic_primary",
+                    connection_ref=SYNTHETIC_ANTHROPIC_CONNECTION,
+                    capability="model.generate",
+                    resource_refs=("resource_conversation",),
+                    operations=("model_egress",),
+                    data_classes=("user_provided",),
+                    purpose="answer.request",
+                    provider_policy=ProviderPolicy(("provider_anthropic",)),
+                    issued_at=now - timedelta(minutes=1),
+                    expires_at=now + timedelta(hours=1),
+                    revision=1,
+                )
+                registry = CapabilityRegistry((grant,))
+                decision = registry.authorize_and_reserve(
+                    AuthorizationRequest(
+                        owner_ref="owner_synthetic_primary",
+                        connection_ref=SYNTHETIC_ANTHROPIC_CONNECTION,
+                        capability="model.generate",
+                        resource_ref="resource_conversation",
+                        operation="model_egress",
+                        data_class="user_provided",
+                        provider_ref="provider_anthropic",
+                        purpose="answer.request",
+                        expected_grant_revision=1,
+                    ),
+                    now=now,
+                )
+                if change == "revoke":
+                    registry.revoke_grant(grant.grant_id)
+                else:
+                    registry.replace_grant(replace(grant, revision=2))
+                fake_transport = unittest.mock.Mock()
+                fake_client = SimpleNamespace(messages=SimpleNamespace(create=fake_transport))
+                with patch.object(client, "_get_client", return_value=fake_client):
+                    with self.assertRaises(client.LLMError):
+                        client.complete(
+                            prompt="Synthetic question",
+                            authorization=decision,
+                            **AUTH_SCOPE,
+                        )
+                fake_transport.assert_not_called()
+                with sqlite3.connect(self.db_path) as connection:
+                    count = connection.execute("SELECT COUNT(*) FROM llm_usage").fetchone()[0]
+                self.assertEqual(count, 0)
+
+    def test_complete_does_not_persist_llm_usage_without_a_local_write_grant(self):
         response = SimpleNamespace(
             content=[SimpleNamespace(type="text", text="hello world")],
             usage=SimpleNamespace(input_tokens=123, output_tokens=45),
@@ -218,10 +269,7 @@ class TestLLMClient(unittest.TestCase):
                 """
             ).fetchone()
 
-        self.assertEqual(row[0], "claude-haiku-4-5")
-        self.assertEqual(row[1], "test")
-        self.assertEqual(row[2], 123)
-        self.assertEqual(row[3], 45)
+        self.assertIsNone(row)
 
     def test_complete_with_receipt_returns_immutable_usage_metadata(self):
         response = SimpleNamespace(
@@ -247,7 +295,7 @@ class TestLLMClient(unittest.TestCase):
         self.assertAlmostEqual(receipt.estimated_cost_usd, 0.0002)
         self.assertGreaterEqual(receipt.duration_ms, 0)
         self.assertEqual(receipt.attempts, 1)
-        self.assertTrue(receipt.usage_recorded)
+        self.assertFalse(receipt.usage_recorded)
         with self.assertRaises(FrozenInstanceError):
             receipt.text = "changed"
 
@@ -379,7 +427,7 @@ class TestLLMClient(unittest.TestCase):
             **AUTH_SCOPE,
         )
 
-    def test_complete_records_llm_usage_row_with_set_usage_db_path(self):
+    def test_complete_does_not_persist_llm_usage_with_an_explicit_usage_db_path(self):
         response = SimpleNamespace(
             content=[SimpleNamespace(type="text", text="hello world")],
             usage=SimpleNamespace(input_tokens=123, output_tokens=45),
@@ -408,12 +456,9 @@ class TestLLMClient(unittest.TestCase):
                 """
             ).fetchone()
 
-        self.assertEqual(row[0], "claude-haiku-4-5")
-        self.assertEqual(row[1], "test")
-        self.assertEqual(row[2], 123)
-        self.assertEqual(row[3], 45)
+        self.assertIsNone(row)
 
-    def test_complete_skips_usage_recording_when_database_is_locked(self):
+    def test_complete_never_touches_a_locked_usage_database_without_a_local_write_grant(self):
         response = SimpleNamespace(
             content=[SimpleNamespace(type="text", text="hello world")],
             usage=SimpleNamespace(input_tokens=123, output_tokens=45),
