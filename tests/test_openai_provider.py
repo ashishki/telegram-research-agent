@@ -180,6 +180,89 @@ def test_provider_requires_matching_opaque_operation_references_before_fake_call
     assert forged_ref_client.responses.calls == []
 
 
+def test_context_transport_uses_sealed_reservation_scope_not_copied_decision_fields(monkeypatch) -> None:
+    monkeypatch.setenv(PROVIDER_ENABLE_ENV, "true")
+    monkeypatch.setenv(CONTEXT_EGRESS_ENABLE_ENV, "true")
+    monkeypatch.setenv("OPENAI_API_KEY", SYNTHETIC_OPENAI_KEY)
+    client = _FakeClient()
+    context_authorization = _authorization(
+        capability="model.context_egress",
+        resource_ref="resource_archive_authorized",
+        data_class="private_archive",
+        purpose="answer.context",
+    )
+
+    result = complete_with_provider(
+        "Question",
+        provider="openai",
+        allow_provider_egress=True,
+        allow_context_egress=True,
+        authorization=_authorization(),
+        context_authorization=replace(
+            context_authorization,
+            resource_ref="resource_archive_ungranted",
+        ),
+        local_context=[{
+            "title": "approved",
+            "text": "private-archive-forgery-sentinel",
+            "source_ref": "archive:synthetic-approved-1",
+        }],
+        owner_ref="owner_synthetic_primary",
+        connection_ref=SYNTHETIC_OPENAI_CONNECTION,
+        resource_ref="resource_conversation",
+        context_resource_ref="resource_archive_ungranted",
+        client=client,
+    )
+
+    assert result.receipt.context_egress_performed is False
+    assert len(client.responses.calls) == 1
+    assert "private-archive-forgery-sentinel" not in repr(client.responses.calls[0]["input"])
+
+    forged_text_client = _FakeClient()
+    with pytest.raises(ProviderEgressDenied):
+        complete_with_provider(
+            "Question",
+            provider="openai",
+            allow_provider_egress=True,
+            authorization=replace(
+                _authorization(),
+                resource_ref="resource_conversation_ungranted",
+            ),
+            owner_ref="owner_synthetic_primary",
+            connection_ref=SYNTHETIC_OPENAI_CONNECTION,
+            resource_ref="resource_conversation_ungranted",
+            client=forged_text_client,
+        )
+
+    assert forged_text_client.responses.calls == []
+
+
+def test_provider_releases_operation_key_after_pretransport_ref_denial(monkeypatch) -> None:
+    monkeypatch.setenv(PROVIDER_ENABLE_ENV, "true")
+    monkeypatch.setenv("OPENAI_API_KEY", SYNTHETIC_OPENAI_KEY)
+    registry, request = _registry_and_request(operation_ref="operation_synthetic_release_001")
+    authorization = registry.authorize_and_reserve(request)
+    client = _FakeClient()
+
+    with pytest.raises(ProviderEgressDenied):
+        complete_with_provider(
+            "Question",
+            provider="openai",
+            allow_provider_egress=True,
+            authorization=replace(
+                authorization,
+                operation_ref="operation_synthetic_release_forged",
+            ),
+            owner_ref="owner_synthetic_primary",
+            connection_ref=SYNTHETIC_OPENAI_CONNECTION,
+            resource_ref="resource_conversation",
+            client=client,
+        )
+
+    assert client.responses.calls == []
+    assert registry.authorize_and_reserve(request).allowed is True
+
+
 def test_provider_transport_rejects_a_grant_for_another_active_credential_before_fake_call(monkeypatch) -> None:
     granted_connection_ref = openai_provider._openai_connection_ref("synthetic-openai-grant-a")
     assert granted_connection_ref is not None

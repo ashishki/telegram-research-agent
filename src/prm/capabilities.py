@@ -402,6 +402,34 @@ class BudgetReservation:
     def operation_ref(self) -> str | None:
         return self._request.operation_ref
 
+    def matches(
+        self,
+        *,
+        owner_ref: str,
+        capability: str,
+        resource_ref: str,
+        operation: str,
+        data_class: str,
+        provider_ref: str,
+        purpose: str,
+        connection_ref: str | None,
+    ) -> bool:
+        """Match an adapter request against this reservation's sealed request."""
+
+        request = self._request
+        return bool(
+            request.grant_ref == self.grant_ref
+            and request.expected_grant_revision == self.grant_revision
+            and request.owner_ref == owner_ref
+            and request.capability == capability
+            and request.resource_ref == resource_ref
+            and request.operation == operation
+            and request.data_class == data_class
+            and request.provider_ref == provider_ref
+            and request.purpose == purpose
+            and request.connection_ref == connection_ref
+        )
+
     @property
     def available(self) -> bool:
         with self._lock:
@@ -687,15 +715,17 @@ def is_authorized_operation(
     return bool(
         decision is not None
         and decision.allowed
-        and decision.owner_ref == owner_ref
-        and decision.connection_ref == connection_ref
-        and decision.resource_ref == resource_ref
-        and decision.capability == capability
-        and decision.operation == operation
-        and decision.provider_ref == provider_ref
-        and decision.data_class == data_class
-        and decision.purpose == purpose
         and decision.reservation is not None
+        and decision.reservation.matches(
+            owner_ref=owner_ref,
+            capability=capability,
+            resource_ref=resource_ref,
+            operation=operation,
+            data_class=data_class,
+            provider_ref=provider_ref,
+            purpose=purpose,
+            connection_ref=connection_ref,
+        )
         and decision.reservation.current
     )
 

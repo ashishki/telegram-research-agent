@@ -131,6 +131,7 @@ def complete_with_provider(
         )
 
     if not (_env_enabled(PROVIDER_ENABLE_ENV) and allow_provider_egress):
+        _abandon_before_transport(authorization, context_authorization)
         raise ProviderEgressDenied(
             "OpenAI provider egress requires PRM_OPENAI_PROVIDER_ENABLED=true "
             "and allow_provider_egress=True."
@@ -138,6 +139,7 @@ def complete_with_provider(
     active_api_key = _configured_openai_api_key()
     active_connection_ref = _openai_connection_ref(active_api_key)
     if active_connection_ref is None or connection_ref != active_connection_ref:
+        _abandon_before_transport(authorization, context_authorization)
         raise ProviderEgressDenied("OpenAI provider egress requires an active matching capability grant.")
     if not _has_matching_authorization(
         authorization,
@@ -147,8 +149,10 @@ def complete_with_provider(
         connection_ref=active_connection_ref,
         resource_ref=resource_ref,
     ):
+        _abandon_before_transport(authorization, context_authorization)
         raise ProviderEgressDenied("OpenAI provider egress requires an active matching capability grant.")
     if _matching_operation_ref(authorization, context_authorization) is None:
+        _abandon_before_transport(authorization, context_authorization)
         raise ProviderEgressDenied(
             "OpenAI provider egress requires matching opaque operation references."
         )
@@ -167,7 +171,11 @@ def complete_with_provider(
         clean_query,
         local_context=validated_context if include_context else None,
     )
-    active_client = client or _build_client(active_api_key)
+    try:
+        active_client = client or _build_client(active_api_key)
+    except OpenAIProviderError:
+        _abandon_before_transport(authorization, context_authorization)
+        raise
     try:
         require_authorized_egress(
             authorization,
@@ -275,7 +283,7 @@ def _matching_operation_ref(
         if (
             context_authorization.reservation is None
             or context_authorization.operation_ref != authorization.operation_ref
-            or context_authorization.reservation.operation_ref != authorization.operation_ref
+            or context_authorization.reservation.operation_ref != context_authorization.operation_ref
         ):
             return None
     return authorization.operation_ref
