@@ -4,24 +4,16 @@ Status: review_required. Planning depth: designed_slices. Risk: high.
 The owner requested this design and its publication; exact hash-bound human
 approval has not been recorded. Never manufacture that approval.
 
-## Product outcome
-
-One conversation unifies Chat, archive/web AI Search, Briefs, Watch and
-confirmed Act. `docs/PERSONAL_ASSISTANT_SPEC.md` remains authoritative; this is
-not an MVP plan.
-
 ## Architecture contract
 
-Use a modular monolith with bounded adapters and a durable work worker: no
-second bot, duplicate source database or platform migration. Flow is message ->
+Use a modular monolith and durable worker: no second bot, duplicate source DB or
+platform migration. Flow is message ->
 ConversationState -> bounded plan -> permission check -> typed evidence/object
 result -> answer/ActionProposal -> verification/receipt; checks run before data
 egress and again before external write/send, and the model never grants itself
-authority. Versioned types cover ConversationState (summary is not authority),
-CapabilityGrant (mail-read != write), evidence/result coverage, immutable
-source-identical BriefDocument, academic lifecycle, one-use proposal/receipt and
-lease/retry WatchSubscription. Preserve account identity, revocable derived
-cache/index and bounded corpus/mail output.
+authority. Versioned types cover state/grants/evidence, immutable briefs,
+academic lifecycle, one-use proposal/receipt and watched work. Preserve account
+identity and revocable bounded derived data.
 
 ### Confirmation-context invariant
 
@@ -202,7 +194,7 @@ write. `transition_utd_proposal(conn, context_id, expected, next)` begins one
 transaction, decodes the current pair, and conditionally updates both encoded
 JSON and mapped status only where the exact expected logical state, mapped
 status and prior JSON fingerprint still match. Allowed transitions are
-`draft -> previewed|cancelled`; `previewed -> confirming|cancelled|expired`;
+`draft -> draft|previewed|cancelled`; `previewed -> draft|confirming|cancelled|expired`;
 `confirming -> confirmed|previewed|cancelled|expired`; terminal states have none. All
 onboarding, draft load/save/discard, profile preview/confirm/cancel and
 subscription start/claim/finish/cancel call that codec/guard. A canonical-schema
@@ -211,7 +203,10 @@ CAS wins. A provider-confirm known-no-write failure transitions
 `confirming -> previewed` by CAS so the exact preview can be retried. Timeout,
 crash or ambiguous provider outcome leaves `confirming` locked: no retry occurs
 until explicit reconciliation establishes confirmed, cancelled, or known-no-write
-previewed. Recovery tests cover both outcomes. This permits a real UTD-path drain fixture; shared drain blocks old
+previewed. `draft -> draft` is guarded category/settings edit; `previewed ->
+draft` atomically invalidates its confirmation and old callback. Acceptance is
+blank onboarding -> category -> preview -> return/edit -> old-confirmation denial
+-> new preview -> confirm. Recovery tests cover both outcomes. This permits a real UTD-path drain fixture; shared drain blocks old
 UTD code until active mapped rows are gone.
 
 This is JSON-additive: PA-00 adds no table migration. Only `context_kind=prm`
@@ -226,10 +221,11 @@ namespace. The report canonicalizes the raw owner once, calculates
 `:prm_owner_hash` with the current `prm.post-answer.v1` algorithm and
 `:utd_owner_hash` by invoking the current `assistant.utd_profile_store._chat_hash`
 helper (therefore using the configured `PI_SAVE_CONFIRMATION_SECRET` without
-exposing it), then selects exactly
-`chat_id_hash IN (:prm_owner_hash, :utd_owner_hash) AND expires_at > :now AND
-status NOT IN ('confirmed','cancelled','expired')`. It is deliberately
-conservative: any returned legacy, malformed or unknown row is a blocker. Its
+exposing it), then SELECTs all rows for either hash before strict JSON/status/UTC
+expiry parsing. Nonterminal unexpired rows block; issued PRM confirmation locks
+and UTD `confirming` block regardless of expiry until reconciliation. Bad,
+malformed or unknown data is unavailable and blocks; no loader/drain deletes a
+confirming payload. Its
 only classification is derived from `summary_json`: `prm_binding_v1` when
 `context_kind="prm"`; `legacy_prm_candidate` when the old PRM
 `primary_intent`/`allowed_actions` shape is present; `utd_profile` or
