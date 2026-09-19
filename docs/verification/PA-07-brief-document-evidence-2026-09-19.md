@@ -5,7 +5,7 @@ This record is not human acceptance, release approval, live Telegram evidence,
 or formal approval of the mechanically `review_required` PA design.
 
 Branch: `docs/personal-assistant-blueprint-playbook-20260918`.
-Tested implementation SHA: `dfa135ff274855dee05283ff9c62f7a14429d018`.
+Tested implementation SHA: `ff6329e328a52289e98d7b788ae6b65b2550ff63`.
 
 ## Implemented boundary
 
@@ -34,10 +34,11 @@ Tested implementation SHA: `dfa135ff274855dee05283ff9c62f7a14429d018`.
 - The owner authorized a narrow 2026-09-19 P1 remediation: immutable selected
   document versions are retained in the existing local SQLite schema only when
   the Telegram ingress carries one canonical private `(chat_id, actor_id,
-  owner_chat_id)` tuple. Application code derives an opaque owner scope from
-  that tuple and replaces any caller-supplied `BriefBuildRequest.owner_ref`.
+  owner_chat_id)` tuple. Application code derives its opaque owner reference
+  from that tuple and replaces any caller-supplied `BriefBuildRequest.owner_ref`.
   Group, absent, mismatched and CLI tuples retain only ephemeral visible
-  state. Durable reads require that authenticated scope plus exact
+  state. Durable reads, listing, writes and deletion each consume that tuple
+  plus exact
   `(brief_id, version)`; there is no cross-chat or latest-report lookup.
 - Retained history contains bounded excerpts/inspection data rather than the
   archive corpus, checks its stored content identity when loading, is capped at
@@ -55,16 +56,16 @@ staged or modified.
 
 ## Verification
 
-Commands run against `dfa135f`:
+Commands run against `ff6329e`:
 
 ```text
 PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q \
   tests/test_assistant_briefs.py \
   tests/test_assistant_report_dialogue.py
-# 22 passed in 8.08s
+# 22 passed in 10.70s
 
 PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/test_tiers.py focused-prm
-# 412 passed in 93.70s
+# 412 passed in 82.92s
 ```
 
 The direct suites cover timezone/DST half-open selection, exact local-source
@@ -72,12 +73,13 @@ provenance, coverage/empty/partial states, deduplication, unresolved conflict,
 importance/urgency, content identity, immutable refresh history, current
 visible-response expiry, all report follow-ups, window filtering before and
 after candidate selection, and the Telegram full-view button payload. The
-durable-history additions cover exact private-scope owner binding,
+durable-history additions cover private-tuple owner binding,
 caller-supplied owner replacement, group/missing/mismatched/CLI rejection,
-cross-owner denial, restart-visible-state expiry, tampered JSON fail-closed,
-owner deletion and the owner-wide 64-document cap. They are fixture/adapter
-evidence only: they do not prove actual Telegram rendering, mobile readability,
-archive recall quality, or operator usefulness.
+forged-tuple read/list/write/delete denial, cross-owner denial,
+restart-visible-state expiry, tampered JSON fail-closed, owner deletion and the
+owner-wide 64-document cap. They are fixture/adapter evidence only: they do
+not prove actual Telegram rendering, mobile readability, archive recall
+quality, or operator usefulness.
 
 `focused-prm` now includes both PA-07 suites. It is a regression tier, not
 human content, visual, live runtime, or release evidence.
@@ -104,10 +106,16 @@ The relevant remediation/recheck chain is:
 - Fresh review `20260919T102000Z-slice_review-5a7957ec` reviewed `f146925`,
   requested and observed `gpt-5.6-terra` / `high`, and returned `STOP_SHIP`.
   Its P1 findings were authenticated private owner binding, an owner-wide
-  retention cap and current evidence. Commit `dfa135f` adds the first two;
-  this record replaces the stale evidence and reports the current test runs.
+  retention cap and current evidence. Commit `dfa135f` added the first two;
+  this record replaced the stale evidence and reported the corresponding tests.
+- Fresh review `20260919T103250Z-slice_review-a7231974` reviewed `bce76c5`,
+  requested and observed `gpt-5.6-terra` / `high`, and returned `STOP_SHIP`.
+  It found that the intermediate `BriefOwnerScope` was forgeable. Commit
+  `ff6329e` removes that object-capability interface: durable store methods
+  now consume the canonical private tuple themselves, and the PA-07 registry
+  records the owner-authorized schema/test-tier amendment.
 
-A fresh independent Terra/high recheck of `dfa135f` plus this evidence update
+A fresh independent Terra/high recheck of `ff6329e` plus this evidence update
 is still required. Actual Telegram/mobile visual and human content review also
 remain separate gates. Neither fixture tests nor model review authorizes
 runtime, publication, a design-state change, or PA-08/PA-09 work.

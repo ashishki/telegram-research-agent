@@ -47,12 +47,12 @@ remediate two independent P1 findings: add owner-scoped, bounded immutable
 BriefDocument history through the existing local SQLite schema path, and
 register the two PA-07 suites in `focused-prm`. Visible conversation bindings
 remain ephemeral: a new topic or process restart cannot resolve a normal
-language follow-up without its current visible response. Durable lookup is
-only an exact authenticated private-tuple-derived owner scope plus
-`(brief_id, version)`, never a cross-chat or latest-report catalogue. History
-is capped owner-wide, not only per report identity. The migration is additive
-and is exercised only on a temporary test database; do not access or migrate a
-production database.
+language follow-up without its current visible response. Durable lookup,
+listing, writes and deletion each consume the canonical authenticated private
+tuple plus exact `(brief_id, version)` where applicable, never a cross-chat or
+latest-report catalogue. History is capped owner-wide, not only per report
+identity. The migration is additive and is exercised only on a temporary test
+database; do not access or migrate a production database.
 
 This amendment does not authorize a durable job, worker, Redis, schedule,
 export, live provider/account/credential action, Telegram polling or any
