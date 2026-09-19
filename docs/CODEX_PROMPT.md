@@ -33,61 +33,45 @@ made on 2026-09-19 using the documented secret path; it skipped migrations,
 was stopped cleanly, and the pre-existing service was restored. It produced no
 test brief or human-review receipt, so it grants no continuing live authority.
 
-## Current slice: PA-07 editorial content and conversation correction
+## Current slice: PA-08 private report views and exports
 
-On 2026-09-19 the owner rejected the feed-like brief and explicitly directed
-integrating the product-quality recommendations throughout active tasks up to
-PA-15 and beginning implementation with batched review. This newer instruction
-supersedes the previous narrow local PA-07 edit boundary, not runtime consent.
-Read `docs/design/PA-PRODUCT-QUALITY.md` and the current PA-07 task first.
-The complete PA-00..PA-18 programme and formal `review_required` state remain.
+PA-07 is complete as a local dependency checkpoint. Its final Terra/high
+recheck at `065033c` found no further local P0/P1; do not repeat that review.
+The open provider/runtime, private Telegram/mobile and owner-content acceptance
+gate is still an acceptance/release boundary, not authority to start a service
+or collect live evidence.
 
-The current correction adds source-anchored editorial stories, explanations,
-selection rationale and conditional next steps to the immutable report, with
-real source references across short/full/discussion views. Candidate and display
-limits are distinct. The existing paired archive model grant is still required;
-no live model/account/service is enabled by these local edits. Quote anchoring
-is not semantic verification or human content acceptance.
+PA-08 projects one immutable, owner-scoped `BriefDocument` into static HTML,
+PDF and Markdown. Each artifact carries the exact `brief_id`, version, content
+digest and ordered source URLs from the stored object; rendering must not
+retrieve, generate facts, persist an export, send it, create a public link, or
+call a provider. HTML has a restrictive CSP and no executable/tracking
+resources. Its mobile/dark/print CSS preserves the editorial hierarchy, caveat,
+source timeline and coverage table; a chart is omitted because this document
+has no comparable measurement that could justify one.
 
-Use the dedicated editorial/brief/dialogue/synthesis tests and focused-prm.
-Review one coherent change, then only scoped P0/P1 corrections. Do not repeat
-Deep Review per wording patch. Preserve the prior ownership, history, temporal
-and permission checks. Human mobile/provider evidence remains required before
-claiming product acceptance; proceed with independent local work meanwhile.
+The local reader uses PA-07's exact persisted owner/version lookup. It issues
+an opaque process-local handle for at most 20 minutes, then rechecks the
+canonical private tuple and stored content digest before every render. Restart,
+wrong owner, altered version/digest, expiry, malformed format and deleted or
+tampered history all fail closed. A sharing request stops at an exact rendered
+content and recipient-label preview with `preview_only_no_delivery`; there is
+no delivery implementation in this slice.
 
-The earlier source-link/comparison checkpoint `dbc87126` is preserved. The
-current PA-07 code checkpoint is `55877b0ecbcb3f8b1d0047ee904689bd332c8658`:
-after a detailed story, bounded natural continuations for importance,
-simplification, conditional next step, uncertainty and sources use the same
-exact immutable story/version and never retrieve, egress or act. The current
-story reference is ephemeral and is cleared by broad/full/filter/comparison
-views, so an ambiguous shorthand cannot silently target an old detail.
+The preferred local PDF backend is the declared WeasyPrint dependency with an
+external-resource-denying fetcher. The current environment's WeasyPrint/pydyf
+pair imports but fails before a PDF is created, so the renderer falls back only
+to an in-memory Unicode PDF projection with an embedded local font. It does
+not use a network or change dependencies. Record the backend limitation in the
+PA-08 evidence; actual rendered PDF/mobile owner inspection remains a required
+external acceptance gate.
 
-At that SHA, the editorial+synthesis command passed 46 tests, the
-briefs+dialogue command passed 28 tests, and `focused-prm` passed 452 tests.
-Independent runs `20260919T170254Z-slice_review-c67210a0` and
-`20260919T170826Z-slice_review-95c761a4` recorded requested/observed
-`gpt-5.6-terra` / `high`. The first found two scoped P1s (invalid item binding
-and missing exact-version renderer views), which are remediated in `55877b0`.
-The second requested contemporaneous writable-workspace verification and
-flagged the broad-view transition; both are addressed and recorded in the
-current evidence. Its remaining STOP_SHIP is the already-open actual
-provider/runtime, private Telegram/mobile and owner-content acceptance gate.
-Final validated recheck `20260919T171533Z-slice_review-6f46ea2a` at `065033c`
-found no further local P0/P1; it retains only that same acceptance/release
-gate. The run receipt is in the evidence record.
-No release is requested and no live evidence may be obtained without separate
-authority. Do not repeat code/design review merely for that known gate.
-Current evidence: `docs/verification/PA-07-editorial-evidence-2026-09-19.md`.
-The dedicated editorial/brief/dialogue/synthesis suite includes the comparison
-regressions; final
-focused and independent recheck receipts belong in that evidence record.
-
-Historical PA-07 evidence is in
-`docs/verification/PA-07-brief-document-evidence-2026-09-19.md`.
-The earlier two-item synthetic judge pass is not evidence of editorial quality.
-The previous bounded live attempt produced no acceptance receipt. Record the
-current implementation/checkpoint in the new editorial evidence record.
+Run `tests/test_assistant_report_exports.py` and
+`tests/test_assistant_report_access.py`, then `python tools/test_tiers.py
+fast-contract`. Record the exact scoped commit, all commands/results, and a
+fresh independent Terra/high PA-08 slice review in
+`docs/verification/PA-08-report-export-evidence-2026-09-19.md`. The design
+remains mechanically `review_required`; no human approval is inferred.
 
 The checkpoints below are historical dependency evidence. The owner's newer
 quality amendment governs current local work; live/runtime gates remain.

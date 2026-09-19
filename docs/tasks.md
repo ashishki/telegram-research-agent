@@ -274,6 +274,7 @@ Acceptance-Criteria:
   - Facts and citations remain equivalent across formats; long URLs/Cyrillic/dark mode/page breaks do not corrupt the layout.
   - Private views enforce ownership and expiry, sanitize content and do not load tracking resources; sharing has a content/recipient preview.
 Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_assistant_report_exports.py tests/test_assistant_report_access.py
   - python tools/test_tiers.py fast-contract
 Context-Refs:
   - docs/design/PA-PRODUCT-QUALITY.md
