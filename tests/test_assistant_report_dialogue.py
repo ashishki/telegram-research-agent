@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from types import SimpleNamespace
 
 from bot.prm_handlers import _brief_navigation_markup
+from bot import prm_handlers
 from prm.application import PersonalResearchAssistant
 from prm.briefs import BriefBuildRequest, BriefDocumentStore, BriefWindow, CoverageSource, build_brief_document, render_brief
 from prm.contracts import OperatorRequest
@@ -208,3 +210,55 @@ def test_active_brief_refresh_versions_and_two_active_weeks_bind_real_history(mo
     }
     assert compared.payload["brief_followup"]["kind"] == "compare_weeks"
     assert len(calls) == 2
+
+
+def test_telegram_dispatch_reuses_visible_brief_store_across_turns_and_denies_after_restart(monkeypatch) -> None:
+    chat_id = "987654321"
+    settings = SimpleNamespace(db_path=":memory:")
+    created = []
+    sent = []
+
+    class DispatchAssistant(PersonalResearchAssistant):
+        def __init__(self, *args, **kwargs) -> None:
+            super().__init__(*args, **kwargs)
+            created.append(self)
+
+        def answer(self, request):
+            if request.query == "weekly signals":
+                return super().answer(replace(request, mode="brief", brief_request=_request()))
+            return super().answer(request)
+
+    fallback_payload = {
+        "status": "ok", "direct_answer": "No visible brief remains.", "answer_gate": {"allow_answer": True},
+        "archive_evidence": {"items": []}, "evidence_quality": {"items": []},
+        "professional_answer": {}, "project_fit": {}, "project_decision": {}, "claim_ledger": {},
+        "unknowns": [], "next_steps": {}, "receipt": {}, "privacy": {},
+    }
+    monkeypatch.setattr(prm_handlers, "PersonalResearchAssistant", DispatchAssistant)
+    monkeypatch.setattr("prm.application.answer_memory_research", lambda *args, **kwargs: fallback_payload)
+    monkeypatch.setattr("prm.application.build_research_facade", lambda **kwargs: SimpleNamespace())
+    monkeypatch.setattr(prm_handlers, "_send_chunks", lambda _chat, text, **_kwargs: sent.append(text))
+    prm_handlers._PRM_BRIEF_STORES.clear()
+
+    prm_handlers.dispatch_prm_command(
+        chat_id, "/brief weekly signals", settings, actor_id=chat_id, owner_chat_id=chat_id,
+    )
+    prm_handlers.dispatch_prm_command(
+        chat_id, "/auto объясни пункт 2", settings, actor_id=chat_id, owner_chat_id=chat_id,
+    )
+
+    assert len(created) == 2
+    assert created[0].briefs is created[1].briefs
+    assert "Пункт 2: Career item" in sent[-1]
+
+    visible_store = created[-1].briefs
+    # A process restart loses only the bounded visible store. Conversation
+    # metadata alone cannot reconstruct a natural-language report follow-up.
+    prm_handlers._PRM_BRIEF_STORES.clear()
+    prm_handlers.dispatch_prm_command(
+        chat_id, "/auto объясни пункт 2", settings, actor_id=chat_id, owner_chat_id=chat_id,
+    )
+
+    assert created[-1].briefs is not visible_store
+    assert "Пункт 2: Career item" not in sent[-1]
+    prm_handlers._PRM_BRIEF_STORES.clear()

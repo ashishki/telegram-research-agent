@@ -7,6 +7,7 @@ import os
 import hashlib
 import uuid
 from datetime import datetime, timedelta, timezone
+from threading import RLock
 from typing import Any, Mapping, Sequence
 
 from assistant.prm_post_answer_actions import build_post_answer_actions, canonical_private_owner_id
@@ -19,6 +20,7 @@ from assistant.utd_profile import (
 from bot.telegram_delivery import _send_text_internal
 from config.settings import Settings
 from prm.application import PersonalResearchAssistant
+from prm.briefs import BriefDocumentStore
 from prm.capabilities import (
     AuthorizationDecision,
     AuthorizationRequest,
@@ -55,12 +57,29 @@ PRM_SAFE_COMMANDS = frozenset(
 _PRM_DIALOG_TTL = timedelta(minutes=20)
 _MAX_PRM_DIALOGS = 200
 _PRM_DIALOG_STATE: dict[str, dict[str, Any]] = {}
+_PRM_BRIEF_STORES: dict[str, BriefDocumentStore] = {}
+_PRM_BRIEF_STORES_LOCK = RLock()
+_MAX_PRM_BRIEF_STORES = 4
 TELEGRAM_PROVIDER_REF = "provider_telegram"
 RESULT_DELIVERY_CAPABILITY = "assistant.result_delivery"
 RESULT_DELIVERY_DATA_CLASS = "private_archive"
 UTD_DRAFT_CAPABILITY = "assistant.utd_draft"
 LOCAL_PROVIDER_REF = "provider_local"
 MAX_EPHEMERAL_REPLY_SENDS = 8
+
+
+def _assistant_for_prm(settings: Settings) -> PersonalResearchAssistant:
+    """Keep only the bounded visible BriefDocument projection across turns."""
+
+    db_path = str(settings.db_path)
+    with _PRM_BRIEF_STORES_LOCK:
+        briefs = _PRM_BRIEF_STORES.get(db_path)
+        if briefs is None:
+            if len(_PRM_BRIEF_STORES) >= _MAX_PRM_BRIEF_STORES:
+                _PRM_BRIEF_STORES.pop(next(iter(_PRM_BRIEF_STORES)))
+            briefs = BriefDocumentStore(db_path=db_path)
+            _PRM_BRIEF_STORES[db_path] = briefs
+    return PersonalResearchAssistant(settings=settings, briefs=briefs)
 
 
 def send_message(
@@ -172,7 +191,7 @@ def dispatch_prm_command(
         send_private_reply(describe_current_capability_scope(()))
         return
     if command in {"/new", "/cancel"}:
-        assistant = PersonalResearchAssistant(settings=settings)
+        assistant = _assistant_for_prm(settings)
         try:
             result = assistant.answer(
                 OperatorRequest(
@@ -253,7 +272,7 @@ def dispatch_prm_command(
         args,
         mode=mode,
     ) or args
-    assistant = PersonalResearchAssistant(settings=settings)
+    assistant = _assistant_for_prm(settings)
     try:
         result = assistant.answer(
             OperatorRequest(
