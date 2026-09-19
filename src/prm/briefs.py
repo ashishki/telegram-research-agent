@@ -11,6 +11,7 @@ recovery in this module.
 
 from __future__ import annotations
 
+from assistant.prm_post_answer_actions import canonical_private_owner_id
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import hashlib
@@ -44,7 +45,6 @@ _SAFE_REASON = re.compile(r"^[a-z][a-z0-9_.-]{2,120}$")
 _SAFE_TOPIC = re.compile(r"^[a-z0-9][a-z0-9 _./-]{0,63}$")
 _PROJECT_REF = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 _.\-/]{0,79}$")
 _CONTENT_DIGEST = re.compile(r"^sha256:[a-f0-9]{64}$")
-_PRIVATE_ID = re.compile(r"^[1-9][0-9]{0,18}$")
 _COVERAGE_STATES = frozenset({"checked", "excluded", "unavailable", "stale", "partial"})
 _IMPORTANCE = frozenset({"critical", "high", "medium", "low", "unknown"})
 _URGENCY = frozenset({"urgent", "soon", "not_marked", "unknown"})
@@ -371,14 +371,10 @@ def brief_owner_ref_from_authenticated_private_tuple(
 ) -> str | None:
     """Derive durable ownership only from the canonical private Telegram tuple."""
 
-    values = (str(chat_id or ""), str(actor_id or ""), str(owner_chat_id or ""))
-    if (
-        any(not _PRIVATE_ID.fullmatch(value) for value in values)
-        or any(int(value) > 9223372036854775807 for value in values)
-        or len(set(values)) != 1
-    ):
+    values = tuple(canonical_private_owner_id(value) for value in (chat_id, actor_id, owner_chat_id))
+    if any(value is None for value in values) or len(set(values)) != 1:
         return None
-    canonical = "\x1f".join(values)
+    canonical = "\x1f".join(value for value in values if value is not None)
     digest = hashlib.sha256(f"pa07.brief.owner.v1:{canonical}".encode("utf-8")).hexdigest()
     return "owner_brief_" + digest[:24]
 

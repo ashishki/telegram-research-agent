@@ -300,6 +300,38 @@ def test_exact_owner_scoped_brief_history_survives_a_store_restart_and_can_be_fo
         authenticated_chat_id=primary_tuple[0], authenticated_actor_id=primary_tuple[1], authenticated_owner_chat_id=primary_tuple[2], brief_id=first.brief_id, version=1,
     ) == first
 
+    integer_tuple = (42, 42, 42)
+    integer_document = build_brief_document(
+        BriefBuildRequest(
+            topic="AI integer", window=_window(), owner_ref=primary_owner_ref,
+            coverage=(CoverageSource("telegram:archive", "checked"),),
+            evidence=(_evidence("integer", "https://t.me/example/integer", title="Integer", summary="Must remain visible-only."),),
+        )
+    )
+    initial.bind_visible(
+        conversation_id="conversation_integer",
+        response_ref="response_" + "1" * 24,
+        document=integer_document,
+        authenticated_chat_id=integer_tuple[0],
+        authenticated_actor_id=integer_tuple[1],
+        authenticated_owner_chat_id=integer_tuple[2],
+    )
+    assert restarted.get_persisted_document(
+        authenticated_chat_id=integer_tuple[0], authenticated_actor_id=integer_tuple[1], authenticated_owner_chat_id=integer_tuple[2], brief_id=first.brief_id, version=1,
+    ) is None
+    assert restarted.list_persisted_versions(
+        authenticated_chat_id=integer_tuple[0], authenticated_actor_id=integer_tuple[1], authenticated_owner_chat_id=integer_tuple[2], brief_id=first.brief_id,
+    ) == ()
+    assert restarted.get_persisted_document(
+        authenticated_chat_id=primary_tuple[0], authenticated_actor_id=primary_tuple[1], authenticated_owner_chat_id=primary_tuple[2], brief_id=integer_document.brief_id, version=1,
+    ) is None
+    restarted.forget_owner(
+        authenticated_chat_id=integer_tuple[0], authenticated_actor_id=integer_tuple[1], authenticated_owner_chat_id=integer_tuple[2],
+    )
+    assert restarted.get_persisted_document(
+        authenticated_chat_id=primary_tuple[0], authenticated_actor_id=primary_tuple[1], authenticated_owner_chat_id=primary_tuple[2], brief_id=first.brief_id, version=1,
+    ) == first
+
     restarted.forget_owner(
         authenticated_chat_id=primary_tuple[0], authenticated_actor_id=primary_tuple[1], authenticated_owner_chat_id=primary_tuple[2],
     )
