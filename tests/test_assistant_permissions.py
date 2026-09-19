@@ -146,6 +146,12 @@ def test_authorization_request_rejects_non_boolean_is_fallback_fail_closed(malfo
         make_request(is_fallback=malformed)  # type: ignore[arg-type]
 
 
+@pytest.mark.parametrize("malformed", [True, False, 0, "1"])
+def test_authorization_request_rejects_a_non_integer_expected_grant_revision(malformed: object):
+    with pytest.raises(ValueError, match="invalid expected grant revision"):
+        make_request(expected_revision=malformed)  # type: ignore[arg-type]
+
+
 def test_registry_rejects_a_crafted_policy_shape_before_authorization():
     grant = make_grant()
     object.__setattr__(
@@ -191,6 +197,31 @@ def test_registry_seals_registered_policy_against_post_registration_mutation(rep
     assert denied.reason == "fallback_not_granted"
 
 
+@pytest.mark.parametrize("replace_registered_grant", [False, True])
+def test_registry_seals_mutable_provider_collections_against_post_registration_mutation(
+    replace_registered_grant: bool,
+):
+    providers = ["provider_openai"]
+    registered = make_grant(revision=3, providers=providers)
+    registry = CapabilityRegistry((registered,))
+    if replace_registered_grant:
+        providers = ["provider_openai"]
+        registered = make_grant(revision=4, providers=providers)
+        registry.replace_grant(registered)
+
+    providers.append("provider_anthropic")
+    denied = registry.authorize(
+        make_request(
+            expected_revision=registered.revision,
+            provider_ref="provider_anthropic",
+        ),
+        now=NOW,
+    )
+
+    assert denied.allowed is False
+    assert denied.reason == "provider_not_permitted"
+
+
 @pytest.mark.parametrize("reserve", [False, True])
 def test_registry_rejects_crafted_or_mutated_request_before_any_decision(reserve: bool):
     registry = CapabilityRegistry((make_grant(fallback_allowed=False),))
@@ -213,15 +244,37 @@ def test_registry_rejects_crafted_or_mutated_request_before_any_decision(reserve
         action(shaped_request, now=NOW)
 
 
+@pytest.mark.parametrize("reserve", [False, True])
+def test_registry_rejects_a_mutated_boolean_revision_before_any_decision(reserve: bool):
+    registry = CapabilityRegistry((make_grant(),))
+    request = make_request()
+    object.__setattr__(request, "expected_grant_revision", True)
+
+    action = registry.authorize_and_reserve if reserve else registry.authorize
+    with pytest.raises(ValueError, match="invalid expected grant revision"):
+        action(request, now=NOW)
+
+
 def test_registry_reservation_seals_a_valid_request_against_later_caller_mutation():
     registry = CapabilityRegistry((make_grant(),))
     request = make_request()
     decision = registry.authorize_and_reserve(request, now=NOW)
     assert decision.allowed is True and decision.reservation is not None
 
-    object.__setattr__(request, "resource_ref", "resource_other")
+    object.__setattr__(request, "provider_ref", "provider_anthropic")
 
     assert decision.reservation.current is True
+    with pytest.raises(CapabilityDenied):
+        require_authorized_egress(
+            decision,
+            capability="model.generate",
+            provider_ref="provider_anthropic",
+            data_class="user_provided",
+            owner_ref="owner_synthetic_primary",
+            connection_ref=None,
+            resource_ref="resource_conversation",
+            purpose="answer.request",
+        )
 
 
 def test_budget_reservation_is_conservative_and_single_use_at_egress():

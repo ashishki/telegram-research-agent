@@ -332,7 +332,11 @@ class AuthorizationRequest:
             raise ValueError("invalid authorization scope")
         if not isinstance(self.is_fallback, bool):
             raise ValueError("is_fallback must be boolean")
-        if self.expected_grant_revision is not None and self.expected_grant_revision < 1:
+        if self.expected_grant_revision is not None and (
+            not isinstance(self.expected_grant_revision, int)
+            or isinstance(self.expected_grant_revision, bool)
+            or self.expected_grant_revision < 1
+        ):
             raise ValueError("invalid expected grant revision")
 
 
