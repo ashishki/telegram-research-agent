@@ -55,13 +55,17 @@ Deep Review per wording patch. Preserve the prior ownership, history, temporal
 and permission checks. Human mobile/provider evidence remains required before
 claiming product acceptance; proceed with independent local work meanwhile.
 
-Implementation checkpoints: `e280723`, `f912046`, `b69f8f2` and `57b7e35`.
-The current scoped P1 correction against `57b7e35` preserves long source URLs
-in expanded views and resolves a stored comparison's exact owner-scoped
-companion in the public render API. Recheck these two findings from run
-`20260919T160938Z-slice_review-3d155e8d`, the changed diff and directly affected
-delivery/ownership paths. Do not restart programme design or unrelated historical
-reviews. No release is requested.
+Implementation checkpoint: `dbc87126fb88aa21e4af0f9ac643eeb1cea9fbda`.
+Focused-prm passed 448 tests at that SHA. Independent run
+`20260919T162136Z-slice_review-bff8757a` found the two source-link/comparison
+fixes sound, but returned STOP_SHIP for missing contemporaneous test evidence,
+three missing programme-document paths in allowed_files, and open real mobile
+acceptance. The receipt and test log are recorded in the evidence below.
+Only documentation changed after that code SHA: the evidence and machine scope
+now include the actual completed check and explicitly owner-authorized paths.
+The final recheck is limited to those two documentary findings; real Telegram,
+provider and human acceptance remain OPEN, and no release is requested. Do not
+restart code/design review or treat an open live gate as missing local authority.
 Current evidence: `docs/verification/PA-07-editorial-evidence-2026-09-19.md`.
 The dedicated editorial/brief/dialogue/synthesis suite includes the comparison
 regressions; final

@@ -205,3 +205,56 @@ without changing the contract. The dedicated four-file command then passed
 **70 tests in 12.90s**. `git diff --check` and the plan consistency checker passed.
 The remaining recheck is scoped to these two P1s and the directly affected
 delivery/ownership paths. Formal design, live-provider and human gates remain.
+
+## Final code verification and independent scope receipt
+
+Code SHA: `dbc87126fb88aa21e4af0f9ac643eeb1cea9fbda`.
+`PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/test_tiers.py focused-prm`
+completed at that SHA with exit 0: **448 passed in 107.35s**. This tier includes
+all 70 dedicated editorial/brief/dialogue/synthesis cases; no code changed
+between their earlier dedicated receipt and the commit. Local log:
+`/tmp/pa-editorial-focused-links-20260919.log`. The historical full suite was not run.
+
+Independent run `20260919T162136Z-slice_review-bff8757a` reviewed that exact code
+SHA with requested/recorded `gpt-5.6-terra` / `high`. Its runner receipt is
+validated; `python3 tools/run_codex_role.py verify --root . --result
+.playbook-artifacts/runs/20260919T162136Z-slice_review-bff8757a/result.json`
+returned valid. Report SHA-256:
+`ee0f0893e7a9d2be4e964653721974d8db5bff11423692386d6f71ce8308cb3d`.
+The independent reviewer explicitly found both scoped code fixes sound. Its
+overall verdict remains **STOP_SHIP**, with three findings:
+
+- The focused receipt was not yet in the document the reviewer read. The
+  concurrent writable-workspace run completed successfully, as recorded above.
+  The reviewer's own pytest invocation could not create a temp file under its
+  read-only sandbox; that failed invocation is not a passing receipt.
+- The machine allowed_files omitted the specification and paired design paths
+  changed under the owner's explicit programme integration direction. PA-07 now
+  lists those three paths. This corrects the declared local scope; it changes no
+  approval, slice status, runtime permission or implementation claim.
+- Real private Telegram/mobile inspection is absent. This remains OPEN, along
+  with real-provider and owner content acceptance, rather than being papered
+  over with synthetic tests. This handoff publishes local implementation, not a
+  release or a claim that PA-07/PA-08..15 are accepted.
+
+Only evidence/scope/handoff documentation changed after the reviewed code SHA.
+The final documentary recheck is limited to the first two findings; it must
+preserve the third as an open acceptance gate.
+
+Changed files relative to `1533fe0`:
+
+- `src/prm/application.py`, `src/prm/archive_synthesis_transport.py`,
+  `src/prm/brief_editorial.py`, `src/prm/briefs.py`, `src/prm/routing.py`.
+- `schemas/assistant_brief_document.v1.schema.json`, `tools/test_tiers.py`.
+- `tests/test_assistant_brief_editorial.py`, `tests/test_assistant_briefs.py`,
+  `tests/test_assistant_report_dialogue.py`.
+- `docs/CODEX_PROMPT.md`, `docs/PERSONAL_ASSISTANT_SPEC.md`, `docs/tasks.md`,
+  `docs/design/PA.md`, `docs/design/PA.design.json`, `docs/design/PA-PRODUCT-QUALITY.md`.
+- `docs/verification/PA-07-editorial-evidence-2026-09-19.md`,
+  `docs/verification/PA-07-editorial-example-2026-09-19.md`,
+  `docs/verification/PA-07-telegram-brief-user-judge-prompt.md`.
+
+Next local verification command: `python3 tools/check_personal_assistant_plan.py`.
+Next development work is the already-declared held-out content/conversation
+scenarios and dependency-ready slices; no service, timer or live provider starts
+as a consequence of this handoff.
