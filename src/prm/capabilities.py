@@ -57,6 +57,9 @@ TRANSPORT_PURPOSES: dict[tuple[str, str, str], str] = {
     # read, and no private data class is accepted by either adapter.
     ("provider_public_web", "web.search", "read"): "public.search",
     ("provider_public_web", "web.fetch", "read"): "public.fetch",
+    # PA-06 repository context is a separately scoped, read-only transport;
+    # it cannot reuse either public-document or private archive authority.
+    ("provider_github", "github.repository_context", "read"): "project.context",
 }
 
 
