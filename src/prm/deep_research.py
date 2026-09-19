@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 import hashlib
 import hmac
 import json
+from math import isfinite
 import re
 import secrets
 from threading import Event, Lock
@@ -66,7 +67,8 @@ class ResearchBudget:
             raise ValueError("deep research tool budget is out of range")
         if not 1 <= self.timeout_seconds <= _MAX_TIMEOUT_SECONDS:
             raise ValueError("deep research time budget is out of range")
-        if not 0.0 <= float(self.max_cost_usd) <= 100.0:
+        cost_limit = float(self.max_cost_usd)
+        if not isfinite(cost_limit) or not 0.0 <= cost_limit <= 100.0:
             raise ValueError("deep research cost budget is out of range")
         if not 1 <= self.max_archive_sources <= 10:
             raise ValueError("deep research archive source limit is out of range")
@@ -174,11 +176,13 @@ class ResearchCostLedger:
                 or not tariff_version
                 or not isinstance(estimate, (int, float))
                 or isinstance(estimate, bool)
-                or float(estimate) < 0
             ):
                 self._unknown_price_refusals += 1
                 return "unknown_price"
             amount = float(estimate)
+            if not isfinite(amount) or amount < 0:
+                self._unknown_price_refusals += 1
+                return "unknown_price"
             if self._consumed_usd + amount > self._maximum_usd + 1e-12:
                 return "cost_budget_exhausted"
             self._consumed_usd += amount

@@ -409,7 +409,6 @@ def test_unknown_or_over_budget_cost_refuses_public_transport_before_provider_ca
     monkeypatch.setattr("prm.public_web._reject_private_resolution", lambda _host: None)
     archive = _Archive([])
     query = "vendor current release official"
-    provider = _Public()
     class _UnpricedPublic(_Public):
         research_cost_quote = None
 
@@ -417,12 +416,13 @@ def test_unknown_or_over_budget_cost_refuses_public_transport_before_provider_ca
         "What is current?", archive_query="evidence",
         public_tasks=(PublicResearchTask(query, _public_access(query)),),
     )
+    unknown_provider = _UnpricedPublic()
     unknown_result = run_bounded_research(
         unknown, original_query="What is current?", archive_reader=archive,
-        public_provider=_UnpricedPublic(), public_bounds=_bounds(), github_provider=None,
+        public_provider=unknown_provider, public_bounds=_bounds(), github_provider=None,
     )
     assert "unknown_price" in unknown_result["coverage"]["source_gaps"]
-    assert provider.queries == []
+    assert unknown_provider.queries == []
 
     class _OverBudgetPublic(_Public):
         def research_cost_quote(self):
@@ -441,6 +441,56 @@ def test_unknown_or_over_budget_cost_refuses_public_transport_before_provider_ca
     assert "cost_budget_exhausted" in over_budget_result["coverage"]["source_gaps"]
     assert over_budget_result["coverage"]["cost"]["consumed_usd"] == 0.0
     assert over.queries == []
+
+
+@pytest.mark.parametrize(
+    "estimate",
+    (float("nan"), float("inf"), float("-inf")),
+    ids=("nan", "positive-infinity", "negative-infinity"),
+)
+def test_nonfinite_cost_quote_refuses_transport_and_abandons_authorizations(monkeypatch, estimate):
+    monkeypatch.setattr("prm.public_web._reject_private_resolution", lambda _host: None)
+    query = "vendor current release official"
+    access = _public_access(query)
+
+    class _NonFiniteQuotePublic(_Public):
+        def research_cost_quote(self):
+            return {
+                "provider_ref": "provider_public_web",
+                "tariff_version": "fixture-nonfinite-v1",
+                "estimated_cost_usd": estimate,
+            }
+
+    provider = _NonFiniteQuotePublic()
+    plan = build_research_plan(
+        "What is current?", archive_query="evidence",
+        public_tasks=(PublicResearchTask(query, access),),
+        budget=ResearchBudget(max_cost_usd=0.0),
+    )
+
+    result = run_bounded_research(
+        plan, original_query="What is current?", archive_reader=_Archive([]),
+        public_provider=provider, public_bounds=_bounds(), github_provider=None,
+    )
+
+    assert "unknown_price" in result["coverage"]["source_gaps"]
+    assert result["coverage"]["cost"] == {
+        "maximum_usd": 0.0,
+        "consumed_usd": 0.0,
+        "unknown_price_refusals": 1,
+        "observed_tariffs": [],
+    }
+    assert provider.queries == []
+    assert all(
+        item.reservation is not None and item.reservation.available is False
+        for item in (access.search_authorization, *access.fetch_authorizations)
+    )
+
+
+@pytest.mark.parametrize("cost_limit", (float("nan"), float("inf"), float("-inf")))
+def test_research_budget_rejects_nonfinite_cost_limit(cost_limit):
+    with pytest.raises(ValueError, match="cost budget"):
+        ResearchBudget(max_cost_usd=cost_limit)
 
 
 def test_timeout_kills_inflight_reader_before_returning_partial_checkpoint():
