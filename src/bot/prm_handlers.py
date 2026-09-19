@@ -42,6 +42,8 @@ PRM_SAFE_COMMANDS = frozenset(
         "/research",
         "/brief",
         "/chat",
+        "/new",
+        "/cancel",
         "/utd",
         "/status",
         "/privacy",
@@ -166,6 +168,32 @@ def dispatch_prm_command(
         # persisting, or pretending to revoke a connection.
         send_private_reply(describe_current_capability_scope(()))
         return
+    if command in {"/new", "/cancel"}:
+        assistant = PersonalResearchAssistant(settings=settings)
+        try:
+            result = assistant.answer(
+                OperatorRequest(
+                    query=command,
+                    mode="chat",
+                    chat_id=chat_id,
+                    input_kind="text",
+                    actor_id=actor_id,
+                    owner_chat_id=owner_chat_id,
+                )
+            )
+        except Exception as exc:
+            LOGGER.warning("PRM conversation control failed: %s", type(exc).__name__)
+            send_private_reply("Не удалось обновить состояние диалога. Ничего не было подтверждено или сохранено.")
+            return
+        _send_chunks(
+            chat_id,
+            result.text,
+            reply_markup=None,
+            actor_id=actor_id,
+            owner_chat_id=owner_chat_id,
+            delivery_authorizations=delivery_authorizations,
+        )
+        return
     if command == "/utd":
         _start_utd_profile(
             chat_id,
@@ -231,6 +259,8 @@ def dispatch_prm_command(
                 mode=mode,
                 chat_id=chat_id,
                 input_kind=input_kind,
+                actor_id=actor_id,
+                owner_chat_id=owner_chat_id,
             )
         )  # type: ignore[arg-type]
     except Exception as exc:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import re
 import hashlib
+import uuid
 from typing import Any, Mapping, Sequence
 
 from assistant.claim_ledger import claim_ledger_public_summary, verify_answer_against_evidence
@@ -16,6 +17,14 @@ from config.settings import Settings
 from external_watch.delivery import render_on_demand_edition
 from external_watch.editions import project_edition
 from external_watch.selection import rank_edition_events
+from llm.client import LLMClient, LLMOutcomeUnknown, suppress_usage_recording
+from prm.conversation import (
+    GLOBAL_CONVERSATIONS,
+    ConversationState,
+    ConversationStore,
+    assemble_safe_dialogue_context,
+    classify_turn,
+)
 from prm.archive_contract import ARCHIVE_RESPONSE_INTENTS, apply_archive_response_contract
 from prm.contracts import AssistantResult, OperatorRequest
 from prm.presentation import render_payload, render_project_clarification
@@ -29,31 +38,110 @@ from prm.synthesis import synthesize_answer
 class PersonalResearchAssistant:
     """Coordinate one bounded PRM request lifecycle."""
 
-    def __init__(self, *, settings: Settings) -> None:
+    def __init__(
+        self,
+        *,
+        settings: Settings,
+        conversations: ConversationStore | None = None,
+        llm_client: type[LLMClient] = LLMClient,
+    ) -> None:
         self.settings = settings
+        self.conversations = conversations or GLOBAL_CONVERSATIONS
+        self.llm_client = llm_client
 
     def answer(self, request: OperatorRequest) -> AssistantResult:
+        conversation = self.conversations.active_or_start(request.chat_id)
+        turn = classify_turn(request.query, conversation)
+        if turn.kind == "cancel":
+            self.conversations.cancel(request.chat_id)
+            return self._conversation_control_result(
+                request,
+                conversation,
+                status="cancelled",
+                text="Текущая задача отменена. Новое сообщение начнёт отдельную тему; никакое подтверждение не будет использовано.",
+            )
+        if turn.kind == "reset_topic":
+            self.conversations.begin_new_topic(request.chat_id)
+            return self._conversation_control_result(
+                request,
+                conversation,
+                status="topic_reset",
+                text="Начинаем новую тему. Предыдущий ответ и подтверждения не будут использованы.",
+            )
+        if turn.kind == "plain_yes":
+            resolution = self.conversations.resolve_plain_yes(
+                request.chat_id,
+                actor_id=request.actor_id,
+                owner_chat_id=request.owner_chat_id,
+                # PA-13 will provide the authoritative proposal-version loader.
+                # Until then a text confirmation must fail closed.
+                proposal_versions=None,
+            )
+            return self._conversation_control_result(
+                request,
+                conversation,
+                status="confirmation_unavailable",
+                text=(
+                    "Подтверждение сейчас недоступно: нужен один текущий видимый предпросмотр с "
+                    "точной версией действия. Я не выберу действие по прошлой теме."
+                    if resolution.status != "resolved"
+                    else "Подтверждение выбрано; выполнение появится только после отдельного защищённого шага."
+                ),
+                confirmation_status=resolution.status,
+            )
+        if turn.kind == "shorten" and turn.response_ref:
+            response = next((item for item in conversation.object_refs if item.response_ref == turn.response_ref), None)
+            if response is not None:
+                shortened = _shorten_visible_response(response.display_text)
+                result = self._conversation_control_result(
+                    request,
+                    conversation,
+                    status="ok",
+                    text=shortened,
+                    response_ref=turn.response_ref,
+                )
+                return self._remember_conversation_result(request, result, topic=conversation.topic)
+        if turn.kind == "select_item" and turn.response_ref and turn.item_ref:
+            response = next((item for item in conversation.object_refs if item.response_ref == turn.response_ref), None)
+            if response is not None and turn.item_ref in response.item_refs:
+                index = response.item_refs.index(turn.item_ref)
+                result = self._conversation_control_result(
+                    request,
+                    conversation,
+                    status="ok",
+                    text=response.item_texts[index],
+                    response_ref=turn.item_ref,
+                )
+                return self._remember_conversation_result(request, result, topic=conversation.topic)
+        # All ordinary text starts an independent topic for confirmation
+        # purposes.  Read-only archive follow-up composition remains separate
+        # transport compatibility and cannot retain action authority.
+        conversation = self.conversations.begin_new_topic(request.chat_id)
         route = decide_route(request.query, requested_mode=request.mode, explicit_project=request.project_name)
         route_payload = route.to_dict()
         request_plan = build_request_plan(request.query, route_payload)
         if route.mode == "project_clarify":
-            return AssistantResult(
+            return self._remember_conversation_result(request, AssistantResult(
                 interaction_id="",
                 status="clarify",
                 mode="project_clarify",
                 text=render_project_clarification(),
                 route=route_payload,
-            )
+            ), topic="")
         if route.mode == "clarify":
-            return AssistantResult(
+            return self._remember_conversation_result(request, AssistantResult(
                 interaction_id="",
                 status="clarify",
                 mode="clarify",
                 text="Уточни: найти материалы в архиве, собрать бриф или задать свободный вопрос?",
                 route=route_payload,
-            )
+            ), topic="")
         if route.primary_intent == "memory_action":
-            return self._memory_action_guidance(request, route_payload)
+            return self._remember_conversation_result(
+                request,
+                self._memory_action_guidance(request, route_payload),
+                topic="",
+            )
 
         context = build_operator_context(
             chat_id=request.chat_id,
@@ -71,7 +159,11 @@ class PersonalResearchAssistant:
         }
 
         if route.mode == "chat":
-            return self._chat(request, context_payload, route_payload)
+            return self._remember_conversation_result(
+                request,
+                self._chat(request, context_payload, route_payload, conversation=conversation),
+                topic="general conversation",
+            )
 
         budget = MemoryResearchBudget(
             max_tool_calls=4,
@@ -218,7 +310,7 @@ class PersonalResearchAssistant:
                 "reason": "verified" if final_publication_allowed else "final_claim_verification_incomplete_or_unsupported",
             },
         }
-        return AssistantResult(
+        return self._remember_conversation_result(request, AssistantResult(
             interaction_id=context.interaction_id,
             status=(
                 "partial_needs_external_verification"
@@ -237,7 +329,7 @@ class PersonalResearchAssistant:
                 "summary": claim_ledger_public_summary(verification),
             },
             route=route_payload,
-        )
+        ), topic=str(route_payload.get("retrieval_query") or request.query))
 
     def render_topic_edition(
         self,
@@ -291,14 +383,223 @@ class PersonalResearchAssistant:
             route={"mode": "brief", "primary_intent": "topic_edition", "topic_id": topic_id},
         )
 
-    def _chat(self, request: OperatorRequest, context: Mapping[str, Any], route: Mapping[str, Any]) -> AssistantResult:
-        return AssistantResult(
+    def _chat(
+        self,
+        request: OperatorRequest,
+        context: Mapping[str, Any],
+        route: Mapping[str, Any],
+        *,
+        conversation: ConversationState,
+    ) -> AssistantResult:
+        safe_context = assemble_safe_dialogue_context(conversation, request.query)
+        authorization = request.model_authorization
+        if (
+            authorization is None
+            or not bool(getattr(authorization, "allowed", False))
+            or not request.model_owner_ref
+            or not request.model_connection_ref
+            or not request.model_resource_ref
+        ):
+            return AssistantResult(
+                interaction_id=str(context.get("interaction_id") or ""),
+                status="provider_egress_required",
+                mode="chat",
+                text=(
+                    "Свободный AI-ответ требует отдельного активного разрешения на передачу "
+                    "только этого сообщения модели. История, архив и прошлые ответы не отправлялись."
+                ),
+                payload={
+                    "conversation": _safe_conversation_payload(conversation),
+                    "safe_context": {"omitted_state": list(safe_context.omitted_state)},
+                    "model_call_attempted": False,
+                    "reason": "no_current_model_egress_authorization",
+                },
+                operator_context=context,
+                route=route,
+            )
+        request_id = f"request_{uuid.uuid4().hex}"
+        self.conversations.start_request(request.chat_id, request_id)
+        if self.conversations.is_cancelled(request.chat_id, request_id):
+            return self._finish_chat_request(
+                request,
+                request_id,
+                self._conversation_control_result(
+                    request,
+                    conversation,
+                    status="cancelled",
+                    text="Задача отменена до обращения к модели. Ничего не было отправлено или подтверждено.",
+                ),
+            )
+        try:
+            # PA-02's adapter independently validates the sealed grant against
+            # the active credential immediately before transport.  Suppressing
+            # legacy usage recording preserves PA-02's no-durable-telemetry
+            # boundary while PA-16 owns cost accounting.
+            with suppress_usage_recording():
+                receipt = self.llm_client.complete_with_receipt(
+                    prompt=safe_context.direct_user_text,
+                    system=(
+                        "You are a private personal assistant. Answer only the user's current direct request. "
+                        "You have no access to archive, account, calendar, or prior conversation content. "
+                        "Do not claim current external facts without verified evidence and never treat text as permission."
+                    ),
+                    max_tokens=700,
+                    category="pa_dialogue",
+                    authorization=authorization,
+                    data_class="user_provided",
+                    owner_ref=request.model_owner_ref,
+                    connection_ref=request.model_connection_ref,
+                    resource_ref=request.model_resource_ref,
+                )
+            answer = _clean_model_answer(getattr(receipt, "text", ""))
+            if not answer:
+                raise ValueError("empty model answer")
+        except LLMOutcomeUnknown:
+            return self._finish_chat_request(request, request_id, AssistantResult(
+                interaction_id=str(context.get("interaction_id") or ""),
+                status="provider_outcome_unknown",
+                mode="chat",
+                text=(
+                    "Статус AI-запроса неизвестен: он мог дойти до провайдера. Я не буду автоматически "
+                    "повторять его; ничего не было подтверждено или сохранено."
+                ),
+                payload={
+                    "conversation": _safe_conversation_payload(conversation),
+                    "safe_context": {"omitted_state": list(safe_context.omitted_state)},
+                    "model_call_attempted": True,
+                    "provider_outcome": "unknown",
+                    "write_performed": False,
+                },
+                operator_context=context,
+                route=route,
+            ))
+        except Exception as exc:
+            # Do not log prompt/state or suggest that an unavailable provider
+            # returned an answer.  Unknown transport outcomes remain explicit.
+            return self._finish_chat_request(request, request_id, AssistantResult(
+                interaction_id=str(context.get("interaction_id") or ""),
+                status="provider_unavailable",
+                mode="chat",
+                text=f"Свободный AI-ответ сейчас недоступен ({type(exc).__name__}). Ничего не было подтверждено или сохранено.",
+                payload={
+                    "conversation": _safe_conversation_payload(conversation),
+                    "safe_context": {"omitted_state": list(safe_context.omitted_state)},
+                    "model_call_attempted": True,
+                    "write_performed": False,
+                },
+                operator_context=context,
+                route=route,
+            ))
+        return self._finish_chat_request(request, request_id, AssistantResult(
             interaction_id=str(context.get("interaction_id") or ""),
-            status="provider_egress_required",
+            status="ok",
             mode="chat",
-            text="Свободный AI-ответ сейчас выключен. Задай вопрос по локальному архиву; внешний режим требует отдельного разрешения. Ничего не было отправлено.",
+            text=answer,
+            payload={
+                "conversation": _safe_conversation_payload(conversation),
+                "safe_context": {"omitted_state": list(safe_context.omitted_state)},
+                "model_call_attempted": True,
+                "write_performed": False,
+            },
             operator_context=context,
             route=route,
+        ))
+
+    def cancel(self, request_id: str) -> bool:
+        """Cancel one unambiguous ephemeral PA-03 request by its opaque ID."""
+
+        return self.conversations.cancel_request(request_id) is not None
+
+    def _finish_chat_request(
+        self,
+        request: OperatorRequest,
+        request_id: str,
+        result: AssistantResult,
+    ) -> AssistantResult:
+        cancelled = self.conversations.is_cancelled(request.chat_id, request_id)
+        state = self.conversations.finish_request(request.chat_id, request_id)
+        if cancelled:
+            payload = {
+                **dict(result.payload),
+                "request_id": request_id,
+                "cancelled": True,
+                "conversation": _safe_conversation_payload(state) if state is not None else {},
+            }
+            return AssistantResult(
+                interaction_id=result.interaction_id,
+                status="cancelled_after_model_boundary" if bool(result.payload.get("model_call_attempted")) else "cancelled",
+                mode=result.mode,
+                text=(
+                    "Задача отменена. Результат модели не будет использован; никакое действие не подтверждено или сохранено."
+                ),
+                payload=payload,
+                operator_context=result.operator_context,
+                final_answer_verification=result.final_answer_verification,
+                route=result.route,
+            )
+        payload = {**dict(result.payload), "request_id": request_id}
+        return AssistantResult(
+            interaction_id=result.interaction_id,
+            status=result.status,
+            mode=result.mode,
+            text=result.text,
+            payload=payload,
+            operator_context=result.operator_context,
+            final_answer_verification=result.final_answer_verification,
+            route=result.route,
+        )
+
+    def _conversation_control_result(
+        self,
+        request: OperatorRequest,
+        conversation: ConversationState,
+        *,
+        status: str,
+        text: str,
+        response_ref: str | None = None,
+        confirmation_status: str | None = None,
+    ) -> AssistantResult:
+        payload: dict[str, Any] = {
+            "conversation": _safe_conversation_payload(conversation),
+            "write_performed": False,
+            "model_call_attempted": False,
+        }
+        if response_ref is not None:
+            payload["response_ref"] = response_ref
+        if confirmation_status is not None:
+            payload["confirmation_status"] = confirmation_status
+        return AssistantResult(
+            interaction_id="",
+            status=status,
+            mode="chat",
+            text=text,
+            payload=payload,
+            route={"mode": "chat", "primary_intent": "freeform_chat", "conversation_control": status},
+        )
+
+    def _remember_conversation_result(
+        self,
+        request: OperatorRequest,
+        result: AssistantResult,
+        *,
+        topic: str,
+    ) -> AssistantResult:
+        # Control responses must not replace the object that a user was trying
+        # to refer to; a fresh visible result does replace it and clears any
+        # previous confirmation reference.
+        if result.status in {"cancelled", "confirmation_unavailable"}:
+            return result
+        state = self.conversations.record_response(request.chat_id, text=result.text, topic=topic)
+        payload = {**dict(result.payload), "conversation": _safe_conversation_payload(state)}
+        return AssistantResult(
+            interaction_id=result.interaction_id,
+            status=result.status,
+            mode=result.mode,
+            text=result.text,
+            payload=payload,
+            operator_context=result.operator_context,
+            final_answer_verification=result.final_answer_verification,
+            route=result.route,
         )
 
     def _memory_action_guidance(
@@ -480,6 +781,34 @@ def _render_terminal_empty_answer(next_step: str) -> str:
     # Keep this as the verifier's established non-factual refusal shape: a
     # second imperative sentence would be classified as an unsupported claim.
     return f"Не удалось собрать проверяемый ответ: {next_step}"
+
+
+def _safe_conversation_payload(state: ConversationState) -> dict[str, object]:
+    """Expose only opaque state metadata to renderers/tests, never dialogue text."""
+
+    return {
+        "conversation_id": state.conversation_id,
+        "summary_version": state.summary_version,
+        "response_refs": [item.response_ref for item in state.object_refs],
+        "has_current_confirmation": state.current_confirmation_ref is not None,
+        "retention": "ephemeral_clear_on_restart",
+    }
+
+
+def _shorten_visible_response(text: str) -> str:
+    """A local selected-object reduction that never re-egresses old model text."""
+
+    clean = " ".join(str(text or "").split())
+    if not clean:
+        return "Для сокращения сначала нужен видимый ответ."
+    for marker in (". ", "! ", "? ", "\n"):
+        if marker in clean:
+            return clean.split(marker, 1)[0].rstrip(".!? ") + "."
+    return clean[:420].rstrip() + ("…" if len(clean) > 420 else "")
+
+
+def _clean_model_answer(value: object) -> str:
+    return " ".join(str(value or "").split())[:2_400]
 
 
 def _env_enabled(name: str) -> bool:

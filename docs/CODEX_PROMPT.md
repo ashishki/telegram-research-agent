@@ -30,16 +30,21 @@ No production DB, live Telegram polling, account/provider access, job, timer,
 credential, `.env` or release action has been used or is authorized. Preserve
 the two untracked local files. Do not run the full historical pytest suite.
 
-## Next implementation slice: PA-03
+## Current slice: PA-03
 
-PA-03 is dependency-ready. Read its block in `docs/tasks.md`, its exact registry
-entry in `docs/design/PA.design.json`, the relevant PA-03 section of
-`docs/design/PA.md`, `docs/ASSISTANT_BOUNDARIES.md` and
-`docs/IMPLEMENTATION_CONTRACT.md` before editing. Implement the complete
-conversation-state/plain-language-confirmation scope specified there, not a
-demo. PA-00 covers callback/source integrity only; PA-03 must not infer a
-confirmation from stale dialogue, unrelated topic or missing exact visible
-proposal. PA-13 owns provider-write confirmation/reconciliation.
+PA-03 has a locally tested initial implementation and evidence at
+`docs/verification/PA-03-conversation-evidence-2026-09-19.md`; its required
+independent Conversation/Test Critic review is pending. The new state is
+ephemeral (restart clears it), object-bound, and fails closed for plain `yes`
+until PA-13 supplies the authoritative proposal/version loader and execution
+reconciliation. General chat routes explicitly and remains default-deny unless
+a PA-02 reserved model decision is supplied; the model receives only current
+direct user text, never archive/history/old response context.
+
+Do not call PA-03 formally accepted or start PA-04 until the PA-03 review and
+any P0/P1 remediation are recorded. After that boundary, PA-04 connects
+authorized source-bound archive synthesis; it must not widen PA-03's direct
+user-text model boundary.
 
 For each slice: add focused positive/negative tests, run the smallest relevant
 existing tier, record evidence that distinguishes fixtures from integrations,

@@ -37,6 +37,17 @@ class OperatorRequest:
     input_kind: Literal["text", "voice_transcript"] = "text"
     project_name: str = ""
     remember_dialog: bool = False
+    # Telegram transport supplies this authenticated tuple when it exists.  It
+    # is optional for read-only CLI/evaluation calls, where plain-language
+    # confirmation must fail closed rather than synthesizing an actor.
+    actor_id: str | None = None
+    owner_chat_id: str | None = None
+    # PA-03 receives model access only as an already-reserved PA-02 decision.
+    # These opaque fields contain no prompt, credential or provider payload.
+    model_authorization: Any | None = None
+    model_owner_ref: str = ""
+    model_connection_ref: str | None = None
+    model_resource_ref: str = ""
 
 
 @dataclass(frozen=True, slots=True)

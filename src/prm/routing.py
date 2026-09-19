@@ -449,19 +449,24 @@ def decide_route(query: str, *, requested_mode: RequestMode = "auto", explicit_p
             decision_requested=False,
             reason_codes=("archive_scope", "no_implicit_project"),
         )
+    # A greeting, editing request, or ordinary conversation has no implicit
+    # archive scope.  Defaulting it to retrieval both surprises the operator
+    # and risks treating a conversational follow-up as an archive query.  The
+    # chat boundary remains default-deny for model egress until PA-02 supplies
+    # an active exact grant.
     return _decision(
-        mode="research",
-        reason="safe_archive_default",
+        mode="chat",
+        reason="general_conversation_default",
         confidence=0.76,
         project=project,
-        retrieval_query=_retrieval_query(clean),
-        intent="archive_synthesis",
-        contract="archive_research.v2",
+        retrieval_query="",
+        intent="freeform_chat",
+        contract="chat.v1",
         archive_scope=False,
         project_context_required=False,
         current_required=False,
         decision_requested=False,
-        reason_codes=("safe_archive_default",),
+        reason_codes=("general_conversation_default",),
     )
 
 
