@@ -2469,6 +2469,8 @@ def _render_apply(document: BriefDocument) -> str:
 def _render_comparison(current: BriefDocument, previous: BriefDocument | None) -> str:
     if previous is None or current.comparison_ref != previous.version_ref:
         return "Сравнение недоступно: текущий BriefDocument не содержит доступной ссылки на отчёт другой недели; новый поиск не запускался."
+    if current.editorial is not None or previous.editorial is not None:
+        return _render_editorial_comparison(current, previous)
     current_by_source = {item.source_ref: item for item in current.evidence}
     prior_by_source = {item.source_ref: item for item in previous.evidence}
     added = [item for key, item in current_by_source.items() if key not in prior_by_source]
@@ -2493,6 +2495,53 @@ def _render_comparison(current: BriefDocument, previous: BriefDocument | None) -
         "Сравнение использует только две сохранённые версии BriefDocument; поиск не запускался.",
     ]
     return _bounded(lines)
+
+
+def _render_editorial_comparison(current: BriefDocument, previous: BriefDocument) -> str:
+    """Compare saved editorial selections, never turn omitted sources into events.
+
+    Matching requires the same headline and source identities. A changed title
+    or source set is shown as a selection difference, not proof that a real-world
+    event appeared/disappeared. Semantic cross-source alignment needs research.
+    """
+    if current.editorial is None or previous.editorial is None:
+        return "Содержательное сравнение пока недоступно: для одного из двух обзоров ещё не подготовлен редакторский текст."
+
+    def key(story: Any, document: BriefDocument) -> tuple[str, tuple[str, ...]]:
+        sources = document.evidence_by_ref()
+        return story.title.casefold(), tuple(sorted({sources[a.evidence_ref].source_ref for a in story.anchors}))
+
+    now = {key(story, current): story for story in current.editorial.stories}
+    before = {key(story, previous): story for story in previous.editorial.stories}
+    added = [story for identity, story in now.items() if identity not in before]
+    removed = [story for identity, story in before.items() if identity not in now]
+    changed = [story for identity, story in now.items() if identity in before and story != before[identity]]
+    unchanged = [story for identity, story in now.items() if identity in before and story == before[identity]]
+    lines = ["<b>Сравнение сохранённых обзоров</b>",
+             f"Сейчас: {_telegram_html(_human_brief_period(current.window), 120)}",
+             f"Ранее: {_telegram_html(_human_brief_period(previous.window), 120)}"]
+    if not now and not before:
+        lines.extend(("", "В обеих сохранённых подборках содержательных событий по теме не выделено."))
+    for heading, stories, document in (
+        ("Вошло в текущий обзор", added, current),
+        ("Изменились формулировки сохранённых пунктов", changed, current),
+        ("Без изменения формулировки", unchanged, current),
+        ("Осталось в предыдущем обзоре", removed, previous),
+    ):
+        if not stories:
+            continue
+        lines.extend(("", f"<b>{heading}</b>"))
+        evidence = document.evidence_by_ref()
+        for story in stories:
+            lines.extend(("", f"<b>{_telegram_html(story.title, 140)}</b>", _telegram_html(story.summary, 300)))
+            if story.caveat:
+                lines.append(f"Ограничение: {_telegram_html(story.caveat, 300)}")
+            for ref in dict.fromkeys(anchor.evidence_ref for anchor in story.anchors):
+                lines.append(_telegram_card_source_link(evidence[ref].source_ref))
+    lines.extend(("", "Это различия двух сохранённых подборок; отсутствие пункта не означает исчезновения события.",
+                  "Текущий обзор: " + _telegram_card_coverage_line(current),
+                  "Предыдущий обзор: " + _telegram_card_coverage_line(previous)))
+    return "\n".join(lines)
 
 
 def _comparison_lines(items: Sequence[BriefEvidence]) -> list[str]:

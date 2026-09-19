@@ -126,3 +126,32 @@ After the correction the dedicated command above passed **61 tests in 12.44s**.
 A fresh scoped Role Runner recheck will run against the correction commit,
 with the repository kept unchanged until its postflight completes. This is the
 one required P1 recheck, not a repeated full programme/Deep Review.
+
+## Independent recheck and comparison correction
+
+The fresh runner receipt `20260919T155507Z-slice_review-0dfc89a0` is validated
+and its `verify` command succeeded. Requested and recorded model/effort:
+`gpt-5.6-terra` / `high`; reviewed SHA:
+`f912046ee6d4af6d81b64eab618a1d736bf80481`.
+Report SHA-256: `bdeae680c31bf9f53190d9e9623afce0fabf66cf2fbd939ffce6fe586320d3db`.
+The workspace remained unchanged throughout this run. Verdict: `STOP_SHIP`.
+
+It identified a second P1 in the neighboring comparison view: raw source
+comparison could reintroduce items excluded by the saved editorial selection.
+The correction compares only saved editorial stories, retaining their caveats
+and source anchors. Matching uses headline and source identities; changed
+wording is explicitly a saved-report change, not invented real-world change.
+Noise-only comparisons stay empty. If only one report has editorial content,
+comparison is unavailable rather than silently falling back to a source feed.
+Four new tests cover both empty reports, selected events versus omitted noise,
+changed wording, and a mixed editorial/unedited pair.
+
+The focused tier at `f912046` passed **439 tests in 100.78s**. The dedicated
+suite after the comparison correction is recorded in the final receipt below.
+The remaining independent check is a scoped comparison-P1 recheck, not a new
+programme design review or rollout approval. Human/provider/mobile gates are
+unchanged and do not require another speculative review loop.
+
+Dedicated editorial/brief/dialogue/synthesis command after the comparison fix:
+**65 passed in 40.22s**. `git diff --check` and the PA plan consistency check
+also passed. No statuses or approval artifacts were hand-edited.

@@ -291,3 +291,48 @@ def test_noise_only_brief_is_valid_empty_editorial_with_honest_coverage(monkeypa
     jsonschema.Draft202012Validator(json.loads(Path("schemas/assistant_brief_document.v1.schema.json").read_text())).validate(document.to_dict())
     with pytest.raises(ValueError):
         BriefEditorial.from_dict({"stories": [], "omitted_refs": []}, document.evidence)
+
+
+@pytest.mark.parametrize("populated", [False, True])
+def test_editorial_comparison_never_reintroduces_omitted_noise(populated):
+    request = _request()
+    prior_base = build_brief_document(request)
+    empty = {"stories": [], "omitted_refs": [item.evidence_ref for item in prior_base.evidence]}
+    prior = build_brief_document(replace(request, editorial=BriefEditorial.from_dict(empty, prior_base.evidence)))
+    data = _editorial_data() if populated else empty
+    current = build_brief_document(replace(request, comparison_document=prior,
+        editorial=BriefEditorial.from_dict(data, prior_base.evidence)))
+    rendered = render_brief_document(current, view="comparison", comparison_document=prior)
+    assert "@channel" not in rendered and "Личное поздравление" not in rendered
+    assert "source/2" not in rendered
+    assert "BriefDocument" not in rendered and current.brief_id not in rendered
+    assert "не означает исчезновения события" in rendered
+    if populated:
+        assert "Вошло в текущий обзор" in rendered and "Orion SDK" in rendered
+        assert "Поведение незавершённого шага" in rendered
+        assert "https://example.org/source/0" in rendered and "https://example.org/source/1" in rendered
+    else:
+        assert "В обеих сохранённых подборках" in rendered
+        assert "https://" not in rendered
+
+
+def test_comparison_with_one_unedited_report_does_not_downgrade_to_source_feed():
+    prior = build_brief_document(_request())
+    current = build_brief_document(replace(_request(), comparison_document=prior,
+        editorial=BriefEditorial.from_dict(_editorial_data(), prior.evidence)))
+    result = render_brief_document(current, view="comparison", comparison_document=prior)
+    assert "для одного из двух обзоров" in result
+    assert "@channel" not in result and "https://" not in result
+
+
+def test_editorial_comparison_reports_revised_wording_with_bound_sources():
+    prior = _edited_document()
+    data = _editorial_data()
+    data["stories"][0]["summary"] = "При продолжении задачи агент использует сохранённые завершённые шаги."
+    current = build_brief_document(replace(_request(), comparison_document=prior,
+        editorial=BriefEditorial.from_dict(data, prior.evidence)))
+    result = render_brief_document(current, view="comparison", comparison_document=prior)
+    assert "Изменились формулировки" in result
+    assert data["stories"][0]["summary"] in result
+    assert "https://example.org/source/0" in result
+    assert "source/2" not in result
