@@ -22,6 +22,7 @@ BRIEF_DOCUMENT_SCHEMA_VERSION = "assistant.brief_document.v1"
 BRIEF_INSPECTION_SCHEMA_VERSION = "prm_brief_inspection.v1"
 BRIEF_RETENTION = "ephemeral_current_visible_response_only"
 _MAX_BRIEFS = 64
+_MAX_HISTORY_REFS = 8
 _MAX_ITEMS = 20
 _MAX_TELEGRAM_CHARS = 2_400
 _BRIEF_ID = re.compile(r"^brief_[a-z0-9_-]{3,120}$")
@@ -593,7 +594,18 @@ class BriefDocumentStore:
 
     def __init__(self) -> None:
         self._documents: dict[tuple[str, str, int], BriefDocument] = {}
-        self._bindings: dict[str, tuple[str, tuple[str, str, int], tuple[str, str, int] | None]] = {}
+        # response_ref, current document, optional comparison baseline, and a
+        # bounded exact-version history. The history is scoped to one active
+        # conversation; it is not a cross-chat catalogue or durable archive.
+        self._bindings: dict[
+            str,
+            tuple[
+                str,
+                tuple[str, str, int],
+                tuple[str, str, int] | None,
+                tuple[tuple[str, str, int], ...],
+            ],
+        ] = {}
         self._lock = RLock()
 
     def clear(self) -> None:
@@ -620,19 +632,28 @@ class BriefDocumentStore:
                 if comparison_document is not None
                 else None
             )
-            incoming = {key, comparison_key} - {None}
+            prior = self._bindings.get(conversation_id)
+            history = tuple(
+                dict.fromkeys(
+                    history_key
+                    for history_key in (
+                        key,
+                        comparison_key,
+                        *(prior[3] if prior is not None else ()),
+                    )
+                    if history_key is not None
+                )
+            )[:_MAX_HISTORY_REFS]
+            incoming = set(history)
             while len(set(self._documents) | incoming) > _MAX_BRIEFS:
                 oldest = next(iter(self._documents))
                 self._documents.pop(oldest, None)
-                self._bindings = {
-                    key: value for key, value in self._bindings.items()
-                    if value[1] != oldest and value[2] != oldest
-                }
+                self._drop_history_key(oldest)
             self._documents[key] = document
             if comparison_document is not None:
                 assert comparison_key is not None
                 self._documents[comparison_key] = comparison_document
-            self._bindings[conversation_id] = (response_ref, key, comparison_key)
+            self._bindings[conversation_id] = (response_ref, key, comparison_key, history)
 
     def resolve_visible(
         self,
@@ -657,17 +678,15 @@ class BriefDocumentStore:
             binding = self._bindings.pop(conversation_id, None)
             if binding is None:
                 return
-            for key in (binding[1], binding[2]):
-                if key is not None:
-                    self._documents.pop(key, None)
+            for key in binding[3]:
+                self._documents.pop(key, None)
 
     def render_brief(self, brief_id: str, version: int, view: str, **kwargs: object) -> str | None:
         with self._lock:
             visible_keys = {
                 key
                 for binding in self._bindings.values()
-                for key in (binding[1], binding[2])
-                if key is not None
+                for key in binding[3]
             }
             matches = [
                 document
@@ -683,6 +702,33 @@ class BriefDocumentStore:
         if view not in {"telegram", "short", "item", "topics", "comparison", "less_technical", "apply"}:
             raise ValueError("brief view is invalid")
         return render_brief_document(document, view=view, **kwargs)  # type: ignore[arg-type]
+
+    def _drop_history_key(self, key: tuple[str, str, int]) -> None:
+        """Evict a version without leaving a binding that points at it."""
+
+        updated: dict[
+            str,
+            tuple[
+                str,
+                tuple[str, str, int],
+                tuple[str, str, int] | None,
+                tuple[tuple[str, str, int], ...],
+            ],
+        ] = {}
+        for conversation_id, binding in self._bindings.items():
+            response_ref, current, comparison, history = binding
+            if current == key:
+                # The response no longer has its actual source document, so
+                # resolving it must fail rather than showing a stale sibling.
+                continue
+            reduced = tuple(item for item in history if item != key)
+            updated[conversation_id] = (
+                response_ref,
+                current,
+                None if comparison == key else comparison,
+                reduced,
+            )
+        self._bindings = updated
 
 
 GLOBAL_BRIEFS = BriefDocumentStore()

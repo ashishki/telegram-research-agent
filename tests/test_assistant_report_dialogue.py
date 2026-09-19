@@ -3,7 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from prm.application import PersonalResearchAssistant
-from prm.briefs import BriefBuildRequest, BriefDocumentStore, BriefWindow, CoverageSource, build_brief_document
+from prm.briefs import BriefBuildRequest, BriefDocumentStore, BriefWindow, CoverageSource, build_brief_document, render_brief
 from prm.contracts import OperatorRequest
 from prm.conversation import ConversationStore
 
@@ -117,13 +117,20 @@ def test_compare_weeks_uses_an_actual_bound_prior_brief_not_a_new_search(monkeyp
 def test_new_topic_and_restart_make_report_state_unavailable() -> None:
     assistant, briefs = _assistant()
     initial = assistant.answer(OperatorRequest(query="weekly signals", mode="brief", chat_id="42", brief_request=_request()))
+    refreshed = assistant.answer(OperatorRequest(query="обнови бриф", chat_id="42"))
     conversation_id = initial.payload["conversation"]["conversation_id"]
     response_ref = initial.payload["conversation"]["response_refs"][0]
-    assert briefs.resolve_visible(conversation_id=conversation_id, response_ref=response_ref) is not None
+    brief_id = initial.payload["brief_document"]["brief_id"]
+    assert render_brief(brief_id, 1, "short", store=briefs) is not None
+    assert render_brief(brief_id, 2, "short", store=briefs) is not None
+    refreshed_ref = refreshed.payload["conversation"]["response_refs"][0]
+    assert briefs.resolve_visible(conversation_id=conversation_id, response_ref=refreshed_ref) is not None
 
     reset = assistant.answer(OperatorRequest(query="/new", mode="chat", chat_id="42"))
     assert reset.status == "topic_reset"
     assert briefs.resolve_visible(conversation_id=conversation_id, response_ref=response_ref) is None
+    assert render_brief(brief_id, 1, "short", store=briefs) is None
+    assert render_brief(brief_id, 2, "short", store=briefs) is None
 
     # A fresh process owns fresh ConversationStore and BriefDocumentStore;
     # no report reference is reconstructed from a topic or response string.
@@ -142,6 +149,10 @@ def test_active_brief_refresh_versions_and_two_active_weeks_bind_real_history(mo
         "brief_id": initial.payload["brief_document"]["brief_id"], "version": 1,
     }
     assert refreshed.payload["brief_inspection"]["period"]["basis"] == "revised_existing_evidence"
+    third = assistant.answer(OperatorRequest(query="обнови бриф", chat_id="42"))
+    brief_id = initial.payload["brief_document"]["brief_id"]
+    assert third.payload["brief_document"]["version"] == 3
+    assert all(render_brief(brief_id, version, "short", store=assistant.briefs) is not None for version in (1, 2, 3))
     calls = []
     empty_payload = {
         "status": "ok", "direct_answer": "", "answer_gate": {"allow_answer": True},
