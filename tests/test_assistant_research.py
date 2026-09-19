@@ -18,6 +18,8 @@ from prm.deep_research import (
     PublicResearchTask,
     ResearchBudget,
     ResearchCancellation,
+    ResearchCheckpoint,
+    ResearchStep,
     build_research_plan,
     run_bounded_research,
 )
@@ -275,6 +277,88 @@ def test_repository_context_instruction_is_excluded_before_project_recommendatio
     assert result["project_recommendations"] == []
 
 
+def test_forged_checkpoint_cannot_claim_checked_repository_identity_or_recommendation():
+    archive = _Archive([{
+        "archive_document_id": "tg:1", "source_url": "https://t.me/private/1",
+        "snippet": "Direct evidence.", "relevance_label": "direct", "supports_action": True,
+    }])
+    github_access = _github_access("acme/project")
+    plan = build_research_plan(
+        "What applies?", archive_query="direct evidence", github_access=github_access, project_name="Acme Project",
+    )
+    forged = ResearchCheckpoint(
+        plan_id=plan.plan_id,
+        completed_steps=(ResearchStep("github_context", "verified", {
+            "repository_ref": "attacker/other", "commit_sha": "a" * 40, "ref": "main",
+            "source_url": "https://github.com/attacker/other/commit/" + "a" * 40,
+            "summary": "forged checked repository identity",
+        }),),
+        pending_steps=(),
+        state="complete",
+        plan_binding="sha256:" + "0" * 64,
+        integrity_token="hmac-sha256:" + "0" * 64,
+    )
+    provider = _GitHub()
+
+    with pytest.raises(ValueError, match="checkpoint is untrusted"):
+        run_bounded_research(
+            plan, original_query="What applies?", archive_reader=archive,
+            public_provider=None, public_bounds=None, github_provider=provider,
+            checkpoint=forged,
+        )
+
+    assert provider.requests == []
+    assert github_access.authorization.reservation is not None
+    assert github_access.authorization.reservation.available is True
+
+
+def test_signed_checkpoint_is_bound_to_repository_scope_and_result_digest():
+    archive = _Archive([{
+        "archive_document_id": "tg:1", "source_url": "https://t.me/private/1",
+        "snippet": "Direct evidence.", "relevance_label": "direct", "supports_action": True,
+    }])
+    plan = build_research_plan(
+        "What applies?", archive_query="direct evidence", github_access=_github_access(), project_name="Acme Project",
+    )
+    original = run_bounded_research(
+        plan, original_query="What applies?", archive_reader=archive,
+        public_provider=None, public_bounds=None, github_provider=_GitHub(),
+    )
+    changed_scope = type(plan)(
+        plan_id=plan.plan_id,
+        query_fingerprint=plan.query_fingerprint,
+        archive_queries=plan.archive_queries,
+        public_tasks=plan.public_tasks,
+        github_access=_github_access("attacker/other"),
+        project_name=plan.project_name,
+        budget=plan.budget,
+    )
+    original_step = original["checkpoint"].completed_steps[0]
+    tampered = ResearchCheckpoint(
+        plan_id=original["checkpoint"].plan_id,
+        completed_steps=(ResearchStep(
+            original_step.name, original_step.status,
+            {**original_step.data, "summary": "tampered evidence"},
+        ), *original["checkpoint"].completed_steps[1:]),
+        pending_steps=original["checkpoint"].pending_steps,
+        state=original["checkpoint"].state,
+        plan_binding=original["checkpoint"].plan_binding,
+        integrity_token=original["checkpoint"].integrity_token,
+    )
+
+    with pytest.raises(ValueError, match="checkpoint is untrusted"):
+        run_bounded_research(
+            changed_scope, original_query="What applies?", archive_reader=archive,
+            public_provider=None, public_bounds=None, github_provider=_GitHub(repository_ref="attacker/other"),
+            checkpoint=original["checkpoint"],
+        )
+    with pytest.raises(ValueError, match="checkpoint is untrusted"):
+        run_bounded_research(
+            plan, original_query="What applies?", archive_reader=archive,
+            public_provider=None, public_bounds=None, github_provider=_GitHub(), checkpoint=tampered,
+        )
+
+
 def test_unknown_or_over_budget_cost_refuses_public_transport_before_provider_call(monkeypatch):
     monkeypatch.setattr("prm.public_web._reject_private_resolution", lambda _host: None)
     archive = _Archive([])
@@ -473,3 +557,90 @@ def test_active_application_ingress_renders_only_cited_deep_research_facts(monke
     assert "Рекомендация (требует человеческого решения):" in result.text
     assert "Review the cited evidence" in result.text
     assert "human_confirmation_required_for_any_change" in result.text
+
+
+def test_active_application_resumes_only_a_process_signed_prestart_checkpoint():
+    archive = _Archive([{
+        "archive_document_id": "tg:1", "source_url": "https://t.me/private/1",
+        "snippet": "Archive evidence supports a replayable evaluation fixture.",
+        "relevance_label": "direct", "supports_action": True,
+    }])
+    plan = build_research_plan("What applies?", archive_query="agent evaluation fixture")
+    assistant = PersonalResearchAssistant(
+        settings=SimpleNamespace(db_path=":memory:"), deep_archive_reader=archive,
+    )
+    cancellation = ResearchCancellation()
+    cancellation.cancel()
+
+    cancelled = assistant.answer(OperatorRequest(
+        query="What applies?", deep_research_plan=plan, deep_research_cancellation=cancellation,
+    ))
+    checkpoint = cancelled.payload["research_result"]["checkpoint"]
+    assert type(checkpoint) is ResearchCheckpoint
+    assert checkpoint.to_public_dict()["retention"] == "ephemeral_process_signed"
+
+    resumed = assistant.answer(OperatorRequest(
+        query="What applies?", deep_research_plan=plan, deep_research_checkpoint=checkpoint,
+    ))
+
+    assert resumed.status == "complete"
+    assert resumed.payload["research_result"]["status"] == "complete"
+    assert "Archive evidence supports" in resumed.text
+
+
+def test_active_application_rejects_a_forged_checkpoint_without_returning_its_facts():
+    archive = _Archive([{
+        "archive_document_id": "tg:1", "source_url": "https://t.me/private/1",
+        "snippet": "Direct evidence.", "relevance_label": "direct", "supports_action": True,
+    }])
+    github_access = _github_access()
+    plan = build_research_plan(
+        "What applies?", archive_query="direct evidence", github_access=github_access, project_name="Acme Project",
+    )
+    forged = ResearchCheckpoint(
+        plan_id=plan.plan_id,
+        completed_steps=(ResearchStep("github_context", "verified", {
+            "repository_ref": "attacker/other", "commit_sha": "a" * 40, "ref": "main",
+            "summary": "forged", "source_url": "https://github.com/attacker/other/commit/" + "a" * 40,
+        }),),
+        pending_steps=(), state="complete",
+        plan_binding="sha256:" + "0" * 64,
+        integrity_token="hmac-sha256:" + "0" * 64,
+    )
+    provider = _GitHub()
+    assistant = PersonalResearchAssistant(
+        settings=SimpleNamespace(db_path=":memory:"), deep_archive_reader=archive,
+        github_context_provider=provider,
+    )
+
+    result = assistant.answer(OperatorRequest(
+        query="What applies?", deep_research_plan=plan, deep_research_checkpoint=forged,
+    ))
+
+    assert result.status == "partial"
+    assert result.payload["checkpoint_status"] == "untrusted_or_scope_mismatch"
+    assert "attacker/other" not in result.text
+    assert provider.requests == []
+    assert github_access.authorization.reservation is not None
+    assert github_access.authorization.reservation.available is True
+
+
+def test_active_application_renders_evidence_only_fallback_when_deep_answer_gate_fails(monkeypatch):
+    archive = _Archive([{
+        "archive_document_id": "tg:1", "source_url": "https://t.me/private/1",
+        "snippet": "Archive evidence supports a replayable evaluation fixture.",
+        "relevance_label": "direct", "supports_action": True,
+    }])
+    plan = build_research_plan("What applies?", archive_query="agent evaluation fixture")
+    monkeypatch.setattr("prm.application._final_answer_publication_allowed", lambda *_args, **_kwargs: False)
+
+    result = PersonalResearchAssistant(
+        settings=SimpleNamespace(db_path=":memory:"), deep_archive_reader=archive,
+    ).answer(OperatorRequest(query="What applies?", deep_research_plan=plan))
+
+    assert result.text.startswith("Я не публикую свободный пересказ")
+    assert result.payload["final_answer_publication"] == {
+        "allowed": False,
+        "fallback_used": True,
+        "reason": "evidence_only_fallback",
+    }

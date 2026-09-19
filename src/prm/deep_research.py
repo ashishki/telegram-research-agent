@@ -12,7 +12,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import hashlib
+import hmac
+import json
 import re
+import secrets
 from threading import Event, Lock
 from time import monotonic
 from typing import Any, Mapping, Protocol, Sequence
@@ -34,6 +37,9 @@ _INSTRUCTION_MARKERS = (
     "ignore previous", "system message", "developer message", "assistant instruction",
     "игнорируй предыдущ", "системное сообщение", "инструкция для ассистента",
 )
+_CHECKPOINT_SIGNING_KEY = secrets.token_bytes(32)
+_CHECKPOINT_DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
+_CHECKPOINT_SIGNATURE = re.compile(r"^hmac-sha256:[0-9a-f]{64}$")
 
 
 class ArchiveResearchReader(Protocol):
@@ -228,12 +234,19 @@ class ResearchStep:
 
 @dataclass(frozen=True, slots=True)
 class ResearchCheckpoint:
-    """Ephemeral resume point; callers choose whether and where to retain it."""
+    """Process-signed, plan-bound ephemeral resume receipt.
+
+    It can be held by a caller for a same-process retry, but it cannot be
+    assembled from arbitrary completed steps.  PA-09 owns durable jobs and
+    persistence; a restart intentionally invalidates this receipt.
+    """
 
     plan_id: str
     completed_steps: tuple[ResearchStep, ...]
     pending_steps: tuple[str, ...]
     state: str
+    plan_binding: str
+    integrity_token: str
 
     def __post_init__(self) -> None:
         if not re.fullmatch(r"plan:[0-9a-f]{24}", self.plan_id):
@@ -244,6 +257,10 @@ class ResearchCheckpoint:
             raise ValueError("research checkpoint step type is invalid")
         if any(not re.fullmatch(r"(?:archive_initial|archive_expansion|public_[1-3]|github_context)", step) for step in self.pending_steps):
             raise ValueError("research checkpoint cannot schedule an unbounded step")
+        if not _CHECKPOINT_DIGEST.fullmatch(self.plan_binding):
+            raise ValueError("research checkpoint plan binding is invalid")
+        if not _CHECKPOINT_SIGNATURE.fullmatch(self.integrity_token):
+            raise ValueError("research checkpoint integrity token is invalid")
 
     def to_public_dict(self) -> dict[str, Any]:
         return {
@@ -251,7 +268,8 @@ class ResearchCheckpoint:
             "state": self.state,
             "completed_steps": [step.to_public_dict() for step in self.completed_steps],
             "pending_steps": list(self.pending_steps),
-            "retention": "ephemeral_caller_owned",
+            "retention": "ephemeral_process_signed",
+            "resume_requires": "same_process_matching_plan_and_scope",
         }
 
 
@@ -366,8 +384,11 @@ def run_bounded_research(
 
     if type(plan) is not ResearchPlan:
         raise ValueError("research plan must be typed")
-    if checkpoint is not None and (type(checkpoint) is not ResearchCheckpoint or checkpoint.plan_id != plan.plan_id):
-        raise ValueError("research checkpoint does not match plan")
+    if checkpoint is not None:
+        if type(checkpoint) is not ResearchCheckpoint or checkpoint.plan_id != plan.plan_id:
+            raise ValueError("research checkpoint does not match plan")
+        if not _checkpoint_is_trusted(plan, checkpoint):
+            raise ValueError("research checkpoint is untrusted or belongs to a different source scope")
     cancellation = cancellation or ResearchCancellation()
     # A checkpoint resumes only work stopped before a worker was authorized.
     # Once parent-side authority was consumed, a provider call may have begun
@@ -730,8 +751,8 @@ def _result(
     github = next((step.data for step in steps if step.name == "github_context" and step.status == "verified"), {})
     project_recommendations = _project_recommendations(plan, facts, github)
     partial = state != "complete" or any(step.status not in {"complete", "verified", "verified_current_evidence"} for step in steps)
-    checkpoint = ResearchCheckpoint(
-        plan_id=plan.plan_id,
+    checkpoint = _issue_checkpoint(
+        plan,
         completed_steps=tuple(steps),
         pending_steps=tuple(pending),
         state=state if state in {"partial", "cancelled", "time_budget_exhausted", "complete"} else "partial",
@@ -755,8 +776,152 @@ def _result(
     )
 
 
-def render_research_result(result: ResearchResult) -> str:
-    """Render fact, inference and recommendation as visibly different kinds."""
+def _issue_checkpoint(
+    plan: ResearchPlan,
+    *,
+    completed_steps: tuple[ResearchStep, ...],
+    pending_steps: tuple[str, ...],
+    state: str,
+) -> ResearchCheckpoint:
+    binding = _checkpoint_plan_binding(plan)
+    return ResearchCheckpoint(
+        plan_id=plan.plan_id,
+        completed_steps=completed_steps,
+        pending_steps=pending_steps,
+        state=state,
+        plan_binding=binding,
+        integrity_token=_checkpoint_integrity(
+            plan_id=plan.plan_id,
+            plan_binding=binding,
+            completed_steps=completed_steps,
+            pending_steps=pending_steps,
+            state=state,
+        ),
+    )
+
+
+def _checkpoint_is_trusted(plan: ResearchPlan, checkpoint: ResearchCheckpoint) -> bool:
+    binding = _checkpoint_plan_binding(plan)
+    if not hmac.compare_digest(checkpoint.plan_binding, binding):
+        return False
+    expected = _checkpoint_integrity(
+        plan_id=checkpoint.plan_id,
+        plan_binding=checkpoint.plan_binding,
+        completed_steps=checkpoint.completed_steps,
+        pending_steps=checkpoint.pending_steps,
+        state=checkpoint.state,
+    )
+    return hmac.compare_digest(checkpoint.integrity_token, expected)
+
+
+def _checkpoint_plan_binding(plan: ResearchPlan) -> str:
+    """Bind a receipt to its exact source identities and sealed scopes."""
+
+    public_sources: list[dict[str, Any]] = []
+    for task in plan.public_tasks:
+        access = task.access
+        if type(access) is not PublicWebAccess:
+            public_sources.append({"access_type": type(access).__name__})
+            continue
+        public_sources.append({
+            "query_digest": access.public_query_digest,
+            "owner_ref": access.owner_ref,
+            "connection_ref": access.connection_ref,
+            "search_resource_ref": access.search_resource_ref,
+            "fetch_resource_ref": access.fetch_resource_ref,
+            "search_authorization": _authorization_scope(access.search_authorization),
+            "fetch_authorizations": [_authorization_scope(item) for item in access.fetch_authorizations],
+        })
+    github = None
+    if plan.github_access is not None:
+        github = {
+            "repository_ref": plan.github_access.repository_ref,
+            "owner_ref": plan.github_access.owner_ref,
+            "connection_ref": plan.github_access.connection_ref,
+            "authorization": _authorization_scope(plan.github_access.authorization),
+        }
+    binding = {
+        "schema_version": DEEP_RESEARCH_SCHEMA_VERSION,
+        "plan_id": plan.plan_id,
+        "query_fingerprint": plan.query_fingerprint,
+        "archive_query_fingerprints": [_fingerprint(item) for item in plan.archive_queries],
+        "public_sources": public_sources,
+        "github_source": github,
+        "project_name": plan.project_name,
+        "budget": plan.budget.to_dict(),
+    }
+    return _fingerprint(_canonical_checkpoint_json(binding))
+
+
+def _authorization_scope(decision: AuthorizationDecision) -> dict[str, Any]:
+    return {
+        "grant_ref": decision.grant_ref,
+        "grant_revision": decision.grant_revision,
+        "owner_ref": decision.owner_ref,
+        "connection_ref": decision.connection_ref,
+        "resource_ref": decision.resource_ref,
+        "capability": decision.capability,
+        "operation": decision.operation,
+        "data_class": decision.data_class,
+        "provider_ref": decision.provider_ref,
+        "purpose": decision.purpose,
+    }
+
+
+def _checkpoint_integrity(
+    *,
+    plan_id: str,
+    plan_binding: str,
+    completed_steps: Sequence[ResearchStep],
+    pending_steps: Sequence[str],
+    state: str,
+) -> str:
+    payload = {
+        "plan_id": plan_id,
+        "plan_binding": plan_binding,
+        "completed_steps": [
+            {"name": item.name, "status": item.status, "data": _checkpoint_value(item.data)}
+            for item in completed_steps
+        ],
+        "pending_steps": list(pending_steps),
+        "state": state,
+    }
+    digest = hmac.new(
+        _CHECKPOINT_SIGNING_KEY,
+        _canonical_checkpoint_json(payload).encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    return "hmac-sha256:" + digest
+
+
+def _checkpoint_value(value: object) -> Any:
+    """Canonicalize result data for integrity without exposing it elsewhere."""
+
+    if value is None or isinstance(value, (str, int, bool)):
+        return value
+    if isinstance(value, float):
+        if value != value or value in {float("inf"), float("-inf")}:
+            return {"nonfinite_float": repr(value)}
+        return value
+    if isinstance(value, bytes):
+        return {"bytes_sha256": hashlib.sha256(value).hexdigest(), "length": len(value)}
+    if isinstance(value, datetime):
+        return {"datetime": value.isoformat()}
+    if isinstance(value, Mapping):
+        if any(not isinstance(key, str) for key in value):
+            return {"mapping_repr": repr(value)}
+        return {key: _checkpoint_value(item) for key, item in value.items()}
+    if isinstance(value, Sequence):
+        return [_checkpoint_value(item) for item in value]
+    return {"value_type": type(value).__name__, "value_repr": repr(value)}
+
+
+def _canonical_checkpoint_json(value: object) -> str:
+    return json.dumps(_checkpoint_value(value), sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False)
+
+
+def render_research_fact_section(result: ResearchResult) -> str:
+    """Render only exact cited facts for the generic claim-ledger verifier."""
 
     fact_lines: list[str] = []
     for fact in result.facts:
@@ -766,7 +931,16 @@ def render_research_result(result: ResearchResult) -> str:
             fact_lines.extend(("Факт: " + span, "Источник: " + source))
     if not fact_lines:
         return "Я не могу подтвердить актуальный внешний факт: исследование вернуло только частичное покрытие."
-    lines = ["Проверенные факты:", *fact_lines[:12]]
+    return "\n".join(["Проверенные факты:", *fact_lines[:12]])
+
+
+def render_research_result(result: ResearchResult) -> str:
+    """Render fact, inference and recommendation as visibly different kinds."""
+
+    fact_section = render_research_fact_section(result)
+    if fact_section.startswith("Я не могу подтвердить актуальный внешний факт"):
+        return fact_section
+    lines = fact_section.splitlines()
     if result.inferences:
         lines.append("Инференция (не факт): " + str(result.inferences[0].get("statement") or ""))
     if result.project_recommendations:

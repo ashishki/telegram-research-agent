@@ -41,8 +41,10 @@ from prm.deep_research import (
     ArchiveResearchReader,
     GitHubContextProvider,
     ResearchCancellation,
+    ResearchCheckpoint,
     ResearchPlan,
     ResearchResult,
+    render_research_fact_section,
     render_research_result,
     run_bounded_research,
 )
@@ -548,20 +550,54 @@ class PersonalResearchAssistant:
     ) -> AssistantResult:
         """Active PA-06 ingress for an already bounded, typed plan only."""
 
-        result: ResearchResult = run_bounded_research(
-            plan,
-            original_query=request.query,
-            archive_reader=self.deep_archive_reader,
-            public_provider=self.public_web_provider,
-            public_bounds=self.public_web_bounds,
-            github_provider=self.github_context_provider,
-            cancellation=(
-                request.deep_research_cancellation
-                if type(request.deep_research_cancellation) is ResearchCancellation
-                else ResearchCancellation()
-            ),
+        checkpoint = (
+            request.deep_research_checkpoint
+            if type(request.deep_research_checkpoint) is ResearchCheckpoint
+            else None
         )
-        final_text = render_research_result(result)
+        try:
+            result: ResearchResult = run_bounded_research(
+                plan,
+                original_query=request.query,
+                archive_reader=self.deep_archive_reader,
+                public_provider=self.public_web_provider,
+                public_bounds=self.public_web_bounds,
+                github_provider=self.github_context_provider,
+                cancellation=(
+                    request.deep_research_cancellation
+                    if type(request.deep_research_cancellation) is ResearchCancellation
+                    else ResearchCancellation()
+                ),
+                checkpoint=checkpoint,
+            )
+        except ValueError:
+            if checkpoint is None:
+                raise
+            final_text = _render_terminal_empty_answer(
+                "для продолжения нужен текущий защищённый checkpoint для того же исследования."
+            )
+            verification = verify_answer_against_evidence(final_text, [])
+            return AssistantResult(
+                interaction_id=str(context.get("interaction_id") or ""),
+                status="partial",
+                mode="research",
+                text=final_text,
+                payload={
+                    "status": "partial",
+                    "primary_intent": "deep_research",
+                    "route_decision": dict(route),
+                    "checkpoint_status": "untrusted_or_scope_mismatch",
+                    "write_performed": False,
+                },
+                operator_context=context,
+                final_answer_verification={
+                    "claim_count": int(verification.get("claim_count") or 0),
+                    "metrics": verification.get("metrics") or {},
+                    "summary": claim_ledger_public_summary(verification),
+                },
+                route=route,
+            )
+        rendered_research_text = render_research_result(result)
         evidence_items = [
             {
                 "support_span": item.get("support_span") or "",
@@ -571,8 +607,27 @@ class PersonalResearchAssistant:
             for item in result.facts
             if item.get("support_span") and item.get("source_url")
         ]
-        verification = verify_answer_against_evidence(final_text, evidence_items)
-        publication_allowed = _final_answer_publication_allowed(verification, {})
+        # The generic verifier is intentionally lexical and evaluates exact
+        # fact spans only. PA-06 separately validates the typed inference and
+        # recommendation contract before rendering those visibly labelled
+        # non-fact categories.
+        verification = verify_answer_against_evidence(render_research_fact_section(result), evidence_items)
+        category_verification = _verify_deep_research_categories(result)
+        verification = {**verification, "deep_research_categories": category_verification}
+        publication_allowed = (
+            _final_answer_publication_allowed(verification, {})
+            and bool(category_verification["valid"])
+        )
+        fallback_used = False
+        final_text = rendered_research_text
+        if not publication_allowed:
+            # Do not expose a renderer regression as if its factual prose had
+            # passed verification. The established evidence-only fallback has
+            # no recommendation or inferred conclusion.
+            fallback_used = True
+            final_text = _render_verified_evidence_fallback(evidence_items)
+            verification = verify_answer_against_evidence(final_text, evidence_items)
+            publication_allowed = _final_answer_publication_allowed(verification, {})
         payload = {
             "status": result.status,
             "primary_intent": "deep_research",
@@ -582,8 +637,12 @@ class PersonalResearchAssistant:
             "rendered_final_answer_verification": verification,
             "final_answer_publication": {
                 "allowed": publication_allowed,
-                "fallback_used": not publication_allowed,
-                "reason": "cited_research_facts" if publication_allowed else "research_result_partial_or_unverified",
+                "fallback_used": fallback_used,
+                "reason": (
+                    "cited_research_facts"
+                    if publication_allowed and not fallback_used
+                    else "evidence_only_fallback" if fallback_used else "research_result_partial_or_unverified"
+                ),
             },
             "write_performed": False,
         }
@@ -1009,6 +1068,56 @@ def _preserve_requested_project_identity(payload: Mapping[str, Any], route: Mapp
             "guidance": guidance,
             "inferred_project_name": current or None,
         },
+    }
+
+
+def _verify_deep_research_categories(result: ResearchResult) -> dict[str, Any]:
+    """Check non-fact PA-06 categories against their typed evidence contract."""
+
+    source_kinds = {str(item.get("source_kind") or "") for item in result.facts}
+    source_urls = {str(item.get("source_url") or "") for item in result.facts if str(item.get("source_url") or "")}
+    failures: list[str] = []
+    for item in result.inferences:
+        basis = tuple(str(value) for value in item.get("basis") or ())
+        statement = " ".join(str(item.get("statement") or "").split())
+        if (
+            item.get("kind") != "inference"
+            or not statement
+            or len(statement) > 400
+            or not basis
+            or not set(basis) <= source_kinds
+        ):
+            failures.append("invalid_inference_contract")
+            break
+    github_facts = [
+        item for item in result.facts
+        if item.get("source_kind") == "github_repository_identity"
+    ]
+    for item in result.project_recommendations:
+        conditions = {str(value) for value in item.get("conditions") or ()}
+        references = tuple(str(value) for value in item.get("evidence_refs") or ())
+        statement = " ".join(str(item.get("statement") or "").split())
+        repository_match = any(
+            f"{fact.get('repository_ref')}@{fact.get('commit_sha')}" in statement
+            for fact in github_facts
+        )
+        if (
+            item.get("kind") != "project_recommendation"
+            or not statement
+            or len(statement) > 500
+            or not references
+            or not set(references) <= source_urls
+            or "human_confirmation_required_for_any_change" not in conditions
+            or not repository_match
+            or item.get("write_performed") is not False
+        ):
+            failures.append("invalid_project_recommendation_contract")
+            break
+    return {
+        "valid": not failures,
+        "inference_count": len(result.inferences),
+        "project_recommendation_count": len(result.project_recommendations),
+        "failures": failures,
     }
 
 

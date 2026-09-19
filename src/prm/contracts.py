@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Literal, Mapping
 from prm.capabilities import AuthorizationDecision
 
 if TYPE_CHECKING:
-    from prm.deep_research import ResearchCancellation, ResearchPlan
+    from prm.deep_research import ResearchCancellation, ResearchCheckpoint, ResearchPlan
 
 RequestMode = Literal["auto", "research", "brief", "chat"]
 ResponseMode = Literal["research", "brief", "chat", "project_clarify", "clarify"]
@@ -225,6 +225,9 @@ class OperatorRequest:
     # multi-source agent loop.
     deep_research_plan: "ResearchPlan | None" = None
     deep_research_cancellation: "ResearchCancellation | None" = None
+    # A PA-06 checkpoint is process-signed and accepted only with the same
+    # typed plan/source scope. It is intentionally not a durable job receipt.
+    deep_research_checkpoint: "ResearchCheckpoint | None" = None
 
 
 @dataclass(frozen=True, slots=True)
