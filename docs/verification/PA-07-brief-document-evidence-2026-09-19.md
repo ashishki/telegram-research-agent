@@ -5,7 +5,7 @@ This record is not human acceptance, release approval, live Telegram evidence,
 or formal approval of the mechanically `review_required` PA design.
 
 Branch: `docs/personal-assistant-blueprint-playbook-20260918`.
-Tested implementation SHA: `9603c28d68315d32ec0bc0895b060c15db168be7`.
+Tested implementation SHA: `c1cd081`.
 
 ## Implemented boundary
 
@@ -31,6 +31,13 @@ Tested implementation SHA: `9603c28d68315d32ec0bc0895b060c15db168be7`.
   the current visible `BriefDocument` binding. Explain-item, shorten, topic
   filter, less-technical, cautious apply and week comparison views all render
   the bound report object with `retrieval_performed: false`.
+- The Telegram dispatcher retains a bounded, process-local `BriefDocumentStore`
+  keyed by local database path, so an immediate second command can navigate the
+  visible report. It evicts the oldest of at most four stores and naturally
+  loses that visible projection on process restart; no job, timer or shared
+  runtime state is involved. A narrow settings-only compatibility path remains
+  for pre-existing injected test facades that cannot accept the PA-07 store
+  seam.
 - The owner authorized a narrow 2026-09-19 P1 remediation: immutable selected
   document versions are retained in the existing local SQLite schema only when
   the Telegram ingress carries one canonical private `(chat_id, actor_id,
@@ -56,16 +63,16 @@ staged or modified.
 
 ## Verification
 
-Commands run against `9603c28`:
+Commands run against `c1cd081`:
 
 ```text
 PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q \
   tests/test_assistant_briefs.py \
   tests/test_assistant_report_dialogue.py
-# 23 passed in 6.99s
+# 24 passed in 8.78s
 
 PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/test_tiers.py focused-prm
-# 413 passed in 73.51s
+# 414 passed in 93.19s
 ```
 
 The direct suites cover timezone/DST half-open selection, exact local-source
@@ -80,6 +87,11 @@ restart-visible-state expiry, tampered JSON fail-closed, owner deletion and the
 owner-wide 64-document cap. They are fixture/adapter evidence only: they do
 not prove actual Telegram rendering, mobile readability, archive recall
 quality, or operator usefulness.
+
+The final direct dialogue case dispatches a brief and then `объясни пункт 2`
+through separate Telegram command calls, confirms that the shared bounded
+store renders the retained visible item, then clears that process-local
+registry to model a restart and confirms the old item is not reconstructed.
 
 `focused-prm` now includes both PA-07 suites. It is a regression tier, not
 human content, visual, live runtime, or release evidence.
@@ -128,7 +140,16 @@ The relevant remediation/recheck chain is:
   machine registry to its unchanged `review_required` state; the precise owner
   amendment remains in this task record.
 
-A fresh independent Terra/high recheck of `9603c28` plus this evidence update
+- Fresh review `20260919T105529Z-slice_review-ecf52f50` reviewed `fde4313`,
+  requested and observed `gpt-5.6-terra` / `high`, and returned `STOP_SHIP`.
+  It found that the Telegram dispatcher constructed a new visible store for
+  each command, preventing a real second-turn report follow-up. Commit
+  `d9a684f` retains the bounded process-local store and adds the dispatcher
+  restart-denial test. Commit `c1cd081` preserves the settings-only constructor
+  expected by narrow legacy injected test facades; the real assistant continues
+  to receive the shared store.
+
+A fresh independent Terra/high recheck of `c1cd081` plus this evidence update
 is still required. Actual Telegram/mobile visual and human content review also
 remain separate gates. Neither fixture tests nor model review authorizes
 runtime, publication, a design-state change, or PA-08/PA-09 work.
