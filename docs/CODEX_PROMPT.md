@@ -1,185 +1,63 @@
 # Current Session Handoff
 
-Updated: 2026-09-18
-Workstream: PA — full Personal AI Assistant
-Scope completed in this publication: PA-00 local technical implementation and
-human high-risk slice acceptance; PA-01 contract/acceptance foundation is
-published at `9b0fa37` with receipt `f91b83b`; PA-02 local default-deny
-capability-policy implementation is published at `2c51c19`; Astra review
-remediation is at `7019000` and awaits fresh Terra/high recheck.
-Baseline: cc105b0024b3e7aa6768ee29acc105b4c682376c
-Playbook: d570163ab17ec3b4245187c778f1e8d89af9690f
+Updated: 2026-09-19
+Workstream: PA — full Personal AI Assistant, not an MVP
+Branch: `docs/personal-assistant-blueprint-playbook-20260918`
+Baseline: `f011d3b8641aab862f29b8e975ef2d5e647bc89c`
+Last PA-02 code SHA: `779454705928e90a9ecf922ab0bdc3f11f4c17ab`
+Playbook pin: `d570163ab17ec3b4245187c778f1e8d89af9690f`
 
-## Goal
+## Authority and current boundary
 
-Implement the complete `docs/PERSONAL_ASSISTANT_SPEC.md`, not a minimal demo:
-natural conversation, real archive/web AI search, beautiful weekly/topic
-briefings, subscriptions, mail/calendar/Canvas, confirmed actions, memory,
-multimodality, model-quality/cost controls and reliable operations.
+The owner directed implementation through dependency-ready slices and accepted
+PA-00, but that does not alter the formal PA design record. The paired design
+in `docs/design/PA.md` / `docs/design/PA.design.json` remains mechanically
+`review_required` because of the historic STOP_SHIP artifact. Do not hand-edit
+Playbook artifacts or describe the design as formally approved.
 
-PA-00 is accepted by the human operator, with focused technical evidence at
-`docs/verification/PA-00-technical-evidence-2026-09-18.md`. The owner then
-explicitly instructed the implementer to begin PA-01 and continue the programme
-after stating design approval. That direct instruction permits the scoped PA-01
-and PA-02 work; it does not alter the separate formal Playbook approval record.
-The paired design is `docs/design/PA.md` and `docs/design/PA.design.json`. Its
-mechanical `review_required` status is preserved because the approval recorder
-refused the historical STOP_SHIP review artifact; do not hand-edit or represent
-that state as formal approval.
+PA-00 technical evidence is
+`docs/verification/PA-00-technical-evidence-2026-09-18.md`. PA-01 is the
+published contracts foundation. PA-02 is locally synthetic/offline verified at
+the SHA above; its final evidence is
+`docs/verification/PA-02-capability-policy-evidence-2026-09-18.md`.
 
-## Next session
+PA-02 P0/P1 boundary findings are remediated and independently rechecked. The
+final accumulated PA-00..PA-02 Deep Review is `ADVISORY`: two historical
+compatibility dispatch facades retain a legacy default but have no active PA
+production entrypoint. Preserve this P2 debt; do not portray it as resolved.
 
-Follow `docs/prompts/personal_assistant_implementer.md`. Preserve the branch and
-all historical state. First establish Git identity and initialize only the
-pinned development submodule, then run:
+No production DB, live Telegram polling, account/provider access, job, timer,
+credential, `.env` or release action has been used or is authorized. Preserve
+the two untracked local files. Do not run the full historical pytest suite.
+
+## Next implementation slice: PA-03
+
+PA-03 is dependency-ready. Read its block in `docs/tasks.md`, its exact registry
+entry in `docs/design/PA.design.json`, the relevant PA-03 section of
+`docs/design/PA.md`, `docs/ASSISTANT_BOUNDARIES.md` and
+`docs/IMPLEMENTATION_CONTRACT.md` before editing. Implement the complete
+conversation-state/plain-language-confirmation scope specified there, not a
+demo. PA-00 covers callback/source integrity only; PA-03 must not infer a
+confirmation from stale dialogue, unrelated topic or missing exact visible
+proposal. PA-13 owns provider-write confirmation/reconciliation.
+
+For each slice: add focused positive/negative tests, run the smallest relevant
+existing tier, record evidence that distinguishes fixtures from integrations,
+make a scoped commit and push. Use a fresh independent read-only reviewer for
+P0/P1 rechecks; batch Deep Review at the declared phase boundaries unless an
+immediate safety boundary changes. Reviewer launch records requested model and
+effort; lack of reviewer telemetry is a limitation, never approval.
+
+Useful initial checks:
 
 ```bash
 git status --short
 git branch --show-current
 git rev-parse HEAD
-git submodule update --init --checkout -- .playbook/upstream
-python tools/playbook.py --check-pin
-python tools/check_personal_assistant_plan.py
-python3 tools/run_codex_role.py run --root . --task PA-02 --feature-id PA \
-  --slice-id PA-02 --role slice_review --model gpt-5.6-terra \
-  --reasoning-effort high
+python3 tools/playbook.py --check-pin
+python3 tools/check_personal_assistant_plan.py
 ```
 
-Inspect PA-00, PA-01 and PA-02 evidence without overwriting preserved Playbook
-review history. The normal Feature Workflow still reports the separate formal
-gate as `review_required`; its artifacts remain tool-owned. The current owner
-instruction is the explicit scoped exception permitting implementation through
-the dependency-ready programme, not a reason to edit that record. Continue
-after each applicable gate; do not ask again for already-assigned safe steps.
-Stop only at genuine safety, scope, credential, exact-design or human
-release/acceptance gates.
-
-The first PA-02 implementation review ran as a fresh Astra/high Role Runner
-slice review at `24a2d86` and found four P1 egress defects. Remediation is
-`7019000`; focused PA-02 tests passed `40`, and fast-contract passed `415`.
-The next safe action is the requested fresh Terra/high recheck of that changed
-scope, then the mandatory boundary privacy/Test Critic evidence. Do not begin
-PA-03 until P0/P1 are clear; its Feature Workflow planning record is already
-tool-generated and remains separate from the mechanical design status.
-
-PA-00 must first reproduce/diagnose the baseline failure:
-`tests/test_prm_product_ux_eval.py::test_product_ux_keeps_project_context_for_confirmation_followups`.
-Baseline GitHub run 35328205490 failed with 302 passed and 1 failed. This is not
-proof that a live bot loses context; distinguish evaluator from application.
-The historical test name remains, but after diagnosis its unsafe stale-dialogue
-expectation was deliberately replaced by denied free-text behavior and a
-separate immutable bound-inline provenance case—not merely changed to green CI.
-
-The approved-design candidate is now explicit: PA-00 makes the existing durable
-callback bind an additive `prm_post_answer_action_binding.v1` source snapshot
-(PRM context kind/ID, canonical SHA-256 source snapshot, optional project
-provenance, offered action codes, private owner chat/actor hashes and expiry),
-never mutable `last_project_name`. One pure snapshot canonicalizer is used for
-registration and validation; its counts are non-boolean integers in
-`0..1000000`, and its optional project reference is only an exact bounded copy
-of canonical `project_name`. A non-finite/non-serializable value renders no
-control and writes neither context nor receipt. PA-00 controls render only for
-`actor_id == chat_id == owner_chat_id`; the shared ID predicate accepts only
-canonical positive ASCII decimals `[1-9][0-9]{0,18}` at most `9223372036854775807`.
-Every Telegram text/voice, compatibility-dispatch and callback ingress must
-carry that authenticated tuple unchanged, while a missing/invalid tuple renders
-no controls. Callbacks validate binding
-and requested action for both draft and confirmation without rerouting/searching.
-Rejected parse/identity/row/schema/digest/expiry/action cases are read-only: no
-row, receipt or memory mutation and no expiry cleanup, including malformed parse
-or row JSON at the outer callback handler. Legacy text selection asks for the
-inline callback without consulting `_PRM_DIALOG_STATE` or transforming its last
-project/topic/action fields. PA-00's
-`read_prm_rollback_drain(db_path, *, owner_chat_id, now=None)` is
-owner-restricted/read-only, derives both established PRM and UTD owner hashes,
-returns only status/UTC-now/count-only classifications, fails closed for
-unavailable data and blocks an old handler until no unexpired nonterminal row
-in either namespace remains; it never changes shared UTD rows. Its PA-00 test
-must create a real UTD-path row and prove both blocker detection and SELECT-only
-SQL tracing.
-The binding's `source_result_id`, table key and callback context ID are the same
-canonical lowercase 10-hex value. UTD clean-schema compatibility is PA-00 work:
-logical `utd_state` maps draft/previewed/confirming/confirmed/cancelled-or-expired
-to ready/pending/pending/confirmed/cancelled without a migration; untagged
-legacy pending rows fail closed.
-The exact tuple-bearing boundaries are bot/compatibility/PRM dispatch,
-post-answer bundle and PRM callback facade; only `run_bot` supplies sender plus
-configured owner. This applies to `prma`/`prmc`, not UTD prefixes. PRM invalid
-callback validation precedes its generic Telegram acknowledgement and produces
-no follow-up message or durable write. `encode_utd_proposal_state` and
-`decode_utd_proposal_state` are mandatory for every UTD profile/subscription
-state transition; their canonical-schema integration test executes every
-transition. The facade's one pure PRM validation result is retained through the
-acknowledgement decision, never recomputed by transport. The immutable result
-includes status/expiry/summary/proposals fingerprints and is consumed once by
-transactional CAS; UTD transitions CAS expected logical state, mapped status and
-prior JSON fingerprint, so concurrent confirm/cancel has exactly one winner.
-Legacy PRM markup receives no authenticated actor/owner tuple and must render
-no control. Initial offered action codes alone are valid; dynamic `c`, `n1`–`n5`,
-feedback-reason and confirmation codes require their exact issued, persisted
-parent transition, otherwise they fail read-only. The focused tier's existing
-callbacks/UTD callback/UTD dispatch tests are PA-00 scope, not bypassed.
-The evaluator must deny free-text legacy action selection without fabricating a
-preview/callback/`eval-*` context, while a separate immutable bound-inline
-fixture covers project provenance. `test_interaction_ledger.py` passes the same
-explicit synthetic private tuple as production; chat-only controls stay denied.
-When no valid inline control exists, free-text action denial tells the user to
-run the request again for a new action button; it must not point to a nonexistent
-current control. UTD decoding accepts only a matching encoded `utd_state` and
-table status; missing, malformed or mismatched pairs fail closed without a write.
-Use `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest` for
-the direct PA-00 command, which explicitly includes
-`test_product_ux_keeps_project_context_for_confirmation_followups`; record the
-resolved Python/version. Full
-plain-language “yes” is PA-03 work, where an exact current visible confirmation
-ref must be cleared on a new topic or cancellation; PA-13 applies the same
-invariant to provider writes. PA-00 must register and run
-`test_post_answer_controls_require_private_owner_actor_binding`,
-`test_post_answer_context_binds_canonical_snapshot_and_project_ref`,
-the text/embedded-transcript/completed-voice/compatibility/callback matrix
-`test_prm_entrypoints_propagate_private_owner_identity_or_render_no_controls`,
-`test_post_answer_callback_preserves_bound_source_without_reroute`,
-`test_post_answer_context_rejects_expired_wrong_chat_actor_or_tampered_binding`,
-`test_invalid_prm_action_context_is_read_only_before_rejection`,
-`test_prm_rollback_drain_is_owner_restricted_and_never_mutates_utd_rows`, and
-`test_plain_language_action_selection_rejects_stale_or_cross_topic_context`,
-plus stale PRM validation-result and concurrent UTD confirm/cancel CAS tests.
-Record the interpreter/environment, exact HEAD, active entrypoints,
-classification (evaluator, application, or both), before/after direct result,
-focused-tier result and any infrastructure-only blocker. Invoke the focused tier
-with the same `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` environment.
-
-## Boundaries and evidence
-
-No .env, production database, account, subscription, service or timer was
-changed by this planning publication. No independent model review or real-user
-pilot is claimed. The submodule is development tooling, not an application
-runtime or authorization to install external skills/hooks. Existing archive
-and UTD data permissions remain separate from future connectors.
-
-`docs/tasks.md` is the active PA queue. Historic PRM-SN/RFX/UTD statuses remain
-in `docs/tasks.before-pa-20260918.md`; do not restart that queue. Current
-architecture docs describe existing implementation; PA design describes the
-future target. Specific checks in the slice registry are regression floors;
-add and wire new acceptance tests before accepting any new feature.
-
-Read `docs/PLAYBOOK_ADOPTION.md` for verification commands, token discipline,
-review routing and rollback. Record fresh evidence in `docs/verification/` and
-private machine receipts under `.playbook-artifacts/`. Keep the handoff short.
-
-## Reviewer execution contract
-
-The primary implementer uses the current session's default Codex
-model/reasoning mode; it does not self-pin and must not review its own changes.
-Every independent reviewer is a fresh, separate, read-only process using
-`gpt-5.6-terra` with `high` reasoning. Use
-`python3 tools/run_codex_role.py run` for each role supported by the Playbook
-Role Runner; use a fresh read-only `codex exec` for every other required review
-role. Reviewers do not alter code or fix their own findings. The implementer or
-a separate scoped fix agent resolves P0/P1 findings, and an independent
-reviewer rechecks the affected evidence before dependent work proceeds.
-
-Batch Deep Review at the PA phase boundaries in `docs/REVIEW_POLICY.md`, rather
-than after each small change, unless an immediate safety boundary requires it.
-Record the requested and observed reviewer model/effort, command, SHA/diff,
-scope, findings and recheck result.
+The full programme remains Chat, real AI Search, beautiful weekly Briefs,
+Watch and confirmed Act across PA-00..PA-18. Continue safe independent work;
+stop only at a real human/security/credential/live-action gate.
