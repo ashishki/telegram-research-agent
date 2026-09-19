@@ -199,6 +199,7 @@ def test_expanded_telegram_brief_uses_user_language_not_internal_audit_fields() 
                 _evidence(
                     "unranked-one", "https://t.me/example/unranked-one", title="Unranked one",
                     summary="A local archive excerpt.", importance="unknown", urgent=None,
+                    project_refs=("Weekly brief",),
                 ),
                 _evidence(
                     "unranked-two", "https://t.me/example/unranked-two", title="Unranked two",
@@ -213,6 +214,7 @@ def test_expanded_telegram_brief_uses_user_language_not_internal_audit_fields() 
     assert rendered.startswith("🗞 <b>Подробный бриф</b>")
     assert "Это подборка по теме, а не рейтинг важности." in rendered
     assert "Важность: не отмечена · Срочность: срок не указан" in rendered
+    assert "Зачем вам: связано с проектом «Weekly brief»." in rendered
     assert '<a href="https://t.me/example/unranked-one">Открыть источник</a>' in rendered
     assert "снимок sha256" not in rendered
     assert document.brief_id not in rendered

@@ -2171,6 +2171,7 @@ def _render_telegram_full_card(document: BriefDocument) -> str:
                 (
                     f"{index}. <b>{_telegram_html(item.title, 112)}</b>",
                     _telegram_html(_short(item.summary, 160), 160),
+                    *_telegram_why_it_matters(item),
                     f"{_telegram_card_priority(item)} · {_telegram_card_source_link(source.source_ref)}",
                     f"<i>{_telegram_human_time_label(source)}</i>",
                 )
@@ -2247,6 +2248,17 @@ def _telegram_human_time_label(source: BriefEvidence) -> str:
         "unknown": "состояние источника не указано",
     }[source.source_state]
     return f"{relation}; {state}."
+
+
+def _telegram_why_it_matters(item: BriefItem) -> tuple[str, ...]:
+    """Show personal relevance only when the selected source bound it."""
+
+    if item.project_refs:
+        projects = ", ".join(f"«{_telegram_html(project, 80)}»" for project in item.project_refs[:2])
+        return (f"<i>Зачем вам: связано с проектом {projects}.</i>",)
+    if "personal_relevance_marked" in item.selection_reasons:
+        return ("<i>Зачем вам: источник помечен в локальной выборке как лично релевантный.</i>",)
+    return ()
 
 
 def _telegram_card_coverage_line(document: BriefDocument) -> str:
