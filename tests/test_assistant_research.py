@@ -14,6 +14,7 @@ from prm.capabilities import AuthorizationRequest, CapabilityGrant, CapabilityRe
 from prm.application import PersonalResearchAssistant
 from prm.contracts import OperatorRequest, PublicWebAccess
 from prm.deep_research import (
+    DeepResearchRequest,
     GitHubReadAccess,
     PublicResearchTask,
     ResearchBudget,
@@ -602,6 +603,36 @@ def test_active_application_ingress_renders_only_cited_deep_research_facts(monke
     assert "Рекомендация (требует человеческого решения):" in result.text
     assert "Review the cited evidence" in result.text
     assert "human_confirmation_required_for_any_change" in result.text
+
+
+def test_explicit_deep_research_request_builds_the_active_bounded_plan_and_marks_label_unverified():
+    archive = _Archive([{
+        "archive_document_id": "tg:1", "source_url": "https://t.me/private/1",
+        "snippet": "Archive evidence supports a replayable evaluation fixture.",
+        "relevance_label": "direct", "supports_action": True,
+    }])
+    label = "Unverified project label"
+    request = DeepResearchRequest(
+        archive_query="agent evaluation fixture",
+        github_access=_github_access(),
+        requested_project_label=label,
+    )
+    result = PersonalResearchAssistant(
+        settings=SimpleNamespace(db_path=":memory:"), deep_archive_reader=archive,
+        github_context_provider=_GitHub(),
+    ).answer(OperatorRequest(query="What applies to the project?", deep_research_request=request))
+
+    research = result.payload["research_result"]
+    recommendation = research["project_recommendations"][0]
+    assert result.status == "complete"
+    assert result.payload["primary_intent"] == "deep_research"
+    assert research["plan"]["requested_project_label"] == label
+    assert research["plan"]["project_label_status"] == "unverified_user_input"
+    assert recommendation["requested_project_label"] == label
+    assert recommendation["project_label_status"] == "unverified_user_input"
+    assert label not in recommendation["statement"]
+    assert "project_label_unverified" in recommendation["conditions"]
+    assert "acme/project@" in recommendation["statement"]
 
 
 def test_active_application_resumes_only_a_process_signed_prestart_checkpoint():

@@ -39,11 +39,13 @@ from prm.research_facade import build_research_facade
 from prm.request_plan import build_request_plan
 from prm.deep_research import (
     ArchiveResearchReader,
+    DeepResearchRequest,
     GitHubContextProvider,
     ResearchCancellation,
     ResearchCheckpoint,
     ResearchPlan,
     ResearchResult,
+    build_research_plan,
     render_research_fact_section,
     render_research_result,
     run_bounded_research,
@@ -207,14 +209,25 @@ class PersonalResearchAssistant:
             "archive_scope": route.archive_scope,
         }
 
-        if type(request.deep_research_plan) is ResearchPlan:
+        deep_research_plan = request.deep_research_plan
+        if type(deep_research_plan) is not ResearchPlan and type(request.deep_research_request) is DeepResearchRequest:
+            deep_request = request.deep_research_request
+            deep_research_plan = build_research_plan(
+                request.query,
+                archive_query=deep_request.archive_query or None,
+                public_tasks=deep_request.public_tasks,
+                github_access=deep_request.github_access,
+                project_name=deep_request.requested_project_label,
+                budget=deep_request.budget,
+            )
+        if type(deep_research_plan) is ResearchPlan:
             return self._remember_conversation_result(
                 request,
                 self._deep_research(
                     request,
                     context=context_payload,
                     route=route_payload,
-                    plan=request.deep_research_plan,
+                    plan=deep_research_plan,
                 ),
                 topic=str(route_payload.get("retrieval_query") or request.query),
             )
@@ -1123,6 +1136,7 @@ def _verify_deep_research_categories(result: ResearchResult) -> dict[str, Any]:
         conditions = {str(value) for value in item.get("conditions") or ()}
         references = tuple(str(value) for value in item.get("evidence_refs") or ())
         statement = " ".join(str(item.get("statement") or "").split())
+        requested_label = " ".join(str(item.get("requested_project_label") or "").split())
         repository_match = any(
             f"{fact.get('repository_ref')}@{fact.get('commit_sha')}" in statement
             for fact in github_facts
@@ -1134,8 +1148,11 @@ def _verify_deep_research_categories(result: ResearchResult) -> dict[str, Any]:
             or not references
             or not set(references) <= source_urls
             or "human_confirmation_required_for_any_change" not in conditions
+            or "project_label_unverified" not in conditions
             or not repository_match
             or item.get("write_performed") is not False
+            or item.get("project_label_status") != "unverified_user_input"
+            or (requested_label and requested_label in statement)
         ):
             failures.append("invalid_project_recommendation_contract")
             break

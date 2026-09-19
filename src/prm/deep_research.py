@@ -120,6 +120,37 @@ class PublicResearchTask:
             raise ValueError("public research query is out of range")
 
 
+@dataclass(frozen=True, slots=True)
+class DeepResearchRequest:
+    """Explicit active-ingress inputs from which the application builds a plan.
+
+    Ordinary chat text never creates this object. Public tasks and GitHub scope
+    remain separately typed and authorized; this carrier only makes the
+    already-designed bounded plan construction reachable from an operator turn.
+    """
+
+    archive_query: str = ""
+    public_tasks: tuple[PublicResearchTask, ...] = ()
+    github_access: GitHubReadAccess | None = None
+    requested_project_label: str = ""
+    budget: ResearchBudget | None = None
+
+    def __post_init__(self) -> None:
+        archive_query = " ".join(str(self.archive_query or "").split())
+        if archive_query and not 2 <= len(archive_query) <= 400:
+            raise ValueError("deep research archive query is out of range")
+        if not isinstance(self.public_tasks, tuple) or len(self.public_tasks) > _MAX_PUBLIC_TASKS:
+            raise ValueError("deep research public task count is invalid")
+        if any(type(item) is not PublicResearchTask for item in self.public_tasks):
+            raise ValueError("deep research public task type is invalid")
+        if self.github_access is not None and type(self.github_access) is not GitHubReadAccess:
+            raise ValueError("deep research github access type is invalid")
+        if self.budget is not None and type(self.budget) is not ResearchBudget:
+            raise ValueError("deep research budget type is invalid")
+        if len(" ".join(str(self.requested_project_label or "").split())) > 160:
+            raise ValueError("deep research project label is out of range")
+
+
 class ResearchCostLedger:
     """Per-plan cost reservation; unknown price is refused before transport."""
 
@@ -210,7 +241,8 @@ class ResearchPlan:
             "archive_query_count": len(self.archive_queries),
             "public_query_count": len(self.public_tasks),
             "github_repository_requested": self.github_access.repository_ref if self.github_access is not None else None,
-            "project_name": self.project_name or None,
+            "requested_project_label": self.project_name or None,
+            "project_label_status": "unverified_user_input" if self.project_name else None,
             "budget": self.budget.to_dict(),
             "paid_workload_enabled": False,
             "automatic_expansion": "local_archive_only",
@@ -859,7 +891,7 @@ def _checkpoint_plan_binding(plan: ResearchPlan) -> str:
         "archive_query_fingerprints": [_fingerprint(item) for item in plan.archive_queries],
         "public_sources": public_sources,
         "github_source": github,
-        "project_name": plan.project_name,
+        "requested_project_label": plan.project_name,
         "budget": plan.budget.to_dict(),
     }
     return _fingerprint(_canonical_checkpoint_json(binding))
@@ -1010,9 +1042,15 @@ def _project_recommendations(plan: ResearchPlan, facts: Sequence[Mapping[str, An
     commit_sha = str(github.get("commit_sha") or "")
     return [{
         "kind": "project_recommendation",
-        "project_name": plan.project_name,
+        "requested_project_label": plan.project_name,
+        "project_label_status": "unverified_user_input",
         "statement": f"Review the cited evidence against {repository_ref}@{commit_sha} before proposing a project change.",
-        "conditions": ["repository_identity_checked", "at_least_two_cited_facts", "human_confirmation_required_for_any_change"],
+        "conditions": [
+            "repository_identity_checked",
+            "at_least_two_cited_facts",
+            "project_label_unverified",
+            "human_confirmation_required_for_any_change",
+        ],
         "evidence_refs": source_refs[:5],
         "write_performed": False,
     }]

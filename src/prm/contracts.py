@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Literal, Mapping
 from prm.capabilities import AuthorizationDecision
 
 if TYPE_CHECKING:
-    from prm.deep_research import ResearchCancellation, ResearchCheckpoint, ResearchPlan
+    from prm.deep_research import DeepResearchRequest, ResearchCancellation, ResearchCheckpoint, ResearchPlan
 
 RequestMode = Literal["auto", "research", "brief", "chat"]
 ResponseMode = Literal["research", "brief", "chat", "project_clarify", "clarify"]
@@ -224,6 +224,9 @@ class OperatorRequest:
     # chat text, so transport ingress cannot turn an ordinary request into a
     # multi-source agent loop.
     deep_research_plan: "ResearchPlan | None" = None
+    # PA-06 can build a plan only from this explicit bounded carrier. A normal
+    # chat message never gains archive/web/GitHub research authority by itself.
+    deep_research_request: "DeepResearchRequest | None" = None
     deep_research_cancellation: "ResearchCancellation | None" = None
     # A PA-06 checkpoint is process-signed and accepted only with the same
     # typed plan/source scope. It is intentionally not a durable job receipt.
