@@ -26,9 +26,12 @@ final accumulated PA-00..PA-02 Deep Review is `ADVISORY`: two historical
 compatibility dispatch facades retain a legacy default but have no active PA
 production entrypoint. Preserve this P2 debt; do not portray it as resolved.
 
-No production DB, live Telegram polling, account/provider access, job, timer,
-credential, `.env` or release action has been used or is authorized. Preserve
-the two untracked local files. Do not run the full historical pytest suite.
+No production DB migration, job, timer, release action or full historical
+pytest suite is authorized. Preserve the two untracked local files. A single
+owner-authorized, time-bounded manual PA-safe Telegram polling attempt was
+made on 2026-09-19 using the documented secret path; it skipped migrations,
+was stopped cleanly, and the pre-existing service was restored. It produced no
+test brief or human-review receipt, so it grants no continuing live authority.
 
 ## Current slice: PA-07 local BriefDocument handoff
 
@@ -60,8 +63,9 @@ identity. The migration is additive and is exercised only on a temporary test
 database; do not access or migrate a production database.
 
 This amendment does not authorize a durable job, worker, Redis, schedule,
-export, live provider/account/credential action, Telegram polling or any
-PA-08/PA-09 implementation. The direct PA-07 suites and `focused-prm` remain
+export, provider/model egress, PA-08/PA-09 implementation or continuing
+Telegram polling. The one manual runtime attempt described above does not
+broaden this boundary. The direct PA-07 suites and `focused-prm` remain
 required evidence.
 
 The evidence record is
@@ -73,8 +77,9 @@ gates: actual authorized private Telegram/mobile rendering inspection and
 human content review. Its read-only sandbox could not create pytest temporary
 files; the exact current code was instead run successfully in the writable
 workspace and recorded in the evidence. Do not claim that either external gate
-is satisfied, or begin PA-08/PA-09. The design remains mechanically
-`review_required`.
+is satisfied: the subsequent bounded live attempt received no submitted test
+brief or human review before shutdown. Do not begin PA-08/PA-09. The design
+remains mechanically `review_required`.
 
 PA-06's local checkpoint below is historical context for PA-07's dependency;
 do not treat it as an instruction to start PA-08 or PA-09.

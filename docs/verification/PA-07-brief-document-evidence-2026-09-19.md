@@ -1,8 +1,10 @@
 # PA-07 BriefDocument evidence — 2026-09-19
 
 Status: locally implemented and verified with offline/local-archive fixtures.
-This record is not human acceptance, release approval, live Telegram evidence,
-or formal approval of the mechanically `review_required` PA design.
+One bounded owner-authorized private Telegram runtime attempt is recorded below,
+but it did not receive a test brief or human review. This record is not human
+acceptance, release approval, rendered-live-brief evidence, or formal approval
+of the mechanically `review_required` PA design.
 
 Branch: `docs/personal-assistant-blueprint-playbook-20260918`.
 Tested implementation SHA: `c1cd081`.
@@ -55,11 +57,17 @@ Tested implementation SHA: `c1cd081`.
   reads are a future authorized report-reader seam, not PA-08 export or PA-09
   scheduling.
 
-No production database was accessed or migrated. The additive schema was run
-only against temporary test databases. No live provider/account, credential,
-Telegram polling, timer, Redis, worker, schedule, HTML/PDF/export or live
-action was introduced. The two pre-existing untracked local files were not
-staged or modified.
+No production database was migrated. The additive schema was run only against
+temporary test databases. On 2026-09-19 the owner separately authorized one
+time-bounded manual PA-safe Telegram polling attempt with the existing
+documented secret path; it ran with automatic migrations skipped, was stopped
+cleanly by SIGINT, and the pre-existing `telegram-prm-assistant.service` was
+restored active. It received no confirmed test brief or human review before
+shutdown; one generic `getUpdates` failure was handled without exposing
+credentials or private content. No raw message, account ID, secret, report or
+provider/model egress was retained here. No timer, Redis, worker, schedule,
+HTML/PDF/export or live action was introduced. The two pre-existing untracked
+local files were not staged or modified.
 
 ## Verification
 
@@ -179,16 +187,16 @@ static diff/AST checks passed and it confirmed the authorized durable-history,
 ownership, window and visible-object boundaries. Its required test commands
 could not create a temporary directory in that read-only sandbox; the
 writable-workspace receipts above supply the executable result for the same
-code. The remaining P1 acceptance gates are actual authorized private
-Telegram/mobile rendering inspection and human content review. They remain
-intentionally outstanding because this slice has no live Telegram/account or
-credential authorization.
+code. The remaining P1 acceptance gates are actual private Telegram/mobile
+rendering inspection and human content review. A separately owner-authorized,
+time-bounded manual polling attempt was made after this review, but no test
+brief or human result arrived before shutdown, so neither gate is satisfied.
 
 Neither fixture tests, the model review, nor this evidence authorizes runtime,
 publication, a design-state change, or PA-08/PA-09 work. The PA design remains
 mechanically `review_required`.
 
-Next required activity: an owner-authorized private Telegram/mobile rendering
-inspection and human content review of a real selected-local-archive brief.
-It needs a separate live-account authorization; no additional local command
-can substitute for that gate.
+Next required activity: when the owner is ready to submit a test request,
+repeat a time-bounded private Telegram/mobile rendering inspection and record
+the human content result for a real selected-local-archive brief. No additional
+local command can substitute for that gate.
