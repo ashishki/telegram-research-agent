@@ -63,9 +63,11 @@ three missing programme-document paths in allowed_files, and open real mobile
 acceptance. The receipt and test log are recorded in the evidence below.
 Only documentation changed after that code SHA: the evidence and machine scope
 now include the actual completed check and explicitly owner-authorized paths.
-The final recheck is limited to those two documentary findings; real Telegram,
-provider and human acceptance remain OPEN, and no release is requested. Do not
-restart code/design review or treat an open live gate as missing local authority.
+Final documentary recheck `20260919T162628Z-slice_review-fd0cf1c0` at `744e209`
+confirmed both documentary findings resolved. The overall verdict remains
+STOP_SHIP solely for the open runtime/provider and human Telegram/mobile/content
+acceptance gate. No release is requested. Proceed with independent local work;
+do not repeat code/design review for that already-recorded live gate.
 Current evidence: `docs/verification/PA-07-editorial-evidence-2026-09-19.md`.
 The dedicated editorial/brief/dialogue/synthesis suite includes the comparison
 regressions; final

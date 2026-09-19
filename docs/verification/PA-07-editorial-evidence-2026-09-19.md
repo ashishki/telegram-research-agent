@@ -258,3 +258,24 @@ Next local verification command: `python3 tools/check_personal_assistant_plan.py
 Next development work is the already-declared held-out content/conversation
 scenarios and dependency-ready slices; no service, timer or live provider starts
 as a consequence of this handoff.
+
+## Final documentary recheck
+
+Run `20260919T162628Z-slice_review-fd0cf1c0` reviewed
+`744e209c584cdd92880725166538d1ac52a648a9` (documentation-only difference from
+the reviewed/tested code checkpoint). Requested/recorded model and effort:
+`gpt-5.6-terra` / `high`. The runner receipt is validated and its `verify`
+command returned valid. Report SHA-256:
+`170fdab94b3a17172cee4b58d35581a121793267a2ca26e0e375a7285cc8c4fb`.
+
+The independent reviewer confirmed the prior documentary P1s resolved and the
+plan/pin/diff checks passing. The overall verdict remains **STOP_SHIP**, solely
+because actual provider/runtime, private Telegram/mobile and owner content
+acceptance evidence is absent. That blocks acceptance/release, not publication
+of this owner-authorized local implementation or independent local development.
+There is no permission to obtain that evidence by starting live activity here.
+Do not repeat an offline review to pretend this real-use gate is closed.
+
+No code changed after `dbc87126fb88aa21e4af0f9ac643eeb1cea9fbda`; the final
+handoff commit adds only this receipt and its current-session pointer. The
+machine design remains `review_required`; no slice is marked complete.
