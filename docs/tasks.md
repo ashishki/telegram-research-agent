@@ -234,6 +234,9 @@ Scope-Amendment:
     brief/version references, with owner-wide bounded retention. This does not
     authorize a production DB migration/access, job, worker, Redis, schedule,
     export, provider/account/credential action, or PA-08/PA-09 implementation.
+    This narrow current-task amendment governs those two paths; the
+    machine-readable design registry remains mechanically `review_required`
+    and is not hand-edited as an approval record.
 Context-Refs:
   - docs/design/PA.md
   - docs/PERSONAL_ASSISTANT_SPEC.md

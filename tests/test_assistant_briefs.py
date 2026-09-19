@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import json
 import sqlite3
 from types import SimpleNamespace
 
@@ -372,6 +373,70 @@ def test_persisted_brief_history_fails_closed_if_its_json_is_altered(tmp_path, m
     assert restarted.get_persisted_document(
         authenticated_chat_id=primary_tuple[0], authenticated_actor_id=primary_tuple[1], authenticated_owner_chat_id=primary_tuple[2], brief_id=document.brief_id, version=1,
     ) is None
+
+
+def test_persisted_brief_history_rejects_semantic_history_tampering(tmp_path, monkeypatch) -> None:
+    db_path = tmp_path / "semantic-tamper-brief.db"
+    monkeypatch.setenv("AGENT_DB_PATH", str(db_path))
+    run_migrations()
+    primary_tuple = _owner_tuple("42")
+    primary_owner_ref = _owner_ref("42")
+    prior = build_brief_document(
+        BriefBuildRequest(
+            topic="AI", window=_window(), owner_ref=primary_owner_ref,
+            coverage=(CoverageSource("telegram:archive", "checked"),),
+            evidence=(_evidence("prior", "https://t.me/example/prior", title="Prior", summary="Prior exact source."),),
+        )
+    )
+    comparison = build_brief_document(
+        BriefBuildRequest(
+            topic="AI", owner_ref=primary_owner_ref,
+            window=_window(start="2026-10-24T00:00:00+02:00", end="2026-10-25T00:00:00+02:00"),
+            coverage=(CoverageSource("telegram:archive", "checked"),),
+            evidence=(_evidence(
+                "comparison", "https://t.me/example/comparison", title="Comparison", summary="Comparison exact source.",
+                posted_at="2026-10-24T10:00:00+02:00",
+            ),),
+        )
+    )
+    document = build_brief_document(
+        BriefBuildRequest(
+            topic="AI", window=_window(), owner_ref=primary_owner_ref,
+            coverage=(CoverageSource("telegram:archive", "checked"),),
+            evidence=(_evidence("current", "https://t.me/example/current", title="Current", summary="Current exact source."),),
+            previous_document=prior,
+            comparison_document=comparison,
+        )
+    )
+    store = BriefDocumentStore(db_path=str(db_path))
+    store.bind_visible(
+        conversation_id="conversation_" + "a" * 24,
+        response_ref="response_" + "b" * 24,
+        document=document,
+        comparison_document=comparison,
+        authenticated_chat_id=primary_tuple[0], authenticated_actor_id=primary_tuple[1], authenticated_owner_chat_id=primary_tuple[2],
+    )
+    with sqlite3.connect(db_path) as connection:
+        original_json = connection.execute(
+            "SELECT document_json FROM assistant_brief_documents WHERE owner_ref = ? AND brief_id = ? AND version = ?",
+            (primary_owner_ref, document.brief_id, document.version),
+        ).fetchone()[0]
+        original = json.loads(original_json)
+        for field, value in (
+            ("previous_version", None),
+            ("comparison_ref", None),
+            ("selection_reasons", ["local_archive_selected"]),
+        ):
+            altered = {**original, field: value}
+            connection.execute(
+                "UPDATE assistant_brief_documents SET document_json = ? WHERE owner_ref = ? AND brief_id = ? AND version = ?",
+                (json.dumps(altered, ensure_ascii=False, sort_keys=True), primary_owner_ref, document.brief_id, document.version),
+            )
+            connection.commit()
+            assert BriefDocumentStore(db_path=str(db_path)).get_persisted_document(
+                authenticated_chat_id=primary_tuple[0], authenticated_actor_id=primary_tuple[1], authenticated_owner_chat_id=primary_tuple[2],
+                brief_id=document.brief_id, version=document.version,
+            ) is None
 
 
 def test_application_default_store_keeps_only_exact_history_after_restart(tmp_path, monkeypatch) -> None:

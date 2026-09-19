@@ -590,15 +590,6 @@ def build_brief_document(request: BriefBuildRequest) -> BriefDocument:
         reasons.append("conflicts_preserved")
     if status != "complete":
         reasons.append("coverage_not_complete")
-    content_digest = _content_digest(
-        topic=topic,
-        window=request.window,
-        evidence=kept,
-        coverage=coverage,
-        deduplication=deduplication,
-        conflicts=conflicts,
-        period_basis=request.period_basis,
-    )
     previous = request.previous_document
     if previous is not None and _same_logical_report(previous, owner_ref=request.owner_ref, topic=topic, window=request.window):
         # A visible prior version is the only authority to increment the same
@@ -611,6 +602,19 @@ def build_brief_document(request: BriefBuildRequest) -> BriefDocument:
         # its canonical selected content avoids reusing an identity for a
         # different evidence set while still being deterministic for the same
         # exact selection.
+        previous_ref = None
+        base_content_digest = _content_digest(
+            topic=topic,
+            window=request.window,
+            evidence=kept,
+            coverage=coverage,
+            deduplication=deduplication,
+            conflicts=conflicts,
+            selection_reasons=tuple(reasons),
+            previous_version=None,
+            comparison_ref=request.comparison_document.version_ref if request.comparison_document is not None else None,
+            period_basis=request.period_basis,
+        )
         brief_id = "brief_" + _digest(
             "prm.brief.content.v1",
             request.owner_ref,
@@ -618,10 +622,22 @@ def build_brief_document(request: BriefBuildRequest) -> BriefDocument:
             request.window.timezone,
             _iso(request.window.start_at),
             _iso(request.window.end_at),
-            content_digest,
+            base_content_digest,
         )
         version = 1
-        previous_ref = None
+    comparison_ref = request.comparison_document.version_ref if request.comparison_document is not None else None
+    content_digest = _content_digest(
+        topic=topic,
+        window=request.window,
+        evidence=kept,
+        coverage=coverage,
+        deduplication=deduplication,
+        conflicts=conflicts,
+        selection_reasons=tuple(reasons),
+        previous_version=previous_ref,
+        comparison_ref=comparison_ref,
+        period_basis=request.period_basis,
+    )
     return BriefDocument(
         brief_id=brief_id,
         version=version,
@@ -637,7 +653,7 @@ def build_brief_document(request: BriefBuildRequest) -> BriefDocument:
         content_digest=content_digest,
         deduplication=deduplication,
         conflicts=conflicts,
-        comparison_ref=request.comparison_document.version_ref if request.comparison_document is not None else None,
+        comparison_ref=comparison_ref,
         period_basis=request.period_basis,
     )
 
@@ -979,6 +995,9 @@ def _stored_document(payload: object) -> BriefDocument:
         coverage=document.coverage_manifest,
         deduplication=document.deduplication,
         conflicts=document.conflicts,
+        selection_reasons=document.selection_reasons,
+        previous_version=document.previous_version,
+        comparison_ref=document.comparison_ref,
         period_basis=document.period_basis,
     )
     expected_sections = _sections(
@@ -1846,6 +1865,9 @@ def _content_digest(
     coverage: CoverageManifest,
     deduplication: Sequence[DeduplicationRecord],
     conflicts: Sequence[ConflictRecord],
+    selection_reasons: Sequence[str],
+    previous_version: BriefVersionRef | None,
+    comparison_ref: BriefVersionRef | None,
     period_basis: str,
 ) -> str:
     """Canonical identity for the selected facts and their inspection basis."""
@@ -1855,6 +1877,9 @@ def _content_digest(
         "topic": topic,
         "window": window.to_dict(),
         "period_basis": period_basis,
+        "selection_reasons": list(selection_reasons),
+        "previous_version": previous_version.to_dict() if previous_version is not None else None,
+        "comparison_ref": comparison_ref.to_dict() if comparison_ref is not None else None,
         "evidence": [
             {
                 "evidence_ref": item.evidence_ref,
