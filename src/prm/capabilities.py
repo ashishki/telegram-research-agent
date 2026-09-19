@@ -81,6 +81,8 @@ class ProviderPolicy:
             raise ValueError("maximum request count must be an integer")
         if not 0 <= self.maximum_request_count <= 100000:
             raise ValueError("maximum request count is out of range")
+        if not isinstance(self.fallback_allowed, bool):
+            raise ValueError("fallback_allowed must be boolean")
         if not isinstance(self.egress_allowed, bool):
             raise ValueError("egress_allowed must be boolean")
         if not self.egress_allowed and self.permitted_provider_refs:
@@ -320,6 +322,8 @@ class AuthorizationRequest:
             raise ValueError("invalid capability")
         if self.operation not in _OPERATIONS or self.data_class not in _DATA_CLASSES:
             raise ValueError("invalid authorization scope")
+        if not isinstance(self.is_fallback, bool):
+            raise ValueError("is_fallback must be boolean")
         if self.expected_grant_revision is not None and self.expected_grant_revision < 1:
             raise ValueError("invalid expected grant revision")
 

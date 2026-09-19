@@ -133,6 +133,18 @@ def test_fallback_requires_an_explicit_grant_policy():
     assert allowed.allowed is True
 
 
+@pytest.mark.parametrize("malformed", ["false", 1, None])
+def test_provider_policy_rejects_non_boolean_fallback_allowed_fail_closed(malformed: object):
+    with pytest.raises(ValueError, match="fallback_allowed must be boolean"):
+        ProviderPolicy(("provider_openai",), fallback_allowed=malformed)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("malformed", ["false", 1, None])
+def test_authorization_request_rejects_non_boolean_is_fallback_fail_closed(malformed: object):
+    with pytest.raises(ValueError, match="is_fallback must be boolean"):
+        make_request(is_fallback=malformed)  # type: ignore[arg-type]
+
+
 def test_budget_reservation_is_conservative_and_single_use_at_egress():
     registry = CapabilityRegistry((make_grant(maximum_request_count=1),))
     first = registry.authorize_and_reserve(make_request(), now=NOW)
