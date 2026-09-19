@@ -230,7 +230,7 @@ def test_pa04_synthesis_accepts_bounded_useful_paraphrase(monkeypatch):
     monkeypatch.setattr(
         "prm.synthesis.complete_archive_synthesis",
         lambda **_kwargs: ArchiveSynthesisTransportResult(
-            text="Archive materials describe using task success and groundedness for agent evals (https://t.me/example/1).", receipt=receipt,
+            text="Archive materials describe agent evals using task success and groundedness (https://t.me/example/1).", receipt=receipt,
         ),
     )
 
@@ -240,6 +240,49 @@ def test_pa04_synthesis_accepts_bounded_useful_paraphrase(monkeypatch):
 
     assert outcome.status == "generated_verified"
     assert outcome.text is not None and outcome.text.startswith("Archive materials describe")
+
+
+def test_pa04_synthesis_rejects_order_inversions_in_english_and_russian(monkeypatch):
+    receipt = ArchiveSynthesisReceipt(
+        provider="openai", model="gpt-5.6-terra", external_call_attempted=True, external_call_performed=True,
+        context_egress_attempted=True, context_egress_performed=True, delivery_outcome="accepted", context_binding_digest="synthetic",
+    )
+    russian_payload = _archive_payload()
+    russian_payload["archive_contract"]["direct_findings"][0].update({
+        "summary": "Agent evals измеряют task success и groundedness.",
+        "source_url": "https://t.me/example/ru-order",
+    })
+    russian_evidence = [{
+        "evidence_id": "tg:synthetic-1",
+        "source_url": "https://t.me/example/ru-order",
+        "support_span": "Agent evals измеряют task success и groundedness.",
+        "local_archive_provenance": True,
+    }]
+    cases = (
+        (
+            _archive_payload(),
+            _archive_evidence(),
+            "Task success and groundedness use agent evals (https://t.me/example/1).",
+            "What does my archive say about agent evals?",
+        ),
+        (
+            russian_payload,
+            russian_evidence,
+            "Task success и groundedness измеряют agent evals (https://t.me/example/ru-order).",
+            "Что в моём архиве есть про agent evals?",
+        ),
+    )
+    for payload, evidence, inverted_answer, question in cases:
+        monkeypatch.setattr(
+            "prm.synthesis.complete_archive_synthesis",
+            lambda **_kwargs: ArchiveSynthesisTransportResult(text=inverted_answer, receipt=receipt),
+        )
+        outcome = synthesize_archive_response(
+            payload, question=question, evidence_items=evidence, access=_archive_access(),
+        )
+
+        assert outcome.text is None
+        assert outcome.status == "generated_answer_rejected"
 
 
 def test_pa04_synthesis_accepts_cited_answer_and_reports_measurement(monkeypatch):

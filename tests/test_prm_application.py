@@ -221,6 +221,43 @@ def test_application_uses_verified_pa04_synthesis_and_records_retrieval_generati
     assert measurement["generation"]["context_egress_performed"] is True
 
 
+def test_pa04_application_rejects_claim_cited_only_by_unselected_evidence(monkeypatch):
+    payload = _payload()
+    payload["evidence_quality"]["items"].append({
+        "evidence_id": "tg:unselected",
+        "support_span": "Unselected provider claim must not be published.",
+        "source_url": "https://t.me/example/unselected",
+        "source_group_id": "g-unselected",
+        "freshness_status": "fresh",
+        "relevance_label": "unrelated",
+    })
+    monkeypatch.setattr("prm.application.answer_memory_research", lambda *args, **kwargs: payload)
+    monkeypatch.setattr("prm.application.build_research_facade", lambda **_kwargs: SimpleNamespace())
+    monkeypatch.setattr(
+        "prm.synthesis.complete_archive_synthesis",
+        lambda **_kwargs: ArchiveSynthesisTransportResult(
+            text=(
+                "Agent evals use task success and groundedness (https://t.me/example/1). "
+                "Unselected provider claim must not be published (https://t.me/example/unselected)."
+            ),
+            receipt=_synthetic_archive_receipt(),
+        ),
+    )
+
+    result = PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:")).answer(OperatorRequest(
+        query="What does my archive say about agent evals?",
+        mode="research",
+        chat_id="unselected-evidence-holdout",
+        archive_synthesis_access=_archive_synthesis_access(),
+    ))
+
+    generation = result.payload["retrieval_generation_measurement"]["generation"]
+    assert generation["status"] == "generated_answer_rejected"
+    assert result.payload["final_answer_publication"]["fallback_used"] is True
+    assert "https://t.me/example/1" in result.text
+    assert "https://t.me/example/unselected" not in result.text
+
+
 @pytest.mark.parametrize(
     ("question", "source_url", "support_span"),
     [

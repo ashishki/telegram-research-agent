@@ -276,6 +276,10 @@ class PersonalResearchAssistant:
             for item in _mapping(payload.get("evidence_quality")).get("items") or []
             if isinstance(item, Mapping)
         ]
+        selected_archive_evidence = _selected_archive_evidence_items(
+            evidence_items,
+            archive_contract=_mapping(payload.get("archive_contract")),
+        )
         final_text = deterministic
         gate = _mapping(payload.get("answer_gate"))
         if route.primary_intent in ARCHIVE_RESPONSE_INTENTS and not bool(payload.get("mixed_current_boundary")):
@@ -313,7 +317,7 @@ class PersonalResearchAssistant:
             # fact.  This path is local-only and shows the selected excerpts
             # with their actual source URLs.
             final_text = _render_verified_evidence_fallback(
-                evidence_items,
+                selected_archive_evidence,
                 boundary=str(payload.get("mixed_current_boundary") or ""),
                 local_only=bool(payload.get("mixed_current_boundary")),
                 empty_next_step=empty_next_step,
@@ -687,8 +691,36 @@ class PersonalResearchAssistant:
                 "primary_intent": "memory_action",
                 "response_contract_id": payload["response_contract_id"],
             },
-            route=route,
-        )
+        route=route,
+    )
+
+
+def _selected_archive_evidence_items(
+    evidence_items: Sequence[Mapping[str, Any]],
+    *,
+    archive_contract: Mapping[str, Any],
+) -> list[Mapping[str, Any]]:
+    """Keep fallback excerpts within the immutable archive response contract.
+
+    ``evidence_quality`` can contain diagnostics or locally retrieved candidates
+    which were deliberately excluded from the direct/partial/adjacent archive
+    contract.  They must neither reach the synthesis provider nor reappear
+    after that provider's output is rejected.
+    """
+
+    selected = {
+        (str(finding.get("evidence_id") or "").strip(), str(finding.get("source_url") or "").strip())
+        for field in ("direct_findings", "partial_findings", "adjacent_findings")
+        for finding in archive_contract.get(field) or ()
+        if isinstance(finding, Mapping)
+        if str(finding.get("evidence_id") or "").strip() and str(finding.get("source_url") or "").strip()
+    }
+    return [
+        item
+        for item in evidence_items
+        if item.get("local_archive_provenance") is True
+        and (str(item.get("evidence_id") or "").strip(), str(item.get("source_url") or "").strip()) in selected
+    ]
 
 
 def _retrieval_generation_measurement(payload: Mapping[str, Any], *, synthesis: Any | None) -> dict[str, Any]:

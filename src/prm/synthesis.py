@@ -184,7 +184,12 @@ def synthesize_archive_response(
         )
 
     answer = " ".join(str(result.text or "").split())
-    if not _verified_archive_answer(answer, contract=contract, evidence_items=evidence_items):
+    if not _verified_archive_answer(
+        answer,
+        contract=contract,
+        evidence_items=evidence_items,
+        selected_context=context,
+    ):
         return ArchiveSynthesisOutcome(
             text=None,
             status="generated_answer_rejected",
@@ -264,6 +269,7 @@ def _verified_archive_answer(
     *,
     contract: Mapping[str, Any],
     evidence_items: Sequence[Mapping[str, Any]],
+    selected_context: ArchiveEvidenceContext,
 ) -> bool:
     if not answer or len(answer) > 1_800:
         return False
@@ -317,7 +323,11 @@ def _verified_archive_answer(
     required_sources = {str(item.get("source_url") or "").strip() for item in required_findings}
     if any(source and source not in answer for source in required_sources):
         return False
-    if not _claims_are_source_bounded(answer, evidence_items=evidence_items, direct_required=bool(direct_count)):
+    if not _claims_are_source_bounded(
+        answer,
+        selected_context=selected_context,
+        direct_required=bool(direct_count),
+    ):
         return False
     verification = verify_answer_against_evidence(
         answer,
@@ -336,26 +346,28 @@ def _verified_archive_answer(
 def _claims_are_source_bounded(
     answer: str,
     *,
-    evidence_items: Sequence[Mapping[str, Any]],
+    selected_context: ArchiveEvidenceContext,
     direct_required: bool,
 ) -> bool:
-    """Allow only extractive or explicitly whitelisted paraphrase claims.
+    """Allow only ordered, source-bound claims from the sent context.
 
     The general claim ledger remains useful for aggregate diagnostics, but a
     lexical overlap score cannot prove that a generated relationship retained
-    its meaning. This archive-only gate makes every substantive generated token
-    trace to the cited selected span (apart from a deliberately tiny inflection
-    map) and therefore rejects inversions such as ``use`` -> ``destroy``.
+    its meaning. This archive-only gate accepts an order-preserving subsequence
+    of one explicitly cited, immutable selected span (apart from a deliberately
+    tiny inflection map).  It therefore rejects both token additions and
+    inversions that retain the same token set.  It deliberately does not use
+    the broader evidence-quality bundle: a provider may publish only evidence
+    it actually received in ``ArchiveEvidenceContext``.
     """
 
-    supports: dict[str, list[str]] = {}
-    for item in evidence_items:
-        if not isinstance(item, Mapping) or item.get("local_archive_provenance") is not True:
-            continue
-        source = str(item.get("source_url") or "").strip()
-        span = str(item.get("support_span") or item.get("snippet") or "").strip()
-        if source and span:
-            supports.setdefault(source, []).append(span)
+    if type(selected_context) is not ArchiveEvidenceContext:
+        return False
+    supports = {
+        item.source_ref: _archive_content_tokens(item.text)
+        for item in selected_context.items
+        if item.source_ref and item.text
+    }
     if not supports:
         return not direct_required
 
@@ -366,26 +378,39 @@ def _claims_are_source_bounded(
         if not content_tokens:
             continue
         factual_sentences += 1
-        if not urls or any(url not in supports for url in urls):
+        # One factual relationship gets one explicit source.  Joining multiple
+        # URLs into an unordered token bag would otherwise permit a generated
+        # relation to borrow its subject from one span and its predicate from
+        # another.
+        if len(urls) != 1 or urls[0] not in supports:
             return False
-        cited_tokens = {
-            _archive_token(token)
-            for url in urls
-            for span in supports[url]
-            for token in _ARCHIVE_TOKEN_RE.findall(span)
-        }
-        if any(token not in cited_tokens for token in content_tokens):
+        if not _is_ordered_subsequence(content_tokens, supports[urls[0]]):
             return False
     return factual_sentences > 0 or not direct_required
 
 
-def _archive_content_tokens(sentence: str) -> set[str]:
+def _archive_content_tokens(sentence: str) -> list[str]:
     without_urls = _ARCHIVE_URL_RE.sub("", sentence)
-    return {
+    return [
         token
         for raw in _ARCHIVE_TOKEN_RE.findall(without_urls)
         if (token := _archive_token(raw)) not in _ARCHIVE_NON_FACT_TOKENS
-    }
+    ]
+
+
+def _is_ordered_subsequence(candidate: Sequence[str], support: Sequence[str]) -> bool:
+    """Return whether candidate retains the source span's token order."""
+
+    if not candidate:
+        return True
+    support_index = 0
+    for token in candidate:
+        while support_index < len(support) and support[support_index] != token:
+            support_index += 1
+        if support_index == len(support):
+            return False
+        support_index += 1
+    return True
 
 
 def _archive_token(value: str) -> str:
