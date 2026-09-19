@@ -597,6 +597,32 @@ class PersonalResearchAssistant:
                 },
                 route=route,
             )
+        if result.coverage.get("refusal_reason") == "request_context_mismatch":
+            final_text = _render_terminal_empty_answer(
+                "выданный план относится к другому запросу; создай новый план для текущего вопроса."
+            )
+            verification = verify_answer_against_evidence(final_text, [])
+            return AssistantResult(
+                interaction_id=str(context.get("interaction_id") or ""),
+                status="partial",
+                mode="research",
+                text=final_text,
+                payload={
+                    "status": "partial",
+                    "primary_intent": "deep_research",
+                    "route_decision": dict(route),
+                    "research_result": result.to_dict(),
+                    "refusal_reason": "request_context_mismatch",
+                    "write_performed": False,
+                },
+                operator_context=context,
+                final_answer_verification={
+                    "claim_count": int(verification.get("claim_count") or 0),
+                    "metrics": verification.get("metrics") or {},
+                    "summary": claim_ledger_public_summary(verification),
+                },
+                route=route,
+            )
         rendered_research_text = render_research_result(result)
         evidence_items = [
             {

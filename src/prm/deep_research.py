@@ -384,6 +384,18 @@ def run_bounded_research(
 
     if type(plan) is not ResearchPlan:
         raise ValueError("research plan must be typed")
+    started = monotonic()
+    cost_ledger = ResearchCostLedger(plan.budget.max_cost_usd)
+    if _fingerprint(_normalized_query(original_query)) != plan.query_fingerprint:
+        return _result(
+            plan,
+            [],
+            pending=[],
+            state="partial",
+            started=started,
+            cost_ledger=cost_ledger,
+            refusal_reason="request_context_mismatch",
+        )
     if checkpoint is not None:
         if type(checkpoint) is not ResearchCheckpoint or checkpoint.plan_id != plan.plan_id:
             raise ValueError("research checkpoint does not match plan")
@@ -398,9 +410,7 @@ def run_bounded_research(
     resumable_statuses = {"cancelled_before_start"}
     steps = [step for step in prior_steps if step.status not in resumable_statuses]
     completed_names = {step.name for step in steps}
-    started = monotonic()
     pending: list[str] = []
-    cost_ledger = ResearchCostLedger(plan.budget.max_cost_usd)
 
     if cancellation.cancelled:
         return _result(plan, steps, pending=["archive_initial"], state="cancelled", started=started, cost_ledger=cost_ledger)
@@ -745,6 +755,7 @@ def _result(
     state: str,
     started: float,
     budget_exhausted: bool = False,
+    refusal_reason: str = "",
     cost_ledger: ResearchCostLedger,
 ) -> ResearchResult:
     facts = _facts(steps)
@@ -768,6 +779,7 @@ def _result(
             "completed_steps": [step.to_public_dict() for step in steps],
             "pending_steps": list(pending),
             "budget_exhausted": budget_exhausted,
+            "refusal_reason": refusal_reason or None,
             "elapsed_seconds": round(monotonic() - started, 4),
             "source_gaps": _gaps(steps),
             "cost": cost_ledger.to_dict(),
@@ -937,6 +949,8 @@ def render_research_fact_section(result: ResearchResult) -> str:
 def render_research_result(result: ResearchResult) -> str:
     """Render fact, inference and recommendation as visibly different kinds."""
 
+    if result.coverage.get("refusal_reason") == "request_context_mismatch":
+        return "Исследование не выполнено: выданный план относится к другому запросу."
     fact_section = render_research_fact_section(result)
     if fact_section.startswith("Я не могу подтвердить актуальный внешний факт"):
         return fact_section
@@ -1029,6 +1043,10 @@ def _abandon_public_access(access: object) -> None:
 
 def _fingerprint(query: str) -> str:
     return "sha256:" + hashlib.sha256(query.encode("utf-8")).hexdigest()
+
+
+def _normalized_query(query: object) -> str:
+    return " ".join(str(query or "").split())
 
 
 def _now() -> str:

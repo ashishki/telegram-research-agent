@@ -232,6 +232,51 @@ def test_cancellation_returns_resumable_checkpoint_without_starting_sources(monk
     assert any(item["source_kind"] == "public_primary" for item in resumed["facts"])
 
 
+def test_request_context_mismatch_refuses_initial_and_resume_without_source_or_scope_use(monkeypatch):
+    monkeypatch.setattr("prm.public_web._reject_private_resolution", lambda _host: None)
+    archive = _Archive([{
+        "archive_document_id": "tg:1", "source_url": "https://t.me/private/1",
+        "snippet": "Direct evidence.", "relevance_label": "direct", "supports_action": True,
+    }])
+    public_query = "vendor current release official"
+    public_access = _public_access(public_query)
+    github_access = _github_access()
+    public = _Public()
+    github = _GitHub()
+    plan = build_research_plan(
+        "research request alpha", archive_query="local alpha evidence",
+        public_tasks=(PublicResearchTask(public_query, public_access),),
+        github_access=github_access, project_name="Acme Project",
+    )
+    cancellation = ResearchCancellation()
+    cancellation.cancel()
+    checkpoint = run_bounded_research(
+        plan, original_query="research request alpha", archive_reader=archive,
+        public_provider=public, public_bounds=_bounds(), github_provider=github, cancellation=cancellation,
+    )["checkpoint"]
+
+    initial = run_bounded_research(
+        plan, original_query="research request beta", archive_reader=archive,
+        public_provider=public, public_bounds=_bounds(), github_provider=github,
+    )
+    resumed = run_bounded_research(
+        plan, original_query="research request beta", archive_reader=archive,
+        public_provider=public, public_bounds=_bounds(), github_provider=github, checkpoint=checkpoint,
+    )
+
+    for result in (initial, resumed):
+        assert result["status"] == "partial"
+        assert result["facts"] == []
+        assert result["coverage"]["refusal_reason"] == "request_context_mismatch"
+        assert result["coverage"]["cost"]["consumed_usd"] == 0.0
+    assert archive.queries == [] and public.queries == [] and github.requests == []
+    assert public_access.search_authorization.reservation is not None
+    assert public_access.search_authorization.reservation.available is True
+    assert all(item.reservation is not None and item.reservation.available for item in public_access.fetch_authorizations)
+    assert github_access.authorization.reservation is not None
+    assert github_access.authorization.reservation.available is True
+
+
 def test_repository_identity_mismatch_cannot_create_project_recommendation():
     archive = _Archive([{
         "archive_document_id": "tg:1", "source_url": "https://t.me/private/1",
@@ -623,6 +668,25 @@ def test_active_application_rejects_a_forged_checkpoint_without_returning_its_fa
     assert provider.requests == []
     assert github_access.authorization.reservation is not None
     assert github_access.authorization.reservation.available is True
+
+
+def test_active_application_returns_typed_refusal_for_a_plan_from_another_request():
+    archive = _Archive([{
+        "archive_document_id": "tg:1", "source_url": "https://t.me/private/1",
+        "snippet": "Direct evidence.", "relevance_label": "direct", "supports_action": True,
+    }])
+    plan = build_research_plan("research request alpha", archive_query="local alpha evidence")
+    assistant = PersonalResearchAssistant(
+        settings=SimpleNamespace(db_path=":memory:"), deep_archive_reader=archive,
+    )
+
+    result = assistant.answer(OperatorRequest(query="research request beta", deep_research_plan=plan))
+
+    assert result.status == "partial"
+    assert result.payload["refusal_reason"] == "request_context_mismatch"
+    assert result.payload["research_result"]["facts"] == []
+    assert "alpha" not in result.text
+    assert archive.queries == []
 
 
 def test_active_application_renders_evidence_only_fallback_when_deep_answer_gate_fails(monkeypatch):

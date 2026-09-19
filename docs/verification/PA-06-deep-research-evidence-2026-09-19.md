@@ -37,6 +37,11 @@ historic STOP_SHIP artifact.
   data. Forged or mismatched checkpoints are rejected before a reader/provider
   call; the active application returns a safe partial boundary instead of
   exposing supplied facts.
+- The current inbound query is normalized and fingerprint-matched to the plan
+  before checkpoint validation, archive reading, tariff lookup, cost
+  reservation, authorization preflight or provider calls. A different request
+  receives a typed `request_context_mismatch` partial refusal with no source or
+  reservation use.
 - User-facing research keeps verified facts, labelled non-fact inferences and
   conditional project recommendations separate. A factual claim verifier plus
   a typed-category contract controls publication; failure renders only the
@@ -48,10 +53,10 @@ Commands run against the working tree containing the registered PA-06 suite:
 
 ```text
 PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_assistant_research.py
-# 17 passed in 3.19s
+# 19 passed in 4.32s
 
 TMPDIR=<mktemp> PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/test_tiers.py focused-prm
-# 381 passed in 86.17s
+# 383 passed in 102.94s
 ```
 
 The dedicated offline holdouts cover permitted-source aggregation, local-only
@@ -68,12 +73,14 @@ restart recovery or actual GitHub/public-web access.
 Fresh read-only Terra 5.6/high `slice_review` runs found and drove remediations
 at `5b8b53b` (run `20260919T041940Z-slice_review-250eb5c4`), `3b5189b`
 (`20260919T043132Z-slice_review-76ac9a53`), `4ae05a2`
-(`20260919T064845Z-slice_review-c008021f`), and `af24451`
-(`20260919T070458Z-slice_review-93af1062`). The last report's P1 was the
-missing mandatory-tier registration; it is the subject of the authorized
-amendment and commands above. A fresh Terra/high recheck is still required on
-the commit that adds this registration and evidence. No human acceptance,
-release approval or live-runtime authorization is claimed by this receipt.
+(`20260919T064845Z-slice_review-c008021f`), `af24451`
+(`20260919T070458Z-slice_review-93af1062`) and `0f61711`
+(`20260919T071634Z-slice_review-ef4a9e48`). The last report's P1 was a plan
+being usable for a different inbound request; the request-fingerprint refusal
+and its initial/resume/application zero-call holdouts above remediate it. A
+fresh Terra/high recheck is still required on the corresponding commit. No
+human acceptance, release approval or live-runtime authorization is claimed by
+this receipt.
 
 Next command:
 
