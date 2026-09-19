@@ -17,6 +17,7 @@ from prm.archive_synthesis_transport import (
 )
 from prm.capabilities import AuthorizationRequest, CapabilityGrant, CapabilityRegistry, ProviderPolicy
 from prm.contracts import ArchiveSynthesisAccess, AssistantResult, OperatorRequest
+from prm.deep_research import build_research_plan
 from prm.presentation import render_payload
 from prm.synthesis import ArchiveSynthesisOutcome
 
@@ -702,3 +703,30 @@ def test_explicit_project_name_is_not_replaced_by_downstream_project_fit(monkeyp
     assert result.payload["project_fit"]["project_name"] == "Workflow-to-Agent-Studio"
     assert "AI_workflow_playbook" in result.payload["project_fit"]["inferred_project_name"]
     assert result.payload["final_answer_publication"]["fallback_used"] is True
+
+
+def test_active_deep_research_ingress_is_covered_by_focused_prm_tier():
+    class _DeepArchive:
+        def __init__(self):
+            self.calls = []
+
+        def search_archive(self, query, *, limit):
+            self.calls.append((query, limit))
+            return {
+                "status": "ok",
+                "items": [{
+                    "archive_document_id": "tg:deep", "source_url": "https://t.me/example/deep",
+                    "snippet": "A replayable fixture is direct archive evidence.",
+                    "relevance_label": "direct", "supports_action": True,
+                }],
+            }
+
+    archive = _DeepArchive()
+    plan = build_research_plan("What applies?", archive_query="replayable fixture")
+    result = PersonalResearchAssistant(
+        settings=SimpleNamespace(db_path=":memory:"), deep_archive_reader=archive,
+    ).answer(OperatorRequest(query="What applies?", deep_research_plan=plan))
+
+    assert result.status == "complete"
+    assert result.payload["research_result"]["status"] == "complete"
+    assert archive.calls == [("replayable fixture", 5)]

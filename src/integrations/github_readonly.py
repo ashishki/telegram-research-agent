@@ -80,12 +80,14 @@ class ReadOnlyGitHubContextProvider:
         expected_api_prefix = f"https://{_GITHUB_API_HOST}/repos/{repository_ref}/commits/"
         if not _COMMIT_SHA.fullmatch(commit_sha) or api_url != expected_api_prefix + commit_sha:
             raise GitHubReadError("repository_identity_mismatch")
-        # Commit messages and arbitrary repository metadata are external,
-        # untrusted content. PA-06 needs identity/ref freshness, not a second
-        # text channel that could carry instructions into the planner.
+        commit = payload.get("commit") if isinstance(payload.get("commit"), Mapping) else {}
+        # The first commit subject is bounded context data, not an instruction
+        # channel. PA-06 independently rejects prompt-injection markers before
+        # it can become evidence or a project recommendation.
+        summary = " ".join(str(commit.get("message") or "").splitlines()[0].split())[:240]
         return {
             "repository_ref": repository_ref,
             "commit_sha": commit_sha,
             "ref": "HEAD",
-            "summary": "",
+            "summary": summary,
         }

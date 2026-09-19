@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import re
-from typing import Any, Literal, Mapping
+from typing import TYPE_CHECKING, Any, Literal, Mapping
 
 from prm.capabilities import AuthorizationDecision
+
+if TYPE_CHECKING:
+    from prm.deep_research import ResearchCancellation, ResearchPlan
 
 RequestMode = Literal["auto", "research", "brief", "chat"]
 ResponseMode = Literal["research", "brief", "chat", "project_clarify", "clarify"]
@@ -217,6 +220,11 @@ class OperatorRequest:
     # omitted values retain the current-fact boundary without network activity.
     public_web_query: str = ""
     public_web_access: PublicWebAccess | None = None
+    # PA-06 receives an already-built bounded plan. It is not inferred from
+    # chat text, so transport ingress cannot turn an ordinary request into a
+    # multi-source agent loop.
+    deep_research_plan: "ResearchPlan | None" = None
+    deep_research_cancellation: "ResearchCancellation | None" = None
 
 
 @dataclass(frozen=True, slots=True)

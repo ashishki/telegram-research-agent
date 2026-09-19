@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import hashlib
 import re
-from threading import Event
+from threading import Event, Lock
 from time import monotonic
 from typing import Any, Callable, Mapping, Protocol, Sequence
 
@@ -23,7 +23,6 @@ from prm.research_planner import assess_research_gaps
 
 
 DEEP_RESEARCH_SCHEMA_VERSION = "prm_deep_research.v1"
-_MAX_ARCHIVE_QUERIES = 4
 _MAX_PUBLIC_TASKS = 3
 _MAX_TOOL_CALLS = 8
 _MAX_TIMEOUT_SECONDS = 60
@@ -59,11 +58,8 @@ class ResearchBudget:
             raise ValueError("deep research tool budget is out of range")
         if not 1 <= self.timeout_seconds <= _MAX_TIMEOUT_SECONDS:
             raise ValueError("deep research time budget is out of range")
-        if self.max_cost_usd != 0.0:
-            # PA-16 owns paid-model and priced-provider policy. Keeping this
-            # zero makes an unknown-priced adapter fail closed rather than
-            # treating a development fixture as a spending authorization.
-            raise ValueError("deep research has no approved nonzero cost budget")
+        if not 0.0 <= float(self.max_cost_usd) <= 100.0:
+            raise ValueError("deep research cost budget is out of range")
         if not 1 <= self.max_archive_sources <= 10:
             raise ValueError("deep research archive source limit is out of range")
 
@@ -110,13 +106,44 @@ class PublicResearchTask:
 
     public_query: str
     access: object
-    estimated_cost_usd: float = 0.0
+    estimated_cost_usd: float | None = None
 
     def __post_init__(self) -> None:
         if not 3 <= len(" ".join(self.public_query.split())) <= 300:
             raise ValueError("public research query is out of range")
-        if self.estimated_cost_usd != 0.0:
-            raise ValueError("public research task has no approved nonzero cost")
+        if self.estimated_cost_usd is not None and (
+            not isinstance(self.estimated_cost_usd, (int, float)) or self.estimated_cost_usd < 0
+        ):
+            raise ValueError("public research task estimate is invalid")
+
+
+class ResearchCostLedger:
+    """Per-plan cost reservation; unknown price is refused before transport."""
+
+    def __init__(self, maximum_usd: float) -> None:
+        self._maximum_usd = float(maximum_usd)
+        self._consumed_usd = 0.0
+        self._unknown_price_refusals = 0
+        self._lock = Lock()
+
+    def reserve_and_consume(self, estimate: float | None) -> str:
+        with self._lock:
+            if estimate is None:
+                self._unknown_price_refusals += 1
+                return "unknown_price"
+            amount = float(estimate)
+            if self._consumed_usd + amount > self._maximum_usd + 1e-12:
+                return "cost_budget_exhausted"
+            self._consumed_usd += amount
+            return "allowed"
+
+    def to_dict(self) -> dict[str, Any]:
+        with self._lock:
+            return {
+                "maximum_usd": self._maximum_usd,
+                "consumed_usd": round(self._consumed_usd, 8),
+                "unknown_price_refusals": self._unknown_price_refusals,
+            }
 
 
 @dataclass(frozen=True, slots=True)
@@ -136,8 +163,12 @@ class ResearchPlan:
             raise ValueError("research plan id is invalid")
         if not re.fullmatch(r"sha256:[0-9a-f]{64}", self.query_fingerprint):
             raise ValueError("research query fingerprint is invalid")
-        if not isinstance(self.archive_queries, tuple) or not self.archive_queries or len(self.archive_queries) > _MAX_ARCHIVE_QUERIES:
-            raise ValueError("research plan requires bounded archive queries")
+        # The initial local read is exactly one query. A single deterministic
+        # gap result may add one later archive expansion; public queries are
+        # independent, separately authorized tasks rather than generated
+        # variants of private/archive text.
+        if not isinstance(self.archive_queries, tuple) or len(self.archive_queries) != 1:
+            raise ValueError("research plan requires one initial archive query")
         if any(not 2 <= len(" ".join(item.split())) <= 400 for item in self.archive_queries):
             raise ValueError("research archive query is invalid")
         if not isinstance(self.public_tasks, tuple) or len(self.public_tasks) > _MAX_PUBLIC_TASKS:
@@ -199,7 +230,7 @@ class ResearchCheckpoint:
             raise ValueError("research checkpoint state is invalid")
         if any(type(step) is not ResearchStep for step in self.completed_steps):
             raise ValueError("research checkpoint step type is invalid")
-        if any(step not in {"archive_expansion"} for step in self.pending_steps):
+        if any(not re.fullmatch(r"(?:archive_initial|archive_expansion|public_[1-3]|github_context)", step) for step in self.pending_steps):
             raise ValueError("research checkpoint cannot schedule an unbounded step")
 
     def to_public_dict(self) -> dict[str, Any]:
@@ -210,6 +241,51 @@ class ResearchCheckpoint:
             "pending_steps": list(self.pending_steps),
             "retention": "ephemeral_caller_owned",
         }
+
+
+@dataclass(frozen=True, slots=True)
+class ResearchResult(Mapping[str, Any]):
+    """Typed partial result returned by the PA-06 engine and application.
+
+    Mapping compatibility keeps established render/test callers read-only while
+    making the result/checkpoint boundary explicit for the active application
+    ingress. The payload contains no provider credentials or raw public query.
+    """
+
+    status: str
+    plan: Mapping[str, Any]
+    facts: tuple[Mapping[str, Any], ...]
+    inferences: tuple[Mapping[str, Any], ...]
+    project_recommendations: tuple[Mapping[str, Any], ...]
+    coverage: Mapping[str, Any]
+    checkpoint: ResearchCheckpoint
+    write_performed: bool = False
+    provider_fallback_used: bool = False
+    automatic_public_expansion: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": DEEP_RESEARCH_SCHEMA_VERSION,
+            "status": self.status,
+            "plan": dict(self.plan),
+            "facts": [dict(item) for item in self.facts],
+            "inferences": [dict(item) for item in self.inferences],
+            "project_recommendations": [dict(item) for item in self.project_recommendations],
+            "coverage": dict(self.coverage),
+            "checkpoint": self.checkpoint,
+            "write_performed": self.write_performed,
+            "provider_fallback_used": self.provider_fallback_used,
+            "automatic_public_expansion": self.automatic_public_expansion,
+        }
+
+    def __getitem__(self, key: str) -> Any:
+        return self.to_dict()[key]
+
+    def __iter__(self):
+        return iter(self.to_dict())
+
+    def __len__(self) -> int:
+        return len(self.to_dict())
 
 
 class ResearchCancellation:
@@ -267,7 +343,7 @@ def run_bounded_research(
     github_provider: GitHubContextProvider | None,
     cancellation: ResearchCancellation | None = None,
     checkpoint: ResearchCheckpoint | None = None,
-) -> dict[str, Any]:
+) -> ResearchResult:
     """Run/resume a bounded plan and return typed partial evidence on failure.
 
     Work starts only after validation and cooperative cancellation checks. The
@@ -281,13 +357,20 @@ def run_bounded_research(
     if checkpoint is not None and (type(checkpoint) is not ResearchCheckpoint or checkpoint.plan_id != plan.plan_id):
         raise ValueError("research checkpoint does not match plan")
     cancellation = cancellation or ResearchCancellation()
-    steps = list(checkpoint.completed_steps) if checkpoint is not None else []
+    # A checkpoint resumes only steps known to have completed without an
+    # unknown transport outcome. Failed provider calls have consumed their
+    # sealed grant and are preserved as partial coverage rather than retried
+    # silently; a caller must issue a fresh plan/scope to attempt them again.
+    prior_steps = list(checkpoint.completed_steps) if checkpoint is not None else []
+    resumable_statuses = {"cancelled_before_start", "time_budget_exhausted"}
+    steps = [step for step in prior_steps if step.status not in resumable_statuses]
     completed_names = {step.name for step in steps}
     started = monotonic()
     pending: list[str] = []
+    cost_ledger = ResearchCostLedger(plan.budget.max_cost_usd)
 
     if cancellation.cancelled:
-        return _result(plan, steps, pending=["archive_expansion"], state="cancelled", started=started)
+        return _result(plan, steps, pending=["archive_initial"], state="cancelled", started=started, cost_ledger=cost_ledger)
 
     initial: dict[str, Callable[[], ResearchStep]] = {}
     if "archive_initial" not in completed_names:
@@ -298,18 +381,21 @@ def run_bounded_research(
         name = f"public_{index + 1}"
         if name not in completed_names:
             initial[name] = lambda task=task, name=name: _public_step(
-                name, task, original_query=original_query, provider=public_provider, bounds=public_bounds, cancellation=cancellation,
+                name, task, original_query=original_query, provider=public_provider, bounds=public_bounds,
+                cancellation=cancellation, cost_ledger=cost_ledger,
             )
     if plan.github_access is not None and "github_context" not in completed_names:
         initial["github_context"] = lambda: _github_step(plan.github_access, github_provider, cancellation=cancellation)
 
     if len(initial) + len(steps) > plan.budget.max_tool_calls:
-        return _result(plan, steps, pending=["archive_expansion"], state="partial", started=started, budget_exhausted=True)
+        return _result(plan, steps, pending=["archive_expansion"], state="partial", started=started, budget_exhausted=True, cost_ledger=cost_ledger)
     steps.extend(_run_independent(initial, timeout_seconds=plan.budget.timeout_seconds, cancellation=cancellation, started=started))
     if cancellation.cancelled:
-        return _result(plan, steps, pending=["archive_expansion"], state="cancelled", started=started)
+        pending = [step.name for step in steps if step.status == "cancelled_before_start"] or ["archive_expansion"]
+        return _result(plan, steps, pending=pending, state="cancelled", started=started, cost_ledger=cost_ledger)
     if monotonic() - started >= plan.budget.timeout_seconds:
-        return _result(plan, steps, pending=["archive_expansion"], state="time_budget_exhausted", started=started)
+        pending = [step.name for step in steps if step.status == "time_budget_exhausted"] or ["archive_expansion"]
+        return _result(plan, steps, pending=pending, state="time_budget_exhausted", started=started, cost_ledger=cost_ledger)
 
     if "archive_expansion" not in {step.name for step in steps}:
         expansion_query = _gap_expansion_query(plan, steps)
@@ -327,11 +413,11 @@ def run_bounded_research(
 
     if cancellation.cancelled:
         pending = ["archive_expansion"] if "archive_expansion" not in {step.name for step in steps} else []
-        return _result(plan, steps, pending=pending, state="cancelled", started=started)
+        return _result(plan, steps, pending=pending, state="cancelled", started=started, cost_ledger=cost_ledger)
     if monotonic() - started >= plan.budget.timeout_seconds:
         pending = ["archive_expansion"] if "archive_expansion" not in {step.name for step in steps} else []
-        return _result(plan, steps, pending=pending, state="time_budget_exhausted", started=started)
-    return _result(plan, steps, pending=pending, state="complete" if not pending else "partial", started=started)
+        return _result(plan, steps, pending=pending, state="time_budget_exhausted", started=started, cost_ledger=cost_ledger)
+    return _result(plan, steps, pending=pending, state="complete" if not pending else "partial", started=started, cost_ledger=cost_ledger)
 
 
 def _run_independent(
@@ -359,7 +445,10 @@ def _run_independent(
         results.append(ResearchStep(futures[future], "time_budget_exhausted", {"status": "time_budget_exhausted"}))
     # Do not wait past the declared research budget for a non-cooperative
     # adapter. Its result is discarded; callers receive a partial checkpoint.
-    executor.shutdown(wait=False, cancel_futures=True)
+    # A response must never return while an egress callback is still running.
+    # The transport's own bounded timeout remains the deadline for a
+    # cooperative adapter; an overrun is reported as partial, never detached.
+    executor.shutdown(wait=True, cancel_futures=True)
     return sorted(results, key=lambda item: item.name)
 
 
@@ -391,9 +480,13 @@ def _public_step(
     provider: PublicWebProvider | None,
     bounds: PublicWebBounds | None,
     cancellation: ResearchCancellation,
+    cost_ledger: ResearchCostLedger,
 ) -> ResearchStep:
     if cancellation.cancelled:
         return ResearchStep(name, "cancelled_before_start", {"status": "cancelled_before_start"})
+    cost_status = cost_ledger.reserve_and_consume(task.estimated_cost_usd)
+    if cost_status != "allowed":
+        return ResearchStep(name, cost_status, {"status": cost_status, "provider_called": False})
     result = execute_public_web_research(
         public_query=task.public_query,
         original_query=original_query,
@@ -452,6 +545,7 @@ def _github_step(
         "ref": ref,
         "fetched_at": _now(),
         "source_url": f"https://github.com/{repository_ref}/commit/{commit_sha}",
+        "summary": summary,
     })
 
 
@@ -474,7 +568,8 @@ def _result(
     state: str,
     started: float,
     budget_exhausted: bool = False,
-) -> dict[str, Any]:
+    cost_ledger: ResearchCostLedger,
+) -> ResearchResult:
     facts = _facts(steps)
     github = next((step.data for step in steps if step.name == "github_context" and step.status == "verified"), {})
     project_recommendations = _project_recommendations(plan, facts, github)
@@ -485,26 +580,37 @@ def _result(
         pending_steps=tuple(pending),
         state=state if state in {"partial", "cancelled", "time_budget_exhausted", "complete"} else "partial",
     )
-    return {
-        "schema_version": DEEP_RESEARCH_SCHEMA_VERSION,
-        "status": "partial" if partial else "complete",
-        "plan": plan.to_public_dict(),
-        "facts": facts,
-        "inferences": _inferences(facts, github),
-        "project_recommendations": project_recommendations,
-        "coverage": {
+    return ResearchResult(
+        status="partial" if partial else "complete",
+        plan=plan.to_public_dict(),
+        facts=tuple(facts),
+        inferences=tuple(_inferences(facts, github)),
+        project_recommendations=tuple(project_recommendations),
+        coverage={
             "state": state,
             "completed_steps": [step.to_public_dict() for step in steps],
             "pending_steps": list(pending),
             "budget_exhausted": budget_exhausted,
             "elapsed_seconds": round(monotonic() - started, 4),
             "source_gaps": _gaps(steps),
+            "cost": cost_ledger.to_dict(),
         },
-        "checkpoint": checkpoint,
-        "write_performed": False,
-        "provider_fallback_used": False,
-        "automatic_public_expansion": False,
-    }
+        checkpoint=checkpoint,
+    )
+
+
+def render_research_result(result: ResearchResult) -> str:
+    """Render only cited factual spans; analysis stays structured in payload."""
+
+    lines: list[str] = []
+    for fact in result.facts:
+        span = " ".join(str(fact.get("support_span") or "").split())
+        source = str(fact.get("source_url") or "")
+        if span and source:
+            lines.extend((span, "Источник: " + source))
+    if lines:
+        return "\n".join(lines[:12])
+    return "Я не могу подтвердить актуальный внешний факт: исследование вернуло только частичное покрытие."
 
 
 def _facts(steps: Sequence[ResearchStep]) -> list[dict[str, Any]]:
@@ -524,10 +630,13 @@ def _facts(steps: Sequence[ResearchStep]) -> list[dict[str, Any]]:
                         "source_url": str(item.get("source_url") or ""), "freshness": str(item.get("freshness") or "unknown"),
                     })
         elif step.name == "github_context" and step.status == "verified":
-            facts.append({
+            fact = {
                 "kind": "fact", "source_kind": "github_repository_identity", "repository_ref": step.data.get("repository_ref"),
                 "commit_sha": step.data.get("commit_sha"), "ref": step.data.get("ref"), "source_url": step.data.get("source_url"),
-            })
+            }
+            if str(step.data.get("summary") or ""):
+                fact["support_span"] = str(step.data.get("summary") or "")[:240]
+            facts.append(fact)
     return facts[:16]
 
 

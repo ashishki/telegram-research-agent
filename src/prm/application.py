@@ -37,6 +37,15 @@ from prm.public_web import (
 from prm.research_planner import plan_archive_evidence
 from prm.research_facade import build_research_facade
 from prm.request_plan import build_request_plan
+from prm.deep_research import (
+    ArchiveResearchReader,
+    GitHubContextProvider,
+    ResearchCancellation,
+    ResearchPlan,
+    ResearchResult,
+    render_research_result,
+    run_bounded_research,
+)
 from prm.routing import decide_route
 from prm.synthesis import synthesize_archive_response
 
@@ -52,6 +61,8 @@ class PersonalResearchAssistant:
         llm_client: type[LLMClient] = LLMClient,
         public_web_provider: PublicWebProvider | None = None,
         public_web_bounds: PublicWebBounds | None = None,
+        deep_archive_reader: ArchiveResearchReader | None = None,
+        github_context_provider: GitHubContextProvider | None = None,
     ) -> None:
         self.settings = settings
         self.conversations = conversations or GLOBAL_CONVERSATIONS
@@ -61,6 +72,8 @@ class PersonalResearchAssistant:
         # user asking a current-fact question.
         self.public_web_provider = public_web_provider
         self.public_web_bounds = public_web_bounds
+        self.deep_archive_reader = deep_archive_reader
+        self.github_context_provider = github_context_provider
 
     def answer(self, request: OperatorRequest) -> AssistantResult:
         conversation = self.conversations.active_or_start(request.chat_id)
@@ -191,6 +204,18 @@ class PersonalResearchAssistant:
             "response_contract_id": route.response_contract_id,
             "archive_scope": route.archive_scope,
         }
+
+        if type(request.deep_research_plan) is ResearchPlan:
+            return self._remember_conversation_result(
+                request,
+                self._deep_research(
+                    request,
+                    context=context_payload,
+                    route=route_payload,
+                    plan=request.deep_research_plan,
+                ),
+                topic=str(route_payload.get("retrieval_query") or request.query),
+            )
 
         # A public query and its authority are separate ingress fields. Do
         # not compose a mixed archive/current request here: private archive
@@ -501,6 +526,70 @@ class PersonalResearchAssistant:
         return AssistantResult(
             interaction_id=str(context.get("interaction_id") or ""),
             status=status,
+            mode="research",
+            text=final_text,
+            payload=payload,
+            operator_context=context,
+            final_answer_verification={
+                "claim_count": int(verification.get("claim_count") or 0),
+                "metrics": verification.get("metrics") or {},
+                "summary": claim_ledger_public_summary(verification),
+            },
+            route=route,
+        )
+
+    def _deep_research(
+        self,
+        request: OperatorRequest,
+        *,
+        context: Mapping[str, Any],
+        route: Mapping[str, Any],
+        plan: ResearchPlan,
+    ) -> AssistantResult:
+        """Active PA-06 ingress for an already bounded, typed plan only."""
+
+        result: ResearchResult = run_bounded_research(
+            plan,
+            original_query=request.query,
+            archive_reader=self.deep_archive_reader,
+            public_provider=self.public_web_provider,
+            public_bounds=self.public_web_bounds,
+            github_provider=self.github_context_provider,
+            cancellation=(
+                request.deep_research_cancellation
+                if type(request.deep_research_cancellation) is ResearchCancellation
+                else ResearchCancellation()
+            ),
+        )
+        final_text = render_research_result(result)
+        evidence_items = [
+            {
+                "support_span": item.get("support_span") or "",
+                "source_url": item.get("source_url") or "",
+                "freshness_status": item.get("freshness") or "unknown",
+            }
+            for item in result.facts
+            if item.get("support_span") and item.get("source_url")
+        ]
+        verification = verify_answer_against_evidence(final_text, evidence_items)
+        publication_allowed = _final_answer_publication_allowed(verification, {})
+        payload = {
+            "status": result.status,
+            "primary_intent": "deep_research",
+            "route_decision": dict(route),
+            "research_result": result.to_dict(),
+            "rendered_final_answer": final_text,
+            "rendered_final_answer_verification": verification,
+            "final_answer_publication": {
+                "allowed": publication_allowed,
+                "fallback_used": not publication_allowed,
+                "reason": "cited_research_facts" if publication_allowed else "research_result_partial_or_unverified",
+            },
+            "write_performed": False,
+        }
+        return AssistantResult(
+            interaction_id=str(context.get("interaction_id") or ""),
+            status=result.status,
             mode="research",
             text=final_text,
             payload=payload,
