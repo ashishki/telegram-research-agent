@@ -96,6 +96,29 @@ registry to model a restart and confirms the old item is not reconstructed.
 `focused-prm` now includes both PA-07 suites. It is a regression tier, not
 human content, visual, live runtime, or release evidence.
 
+Current writable-workspace rerun at reviewed `ba84cd3` (the code is unchanged
+from `c1cd081`; that commit adds the preceding evidence record) completed:
+
+```text
+PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q \
+  tests/test_assistant_briefs.py \
+  tests/test_assistant_report_dialogue.py
+# 24 passed in 8.07s
+
+PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/test_tiers.py focused-prm
+# 414 passed in 82.29s
+
+python3 tools/playbook.py --check-pin
+# Playbook pin verified; no model, hook or application runtime enabled.
+
+python3 tools/check_personal_assistant_plan.py
+# PA plan: 19 consistent slices; schemas, references, dependencies and context limits passed.
+# Design state: review_required; no product, human-approval or runtime claim.
+```
+
+`git diff --check` also passed. This is writable local-fixture evidence only;
+it does not change the external gates below.
+
 ## Independent slice review
 
 Every listed review uses the Role Runner in a fresh read-only process with
@@ -149,15 +172,23 @@ The relevant remediation/recheck chain is:
   expected by narrow legacy injected test facades; the real assistant continues
   to receive the shared store.
 
-A fresh independent Terra/high recheck of `c1cd081` plus this evidence update
-is still required. Actual Telegram/mobile visual and human content review also
-remain separate gates. Neither fixture tests nor model review authorizes
-runtime, publication, a design-state change, or PA-08/PA-09 work.
+Fresh recheck `20260919T110742Z-slice_review-d305cf5c` reviewed `ba84cd3` in a
+fresh read-only Role Runner process, requested and observed
+`gpt-5.6-terra` / `high`, and returned `STOP_SHIP`. It found no new code defect:
+static diff/AST checks passed and it confirmed the authorized durable-history,
+ownership, window and visible-object boundaries. Its required test commands
+could not create a temporary directory in that read-only sandbox; the
+writable-workspace receipts above supply the executable result for the same
+code. The remaining P1 acceptance gates are actual authorized private
+Telegram/mobile rendering inspection and human content review. They remain
+intentionally outstanding because this slice has no live Telegram/account or
+credential authorization.
 
-Next command:
+Neither fixture tests, the model review, nor this evidence authorizes runtime,
+publication, a design-state change, or PA-08/PA-09 work. The PA design remains
+mechanically `review_required`.
 
-```text
-python3 tools/run_codex_role.py run --root . --task PA-07 --feature-id PA \
-  --slice-id PA-07 --role slice_review --model gpt-5.6-terra \
-  --reasoning-effort high --timeout-seconds 1800 --no-publish
-```
+Next required activity: an owner-authorized private Telegram/mobile rendering
+inspection and human content review of a real selected-local-archive brief.
+It needs a separate live-account authorization; no additional local command
+can substitute for that gate.
