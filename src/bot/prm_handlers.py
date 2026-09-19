@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import hashlib
+import inspect
 import uuid
 from datetime import datetime, timedelta, timezone
 from threading import RLock
@@ -79,6 +80,15 @@ def _assistant_for_prm(settings: Settings) -> PersonalResearchAssistant:
                 _PRM_BRIEF_STORES.pop(next(iter(_PRM_BRIEF_STORES)))
             briefs = BriefDocumentStore(db_path=db_path)
             _PRM_BRIEF_STORES[db_path] = briefs
+    parameters = inspect.signature(PersonalResearchAssistant).parameters
+    if "briefs" not in parameters and not any(
+        parameter.kind is inspect.Parameter.VAR_KEYWORD
+        for parameter in parameters.values()
+    ):
+        # Narrow injected test/compatibility facades predate the PA-07 store
+        # seam. They cannot model report navigation, so preserve their old
+        # settings-only constructor without weakening the real ingress.
+        return PersonalResearchAssistant(settings=settings)
     return PersonalResearchAssistant(settings=settings, briefs=briefs)
 
 
