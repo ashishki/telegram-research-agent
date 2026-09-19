@@ -99,6 +99,15 @@ def test_private_reader_requires_exact_owner_version_digest_and_unexpired_access
         authenticated_chat_id=owner[0], authenticated_actor_id=owner[1], authenticated_owner_chat_id=owner[2],
         format="html", now=now + timedelta(seconds=1),
     ) is None
+    # Rebind the process-local record as well: this reaches the persisted
+    # document-versus-handle comparison instead of failing on record equality.
+    forged_digest = replace(access, content_digest="sha256:" + "0" * 64)
+    reader._issued[forged_digest.access_ref] = (document.owner_ref, forged_digest)
+    assert reader.render(
+        forged_digest,
+        authenticated_chat_id=owner[0], authenticated_actor_id=owner[1], authenticated_owner_chat_id=owner[2],
+        format="html", now=now + timedelta(seconds=1),
+    ) is None
     assert reader.render(
         access,
         authenticated_chat_id=owner[0], authenticated_actor_id=owner[1], authenticated_owner_chat_id=owner[2],

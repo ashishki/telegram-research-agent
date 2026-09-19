@@ -132,6 +132,42 @@ def test_fallback_pdf_keeps_unicode_text_links_long_urls_and_page_numbers(monkey
     assert "Страница 1 /" in extracted
 
 
+def test_fallback_pdf_numbers_every_page_of_a_multi_page_report(monkeypatch) -> None:
+    evidence = tuple(
+        _source(
+            f"page-{number}",
+            f"https://example.test/multi-page/{number}",
+            f"Проверяемый источник {number}",
+            "Подтверждение для проверки разрыва страниц. " * 25,
+            f"2026-10-{number:02d}T10:00:00+02:00",
+        )
+        for number in range(1, 21)
+    )
+    document = build_brief_document(
+        BriefBuildRequest(
+            topic="Многостраничный частный отчёт",
+            window=_window(),
+            coverage=(CoverageSource("telegram:archive", "checked"),),
+            evidence=evidence,
+        )
+    )
+
+    def unavailable(_: str) -> bytes:
+        raise RuntimeError("synthetic local PDF backend failure")
+
+    monkeypatch.setattr("prm.report_exports._render_with_weasyprint", unavailable)
+    pdf = render_pdf(document)
+    extracted = _fallback_pdf_text(pdf.body)
+    labels = re.findall(r"Страница (\d+) / (\d+)", extracted)
+
+    assert labels
+    total = int(labels[0][1])
+    assert total > 1
+    assert ("1", str(total)) in labels
+    assert (str(total), str(total)) in labels
+    assert document.evidence[-1].source_ref in extracted
+
+
 def _fallback_pdf_text(pdf: bytes) -> str:
     """Read this fallback's explicit CID text streams via its ToUnicode map."""
 
