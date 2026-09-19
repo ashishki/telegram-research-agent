@@ -55,19 +55,26 @@ Deep Review per wording patch. Preserve the prior ownership, history, temporal
 and permission checks. Human mobile/provider evidence remains required before
 claiming product acceptance; proceed with independent local work meanwhile.
 
-Implementation checkpoint: `dbc87126fb88aa21e4af0f9ac643eeb1cea9fbda`.
-Focused-prm passed 448 tests at that SHA. Independent run
-`20260919T162136Z-slice_review-bff8757a` found the two source-link/comparison
-fixes sound, but returned STOP_SHIP for missing contemporaneous test evidence,
-three missing programme-document paths in allowed_files, and open real mobile
-acceptance. The receipt and test log are recorded in the evidence below.
-Only documentation changed after that code SHA: the evidence and machine scope
-now include the actual completed check and explicitly owner-authorized paths.
-Final documentary recheck `20260919T162628Z-slice_review-fd0cf1c0` at `744e209`
-confirmed both documentary findings resolved. The overall verdict remains
-STOP_SHIP solely for the open runtime/provider and human Telegram/mobile/content
-acceptance gate. No release is requested. Proceed with independent local work;
-do not repeat code/design review for that already-recorded live gate.
+The earlier source-link/comparison checkpoint `dbc87126` is preserved. The
+current PA-07 code checkpoint is `55877b0ecbcb3f8b1d0047ee904689bd332c8658`:
+after a detailed story, bounded natural continuations for importance,
+simplification, conditional next step, uncertainty and sources use the same
+exact immutable story/version and never retrieve, egress or act. The current
+story reference is ephemeral and is cleared by broad/full/filter/comparison
+views, so an ambiguous shorthand cannot silently target an old detail.
+
+At that SHA, the editorial+synthesis command passed 46 tests, the
+briefs+dialogue command passed 28 tests, and `focused-prm` passed 452 tests.
+Independent runs `20260919T170254Z-slice_review-c67210a0` and
+`20260919T170826Z-slice_review-95c761a4` recorded requested/observed
+`gpt-5.6-terra` / `high`. The first found two scoped P1s (invalid item binding
+and missing exact-version renderer views), which are remediated in `55877b0`.
+The second requested contemporaneous writable-workspace verification and
+flagged the broad-view transition; both are addressed and recorded in the
+current evidence. Its remaining STOP_SHIP is the already-open actual
+provider/runtime, private Telegram/mobile and owner-content acceptance gate.
+No release is requested and no live evidence may be obtained without separate
+authority. Do not repeat code/design review merely for that known gate.
 Current evidence: `docs/verification/PA-07-editorial-evidence-2026-09-19.md`.
 The dedicated editorial/brief/dialogue/synthesis suite includes the comparison
 regressions; final

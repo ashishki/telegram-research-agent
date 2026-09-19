@@ -279,3 +279,60 @@ Do not repeat an offline review to pretend this real-use gate is closed.
 No code changed after `dbc87126fb88aa21e4af0f9ac643eeb1cea9fbda`; the final
 handoff commit adds only this receipt and its current-session pointer. The
 machine design remains `review_required`; no slice is marked complete.
+
+## Bounded multi-step editorial discussion
+
+Code checkpoint: `55877b0ecbcb3f8b1d0047ee904689bd332c8658`.
+
+This local PA-07 continuation fixes the qualitative gap between a one-shot
+``объясни пункт N`` view and a live, readable discussion without expanding the
+archive/model boundary:
+
+- New editorial candidates must include a source-anchored, reviewed
+  `plain_explanation`; existing immutable documents that predate this optional
+  field keep their original identity and render an explicit fallback rather
+  than inventing a simpler explanation.
+- Once an exact editorial item was displayed, the bounded follow-ups
+  ``почему это важно?``, ``можно проще?``, ``что дальше?``, ``какие
+  ограничения?`` and ``покажи источники`` answer from that same story and its
+  anchors. They report no new fact/search. The ephemeral item reference is
+  cleared by short/full/topic/comparison projections, reset/cancel and process
+  restart; a shorthand then has no implicit target.
+- Invalid item numbers no longer raise while rebinding visible state. They
+  render the existing unavailable answer and clear the active item. The exact
+  current and authenticated persisted `render_brief` facades accept the same
+  bounded item views, including `why`, `simplify`, `next_step`, `sources` and
+  `caveat`; no latest/topic fallback was added.
+
+At the code checkpoint, in a writable local workspace:
+
+- `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q
+  tests/test_assistant_brief_editorial.py tests/test_prm_synthesis.py` —
+  **46 passed in 4.47s**.
+- `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q
+  tests/test_assistant_briefs.py tests/test_assistant_report_dialogue.py` —
+  **28 passed in 9.98s**.
+- `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/test_tiers.py focused-prm`
+  — **452 passed in 100.12s**. The historical full suite was not run.
+- `git diff --check` — PASS before the code commit.
+
+Independent `slice_review` run
+`20260919T170254Z-slice_review-c67210a0` was validated, remained read-only,
+and recorded `gpt-5.6-terra` / `high` (report SHA-256
+`9c300af8c5862ff5d6a5b4645f4881d1e00c3bf6e65f5482096d51d8bd7d2de2`). It
+found two P1s: an out-of-range item could be rebound as active and the
+exact-version renderer facade rejected the newly added item views. Both are
+covered by the checkpoint tests above. Fresh validated run
+`20260919T170826Z-slice_review-95c761a4`, also `gpt-5.6-terra` / `high`
+(report SHA-256
+`bd8594bc56ce5e1876273666133a62c145b4efdcc5651feb5feb2fe24756a69a`),
+requested this contemporaneous writable-workspace receipt and identified the
+broad-view shorthand transition, now covered by the new holdout.
+
+Those runners cannot create pytest temporary directories in their read-only
+sandbox; their failed test start is not reported as a pass. The remaining
+STOP_SHIP condition is unchanged: no authorized real provider/runtime,
+private Telegram/mobile visual inspection or owner content-acceptance receipt
+exists. It blocks PA-07 acceptance/release, not this owner-authorized local
+implementation or the next independent local slice. No live service, account,
+credential, timer, job, migration or deployment was started.
