@@ -31,6 +31,10 @@ PRM_ACTIVE_TESTS = (
     "tests/test_prm_product_ux_eval.py",
     "tests/test_callbacks.py",
     "tests/test_prm_application.py",
+    # PA-06 is a high-risk worker/checkpoint boundary. Keep its dedicated
+    # adversarial suite in the required active tier rather than relying on a
+    # separate optional command.
+    "tests/test_assistant_research.py",
     "tests/test_prm_synthesis.py",
     "tests/test_prm_bot_dispatch.py",
     "tests/test_prm_cli.py",

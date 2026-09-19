@@ -195,6 +195,10 @@ Acceptance-Criteria:
   - Tool/time/cost limits, cancellation and provider failures yield useful partial results rather than runaway loops.
 Verification:
   - python tools/test_tiers.py focused-prm
+Scope-Amendment:
+  - 2026-09-19 owner authorization: `tools/test_tiers.py` may be changed only
+    to register the dedicated PA-06 holdout suite in `focused-prm`; no runtime,
+    job, Redis, database, credential or live-provider scope is added.
 Context-Refs:
   - docs/design/PA.md
   - docs/COST_ARCHITECTURE.md

@@ -75,6 +75,11 @@ registry and does not change the mechanical `review_required` design state.
 
 PA-06 may proceed on this local dependency checkpoint. No production DB, live
 account/provider, credential, live job, timer or deployment is authorized.
+The owner explicitly authorized one narrow 2026-09-19 scope amendment:
+`tools/test_tiers.py` may register the dedicated PA-06 holdout suite in
+`focused-prm`. This does not change the mechanical design `review_required`
+status or authorize Redis, durable workers/jobs, a database, credentials or
+live-provider activity.
 Accumulate the next Deep Review at the declared PA-04..PA-06 boundary; do not
 schedule a new review earlier absent an immediate safety trigger.
 
