@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import sqlite3
 from dataclasses import replace
+from threading import local
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -16,7 +17,7 @@ from bot import prm_handlers
 from bot.voice import VoiceTranscriptionUnavailable, transcribe_audio_file, transcribe_telegram_voice
 import llm.client as anthropic_client
 import llm.openai_provider as openai_provider
-from llm.openai_provider import OpenAIProviderError, ProviderEgressDenied, complete_with_provider
+from llm.openai_provider import OpenAIProviderError, ProviderEgressDenied, complete_with_provider as _production_complete_with_provider
 from tests.test_assistant_permissions import NOW, make_grant, make_request
 from db.migrate import run_migrations
 from prm.capabilities import CapabilityRegistry
@@ -46,6 +47,36 @@ class _FakeResponses:
 class _FakeClient:
     def __init__(self) -> None:
         self.responses = _FakeResponses()
+
+
+_TEST_PROVIDER_CLIENT = local()
+_PRODUCTION_BUILD_CLIENT = openai_provider._build_client
+
+
+@pytest.fixture(autouse=True)
+def _fake_provider_only_at_private_builder_seam(monkeypatch):
+    def build_client(api_key: str):
+        fake_client = getattr(_TEST_PROVIDER_CLIENT, "client", None)
+        return fake_client if fake_client is not None else _PRODUCTION_BUILD_CLIENT(api_key)
+
+    monkeypatch.setattr(openai_provider, "_build_client", build_client)
+
+
+def complete_with_provider(*args, **kwargs):
+    """Test-only fake transport injection; production rejects ``client=``."""
+
+    fake_client = kwargs.pop("client", None)
+    previous = getattr(_TEST_PROVIDER_CLIENT, "client", None)
+    if fake_client is not None:
+        _TEST_PROVIDER_CLIENT.client = fake_client
+    try:
+        return _production_complete_with_provider(*args, **kwargs)
+    finally:
+        if fake_client is not None:
+            if previous is None:
+                del _TEST_PROVIDER_CLIENT.client
+            else:
+                _TEST_PROVIDER_CLIENT.client = previous
 
 
 def _decision(

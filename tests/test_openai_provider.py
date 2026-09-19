@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from threading import Barrier, Event, Thread
+from threading import Barrier, Event, Thread, local
 from types import SimpleNamespace
 from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
 
 import pytest
 
 import llm.openai_provider as openai_provider
-from llm.openai_provider import CONTEXT_EGRESS_ENABLE_ENV, OPENAI_TERRA_MODEL, PROVIDER_ENABLE_ENV, ProviderEgressDenied, ProviderEgressOutcomeUnknown, complete_with_provider
+from llm.openai_provider import CONTEXT_EGRESS_ENABLE_ENV, OPENAI_TERRA_MODEL, PROVIDER_ENABLE_ENV, ProviderEgressDenied, ProviderEgressOutcomeUnknown, complete_with_provider as _production_complete_with_provider
 from prm.capabilities import (
     AuthorizationRequest,
     CapabilityGrant,
@@ -23,6 +24,36 @@ class _FakeResponses:
     def create(self, **kwargs): self.calls.append(kwargs); return SimpleNamespace(output_text="provider answer")
 class _FakeClient:
     def __init__(self): self.responses = _FakeResponses()
+
+
+_TEST_CLIENT = local()
+_PRODUCTION_BUILD_CLIENT = openai_provider._build_client
+
+
+@pytest.fixture(autouse=True)
+def _fake_client_only_at_private_builder_seam(monkeypatch):
+    def build_client(api_key: str):
+        fake_client = getattr(_TEST_CLIENT, "client", None)
+        return fake_client if fake_client is not None else _PRODUCTION_BUILD_CLIENT(api_key)
+
+    monkeypatch.setattr(openai_provider, "_build_client", build_client)
+
+
+def complete_with_provider(*args, **kwargs):
+    """Test-only fake transport injection; production rejects ``client=``."""
+
+    fake_client = kwargs.pop("client", None)
+    previous = getattr(_TEST_CLIENT, "client", None)
+    if fake_client is not None:
+        _TEST_CLIENT.client = fake_client
+    try:
+        return _production_complete_with_provider(*args, **kwargs)
+    finally:
+        if fake_client is not None:
+            if previous is None:
+                del _TEST_CLIENT.client
+            else:
+                _TEST_CLIENT.client = previous
 
 
 SYNTHETIC_OPENAI_KEY = "synthetic-openai-key"
@@ -202,6 +233,27 @@ def test_provider_call_requires_environment_and_per_call_gate(monkeypatch) -> No
     with pytest.raises(ProviderEgressDenied): complete_with_provider("Use provider", provider="openai", allow_provider_egress=True, client=_FakeClient())
     monkeypatch.setenv(PROVIDER_ENABLE_ENV, "true")
     with pytest.raises(ProviderEgressDenied): complete_with_provider("Use provider", provider="openai", allow_provider_egress=False, client=_FakeClient())
+
+
+def test_public_provider_boundary_rejects_an_injected_client_before_transport(monkeypatch) -> None:
+    monkeypatch.setenv(PROVIDER_ENABLE_ENV, "true")
+    monkeypatch.setenv("OPENAI_API_KEY", SYNTHETIC_OPENAI_KEY)
+    injected_client = _FakeClient()
+    with patch.object(openai_provider, "_build_client") as build_client:
+        with pytest.raises(ProviderEgressDenied, match="caller-supplied client"):
+            openai_provider.complete_with_provider(
+                "Question",
+                provider="openai",
+                allow_provider_egress=True,
+                authorization=_authorization(),
+                owner_ref="owner_synthetic_primary",
+                connection_ref=SYNTHETIC_OPENAI_CONNECTION,
+                resource_ref="resource_conversation",
+                client=injected_client,
+            )
+
+    build_client.assert_not_called()
+    assert injected_client.responses.calls == []
 
 
 def test_provider_requires_matching_opaque_operation_references_before_fake_call(monkeypatch) -> None:

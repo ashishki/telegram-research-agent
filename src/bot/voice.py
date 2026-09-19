@@ -245,6 +245,28 @@ def _open_telegram_voice_download_request(http_request: request.Request, *, time
     return request.build_opener(_RejectRedirects()).open(http_request, timeout=timeout)
 
 
+def _open_telegram_get_file_request(http_request: request.Request, *, timeout: int):
+    """Call Telegram's fixed ``getFile`` endpoint without accepting redirects."""
+
+    parsed = parse.urlsplit(http_request.full_url)
+    expected = parse.urlsplit(BOT_API_BASE)
+    bot_prefix = f"{expected.path.rstrip('/')}/bot"
+    query = parse.parse_qsl(parsed.query, keep_blank_values=True)
+    if (
+        parsed.scheme != expected.scheme
+        or parsed.netloc != expected.netloc
+        or not parsed.path.startswith(bot_prefix)
+        or not parsed.path.endswith("/getFile")
+        or len(parsed.path) <= len(bot_prefix) + len("/getFile")
+        or parsed.fragment
+        or len(query) != 1
+        or query[0][0] != "file_id"
+        or not query[0][1]
+    ):
+        raise VoiceTranscriptionError("Telegram getFile endpoint is not approved")
+    return request.build_opener(_RejectRedirects()).open(http_request, timeout=timeout)
+
+
 def _telegram_connection_ref(token: str) -> str | None:
     return _credential_connection_ref("telegram", token)
 
@@ -479,7 +501,7 @@ def _get_telegram_file_path(
         resource_ref=resource_ref,
     )
     try:
-        with request.urlopen(url, timeout=30) as response:
+        with _open_telegram_get_file_request(request.Request(url), timeout=30) as response:
             payload = response.read().decode("utf-8")
     except Exception:
         raise VoiceTranscriptionError("Telegram getFile failed") from None

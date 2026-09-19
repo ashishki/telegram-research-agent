@@ -1,8 +1,9 @@
 """Default-deny OpenAI adapter for explicit PRM provider egress.
 
 The active assistant remains local-first. Merely importing this module, setting
-an API key, or selecting a model never sends archive context. A caller must
-explicitly enable the provider and separately opt in to context egress.
+an API key, selecting a model, or supplying a client never sends archive
+context. PA-02 accepts no caller-supplied client and always omits private
+archive context pending PA-04's repository-evidence binding.
 """
 
 from __future__ import annotations
@@ -136,6 +137,14 @@ def complete_with_provider(
             "OpenAI provider egress requires PRM_OPENAI_PROVIDER_ENABLED=true "
             "and allow_provider_egress=True."
         )
+    # A caller-supplied client can use an arbitrary key, base URL or transport.
+    # The capability binding below is to the exact configured credential, so
+    # only this module may construct the transport from that credential. Tests
+    # exercise fake transports by replacing the private ``_build_client`` seam,
+    # never by widening this public boundary.
+    if client is not None:
+        _abandon_before_transport(authorization, context_authorization)
+        raise ProviderEgressDenied("OpenAI provider egress does not accept a caller-supplied client")
     active_api_key = _configured_openai_api_key()
     active_connection_ref = _openai_connection_ref(active_api_key)
     if active_connection_ref is None or connection_ref != active_connection_ref:
@@ -170,7 +179,7 @@ def complete_with_provider(
         local_context=None,
     )
     try:
-        active_client = client or _build_client(active_api_key)
+        active_client = _build_client(active_api_key)
     except OpenAIProviderError:
         _abandon_before_transport(authorization, context_authorization)
         raise
