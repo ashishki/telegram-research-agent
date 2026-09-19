@@ -5,7 +5,7 @@ This record is not human acceptance, release approval, live Telegram evidence,
 or formal approval of the mechanically `review_required` PA design.
 
 Branch: `docs/personal-assistant-blueprint-playbook-20260918`.
-Tested implementation SHA: `fa1cc10c5367c78091fe89f6f0b7f01a9f774f8a`.
+Tested implementation SHA: `9603c28d68315d32ec0bc0895b060c15db168be7`.
 
 ## Implemented boundary
 
@@ -56,16 +56,16 @@ staged or modified.
 
 ## Verification
 
-Commands run against `fa1cc10`:
+Commands run against `9603c28`:
 
 ```text
 PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q \
   tests/test_assistant_briefs.py \
   tests/test_assistant_report_dialogue.py
-# 22 passed in 6.99s
+# 23 passed in 6.99s
 
 PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/test_tiers.py focused-prm
-# 412 passed in 90.37s
+# 413 passed in 73.51s
 ```
 
 The direct suites cover timezone/DST half-open selection, exact local-source
@@ -112,16 +112,23 @@ The relevant remediation/recheck chain is:
   requested and observed `gpt-5.6-terra` / `high`, and returned `STOP_SHIP`.
   It found that the intermediate `BriefOwnerScope` was forgeable. Commit
   `ff6329e` removes that object-capability interface: durable store methods
-  now consume the canonical private tuple themselves, and the PA-07 registry
-  records the owner-authorized schema/test-tier amendment.
+  now consume the canonical private tuple themselves; the owner-authorized
+  schema/test-tier amendment is recorded in `docs/tasks.md`.
 - Fresh review `20260919T104122Z-slice_review-b4f139ef` reviewed `89cc3b4`,
   requested and observed `gpt-5.6-terra` / `high`, and returned `STOP_SHIP`.
   It found that non-string values such as integer `42` were incorrectly
   coerced into a private owner ID. Commit `fa1cc10` now calls the established
   strict `canonical_private_owner_id` helper and adds integer rejection for
   persistence, lookup, listing and deletion.
+- Fresh review `20260919T104658Z-slice_review-6fbe8421` reviewed `6f36224`,
+  requested and observed `gpt-5.6-terra` / `high`, and returned `STOP_SHIP`.
+  It found that the earlier content digest excluded history/comparison refs and
+  document-level selection reasons. Commit `9603c28` adds those fields to the
+  canonical digest, makes semantic JSON tampering fail closed, and returns the
+  machine registry to its unchanged `review_required` state; the precise owner
+  amendment remains in this task record.
 
-A fresh independent Terra/high recheck of `fa1cc10` plus this evidence update
+A fresh independent Terra/high recheck of `9603c28` plus this evidence update
 is still required. Actual Telegram/mobile visual and human content review also
 remain separate gates. Neither fixture tests nor model review authorizes
 runtime, publication, a design-state change, or PA-08/PA-09 work.
