@@ -37,10 +37,10 @@ _ARCHIVE_URL_RE = re.compile(r"https://[^\s)\]]+")
 _ARCHIVE_TOKEN_RE = re.compile(r"[A-Za-zА-Яа-яЁё0-9][A-Za-zА-Яа-яЁё0-9_+-]{1,}")
 _ARCHIVE_SENTENCE_RE = re.compile(r"(?<=[.!?。！？])\s+|[\r\n]+")
 _ARCHIVE_NON_FACT_TOKENS = frozenset({
-    "the", "a", "an", "this", "that", "these", "those", "from", "in", "on", "for", "and", "or", "with",
+    "the", "a", "an", "this", "that", "these", "those", "from", "in", "on", "for", "and", "or", "with", "no", "not",
     "archive", "archives", "material", "materials", "source", "sources", "finding", "findings", "says", "said",
     "shows", "show", "describes", "describe", "about", "direct", "partial", "adjacent", "evidence", "summary",
-    "в", "из", "по", "и", "или", "для", "это", "этот", "эта", "эти", "что", "как", "есть", "был", "была",
+    "в", "из", "по", "и", "или", "для", "это", "этот", "эта", "эти", "что", "как", "есть", "был", "была", "нет",
     "архив", "архиве", "материал", "материалы", "источник", "источники", "находка", "находки", "прямой", "прямые",
     "частичный", "смежный", "вывод", "данные", "говорит", "описывает", "показывает", "согласно",
 })
@@ -272,17 +272,50 @@ def _verified_archive_answer(
         return False
     summary = _mapping(contract.get("result_summary"))
     direct = _mappings(contract.get("direct_findings"))
+    partial = _mappings(contract.get("partial_findings"))
+    adjacent = _mappings(contract.get("adjacent_findings"))
     direct_count = int(summary.get("direct_count") or 0)
-    if direct_count and any(marker in lowered for marker in (
-        "недостаточно данных", "прямых материалов не найден", "ничего не найдено", "not enough evidence", "no direct evidence",
-    )):
+    partial_count = int(summary.get("partial_count") or 0)
+    adjacent_count = int(summary.get("adjacent_count") or 0)
+    supported_count = direct_count + partial_count + adjacent_count
+    blanket_refusal_markers = (
+        "недостаточно данных", "ничего не найдено", "not enough evidence", "no evidence", "nothing found",
+    )
+    direct_refusal_markers = ("прямых материалов не найден", "no direct evidence", "no direct material")
+    if supported_count and any(marker in lowered for marker in blanket_refusal_markers):
         return False
-    if not direct_count and not any(marker in lowered for marker in ("прям", "direct")):
+    # A generated response may accurately state that there is no *direct*
+    # evidence when partial/adjacent support exists, but it must then publish
+    # the useful bounded result instead of stopping at that refusal.  This is
+    # deliberately separate from generic claim scoring: a citation-free
+    # sentence such as "No direct evidence" often has no lexical claim for
+    # that scorer to reject.
+    if direct_count and any(marker in lowered for marker in direct_refusal_markers):
         return False
-    # A direct finding that contributes to the answer cannot silently lose its
-    # source identity on the way through generation.
-    direct_sources = {str(item.get("source_url") or "").strip() for item in direct}
-    if any(source and source not in answer for source in direct_sources):
+    if partial_count and not direct_count:
+        if any(marker in lowered for marker in direct_refusal_markers):
+            return False
+        if not any(marker in lowered for marker in ("частич", "partial")):
+            return False
+        required_findings = partial
+    elif adjacent_count and not direct_count:
+        if any(marker in lowered for marker in direct_refusal_markers):
+            return False
+        if not any(marker in lowered for marker in ("смеж", "adjacent")):
+            return False
+        required_findings = adjacent
+    elif direct_count:
+        required_findings = direct
+    else:
+        # Empty archive results are published by the deterministic local
+        # renderer.  A provider must never turn an empty selected context into
+        # a synthetic answer.
+        return False
+    # Every selected evidence class that permits generation retains visible
+    # source identity; a partial result cannot be silently reduced to a
+    # citation-free refusal.
+    required_sources = {str(item.get("source_url") or "").strip() for item in required_findings}
+    if any(source and source not in answer for source in required_sources):
         return False
     if not _claims_are_source_bounded(answer, evidence_items=evidence_items, direct_required=bool(direct_count)):
         return False

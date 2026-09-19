@@ -1,8 +1,22 @@
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
-from prm.application import PersonalResearchAssistant, _final_answer_publication_allowed, _render_terminal_empty_answer, _render_verified_evidence_fallback
+import pytest
+
 from assistant.claim_ledger import verify_answer_against_evidence
-from prm.contracts import AssistantResult, OperatorRequest
+from prm.application import (
+    PersonalResearchAssistant,
+    _final_answer_publication_allowed,
+    _render_terminal_empty_answer,
+    _render_verified_evidence_fallback,
+)
+from prm.archive_synthesis_transport import (
+    ArchiveSynthesisReceipt,
+    ArchiveSynthesisTransportResult,
+    _openai_connection_ref,
+)
+from prm.capabilities import AuthorizationRequest, CapabilityGrant, CapabilityRegistry, ProviderPolicy
+from prm.contracts import ArchiveSynthesisAccess, AssistantResult, OperatorRequest
 from prm.presentation import render_payload
 from prm.synthesis import ArchiveSynthesisOutcome
 
@@ -28,6 +42,128 @@ def _payload():
                                 "primary_workflow": "archive_research"},
         "project_fit": {}, "project_decision": {}, "claim_ledger": {"claims": []},
         "unknowns": [], "next_steps": {}, "receipt": {}, "privacy": {},
+    }
+
+
+class _ArchiveHoldoutFacade:
+    """Representative offline archive corpus; the production retriever ranks it."""
+
+    def __init__(self, items):
+        self.items = list(items)
+        self.archive_queries = []
+
+    def search_telegram_archive(self, query, filters=None, limit=5):
+        self.archive_queries.append((query, dict(filters or {}), limit))
+        return {
+            "status": "ok" if self.items else "insufficient_evidence",
+            "query": query,
+            "retrieval_mode": "sqlite_fts_archive",
+            "items": self.items[:limit],
+        }
+
+    def search_intelligence_items(self, query, filters=None, limit=5):
+        return {"status": "empty", "query": query, "items": []}
+
+    def analyze_project_context(self, query, project_name=None, week_label=None, limit=5):
+        return {
+            "status": "empty",
+            "query": query,
+            "project_name": project_name or "",
+            "relevance_label": "no_match",
+            "source_refs": [],
+            "unknowns": [],
+            "decision_support": {},
+        }
+
+
+def _archive_synthesis_access() -> ArchiveSynthesisAccess:
+    now = datetime.now(timezone.utc)
+    connection_ref = _openai_connection_ref("synthetic-pa04-holdout-key")
+    assert connection_ref is not None
+    text = CapabilityGrant(
+        grant_id="grant_pa04_holdout_text",
+        owner_ref="owner_pa04_holdout",
+        connection_ref=connection_ref,
+        capability="model.generate",
+        resource_refs=("resource_conversation",),
+        operations=("model_egress",),
+        data_classes=("user_provided",),
+        purpose="answer.request",
+        provider_policy=ProviderPolicy(("provider_openai",), maximum_request_count=2),
+        issued_at=now - timedelta(minutes=1),
+        expires_at=now + timedelta(minutes=5),
+        revision=1,
+    )
+    context = CapabilityGrant(
+        grant_id="grant_pa04_holdout_context",
+        owner_ref=text.owner_ref,
+        connection_ref=connection_ref,
+        capability="model.context_egress",
+        resource_refs=("resource_archive",),
+        operations=("model_egress",),
+        data_classes=("private_archive",),
+        purpose="answer.context",
+        provider_policy=ProviderPolicy(("provider_openai",), maximum_request_count=2),
+        issued_at=now - timedelta(minutes=1),
+        expires_at=now + timedelta(minutes=5),
+        revision=1,
+    )
+    registry = CapabilityRegistry((text, context))
+    operation_ref = "operation_pa04_holdout"
+    query = registry.authorize_and_reserve(AuthorizationRequest(
+        owner_ref=text.owner_ref,
+        connection_ref=connection_ref,
+        capability="model.generate",
+        resource_ref="resource_conversation",
+        operation="model_egress",
+        data_class="user_provided",
+        provider_ref="provider_openai",
+        purpose="answer.request",
+        expected_grant_revision=1,
+        operation_ref=operation_ref,
+    ))
+    archive = registry.authorize_and_reserve(AuthorizationRequest(
+        owner_ref=text.owner_ref,
+        connection_ref=connection_ref,
+        capability="model.context_egress",
+        resource_ref="resource_archive",
+        operation="model_egress",
+        data_class="private_archive",
+        provider_ref="provider_openai",
+        purpose="answer.context",
+        expected_grant_revision=1,
+        operation_ref=operation_ref,
+    ))
+    return ArchiveSynthesisAccess(
+        query_authorization=query,
+        context_authorization=archive,
+        owner_ref=text.owner_ref,
+        connection_ref=connection_ref,
+        query_resource_ref="resource_conversation",
+        context_resource_ref="resource_archive",
+    )
+
+
+def _synthetic_archive_receipt() -> ArchiveSynthesisReceipt:
+    return ArchiveSynthesisReceipt(
+        provider="openai",
+        model="synthetic-pa04-holdout",
+        external_call_attempted=True,
+        external_call_performed=True,
+        context_egress_attempted=True,
+        context_egress_performed=True,
+        delivery_outcome="accepted",
+        context_binding_digest="synthetic-pa04-holdout",
+    )
+
+
+def _holdout_item(*, document_id: str, source_url: str, snippet: str) -> dict:
+    return {
+        "archive_document_id": document_id,
+        "posted_at": "2026-09-01T10:00:00Z",
+        "channel_username": "eval_holdout",
+        "source_url": source_url,
+        "snippet": snippet,
     }
 
 
@@ -83,6 +219,140 @@ def test_application_uses_verified_pa04_synthesis_and_records_retrieval_generati
     assert measurement["retrieval"]["selected_source_count"] == 1
     assert measurement["generation"]["status"] == "generated_verified"
     assert measurement["generation"]["context_egress_performed"] is True
+
+
+@pytest.mark.parametrize(
+    ("question", "source_url", "support_span"),
+    [
+        (
+            "What does my archive say about agent evals?",
+            "https://t.me/eval_holdout/english",
+            "Agent evals use task success and groundedness.",
+        ),
+        (
+            "Что в моём архиве есть про agent evals?",
+            "https://t.me/eval_holdout/russian",
+            "В архиве есть практика: измерять task success и groundedness для agent evals.",
+        ),
+    ],
+)
+def test_pa04_bilingual_holdout_uses_actual_retriever_ranking_and_publication(
+    monkeypatch, question, source_url, support_span,
+):
+    direct = _holdout_item(
+        document_id=f"tg:holdout:{source_url.rsplit('/', 1)[-1]}",
+        source_url=source_url,
+        snippet=support_span,
+    )
+    facade = _ArchiveHoldoutFacade([
+        _holdout_item(
+            document_id="tg:holdout:partial",
+            source_url="https://t.me/eval_holdout/partial",
+            snippet="Evaluation notes mention gold labels.",
+        ),
+        _holdout_item(
+            document_id="tg:holdout:unrelated",
+            source_url="https://t.me/eval_holdout/unrelated",
+            snippet="Travel planning notes have no evaluation practice.",
+        ),
+        direct,
+    ])
+    monkeypatch.setattr("prm.application.build_research_facade", lambda **_kwargs: facade)
+
+    def complete(*, context, access):
+        del access
+        selected = context.items[0]
+        return ArchiveSynthesisTransportResult(
+            text=f"{selected.text.rstrip('.!?…')} ({selected.source_ref}).",
+            receipt=_synthetic_archive_receipt(),
+        )
+
+    monkeypatch.setattr("prm.synthesis.complete_archive_synthesis", complete)
+    result = PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:")).answer(
+        OperatorRequest(
+            query=question,
+            mode="research",
+            chat_id=f"holdout-{source_url.rsplit('/', 1)[-1]}",
+            archive_synthesis_access=_archive_synthesis_access(),
+        )
+    )
+
+    contract = result.payload["archive_contract"]
+    selected = result.payload["archive_evidence"]["items"]
+    measurement = result.payload["retrieval_generation_measurement"]
+    assert facade.archive_queries
+    assert selected[0]["source_url"] == source_url
+    assert selected[0]["relevance_label"] == "direct"
+    assert contract["result_summary"]["direct_count"] == 1
+    assert source_url in result.text
+    assert result.payload["final_answer_publication"]["allowed"] is True
+    assert measurement["retrieval"]["candidate_count"] >= 3
+    assert measurement["retrieval"]["selected_source_count"] >= 1
+    assert measurement["retrieval"]["attempted_query_count"] >= 1
+    assert measurement["generation"]["status"] == "generated_verified"
+    assert result.payload["final_answer_publication"]["fallback_used"] is False
+
+
+def test_pa04_partial_result_publishes_useful_cited_support_and_rejects_false_refusal(monkeypatch):
+    partial = _holdout_item(
+        document_id="tg:holdout:partial-only",
+        source_url="https://t.me/eval_holdout/partial-only",
+        snippet="Evaluation gates measure task success with gold labels.",
+    )
+
+    def run_with(provider_text):
+        facade = _ArchiveHoldoutFacade([partial])
+        monkeypatch.setattr("prm.application.build_research_facade", lambda **_kwargs: facade)
+        monkeypatch.setattr(
+            "prm.synthesis.complete_archive_synthesis",
+            lambda **_kwargs: ArchiveSynthesisTransportResult(text=provider_text, receipt=_synthetic_archive_receipt()),
+        )
+        return PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:")).answer(OperatorRequest(
+            query="What does my archive say about agent evals?",
+            mode="research",
+            chat_id=f"partial-{len(provider_text)}",
+            archive_synthesis_access=_archive_synthesis_access(),
+        ))
+
+    positive = run_with(
+        "Partial: Evaluation gates measure task success with gold labels "
+        "(https://t.me/eval_holdout/partial-only)."
+    )
+    assert positive.payload["archive_contract"]["result_summary"] == {
+        "direct_count": 0,
+        "partial_count": 1,
+        "adjacent_count": 0,
+        "unrelated_count": 0,
+        "selected_count": 1,
+        "actionable_count": 0,
+    }
+    assert positive.payload["retrieval_generation_measurement"]["generation"]["status"] == "generated_verified"
+    assert positive.payload["final_answer_publication"]["fallback_used"] is False
+    assert "https://t.me/eval_holdout/partial-only" in positive.text
+
+    false_refusal = run_with("No direct evidence.")
+    assert false_refusal.payload["retrieval_generation_measurement"]["generation"]["status"] == "generated_answer_rejected"
+    assert false_refusal.payload["final_answer_publication"]["fallback_used"] is True
+    assert "Evaluation gates measure task success with gold labels." in false_refusal.text
+    assert "https://t.me/eval_holdout/partial-only" in false_refusal.text
+
+
+def test_pa04_truthful_empty_archive_result_publishes_without_generation_or_citation(monkeypatch):
+    facade = _ArchiveHoldoutFacade([])
+    monkeypatch.setattr("prm.application.build_research_facade", lambda **_kwargs: facade)
+    result = PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:")).answer(OperatorRequest(
+        query="What does my archive say about agent evals?",
+        mode="research",
+        chat_id="empty-archive-holdout",
+    ))
+
+    assert facade.archive_queries
+    assert result.payload["archive_contract"]["result_summary"]["selected_count"] == 0
+    assert result.payload["retrieval_generation_measurement"]["generation"]["status"] == "context_unavailable"
+    assert result.payload["final_answer_publication"]["allowed"] is True
+    assert result.payload["final_answer_publication"]["fallback_used"] is True
+    assert "не удалось собрать проверяемый ответ" in result.text.casefold()
+    assert "https://" not in result.text
 
 
 def test_explicit_topic_edition_is_application_path_without_fetch_send_or_write():
