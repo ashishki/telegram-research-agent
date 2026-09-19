@@ -35,7 +35,7 @@ test brief or human-review receipt, so it grants no continuing live authority.
 
 ## Current slice: PA-07 local BriefDocument handoff
 
-PA-07 is locally implemented through `c1cd081` (with preceding scoped commits
+PA-07 is locally implemented through `023688c` (with preceding scoped commits
 `1f5a75a`, `a1f8001`, `de32184`, `447af21`, `d553f3b`, `44d2195`, `264bc5f`,
 `d2163a1`, `f146925`, `dfa135f`, `ff6329e`, `fa1cc10`, `9603c28` and
 `d9a684f`). It provides an immutable, inspectable source-backed
@@ -49,6 +49,21 @@ against the current visible in-process report object.
 The dispatcher keeps that visible report object in a bounded process-local
 store across immediate commands; a process restart clears the projection and
 prevents normal-language reconstruction of the old brief.
+
+Private owner feedback identified the former expanded Telegram rendering as a
+P1 usability failure: it exposed a technical/audit dump instead of a readable
+brief. Commits `d6188c3` through `023688c` render a short native-Telegram HTML
+card and a conversational expanded view: assessed/project-linked items occupy
+the mobile slots, unknown priorities are stated honestly without inventing a
+ranking, source links have named identities, and coverage is phrased for a
+reader. Exact document IDs, hashes, source states and history remain at the
+inspectable `BriefDocument` boundary, not in the chat card. The raw private
+brief is not retained in Git. Direct PA-07 tests pass 27/27, `focused-prm`
+completed PASS, and a fresh read-only Terra 5.6/high advisory judge passed a
+synthetic/redacted fixture. That is not human acceptance or current live
+render evidence: the system service has not yet been refreshed to this SHA and
+a bounded private mobile check plus fresh independent slice review remain
+required. The design stays mechanically `review_required`.
 
 The owner explicitly amended this narrow PA-07 boundary on 2026-09-19 to
 remediate two independent P1 findings: add owner-scoped, bounded immutable

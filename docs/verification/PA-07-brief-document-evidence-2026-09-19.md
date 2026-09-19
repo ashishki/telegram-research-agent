@@ -6,6 +6,12 @@ but it did not receive a test brief or human review. This record is not human
 acceptance, release approval, rendered-live-brief evidence, or formal approval
 of the mechanically `review_required` PA design.
 
+On the same private owner conversation, a subsequently received expanded-brief
+render was reported unreadable and dominated by audit language. Treat that
+feedback as a P1 usability finding, not as approval or a release result. The
+private rendered text, source URLs, source excerpts and account information are
+intentionally not copied into this repository or this evidence record.
+
 Branch: `docs/personal-assistant-blueprint-playbook-20260918`.
 Tested implementation SHA: `c1cd081`.
 
@@ -127,6 +133,51 @@ python3 tools/check_personal_assistant_plan.py
 `git diff --check` also passed. This is writable local-fixture evidence only;
 it does not change the external gates below.
 
+## Telegram-card P1 remediation
+
+Commits `d6188c3` through `023688c` replace the Telegram human surface with a
+short, escaped native-Telegram HTML card and a conversational expanded view.
+The compact card reserves its two mobile slots for an assessed priority or a
+source-bound project reference. When the local archive contains only unranked
+material it says so rather than promoting arbitrary rows as the week's most
+important news. The expanded view uses a title, a bounded summary, a
+source-bound `Зачем вам` line only where the selected document supplies a
+project/relevance reference, human labels for importance and urgency, and a
+named source link. It hides document IDs, snapshot hashes, source-state dumps
+and version/history mechanics from the Telegram conversation; those remain
+available at the inspectable `BriefDocument` boundary. Coverage stays visible
+in ordinary language so partial local selection is not presented as a complete
+week.
+
+At `023688c`, writable-workspace checks completed:
+
+```text
+PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q \
+  tests/test_assistant_briefs.py \
+  tests/test_assistant_report_dialogue.py
+# 27 passed in 12.65s
+
+PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/test_tiers.py focused-prm
+# PASS (the focused tier completed; its progress/count output was intentionally
+# suppressed in the final capture to preserve an unambiguous exit result)
+
+python3 tools/playbook.py --check-pin
+# Playbook pin verified; no model, hook or application runtime enabled.
+
+python3 tools/check_personal_assistant_plan.py
+# PA plan: 19 consistent slices; schemas, references, dependencies and context limits passed.
+# Design state: review_required; no product, human-approval or runtime claim.
+```
+
+`docs/verification/PA-07-telegram-brief-user-judge-prompt.md` is an advisory
+privacy-safe rubric, not a product prompt. A fresh read-only `gpt-5.6-terra`
+with `high` reasoning received only a synthetic/redacted two-item rendering;
+it returned `pass`, scores 5/5 for scanability, priority honesty and source
+clarity, 4/5 for usefulness, and no P1. It received no live archive content,
+user message, account data, credential or runtime authority. This supports the
+offline wording decision only; a person still needs to inspect the current
+Telegram rendering after an explicitly bounded service refresh.
+
 ## Independent slice review
 
 Every listed review uses the Role Runner in a fresh read-only process with
@@ -196,7 +247,8 @@ Neither fixture tests, the model review, nor this evidence authorizes runtime,
 publication, a design-state change, or PA-08/PA-09 work. The PA design remains
 mechanically `review_required`.
 
-Next required activity: when the owner is ready to submit a test request,
-repeat a time-bounded private Telegram/mobile rendering inspection and record
-the human content result for a real selected-local-archive brief. No additional
-local command can substitute for that gate.
+Next required activity: conduct a time-bounded private Telegram/mobile
+inspection of the current `023688c` card and record only the human verdict
+(never the private report contents). A fresh independent slice review is also
+required for this P1 remediation. No additional local command can substitute
+for the human gate.
