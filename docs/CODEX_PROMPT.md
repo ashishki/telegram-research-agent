@@ -30,7 +30,38 @@ No production DB, live Telegram polling, account/provider access, job, timer,
 credential, `.env` or release action has been used or is authorized. Preserve
 the two untracked local files. Do not run the full historical pytest suite.
 
-## Current slice: PA-06 preparation after PA-05 local checkpoint
+## Current slice: PA-07 local BriefDocument handoff
+
+PA-07 is locally implemented through `d2163a1` (with preceding scoped commits
+`1f5a75a`, `a1f8001`, `de32184`, `447af21`, `d553f3b`, `44d2195` and
+`264bc5f`). It provides an immutable, inspectable source-backed
+`BriefDocument`, a selected IANA-zone half-open period, coverage/deduplication/
+conflict/importance-versus-urgency evidence, bounded visible report history,
+and deterministic Telegram/report follow-ups. A request window is bound before
+local archive candidate selection and rechecked afterwards. The Telegram full
+view is reached by a one-time reply-keyboard text control that resolves only
+against the current visible in-process report object.
+
+This is deliberately not durable report retention: the owner scoped PA-07
+state to the current visible response and required it to disappear on a new
+topic or restart. Do not add a database, migration, durable job, worker,
+Redis, schedule, export, live provider/account/credential action, or an edit
+to `tools/test_tiers.py` for this slice. The direct PA-07 suites and the
+existing `focused-prm` tier are both required evidence, but the latter does not
+currently collect the two PA-07 suites; retain that owner-level test-registry
+gate rather than silently changing the tier.
+
+The evidence record is
+`docs/verification/PA-07-brief-document-evidence-2026-09-19.md`. Fresh
+read-only Terra 5.6/high reviews found and drove the scoped remediations. The
+latest recheck, run `20260919T092541Z-slice_review-8b606ab1` against
+`d2163a1`, retains two STOP_SHIP P1 requests for durable restart history and
+PA-07 test registration in `focused-prm`; both conflict with the explicit
+owner scope above and require a human/design decision. This is not an approval
+or completion claim. The design remains mechanically `review_required`.
+
+PA-06's local checkpoint below is historical context for PA-07's dependency;
+do not treat it as an instruction to start PA-08 or PA-09.
 
 PA-03 is locally tested at `081dded92b00bdaa822a6f6c0efbe8ae7ab86861` with
 evidence at `docs/verification/PA-03-conversation-evidence-2026-09-19.md`.
