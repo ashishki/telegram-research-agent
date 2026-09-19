@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 import hashlib
-from threading import Barrier, Event
-from time import sleep
+from multiprocessing import get_context
+from time import monotonic, sleep
 from types import SimpleNamespace
 
 import pytest
@@ -26,28 +26,22 @@ from integrations.github_readonly import GitHubReadError, ReadOnlyGitHubContextP
 
 
 class _Archive:
-    def __init__(self, rows, barrier: Barrier | None = None):
+    def __init__(self, rows):
         self.rows = rows
-        self.barrier = barrier
         self.queries = []
 
     def search_archive(self, query, *, limit):
         self.queries.append((query, limit))
-        if self.barrier is not None:
-            self.barrier.wait(timeout=2)
         return {"status": "ok", "items": self.rows[:limit]}
 
 
 class _Public:
-    def __init__(self, *, barrier: Barrier | None = None, fail=False):
-        self.barrier = barrier
+    def __init__(self, *, fail=False):
         self.fail = fail
         self.queries = []
 
     def search_public(self, query, *, bounds):
         self.queries.append(query)
-        if self.barrier is not None:
-            self.barrier.wait(timeout=2)
         if self.fail:
             raise RuntimeError("offline provider failure")
         return [{"url": "https://docs.vendor.example/release", "title": "Official", "snippet": "discovery only"}]
@@ -66,16 +60,13 @@ class _Public:
 
 
 class _GitHub:
-    def __init__(self, *, barrier: Barrier | None = None, repository_ref="acme/project", commit_sha="a" * 40):
-        self.barrier = barrier
+    def __init__(self, *, repository_ref="acme/project", commit_sha="a" * 40):
         self.repository_ref = repository_ref
         self.commit_sha = commit_sha
         self.requests = []
 
     def read_repository_context(self, repository_ref):
         self.requests.append(repository_ref)
-        if self.barrier is not None:
-            self.barrier.wait(timeout=2)
         return {
             "repository_ref": self.repository_ref,
             "commit_sha": self.commit_sha,
@@ -148,19 +139,20 @@ def _bounds():
 
 def test_research_combines_independent_sources_and_checked_project_identity(monkeypatch):
     monkeypatch.setattr("prm.public_web._reject_private_resolution", lambda _host: None)
-    barrier = Barrier(3)
     archive = _Archive([{
         "archive_document_id": "tg:1", "source_url": "https://t.me/private/1",
         "snippet": "Archive evidence supports a replayable evaluation fixture.",
         "relevance_label": "direct", "supports_action": True,
-    }], barrier)
+    }])
     public_query = "vendor current release official"
-    public = _Public(barrier=barrier)
-    github = _GitHub(barrier=barrier)
+    public = _Public()
+    github = _GitHub()
+    public_access = _public_access(public_query)
+    github_access = _github_access()
     plan = build_research_plan(
         "What applies to my project? Private context Q-71.", archive_query="agent evaluation fixture",
-        public_tasks=(PublicResearchTask(public_query, _public_access(public_query)),),
-        github_access=_github_access(), project_name="Acme Project",
+        public_tasks=(PublicResearchTask(public_query, public_access),),
+        github_access=github_access, project_name="Acme Project",
     )
 
     result = run_bounded_research(
@@ -171,9 +163,15 @@ def test_research_combines_independent_sources_and_checked_project_identity(monk
     assert result["status"] == "complete"
     assert {item["source_kind"] for item in result["facts"]} == {"archive", "public_primary", "github_repository_identity"}
     assert result["project_recommendations"][0]["statement"].endswith("acme/project@" + "a" * 40 + " before proposing a project change.")
-    assert public.queries == [public_query]
+    assert any(item["source_kind"] == "public_primary" for item in result["facts"])
     assert "Private context Q-71" not in repr(result["plan"])
     assert result["write_performed"] is False
+    assert public_access.search_authorization.reservation is not None
+    assert all(item.reservation is not None and not item.reservation.available for item in (
+        public_access.search_authorization, *public_access.fetch_authorizations,
+    ))
+    assert github_access.authorization.reservation is not None
+    assert github_access.authorization.reservation.available is False
 
 
 def test_gap_expansion_is_local_bounded_and_provider_failure_is_partial(monkeypatch):
@@ -195,8 +193,7 @@ def test_gap_expansion_is_local_bounded_and_provider_failure_is_partial(monkeypa
     )
 
     assert result["status"] == "partial"
-    assert len(archive.queries) == 2
-    assert "agent evals harness regression fixture" in archive.queries[1][0]
+    assert {item["name"] for item in result["coverage"]["completed_steps"]} == {"archive_initial", "archive_expansion", "public_1"}
     assert "search_failed" in result["coverage"]["source_gaps"]
     assert result["automatic_public_expansion"] is False
 
@@ -229,7 +226,8 @@ def test_cancellation_returns_resumable_checkpoint_without_starting_sources(monk
         checkpoint=cancelled["checkpoint"],
     )
     assert resumed["status"] == "complete"
-    assert archive.queries and public.queries == [public_query]
+    assert resumed["status"] == "complete"
+    assert any(item["source_kind"] == "public_primary" for item in resumed["facts"])
 
 
 def test_repository_identity_mismatch_cannot_create_project_recommendation():
@@ -315,26 +313,87 @@ def test_unknown_or_over_budget_cost_refuses_public_transport_before_provider_ca
     assert over.queries == []
 
 
-def test_timeout_waits_for_inflight_reader_before_returning_partial_checkpoint():
-    finished = Event()
+def test_timeout_kills_inflight_reader_before_returning_partial_checkpoint():
+    context = get_context("fork")
+    started = context.Event()
+    finished = context.Event()
 
     class _SlowArchive:
         def search_archive(self, query, *, limit):
-            sleep(1.05)
+            started.set()
+            sleep(5)
             finished.set()
             return {"status": "ok", "items": []}
 
     plan = build_research_plan(
         "What applies?", archive_query="slow evidence", budget=ResearchBudget(timeout_seconds=1),
     )
+    began = monotonic()
     result = run_bounded_research(
         plan, original_query="What applies?", archive_reader=_SlowArchive(),
         public_provider=None, public_bounds=None, github_provider=None,
     )
 
     assert result["coverage"]["state"] == "time_budget_exhausted"
-    assert finished.is_set() is True
-    assert "archive_initial" in result["coverage"]["pending_steps"]
+    assert started.is_set() is True
+    assert finished.is_set() is False
+    assert monotonic() - began < 1.5
+    assert result["coverage"]["pending_steps"] == []
+    assert "time_budget_exhausted" in result["coverage"]["source_gaps"]
+
+
+def test_cancellation_kills_an_inflight_reader_before_returning_partial_checkpoint():
+    context = get_context("fork")
+    started = context.Event()
+    finished = context.Event()
+
+    class _SlowArchive:
+        def search_archive(self, query, *, limit):
+            started.set()
+            sleep(5)
+            finished.set()
+            return {"status": "ok", "items": []}
+
+    class _CancelAfterStart(ResearchCancellation):
+        def __init__(self):
+            super().__init__()
+            self._began = monotonic()
+
+        @property
+        def cancelled(self):
+            return started.is_set() and monotonic() - self._began >= 0.1
+
+    plan = build_research_plan(
+        "What applies?", archive_query="slow evidence", budget=ResearchBudget(timeout_seconds=5),
+    )
+    began = monotonic()
+    result = run_bounded_research(
+        plan, original_query="What applies?", archive_reader=_SlowArchive(),
+        public_provider=None, public_bounds=None, github_provider=None,
+        cancellation=_CancelAfterStart(),
+    )
+
+    assert result["coverage"]["state"] == "cancelled"
+    assert started.is_set() is True
+    assert finished.is_set() is False
+    assert monotonic() - began < 1.0
+    assert result["coverage"]["pending_steps"] == []
+    assert "cancelled_during_execution" in result["coverage"]["source_gaps"]
+
+
+def test_worker_refuses_to_fall_back_to_an_unbounded_thread_on_unsupported_platform(monkeypatch):
+    archive = _Archive([])
+    monkeypatch.setattr("prm.research_worker.sys.platform", "darwin")
+    plan = build_research_plan("What applies?", archive_query="local evidence")
+
+    result = run_bounded_research(
+        plan, original_query="What applies?", archive_reader=archive,
+        public_provider=None, public_bounds=None, github_provider=None,
+    )
+
+    assert result["status"] == "partial"
+    assert "worker_unavailable" in result["coverage"]["source_gaps"]
+    assert archive.queries == []
 
 class _HttpResponse:
     def __init__(self, *, body, url):

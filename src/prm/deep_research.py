@@ -1,25 +1,27 @@
 """Bounded, resumable multi-source research with explicit authority seams.
 
-PA-06 intentionally has no default providers, persistence, background worker,
+PA-06 intentionally has no default providers, persistence, queue, scheduler,
 or model loop.  It coordinates caller-injected local archive, PA-05 public-web
-and read-only GitHub adapters under one small budget, preserving a safe
-checkpoint whenever it returns a partial result.
+and read-only GitHub adapters under one small budget. Each external callback
+runs in an ephemeral, supervised local process so a cancel/deadline cannot
+leave egress running after a partial result is returned.
 """
 
 from __future__ import annotations
 
-from concurrent.futures import Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import hashlib
 import re
 from threading import Event, Lock
 from time import monotonic
-from typing import Any, Callable, Mapping, Protocol, Sequence
+from typing import Any, Mapping, Protocol, Sequence
 
 from prm.capabilities import AuthorizationDecision, CapabilityDenied, require_authorized_operation
+from prm.contracts import PublicWebAccess
 from prm.public_web import PublicWebBounds, PublicWebProvider, execute_public_web_research
 from prm.research_planner import assess_research_gaps
+from prm.research_worker import SupervisedWork, run_supervised_work
 
 
 DEEP_RESEARCH_SCHEMA_VERSION = "prm_deep_research.v1"
@@ -367,12 +369,12 @@ def run_bounded_research(
     if checkpoint is not None and (type(checkpoint) is not ResearchCheckpoint or checkpoint.plan_id != plan.plan_id):
         raise ValueError("research checkpoint does not match plan")
     cancellation = cancellation or ResearchCancellation()
-    # A checkpoint resumes only steps known to have completed without an
-    # unknown transport outcome. Failed provider calls have consumed their
-    # sealed grant and are preserved as partial coverage rather than retried
-    # silently; a caller must issue a fresh plan/scope to attempt them again.
+    # A checkpoint resumes only work stopped before a worker was authorized.
+    # Once parent-side authority was consumed, a provider call may have begun
+    # even if it was killed before a response reached us. Preserve that unknown
+    # outcome as partial coverage; a caller needs a fresh plan/scope to retry.
     prior_steps = list(checkpoint.completed_steps) if checkpoint is not None else []
-    resumable_statuses = {"cancelled_before_start", "time_budget_exhausted"}
+    resumable_statuses = {"cancelled_before_start"}
     steps = [step for step in prior_steps if step.status not in resumable_statuses]
     completed_names = {step.name for step in steps}
     started = monotonic()
@@ -382,29 +384,39 @@ def run_bounded_research(
     if cancellation.cancelled:
         return _result(plan, steps, pending=["archive_initial"], state="cancelled", started=started, cost_ledger=cost_ledger)
 
-    initial: dict[str, Callable[[], ResearchStep]] = {}
+    initial: list[SupervisedWork] = []
     if "archive_initial" not in completed_names:
-        initial["archive_initial"] = lambda: _archive_step(
-            "archive_initial", plan.archive_queries[0], archive_reader, limit=plan.budget.max_archive_sources, cancellation=cancellation,
-        )
+        initial.append(_archive_work(
+            "archive_initial", plan.archive_queries[0], archive_reader,
+            limit=plan.budget.max_archive_sources, cancellation=cancellation,
+        ))
     for index, task in enumerate(plan.public_tasks):
         name = f"public_{index + 1}"
         if name not in completed_names:
-            initial[name] = lambda task=task, name=name: _public_step(
-                name, task, original_query=original_query, provider=public_provider, bounds=public_bounds,
-                cancellation=cancellation, cost_ledger=cost_ledger,
+            prepared = _public_work(
+                name, task, original_query=original_query, provider=public_provider,
+                bounds=public_bounds, cancellation=cancellation, cost_ledger=cost_ledger,
             )
+            if type(prepared) is ResearchStep:
+                steps.append(prepared)
+            else:
+                initial.append(prepared)
     if plan.github_access is not None and "github_context" not in completed_names:
-        initial["github_context"] = lambda: _github_step(plan.github_access, github_provider, cancellation=cancellation)
+        initial.append(_github_work(plan.github_access, github_provider, cancellation=cancellation))
 
     if len(initial) + len(steps) > plan.budget.max_tool_calls:
         return _result(plan, steps, pending=["archive_expansion"], state="partial", started=started, budget_exhausted=True, cost_ledger=cost_ledger)
-    steps.extend(_run_independent(initial, timeout_seconds=plan.budget.timeout_seconds, cancellation=cancellation, started=started))
+    steps.extend(_run_independent(
+        initial, deadline_monotonic=started + plan.budget.timeout_seconds, cancellation=cancellation,
+    ))
     if cancellation.cancelled:
-        pending = [step.name for step in steps if step.status == "cancelled_before_start"] or ["archive_expansion"]
+        pending = [
+            step.name for step in steps
+            if step.status == "cancelled_before_start"
+        ]
         return _result(plan, steps, pending=pending, state="cancelled", started=started, cost_ledger=cost_ledger)
     if monotonic() - started >= plan.budget.timeout_seconds:
-        pending = [step.name for step in steps if step.status == "time_budget_exhausted"] or ["archive_expansion"]
+        pending = []
         return _result(plan, steps, pending=pending, state="time_budget_exhausted", started=started, cost_ledger=cost_ledger)
 
     if "archive_expansion" not in {step.name for step in steps}:
@@ -417,8 +429,13 @@ def run_bounded_research(
             elif cancellation.cancelled:
                 pending.append("archive_expansion")
             else:
-                steps.append(_archive_step(
-                    "archive_expansion", expansion_query, archive_reader, limit=plan.budget.max_archive_sources, cancellation=cancellation,
+                steps.extend(_run_independent(
+                    [_archive_work(
+                        "archive_expansion", expansion_query, archive_reader,
+                        limit=plan.budget.max_archive_sources, cancellation=cancellation,
+                    )],
+                    deadline_monotonic=started + plan.budget.timeout_seconds,
+                    cancellation=cancellation,
                 ))
 
     if cancellation.cancelled:
@@ -431,35 +448,168 @@ def run_bounded_research(
 
 
 def _run_independent(
-    tasks: Mapping[str, Callable[[], ResearchStep]],
+    tasks: Sequence[SupervisedWork],
     *,
-    timeout_seconds: int,
+    deadline_monotonic: float,
     cancellation: ResearchCancellation,
-    started: float,
 ) -> list[ResearchStep]:
-    if not tasks:
-        return []
-    executor = ThreadPoolExecutor(max_workers=min(4, len(tasks)), thread_name_prefix="prm-research")
-    futures: dict[Future[ResearchStep], str] = {executor.submit(callback): name for name, callback in tasks.items()}
-    remaining = max(0.0, timeout_seconds - (monotonic() - started))
-    done, not_done = wait(futures, timeout=remaining)
-    results: list[ResearchStep] = []
-    for future in done:
-        name = futures[future]
-        try:
-            results.append(future.result())
-        except Exception as exc:  # a provider failure is data, not a retry loop
-            results.append(ResearchStep(name, "provider_failed", {"status": "provider_failed", "error_type": type(exc).__name__}))
-    for future in not_done:
-        future.cancel()
-        results.append(ResearchStep(futures[future], "time_budget_exhausted", {"status": "time_budget_exhausted"}))
-    # Do not wait past the declared research budget for a non-cooperative
-    # adapter. Its result is discarded; callers receive a partial checkpoint.
-    # A response must never return while an egress callback is still running.
-    # The transport's own bounded timeout remains the deadline for a
-    # cooperative adapter; an overrun is reported as partial, never detached.
-    executor.shutdown(wait=True, cancel_futures=True)
-    return sorted(results, key=lambda item: item.name)
+    """Run only supervised child callbacks; never leave one alive on return."""
+
+    results = run_supervised_work(
+        tasks,
+        deadline_monotonic=deadline_monotonic,
+        cancelled=lambda: cancellation.cancelled,
+    )
+    return sorted(
+        [item for item in results if type(item) is ResearchStep],
+        key=lambda item: item.name,
+    )
+
+
+def _archive_work(
+    name: str,
+    query: str,
+    reader: ArchiveResearchReader | None,
+    *,
+    limit: int,
+    cancellation: ResearchCancellation,
+) -> SupervisedWork:
+    return SupervisedWork(
+        name=name,
+        callback=lambda: _archive_step(name, query, reader, limit=limit, cancellation=cancellation),
+        fallback=lambda status: ResearchStep(name, status, {"status": status}),
+        # ArchiveResearchReader is the local-only PA-04 seam, not a provider
+        # adapter. Making this explicit keeps worker start default-deny.
+        preflight=lambda: None,
+    )
+
+
+def _public_work(
+    name: str,
+    task: PublicResearchTask,
+    *,
+    original_query: str,
+    provider: PublicWebProvider | None,
+    bounds: PublicWebBounds | None,
+    cancellation: ResearchCancellation,
+    cost_ledger: ResearchCostLedger,
+) -> SupervisedWork | ResearchStep:
+    """Prepare one public read without allowing a child to mint authority.
+
+    The tariff is observed and reserved in the parent before any child starts.
+    Parent preflight then consumes the exact one-use PA-02 slots before it
+    sends the child its start signal.  The child inherited the sealed snapshot
+    and repeats the normal PA-05 checks at the real transport call.
+    """
+
+    if provider is None or bounds is None:
+        _abandon_public_access(task.access)
+        return ResearchStep(name, "provider_unavailable", {"status": "provider_unavailable", "provider_called": False})
+    quote_provider = getattr(provider, "research_cost_quote", None)
+    try:
+        quote = quote_provider() if callable(quote_provider) else None
+    except Exception:
+        quote = None
+    cost_status = cost_ledger.reserve_and_consume(quote)
+    if cost_status != "allowed":
+        _abandon_public_access(task.access)
+        return ResearchStep(name, cost_status, {"status": cost_status, "provider_called": False})
+    return SupervisedWork(
+        name=name,
+        callback=lambda: _public_step(
+            name, task, original_query=original_query, provider=provider,
+            bounds=bounds, cancellation=cancellation,
+        ),
+        fallback=lambda status: ResearchStep(name, status, {"status": status}),
+        preflight=lambda: _preflight_public_access(name, task, bounds),
+    )
+
+
+def _github_work(
+    access: GitHubReadAccess,
+    provider: GitHubContextProvider | None,
+    *,
+    cancellation: ResearchCancellation,
+) -> SupervisedWork:
+    return SupervisedWork(
+        name="github_context",
+        callback=lambda: _github_step(access, provider, cancellation=cancellation),
+        fallback=lambda status: ResearchStep("github_context", status, {"status": status}),
+        preflight=lambda: _preflight_github_access(access, provider),
+    )
+
+
+def _preflight_public_access(
+    name: str,
+    task: PublicResearchTask,
+    bounds: PublicWebBounds | None,
+) -> ResearchStep | None:
+    """Consume every possible PA-05 egress slot before a worker can start.
+
+    Reserving all bounded fetch slots is intentionally conservative.  The
+    parent cannot observe which URLs the forked child will discover, so it
+    must not leave an extra parent-side slot usable after the child starts.
+    """
+
+    access = task.access
+    if type(access) is not PublicWebAccess or bounds is None:
+        _abandon_public_access(access)
+        return ResearchStep(name, "authorization_required", {"status": "authorization_required"})
+    try:
+        require_authorized_operation(
+            access.search_authorization,
+            capability="web.search",
+            operation="read",
+            provider_ref="provider_public_web",
+            data_class="public",
+            owner_ref=access.owner_ref,
+            connection_ref=access.connection_ref,
+            resource_ref=access.search_resource_ref,
+            purpose="public.search",
+        )
+        for decision in access.fetch_authorizations[:bounds.max_fetches]:
+            require_authorized_operation(
+                decision,
+                capability="web.fetch",
+                operation="read",
+                provider_ref="provider_public_web",
+                data_class="public",
+                owner_ref=access.owner_ref,
+                connection_ref=access.connection_ref,
+                resource_ref=access.fetch_resource_ref,
+                purpose="public.fetch",
+            )
+    except CapabilityDenied:
+        _abandon_public_access(access)
+        return ResearchStep(name, "authorization_required", {"status": "authorization_required"})
+    for decision in access.fetch_authorizations[bounds.max_fetches:]:
+        _abandon(decision)
+    return None
+
+
+def _preflight_github_access(
+    access: GitHubReadAccess,
+    provider: GitHubContextProvider | None,
+) -> ResearchStep | None:
+    if provider is None:
+        _abandon(access.authorization)
+        return ResearchStep("github_context", "provider_unavailable", {"status": "provider_unavailable"})
+    try:
+        require_authorized_operation(
+            access.authorization,
+            capability="github.repository_context",
+            operation="read",
+            provider_ref="provider_github",
+            data_class="public",
+            owner_ref=access.owner_ref,
+            connection_ref=access.connection_ref,
+            resource_ref=access.repository_ref,
+            purpose="project.context",
+        )
+    except CapabilityDenied:
+        _abandon(access.authorization)
+        return ResearchStep("github_context", "authorization_required", {"status": "authorization_required"})
+    return None
 
 
 def _archive_step(
@@ -490,15 +640,9 @@ def _public_step(
     provider: PublicWebProvider | None,
     bounds: PublicWebBounds | None,
     cancellation: ResearchCancellation,
-    cost_ledger: ResearchCostLedger,
 ) -> ResearchStep:
     if cancellation.cancelled:
         return ResearchStep(name, "cancelled_before_start", {"status": "cancelled_before_start"})
-    quote_provider = getattr(provider, "research_cost_quote", None)
-    quote = quote_provider() if callable(quote_provider) else None
-    cost_status = cost_ledger.reserve_and_consume(quote)
-    if cost_status != "allowed":
-        return ResearchStep(name, cost_status, {"status": cost_status, "provider_called": False})
     result = execute_public_web_research(
         public_query=task.public_query,
         original_query=original_query,
@@ -700,6 +844,13 @@ def _items(value: Mapping[str, Any] | object) -> list[Mapping[str, Any]]:
 def _abandon(decision: AuthorizationDecision) -> None:
     if decision.reservation is not None:
         decision.reservation.abandon_before_transport()
+
+
+def _abandon_public_access(access: object) -> None:
+    if type(access) is not PublicWebAccess:
+        return
+    for decision in (access.search_authorization, *access.fetch_authorizations):
+        _abandon(decision)
 
 
 def _fingerprint(query: str) -> str:

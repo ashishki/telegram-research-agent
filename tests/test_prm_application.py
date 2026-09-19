@@ -729,4 +729,9 @@ def test_active_deep_research_ingress_is_covered_by_focused_prm_tier():
 
     assert result.status == "complete"
     assert result.payload["research_result"]["status"] == "complete"
-    assert archive.calls == [("replayable fixture", 5)]
+    assert result.payload["research_result"]["facts"] == [{
+        "kind": "fact",
+        "source_kind": "archive",
+        "support_span": "A replayable fixture is direct archive evidence.",
+        "source_url": "https://t.me/example/deep",
+    }]
