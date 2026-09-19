@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
 import pytest
 
@@ -143,6 +144,45 @@ def test_provider_policy_rejects_non_boolean_fallback_allowed_fail_closed(malfor
 def test_authorization_request_rejects_non_boolean_is_fallback_fail_closed(malformed: object):
     with pytest.raises(ValueError, match="is_fallback must be boolean"):
         make_request(is_fallback=malformed)  # type: ignore[arg-type]
+
+
+def test_registry_rejects_a_crafted_policy_shape_before_authorization():
+    grant = make_grant()
+    object.__setattr__(
+        grant,
+        "provider_policy",
+        SimpleNamespace(
+            permitted_provider_refs=("provider_openai",),
+            fallback_allowed="false",
+            maximum_request_count=1,
+            egress_allowed=True,
+        ),
+    )
+
+    with pytest.raises(ValueError, match="provider_policy must be ProviderPolicy"):
+        CapabilityRegistry((grant,))
+
+
+@pytest.mark.parametrize("reserve", [False, True])
+def test_registry_rejects_crafted_or_mutated_request_before_any_decision(reserve: bool):
+    registry = CapabilityRegistry((make_grant(fallback_allowed=False),))
+    request = make_request(is_fallback=True)
+    object.__setattr__(request, "is_fallback", 0)
+
+    action = registry.authorize_and_reserve if reserve else registry.authorize
+    with pytest.raises(ValueError, match="is_fallback must be boolean"):
+        action(request, now=NOW)
+
+    shaped_request = SimpleNamespace(**{
+        field: getattr(make_request(), field)
+        for field in (
+            "owner_ref", "capability", "resource_ref", "operation", "data_class",
+            "provider_ref", "purpose", "connection_ref", "expected_grant_revision",
+            "grant_ref", "operation_ref", "is_fallback",
+        )
+    })
+    with pytest.raises(ValueError, match="request must be AuthorizationRequest"):
+        action(shaped_request, now=NOW)
 
 
 def test_budget_reservation_is_conservative_and_single_use_at_egress():

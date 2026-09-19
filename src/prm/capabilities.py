@@ -108,6 +108,14 @@ class CapabilityGrant:
     revoked_at: datetime | None = None
 
     def __post_init__(self) -> None:
+        # This is an enforcement-boundary object, not a structural protocol:
+        # a lookalike policy could otherwise carry truthy non-bool flags into
+        # the registry. Re-run the nested value validation as well because a
+        # frozen dataclass can still be corrupted by privileged object-level
+        # mutation before it reaches a registry.
+        if type(self.provider_policy) is not ProviderPolicy:
+            raise ValueError("provider_policy must be ProviderPolicy")
+        self.provider_policy.__post_init__()
         for name, value in (("grant_id", self.grant_id), ("owner_ref", self.owner_ref), ("purpose", self.purpose)):
             if not _is_opaque_ref(value):
                 raise ValueError(f"invalid {name}")
@@ -582,6 +590,9 @@ class CapabilityRegistry:
     """
 
     def __init__(self, grants: Sequence[CapabilityGrant]) -> None:
+        grants = tuple(grants)
+        for grant in grants:
+            _validate_capability_grant(grant)
         self._grants_by_id = {grant.grant_id: grant for grant in grants}
         self._reserved_counts: dict[tuple[str, int], int] = {}
         self._operation_groups: dict[str, _OperationGroup] = {}
@@ -593,6 +604,7 @@ class CapabilityRegistry:
     def replace_grant(self, grant: CapabilityGrant) -> None:
         """Atomically publish a strictly newer revision of an existing grant."""
 
+        _validate_capability_grant(grant)
         with self._lock:
             current = self._grants_by_id.get(grant.grant_id)
             if current is None:
@@ -826,6 +838,7 @@ class CapabilityRegistry:
                     del self._operation_groups[operation_ref]
 
     def _authorize_unlocked(self, request: AuthorizationRequest, *, moment: datetime) -> AuthorizationDecision:
+        _validate_authorization_request(request)
         candidates = [grant for grant in self._grants_by_id.values() if grant.owner_ref == request.owner_ref]
         if request.grant_ref is not None:
             candidates = [grant for grant in candidates if grant.grant_id == request.grant_ref]
@@ -1090,6 +1103,22 @@ def _utc(value: datetime) -> datetime:
 
 def _is_opaque_ref(value: object) -> bool:
     return isinstance(value, str) and bool(_OPAQUE_REF.fullmatch(value))
+
+
+def _validate_capability_grant(grant: CapabilityGrant) -> None:
+    """Reject lookalike or bypass-mutated grants at the registry ingress."""
+
+    if type(grant) is not CapabilityGrant:
+        raise ValueError("grant must be CapabilityGrant")
+    grant.__post_init__()
+
+
+def _validate_authorization_request(request: AuthorizationRequest) -> None:
+    """Reject lookalike or bypass-mutated requests before policy evaluation."""
+
+    if type(request) is not AuthorizationRequest:
+        raise ValueError("request must be AuthorizationRequest")
+    request.__post_init__()
 
 
 def _operation_state_denial(state: Literal["reserved", "committed", "accepted", "unknown"]) -> str:
