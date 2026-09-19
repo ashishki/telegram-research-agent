@@ -221,6 +221,28 @@ def test_expanded_telegram_brief_uses_user_language_not_internal_audit_fields() 
     assert "История:" not in rendered
 
 
+def test_telegram_card_does_not_promote_an_unranked_archive_feed() -> None:
+    document = build_brief_document(
+        BriefBuildRequest(
+            topic="AI за неделю",
+            window=_window(),
+            coverage=(CoverageSource("telegram:archive", "partial"),),
+            evidence=(
+                _evidence(
+                    "unranked-card", "https://t.me/example/unranked-card", title="Unranked item",
+                    summary="A local archive excerpt.", importance="unknown", urgent=None,
+                ),
+            ),
+        )
+    )
+
+    rendered = render_brief_document(document)
+
+    assert "нет оценённых приоритетов" in rendered
+    assert "Unranked item" not in rendered
+    assert "Не называю случайные архивные материалы «главным»." in rendered
+
+
 def test_invalid_or_unselected_local_evidence_cannot_become_a_brief_source() -> None:
     document = build_brief_document(
         BriefBuildRequest(

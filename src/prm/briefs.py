@@ -2095,10 +2095,23 @@ def _render_telegram_card(document: BriefDocument, items: Sequence[BriefItem]) -
         lines.extend(("", _telegram_card_coverage_line(document), "Открой полный бриф: там период, покрытие и основания отбора."))
         return "\n".join(lines)
 
+    featured = tuple(item for item in items if _telegram_featured_item(item))
+    if not featured:
+        lines.extend(
+            (
+                "",
+                "⚪ <b>В доступной выборке нет оценённых приоритетов.</b>",
+                "Не называю случайные архивные материалы «главным».",
+                _telegram_card_coverage_line(document),
+                f"<i>Открой «{BRIEF_FULL_VIEW_BUTTON_TEXT}», чтобы посмотреть тематическую подборку и источники.</i>",
+            )
+        )
+        return "\n".join(lines)
+
     evidence = document.evidence_by_ref()
     shown = 0
     for section in document.sections:
-        contained = [item for item in section.items if item in items]
+        contained = [item for item in section.items if item in featured]
         if not contained:
             continue
         section_added = False
@@ -2130,6 +2143,12 @@ def _render_telegram_card(document: BriefDocument, items: Sequence[BriefItem]) -
         f"<i>Открой «{BRIEF_FULL_VIEW_BUTTON_TEXT}»: все источники, детали периода и покрытие.</i>"
     )
     return "\n".join(lines)
+
+
+def _telegram_featured_item(item: BriefItem) -> bool:
+    """Reserve the two mobile slots for a real priority or source-bound project link."""
+
+    return item.importance != "unknown" or item.urgency != "unknown" or bool(item.project_refs)
 
 
 def _render_telegram_full_card(document: BriefDocument) -> str:
@@ -2236,6 +2255,8 @@ def _telegram_human_time_label(source: BriefEvidence) -> str:
         "deleted_in_window": "Источник удалён в выбранный период",
         "reissued_in_window": "Источник переиздан в выбранный период",
     }[source.period_relation]
+    if source.source_state == "active":
+        return f"{relation}."
     state = {
         "active": "актуальное состояние источника",
         "stale": "источник помечен как устаревший",
