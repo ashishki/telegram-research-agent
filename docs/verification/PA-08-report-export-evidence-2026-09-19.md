@@ -119,6 +119,20 @@ and confirmed an unchanged workspace.
   SHA-256: `0361875d4e05e63e2aefbaf237e5d3f189b74ae339163f91c2b093e4799c0918`;
   runner-result SHA-256:
   `269ed680aa021b76e1167433a28ff75d1db42db9ff3dcc7ba16432b050a5d4b6`.
+- `20260919T190129Z-slice_review-d7b8c8bc` independently rechecked
+  `e3504e2908b850ce0531350e7603d190e44626da` against `31a9a92` after the
+  final direct-test receipt. The validated, read-only Terra/high runner
+  observed the requested `gpt-5.6-terra` / `high`, exit code 0 and no workspace
+  changes; verdict: `ADVISORY`, no P0/P1. Report SHA-256:
+  `240d8438a4d44dfe9d97eb2dcbb75583212305a00863397c389aaafe6cf345f4`;
+  runner-result SHA-256:
+  `a41d6f0de859db7ac93945a36352b2f367372bd8560456b502fd483debcbcec4`.
+  Its three non-blocking advisories retain the external visual gate, future
+  HTTP transport enforcement, and fuller PDF-equivalence extraction coverage.
+  The first two are out of PA-08's authorised local boundary; the last is a
+  future test-depth improvement, while the current focused tests already prove
+  immutable identity, selected editorial facts, all source links, exact digest
+  rebinding and ordered fallback page footers.
 
 A separate fresh read-only Test Critic process was requested as
 `gpt-5.6-terra` / `high` for `31a9a92..0fffff8`. Its final report did not emit
