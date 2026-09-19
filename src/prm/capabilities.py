@@ -590,9 +590,7 @@ class CapabilityRegistry:
     """
 
     def __init__(self, grants: Sequence[CapabilityGrant]) -> None:
-        grants = tuple(grants)
-        for grant in grants:
-            _validate_capability_grant(grant)
+        grants = tuple(_seal_capability_grant(grant) for grant in grants)
         self._grants_by_id = {grant.grant_id: grant for grant in grants}
         self._reserved_counts: dict[tuple[str, int], int] = {}
         self._operation_groups: dict[str, _OperationGroup] = {}
@@ -604,7 +602,7 @@ class CapabilityRegistry:
     def replace_grant(self, grant: CapabilityGrant) -> None:
         """Atomically publish a strictly newer revision of an existing grant."""
 
-        _validate_capability_grant(grant)
+        grant = _seal_capability_grant(grant)
         with self._lock:
             current = self._grants_by_id.get(grant.grant_id)
             if current is None:
@@ -649,6 +647,7 @@ class CapabilityRegistry:
         unknown outcome. Automatic retries are not authorized by this method.
         """
 
+        request = _seal_authorization_request(request)
         with self._lock:
             decision = self._authorize_unlocked(request, moment=_utc(now or datetime.now(timezone.utc)))
             if not decision.allowed or decision.grant_ref is None or decision.grant_revision is None:
@@ -731,6 +730,7 @@ class CapabilityRegistry:
             return True
 
     def authorize(self, request: AuthorizationRequest, *, now: datetime | None = None) -> AuthorizationDecision:
+        request = _seal_authorization_request(request)
         with self._lock:
             return self._authorize_unlocked(request, moment=_utc(now or datetime.now(timezone.utc)))
 
@@ -1113,12 +1113,59 @@ def _validate_capability_grant(grant: CapabilityGrant) -> None:
     grant.__post_init__()
 
 
+def _seal_capability_grant(grant: CapabilityGrant) -> CapabilityGrant:
+    """Copy a validated grant so caller-held objects cannot change registry state."""
+
+    _validate_capability_grant(grant)
+    policy = grant.provider_policy
+    return CapabilityGrant(
+        grant_id=grant.grant_id,
+        owner_ref=grant.owner_ref,
+        connection_ref=grant.connection_ref,
+        capability=grant.capability,
+        resource_refs=tuple(grant.resource_refs),
+        operations=tuple(grant.operations),
+        data_classes=tuple(grant.data_classes),
+        purpose=grant.purpose,
+        provider_policy=ProviderPolicy(
+            tuple(policy.permitted_provider_refs),
+            fallback_allowed=policy.fallback_allowed,
+            maximum_request_count=policy.maximum_request_count,
+            egress_allowed=policy.egress_allowed,
+        ),
+        issued_at=grant.issued_at,
+        expires_at=grant.expires_at,
+        revision=grant.revision,
+        revoked_at=grant.revoked_at,
+    )
+
+
 def _validate_authorization_request(request: AuthorizationRequest) -> None:
     """Reject lookalike or bypass-mutated requests before policy evaluation."""
 
     if type(request) is not AuthorizationRequest:
         raise ValueError("request must be AuthorizationRequest")
     request.__post_init__()
+
+
+def _seal_authorization_request(request: AuthorizationRequest) -> AuthorizationRequest:
+    """Copy a validated request before a decision or reservation can retain it."""
+
+    _validate_authorization_request(request)
+    return AuthorizationRequest(
+        owner_ref=request.owner_ref,
+        capability=request.capability,
+        resource_ref=request.resource_ref,
+        operation=request.operation,
+        data_class=request.data_class,
+        provider_ref=request.provider_ref,
+        purpose=request.purpose,
+        connection_ref=request.connection_ref,
+        expected_grant_revision=request.expected_grant_revision,
+        grant_ref=request.grant_ref,
+        operation_ref=request.operation_ref,
+        is_fallback=request.is_fallback,
+    )
 
 
 def _operation_state_denial(state: Literal["reserved", "committed", "accepted", "unknown"]) -> str:

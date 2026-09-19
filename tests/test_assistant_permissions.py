@@ -163,6 +163,34 @@ def test_registry_rejects_a_crafted_policy_shape_before_authorization():
         CapabilityRegistry((grant,))
 
 
+@pytest.mark.parametrize("replace_registered_grant", [False, True])
+def test_registry_seals_registered_policy_against_post_registration_mutation(replace_registered_grant: bool):
+    initial = make_grant(revision=3, fallback_allowed=False)
+    registry = CapabilityRegistry((initial,))
+    registered = initial
+    if replace_registered_grant:
+        registered = make_grant(revision=4, fallback_allowed=False)
+        registry.replace_grant(registered)
+
+    object.__setattr__(
+        registered,
+        "provider_policy",
+        SimpleNamespace(
+            permitted_provider_refs=("provider_openai",),
+            fallback_allowed="false",
+            maximum_request_count=1,
+            egress_allowed=True,
+        ),
+    )
+    denied = registry.authorize(
+        make_request(expected_revision=registered.revision, is_fallback=True),
+        now=NOW,
+    )
+
+    assert denied.allowed is False
+    assert denied.reason == "fallback_not_granted"
+
+
 @pytest.mark.parametrize("reserve", [False, True])
 def test_registry_rejects_crafted_or_mutated_request_before_any_decision(reserve: bool):
     registry = CapabilityRegistry((make_grant(fallback_allowed=False),))
@@ -183,6 +211,17 @@ def test_registry_rejects_crafted_or_mutated_request_before_any_decision(reserve
     })
     with pytest.raises(ValueError, match="request must be AuthorizationRequest"):
         action(shaped_request, now=NOW)
+
+
+def test_registry_reservation_seals_a_valid_request_against_later_caller_mutation():
+    registry = CapabilityRegistry((make_grant(),))
+    request = make_request()
+    decision = registry.authorize_and_reserve(request, now=NOW)
+    assert decision.allowed is True and decision.reservation is not None
+
+    object.__setattr__(request, "resource_ref", "resource_other")
+
+    assert decision.reservation.current is True
 
 
 def test_budget_reservation_is_conservative_and_single_use_at_egress():
