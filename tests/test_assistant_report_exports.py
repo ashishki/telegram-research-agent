@@ -163,8 +163,7 @@ def test_fallback_pdf_numbers_every_page_of_a_multi_page_report(monkeypatch) -> 
     assert labels
     total = int(labels[0][1])
     assert total > 1
-    assert ("1", str(total)) in labels
-    assert (str(total), str(total)) in labels
+    assert labels == [(str(number), str(total)) for number in range(1, total + 1)]
     assert document.evidence[-1].source_ref in extracted
 
 

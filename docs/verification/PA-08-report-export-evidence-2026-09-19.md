@@ -66,8 +66,8 @@ with exit code 0:
   tests/test_assistant_report_exports.py tests/test_assistant_report_access.py`:
   **6 passed in 7.16s**. This is the task's direct command. It covers immutable
   cross-format identity/citations, Cyrillic and long URLs, sanitization,
-  source-link annotations, forced fallback PDF, multiple fallback pages and
-  exact owner/version/digest/expiry/restart denial.
+  source-link annotations, forced fallback PDF, every ordered footer of a
+  multiple-page fallback, and exact owner/version/digest/expiry/restart denial.
 - `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q
   tests/test_assistant_report_exports.py tests/test_assistant_report_access.py
   tests/test_assistant_briefs.py tests/test_assistant_report_dialogue.py`:
