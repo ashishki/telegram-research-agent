@@ -218,6 +218,7 @@ def test_expanded_telegram_brief_uses_user_language_not_internal_audit_fields() 
     assert '<a href="https://t.me/example/unranked-one">Открыть источник</a>' in rendered
     assert "снимок sha256" not in rendered
     assert document.brief_id not in rendered
+    assert "История:" not in rendered
 
 
 def test_invalid_or_unselected_local_evidence_cannot_become_a_brief_source() -> None:

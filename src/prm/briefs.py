@@ -2127,7 +2127,7 @@ def _render_telegram_card(document: BriefDocument, items: Sequence[BriefItem]) -
     if omitted:
         lines.append(f"Ещё {_telegram_item_count(omitted)} — в полном брифе.")
     lines.append(
-        f"<i>Открой «{BRIEF_FULL_VIEW_BUTTON_TEXT}»: все источники, детали периода, отбор и версия.</i>"
+        f"<i>Открой «{BRIEF_FULL_VIEW_BUTTON_TEXT}»: все источники, детали периода и покрытие.</i>"
     )
     return "\n".join(lines)
 
@@ -2182,10 +2182,6 @@ def _render_telegram_full_card(document: BriefDocument) -> str:
     lines.extend(("", _telegram_card_coverage_line(document)))
     if document.deduplication:
         lines.append(f"Повторы: исключено {len(document.deduplication)} по совпадающему источнику.")
-    if document.previous_version is None:
-        lines.append("История: первая версия этого брифа.")
-    else:
-        lines.append(f"История: версия {document.version}; обновлена из той же выбранной базы.")
     lines.append("<i>Спроси «объясни пункт 2», «сделай короче» или «только &lt;тема&gt;».</i>")
     return "\n".join(lines)
 
