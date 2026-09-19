@@ -39,6 +39,11 @@ _CONTENT_DIGEST = re.compile(r"^sha256:[a-f0-9]{64}$")
 _COVERAGE_STATES = frozenset({"checked", "excluded", "unavailable", "stale", "partial"})
 _IMPORTANCE = frozenset({"critical", "high", "medium", "low", "unknown"})
 _URGENCY = frozenset({"urgent", "soon", "not_marked", "unknown"})
+_SOURCE_STATES = frozenset({"active", "stale", "deleted", "reissued", "unknown"})
+_PERIOD_RELATIONS = frozenset({
+    "event_in_window", "published_in_window", "first_discovered_in_window",
+    "updated_in_window", "deleted_in_window", "reissued_in_window",
+})
 
 
 def _clean(value: object, limit: int, *, required: bool = False) -> str | None:
@@ -182,14 +187,24 @@ class BriefEvidence:
     title: str
     summary: str
     observed_at: datetime
-    time_kind: Literal["published", "event", "updated"]
+    time_kind: Literal["published", "event", "discovered", "updated", "deleted", "reissued"]
     topics: tuple[str, ...]
     importance: Literal["critical", "high", "medium", "low", "unknown"]
     urgency: Literal["urgent", "soon", "not_marked", "unknown"]
     selection_reasons: tuple[str, ...]
+    factual_snapshot_digest: str
     project_refs: tuple[str, ...] = ()
     conflict_group: str | None = None
     conflict_value: str | None = None
+    published_at: datetime | None = None
+    event_at: datetime | None = None
+    first_discovered_at: datetime | None = None
+    updated_at: datetime | None = None
+    deleted_at: datetime | None = None
+    reissued_at: datetime | None = None
+    source_state: str = "unknown"
+    period_relation: str = "published_in_window"
+    source_version: str = ""
 
     def __post_init__(self) -> None:
         if (
@@ -200,8 +215,24 @@ class BriefEvidence:
             raise ValueError("brief evidence identity is invalid")
         if _clean(self.title, 240, required=True) is None or _clean(self.summary, 400, required=True) is None:
             raise ValueError("brief evidence text is invalid")
-        if self.observed_at.tzinfo is None or self.time_kind not in {"published", "event", "updated"}:
+        if self.observed_at.tzinfo is None or self.time_kind not in {"published", "event", "discovered", "updated", "deleted", "reissued"}:
             raise ValueError("brief evidence time is invalid")
+        if any(
+            item is not None and item.tzinfo is None
+            for item in (
+                self.published_at,
+                self.event_at,
+                self.first_discovered_at,
+                self.updated_at,
+                self.deleted_at,
+                self.reissued_at,
+            )
+        ):
+            raise ValueError("brief evidence provenance time is invalid")
+        if self.source_state not in _SOURCE_STATES or self.period_relation not in _PERIOD_RELATIONS:
+            raise ValueError("brief evidence source state is invalid")
+        if _clean(self.source_version, 120) is None or not _CONTENT_DIGEST.fullmatch(self.factual_snapshot_digest):
+            raise ValueError("brief evidence factual identity is invalid")
         if (
             not self.topics
             or len(self.topics) > 8
@@ -449,6 +480,16 @@ class BriefDocument:
                     "source_ref": item.source_ref,
                     "observed_at": _iso(item.observed_at),
                     "time_kind": item.time_kind,
+                    "period_relation": item.period_relation,
+                    "published_at": _iso(item.published_at) if item.published_at is not None else None,
+                    "event_at": _iso(item.event_at) if item.event_at is not None else None,
+                    "first_discovered_at": _iso(item.first_discovered_at) if item.first_discovered_at is not None else None,
+                    "updated_at": _iso(item.updated_at) if item.updated_at is not None else None,
+                    "deleted_at": _iso(item.deleted_at) if item.deleted_at is not None else None,
+                    "reissued_at": _iso(item.reissued_at) if item.reissued_at is not None else None,
+                    "source_state": item.source_state,
+                    "source_version": item.source_version or None,
+                    "factual_snapshot_digest": item.factual_snapshot_digest,
                     "topics": list(item.topics),
                 }
                 for item in self.evidence
@@ -851,7 +892,6 @@ def rebuild_brief_request(document: BriefDocument) -> BriefBuildRequest:
 
     raw_items: list[dict[str, object]] = []
     for item in document.evidence:
-        timestamp_key = {"published": "published_at", "event": "event_at", "updated": "updated_at"}[item.time_kind]
         raw_items.append(
             {
                 "local_archive_provenance": True,
@@ -860,7 +900,14 @@ def rebuild_brief_request(document: BriefDocument) -> BriefBuildRequest:
                 "repost_family_id": item.source_family_ref,
                 "title": item.title,
                 "support_span": item.summary,
-                timestamp_key: _iso(item.observed_at),
+                "published_at": _iso(item.published_at) if item.published_at is not None else None,
+                "event_at": _iso(item.event_at) if item.event_at is not None else None,
+                "first_discovered_at": _iso(item.first_discovered_at) if item.first_discovered_at is not None else None,
+                "updated_at": _iso(item.updated_at) if item.updated_at is not None else None,
+                "deleted_at": _iso(item.deleted_at) if item.deleted_at is not None else None,
+                "reissued_at": _iso(item.reissued_at) if item.reissued_at is not None else None,
+                "source_state": item.source_state,
+                "source_version": item.source_version,
                 "topics": item.topics,
                 "importance": item.importance,
                 "urgency": item.urgency,
@@ -895,21 +942,29 @@ def _local_archive_evidence(
     invalid = undated = outside = 0
     for raw in raw_items:
         try:
-            evidence = _evidence_from_mapping(raw, timezone_name=window.timezone)
-        except ValueError:
-            invalid += 1
-            continue
-        if evidence.observed_at is None:  # pragma: no cover - construction is guarded
+            evidence = _evidence_from_mapping(raw, window=window)
+        except _UndatedLocalEvidence:
             undated += 1
             continue
-        if not window.contains(evidence.observed_at):
+        except _OutsideBriefWindow:
             outside += 1
+            continue
+        except ValueError:
+            invalid += 1
             continue
         selected.append(evidence)
     return tuple(selected), invalid, undated, outside
 
 
-def _evidence_from_mapping(raw: Mapping[str, Any], *, timezone_name: str) -> BriefEvidence:
+class _UndatedLocalEvidence(ValueError):
+    pass
+
+
+class _OutsideBriefWindow(ValueError):
+    pass
+
+
+def _evidence_from_mapping(raw: Mapping[str, Any], *, window: BriefWindow) -> BriefEvidence:
     if raw.get("local_archive_provenance") is not True:
         raise ValueError("brief source lacks local archive provenance")
     identity = _clean(
@@ -929,9 +984,7 @@ def _evidence_from_mapping(raw: Mapping[str, Any], *, timezone_name: str) -> Bri
     )
     if family_ref is None:
         raise ValueError("brief local archive source family is invalid")
-    timestamp, time_kind = _source_time(raw, timezone_name=timezone_name)
-    if timestamp is None:
-        raise ValueError("brief local archive source has no usable event time")
+    provenance = _source_provenance(raw, window=window)
     topics = _topics(raw)
     project_refs = _projects(raw)
     importance = _importance(raw)
@@ -944,30 +997,159 @@ def _evidence_from_mapping(raw: Mapping[str, Any], *, timezone_name: str) -> Bri
         reasons.append(f"change_{change.casefold().replace('-', '_')}")
     if project_refs:
         reasons.append("project_source_binding")
+    reasons.extend((provenance[2], f"source_{provenance[9]}"))
+    snapshot = _factual_snapshot_digest(
+        source_ref=source_ref,
+        title=title,
+        summary=summary,
+        observed_at=provenance[0],
+        time_kind=provenance[1],
+        published_at=provenance[3],
+        event_at=provenance[4],
+        first_discovered_at=provenance[5],
+        updated_at=provenance[6],
+        deleted_at=provenance[7],
+        reissued_at=provenance[8],
+        source_state=provenance[9],
+        source_version=provenance[10],
+        importance=importance,
+        urgency=urgency,
+        conflict_group=_clean(raw.get("conflict_group"), 120, required=True),
+        conflict_value=_clean(raw.get("conflict_value"), 240, required=True),
+    )
     return BriefEvidence(
         evidence_ref=identity if _EVIDENCE_REF.fullmatch(identity) else "evidence_" + _slug(identity, fallback=source_ref),
         source_ref=source_ref,
         source_family_ref=family_ref,
         title=title,
         summary=summary,
-        observed_at=timestamp,
-        time_kind=time_kind,
+        observed_at=provenance[0],
+        time_kind=provenance[1],
         topics=topics,
         importance=importance,
         urgency=urgency,
         selection_reasons=tuple(dict.fromkeys(reasons)),
+        factual_snapshot_digest=snapshot,
         project_refs=project_refs,
         conflict_group=_clean(raw.get("conflict_group"), 120, required=True),
         conflict_value=_clean(raw.get("conflict_value"), 240, required=True),
+        published_at=provenance[3],
+        event_at=provenance[4],
+        first_discovered_at=provenance[5],
+        updated_at=provenance[6],
+        deleted_at=provenance[7],
+        reissued_at=provenance[8],
+        source_state=provenance[9],
+        period_relation=provenance[2],
+        source_version=provenance[10],
     )
 
 
-def _source_time(raw: Mapping[str, Any], *, timezone_name: str) -> tuple[datetime | None, Literal["published", "event", "updated"]]:
-    for key, kind in (("event_at", "event"), ("published_at", "published"), ("posted_at", "published"), ("updated_at", "updated")):
-        parsed = _parse_timestamp(raw.get(key), timezone_name=timezone_name)
-        if parsed is not None:
-            return parsed, kind
-    return None, "published"
+def _source_provenance(
+    raw: Mapping[str, Any],
+    *,
+    window: BriefWindow,
+) -> tuple[
+    datetime,
+    Literal["published", "event", "discovered", "updated", "deleted", "reissued"],
+    str,
+    datetime | None,
+    datetime | None,
+    datetime | None,
+    datetime | None,
+    datetime | None,
+    datetime | None,
+    str,
+    str,
+]:
+    """Keep all source clocks rather than relabelling late discovery as news."""
+
+    zone = window.timezone
+    published = _parse_timestamp(raw.get("published_at") or raw.get("posted_at"), timezone_name=zone)
+    event = _parse_timestamp(raw.get("event_at"), timezone_name=zone)
+    discovered = _parse_timestamp(raw.get("first_discovered_at") or raw.get("first_seen_at"), timezone_name=zone)
+    updated = _parse_timestamp(raw.get("updated_at"), timezone_name=zone)
+    deleted = _parse_timestamp(raw.get("deleted_at"), timezone_name=zone)
+    reissued = _parse_timestamp(raw.get("reissued_at"), timezone_name=zone)
+    state = _source_state(raw, deleted_at=deleted, reissued_at=reissued)
+    candidates: tuple[tuple[str, datetime | None, str], ...] = (
+        ("deleted", deleted, "deleted_in_window"),
+        ("reissued", reissued or updated, "reissued_in_window"),
+        ("event", event, "event_in_window"),
+        ("published", published, "published_in_window"),
+        ("discovered", discovered, "first_discovered_in_window"),
+        ("updated", updated, "updated_in_window"),
+    )
+    if not any(value is not None for _kind, value, _relation in candidates):
+        raise _UndatedLocalEvidence("brief local archive source has no usable temporal provenance")
+    for kind, moment, relation in candidates:
+        if moment is not None and window.contains(moment):
+            return moment, kind, relation, published, event, discovered, updated, deleted, reissued, state, _source_version(raw)
+    raise _OutsideBriefWindow("brief local archive source is outside the requested half-open window")
+
+
+def _source_state(raw: Mapping[str, Any], *, deleted_at: datetime | None, reissued_at: datetime | None) -> str:
+    explicit = str(raw.get("source_state") or raw.get("status") or "").casefold()
+    freshness = str(raw.get("freshness_status") or "").casefold()
+    change = str(raw.get("change_type") or "").casefold()
+    if deleted_at is not None or explicit in {"deleted", "removed"} or raw.get("deleted") is True:
+        return "deleted"
+    if reissued_at is not None or explicit == "reissued" or change == "reissued" or raw.get("reissued") is True:
+        return "reissued"
+    if explicit == "stale" or freshness == "stale":
+        return "stale"
+    return "active" if explicit or freshness or change or raw.get("local_archive_provenance") is True else "unknown"
+
+
+def _source_version(raw: Mapping[str, Any]) -> str:
+    return _clean(
+        raw.get("source_version") or raw.get("material_hash") or raw.get("fingerprint") or raw.get("content_hash"),
+        120,
+    ) or ""
+
+
+def _factual_snapshot_digest(
+    *,
+    source_ref: str,
+    title: str,
+    summary: str,
+    observed_at: datetime,
+    time_kind: str,
+    published_at: datetime | None,
+    event_at: datetime | None,
+    first_discovered_at: datetime | None,
+    updated_at: datetime | None,
+    deleted_at: datetime | None,
+    reissued_at: datetime | None,
+    source_state: str,
+    source_version: str,
+    importance: str,
+    urgency: str,
+    conflict_group: str | None,
+    conflict_value: str | None,
+) -> str:
+    payload = {
+        "source_ref": source_ref,
+        "title": title,
+        "summary": summary,
+        "observed_at": _iso(observed_at),
+        "time_kind": time_kind,
+        "published_at": _iso(published_at) if published_at is not None else None,
+        "event_at": _iso(event_at) if event_at is not None else None,
+        "first_discovered_at": _iso(first_discovered_at) if first_discovered_at is not None else None,
+        "updated_at": _iso(updated_at) if updated_at is not None else None,
+        "deleted_at": _iso(deleted_at) if deleted_at is not None else None,
+        "reissued_at": _iso(reissued_at) if reissued_at is not None else None,
+        "source_state": source_state,
+        "source_version": source_version,
+        "importance": importance,
+        "urgency": urgency,
+        "conflict_group": conflict_group,
+        "conflict_value": conflict_value,
+    }
+    return "sha256:" + hashlib.sha256(
+        json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+    ).hexdigest()
 
 
 def _topics(raw: Mapping[str, Any]) -> tuple[str, ...]:
@@ -1107,6 +1289,16 @@ def _content_digest(
                 "summary": item.summary,
                 "observed_at": _iso(item.observed_at),
                 "time_kind": item.time_kind,
+                "published_at": _iso(item.published_at) if item.published_at is not None else None,
+                "event_at": _iso(item.event_at) if item.event_at is not None else None,
+                "first_discovered_at": _iso(item.first_discovered_at) if item.first_discovered_at is not None else None,
+                "updated_at": _iso(item.updated_at) if item.updated_at is not None else None,
+                "deleted_at": _iso(item.deleted_at) if item.deleted_at is not None else None,
+                "reissued_at": _iso(item.reissued_at) if item.reissued_at is not None else None,
+                "source_state": item.source_state,
+                "period_relation": item.period_relation,
+                "source_version": item.source_version,
+                "factual_snapshot_digest": item.factual_snapshot_digest,
                 "topics": item.topics,
                 "importance": item.importance,
                 "urgency": item.urgency,
@@ -1257,6 +1449,7 @@ def _render_telegram(
                 source = evidence[item.evidence_refs[0]]
                 source_ref = source.source_ref if full else _telegram_source_label(source.source_ref, item.evidence_refs[0])
                 section_lines.append(f"   Источник: {source_ref}")
+                section_lines.append(f"   В периоде: {_temporal_label(source)}")
             if item.conflict_groups:
                 section_lines.append("   ⚠ В источниках есть неразрешённое расхождение.")
             if short and index >= 3:
@@ -1289,6 +1482,7 @@ def _render_item(document: BriefDocument, item_number: int | None) -> str:
         f"Важность: {item.importance}; срочность: {item.urgency}.",
         "Основания отбора: " + ", ".join(item.selection_reasons),
         f"Источник: {source.source_ref}",
+        f"Временная связь с периодом: {_temporal_label(source)}.",
         f"Версия BriefDocument: {document.brief_id} v{document.version}",
     ]
     if item.conflict_groups:
@@ -1339,7 +1533,7 @@ def _render_comparison(current: BriefDocument, previous: BriefDocument | None) -
     removed = [item for key, item in prior_by_source.items() if key not in current_by_source]
     changed = [
         item for key, item in current_by_source.items()
-        if key in prior_by_source and item.summary != prior_by_source[key].summary
+        if key in prior_by_source and item.factual_snapshot_digest != prior_by_source[key].factual_snapshot_digest
     ]
     lines = [
         f"Сравнение: { _period_label(current.window) } ↔ { _period_label(previous.window) }",
@@ -1368,6 +1562,26 @@ def _period_label(window: BriefWindow) -> str:
     start = window.start_at.astimezone(zone).strftime("%d.%m %H:%M")
     end = window.end_at.astimezone(zone).strftime("%d.%m %H:%M")
     return f"[{start}, {end})"
+
+
+def _temporal_label(item: BriefEvidence) -> str:
+    relation = {
+        "event_in_window": "событие в периоде",
+        "published_in_window": "публикация в периоде",
+        "first_discovered_in_window": "впервые обнаружен в периоде (публикация могла быть раньше)",
+        "updated_in_window": "обновлён в периоде",
+        "deleted_in_window": "удалён в периоде",
+        "reissued_in_window": "переиздан в периоде",
+    }[item.period_relation]
+    state = {
+        "active": "актуальное состояние источника",
+        "stale": "источник помечен как устаревший",
+        "deleted": "источник удалён",
+        "reissued": "источник переиздан",
+        "unknown": "состояние источника не указано",
+    }[item.source_state]
+    version = f"; снимок {item.source_version}" if item.source_version else ""
+    return f"{relation}; {state}{version}"
 
 
 def _priority_label(item: BriefItem) -> str:

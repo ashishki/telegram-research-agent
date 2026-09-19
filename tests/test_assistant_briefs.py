@@ -12,6 +12,7 @@ from prm.briefs import (
     BriefWindow,
     CoverageSource,
     build_brief_document,
+    rebuild_brief_request,
     render_brief,
     render_brief_document,
 )
@@ -42,8 +43,9 @@ def _evidence(
     conflict_value: str | None = None,
     repost_family_id: str | None = None,
     project_refs: tuple[str, ...] = (),
+    **temporal_metadata: object,
 ) -> dict[str, object]:
-    return {
+    evidence: dict[str, object] = {
         "local_archive_provenance": True,
         "evidence_id": identifier,
         "source_url": source,
@@ -59,6 +61,8 @@ def _evidence(
         "project_refs": project_refs,
         "project_binding_provenance": "source" if project_refs else "",
     }
+    evidence.update(temporal_metadata)
+    return evidence
 
 
 def test_brief_document_is_versioned_inspectable_and_dst_half_open() -> None:
@@ -327,3 +331,89 @@ def test_new_period_or_topic_is_comparison_not_a_version_increment() -> None:
     assert next_report.brief_id != first.brief_id
     assert next_report.previous_version is None
     assert next_report.comparison_ref == first.version_ref
+
+
+def test_brief_preserves_local_archive_temporal_provenance_and_source_state() -> None:
+    document = build_brief_document(
+        BriefBuildRequest(
+            topic="AI",
+            window=_window(),
+            coverage=(CoverageSource("telegram:archive", "checked"),),
+            evidence=(
+                _evidence(
+                    "delayed", "https://t.me/example/delayed", title="Delayed discovery", summary="An older post entered the archive now.",
+                    posted_at="2026-10-20T10:00:00+02:00", first_discovered_at="2026-10-25T02:30:00+02:00",
+                    source_version="archive-v2",
+                ),
+                _evidence(
+                    "stale", "https://t.me/example/stale", title="Stale source", summary="The retained archive material is stale.",
+                    freshness_status="stale",
+                ),
+                _evidence(
+                    "deleted", "https://t.me/example/deleted", title="Deleted source", summary="An older material was removed.",
+                    posted_at="2026-10-20T10:00:00+02:00", deleted_at="2026-10-25T11:00:00+02:00",
+                ),
+                _evidence(
+                    "reissued", "https://t.me/example/reissued", title="Reissued source", summary="An older material was reissued.",
+                    posted_at="2026-10-20T10:00:00+02:00", reissued_at="2026-10-25T12:00:00+02:00",
+                ),
+            ),
+        )
+    )
+
+    evidence = {item["evidence_ref"]: item for item in document.inspect()["evidence"]}
+    assert evidence["evidence_delayed"]["time_kind"] == "discovered"
+    assert evidence["evidence_delayed"]["period_relation"] == "first_discovered_in_window"
+    assert evidence["evidence_delayed"]["published_at"] == "2026-10-20T08:00:00Z"
+    assert evidence["evidence_delayed"]["first_discovered_at"] == "2026-10-25T00:30:00Z"
+    assert evidence["evidence_delayed"]["source_state"] == "active"
+    assert evidence["evidence_delayed"]["source_version"] == "archive-v2"
+    assert evidence["evidence_stale"]["source_state"] == "stale"
+    assert evidence["evidence_deleted"]["period_relation"] == "deleted_in_window"
+    assert evidence["evidence_deleted"]["deleted_at"] == "2026-10-25T09:00:00Z"
+    assert evidence["evidence_reissued"]["period_relation"] == "reissued_in_window"
+    assert evidence["evidence_reissued"]["reissued_at"] == "2026-10-25T10:00:00Z"
+    rendered = render_brief_document(document, view="full")
+    assert "впервые обнаружен в периоде" in rendered
+    assert "источник помечен как устаревший" in rendered
+    assert "источник удалён" in rendered
+    assert "источник переиздан" in rendered
+
+    rebuilt = build_brief_document(rebuild_brief_request(document))
+    rebuilt_evidence = {item.evidence_ref: item for item in rebuilt.evidence}
+    assert rebuilt_evidence["evidence_deleted"].deleted_at == document.evidence_by_ref()["evidence_deleted"].deleted_at
+    assert rebuilt_evidence["evidence_reissued"].reissued_at == document.evidence_by_ref()["evidence_reissued"].reissued_at
+
+
+def test_week_comparison_uses_factual_snapshot_not_only_summary_text() -> None:
+    prior_window = BriefWindow.from_iso(
+        timezone_name="Europe/Berlin",
+        start_at="2026-10-24T00:00:00+02:00",
+        end_at="2026-10-25T00:00:00+02:00",
+        generated_at="2026-10-25T01:00:00+02:00",
+    )
+    prior = build_brief_document(
+        BriefBuildRequest(
+            topic="AI", window=prior_window, owner_ref="owner_primary",
+            coverage=(CoverageSource("telegram:archive", "checked"),),
+            evidence=(_evidence(
+                "deadline", "https://t.me/example/deadline", title="Deadline", summary="The schedule is retained.",
+                posted_at="2026-10-24T10:00:00+02:00", conflict_group="deadline", conflict_value="Monday",
+            ),),
+        )
+    )
+    current = build_brief_document(
+        BriefBuildRequest(
+            topic="AI", window=_window(), owner_ref="owner_primary",
+            coverage=(CoverageSource("telegram:archive", "checked"),),
+            evidence=(_evidence(
+                "deadline", "https://t.me/example/deadline", title="Deadline", summary="The schedule is retained.",
+                conflict_group="deadline", conflict_value="Tuesday", source_version="archive-v2",
+            ),),
+            comparison_document=prior,
+        )
+    )
+
+    comparison = render_brief_document(current, view="comparison", comparison_document=prior)
+    assert "Изменилось\n- Deadline: https://t.me/example/deadline" in comparison
+    assert "Нет зафиксированных изменений по общим источникам." not in comparison
