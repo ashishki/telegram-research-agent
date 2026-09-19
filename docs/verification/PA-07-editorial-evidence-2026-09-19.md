@@ -180,3 +180,28 @@ contain balanced HTML and full/item views fit the reserved send count. The
 new fixture passed independently (1 passed in 1.96s); the dedicated four-file
 suite passed 66 tests in 11.52s before the final two-link compacting adjustment.
 The final focused tier and scoped delivery-bound recheck are recorded below.
+
+## Source links and public comparison API
+
+At `57b7e35592abc34aad31ffa3089251ac0e82d2e5`, focused-prm passed **444 tests
+in 107.61s** (`/tmp/pa-editorial-focused-bounded-20260919.log`). The independent
+run `20260919T160938Z-slice_review-3d155e8d` has a validated and verified receipt,
+requested/recorded `gpt-5.6-terra` / `high`, and report SHA-256
+`01b599cd357d5c628d1f3530901ef1a6c5d9bed343025b549a46a953ca83dc5e`.
+Its `STOP_SHIP` report identified two remaining P1s: URLs longer than 240
+characters were hidden even in full/item views, and the public store renderer
+did not resolve a saved comparison companion.
+
+The scoped correction preserves direct links in expanded views while keeping
+compact projections bounded. The public API resolves only the saved exact
+comparison reference through the same conversation history or authenticated
+owner store; a caller-supplied companion cannot override that binding. Tests
+exercise URLs of 261 and 500 characters, worst-case escaped links, comparison
+before/after a store restart, foreign scopes and an unbound supplied companion.
+
+The first new test run failed 2 cases because the synthetic response reference
+did not follow the existing 24-hex contract (68 passed). The fixture was corrected
+without changing the contract. The dedicated four-file command then passed
+**70 tests in 12.90s**. `git diff --check` and the plan consistency checker passed.
+The remaining recheck is scoped to these two P1s and the directly affected
+delivery/ownership paths. Formal design, live-provider and human gates remain.

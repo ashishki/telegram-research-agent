@@ -55,9 +55,13 @@ Deep Review per wording patch. Preserve the prior ownership, history, temporal
 and permission checks. Human mobile/provider evidence remains required before
 claiming product acceptance; proceed with independent local work meanwhile.
 
-Implementation checkpoints: `e280723` and `f912046`, followed by the scoped
-editorial-comparison P1 correction. The next independent recheck concerns that
-comparison delivery bound and its directly affected tests; no release is requested.
+Implementation checkpoints: `e280723`, `f912046`, `b69f8f2` and `57b7e35`.
+The current scoped P1 correction against `57b7e35` preserves long source URLs
+in expanded views and resolves a stored comparison's exact owner-scoped
+companion in the public render API. Recheck these two findings from run
+`20260919T160938Z-slice_review-3d155e8d`, the changed diff and directly affected
+delivery/ownership paths. Do not restart programme design or unrelated historical
+reviews. No release is requested.
 Current evidence: `docs/verification/PA-07-editorial-evidence-2026-09-19.md`.
 The dedicated editorial/brief/dialogue/synthesis suite includes the comparison
 regressions; final

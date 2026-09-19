@@ -1298,6 +1298,7 @@ class BriefDocumentStore:
         **kwargs: object,
     ) -> str | None:
         document: BriefDocument | None
+        comparison_document: BriefDocument | None = None
         if conversation_id:
             with self._lock:
                 binding = self._bindings.get(conversation_id)
@@ -1307,6 +1308,13 @@ class BriefDocumentStore:
                 if key not in binding[3]:
                     return None
                 document = self._documents.get(key)
+                if view == "comparison" and document is not None and document.comparison_ref is not None:
+                    ref = document.comparison_ref
+                    comparison_key = (conversation_id, ref.brief_id, ref.version)
+                    if comparison_key in binding[3]:
+                        candidate = self._documents.get(comparison_key)
+                        if candidate is not None and candidate.owner_ref == document.owner_ref:
+                            comparison_document = candidate
         else:
             document = self.get_persisted_document(
                 authenticated_chat_id=authenticated_chat_id,
@@ -1315,12 +1323,24 @@ class BriefDocumentStore:
                 brief_id=brief_id,
                 version=version,
             )
+            if view == "comparison" and document is not None and document.comparison_ref is not None:
+                comparison_document = self.get_persisted_document(
+                    authenticated_chat_id=authenticated_chat_id,
+                    authenticated_actor_id=authenticated_actor_id,
+                    authenticated_owner_chat_id=authenticated_owner_chat_id,
+                    brief_id=document.comparison_ref.brief_id,
+                    version=document.comparison_ref.version,
+                )
         # Either an exact current visible version or an exact authenticated
         # owner/history key is required. There is no global/latest lookup.
         if document is None:
             return None
         if view not in {"telegram", "short", "item", "topics", "comparison", "less_technical", "apply", "full"}:
             raise ValueError("brief view is invalid")
+        if view == "comparison":
+            # Resolve the immutable companion through the same authenticated
+            # scope, never a caller-supplied document or a latest/topic lookup.
+            kwargs = {**kwargs, "comparison_document": comparison_document}
         return render_brief_document(document, view=view, **kwargs)  # type: ignore[arg-type]
 
     def _storage_connection(self) -> sqlite3.Connection | None:
@@ -2154,7 +2174,7 @@ def _render_telegram_card(document: BriefDocument, items: Sequence[BriefItem]) -
                 (
                     f"{_telegram_number(shown)} <b>{_telegram_html(item.title, 96)}</b>",
                     _telegram_html(_short(item.summary, 220), 220),
-                    f"{_telegram_card_priority(item)} · {_telegram_card_source_link(source.source_ref)}",
+                    f"{_telegram_card_priority(item)} · {_telegram_card_source_link(source.source_ref, compact=True)}",
                 )
             )
             if item.conflict_groups:
@@ -2315,7 +2335,7 @@ def _render_editorial(
         refs = tuple(dict.fromkeys(anchor.evidence_ref for anchor in story.anchors))
         for ref in refs[:1] if compact else refs:
             source = sources[ref]
-            block.append(_telegram_card_source_link(source.source_ref))
+            block.append(_telegram_card_source_link(source.source_ref, compact=compact))
             if not compact:
                 note = _telegram_human_time_label(source)
                 if note:
@@ -2340,12 +2360,12 @@ def _render_editorial(
     return "\n".join(lines)
 
 
-def _telegram_card_source_link(source_ref: str) -> str:
+def _telegram_card_source_link(source_ref: str, *, compact: bool = False) -> str:
     """Keep the card compact while preserving a safe direct source link."""
 
-    if len(source_ref) > 240:
+    if compact and len(source_ref) > 240:
         return "Источник — в полном брифе"
-    label = _telegram_source_identity(source_ref)
+    label = _short(_telegram_source_identity(source_ref), 40)
     return f'Источник: <a href="{_html_escape(source_ref, quote=True)}">{_html_escape(label, quote=True)}</a>'
 
 
@@ -2557,7 +2577,7 @@ def _render_editorial_comparison(current: BriefDocument, previous: BriefDocument
                 block.append(f"Ограничение: {_telegram_html(story.caveat, 300)}")
             refs = tuple(dict.fromkeys(anchor.evidence_ref for anchor in story.anchors))
             for ref in refs[:2]:
-                block.append(_telegram_card_source_link(evidence[ref].source_ref))
+                block.append(_telegram_card_source_link(evidence[ref].source_ref, compact=True))
             if len(refs) > 2:
                 block.append(f"Ещё {len(refs) - 2} источников сохранено в полном пункте обзора.")
             addition = ([] if heading_shown else ["", f"<b>{heading}</b>"]) + block

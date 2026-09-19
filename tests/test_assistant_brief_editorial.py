@@ -339,13 +339,79 @@ def test_editorial_comparison_reports_revised_wording_with_bound_sources():
     assert "source/2" not in result
 
 
+@pytest.mark.parametrize("length", [261, 500])
+def test_expanded_editorial_preserves_long_source_urls(length):
+    prefix = "https://example.org/source?value="
+    url = prefix + "&" * (length - len(prefix))
+    request = _request()
+    request = replace(request, evidence=tuple(dict(item, source_url=url) if i == 0 else item
+                                             for i, item in enumerate(request.evidence)))
+    base = build_brief_document(request)
+    document = build_brief_document(replace(request,
+        editorial=BriefEditorial.from_dict(_editorial_data(), base.evidence)))
+    class Links(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.urls = []
+        def handle_starttag(self, tag, attrs):
+            if tag == "a":
+                self.urls.append(dict(attrs)["href"])
+    for view in ("full", "item"):
+        parser = Links()
+        parser.feed(render_brief_document(document, view=view, item_number=1))
+        assert url in parser.urls
+    assert "Источник — в полном брифе" in render_brief_document(document, view="short")
+
+
+@pytest.mark.parametrize("restart", [False, True])
+def test_store_comparison_resolves_only_the_bound_owner_scoped_version(tmp_path, monkeypatch, restart):
+    from db.migrate import run_migrations
+    from prm.briefs import brief_owner_ref_from_authenticated_private_tuple
+    db_path = tmp_path / "briefs.db"
+    monkeypatch.setenv("AGENT_DB_PATH", str(db_path))
+    run_migrations()
+    auth = dict(authenticated_chat_id="42", authenticated_actor_id="42", authenticated_owner_chat_id="42")
+    request = replace(_request(), owner_ref=brief_owner_ref_from_authenticated_private_tuple("42", "42", "42"))
+    base = build_brief_document(request)
+    prior = build_brief_document(replace(request,
+        editorial=BriefEditorial.from_dict(_editorial_data(), base.evidence)))
+    data = _editorial_data()
+    data["stories"][0]["summary"] = "При продолжении задачи агент использует сохранённые завершённые шаги."
+    current = build_brief_document(replace(request, comparison_document=prior,
+        editorial=BriefEditorial.from_dict(data, base.evidence)))
+    store = BriefDocumentStore(db_path=str(db_path))
+    store.bind_visible(conversation_id="conversation_editorial", response_ref="response_" + "e" * 24,
+                       document=current, comparison_document=prior, **auth)
+    if restart:
+        store = BriefDocumentStore(db_path=str(db_path))
+        scope = auth
+    else:
+        scope = {"conversation_id": "conversation_editorial"}
+    # Caller-supplied companion cannot override the saved exact reference.
+    result = store.render_brief(current.brief_id, current.version, "comparison",
+                                comparison_document=current, **scope)
+    assert "Изменились формулировки" in result
+    assert data["stories"][0]["summary"] in result
+    assert "source/2" not in result
+    assert store.render_brief(current.brief_id, current.version, "comparison",
+                             conversation_id="conversation_other") is None
+    assert store.render_brief(current.brief_id, current.version, "comparison",
+        authenticated_chat_id="43", authenticated_actor_id="43", authenticated_owner_chat_id="43") is None
+    if not restart:
+        store = BriefDocumentStore()
+        store.bind_visible(conversation_id="conversation_editorial", response_ref="response_" + "e" * 24, document=current)
+        unavailable = store.render_brief(current.brief_id, current.version, "comparison",
+            comparison_document=prior, conversation_id="conversation_editorial")
+        assert "Изменились формулировки" not in unavailable
+
+
 def test_maximum_changed_editorial_comparison_and_full_view_fit_safe_delivery():
     from bot.prm_handlers import _split_telegram_text
     request = _request()
     source = request.evidence[0]
     request = replace(request, evidence=tuple(dict(source,
         evidence_id=f"evidence_source_{i}",
-        source_url=f"https://example.org/{i}?v=" + "&x=" * 65,
+        source_url=f"https://example.org/{i}?v=" + "&x=" * 150,
     ) for i in range(8)))
     base = build_brief_document(request)
     def editorial(prefix):
