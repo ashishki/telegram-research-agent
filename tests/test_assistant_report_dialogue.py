@@ -121,16 +121,16 @@ def test_new_topic_and_restart_make_report_state_unavailable() -> None:
     conversation_id = initial.payload["conversation"]["conversation_id"]
     response_ref = initial.payload["conversation"]["response_refs"][0]
     brief_id = initial.payload["brief_document"]["brief_id"]
-    assert render_brief(brief_id, 1, "short", store=briefs) is not None
-    assert render_brief(brief_id, 2, "short", store=briefs) is not None
+    assert render_brief(brief_id, 1, "short", conversation_id=conversation_id, store=briefs) is not None
+    assert render_brief(brief_id, 2, "short", conversation_id=conversation_id, store=briefs) is not None
     refreshed_ref = refreshed.payload["conversation"]["response_refs"][0]
     assert briefs.resolve_visible(conversation_id=conversation_id, response_ref=refreshed_ref) is not None
 
     reset = assistant.answer(OperatorRequest(query="/new", mode="chat", chat_id="42"))
     assert reset.status == "topic_reset"
     assert briefs.resolve_visible(conversation_id=conversation_id, response_ref=response_ref) is None
-    assert render_brief(brief_id, 1, "short", store=briefs) is None
-    assert render_brief(brief_id, 2, "short", store=briefs) is None
+    assert render_brief(brief_id, 1, "short", conversation_id=conversation_id, store=briefs) is None
+    assert render_brief(brief_id, 2, "short", conversation_id=conversation_id, store=briefs) is None
 
     # A fresh process owns fresh ConversationStore and BriefDocumentStore;
     # no report reference is reconstructed from a topic or response string.
@@ -149,10 +149,20 @@ def test_active_brief_refresh_versions_and_two_active_weeks_bind_real_history(mo
         "brief_id": initial.payload["brief_document"]["brief_id"], "version": 1,
     }
     assert refreshed.payload["brief_inspection"]["period"]["basis"] == "revised_existing_evidence"
+    assert refreshed.payload["brief_refresh"] == {
+        "performed": True,
+        "new_source_search": False,
+        "material_changes": [],
+    }
+    assert "Существенных изменений фактов не обнаружено" in refreshed.text
     third = assistant.answer(OperatorRequest(query="обнови бриф", chat_id="42"))
     brief_id = initial.payload["brief_document"]["brief_id"]
+    conversation_id = initial.payload["conversation"]["conversation_id"]
     assert third.payload["brief_document"]["version"] == 3
-    assert all(render_brief(brief_id, version, "short", store=assistant.briefs) is not None for version in (1, 2, 3))
+    assert all(
+        render_brief(brief_id, version, "short", conversation_id=conversation_id, store=assistant.briefs) is not None
+        for version in (1, 2, 3)
+    )
     calls = []
     empty_payload = {
         "status": "ok", "direct_answer": "", "answer_gate": {"allow_answer": True},

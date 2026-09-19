@@ -121,7 +121,11 @@ class PersonalResearchAssistant:
                     refreshed_request,
                     comparison_document=visible_brief[1],
                 )
-            return self.render_brief_document(request, refreshed_request)
+            return self.render_brief_document(
+                request,
+                refreshed_request,
+                refresh_note=True,
+            )
         turn = classify_turn(request.query, conversation)
         if turn.kind == "cancel":
             self.briefs.forget_conversation(conversation.conversation_id)
@@ -546,6 +550,7 @@ class PersonalResearchAssistant:
         *,
         source_payload: Mapping[str, Any] | None = None,
         route: Mapping[str, Any] | None = None,
+        refresh_note: bool = False,
     ) -> AssistantResult:
         """Render one explicit local-evidence BriefDocument without retrieval.
 
@@ -572,8 +577,14 @@ class PersonalResearchAssistant:
                     "error_type": type(exc).__name__,
                 },
                 route=dict(route or {"mode": "brief", "primary_intent": "writer_brief"}),
-            )
+        )
         text = render_brief_document(document, view="telegram")
+        if refresh_note:
+            text = (
+                "Обновление: создана новая версия из того же выбранного набора источников. "
+                "Существенных изменений фактов не обнаружено; новый поиск не запускался.\n\n"
+                + text
+            )
         result = AssistantResult(
             interaction_id=hashlib.sha256(
                 f"{request.chat_id}\x1f{document.brief_id}\x1f{document.version}".encode("utf-8")
@@ -587,10 +598,18 @@ class PersonalResearchAssistant:
                 "brief_inspection": document.inspect(),
                 "brief_view": "telegram",
                 "brief_document_created": True,
-                "retrieval_performed": False,
+                # A direct BriefBuildRequest is a zero-retrieval seam. The
+                # normal active /brief route calls local retrieval first and
+                # passes its selected payload here, which must remain visible.
+                "retrieval_performed": source_payload is not None,
                 "write_performed": False,
                 "automatic_job_created": False,
                 "notification_sent": False,
+                "brief_refresh": {
+                    "performed": refresh_note,
+                    "new_source_search": False,
+                    "material_changes": [],
+                },
             },
             operator_context={
                 "input_kind": request.input_kind,
@@ -1317,12 +1336,16 @@ def _brief_request_from_archive_payload(
         topic=(" ".join(str(topic or request.query).split())[:160] or "local archive"),
         window=window,
         evidence=tuple(selected),
-        # Do not place the raw chat ID in the document or its inspectable
-        # manifest. The stable opaque owner scope also keeps two private
-        # conversations from sharing a logical brief/version identity.
-        owner_ref="owner_brief_" + hashlib.sha256(
-            f"pa07.owner:{request.chat_id}".encode("utf-8")
-        ).hexdigest()[:24],
+        # Retain the actual visible report's opaque owner scope when a new
+        # period is created from that same conversation. A first normal brief
+        # derives one from the chat without exposing the raw chat ID.
+        owner_ref=(
+            prior_document.owner_ref
+            if prior_document is not None
+            else "owner_brief_" + hashlib.sha256(
+                f"pa07.owner:{request.chat_id}".encode("utf-8")
+            ).hexdigest()[:24]
+        ),
         coverage=(
             CoverageSource(
                 "local_archive_selected_evidence",

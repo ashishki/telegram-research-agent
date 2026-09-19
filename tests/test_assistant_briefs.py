@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
+import pytest
+
 from prm.application import PersonalResearchAssistant
 from prm.briefs import (
     BriefBuildRequest,
@@ -39,6 +41,7 @@ def _evidence(
     conflict_group: str | None = None,
     conflict_value: str | None = None,
     repost_family_id: str | None = None,
+    project_refs: tuple[str, ...] = (),
 ) -> dict[str, object]:
     return {
         "local_archive_provenance": True,
@@ -53,6 +56,8 @@ def _evidence(
         "conflict_group": conflict_group,
         "conflict_value": conflict_value,
         "repost_family_id": repost_family_id,
+        "project_refs": project_refs,
+        "project_binding_provenance": "source" if project_refs else "",
     }
 
 
@@ -161,16 +166,21 @@ def test_exact_ephemeral_render_lookup_has_no_latest_fallback() -> None:
         )
     )
     store = BriefDocumentStore()
+    conversation_id = "conversation_" + "a" * 24
     store.bind_visible(
-        conversation_id="conversation_" + "a" * 24,
+        conversation_id=conversation_id,
         response_ref="response_" + "b" * 24,
         document=document,
     )
 
-    assert render_brief(document.brief_id, document.version, "short", store=store)
-    assert render_brief(document.brief_id, document.version + 1, "short", store=store) is None
-    store.forget_conversation("conversation_" + "a" * 24)
-    assert render_brief(document.brief_id, document.version, "telegram", store=store) is None
+    assert render_brief(document.brief_id, document.version, "short", conversation_id=conversation_id, store=store)
+    assert render_brief(document.brief_id, document.version + 1, "short", conversation_id=conversation_id, store=store) is None
+    assert render_brief(document.brief_id, document.version, "short", store=store) is None
+    assert render_brief(
+        document.brief_id, document.version, "short", conversation_id="conversation_" + "c" * 24, store=store,
+    ) is None
+    store.forget_conversation(conversation_id)
+    assert render_brief(document.brief_id, document.version, "telegram", conversation_id=conversation_id, store=store) is None
 
 
 def test_brief_mode_projects_current_selected_archive_evidence_without_a_provider(monkeypatch) -> None:
@@ -203,7 +213,7 @@ def test_brief_mode_projects_current_selected_archive_evidence_without_a_provide
 
     assert result.mode == "brief"
     assert result.payload["brief_document_created"] is True
-    assert result.payload["retrieval_performed"] is False
+    assert result.payload["retrieval_performed"] is True
     assert result.payload["brief_document"]["evidence_refs"] == ["evidence_tg_brief"]
 
 
@@ -219,3 +229,32 @@ def test_active_brief_window_parses_explicit_range_and_selected_timezone() -> No
     assert window.timezone == "Europe/Berlin"
     assert window.to_dict()["start_at"] == "2026-10-24T22:00:00Z"
     assert window.to_dict()["end_at"] == "2026-10-25T23:00:00Z"
+
+
+def test_project_section_needs_a_source_binding_and_history_needs_same_owner() -> None:
+    request = BriefBuildRequest(
+        topic="AI",
+        window=_window(),
+        owner_ref="owner_primary",
+        coverage=(CoverageSource("telegram:archive", "checked"),),
+        evidence=(_evidence(
+            "project", "https://t.me/example/project", title="Project signal", summary="Source connects this signal to the project.",
+            project_refs=("telegram-research-agent",),
+        ),),
+    )
+    document = build_brief_document(request)
+    section = document.sections[0]
+    assert section.section_id == "for_projects"
+    assert section.items[0].project_refs == ("telegram-research-agent",)
+    assert document.inspect()["importance_vs_urgency"][0]["project_refs"] == ["telegram-research-agent"]
+
+    other_owner = build_brief_document(
+        BriefBuildRequest(
+            topic="AI", window=_window(), owner_ref="owner_other",
+            coverage=(CoverageSource("telegram:archive", "checked"),), evidence=(),
+        )
+    )
+    with pytest.raises(ValueError, match="one owner scope"):
+        BriefBuildRequest(
+            topic="AI", window=_window(), owner_ref="owner_primary", evidence=(), comparison_document=other_owner,
+        )

@@ -33,6 +33,7 @@ _RESPONSE_REF = re.compile(r"^response_[a-f0-9]{24}$")
 _HTTPS_REF = re.compile(r"^https://[^\s]{1,500}$", re.IGNORECASE)
 _SAFE_REASON = re.compile(r"^[a-z][a-z0-9_.-]{2,120}$")
 _SAFE_TOPIC = re.compile(r"^[a-z0-9][a-z0-9 _./-]{0,63}$")
+_PROJECT_REF = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 _.\-/]{0,79}$")
 _COVERAGE_STATES = frozenset({"checked", "excluded", "unavailable", "stale", "partial"})
 _IMPORTANCE = frozenset({"critical", "high", "medium", "low", "unknown"})
 _URGENCY = frozenset({"urgent", "soon", "not_marked", "unknown"})
@@ -184,6 +185,7 @@ class BriefEvidence:
     importance: Literal["critical", "high", "medium", "low", "unknown"]
     urgency: Literal["urgent", "soon", "not_marked", "unknown"]
     selection_reasons: tuple[str, ...]
+    project_refs: tuple[str, ...] = ()
     conflict_group: str | None = None
     conflict_value: str | None = None
 
@@ -208,6 +210,12 @@ class BriefEvidence:
         if self.importance not in _IMPORTANCE or self.urgency not in _URGENCY:
             raise ValueError("brief evidence priority is invalid")
         if (
+            len(self.project_refs) > 8
+            or len(set(self.project_refs)) != len(self.project_refs)
+            or any(not _PROJECT_REF.fullmatch(item) for item in self.project_refs)
+        ):
+            raise ValueError("brief evidence project bindings are invalid")
+        if (
             not self.selection_reasons
             or len(self.selection_reasons) > 10
             or len(set(self.selection_reasons)) != len(self.selection_reasons)
@@ -231,6 +239,7 @@ class BriefItem:
     importance: Literal["critical", "high", "medium", "low", "unknown"]
     urgency: Literal["urgent", "soon", "not_marked", "unknown"]
     conflict_groups: tuple[str, ...] = ()
+    project_refs: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not _ITEM_ID.fullmatch(self.item_id):
@@ -245,6 +254,8 @@ class BriefItem:
             raise ValueError("brief item reasons are invalid")
         if self.importance not in _IMPORTANCE or self.urgency not in _URGENCY:
             raise ValueError("brief item priority is invalid")
+        if len(self.project_refs) > 8 or any(not _PROJECT_REF.fullmatch(item) for item in self.project_refs):
+            raise ValueError("brief item project bindings are invalid")
 
     def to_contract_dict(self) -> dict[str, object]:
         return {
@@ -414,6 +425,7 @@ class BriefDocument:
                     "item_id": item.item_id,
                     "importance": item.importance,
                     "urgency": item.urgency,
+                    "project_refs": list(item.project_refs),
                     "selection_reasons": list(item.selection_reasons),
                 }
                 for item in self.items
@@ -460,6 +472,11 @@ class BriefBuildRequest:
             raise ValueError("brief previous document is invalid")
         if self.comparison_document is not None and type(self.comparison_document) is not BriefDocument:
             raise ValueError("brief comparison document is invalid")
+        if any(
+            document is not None and document.owner_ref != self.owner_ref
+            for document in (self.previous_document, self.comparison_document)
+        ):
+            raise ValueError("brief history must remain within one owner scope")
         if not _SAFE_REASON.fullmatch(self.period_basis):
             raise ValueError("brief request period basis is invalid")
 
@@ -681,24 +698,29 @@ class BriefDocumentStore:
             for key in binding[3]:
                 self._documents.pop(key, None)
 
-    def render_brief(self, brief_id: str, version: int, view: str, **kwargs: object) -> str | None:
+    def render_brief(
+        self,
+        brief_id: str,
+        version: int,
+        view: str,
+        *,
+        conversation_id: str | None = None,
+        **kwargs: object,
+    ) -> str | None:
         with self._lock:
-            visible_keys = {
-                key
-                for binding in self._bindings.values()
-                for key in binding[3]
-            }
-            matches = [
-                document
-                for key, document in self._documents.items()
-                if key in visible_keys and key[1] == brief_id and key[2] == version
-            ]
-        # An exact version reference still cannot cross an ephemeral private
-        # conversation boundary.  Ambiguity fails closed rather than selecting
-        # a most-recent report from another visible conversation.
-        if len(matches) != 1:
+            if not conversation_id:
+                return None
+            binding = self._bindings.get(conversation_id)
+            if binding is None:
+                return None
+            key = (conversation_id, brief_id, version)
+            if key not in binding[3]:
+                return None
+            document = self._documents.get(key)
+        # Exact version identity plus the current authenticated conversation is
+        # required. There is intentionally no global/latest report lookup.
+        if document is None:
             return None
-        document = matches[0]
         if view not in {"telegram", "short", "item", "topics", "comparison", "less_technical", "apply"}:
             raise ValueError("brief view is invalid")
         return render_brief_document(document, view=view, **kwargs)  # type: ignore[arg-type]
@@ -734,10 +756,18 @@ class BriefDocumentStore:
 GLOBAL_BRIEFS = BriefDocumentStore()
 
 
-def render_brief(brief_id: str, version: int, view: str, *, store: BriefDocumentStore = GLOBAL_BRIEFS, **kwargs: object) -> str | None:
-    """Read one exact ephemeral report version; no fallback/latest lookup exists."""
+def render_brief(
+    brief_id: str,
+    version: int,
+    view: str,
+    *,
+    conversation_id: str | None = None,
+    store: BriefDocumentStore = GLOBAL_BRIEFS,
+    **kwargs: object,
+) -> str | None:
+    """Read one exact report version only inside its active conversation."""
 
-    return store.render_brief(brief_id, version, view, **kwargs)
+    return store.render_brief(brief_id, version, view, conversation_id=conversation_id, **kwargs)
 
 
 def parse_requested_brief_window(text: str, *, now: datetime | None = None) -> tuple[BriefWindow, str]:
@@ -804,6 +834,8 @@ def rebuild_brief_request(document: BriefDocument) -> BriefBuildRequest:
                 "topics": item.topics,
                 "importance": item.importance,
                 "urgency": item.urgency,
+                "project_refs": item.project_refs,
+                "project_binding_provenance": "source" if item.project_refs else "",
                 "conflict_group": item.conflict_group,
                 "conflict_value": item.conflict_value,
             }
@@ -871,6 +903,7 @@ def _evidence_from_mapping(raw: Mapping[str, Any], *, timezone_name: str) -> Bri
     if timestamp is None:
         raise ValueError("brief local archive source has no usable event time")
     topics = _topics(raw)
+    project_refs = _projects(raw)
     importance = _importance(raw)
     urgency = _urgency(raw)
     reasons = ["local_archive_source", f"importance_{importance}", f"urgency_{urgency}"]
@@ -879,6 +912,8 @@ def _evidence_from_mapping(raw: Mapping[str, Any], *, timezone_name: str) -> Bri
     change = _clean(raw.get("change_type"), 48)
     if change and _SAFE_REASON.fullmatch(f"change_{change.casefold().replace('-', '_')}"):
         reasons.append(f"change_{change.casefold().replace('-', '_')}")
+    if project_refs:
+        reasons.append("project_source_binding")
     return BriefEvidence(
         evidence_ref=identity if _EVIDENCE_REF.fullmatch(identity) else "evidence_" + _slug(identity, fallback=source_ref),
         source_ref=source_ref,
@@ -891,6 +926,7 @@ def _evidence_from_mapping(raw: Mapping[str, Any], *, timezone_name: str) -> Bri
         importance=importance,
         urgency=urgency,
         selection_reasons=tuple(dict.fromkeys(reasons)),
+        project_refs=project_refs,
         conflict_group=_clean(raw.get("conflict_group"), 120, required=True),
         conflict_value=_clean(raw.get("conflict_value"), 240, required=True),
     )
@@ -913,6 +949,29 @@ def _topics(raw: Mapping[str, Any]) -> tuple[str, ...]:
         values = ()
     normalized = tuple(dict.fromkeys(value for value in (_topic(item) for item in values) if value))
     return normalized[:8] or ("unclassified",)
+
+
+def _projects(raw: Mapping[str, Any]) -> tuple[str, ...]:
+    """Accept a project section only when the selected source bound it."""
+
+    values: object = ()
+    if raw.get("project_binding_provenance") == "source":
+        values = raw.get("project_refs") or ()
+    source_binding = raw.get("source_project_ref")
+    if isinstance(source_binding, Mapping) and source_binding.get("origin") == "source":
+        values = tuple(values) + (source_binding.get("value"),)
+    if isinstance(values, str):
+        values = (values,)
+    if not isinstance(values, (tuple, list)):
+        return ()
+    normalized = tuple(
+        dict.fromkeys(
+            clean
+            for clean in (_clean(value, 80, required=True) for value in values)
+            if clean is not None and _PROJECT_REF.fullmatch(clean)
+        )
+    )
+    return normalized[:8]
 
 
 def _topic(value: object) -> str:
@@ -1006,11 +1065,14 @@ def _conflicts(evidence: Sequence[BriefEvidence]) -> tuple[ConflictRecord, ...]:
 
 
 def _sections(evidence: Sequence[BriefEvidence], conflict_refs: set[str]) -> tuple[BriefSection, ...]:
-    important = [item for item in evidence if item.importance in {"critical", "high"}]
-    attention = [item for item in evidence if item.urgency in {"urgent", "soon"} and item not in important]
-    remainder = [item for item in evidence if item not in important and item not in attention]
+    projects = [item for item in evidence if item.project_refs]
+    unassigned = [item for item in evidence if item not in projects]
+    important = [item for item in unassigned if item.importance in {"critical", "high"}]
+    attention = [item for item in unassigned if item.urgency in {"urgent", "soon"} and item not in important]
+    remainder = [item for item in unassigned if item not in important and item not in attention]
     sections: list[BriefSection] = []
     for section_id, title, items in (
+        ("for_projects", "Для моих проектов", projects),
         ("main_changes", "Главное", important),
         ("needs_attention", "Требует внимания", attention),
         ("other_signals", "По темам", remainder),
@@ -1037,6 +1099,7 @@ def _item(evidence: BriefEvidence, conflict_refs: set[str]) -> BriefItem:
         importance=evidence.importance,
         urgency=evidence.urgency,
         conflict_groups=conflict_groups,
+        project_refs=evidence.project_refs,
     )
 
 
