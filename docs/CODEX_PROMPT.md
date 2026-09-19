@@ -32,21 +32,25 @@ the two untracked local files. Do not run the full historical pytest suite.
 
 ## Current slice: PA-03
 
-PA-03 has a locally tested initial implementation and evidence at
-`docs/verification/PA-03-conversation-evidence-2026-09-19.md`. Its fresh
-Terra/high `slice_review` returned STOP_SHIP on three P1s; the scoped
-remediation is ready for a new independent recheck. Active ingress no longer
-uses legacy keyword state; model access is a typed PA-02 reservation injected
-per private turn; and confirmation requires a canonical equal private tuple.
-The new state is ephemeral (restart clears it), object-bound, and fails closed
-for plain `yes` until PA-13 supplies authoritative proposal/version loading and
-execution reconciliation. The model receives only current direct user text,
-never archive/history/old response context.
+PA-03 is locally tested at `081dded92b00bdaa822a6f6c0efbe8ae7ab86861` with
+evidence at `docs/verification/PA-03-conversation-evidence-2026-09-19.md`.
+Its initial Terra/high `slice_review` found three P1s; the scoped remediation
+was independently rechecked at the same model/effort and returned `ADVISORY`.
+Active ingress no longer uses legacy keyword state; model access is a typed
+PA-02 reservation injected per private turn; and confirmation requires a
+canonical equal private tuple. The new state is ephemeral (restart clears it),
+object-bound, and fails closed for plain `yes` until PA-13 supplies
+authoritative proposal/version loading and execution reconciliation. The model
+receives only current direct user text, never archive/history/old response
+context.
 
-Do not call PA-03 formally accepted or start PA-04 until the PA-03 review and
-any P0/P1 remediation are recorded. After that boundary, PA-04 connects
-authorized source-bound archive synthesis; it must not widen PA-03's direct
-user-text model boundary.
+PA-03 has no formal acceptance claim. Keep its three advisory follow-ups open:
+inactive legacy helper ownership, response-reference/version binding for archive
+refinement, and a narrow dialogue-disable switch before authorized runtime.
+PA-04 is dependency-ready: connect authorized source-bound archive synthesis
+without widening PA-03's direct-user-text model boundary. Do not schedule a
+Deep Review until the declared PA-04..PA-06 phase boundary absent a new
+immediate safety trigger.
 
 For each slice: add focused positive/negative tests, run the smallest relevant
 existing tier, record evidence that distinguishes fixtures from integrations,

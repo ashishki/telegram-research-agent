@@ -115,14 +115,30 @@ The P1 remediation does all of the following:
   yes resolution. Group/mismatch fixtures now reject before a proposal can be
   selected.
 
-A fresh independent Terra/high recheck of this changed scope is still required
-after the remediation commit. No P0/P1 finding is considered closed merely by
-this implementer-run test result.
+A fresh independent Terra/high recheck then examined remediation commit
+`081dded92b00bdaa822a6f6c0efbe8ae7ab86861` and returned `ADVISORY`. The
+requested and observed runner telemetry was `gpt-5.6-terra` / `high`; run
+`20260919T023222Z-slice_review-e0222766` was validated in a read-only sandbox
+with an unchanged reviewer workspace. Its report SHA-256 is
+`3a31b4b50d9a8df0fa3d0fd7609217fbf7f2fc711377477f279238dd220b01a2` at
+`.playbook-artifacts/runs/20260919T023222Z-slice_review-e0222766/report.md`.
+The reviewer confirmed the three prior P1s are remediated and independently
+reran the targeted surface (91 passed), focused-prm (341 passed), and
+`git diff --check d6e537b..081dded`. This is recheck evidence, not design,
+human completion, runtime, or release approval.
+
+The recheck retains three non-blocking follow-ups: resolve ownership of the
+inactive legacy `_PRM_DIALOG_STATE` helper before removing/quarantining it;
+bind archive refinement to an explicit response reference/version rather than
+only a current response plus topic; and add a narrower dialogue-disable switch
+before any authorized runtime enablement. None authorizes provider, credential,
+account, database, or live Telegram use.
 
 ## Remaining gates and handoff
 
-- Required independent Conversation/Test Critic recheck is pending for the
-  scoped remediation; it is not replaced by these tests.
+- The independent Conversation/Test Critic recheck completed with `ADVISORY`;
+  its three follow-ups above remain open and are not silently treated as
+  completed work.
 - Plain-language confirmation intentionally resolves no live action until
   PA-13 supplies an authoritative proposal/version loader and execution
   reconciliation. Existing PA-00 callback controls remain separately bound.
@@ -131,6 +147,5 @@ this implementer-run test result.
   supplies a reserved decision.
 - The two pre-existing untracked local files remain unstaged and untouched.
 
-After independent review and any required scoped remediation, PA-04 is the
-next dependency-ready slice: connect authorized, source-bound archive synthesis
-without widening PA-03's direct-user-text model boundary.
+PA-04 is the next dependency-ready slice: connect authorized, source-bound
+archive synthesis without widening PA-03's direct-user-text model boundary.
