@@ -3,7 +3,8 @@
 Date: 2026-09-19
 Branch: `docs/personal-assistant-blueprint-playbook-20260918`
 Implementation commits under review: `5b8b53b`, `3b5189b`, `cd47dde`,
-`4ae05a2`, `af24451`, `7740a3b`, `f9089ca2197205b3838bc10db92c5691c1fdb4a1`
+`4ae05a2`, `af24451`, `7740a3b`, `f9089ca2197205b3838bc10db92c5691c1fdb4a1`,
+`120395790fcd728c98d482def304ffe15f42b5e2`
 
 ## Scope and authority
 
@@ -29,8 +30,8 @@ historic STOP_SHIP artifact.
   that plan from the current request plus bounded archive/public/GitHub fields.
   Plain chat does not construct it and therefore cannot become an agent loop.
 - Public and GitHub work consume sealed parent-side PA-02 scopes before the
-  worker receives its start signal. Unknown tariff or exhausted cost budget
-  prevents provider transport.
+  worker receives its start signal. Unknown, non-finite or exhausted tariff
+  data prevents provider transport and leaves cost receipts JSON-finite.
 - Deadline/cancel kills in-flight worker processes. A post-authorization
   outcome is deliberately not retried from a checkpoint, because egress may
   already have happened. A pre-start cancellation can resume only with the
@@ -57,14 +58,14 @@ historic STOP_SHIP artifact.
 ## Focused verification
 
 Commands run against the working tree containing the registered PA-06 suite:
-Tested implementation SHA: `f9089ca2197205b3838bc10db92c5691c1fdb4a1`.
+Tested implementation SHA: `120395790fcd728c98d482def304ffe15f42b5e2`.
 
 ```text
-PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_assistant_research.py
-# 20 passed in 3.55s
+python3 -m pytest -q tests/test_assistant_research.py
+# 26 passed in 5.39s
 
-TMPDIR=<mktemp> PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/test_tiers.py focused-prm
-# 384 passed in 142.86s
+python3 tools/test_tiers.py focused-prm
+# 390 passed in 128.70s
 ```
 
 The dedicated offline holdouts cover permitted-source aggregation, local-only
@@ -75,6 +76,13 @@ checkpoint forgery/scope/data tampering, same-process pre-start resume, and
 the active application's evidence-only fallback. Fixture passes do not prove
 live provider integration, provider billing, operator usefulness, durable
 restart recovery or actual GitHub/public-web access.
+
+The added three-value holdout supplies `NaN`, positive infinity and negative
+infinity as a public-provider quote under a zero budget. Each is recorded as
+`unknown_price`, makes zero provider calls, abandons every sealed public
+authorization before worker preflight, and leaves both consumed cost and the
+tariff list finite/empty. `ResearchBudget` also rejects each non-finite
+maximum, so a caller cannot construct an unbounded ledger with such a limit.
 
 ## Independent-review history and remaining gate
 
@@ -89,9 +97,16 @@ and its initial/resume/application zero-call holdouts above remediate it. A
 second P1 found at `7740a3b` (run
 `20260919T072409Z-slice_review-4e47cf5b`) was missing active plan
 construction; `DeepResearchRequest` and the unverified-label restriction above
-remediate it. A fresh Terra/high recheck is still required on the corresponding
-commit. No human acceptance, release approval or live-runtime authorization is
-claimed by this receipt.
+remediate it. The fresh runner `20260919T073445Z-slice_review-68afc9dc`
+reviewed `197bd1ce50b8c7fcde7e59832627f2def6ff5e86`, requested and observed
+`gpt-5.6-terra` / `high` in a validated read-only run, and returned
+`STOP_SHIP` P1 for non-finite cost quotes (report SHA-256
+`7246ab18b7f78a0dbe7b5c2d8236f8ea724acf26a29926db28e27ce0f1db5a70`).
+Commit `120395790fcd728c98d482def304ffe15f42b5e2` remediates that P1 with the
+three adversarial quote values and non-finite budget-limit holdouts above. A
+fresh Terra/high recheck is still required on that exact commit. No human
+acceptance, release approval or live-runtime authorization is claimed by this
+receipt.
 
 Next command:
 
