@@ -20,6 +20,7 @@ import json
 from pathlib import Path
 import re
 import sqlite3
+import textwrap
 from threading import RLock
 from typing import Any, Literal, Mapping, Sequence
 from urllib.parse import urlsplit
@@ -2228,7 +2229,13 @@ def _render_telegram_full_card(document: BriefDocument) -> str:
 def _telegram_html(value: str, limit: int) -> str:
     """Escape an archive-derived value for Telegram's constrained HTML mode."""
 
-    return _html_escape(_short(value, limit), quote=True)
+    plain = _short(value, limit)
+    escaped = _html_escape(plain, quote=True)
+    if len(escaped) <= 2800:
+        return escaped
+    # Delivery splits on lines. Wrap plain text before escaping so that even
+    # entity-heavy evidence cannot split an HTML entity across send chunks.
+    return "\n".join(_html_escape(part, quote=True) for part in textwrap.wrap(plain, width=400))
 
 
 def _telegram_number(number: int) -> str:
@@ -2289,6 +2296,7 @@ def _render_editorial(
     compact = view in {"telegram", "short", "less_technical", "topics"}
     lines = [f"🗞 <b>{_telegram_html(document.topic, 160)}</b>",
              f"<i>{_telegram_html(_human_brief_period(document.window), 120)}</i>"]
+    shown = 0
     for index, story in indexed:
         block = ["", f"<b>{index}. {_telegram_html(story.title, 140)}</b>"]
         if view == "apply":
@@ -2314,12 +2322,16 @@ def _render_editorial(
                     block.append(_telegram_html(note, 300))
         if any(ref in conflict.evidence_refs for ref in refs for conflict in document.conflicts):
             block.append("⚠️ Источники расходятся; это расхождение пока не разрешено.")
-        if compact and len("\n".join(lines + block)) > 2000:
+        if len("\n".join(lines + block)) > (2000 if compact else 22000):
             break
         lines.extend(block)
+        shown += 1
         if compact and sum(line.startswith("<b>") for line in lines) >= 3:
             break
     lines.extend(("", _telegram_card_coverage_line(document)))
+    if shown < len(indexed):
+        first_unshown = indexed[shown][0]
+        lines.append(f"Осталось {len(indexed) - shown} пунктов. Можно попросить «объясни пункт {first_unshown}».")
     if compact:
         lines.append(f"Подробнее — «{BRIEF_FULL_VIEW_BUTTON_TEXT}». Можно попросить объяснить любой пункт.")
     else:
@@ -2522,6 +2534,13 @@ def _render_editorial_comparison(current: BriefDocument, previous: BriefDocument
              f"Ранее: {_telegram_html(_human_brief_period(previous.window), 120)}"]
     if not now and not before:
         lines.extend(("", "В обеих сохранённых подборках содержательных событий по теме не выделено."))
+    footer = ["", "Это различия двух сохранённых подборок; отсутствие пункта не означает исчезновения события.",
+              "Текущий обзор: " + _telegram_card_coverage_line(current),
+              "Предыдущий обзор: " + _telegram_card_coverage_line(previous)]
+    # A comparison is a concise Telegram projection. Reserve room for both
+    # coverage notes and the omission notice; append only whole event blocks.
+    content_limit = _MAX_TELEGRAM_CHARS - len("\n".join(footer)) - 180
+    skipped = 0
     for heading, stories, document in (
         ("Вошло в текущий обзор", added, current),
         ("Изменились формулировки сохранённых пунктов", changed, current),
@@ -2530,17 +2549,26 @@ def _render_editorial_comparison(current: BriefDocument, previous: BriefDocument
     ):
         if not stories:
             continue
-        lines.extend(("", f"<b>{heading}</b>"))
+        heading_shown = False
         evidence = document.evidence_by_ref()
         for story in stories:
-            lines.extend(("", f"<b>{_telegram_html(story.title, 140)}</b>", _telegram_html(story.summary, 300)))
+            block = ["", f"<b>{_telegram_html(story.title, 140)}</b>", _telegram_html(story.summary, 300)]
             if story.caveat:
-                lines.append(f"Ограничение: {_telegram_html(story.caveat, 300)}")
-            for ref in dict.fromkeys(anchor.evidence_ref for anchor in story.anchors):
-                lines.append(_telegram_card_source_link(evidence[ref].source_ref))
-    lines.extend(("", "Это различия двух сохранённых подборок; отсутствие пункта не означает исчезновения события.",
-                  "Текущий обзор: " + _telegram_card_coverage_line(current),
-                  "Предыдущий обзор: " + _telegram_card_coverage_line(previous)))
+                block.append(f"Ограничение: {_telegram_html(story.caveat, 300)}")
+            refs = tuple(dict.fromkeys(anchor.evidence_ref for anchor in story.anchors))
+            for ref in refs[:2]:
+                block.append(_telegram_card_source_link(evidence[ref].source_ref))
+            if len(refs) > 2:
+                block.append(f"Ещё {len(refs) - 2} источников сохранено в полном пункте обзора.")
+            addition = ([] if heading_shown else ["", f"<b>{heading}</b>"]) + block
+            if len("\n".join(lines + addition)) > content_limit:
+                skipped += 1
+                continue
+            lines.extend(addition)
+            heading_shown = True
+    if skipped:
+        lines.extend(("", f"В коротком сравнении не показано пунктов: {skipped}. Объяснения текущих пунктов доступны в полном брифе."))
+    lines.extend(footer)
     return "\n".join(lines)
 
 

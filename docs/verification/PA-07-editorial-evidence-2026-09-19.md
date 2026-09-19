@@ -155,3 +155,28 @@ unchanged and do not require another speculative review loop.
 Dedicated editorial/brief/dialogue/synthesis command after the comparison fix:
 **65 passed in 40.22s**. `git diff --check` and the PA plan consistency check
 also passed. No statuses or approval artifacts were hand-edited.
+
+## Bounded comparison presentation
+
+The comparison recheck `20260919T160142Z-slice_review-e8496f71` reviewed
+`b69f8f2794c6fabc20bdc270bbab61f926386c45`, recorded
+`gpt-5.6-terra` / `high`, and has a validated, successfully verified runner
+receipt. Its P1 was the maximum-size comparison: two changed reports could
+produce too many Telegram chunks. At that SHA focused-prm passed **443 tests
+in 93.85s**; passing tests did not cover that maximum shape.
+
+The presentation correction appends whole story blocks within a 2400-character
+comparison budget, retains caveats and up to two displayed source anchors per
+story, and explicitly states how many sources/items are retained in the full
+report rather than truncating links or presenting an apparently complete diff.
+Expanded editorial views also have a bounded text budget and retain navigation
+to unshown story numbers. Long escaped text is wrapped before escaping so
+Telegram chunk boundaries do not cut HTML entities.
+
+The new adversarial fixture constructs two five-story reports with eight anchors
+per story, long escaped URLs and entity-heavy explanations. It checks that the
+comparison remains useful and <=2400 characters; individual Telegram chunks
+contain balanced HTML and full/item views fit the reserved send count. The
+new fixture passed independently (1 passed in 1.96s); the dedicated four-file
+suite passed 66 tests in 11.52s before the final two-link compacting adjustment.
+The final focused tier and scoped delivery-bound recheck are recorded below.

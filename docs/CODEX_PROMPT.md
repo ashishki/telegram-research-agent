@@ -57,7 +57,7 @@ claiming product acceptance; proceed with independent local work meanwhile.
 
 Implementation checkpoints: `e280723` and `f912046`, followed by the scoped
 editorial-comparison P1 correction. The next independent recheck concerns that
-comparison correction and its directly affected tests; no release is requested.
+comparison delivery bound and its directly affected tests; no release is requested.
 Current evidence: `docs/verification/PA-07-editorial-evidence-2026-09-19.md`.
 The dedicated editorial/brief/dialogue/synthesis suite includes the comparison
 regressions; final

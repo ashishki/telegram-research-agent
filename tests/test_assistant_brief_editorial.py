@@ -2,6 +2,7 @@
 
 from dataclasses import replace
 import json
+from html.parser import HTMLParser
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -336,3 +337,50 @@ def test_editorial_comparison_reports_revised_wording_with_bound_sources():
     assert data["stories"][0]["summary"] in result
     assert "https://example.org/source/0" in result
     assert "source/2" not in result
+
+
+def test_maximum_changed_editorial_comparison_and_full_view_fit_safe_delivery():
+    from bot.prm_handlers import _split_telegram_text
+    request = _request()
+    source = request.evidence[0]
+    request = replace(request, evidence=tuple(dict(source,
+        evidence_id=f"evidence_source_{i}",
+        source_url=f"https://example.org/{i}?v=" + "&x=" * 65,
+    ) for i in range(8)))
+    base = build_brief_document(request)
+    def editorial(prefix):
+        stories = []
+        for letter in "ABCDE":
+            story = dict(_editorial_data()["stories"][0])
+            story.update(title=prefix + letter, summary="Сохранение результатов. " * 12,
+                         explanation="&" * 900, caveat="Ограничение источника. " * 12,
+                         anchors=[{"evidence_ref": item.evidence_ref, "quote": item.summary} for item in base.evidence])
+            stories.append(story)
+        return BriefEditorial.from_dict({"stories": stories, "omitted_refs": []}, base.evidence)
+    prior = build_brief_document(replace(request, editorial=editorial("Ранее ")))
+    current = build_brief_document(replace(request, editorial=editorial("Сейчас "), comparison_document=prior))
+    comparison = render_brief_document(current, view="comparison", comparison_document=prior)
+    assert len(comparison) <= 2400
+    assert "не показано пунктов" in comparison
+    assert "Сейчас A" in comparison
+    assert "не означает исчезновения" in comparison
+    assert len(_split_telegram_text(comparison)) == 1
+    class BalancedHTML(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.stack = []
+        def handle_starttag(self, tag, attrs):
+            self.stack.append(tag)
+        def handle_endtag(self, tag):
+            assert self.stack.pop() == tag
+    for view in ("full", "item"):
+        rendered = render_brief_document(current, view=view, item_number=1)
+        chunks = _split_telegram_text(rendered)
+        assert len(chunks) <= 8
+        for chunk in chunks:
+            assert len(chunk) <= 3400
+            parser = BalancedHTML()
+            parser.feed(chunk)
+            parser.close()
+            assert parser.stack == []
+            assert not chunk.endswith(("&", "&a", "&am", "&amp"))
