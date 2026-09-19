@@ -12,7 +12,7 @@ from prm.briefs import (
     BriefDocumentStore,
     BriefWindow,
     CoverageSource,
-    brief_owner_scope_from_authenticated_private_tuple,
+    brief_owner_ref_from_authenticated_private_tuple,
     build_brief_document,
     rebuild_brief_request,
     render_brief,
@@ -33,10 +33,14 @@ def _window(*, start: str = "2026-10-25T00:00:00+02:00", end: str = "2026-10-26T
     )
 
 
-def _owner_scope(identifier: str):
-    scope = brief_owner_scope_from_authenticated_private_tuple(identifier, identifier, identifier)
-    assert scope is not None
-    return scope
+def _owner_tuple(identifier: str) -> tuple[str, str, str]:
+    return identifier, identifier, identifier
+
+
+def _owner_ref(identifier: str) -> str:
+    owner_ref = brief_owner_ref_from_authenticated_private_tuple(*_owner_tuple(identifier))
+    assert owner_ref is not None
+    return owner_ref
 
 
 def _evidence(
@@ -201,18 +205,20 @@ def test_exact_owner_scoped_brief_history_survives_a_store_restart_and_can_be_fo
     db_path = tmp_path / "assistant-briefs.db"
     monkeypatch.setenv("AGENT_DB_PATH", str(db_path))
     assert run_migrations() == db_path
-    primary_scope = _owner_scope("42")
-    secondary_scope = _owner_scope("43")
+    primary_tuple = _owner_tuple("42")
+    primary_owner_ref = _owner_ref("42")
+    secondary_tuple = _owner_tuple("43")
+    secondary_owner_ref = _owner_ref("43")
     first = build_brief_document(
         BriefBuildRequest(
-            topic="AI", window=_window(), owner_ref=primary_scope.owner_ref,
+            topic="AI", window=_window(), owner_ref=primary_owner_ref,
             coverage=(CoverageSource("telegram:archive", "checked"),),
             evidence=(_evidence("one", "https://t.me/example/one", title="One", summary="Persisted bounded source."),),
         )
     )
     second = build_brief_document(
         BriefBuildRequest(
-            topic="AI", window=_window(), owner_ref=primary_scope.owner_ref,
+            topic="AI", window=_window(), owner_ref=primary_owner_ref,
             coverage=(CoverageSource("telegram:archive", "checked"),),
             evidence=(_evidence("two", "https://t.me/example/two", title="Two", summary="A revised exact source."),),
             previous_document=first,
@@ -220,7 +226,7 @@ def test_exact_owner_scoped_brief_history_survives_a_store_restart_and_can_be_fo
     )
     other = build_brief_document(
         BriefBuildRequest(
-            topic="AI", window=_window(), owner_ref=secondary_scope.owner_ref,
+            topic="AI", window=_window(), owner_ref=secondary_owner_ref,
             coverage=(CoverageSource("telegram:archive", "checked"),),
             evidence=(_evidence("other", "https://t.me/example/other", title="Other", summary="Separate owner source."),),
         )
@@ -230,20 +236,20 @@ def test_exact_owner_scoped_brief_history_survives_a_store_restart_and_can_be_fo
         conversation_id="conversation_" + "a" * 24,
         response_ref="response_" + "b" * 24,
         document=first,
-        durable_owner_scope=primary_scope,
+        authenticated_chat_id=primary_tuple[0], authenticated_actor_id=primary_tuple[1], authenticated_owner_chat_id=primary_tuple[2],
     )
     initial.bind_visible(
         conversation_id="conversation_" + "a" * 24,
         response_ref="response_" + "c" * 24,
         document=second,
         comparison_document=first,
-        durable_owner_scope=primary_scope,
+        authenticated_chat_id=primary_tuple[0], authenticated_actor_id=primary_tuple[1], authenticated_owner_chat_id=primary_tuple[2],
     )
     initial.bind_visible(
         conversation_id="conversation_" + "d" * 24,
         response_ref="response_" + "e" * 24,
         document=other,
-        durable_owner_scope=secondary_scope,
+        authenticated_chat_id=secondary_tuple[0], authenticated_actor_id=secondary_tuple[1], authenticated_owner_chat_id=secondary_tuple[2],
     )
 
     restarted = BriefDocumentStore(db_path=str(db_path))
@@ -252,36 +258,68 @@ def test_exact_owner_scoped_brief_history_survives_a_store_restart_and_can_be_fo
         response_ref="response_" + "c" * 24,
     ) is None
     assert restarted.get_persisted_document(
-        durable_owner_scope=primary_scope, brief_id=first.brief_id, version=1,
+        authenticated_chat_id=primary_tuple[0], authenticated_actor_id=primary_tuple[1], authenticated_owner_chat_id=primary_tuple[2], brief_id=first.brief_id, version=1,
     ) == first
     assert restarted.get_persisted_document(
-        durable_owner_scope=primary_scope, brief_id=second.brief_id, version=2,
+        authenticated_chat_id=primary_tuple[0], authenticated_actor_id=primary_tuple[1], authenticated_owner_chat_id=primary_tuple[2], brief_id=second.brief_id, version=2,
     ) == second
     assert restarted.get_persisted_document(
-        durable_owner_scope=secondary_scope, brief_id=first.brief_id, version=1,
+        authenticated_chat_id=secondary_tuple[0], authenticated_actor_id=secondary_tuple[1], authenticated_owner_chat_id=secondary_tuple[2], brief_id=first.brief_id, version=1,
     ) is None
-    assert restarted.list_persisted_versions(durable_owner_scope=primary_scope, brief_id=first.brief_id) == (
+    assert restarted.list_persisted_versions(
+        authenticated_chat_id=primary_tuple[0], authenticated_actor_id=primary_tuple[1], authenticated_owner_chat_id=primary_tuple[2], brief_id=first.brief_id,
+    ) == (
         first.version_ref,
         second.version_ref,
     )
     assert render_brief(
-        first.brief_id, 1, "full", durable_owner_scope=primary_scope, store=restarted,
+        first.brief_id, 1, "full", authenticated_chat_id=primary_tuple[0], authenticated_actor_id=primary_tuple[1], authenticated_owner_chat_id=primary_tuple[2], store=restarted,
     ) == render_brief_document(first, view="full")
     assert render_brief(first.brief_id, 1, "full", store=restarted) is None
 
-    restarted.forget_owner(primary_scope)
-    assert restarted.get_persisted_document(durable_owner_scope=primary_scope, brief_id=first.brief_id, version=1) is None
-    assert restarted.get_persisted_document(durable_owner_scope=secondary_scope, brief_id=other.brief_id, version=1) == other
+    forged_tuple = _owner_tuple("44")
+    assert restarted.get_persisted_document(
+        authenticated_chat_id=forged_tuple[0], authenticated_actor_id=forged_tuple[1], authenticated_owner_chat_id=forged_tuple[2], brief_id=first.brief_id, version=1,
+    ) is None
+    assert restarted.list_persisted_versions(
+        authenticated_chat_id=forged_tuple[0], authenticated_actor_id=forged_tuple[1], authenticated_owner_chat_id=forged_tuple[2], brief_id=first.brief_id,
+    ) == ()
+    with pytest.raises(ValueError, match="durable ownership"):
+        initial.bind_visible(
+            conversation_id="conversation_" + "f" * 24,
+            response_ref="response_" + "f" * 24,
+            document=first,
+            authenticated_chat_id=forged_tuple[0],
+            authenticated_actor_id=forged_tuple[1],
+            authenticated_owner_chat_id=forged_tuple[2],
+        )
+    restarted.forget_owner(
+        authenticated_chat_id=forged_tuple[0], authenticated_actor_id=forged_tuple[1], authenticated_owner_chat_id=forged_tuple[2],
+    )
+    assert restarted.get_persisted_document(
+        authenticated_chat_id=primary_tuple[0], authenticated_actor_id=primary_tuple[1], authenticated_owner_chat_id=primary_tuple[2], brief_id=first.brief_id, version=1,
+    ) == first
+
+    restarted.forget_owner(
+        authenticated_chat_id=primary_tuple[0], authenticated_actor_id=primary_tuple[1], authenticated_owner_chat_id=primary_tuple[2],
+    )
+    assert restarted.get_persisted_document(
+        authenticated_chat_id=primary_tuple[0], authenticated_actor_id=primary_tuple[1], authenticated_owner_chat_id=primary_tuple[2], brief_id=first.brief_id, version=1,
+    ) is None
+    assert restarted.get_persisted_document(
+        authenticated_chat_id=secondary_tuple[0], authenticated_actor_id=secondary_tuple[1], authenticated_owner_chat_id=secondary_tuple[2], brief_id=other.brief_id, version=1,
+    ) == other
 
 
 def test_persisted_brief_history_fails_closed_if_its_json_is_altered(tmp_path, monkeypatch) -> None:
     db_path = tmp_path / "tampered-brief.db"
     monkeypatch.setenv("AGENT_DB_PATH", str(db_path))
     run_migrations()
-    primary_scope = _owner_scope("42")
+    primary_tuple = _owner_tuple("42")
+    primary_owner_ref = _owner_ref("42")
     document = build_brief_document(
         BriefBuildRequest(
-            topic="AI", window=_window(), owner_ref=primary_scope.owner_ref,
+            topic="AI", window=_window(), owner_ref=primary_owner_ref,
             coverage=(CoverageSource("telegram:archive", "checked"),),
             evidence=(_evidence("one", "https://t.me/example/one", title="One", summary="Bounded local source."),),
         )
@@ -291,16 +329,16 @@ def test_persisted_brief_history_fails_closed_if_its_json_is_altered(tmp_path, m
         conversation_id="conversation_" + "a" * 24,
         response_ref="response_" + "b" * 24,
         document=document,
-        durable_owner_scope=primary_scope,
+        authenticated_chat_id=primary_tuple[0], authenticated_actor_id=primary_tuple[1], authenticated_owner_chat_id=primary_tuple[2],
     )
     with sqlite3.connect(db_path) as connection:
         connection.execute(
             "UPDATE assistant_brief_documents SET document_json = ? WHERE owner_ref = ? AND brief_id = ? AND version = ?",
-            ('{"schema_version":"prm_brief_document_storage.v1"}', primary_scope.owner_ref, document.brief_id, 1),
+            ('{"schema_version":"prm_brief_document_storage.v1"}', primary_owner_ref, document.brief_id, 1),
         )
     restarted = BriefDocumentStore(db_path=str(db_path))
     assert restarted.get_persisted_document(
-        durable_owner_scope=primary_scope, brief_id=document.brief_id, version=1,
+        authenticated_chat_id=primary_tuple[0], authenticated_actor_id=primary_tuple[1], authenticated_owner_chat_id=primary_tuple[2], brief_id=document.brief_id, version=1,
     ) is None
 
 
@@ -308,7 +346,8 @@ def test_application_default_store_keeps_only_exact_history_after_restart(tmp_pa
     db_path = tmp_path / "application-briefs.db"
     monkeypatch.setenv("AGENT_DB_PATH", str(db_path))
     run_migrations()
-    primary_scope = _owner_scope("42")
+    primary_tuple = _owner_tuple("42")
+    primary_owner_ref = _owner_ref("42")
     request = BriefBuildRequest(
         topic="AI", window=_window(), owner_ref="owner_caller_scope",
         coverage=(CoverageSource("telegram:archive", "checked"),),
@@ -331,13 +370,13 @@ def test_application_default_store_keeps_only_exact_history_after_restart(tmp_pa
     )
     assert restarted.briefs.resolve_visible(conversation_id=conversation_id, response_ref=response_ref) is None
     restored = restarted.briefs.get_persisted_document(
-        durable_owner_scope=primary_scope,
+        authenticated_chat_id=primary_tuple[0], authenticated_actor_id=primary_tuple[1], authenticated_owner_chat_id=primary_tuple[2],
         brief_id=str(document["brief_id"]),
         version=int(document["version"]),
     )
     assert restored is not None
     assert restored.to_dict() == document
-    assert document["owner_ref"] == primary_scope.owner_ref
+    assert document["owner_ref"] == primary_owner_ref
 
 
 def test_durable_brief_history_rejects_group_missing_mismatched_and_cli_identity_tuples(tmp_path, monkeypatch) -> None:
@@ -371,13 +410,14 @@ def test_durable_brief_history_has_an_owner_wide_cap(tmp_path, monkeypatch) -> N
     db_path = tmp_path / "bounded-briefs.db"
     monkeypatch.setenv("AGENT_DB_PATH", str(db_path))
     run_migrations()
-    scope = _owner_scope("42")
+    owner_tuple = _owner_tuple("42")
+    owner_ref = _owner_ref("42")
     store = BriefDocumentStore(db_path=str(db_path))
     documents = []
     for index in range(65):
         document = build_brief_document(
             BriefBuildRequest(
-                topic=f"AI cap {index}", window=_window(), owner_ref=scope.owner_ref,
+                topic=f"AI cap {index}", window=_window(), owner_ref=owner_ref,
                 coverage=(CoverageSource("telegram:archive", "checked"),),
                 evidence=(_evidence(
                     f"cap-{index}", f"https://t.me/example/cap-{index}", title=f"Cap {index}",
@@ -390,17 +430,17 @@ def test_durable_brief_history_has_an_owner_wide_cap(tmp_path, monkeypatch) -> N
             conversation_id=f"conversation_cap_{index}",
             response_ref=f"response_{index + 1:024x}",
             document=document,
-            durable_owner_scope=scope,
+            authenticated_chat_id=owner_tuple[0], authenticated_actor_id=owner_tuple[1], authenticated_owner_chat_id=owner_tuple[2],
         )
     with sqlite3.connect(db_path) as connection:
         assert connection.execute(
-            "SELECT COUNT(*) FROM assistant_brief_documents WHERE owner_ref = ?", (scope.owner_ref,),
+            "SELECT COUNT(*) FROM assistant_brief_documents WHERE owner_ref = ?", (owner_ref,),
         ).fetchone() == (64,)
     assert store.get_persisted_document(
-        durable_owner_scope=scope, brief_id=documents[0].brief_id, version=1,
+        authenticated_chat_id=owner_tuple[0], authenticated_actor_id=owner_tuple[1], authenticated_owner_chat_id=owner_tuple[2], brief_id=documents[0].brief_id, version=1,
     ) is None
     assert store.get_persisted_document(
-        durable_owner_scope=scope, brief_id=documents[-1].brief_id, version=1,
+        authenticated_chat_id=owner_tuple[0], authenticated_actor_id=owner_tuple[1], authenticated_owner_chat_id=owner_tuple[2], brief_id=documents[-1].brief_id, version=1,
     ) == documents[-1]
 
 

@@ -34,10 +34,9 @@ from prm.briefs import (
     BriefDocument,
     BriefDocumentStore,
     BriefFollowup,
-    BriefOwnerScope,
     BriefWindow,
     CoverageSource,
-    brief_owner_scope_from_authenticated_private_tuple,
+    brief_owner_ref_from_authenticated_private_tuple,
     build_brief_document,
     classify_brief_followup,
     parse_requested_brief_window,
@@ -580,8 +579,8 @@ class PersonalResearchAssistant:
         adapter, job, delivery handle, or untyped history lookup.
         """
 
-        durable_owner_scope = _brief_owner_scope(request)
-        brief_request = _with_authenticated_brief_owner(brief_request, durable_owner_scope)
+        durable_owner_ref = _brief_owner_ref(request)
+        brief_request = _with_authenticated_brief_owner(brief_request, durable_owner_ref)
         try:
             document = build_brief_document(brief_request)
         except ValueError as exc:
@@ -728,16 +727,19 @@ class PersonalResearchAssistant:
 
         state = self.conversations.record_response(request.chat_id, text=result.text, topic=topic)
         response_ref = state.object_refs[0].response_ref
+        authenticated_tuple = (
+            (request.chat_id, request.actor_id, request.owner_chat_id)
+            if _brief_owner_ref(request) == document.owner_ref
+            else (None, None, None)
+        )
         self.briefs.bind_visible(
             conversation_id=state.conversation_id,
             response_ref=response_ref,
             document=document,
             comparison_document=comparison_document,
-            durable_owner_scope=(
-                scope
-                if (scope := _brief_owner_scope(request)) is not None and document.owner_ref == scope.owner_ref
-                else None
-            ),
+            authenticated_chat_id=authenticated_tuple[0],
+            authenticated_actor_id=authenticated_tuple[1],
+            authenticated_owner_chat_id=authenticated_tuple[2],
         )
         payload = {**dict(result.payload), "conversation": _safe_conversation_payload(state)}
         return AssistantResult(
@@ -1316,10 +1318,10 @@ def _selected_archive_evidence_items(
     ]
 
 
-def _brief_owner_scope(request: OperatorRequest) -> BriefOwnerScope | None:
+def _brief_owner_ref(request: OperatorRequest) -> str | None:
     """Accept durable brief history only from the canonical private ingress tuple."""
 
-    return brief_owner_scope_from_authenticated_private_tuple(
+    return brief_owner_ref_from_authenticated_private_tuple(
         request.chat_id,
         request.actor_id,
         request.owner_chat_id,
@@ -1328,25 +1330,25 @@ def _brief_owner_scope(request: OperatorRequest) -> BriefOwnerScope | None:
 
 def _with_authenticated_brief_owner(
     brief_request: BriefBuildRequest,
-    durable_owner_scope: BriefOwnerScope | None,
+    durable_owner_ref: str | None,
 ) -> BriefBuildRequest:
     """Never let a caller-supplied request choose an authenticated owner scope."""
 
-    if durable_owner_scope is None:
+    if durable_owner_ref is None:
         return brief_request
     previous = (
         brief_request.previous_document
-        if brief_request.previous_document is not None and brief_request.previous_document.owner_ref == durable_owner_scope.owner_ref
+        if brief_request.previous_document is not None and brief_request.previous_document.owner_ref == durable_owner_ref
         else None
     )
     comparison = (
         brief_request.comparison_document
-        if brief_request.comparison_document is not None and brief_request.comparison_document.owner_ref == durable_owner_scope.owner_ref
+        if brief_request.comparison_document is not None and brief_request.comparison_document.owner_ref == durable_owner_ref
         else None
     )
     return replace(
         brief_request,
-        owner_ref=durable_owner_scope.owner_ref,
+        owner_ref=durable_owner_ref,
         previous_document=previous,
         comparison_document=comparison,
     )
@@ -1404,10 +1406,10 @@ def _brief_request_from_archive_payload(
                 "relevance_label": quality.get("relevance_label") or item.get("relevance_label"),
             }
         )
-    durable_owner_scope = _brief_owner_scope(request)
+    durable_owner_ref = _brief_owner_ref(request)
     owner_ref = (
-        durable_owner_scope.owner_ref
-        if durable_owner_scope is not None
+        durable_owner_ref
+        if durable_owner_ref is not None
         else prior_document.owner_ref
         if prior_document is not None
         else "owner_ephemeral_" + hashlib.sha256(f"pa07.owner:{request.chat_id}".encode("utf-8")).hexdigest()[:24]
