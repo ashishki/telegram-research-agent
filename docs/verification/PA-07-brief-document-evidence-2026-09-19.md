@@ -5,7 +5,7 @@ This record is not human acceptance, release approval, live Telegram evidence,
 or formal approval of the mechanically `review_required` PA design.
 
 Branch: `docs/personal-assistant-blueprint-playbook-20260918`.
-Tested implementation SHA: `d2163a13fce5ae16e1f1cb9d09b3131944b58d49`.
+Tested implementation SHA: `dfa135ff274855dee05283ff9c62f7a14429d018`.
 
 ## Implemented boundary
 
@@ -31,58 +31,60 @@ Tested implementation SHA: `d2163a13fce5ae16e1f1cb9d09b3131944b58d49`.
   the current visible `BriefDocument` binding. Explain-item, shorten, topic
   filter, less-technical, cautious apply and week comparison views all render
   the bound report object with `retrieval_performed: false`.
-- Report state is intentionally bounded process-local state tied to the
-  current visible response. A new topic or process restart makes it
-  unavailable. This is the owner-directed PA-07 boundary, not a substitute for
-  PA-08 version exports or PA-09 durable work.
+- The owner authorized a narrow 2026-09-19 P1 remediation: immutable selected
+  document versions are retained in the existing local SQLite schema only when
+  the Telegram ingress carries one canonical private `(chat_id, actor_id,
+  owner_chat_id)` tuple. Application code derives an opaque owner scope from
+  that tuple and replaces any caller-supplied `BriefBuildRequest.owner_ref`.
+  Group, absent, mismatched and CLI tuples retain only ephemeral visible
+  state. Durable reads require that authenticated scope plus exact
+  `(brief_id, version)`; there is no cross-chat or latest-report lookup.
+- Retained history contains bounded excerpts/inspection data rather than the
+  archive corpus, checks its stored content identity when loading, is capped at
+  64 versions/documents owner-wide, and has owner-scoped deletion. A new topic
+  or process restart still removes the visible conversation binding, so normal
+  language follow-ups cannot be reconstructed after restart. Exact retained
+  reads are a future authorized report-reader seam, not PA-08 export or PA-09
+  scheduling.
 
-No database migration, production database access, live provider/account,
-credential, Telegram polling, timer, Redis, worker, schedule, HTML/PDF/export
-or live action was introduced. The two pre-existing untracked local files were
-not staged or modified.
+No production database was accessed or migrated. The additive schema was run
+only against temporary test databases. No live provider/account, credential,
+Telegram polling, timer, Redis, worker, schedule, HTML/PDF/export or live
+action was introduced. The two pre-existing untracked local files were not
+staged or modified.
 
 ## Verification
 
-Commands run against `d2163a1`:
+Commands run against `dfa135f`:
 
 ```text
 PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q \
   tests/test_assistant_briefs.py \
-  tests/test_assistant_report_dialogue.py \
-  tests/test_prm_application.py \
-  tests/test_assistant_conversation.py
-# 55 passed in 4.03s
+  tests/test_assistant_report_dialogue.py
+# 22 passed in 8.08s
 
 PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/test_tiers.py focused-prm
-# 390 passed in 85.77s
-
-python3 tools/playbook.py --check-pin
-# Playbook pin verified; no model, hook or application runtime enabled.
-
-python3 tools/check_personal_assistant_plan.py
-# PA plan: 19 consistent slices; schemas, references, dependencies and context limits passed.
-# Design state: review_required; no product, human-approval or runtime claim.
-
-git diff --check
-# passed
+# 412 passed in 93.70s
 ```
 
 The direct suites cover timezone/DST half-open selection, exact local-source
 provenance, coverage/empty/partial states, deduplication, unresolved conflict,
 importance/urgency, content identity, immutable refresh history, current
 visible-response expiry, all report follow-ups, window filtering before and
-after candidate selection, and the Telegram full-view button payload. They are
-fixture/adapter evidence only: they do not prove actual Telegram rendering,
-mobile readability, archive recall quality, or operator usefulness.
+after candidate selection, and the Telegram full-view button payload. The
+durable-history additions cover exact private-scope owner binding,
+caller-supplied owner replacement, group/missing/mismatched/CLI rejection,
+cross-owner denial, restart-visible-state expiry, tampered JSON fail-closed,
+owner deletion and the owner-wide 64-document cap. They are fixture/adapter
+evidence only: they do not prove actual Telegram rendering, mobile readability,
+archive recall quality, or operator usefulness.
 
-`focused-prm` remains green but does not currently collect the PA-07 suites.
-The owner expressly prohibited an extension to `tools/test_tiers.py` in this
-slice, so the direct command above remains the PA-07-specific executable
-evidence.
+`focused-prm` now includes both PA-07 suites. It is a regression tier, not
+human content, visual, live runtime, or release evidence.
 
 ## Independent slice review
 
-Every listed run used the Role Runner in a fresh read-only process with
+Every listed review uses the Role Runner in a fresh read-only process with
 requested and observed `gpt-5.6-terra` / `high`; no reviewer changed files.
 Early P1 findings drove scoped commits for period/history ownership, content
 identity, full navigation, comparison identity and temporal source semantics.
@@ -95,27 +97,22 @@ The relevant remediation/recheck chain is:
   window binding and button navigation. Commit `d2163a1` binds the window
   before candidate selection, rechecks returned rows, and renders the
   stateless one-time reply button.
-- Fresh recheck `20260919T092541Z-slice_review-8b606ab1` reviewed
-  `d2163a1`, requested and observed `gpt-5.6-terra` / `high`, and returned
-  `STOP_SHIP`. It independently executed a non-writing targeted retry with
-  `PYTHONDONTWRITEBYTECODE=1`, `-p no:cacheprovider` and reported 17 passed;
-  its normal writable-temp command was unavailable in the read-only runner.
+- Pre-amendment recheck `20260919T092541Z-slice_review-8b606ab1` reviewed
+  `d2163a1` and returned `STOP_SHIP` for durable restart history and PA-07
+  registration in `focused-prm`. The owner then authorized those two bounded
+  remediations.
+- Fresh review `20260919T102000Z-slice_review-5a7957ec` reviewed `f146925`,
+  requested and observed `gpt-5.6-terra` / `high`, and returned `STOP_SHIP`.
+  Its P1 findings were authenticated private owner binding, an owner-wide
+  retention cap and current evidence. Commit `dfa135f` adds the first two;
+  this record replaces the stale evidence and reports the current test runs.
 
-The final reviewer retained two P1 requests which are not implementable within
-the owner-authorized PA-07 boundary:
+A fresh independent Terra/high recheck of `dfa135f` plus this evidence update
+is still required. Actual Telegram/mobile visual and human content review also
+remain separate gates. Neither fixture tests nor model review authorizes
+runtime, publication, a design-state change, or PA-08/PA-09 work.
 
-1. Durable owner-scoped restart history would contradict the explicit
-   requirement that report state be ephemeral and unavailable after restart or
-   a new topic. Durable retention/export belongs to a separately authorized
-   design/slice decision.
-2. Registering PA-07 tests in `focused-prm` would edit `tools/test_tiers.py`,
-   explicitly forbidden by the owner for this slice.
-
-Actual Telegram/mobile visual and human content review remain separate gates.
-Neither the fixture tests nor the read-only review authorizes runtime,
-publication, a design-state change, or PA-08/PA-09 work.
-
-Next command after an owner decision on the two scope conflicts:
+Next command:
 
 ```text
 python3 tools/run_codex_role.py run --root . --task PA-07 --feature-id PA \
