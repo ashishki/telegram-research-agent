@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import re
 
 import pytest
 
@@ -103,7 +104,46 @@ def test_html_pdf_and_markdown_preserve_one_exact_editorial_document() -> None:
     assert "Временная линия источников" in markdown.body
     assert "Временная линия источников" in html.body
     assert "Покрытие" in markdown.body and "<table>" in html.body
+    assert f"[{document.evidence[0].source_ref}](<{document.evidence[0].source_ref}>)" in markdown.body
+    assert f"[{document.evidence[1].source_ref}](<{document.evidence[1].source_ref}>)" in markdown.body
     assert validate_report_html(html.body)["status"] == "passed"
+
+
+def test_fallback_pdf_keeps_unicode_text_links_long_urls_and_page_numbers(monkeypatch) -> None:
+    document = _editorial_document()
+
+    def unavailable(_: str) -> bytes:
+        raise RuntimeError("synthetic local PDF backend failure")
+
+    monkeypatch.setattr("prm.report_exports._render_with_weasyprint", unavailable)
+    pdf = render_pdf(document)
+
+    assert isinstance(pdf.body, bytes)
+    assert b"/ToUnicode" in pdf.body
+    assert b"/Annots [" in pdf.body
+    for source_ref in pdf.identity.source_refs:
+        assert f"/URI ({source_ref})".encode("ascii") in pdf.body
+    extracted = _fallback_pdf_text(pdf.body)
+    assert "Отчёт получил проверяемую подробную форму" in extracted
+    assert document.evidence[0].source_ref in extracted
+    assert "Страница 1 /" in extracted
+
+
+def _fallback_pdf_text(pdf: bytes) -> str:
+    """Read this fallback's explicit CID text streams via its ToUnicode map."""
+
+    cmap = {
+        int(source, 16): bytes.fromhex(destination.decode("ascii")).decode("utf-16-be")
+        for source, destination in re.findall(rb"<([0-9A-F]{4})> <([0-9A-F]+)>", pdf)
+        if len(destination) % 4 == 0
+    }
+    lines = []
+    for stream in re.findall(rb"stream\n(.*?)\nendstream", pdf, flags=re.DOTALL):
+        if b" Tj" not in stream:
+            continue
+        for payload in re.findall(rb"<([0-9A-F]+)> Tj", stream):
+            lines.append("".join(cmap.get(int(payload[index:index + 4], 16), "?") for index in range(0, len(payload), 4)))
+    return "".join(lines)
 
 
 def test_source_text_is_escaped_and_static_html_rejects_active_or_tracking_markup() -> None:

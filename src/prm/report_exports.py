@@ -228,16 +228,22 @@ def render_pdf(document: BriefDocument) -> BriefReportArtifact:
 
     html_artifact = render_html(document)
     try:
-        from weasyprint import HTML as WeasyHTML
-    except ImportError as exc:  # pragma: no cover - the declared dependency is available in CI
-        raise BriefReportRenderUnavailable("local PDF renderer is unavailable") from exc
-    try:
-        body = WeasyHTML(string=str(html_artifact.body), url_fetcher=_reject_external_resource).write_pdf()
+        body = _render_with_weasyprint(str(html_artifact.body))
     except Exception:
         body = _render_fallback_pdf(document)
     if not isinstance(body, bytes) or not body.startswith(b"%PDF-"):
         raise BriefReportRenderUnavailable("local PDF renderer returned an invalid artifact")
     return BriefReportArtifact("pdf", "application/pdf", body, html_artifact.identity)
+
+
+def _render_with_weasyprint(html: str) -> bytes:
+    """Use only the declared local backend and reject every attempted fetch."""
+
+    try:
+        from weasyprint import HTML as WeasyHTML
+    except ImportError as exc:  # pragma: no cover - the declared dependency is available in CI
+        raise BriefReportRenderUnavailable("local PDF renderer is unavailable") from exc
+    return WeasyHTML(string=html, url_fetcher=_reject_external_resource).write_pdf()
 
 
 def render_report(document: BriefDocument, format: Literal["html", "markdown", "pdf"]) -> BriefReportArtifact:
@@ -648,8 +654,10 @@ def _markdown_table(value: object) -> str:
 
 
 def _markdown_source(value: str) -> str:
-    # Backticks prevent a malformed source value from becoming Markdown/HTML;
-    # the artifact identity retains the exact ordered source references.
+    # An allowed HTTPS source remains a portable clickable link. Anything else
+    # stays inert code so malformed stored data cannot become active Markdown.
+    if _safe_https_url(value):
+        return f"[{_markdown_text(value)}](<{value}>)"
     return "`" + value.replace("`", "\\`").replace("<", "&lt;").replace(">", "&gt;") + "`"
 
 
@@ -711,18 +719,27 @@ def _render_fallback_pdf(document: BriefDocument) -> bytes:
     def text_width(text: str, size: float) -> float:
         return sum(widths.get(glyph_id(character), replacement_width) * size / 1000 for character in text)
 
-    pages: list[bytes] = []
+    pages: list[tuple[list[str], list[tuple[float, float, float, float, str]]]] = []
     commands: list[str] = []
+    page_links: list[tuple[float, float, float, float, str]] = []
     y = 800.0
 
     def new_page() -> None:
-        nonlocal commands, y
+        nonlocal commands, page_links, y
         if commands:
-            pages.append("\n".join(commands).encode("ascii"))
+            pages.append((commands, page_links))
         commands = ["0.08 0.42 0.36 rg", "36 814 523 3 re f", "0.12 0.15 0.15 rg"]
+        page_links = []
         y = 790.0
 
-    def put(text: str, *, size: float, color: tuple[float, float, float], gap: float = 0.0) -> None:
+    def put(
+        text: str,
+        *,
+        size: float,
+        color: tuple[float, float, float],
+        gap: float = 0.0,
+        link: str | None = None,
+    ) -> None:
         nonlocal y
         for line in _pdf_wrap(text, size=size, maximum=523.0, width=text_width):
             line_height = size * 1.42
@@ -730,26 +747,37 @@ def _render_fallback_pdf(document: BriefDocument) -> bytes:
                 new_page()
             commands.append(f"{color[0]:.3f} {color[1]:.3f} {color[2]:.3f} rg")
             commands.append(f"BT /F1 {size:.2f} Tf 1 0 0 1 36 {y:.2f} Tm <{encoded(line)}> Tj ET")
+            if link is not None and _safe_https_url(link):
+                page_links.append((36.0, y - size * 0.32, min(559.0, 36.0 + text_width(line, size)), y + size, link))
             y -= line_height
         y -= gap
 
     new_page()
-    for style, text in _pdf_text_lines(document):
+    for style, text, link in _pdf_text_lines(document):
         if style == "title":
-            put(text, size=21, color=(0.06, 0.24, 0.21), gap=9)
+            put(text, size=21, color=(0.06, 0.24, 0.21), gap=9, link=link)
         elif style == "heading":
-            put(text, size=14, color=(0.06, 0.36, 0.31), gap=4)
+            put(text, size=14, color=(0.06, 0.36, 0.31), gap=4, link=link)
         elif style == "subheading":
-            put(text, size=11.5, color=(0.12, 0.15, 0.15), gap=2)
+            put(text, size=11.5, color=(0.12, 0.15, 0.15), gap=2, link=link)
         elif style == "caveat":
-            put(text, size=9.6, color=(0.43, 0.23, 0.04), gap=3)
+            put(text, size=9.6, color=(0.43, 0.23, 0.04), gap=3, link=link)
         else:
-            put(text, size=9.6, color=(0.12, 0.15, 0.15), gap=2)
+            put(text, size=9.6, color=(0.12, 0.15, 0.15), gap=2, link=link)
     if commands:
-        pages.append("\n".join(commands).encode("ascii"))
+        pages.append((commands, page_links))
+
+    numbered_pages = []
+    for number, (page_commands, links) in enumerate(pages, start=1):
+        footer = f"Страница {number} / {len(pages)}"
+        page_commands.extend((
+            "0.35 0.40 0.39 rg",
+            f"BT /F1 8 Tf 1 0 0 1 490 25 Tm <{encoded(footer)}> Tj ET",
+        ))
+        numbered_pages.append(("\n".join(page_commands).encode("ascii"), links))
 
     return _build_unicode_pdf(
-        pages=pages,
+        pages=numbered_pages,
         font_data=font_data,
         glyph_unicode=glyph_unicode,
         widths=widths,
@@ -768,56 +796,57 @@ def _fallback_font_path() -> Path | None:
     return None
 
 
-def _pdf_text_lines(document: BriefDocument) -> list[tuple[str, str]]:
+def _pdf_text_lines(document: BriefDocument) -> list[tuple[str, str, str | None]]:
     """Flatten all saved report content into labelled print lines without inference."""
 
-    lines: list[tuple[str, str]] = [
-        ("title", document.topic),
-        ("body", f"Версия: {document.brief_id} v{document.version}"),
-        ("body", f"Идентичность содержимого: {document.content_digest}"),
-        ("body", f"Период: {_period_text(document)}"),
-        ("heading", "События и объяснения"),
+    lines: list[tuple[str, str, str | None]] = [
+        ("title", document.topic, None),
+        ("body", f"Версия: {document.brief_id} v{document.version}", None),
+        ("body", f"Идентичность содержимого: {document.content_digest}", None),
+        ("body", f"Период: {_period_text(document)}", None),
+        ("heading", "События и объяснения", None),
     ]
     sources = document.evidence_by_ref()
     if document.editorial is not None:
         if not document.editorial.stories:
-            lines.append(("body", "В выбранной области событий не выделено; покрытие указано ниже."))
+            lines.append(("body", "В выбранной области событий не выделено; покрытие указано ниже.", None))
         for number, story in enumerate(document.editorial.stories, start=1):
             lines.extend((
-                ("subheading", f"{number}. {story.title}"),
-                ("body", story.summary),
-                ("body", f"Объяснение: {story.explanation}"),
-                ("body", f"Почему выделено: {story.why_selected}"),
+                ("subheading", f"{number}. {story.title}", None),
+                ("body", story.summary, None),
+                ("body", f"Объяснение: {story.explanation}", None),
+                ("body", f"Почему выделено: {story.why_selected}", None),
             ))
             if story.next_step:
-                lines.append(("body", f"Условный следующий шаг: {story.next_step}"))
+                lines.append(("body", f"Условный следующий шаг: {story.next_step}", None))
             if story.caveat:
-                lines.append(("caveat", f"Оговорка: {story.caveat}"))
+                lines.append(("caveat", f"Оговорка: {story.caveat}", None))
             for anchor in story.anchors:
-                lines.append(("body", f"Источник: {sources[anchor.evidence_ref].source_ref}"))
-                lines.append(("body", f"Цитата: {anchor.quote}"))
+                source_ref = sources[anchor.evidence_ref].source_ref
+                lines.append(("body", f"Источник: {source_ref}", source_ref))
+                lines.append(("body", f"Цитата: {anchor.quote}", None))
     else:
         for section in document.sections:
-            lines.append(("subheading", section.title))
+            lines.append(("subheading", section.title, None))
             for item in section.items:
-                lines.extend((("body", item.title), ("body", item.summary)))
-                lines.extend(("body", f"Источник: {sources[ref].source_ref}") for ref in item.evidence_refs)
-    lines.append(("heading", "Временная линия источников"))
+                lines.extend((("body", item.title, None), ("body", item.summary, None)))
+                lines.extend(("body", f"Источник: {sources[ref].source_ref}", sources[ref].source_ref) for ref in item.evidence_refs)
+    lines.append(("heading", "Временная линия источников", None))
     for evidence in _timeline(document):
-        lines.extend((("subheading", f"{_display_time(evidence)} — {evidence.title}"), ("body", evidence.summary)))
-    lines.append(("heading", "Покрытие"))
+        lines.extend((("subheading", f"{_display_time(evidence)} — {evidence.title}", None), ("body", evidence.summary, None)))
+    lines.append(("heading", "Покрытие", None))
     for source in document.coverage_manifest.sources:
         suffix = f"; ограничение: {source.reason}" if source.reason else ""
-        lines.append(("body", f"{source.source_ref}: {source.state}{suffix}"))
+        lines.append(("body", f"{source.source_ref}: {source.state}{suffix}", None))
     if document.coverage_manifest.limitations:
-        lines.append(("body", "Ограничения: " + ", ".join(document.coverage_manifest.limitations)))
-    lines.append(("heading", "Источники"))
+        lines.append(("body", "Ограничения: " + ", ".join(document.coverage_manifest.limitations), None))
+    lines.append(("heading", "Источники", None))
     for evidence in document.evidence:
         lines.extend((
-            ("subheading", evidence.title),
-            ("body", evidence.summary),
-            ("body", f"URL: {evidence.source_ref}"),
-            ("body", f"Время: {_display_time(evidence)}; состояние: {evidence.source_state}; отношение к периоду: {evidence.period_relation}"),
+            ("subheading", evidence.title, None),
+            ("body", evidence.summary, None),
+            ("body", f"URL: {evidence.source_ref}", evidence.source_ref),
+            ("body", f"Время: {_display_time(evidence)}; состояние: {evidence.source_state}; отношение к периоду: {evidence.period_relation}", None),
         ))
     return lines
 
@@ -856,7 +885,7 @@ def _pdf_wrap(
 
 def _build_unicode_pdf(
     *,
-    pages: list[bytes],
+    pages: list[tuple[bytes, list[tuple[float, float, float, float, str]]]],
     font_data: bytes,
     glyph_unicode: dict[int, str],
     widths: dict[int, int],
@@ -868,6 +897,7 @@ def _build_unicode_pdf(
     page_count = len(pages)
     page_object_start = 8
     content_object_start = page_object_start + page_count
+    annotation_object_start = content_object_start + page_count
     objects: dict[int, bytes] = {}
     kids = " ".join(f"{page_object_start + index} 0 R" for index in range(page_count))
     objects[1] = b"<< /Type /Catalog /Pages 2 0 R >>"
@@ -883,11 +913,22 @@ def _build_unicode_pdf(
     compressed_font = zlib.compress(font_data, level=9)
     objects[6] = _pdf_stream(compressed_font, extra=f"/Length1 {len(font_data)} /Filter /FlateDecode")
     objects[7] = _pdf_stream(_to_unicode_cmap(glyph_unicode), extra="")
-    for index, content in enumerate(pages):
+    next_annotation = annotation_object_start
+    for index, (content, links) in enumerate(pages):
         page_number = page_object_start + index
         content_number = content_object_start + index
+        annotation_refs = []
+        for left, bottom, right, top, source_ref in links:
+            annotation_refs.append(f"{next_annotation} 0 R")
+            objects[next_annotation] = (
+                "<< /Type /Annot /Subtype /Link /Rect "
+                f"[{left:.2f} {bottom:.2f} {right:.2f} {top:.2f}] /Border [0 0 0] "
+                f"/A << /S /URI /URI ({_pdf_literal(source_ref)}) >> >>"
+            ).encode("ascii")
+            next_annotation += 1
+        annotations = " /Annots [" + " ".join(annotation_refs) + "]" if annotation_refs else ""
         objects[page_number] = (
-            f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents {content_number} 0 R >>"
+            f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents {content_number} 0 R{annotations} >>"
         ).encode("ascii")
         objects[content_number] = _pdf_stream(content, extra="")
     buffer = bytearray(b"%PDF-1.7\n%\xe2\xe3\xcf\xd3\n")
@@ -907,6 +948,10 @@ def _build_unicode_pdf(
 def _pdf_stream(data: bytes, *, extra: str) -> bytes:
     suffix = (" " + extra) if extra else ""
     return f"<< /Length {len(data)}{suffix} >>\nstream\n".encode("ascii") + data + b"\nendstream"
+
+
+def _pdf_literal(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
 
 
 def _to_unicode_cmap(glyph_unicode: dict[int, str]) -> bytes:
@@ -929,7 +974,7 @@ def _to_unicode_cmap(glyph_unicode: dict[int, str]) -> bytes:
 
 def _stylesheet() -> str:
     return """
-@page { size: A4; margin: 15mm 13mm; }
+@page { size: A4; margin: 15mm 13mm; @bottom-center { content: "Страница " counter(page) " / " counter(pages); font-size: 8pt; } }
 :root { color-scheme: light dark; --bg: #f5f5f0; --panel: #ffffff; --ink: #1e2525; --muted: #586161; --line: #cbd2cc; --accent: #146b5c; --caveat: #7b4a13; }
 * { box-sizing: border-box; }
 html { background: var(--bg); }
