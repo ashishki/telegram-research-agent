@@ -264,7 +264,7 @@ def decide_route(query: str, *, requested_mode: RequestMode = "auto", explicit_p
             reason="explicit_mode",
             confidence=1.0,
             project=project,
-            retrieval_query=_retrieval_query(clean),
+            retrieval_query=brief_topic_query(clean),
             intent="writer_brief",
             contract="brief.v1",
             archive_scope=archive_scope,
@@ -335,7 +335,7 @@ def decide_route(query: str, *, requested_mode: RequestMode = "auto", explicit_p
             reason="editorial_request",
             confidence=0.94,
             project=project,
-            retrieval_query=_retrieval_query(clean),
+            retrieval_query=brief_topic_query(clean),
             intent="writer_brief",
             contract="brief.v1",
             archive_scope=archive_scope,
@@ -550,6 +550,18 @@ def _requires_current_fact_verification(lowered: str, *, archive_scope: bool) ->
     # Outside an archive scope, a standalone freshness word is meaningful, but
     # it is deliberately ignored inside archive lookup/applicability questions.
     return bool(re.search(r"\b(сейчас|актуальн\w*|today|currently|now)\b", lowered))
+
+
+def brief_topic_query(query: str) -> str:
+    """Keep period and presentation instructions out of semantic retrieval."""
+    clean = " ".join(str(query or "").split())
+    clean = re.sub(r"\b(?:timezone|часовой пояс)\s+[A-Za-z_]+/[A-Za-z_/]+", " ", clean, flags=re.I)
+    clean = re.sub(r"\b(?:с|from)\s+\d{4}-\d{2}-\d{2}\s+(?:по|до|to)\s+\d{4}-\d{2}-\d{2}", " ", clean, flags=re.I)
+    clean = re.sub(r"\b(?:за\s+)?(?:последн\w*|прошл\w*|эт\w*)?\s*(?:недел\w*|семь дней|7 дней|месяц|день)\b", " ", clean, flags=re.I)
+    clean = re.sub(r"\b(?:last|past|this)\s+(?:week|month|day|7 days)\b", " ", clean, flags=re.I)
+    clean = re.sub(r"\b(?:покажи|составь|сделай|подготовь|собери|подробный|полный|короткий|бриф|обзор|дайджест|brief|weekly|digest)\b", " ", clean, flags=re.I)
+    clean = " ".join(clean.strip(" :,.?!").split())
+    return _retrieval_query(clean) if clean else "новости"
 
 
 def _retrieval_query(query: str) -> str:

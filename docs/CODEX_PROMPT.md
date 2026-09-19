@@ -33,71 +33,36 @@ made on 2026-09-19 using the documented secret path; it skipped migrations,
 was stopped cleanly, and the pre-existing service was restored. It produced no
 test brief or human-review receipt, so it grants no continuing live authority.
 
-## Current slice: PA-07 local BriefDocument handoff
+## Current slice: PA-07 editorial content and conversation correction
 
-PA-07 is locally implemented through `023688c` (with preceding scoped commits
-`1f5a75a`, `a1f8001`, `de32184`, `447af21`, `d553f3b`, `44d2195`, `264bc5f`,
-`d2163a1`, `f146925`, `dfa135f`, `ff6329e`, `fa1cc10`, `9603c28` and
-`d9a684f`). It provides an immutable, inspectable source-backed
-`BriefDocument`, a selected IANA-zone half-open period, coverage/deduplication/
-conflict/importance-versus-urgency evidence, bounded visible report history,
-and deterministic Telegram/report follow-ups. A request window is bound before
-local archive candidate selection and rechecked afterwards. The Telegram full
-view is reached by a one-time reply-keyboard text control that resolves only
-against the current visible in-process report object.
+On 2026-09-19 the owner rejected the feed-like brief and explicitly directed
+integrating the product-quality recommendations throughout active tasks up to
+PA-15 and beginning implementation with batched review. This newer instruction
+supersedes the previous narrow local PA-07 edit boundary, not runtime consent.
+Read `docs/design/PA-PRODUCT-QUALITY.md` and the current PA-07 task first.
+The complete PA-00..PA-18 programme and formal `review_required` state remain.
 
-The dispatcher keeps that visible report object in a bounded process-local
-store across immediate commands; a process restart clears the projection and
-prevents normal-language reconstruction of the old brief.
+The current correction adds source-anchored editorial stories, explanations,
+selection rationale and conditional next steps to the immutable report, with
+real source references across short/full/discussion views. Candidate and display
+limits are distinct. The existing paired archive model grant is still required;
+no live model/account/service is enabled by these local edits. Quote anchoring
+is not semantic verification or human content acceptance.
 
-Private owner feedback identified the former expanded Telegram rendering as a
-P1 usability failure: it exposed a technical/audit dump instead of a readable
-brief. Commits `d6188c3` through `023688c` render a short native-Telegram HTML
-card and a conversational expanded view: assessed/project-linked items occupy
-the mobile slots, unknown priorities are stated honestly without inventing a
-ranking, source links have named identities, and coverage is phrased for a
-reader. Exact document IDs, hashes, source states and history remain at the
-inspectable `BriefDocument` boundary, not in the chat card. The raw private
-brief is not retained in Git. Direct PA-07 tests pass 27/27, `focused-prm`
-completed PASS, and a fresh read-only Terra 5.6/high advisory judge passed a
-synthetic/redacted fixture. That is not human acceptance or current live
-render evidence: the system service has not yet been refreshed to this SHA and
-a bounded private mobile check plus fresh independent slice review remain
-required. The design stays mechanically `review_required`.
+Use the dedicated editorial/brief/dialogue/synthesis tests and focused-prm.
+Review one coherent change, then only scoped P0/P1 corrections. Do not repeat
+Deep Review per wording patch. Preserve the prior ownership, history, temporal
+and permission checks. Human mobile/provider evidence remains required before
+claiming product acceptance; proceed with independent local work meanwhile.
 
-The owner explicitly amended this narrow PA-07 boundary on 2026-09-19 to
-remediate two independent P1 findings: add owner-scoped, bounded immutable
-BriefDocument history through the existing local SQLite schema path, and
-register the two PA-07 suites in `focused-prm`. Visible conversation bindings
-remain ephemeral: a new topic or process restart cannot resolve a normal
-language follow-up without its current visible response. Durable lookup,
-listing, writes and deletion each consume the canonical authenticated private
-tuple plus exact `(brief_id, version)` where applicable, never a cross-chat or
-latest-report catalogue. History is capped owner-wide, not only per report
-identity. The migration is additive and is exercised only on a temporary test
-database; do not access or migrate a production database.
+Historical PA-07 evidence is in
+`docs/verification/PA-07-brief-document-evidence-2026-09-19.md`.
+The earlier two-item synthetic judge pass is not evidence of editorial quality.
+The previous bounded live attempt produced no acceptance receipt. Record the
+current implementation/checkpoint in the new editorial evidence record.
 
-This amendment does not authorize a durable job, worker, Redis, schedule,
-export, provider/model egress, PA-08/PA-09 implementation or continuing
-Telegram polling. The one manual runtime attempt described above does not
-broaden this boundary. The direct PA-07 suites and `focused-prm` remain
-required evidence.
-
-The evidence record is
-`docs/verification/PA-07-brief-document-evidence-2026-09-19.md`. Fresh
-read-only Terra 5.6/high reviews found and drove the scoped remediations. The
-latest recheck, `20260919T110742Z-slice_review-d305cf5c` against `ba84cd3`,
-found no further code defect but returned `STOP_SHIP` for external acceptance
-gates: actual authorized private Telegram/mobile rendering inspection and
-human content review. Its read-only sandbox could not create pytest temporary
-files; the exact current code was instead run successfully in the writable
-workspace and recorded in the evidence. Do not claim that either external gate
-is satisfied: the subsequent bounded live attempt received no submitted test
-brief or human review before shutdown. Do not begin PA-08/PA-09. The design
-remains mechanically `review_required`.
-
-PA-06's local checkpoint below is historical context for PA-07's dependency;
-do not treat it as an instruction to start PA-08 or PA-09.
+The checkpoints below are historical dependency evidence. The owner's newer
+quality amendment governs current local work; live/runtime gates remain.
 
 PA-03 is locally tested at `081dded92b00bdaa822a6f6c0efbe8ae7ab86861` with
 evidence at `docs/verification/PA-03-conversation-evidence-2026-09-19.md`.

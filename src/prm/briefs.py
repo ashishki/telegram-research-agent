@@ -25,6 +25,8 @@ from typing import Any, Literal, Mapping, Sequence
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from prm.brief_editorial import BriefEditorial
+
 
 BRIEF_DOCUMENT_SCHEMA_VERSION = "assistant.brief_document.v1"
 BRIEF_INSPECTION_SCHEMA_VERSION = "prm_brief_inspection.v1"
@@ -224,7 +226,7 @@ class BriefEvidence:
             or _clean(self.source_family_ref, 512, required=True) is None
         ):
             raise ValueError("brief evidence identity is invalid")
-        if _clean(self.title, 240, required=True) is None or _clean(self.summary, 400, required=True) is None:
+        if _clean(self.title, 240, required=True) is None or _clean(self.summary, 1200, required=True) is None:
             raise ValueError("brief evidence text is invalid")
         if self.observed_at.tzinfo is None or self.time_kind not in {"published", "event", "discovered", "updated", "deleted", "reissued"}:
             raise ValueError("brief evidence time is invalid")
@@ -288,7 +290,7 @@ class BriefItem:
     def __post_init__(self) -> None:
         if not _ITEM_ID.fullmatch(self.item_id):
             raise ValueError("brief item id is invalid")
-        if _clean(self.title, 240, required=True) is None or _clean(self.summary, 400, required=True) is None:
+        if _clean(self.title, 240, required=True) is None or _clean(self.summary, 1200, required=True) is None:
             raise ValueError("brief item text is invalid")
         if not self.evidence_refs or len(self.evidence_refs) > 20 or len(set(self.evidence_refs)) != len(self.evidence_refs):
             raise ValueError("brief item evidence is invalid")
@@ -401,6 +403,7 @@ class BriefDocument:
     conflicts: tuple[ConflictRecord, ...] = ()
     comparison_ref: BriefVersionRef | None = None
     period_basis: str = "explicit_requested_range"
+    editorial: BriefEditorial | None = None
 
     def __post_init__(self) -> None:
         if (
@@ -438,6 +441,10 @@ class BriefDocument:
             raise ValueError("brief content identity is invalid")
         if not _SAFE_REASON.fullmatch(self.period_basis):
             raise ValueError("brief period basis is invalid")
+        if self.editorial is not None:
+            if type(self.editorial) is not BriefEditorial:
+                raise ValueError("brief editorial is invalid")
+            BriefEditorial.from_dict(self.editorial.to_dict(), self.evidence)
 
     @property
     def version_ref(self) -> BriefVersionRef:
@@ -465,6 +472,7 @@ class BriefDocument:
             "selection_reasons": list(self.selection_reasons),
             "previous_version": self.previous_version.to_dict() if self.previous_version is not None else None,
             "coverage_manifest": self.coverage_manifest.to_dict(),
+            **({"editorial": self.editorial.to_dict()} if self.editorial is not None else {}),
         }
 
     def inspect(self) -> dict[str, object]:
@@ -536,6 +544,7 @@ class BriefBuildRequest:
     previous_document: BriefDocument | None = None
     comparison_document: BriefDocument | None = None
     period_basis: str = "explicit_requested_range"
+    editorial: BriefEditorial | None = None
 
     def __post_init__(self) -> None:
         if _clean(self.topic, 160, required=True) is None or not _OWNER_REF.fullmatch(self.owner_ref):
@@ -616,6 +625,7 @@ def build_brief_document(request: BriefBuildRequest) -> BriefDocument:
             previous_version=None,
             comparison_ref=request.comparison_document.version_ref if request.comparison_document is not None else None,
             period_basis=request.period_basis,
+            editorial=request.editorial,
         )
         brief_id = "brief_" + _digest(
             "prm.brief.content.v1",
@@ -639,6 +649,7 @@ def build_brief_document(request: BriefBuildRequest) -> BriefDocument:
         previous_version=previous_ref,
         comparison_ref=comparison_ref,
         period_basis=request.period_basis,
+        editorial=request.editorial,
     )
     return BriefDocument(
         brief_id=brief_id,
@@ -657,15 +668,18 @@ def build_brief_document(request: BriefBuildRequest) -> BriefDocument:
         conflicts=conflicts,
         comparison_ref=comparison_ref,
         period_basis=request.period_basis,
+        editorial=request.editorial,
     )
 
 
 def classify_brief_followup(text: str) -> BriefFollowup | None:
     clean = " ".join(str(text or "").split())
     lowered = clean.casefold()
-    item = re.fullmatch(r"(?:объясни|поясни|расскажи про|explain)\s+(?:пункт|item)\s*(\d{1,2})", lowered)
+    item = re.fullmatch(r"(?:объясни|поясни|расскажи про|подробнее про|explain)\s+(?:пункт\s*|item\s*)?(\d{1,2})[?.!]?", lowered)
     if item is not None:
         return BriefFollowup("explain_item", item_number=int(item.group(1)))
+    if lowered in {"а второе?", "а второе", "объясни второе", "подробнее про второе"}:
+        return BriefFollowup("explain_item", item_number=2)
     if lowered in {"сделай короче", "сократи", "shorten it", "make it shorter"}:
         return BriefFollowup("shorten")
     if lowered in {
@@ -682,6 +696,7 @@ def classify_brief_followup(text: str) -> BriefFollowup | None:
     if lowered in {
         "что из этого применить?", "что из этого применить", "что применить?", "что применить",
         "what from this should i apply?", "what from this should i apply",
+        "а мне это зачем?", "а мне это зачем", "что попробовать?", "что попробовать",
     }:
         return BriefFollowup("apply")
     if ("сравни" in lowered or "compare" in lowered) and ("прошл" in lowered or "week" in lowered or "недел" in lowered):
@@ -706,6 +721,8 @@ def render_brief_document(
 
     if type(document) is not BriefDocument:
         raise ValueError("brief document is required")
+    if document.editorial is not None and view != "comparison":
+        return _render_editorial(document, view=view, item_number=item_number, topics=topics)
     if view == "item":
         return _render_item(document, item_number)
     if view == "comparison":
@@ -799,6 +816,7 @@ def _storage_document(document: BriefDocument) -> dict[str, object]:
         "deduplication": [item.to_dict() for item in document.deduplication],
         "conflicts": [item.to_dict() for item in document.conflicts],
         "period_basis": document.period_basis,
+        **({"editorial": document.editorial.to_dict()} if document.editorial is not None else {}),
     }
 
 
@@ -887,7 +905,7 @@ def _stored_document(payload: object) -> BriefDocument:
                 source_ref=str(_stored_text(item.get("source_ref"), field="source_ref", limit=512)),
                 source_family_ref=str(_stored_text(item.get("source_family_ref"), field="source_family_ref", limit=512)),
                 title=str(_stored_text(item.get("title"), field="evidence.title", limit=240)),
-                summary=str(_stored_text(item.get("summary"), field="evidence.summary", limit=400)),
+                summary=str(_stored_text(item.get("summary"), field="evidence.summary", limit=1200)),
                 observed_at=_stored_timestamp(item.get("observed_at"), field="observed_at", timezone_name=timezone_name),
                 time_kind=str(_stored_text(item.get("time_kind"), field="time_kind", limit=16)),  # type: ignore[arg-type]
                 topics=_stored_string_tuple(item.get("topics"), field="evidence.topics", limit=8),
@@ -932,7 +950,7 @@ def _stored_document(payload: object) -> BriefDocument:
                 BriefItem(
                     item_id=str(_stored_text(item.get("item_id"), field="item_id", limit=128)),
                     title=str(_stored_text(item.get("title"), field="item.title", limit=240)),
-                    summary=str(_stored_text(item.get("summary"), field="item.summary", limit=400)),
+                    summary=str(_stored_text(item.get("summary"), field="item.summary", limit=1200)),
                     evidence_refs=_stored_string_tuple(item.get("evidence_refs"), field="item.evidence_refs", limit=20),
                     selection_reasons=_stored_string_tuple(item.get("selection_reasons"), field="item.reasons", limit=10),
                     topics=topics,
@@ -991,6 +1009,7 @@ def _stored_document(payload: object) -> BriefDocument:
         conflicts=conflicts,
         comparison_ref=_stored_version_ref(data.get("comparison_ref"), field="comparison_ref"),
         period_basis=str(_stored_text(data.get("period_basis"), field="period_basis", limit=120)),
+        editorial=BriefEditorial.from_dict(data["editorial"], evidence) if "editorial" in data else None,
     )
     expected_digest = _content_digest(
         topic=document.topic,
@@ -1003,6 +1022,7 @@ def _stored_document(payload: object) -> BriefDocument:
         previous_version=document.previous_version,
         comparison_ref=document.comparison_ref,
         period_basis=document.period_basis,
+        editorial=document.editorial,
     )
     expected_sections = _sections(
         document.evidence,
@@ -1529,6 +1549,7 @@ def rebuild_brief_request(document: BriefDocument) -> BriefBuildRequest:
         limitations=document.coverage_manifest.limitations,
         previous_document=document,
         period_basis="revised_existing_evidence",
+        editorial=document.editorial,
     )
 
 
@@ -1571,7 +1592,7 @@ def _evidence_from_mapping(raw: Mapping[str, Any], *, window: BriefWindow) -> Br
         required=True,
     )
     source_ref = _clean(raw.get("canonical_url") or raw.get("source_url") or raw.get("telegram_url"), 512, required=True)
-    summary = _clean(raw.get("support_span") or raw.get("snippet") or raw.get("summary"), 400, required=True)
+    summary = _clean(raw.get("support_span") or raw.get("snippet") or raw.get("summary"), 1200, required=True)
     title = _clean(raw.get("title"), 240) or _clean(raw.get("channel_username"), 160) or "Архивный материал"
     if identity is None or source_ref is None or summary is None or not _HTTPS_REF.fullmatch(source_ref):
         raise ValueError("brief local archive source is invalid")
@@ -1873,6 +1894,7 @@ def _content_digest(
     previous_version: BriefVersionRef | None,
     comparison_ref: BriefVersionRef | None,
     period_basis: str,
+    editorial: BriefEditorial | None = None,
 ) -> str:
     """Canonical identity for the selected facts and their inspection basis."""
 
@@ -1918,6 +1940,9 @@ def _content_digest(
         "conflicts": [item.to_dict() for item in conflicts],
     }
     encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+    if editorial is not None:
+        payload["editorial"] = editorial.to_dict()
+        encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
     return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
 
@@ -2161,7 +2186,7 @@ def _render_telegram_full_card(document: BriefDocument) -> str:
     """
 
     lines = [
-        "🗞 <b>Подробный бриф</b>",
+        "🗞 <b>Материалы по теме</b>",
         f"<b>{_telegram_html(document.topic, 88)}</b>",
         f"<i>{_telegram_html(_period_label(document.window), 72)} · {_telegram_html(document.window.timezone, 64)}</i>",
     ]
@@ -2169,14 +2194,7 @@ def _render_telegram_full_card(document: BriefDocument) -> str:
         lines.extend(("", "В этой выборке нет пунктов для подробного разбора.", _telegram_card_coverage_line(document)))
         return "\n".join(lines)
 
-    if all(item.importance == "unknown" and item.urgency == "unknown" for item in document.items):
-        lines.extend(
-            (
-                "",
-                "⚪ <b>Это подборка по теме, а не рейтинг важности.</b>",
-                "В найденных материалах нет оценки важности или срока; я не буду придумывать «главное».",
-            )
-        )
+    lines.extend(("", "Редакторский обзор пока не подготовлен. Ниже — найденные фрагменты и источники."))
 
     evidence = document.evidence_by_ref()
     index = 0
@@ -2189,9 +2207,9 @@ def _render_telegram_full_card(document: BriefDocument) -> str:
             source = evidence[item.evidence_refs[0]]
             item_lines = [
                 f"{index}. <b>{_telegram_html(item.title, 112)}</b>",
-                _telegram_html(_short(item.summary, 160), 160),
+                _telegram_html(item.summary, 1200),
                 *_telegram_why_it_matters(item),
-                f"{_telegram_card_priority(item)} · {_telegram_card_source_link(source.source_ref)}",
+                " · ".join(value for value in (_telegram_card_priority(item), _telegram_card_source_link(source.source_ref)) if value),
             ]
             temporal_note = _telegram_human_time_label(source)
             if temporal_note:
@@ -2223,15 +2241,80 @@ def _telegram_card_priority(item: BriefItem) -> str:
         "high": "Важность: важно",
         "medium": "Важность: полезно",
         "low": "Важность: контекст",
-        "unknown": "Важность: не отмечена",
+        "unknown": "",
     }[item.importance]
     urgency = {
         "urgent": "срочно",
         "soon": "скоро",
-        "not_marked": "без срока",
-        "unknown": "срок не указан",
+        "not_marked": "",
+        "unknown": "",
     }[item.urgency]
-    return f"{importance} · Срочность: {urgency}"
+    return " · ".join(value for value in (importance, f"Срочность: {urgency}" if urgency else "") if value)
+
+
+def _human_brief_period(window: BriefWindow) -> str:
+    zone = ZoneInfo(window.timezone)
+    start = window.start_at.astimezone(zone)
+    end = window.end_at.astimezone(zone)
+    return f"{start:%d.%m %H:%M} — {end:%d.%m %H:%M} · {window.timezone}"
+
+
+def _render_editorial(
+    document: BriefDocument, *, view: str, item_number: int | None, topics: Sequence[str],
+) -> str:
+    editorial = document.editorial
+    assert editorial is not None
+    sources = document.evidence_by_ref()
+    indexed = list(enumerate(editorial.stories, start=1))
+    if view == "item":
+        indexed = [(i, story) for i, story in indexed if i == item_number]
+    if topics:
+        selected_topics = {_topic(topic) for topic in topics}
+        indexed = [(i, story) for i, story in indexed if any(
+            selected_topics & set(sources[anchor.evidence_ref].topics) for anchor in story.anchors
+        )]
+    if not indexed:
+        return "В этом обзоре нет такого пункта или темы. Можно вернуться к полному брифу."
+    compact = view in {"telegram", "short", "less_technical", "topics"}
+    lines = [f"🗞 <b>{_telegram_html(document.topic, 160)}</b>",
+             f"<i>{_telegram_html(_human_brief_period(document.window), 120)}</i>"]
+    for index, story in indexed:
+        block = ["", f"<b>{index}. {_telegram_html(story.title, 140)}</b>"]
+        if view == "apply":
+            block.append(_telegram_html(story.why_selected, 300))
+            block.append(_telegram_html(story.next_step, 300) if story.next_step else
+                         "Конкретный следующий шаг из этих материалов пока не следует.")
+        else:
+            block.append(_telegram_html(story.summary, 300))
+            if not compact:
+                block.extend(("", _telegram_html(story.explanation, 900),
+                              f"<b>Почему выделил:</b> {_telegram_html(story.why_selected, 300)}"))
+                if story.next_step:
+                    block.append(f"<b>Можно попробовать:</b> {_telegram_html(story.next_step, 300)}")
+        if story.caveat and not compact:
+            block.append(f"<b>Ограничение:</b> {_telegram_html(story.caveat, 300)}")
+        refs = tuple(dict.fromkeys(anchor.evidence_ref for anchor in story.anchors))
+        for ref in refs[:1] if compact else refs:
+            source = sources[ref]
+            block.append(_telegram_card_source_link(source.source_ref))
+            if not compact:
+                note = _telegram_human_time_label(source)
+                if note:
+                    block.append(_telegram_html(note, 300))
+        if any(ref in conflict.evidence_refs for ref in refs for conflict in document.conflicts):
+            block.append("⚠️ Источники расходятся; это расхождение пока не разрешено.")
+        if compact and len("\n".join(lines + block)) > 2000:
+            break
+        lines.extend(block)
+        if compact and sum(line.startswith("<b>") for line in lines) >= 3:
+            break
+    lines.extend(("", _telegram_card_coverage_line(document)))
+    if compact:
+        lines.append(f"Подробнее — «{BRIEF_FULL_VIEW_BUTTON_TEXT}». Можно попросить объяснить любой пункт.")
+    else:
+        example_number = 2 if len(editorial.stories) > 1 else 1
+        lines.append(f"Спроси «объясни пункт {example_number}», «сделай короче» или «что попробовать?».")
+    return "\n".join(lines)
 
 
 def _telegram_card_source_link(source_ref: str) -> str:

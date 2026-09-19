@@ -268,9 +268,9 @@ callback, retrieval call or `eval-*` ID; a declared immutable bound-inline
 fixture checks project provenance. It never preserves stale dialogue merely to
 satisfy the old corpus. The direct handler tests prove the real callback path.
 
-These are planned test-first tests, not pre-approval evidence. Existing commands
-are regression floors; each code slice registers exact acceptance tests and
-intended semantic failures before implementation. PA-00 records interpreter,
+The owner-authorized content/conversation amendment is in
+`docs/design/PA-PRODUCT-QUALITY.md`; it applies through PA-15.
+Existing commands are regression floors; register slice acceptance tests. PA-00 records interpreter,
 HEAD, runtime mode and evaluator IDs; historic `cc105…` is reference-only. Its
 scope includes the affected callbacks/UTD/ledger tests and legacy markup within
 `files<=22`.

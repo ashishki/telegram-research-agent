@@ -68,7 +68,8 @@ from prm.deep_research import (
     run_bounded_research,
 )
 from prm.routing import decide_route
-from prm.synthesis import synthesize_archive_response
+from prm.synthesis import synthesize_archive_response, _abandon_archive_access
+from prm.brief_editorial import synthesize_brief_editorial
 
 
 class PersonalResearchAssistant:
@@ -321,8 +322,8 @@ class PersonalResearchAssistant:
 
         budget = MemoryResearchBudget(
             max_tool_calls=4,
-            max_archive_sources=8 if route.primary_intent == "archive_to_action" else (5 if route.mode == "brief" else 4),
-            max_archive_candidates=32 if route.primary_intent == "archive_to_action" else 16,
+            max_archive_sources=8 if route.primary_intent == "archive_to_action" or route.mode == "brief" else 4,
+            max_archive_candidates=32 if route.primary_intent == "archive_to_action" or route.mode == "brief" else 16,
             max_linked_sources=3,
             max_retries=0,
             timeout_seconds=30,
@@ -343,7 +344,7 @@ class PersonalResearchAssistant:
             brief_window, brief_period_basis = parse_requested_brief_window(request.query)
         facade = build_research_facade(
             settings=self.settings,
-            question=request.query,
+            question=route.retrieval_query if route.mode == "brief" else request.query,
             project_context_required=route.project_context_required,
         )
         if brief_window is not None:
@@ -354,7 +355,7 @@ class PersonalResearchAssistant:
             project_name=route.project_name if route.project_context_required else "",
             settings=self.settings,
             facade=facade,
-            limit=8 if route.primary_intent == "archive_to_action" else (5 if route.mode == "brief" else 4),
+            limit=8 if route.primary_intent == "archive_to_action" or route.mode == "brief" else 4,
             budget=budget,
             operator_context=context_payload,
             # Preserve a requested archive portion even when the same message
@@ -393,10 +394,9 @@ class PersonalResearchAssistant:
             )
 
         if route.mode == "brief" and not mixed_archive_current:
-            # PA-07's brief is a deterministic projection of this exact local
-            # selection. It does not reuse the prose renderer/synthesis path
-            # and, importantly, later report dialogue comes back to this object
-            # instead of invoking ``answer_memory_research`` again.
+            # Editorial synthesis uses the exact period-bound selection and
+            # the existing paired archive authorization. Saved views/follow-ups
+            # reuse that immutable content without a second provider request.
             return self.render_brief_document(
                 request,
                 _brief_request_from_archive_payload(
@@ -600,6 +600,16 @@ class PersonalResearchAssistant:
                 },
                 route=dict(route or {"mode": "brief", "primary_intent": "writer_brief"}),
         )
+        editorial_measurement: Mapping[str, object] = {"status": "saved_editorial" if document.editorial else "not_attempted"}
+        if document.editorial is None and not refresh_note:
+            editorial, editorial_measurement = synthesize_brief_editorial(
+                document, question=request.query, access=request.archive_synthesis_access,
+            )
+            if editorial is not None:
+                brief_request = replace(brief_request, editorial=editorial)
+                document = build_brief_document(brief_request)
+        else:
+            _abandon_archive_access(request.archive_synthesis_access)
         text = render_brief_document(document, view="telegram")
         if refresh_note:
             text = (
@@ -619,6 +629,7 @@ class PersonalResearchAssistant:
                 "brief_document": document.to_dict(),
                 "brief_inspection": document.inspect(),
                 "brief_view": "telegram",
+                "brief_editorial": dict(editorial_measurement),
                 # The conversational Telegram views are native HTML. The
                 # source object remains an ordinary inspectable data contract.
                 "telegram_parse_mode": "HTML",
@@ -662,6 +673,8 @@ class PersonalResearchAssistant:
     ) -> AssistantResult:
         """Use the current report object only; never fall through to retrieval."""
 
+        _abandon_archive_access(request.archive_synthesis_access)
+
         if followup.kind == "explain_item":
             text = render_brief_document(document, view="item", item_number=followup.item_number)
             view = "item"
@@ -696,7 +709,7 @@ class PersonalResearchAssistant:
                 "brief_document": document.to_dict(),
                 "brief_inspection": document.inspect(),
                 "brief_view": view,
-                "telegram_parse_mode": "HTML" if view == "full" else None,
+                "telegram_parse_mode": "HTML" if view == "full" or document.editorial is not None else None,
                 "brief_followup": {
                     "kind": followup.kind,
                     "item_number": followup.item_number,
@@ -1406,7 +1419,7 @@ def _brief_request_from_archive_payload(
                 "local_archive_provenance": True,
                 "evidence_id": evidence_id,
                 "source_url": source_ref,
-                "support_span": quality.get("support_span") or item.get("snippet") or item.get("summary"),
+                "support_span": quality.get("support_span") or item.get("support_span") or item.get("snippet") or item.get("summary"),
                 "relevance_label": quality.get("relevance_label") or item.get("relevance_label"),
             }
         )

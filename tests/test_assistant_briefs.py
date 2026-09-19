@@ -155,7 +155,8 @@ def test_brief_views_are_source_backed_and_empty_claim_depends_on_coverage() -> 
     rendered = render_brief_document(populated)
     assert "<b>Короткий бриф</b>" in rendered
     assert '<a href="https://t.me/example/1">@example</a>' in rendered
-    assert "Важность: важно · Срочность: без срока" in rendered
+    assert "Важность: важно" in rendered
+    assert "Срочность:" not in rendered  # no fabricated deadline or repetitive empty field
     assert "Версия:" not in rendered
     assert len(rendered) <= 2400
 
@@ -211,9 +212,10 @@ def test_expanded_telegram_brief_uses_user_language_not_internal_audit_fields() 
 
     rendered = render_brief_document(document, view="full")
 
-    assert rendered.startswith("🗞 <b>Подробный бриф</b>")
-    assert "Это подборка по теме, а не рейтинг важности." in rendered
-    assert "Важность: не отмечена · Срочность: срок не указан" in rendered
+    assert rendered.startswith("🗞 <b>Материалы по теме</b>")
+    assert "Редакторский обзор пока не подготовлен" in rendered
+    assert "A local archive excerpt." in rendered and "Another local archive excerpt." in rendered
+    assert "Важность: не отмечена" not in rendered and "срок не указан" not in rendered
     assert "Зачем вам: связано с проектом «Weekly brief»." in rendered
     assert '<a href="https://t.me/example/unranked-one">@example</a>' in rendered
     assert "снимок sha256" not in rendered

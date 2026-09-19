@@ -119,11 +119,13 @@ Planning-Depth: designed_slices
 Slice-ID: PA-03
 Objective: Provide authorized model-backed dialogue with object-aware followups, topic changes and cancellation.
 Acceptance-Criteria:
+  - Natural report corrections and follow-ups give substantive explanations over the correct object; command matching alone is not conversational acceptance.
   - Greeting/editing/general conversation does not fall into archive search; mixed requests use appropriate tools.
   - Shorten/new topic/second item/ambiguous yes/restart cases preserve the intended object. A plain `yes` resolves only one current visible confirmation ref; a new topic, cancellation, expiry, actor/chat mismatch or changed proposal never executes a stale proposal.
 Verification:
   - python tools/test_tiers.py focused-prm
 Context-Refs:
+  - docs/design/PA-PRODUCT-QUALITY.md
   - docs/design/PA.md
   - docs/ASSISTANT_BOUNDARIES.md
 Design-Refs:
@@ -143,11 +145,13 @@ Planning-Depth: designed_slices
 Slice-ID: PA-04
 Objective: Connect the working archive retriever and authorized synthesis to the actual user-facing path.
 Acceptance-Criteria:
+  - Topic and time instructions are separated; relevant omissions and noisy inclusions are measured alongside claim support.
   - Representative Russian/English archive questions produce useful source-backed answers with measured retrieval/generation results.
   - No corpus dumps, invented citations or blanket refusal substituted for useful supported partial results.
 Verification:
   - python tools/test_tiers.py focused-prm
 Context-Refs:
+  - docs/design/PA-PRODUCT-QUALITY.md
   - docs/design/PA.md
   - docs/IMPLEMENTATION_CONTRACT.md
 Design-Refs:
@@ -167,11 +171,13 @@ Planning-Depth: designed_slices
 Slice-ID: PA-05
 Objective: Complete the approved public-search/fetch/evidence/answer path without enlarging the old UTD allowlist.
 Acceptance-Criteria:
+  - Current claims retain primary-source support and material uncertainty in readable partial answers.
   - Current-fact, primary-source-only, conflicting, stale and partial-source scenarios return truthful evidence and gaps.
   - Private query leakage, SSRF/redirect/DNS tricks and injected source instructions cannot expand rights.
 Verification:
   - python tools/test_tiers.py focused-prm
 Context-Refs:
+  - docs/design/PA-PRODUCT-QUALITY.md
   - docs/design/PA.md
   - docs/ASSISTANT_BOUNDARIES.md
 Design-Refs:
@@ -191,6 +197,7 @@ Planning-Depth: designed_slices
 Slice-ID: PA-06
 Objective: Combine permitted archive, web and current GitHub context in a bounded, resumable investigation.
 Acceptance-Criteria:
+  - Multi-source synthesis explains differences and conditional applicability to actual project context.
   - The answer distinguishes facts, inference and project recommendations with actual checked repository identity.
   - Tool/time/cost limits, cancellation and provider failures yield useful partial results rather than runaway loops.
 Verification:
@@ -200,6 +207,7 @@ Scope-Amendment:
     to register the dedicated PA-06 holdout suite in `focused-prm`; no runtime,
     job, Redis, database, credential or live-provider scope is added.
 Context-Refs:
+  - docs/design/PA-PRODUCT-QUALITY.md
   - docs/design/PA.md
   - docs/COST_ARCHITECTURE.md
 Design-Refs:
@@ -220,12 +228,15 @@ Slice-ID: PA-07
 Visual-Contract: required
 Objective: Produce a source-backed BriefDocument and a concise conversational Telegram view for any requested period/topic.
 Acceptance-Criteria:
+  - Event-level editorial stories contain takeaways, explanations, selection rationale, optional next steps and source anchors; unknown priority fields never substitute for editorial work. Short/full/follow-up views use the same stored story identities.
   - Selection, period/timezone, coverage, conflicts, duplicates and version identity are inspectable; no fabricated reading or productivity counts.
   - Explain item two, shorten, filter topics, compare weeks and no-news/partial-week cases work from the actual report object.
 Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_assistant_brief_editorial.py tests/test_prm_synthesis.py
   - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_assistant_briefs.py tests/test_assistant_report_dialogue.py
   - python tools/test_tiers.py focused-prm
 Scope-Amendment:
+  - 2026-09-19 subsequent owner direction authorizes local product-quality integration through PA-15 and implementation beginning with PA-07; docs/design/PA-PRODUCT-QUALITY.md defines the expanded local scope and batched review. Runtime consent and formal approval remain separate.
   - 2026-09-19 owner authorization: remediate the independent PA-07 P1s with
     owner-scoped bounded immutable BriefDocument history through the existing
     local SQLite schema path, and register the two dedicated PA-07 suites in
@@ -238,6 +249,7 @@ Scope-Amendment:
     machine-readable design registry remains mechanically `review_required`
     and is not hand-edited as an approval record.
 Context-Refs:
+  - docs/design/PA-PRODUCT-QUALITY.md
   - docs/design/PA.md
   - docs/PERSONAL_ASSISTANT_SPEC.md
 Design-Refs:
@@ -258,11 +270,13 @@ Slice-ID: PA-08
 Visual-Contract: required
 Objective: Render the same report as accessible private mobile HTML, polished PDF and portable Markdown.
 Acceptance-Criteria:
+  - Information hierarchy and meaningful tables/timelines/charts preserve the editorial story and its caveats; no new factual generation during export.
   - Facts and citations remain equivalent across formats; long URLs/Cyrillic/dark mode/page breaks do not corrupt the layout.
   - Private views enforce ownership and expiry, sanitize content and do not load tracking resources; sharing has a content/recipient preview.
 Verification:
   - python tools/test_tiers.py fast-contract
 Context-Refs:
+  - docs/design/PA-PRODUCT-QUALITY.md
   - docs/design/PA.md
   - docs/PERSONAL_ASSISTANT_SPEC.md
 Design-Refs:
@@ -282,11 +296,13 @@ Planning-Depth: designed_slices
 Slice-ID: PA-09
 Objective: Turn explicitly confirmed watches/reports/reminders into cancellable durable jobs with honest delivery state.
 Acceptance-Criteria:
+  - Each notification explains a meaningful change and its relevance; repeated reports of one event do not create noisy new alerts.
   - Pause, unsubscribe, quiet hours, DST, changed deadlines, completion and grant revocation work before collection and final send.
   - Restart/double execution/unknown-send scenarios avoid blind retries, preserve receipts and expose reconciliation needs.
 Verification:
   - python tools/test_tiers.py focused-prm
 Context-Refs:
+  - docs/design/PA-PRODUCT-QUALITY.md
   - docs/design/PA.md
   - docs/ASSISTANT_BOUNDARIES.md
 Design-Refs:
@@ -306,11 +322,13 @@ Planning-Depth: designed_slices
 Slice-ID: PA-10
 Objective: Read/search selected mail through a verified provider and minimal explicit OAuth/retention policy.
 Acceptance-Criteria:
+  - Thread summaries explain requested decisions, supported deadlines and optional opportunities rather than dumping mail excerpts.
   - Provider, actual token scope versus app filter, paging/sync/freshness, minimal fields and revocation/delete are documented and tested.
   - No account is assumed connected; live proof is separated from synthetic adapter tests; attachments/raw histories are not fetched by default.
 Verification:
   - python tools/test_tiers.py fast-contract
 Context-Refs:
+  - docs/design/PA-PRODUCT-QUALITY.md
   - docs/design/PA.md
   - docs/UTD_ACADEMIC_INBOX_RESEARCH_HANDOFF.md
 Design-Refs:
@@ -330,11 +348,13 @@ Planning-Depth: designed_slices
 Slice-ID: PA-11
 Objective: Read calendars, resolve recipients and check availability without conflating accounts, timezones or event versions.
 Acceptance-Criteria:
+  - Schedule answers explain conflicts, implications and available options with correct local/source times.
   - Recurrence/DST/multiple-account/ambiguous-contact cases are correct and visible to the operator.
   - Unauthorized calendars/fields stay inaccessible and read capability never grants write permission.
 Verification:
   - python tools/test_tiers.py fast-contract
 Context-Refs:
+  - docs/design/PA-PRODUCT-QUALITY.md
   - docs/design/PA.md
   - docs/ASSISTANT_BOUNDARIES.md
 Design-Refs:
@@ -354,11 +374,13 @@ Planning-Depth: designed_slices
 Slice-ID: PA-12
 Objective: Integrate the existing academic handoff as a module of the same assistant, not a new bot or broad crawler.
 Acceptance-Criteria:
+  - Academic briefs distinguish obligations, opportunities and reading, with explained eligibility uncertainty and conflicting deadlines.
   - Institutional permission, minimal read scopes and separate consent are established before real Canvas/mail processing.
   - Stage, category, priority, uncertain/conflicting dates, eligibility, local done versus source completion and reminder changes preserve evidence.
 Verification:
   - python tools/test_tiers.py fast-contract
 Context-Refs:
+  - docs/design/PA-PRODUCT-QUALITY.md
   - docs/design/PA.md
   - docs/UTD_ACADEMIC_INBOX_RESEARCH_HANDOFF.md
 Design-Refs:
@@ -378,11 +400,13 @@ Planning-Depth: designed_slices
 Slice-ID: PA-13
 Objective: Execute exact mail/calendar proposals after one-use version-bound confirmation and return truthful receipts.
 Acceptance-Criteria:
+  - A finding can become a concrete editable proposal with source rationale, exact confirmation and an honest execution result.
   - Changed text/recipient/time, expired confirmation, another actor, revoked grant and double click cannot reuse old permission.
   - Idempotency and provider-state reconciliation distinguish failed versus unknown outcomes; dangerous out-of-scope actions remain unavailable.
 Verification:
   - python tools/test_tiers.py fast-contract
 Context-Refs:
+  - docs/design/PA-PRODUCT-QUALITY.md
   - docs/design/PA.md
   - docs/ASSISTANT_BOUNDARIES.md
 Design-Refs:
@@ -402,11 +426,13 @@ Planning-Depth: designed_slices
 Slice-ID: PA-14
 Objective: Let the operator inspect/correct/forget/export memory and reuse reports/materials without hidden profile learning.
 Acceptance-Criteria:
+  - Explicit interests, projects and length/depth preferences improve future selection; feedback and saved preference changes remain inspectable and reversible.
   - Source, confirmation, time and lifecycle are visible; indexed/opened/read/applied are not conflated.
   - Deletion and permission changes propagate to derived indexes/caches/jobs according to an explicit policy while preserving unrelated archive data.
 Verification:
   - python tools/test_tiers.py focused-prm
 Context-Refs:
+  - docs/design/PA-PRODUCT-QUALITY.md
   - docs/design/PA.md
   - docs/ASSISTANT_BOUNDARIES.md
 Design-Refs:
@@ -426,11 +452,13 @@ Planning-Depth: designed_slices
 Slice-ID: PA-15
 Objective: Integrate editable transcription, optional spoken response and safe image/PDF/document questions into the same conversation.
 Acceptance-Criteria:
+  - Voice, image and document follow-ups preserve report identity and readable explanations with source/page references.
   - All media respects the same provider/grant policy and supports source/page references and reliable temporary cleanup.
   - Malicious/oversized/unsupported content never executes; OCR is bounded and used only when text extraction is inadequate.
 Verification:
   - python tools/test_tiers.py focused-prm
 Context-Refs:
+  - docs/design/PA-PRODUCT-QUALITY.md
   - docs/design/PA.md
   - docs/ASSISTANT_BOUNDARIES.md
 Design-Refs:
@@ -450,11 +478,13 @@ Planning-Depth: designed_slices
 Slice-ID: PA-16
 Objective: Compare quality-first model routes, privacy-compatible fallback and caching on complete successful tasks.
 Acceptance-Criteria:
+  - Quality comparisons include editorial and multi-turn usefulness before model cost optimization.
   - Requested/observed model, tariff version, token classes, latency, retries and total per-success cost are recorded without private text.
   - Unknown pricing and provider failures do not silently broaden permissions or underestimate spend; savings require matched quality evidence.
 Verification:
   - python tools/test_tiers.py fast-contract
 Context-Refs:
+  - docs/design/PA-PRODUCT-QUALITY.md
   - docs/design/PA.md
   - docs/COST_ARCHITECTURE.md
 Design-Refs:
@@ -500,11 +530,13 @@ Slice-ID: PA-18
 Visual-Contract: required
 Objective: Accept the complete Chat/Search/Brief/Watch/Act product using exact-HEAD checks, visual review and authorized real use.
 Acceptance-Criteria:
+  - Owner-calibrated held-out content and multi-turn scenarios gate acceptance separately from schema, provider and mobile evidence.
   - Every requirement maps to implemented paths, tests, review and user evidence; synthetic passes are not called live proof.
   - All required views/connectors/actions/recovery paths are accepted or explicit external blockers prevent a full-completion claim.
 Verification:
   - python tools/playbook.py verify_project --root .
 Context-Refs:
+  - docs/design/PA-PRODUCT-QUALITY.md
   - docs/design/PA.md
   - docs/PERSONAL_ASSISTANT_SPEC.md
   - docs/REVIEW_POLICY.md

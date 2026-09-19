@@ -38,6 +38,7 @@ PRM_ACTIVE_TESTS = (
     # PA-07 must keep the exact BriefDocument/history and report-follow-up
     # contracts in the active regression tier, not only in a manual command.
     "tests/test_assistant_briefs.py",
+    "tests/test_assistant_brief_editorial.py",
     "tests/test_assistant_report_dialogue.py",
     "tests/test_prm_synthesis.py",
     "tests/test_prm_bot_dispatch.py",
