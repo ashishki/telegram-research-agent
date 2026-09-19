@@ -101,7 +101,8 @@ def test_report_followups_use_only_the_current_visible_brief_document(monkeypatc
     assert apply.payload["brief_view"] == "apply"
     assert "не выполненные действия" in apply.text
     assert full.payload["brief_view"] == "full"
-    assert full.text.startswith("Полный бриф")
+    assert full.payload["telegram_parse_mode"] == "HTML"
+    assert full.text.startswith("🗞 <b>Подробный бриф</b>")
     assert all(
         result.payload["retrieval_performed"] is False
         for result in (initial, explained, shortened, filtered, less_technical, apply, full)

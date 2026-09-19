@@ -619,8 +619,8 @@ class PersonalResearchAssistant:
                 "brief_document": document.to_dict(),
                 "brief_inspection": document.inspect(),
                 "brief_view": "telegram",
-                # Only the compact card is Telegram-native HTML. The source
-                # object and every inspectable/full view remain ordinary text.
+                # The conversational Telegram views are native HTML. The
+                # source object remains an ordinary inspectable data contract.
                 "telegram_parse_mode": "HTML",
                 "brief_document_created": True,
                 # A direct BriefBuildRequest is a zero-retrieval seam. The
@@ -696,6 +696,7 @@ class PersonalResearchAssistant:
                 "brief_document": document.to_dict(),
                 "brief_inspection": document.inspect(),
                 "brief_view": view,
+                "telegram_parse_mode": "HTML" if view == "full" else None,
                 "brief_followup": {
                     "kind": followup.kind,
                     "item_number": followup.item_number,

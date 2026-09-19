@@ -714,7 +714,7 @@ def render_brief_document(
     if view == "apply":
         return _render_apply(document)
     if view == "full":
-        return _render_telegram(document, document.items, short=False, topics=(), maximum_items=None, full=True)
+        return _render_telegram_full_card(document)
     selected_topics = tuple(_topic(item) for item in topics if _topic(item))
     items = tuple(item for item in document.items if not selected_topics or set(selected_topics) & set(item.topics))
     if view == "telegram":
@@ -2132,6 +2132,63 @@ def _render_telegram_card(document: BriefDocument, items: Sequence[BriefItem]) -
     return "\n".join(lines)
 
 
+def _render_telegram_full_card(document: BriefDocument) -> str:
+    """Render the expanded Telegram view without exposing an audit dump.
+
+    Exact identifiers, snapshot hashes and the canonical inspection structure
+    remain in ``BriefDocument`` for the inspectable application/API boundary.
+    They do not help a person decide what to read in a Telegram conversation.
+    """
+
+    lines = [
+        "🗞 <b>Подробный бриф</b>",
+        f"<b>{_telegram_html(document.topic, 88)}</b>",
+        f"<i>{_telegram_html(_period_label(document.window), 72)} · {_telegram_html(document.window.timezone, 64)}</i>",
+    ]
+    if not document.items:
+        lines.extend(("", "В этой выборке нет пунктов для подробного разбора.", _telegram_card_coverage_line(document)))
+        return "\n".join(lines)
+
+    if all(item.importance == "unknown" and item.urgency == "unknown" for item in document.items):
+        lines.extend(
+            (
+                "",
+                "⚪ <b>Это подборка по теме, а не рейтинг важности.</b>",
+                "В archive rows не было оценки важности или срока; я не буду придумывать «главное». ",
+            )
+        )
+
+    evidence = document.evidence_by_ref()
+    index = 0
+    for section in document.sections:
+        if not section.items:
+            continue
+        lines.extend(("", f"<b>{_telegram_full_section_title(section.section_id, section.title)}</b>"))
+        for item in section.items:
+            index += 1
+            source = evidence[item.evidence_refs[0]]
+            lines.extend(
+                (
+                    f"{index}. <b>{_telegram_html(item.title, 112)}</b>",
+                    _telegram_html(_short(item.summary, 160), 160),
+                    f"{_telegram_card_priority(item)} · {_telegram_card_source_link(source.source_ref)}",
+                    f"<i>{_telegram_human_time_label(source)}</i>",
+                )
+            )
+            if item.conflict_groups:
+                lines.append("⚠️ В источниках есть расхождение — вывод не объединён автоматически.")
+
+    lines.extend(("", _telegram_card_coverage_line(document)))
+    if document.deduplication:
+        lines.append(f"Повторы: исключено {len(document.deduplication)} по совпадающему источнику.")
+    if document.previous_version is None:
+        lines.append("История: первая версия этого брифа.")
+    else:
+        lines.append(f"История: версия {document.version}; обновлена из той же выбранной базы.")
+    lines.append("<i>Спроси «объясни пункт 2», «сделай короче» или «только &lt;тема&gt;».</i>")
+    return "\n".join(lines)
+
+
 def _telegram_html(value: str, limit: int) -> str:
     """Escape an archive-derived value for Telegram's constrained HTML mode."""
 
@@ -2165,6 +2222,31 @@ def _telegram_card_source_link(source_ref: str) -> str:
     if len(source_ref) > 240:
         return "Источник — в полном брифе"
     return f'<a href="{_html_escape(source_ref, quote=True)}">Открыть источник</a>'
+
+
+def _telegram_full_section_title(section_id: str, title: str) -> str:
+    if section_id == "other_signals":
+        return "Подборка по теме"
+    return _telegram_html(title, 80)
+
+
+def _telegram_human_time_label(source: BriefEvidence) -> str:
+    relation = {
+        "event_in_window": "Событие относится к выбранному периоду",
+        "published_in_window": "Опубликовано в выбранный период",
+        "first_discovered_in_window": "впервые обнаружен в периоде; публикация могла быть раньше",
+        "updated_in_window": "Источник обновлён в выбранный период",
+        "deleted_in_window": "Источник удалён в выбранный период",
+        "reissued_in_window": "Источник переиздан в выбранный период",
+    }[source.period_relation]
+    state = {
+        "active": "актуальное состояние источника",
+        "stale": "источник помечен как устаревший",
+        "deleted": "источник удалён",
+        "reissued": "источник переиздан",
+        "unknown": "состояние источника не указано",
+    }[source.source_state]
+    return f"{relation}; {state}."
 
 
 def _telegram_card_coverage_line(document: BriefDocument) -> str:

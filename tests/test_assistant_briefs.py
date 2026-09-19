@@ -189,6 +189,35 @@ def test_telegram_card_is_compact_html_and_escapes_archive_derived_content() -> 
     assert len(rendered) <= 2400
 
 
+def test_expanded_telegram_brief_uses_user_language_not_internal_audit_fields() -> None:
+    document = build_brief_document(
+        BriefBuildRequest(
+            topic="AI за неделю",
+            window=_window(),
+            coverage=(CoverageSource("telegram:archive", "partial", "bounded selection"),),
+            evidence=(
+                _evidence(
+                    "unranked-one", "https://t.me/example/unranked-one", title="Unranked one",
+                    summary="A local archive excerpt.", importance="unknown", urgent=None,
+                ),
+                _evidence(
+                    "unranked-two", "https://t.me/example/unranked-two", title="Unranked two",
+                    summary="Another local archive excerpt.", importance="unknown", urgent=None,
+                ),
+            ),
+        )
+    )
+
+    rendered = render_brief_document(document, view="full")
+
+    assert rendered.startswith("🗞 <b>Подробный бриф</b>")
+    assert "Это подборка по теме, а не рейтинг важности." in rendered
+    assert "Важность: не отмечена · Срочность: срок не указан" in rendered
+    assert '<a href="https://t.me/example/unranked-one">Открыть источник</a>' in rendered
+    assert "снимок sha256" not in rendered
+    assert document.brief_id not in rendered
+
+
 def test_invalid_or_unselected_local_evidence_cannot_become_a_brief_source() -> None:
     document = build_brief_document(
         BriefBuildRequest(
