@@ -6,6 +6,7 @@ import os
 import re
 import hashlib
 import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Any, Mapping, Sequence
 
 from assistant.claim_ledger import claim_ledger_public_summary, verify_answer_against_evidence
@@ -26,6 +27,19 @@ from prm.conversation import (
     classify_turn,
 )
 from prm.archive_contract import ARCHIVE_RESPONSE_INTENTS, apply_archive_response_contract
+from prm.briefs import (
+    BRIEF_RETENTION,
+    BriefBuildRequest,
+    BriefDocument,
+    BriefDocumentStore,
+    BriefFollowup,
+    BriefWindow,
+    CoverageSource,
+    GLOBAL_BRIEFS,
+    build_brief_document,
+    classify_brief_followup,
+    render_brief_document,
+)
 from prm.contracts import AssistantResult, OperatorRequest, PublicWebAccess
 from prm.presentation import render_payload, render_project_clarification
 from prm.public_web import (
@@ -67,6 +81,7 @@ class PersonalResearchAssistant:
         public_web_bounds: PublicWebBounds | None = None,
         deep_archive_reader: ArchiveResearchReader | None = None,
         github_context_provider: GitHubContextProvider | None = None,
+        briefs: BriefDocumentStore | None = None,
     ) -> None:
         self.settings = settings
         self.conversations = conversations or GLOBAL_CONVERSATIONS
@@ -78,11 +93,29 @@ class PersonalResearchAssistant:
         self.public_web_bounds = public_web_bounds
         self.deep_archive_reader = deep_archive_reader
         self.github_context_provider = github_context_provider
+        # This is intentionally a bounded in-process projection. A new process
+        # has no report/session state to resolve, which is the PA-07 boundary.
+        self.briefs = briefs or GLOBAL_BRIEFS
 
     def answer(self, request: OperatorRequest) -> AssistantResult:
         conversation = self.conversations.active_or_start(request.chat_id)
+        visible_ref = conversation.object_refs[0].response_ref if conversation.object_refs else None
+        visible_brief = self.briefs.resolve_visible(
+            conversation_id=conversation.conversation_id,
+            response_ref=visible_ref,
+        )
+        brief_followup = classify_brief_followup(request.query) if visible_brief is not None else None
+        if brief_followup is not None:
+            return self._brief_followup_result(
+                request,
+                conversation=conversation,
+                document=visible_brief[0],
+                comparison_document=visible_brief[1],
+                followup=brief_followup,
+            )
         turn = classify_turn(request.query, conversation)
         if turn.kind == "cancel":
+            self.briefs.forget_conversation(conversation.conversation_id)
             self.conversations.cancel(request.chat_id)
             return self._conversation_control_result(
                 request,
@@ -91,6 +124,7 @@ class PersonalResearchAssistant:
                 text="Текущая задача отменена. Новое сообщение начнёт отдельную тему; никакое подтверждение не будет использовано.",
             )
         if turn.kind == "reset_topic":
+            self.briefs.forget_conversation(conversation.conversation_id)
             self.conversations.begin_new_topic(request.chat_id)
             return self._conversation_control_result(
                 request,
@@ -157,9 +191,17 @@ class PersonalResearchAssistant:
                     response_ref=turn.item_ref,
                 )
                 return self._remember_conversation_result(request, result, topic=conversation.topic)
+        if type(request.brief_request) is BriefBuildRequest:
+            # The carrier was assembled by a caller with a fixed selected local
+            # archive set. It has no archive-search capability, so this branch
+            # is a zero-retrieval route even when the query text is elaborate.
+            self.briefs.forget_conversation(conversation.conversation_id)
+            self.conversations.begin_new_topic(request.chat_id)
+            return self.render_brief_document(request, request.brief_request)
         # All ordinary text starts an independent topic for confirmation
         # purposes.  Read-only archive follow-up composition remains separate
         # transport compatibility and cannot retain action authority.
+        self.briefs.forget_conversation(conversation.conversation_id)
         conversation = self.conversations.begin_new_topic(request.chat_id)
         route = decide_route(request.query, requested_mode=request.mode, explicit_project=request.project_name)
         route_payload = route.to_dict()
@@ -324,6 +366,22 @@ class PersonalResearchAssistant:
                 route=route_payload,
             )
 
+        if route.mode == "brief" and not mixed_archive_current:
+            # PA-07's brief is a deterministic projection of this exact local
+            # selection. It does not reuse the prose renderer/synthesis path
+            # and, importantly, later report dialogue comes back to this object
+            # instead of invoking ``answer_memory_research`` again.
+            return self.render_brief_document(
+                request,
+                _brief_request_from_archive_payload(
+                    request=request,
+                    payload=payload,
+                    topic=str(route_payload.get("retrieval_query") or request.query),
+                ),
+                source_payload=payload,
+                route=route_payload,
+            )
+
         deterministic = render_payload(payload, mode=route.mode)
         local_archive_evidence = {
             (
@@ -468,6 +526,160 @@ class PersonalResearchAssistant:
             },
             route=route_payload,
         ), topic=str(route_payload.get("retrieval_query") or request.query))
+
+    def render_brief_document(
+        self,
+        request: OperatorRequest,
+        brief_request: BriefBuildRequest,
+        *,
+        source_payload: Mapping[str, Any] | None = None,
+        route: Mapping[str, Any] | None = None,
+    ) -> AssistantResult:
+        """Render one explicit local-evidence BriefDocument without retrieval.
+
+        The public method is the PA-07 application seam for callers that have
+        already selected archive evidence. It cannot accept a provider, source
+        adapter, job, delivery handle, or untyped history lookup.
+        """
+
+        try:
+            document = build_brief_document(brief_request)
+        except ValueError as exc:
+            return AssistantResult(
+                interaction_id="",
+                status="invalid_brief_request",
+                mode="brief",
+                text=(
+                    "Не удалось собрать BriefDocument из предоставленной локальной выборки; "
+                    "новый поиск источников не запускался."
+                ),
+                payload={
+                    "brief_document_created": False,
+                    "retrieval_performed": False,
+                    "write_performed": False,
+                    "error_type": type(exc).__name__,
+                },
+                route=dict(route or {"mode": "brief", "primary_intent": "writer_brief"}),
+            )
+        text = render_brief_document(document, view="telegram")
+        result = AssistantResult(
+            interaction_id=hashlib.sha256(
+                f"{request.chat_id}\x1f{document.brief_id}\x1f{document.version}".encode("utf-8")
+            ).hexdigest()[:24],
+            status="ok" if document.status == "complete" else "partial_brief" if document.status == "partial" else "empty_brief",
+            mode="brief",
+            text=text,
+            payload={
+                **dict(source_payload or {}),
+                "brief_document": document.to_dict(),
+                "brief_inspection": document.inspect(),
+                "brief_view": "telegram",
+                "brief_document_created": True,
+                "retrieval_performed": False,
+                "write_performed": False,
+                "automatic_job_created": False,
+                "notification_sent": False,
+            },
+            operator_context={
+                "input_kind": request.input_kind,
+                "brief_retention": BRIEF_RETENTION,
+            },
+            route=dict(route or {"mode": "brief", "primary_intent": "writer_brief"}),
+        )
+        return self._remember_brief_document(
+            request,
+            result,
+            document=document,
+            comparison_document=brief_request.comparison_document,
+            topic=brief_request.topic,
+        )
+
+    def _brief_followup_result(
+        self,
+        request: OperatorRequest,
+        *,
+        conversation: ConversationState,
+        document: BriefDocument,
+        comparison_document: BriefDocument | None,
+        followup: BriefFollowup,
+    ) -> AssistantResult:
+        """Use the current report object only; never fall through to retrieval."""
+
+        if followup.kind == "explain_item":
+            text = render_brief_document(document, view="item", item_number=followup.item_number)
+            view = "item"
+        elif followup.kind == "shorten":
+            text = render_brief_document(document, view="short")
+            view = "short"
+        elif followup.kind == "filter_topics":
+            text = render_brief_document(document, view="topics", topics=followup.topics)
+            view = "topics"
+        else:
+            text = render_brief_document(
+                document,
+                view="comparison",
+                comparison_document=comparison_document,
+            )
+            view = "comparison"
+        result = AssistantResult(
+            interaction_id="",
+            status="ok" if document.status == "complete" else "partial_brief",
+            mode="brief",
+            text=text,
+            payload={
+                "brief_document": document.to_dict(),
+                "brief_inspection": document.inspect(),
+                "brief_view": view,
+                "brief_followup": {
+                    "kind": followup.kind,
+                    "item_number": followup.item_number,
+                    "topics": list(followup.topics),
+                    "source": "current_visible_brief_document",
+                },
+                "retrieval_performed": False,
+                "write_performed": False,
+            },
+            operator_context={"brief_retention": BRIEF_RETENTION},
+            route={"mode": "brief", "primary_intent": "brief_document_followup"},
+        )
+        return self._remember_brief_document(
+            request,
+            result,
+            document=document,
+            comparison_document=comparison_document,
+            topic=conversation.topic,
+        )
+
+    def _remember_brief_document(
+        self,
+        request: OperatorRequest,
+        result: AssistantResult,
+        *,
+        document: BriefDocument,
+        comparison_document: BriefDocument | None,
+        topic: str,
+    ) -> AssistantResult:
+        """Bind report state to precisely the response made visible this turn."""
+
+        state = self.conversations.record_response(request.chat_id, text=result.text, topic=topic)
+        response_ref = state.object_refs[0].response_ref
+        self.briefs.bind_visible(
+            conversation_id=state.conversation_id,
+            response_ref=response_ref,
+            document=document,
+            comparison_document=comparison_document,
+        )
+        payload = {**dict(result.payload), "conversation": _safe_conversation_payload(state)}
+        return AssistantResult(
+            interaction_id=result.interaction_id,
+            status=result.status,
+            mode=result.mode,
+            text=result.text,
+            payload=payload,
+            operator_context=result.operator_context,
+            final_answer_verification=result.final_answer_verification,
+            route=result.route,
+        )
 
     def _current_fact_with_public_web(
         self,
@@ -1032,6 +1244,81 @@ def _selected_archive_evidence_items(
         if item.get("local_archive_provenance") is True
         and (str(item.get("evidence_id") or "").strip(), str(item.get("source_url") or "").strip()) in selected
     ]
+
+
+def _brief_request_from_archive_payload(
+    *,
+    request: OperatorRequest,
+    payload: Mapping[str, Any],
+    topic: str,
+) -> BriefBuildRequest:
+    """Adapt only the already-selected local archive rows to PA-07 evidence.
+
+    The archive result is a bounded current-turn selection, not an archive
+    inventory.  The resulting coverage is therefore always partial unless a
+    future, separately-authorized caller supplies a checked manifest.
+    """
+
+    now = datetime.now(timezone.utc)
+    window = BriefWindow(
+        timezone="UTC",
+        start_at=now - timedelta(days=7),
+        end_at=now,
+        generated_at=now,
+    )
+    archive = _mapping(payload.get("archive_evidence"))
+    quality_by_identity: dict[tuple[str, str], Mapping[str, Any]] = {}
+    for item in _mapping(payload.get("evidence_quality")).get("items") or ():
+        if not isinstance(item, Mapping):
+            continue
+        evidence_id = str(item.get("evidence_id") or "").strip()
+        source_ref = str(item.get("source_url") or "").strip()
+        if evidence_id and source_ref:
+            quality_by_identity[(evidence_id, source_ref)] = item
+    selected: list[Mapping[str, Any]] = []
+    for item in archive.get("items") or ():
+        if not isinstance(item, Mapping):
+            continue
+        source_ref = str(item.get("source_url") or item.get("telegram_url") or "").strip()
+        evidence_id = str(
+            item.get("archive_document_id")
+            or item.get("post_archive_document_id")
+            or item.get("post_id")
+            or ""
+        ).strip()
+        quality = quality_by_identity.get((evidence_id, source_ref), {})
+        selected.append(
+            {
+                **dict(item),
+                # The application establishes this provenance by iterating the
+                # selected ``archive_evidence`` payload itself, not by trusting
+                # a marker that arrived from an adapter/source document.
+                "local_archive_provenance": True,
+                "evidence_id": evidence_id,
+                "source_url": source_ref,
+                "support_span": quality.get("support_span") or item.get("snippet") or item.get("summary"),
+                "relevance_label": quality.get("relevance_label") or item.get("relevance_label"),
+            }
+        )
+    return BriefBuildRequest(
+        topic=(" ".join(str(topic or request.query).split())[:160] or "local archive"),
+        window=window,
+        evidence=tuple(selected),
+        # Do not place the raw chat ID in the document or its inspectable
+        # manifest. The stable opaque owner scope also keeps two private
+        # conversations from sharing a logical brief/version identity.
+        owner_ref="owner_brief_" + hashlib.sha256(
+            f"pa07.owner:{request.chat_id}".encode("utf-8")
+        ).hexdigest()[:24],
+        coverage=(
+            CoverageSource(
+                "local_archive_selected_evidence",
+                "partial",
+                "bounded current-turn local archive selection",
+            ),
+        ),
+        limitations=("bounded_local_archive_selection", "full_archive_coverage_not_measured"),
+    )
 
 
 def _retrieval_generation_measurement(payload: Mapping[str, Any], *, synthesis: Any | None) -> dict[str, Any]:

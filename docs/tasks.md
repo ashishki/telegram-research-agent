@@ -223,6 +223,7 @@ Acceptance-Criteria:
   - Selection, period/timezone, coverage, conflicts, duplicates and version identity are inspectable; no fabricated reading or productivity counts.
   - Explain item two, shorten, filter topics, compare weeks and no-news/partial-week cases work from the actual report object.
 Verification:
+  - PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_assistant_briefs.py tests/test_assistant_report_dialogue.py
   - python tools/test_tiers.py focused-prm
 Context-Refs:
   - docs/design/PA.md

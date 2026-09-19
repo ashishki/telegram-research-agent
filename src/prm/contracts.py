@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Literal, Mapping
 from prm.capabilities import AuthorizationDecision
 
 if TYPE_CHECKING:
+    from prm.briefs import BriefBuildRequest
     from prm.deep_research import DeepResearchRequest, ResearchCancellation, ResearchCheckpoint, ResearchPlan
 
 RequestMode = Literal["auto", "research", "brief", "chat"]
@@ -231,6 +232,10 @@ class OperatorRequest:
     # A PA-06 checkpoint is process-signed and accepted only with the same
     # typed plan/source scope. It is intentionally not a durable job receipt.
     deep_research_checkpoint: "ResearchCheckpoint | None" = None
+    # PA-07 receives only caller-supplied, already-selected local archive
+    # evidence. Its process-local report object is not a grant, durable record,
+    # export, or instruction to perform another retrieval.
+    brief_request: "BriefBuildRequest | None" = None
 
 
 @dataclass(frozen=True, slots=True)
