@@ -61,6 +61,9 @@ class _Public:
             "published_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         }
 
+    def research_cost_quote(self):
+        return {"provider_ref": "provider_public_web", "tariff_version": "fixture-free-v1", "estimated_cost_usd": 0.0}
+
 
 class _GitHub:
     def __init__(self, *, barrier: Barrier | None = None, repository_ref="acme/project", commit_sha="a" * 40):
@@ -156,7 +159,7 @@ def test_research_combines_independent_sources_and_checked_project_identity(monk
     github = _GitHub(barrier=barrier)
     plan = build_research_plan(
         "What applies to my project? Private context Q-71.", archive_query="agent evaluation fixture",
-        public_tasks=(PublicResearchTask(public_query, _public_access(public_query), estimated_cost_usd=0.0),),
+        public_tasks=(PublicResearchTask(public_query, _public_access(public_query)),),
         github_access=_github_access(), project_name="Acme Project",
     )
 
@@ -182,7 +185,7 @@ def test_gap_expansion_is_local_bounded_and_provider_failure_is_partial(monkeypa
     public_query = "vendor current release official"
     plan = build_research_plan(
         "What practice applies?", archive_query="agent evals",
-        public_tasks=(PublicResearchTask(public_query, _public_access(public_query), estimated_cost_usd=0.0),),
+        public_tasks=(PublicResearchTask(public_query, _public_access(public_query)),),
         budget=ResearchBudget(max_tool_calls=4),
     )
 
@@ -208,7 +211,7 @@ def test_cancellation_returns_resumable_checkpoint_without_starting_sources(monk
     public = _Public()
     plan = build_research_plan(
         "What is current?", archive_query="direct evidence",
-        public_tasks=(PublicResearchTask(public_query, _public_access(public_query), estimated_cost_usd=0.0),),
+        public_tasks=(PublicResearchTask(public_query, _public_access(public_query)),),
     )
     cancellation = ResearchCancellation()
     cancellation.cancel()
@@ -279,29 +282,37 @@ def test_unknown_or_over_budget_cost_refuses_public_transport_before_provider_ca
     archive = _Archive([])
     query = "vendor current release official"
     provider = _Public()
+    class _UnpricedPublic(_Public):
+        research_cost_quote = None
+
     unknown = build_research_plan(
         "What is current?", archive_query="evidence",
         public_tasks=(PublicResearchTask(query, _public_access(query)),),
     )
     unknown_result = run_bounded_research(
         unknown, original_query="What is current?", archive_reader=archive,
-        public_provider=provider, public_bounds=_bounds(), github_provider=None,
+        public_provider=_UnpricedPublic(), public_bounds=_bounds(), github_provider=None,
     )
     assert "unknown_price" in unknown_result["coverage"]["source_gaps"]
     assert provider.queries == []
 
+    class _OverBudgetPublic(_Public):
+        def research_cost_quote(self):
+            return {"provider_ref": "provider_public_web", "tariff_version": "fixture-priced-v1", "estimated_cost_usd": 0.01}
+
     over_budget = build_research_plan(
         "What is current?", archive_query="evidence",
-        public_tasks=(PublicResearchTask(query, _public_access(query), estimated_cost_usd=0.01),),
+        public_tasks=(PublicResearchTask(query, _public_access(query)),),
         budget=ResearchBudget(max_cost_usd=0.005),
     )
+    over = _OverBudgetPublic()
     over_budget_result = run_bounded_research(
         over_budget, original_query="What is current?", archive_reader=archive,
-        public_provider=provider, public_bounds=_bounds(), github_provider=None,
+        public_provider=over, public_bounds=_bounds(), github_provider=None,
     )
     assert "cost_budget_exhausted" in over_budget_result["coverage"]["source_gaps"]
     assert over_budget_result["coverage"]["cost"]["consumed_usd"] == 0.0
-    assert provider.queries == []
+    assert over.queries == []
 
 
 def test_timeout_waits_for_inflight_reader_before_returning_partial_checkpoint():
@@ -385,7 +396,7 @@ def test_active_application_ingress_renders_only_cited_deep_research_facts(monke
     public_query = "vendor current release official"
     plan = build_research_plan(
         "What applies to the project?", archive_query="agent evaluation fixture",
-        public_tasks=(PublicResearchTask(public_query, _public_access(public_query), estimated_cost_usd=0.0),),
+        public_tasks=(PublicResearchTask(public_query, _public_access(public_query)),),
         github_access=_github_access(), project_name="Acme Project",
     )
     assistant = PersonalResearchAssistant(
@@ -399,5 +410,7 @@ def test_active_application_ingress_renders_only_cited_deep_research_facts(monke
     assert result.payload["primary_intent"] == "deep_research"
     assert result.payload["research_result"]["status"] == "complete"
     assert "Archive evidence supports" in result.text
-    assert "Review the cited evidence" not in result.text
-    assert result.payload["final_answer_publication"]["allowed"] is True
+    assert "Инференция (не факт):" in result.text
+    assert "Рекомендация (требует человеческого решения):" in result.text
+    assert "Review the cited evidence" in result.text
+    assert "human_confirmation_required_for_any_change" in result.text

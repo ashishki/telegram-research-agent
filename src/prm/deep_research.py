@@ -106,15 +106,10 @@ class PublicResearchTask:
 
     public_query: str
     access: object
-    estimated_cost_usd: float | None = None
 
     def __post_init__(self) -> None:
         if not 3 <= len(" ".join(self.public_query.split())) <= 300:
             raise ValueError("public research query is out of range")
-        if self.estimated_cost_usd is not None and (
-            not isinstance(self.estimated_cost_usd, (int, float)) or self.estimated_cost_usd < 0
-        ):
-            raise ValueError("public research task estimate is invalid")
 
 
 class ResearchCostLedger:
@@ -124,17 +119,31 @@ class ResearchCostLedger:
         self._maximum_usd = float(maximum_usd)
         self._consumed_usd = 0.0
         self._unknown_price_refusals = 0
+        self._observed_tariffs: list[dict[str, Any]] = []
         self._lock = Lock()
 
-    def reserve_and_consume(self, estimate: float | None) -> str:
+    def reserve_and_consume(self, quote: object) -> str:
         with self._lock:
-            if estimate is None:
+            if not isinstance(quote, Mapping):
+                self._unknown_price_refusals += 1
+                return "unknown_price"
+            provider_ref = str(quote.get("provider_ref") or "")
+            tariff_version = str(quote.get("tariff_version") or "")
+            estimate = quote.get("estimated_cost_usd")
+            if (
+                provider_ref != "provider_public_web"
+                or not tariff_version
+                or not isinstance(estimate, (int, float))
+                or isinstance(estimate, bool)
+                or float(estimate) < 0
+            ):
                 self._unknown_price_refusals += 1
                 return "unknown_price"
             amount = float(estimate)
             if self._consumed_usd + amount > self._maximum_usd + 1e-12:
                 return "cost_budget_exhausted"
             self._consumed_usd += amount
+            self._observed_tariffs.append({"provider_ref": provider_ref, "tariff_version": tariff_version, "estimated_cost_usd": amount})
             return "allowed"
 
     def to_dict(self) -> dict[str, Any]:
@@ -143,6 +152,7 @@ class ResearchCostLedger:
                 "maximum_usd": self._maximum_usd,
                 "consumed_usd": round(self._consumed_usd, 8),
                 "unknown_price_refusals": self._unknown_price_refusals,
+                "observed_tariffs": list(self._observed_tariffs),
             }
 
 
@@ -484,7 +494,9 @@ def _public_step(
 ) -> ResearchStep:
     if cancellation.cancelled:
         return ResearchStep(name, "cancelled_before_start", {"status": "cancelled_before_start"})
-    cost_status = cost_ledger.reserve_and_consume(task.estimated_cost_usd)
+    quote_provider = getattr(provider, "research_cost_quote", None)
+    quote = quote_provider() if callable(quote_provider) else None
+    cost_status = cost_ledger.reserve_and_consume(quote)
     if cost_status != "allowed":
         return ResearchStep(name, cost_status, {"status": cost_status, "provider_called": False})
     result = execute_public_web_research(
@@ -600,17 +612,24 @@ def _result(
 
 
 def render_research_result(result: ResearchResult) -> str:
-    """Render only cited factual spans; analysis stays structured in payload."""
+    """Render fact, inference and recommendation as visibly different kinds."""
 
-    lines: list[str] = []
+    fact_lines: list[str] = []
     for fact in result.facts:
         span = " ".join(str(fact.get("support_span") or "").split())
         source = str(fact.get("source_url") or "")
         if span and source:
-            lines.extend((span, "Источник: " + source))
-    if lines:
-        return "\n".join(lines[:12])
-    return "Я не могу подтвердить актуальный внешний факт: исследование вернуло только частичное покрытие."
+            fact_lines.extend(("Факт: " + span, "Источник: " + source))
+    if not fact_lines:
+        return "Я не могу подтвердить актуальный внешний факт: исследование вернуло только частичное покрытие."
+    lines = ["Проверенные факты:", *fact_lines[:12]]
+    if result.inferences:
+        lines.append("Инференция (не факт): " + str(result.inferences[0].get("statement") or ""))
+    if result.project_recommendations:
+        recommendation = result.project_recommendations[0]
+        lines.append("Рекомендация (требует человеческого решения): " + str(recommendation.get("statement") or ""))
+        lines.append("Условия: " + ", ".join(str(item) for item in recommendation.get("conditions") or []))
+    return "\n".join(lines)
 
 
 def _facts(steps: Sequence[ResearchStep]) -> list[dict[str, Any]]:
