@@ -62,6 +62,59 @@ class ModelEgressAccess:
 
 
 @dataclass(frozen=True, slots=True)
+class ArchiveSynthesisAccess:
+    """The exact paired PA-02 reservations for one private archive answer.
+
+    A text reservation does not authorize an archive excerpt, and an archive
+    context reservation does not authorize an answer on its own.  PA-04 carries
+    the already-reserved pair to its dedicated, evidence-bound transport.  The
+    transport rechecks both reservations immediately before its one request.
+    """
+
+    query_authorization: AuthorizationDecision
+    context_authorization: AuthorizationDecision
+    owner_ref: str
+    connection_ref: str
+    query_resource_ref: str
+    context_resource_ref: str
+
+    def __post_init__(self) -> None:
+        query = self.query_authorization
+        context = self.context_authorization
+        if type(query) is not AuthorizationDecision or type(context) is not AuthorizationDecision:
+            raise ValueError("archive synthesis access requires typed authorizations")
+        if not query.allowed or not context.allowed or query.reservation is None or context.reservation is None:
+            raise ValueError("archive synthesis access requires sealed allowed reservations")
+        if (
+            query.owner_ref != self.owner_ref
+            or context.owner_ref != self.owner_ref
+            or query.connection_ref != self.connection_ref
+            or context.connection_ref != self.connection_ref
+            or query.resource_ref != self.query_resource_ref
+            or context.resource_ref != self.context_resource_ref
+            or query.provider_ref != "provider_openai"
+            or context.provider_ref != "provider_openai"
+            or query.capability != "model.generate"
+            or context.capability != "model.context_egress"
+            or query.operation != "model_egress"
+            or context.operation != "model_egress"
+            or query.data_class != "user_provided"
+            or context.data_class != "private_archive"
+            or query.purpose != "answer.request"
+            or context.purpose != "answer.context"
+        ):
+            raise ValueError("archive synthesis access does not preserve the paired PA-02 scope")
+        if (
+            query.operation_ref is None
+            or query.operation_ref != context.operation_ref
+            or query.reservation.operation_ref != query.operation_ref
+            or context.reservation.operation_ref != context.operation_ref
+            or query.reservation.registry is not context.reservation.registry
+        ):
+            raise ValueError("archive synthesis access requires one paired reservation group")
+
+
+@dataclass(frozen=True, slots=True)
 class OperatorRequest:
     query: str
     mode: RequestMode = "auto"
@@ -77,6 +130,9 @@ class OperatorRequest:
     # PA-03 receives model access only as a typed, already-reserved PA-02
     # decision. It contains no prompt, credential or provider payload.
     model_access: ModelEgressAccess | None = None
+    # PA-04 deliberately uses a different paired scope: current user text plus
+    # a bounded private-archive context cannot be substituted for PA-03 chat.
+    archive_synthesis_access: ArchiveSynthesisAccess | None = None
 
 
 @dataclass(frozen=True, slots=True)

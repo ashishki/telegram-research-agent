@@ -3,12 +3,20 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
 
 from assistant.claim_ledger import verify_answer_against_evidence
 from llm.client import LLMClient
 from prm.archive_contract import ARCHIVE_RESPONSE_CONTRACTS
+from prm.archive_context import ArchiveEvidenceContext
+from prm.archive_synthesis_transport import (
+    ArchiveSynthesisTransportOutcomeUnknown,
+    ArchiveSynthesisTransportUnavailable,
+    complete_archive_synthesis,
+)
 from prm.capabilities import AuthorizationDecision
+from prm.contracts import ArchiveSynthesisAccess
 
 _FORBIDDEN_USER_MARKERS = (
     "The local research path found grounded evidence",
@@ -25,15 +33,22 @@ _ARCHIVE_FORBIDDEN_SECTIONS = (
 )
 
 
-def synthesis_allowed(authorization: AuthorizationDecision | None = None) -> bool:
-    """Keep private-archive synthesis local until PA-04 binds real evidence.
+@dataclass(frozen=True, slots=True)
+class ArchiveSynthesisOutcome:
+    """A verified generation result or a truthful reason to keep local output."""
 
-    An egress grant describes who may use a provider; it does not prove that a
-    caller-supplied prompt or archive snippet came from selected, inspectable
-    evidence. PA-02 therefore deliberately does not enable this optional
-    Anthropic archive path, even when legacy environment switches and a grant
-    are present. PA-04 must introduce the repository-verified evidence/context
-    binding before this becomes eligible for provider transport.
+    text: str | None
+    status: str
+    measurement: Mapping[str, object]
+
+
+def synthesis_allowed(authorization: AuthorizationDecision | None = None) -> bool:
+    """Keep the legacy generic synthesis entrypoint local-only.
+
+    PA-04 uses ``synthesize_archive_response`` instead: it creates an immutable
+    selected-evidence packet and consumes the paired OpenAI text/context
+    reservations. This legacy Anthropic-shaped function still has no archive
+    provenance carrier, so it must never be enabled by a grant alone.
     """
 
     del authorization
@@ -94,6 +109,78 @@ def synthesize_answer(
     )
 
 
+def synthesize_archive_response(
+    payload: Mapping[str, Any],
+    *,
+    question: str,
+    evidence_items: Sequence[Mapping[str, Any]],
+    access: ArchiveSynthesisAccess | None,
+) -> ArchiveSynthesisOutcome:
+    """Generate only from a locally selected, immutable archive evidence set.
+
+    No access, malformed provenance, a denied transport, an unknown provider
+    outcome, a wrong citation, or a false no-evidence answer all preserve the
+    deterministic local archive renderer.  The returned measurement carries no
+    excerpts or user question.
+    """
+
+    contract = _mapping(payload.get("archive_contract"))
+    context = ArchiveEvidenceContext.from_payload(
+        question=question,
+        archive_contract=contract,
+        evidence_items=evidence_items,
+    )
+    if context is None:
+        _abandon_archive_access(access)
+        return ArchiveSynthesisOutcome(
+            text=None,
+            status="context_unavailable",
+            measurement={"provider_egress_attempted": False, "context_egress_attempted": False},
+        )
+    base_measurement: dict[str, object] = {**context.public_measurement()}
+    if type(access) is not ArchiveSynthesisAccess:
+        return ArchiveSynthesisOutcome(
+            text=None,
+            status="authorization_required",
+            measurement={**base_measurement, "provider_egress_attempted": False, "context_egress_attempted": False},
+        )
+    try:
+        result = complete_archive_synthesis(context=context, access=access)
+    except ArchiveSynthesisTransportOutcomeUnknown:
+        return ArchiveSynthesisOutcome(
+            text=None,
+            status="provider_outcome_unknown",
+            measurement={**base_measurement, "provider_egress_attempted": True, "context_egress_attempted": True},
+        )
+    except ArchiveSynthesisTransportUnavailable:
+        return ArchiveSynthesisOutcome(
+            text=None,
+            status="provider_unavailable_or_denied",
+            measurement={**base_measurement, "provider_egress_attempted": False, "context_egress_attempted": False},
+        )
+
+    answer = " ".join(str(result.text or "").split())
+    if not _verified_archive_answer(answer, contract=contract, evidence_items=evidence_items):
+        return ArchiveSynthesisOutcome(
+            text=None,
+            status="generated_answer_rejected",
+            measurement={**base_measurement, **result.receipt.public_measurement()},
+        )
+    return ArchiveSynthesisOutcome(
+        text=answer,
+        status="generated_verified",
+        measurement={**base_measurement, **result.receipt.public_measurement()},
+    )
+
+
+def _abandon_archive_access(access: object) -> None:
+    if type(access) is not ArchiveSynthesisAccess:
+        return
+    for decision in (access.query_authorization, access.context_authorization):
+        if decision.reservation is not None:
+            decision.reservation.abandon_before_transport()
+
+
 def _synthesize_archive_answer(
     payload: Mapping[str, Any],
     *,
@@ -146,6 +233,50 @@ def _synthesize_archive_answer(
     if int(summary.get("direct_count") or 0) == 0 and "прям" not in answer.casefold():
         return None
     return answer
+
+
+def _verified_archive_answer(
+    answer: str,
+    *,
+    contract: Mapping[str, Any],
+    evidence_items: Sequence[Mapping[str, Any]],
+) -> bool:
+    if not answer or len(answer) > 1_800:
+        return False
+    lowered = answer.casefold()
+    if any(marker.casefold() in lowered for marker in _ARCHIVE_FORBIDDEN_SECTIONS):
+        return False
+    summary = _mapping(contract.get("result_summary"))
+    direct = _mappings(contract.get("direct_findings"))
+    direct_count = int(summary.get("direct_count") or 0)
+    if direct_count and any(marker in lowered for marker in (
+        "недостаточно данных", "прямых материалов не найден", "ничего не найдено", "not enough evidence", "no direct evidence",
+    )):
+        return False
+    if not direct_count and not any(marker in lowered for marker in ("прям", "direct")):
+        return False
+    # A direct finding that contributes to the answer cannot silently lose its
+    # source identity on the way through generation.
+    direct_sources = {str(item.get("source_url") or "").strip() for item in direct}
+    if any(source and source not in answer for source in direct_sources):
+        return False
+    verification = verify_answer_against_evidence(
+        answer,
+        evidence_items,
+        current_fact_required=False,
+        project_name="",
+    )
+    metrics = _mapping(verification.get("metrics"))
+    return bool(
+        verification.get("verification_complete")
+        and int(metrics.get("current_fact_violations") or 0) == 0
+        and int(metrics.get("technical_leaks") or 0) == 0
+        and float(metrics.get("unsupported_claim_rate") or 0.0) == 0.0
+        and (
+            int(metrics.get("claim_count") or 0) == 0
+            or float(metrics.get("citation_integrity") or 0.0) == 1.0
+        )
+    )
 
 
 def _call_and_verify(

@@ -32,7 +32,7 @@ from prm.research_planner import plan_archive_evidence
 from prm.research_facade import build_research_facade
 from prm.request_plan import build_request_plan
 from prm.routing import decide_route
-from prm.synthesis import synthesize_answer
+from prm.synthesis import synthesize_archive_response
 
 
 class PersonalResearchAssistant:
@@ -261,10 +261,19 @@ class PersonalResearchAssistant:
             for item in _mapping(payload.get("evidence_quality")).get("items") or []
             if isinstance(item, Mapping)
         ]
-        # No synthesis capability is invoked in this assigned local-only
-        # implementation, regardless of environment flags.
         final_text = deterministic
         gate = _mapping(payload.get("answer_gate"))
+        if route.primary_intent in ARCHIVE_RESPONSE_INTENTS and not bool(payload.get("mixed_current_boundary")):
+            synthesis = synthesize_archive_response(
+                payload,
+                question=request.query,
+                evidence_items=evidence_items,
+                access=request.archive_synthesis_access,
+            )
+        else:
+            synthesis = None
+        if synthesis is not None and synthesis.text is not None:
+            final_text = synthesis.text
         verification = verify_answer_against_evidence(
             final_text,
             evidence_items,
@@ -323,6 +332,7 @@ class PersonalResearchAssistant:
                 "fallback_used": not publication_allowed,
                 "reason": "verified" if final_publication_allowed else "final_claim_verification_incomplete_or_unsupported",
             },
+            "retrieval_generation_measurement": _retrieval_generation_measurement(payload, synthesis=synthesis),
         }
         return self._remember_conversation_result(request, AssistantResult(
             interaction_id=context.interaction_id,
@@ -649,6 +659,34 @@ class PersonalResearchAssistant:
             },
             route=route,
         )
+
+
+def _retrieval_generation_measurement(payload: Mapping[str, Any], *, synthesis: Any | None) -> dict[str, Any]:
+    """Expose bounded retrieval/generation facts without recording source text."""
+
+    archive = _mapping(payload.get("archive_evidence"))
+    receipt = _mapping(payload.get("receipt"))
+    selected = [item for item in archive.get("items") or [] if isinstance(item, Mapping)]
+    retrieval = {
+        "status": str(archive.get("status") or "unknown"),
+        "retrieval_mode": str(archive.get("retrieval_mode") or _mapping(receipt.get("retrieval_policy")).get("mode") or "unknown"),
+        "candidate_count": len([item for item in payload.get("archive_candidate_pool") or [] if isinstance(item, Mapping)]),
+        "selected_source_count": len(selected),
+        "attempted_query_count": len([item for item in archive.get("attempted_queries") or [] if isinstance(item, Mapping)]),
+    }
+    if synthesis is None:
+        generation: dict[str, Any] = {
+            "status": "skipped_current_or_non_archive_boundary",
+            "provider_egress_attempted": False,
+            "context_egress_attempted": False,
+        }
+    else:
+        generation = {"status": str(synthesis.status), **dict(synthesis.measurement)}
+    return {
+        "schema_version": "prm_retrieval_generation_measurement.v1",
+        "retrieval": retrieval,
+        "generation": generation,
+    }
 
 
 def _apply_route_boundaries(

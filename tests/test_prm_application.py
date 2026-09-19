@@ -4,6 +4,7 @@ from prm.application import PersonalResearchAssistant, _final_answer_publication
 from assistant.claim_ledger import verify_answer_against_evidence
 from prm.contracts import AssistantResult, OperatorRequest
 from prm.presentation import render_payload
+from prm.synthesis import ArchiveSynthesisOutcome
 
 
 def _payload():
@@ -33,7 +34,6 @@ def _payload():
 def test_application_returns_intent_specific_archive_contract(monkeypatch):
     monkeypatch.setattr("prm.application.answer_memory_research", lambda *args, **kwargs: _payload())
     monkeypatch.setattr("prm.application.build_research_facade", lambda **kwargs: SimpleNamespace())
-    monkeypatch.setattr("prm.application.synthesize_answer", lambda *args, **kwargs: None)
     assistant = PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:"))
     result = assistant.answer(OperatorRequest(
         query="Что в моём архиве есть про agent evals и что из этого реально применимо сейчас?",
@@ -48,6 +48,41 @@ def test_application_returns_intent_specific_archive_contract(monkeypatch):
     assert "Agent evals use task success and groundedness." in result.text
     assert "https://t.me/example/1" in result.text
     assert result.payload["final_answer_publication"]["fallback_used"] is True
+
+
+def test_application_uses_verified_pa04_synthesis_and_records_retrieval_generation(monkeypatch):
+    monkeypatch.setattr("prm.application.answer_memory_research", lambda *args, **kwargs: _payload())
+    monkeypatch.setattr("prm.application.build_research_facade", lambda **kwargs: SimpleNamespace())
+    seen = []
+
+    def synthesize(*_args, **kwargs):
+        seen.append(kwargs["access"])
+        return ArchiveSynthesisOutcome(
+            text="Agent evals use task success and groundedness (https://t.me/example/1).",
+            status="generated_verified",
+            measurement={
+                "selected_source_count": 1,
+                "provider_egress_attempted": True,
+                "context_egress_attempted": True,
+                "context_egress_performed": True,
+            },
+        )
+
+    marker = object()
+    monkeypatch.setattr("prm.application.synthesize_archive_response", synthesize)
+    result = PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:")).answer(OperatorRequest(
+        query="Что в моём архиве есть про agent evals?",
+        mode="auto",
+        archive_synthesis_access=marker,  # the transport independently requires the concrete typed carrier
+    ))
+
+    assert seen == [marker]
+    assert result.text == "Agent evals use task success and groundedness (https://t.me/example/1)."
+    assert result.payload["final_answer_publication"]["fallback_used"] is False
+    measurement = result.payload["retrieval_generation_measurement"]
+    assert measurement["retrieval"]["selected_source_count"] == 1
+    assert measurement["generation"]["status"] == "generated_verified"
+    assert measurement["generation"]["context_egress_performed"] is True
 
 
 def test_explicit_topic_edition_is_application_path_without_fetch_send_or_write():
@@ -98,7 +133,6 @@ def test_archive_to_action_uses_bounded_research_plan(monkeypatch):
     ]
     monkeypatch.setattr("prm.application.answer_memory_research", lambda *args, **kwargs: payload)
     monkeypatch.setattr("prm.application.build_research_facade", lambda **kwargs: SimpleNamespace())
-    monkeypatch.setattr("prm.application.synthesize_answer", lambda *args, **kwargs: None)
     monkeypatch.setattr("prm.application.plan_archive_evidence", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("provider-capable planner must remain disabled")))
 
     result = PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:")).answer(OperatorRequest(
@@ -178,7 +212,6 @@ def test_current_fact_boundary_suppresses_archive_snippets_and_sources(monkeypat
     }
     monkeypatch.setattr("prm.application.answer_memory_research", lambda *args, **kwargs: payload)
     monkeypatch.setattr("prm.application.build_research_facade", lambda **kwargs: SimpleNamespace())
-    monkeypatch.setattr("prm.application.synthesize_answer", lambda *args, **kwargs: None)
 
     result = PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:")).answer(
         OperatorRequest(query="какая текущая цена акций Nvidia сегодня?", mode="auto")
@@ -268,7 +301,6 @@ def test_terminal_empty_answer_keeps_a_contextual_next_step_without_factual_clai
 def test_mixed_archive_and_current_question_keeps_archive_part_without_claiming_current_fact(monkeypatch):
     monkeypatch.setattr("prm.application.answer_memory_research", lambda *args, **kwargs: _payload())
     monkeypatch.setattr("prm.application.build_research_facade", lambda **kwargs: SimpleNamespace())
-    monkeypatch.setattr("prm.application.synthesize_answer", lambda *args, **kwargs: None)
     result = PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:")).answer(
         OperatorRequest(query="Что в моём архиве про agent evals и какая сейчас текущая цена Nvidia?", mode="auto")
     )
@@ -299,7 +331,6 @@ def test_explicit_project_name_is_not_replaced_by_downstream_project_fit(monkeyp
     }
     monkeypatch.setattr("prm.application.answer_memory_research", lambda *args, **kwargs: payload)
     monkeypatch.setattr("prm.application.build_research_facade", lambda **kwargs: SimpleNamespace())
-    monkeypatch.setattr("prm.application.synthesize_answer", lambda *args, **kwargs: None)
 
     result = PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:")).answer(
         OperatorRequest(

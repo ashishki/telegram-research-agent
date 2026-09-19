@@ -30,7 +30,7 @@ No production DB, live Telegram polling, account/provider access, job, timer,
 credential, `.env` or release action has been used or is authorized. Preserve
 the two untracked local files. Do not run the full historical pytest suite.
 
-## Current slice: PA-03
+## Current slice: PA-04
 
 PA-03 is locally tested at `081dded92b00bdaa822a6f6c0efbe8ae7ab86861` with
 evidence at `docs/verification/PA-03-conversation-evidence-2026-09-19.md`.
@@ -47,10 +47,17 @@ context.
 PA-03 has no formal acceptance claim. Keep its three advisory follow-ups open:
 inactive legacy helper ownership, response-reference/version binding for archive
 refinement, and a narrow dialogue-disable switch before authorized runtime.
-PA-04 is dependency-ready: connect authorized source-bound archive synthesis
-without widening PA-03's direct-user-text model boundary. Do not schedule a
-Deep Review until the declared PA-04..PA-06 phase boundary absent a new
-immediate safety trigger.
+PA-04 has a locally tested initial implementation and evidence at
+`docs/verification/PA-04-archive-synthesis-evidence-2026-09-19.md`. It binds
+the selected local archive contract to bounded support spans, carries only a
+typed paired PA-02 OpenAI text/context reservation, verifies citations and
+records safe retrieval/generation measurements. The default active runtime
+still has no paired access source and therefore keeps the local source-backed
+renderer; no provider, credential, account, live archive or job was used. A
+required independent Retrieval/Synthesis Critic review is pending. Do not call
+PA-04 formally accepted or start PA-05 until that review and any P0/P1
+remediation are recorded. Do not schedule a Deep Review until the declared
+PA-04..PA-06 phase boundary absent a new immediate safety trigger.
 
 For each slice: add focused positive/negative tests, run the smallest relevant
 existing tier, record evidence that distinguishes fixtures from integrations,
