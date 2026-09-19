@@ -104,9 +104,19 @@ reviewed `197bd1ce50b8c7fcde7e59832627f2def6ff5e86`, requested and observed
 `7246ab18b7f78a0dbe7b5c2d8236f8ea724acf26a29926db28e27ce0f1db5a70`).
 Commit `120395790fcd728c98d482def304ffe15f42b5e2` remediates that P1 with the
 three adversarial quote values and non-finite budget-limit holdouts above. A
-fresh Terra/high recheck is still required on that exact commit. No human
-acceptance, release approval or live-runtime authorization is claimed by this
-receipt.
+fresh Terra/high recheck `20260919T074237Z-slice_review-a64a4c04` reviewed
+`c0e5b7ce3b7026cc8fa76862b595d9a84fb2acf4`, requested and observed
+`gpt-5.6-terra` / `high` in a validated read-only run, and returned
+`ADVISORY` (report SHA-256
+`28ce1511ce680619f37c4a4ae621ac1172c9d56caccd3119c544fe85478c974e`). It
+found no PA-06 scope violation or P0/P1. Its retained limits are deliberate:
+only same-process, pre-start checkpoints resume; durable restart recovery is
+PA-09; and GitHub evidence verifies bounded repository identity/commit, not a
+repository-content assessment. The reviewer could not run pytest in its
+read-only temporary-directory environment; the writable focused results above
+are the independent implementation evidence. The accumulated PA-03..PA-06
+phase-boundary Deep Review remains next. No human acceptance, release approval
+or live-runtime authorization is claimed by this receipt.
 
 Next command:
 
