@@ -535,7 +535,7 @@ def build_brief_document(request: BriefBuildRequest) -> BriefDocument:
         period_basis=request.period_basis,
     )
     previous = request.previous_document
-    if previous is not None:
+    if previous is not None and _same_logical_report(previous, owner_ref=request.owner_ref, topic=topic, window=request.window):
         # A visible prior version is the only authority to increment the same
         # report identity. It remains conversation-bound in BriefDocumentStore.
         brief_id = previous.brief_id
@@ -1123,6 +1123,24 @@ def _content_digest(
     }
     encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
     return "sha256:" + hashlib.sha256(encoded).hexdigest()
+
+
+def _same_logical_report(
+    document: BriefDocument,
+    *,
+    owner_ref: str,
+    topic: str,
+    window: BriefWindow,
+) -> bool:
+    """Only a refresh of the same selected period may increment its version."""
+
+    return bool(
+        document.owner_ref == owner_ref
+        and document.topic.casefold() == topic.casefold()
+        and document.window.timezone == window.timezone
+        and _utc(document.window.start_at) == _utc(window.start_at)
+        and _utc(document.window.end_at) == _utc(window.end_at)
+    )
 
 
 def _conflicts(evidence: Sequence[BriefEvidence]) -> tuple[ConflictRecord, ...]:

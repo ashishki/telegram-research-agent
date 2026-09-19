@@ -295,3 +295,35 @@ def test_fresh_content_has_distinct_identity_and_mobile_card_has_full_navigation
     assert "Item 5" not in card
     assert "Item 5" in full
     assert "…" not in full
+
+
+def test_new_period_or_topic_is_comparison_not_a_version_increment() -> None:
+    first = build_brief_document(
+        BriefBuildRequest(
+            topic="AI", window=_window(), owner_ref="owner_primary", coverage=(CoverageSource("telegram:archive", "checked"),),
+            evidence=(_evidence("first", "https://t.me/example/first", title="AI", summary="First week."),),
+        )
+    )
+    next_window = BriefWindow.from_iso(
+        timezone_name="Europe/Berlin",
+        start_at="2026-10-26T00:00:00+01:00",
+        end_at="2026-10-27T00:00:00+01:00",
+        generated_at="2026-10-27T01:00:00+01:00",
+    )
+    next_report = build_brief_document(
+        BriefBuildRequest(
+            topic="Career", window=next_window, owner_ref="owner_primary",
+            coverage=(CoverageSource("telegram:archive", "checked"),),
+            evidence=(_evidence(
+                "next", "https://t.me/example/next", title="Career", summary="Next week.",
+                posted_at="2026-10-26T10:00:00+01:00", topics=("career",),
+            ),),
+            previous_document=first,
+            comparison_document=first,
+        )
+    )
+
+    assert next_report.version == 1
+    assert next_report.brief_id != first.brief_id
+    assert next_report.previous_version is None
+    assert next_report.comparison_ref == first.version_ref
