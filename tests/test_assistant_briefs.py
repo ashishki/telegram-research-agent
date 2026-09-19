@@ -38,6 +38,7 @@ def _evidence(
     urgent: bool = False,
     conflict_group: str | None = None,
     conflict_value: str | None = None,
+    repost_family_id: str | None = None,
 ) -> dict[str, object]:
     return {
         "local_archive_provenance": True,
@@ -51,6 +52,7 @@ def _evidence(
         "urgent": urgent,
         "conflict_group": conflict_group,
         "conflict_value": conflict_value,
+        "repost_family_id": repost_family_id,
     }
 
 
@@ -64,8 +66,8 @@ def test_brief_document_is_versioned_inspectable_and_dst_half_open() -> None:
             CoverageSource("telegram:channel-missing", "unavailable", "not supplied"),
         ),
         evidence=(
-            _evidence("dup-low", "https://t.me/example/dup", title="Duplicate older", summary="Older duplicate.", importance="low"),
-            _evidence("dup-high", "https://t.me/example/dup", title="Duplicate selected", summary="Selected duplicate.", importance="high"),
+            _evidence("dup-low", "https://t.me/example/repost-a", title="Duplicate older", summary="Older duplicate.", importance="low", repost_family_id="origin:eval-release"),
+            _evidence("dup-high", "https://t.me/example/repost-b", title="Duplicate selected", summary="Selected duplicate.", importance="high", repost_family_id="origin:eval-release"),
             _evidence("conflict-a", "https://t.me/example/a", title="Deadline source A", summary="Deadline says Monday.", urgent=True, conflict_group="deadline", conflict_value="Monday"),
             _evidence("conflict-b", "https://t.me/example/b", title="Deadline source B", summary="Deadline says Tuesday.", urgent=True, conflict_group="deadline", conflict_value="Tuesday"),
             # The right edge is excluded even across the Europe/Berlin DST
@@ -92,6 +94,7 @@ def test_brief_document_is_versioned_inspectable_and_dst_half_open() -> None:
     assert inspection["period"]["interval"] == "[start_at,end_at)"
     assert inspection["coverage"]["complete"] is False
     assert inspection["deduplication"][0]["kept_evidence_ref"] == "evidence_dup-high"
+    assert inspection["deduplication"][0]["key"] == "origin:eval-release"
     assert inspection["conflicts"] == [{
         "group": "deadline",
         "evidence_refs": ["evidence_conflict-a", "evidence_conflict-b"],
@@ -202,3 +205,17 @@ def test_brief_mode_projects_current_selected_archive_evidence_without_a_provide
     assert result.payload["brief_document_created"] is True
     assert result.payload["retrieval_performed"] is False
     assert result.payload["brief_document"]["evidence_refs"] == ["evidence_tg_brief"]
+
+
+def test_active_brief_window_parses_explicit_range_and_selected_timezone() -> None:
+    from prm.briefs import parse_requested_brief_window
+
+    window, basis = parse_requested_brief_window(
+        "бриф AI с 2026-10-25 по 2026-10-26 timezone Europe/Berlin",
+        now=datetime(2026, 10, 30, tzinfo=timezone.utc),
+    )
+
+    assert basis == "explicit_requested_range"
+    assert window.timezone == "Europe/Berlin"
+    assert window.to_dict()["start_at"] == "2026-10-24T22:00:00Z"
+    assert window.to_dict()["end_at"] == "2026-10-25T23:00:00Z"

@@ -67,6 +67,8 @@ def test_report_followups_use_only_the_current_visible_brief_document(monkeypatc
     explained = assistant.answer(OperatorRequest(query="объясни пункт 2", chat_id="42"))
     shortened = assistant.answer(OperatorRequest(query="сделай короче", chat_id="42"))
     filtered = assistant.answer(OperatorRequest(query="только AI", chat_id="42"))
+    less_technical = assistant.answer(OperatorRequest(query="сделай менее техническим", chat_id="42"))
+    apply = assistant.answer(OperatorRequest(query="что из этого применить?", chat_id="42"))
 
     assert initial.payload["brief_document_created"] is True
     assert explained.payload["brief_followup"]["kind"] == "explain_item"
@@ -76,7 +78,14 @@ def test_report_followups_use_only_the_current_visible_brief_document(monkeypatc
     assert filtered.payload["brief_view"] == "topics"
     assert "AI item" in filtered.text
     assert "Career item" not in filtered.text
-    assert all(result.payload["retrieval_performed"] is False for result in (initial, explained, shortened, filtered))
+    assert less_technical.payload["brief_view"] == "less_technical"
+    assert "новых фактов и поиска нет" in less_technical.text
+    assert apply.payload["brief_view"] == "apply"
+    assert "не выполненные действия" in apply.text
+    assert all(
+        result.payload["retrieval_performed"] is False
+        for result in (initial, explained, shortened, filtered, less_technical, apply)
+    )
 
 
 def test_compare_weeks_uses_an_actual_bound_prior_brief_not_a_new_search(monkeypatch) -> None:
@@ -121,3 +130,42 @@ def test_new_topic_and_restart_make_report_state_unavailable() -> None:
     restarted, restarted_briefs = _assistant()
     assert restarted_briefs.resolve_visible(conversation_id=conversation_id, response_ref=response_ref) is None
     assert restarted.briefs is restarted_briefs
+
+
+def test_active_brief_refresh_versions_and_two_active_weeks_bind_real_history(monkeypatch) -> None:
+    assistant, _ = _assistant()
+    initial = assistant.answer(OperatorRequest(query="weekly signals", mode="brief", chat_id="42", brief_request=_request()))
+    refreshed = assistant.answer(OperatorRequest(query="обнови бриф", chat_id="42"))
+
+    assert refreshed.payload["brief_document"]["version"] == 2
+    assert refreshed.payload["brief_document"]["previous_version"] == {
+        "brief_id": initial.payload["brief_document"]["brief_id"], "version": 1,
+    }
+    assert refreshed.payload["brief_inspection"]["period"]["basis"] == "revised_existing_evidence"
+    calls = []
+    empty_payload = {
+        "status": "ok", "direct_answer": "", "answer_gate": {"allow_answer": True},
+        "archive_evidence": {"items": []}, "evidence_quality": {"items": []},
+        "professional_answer": {}, "project_fit": {}, "project_decision": {}, "claim_ledger": {},
+        "unknowns": [], "next_steps": {}, "receipt": {}, "privacy": {},
+    }
+    monkeypatch.setattr(
+        "prm.application.answer_memory_research",
+        lambda *args, **kwargs: calls.append(args) or empty_payload,
+    )
+    first_week = assistant.answer(
+        OperatorRequest(query="бриф AI за прошлую неделю timezone Europe/Berlin", mode="brief", chat_id="42")
+    )
+    second_week = assistant.answer(
+        OperatorRequest(query="бриф AI последние 7 дней timezone Europe/Berlin", mode="brief", chat_id="42")
+    )
+    compared = assistant.answer(OperatorRequest(query="сравни с прошлой неделей", chat_id="42"))
+
+    assert len(calls) == 2
+    assert first_week.payload["brief_inspection"]["period"]["basis"] == "previous_calendar_week"
+    assert second_week.payload["brief_inspection"]["history"]["comparison_ref"] == {
+        "brief_id": first_week.payload["brief_document"]["brief_id"],
+        "version": first_week.payload["brief_document"]["version"],
+    }
+    assert compared.payload["brief_followup"]["kind"] == "compare_weeks"
+    assert len(calls) == 2

@@ -9,8 +9,8 @@ recovery in this module.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 import hashlib
 import re
 from threading import RLock
@@ -174,6 +174,7 @@ class BriefEvidence:
 
     evidence_ref: str
     source_ref: str
+    source_family_ref: str
     title: str
     summary: str
     observed_at: datetime
@@ -186,7 +187,11 @@ class BriefEvidence:
     conflict_value: str | None = None
 
     def __post_init__(self) -> None:
-        if not _EVIDENCE_REF.fullmatch(self.evidence_ref) or not _HTTPS_REF.fullmatch(self.source_ref):
+        if (
+            not _EVIDENCE_REF.fullmatch(self.evidence_ref)
+            or not _HTTPS_REF.fullmatch(self.source_ref)
+            or _clean(self.source_family_ref, 512, required=True) is None
+        ):
             raise ValueError("brief evidence identity is invalid")
         if _clean(self.title, 240, required=True) is None or _clean(self.summary, 400, required=True) is None:
             raise ValueError("brief evidence text is invalid")
@@ -312,6 +317,7 @@ class BriefDocument:
     brief_id: str
     version: int
     owner_ref: str
+    topic: str
     window: BriefWindow
     status: Literal["complete", "partial", "empty"]
     sections: tuple[BriefSection, ...]
@@ -322,9 +328,15 @@ class BriefDocument:
     deduplication: tuple[DeduplicationRecord, ...] = ()
     conflicts: tuple[ConflictRecord, ...] = ()
     comparison_ref: BriefVersionRef | None = None
+    period_basis: str = "explicit_requested_range"
 
     def __post_init__(self) -> None:
-        if not _BRIEF_ID.fullmatch(self.brief_id) or self.version < 1 or not _OWNER_REF.fullmatch(self.owner_ref):
+        if (
+            not _BRIEF_ID.fullmatch(self.brief_id)
+            or self.version < 1
+            or not _OWNER_REF.fullmatch(self.owner_ref)
+            or _clean(self.topic, 160, required=True) is None
+        ):
             raise ValueError("brief identity is invalid")
         if self.status not in {"complete", "partial", "empty"}:
             raise ValueError("brief status is invalid")
@@ -350,6 +362,8 @@ class BriefDocument:
             raise ValueError("brief selection reasons are invalid")
         if self.previous_version is not None and self.previous_version.brief_id != self.brief_id:
             raise ValueError("previous version must preserve the brief identity")
+        if not _SAFE_REASON.fullmatch(self.period_basis):
+            raise ValueError("brief period basis is invalid")
 
     @property
     def version_ref(self) -> BriefVersionRef:
@@ -385,7 +399,12 @@ class BriefDocument:
         return {
             "schema_version": BRIEF_INSPECTION_SCHEMA_VERSION,
             "brief_ref": {**self.version_ref.to_dict(), "retention": BRIEF_RETENTION},
-            "period": {**self.window.to_dict(), "interval": "[start_at,end_at)"},
+            "period": {
+                **self.window.to_dict(),
+                "interval": "[start_at,end_at)",
+                "basis": self.period_basis,
+            },
+            "topic": self.topic,
             "coverage": {**self.coverage_manifest.to_dict(), "complete": self.coverage_manifest.complete},
             "deduplication": [item.to_dict() for item in self.deduplication],
             "conflicts": [item.to_dict() for item in self.conflicts],
@@ -427,6 +446,7 @@ class BriefBuildRequest:
     limitations: tuple[str, ...] = ()
     previous_document: BriefDocument | None = None
     comparison_document: BriefDocument | None = None
+    period_basis: str = "explicit_requested_range"
 
     def __post_init__(self) -> None:
         if _clean(self.topic, 160, required=True) is None or not _OWNER_REF.fullmatch(self.owner_ref):
@@ -439,11 +459,13 @@ class BriefBuildRequest:
             raise ValueError("brief previous document is invalid")
         if self.comparison_document is not None and type(self.comparison_document) is not BriefDocument:
             raise ValueError("brief comparison document is invalid")
+        if not _SAFE_REASON.fullmatch(self.period_basis):
+            raise ValueError("brief request period basis is invalid")
 
 
 @dataclass(frozen=True, slots=True)
 class BriefFollowup:
-    kind: Literal["explain_item", "shorten", "filter_topics", "compare_weeks"]
+    kind: Literal["explain_item", "shorten", "filter_topics", "compare_weeks", "less_technical", "apply"]
     item_number: int | None = None
     topics: tuple[str, ...] = ()
 
@@ -496,6 +518,7 @@ def build_brief_document(request: BriefBuildRequest) -> BriefDocument:
         brief_id=brief_id,
         version=version,
         owner_ref=request.owner_ref,
+        topic=topic,
         window=request.window,
         status=status,
         sections=sections,
@@ -506,6 +529,7 @@ def build_brief_document(request: BriefBuildRequest) -> BriefDocument:
         deduplication=deduplication,
         conflicts=conflicts,
         comparison_ref=request.comparison_document.version_ref if request.comparison_document is not None else None,
+        period_basis=request.period_basis,
     )
 
 
@@ -517,6 +541,18 @@ def classify_brief_followup(text: str) -> BriefFollowup | None:
         return BriefFollowup("explain_item", item_number=int(item.group(1)))
     if lowered in {"сделай короче", "сократи", "shorten it", "make it shorter"}:
         return BriefFollowup("shorten")
+    if (
+        "менее техничес" in lowered
+        or "проще" in lowered
+        or "less technical" in lowered
+        or "less tech" in lowered
+    ):
+        return BriefFollowup("less_technical")
+    if lowered in {
+        "что из этого применить?", "что из этого применить", "что применить?", "что применить",
+        "what from this should i apply?", "what from this should i apply",
+    }:
+        return BriefFollowup("apply")
     if ("сравни" in lowered or "compare" in lowered) and ("прошл" in lowered or "week" in lowered or "недел" in lowered):
         return BriefFollowup("compare_weeks")
     topic = re.fullmatch(r"(?:только|покажи только|filter)\s+(.{1,120})", lowered)
@@ -530,7 +566,7 @@ def classify_brief_followup(text: str) -> BriefFollowup | None:
 def render_brief_document(
     document: BriefDocument,
     *,
-    view: Literal["telegram", "short", "item", "topics", "comparison"] = "telegram",
+    view: Literal["telegram", "short", "item", "topics", "comparison", "less_technical", "apply"] = "telegram",
     item_number: int | None = None,
     topics: Sequence[str] = (),
     comparison_document: BriefDocument | None = None,
@@ -543,6 +579,10 @@ def render_brief_document(
         return _render_item(document, item_number)
     if view == "comparison":
         return _render_comparison(document, comparison_document)
+    if view == "less_technical":
+        return _render_less_technical(document)
+    if view == "apply":
+        return _render_apply(document)
     selected_topics = tuple(_topic(item) for item in topics if _topic(item))
     items = tuple(item for item in document.items if not selected_topics or set(selected_topics) & set(item.topics))
     return _render_telegram(document, items, short=view == "short", topics=selected_topics)
@@ -640,7 +680,7 @@ class BriefDocumentStore:
         if len(matches) != 1:
             return None
         document = matches[0]
-        if view not in {"telegram", "short", "item", "topics", "comparison"}:
+        if view not in {"telegram", "short", "item", "topics", "comparison", "less_technical", "apply"}:
             raise ValueError("brief view is invalid")
         return render_brief_document(document, view=view, **kwargs)  # type: ignore[arg-type]
 
@@ -652,6 +692,91 @@ def render_brief(brief_id: str, version: int, view: str, *, store: BriefDocument
     """Read one exact ephemeral report version; no fallback/latest lookup exists."""
 
     return store.render_brief(brief_id, version, view, **kwargs)
+
+
+def parse_requested_brief_window(text: str, *, now: datetime | None = None) -> tuple[BriefWindow, str]:
+    """Parse the narrow active Telegram period/timezone syntax without search.
+
+    Supported explicit form is ``с 2026-09-14 по 2026-09-21`` (ISO timestamps
+    are accepted too), optionally followed by an IANA zone such as
+    ``Europe/Berlin``. ``за прошлую неделю`` means the preceding calendar week
+    in that zone; ``последние 7 дней`` is a rolling interval. Ambiguous prose
+    remains an inspectable rolling default instead of a guessed calendar week.
+    """
+
+    clean = " ".join(str(text or "").split())
+    timezone_name = _requested_timezone(clean) or "UTC"
+    try:
+        zone = ZoneInfo(timezone_name)
+    except ZoneInfoNotFoundError:
+        zone = ZoneInfo("UTC")
+        timezone_name = "UTC"
+    moment = (now or datetime.now(timezone.utc)).astimezone(zone)
+    explicit = re.search(
+        r"(?:с\s*)?(\d{4}-\d{2}-\d{2}(?:[T ][0-2]\d:[0-5]\d(?::[0-5]\d)?(?:Z|[+-][0-2]\d:[0-5]\d)?)?)\s*"
+        r"(?:по|to|…|\.\.)\s*"
+        r"(\d{4}-\d{2}-\d{2}(?:[T ][0-2]\d:[0-5]\d(?::[0-5]\d)?(?:Z|[+-][0-2]\d:[0-5]\d)?)?)",
+        clean,
+        flags=re.IGNORECASE,
+    )
+    if explicit is not None:
+        start = _date_edge(explicit.group(1))
+        end = _date_edge(explicit.group(2))
+        return BriefWindow.from_iso(
+            timezone_name=timezone_name,
+            start_at=start,
+            end_at=end,
+            generated_at=moment.isoformat(),
+        ), "explicit_requested_range"
+    lowered = clean.casefold()
+    if ("прошл" in lowered and "недел" in lowered) or "previous week" in lowered:
+        end = (moment.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=moment.weekday()))
+        start = end - timedelta(days=7)
+        basis = "previous_calendar_week"
+    else:
+        end = moment
+        start = end - timedelta(days=7)
+        basis = "rolling_last_7_days" if ("последн" in lowered and "7" in lowered) or "last 7" in lowered else "rolling_default_7_days"
+    return BriefWindow(timezone_name, start, end, moment), basis
+
+
+def rebuild_brief_request(document: BriefDocument) -> BriefBuildRequest:
+    """Create a new version from the same immutable evidence, without search."""
+
+    raw_items: list[dict[str, object]] = []
+    for item in document.evidence:
+        timestamp_key = {"published": "published_at", "event": "event_at", "updated": "updated_at"}[item.time_kind]
+        raw_items.append(
+            {
+                "local_archive_provenance": True,
+                "evidence_id": item.evidence_ref,
+                "source_url": item.source_ref,
+                "repost_family_id": item.source_family_ref,
+                "title": item.title,
+                "support_span": item.summary,
+                timestamp_key: _iso(item.observed_at),
+                "topics": item.topics,
+                "importance": item.importance,
+                "urgency": item.urgency,
+                "conflict_group": item.conflict_group,
+                "conflict_value": item.conflict_value,
+            }
+        )
+    return BriefBuildRequest(
+        topic=document.topic,
+        window=BriefWindow(
+            document.window.timezone,
+            document.window.start_at,
+            document.window.end_at,
+            datetime.now(timezone.utc),
+        ),
+        evidence=tuple(raw_items),
+        owner_ref=document.owner_ref,
+        coverage=document.coverage_manifest.sources,
+        limitations=document.coverage_manifest.limitations,
+        previous_document=document,
+        period_basis="revised_existing_evidence",
+    )
 
 
 def _local_archive_evidence(
@@ -689,6 +814,13 @@ def _evidence_from_mapping(raw: Mapping[str, Any], *, timezone_name: str) -> Bri
     title = _clean(raw.get("title"), 240) or _clean(raw.get("channel_username"), 160) or "Архивный материал"
     if identity is None or source_ref is None or summary is None or not _HTTPS_REF.fullmatch(source_ref):
         raise ValueError("brief local archive source is invalid")
+    family_ref = _clean(
+        raw.get("repost_family_id") or raw.get("canonical_url") or source_ref,
+        512,
+        required=True,
+    )
+    if family_ref is None:
+        raise ValueError("brief local archive source family is invalid")
     timestamp, time_kind = _source_time(raw, timezone_name=timezone_name)
     if timestamp is None:
         raise ValueError("brief local archive source has no usable event time")
@@ -702,8 +834,9 @@ def _evidence_from_mapping(raw: Mapping[str, Any], *, timezone_name: str) -> Bri
     if change and _SAFE_REASON.fullmatch(f"change_{change.casefold().replace('-', '_')}"):
         reasons.append(f"change_{change.casefold().replace('-', '_')}")
     return BriefEvidence(
-        evidence_ref="evidence_" + _slug(identity, fallback=source_ref),
+        evidence_ref=identity if _EVIDENCE_REF.fullmatch(identity) else "evidence_" + _slug(identity, fallback=source_ref),
         source_ref=source_ref,
+        source_family_ref=family_ref,
         title=title,
         summary=summary,
         observed_at=timestamp,
@@ -741,6 +874,29 @@ def _topic(value: object) -> str:
     return clean if _SAFE_TOPIC.fullmatch(clean) else ""
 
 
+def _requested_timezone(value: str) -> str | None:
+    # Keep the active Telegram parser narrow: accept only an explicit IANA
+    # zone token (or UTC), never infer it from a source timestamp or host.
+    match = re.search(r"\b(?:timezone|tz|часовой\s+пояс)\s*[:=]?\s*([A-Za-z_]+/[A-Za-z_]+|UTC)\b", value, re.IGNORECASE)
+    if match is None:
+        match = re.search(r"\b([A-Za-z_]+/[A-Za-z_]+|UTC)\b", value)
+    if match is None:
+        return None
+    candidate = match.group(1)
+    try:
+        ZoneInfo(candidate)
+    except ZoneInfoNotFoundError:
+        return None
+    return candidate
+
+
+def _date_edge(value: str) -> str:
+    clean = " ".join(value.split()).replace(" ", "T", 1)
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", clean):
+        return clean + "T00:00:00"
+    return clean
+
+
 def _importance(raw: Mapping[str, Any]) -> Literal["critical", "high", "medium", "low", "unknown"]:
     relevance = _mapping(raw.get("relevance"))
     value = str(raw.get("importance") or relevance.get("importance") or "").casefold()
@@ -773,7 +929,7 @@ def _urgency(raw: Mapping[str, Any]) -> Literal["urgent", "soon", "not_marked", 
 def _deduplicate(evidence: Sequence[BriefEvidence]) -> tuple[tuple[BriefEvidence, ...], tuple[DeduplicationRecord, ...]]:
     families: dict[str, list[BriefEvidence]] = {}
     for item in evidence:
-        families.setdefault(item.source_ref, []).append(item)
+        families.setdefault(item.source_family_ref, []).append(item)
     kept: list[BriefEvidence] = []
     records: list[DeduplicationRecord] = []
     for key, family in families.items():
@@ -912,6 +1068,40 @@ def _render_item(document: BriefDocument, item_number: int | None) -> str:
     ]
     if item.conflict_groups:
         lines.append("Есть неразрешённый конфликт источников; вывод не выравнивался автоматически.")
+    return _bounded(lines)
+
+
+def _render_less_technical(document: BriefDocument) -> str:
+    """A deterministic plain-language view, not a second model generation."""
+
+    if not document.items:
+        return _render_telegram(document, (), short=True, topics=())
+    evidence = document.evidence_by_ref()
+    lines = ["Коротко и менее технически"]
+    for index, item in enumerate(document.items[:4], start=1):
+        source = evidence[item.evidence_refs[0]]
+        lines.append(f"{index}. {item.title}: {_short(item.summary, 180)}")
+        lines.append(f"   Основание: {source.source_ref}")
+    lines.extend(("", "Формулировки упрощены локальным отображением; новых фактов и поиска нет.", f"Версия: {document.brief_id} v{document.version}"))
+    return _bounded(lines)
+
+
+def _render_apply(document: BriefDocument) -> str:
+    """Offer source-bounded consideration prompts without inventing actions."""
+
+    if not document.items:
+        return "В текущем BriefDocument нет источников, из которых можно осторожно вывести следующий шаг; поиск не запускался."
+    evidence = document.evidence_by_ref()
+    lines = ["Что из этого можно рассмотреть"]
+    for item in document.items[:4]:
+        source = evidence[item.evidence_refs[0]]
+        urgency = "сначала проверить срок" if item.urgency in {"urgent", "soon"} else "оценить применимость"
+        lines.append(f"- {item.title}: {urgency}; основание — {source.source_ref}")
+    lines.extend((
+        "",
+        "Это не выполненные действия и не новые обязательства: BriefDocument хранит сигналы и источники, не подтверждённый план.",
+        f"Версия: {document.brief_id} v{document.version}; поиск не запускался.",
+    ))
     return _bounded(lines)
 
 

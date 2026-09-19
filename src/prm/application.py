@@ -6,7 +6,7 @@ import os
 import re
 import hashlib
 import uuid
-from datetime import datetime, timedelta, timezone
+from dataclasses import replace
 from typing import Any, Mapping, Sequence
 
 from assistant.claim_ledger import claim_ledger_public_summary, verify_answer_against_evidence
@@ -33,11 +33,12 @@ from prm.briefs import (
     BriefDocument,
     BriefDocumentStore,
     BriefFollowup,
-    BriefWindow,
     CoverageSource,
     GLOBAL_BRIEFS,
     build_brief_document,
     classify_brief_followup,
+    parse_requested_brief_window,
+    rebuild_brief_request,
     render_brief_document,
 )
 from prm.contracts import AssistantResult, OperatorRequest, PublicWebAccess
@@ -113,6 +114,14 @@ class PersonalResearchAssistant:
                 comparison_document=visible_brief[1],
                 followup=brief_followup,
             )
+        if visible_brief is not None and _is_brief_refresh(request.query):
+            refreshed_request = rebuild_brief_request(visible_brief[0])
+            if visible_brief[1] is not None:
+                refreshed_request = replace(
+                    refreshed_request,
+                    comparison_document=visible_brief[1],
+                )
+            return self.render_brief_document(request, refreshed_request)
         turn = classify_turn(request.query, conversation)
         if turn.kind == "cancel":
             self.briefs.forget_conversation(conversation.conversation_id)
@@ -201,7 +210,9 @@ class PersonalResearchAssistant:
         # All ordinary text starts an independent topic for confirmation
         # purposes.  Read-only archive follow-up composition remains separate
         # transport compatibility and cannot retain action authority.
-        self.briefs.forget_conversation(conversation.conversation_id)
+        prior_brief_for_new_report = visible_brief if _may_start_brief(request) else None
+        if prior_brief_for_new_report is None:
+            self.briefs.forget_conversation(conversation.conversation_id)
         conversation = self.conversations.begin_new_topic(request.chat_id)
         route = decide_route(request.query, requested_mode=request.mode, explicit_project=request.project_name)
         route_payload = route.to_dict()
@@ -377,6 +388,7 @@ class PersonalResearchAssistant:
                     request=request,
                     payload=payload,
                     topic=str(route_payload.get("retrieval_query") or request.query),
+                    prior_document=(prior_brief_for_new_report or (None, None))[0],
                 ),
                 source_payload=payload,
                 route=route_payload,
@@ -614,6 +626,12 @@ class PersonalResearchAssistant:
         elif followup.kind == "filter_topics":
             text = render_brief_document(document, view="topics", topics=followup.topics)
             view = "topics"
+        elif followup.kind == "less_technical":
+            text = render_brief_document(document, view="less_technical")
+            view = "less_technical"
+        elif followup.kind == "apply":
+            text = render_brief_document(document, view="apply")
+            view = "apply"
         else:
             text = render_brief_document(
                 document,
@@ -1251,6 +1269,7 @@ def _brief_request_from_archive_payload(
     request: OperatorRequest,
     payload: Mapping[str, Any],
     topic: str,
+    prior_document: BriefDocument | None = None,
 ) -> BriefBuildRequest:
     """Adapt only the already-selected local archive rows to PA-07 evidence.
 
@@ -1259,13 +1278,7 @@ def _brief_request_from_archive_payload(
     future, separately-authorized caller supplies a checked manifest.
     """
 
-    now = datetime.now(timezone.utc)
-    window = BriefWindow(
-        timezone="UTC",
-        start_at=now - timedelta(days=7),
-        end_at=now,
-        generated_at=now,
-    )
+    window, period_basis = parse_requested_brief_window(request.query)
     archive = _mapping(payload.get("archive_evidence"))
     quality_by_identity: dict[tuple[str, str], Mapping[str, Any]] = {}
     for item in _mapping(payload.get("evidence_quality")).get("items") or ():
@@ -1318,6 +1331,38 @@ def _brief_request_from_archive_payload(
             ),
         ),
         limitations=("bounded_local_archive_selection", "full_archive_coverage_not_measured"),
+        previous_document=prior_document,
+        comparison_document=(
+            prior_document
+            if prior_document is not None
+            and (
+                prior_document.window.timezone != window.timezone
+                or prior_document.window.start_at != window.start_at
+                or prior_document.window.end_at != window.end_at
+            )
+            else None
+        ),
+        period_basis=period_basis,
+    )
+
+
+def _is_brief_refresh(text: str) -> bool:
+    lowered = " ".join(str(text or "").split()).casefold()
+    return lowered in {
+        "обнови бриф", "обнови отчёт", "обнови отчет", "update brief", "refresh brief",
+    }
+
+
+def _may_start_brief(request: OperatorRequest) -> bool:
+    if request.mode == "brief":
+        return True
+    lowered = " ".join(str(request.query or "").split()).casefold()
+    return bool(
+        lowered.startswith("/brief")
+        or "бриф" in lowered
+        or "brief" in lowered
+        or "за прошлую неделю" in lowered
+        or "what matters this week" in lowered
     )
 
 
