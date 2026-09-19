@@ -151,18 +151,98 @@ git diff --check
 # passed; no output
 ```
 
+## Independent rechecks and final observed verdict
+
+All reviewer runs below were fresh Role Runner `slice_review` processes with
+requested and observed `gpt-5.6-terra` / `high`, Codex CLI `0.154.0`, a
+read-only sandbox and an unchanged workspace. Their temporary-directory
+restriction meant they could not independently start `focused-prm`; that is an
+environment limitation, not a test result. Every reviewer report is evidence
+only and grants neither design approval, slice acceptance, runtime authorization
+nor release approval.
+
+1. Run `20260919T031019Z-slice_review-8e75ddb8` reviewed remediation
+   `ad35e50287cf625770d1b330f2473f6b0eb58206` and returned `STOP_SHIP`
+   (report SHA-256
+   `a40240cdc5e2d960ed6d95a072143a0adfa0397a7b457326e7d463769617aeb4`).
+   Its P1s required actual Russian/English retrieval/ranking holdouts and
+   truthful partial/false-refusal/no-result publication paths. Commit
+   `7c8c3fe5feaf89851d3b401f898374694dce174d` adds those offline holdouts and
+   source-backed partial fallback protection.
+2. Run `20260919T032254Z-slice_review-a1f4b3ec` reviewed `7c8c3fe` and
+   returned `STOP_SHIP` (report SHA-256
+   `992ea94831273d2245838034c76bccfd2764841995ec771de279bf8af96ec5c9`).
+   Its P1s required relation-order preservation and a publication set limited
+   to the exact provider context. Commit
+   `901996ee2943709c2a90a9b066376ec6d13e5965` requires an ordered selected
+   span per cited factual sentence and limits rejected-output fallback to the
+   exact archive contract selection.
+3. Run `20260919T033145Z-slice_review-893264df` reviewed `901996e` and
+   returned `STOP_SHIP` (report SHA-256
+   `21b58d35ad54c19817606688398a6062bd8841e6fb9ff2dc660a80719ebd97b8`).
+   Its P1 found a polarity mutation: a positive answer could omit a cited
+   source's `no`/`not`/Russian negation. Commit
+   `c4f828cc6c09806de82eca42b9fb1447693f5a5c` preserves negation as a factual
+   polarity signal, with English and Russian synthesis and application
+   publication mutation tests.
+4. Run `20260919T034333Z-slice_review-5895c5cd` reviewed `c4f828c` against
+   `081dded..c4f828c` and returned `ADVISORY`, with no P0/P1 design or boundary
+   blocker (report SHA-256
+   `a1bdc17e33cba1a89d280ca473e9456bb10f8af646055a0b71666c1e8089068a`).
+   It confirmed the default-deny paired access, local fallback and selected
+   evidence boundary. Its two follow-ups remain open: abandon a pre-reserved
+   pair on skipped/exceptional application outcomes, and add an active
+   `run_bot` group/non-private message regression for non-invocation of the
+   access provider.
+
+The earlier `901996e` review also recorded two P2 limitations that remain
+visible rather than being silently closed: the bilingual holdout is an
+offline in-memory corpus (application wiring, not FTS recall quality), and
+`ResearchResult` remains deferred while measurements live in the existing
+`AssistantResult.payload` compatibility DTO. No reviewer asked to expand this
+slice beyond its bounded scope to resolve them.
+
+After each remediation the implementer ran offline checks with a freshly
+created writable `TMPDIR`; no test accessed a live provider, credential,
+Telegram, archive database, account or job:
+
+```text
+PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q \
+  tests/test_prm_synthesis.py tests/test_prm_application.py
+# 32 passed in 2.52s (7c8c3fe)
+
+TMPDIR=<mktemp> PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/test_tiers.py focused-prm
+# 358 passed in 76.22s (7c8c3fe)
+# 360 passed in 95.84s (901996e)
+# 363 passed in 76.82s (c4f828c)
+
+PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q \
+  tests/test_prm_synthesis.py tests/test_prm_application.py tests/test_prm_bot_dispatch.py
+# 41 passed in 4.09s (901996e)
+# 44 passed in 5.20s (c4f828c)
+
+python3 -m py_compile src/prm/application.py src/prm/synthesis.py \
+  tests/test_prm_application.py tests/test_prm_synthesis.py
+git diff --check
+python3 tools/check_personal_assistant_plan.py
+python3 tools/playbook.py --check-pin
+# all passed; plan output retained mechanical design state review_required
+```
+
 ## Remaining gates and handoff
 
-- A fresh independent Terra/high recheck is required for this remediation;
-  implementer-run tests do not close the Astra P1s.
+- PA-04 is locally verified and independently rechecked `ADVISORY`; it has no
+  formal human acceptance claim and the mechanical design status remains
+  `review_required` because of the historic STOP_SHIP artifact.
 - No durable source of paired archive-synthesis authorization is implemented.
-  The new ingress accepts only an externally injected exact typed pair; neither
-  a configured key nor the two environment flags are consent.
-- Synthetic fixture verification does not establish real retriever quality,
-  model quality, provider behavior, mobile usefulness, actual archive freshness,
-  or authorized private-data egress. Those remain distinct later gates.
+  The ingress accepts only an externally injected exact typed pair; neither a
+  configured key nor the two environment flags are consent.
+- Synthetic fixture verification does not establish FTS-quality multilingual
+  recall, model quality, provider behavior, mobile usefulness, actual archive
+  freshness or authorized private-data egress. Those remain distinct later
+  gates.
 - The two pre-existing untracked local files remain unstaged and untouched.
 
-After the independent review and any scoped remediation, PA-05 is the next
-dependency-ready slice: controlled public search/fetch/evidence without
-leaking private archive context or widening this paired archive boundary.
+PA-05 is dependency-ready: controlled public search/fetch/evidence without
+leaking private archive context or widening the paired archive boundary. Deep
+Review remains deferred until the declared PA-04..PA-06 phase boundary.

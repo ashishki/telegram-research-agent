@@ -30,7 +30,7 @@ No production DB, live Telegram polling, account/provider access, job, timer,
 credential, `.env` or release action has been used or is authorized. Preserve
 the two untracked local files. Do not run the full historical pytest suite.
 
-## Current slice: PA-04
+## Current slice: PA-05
 
 PA-03 is locally tested at `081dded92b00bdaa822a6f6c0efbe8ae7ab86861` with
 evidence at `docs/verification/PA-03-conversation-evidence-2026-09-19.md`.
@@ -50,18 +50,25 @@ refinement, and a narrow dialogue-disable switch before authorized runtime.
 PA-04 has locally tested remediation and evidence at
 `docs/verification/PA-04-archive-synthesis-evidence-2026-09-19.md`. It binds
 the selected local archive contract to bounded support spans, carries only a
-typed paired PA-02 OpenAI text/context reservation, verifies citations and
-records safe retrieval/generation measurements. Astra/high `slice_review` on
-initial commit `0cdd5c1` returned STOP_SHIP with four P1s; remediation adds
-exact source-ID/provenance/span binding, bounded semantic claim checks,
-truncation-safe context and a default-deny typed Telegram ingress seam. The
-active runtime still has no grant/credential source and therefore keeps the
-local source-backed renderer unless an external caller supplies the exact
-paired reservation; no provider, credential, account, live archive or job was
-used. A fresh independent Terra/high recheck is required. Do not call PA-04
-formally accepted or start PA-05 until that recheck and any P0/P1 remediation
-are recorded. Do not schedule a Deep Review until the declared PA-04..PA-06
-phase boundary absent a new immediate safety trigger.
+typed paired PA-02 OpenAI text/context reservation, verifies citations,
+relation order and negation polarity, and records safe retrieval/generation
+measurements. The owner-requested Astra/high review found initial P1s; three
+fresh Terra/high P1 remediations then converged to the final fresh Terra/high
+`ADVISORY` review on `c4f828c`. Do not call PA-04 formally accepted: the
+mechanical design status remains `review_required` due to the historic
+STOP_SHIP artifact, and the final review grants no human acceptance, runtime
+authorization or release approval. Keep the following advisory debt visible:
+pre-reserved pair abandonment on exceptional/skipped application paths; an
+active `run_bot` group/non-private non-invocation regression; offline holdouts
+are application wiring rather than FTS-quality recall; and `ResearchResult`
+remains deferred behind the established `AssistantResult.payload` DTO.
+
+PA-05 is dependency-ready. It must implement an on-demand, grant-gated public
+search/fetch/evidence path without widening the legacy UTD allowlist or
+leaking private archive/query data. No production DB, live account/provider,
+credential, live job, timer or deployment is authorized. Do not schedule a
+Deep Review until the declared PA-04..PA-06 phase boundary absent a new
+immediate safety trigger.
 
 For each slice: add focused positive/negative tests, run the smallest relevant
 existing tier, record evidence that distinguishes fixtures from integrations,
