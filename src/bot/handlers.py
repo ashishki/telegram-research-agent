@@ -10,7 +10,7 @@ from importlib import import_module
 from typing import Any
 
 from config.settings import Settings
-from prm.contracts import ModelEgressAccess
+from prm.contracts import ArchiveSynthesisAccess, ModelEgressAccess
 from .prm_handlers import PRM_SAFE_COMMANDS, dispatch_prm_command, send_message
 from .runtime import BOT_RUNTIME_LEGACY, BOT_RUNTIME_MODES, BOT_RUNTIME_PRM_ASSISTANT, normalize_bot_runtime_mode
 
@@ -19,12 +19,15 @@ def dispatch_command(
     chat_id: str, text: str, settings: Settings, *, runtime_mode: str = BOT_RUNTIME_LEGACY,
     actor_id: str | None = None, owner_chat_id: str | None = None,
     model_access: ModelEgressAccess | None = None,
+    archive_synthesis_access: ArchiveSynthesisAccess | None = None,
 ) -> None:
     mode = normalize_bot_runtime_mode(runtime_mode)
     if mode == BOT_RUNTIME_PRM_ASSISTANT:
         kwargs: dict[str, object] = {"actor_id": actor_id, "owner_chat_id": owner_chat_id}
         if model_access is not None:
             kwargs["model_access"] = model_access
+        if archive_synthesis_access is not None:
+            kwargs["archive_synthesis_access"] = archive_synthesis_access
         dispatch_prm_command(chat_id, text, settings, **kwargs)
         return
     _legacy().dispatch_command(chat_id=chat_id, text=text, settings=settings, runtime_mode=BOT_RUNTIME_LEGACY)

@@ -18,7 +18,7 @@ def _payload():
             "matched_query_variant": "agent evals",
         }]},
         "evidence_quality": {"items": [{
-            "evidence_id": "e1", "support_span": "Agent evals use task success and groundedness.",
+            "evidence_id": "tg:1", "support_span": "Agent evals use task success and groundedness.",
             "source_url": "https://t.me/example/1", "source_group_id": "g1", "freshness_status": "fresh",
             "relevance_label": "direct",
         }]},

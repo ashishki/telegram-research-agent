@@ -47,17 +47,21 @@ context.
 PA-03 has no formal acceptance claim. Keep its three advisory follow-ups open:
 inactive legacy helper ownership, response-reference/version binding for archive
 refinement, and a narrow dialogue-disable switch before authorized runtime.
-PA-04 has a locally tested initial implementation and evidence at
+PA-04 has locally tested remediation and evidence at
 `docs/verification/PA-04-archive-synthesis-evidence-2026-09-19.md`. It binds
 the selected local archive contract to bounded support spans, carries only a
 typed paired PA-02 OpenAI text/context reservation, verifies citations and
-records safe retrieval/generation measurements. The default active runtime
-still has no paired access source and therefore keeps the local source-backed
-renderer; no provider, credential, account, live archive or job was used. A
-required independent Retrieval/Synthesis Critic review is pending. Do not call
-PA-04 formally accepted or start PA-05 until that review and any P0/P1
-remediation are recorded. Do not schedule a Deep Review until the declared
-PA-04..PA-06 phase boundary absent a new immediate safety trigger.
+records safe retrieval/generation measurements. Astra/high `slice_review` on
+initial commit `0cdd5c1` returned STOP_SHIP with four P1s; remediation adds
+exact source-ID/provenance/span binding, bounded semantic claim checks,
+truncation-safe context and a default-deny typed Telegram ingress seam. The
+active runtime still has no grant/credential source and therefore keeps the
+local source-backed renderer unless an external caller supplies the exact
+paired reservation; no provider, credential, account, live archive or job was
+used. A fresh independent Terra/high recheck is required. Do not call PA-04
+formally accepted or start PA-05 until that recheck and any P0/P1 remediation
+are recorded. Do not schedule a Deep Review until the declared PA-04..PA-06
+phase boundary absent a new immediate safety trigger.
 
 For each slice: add focused positive/negative tests, run the smallest relevant
 existing tier, record evidence that distinguishes fixtures from integrations,

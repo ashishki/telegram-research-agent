@@ -246,16 +246,31 @@ class PersonalResearchAssistant:
 
         deterministic = render_payload(payload, mode=route.mode)
         local_archive_evidence = {
-            (str(item.get("source_url") or ""), str(item.get("snippet") or ""))
+            (
+                str(item.get("source_url") or ""),
+                str(
+                    item.get("archive_document_id")
+                    or item.get("post_archive_document_id")
+                    or item.get("post_id")
+                    or item.get("source_url")
+                    or ""
+                ),
+            )
             for item in _mapping(payload.get("archive_evidence")).get("items") or []
-            if isinstance(item, Mapping) and str(item.get("archive_document_id") or "")
+            if isinstance(item, Mapping)
+            and str(
+                item.get("archive_document_id")
+                or item.get("post_archive_document_id")
+                or item.get("post_id")
+                or item.get("source_url")
+                or ""
+            )
         }
         evidence_items = [
             {
                 **dict(item),
                 "local_archive_provenance": (
-                    str(item.get("source_url") or ""),
-                    str(item.get("support_span") or item.get("snippet") or ""),
+                    str(item.get("source_url") or ""), str(item.get("evidence_id") or ""),
                 ) in local_archive_evidence,
             }
             for item in _mapping(payload.get("evidence_quality")).get("items") or []
@@ -284,8 +299,12 @@ class PersonalResearchAssistant:
                 else ""
             ),
         )
+        archive_synthesis_verified = synthesis is not None and synthesis.status == "generated_verified" and synthesis.text is not None
         publication_allowed = _final_answer_publication_allowed(
-            verification, gate, response_contract_id=str(payload.get("response_contract_id") or route.response_contract_id)
+            verification,
+            gate,
+            response_contract_id=str(payload.get("response_contract_id") or route.response_contract_id),
+            archive_source_bound=archive_synthesis_verified,
         )
         final_publication_allowed = publication_allowed
         if not publication_allowed:
@@ -330,9 +349,20 @@ class PersonalResearchAssistant:
             "final_answer_publication": {
                 "allowed": final_publication_allowed,
                 "fallback_used": not publication_allowed,
-                "reason": "verified" if final_publication_allowed else "final_claim_verification_incomplete_or_unsupported",
+                "reason": (
+                    "archive_source_bound_verified"
+                    if final_publication_allowed and archive_synthesis_verified
+                    else "verified"
+                    if final_publication_allowed
+                    else "final_claim_verification_incomplete_or_unsupported"
+                ),
             },
             "retrieval_generation_measurement": _retrieval_generation_measurement(payload, synthesis=synthesis),
+            "archive_synthesis_verification": {
+                "status": str(synthesis.status) if synthesis is not None else "not_attempted",
+                "method": "exact_selected_span_with_bounded_paraphrase.v1" if archive_synthesis_verified else "not_published",
+                "published": archive_synthesis_verified and final_publication_allowed,
+            },
         }
         return self._remember_conversation_result(request, AssistantResult(
             interaction_id=context.interaction_id,
@@ -738,7 +768,7 @@ def _preserve_requested_project_identity(payload: Mapping[str, Any], route: Mapp
 
 
 def _final_answer_publication_allowed(
-    verification: Mapping[str, Any], gate: Mapping[str, Any], *, response_contract_id: str = ""
+    verification: Mapping[str, Any], gate: Mapping[str, Any], *, response_contract_id: str = "", archive_source_bound: bool = False
 ) -> bool:
     """Whether rendered factual text is safe to publish as an answer."""
     metrics = _mapping(verification.get("metrics"))
@@ -746,7 +776,7 @@ def _final_answer_publication_allowed(
         return False
     if int(metrics.get("current_fact_violations") or 0):
         return False
-    if float(metrics.get("unsupported_claim_rate") or 0.0) > 0.0:
+    if not archive_source_bound and float(metrics.get("unsupported_claim_rate") or 0.0) > 0.0:
         return False
     factual = [
         claim for claim in verification.get("claims") or []
@@ -760,6 +790,12 @@ def _final_answer_publication_allowed(
             isinstance(claim, Mapping) and str(claim.get("claim_type") or "") == "boundary"
             for claim in verification.get("claims") or []
         )
+    if archive_source_bound:
+        # ``synthesize_archive_response`` already establishes a stricter
+        # source-bound condition for generated archive claims. The generic
+        # ledger remains in the payload as an independent lexical diagnostic;
+        # it must not turn a checked safe paraphrase into an evidence fallback.
+        return True
     return all(
         bool(claim.get("evidence_refs"))
         and all(str(status) == "supported" for status in _mapping(claim.get("citation_support")).values())

@@ -30,7 +30,7 @@ from prm.capabilities import (
     require_authorized_operation,
     transport_purpose,
 )
-from prm.contracts import ModelEgressAccess, OperatorRequest
+from prm.contracts import ArchiveSynthesisAccess, ModelEgressAccess, OperatorRequest
 from prm.conversation import GLOBAL_CONVERSATIONS, compose_object_bound_archive_followup
 
 LOGGER = logging.getLogger(__name__)
@@ -133,6 +133,7 @@ def dispatch_prm_command(
     delivery_authorizations: Sequence[AuthorizationDecision] = (),
     utd_draft_authorization: AuthorizationDecision | None = None,
     model_access: ModelEgressAccess | None = None,
+    archive_synthesis_access: ArchiveSynthesisAccess | None = None,
 ) -> None:
     command, args = _split_command(text)
 
@@ -263,6 +264,7 @@ def dispatch_prm_command(
                 actor_id=actor_id,
                 owner_chat_id=owner_chat_id,
                 model_access=model_access,
+                archive_synthesis_access=archive_synthesis_access,
             )
         )  # type: ignore[arg-type]
     except Exception as exc:

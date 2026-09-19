@@ -32,6 +32,14 @@ class ArchiveSynthesisTransportOutcomeUnknown(RuntimeError):
     """The paired provider request may have crossed the transport boundary."""
 
 
+class ArchiveSynthesisTransportEmptyResponse(RuntimeError):
+    """The request was accepted but supplied no usable generated text."""
+
+    def __init__(self, receipt: "ArchiveSynthesisReceipt") -> None:
+        super().__init__("archive synthesis provider returned no text")
+        self.receipt = receipt
+
+
 class _ResponsesAPI(Protocol):
     def create(self, **kwargs: Any) -> Any: ...
 
@@ -116,20 +124,21 @@ def complete_archive_synthesis(
 
     _record_outcome(access, "accepted")
     text = _extract_output_text(response)
+    receipt = ArchiveSynthesisReceipt(
+        provider="openai",
+        model=model,
+        external_call_attempted=True,
+        external_call_performed=True,
+        context_egress_attempted=True,
+        context_egress_performed=True,
+        delivery_outcome="accepted",
+        context_binding_digest=context.binding_digest,
+    )
     if not text:
-        raise ArchiveSynthesisTransportUnavailable("archive synthesis provider returned no text")
+        raise ArchiveSynthesisTransportEmptyResponse(receipt)
     return ArchiveSynthesisTransportResult(
         text=text,
-        receipt=ArchiveSynthesisReceipt(
-            provider="openai",
-            model=model,
-            external_call_attempted=True,
-            external_call_performed=True,
-            context_egress_attempted=True,
-            context_egress_performed=True,
-            delivery_outcome="accepted",
-            context_binding_digest=context.binding_digest,
-        ),
+        receipt=receipt,
     )
 
 

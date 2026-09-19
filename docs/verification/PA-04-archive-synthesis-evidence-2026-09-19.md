@@ -37,11 +37,13 @@ runtime, owner-usefulness, release, or human acceptance.
   unavailability, or unknown outcome retain the useful local source-backed
   response rather than inventing a citation or claim.
 
-The active Telegram runtime does not mint or inject this paired access, so it
-continues on the local renderer by default. That is intentional default-deny:
-an authorized outer transport can pass the typed access through the application
-only after its own future scope and human/runtime gates. No bot, job, service,
-timer, production DB, or live provider was changed in this slice.
+The active Telegram runtime has a narrow default-deny ingress seam. It calls an
+optional injected paired-access provider only after the local router selects an
+archive intent, then forwards only a valid `ArchiveSynthesisAccess` through the
+PRM handler to the application. Chat and current-fact turns never ask that
+provider; omitted, malformed or failing access remains the local renderer. The
+runtime does not mint a grant or credential. No job, service, timer, production
+DB, or live provider was changed in this slice.
 
 ## Verification
 
@@ -92,14 +94,70 @@ tests. They were immediately replaced with the repository's actual focused
 paths above; this is a command-selection correction, not a product pass/fail
 result. The prohibited full historical pytest suite was not run.
 
+## Independent review and remediation
+
+Fresh read-only Role Runner `slice_review` examined initial commit
+`0cdd5c100e52b5dbcc6eb738e4217c3bf0b18f32` (`961d1ee..0cdd5c1`) and returned
+`STOP_SHIP`. Per the owner-requested review order, the requested and observed
+telemetry was `gpt-6-astra` / `high`; run
+`20260919T025631Z-slice_review-8edc2055` was validated in a read-only sandbox
+with an unchanged workspace. Its report SHA-256 is
+`14c175002208077fe11bb6ce7b8670bad46a87dea54eb4b0e424ad16eef1f5b4` at
+`.playbook-artifacts/runs/20260919T025631Z-slice_review-8edc2055/report.md`.
+It is review evidence only, never design, completion, runtime or release
+approval.
+
+The scoped remediation addresses all four P1s and the P2 telemetry advisory:
+
+- context now requires the exact selected `evidence_id` and source URL plus
+  `local_archive_provenance=True`, and sends the canonical bounded
+  evidence-quality support span rather than a separately truncated or appended
+  display summary. Ambiguous duplicate spans, detached IDs, unprovenanced
+  evidence and mutation probes all fail before transport;
+- generated archive claims require an explicit cited selected source and every
+  substantive token to occur in its exact span or a deliberately tiny
+  inflection/paraphrase allowlist. This rejects a relationship inversion with
+  the correct URL while allowing a bounded useful paraphrase. The generic claim
+  ledger remains a diagnostic; publication records this stricter source-bound
+  verification method rather than treating lexical overlap as semantic proof;
+- canonical support spans make an ordinary 260-character display ellipsis
+  irrelevant to model context; a long-excerpt holdout succeeds while appended
+  display text never enters the provider input; and
+- the registry scope was explicitly amended, while retaining mechanical
+  `review_required`, to include the default-deny bot/handler seam and its tests.
+  Text, embedded-transcript and voice-transcript paths obtain a typed pair only
+  after archive routing. The active ingress test exercises handler → actual
+  retrieval → context binding → synthetic provider result → publication.
+  `focused-prm` now registers `tests/test_prm_synthesis.py` rather than leaving
+  the slice's own security regressions outside its required tier.
+
+After remediation, only synthetic/offline checks were rerun:
+
+```text
+PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q \
+  tests/test_prm_synthesis.py tests/test_prm_application.py \
+  tests/test_prm_bot_dispatch.py tests/test_prm_utd_dispatch.py \
+  tests/test_prm_intent_archive_contract.py tests/test_prm_research_planner.py \
+  tests/test_openai_provider.py
+# 97 passed in 6.90s
+
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/test_tiers.py focused-prm
+# 354 passed in 80.75s (0:01:20)
+
+python3 -m py_compile src/prm/application.py src/prm/contracts.py \
+  src/prm/archive_context.py src/prm/archive_synthesis_transport.py src/prm/synthesis.py \
+  src/bot/bot.py src/bot/handlers.py src/bot/prm_handlers.py tools/test_tiers.py
+git diff --check
+# passed; no output
+```
+
 ## Remaining gates and handoff
 
-- Required independent PA-04 Retrieval/Synthesis Critic review is pending for
-  this scoped commit; implementer-run tests do not replace it.
+- A fresh independent Terra/high recheck is required for this remediation;
+  implementer-run tests do not close the Astra P1s.
 - No durable source of paired archive-synthesis authorization is implemented.
-  A future ingress/runtime change must preserve the exact typed pair and has
-  separate scope; neither a configured key nor the two environment flags are
-  consent.
+  The new ingress accepts only an externally injected exact typed pair; neither
+  a configured key nor the two environment flags are consent.
 - Synthetic fixture verification does not establish real retriever quality,
   model quality, provider behavior, mobile usefulness, actual archive freshness,
   or authorized private-data egress. Those remain distinct later gates.

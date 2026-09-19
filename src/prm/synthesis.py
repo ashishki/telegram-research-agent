@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+import re
 from typing import Any, Mapping, Sequence
 
 from assistant.claim_ledger import verify_answer_against_evidence
@@ -11,6 +12,7 @@ from llm.client import LLMClient
 from prm.archive_contract import ARCHIVE_RESPONSE_CONTRACTS
 from prm.archive_context import ArchiveEvidenceContext
 from prm.archive_synthesis_transport import (
+    ArchiveSynthesisTransportEmptyResponse,
     ArchiveSynthesisTransportOutcomeUnknown,
     ArchiveSynthesisTransportUnavailable,
     complete_archive_synthesis,
@@ -31,6 +33,22 @@ _ARCHIVE_FORBIDDEN_SECTIONS = (
     "влияние на backlog",
     "влияния на backlog",
 )
+_ARCHIVE_URL_RE = re.compile(r"https://[^\s)\]]+")
+_ARCHIVE_TOKEN_RE = re.compile(r"[A-Za-zА-Яа-яЁё0-9][A-Za-zА-Яа-яЁё0-9_+-]{1,}")
+_ARCHIVE_SENTENCE_RE = re.compile(r"(?<=[.!?。！？])\s+|[\r\n]+")
+_ARCHIVE_NON_FACT_TOKENS = frozenset({
+    "the", "a", "an", "this", "that", "these", "those", "from", "in", "on", "for", "and", "or", "with",
+    "archive", "archives", "material", "materials", "source", "sources", "finding", "findings", "says", "said",
+    "shows", "show", "describes", "describe", "about", "direct", "partial", "adjacent", "evidence", "summary",
+    "в", "из", "по", "и", "или", "для", "это", "этот", "эта", "эти", "что", "как", "есть", "был", "была",
+    "архив", "архиве", "материал", "материалы", "источник", "источники", "находка", "находки", "прямой", "прямые",
+    "частичный", "смежный", "вывод", "данные", "говорит", "описывает", "показывает", "согласно",
+})
+_ARCHIVE_SAFE_PARAPHRASES = {
+    "using": "use", "used": "use", "uses": "use", "measure": "use", "measures": "use", "measuring": "use",
+    "измерение": "измерять", "измеряет": "измерять", "измеряют": "измерять", "использует": "использовать",
+    "используют": "использовать", "использование": "использовать",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -146,6 +164,12 @@ def synthesize_archive_response(
         )
     try:
         result = complete_archive_synthesis(context=context, access=access)
+    except ArchiveSynthesisTransportEmptyResponse as exc:
+        return ArchiveSynthesisOutcome(
+            text=None,
+            status="provider_empty_response",
+            measurement={**base_measurement, **exc.receipt.public_measurement()},
+        )
     except ArchiveSynthesisTransportOutcomeUnknown:
         return ArchiveSynthesisOutcome(
             text=None,
@@ -260,6 +284,8 @@ def _verified_archive_answer(
     direct_sources = {str(item.get("source_url") or "").strip() for item in direct}
     if any(source and source not in answer for source in direct_sources):
         return False
+    if not _claims_are_source_bounded(answer, evidence_items=evidence_items, direct_required=bool(direct_count)):
+        return False
     verification = verify_answer_against_evidence(
         answer,
         evidence_items,
@@ -271,12 +297,67 @@ def _verified_archive_answer(
         verification.get("verification_complete")
         and int(metrics.get("current_fact_violations") or 0) == 0
         and int(metrics.get("technical_leaks") or 0) == 0
-        and float(metrics.get("unsupported_claim_rate") or 0.0) == 0.0
-        and (
-            int(metrics.get("claim_count") or 0) == 0
-            or float(metrics.get("citation_integrity") or 0.0) == 1.0
-        )
     )
+
+
+def _claims_are_source_bounded(
+    answer: str,
+    *,
+    evidence_items: Sequence[Mapping[str, Any]],
+    direct_required: bool,
+) -> bool:
+    """Allow only extractive or explicitly whitelisted paraphrase claims.
+
+    The general claim ledger remains useful for aggregate diagnostics, but a
+    lexical overlap score cannot prove that a generated relationship retained
+    its meaning. This archive-only gate makes every substantive generated token
+    trace to the cited selected span (apart from a deliberately tiny inflection
+    map) and therefore rejects inversions such as ``use`` -> ``destroy``.
+    """
+
+    supports: dict[str, list[str]] = {}
+    for item in evidence_items:
+        if not isinstance(item, Mapping) or item.get("local_archive_provenance") is not True:
+            continue
+        source = str(item.get("source_url") or "").strip()
+        span = str(item.get("support_span") or item.get("snippet") or "").strip()
+        if source and span:
+            supports.setdefault(source, []).append(span)
+    if not supports:
+        return not direct_required
+
+    factual_sentences = 0
+    for sentence in _ARCHIVE_SENTENCE_RE.split(answer):
+        urls = _ARCHIVE_URL_RE.findall(sentence)
+        content_tokens = _archive_content_tokens(sentence)
+        if not content_tokens:
+            continue
+        factual_sentences += 1
+        if not urls or any(url not in supports for url in urls):
+            return False
+        cited_tokens = {
+            _archive_token(token)
+            for url in urls
+            for span in supports[url]
+            for token in _ARCHIVE_TOKEN_RE.findall(span)
+        }
+        if any(token not in cited_tokens for token in content_tokens):
+            return False
+    return factual_sentences > 0 or not direct_required
+
+
+def _archive_content_tokens(sentence: str) -> set[str]:
+    without_urls = _ARCHIVE_URL_RE.sub("", sentence)
+    return {
+        token
+        for raw in _ARCHIVE_TOKEN_RE.findall(without_urls)
+        if (token := _archive_token(raw)) not in _ARCHIVE_NON_FACT_TOKENS
+    }
+
+
+def _archive_token(value: str) -> str:
+    clean = value.casefold()
+    return _ARCHIVE_SAFE_PARAPHRASES.get(clean, clean)
 
 
 def _call_and_verify(

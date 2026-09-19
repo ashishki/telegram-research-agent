@@ -63,35 +63,40 @@ class ArchiveEvidenceContext:
         selected = _selected_findings(archive_contract)
         if not selected or len(selected) > _MAX_ITEMS:
             return None
-        support_by_source = _support_by_source(evidence_items)
-        if not support_by_source:
+        support_by_identity = _support_by_identity(evidence_items)
+        if not support_by_identity:
             return None
 
         items: list[ArchiveContextItem] = []
         seen_sources: set[str] = set()
         for finding in selected:
             source_ref = _clean(finding.get("source_url"), _MAX_SOURCE_REF_CHARS, required=True)
-            summary = _clean(finding.get("summary"), _MAX_TEXT_CHARS, required=True)
             title = _clean(finding.get("title"), _MAX_TITLE_CHARS) or "Архивный материал"
             evidence_id = _clean(finding.get("evidence_id"), 220, required=True)
             label = _clean(finding.get("relevance_label"), 32, required=True)
             if (
                 source_ref is None
-                or summary is None
                 or evidence_id is None
                 or label not in {"direct", "partial", "adjacent"}
                 or not _HTTPS_SOURCE_REF.fullmatch(source_ref)
                 or source_ref in seen_sources
             ):
                 return None
-            support = support_by_source.get(source_ref)
-            if support is None or not _summary_is_bound(summary, support):
+            supports = support_by_identity.get((evidence_id, source_ref))
+            # The evidence item has already been selected by local retrieval.
+            # A source URL alone is only a locator: require its exact archive
+            # identity and explicit local provenance, and use its canonical
+            # bounded support span rather than a separately truncated display
+            # summary.  More than one span for the same source identity is
+            # ambiguous and must not be silently selected.
+            if supports is None or len(supports) != 1:
                 return None
+            support = supports[0]
             seen_sources.add(source_ref)
             items.append(ArchiveContextItem(
                 evidence_id=evidence_id,
                 title=title,
-                text=summary,
+                text=support,
                 source_ref=source_ref,
                 relevance_label=label,
             ))
@@ -173,25 +178,24 @@ def _selected_findings(contract: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     return items
 
 
-def _support_by_source(evidence_items: Sequence[Mapping[str, Any]]) -> dict[str, list[str]]:
-    grouped: dict[str, list[str]] = {}
+def _support_by_identity(evidence_items: Sequence[Mapping[str, Any]]) -> dict[tuple[str, str], list[str]]:
+    grouped: dict[tuple[str, str], list[str]] = {}
     for item in evidence_items:
         if not isinstance(item, Mapping):
             continue
+        evidence_id = _clean(item.get("evidence_id"), 220, required=True)
         source_ref = _clean(item.get("source_url"), _MAX_SOURCE_REF_CHARS, required=True)
         support = _clean(item.get("support_span") or item.get("snippet"), _MAX_TEXT_CHARS, required=True)
-        if source_ref is None or support is None or not _HTTPS_SOURCE_REF.fullmatch(source_ref):
+        if (
+            evidence_id is None
+            or source_ref is None
+            or support is None
+            or item.get("local_archive_provenance") is not True
+            or not _HTTPS_SOURCE_REF.fullmatch(source_ref)
+        ):
             continue
-        grouped.setdefault(source_ref, []).append(support)
+        grouped.setdefault((evidence_id, source_ref), []).append(support)
     return grouped
-
-
-def _summary_is_bound(summary: str, supports: Sequence[str]) -> bool:
-    normalized_summary = _normalized(summary)
-    return any(
-        normalized_summary in _normalized(support) or _normalized(support) in normalized_summary
-        for support in supports
-    )
 
 
 def _render(items: Sequence[ArchiveContextItem]) -> str:
@@ -208,7 +212,3 @@ def _clean(value: object, limit: int, *, required: bool = False) -> str | None:
     if len(clean) > limit or (required and not clean):
         return None
     return clean
-
-
-def _normalized(value: str) -> str:
-    return " ".join(value.casefold().split())

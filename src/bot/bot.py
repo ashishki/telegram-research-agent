@@ -21,7 +21,8 @@ from .prm_handlers import (
     send_message,
 )
 from prm.capabilities import AuthorizationDecision
-from prm.contracts import ModelEgressAccess
+from prm.archive_contract import ARCHIVE_RESPONSE_INTENTS
+from prm.contracts import ArchiveSynthesisAccess, ModelEgressAccess
 from prm.routing import decide_route
 from .runtime import (
     BOT_RUNTIME_LEGACY,
@@ -151,6 +152,7 @@ def dispatch_command(
     delivery_authorizations: tuple[AuthorizationDecision, ...] = (),
     utd_draft_authorization: AuthorizationDecision | None = None,
     model_access: ModelEgressAccess | None = None,
+    archive_synthesis_access: ArchiveSynthesisAccess | None = None,
 ) -> None:
     """Stable patch point and explicit compatibility dispatcher."""
 
@@ -166,6 +168,8 @@ def dispatch_command(
             prm_kwargs["utd_draft_authorization"] = utd_draft_authorization
         if model_access is not None:
             prm_kwargs["model_access"] = model_access
+        if archive_synthesis_access is not None:
+            prm_kwargs["archive_synthesis_access"] = archive_synthesis_access
         dispatch_prm_command(chat_id, text, settings, **prm_kwargs)
         return
     legacy = import_module("bot.legacy_handlers")
@@ -222,6 +226,7 @@ def run_bot(
     *,
     runtime_mode: str = BOT_RUNTIME_PRM_ASSISTANT,
     model_access_provider: Callable[[str, str, str], ModelEgressAccess | None] | None = None,
+    archive_synthesis_access_provider: Callable[[str, str, str], ArchiveSynthesisAccess | None] | None = None,
 ) -> None:
     """Run the PA-safe polling surface; legacy polling is opt-in only.
 
@@ -306,6 +311,13 @@ def run_bot(
                         actor_id=actor_id,
                         owner_chat_id=owner_chat_id,
                     )
+                    archive_synthesis_access = _archive_synthesis_access_for_command(
+                        archive_synthesis_access_provider,
+                        command=command,
+                        chat_id=chat_id,
+                        actor_id=actor_id,
+                        owner_chat_id=owner_chat_id,
+                    )
                     dispatch_command(
                         chat_id=chat_id,
                         text=command,
@@ -315,6 +327,7 @@ def run_bot(
                         owner_chat_id=owner_chat_id,
                         delivery_authorizations=delivery_authorizations,
                         model_access=model_access,
+                        archive_synthesis_access=archive_synthesis_access,
                     )
                 else:
                     dispatch_command(chat_id=chat_id, text=command, settings=settings)
@@ -331,6 +344,13 @@ def run_bot(
                         actor_id=actor_id,
                         owner_chat_id=owner_chat_id,
                     )
+                    archive_synthesis_access = _archive_synthesis_access_for_command(
+                        archive_synthesis_access_provider,
+                        command=command,
+                        chat_id=chat_id,
+                        actor_id=actor_id,
+                        owner_chat_id=owner_chat_id,
+                    )
                     dispatch_command(
                         chat_id=chat_id,
                         text=command,
@@ -340,6 +360,7 @@ def run_bot(
                         owner_chat_id=owner_chat_id,
                         delivery_authorizations=delivery_authorizations,
                         model_access=model_access,
+                        archive_synthesis_access=archive_synthesis_access,
                     )
                 else:
                     dispatch_command(chat_id=chat_id, text=command, settings=settings)
@@ -392,6 +413,13 @@ def run_bot(
                     actor_id=actor_id,
                     owner_chat_id=owner_chat_id,
                 )
+                archive_synthesis_access = _archive_synthesis_access_for_command(
+                    archive_synthesis_access_provider,
+                    command=command,
+                    chat_id=chat_id,
+                    actor_id=actor_id,
+                    owner_chat_id=owner_chat_id,
+                )
                 dispatch_command(
                     chat_id=chat_id,
                     text=command,
@@ -401,6 +429,7 @@ def run_bot(
                     owner_chat_id=owner_chat_id,
                     delivery_authorizations=delivery_authorizations[1:],
                     model_access=model_access,
+                    archive_synthesis_access=archive_synthesis_access,
                 )
             else:
                 dispatch_command(chat_id=chat_id, text=command, settings=settings)
@@ -453,6 +482,51 @@ def _model_access_for_command(
     if decide_route(query, requested_mode=requested_mode).mode != "chat":
         return None
     return _model_access_for_private_turn(
+        provider,
+        chat_id=chat_id,
+        actor_id=actor_id,
+        owner_chat_id=owner_chat_id,
+    )
+
+
+def _archive_synthesis_access_for_private_turn(
+    provider: Callable[[str, str, str], ArchiveSynthesisAccess | None] | None,
+    *,
+    chat_id: str,
+    actor_id: str,
+    owner_chat_id: str,
+) -> ArchiveSynthesisAccess | None:
+    """Receive one externally reserved paired access; never mint a grant here."""
+
+    if provider is None:
+        return None
+    try:
+        access = provider(chat_id, actor_id, owner_chat_id)
+    except Exception:
+        LOGGER.warning("PA archive synthesis access provider failed")
+        return None
+    return access if isinstance(access, ArchiveSynthesisAccess) else None
+
+
+def _archive_synthesis_access_for_command(
+    provider: Callable[[str, str, str], ArchiveSynthesisAccess | None] | None,
+    *,
+    command: str,
+    chat_id: str,
+    actor_id: str,
+    owner_chat_id: str,
+) -> ArchiveSynthesisAccess | None:
+    """Request paired access only for local archive intents, never chat/current facts."""
+
+    clean = str(command or "").strip()
+    parts = clean.split(maxsplit=1)
+    name = parts[0].split("@", 1)[0].casefold() if parts else "/auto"
+    query = parts[1].strip() if len(parts) > 1 else ""
+    requested_mode = {"/chat": "chat", "/research": "research", "/brief": "brief"}.get(name, "auto")
+    route = decide_route(query, requested_mode=requested_mode)
+    if route.primary_intent not in ARCHIVE_RESPONSE_INTENTS:
+        return None
+    return _archive_synthesis_access_for_private_turn(
         provider,
         chat_id=chat_id,
         actor_id=actor_id,

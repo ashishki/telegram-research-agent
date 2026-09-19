@@ -105,6 +105,7 @@ def _archive_evidence():
         "evidence_id": "tg:synthetic-1",
         "source_url": "https://t.me/example/1",
         "support_span": "Agent evals use task success and groundedness.",
+        "local_archive_provenance": True,
     }]
 
 
@@ -182,6 +183,24 @@ def test_pa04_transport_sends_only_immutable_source_bound_context(monkeypatch):
     assert "https://t.me/example/1" in repr(calls[0]["input"])
 
 
+def test_pa04_empty_provider_response_keeps_accepted_egress_measurement(monkeypatch):
+    monkeypatch.setenv("PRM_OPENAI_PROVIDER_ENABLED", "true")
+    monkeypatch.setenv("PRM_OPENAI_CONTEXT_EGRESS_ENABLED", "true")
+    monkeypatch.setenv("OPENAI_API_KEY", "synthetic-pa04-key")
+    monkeypatch.setattr(
+        "prm.archive_synthesis_transport._build_client",
+        lambda _key: SimpleNamespace(responses=SimpleNamespace(create=lambda **_kwargs: SimpleNamespace(output_text=""))),
+    )
+
+    outcome = synthesize_archive_response(
+        _archive_payload(), question="What does my archive say about agent evals?", evidence_items=_archive_evidence(), access=_archive_access(),
+    )
+
+    assert outcome.status == "provider_empty_response"
+    assert outcome.measurement["external_call_attempted"] is True
+    assert outcome.measurement["context_egress_performed"] is True
+
+
 def test_pa04_synthesis_rejects_wrong_citation_and_false_refusal(monkeypatch):
     receipt = ArchiveSynthesisReceipt(
         provider="openai", model="gpt-5.6-terra", external_call_attempted=True, external_call_performed=True,
@@ -190,7 +209,7 @@ def test_pa04_synthesis_rejects_wrong_citation_and_false_refusal(monkeypatch):
     monkeypatch.setattr(
         "prm.synthesis.complete_archive_synthesis",
         lambda **_kwargs: ArchiveSynthesisTransportResult(
-            text="Прямых материалов не найдено. https://t.me/example/wrong", receipt=receipt,
+            text="Agent evals destroy task success and groundedness (https://t.me/example/1).", receipt=receipt,
         ),
     )
 
@@ -201,6 +220,26 @@ def test_pa04_synthesis_rejects_wrong_citation_and_false_refusal(monkeypatch):
     assert outcome.text is None
     assert outcome.status == "generated_answer_rejected"
     assert outcome.measurement["context_egress_performed"] is True
+
+
+def test_pa04_synthesis_accepts_bounded_useful_paraphrase(monkeypatch):
+    receipt = ArchiveSynthesisReceipt(
+        provider="openai", model="gpt-5.6-terra", external_call_attempted=True, external_call_performed=True,
+        context_egress_attempted=True, context_egress_performed=True, delivery_outcome="accepted", context_binding_digest="synthetic",
+    )
+    monkeypatch.setattr(
+        "prm.synthesis.complete_archive_synthesis",
+        lambda **_kwargs: ArchiveSynthesisTransportResult(
+            text="Archive materials describe using task success and groundedness for agent evals (https://t.me/example/1).", receipt=receipt,
+        ),
+    )
+
+    outcome = synthesize_archive_response(
+        _archive_payload(), question="What does my archive say about agent evals?", evidence_items=_archive_evidence(), access=_archive_access(),
+    )
+
+    assert outcome.status == "generated_verified"
+    assert outcome.text is not None and outcome.text.startswith("Archive materials describe")
 
 
 def test_pa04_synthesis_accepts_cited_answer_and_reports_measurement(monkeypatch):
@@ -234,6 +273,7 @@ def test_pa04_synthesis_accepts_russian_cited_answer(monkeypatch):
         "evidence_id": "tg:synthetic-1",
         "source_url": "https://t.me/example/ru-1",
         "support_span": "В архиве есть практика: измерять task success и groundedness.",
+        "local_archive_provenance": True,
     }]
     receipt = ArchiveSynthesisReceipt(
         provider="openai", model="gpt-5.6-terra", external_call_attempted=True, external_call_performed=True,
@@ -274,3 +314,42 @@ def test_pa04_unbound_source_context_cannot_reach_transport(monkeypatch):
     assert calls == []
     assert access.query_authorization.reservation is not None and access.query_authorization.reservation.current is False
     assert access.context_authorization.reservation is not None and access.context_authorization.reservation.current is False
+
+
+def test_pa04_context_uses_exact_selected_span_and_rejects_identity_or_provenance_mutations():
+    payload = _archive_payload()
+    payload["archive_contract"]["direct_findings"][0]["summary"] += " private-appended-sentinel"
+    context = ArchiveEvidenceContext.from_payload(
+        question="What does my archive say about agent evals?",
+        archive_contract=payload["archive_contract"], evidence_items=_archive_evidence(),
+    )
+
+    assert context is not None
+    assert context.items[0].text == "Agent evals use task success and groundedness."
+    assert "private-appended-sentinel" not in repr(context.to_transport_context())
+
+    wrong_identity = [{**_archive_evidence()[0], "evidence_id": "tg:other"}]
+    no_provenance = [{**_archive_evidence()[0], "local_archive_provenance": False}]
+    assert ArchiveEvidenceContext.from_payload(
+        question="What does my archive say about agent evals?", archive_contract=payload["archive_contract"], evidence_items=wrong_identity,
+    ) is None
+    assert ArchiveEvidenceContext.from_payload(
+        question="What does my archive say about agent evals?", archive_contract=payload["archive_contract"], evidence_items=no_provenance,
+    ) is None
+
+
+def test_pa04_context_accepts_normal_truncated_display_summary_from_canonical_span():
+    support = "x" * 259 + "z"
+    payload = _archive_payload()
+    payload["archive_contract"]["direct_findings"][0]["summary"] = "x" * 259 + "…"
+    evidence = [{
+        "evidence_id": "tg:synthetic-1", "source_url": "https://t.me/example/1", "support_span": support,
+        "local_archive_provenance": True,
+    }]
+
+    context = ArchiveEvidenceContext.from_payload(
+        question="What does my archive say about agent evals?", archive_contract=payload["archive_contract"], evidence_items=evidence,
+    )
+
+    assert context is not None
+    assert context.items[0].text == support

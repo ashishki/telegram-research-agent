@@ -31,6 +31,7 @@ PRM_ACTIVE_TESTS = (
     "tests/test_prm_product_ux_eval.py",
     "tests/test_callbacks.py",
     "tests/test_prm_application.py",
+    "tests/test_prm_synthesis.py",
     "tests/test_prm_bot_dispatch.py",
     "tests/test_prm_cli.py",
     "tests/test_retrofit_boundaries.py",
