@@ -11,7 +11,7 @@ import pytest
 from prm.application import PersonalResearchAssistant
 from prm.brief_editorial import BriefEditorial, synthesize_brief_editorial
 from prm.briefs import (
-    BriefBuildRequest, BriefDocumentStore, BriefWindow, build_brief_document,
+    BriefBuildRequest, BriefDocumentStore, BriefWindow, CoverageSource, build_brief_document,
     render_brief_document, _storage_document, _stored_document,
 )
 from prm.contracts import OperatorRequest
@@ -253,3 +253,41 @@ def test_normal_brief_route_retrieves_then_synthesizes_and_reuses_result(monkeyp
     followup = assistant.answer(OperatorRequest(query="объясни 1", chat_id="42"))
     assert "Документация ограничивает" in followup.text
     assert len(requests) == 1 and calls == ["brief_editorial", "brief_review"]
+
+
+@pytest.mark.parametrize("complete", [False, True])
+def test_noise_only_brief_is_valid_empty_editorial_with_honest_coverage(monkeypatch, complete):
+    request = _request()
+    request = replace(request, evidence=(request.evidence[2],),
+                      coverage=(CoverageSource("synthetic_archive", "checked" if complete else "partial"),))
+    candidate = {"stories": [], "omitted_refs": ["evidence_source_2"]}
+    calls = []
+    class Receipt:
+        def public_measurement(self):
+            return {"provider_egress_attempted": True}
+    def generate(**kwargs):
+        calls.append(kwargs["response_mode"])
+        output = candidate if len(calls) == 1 else {"verdict": "pass", "issues": []}
+        return SimpleNamespace(text=json.dumps(output), receipt=Receipt())
+    monkeypatch.setattr("prm.archive_synthesis_transport.complete_archive_synthesis", generate)
+    assistant = PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:"),
+        conversations=ConversationStore(), briefs=BriefDocumentStore())
+    result = assistant.answer(OperatorRequest(query="AI", mode="brief", chat_id="42",
+        brief_request=request, archive_synthesis_access=_archive_access()))
+    assert calls == ["brief_editorial", "brief_review"]
+    assert result.payload["brief_document"]["editorial"] == candidate
+    assert result.payload["brief_editorial"]["status"] == "source_anchored_reviewed"
+    full = assistant.answer(OperatorRequest(query="Показать полный бриф", chat_id="42"))
+    for text in (result.text, full.text):
+        assert "Личное поздравление" not in text and "@channel" not in text
+        assert "Редакторский обзор пока не подготовлен" not in text
+        if complete:
+            assert "В проверенной области важных изменений" in text
+        else:
+            assert "Это не вывод за весь период" in text
+            assert "важных изменений по теме не найдено" not in text
+    document = build_brief_document(replace(request, editorial=BriefEditorial.from_dict(candidate, build_brief_document(request).evidence)))
+    assert _stored_document(_storage_document(document)) == document
+    jsonschema.Draft202012Validator(json.loads(Path("schemas/assistant_brief_document.v1.schema.json").read_text())).validate(document.to_dict())
+    with pytest.raises(ValueError):
+        BriefEditorial.from_dict({"stories": [], "omitted_refs": []}, document.evidence)

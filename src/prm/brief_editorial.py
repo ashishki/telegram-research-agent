@@ -55,7 +55,7 @@ class BriefEditorial:
         if not isinstance(value, dict) or set(value) != {"stories", "omitted_refs"}:
             raise ValueError("invalid editorial object")
         rows, omitted = value["stories"], value["omitted_refs"]
-        if not isinstance(rows, list) or not 1 <= len(rows) <= 5:
+        if not isinstance(rows, list) or len(rows) > 5:
             raise ValueError("invalid editorial story count")
         sources = {item.evidence_ref: item for item in evidence}
         if (not isinstance(omitted, list) or any(not isinstance(ref, str) or ref not in sources for ref in omitted)

@@ -55,6 +55,11 @@ Deep Review per wording patch. Preserve the prior ownership, history, temporal
 and permission checks. Human mobile/provider evidence remains required before
 claiming product acceptance; proceed with independent local work meanwhile.
 
+Implementation checkpoint: `e280723` plus the scoped no-news P1 correction.
+Current evidence: `docs/verification/PA-07-editorial-evidence-2026-09-19.md`.
+The dedicated editorial/brief/dialogue/synthesis suite passes 61 tests; final
+focused and independent recheck receipts belong in that evidence record.
+
 Historical PA-07 evidence is in
 `docs/verification/PA-07-brief-document-evidence-2026-09-19.md`.
 The earlier two-item synthetic judge pass is not evidence of editorial quality.

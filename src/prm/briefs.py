@@ -2264,6 +2264,17 @@ def _render_editorial(
 ) -> str:
     editorial = document.editorial
     assert editorial is not None
+    if not editorial.stories:
+        message = (
+            "В проверенной области важных изменений по теме не найдено."
+            if document.coverage_manifest.complete else
+            "В найденной подборке содержательных событий по теме не выделено. Это не вывод за весь период."
+        )
+        return "\n".join((
+            f"🗞 <b>{_telegram_html(document.topic, 160)}</b>",
+            f"<i>{_telegram_html(_human_brief_period(document.window), 120)}</i>", "", message,
+            "", _telegram_card_coverage_line(document), "Можно выбрать другую тему или период.",
+        ))
     sources = document.evidence_by_ref()
     indexed = list(enumerate(editorial.stories, start=1))
     if view == "item":

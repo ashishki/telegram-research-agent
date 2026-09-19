@@ -58,7 +58,7 @@ Baseline: `1533fe00122efaf0d017e2e5232e242f60b7f354` on
   The first focused-prm run had 1 failed / 436 passed: the active brief adapter
   discarded a valid source support_span when no display snippet was present.
   The adapter now preserves the exact selected support span; the end-to-end
-  regression passes in the dedicated suite. The full focused recheck is running.
+  regression passes in the dedicated suite. The full focused recheck passed: 437 tests in 120.75s.
 - `feature_workflow context` first reported a missing planning decision;
   `feature_workflow plan --task PA-07` produced `needs_input`; context then
   reported that state as blocking workflow draft/start/check. No artifact was
@@ -88,3 +88,41 @@ content/conversation scenarios and the relevant PA-03/04/06 integrations,
 then continue dependency-ready tasks under the common quality contract.
 Reproduce this batch with the dedicated command above or
 `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/test_tiers.py focused-prm`.
+
+## Final focused receipt
+
+Implementation commit: `e280723aa4f40de4815e36ab37cf933dc2e5ed85`.
+
+`PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/test_tiers.py focused-prm`
+completed with exit 0: **437 passed in 120.75s**. The historical full suite was
+not run. The log is local at `/tmp/pa-editorial-focused-final-20260919.log`.
+
+`python3 tools/playbook.py playbook_validate --root . --check tasks --check references`
+returned 19 `TASK_DESIGN_APPROVAL_REQUIRED` errors, one per PA slice, reflecting
+the preserved unapproved design state. The dedicated plan checker passes schema,
+reference, dependency and context consistency; formal approval is not forged.
+
+A sanitized, explicitly fictional structure preview is
+`docs/verification/PA-07-editorial-example-2026-09-19.md`.
+
+The independent review was launched with:
+`python3 tools/run_codex_role.py run --root . --task PA-07 --feature-id PA --slice-id PA-07 --role slice_review --model gpt-5.6-terra --reasoning-effort high --timeout-seconds 480 --no-publish`.
+Its run ID is `20260919T155031Z-slice_review-1510807c`; the manifest binds
+`e280723aa4f40de4815e36ab37cf933dc2e5ed85`. The reviewer returned one P1: the generator's valid no-news empty-story result
+was rejected by the parser. The independent report is useful finding evidence,
+but its runner receipt is invalid (`postflight_failed`): the implementer created
+the synthetic preview file while the review was running, which the runner
+reported as a read-only workspace change. The reviewer itself made no edits.
+Do not describe this first receipt as a passed review.
+
+The P1 correction allows zero stories only when every selected source is
+accounted for by omissions. Complete coverage renders a checked-scope no-news
+statement; partial coverage states that no event was selected from the bounded
+selection, never that the entire week was empty. Neither view redisplays noise.
+Two end-to-end tests cover both coverage states, schema, persistence and the
+full-view follow-up.
+
+After the correction the dedicated command above passed **61 tests in 12.44s**.
+A fresh scoped Role Runner recheck will run against the correction commit,
+with the repository kept unchanged until its postflight completes. This is the
+one required P1 recheck, not a repeated full programme/Deep Review.
