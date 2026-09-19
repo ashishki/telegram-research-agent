@@ -12,6 +12,7 @@ from db.migrate import run_migrations
 def test_runtime_mode_is_explicit():
     assert normalize_bot_runtime_mode("prm") == BOT_RUNTIME_PRM_ASSISTANT
     assert normalize_bot_runtime_mode("legacy") == BOT_RUNTIME_LEGACY
+    assert bot_runtime.run_bot.__kwdefaults__ == {"runtime_mode": BOT_RUNTIME_PRM_ASSISTANT}
 
 
 def test_active_registry_contains_only_prm_commands():

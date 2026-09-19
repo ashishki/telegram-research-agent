@@ -270,7 +270,7 @@ class TestIdeaCallbacks(unittest.TestCase):
             bot_runtime,
             "_telegram_answer_callback",
         ) as answer_mock:
-            bot_runtime.run_bot(settings)
+            bot_runtime.run_bot(settings, runtime_mode=bot_runtime.BOT_RUNTIME_LEGACY)
 
         get_updates_mock.assert_called_once_with(token="token", offset=None)
         record_mock.assert_called_once_with(settings, "idea:7:done")
@@ -306,7 +306,7 @@ class TestIdeaCallbacks(unittest.TestCase):
             bot_runtime,
             "_telegram_answer_callback",
         ) as answer_mock:
-            bot_runtime.run_bot(settings, runtime_mode=bot_runtime.BOT_RUNTIME_PRM_ASSISTANT)
+            bot_runtime.run_bot(settings)
 
         record_mock.assert_not_called()
         answer_mock.assert_called_once_with(
@@ -413,7 +413,7 @@ class TestIdeaCallbacks(unittest.TestCase):
             bot_runtime,
             "dispatch_command",
         ) as dispatch_mock:
-            bot_runtime.run_bot(settings)
+            bot_runtime.run_bot(settings, runtime_mode=bot_runtime.BOT_RUNTIME_LEGACY)
 
         dispatch_mock.assert_called_once_with(
             chat_id="12345",
@@ -513,7 +513,7 @@ class TestIdeaCallbacks(unittest.TestCase):
             bot_runtime,
             "dispatch_command",
         ) as dispatch_mock:
-            bot_runtime.run_bot(settings)
+            bot_runtime.run_bot(settings, runtime_mode=bot_runtime.BOT_RUNTIME_LEGACY)
 
         dispatch_mock.assert_called_once_with(
             chat_id="12345",
@@ -618,7 +618,7 @@ class TestIdeaCallbacks(unittest.TestCase):
             "transcribe_telegram_voice",
             return_value="Useful workbook. target=claim-cards.",
         ) as transcribe_mock:
-            bot_runtime.run_bot(settings)
+            bot_runtime.run_bot(settings, runtime_mode=bot_runtime.BOT_RUNTIME_LEGACY)
 
         send_message_mock.assert_called_once()
         self.assertIn("Распознаю", send_message_mock.call_args.args[2])
@@ -662,7 +662,7 @@ class TestIdeaCallbacks(unittest.TestCase):
             "transcribe_telegram_voice",
             side_effect=bot_runtime.VoiceTranscriptionUnavailable("OPENAI_API_KEY is not set"),
         ):
-            bot_runtime.run_bot(settings)
+            bot_runtime.run_bot(settings, runtime_mode=bot_runtime.BOT_RUNTIME_LEGACY)
 
         dispatch_mock.assert_not_called()
         self.assertEqual(send_message_mock.call_count, 2)

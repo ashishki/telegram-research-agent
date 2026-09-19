@@ -212,7 +212,14 @@ def _voice_failed_message(runtime_mode: str) -> str:
     return "Не смог распознать голосовое. Отправь сообщение текстом."
 
 
-def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_LEGACY) -> None:
+def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_PRM_ASSISTANT) -> None:
+    """Run the PA-safe polling surface; legacy polling is opt-in only.
+
+    The historical legacy runtime retains unguarded compatibility transports.
+    It must therefore never be selected by omission from the PA entrypoint:
+    callers that maintain that separate surface must name ``legacy`` explicitly.
+    """
+
     runtime_mode = normalize_bot_runtime_mode(runtime_mode)
     token, owner_chat_id = _load_bot_env()
     if not token or not owner_chat_id:
