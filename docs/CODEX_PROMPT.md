@@ -32,15 +32,20 @@ the two untracked local files. Do not run the full historical pytest suite.
 
 ## Current slice: PA-07 local BriefDocument handoff
 
-PA-07 is locally implemented through `d2163a1` (with preceding scoped commits
-`1f5a75a`, `a1f8001`, `de32184`, `447af21`, `d553f3b`, `44d2195` and
-`264bc5f`). It provides an immutable, inspectable source-backed
+PA-07 is locally implemented through `c1cd081` (with preceding scoped commits
+`1f5a75a`, `a1f8001`, `de32184`, `447af21`, `d553f3b`, `44d2195`, `264bc5f`,
+`d2163a1`, `f146925`, `dfa135f`, `ff6329e`, `fa1cc10`, `9603c28` and
+`d9a684f`). It provides an immutable, inspectable source-backed
 `BriefDocument`, a selected IANA-zone half-open period, coverage/deduplication/
 conflict/importance-versus-urgency evidence, bounded visible report history,
 and deterministic Telegram/report follow-ups. A request window is bound before
 local archive candidate selection and rechecked afterwards. The Telegram full
 view is reached by a one-time reply-keyboard text control that resolves only
 against the current visible in-process report object.
+
+The dispatcher keeps that visible report object in a bounded process-local
+store across immediate commands; a process restart clears the projection and
+prevents normal-language reconstruction of the old brief.
 
 The owner explicitly amended this narrow PA-07 boundary on 2026-09-19 to
 remediate two independent P1 findings: add owner-scoped, bounded immutable
@@ -62,12 +67,13 @@ required evidence.
 The evidence record is
 `docs/verification/PA-07-brief-document-evidence-2026-09-19.md`. Fresh
 read-only Terra 5.6/high reviews found and drove the scoped remediations. The
-latest pre-amendment recheck, run
-`20260919T092541Z-slice_review-8b606ab1` against `d2163a1`, retained two
-STOP_SHIP P1 requests for durable restart history and PA-07 test registration
-in `focused-prm`. The owner has now authorized their bounded remediation; a
-fresh independent Terra/high recheck of the amended diff remains required.
-This is not an approval or completion claim. The design remains mechanically
+latest recheck, `20260919T110742Z-slice_review-d305cf5c` against `ba84cd3`,
+found no further code defect but returned `STOP_SHIP` for external acceptance
+gates: actual authorized private Telegram/mobile rendering inspection and
+human content review. Its read-only sandbox could not create pytest temporary
+files; the exact current code was instead run successfully in the writable
+workspace and recorded in the evidence. Do not claim that either external gate
+is satisfied, or begin PA-08/PA-09. The design remains mechanically
 `review_required`.
 
 PA-06's local checkpoint below is historical context for PA-07's dependency;
