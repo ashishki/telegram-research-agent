@@ -30,6 +30,7 @@ BRIEF_FULL_VIEW_BUTTON_TEXT = "Показать полный бриф"
 _MAX_BRIEFS = 64
 _MAX_HISTORY_REFS = 8
 _MAX_PERSISTED_HISTORY_REFS = 64
+_MAX_PERSISTED_DOCUMENTS_PER_OWNER = 64
 _MAX_ITEMS = 20
 _MAX_TELEGRAM_CHARS = 2_400
 _BRIEF_STORAGE_SCHEMA_VERSION = "prm_brief_document_storage.v1"
@@ -43,6 +44,7 @@ _SAFE_REASON = re.compile(r"^[a-z][a-z0-9_.-]{2,120}$")
 _SAFE_TOPIC = re.compile(r"^[a-z0-9][a-z0-9 _./-]{0,63}$")
 _PROJECT_REF = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 _.\-/]{0,79}$")
 _CONTENT_DIGEST = re.compile(r"^sha256:[a-f0-9]{64}$")
+_PRIVATE_ID = re.compile(r"^[1-9][0-9]{0,18}$")
 _COVERAGE_STATES = frozenset({"checked", "excluded", "unavailable", "stale", "partial"})
 _IMPORTANCE = frozenset({"critical", "high", "medium", "low", "unknown"})
 _URGENCY = frozenset({"urgent", "soon", "not_marked", "unknown"})
@@ -360,6 +362,37 @@ class BriefVersionRef:
 
     def to_dict(self) -> dict[str, object]:
         return {"brief_id": self.brief_id, "version": self.version}
+
+
+@dataclass(frozen=True, slots=True)
+class BriefOwnerScope:
+    """Opaque binding derived only from an authenticated private tuple."""
+
+    owner_ref: str
+    binding_digest: str
+
+    def __post_init__(self) -> None:
+        if not _OWNER_REF.fullmatch(self.owner_ref) or not re.fullmatch(r"sha256:[a-f0-9]{64}", self.binding_digest):
+            raise ValueError("brief owner scope is invalid")
+
+
+def brief_owner_scope_from_authenticated_private_tuple(
+    chat_id: str | None,
+    actor_id: str | None,
+    owner_chat_id: str | None,
+) -> BriefOwnerScope | None:
+    """Derive durable ownership only from the canonical private Telegram tuple."""
+
+    values = (str(chat_id or ""), str(actor_id or ""), str(owner_chat_id or ""))
+    if (
+        any(not _PRIVATE_ID.fullmatch(value) for value in values)
+        or any(int(value) > 9223372036854775807 for value in values)
+        or len(set(values)) != 1
+    ):
+        return None
+    canonical = "\x1f".join(values)
+    digest = hashlib.sha256(f"pa07.brief.owner.v1:{canonical}".encode("utf-8")).hexdigest()
+    return BriefOwnerScope(owner_ref="owner_brief_" + digest[:24], binding_digest="sha256:" + digest)
 
 
 @dataclass(frozen=True, slots=True)
@@ -1028,6 +1061,7 @@ class BriefDocumentStore:
         response_ref: str,
         document: BriefDocument,
         comparison_document: BriefDocument | None = None,
+        durable_owner_scope: BriefOwnerScope | None = None,
     ) -> None:
         if not conversation_id.startswith("conversation_") or not _RESPONSE_REF.fullmatch(response_ref) or type(document) is not BriefDocument:
             raise ValueError("brief visibility binding is invalid")
@@ -1035,9 +1069,12 @@ class BriefDocumentStore:
             raise ValueError("brief comparison binding is invalid")
         if comparison_document is not None and comparison_document.owner_ref != document.owner_ref:
             raise ValueError("brief comparison binding crosses owner scope")
-        self._persist_document(document)
-        if comparison_document is not None:
-            self._persist_document(comparison_document)
+        if durable_owner_scope is not None:
+            if type(durable_owner_scope) is not BriefOwnerScope or document.owner_ref != durable_owner_scope.owner_ref:
+                raise ValueError("brief durable ownership binding is invalid")
+            self._persist_document(document, durable_owner_scope=durable_owner_scope)
+            if comparison_document is not None:
+                self._persist_document(comparison_document, durable_owner_scope=durable_owner_scope)
         with self._lock:
             key = (conversation_id, document.brief_id, document.version)
             comparison_key = (
@@ -1099,14 +1136,15 @@ class BriefDocumentStore:
     def get_persisted_document(
         self,
         *,
-        owner_ref: str,
+        durable_owner_scope: BriefOwnerScope,
         brief_id: str,
         version: int,
     ) -> BriefDocument | None:
         """Load one owner-scoped immutable version; no topic/latest fallback."""
 
-        if not _OWNER_REF.fullmatch(owner_ref) or not _BRIEF_ID.fullmatch(brief_id) or type(version) is not int or version < 1:
+        if type(durable_owner_scope) is not BriefOwnerScope or not _BRIEF_ID.fullmatch(brief_id) or type(version) is not int or version < 1:
             return None
+        owner_ref = durable_owner_scope.owner_ref
         connection = self._storage_connection()
         if connection is None:
             return None
@@ -1140,11 +1178,17 @@ class BriefDocumentStore:
         except (TypeError, ValueError, json.JSONDecodeError):
             return None
 
-    def list_persisted_versions(self, *, owner_ref: str, brief_id: str) -> tuple[BriefVersionRef, ...]:
+    def list_persisted_versions(
+        self,
+        *,
+        durable_owner_scope: BriefOwnerScope,
+        brief_id: str,
+    ) -> tuple[BriefVersionRef, ...]:
         """List at most the owner-scoped retained versions in chronological order."""
 
-        if not _OWNER_REF.fullmatch(owner_ref) or not _BRIEF_ID.fullmatch(brief_id):
+        if type(durable_owner_scope) is not BriefOwnerScope or not _BRIEF_ID.fullmatch(brief_id):
             return ()
+        owner_ref = durable_owner_scope.owner_ref
         connection = self._storage_connection()
         if connection is None:
             return ()
@@ -1165,11 +1209,12 @@ class BriefDocumentStore:
             connection.close()
         return tuple(BriefVersionRef(brief_id, int(row[0])) for row in reversed(rows) if type(row[0]) is int and row[0] >= 1)
 
-    def forget_owner(self, owner_ref: str) -> None:
+    def forget_owner(self, durable_owner_scope: BriefOwnerScope) -> None:
         """Delete one owner's retained documents and their ephemeral projections."""
 
-        if not _OWNER_REF.fullmatch(owner_ref):
+        if type(durable_owner_scope) is not BriefOwnerScope:
             raise ValueError("brief owner is invalid")
+        owner_ref = durable_owner_scope.owner_ref
         connection = self._storage_connection()
         if connection is not None:
             try:
@@ -1190,7 +1235,7 @@ class BriefDocumentStore:
         view: str,
         *,
         conversation_id: str | None = None,
-        owner_ref: str | None = None,
+        durable_owner_scope: BriefOwnerScope | None = None,
         **kwargs: object,
     ) -> str | None:
         document: BriefDocument | None
@@ -1203,8 +1248,12 @@ class BriefDocumentStore:
                 if key not in binding[3]:
                     return None
                 document = self._documents.get(key)
-        elif owner_ref:
-            document = self.get_persisted_document(owner_ref=owner_ref, brief_id=brief_id, version=version)
+        elif durable_owner_scope is not None:
+            document = self.get_persisted_document(
+                durable_owner_scope=durable_owner_scope,
+                brief_id=brief_id,
+                version=version,
+            )
         else:
             return None
         # Either an exact current visible version or an exact authenticated
@@ -1233,9 +1282,11 @@ class BriefDocumentStore:
         except sqlite3.Error:
             return None
 
-    def _persist_document(self, document: BriefDocument) -> None:
+    def _persist_document(self, document: BriefDocument, *, durable_owner_scope: BriefOwnerScope) -> None:
         """Insert one immutable version if the authorized local schema exists."""
 
+        if document.owner_ref != durable_owner_scope.owner_ref:
+            raise ValueError("brief durable ownership binding is invalid")
         connection = self._storage_connection()
         if connection is None:
             return
@@ -1276,19 +1327,17 @@ class BriefDocumentStore:
             connection.execute(
                 """
                 DELETE FROM assistant_brief_documents
-                WHERE owner_ref = ? AND brief_id = ? AND version NOT IN (
-                    SELECT version FROM assistant_brief_documents
-                    WHERE owner_ref = ? AND brief_id = ?
-                    ORDER BY version DESC
+                WHERE owner_ref = ? AND rowid NOT IN (
+                    SELECT rowid FROM assistant_brief_documents
+                    WHERE owner_ref = ?
+                    ORDER BY created_at DESC, rowid DESC
                     LIMIT ?
                 )
                 """,
                 (
                     document.owner_ref,
-                    document.brief_id,
                     document.owner_ref,
-                    document.brief_id,
-                    _MAX_PERSISTED_HISTORY_REFS,
+                    _MAX_PERSISTED_DOCUMENTS_PER_OWNER,
                 ),
             )
             connection.commit()
@@ -1332,18 +1381,18 @@ def render_brief(
     view: str,
     *,
     conversation_id: str | None = None,
-    owner_ref: str | None = None,
+    durable_owner_scope: BriefOwnerScope | None = None,
     store: BriefDocumentStore = GLOBAL_BRIEFS,
     **kwargs: object,
 ) -> str | None:
-    """Read one exact current or owner-scoped retained report version."""
+    """Read one exact current or authenticated retained report version."""
 
     return store.render_brief(
         brief_id,
         version,
         view,
         conversation_id=conversation_id,
-        owner_ref=owner_ref,
+        durable_owner_scope=durable_owner_scope,
         **kwargs,
     )
 

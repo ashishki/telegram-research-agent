@@ -230,9 +230,10 @@ Scope-Amendment:
     owner-scoped bounded immutable BriefDocument history through the existing
     local SQLite schema path, and register the two dedicated PA-07 suites in
     `focused-prm`. Visible-response dialogue state remains ephemeral; durable
-    reads require exact owner/brief/version references. This does not authorize
-    a production DB migration/access, job, worker, Redis, schedule, export,
-    provider/account/credential action, or PA-08/PA-09 implementation.
+    reads require a canonical authenticated private tuple and exact
+    brief/version references, with owner-wide bounded retention. This does not
+    authorize a production DB migration/access, job, worker, Redis, schedule,
+    export, provider/account/credential action, or PA-08/PA-09 implementation.
 Context-Refs:
   - docs/design/PA.md
   - docs/PERSONAL_ASSISTANT_SPEC.md

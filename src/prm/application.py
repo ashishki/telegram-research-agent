@@ -34,8 +34,10 @@ from prm.briefs import (
     BriefDocument,
     BriefDocumentStore,
     BriefFollowup,
+    BriefOwnerScope,
     BriefWindow,
     CoverageSource,
+    brief_owner_scope_from_authenticated_private_tuple,
     build_brief_document,
     classify_brief_followup,
     parse_requested_brief_window,
@@ -578,6 +580,8 @@ class PersonalResearchAssistant:
         adapter, job, delivery handle, or untyped history lookup.
         """
 
+        durable_owner_scope = _brief_owner_scope(request)
+        brief_request = _with_authenticated_brief_owner(brief_request, durable_owner_scope)
         try:
             document = build_brief_document(brief_request)
         except ValueError as exc:
@@ -729,6 +733,11 @@ class PersonalResearchAssistant:
             response_ref=response_ref,
             document=document,
             comparison_document=comparison_document,
+            durable_owner_scope=(
+                scope
+                if (scope := _brief_owner_scope(request)) is not None and document.owner_ref == scope.owner_ref
+                else None
+            ),
         )
         payload = {**dict(result.payload), "conversation": _safe_conversation_payload(state)}
         return AssistantResult(
@@ -1307,6 +1316,42 @@ def _selected_archive_evidence_items(
     ]
 
 
+def _brief_owner_scope(request: OperatorRequest) -> BriefOwnerScope | None:
+    """Accept durable brief history only from the canonical private ingress tuple."""
+
+    return brief_owner_scope_from_authenticated_private_tuple(
+        request.chat_id,
+        request.actor_id,
+        request.owner_chat_id,
+    )
+
+
+def _with_authenticated_brief_owner(
+    brief_request: BriefBuildRequest,
+    durable_owner_scope: BriefOwnerScope | None,
+) -> BriefBuildRequest:
+    """Never let a caller-supplied request choose an authenticated owner scope."""
+
+    if durable_owner_scope is None:
+        return brief_request
+    previous = (
+        brief_request.previous_document
+        if brief_request.previous_document is not None and brief_request.previous_document.owner_ref == durable_owner_scope.owner_ref
+        else None
+    )
+    comparison = (
+        brief_request.comparison_document
+        if brief_request.comparison_document is not None and brief_request.comparison_document.owner_ref == durable_owner_scope.owner_ref
+        else None
+    )
+    return replace(
+        brief_request,
+        owner_ref=durable_owner_scope.owner_ref,
+        previous_document=previous,
+        comparison_document=comparison,
+    )
+
+
 def _brief_request_from_archive_payload(
     *,
     request: OperatorRequest,
@@ -1359,20 +1404,26 @@ def _brief_request_from_archive_payload(
                 "relevance_label": quality.get("relevance_label") or item.get("relevance_label"),
             }
         )
+    durable_owner_scope = _brief_owner_scope(request)
+    owner_ref = (
+        durable_owner_scope.owner_ref
+        if durable_owner_scope is not None
+        else prior_document.owner_ref
+        if prior_document is not None
+        else "owner_ephemeral_" + hashlib.sha256(f"pa07.owner:{request.chat_id}".encode("utf-8")).hexdigest()[:24]
+    )
+    prior_document = (
+        prior_document
+        if prior_document is not None and prior_document.owner_ref == owner_ref
+        else None
+    )
     return BriefBuildRequest(
         topic=(" ".join(str(topic or request.query).split())[:160] or "local archive"),
         window=window,
         evidence=tuple(selected),
-        # Retain the actual visible report's opaque owner scope when a new
-        # period is created from that same conversation. A first normal brief
-        # derives one from the chat without exposing the raw chat ID.
-        owner_ref=(
-            prior_document.owner_ref
-            if prior_document is not None
-            else "owner_brief_" + hashlib.sha256(
-                f"pa07.owner:{request.chat_id}".encode("utf-8")
-            ).hexdigest()[:24]
-        ),
+        # A durable owner scope only comes from the authenticated private
+        # tuple. Other local calls remain visible-only and cannot persist.
+        owner_ref=owner_ref,
         coverage=(
             CoverageSource(
                 "local_archive_selected_evidence",
