@@ -154,7 +154,7 @@ def test_brief_views_are_source_backed_and_empty_claim_depends_on_coverage() -> 
     assert "важных изменений не найдено" not in partial_text
     rendered = render_brief_document(populated)
     assert "<b>Короткий бриф</b>" in rendered
-    assert '<a href="https://t.me/example/1">Открыть источник</a>' in rendered
+    assert '<a href="https://t.me/example/1">@example</a>' in rendered
     assert "Важность: важно · Срочность: без срока" in rendered
     assert "Версия:" not in rendered
     assert len(rendered) <= 2400
@@ -183,7 +183,7 @@ def test_telegram_card_is_compact_html_and_escapes_archive_derived_content() -> 
     assert "&lt;weekly&gt;" in rendered
     assert "&lt;b&gt;Not markup&lt;/b&gt;" in rendered
     assert "&lt;tag&gt; &amp; keeps the characters visible." in rendered
-    assert 'href="https://t.me/example/html?one=1&amp;two=2"' in rendered
+    assert 'href="https://t.me/example/html?one=1&amp;two=2">@example</a>' in rendered
     assert "Покрытие: проверено" in rendered
     assert "Версия:" not in rendered
     assert len(rendered) <= 2400
@@ -215,7 +215,7 @@ def test_expanded_telegram_brief_uses_user_language_not_internal_audit_fields() 
     assert "Это подборка по теме, а не рейтинг важности." in rendered
     assert "Важность: не отмечена · Срочность: срок не указан" in rendered
     assert "Зачем вам: связано с проектом «Weekly brief»." in rendered
-    assert '<a href="https://t.me/example/unranked-one">Открыть источник</a>' in rendered
+    assert '<a href="https://t.me/example/unranked-one">@example</a>' in rendered
     assert "снимок sha256" not in rendered
     assert document.brief_id not in rendered
     assert "История:" not in rendered

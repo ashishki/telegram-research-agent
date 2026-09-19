@@ -22,6 +22,7 @@ import re
 import sqlite3
 from threading import RLock
 from typing import Any, Literal, Mapping, Sequence
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
@@ -2237,7 +2238,22 @@ def _telegram_card_source_link(source_ref: str) -> str:
 
     if len(source_ref) > 240:
         return "Источник — в полном брифе"
-    return f'<a href="{_html_escape(source_ref, quote=True)}">Открыть источник</a>'
+    label = _telegram_source_identity(source_ref)
+    return f'Источник: <a href="{_html_escape(source_ref, quote=True)}">{_html_escape(label, quote=True)}</a>'
+
+
+def _telegram_source_identity(source_ref: str) -> str:
+    """Give a person a source name without rendering an opaque long URL."""
+
+    parsed = urlsplit(source_ref)
+    host = (parsed.hostname or "").casefold()
+    segments = [part for part in parsed.path.split("/") if part]
+    if host in {"t.me", "telegram.me", "www.t.me"}:
+        if segments[:1] == ["s"]:
+            segments = segments[1:]
+        if segments and re.fullmatch(r"[A-Za-z0-9_]{3,64}", segments[0]):
+            return "@" + segments[0]
+    return host or "источник"
 
 
 def _telegram_full_section_title(section_id: str, title: str) -> str:
