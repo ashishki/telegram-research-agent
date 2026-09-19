@@ -258,3 +258,40 @@ def test_project_section_needs_a_source_binding_and_history_needs_same_owner() -
         BriefBuildRequest(
             topic="AI", window=_window(), owner_ref="owner_primary", evidence=(), comparison_document=other_owner,
         )
+
+
+def test_fresh_content_has_distinct_identity_and_mobile_card_has_full_navigation() -> None:
+    window = _window()
+    first = build_brief_document(
+        BriefBuildRequest(
+            topic="AI", window=window, owner_ref="owner_primary", coverage=(CoverageSource("telegram:archive", "checked"),),
+            evidence=(_evidence("one", "https://t.me/example/one", title="One", summary="First selected source."),),
+        )
+    )
+    second = build_brief_document(
+        BriefBuildRequest(
+            topic="AI", window=window, owner_ref="owner_primary", coverage=(CoverageSource("telegram:archive", "checked"),),
+            evidence=(_evidence("two", "https://t.me/example/two", title="Two", summary="Different selected source."),),
+        )
+    )
+    many = build_brief_document(
+        BriefBuildRequest(
+            topic="AI", window=window, owner_ref="owner_primary", coverage=(CoverageSource("telegram:archive", "checked"),),
+            evidence=tuple(
+                _evidence(
+                    f"many-{index}", f"https://t.me/example/many-{index}", title=f"Item {index}",
+                    summary=f"Bounded local detail {index}.", importance="medium",
+                )
+                for index in range(1, 6)
+            ),
+        )
+    )
+
+    assert first.version_ref != second.version_ref
+    assert first.inspect()["brief_ref"]["content_digest"] != second.inspect()["brief_ref"]["content_digest"]
+    card = render_brief_document(many)
+    full = render_brief_document(many, view="full")
+    assert "покажи полный бриф" in card
+    assert "Item 5" not in card
+    assert "Item 5" in full
+    assert "…" not in full

@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import hashlib
+import json
 import re
 from threading import RLock
 from typing import Any, Literal, Mapping, Sequence
@@ -34,6 +35,7 @@ _HTTPS_REF = re.compile(r"^https://[^\s]{1,500}$", re.IGNORECASE)
 _SAFE_REASON = re.compile(r"^[a-z][a-z0-9_.-]{2,120}$")
 _SAFE_TOPIC = re.compile(r"^[a-z0-9][a-z0-9 _./-]{0,63}$")
 _PROJECT_REF = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 _.\-/]{0,79}$")
+_CONTENT_DIGEST = re.compile(r"^sha256:[a-f0-9]{64}$")
 _COVERAGE_STATES = frozenset({"checked", "excluded", "unavailable", "stale", "partial"})
 _IMPORTANCE = frozenset({"critical", "high", "medium", "low", "unknown"})
 _URGENCY = frozenset({"urgent", "soon", "not_marked", "unknown"})
@@ -337,6 +339,7 @@ class BriefDocument:
     selection_reasons: tuple[str, ...]
     previous_version: BriefVersionRef | None
     coverage_manifest: CoverageManifest
+    content_digest: str
     deduplication: tuple[DeduplicationRecord, ...] = ()
     conflicts: tuple[ConflictRecord, ...] = ()
     comparison_ref: BriefVersionRef | None = None
@@ -374,6 +377,8 @@ class BriefDocument:
             raise ValueError("brief selection reasons are invalid")
         if self.previous_version is not None and self.previous_version.brief_id != self.brief_id:
             raise ValueError("previous version must preserve the brief identity")
+        if not _CONTENT_DIGEST.fullmatch(self.content_digest):
+            raise ValueError("brief content identity is invalid")
         if not _SAFE_REASON.fullmatch(self.period_basis):
             raise ValueError("brief period basis is invalid")
 
@@ -410,7 +415,11 @@ class BriefDocument:
 
         return {
             "schema_version": BRIEF_INSPECTION_SCHEMA_VERSION,
-            "brief_ref": {**self.version_ref.to_dict(), "retention": BRIEF_RETENTION},
+            "brief_ref": {
+                **self.version_ref.to_dict(),
+                "content_digest": self.content_digest,
+                "retention": BRIEF_RETENTION,
+            },
             "period": {
                 **self.window.to_dict(),
                 "interval": "[start_at,end_at)",
@@ -483,7 +492,7 @@ class BriefBuildRequest:
 
 @dataclass(frozen=True, slots=True)
 class BriefFollowup:
-    kind: Literal["explain_item", "shorten", "filter_topics", "compare_weeks", "less_technical", "apply"]
+    kind: Literal["explain_item", "shorten", "filter_topics", "compare_weeks", "less_technical", "apply", "full"]
     item_number: int | None = None
     topics: tuple[str, ...] = ()
 
@@ -493,22 +502,6 @@ def build_brief_document(request: BriefBuildRequest) -> BriefDocument:
 
     topic = _clean(request.topic, 160, required=True)
     assert topic is not None  # checked by the request type
-    brief_id = "brief_" + _digest(
-        "prm.brief.logical.v1",
-        request.owner_ref,
-        topic.casefold(),
-        request.window.timezone,
-        _iso(request.window.start_at),
-        _iso(request.window.end_at),
-    )
-    previous = request.previous_document
-    if previous is not None and previous.brief_id == brief_id:
-        version = previous.version + 1
-        previous_ref: BriefVersionRef | None = previous.version_ref
-    else:
-        version = 1
-        previous_ref = None
-
     evidence, invalid_count, undated_count, outside_count = _local_archive_evidence(request.evidence, request.window)
     kept, deduplication = _deduplicate(evidence)
     conflicts = _conflicts(kept)
@@ -532,6 +525,38 @@ def build_brief_document(request: BriefBuildRequest) -> BriefDocument:
         reasons.append("conflicts_preserved")
     if status != "complete":
         reasons.append("coverage_not_complete")
+    content_digest = _content_digest(
+        topic=topic,
+        window=request.window,
+        evidence=kept,
+        coverage=coverage,
+        deduplication=deduplication,
+        conflicts=conflicts,
+        period_basis=request.period_basis,
+    )
+    previous = request.previous_document
+    if previous is not None:
+        # A visible prior version is the only authority to increment the same
+        # report identity. It remains conversation-bound in BriefDocumentStore.
+        brief_id = previous.brief_id
+        version = previous.version + 1
+        previous_ref: BriefVersionRef | None = previous.version_ref
+    else:
+        # After a reset/restart no history is retained. Binding a fresh v1 to
+        # its canonical selected content avoids reusing an identity for a
+        # different evidence set while still being deterministic for the same
+        # exact selection.
+        brief_id = "brief_" + _digest(
+            "prm.brief.content.v1",
+            request.owner_ref,
+            topic.casefold(),
+            request.window.timezone,
+            _iso(request.window.start_at),
+            _iso(request.window.end_at),
+            content_digest,
+        )
+        version = 1
+        previous_ref = None
     return BriefDocument(
         brief_id=brief_id,
         version=version,
@@ -544,6 +569,7 @@ def build_brief_document(request: BriefBuildRequest) -> BriefDocument:
         selection_reasons=tuple(reasons),
         previous_version=previous_ref,
         coverage_manifest=coverage,
+        content_digest=content_digest,
         deduplication=deduplication,
         conflicts=conflicts,
         comparison_ref=request.comparison_document.version_ref if request.comparison_document is not None else None,
@@ -559,6 +585,8 @@ def classify_brief_followup(text: str) -> BriefFollowup | None:
         return BriefFollowup("explain_item", item_number=int(item.group(1)))
     if lowered in {"сделай короче", "сократи", "shorten it", "make it shorter"}:
         return BriefFollowup("shorten")
+    if lowered in {"покажи полный бриф", "полный бриф", "подробный бриф", "show full brief"}:
+        return BriefFollowup("full")
     if (
         "менее техничес" in lowered
         or "проще" in lowered
@@ -584,7 +612,7 @@ def classify_brief_followup(text: str) -> BriefFollowup | None:
 def render_brief_document(
     document: BriefDocument,
     *,
-    view: Literal["telegram", "short", "item", "topics", "comparison", "less_technical", "apply"] = "telegram",
+    view: Literal["telegram", "short", "item", "topics", "comparison", "less_technical", "apply", "full"] = "telegram",
     item_number: int | None = None,
     topics: Sequence[str] = (),
     comparison_document: BriefDocument | None = None,
@@ -601,6 +629,8 @@ def render_brief_document(
         return _render_less_technical(document)
     if view == "apply":
         return _render_apply(document)
+    if view == "full":
+        return _render_telegram(document, document.items, short=False, topics=(), maximum_items=None, full=True)
     selected_topics = tuple(_topic(item) for item in topics if _topic(item))
     items = tuple(item for item in document.items if not selected_topics or set(selected_topics) & set(item.topics))
     return _render_telegram(document, items, short=view == "short", topics=selected_topics)
@@ -721,7 +751,7 @@ class BriefDocumentStore:
         # required. There is intentionally no global/latest report lookup.
         if document is None:
             return None
-        if view not in {"telegram", "short", "item", "topics", "comparison", "less_technical", "apply"}:
+        if view not in {"telegram", "short", "item", "topics", "comparison", "less_technical", "apply", "full"}:
             raise ValueError("brief view is invalid")
         return render_brief_document(document, view=view, **kwargs)  # type: ignore[arg-type]
 
@@ -1051,6 +1081,50 @@ def _evidence_rank(item: BriefEvidence) -> tuple[int, int, str]:
     return importance, urgency, _iso(item.observed_at)
 
 
+def _content_digest(
+    *,
+    topic: str,
+    window: BriefWindow,
+    evidence: Sequence[BriefEvidence],
+    coverage: CoverageManifest,
+    deduplication: Sequence[DeduplicationRecord],
+    conflicts: Sequence[ConflictRecord],
+    period_basis: str,
+) -> str:
+    """Canonical identity for the selected facts and their inspection basis."""
+
+    payload = {
+        "schema_version": "prm_brief_content_identity.v1",
+        "topic": topic,
+        "window": window.to_dict(),
+        "period_basis": period_basis,
+        "evidence": [
+            {
+                "evidence_ref": item.evidence_ref,
+                "source_ref": item.source_ref,
+                "source_family_ref": item.source_family_ref,
+                "title": item.title,
+                "summary": item.summary,
+                "observed_at": _iso(item.observed_at),
+                "time_kind": item.time_kind,
+                "topics": item.topics,
+                "importance": item.importance,
+                "urgency": item.urgency,
+                "selection_reasons": item.selection_reasons,
+                "project_refs": item.project_refs,
+                "conflict_group": item.conflict_group,
+                "conflict_value": item.conflict_value,
+            }
+            for item in evidence
+        ],
+        "coverage": coverage.to_dict(),
+        "deduplication": [item.to_dict() for item in deduplication],
+        "conflicts": [item.to_dict() for item in conflicts],
+    }
+    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+    return "sha256:" + hashlib.sha256(encoded).hexdigest()
+
+
 def _conflicts(evidence: Sequence[BriefEvidence]) -> tuple[ConflictRecord, ...]:
     groups: dict[str, list[BriefEvidence]] = {}
     for item in evidence:
@@ -1123,9 +1197,19 @@ def _coverage(
     return CoverageManifest(base, normalized)
 
 
-def _render_telegram(document: BriefDocument, items: Sequence[BriefItem], *, short: bool, topics: Sequence[str]) -> str:
+def _render_telegram(
+    document: BriefDocument,
+    items: Sequence[BriefItem],
+    *,
+    short: bool,
+    topics: Sequence[str],
+    maximum_items: int | None = 2,
+    full: bool = False,
+) -> str:
+    """Render either a bounded mobile card or an explicitly requested full view."""
+
     period = _period_label(document.window)
-    lines = [f"Бриф · {period}", f"Часовой пояс: {document.window.timezone}"]
+    lines = [f"{'Полный бриф' if full else 'Бриф'} · {period}", f"Часовой пояс: {document.window.timezone}"]
     if topics:
         lines.append("Темы: " + ", ".join(topics))
     if not items:
@@ -1133,31 +1217,45 @@ def _render_telegram(document: BriefDocument, items: Sequence[BriefItem], *, sho
             lines.extend(("", "В проверенной области важных изменений не найдено."))
         else:
             lines.extend(("", "В предоставленной локальной выборке нет пунктов для этого вида; это не вывод за весь период."))
-        return _bounded(lines)
+        return "\n".join(lines).strip() if full else _bounded(lines)
     evidence = document.evidence_by_ref()
-    index = 0
+    index = shown = 0
+    stop = False
     for section in document.sections:
         contained = [item for item in section.items if item in items]
         if not contained:
             continue
-        lines.extend(("", section.title))
+        section_lines = ["", section.title]
         for item in contained:
+            if maximum_items is not None and shown >= maximum_items:
+                stop = True
+                break
             index += 1
+            shown += 1
             priority = _priority_label(item)
-            summary = _short(item.summary, 170 if short else 280)
-            lines.append(f"{index}. {item.title} — {summary} [{priority}]")
+            summary = _short(item.summary, 170 if short else 400 if full else 140)
+            section_lines.append(f"{index}. {item.title} — {summary} [{priority}]")
             if not short:
                 source = evidence[item.evidence_refs[0]]
-                lines.append(f"   Источник: {source.source_ref}")
+                source_ref = source.source_ref if full else _telegram_source_label(source.source_ref, item.evidence_refs[0])
+                section_lines.append(f"   Источник: {source_ref}")
             if item.conflict_groups:
-                lines.append("   ⚠ В источниках есть неразрешённое расхождение.")
+                section_lines.append("   ⚠ В источниках есть неразрешённое расхождение.")
             if short and index >= 3:
+                stop = True
                 break
-        if short and index >= 3:
+        if len(section_lines) > 2:
+            lines.extend(section_lines)
+        if stop:
             break
     lines.extend(("", _coverage_line(document)))
+    omitted = len(items) - shown
+    if omitted and not full:
+        lines.append(f"Ещё {omitted} пункт(а): напиши «покажи полный бриф»." )
+    elif not full:
+        lines.append("Навигация: «поясни пункт 2», «сделай короче» или «покажи полный бриф».")
     lines.append(f"Версия: {document.brief_id} v{document.version}")
-    return _bounded(lines)
+    return "\n".join(lines).strip() if full else _bounded(lines)
 
 
 def _render_item(document: BriefDocument, item_number: int | None) -> str:
@@ -1264,6 +1362,14 @@ def _coverage_line(document: BriefDocument) -> str:
     if document.coverage_manifest.complete:
         return f"Покрытие: проверено ({states})."
     return f"Покрытие частичное ({states}); «ничего важного» не утверждается за весь период."
+
+
+def _telegram_source_label(source_ref: str, evidence_ref: str) -> str:
+    """Keep the first mobile card bounded without silently losing navigation."""
+
+    if len(source_ref) <= 160:
+        return source_ref
+    return f"{evidence_ref}; полная ссылка — в «покажи полный бриф»"
 
 
 def _bounded(lines: Sequence[str]) -> str:

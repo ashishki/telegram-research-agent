@@ -651,6 +651,9 @@ class PersonalResearchAssistant:
         elif followup.kind == "apply":
             text = render_brief_document(document, view="apply")
             view = "apply"
+        elif followup.kind == "full":
+            text = render_brief_document(document, view="full")
+            view = "full"
         else:
             text = render_brief_document(
                 document,

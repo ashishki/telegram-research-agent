@@ -69,6 +69,7 @@ def test_report_followups_use_only_the_current_visible_brief_document(monkeypatc
     filtered = assistant.answer(OperatorRequest(query="только AI", chat_id="42"))
     less_technical = assistant.answer(OperatorRequest(query="сделай менее техническим", chat_id="42"))
     apply = assistant.answer(OperatorRequest(query="что из этого применить?", chat_id="42"))
+    full = assistant.answer(OperatorRequest(query="покажи полный бриф", chat_id="42"))
 
     assert initial.payload["brief_document_created"] is True
     assert explained.payload["brief_followup"]["kind"] == "explain_item"
@@ -82,9 +83,11 @@ def test_report_followups_use_only_the_current_visible_brief_document(monkeypatc
     assert "новых фактов и поиска нет" in less_technical.text
     assert apply.payload["brief_view"] == "apply"
     assert "не выполненные действия" in apply.text
+    assert full.payload["brief_view"] == "full"
+    assert full.text.startswith("Полный бриф")
     assert all(
         result.payload["retrieval_performed"] is False
-        for result in (initial, explained, shortened, filtered, less_technical, apply)
+        for result in (initial, explained, shortened, filtered, less_technical, apply, full)
     )
 
 
