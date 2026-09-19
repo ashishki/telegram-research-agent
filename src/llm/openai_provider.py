@@ -103,12 +103,13 @@ def complete_with_provider(
     model: str = OPENAI_TERRA_MODEL,
     client: _OpenAIClient | None = None,
 ) -> ProviderResult:
-    """Complete through OpenAI only after explicit provider and context gates.
+    """Complete a direct question through OpenAI only after its provider gate.
 
     The default result delegates back to the existing local PRM path. External
     provider selection requires an environment feature gate plus a per-call
-    acknowledgement. Archive context requires a second environment gate plus a
-    second per-call acknowledgement; otherwise it is omitted from the request.
+    acknowledgement. PA-02 always omits private archive context, even if a
+    legacy switch and a separately shaped grant are supplied; PA-04 owns the
+    repository-verified evidence binding needed to revisit that boundary.
     """
 
     clean_query = " ".join(str(query or "").split())

@@ -24,6 +24,8 @@ TELEGRAM_FILE_BASE = "https://api.telegram.org/file"
 DEFAULT_TRANSCRIPTION_MODEL = "whisper-1"
 DEFAULT_MAX_VOICE_BYTES = 24 * 1024 * 1024
 VOICE_ATTACHMENT_ID_PATTERN = re.compile(r"[A-Za-z0-9_-]{1,512}")
+TELEGRAM_FILE_PATH_SEGMENT_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,255}")
+MAX_TELEGRAM_FILE_PATH_CHARS = 1024
 TELEGRAM_PROVIDER_REF = "provider_telegram"
 OPENAI_PROVIDER_REF = "provider_openai"
 VOICE_DOWNLOAD_CAPABILITY = "media.voice_download"
@@ -225,6 +227,24 @@ def _open_openai_transcription_request(http_request: request.Request, *, timeout
     return request.build_opener(_RejectRedirects()).open(http_request, timeout=timeout)
 
 
+def _open_telegram_voice_download_request(http_request: request.Request, *, timeout: int):
+    """Fetch voice bytes only from Telegram's fixed file origin, without redirects."""
+
+    parsed = parse.urlsplit(http_request.full_url)
+    expected = parse.urlsplit(TELEGRAM_FILE_BASE)
+    file_prefix = f"{expected.path.rstrip('/')}/bot"
+    if (
+        parsed.scheme != expected.scheme
+        or parsed.netloc != expected.netloc
+        or not parsed.path.startswith(file_prefix)
+        or len(parsed.path) <= len(file_prefix)
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise VoiceTranscriptionError("Telegram voice download endpoint is not approved")
+    return request.build_opener(_RejectRedirects()).open(http_request, timeout=timeout)
+
+
 def _telegram_connection_ref(token: str) -> str | None:
     return _credential_connection_ref("telegram", token)
 
@@ -375,14 +395,14 @@ def _download_telegram_voice(
     if telegram_connection_ref is None:
         raise VoiceTranscriptionUnavailable("Telegram voice download requires a configured connection")
     _require_safe_telegram_attachment_id(file_id)
-    file_path = _get_telegram_file_path(
+    file_path = _require_safe_telegram_file_path(_get_telegram_file_path(
         token=token,
         file_id=file_id,
         authorization=get_file_authorization,
         owner_ref=owner_ref,
         connection_ref=telegram_connection_ref,
         resource_ref=resource_ref,
-    )
+    ))
     url = f"{TELEGRAM_FILE_BASE}/bot{token}/{file_path}"
     _require_voice_download_authorization(
         download_file_authorization,
@@ -391,7 +411,7 @@ def _download_telegram_voice(
         resource_ref=resource_ref,
     )
     try:
-        with request.urlopen(url, timeout=60) as response:
+        with _open_telegram_voice_download_request(request.Request(url), timeout=60) as response:
             data = response.read()
     except Exception:
         raise VoiceTranscriptionError("Telegram voice download failed") from None
@@ -408,6 +428,34 @@ def _require_safe_telegram_attachment_id(file_id: str) -> None:
 
     if not isinstance(file_id, str) or not VOICE_ATTACHMENT_ID_PATTERN.fullmatch(file_id):
         raise VoiceTranscriptionError("Telegram voice attachment identifier is invalid")
+
+
+def _require_safe_telegram_file_path(file_path: object) -> str:
+    """Accept only a bounded, relative Telegram file path without URL syntax."""
+
+    if not isinstance(file_path, str):
+        raise VoiceTranscriptionError("Telegram getFile response included an invalid file_path")
+    clean_path = file_path.strip()
+    parsed = parse.urlsplit(clean_path)
+    if (
+        not clean_path
+        or len(clean_path) > MAX_TELEGRAM_FILE_PATH_CHARS
+        or clean_path.startswith("/")
+        or parsed.scheme
+        or parsed.netloc
+        or parsed.query
+        or parsed.fragment
+        or "\\" in clean_path
+    ):
+        raise VoiceTranscriptionError("Telegram getFile response included an invalid file_path")
+    segments = clean_path.split("/")
+    if any(
+        segment in {"", ".", ".."}
+        or not TELEGRAM_FILE_PATH_SEGMENT_PATTERN.fullmatch(segment)
+        for segment in segments
+    ):
+        raise VoiceTranscriptionError("Telegram getFile response included an invalid file_path")
+    return clean_path
 
 
 def _get_telegram_file_path(
@@ -442,10 +490,8 @@ def _get_telegram_file_path(
     if not isinstance(decoded, dict) or decoded.get("ok") is not True:
         raise VoiceTranscriptionError("Telegram getFile returned an error")
     result = decoded.get("result")
-    file_path = str((result or {}).get("file_path") or "").strip()
-    if not file_path:
-        raise VoiceTranscriptionError("Telegram getFile response did not include file_path")
-    return file_path
+    file_path = (result or {}).get("file_path")
+    return _require_safe_telegram_file_path(file_path)
 
 
 def _build_multipart_body(

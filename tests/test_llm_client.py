@@ -57,6 +57,7 @@ def _authorization(
     *,
     capability: str = "model.generate",
     purpose: str = "answer.request",
+    data_class: str = "user_provided",
     operation_ref: str | None = "operation_synthetic_anthropic_001",
 ):
     now = datetime.now(timezone.utc).replace(microsecond=0)
@@ -67,7 +68,7 @@ def _authorization(
         capability=capability,
         resource_refs=("resource_conversation",),
         operations=("model_egress",),
-        data_classes=("user_provided",),
+        data_classes=(data_class,),
         purpose=purpose,
         provider_policy=ProviderPolicy(("provider_anthropic",)),
         issued_at=now - timedelta(minutes=1),
@@ -79,7 +80,7 @@ def _authorization(
         capability=capability,
         resource_ref="resource_conversation",
         operation="model_egress",
-        data_class="user_provided",
+        data_class=data_class,
         provider_ref="provider_anthropic",
         purpose=purpose,
         connection_ref=SYNTHETIC_ANTHROPIC_CONNECTION,
@@ -128,6 +129,21 @@ class TestLLMClient(unittest.TestCase):
                 client.complete(
                     prompt="Synthetic question",
                     authorization=_authorization(purpose="answer.context"),
+                    **AUTH_SCOPE,
+                )
+
+        fake_transport.assert_not_called()
+
+    def test_text_transport_rejects_private_archive_even_with_a_matching_grant_before_provider_call(self):
+        fake_transport = unittest.mock.Mock()
+        fake_client = SimpleNamespace(messages=SimpleNamespace(create=fake_transport))
+
+        with patch.object(client, "_get_client", return_value=fake_client):
+            with self.assertRaisesRegex(client.LLMError, "direct user-provided"):
+                client.complete(
+                    prompt="private archive sentinel",
+                    authorization=_authorization(data_class="private_archive"),
+                    data_class="private_archive",
                     **AUTH_SCOPE,
                 )
 

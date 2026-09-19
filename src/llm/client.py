@@ -26,6 +26,7 @@ USAGE_RECORDING_SQLITE_TIMEOUT_SECONDS = 0.05
 USAGE_RECORDING_SQLITE_BUSY_TIMEOUT_MS = 50
 ANTHROPIC_PROVIDER_REF = "provider_anthropic"
 TEXT_CAPABILITY = "model.generate"
+PA02_ANTHROPIC_DATA_CLASS = "user_provided"
 
 # Model routing by task category.
 # Override any entry via env var: LLM_MODEL_DIGEST, LLM_MODEL_BOT_ASK, etc.
@@ -292,6 +293,14 @@ def complete_with_receipt(
     connection_ref: str | None = None,
     resource_ref: str | None = None,
 ) -> LLMCompletionReceipt:
+    # This generic adapter has no repository/evidence binding.  In PA-02 it
+    # therefore carries only the operator's direct question.  A matching grant
+    # and an opaque operation key do not prove the provenance of archive,
+    # connector, or model-derived private material.  PA-04 must introduce a
+    # separately bound input type before any such material can reach Anthropic.
+    if data_class != PA02_ANTHROPIC_DATA_CLASS:
+        _abandon_before_transport(authorization)
+        raise LLMError("Anthropic completion accepts only direct user-provided input in PA-02")
     active_api_key = _configured_anthropic_api_key()
     active_connection_ref = _anthropic_connection_ref(active_api_key)
     if active_connection_ref is None or connection_ref != active_connection_ref:
