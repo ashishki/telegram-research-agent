@@ -259,6 +259,58 @@ def test_pa04_application_rejects_claim_cited_only_by_unselected_evidence(monkey
 
 
 @pytest.mark.parametrize(
+    ("question", "support_span", "generated", "source_url"),
+    [
+        (
+            "What does my archive say about service message retention?",
+            "Service has no message retention.",
+            "Service has message retention (https://t.me/example/negation-en).",
+            "https://t.me/example/negation-en",
+        ),
+        (
+            "Что в моём архиве есть: сервис хранит сообщения?",
+            "Сервис не хранит сообщения.",
+            "Сервис хранит сообщения (https://t.me/example/negation-ru).",
+            "https://t.me/example/negation-ru",
+        ),
+    ],
+)
+def test_pa04_application_rejects_negation_removal_before_publication(
+    monkeypatch, question, support_span, generated, source_url,
+):
+    payload = _payload()
+    payload["archive_evidence"]["items"][0].update({
+        "archive_document_id": "tg:negation",
+        "snippet": support_span,
+        "source_url": source_url,
+    })
+    payload["evidence_quality"]["items"][0].update({
+        "evidence_id": "tg:negation",
+        "support_span": support_span,
+        "source_url": source_url,
+    })
+    monkeypatch.setattr("prm.application.answer_memory_research", lambda *args, **kwargs: payload)
+    monkeypatch.setattr("prm.application.build_research_facade", lambda **_kwargs: SimpleNamespace())
+    monkeypatch.setattr(
+        "prm.synthesis.complete_archive_synthesis",
+        lambda **_kwargs: ArchiveSynthesisTransportResult(text=generated, receipt=_synthetic_archive_receipt()),
+    )
+
+    result = PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:")).answer(OperatorRequest(
+        query=question,
+        mode="research",
+        chat_id=f"negation-{source_url.rsplit('-', 1)[-1]}",
+        archive_synthesis_access=_archive_synthesis_access(),
+    ))
+
+    generation = result.payload["retrieval_generation_measurement"]["generation"]
+    assert generation["status"] == "generated_answer_rejected"
+    assert result.payload["final_answer_publication"]["fallback_used"] is True
+    assert support_span in result.text
+    assert generated not in result.text
+
+
+@pytest.mark.parametrize(
     ("question", "source_url", "support_span"),
     [
         (

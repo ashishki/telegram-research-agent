@@ -285,6 +285,50 @@ def test_pa04_synthesis_rejects_order_inversions_in_english_and_russian(monkeypa
         assert outcome.status == "generated_answer_rejected"
 
 
+def test_pa04_synthesis_rejects_negation_removal_in_english_and_russian(monkeypatch):
+    receipt = ArchiveSynthesisReceipt(
+        provider="openai", model="gpt-5.6-terra", external_call_attempted=True, external_call_performed=True,
+        context_egress_attempted=True, context_egress_performed=True, delivery_outcome="accepted", context_binding_digest="synthetic",
+    )
+    cases = (
+        (
+            "Service has no message retention.",
+            "Service has message retention (https://t.me/example/negation-en).",
+            "https://t.me/example/negation-en",
+            "What does my archive say about service message retention?",
+        ),
+        (
+            "Сервис не хранит сообщения.",
+            "Сервис хранит сообщения (https://t.me/example/negation-ru).",
+            "https://t.me/example/negation-ru",
+            "Что в моём архиве есть про хранение сообщений?",
+        ),
+    )
+    for support_span, generated, source_url, question in cases:
+        payload = _archive_payload()
+        payload["archive_contract"]["direct_findings"][0].update({
+            "summary": support_span,
+            "source_url": source_url,
+        })
+        evidence = [{
+            "evidence_id": "tg:synthetic-1",
+            "source_url": source_url,
+            "support_span": support_span,
+            "local_archive_provenance": True,
+        }]
+        monkeypatch.setattr(
+            "prm.synthesis.complete_archive_synthesis",
+            lambda **_kwargs: ArchiveSynthesisTransportResult(text=generated, receipt=receipt),
+        )
+
+        outcome = synthesize_archive_response(
+            payload, question=question, evidence_items=evidence, access=_archive_access(),
+        )
+
+        assert outcome.text is None
+        assert outcome.status == "generated_answer_rejected"
+
+
 def test_pa04_synthesis_accepts_cited_answer_and_reports_measurement(monkeypatch):
     receipt = ArchiveSynthesisReceipt(
         provider="openai", model="gpt-5.6-terra", external_call_attempted=True, external_call_performed=True,

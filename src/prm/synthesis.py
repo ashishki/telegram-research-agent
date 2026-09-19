@@ -37,10 +37,10 @@ _ARCHIVE_URL_RE = re.compile(r"https://[^\s)\]]+")
 _ARCHIVE_TOKEN_RE = re.compile(r"[A-Za-zА-Яа-яЁё0-9][A-Za-zА-Яа-яЁё0-9_+-]{1,}")
 _ARCHIVE_SENTENCE_RE = re.compile(r"(?<=[.!?。！？])\s+|[\r\n]+")
 _ARCHIVE_NON_FACT_TOKENS = frozenset({
-    "the", "a", "an", "this", "that", "these", "those", "from", "in", "on", "for", "and", "or", "with", "no", "not",
+    "the", "a", "an", "this", "that", "these", "those", "from", "in", "on", "for", "and", "or", "with",
     "archive", "archives", "material", "materials", "source", "sources", "finding", "findings", "says", "said",
     "shows", "show", "describes", "describe", "about", "direct", "partial", "adjacent", "evidence", "summary",
-    "в", "из", "по", "и", "или", "для", "это", "этот", "эта", "эти", "что", "как", "есть", "был", "была", "нет",
+    "в", "из", "по", "и", "или", "для", "это", "этот", "эта", "эти", "что", "как", "есть", "был", "была",
     "архив", "архиве", "материал", "материалы", "источник", "источники", "находка", "находки", "прямой", "прямые",
     "частичный", "смежный", "вывод", "данные", "говорит", "описывает", "показывает", "согласно",
 })
@@ -49,6 +49,7 @@ _ARCHIVE_SAFE_PARAPHRASES = {
     "измерение": "измерять", "измеряет": "измерять", "измеряют": "измерять", "использует": "использовать",
     "используют": "использовать", "использование": "использовать",
 }
+_ARCHIVE_NEGATION_TOKENS = frozenset({"no", "not", "never", "without", "не", "нет", "без", "никогда"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -384,7 +385,15 @@ def _claims_are_source_bounded(
         # another.
         if len(urls) != 1 or urls[0] not in supports:
             return False
-        if not _is_ordered_subsequence(content_tokens, supports[urls[0]]):
+        cited_support = supports[urls[0]]
+        if not _is_ordered_subsequence(content_tokens, cited_support):
+            return False
+        # An ordered subsequence intentionally permits small extractive
+        # compressions, but it must never drop a source's explicit absence or
+        # negation.  Compare this factual polarity before generic scoring,
+        # which can otherwise see a fluent positive sentence with the correct
+        # source URL and no missing lexical token.
+        if _has_archive_negation(content_tokens) != _has_archive_negation(cited_support):
             return False
     return factual_sentences > 0 or not direct_required
 
@@ -411,6 +420,10 @@ def _is_ordered_subsequence(candidate: Sequence[str], support: Sequence[str]) ->
             return False
         support_index += 1
     return True
+
+
+def _has_archive_negation(tokens: Sequence[str]) -> bool:
+    return any(token in _ARCHIVE_NEGATION_TOKENS for token in tokens)
 
 
 def _archive_token(value: str) -> str:
