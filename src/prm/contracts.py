@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import re
 from typing import Any, Literal, Mapping
 
 from prm.capabilities import AuthorizationDecision
@@ -115,6 +116,84 @@ class ArchiveSynthesisAccess:
 
 
 @dataclass(frozen=True, slots=True)
+class PublicWebAccess:
+    """Sealed PA-02 scopes for one public search and bounded source reads.
+
+    This carrier contains only authorization metadata.  It never carries a
+    private query, credentials, an HTTP client, source content or a fallback
+    provider.  Search and fetch are deliberately different capabilities: a
+    search snippet cannot authorize reading a document, and a document-read
+    grant cannot authorize a new public search.
+    """
+
+    search_authorization: AuthorizationDecision
+    fetch_authorizations: tuple[AuthorizationDecision, ...]
+    owner_ref: str
+    connection_ref: str | None
+    search_resource_ref: str
+    fetch_resource_ref: str
+    # The separately minimized public query is bound by digest when the
+    # authorization is assembled.  This carrier never retains raw query text,
+    # so a later caller cannot substitute the original private prompt.
+    public_query_digest: str
+
+    def __post_init__(self) -> None:
+        search = self.search_authorization
+        fetches = self.fetch_authorizations
+        if type(search) is not AuthorizationDecision or not isinstance(fetches, tuple) or not fetches or len(fetches) > 4:
+            raise ValueError("public web access requires bounded typed authorizations")
+        if not re.fullmatch(r"sha256:[0-9a-f]{64}", self.public_query_digest):
+            raise ValueError("public web access requires a normalized public query digest")
+        if not _matches_public_web_authorization(
+            search,
+            owner_ref=self.owner_ref,
+            connection_ref=self.connection_ref,
+            resource_ref=self.search_resource_ref,
+            capability="web.search",
+            purpose="public.search",
+        ):
+            raise ValueError("public web search authorization is out of scope")
+        if len({id(item) for item in fetches}) != len(fetches):
+            raise ValueError("public web fetch authorizations must be distinct")
+        if any(
+            type(item) is not AuthorizationDecision
+            or not _matches_public_web_authorization(
+                item,
+                owner_ref=self.owner_ref,
+                connection_ref=self.connection_ref,
+                resource_ref=self.fetch_resource_ref,
+                capability="web.fetch",
+                purpose="public.fetch",
+            )
+            for item in fetches
+        ):
+            raise ValueError("public web fetch authorization is out of scope")
+
+
+def _matches_public_web_authorization(
+    decision: AuthorizationDecision,
+    *,
+    owner_ref: str,
+    connection_ref: str | None,
+    resource_ref: str,
+    capability: str,
+    purpose: str,
+) -> bool:
+    return bool(
+        decision.allowed
+        and decision.reservation is not None
+        and decision.owner_ref == owner_ref
+        and decision.connection_ref == connection_ref
+        and decision.resource_ref == resource_ref
+        and decision.provider_ref == "provider_public_web"
+        and decision.capability == capability
+        and decision.operation == "read"
+        and decision.data_class == "public"
+        and decision.purpose == purpose
+    )
+
+
+@dataclass(frozen=True, slots=True)
 class OperatorRequest:
     query: str
     mode: RequestMode = "auto"
@@ -133,6 +212,11 @@ class OperatorRequest:
     # PA-04 deliberately uses a different paired scope: current user text plus
     # a bounded private-archive context cannot be substituted for PA-03 chat.
     archive_synthesis_access: ArchiveSynthesisAccess | None = None
+    # PA-05 never derives a public query from archive/profile text.  A caller
+    # must separately supply a minimized public query plus this typed access;
+    # omitted values retain the current-fact boundary without network activity.
+    public_web_query: str = ""
+    public_web_access: PublicWebAccess | None = None
 
 
 @dataclass(frozen=True, slots=True)

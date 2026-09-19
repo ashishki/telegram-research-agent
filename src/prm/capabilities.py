@@ -52,6 +52,11 @@ TRANSPORT_PURPOSES: dict[tuple[str, str, str], str] = {
     ("provider_openai", "media.transcribe", "model_egress"): "voice.transcription",
     ("provider_telegram", "assistant.result_delivery", "deliver"): "answer.delivery",
     ("provider_local", "assistant.utd_draft", "write"): "utd.draft",
+    # PA-05 has distinct public search and document-read reservations.  A
+    # search snippet is discovery-only; it cannot consume a primary-document
+    # read, and no private data class is accepted by either adapter.
+    ("provider_public_web", "web.search", "read"): "public.search",
+    ("provider_public_web", "web.fetch", "read"): "public.fetch",
 }
 
 

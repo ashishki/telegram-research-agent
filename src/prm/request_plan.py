@@ -17,11 +17,11 @@ def build_request_plan(query: str, route: Mapping[str, Any], *, public_mode_cons
     archive_requested = bool(route.get("archive_scope"))
     public_requested = bool(route.get("external_verification_required"))
     private_context_requested = bool(route.get("project_context_required"))
-    # PRM-SN-3A has no approved public-query executor.  A consent preview is
-    # not egress consent, so never derive a query from operator prose here.
-    # A later approved adapter must accept an independently constructed,
-    # reviewed query field rather than reuse archive/profile input.
+    # PA-05 has a capability-gated public executor. A plan still never derives
+    # a public query from operator prose or records it here: the runtime must
+    # receive a separately minimized, scope-bound query with typed access.
     safe_public_query = ""
+    public_execution_ready = public_requested and bool(public_mode_consented)
     return {
         "schema_version": REQUEST_PLAN_SCHEMA_VERSION,
         "archive": {"requested": archive_requested, "allowed": archive_requested, "execution": "local_only"},
@@ -30,12 +30,15 @@ def build_request_plan(query: str, route: Mapping[str, Any], *, public_mode_cons
             "requested": public_requested,
             "consent_preview_required": public_requested and not public_mode_consented,
             "consented_mode": bool(public_mode_consented),
-            "allowed": False,
-            "execution": "capability_off",
+            "allowed": public_execution_ready,
+            "execution": "adapter_and_capability_required" if public_execution_ready else "capability_off",
             "query": safe_public_query,
             "query_redacted": public_requested and not bool(safe_public_query),
-            "max_calls": 0,
-            "timeout_seconds": 0,
+            # One discovery call plus at most four separately authorized
+            # primary-document reads. Actual limits remain the narrower
+            # runtime bounds and sealed reservation count.
+            "max_calls": 5 if public_execution_ready else 0,
+            "timeout_seconds": 30 if public_execution_ready else 0,
             "max_cost_usd": 0.0,
         },
         "primary_source_fixture_verification": {

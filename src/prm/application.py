@@ -26,8 +26,14 @@ from prm.conversation import (
     classify_turn,
 )
 from prm.archive_contract import ARCHIVE_RESPONSE_INTENTS, apply_archive_response_contract
-from prm.contracts import AssistantResult, OperatorRequest
+from prm.contracts import AssistantResult, OperatorRequest, PublicWebAccess
 from prm.presentation import render_payload, render_project_clarification
+from prm.public_web import (
+    PublicWebBounds,
+    PublicWebProvider,
+    execute_public_web_research,
+    render_public_web_answer,
+)
 from prm.research_planner import plan_archive_evidence
 from prm.research_facade import build_research_facade
 from prm.request_plan import build_request_plan
@@ -44,10 +50,17 @@ class PersonalResearchAssistant:
         settings: Settings,
         conversations: ConversationStore | None = None,
         llm_client: type[LLMClient] = LLMClient,
+        public_web_provider: PublicWebProvider | None = None,
+        public_web_bounds: PublicWebBounds | None = None,
     ) -> None:
         self.settings = settings
         self.conversations = conversations or GLOBAL_CONVERSATIONS
         self.llm_client = llm_client
+        # There is intentionally no environment-derived default. Supplying an
+        # adapter is a runtime integration decision, never a consequence of a
+        # user asking a current-fact question.
+        self.public_web_provider = public_web_provider
+        self.public_web_bounds = public_web_bounds
 
     def answer(self, request: OperatorRequest) -> AssistantResult:
         conversation = self.conversations.active_or_start(request.chat_id)
@@ -133,7 +146,14 @@ class PersonalResearchAssistant:
         conversation = self.conversations.begin_new_topic(request.chat_id)
         route = decide_route(request.query, requested_mode=request.mode, explicit_project=request.project_name)
         route_payload = route.to_dict()
-        request_plan = build_request_plan(request.query, route_payload)
+        request_plan = build_request_plan(
+            request.query,
+            route_payload,
+            public_mode_consented=(
+                type(request.public_web_access) is PublicWebAccess
+                and bool(request.public_web_query.strip())
+            ),
+        )
         if route.mode == "project_clarify":
             return self._remember_conversation_result(request, AssistantResult(
                 interaction_id="",
@@ -171,6 +191,26 @@ class PersonalResearchAssistant:
             "response_contract_id": route.response_contract_id,
             "archive_scope": route.archive_scope,
         }
+
+        # A public query and its authority are separate ingress fields. Do
+        # not compose a mixed archive/current request here: private archive
+        # text must not influence public search, and the existing mixed path
+        # remains an explicit no-live-verification boundary.
+        if (
+            route.primary_intent == "current_fact_verification"
+            and not route.archive_scope
+            and (bool(request.public_web_query.strip()) or request.public_web_access is not None)
+        ):
+            return self._remember_conversation_result(
+                request,
+                self._current_fact_with_public_web(
+                    request,
+                    context=context_payload,
+                    route=route_payload,
+                    request_plan=request_plan,
+                ),
+                topic=str(route_payload.get("retrieval_query") or request.query),
+            )
 
         if route.mode == "chat":
             return self._remember_conversation_result(
@@ -388,6 +428,90 @@ class PersonalResearchAssistant:
             },
             route=route_payload,
         ), topic=str(route_payload.get("retrieval_query") or request.query))
+
+    def _current_fact_with_public_web(
+        self,
+        request: OperatorRequest,
+        *,
+        context: Mapping[str, Any],
+        route: Mapping[str, Any],
+        request_plan: Mapping[str, Any],
+    ) -> AssistantResult:
+        """Execute the PA-05 current-fact path without archive retrieval.
+
+        ``execute_public_web_research`` owns every provider operation and
+        consumes the already-sealed public scopes immediately before those
+        operations. This application layer only renders its typed evidence;
+        it neither creates a scope nor selects a provider from configuration.
+        """
+
+        web_result = execute_public_web_research(
+            public_query=request.public_web_query,
+            original_query=request.query,
+            access=request.public_web_access,
+            provider=self.public_web_provider,
+            bounds=self.public_web_bounds,
+        )
+        status = str(web_result.get("status") or "public_web_unavailable")
+        verified_current = status == "verified_current_evidence"
+        evidence_items = [
+            dict(item)
+            for item in web_result.get("evidence_items") or []
+            if isinstance(item, Mapping)
+        ]
+        final_text = render_public_web_answer(web_result)
+        verification = verify_answer_against_evidence(
+            final_text,
+            evidence_items,
+            # The verified branch contains freshly fetched primary evidence;
+            # every other branch is an explicit current-fact boundary.
+            current_fact_required=not verified_current,
+        )
+        answer_gate = {
+            "allow_answer": verified_current,
+            "external_verification_required": not verified_current,
+            "current_claim_allowed": verified_current,
+            "reason": status,
+        }
+        publication_allowed = verified_current and _final_answer_publication_allowed(
+            verification,
+            answer_gate,
+            response_contract_id="current_fact.v2",
+        )
+        payload = {
+            "status": status,
+            "question": request.query,
+            "primary_intent": "current_fact_verification",
+            "response_contract_id": "current_fact.v2",
+            "route_decision": dict(route),
+            "request_plan": dict(request_plan),
+            "answer_gate": answer_gate,
+            "public_web_research": web_result,
+            "archive_accessed": False,
+            "provider_egress_attempted": bool(_mapping(web_result.get("search")).get("performed")),
+            "rendered_final_answer": final_text,
+            "rendered_final_answer_verification": verification,
+            "final_answer_publication": {
+                "allowed": publication_allowed,
+                "fallback_used": not verified_current,
+                "reason": "fresh_primary_evidence_verified" if publication_allowed else status,
+            },
+            "write_performed": False,
+        }
+        return AssistantResult(
+            interaction_id=str(context.get("interaction_id") or ""),
+            status=status,
+            mode="research",
+            text=final_text,
+            payload=payload,
+            operator_context=context,
+            final_answer_verification={
+                "claim_count": int(verification.get("claim_count") or 0),
+                "metrics": verification.get("metrics") or {},
+                "summary": claim_ledger_public_summary(verification),
+            },
+            route=route,
+        )
 
     def render_topic_edition(
         self,
