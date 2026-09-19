@@ -29,10 +29,12 @@ from prm.conversation import (
 from prm.archive_contract import ARCHIVE_RESPONSE_INTENTS, apply_archive_response_contract
 from prm.briefs import (
     BRIEF_RETENTION,
+    BRIEF_FULL_VIEW_BUTTON_TEXT,
     BriefBuildRequest,
     BriefDocument,
     BriefDocumentStore,
     BriefFollowup,
+    BriefWindow,
     CoverageSource,
     GLOBAL_BRIEFS,
     build_brief_document,
@@ -50,7 +52,7 @@ from prm.public_web import (
     render_public_web_answer,
 )
 from prm.research_planner import plan_archive_evidence
-from prm.research_facade import build_research_facade
+from prm.research_facade import BriefWindowResearchFacade, build_research_facade
 from prm.request_plan import build_request_plan
 from prm.deep_research import (
     ArchiveResearchReader,
@@ -331,12 +333,20 @@ class PersonalResearchAssistant:
             allow_vector_retrieval=_env_enabled("PRM_ARCHIVE_HYBRID_RETRIEVAL"),
             vector_index_path=os.environ.get("PRM_ARCHIVE_VECTOR_INDEX_PATH", "").strip(),
         )
+        mixed_archive_current = route.archive_scope and route.external_verification_required
+        brief_window: BriefWindow | None = None
+        brief_period_basis = ""
+        if route.mode == "brief" and not mixed_archive_current:
+            # Parse before archive candidate selection, then carry exactly this
+            # object through retrieval and BriefDocument construction.
+            brief_window, brief_period_basis = parse_requested_brief_window(request.query)
         facade = build_research_facade(
             settings=self.settings,
             question=request.query,
             project_context_required=route.project_context_required,
         )
-        mixed_archive_current = route.archive_scope and route.external_verification_required
+        if brief_window is not None:
+            facade = BriefWindowResearchFacade(facade, window=brief_window)
         payload = answer_memory_research(
             request.query,
             archive_query=route.retrieval_query,
@@ -393,8 +403,17 @@ class PersonalResearchAssistant:
                     payload=payload,
                     topic=str(route_payload.get("retrieval_query") or request.query),
                     prior_document=(prior_brief_for_new_report or (None, None))[0],
+                    window=brief_window,
+                    period_basis=brief_period_basis,
                 ),
-                source_payload=payload,
+                source_payload={
+                    **payload,
+                    "brief_retrieval_window": {
+                        **brief_window.to_dict(),
+                        "interval": "[start_at,end_at)",
+                        "bound_before_candidate_selection": True,
+                    },
+                },
                 route=route_payload,
             )
 
@@ -610,6 +629,7 @@ class PersonalResearchAssistant:
                     "new_source_search": False,
                     "material_changes": [],
                 },
+                "telegram_navigation": _brief_navigation_payload(document, view="telegram"),
             },
             operator_context={
                 "input_kind": request.input_kind,
@@ -676,6 +696,7 @@ class PersonalResearchAssistant:
                     "topics": list(followup.topics),
                     "source": "current_visible_brief_document",
                 },
+                "telegram_navigation": _brief_navigation_payload(document, view=view),
                 "retrieval_performed": False,
                 "write_performed": False,
             },
@@ -1292,6 +1313,8 @@ def _brief_request_from_archive_payload(
     payload: Mapping[str, Any],
     topic: str,
     prior_document: BriefDocument | None = None,
+    window: BriefWindow | None = None,
+    period_basis: str = "",
 ) -> BriefBuildRequest:
     """Adapt only the already-selected local archive rows to PA-07 evidence.
 
@@ -1300,7 +1323,8 @@ def _brief_request_from_archive_payload(
     future, separately-authorized caller supplies a checked manifest.
     """
 
-    window, period_basis = parse_requested_brief_window(request.query)
+    if window is None:
+        window, period_basis = parse_requested_brief_window(request.query)
     archive = _mapping(payload.get("archive_evidence"))
     quality_by_identity: dict[tuple[str, str], Mapping[str, Any]] = {}
     for item in _mapping(payload.get("evidence_quality")).get("items") or ():
@@ -1376,6 +1400,24 @@ def _is_brief_refresh(text: str) -> bool:
     lowered = " ".join(str(text or "").split()).casefold()
     return lowered in {
         "обнови бриф", "обнови отчёт", "обнови отчет", "update brief", "refresh brief",
+    }
+
+
+def _brief_navigation_payload(document: BriefDocument, *, view: str) -> dict[str, object] | None:
+    """Describe a stateless Telegram reply-keyboard control for this view.
+
+    The button sends normal text; it carries no document id and creates no
+    callback, database record, job or restart-recoverable state.  The next
+    turn still resolves only against the current visible BriefDocument.
+    """
+
+    if view == "full":
+        return None
+    return {
+        "kind": "reply_keyboard",
+        "button_text": BRIEF_FULL_VIEW_BUTTON_TEXT,
+        "current_visible_brief_only": True,
+        "brief_version": document.version_ref.to_dict(),
     }
 
 

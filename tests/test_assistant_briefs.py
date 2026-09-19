@@ -18,6 +18,7 @@ from prm.briefs import (
 )
 from prm.contracts import OperatorRequest
 from prm.conversation import ConversationStore
+from prm.research_facade import BriefWindowResearchFacade
 
 
 def _window(*, start: str = "2026-10-25T00:00:00+02:00", end: str = "2026-10-26T00:00:00+01:00") -> BriefWindow:
@@ -221,6 +222,86 @@ def test_brief_mode_projects_current_selected_archive_evidence_without_a_provide
     assert result.payload["brief_document"]["evidence_refs"] == ["evidence_tg_brief"]
 
 
+def test_active_brief_binds_requested_window_before_archive_candidate_selection(monkeypatch) -> None:
+    observed: dict[str, object] = {}
+    archive_item = {
+        "archive_document_id": "tg:in-window", "source_url": "https://t.me/example/in-window",
+        "snippet": "A source selected inside the requested local period.",
+        "posted_at": "2026-10-25T10:00:00+02:00", "title": "In-window source", "topics": ["AI"],
+    }
+
+    class ProbeFacade:
+        def search_telegram_archive(self, query, *, filters, limit):
+            observed["query"] = query
+            observed["filters"] = dict(filters)
+            observed["limit"] = limit
+            return {"status": "ok", "items": [
+                {**archive_item, "archive_document_id": "tg:outside", "source_url": "https://t.me/example/outside", "posted_at": "2000-01-01T00:00:00Z"},
+                archive_item,
+            ]}
+
+    def selected_local_payload(_question, *, facade, **_kwargs):
+        archive_result = facade.search_telegram_archive(
+            "AI", filters={"date_from": "wrong", "date_to": "wrong"}, limit=5,
+        )
+        return {
+            "status": "ok", "direct_answer": "", "answer_gate": {"allow_answer": True},
+            "archive_evidence": {"items": archive_result["items"]},
+            "evidence_quality": {"items": [{
+                "evidence_id": "tg:in-window", "source_url": "https://t.me/example/in-window",
+                "support_span": "A source selected inside the requested local period.",
+            }]},
+            "professional_answer": {}, "project_fit": {}, "project_decision": {}, "claim_ledger": {},
+            "unknowns": [], "next_steps": {}, "receipt": {}, "privacy": {},
+        }
+
+    monkeypatch.setattr("prm.application.answer_memory_research", selected_local_payload)
+    monkeypatch.setattr("prm.application.build_research_facade", lambda **kwargs: ProbeFacade())
+    assistant = PersonalResearchAssistant(
+        settings=SimpleNamespace(db_path=":memory:"), conversations=ConversationStore(), briefs=BriefDocumentStore(),
+    )
+
+    result = assistant.answer(OperatorRequest(
+        query="бриф AI с 2026-10-25 по 2026-10-26 timezone Europe/Berlin", mode="brief", chat_id="42",
+    ))
+
+    assert observed["filters"] == {
+        "date_from": "2026-10-24T22:00:00Z",
+        "date_to": "2026-10-25T23:00:00Z",
+    }
+    assert result.payload["brief_retrieval_window"] == {
+        "timezone": "Europe/Berlin",
+        "start_at": "2026-10-24T22:00:00Z",
+        "end_at": "2026-10-25T23:00:00Z",
+        "generated_at": result.payload["brief_retrieval_window"]["generated_at"],
+        "interval": "[start_at,end_at)",
+        "bound_before_candidate_selection": True,
+    }
+    assert result.payload["brief_document"]["evidence_refs"] == ["evidence_tg_in-window"]
+
+
+def test_brief_window_research_facade_never_accepts_a_caller_time_filter() -> None:
+    calls: list[dict[str, object]] = []
+
+    class ProbeFacade:
+        def search_telegram_archive(self, query, *, filters, limit):
+            calls.append(dict(filters))
+            return {"status": "ok", "items": [
+                {"source_url": "https://t.me/example/outside", "posted_at": "2000-01-01T00:00:00Z"},
+                {"source_url": "https://t.me/example/inside", "posted_at": "2026-10-25T10:00:00+02:00"},
+            ]}
+
+    bound = BriefWindowResearchFacade(ProbeFacade(), window=_window())
+    result = bound.search_telegram_archive(
+        "AI", filters={"date_from": "2000-01-01T00:00:00Z", "date_to": "2000-01-02T00:00:00Z"}, limit=3,
+    )
+
+    assert calls == [{"date_from": "2026-10-24T22:00:00Z", "date_to": "2026-10-25T23:00:00Z"}]
+    assert result["filters"]["brief_window_bound"] is True
+    assert result["filters"]["post_selection_rejected_count"] == 1
+    assert result["items"] == [{"source_url": "https://t.me/example/inside", "posted_at": "2026-10-25T10:00:00+02:00"}]
+
+
 def test_active_brief_window_parses_explicit_range_and_selected_timezone() -> None:
     from prm.briefs import parse_requested_brief_window
 
@@ -295,7 +376,7 @@ def test_fresh_content_has_distinct_identity_and_mobile_card_has_full_navigation
     assert first.inspect()["brief_ref"]["content_digest"] != second.inspect()["brief_ref"]["content_digest"]
     card = render_brief_document(many)
     full = render_brief_document(many, view="full")
-    assert "покажи полный бриф" in card
+    assert "Показать полный бриф" in card
     assert "Item 5" not in card
     assert "Item 5" in full
     assert "…" not in full

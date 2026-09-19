@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any, Mapping
 
 from assistant.archive_relevance import canonical_query_variants, rank_archive_items
 from assistant.pi_facade import PersonalIntelligenceFacade
 from config.settings import Settings
+from prm.briefs import BriefWindow
 
 
 class ArchiveScopedResearchFacade:
@@ -87,6 +89,73 @@ class ArchiveScopedResearchFacade:
         limit: int = 5,
     ) -> dict:
         return self._delegate.search_intelligence_items(query, filters=filters, limit=limit)
+
+
+class BriefWindowResearchFacade:
+    """Bind the legacy archive read to one PA-07 half-open brief window.
+
+    ``answer_memory_research`` has its own older, UTC-date parser.  It cannot
+    represent an explicit PA-07 timestamp range or selected IANA timezone, so
+    the application wraps only the local archive seam before it starts its
+    bounded candidate selection.  The wrapper never widens a caller filter.
+    """
+
+    def __init__(self, delegate: Any, *, window: BriefWindow) -> None:
+        self._delegate = delegate
+        self._window = window
+
+    def search_telegram_archive(
+        self,
+        query: str,
+        filters: Mapping[str, Any] | None = None,
+        limit: int = 5,
+    ) -> dict:
+        bound_filters = dict(filters or {})
+        bound_filters["date_from"] = _brief_window_timestamp(self._window.start_at)
+        bound_filters["date_to"] = _brief_window_timestamp(self._window.end_at)
+        result = dict(self._delegate.search_telegram_archive(query, filters=bound_filters, limit=limit))
+        raw_items = [dict(item) for item in result.get("items") or () if isinstance(item, Mapping)]
+        selected = [item for item in raw_items if _archive_item_is_in_brief_window(item, self._window)]
+        return {
+            **result,
+            "items": selected,
+            "filters": {
+                **dict(result.get("filters") or {}),
+                "date_from": bound_filters["date_from"],
+                "date_to": bound_filters["date_to"],
+                "brief_window_bound": True,
+                "post_selection_rejected_count": len(raw_items) - len(selected),
+            },
+        }
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._delegate, name)
+
+
+def _brief_window_timestamp(value: object) -> str:
+    if not hasattr(value, "astimezone"):
+        raise ValueError("brief window timestamp is invalid")
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _archive_item_is_in_brief_window(item: Mapping[str, Any], window: BriefWindow) -> bool:
+    """Fail closed if an adapter returns a candidate outside the sealed window."""
+
+    for key in (
+        "deleted_at", "reissued_at", "event_at", "published_at", "posted_at", "first_discovered_at", "first_seen_at", "updated_at",
+    ):
+        value = str(item.get(key) or "").strip()
+        if not value:
+            continue
+        try:
+            moment = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if moment.tzinfo is None:
+            moment = moment.replace(tzinfo=timezone.utc)
+        if window.contains(moment):
+            return True
+    return False
 
 
 def build_research_facade(

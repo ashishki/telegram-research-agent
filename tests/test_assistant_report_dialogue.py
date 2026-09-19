@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from bot.prm_handlers import _brief_navigation_markup
 from prm.application import PersonalResearchAssistant
 from prm.briefs import BriefBuildRequest, BriefDocumentStore, BriefWindow, CoverageSource, build_brief_document, render_brief
 from prm.contracts import OperatorRequest
@@ -69,9 +70,23 @@ def test_report_followups_use_only_the_current_visible_brief_document(monkeypatc
     filtered = assistant.answer(OperatorRequest(query="только AI", chat_id="42"))
     less_technical = assistant.answer(OperatorRequest(query="сделай менее техническим", chat_id="42"))
     apply = assistant.answer(OperatorRequest(query="что из этого применить?", chat_id="42"))
-    full = assistant.answer(OperatorRequest(query="покажи полный бриф", chat_id="42"))
+    navigation = initial.payload["telegram_navigation"]
+    full = assistant.answer(OperatorRequest(query=navigation["button_text"], chat_id="42"))
 
     assert initial.payload["brief_document_created"] is True
+    assert navigation == {
+        "kind": "reply_keyboard",
+        "button_text": "Показать полный бриф",
+        "current_visible_brief_only": True,
+        "brief_version": initial.payload["brief_document"]["previous_version"] or {
+            "brief_id": initial.payload["brief_document"]["brief_id"], "version": 1,
+        },
+    }
+    assert _brief_navigation_markup(initial.payload) == {
+        "keyboard": [[{"text": "Показать полный бриф"}]],
+        "resize_keyboard": True,
+        "one_time_keyboard": True,
+    }
     assert explained.payload["brief_followup"]["kind"] == "explain_item"
     assert "Пункт 2: Career item" in explained.text
     assert "https://t.me/example/career" in explained.text

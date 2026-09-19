@@ -273,14 +273,16 @@ def dispatch_prm_command(
         LOGGER.warning("PRM request failed")
         send_private_reply(f"Не смог обработать запрос: {type(exc).__name__}")
         return
-    action_bundle = _post_answer_action_bundle(
-        result.payload,
-        settings=settings,
-        chat_id=chat_id,
-        actor_id=actor_id,
-        owner_chat_id=owner_chat_id,
-    )
-    markup = action_bundle.get("reply_markup") if isinstance(action_bundle, Mapping) else None
+    markup = _brief_navigation_markup(result.payload)
+    if markup is None:
+        action_bundle = _post_answer_action_bundle(
+            result.payload,
+            settings=settings,
+            chat_id=chat_id,
+            actor_id=actor_id,
+            owner_chat_id=owner_chat_id,
+        )
+        markup = action_bundle.get("reply_markup") if isinstance(action_bundle, Mapping) else None
     _send_chunks(
         chat_id,
         result.text,
@@ -337,6 +339,28 @@ def _post_answer_markup(
 ) -> dict | None:
     bundle = _post_answer_action_bundle(payload, settings=settings, chat_id=chat_id)
     return bundle.get("reply_markup") if isinstance(bundle, Mapping) else None
+
+
+def _brief_navigation_markup(payload: Mapping[str, Any]) -> dict | None:
+    """Render PA-07's one-shot, non-callback full-brief navigation button.
+
+    This is a ReplyKeyboard text control, not a durable action or callback.
+    Its text is accepted only if the application still has the matching
+    current visible report in its bounded in-process store.
+    """
+
+    navigation = _mapping(payload.get("telegram_navigation"))
+    if (
+        navigation.get("kind") != "reply_keyboard"
+        or navigation.get("button_text") != "Показать полный бриф"
+        or navigation.get("current_visible_brief_only") is not True
+    ):
+        return None
+    return {
+        "keyboard": [[{"text": "Показать полный бриф"}]],
+        "resize_keyboard": True,
+        "one_time_keyboard": True,
+    }
 
 
 def _post_answer_action_bundle(

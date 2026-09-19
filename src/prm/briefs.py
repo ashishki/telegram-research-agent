@@ -22,6 +22,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 BRIEF_DOCUMENT_SCHEMA_VERSION = "assistant.brief_document.v1"
 BRIEF_INSPECTION_SCHEMA_VERSION = "prm_brief_inspection.v1"
 BRIEF_RETENTION = "ephemeral_current_visible_response_only"
+BRIEF_FULL_VIEW_BUTTON_TEXT = "Показать полный бриф"
 _MAX_BRIEFS = 64
 _MAX_HISTORY_REFS = 8
 _MAX_ITEMS = 20
@@ -626,7 +627,9 @@ def classify_brief_followup(text: str) -> BriefFollowup | None:
         return BriefFollowup("explain_item", item_number=int(item.group(1)))
     if lowered in {"сделай короче", "сократи", "shorten it", "make it shorter"}:
         return BriefFollowup("shorten")
-    if lowered in {"покажи полный бриф", "полный бриф", "подробный бриф", "show full brief"}:
+    if lowered in {
+        "покажи полный бриф", "показать полный бриф", "полный бриф", "подробный бриф", "show full brief",
+    }:
         return BriefFollowup("full")
     if (
         "менее техничес" in lowered
@@ -1462,9 +1465,9 @@ def _render_telegram(
     lines.extend(("", _coverage_line(document)))
     omitted = len(items) - shown
     if omitted and not full:
-        lines.append(f"Ещё {omitted} пункт(а): напиши «покажи полный бриф»." )
+        lines.append(f"Ещё {omitted} пункт(а): кнопка «{BRIEF_FULL_VIEW_BUTTON_TEXT}» откроет полный вид.")
     elif not full:
-        lines.append("Навигация: «поясни пункт 2», «сделай короче» или «покажи полный бриф».")
+        lines.append(f"Навигация: «поясни пункт 2», «сделай короче» или кнопка «{BRIEF_FULL_VIEW_BUTTON_TEXT}».")
     lines.append(f"Версия: {document.brief_id} v{document.version}")
     return "\n".join(lines).strip() if full else _bounded(lines)
 
