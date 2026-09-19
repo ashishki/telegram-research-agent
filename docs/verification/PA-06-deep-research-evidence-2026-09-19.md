@@ -3,7 +3,7 @@
 Date: 2026-09-19
 Branch: `docs/personal-assistant-blueprint-playbook-20260918`
 Implementation commits under review: `5b8b53b`, `3b5189b`, `cd47dde`,
-`4ae05a2`, `af24451`
+`4ae05a2`, `af24451`, `7740a3b`, `f9089ca2197205b3838bc10db92c5691c1fdb4a1`
 
 ## Scope and authority
 
@@ -25,6 +25,9 @@ historic STOP_SHIP artifact.
 - A finite `ResearchPlan` coordinates one local archive query, independently
   scoped public research tasks, an optional read-only GitHub identity read, and
   at most one local-only gap expansion.
+- `DeepResearchRequest` is the explicit active-application ingress that builds
+  that plan from the current request plus bounded archive/public/GitHub fields.
+  Plain chat does not construct it and therefore cannot become an agent loop.
 - Public and GitHub work consume sealed parent-side PA-02 scopes before the
   worker receives its start signal. Unknown tariff or exhausted cost budget
   prevents provider transport.
@@ -46,17 +49,22 @@ historic STOP_SHIP artifact.
   conditional project recommendations separate. A factual claim verifier plus
   a typed-category contract controls publication; failure renders only the
   established evidence-only fallback.
+- A requested project label is preserved only as `unverified_user_input` and
+  never appears in the recommendation statement. The recommendation is a
+  conditional suggestion tied to checked `repository@commit`, two cited facts
+  and human confirmation; it is not a verified local project descriptor.
 
 ## Focused verification
 
 Commands run against the working tree containing the registered PA-06 suite:
+Tested implementation SHA: `f9089ca2197205b3838bc10db92c5691c1fdb4a1`.
 
 ```text
 PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q tests/test_assistant_research.py
-# 19 passed in 4.32s
+# 20 passed in 3.55s
 
 TMPDIR=<mktemp> PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/test_tiers.py focused-prm
-# 383 passed in 102.94s
+# 384 passed in 142.86s
 ```
 
 The dedicated offline holdouts cover permitted-source aggregation, local-only
@@ -78,9 +86,12 @@ at `5b8b53b` (run `20260919T041940Z-slice_review-250eb5c4`), `3b5189b`
 (`20260919T071634Z-slice_review-ef4a9e48`). The last report's P1 was a plan
 being usable for a different inbound request; the request-fingerprint refusal
 and its initial/resume/application zero-call holdouts above remediate it. A
-fresh Terra/high recheck is still required on the corresponding commit. No
-human acceptance, release approval or live-runtime authorization is claimed by
-this receipt.
+second P1 found at `7740a3b` (run
+`20260919T072409Z-slice_review-4e47cf5b`) was missing active plan
+construction; `DeepResearchRequest` and the unverified-label restriction above
+remediate it. A fresh Terra/high recheck is still required on the corresponding
+commit. No human acceptance, release approval or live-runtime authorization is
+claimed by this receipt.
 
 Next command:
 
