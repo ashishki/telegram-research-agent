@@ -216,7 +216,7 @@ def test_telegram_dispatch_reuses_visible_brief_store_across_turns_and_denies_af
     chat_id = "987654321"
     settings = SimpleNamespace(db_path=":memory:")
     created = []
-    sent = []
+    sent: list[tuple[str, dict[str, object]]] = []
 
     class DispatchAssistant(PersonalResearchAssistant):
         def __init__(self, *args, **kwargs) -> None:
@@ -237,7 +237,7 @@ def test_telegram_dispatch_reuses_visible_brief_store_across_turns_and_denies_af
     monkeypatch.setattr(prm_handlers, "PersonalResearchAssistant", DispatchAssistant)
     monkeypatch.setattr("prm.application.answer_memory_research", lambda *args, **kwargs: fallback_payload)
     monkeypatch.setattr("prm.application.build_research_facade", lambda **kwargs: SimpleNamespace())
-    monkeypatch.setattr(prm_handlers, "_send_chunks", lambda _chat, text, **_kwargs: sent.append(text))
+    monkeypatch.setattr(prm_handlers, "_send_chunks", lambda _chat, text, **kwargs: sent.append((text, kwargs)))
     prm_handlers._PRM_BRIEF_STORES.clear()
 
     prm_handlers.dispatch_prm_command(
@@ -249,7 +249,9 @@ def test_telegram_dispatch_reuses_visible_brief_store_across_turns_and_denies_af
 
     assert len(created) == 2
     assert created[0].briefs is created[1].briefs
-    assert "Пункт 2: Career item" in sent[-1]
+    assert sent[0][1]["parse_mode"] == "HTML"
+    assert "<b>Короткий бриф</b>" in sent[0][0]
+    assert "Пункт 2: Career item" in sent[-1][0]
 
     visible_store = created[-1].briefs
     # A process restart loses only the bounded visible store. Conversation
@@ -260,5 +262,5 @@ def test_telegram_dispatch_reuses_visible_brief_store_across_turns_and_denies_af
     )
 
     assert created[-1].briefs is not visible_store
-    assert "Пункт 2: Career item" not in sent[-1]
+    assert "Пункт 2: Career item" not in sent[-1][0]
     prm_handlers._PRM_BRIEF_STORES.clear()

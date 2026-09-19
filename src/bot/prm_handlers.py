@@ -316,6 +316,7 @@ def dispatch_prm_command(
         chat_id,
         result.text,
         reply_markup=markup,
+        parse_mode=_brief_telegram_parse_mode(result.payload),
         actor_id=actor_id,
         owner_chat_id=owner_chat_id,
         delivery_authorizations=delivery_authorizations,
@@ -392,6 +393,12 @@ def _brief_navigation_markup(payload: Mapping[str, Any]) -> dict | None:
     }
 
 
+def _brief_telegram_parse_mode(payload: Mapping[str, Any]) -> str | None:
+    """Enable HTML only for the renderer that escaped its archive fields."""
+
+    return "HTML" if payload.get("telegram_parse_mode") == "HTML" else None
+
+
 def _post_answer_action_bundle(
     payload: Mapping[str, Any], *, settings: Settings, chat_id: str,
     actor_id: str | None = None, owner_chat_id: str | None = None,
@@ -463,6 +470,7 @@ def _send_chunks(
     text: str,
     *,
     reply_markup: dict | None,
+    parse_mode: str | None = None,
     actor_id: str | None = None,
     owner_chat_id: str | None = None,
     delivery_authorizations: Sequence[AuthorizationDecision] = (),
@@ -491,6 +499,7 @@ def _send_chunks(
             _token(),
             chat_id,
             chunk,
+            parse_mode=parse_mode,
             reply_markup=reply_markup if index == len(chunks) - 1 else None,
             delivery_authorization=decision,
             actor_id=actor_id,

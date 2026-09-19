@@ -14,6 +14,7 @@ from __future__ import annotations
 from assistant.prm_post_answer_actions import canonical_private_owner_id
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from html import escape as _html_escape
 import hashlib
 import json
 from pathlib import Path
@@ -716,6 +717,8 @@ def render_brief_document(
         return _render_telegram(document, document.items, short=False, topics=(), maximum_items=None, full=True)
     selected_topics = tuple(_topic(item) for item in topics if _topic(item))
     items = tuple(item for item in document.items if not selected_topics or set(selected_topics) & set(item.topics))
+    if view == "telegram":
+        return _render_telegram_card(document, items)
     return _render_telegram(document, items, short=view == "short", topics=selected_topics)
 
 
@@ -2067,6 +2070,121 @@ def _render_telegram(
         lines.append(f"Навигация: «поясни пункт 2», «сделай короче» или кнопка «{BRIEF_FULL_VIEW_BUTTON_TEXT}».")
     lines.append(f"Версия: {document.brief_id} v{document.version}")
     return "\n".join(lines).strip() if full else _bounded(lines)
+
+
+def _render_telegram_card(document: BriefDocument, items: Sequence[BriefItem]) -> str:
+    """Render PA-07's small, safe Telegram-native HTML card.
+
+    This is Telegram parse-mode markup, not a PA-08 HTML document.  The first
+    card deliberately shows only the decision-relevant layer; the immutable
+    full view remains the inspectable place for exact source/version details.
+    All archive-derived text is escaped before it reaches Telegram HTML.
+    """
+
+    lines = [
+        "🗞 <b>Короткий бриф</b>",
+        f"<b>{_telegram_html(document.topic, 88)}</b>",
+        f"<i>{_telegram_html(_period_label(document.window), 72)} · {_telegram_html(document.window.timezone, 64)}</i>",
+    ]
+    if not items:
+        lines.append("")
+        if document.status == "empty" and document.coverage_manifest.complete:
+            lines.append("В проверенной области важных изменений не найдено.")
+        else:
+            lines.append("В доступной локальной выборке нет пунктов; это не вывод за весь период.")
+        lines.extend(("", _telegram_card_coverage_line(document), "Открой полный бриф: там период, покрытие и основания отбора."))
+        return "\n".join(lines)
+
+    evidence = document.evidence_by_ref()
+    shown = 0
+    for section in document.sections:
+        contained = [item for item in section.items if item in items]
+        if not contained:
+            continue
+        section_added = False
+        for item in contained:
+            if shown >= 2:
+                break
+            if not section_added:
+                lines.extend(("", f"<b>{_telegram_html(section.title, 80)}</b>"))
+                section_added = True
+            shown += 1
+            source = evidence[item.evidence_refs[0]]
+            lines.extend(
+                (
+                    f"{_telegram_number(shown)} <b>{_telegram_html(item.title, 96)}</b>",
+                    _telegram_html(_short(item.summary, 220), 220),
+                    f"{_telegram_card_priority(item)} · {_telegram_card_source_link(source.source_ref)}",
+                )
+            )
+            if item.conflict_groups:
+                lines.append("⚠️ В источниках есть расхождение — сверить в полном брифе.")
+        if shown >= 2:
+            break
+
+    lines.extend(("", _telegram_card_coverage_line(document)))
+    omitted = len(items) - shown
+    if omitted:
+        lines.append(f"Ещё {_telegram_item_count(omitted)} — в полном брифе.")
+    lines.append(
+        f"<i>Открой «{BRIEF_FULL_VIEW_BUTTON_TEXT}»: все источники, детали периода, отбор и версия.</i>"
+    )
+    return "\n".join(lines)
+
+
+def _telegram_html(value: str, limit: int) -> str:
+    """Escape an archive-derived value for Telegram's constrained HTML mode."""
+
+    return _html_escape(_short(value, limit), quote=True)
+
+
+def _telegram_number(number: int) -> str:
+    return {1: "①", 2: "②"}.get(number, f"{number}.")
+
+
+def _telegram_card_priority(item: BriefItem) -> str:
+    importance = {
+        "critical": "Важность: критично",
+        "high": "Важность: важно",
+        "medium": "Важность: полезно",
+        "low": "Важность: контекст",
+        "unknown": "Важность: не отмечена",
+    }[item.importance]
+    urgency = {
+        "urgent": "срочно",
+        "soon": "скоро",
+        "not_marked": "без срока",
+        "unknown": "срок не указан",
+    }[item.urgency]
+    return f"{importance} · Срочность: {urgency}"
+
+
+def _telegram_card_source_link(source_ref: str) -> str:
+    """Keep the card compact while preserving a safe direct source link."""
+
+    if len(source_ref) > 240:
+        return "Источник — в полном брифе"
+    return f'<a href="{_html_escape(source_ref, quote=True)}">Открыть источник</a>'
+
+
+def _telegram_card_coverage_line(document: BriefDocument) -> str:
+    checked = sum(source.state == "checked" for source in document.coverage_manifest.sources)
+    total = len(document.coverage_manifest.sources)
+    if document.coverage_manifest.complete:
+        return f"✓ Покрытие: проверено {checked} из {total} источников."
+    return "◌ Покрытие частичное — вывод только по доступной выборке."
+
+
+def _telegram_item_count(count: int) -> str:
+    """Use a readable Russian noun form instead of UI-style parentheses."""
+
+    if count % 10 == 1 and count % 100 != 11:
+        suffix = "пункт"
+    elif count % 10 in {2, 3, 4} and count % 100 not in {12, 13, 14}:
+        suffix = "пункта"
+    else:
+        suffix = "пунктов"
+    return f"{count} {suffix}"
 
 
 def _render_item(document: BriefDocument, item_number: int | None) -> str:

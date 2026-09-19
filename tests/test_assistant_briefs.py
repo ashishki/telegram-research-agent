@@ -153,8 +153,39 @@ def test_brief_views_are_source_backed_and_empty_claim_depends_on_coverage() -> 
     assert "не вывод за весь период" in partial_text
     assert "важных изменений не найдено" not in partial_text
     rendered = render_brief_document(populated)
-    assert "https://t.me/example/1" in rendered
-    assert "важность: high; срочность" in rendered
+    assert "<b>Короткий бриф</b>" in rendered
+    assert '<a href="https://t.me/example/1">Открыть источник</a>' in rendered
+    assert "Важность: важно · Срочность: без срока" in rendered
+    assert "Версия:" not in rendered
+    assert len(rendered) <= 2400
+
+
+def test_telegram_card_is_compact_html_and_escapes_archive_derived_content() -> None:
+    document = build_brief_document(
+        BriefBuildRequest(
+            topic="AI <weekly>",
+            window=_window(),
+            coverage=(CoverageSource("telegram:archive", "checked"),),
+            evidence=(
+                _evidence(
+                    "html",
+                    "https://t.me/example/html?one=1&two=2",
+                    title="<b>Not markup</b>",
+                    summary="Archive says <tag> & keeps the characters visible.",
+                ),
+            ),
+        )
+    )
+
+    rendered = render_brief_document(document)
+
+    assert "<b>Короткий бриф</b>" in rendered
+    assert "&lt;weekly&gt;" in rendered
+    assert "&lt;b&gt;Not markup&lt;/b&gt;" in rendered
+    assert "&lt;tag&gt; &amp; keeps the characters visible." in rendered
+    assert 'href="https://t.me/example/html?one=1&amp;two=2"' in rendered
+    assert "Покрытие: проверено" in rendered
+    assert "Версия:" not in rendered
     assert len(rendered) <= 2400
 
 

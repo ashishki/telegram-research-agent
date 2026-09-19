@@ -619,6 +619,9 @@ class PersonalResearchAssistant:
                 "brief_document": document.to_dict(),
                 "brief_inspection": document.inspect(),
                 "brief_view": "telegram",
+                # Only the compact card is Telegram-native HTML. The source
+                # object and every inspectable/full view remain ordinary text.
+                "telegram_parse_mode": "HTML",
                 "brief_document_created": True,
                 # A direct BriefBuildRequest is a zero-retrieval seam. The
                 # normal active /brief route calls local retrieval first and
