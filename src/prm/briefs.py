@@ -2101,7 +2101,7 @@ def _render_telegram_card(document: BriefDocument, items: Sequence[BriefItem]) -
         lines.extend(
             (
                 "",
-                "⚪ <b>В доступной выборке нет оценённых приоритетов.</b>",
+                "⚪ <b>Среди найденных материалов нет оценённых приоритетов.</b>",
                 "Не называю случайные архивные материалы «главным».",
                 _telegram_card_coverage_line(document),
                 f"<i>Открой «{BRIEF_FULL_VIEW_BUTTON_TEXT}», чтобы посмотреть тематическую подборку и источники.</i>",
@@ -2141,7 +2141,7 @@ def _render_telegram_card(document: BriefDocument, items: Sequence[BriefItem]) -
     if omitted:
         lines.append(f"Ещё {_telegram_item_count(omitted)} — в полном брифе.")
     lines.append(
-        f"<i>Открой «{BRIEF_FULL_VIEW_BUTTON_TEXT}»: все источники, детали периода и покрытие.</i>"
+        f"<i>Открой «{BRIEF_FULL_VIEW_BUTTON_TEXT}»: остальные материалы и источники.</i>"
     )
     return "\n".join(lines)
 
@@ -2187,15 +2187,16 @@ def _render_telegram_full_card(document: BriefDocument) -> str:
         for item in section.items:
             index += 1
             source = evidence[item.evidence_refs[0]]
-            lines.extend(
-                (
-                    f"{index}. <b>{_telegram_html(item.title, 112)}</b>",
-                    _telegram_html(_short(item.summary, 160), 160),
-                    *_telegram_why_it_matters(item),
-                    f"{_telegram_card_priority(item)} · {_telegram_card_source_link(source.source_ref)}",
-                    f"<i>{_telegram_human_time_label(source)}</i>",
-                )
-            )
+            item_lines = [
+                f"{index}. <b>{_telegram_html(item.title, 112)}</b>",
+                _telegram_html(_short(item.summary, 160), 160),
+                *_telegram_why_it_matters(item),
+                f"{_telegram_card_priority(item)} · {_telegram_card_source_link(source.source_ref)}",
+            ]
+            temporal_note = _telegram_human_time_label(source)
+            if temporal_note:
+                item_lines.append(f"<i>{temporal_note}</i>")
+            lines.extend(item_lines)
             if item.conflict_groups:
                 lines.append("⚠️ В источниках есть расхождение — вывод не объединён автоматически.")
 
@@ -2262,7 +2263,9 @@ def _telegram_full_section_title(section_id: str, title: str) -> str:
     return _telegram_html(title, 80)
 
 
-def _telegram_human_time_label(source: BriefEvidence) -> str:
+def _telegram_human_time_label(source: BriefEvidence) -> str | None:
+    if source.period_relation == "published_in_window" and source.source_state == "active":
+        return None
     relation = {
         "event_in_window": "Событие относится к выбранному периоду",
         "published_in_window": "Опубликовано в выбранный период",
@@ -2298,8 +2301,8 @@ def _telegram_card_coverage_line(document: BriefDocument) -> str:
     checked = sum(source.state == "checked" for source in document.coverage_manifest.sources)
     total = len(document.coverage_manifest.sources)
     if document.coverage_manifest.complete:
-        return f"✓ Покрытие: проверено {checked} из {total} источников."
-    return "◌ Покрытие частичное — вывод только по доступной выборке."
+        return f"✓ Проверено {checked} из {total} источников."
+    return "◌ Это не полный обзор недели: показаны только найденные материалы."
 
 
 def _telegram_item_count(count: int) -> str:
