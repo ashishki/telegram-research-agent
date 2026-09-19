@@ -336,3 +336,29 @@ private Telegram/mobile visual inspection or owner content-acceptance receipt
 exists. It blocks PA-07 acceptance/release, not this owner-authorized local
 implementation or the next independent local slice. No live service, account,
 credential, timer, job, migration or deployment was started.
+
+## Final scoped recheck
+
+Validated fresh run `20260919T171533Z-slice_review-6f46ea2a` reviewed HEAD
+`065033cc1737c07ee0255123756ffb393b466618` (the code checkpoint is
+`55877b0`; the HEAD-only difference is this handoff/evidence record). It
+recorded requested and observed `gpt-5.6-terra` / `high`; its read-only
+postflight confirmed that the reviewer made no workspace changes. Report
+SHA-256: `ebda1be866b4cc43dd40759c2a833235cd60c47b0dcae220924aac28abc8ba55`.
+
+The reviewer found the immutable report, exact-version owner access, source
+accounting, bounded history and object-bound no-search follow-ups vertically
+coherent. It also confirmed the 19 changed programme files are inside PA-07's
+declared paths and budget. Pin, plan consistency and `git diff --check` passed
+in its fresh environment. Its pytest collection could not create a temporary
+directory under the read-only runner, so the writable-workspace receipts above
+remain the executable test evidence.
+
+The verdict remains **STOP_SHIP only for acceptance/release**: authorized
+actual provider/runtime use, private Telegram/mobile visual inspection and an
+owner-reviewed generated brief are still absent. This reviewer creates no new
+local code/documentation P0/P1 correction. Do not start a service or repeat
+offline review to turn that external gate into a pass. The next safe local
+implementation slice is PA-08's source-preserving private report views and
+exports; it requires its own scoped tests/review and does not imply acceptance
+of PA-07 or authorization of a web/export runtime.
