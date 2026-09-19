@@ -1,9 +1,11 @@
 """Immutable local-archive briefs and their bounded conversational views.
 
-PA-07 deliberately keeps a brief in process memory.  A ``BriefDocument`` is
-the one source object for its compact Telegram rendering and every supported
-follow-up; a follow-up never asks the archive retriever to find new material.
-There is no database, job, delivery, export, provider call, or restart
+``BriefDocument`` is the one source object for its compact Telegram rendering
+and every supported follow-up; a follow-up never asks the archive retriever to
+find new material.  The current visible-response binding is deliberately
+ephemeral.  Its immutable versions may also be retained in the local database
+under an exact owner/id/version key for a future authorized report reader.
+There is no job, delivery, export, provider call, or restart follow-up
 recovery in this module.
 """
 
@@ -13,7 +15,9 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import hashlib
 import json
+from pathlib import Path
 import re
+import sqlite3
 from threading import RLock
 from typing import Any, Literal, Mapping, Sequence
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -21,12 +25,14 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 BRIEF_DOCUMENT_SCHEMA_VERSION = "assistant.brief_document.v1"
 BRIEF_INSPECTION_SCHEMA_VERSION = "prm_brief_inspection.v1"
-BRIEF_RETENTION = "ephemeral_current_visible_response_only"
+BRIEF_RETENTION = "owner_scoped_durable_version_history_with_ephemeral_visible_binding"
 BRIEF_FULL_VIEW_BUTTON_TEXT = "Показать полный бриф"
 _MAX_BRIEFS = 64
 _MAX_HISTORY_REFS = 8
+_MAX_PERSISTED_HISTORY_REFS = 64
 _MAX_ITEMS = 20
 _MAX_TELEGRAM_CHARS = 2_400
+_BRIEF_STORAGE_SCHEMA_VERSION = "prm_brief_document_storage.v1"
 _BRIEF_ID = re.compile(r"^brief_[a-z0-9_-]{3,120}$")
 _OWNER_REF = re.compile(r"^owner_[a-z0-9_-]{3,120}$")
 _EVIDENCE_REF = re.compile(r"^evidence_[a-z0-9_-]{3,120}$")
@@ -680,14 +686,322 @@ def render_brief_document(
     return _render_telegram(document, items, short=view == "short", topics=selected_topics)
 
 
-class BriefDocumentStore:
-    """Small process-local store reachable only through a visible response."""
+_BRIEF_DOCUMENT_TABLE = "assistant_brief_documents"
 
-    def __init__(self) -> None:
+
+def _storage_document(document: BriefDocument) -> dict[str, object]:
+    """Encode every rendering-relevant field without serializing a corpus."""
+
+    def timestamp(value: datetime | None) -> str | None:
+        return _iso(value) if value is not None else None
+
+    return {
+        "schema_version": _BRIEF_STORAGE_SCHEMA_VERSION,
+        "brief_id": document.brief_id,
+        "version": document.version,
+        "owner_ref": document.owner_ref,
+        "topic": document.topic,
+        "window": document.window.to_dict(),
+        "status": document.status,
+        "sections": [
+            {
+                "section_id": section.section_id,
+                "title": section.title,
+                "items": [
+                    {
+                        "item_id": item.item_id,
+                        "title": item.title,
+                        "summary": item.summary,
+                        "evidence_refs": list(item.evidence_refs),
+                        "selection_reasons": list(item.selection_reasons),
+                        "topics": list(item.topics),
+                        "importance": item.importance,
+                        "urgency": item.urgency,
+                        "conflict_groups": list(item.conflict_groups),
+                        "project_refs": list(item.project_refs),
+                    }
+                    for item in section.items
+                ],
+            }
+            for section in document.sections
+        ],
+        "evidence": [
+            {
+                "evidence_ref": item.evidence_ref,
+                "source_ref": item.source_ref,
+                "source_family_ref": item.source_family_ref,
+                "title": item.title,
+                "summary": item.summary,
+                "observed_at": _iso(item.observed_at),
+                "time_kind": item.time_kind,
+                "topics": list(item.topics),
+                "importance": item.importance,
+                "urgency": item.urgency,
+                "selection_reasons": list(item.selection_reasons),
+                "factual_snapshot_digest": item.factual_snapshot_digest,
+                "project_refs": list(item.project_refs),
+                "conflict_group": item.conflict_group,
+                "conflict_value": item.conflict_value,
+                "published_at": timestamp(item.published_at),
+                "event_at": timestamp(item.event_at),
+                "first_discovered_at": timestamp(item.first_discovered_at),
+                "updated_at": timestamp(item.updated_at),
+                "deleted_at": timestamp(item.deleted_at),
+                "reissued_at": timestamp(item.reissued_at),
+                "source_state": item.source_state,
+                "period_relation": item.period_relation,
+                "source_version": item.source_version,
+            }
+            for item in document.evidence
+        ],
+        "selection_reasons": list(document.selection_reasons),
+        "previous_version": _storage_version_ref(document.previous_version),
+        "comparison_ref": _storage_version_ref(document.comparison_ref),
+        "coverage_manifest": document.coverage_manifest.to_dict(),
+        "content_digest": document.content_digest,
+        "deduplication": [item.to_dict() for item in document.deduplication],
+        "conflicts": [item.to_dict() for item in document.conflicts],
+        "period_basis": document.period_basis,
+    }
+
+
+def _storage_version_ref(value: BriefVersionRef | None) -> dict[str, object] | None:
+    return value.to_dict() if value is not None else None
+
+
+def _stored_mapping(value: object, *, field: str) -> Mapping[str, object]:
+    if not isinstance(value, Mapping):
+        raise ValueError(f"stored brief {field} is invalid")
+    return value
+
+
+def _stored_text(value: object, *, field: str, limit: int, required: bool = True) -> str | None:
+    if value is None and not required:
+        return None
+    if not isinstance(value, str):
+        raise ValueError(f"stored brief {field} is invalid")
+    result = _clean(value, limit, required=required)
+    if result is None:
+        raise ValueError(f"stored brief {field} is invalid")
+    return result
+
+
+def _stored_string_tuple(value: object, *, field: str, limit: int) -> tuple[str, ...]:
+    if not isinstance(value, list) or len(value) > limit or any(not isinstance(item, str) for item in value):
+        raise ValueError(f"stored brief {field} is invalid")
+    return tuple(value)
+
+
+def _stored_int(value: object, *, field: str, minimum: int = 1) -> int:
+    if type(value) is not int or value < minimum:
+        raise ValueError(f"stored brief {field} is invalid")
+    return value
+
+
+def _stored_timestamp(
+    value: object,
+    *,
+    field: str,
+    timezone_name: str,
+    required: bool = True,
+) -> datetime | None:
+    if value is None and not required:
+        return None
+    result = _parse_timestamp(value, timezone_name=timezone_name)
+    if result is None:
+        raise ValueError(f"stored brief {field} is invalid")
+    return result
+
+
+def _stored_version_ref(value: object, *, field: str) -> BriefVersionRef | None:
+    if value is None:
+        return None
+    payload = _stored_mapping(value, field=field)
+    return BriefVersionRef(
+        str(_stored_text(payload.get("brief_id"), field=f"{field}.brief_id", limit=128)),
+        _stored_int(payload.get("version"), field=f"{field}.version"),
+    )
+
+
+def _stored_document(payload: object) -> BriefDocument:
+    """Decode one stored version and fail closed on malformed or altered data."""
+
+    data = _stored_mapping(payload, field="document")
+    if data.get("schema_version") != _BRIEF_STORAGE_SCHEMA_VERSION:
+        raise ValueError("stored brief schema is unsupported")
+    window_data = _stored_mapping(data.get("window"), field="window")
+    timezone_name = str(_stored_text(window_data.get("timezone"), field="window.timezone", limit=80))
+    window = BriefWindow.from_iso(
+        timezone_name=timezone_name,
+        start_at=str(_stored_text(window_data.get("start_at"), field="window.start_at", limit=64)),
+        end_at=str(_stored_text(window_data.get("end_at"), field="window.end_at", limit=64)),
+        generated_at=str(_stored_text(window_data.get("generated_at"), field="window.generated_at", limit=64)),
+    )
+
+    evidence_rows = data.get("evidence")
+    if not isinstance(evidence_rows, list) or len(evidence_rows) > _MAX_ITEMS:
+        raise ValueError("stored brief evidence is invalid")
+    evidence: list[BriefEvidence] = []
+    for index, row in enumerate(evidence_rows):
+        item = _stored_mapping(row, field=f"evidence[{index}]")
+        evidence.append(
+            BriefEvidence(
+                evidence_ref=str(_stored_text(item.get("evidence_ref"), field="evidence_ref", limit=128)),
+                source_ref=str(_stored_text(item.get("source_ref"), field="source_ref", limit=512)),
+                source_family_ref=str(_stored_text(item.get("source_family_ref"), field="source_family_ref", limit=512)),
+                title=str(_stored_text(item.get("title"), field="evidence.title", limit=240)),
+                summary=str(_stored_text(item.get("summary"), field="evidence.summary", limit=400)),
+                observed_at=_stored_timestamp(item.get("observed_at"), field="observed_at", timezone_name=timezone_name),
+                time_kind=str(_stored_text(item.get("time_kind"), field="time_kind", limit=16)),  # type: ignore[arg-type]
+                topics=_stored_string_tuple(item.get("topics"), field="evidence.topics", limit=8),
+                importance=str(_stored_text(item.get("importance"), field="importance", limit=16)),  # type: ignore[arg-type]
+                urgency=str(_stored_text(item.get("urgency"), field="urgency", limit=16)),  # type: ignore[arg-type]
+                selection_reasons=_stored_string_tuple(item.get("selection_reasons"), field="evidence.reasons", limit=10),
+                factual_snapshot_digest=str(_stored_text(item.get("factual_snapshot_digest"), field="factual_snapshot_digest", limit=80)),
+                project_refs=_stored_string_tuple(item.get("project_refs"), field="project_refs", limit=8),
+                conflict_group=_stored_text(item.get("conflict_group"), field="conflict_group", limit=120, required=False),
+                conflict_value=_stored_text(item.get("conflict_value"), field="conflict_value", limit=240, required=False),
+                published_at=_stored_timestamp(item.get("published_at"), field="published_at", timezone_name=timezone_name, required=False),
+                event_at=_stored_timestamp(item.get("event_at"), field="event_at", timezone_name=timezone_name, required=False),
+                first_discovered_at=_stored_timestamp(item.get("first_discovered_at"), field="first_discovered_at", timezone_name=timezone_name, required=False),
+                updated_at=_stored_timestamp(item.get("updated_at"), field="updated_at", timezone_name=timezone_name, required=False),
+                deleted_at=_stored_timestamp(item.get("deleted_at"), field="deleted_at", timezone_name=timezone_name, required=False),
+                reissued_at=_stored_timestamp(item.get("reissued_at"), field="reissued_at", timezone_name=timezone_name, required=False),
+                source_state=str(_stored_text(item.get("source_state"), field="source_state", limit=16)),
+                period_relation=str(_stored_text(item.get("period_relation"), field="period_relation", limit=40)),
+                source_version=str(_stored_text(item.get("source_version"), field="source_version", limit=120, required=False)),
+            )
+        )
+
+    section_rows = data.get("sections")
+    if not isinstance(section_rows, list) or len(section_rows) > 20:
+        raise ValueError("stored brief sections are invalid")
+    sections: list[BriefSection] = []
+    for section_index, row in enumerate(section_rows):
+        section = _stored_mapping(row, field=f"sections[{section_index}]")
+        item_rows = section.get("items")
+        if not isinstance(item_rows, list) or len(item_rows) > 100:
+            raise ValueError("stored brief section items are invalid")
+        items: list[BriefItem] = []
+        for item_index, item_row in enumerate(item_rows):
+            item = _stored_mapping(item_row, field=f"sections[{section_index}].items[{item_index}]")
+            topics = _stored_string_tuple(item.get("topics"), field="item.topics", limit=8)
+            conflict_groups = _stored_string_tuple(item.get("conflict_groups"), field="item.conflict_groups", limit=8)
+            if any(_clean(value, 120, required=True) is None for value in conflict_groups) or any(
+                not _SAFE_TOPIC.fullmatch(value) for value in topics
+            ):
+                raise ValueError("stored brief item metadata is invalid")
+            items.append(
+                BriefItem(
+                    item_id=str(_stored_text(item.get("item_id"), field="item_id", limit=128)),
+                    title=str(_stored_text(item.get("title"), field="item.title", limit=240)),
+                    summary=str(_stored_text(item.get("summary"), field="item.summary", limit=400)),
+                    evidence_refs=_stored_string_tuple(item.get("evidence_refs"), field="item.evidence_refs", limit=20),
+                    selection_reasons=_stored_string_tuple(item.get("selection_reasons"), field="item.reasons", limit=10),
+                    topics=topics,
+                    importance=str(_stored_text(item.get("importance"), field="item.importance", limit=16)),  # type: ignore[arg-type]
+                    urgency=str(_stored_text(item.get("urgency"), field="item.urgency", limit=16)),  # type: ignore[arg-type]
+                    conflict_groups=conflict_groups,
+                    project_refs=_stored_string_tuple(item.get("project_refs"), field="item.project_refs", limit=8),
+                )
+            )
+        sections.append(
+            BriefSection(
+                section_id=str(_stored_text(section.get("section_id"), field="section_id", limit=80)),
+                title=str(_stored_text(section.get("title"), field="section.title", limit=200)),
+                items=tuple(items),
+            )
+        )
+
+    coverage_data = _stored_mapping(data.get("coverage_manifest"), field="coverage_manifest")
+    source_rows = coverage_data.get("sources")
+    if not isinstance(source_rows, list):
+        raise ValueError("stored brief coverage sources are invalid")
+    coverage = CoverageManifest(
+        tuple(
+            CoverageSource(
+                source_ref=str(_stored_text(_stored_mapping(row, field="coverage.source").get("source_ref"), field="coverage.source_ref", limit=512)),
+                state=str(_stored_text(_stored_mapping(row, field="coverage.source").get("state"), field="coverage.state", limit=16)),  # type: ignore[arg-type]
+                reason=_stored_text(_stored_mapping(row, field="coverage.source").get("reason"), field="coverage.reason", limit=240, required=False),
+            )
+            for row in source_rows
+        ),
+        _stored_string_tuple(coverage_data.get("limitations"), field="coverage.limitations", limit=32),
+    )
+
+    deduplication_rows = data.get("deduplication")
+    conflict_rows = data.get("conflicts")
+    if not isinstance(deduplication_rows, list) or not isinstance(conflict_rows, list):
+        raise ValueError("stored brief inspection records are invalid")
+    deduplication = tuple(
+        _stored_deduplication(row, index=index) for index, row in enumerate(deduplication_rows)
+    )
+    conflicts = tuple(_stored_conflict(row, index=index) for index, row in enumerate(conflict_rows))
+    document = BriefDocument(
+        brief_id=str(_stored_text(data.get("brief_id"), field="brief_id", limit=128)),
+        version=_stored_int(data.get("version"), field="version"),
+        owner_ref=str(_stored_text(data.get("owner_ref"), field="owner_ref", limit=128)),
+        topic=str(_stored_text(data.get("topic"), field="topic", limit=160)),
+        window=window,
+        status=str(_stored_text(data.get("status"), field="status", limit=16)),  # type: ignore[arg-type]
+        sections=tuple(sections),
+        evidence=tuple(evidence),
+        selection_reasons=_stored_string_tuple(data.get("selection_reasons"), field="selection_reasons", limit=32),
+        previous_version=_stored_version_ref(data.get("previous_version"), field="previous_version"),
+        coverage_manifest=coverage,
+        content_digest=str(_stored_text(data.get("content_digest"), field="content_digest", limit=80)),
+        deduplication=deduplication,
+        conflicts=conflicts,
+        comparison_ref=_stored_version_ref(data.get("comparison_ref"), field="comparison_ref"),
+        period_basis=str(_stored_text(data.get("period_basis"), field="period_basis", limit=120)),
+    )
+    expected_digest = _content_digest(
+        topic=document.topic,
+        window=document.window,
+        evidence=document.evidence,
+        coverage=document.coverage_manifest,
+        deduplication=document.deduplication,
+        conflicts=document.conflicts,
+        period_basis=document.period_basis,
+    )
+    expected_sections = _sections(
+        document.evidence,
+        {reference for conflict in document.conflicts for reference in conflict.evidence_refs},
+    )
+    if document.content_digest != expected_digest or document.sections != expected_sections:
+        raise ValueError("stored brief content identity is invalid")
+    return document
+
+
+def _stored_deduplication(value: object, *, index: int) -> DeduplicationRecord:
+    item = _stored_mapping(value, field=f"deduplication[{index}]")
+    kept = str(_stored_text(item.get("kept_evidence_ref"), field="deduplication.kept", limit=128))
+    dropped = _stored_string_tuple(item.get("dropped_evidence_refs"), field="deduplication.dropped", limit=_MAX_ITEMS)
+    key = str(_stored_text(item.get("key"), field="deduplication.key", limit=512))
+    reason = str(_stored_text(item.get("reason"), field="deduplication.reason", limit=120))
+    if not _EVIDENCE_REF.fullmatch(kept) or not dropped or any(not _EVIDENCE_REF.fullmatch(ref) for ref in dropped):
+        raise ValueError("stored brief deduplication is invalid")
+    return DeduplicationRecord(kept, dropped, key, reason)
+
+
+def _stored_conflict(value: object, *, index: int) -> ConflictRecord:
+    item = _stored_mapping(value, field=f"conflicts[{index}]")
+    group = str(_stored_text(item.get("group"), field="conflict.group", limit=120))
+    refs = _stored_string_tuple(item.get("evidence_refs"), field="conflict.refs", limit=_MAX_ITEMS)
+    values = _stored_string_tuple(item.get("values"), field="conflict.values", limit=_MAX_ITEMS)
+    if not refs or not values or any(not _EVIDENCE_REF.fullmatch(ref) for ref in refs):
+        raise ValueError("stored brief conflict is invalid")
+    return ConflictRecord(group, refs, values)
+
+
+class BriefDocumentStore:
+    """Ephemeral visible bindings plus bounded immutable local report history."""
+
+    def __init__(self, *, db_path: str | None = None) -> None:
         self._documents: dict[tuple[str, str, int], BriefDocument] = {}
         # response_ref, current document, optional comparison baseline, and a
         # bounded exact-version history. The history is scoped to one active
-        # conversation; it is not a cross-chat catalogue or durable archive.
+        # conversation; it is not a cross-chat catalogue.
         self._bindings: dict[
             str,
             tuple[
@@ -697,9 +1011,12 @@ class BriefDocumentStore:
                 tuple[tuple[str, str, int], ...],
             ],
         ] = {}
+        self._db_path = None if not db_path or str(db_path) == ":memory:" else Path(str(db_path)).resolve()
         self._lock = RLock()
 
     def clear(self) -> None:
+        """Clear only ephemeral visible bindings; retained history is unchanged."""
+
         with self._lock:
             self._documents.clear()
             self._bindings.clear()
@@ -716,6 +1033,11 @@ class BriefDocumentStore:
             raise ValueError("brief visibility binding is invalid")
         if comparison_document is not None and type(comparison_document) is not BriefDocument:
             raise ValueError("brief comparison binding is invalid")
+        if comparison_document is not None and comparison_document.owner_ref != document.owner_ref:
+            raise ValueError("brief comparison binding crosses owner scope")
+        self._persist_document(document)
+        if comparison_document is not None:
+            self._persist_document(comparison_document)
         with self._lock:
             key = (conversation_id, document.brief_id, document.version)
             comparison_key = (
@@ -765,12 +1087,101 @@ class BriefDocumentStore:
             return document, self._documents.get(binding[2]) if binding[2] is not None else None
 
     def forget_conversation(self, conversation_id: str) -> None:
+        """Remove only the current dialogue binding, never immutable history."""
+
         with self._lock:
             binding = self._bindings.pop(conversation_id, None)
             if binding is None:
                 return
             for key in binding[3]:
                 self._documents.pop(key, None)
+
+    def get_persisted_document(
+        self,
+        *,
+        owner_ref: str,
+        brief_id: str,
+        version: int,
+    ) -> BriefDocument | None:
+        """Load one owner-scoped immutable version; no topic/latest fallback."""
+
+        if not _OWNER_REF.fullmatch(owner_ref) or not _BRIEF_ID.fullmatch(brief_id) or type(version) is not int or version < 1:
+            return None
+        connection = self._storage_connection()
+        if connection is None:
+            return None
+        try:
+            row = connection.execute(
+                """
+                SELECT content_digest, document_json
+                FROM assistant_brief_documents
+                WHERE owner_ref = ? AND brief_id = ? AND version = ?
+                """,
+                (owner_ref, brief_id, version),
+            ).fetchone()
+        except sqlite3.Error:
+            return None
+        finally:
+            connection.close()
+        if row is None:
+            return None
+        try:
+            stored_digest, document_json = row
+            payload = json.loads(str(document_json))
+            document = _stored_document(payload)
+            if (
+                document.owner_ref != owner_ref
+                or document.brief_id != brief_id
+                or document.version != version
+                or document.content_digest != stored_digest
+            ):
+                return None
+            return document
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return None
+
+    def list_persisted_versions(self, *, owner_ref: str, brief_id: str) -> tuple[BriefVersionRef, ...]:
+        """List at most the owner-scoped retained versions in chronological order."""
+
+        if not _OWNER_REF.fullmatch(owner_ref) or not _BRIEF_ID.fullmatch(brief_id):
+            return ()
+        connection = self._storage_connection()
+        if connection is None:
+            return ()
+        try:
+            rows = connection.execute(
+                """
+                SELECT version
+                FROM assistant_brief_documents
+                WHERE owner_ref = ? AND brief_id = ?
+                ORDER BY version DESC
+                LIMIT ?
+                """,
+                (owner_ref, brief_id, _MAX_PERSISTED_HISTORY_REFS),
+            ).fetchall()
+        except sqlite3.Error:
+            return ()
+        finally:
+            connection.close()
+        return tuple(BriefVersionRef(brief_id, int(row[0])) for row in reversed(rows) if type(row[0]) is int and row[0] >= 1)
+
+    def forget_owner(self, owner_ref: str) -> None:
+        """Delete one owner's retained documents and their ephemeral projections."""
+
+        if not _OWNER_REF.fullmatch(owner_ref):
+            raise ValueError("brief owner is invalid")
+        connection = self._storage_connection()
+        if connection is not None:
+            try:
+                connection.execute("DELETE FROM assistant_brief_documents WHERE owner_ref = ?", (owner_ref,))
+                connection.commit()
+            finally:
+                connection.close()
+        with self._lock:
+            for key, document in tuple(self._documents.items()):
+                if document.owner_ref == owner_ref:
+                    self._documents.pop(key, None)
+                    self._drop_history_key(key)
 
     def render_brief(
         self,
@@ -779,25 +1190,110 @@ class BriefDocumentStore:
         view: str,
         *,
         conversation_id: str | None = None,
+        owner_ref: str | None = None,
         **kwargs: object,
     ) -> str | None:
-        with self._lock:
-            if not conversation_id:
-                return None
-            binding = self._bindings.get(conversation_id)
-            if binding is None:
-                return None
-            key = (conversation_id, brief_id, version)
-            if key not in binding[3]:
-                return None
-            document = self._documents.get(key)
-        # Exact version identity plus the current authenticated conversation is
-        # required. There is intentionally no global/latest report lookup.
+        document: BriefDocument | None
+        if conversation_id:
+            with self._lock:
+                binding = self._bindings.get(conversation_id)
+                if binding is None:
+                    return None
+                key = (conversation_id, brief_id, version)
+                if key not in binding[3]:
+                    return None
+                document = self._documents.get(key)
+        elif owner_ref:
+            document = self.get_persisted_document(owner_ref=owner_ref, brief_id=brief_id, version=version)
+        else:
+            return None
+        # Either an exact current visible version or an exact authenticated
+        # owner/history key is required. There is no global/latest lookup.
         if document is None:
             return None
         if view not in {"telegram", "short", "item", "topics", "comparison", "less_technical", "apply", "full"}:
             raise ValueError("brief view is invalid")
         return render_brief_document(document, view=view, **kwargs)  # type: ignore[arg-type]
+
+    def _storage_connection(self) -> sqlite3.Connection | None:
+        """Open an existing local schema only; this method never migrates it."""
+
+        if self._db_path is None or not self._db_path.is_file():
+            return None
+        try:
+            connection = sqlite3.connect(f"{self._db_path.as_uri()}?mode=rw", uri=True)
+            exists = connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+                (_BRIEF_DOCUMENT_TABLE,),
+            ).fetchone()
+            if exists is None:
+                connection.close()
+                return None
+            return connection
+        except sqlite3.Error:
+            return None
+
+    def _persist_document(self, document: BriefDocument) -> None:
+        """Insert one immutable version if the authorized local schema exists."""
+
+        connection = self._storage_connection()
+        if connection is None:
+            return
+        payload = json.dumps(
+            _storage_document(document),
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+        try:
+            row = connection.execute(
+                """
+                SELECT content_digest FROM assistant_brief_documents
+                WHERE owner_ref = ? AND brief_id = ? AND version = ?
+                """,
+                (document.owner_ref, document.brief_id, document.version),
+            ).fetchone()
+            if row is not None:
+                if str(row[0]) != document.content_digest:
+                    raise ValueError("brief version already exists with a different content identity")
+                return
+            connection.execute(
+                """
+                INSERT INTO assistant_brief_documents (
+                    owner_ref, brief_id, version, content_digest, document_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    document.owner_ref,
+                    document.brief_id,
+                    document.version,
+                    document.content_digest,
+                    payload,
+                    _iso(document.window.generated_at),
+                ),
+            )
+            connection.execute(
+                """
+                DELETE FROM assistant_brief_documents
+                WHERE owner_ref = ? AND brief_id = ? AND version NOT IN (
+                    SELECT version FROM assistant_brief_documents
+                    WHERE owner_ref = ? AND brief_id = ?
+                    ORDER BY version DESC
+                    LIMIT ?
+                )
+                """,
+                (
+                    document.owner_ref,
+                    document.brief_id,
+                    document.owner_ref,
+                    document.brief_id,
+                    _MAX_PERSISTED_HISTORY_REFS,
+                ),
+            )
+            connection.commit()
+        finally:
+            connection.close()
 
     def _drop_history_key(self, key: tuple[str, str, int]) -> None:
         """Evict a version without leaving a binding that points at it."""
@@ -836,12 +1332,20 @@ def render_brief(
     view: str,
     *,
     conversation_id: str | None = None,
+    owner_ref: str | None = None,
     store: BriefDocumentStore = GLOBAL_BRIEFS,
     **kwargs: object,
 ) -> str | None:
-    """Read one exact report version only inside its active conversation."""
+    """Read one exact current or owner-scoped retained report version."""
 
-    return store.render_brief(brief_id, version, view, conversation_id=conversation_id, **kwargs)
+    return store.render_brief(
+        brief_id,
+        version,
+        view,
+        conversation_id=conversation_id,
+        owner_ref=owner_ref,
+        **kwargs,
+    )
 
 
 def parse_requested_brief_window(text: str, *, now: datetime | None = None) -> tuple[BriefWindow, str]:

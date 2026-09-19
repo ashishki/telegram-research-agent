@@ -36,7 +36,6 @@ from prm.briefs import (
     BriefFollowup,
     BriefWindow,
     CoverageSource,
-    GLOBAL_BRIEFS,
     build_brief_document,
     classify_brief_followup,
     parse_requested_brief_window,
@@ -96,9 +95,10 @@ class PersonalResearchAssistant:
         self.public_web_bounds = public_web_bounds
         self.deep_archive_reader = deep_archive_reader
         self.github_context_provider = github_context_provider
-        # This is intentionally a bounded in-process projection. A new process
-        # has no report/session state to resolve, which is the PA-07 boundary.
-        self.briefs = briefs or GLOBAL_BRIEFS
+        # Visible conversation bindings remain in-process.  Exact immutable
+        # versions use the already-selected local database only when its
+        # additive PA-07 table exists; the store never migrates it itself.
+        self.briefs = briefs or BriefDocumentStore(db_path=settings.db_path)
 
     def answer(self, request: OperatorRequest) -> AssistantResult:
         conversation = self.conversations.active_or_start(request.chat_id)

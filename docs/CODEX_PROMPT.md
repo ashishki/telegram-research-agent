@@ -42,23 +42,31 @@ local archive candidate selection and rechecked afterwards. The Telegram full
 view is reached by a one-time reply-keyboard text control that resolves only
 against the current visible in-process report object.
 
-This is deliberately not durable report retention: the owner scoped PA-07
-state to the current visible response and required it to disappear on a new
-topic or restart. Do not add a database, migration, durable job, worker,
-Redis, schedule, export, live provider/account/credential action, or an edit
-to `tools/test_tiers.py` for this slice. The direct PA-07 suites and the
-existing `focused-prm` tier are both required evidence, but the latter does not
-currently collect the two PA-07 suites; retain that owner-level test-registry
-gate rather than silently changing the tier.
+The owner explicitly amended this narrow PA-07 boundary on 2026-09-19 to
+remediate two independent P1 findings: add owner-scoped, bounded immutable
+BriefDocument history through the existing local SQLite schema path, and
+register the two PA-07 suites in `focused-prm`. Visible conversation bindings
+remain ephemeral: a new topic or process restart cannot resolve a normal
+language follow-up without its current visible response. Durable lookup is
+only exact `(owner_ref, brief_id, version)` history, never a cross-chat or
+latest-report catalogue. The migration is additive and is exercised only on a
+temporary test database; do not access or migrate a production database.
+
+This amendment does not authorize a durable job, worker, Redis, schedule,
+export, live provider/account/credential action, Telegram polling or any
+PA-08/PA-09 implementation. The direct PA-07 suites and `focused-prm` remain
+required evidence.
 
 The evidence record is
 `docs/verification/PA-07-brief-document-evidence-2026-09-19.md`. Fresh
 read-only Terra 5.6/high reviews found and drove the scoped remediations. The
-latest recheck, run `20260919T092541Z-slice_review-8b606ab1` against
-`d2163a1`, retains two STOP_SHIP P1 requests for durable restart history and
-PA-07 test registration in `focused-prm`; both conflict with the explicit
-owner scope above and require a human/design decision. This is not an approval
-or completion claim. The design remains mechanically `review_required`.
+latest pre-amendment recheck, run
+`20260919T092541Z-slice_review-8b606ab1` against `d2163a1`, retained two
+STOP_SHIP P1 requests for durable restart history and PA-07 test registration
+in `focused-prm`. The owner has now authorized their bounded remediation; a
+fresh independent Terra/high recheck of the amended diff remains required.
+This is not an approval or completion claim. The design remains mechanically
+`review_required`.
 
 PA-06's local checkpoint below is historical context for PA-07's dependency;
 do not treat it as an instruction to start PA-08 or PA-09.

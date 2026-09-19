@@ -35,6 +35,10 @@ PRM_ACTIVE_TESTS = (
     # adversarial suite in the required active tier rather than relying on a
     # separate optional command.
     "tests/test_assistant_research.py",
+    # PA-07 must keep the exact BriefDocument/history and report-follow-up
+    # contracts in the active regression tier, not only in a manual command.
+    "tests/test_assistant_briefs.py",
+    "tests/test_assistant_report_dialogue.py",
     "tests/test_prm_synthesis.py",
     "tests/test_prm_bot_dispatch.py",
     "tests/test_prm_cli.py",
