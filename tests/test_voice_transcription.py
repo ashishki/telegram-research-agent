@@ -227,10 +227,10 @@ class TestVoiceTranscription(unittest.TestCase):
         assert "provider-payload-sentinel" not in str(error.exception)
 
         with tempfile.TemporaryDirectory(prefix="private-local-path-sentinel-") as tmpdir:
-            def fake_urlopen(request_obj, timeout):
+            def fake_urlopen(request_obj, timeout, **_kwargs):
                 url = getattr(request_obj, "full_url", str(request_obj))
                 if "getFile?" in url:
-                    return _FakeResponse({"ok": True, "result": {"file_path": "private/provider/path.ogg"}})
+                    return _FakeResponse({"ok": True, "result": {"file_id": "private-file-id-sentinel", "file_path": "private/provider/path.ogg"}})
                 return _FakeResponse(b"synthetic voice bytes")
 
             with patch("bot.voice._open_telegram_get_file_request", side_effect=fake_urlopen), patch(
@@ -290,10 +290,10 @@ class TestVoiceTranscription(unittest.TestCase):
 
     def test_voice_download_keeps_raw_bytes_in_memory_without_local_staging(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            def fake_urlopen(request_obj, timeout):
+            def fake_urlopen(request_obj, timeout, **_kwargs):
                 url = getattr(request_obj, "full_url", str(request_obj))
                 if "getFile?" in url:
-                    return _FakeResponse({"ok": True, "result": {"file_path": "voice/synthetic.ogg"}})
+                    return _FakeResponse({"ok": True, "result": {"file_id": "private-file-id-sentinel", "file_path": "voice/synthetic.ogg"}})
                 return _FakeResponse(b"synthetic voice bytes")
 
             with patch("bot.voice._open_telegram_get_file_request", side_effect=fake_urlopen), patch(
@@ -375,7 +375,7 @@ class TestVoiceTranscription(unittest.TestCase):
         for unsafe_path in ("../voice.ogg", "/voice.ogg", "voice/file.ogg?token=x", "https://attacker.invalid/voice.ogg", "voice\\file.ogg"):
             with self.subTest(unsafe_path=unsafe_path), patch(
                 "bot.voice._open_telegram_get_file_request",
-                return_value=_FakeResponse({"ok": True, "result": {"file_path": unsafe_path}}),
+                return_value=_FakeResponse({"ok": True, "result": {"file_id": "voice-1", "file_path": unsafe_path}}),
             ):
                 with self.assertRaisesRegex(voice.VoiceTranscriptionError, "invalid file_path"):
                     voice._get_telegram_file_path(
@@ -392,6 +392,28 @@ class TestVoiceTranscription(unittest.TestCase):
                         resource_ref="voice-1",
                     )
 
+    def test_telegram_get_file_rejects_a_different_attachment_id_before_path_use(self):
+        with patch(
+            "bot.voice._open_telegram_get_file_request",
+            return_value=_FakeResponse(
+                {"ok": True, "result": {"file_id": "another-voice", "file_path": "voice/another.ogg"}}
+            ),
+        ):
+            with self.assertRaisesRegex(voice.VoiceTranscriptionError, "requested attachment"):
+                voice._get_telegram_file_path(
+                    token="bot-token",
+                    file_id="voice-1",
+                    authorization=_authorization(
+                        capability="media.voice_download",
+                        operation="read",
+                        provider_ref="provider_telegram",
+                        resource_ref="voice-1",
+                    ),
+                    owner_ref="owner_synthetic_primary",
+                    connection_ref=None,
+                    resource_ref="voice-1",
+                )
+
     def test_telegram_voice_download_rejects_cross_origin_and_redirectable_url_shapes(self):
         for url in (
             "https://attacker.invalid/file/bottoken/voice/file.ogg",
@@ -401,13 +423,20 @@ class TestVoiceTranscription(unittest.TestCase):
         ):
             with self.subTest(url=url), patch("bot.voice.request.build_opener") as build_opener:
                 with self.assertRaisesRegex(voice.VoiceTranscriptionError, "not approved"):
-                    voice._open_telegram_voice_download_request(voice.request.Request(url), timeout=60)
+                    voice._open_telegram_voice_download_request(
+                        voice.request.Request(url),
+                        token="bot-token",
+                        file_path="voice/file.ogg",
+                        timeout=60,
+                    )
                 build_opener.assert_not_called()
 
         opener = unittest.mock.Mock()
         with patch("bot.voice.request.build_opener", return_value=opener) as build_opener:
             voice._open_telegram_voice_download_request(
-                voice.request.Request("https://api.telegram.org/file/bottoken/voice/file.ogg"),
+                voice.request.Request("https://api.telegram.org/file/botbot-token/voice/file.ogg"),
+                token="bot-token",
+                file_path="voice/file.ogg",
                 timeout=60,
             )
         build_opener.assert_called_once()
@@ -423,13 +452,20 @@ class TestVoiceTranscription(unittest.TestCase):
         ):
             with self.subTest(url=url), patch("bot.voice.request.build_opener") as build_opener:
                 with self.assertRaisesRegex(voice.VoiceTranscriptionError, "not approved"):
-                    voice._open_telegram_get_file_request(voice.request.Request(url), timeout=30)
+                    voice._open_telegram_get_file_request(
+                        voice.request.Request(url),
+                        token="bot-token",
+                        file_id="voice-1",
+                        timeout=30,
+                    )
                 build_opener.assert_not_called()
 
         opener = unittest.mock.Mock()
         with patch("bot.voice.request.build_opener", return_value=opener) as build_opener:
             voice._open_telegram_get_file_request(
-                voice.request.Request("https://api.telegram.org/bottoken/getFile?file_id=voice-1"),
+                voice.request.Request("https://api.telegram.org/botbot-token/getFile?file_id=voice-1"),
+                token="bot-token",
+                file_id="voice-1",
                 timeout=30,
             )
         self.assertIsInstance(build_opener.call_args.args[0], voice._RejectRedirects)
@@ -545,11 +581,11 @@ class TestVoiceTranscription(unittest.TestCase):
             urls: list[str] = []
             transcription_bodies: list[bytes] = []
 
-            def fake_urlopen(request_obj, timeout):
+            def fake_urlopen(request_obj, timeout, **_kwargs):
                 url = getattr(request_obj, "full_url", str(request_obj))
                 urls.append(url)
                 if "getFile?" in url:
-                    return _FakeResponse({"ok": True, "result": {"file_path": "voice/synthetic.ogg"}})
+                    return _FakeResponse({"ok": True, "result": {"file_id": "voice-1", "file_path": "voice/synthetic.ogg"}})
                 if "/file/bot" in url:
                     return _FakeResponse(b"synthetic voice bytes")
 
@@ -557,7 +593,7 @@ class TestVoiceTranscription(unittest.TestCase):
                 transcription_bodies.append(request_obj.data)
                 return _FakeResponse({"text": "integrated synthetic transcript"})
 
-            def fake_voice_download_open(request_obj, timeout):
+            def fake_voice_download_open(request_obj, timeout, **_kwargs):
                 urls.append(request_obj.full_url)
                 return _FakeResponse(b"synthetic voice bytes")
 

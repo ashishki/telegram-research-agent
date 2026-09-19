@@ -227,41 +227,50 @@ def _open_openai_transcription_request(http_request: request.Request, *, timeout
     return request.build_opener(_RejectRedirects()).open(http_request, timeout=timeout)
 
 
-def _open_telegram_voice_download_request(http_request: request.Request, *, timeout: int):
+def _open_telegram_voice_download_request(
+    http_request: request.Request,
+    *,
+    token: str,
+    file_path: str,
+    timeout: int,
+):
     """Fetch voice bytes only from Telegram's fixed file origin, without redirects."""
 
     parsed = parse.urlsplit(http_request.full_url)
     expected = parse.urlsplit(TELEGRAM_FILE_BASE)
-    file_prefix = f"{expected.path.rstrip('/')}/bot"
+    expected_path = f"{expected.path.rstrip('/')}/bot{token}/{file_path}"
     if (
         parsed.scheme != expected.scheme
         or parsed.netloc != expected.netloc
-        or not parsed.path.startswith(file_prefix)
-        or len(parsed.path) <= len(file_prefix)
+        or parsed.path != expected_path
         or parsed.query
         or parsed.fragment
+        or http_request.get_method() != "GET"
     ):
         raise VoiceTranscriptionError("Telegram voice download endpoint is not approved")
     return request.build_opener(_RejectRedirects()).open(http_request, timeout=timeout)
 
 
-def _open_telegram_get_file_request(http_request: request.Request, *, timeout: int):
+def _open_telegram_get_file_request(
+    http_request: request.Request,
+    *,
+    token: str,
+    file_id: str,
+    timeout: int,
+):
     """Call Telegram's fixed ``getFile`` endpoint without accepting redirects."""
 
     parsed = parse.urlsplit(http_request.full_url)
     expected = parse.urlsplit(BOT_API_BASE)
-    bot_prefix = f"{expected.path.rstrip('/')}/bot"
-    query = parse.parse_qsl(parsed.query, keep_blank_values=True)
+    expected_path = f"{expected.path.rstrip('/')}/bot{token}/getFile"
+    expected_query = f"file_id={parse.quote(file_id, safe='')}"
     if (
         parsed.scheme != expected.scheme
         or parsed.netloc != expected.netloc
-        or not parsed.path.startswith(bot_prefix)
-        or not parsed.path.endswith("/getFile")
-        or len(parsed.path) <= len(bot_prefix) + len("/getFile")
+        or parsed.path != expected_path
+        or parsed.query != expected_query
         or parsed.fragment
-        or len(query) != 1
-        or query[0][0] != "file_id"
-        or not query[0][1]
+        or http_request.get_method() != "GET"
     ):
         raise VoiceTranscriptionError("Telegram getFile endpoint is not approved")
     return request.build_opener(_RejectRedirects()).open(http_request, timeout=timeout)
@@ -433,7 +442,9 @@ def _download_telegram_voice(
         resource_ref=resource_ref,
     )
     try:
-        with _open_telegram_voice_download_request(request.Request(url), timeout=60) as response:
+        with _open_telegram_voice_download_request(
+            request.Request(url), token=token, file_path=file_path, timeout=60
+        ) as response:
             data = response.read()
     except Exception:
         raise VoiceTranscriptionError("Telegram voice download failed") from None
@@ -501,7 +512,9 @@ def _get_telegram_file_path(
         resource_ref=resource_ref,
     )
     try:
-        with _open_telegram_get_file_request(request.Request(url), timeout=30) as response:
+        with _open_telegram_get_file_request(
+            request.Request(url), token=token, file_id=file_id, timeout=30
+        ) as response:
             payload = response.read().decode("utf-8")
     except Exception:
         raise VoiceTranscriptionError("Telegram getFile failed") from None
@@ -512,6 +525,8 @@ def _get_telegram_file_path(
     if not isinstance(decoded, dict) or decoded.get("ok") is not True:
         raise VoiceTranscriptionError("Telegram getFile returned an error")
     result = decoded.get("result")
+    if not isinstance(result, dict) or result.get("file_id") != file_id:
+        raise VoiceTranscriptionError("Telegram getFile response did not bind the requested attachment")
     file_path = (result or {}).get("file_path")
     return _require_safe_telegram_file_path(file_path)
 
