@@ -30,7 +30,7 @@ No production DB, live Telegram polling, account/provider access, job, timer,
 credential, `.env` or release action has been used or is authorized. Preserve
 the two untracked local files. Do not run the full historical pytest suite.
 
-## Current slice: PA-05
+## Current slice: PA-06 preparation after PA-05 local checkpoint
 
 PA-03 is locally tested at `081dded92b00bdaa822a6f6c0efbe8ae7ab86861` with
 evidence at `docs/verification/PA-03-conversation-evidence-2026-09-19.md`.
@@ -63,12 +63,20 @@ active `run_bot` group/non-private non-invocation regression; offline holdouts
 are application wiring rather than FTS-quality recall; and `ResearchResult`
 remains deferred behind the established `AssistantResult.payload` DTO.
 
-PA-05 is dependency-ready. It must implement an on-demand, grant-gated public
-search/fetch/evidence path without widening the legacy UTD allowlist or
-leaking private archive/query data. No production DB, live account/provider,
-credential, live job, timer or deployment is authorized. Do not schedule a
-Deep Review until the declared PA-04..PA-06 phase boundary absent a new
-immediate safety trigger.
+PA-05 implementation is locally verified at `7aeb66e`; its evidence is
+`docs/verification/PA-05-controlled-web-evidence-2026-09-19.md`. It adds an
+on-demand grant-gated public search/fetch/evidence route without widening the
+legacy UTD allowlist: a separate minimized query is digest-bound to typed
+PA-02 public scopes, and the default application has no web adapter. Fixture
+tests cover source-only evidence, stale/partial/conflicting coverage,
+query-substitution refusal, SSRF/redirect/DNS guards and injected source text;
+they are not live-provider evidence. PA-05 remains unaccepted in the task
+registry and does not change the mechanical `review_required` design state.
+
+PA-06 may proceed on this local dependency checkpoint. No production DB, live
+account/provider, credential, live job, timer or deployment is authorized.
+Accumulate the next Deep Review at the declared PA-04..PA-06 boundary; do not
+schedule a new review earlier absent an immediate safety trigger.
 
 For each slice: add focused positive/negative tests, run the smallest relevant
 existing tier, record evidence that distinguishes fixtures from integrations,
