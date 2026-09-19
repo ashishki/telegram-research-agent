@@ -7,6 +7,7 @@ import types
 import unittest
 from datetime import datetime, timedelta, timezone
 from dataclasses import FrozenInstanceError, replace
+from threading import Event, Thread
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -340,7 +341,7 @@ class TestLLMClient(unittest.TestCase):
             operations=("model_egress",),
             data_classes=("user_provided",),
             purpose="answer.request",
-            provider_policy=ProviderPolicy(("provider_anthropic",), maximum_request_count=2),
+            provider_policy=ProviderPolicy(("provider_anthropic",), maximum_request_count=3),
             issued_at=now - timedelta(minutes=1),
             expires_at=now + timedelta(hours=1),
             revision=1,
@@ -381,8 +382,77 @@ class TestLLMClient(unittest.TestCase):
             registry.authorize_and_reserve(request).reason,
             "operation_outcome_unknown",
         )
-        self.assertTrue(registry.reconcile_unknown_operation(operation_ref, delivery_outcome="not_delivered"))
-        self.assertTrue(registry.authorize_and_reserve(request).allowed)
+        self.assertTrue(registry.reconcile_unknown_operation(operation_ref, delivery_outcome="delivered"))
+        self.assertEqual(
+            registry.authorize_and_reserve(request).reason,
+            "operation_already_delivered",
+        )
+
+        recovered_request = replace(
+            request,
+            operation_ref="operation_synthetic_anthropic_not_delivered_001",
+        )
+        recovered = registry.authorize_and_reserve(recovered_request)
+        assert recovered.reservation is not None
+        self.assertTrue(recovered.reservation.consume())
+        recovered.reservation.record_delivery_outcome("unknown")
+        self.assertTrue(
+            registry.reconcile_unknown_operation(
+                recovered_request.operation_ref or "",
+                delivery_outcome="not_delivered",
+            )
+        )
+        self.assertTrue(registry.authorize_and_reserve(recovered_request).allowed)
+
+    def test_anthropic_committed_reservation_cannot_reopen_before_fake_transport(self):
+        operation_ref = "operation_synthetic_anthropic_committed_001"
+        authorization = _authorization(operation_ref=operation_ref)
+        assert authorization.reservation is not None
+        registry = authorization.reservation.registry
+        request = authorization.reservation._request
+        transport_entered = Event()
+        release_transport = Event()
+        calls = 0
+        errors: list[BaseException] = []
+        response = SimpleNamespace(
+            content=[SimpleNamespace(type="text", text="synthetic response")],
+            usage=SimpleNamespace(input_tokens=1, output_tokens=1),
+        )
+
+        def create(**_kwargs):
+            nonlocal calls
+            calls += 1
+            transport_entered.set()
+            assert release_transport.wait(timeout=5)
+            return response
+
+        fake_client = SimpleNamespace(messages=SimpleNamespace(create=create))
+
+        def transport() -> None:
+            try:
+                client.complete_with_receipt(
+                    prompt="committed transport sentinel",
+                    authorization=authorization,
+                    **AUTH_SCOPE,
+                )
+            except BaseException as error:
+                errors.append(error)
+
+        with patch.object(client, "_get_client", return_value=fake_client):
+            thread = Thread(target=transport)
+            thread.start()
+            self.assertTrue(transport_entered.wait(timeout=5))
+            authorization.reservation.abandon_before_transport()
+            self.assertEqual(
+                registry.authorize_and_reserve(request).reason,
+                "operation_in_progress",
+            )
+            release_transport.set()
+            thread.join(timeout=5)
+
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(errors, [])
+        self.assertEqual(calls, 1)
 
     def test_anthropic_transport_requires_a_sealed_operation_ref_before_fake_call(self):
         fake_transport = unittest.mock.Mock()
