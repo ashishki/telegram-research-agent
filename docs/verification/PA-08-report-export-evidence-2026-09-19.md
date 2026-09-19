@@ -57,17 +57,22 @@ release approval. The PA design remains mechanically `review_required`.
 
 ## Bound local verification
 
-The code and test scope below is committed at
-`4d574901986c1b44a0df1b38892bd9f533ac3bb3`; its implementation diff is
-`31a9a92..4d57490`. Commands were run from the repository root on 2026-09-19,
+The renderer implementation and initial PA-08 tests are committed at
+`4d574901986c1b44a0df1b38892bd9f533ac3bb3`. The final test-only correction is
+`9b6ea67bb6b1a8e8344e419a01d327eb2b052f85`; the full implementation diff is
+`31a9a92..9b6ea67`. Commands were run from the repository root on 2026-09-19,
 with exit code 0:
 
 - `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q
   tests/test_assistant_report_exports.py tests/test_assistant_report_access.py`:
   **6 passed in 7.16s**. This is the task's direct command. It covers immutable
   cross-format identity/citations, Cyrillic and long URLs, sanitization,
-  source-link annotations, forced fallback PDF, every ordered footer of a
-  multiple-page fallback, and exact owner/version/digest/expiry/restart denial.
+  source-link annotations, forced fallback PDF, multipage fallback and exact
+  owner/version/digest/expiry/restart denial.
+- At exact `9b6ea67bb6b1a8e8344e419a01d327eb2b052f85`, the same direct command:
+  **6 passed in 7.47s**. Its only code change after `4d57490` makes the forced
+  fallback assertion require every ordered footer from `Страница 1 / N` through
+  `Страница N / N`; the renderer implementation is unchanged.
 - `PYTHONPATH=src PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q
   tests/test_assistant_report_exports.py tests/test_assistant_report_access.py
   tests/test_assistant_briefs.py tests/test_assistant_report_dialogue.py`:
@@ -84,7 +89,8 @@ with exit code 0:
 
 The earlier initial runs remain useful diagnostics only: the initial direct
 slice run had 32 passed and its earlier fast-contract run had 617 passed in
-156.64s. The bound receipts above supersede them for the committed scope.
+156.64s. The `4d57490` bound receipts verify the implementation source; the
+`9b6ea67` direct receipt verifies the final test correction.
 
 ## Independent review trace
 
@@ -121,9 +127,20 @@ unavailable rather than inferred. The report SHA-256 is
 `15648e6731a99c57da052206a412bce8d1302efc0c70a710edd76cec2b69881d`.
 It reported two evidence blockers and two test-oracle concerns: the first
 evidence blocker is resolved by the bound receipts above; the digest-rebinding
-and multipage-footer concerns are covered by the two added tests in `4d57490`.
-Its remaining blocker is the external visual/runtime gate stated below. A
-fresh Test Critic recheck is required after this evidence record is committed.
+concern is covered by the `4d57490` test.
+
+The first recheck was requested with the same model/effort for
+`db4648ef65a416ccf726a8cbb6794c9f5edf2853`; its report SHA-256 is
+`478a80cb74b4d87c52dedee99fc6dad81b5b2744d00d5c80059aced604b959d2`.
+Its only local P1 required a complete, rather than first-and-last, multipage
+footer oracle. `9b6ea67` resolves it. The second recheck, for exact
+`9b6ea67bb6b1a8e8344e419a01d327eb2b052f85`, has report SHA-256
+`f512647a829343dc71052b5c1f4c807b7270d55f3d62d8aa0f9f6a7fce9c058e`.
+It confirmed both the complete ordered-footer and digest-rebinding tests are
+regression-sensitive. Its only local request was to add the exact `9b6ea67`
+receipt and a fresh changed-scope review, which this record supplies before the
+final independent review. Both recheck reports recorded observed model/effort
+telemetry as unavailable; that limitation is not treated as an approval.
 
 ## Remaining external acceptance gate
 
