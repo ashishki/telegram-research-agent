@@ -150,30 +150,23 @@ def complete_with_provider(
     ):
         _abandon_before_transport(authorization, context_authorization)
         raise ProviderEgressDenied("OpenAI provider egress requires an active matching capability grant.")
-    if _matching_operation_ref(authorization, context_authorization) is None:
+    if _matching_operation_ref(authorization, None) is None:
         _abandon_before_transport(authorization, context_authorization)
         raise ProviderEgressDenied(
             "OpenAI provider egress requires matching opaque operation references."
         )
 
-    validated_context = _validated_cited_context(local_context)
-    context_requested = validated_context is not None and _env_enabled(CONTEXT_EGRESS_ENABLE_ENV) and allow_context_egress
-    include_context = context_requested and _has_matching_authorization(
-        context_authorization,
-        capability=CONTEXT_CAPABILITY,
-        data_class="private_archive",
-        owner_ref=owner_ref,
-        connection_ref=active_connection_ref,
-        resource_ref=context_resource_ref,
-    )
-    if include_context and not _shares_operation_registry(authorization, context_authorization):
-        _abandon_before_transport(authorization, context_authorization)
-        raise ProviderEgressDenied(
-            "OpenAI text and context egress require one registry-bound operation group."
-        )
+    # PA-02 has no repository-verified archive evidence binding yet. A shaped
+    # ``source_ref`` is caller metadata, not proof that the supplied private
+    # text came from the selected archive. Do not let it cross a provider until
+    # PA-04 owns that retrieval-to-context binding. The optional context grant
+    # is therefore invalidated below and the separately authorized question can
+    # proceed without archive context.
+    del local_context, allow_context_egress, context_resource_ref
+    include_context = False
     request_input = _request_input(
         clean_query,
-        local_context=validated_context if include_context else None,
+        local_context=None,
     )
     try:
         active_client = client or _build_client(active_api_key)
@@ -286,21 +279,6 @@ def _commit_transport_authorizations(
         if decision is not None and decision.reservation is not None
     ]
     return len(reservations) == len(authorizations) and commit_transport_reservations(reservations)
-
-
-def _shares_operation_registry(
-    authorization: AuthorizationDecision | None,
-    context_authorization: AuthorizationDecision | None,
-) -> bool:
-    """Refuse text/context decisions joined only by caller-controlled strings."""
-
-    return bool(
-        authorization is not None
-        and context_authorization is not None
-        and authorization.reservation is not None
-        and context_authorization.reservation is not None
-        and authorization.reservation.registry is context_authorization.reservation.registry
-    )
 
 
 def _record_transport_outcome(

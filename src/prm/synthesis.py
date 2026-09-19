@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import json
-import os
 from typing import Any, Mapping, Sequence
 
 from assistant.claim_ledger import verify_answer_against_evidence
 from llm.client import LLMClient
 from prm.archive_contract import ARCHIVE_RESPONSE_CONTRACTS
-from prm.capabilities import AuthorizationDecision, is_authorized_egress, transport_purpose
+from prm.capabilities import AuthorizationDecision
 
 _FORBIDDEN_USER_MARKERS = (
     "The local research path found grounded evidence",
@@ -27,27 +26,18 @@ _ARCHIVE_FORBIDDEN_SECTIONS = (
 
 
 def synthesis_allowed(authorization: AuthorizationDecision | None = None) -> bool:
-    enabled = os.environ.get("PRM_TELEGRAM_RAG_LLM_SYNTHESIS", "").strip().casefold()
-    egress = os.environ.get("PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS", "").strip().casefold()
-    accepted = {"1", "true", "yes", "approved"}
-    return (
-        enabled in accepted
-        and egress in accepted
-        and is_authorized_egress(
-            authorization,
-            capability="model.generate",
-            provider_ref="provider_anthropic",
-            data_class="private_archive",
-            owner_ref=authorization.owner_ref if authorization is not None else "",
-            connection_ref=authorization.connection_ref if authorization is not None else None,
-            resource_ref=authorization.resource_ref if authorization is not None else "",
-            purpose=transport_purpose(
-                provider_ref="provider_anthropic",
-                capability="model.generate",
-                operation="model_egress",
-            ),
-        )
-    )
+    """Keep private-archive synthesis local until PA-04 binds real evidence.
+
+    An egress grant describes who may use a provider; it does not prove that a
+    caller-supplied prompt or archive snippet came from selected, inspectable
+    evidence. PA-02 therefore deliberately does not enable this optional
+    Anthropic archive path, even when legacy environment switches and a grant
+    are present. PA-04 must introduce the repository-verified evidence/context
+    binding before this becomes eligible for provider transport.
+    """
+
+    del authorization
+    return False
 
 
 def synthesize_answer(

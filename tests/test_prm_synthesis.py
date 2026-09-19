@@ -34,7 +34,10 @@ def _archive_synthesis_authorization():
 
 
 def test_synthesis_rejects_diagnostic_fallback_markers(monkeypatch):
+    calls = []
+
     def complete(**_kwargs):
+        calls.append(_kwargs)
         return "The local research path found grounded evidence. Archive signal: raw fallback."
 
     monkeypatch.setenv("PRM_TELEGRAM_ALLOW_PROVIDER_EGRESS", "1")
@@ -68,3 +71,4 @@ def test_synthesis_rejects_diagnostic_fallback_markers(monkeypatch):
     )
 
     assert result is None
+    assert calls == []

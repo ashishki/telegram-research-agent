@@ -225,7 +225,11 @@ def test_anthropic_text_client_uses_only_a_matching_provider_grant():
     connection_ref = anthropic_client._anthropic_connection_ref(synthetic_key)
     assert connection_ref is not None
     grant = make_grant(providers=("provider_anthropic",), connection_ref=connection_ref)
-    request = make_request(provider_ref="provider_anthropic", connection_ref=connection_ref)
+    request = make_request(
+        provider_ref="provider_anthropic",
+        connection_ref=connection_ref,
+        operation_ref="operation_synthetic_anthropic_egress_001",
+    )
     decision = CapabilityRegistry((grant,)).authorize_and_reserve(request, now=NOW)
 
     with pytest.MonkeyPatch.context() as monkeypatch:
@@ -877,7 +881,7 @@ def test_prm_rejects_private_chat_with_a_mismatched_sender_before_dispatch(monke
     assert dispatched == []
 
 
-def test_private_context_needs_its_own_data_class_grant(monkeypatch):
+def test_private_context_never_egresses_before_pa04_evidence_binding(monkeypatch):
     client = _FakeClient()
     monkeypatch.setenv("PRM_OPENAI_PROVIDER_ENABLED", "true")
     monkeypatch.setenv("PRM_OPENAI_CONTEXT_EGRESS_ENABLED", "true")
@@ -923,8 +927,8 @@ def test_private_context_needs_its_own_data_class_grant(monkeypatch):
         **OWNER_SCOPE,
     )
 
-    assert result_with_context.receipt.context_egress_performed is True
-    assert "private synthetic context" in repr(client_with_context.responses.calls[0]["input"])
+    assert result_with_context.receipt.context_egress_performed is False
+    assert "private synthetic context" not in repr(client_with_context.responses.calls[0]["input"])
 
 
 @pytest.mark.parametrize("change", ["revoke", "expire", "revision"])

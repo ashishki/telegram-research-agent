@@ -448,6 +448,8 @@ class BudgetReservation:
         with self._lock:
             if self._consumed or self._abandoned or not self._registry._reservation_is_current(self):
                 return False
+            if not self._registry._commit_single_transport_reservation(self):
+                return False
             self._consumed = True
             self._transport_committed = True
             return True
@@ -748,6 +750,30 @@ class CapabilityRegistry:
                 ):
                     return False
         return True
+
+    def _commit_single_transport_reservation(self, reservation: BudgetReservation) -> bool:
+        """Commit a single-member operation group for non-compound adapters.
+
+        Generic adapters such as Anthropic use ``consume`` rather than the
+        OpenAI group helper. An opaque operation key still has to become
+        committed before their transport, and a joined OpenAI text/context
+        group must never be partially consumed through that generic path.
+        """
+
+        operation_ref = reservation._request.operation_ref
+        if operation_ref is None:
+            return True
+        with self._lock:
+            group = self._operation_groups.get(operation_ref)
+            if (
+                group is None
+                or group.state != "reserved"
+                or group.members.get(id(reservation)) is not reservation
+                or len(group.members) != 1
+            ):
+                return False
+            group.state = "committed"
+            return True
 
     def _mark_transport_groups_committed(self, reservations: Sequence[BudgetReservation]) -> None:
         """Close each already-validated operation group against late joins."""

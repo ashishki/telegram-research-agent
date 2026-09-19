@@ -60,6 +60,14 @@ class LLMSchemaError(LLMError):
     pass
 
 
+class LLMOutcomeUnknown(LLMError):
+    """A provider request may have crossed the transport boundary once."""
+
+    def __init__(self, receipt: "LLMCompletionReceipt") -> None:
+        super().__init__("Anthropic completion outcome is unknown; do not retry automatically")
+        self.receipt = receipt
+
+
 @dataclass(frozen=True, slots=True)
 class LLMCompletionReceipt:
     text: str
@@ -70,6 +78,8 @@ class LLMCompletionReceipt:
     duration_ms: int
     attempts: int
     usage_recorded: bool
+    external_call_attempted: bool = False
+    delivery_outcome: str = "not_attempted"
 
 
 def set_usage_db_path(path: str) -> None:
@@ -223,6 +233,22 @@ def _has_matching_egress_grant(
     )
 
 
+def _has_sealed_operation_ref(authorization: AuthorizationDecision | None) -> bool:
+    """Require the opaque key retained by the sealed reservation, not metadata."""
+
+    return bool(
+        authorization is not None
+        and authorization.reservation is not None
+        and authorization.operation_ref is not None
+        and authorization.reservation.operation_ref == authorization.operation_ref
+    )
+
+
+def _abandon_before_transport(authorization: AuthorizationDecision | None) -> None:
+    if authorization is not None and authorization.reservation is not None:
+        authorization.reservation.abandon_before_transport()
+
+
 def complete(
     prompt: str,
     system: str = "",
@@ -269,6 +295,7 @@ def complete_with_receipt(
     active_api_key = _configured_anthropic_api_key()
     active_connection_ref = _anthropic_connection_ref(active_api_key)
     if active_connection_ref is None or connection_ref != active_connection_ref:
+        _abandon_before_transport(authorization)
         raise LLMError("Anthropic completion requires an active matching capability grant")
     if not _has_matching_egress_grant(
         authorization,
@@ -278,12 +305,20 @@ def complete_with_receipt(
         connection_ref=active_connection_ref,
         resource_ref=resource_ref,
     ):
+        _abandon_before_transport(authorization)
         raise LLMError("Anthropic completion requires an active capability grant")
+    if not _has_sealed_operation_ref(authorization):
+        _abandon_before_transport(authorization)
+        raise LLMError("Anthropic completion requires a matching opaque operation reference")
     # Keep the public argument for compatibility, but do not turn a granted
     # request into multiple provider calls.  PA-13 owns reconciliation before a
     # caller can request another reservation after an unknown outcome.
     del max_attempts
-    client = _get_client(active_api_key)
+    try:
+        client = _get_client(active_api_key)
+    except LLMError:
+        _abandon_before_transport(authorization)
+        raise
     selected_model = model or _get_model(category)
     start_time = time.time()
     try:
@@ -301,6 +336,10 @@ def complete_with_receipt(
                 operation="model_egress",
             ),
         )
+    except CapabilityDenied:
+        _abandon_before_transport(authorization)
+        raise LLMError("Anthropic completion requires an active capability grant") from None
+    try:
         LOGGER.debug(
             "Anthropic completion request model=%s prompt_length=%s max_tokens=%s attempt=1",
             selected_model,
@@ -313,12 +352,27 @@ def complete_with_receipt(
             max_tokens=max_tokens,
             messages=[{"role": "user", "content": prompt}],
         )
-    except CapabilityDenied:
-        raise LLMError("Anthropic completion requires an active capability grant") from None
     except Exception:
+        assert authorization is not None and authorization.reservation is not None
+        authorization.reservation.record_delivery_outcome("unknown")
         LOGGER.warning("Anthropic completion has unknown outcome after one attempt")
-        raise LLMError("Anthropic completion failed") from None
+        raise LLMOutcomeUnknown(
+            LLMCompletionReceipt(
+                text="",
+                model=selected_model,
+                input_tokens=0,
+                output_tokens=0,
+                estimated_cost_usd=0.0,
+                duration_ms=int((time.time() - start_time) * 1000),
+                attempts=1,
+                usage_recorded=False,
+                external_call_attempted=True,
+                delivery_outcome="unknown",
+            )
+        ) from None
 
+    assert authorization is not None and authorization.reservation is not None
+    authorization.reservation.record_delivery_outcome("accepted")
     text = _extract_text(response)
     duration_ms = int((time.time() - start_time) * 1000)
     actual_model = str(getattr(response, "model", None) or selected_model)
@@ -350,6 +404,8 @@ def complete_with_receipt(
         duration_ms=duration_ms,
         attempts=1,
         usage_recorded=usage_recorded,
+        external_call_attempted=True,
+        delivery_outcome="accepted",
     )
 
 

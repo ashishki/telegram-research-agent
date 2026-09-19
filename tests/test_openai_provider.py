@@ -223,34 +223,34 @@ def test_provider_requires_matching_opaque_operation_references_before_fake_call
         )
 
     mismatched_ref_client = _FakeClient()
-    with pytest.raises(ProviderEgressDenied):
-        complete_with_provider(
-            "Question",
-            provider="openai",
-            allow_provider_egress=True,
-            allow_context_egress=True,
-            authorization=_authorization(operation_ref="operation_synthetic_openai_001"),
-            context_authorization=_authorization(
-                capability="model.context_egress",
-                resource_ref="resource_archive",
-                data_class="private_archive",
-                purpose="answer.context",
-                operation_ref="operation_synthetic_openai_002",
-            ),
-            local_context=[{
-                "title": "approved",
-                "text": "private-context-sentinel",
-                "source_ref": "archive:synthetic-approved-1",
-            }],
-            owner_ref="owner_synthetic_primary",
-            connection_ref=SYNTHETIC_OPENAI_CONNECTION,
-            resource_ref="resource_conversation",
-            context_resource_ref="resource_archive",
-            client=mismatched_ref_client,
-        )
+    complete_with_provider(
+        "Question",
+        provider="openai",
+        allow_provider_egress=True,
+        allow_context_egress=True,
+        authorization=_authorization(operation_ref="operation_synthetic_openai_001"),
+        context_authorization=_authorization(
+            capability="model.context_egress",
+            resource_ref="resource_archive",
+            data_class="private_archive",
+            purpose="answer.context",
+            operation_ref="operation_synthetic_openai_002",
+        ),
+        local_context=[{
+            "title": "approved",
+            "text": "private-context-sentinel",
+            "source_ref": "archive:synthetic-approved-1",
+        }],
+        owner_ref="owner_synthetic_primary",
+        connection_ref=SYNTHETIC_OPENAI_CONNECTION,
+        resource_ref="resource_conversation",
+        context_resource_ref="resource_archive",
+        client=mismatched_ref_client,
+    )
 
     assert missing_ref_client.responses.calls == []
-    assert mismatched_ref_client.responses.calls == []
+    assert len(mismatched_ref_client.responses.calls) == 1
+    assert "private-context-sentinel" not in repr(mismatched_ref_client.responses.calls[0]["input"])
 
     forged_ref_client = _FakeClient()
     with pytest.raises(ProviderEgressDenied):
@@ -458,9 +458,9 @@ def test_abandoned_text_and_context_decisions_cannot_transport_after_rereservati
     )
 
     assert stale_client.responses.calls == []
-    assert result.receipt.context_egress_performed is True
+    assert result.receipt.context_egress_performed is False
     assert len(retry_client.responses.calls) == 1
-    assert "private-context-sentinel" in repr(retry_client.responses.calls[0]["input"])
+    assert "private-context-sentinel" not in repr(retry_client.responses.calls[0]["input"])
 
 
 def test_abandoned_decision_cannot_race_a_fresh_reservation_to_transport(monkeypatch) -> None:
@@ -615,7 +615,7 @@ def test_committed_text_and_context_reservations_cannot_reopen_before_transport(
     assert thread.is_alive() is False
     assert errors == []
     assert len(client.responses.calls) == 1
-    assert "private-context-commit-sentinel" in repr(client.responses.calls[0]["input"])
+    assert "private-context-commit-sentinel" not in repr(client.responses.calls[0]["input"])
 
 
 def test_provider_transport_rejects_a_grant_for_another_active_credential_before_fake_call(monkeypatch) -> None:
@@ -699,44 +699,78 @@ def test_context_egress_requires_second_explicit_gate(monkeypatch) -> None:
         resource_ref="resource_conversation",
         context_resource_ref="resource_archive",
     )
-    assert "approved context" in repr(client2.responses.calls[0]["input"])
-    assert "archive:synthetic-approved-1" in repr(client2.responses.calls[0]["input"])
-    assert result2.receipt.context_egress_performed is True
+    assert "approved context" not in repr(client2.responses.calls[0]["input"])
+    assert "archive:synthetic-approved-1" not in repr(client2.responses.calls[0]["input"])
+    assert result2.receipt.context_egress_performed is False
 
 
-def test_context_egress_rejects_same_ref_from_independent_registry_domains(monkeypatch) -> None:
+def test_context_egress_is_omitted_even_with_independent_registry_decisions(monkeypatch) -> None:
     monkeypatch.setenv(PROVIDER_ENABLE_ENV, "true")
     monkeypatch.setenv(CONTEXT_EGRESS_ENABLE_ENV, "true")
     monkeypatch.setenv("OPENAI_API_KEY", SYNTHETIC_OPENAI_KEY)
     client = _FakeClient()
 
-    with pytest.raises(ProviderEgressDenied):
-        complete_with_provider(
-            "Question",
-            provider="openai",
-            allow_provider_egress=True,
-            allow_context_egress=True,
-            authorization=_authorization(operation_ref="operation_synthetic_cross_registry_001"),
-            context_authorization=_authorization(
-                capability="model.context_egress",
-                resource_ref="resource_archive",
-                data_class="private_archive",
-                purpose="answer.context",
-                operation_ref="operation_synthetic_cross_registry_001",
-            ),
-            local_context=[{
-                "title": "approved",
-                "text": "must-not-cross-registry-egress",
-                "source_ref": "archive:synthetic-cross-registry-1",
-            }],
-            client=client,
-            owner_ref="owner_synthetic_primary",
-            connection_ref=SYNTHETIC_OPENAI_CONNECTION,
-            resource_ref="resource_conversation",
-            context_resource_ref="resource_archive",
-        )
+    result = complete_with_provider(
+        "Question",
+        provider="openai",
+        allow_provider_egress=True,
+        allow_context_egress=True,
+        authorization=_authorization(operation_ref="operation_synthetic_cross_registry_001"),
+        context_authorization=_authorization(
+            capability="model.context_egress",
+            resource_ref="resource_archive",
+            data_class="private_archive",
+            purpose="answer.context",
+            operation_ref="operation_synthetic_cross_registry_001",
+        ),
+        local_context=[{
+            "title": "approved",
+            "text": "must-not-cross-registry-egress",
+            "source_ref": "archive:synthetic-cross-registry-1",
+        }],
+        client=client,
+        owner_ref="owner_synthetic_primary",
+        connection_ref=SYNTHETIC_OPENAI_CONNECTION,
+        resource_ref="resource_conversation",
+        context_resource_ref="resource_archive",
+    )
 
-    assert client.responses.calls == []
+    assert result.receipt.context_egress_performed is False
+    assert len(client.responses.calls) == 1
+    assert "must-not-cross-registry-egress" not in repr(client.responses.calls[0]["input"])
+
+
+def test_structurally_cited_but_unbound_private_context_never_enters_openai(monkeypatch) -> None:
+    monkeypatch.setenv(PROVIDER_ENABLE_ENV, "true")
+    monkeypatch.setenv(CONTEXT_EGRESS_ENABLE_ENV, "true")
+    monkeypatch.setenv("OPENAI_API_KEY", SYNTHETIC_OPENAI_KEY)
+    registry, text_request, context_request = _compound_registry_and_requests(
+        operation_ref="operation_synthetic_unbound_context_001"
+    )
+    client = _FakeClient()
+
+    result = complete_with_provider(
+        "Question",
+        provider="openai",
+        allow_provider_egress=True,
+        allow_context_egress=True,
+        authorization=registry.authorize_and_reserve(text_request),
+        context_authorization=registry.authorize_and_reserve(context_request),
+        local_context=[{
+            "title": "forged",
+            "text": "private-unbound-context-sentinel",
+            "source_ref": "archive:forged-not-resolved",
+        }],
+        client=client,
+        owner_ref="owner_synthetic_primary",
+        connection_ref=SYNTHETIC_OPENAI_CONNECTION,
+        resource_ref="resource_conversation",
+        context_resource_ref="resource_archive",
+    )
+
+    assert result.receipt.context_egress_performed is False
+    assert len(client.responses.calls) == 1
+    assert "private-unbound-context-sentinel" not in repr(client.responses.calls[0]["input"])
 
 
 def test_context_transport_rejects_a_reservation_for_the_query_purpose(monkeypatch) -> None:
@@ -864,9 +898,9 @@ def test_context_transport_blocks_unknown_outcome_retry_until_explicit_reconcili
 
     receipt = error.value.receipt
     assert len(captured_calls) == 1
-    assert "private-context-sentinel" in repr(captured_calls[0]["input"])
+    assert "private-context-sentinel" not in repr(captured_calls[0]["input"])
     assert receipt.external_call_attempted is True
-    assert receipt.context_egress_attempted is True
+    assert receipt.context_egress_attempted is False
     assert receipt.external_call_performed is False
     assert receipt.context_egress_performed is False
     assert receipt.delivery_outcome == "unknown"

@@ -52,7 +52,12 @@ AUTH_SCOPE = {
 }
 
 
-def _authorization(*, capability: str = "model.generate", purpose: str = "answer.request"):
+def _authorization(
+    *,
+    capability: str = "model.generate",
+    purpose: str = "answer.request",
+    operation_ref: str | None = "operation_synthetic_anthropic_001",
+):
     now = datetime.now(timezone.utc).replace(microsecond=0)
     grant = CapabilityGrant(
         grant_id=f"grant_synthetic_{capability.replace('.', '_')}",
@@ -78,6 +83,7 @@ def _authorization(*, capability: str = "model.generate", purpose: str = "answer
         purpose=purpose,
         connection_ref=SYNTHETIC_ANTHROPIC_CONNECTION,
         expected_grant_revision=1,
+        operation_ref=operation_ref,
     )
     return CapabilityRegistry((grant,)).authorize_and_reserve(request, now=now)
 
@@ -321,6 +327,76 @@ class TestLLMClient(unittest.TestCase):
                     )
 
         self.assertEqual(calls, 1)
+
+    def test_unknown_anthropic_outcome_blocks_same_operation_until_reconciliation(self):
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        operation_ref = "operation_synthetic_anthropic_unknown_001"
+        grant = CapabilityGrant(
+            grant_id="grant_synthetic_anthropic_unknown",
+            owner_ref="owner_synthetic_primary",
+            connection_ref=SYNTHETIC_ANTHROPIC_CONNECTION,
+            capability="model.generate",
+            resource_refs=("resource_conversation",),
+            operations=("model_egress",),
+            data_classes=("user_provided",),
+            purpose="answer.request",
+            provider_policy=ProviderPolicy(("provider_anthropic",), maximum_request_count=2),
+            issued_at=now - timedelta(minutes=1),
+            expires_at=now + timedelta(hours=1),
+            revision=1,
+        )
+        request = AuthorizationRequest(
+            owner_ref="owner_synthetic_primary",
+            connection_ref=SYNTHETIC_ANTHROPIC_CONNECTION,
+            capability="model.generate",
+            resource_ref="resource_conversation",
+            operation="model_egress",
+            data_class="user_provided",
+            provider_ref="provider_anthropic",
+            purpose="answer.request",
+            expected_grant_revision=1,
+            operation_ref=operation_ref,
+        )
+        registry = CapabilityRegistry((grant,))
+        calls = 0
+
+        def create(**_kwargs):
+            nonlocal calls
+            calls += 1
+            raise TimeoutError("synthetic unknown provider outcome")
+
+        fake_client = SimpleNamespace(messages=SimpleNamespace(create=create))
+        with patch.object(client, "_get_client", return_value=fake_client):
+            with self.assertRaises(client.LLMOutcomeUnknown) as error:
+                client.complete_with_receipt(
+                    prompt="retry sentinel",
+                    authorization=registry.authorize_and_reserve(request),
+                    **AUTH_SCOPE,
+                )
+
+        self.assertTrue(error.exception.receipt.external_call_attempted)
+        self.assertEqual(error.exception.receipt.delivery_outcome, "unknown")
+        self.assertEqual(calls, 1)
+        self.assertEqual(
+            registry.authorize_and_reserve(request).reason,
+            "operation_outcome_unknown",
+        )
+        self.assertTrue(registry.reconcile_unknown_operation(operation_ref, delivery_outcome="not_delivered"))
+        self.assertTrue(registry.authorize_and_reserve(request).allowed)
+
+    def test_anthropic_transport_requires_a_sealed_operation_ref_before_fake_call(self):
+        fake_transport = unittest.mock.Mock()
+        fake_client = SimpleNamespace(messages=SimpleNamespace(create=fake_transport))
+
+        with patch.object(client, "_get_client", return_value=fake_client):
+            with self.assertRaises(client.LLMError):
+                client.complete(
+                    prompt="missing operation ref",
+                    authorization=_authorization(operation_ref=None),
+                    **AUTH_SCOPE,
+                )
+
+        fake_transport.assert_not_called()
 
     def test_text_completion_redacts_provider_exception_from_logs_and_error_chain(self):
         mock_client = SimpleNamespace(
