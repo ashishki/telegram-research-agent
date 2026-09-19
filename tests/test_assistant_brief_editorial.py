@@ -13,7 +13,7 @@ from prm.application import PersonalResearchAssistant
 from prm.brief_editorial import BriefEditorial, synthesize_brief_editorial
 from prm.briefs import (
     BriefBuildRequest, BriefDocumentStore, BriefWindow, CoverageSource, build_brief_document,
-    render_brief_document, _storage_document, _stored_document,
+    classify_brief_followup, render_brief_document, _storage_document, _stored_document,
 )
 from prm.contracts import OperatorRequest
 from prm.conversation import ConversationStore
@@ -43,6 +43,7 @@ def _editorial_data():
         "title": "Orion SDK продолжает задачу после перезапуска",
         "summary": "Агент сохраняет завершённые шаги и использует их при продолжении задачи.",
         "explanation": "Сохранённый результат позволяет продолжить задачу после перезапуска. Документация ограничивает восстановление завершёнными шагами.",
+        "plain_explanation": "Если задача остановилась, агент может продолжить с уже готового этапа, а не начинать его заново.",
         "why_selected": "Это полезный механизм для устойчивости длительных исследований.",
         "next_step": "Если исследование прерывается, можно проверить восстановление на небольшой задаче.",
         "caveat": "Поведение незавершённого шага в этих фрагментах не описано.",
@@ -86,7 +87,7 @@ def test_event_groups_sources_without_priority_metadata_and_has_substantive_deta
     jsonschema.Draft202012Validator(schema).validate(document.to_dict())
 
 
-@pytest.mark.parametrize("mutation", ["source", "quote", "number", "omission", "handle", "markup"])
+@pytest.mark.parametrize("mutation", ["source", "quote", "number", "plain_number", "omission", "handle", "markup"])
 def test_editorial_rejects_unbound_facts_and_unaccounted_sources(mutation):
     data = _editorial_data()
     story = data["stories"][0]
@@ -96,6 +97,8 @@ def test_editorial_rejects_unbound_facts_and_unaccounted_sources(mutation):
         story["anchors"][0]["quote"] = "Invented claim that the source does not contain."
     elif mutation == "number":
         story["summary"] += " Производительность выросла в 99 раз."
+    elif mutation == "plain_number":
+        story["plain_explanation"] += " Это даёт 99 новых этапов."
     elif mutation == "omission":
         data["omitted_refs"] = []
     elif mutation == "handle":
@@ -141,6 +144,63 @@ def test_editorial_followups_reuse_event_numbering_explanations_and_sources(monk
         assert result.payload["brief_document"]["brief_id"] == doc.brief_id
 
 
+def test_editorial_multistep_discussion_stays_on_the_exact_explained_story(monkeypatch):
+    """Natural short questions retain one ephemeral story reference, not a topic guess."""
+
+    doc = _edited_document()
+    assistant = PersonalResearchAssistant(
+        settings=SimpleNamespace(db_path=":memory:"), conversations=ConversationStore(), briefs=BriefDocumentStore(),
+    )
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("a saved story continuation must not retrieve or call a provider")
+
+    monkeypatch.setattr("prm.application.answer_memory_research", forbidden)
+    monkeypatch.setattr("prm.application.synthesize_brief_editorial", forbidden)
+    assistant.answer(OperatorRequest(
+        query="AI", mode="brief", chat_id="42", brief_request=replace(_request(), editorial=doc.editorial),
+    ))
+    explained = assistant.answer(OperatorRequest(query="объясни пункт 1", chat_id="42"))
+    assert explained.payload["brief_followup"]["kind"] == "explain_item"
+
+    invalid = assistant.answer(OperatorRequest(query="объясни пункт 99", chat_id="42"))
+    assert invalid.payload["brief_followup"]["kind"] == "explain_item"
+    assert "нет такого пункта" in invalid.text
+    invalid_conversation = invalid.payload["conversation"]
+    assert assistant.briefs.visible_item_number(
+        conversation_id=invalid_conversation["conversation_id"],
+        response_ref=invalid_conversation["response_refs"][0],
+    ) is None
+
+    # Restore an exact story reference before testing shorthand continuations.
+    assistant.answer(OperatorRequest(query="объясни пункт 1", chat_id="42"))
+
+    expected = (
+        ("почему это важно?", "why_item", "устойчивости длительных исследований"),
+        ("можно проще?", "simplify_item", "не начинать его заново"),
+        ("а что дальше?", "next_step_item", "проверить восстановление на небольшой задаче"),
+        ("какие ограничения?", "caveat_item", "Поведение незавершённого шага"),
+        ("покажи источники", "sources_item", "https://example.org/source/1"),
+    )
+    for query, kind, fragment in expected:
+        result = assistant.answer(OperatorRequest(query=query, chat_id="42"))
+        assert result.payload["brief_followup"]["kind"] == kind
+        assert result.payload["brief_followup"]["item_number"] == 1
+        assert fragment in result.text
+        assert result.payload["retrieval_performed"] is False
+        assert result.payload["brief_document"]["brief_id"] == doc.brief_id
+
+    full = assistant.answer(OperatorRequest(query="Показать полный бриф", chat_id="42"))
+    full_conversation = full.payload["conversation"]
+    assert assistant.briefs.visible_item_number(
+        conversation_id=full_conversation["conversation_id"],
+        response_ref=full_conversation["response_refs"][0],
+    ) is None
+
+    # A shorthand continuation has no meaning without the exact visible item.
+    assert classify_brief_followup("почему это важно?") is None
+
+
 def test_editorial_transport_keeps_paired_permission_and_active_application_path(monkeypatch):
     calls = []
     def create(**kwargs):
@@ -183,6 +243,24 @@ def test_provider_failure_or_invalid_json_does_not_publish_editorial(monkeypatch
                         lambda **kwargs: SimpleNamespace(text='{"stories":[],"stories":[]}', receipt=Receipt()))
     editorial, measurement = synthesize_brief_editorial(build_brief_document(_request()), question="AI", access=_archive_access())
     assert editorial is None and measurement["status"] == "editorial_rejected"
+
+
+def test_generated_editorial_requires_a_saved_plain_language_explanation(monkeypatch):
+    class Receipt:
+        def public_measurement(self):
+            return {"provider_egress_attempted": True}
+
+    candidate = _editorial_data()
+    candidate["stories"][0].pop("plain_explanation")
+    monkeypatch.setattr(
+        "prm.archive_synthesis_transport.complete_archive_synthesis",
+        lambda **kwargs: SimpleNamespace(text=json.dumps(candidate, ensure_ascii=False), receipt=Receipt()),
+    )
+    editorial, measurement = synthesize_brief_editorial(
+        build_brief_document(_request()), question="AI", access=_archive_access(),
+    )
+    assert editorial is None
+    assert measurement["status"] == "editorial_rejected"
 
 
 def test_content_review_rejection_preserves_raw_report_instead_of_publishing(monkeypatch):
@@ -397,6 +475,15 @@ def test_store_comparison_resolves_only_the_bound_owner_scoped_version(tmp_path,
                              conversation_id="conversation_other") is None
     assert store.render_brief(current.brief_id, current.version, "comparison",
         authenticated_chat_id="43", authenticated_actor_id="43", authenticated_owner_chat_id="43") is None
+    for view, fragment in (
+        ("why", "устойчивости длительных исследований"),
+        ("simplify", "не начинать его заново"),
+        ("next_step", "проверить восстановление на небольшой задаче"),
+        ("sources", "https://example.org/source/0"),
+        ("caveat", "Поведение незавершённого шага"),
+    ):
+        rendered = store.render_brief(current.brief_id, current.version, view, item_number=1, **scope)
+        assert rendered is not None and fragment in rendered
     if not restart:
         store = BriefDocumentStore()
         store.bind_visible(conversation_id="conversation_editorial", response_ref="response_" + "e" * 24, document=current)

@@ -234,6 +234,7 @@ def _request_input(
             '{"stories":[{"title":"event headline, at most 140 characters",'
             '"summary":"plain-language takeaway, at most 300 characters",'
             '"explanation":"substantive explanation, at most 900 characters",'
+            '"plain_explanation":"non-technical explanation for a follow-up, at most 500 characters",'
             '"why_selected":"reason for editorial selection, at most 300 characters",'
             '"next_step":"optional conditional suggestion, at most 300 characters",'
             '"caveat":"material uncertainty, at most 300 characters",'
@@ -250,7 +251,8 @@ def _request_input(
             "executed action or invented urgency. Do not invent personal interests, project state, dates, numbers, "
             "trend direction, novelty relative to an unseen previous report, or facts outside the excerpts. "
             "Do not claim full weekly coverage. No URLs or HTML in prose; the renderer supplies source links. "
-            "Optional text fields may be empty. If no substantive event is supported, return an empty stories array "
+            "plain_explanation must explain the same supported event in everyday Russian without adding facts; "
+            "optional text fields may be empty. If no substantive event is supported, return an empty stories array "
             "and put every source in omitted_refs; the application will keep an honest source selection."
         )
     if response_mode == "brief_review":

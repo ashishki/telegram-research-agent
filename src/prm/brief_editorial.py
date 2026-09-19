@@ -28,18 +28,27 @@ class BriefStory:
     title: str
     summary: str
     explanation: str
+    # This is a separately reviewed, source-anchored explanation for the
+    # natural ``можно проще?`` follow-up.  It must not be improvised by the
+    # renderer from a possibly technical source excerpt.
+    plain_explanation: str
     why_selected: str
     next_step: str
     caveat: str
     anchors: tuple[StoryAnchor, ...]
 
     def to_dict(self) -> dict[str, object]:
-        return {
+        result: dict[str, object] = {
             "title": self.title, "summary": self.summary,
             "explanation": self.explanation, "why_selected": self.why_selected,
             "next_step": self.next_step, "caveat": self.caveat,
             "anchors": [{"evidence_ref": a.evidence_ref, "quote": a.quote} for a in self.anchors],
         }
+        # Retained PA-07 documents from before this bounded dialogue addition
+        # remain valid and keep their original immutable identity.
+        if self.plain_explanation:
+            result["plain_explanation"] = self.plain_explanation
+        return result
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,9 +73,10 @@ class BriefEditorial:
         stories = []
         used = set()
         for row in rows:
-            if not isinstance(row, dict) or set(row) != {
+            required = {
                 "title", "summary", "explanation", "why_selected", "next_step", "caveat", "anchors",
-            }:
+            }
+            if not isinstance(row, dict) or not required <= set(row) or set(row) - (required | {"plain_explanation"}):
                 raise ValueError("invalid editorial story")
             anchors = row["anchors"]
             if not isinstance(anchors, list) or not 1 <= len(anchors) <= 8:
@@ -85,6 +95,7 @@ class BriefEditorial:
             story = BriefStory(
                 title=_text(row["title"], 140), summary=_text(row["summary"], 300),
                 explanation=_text(row["explanation"], 900), why_selected=_text(row["why_selected"], 300),
+                plain_explanation=_text(row.get("plain_explanation", ""), 500, optional=True),
                 next_step=_text(row["next_step"], 300, optional=True),
                 caveat=_text(row["caveat"], 300, optional=True), anchors=tuple(bound),
             )
@@ -93,7 +104,7 @@ class BriefEditorial:
             # Reject new numeric factual claims. This is deliberately not a
             # semantic verifier and must never be reported as one.
             support = " ".join(anchor.quote for anchor in bound)
-            factual = " ".join((story.title, story.summary, story.explanation))
+            factual = " ".join((story.title, story.summary, story.explanation, story.plain_explanation))
             if set(re.findall(r"\d+(?:[.,]\d+)?", factual)) - set(re.findall(r"\d+(?:[.,]\d+)?", support)):
                 raise ValueError("editorial introduces an unsupported numeric claim")
             stories.append(story)
@@ -176,6 +187,8 @@ def synthesize_brief_editorial(
         if len(result.text) > 18000:
             raise ValueError("editorial response too large")
         editorial = BriefEditorial.from_dict(json.loads(result.text, object_pairs_hook=_unique_object), document.evidence)
+        if any(not story.plain_explanation for story in editorial.stories):
+            raise ValueError("editorial lacks a plain-language continuation")
     except (ValueError, TypeError, RecursionError):
         _abandon_archive_access(review_access)
         return None, {**result.receipt.public_measurement(), "status": "editorial_rejected"}

@@ -26,7 +26,7 @@ from typing import Any, Literal, Mapping, Sequence
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from prm.brief_editorial import BriefEditorial
+from prm.brief_editorial import BriefEditorial, BriefStory
 
 
 BRIEF_DOCUMENT_SCHEMA_VERSION = "assistant.brief_document.v1"
@@ -569,7 +569,10 @@ class BriefBuildRequest:
 
 @dataclass(frozen=True, slots=True)
 class BriefFollowup:
-    kind: Literal["explain_item", "shorten", "filter_topics", "compare_weeks", "less_technical", "apply", "full"]
+    kind: Literal[
+        "explain_item", "shorten", "filter_topics", "compare_weeks", "less_technical", "apply", "full",
+        "why_item", "simplify_item", "next_step_item", "sources_item", "caveat_item",
+    ]
     item_number: int | None = None
     topics: tuple[str, ...] = ()
 
@@ -673,7 +676,14 @@ def build_brief_document(request: BriefBuildRequest) -> BriefDocument:
     )
 
 
-def classify_brief_followup(text: str) -> BriefFollowup | None:
+def classify_brief_followup(text: str, *, active_item_number: int | None = None) -> BriefFollowup | None:
+    """Recognise a bounded, report-bound continuation without new retrieval.
+
+    An abbreviated question such as ``а почему это важно?`` is meaningful only
+    after an exact displayed report item.  Callers therefore provide the
+    ephemeral item reference, never a topic guess or an old stored report.
+    """
+
     clean = " ".join(str(text or "").split())
     lowered = clean.casefold()
     item = re.fullmatch(r"(?:объясни|поясни|расскажи про|подробнее про|explain)\s+(?:пункт\s*|item\s*)?(\d{1,2})[?.!]?", lowered)
@@ -681,6 +691,33 @@ def classify_brief_followup(text: str) -> BriefFollowup | None:
         return BriefFollowup("explain_item", item_number=int(item.group(1)))
     if lowered in {"а второе?", "а второе", "объясни второе", "подробнее про второе"}:
         return BriefFollowup("explain_item", item_number=2)
+    if active_item_number is not None and active_item_number > 0:
+        if lowered in {
+            "почему это важно?", "почему это важно", "почему важно?", "почему важно",
+            "а мне это зачем?", "а мне это зачем", "зачем это мне?", "зачем это мне",
+            "why does this matter?", "why does this matter",
+        }:
+            return BriefFollowup("why_item", item_number=active_item_number)
+        if lowered in {
+            "можно проще?", "можно проще", "а проще?", "а проще", "объясни проще",
+            "простыми словами", "in simpler words", "can you explain simply?",
+        }:
+            return BriefFollowup("simplify_item", item_number=active_item_number)
+        if lowered in {
+            "что дальше?", "что дальше", "а что дальше?", "а что дальше", "что попробовать дальше?",
+            "что мне сделать?", "что мне сделать", "what next?", "what next",
+        }:
+            return BriefFollowup("next_step_item", item_number=active_item_number)
+        if lowered in {
+            "откуда это?", "откуда это", "покажи источник", "покажи источники",
+            "какие источники?", "какие источники", "what is the source?", "show sources",
+        }:
+            return BriefFollowup("sources_item", item_number=active_item_number)
+        if lowered in {
+            "какие ограничения?", "какие ограничения", "в чём ограничение?", "в чем ограничение?",
+            "что неизвестно?", "что неизвестно", "what is uncertain?", "what are the limits?",
+        }:
+            return BriefFollowup("caveat_item", item_number=active_item_number)
     if lowered in {"сделай короче", "сократи", "shorten it", "make it shorter"}:
         return BriefFollowup("shorten")
     if lowered in {
@@ -713,7 +750,10 @@ def classify_brief_followup(text: str) -> BriefFollowup | None:
 def render_brief_document(
     document: BriefDocument,
     *,
-    view: Literal["telegram", "short", "item", "topics", "comparison", "less_technical", "apply", "full"] = "telegram",
+    view: Literal[
+        "telegram", "short", "item", "topics", "comparison", "less_technical", "apply", "full",
+        "why", "simplify", "next_step", "sources", "caveat",
+    ] = "telegram",
     item_number: int | None = None,
     topics: Sequence[str] = (),
     comparison_document: BriefDocument | None = None,
@@ -1060,9 +1100,10 @@ class BriefDocumentStore:
 
     def __init__(self, *, db_path: str | None = None) -> None:
         self._documents: dict[tuple[str, str, int], BriefDocument] = {}
-        # response_ref, current document, optional comparison baseline, and a
-        # bounded exact-version history. The history is scoped to one active
-        # conversation; it is not a cross-chat catalogue.
+        # response_ref, current document, optional comparison baseline, a
+        # bounded exact-version history and the currently discussed story.
+        # The latter is ephemeral and scoped to one active conversation; it is
+        # never reconstructed from topic text or durable report history.
         self._bindings: dict[
             str,
             tuple[
@@ -1070,6 +1111,7 @@ class BriefDocumentStore:
                 tuple[str, str, int],
                 tuple[str, str, int] | None,
                 tuple[tuple[str, str, int], ...],
+                int | None,
             ],
         ] = {}
         self._db_path = None if not db_path or str(db_path) == ":memory:" else Path(str(db_path)).resolve()
@@ -1089,6 +1131,7 @@ class BriefDocumentStore:
         response_ref: str,
         document: BriefDocument,
         comparison_document: BriefDocument | None = None,
+        active_item_number: int | None = None,
         authenticated_chat_id: str | None = None,
         authenticated_actor_id: str | None = None,
         authenticated_owner_chat_id: str | None = None,
@@ -1099,6 +1142,11 @@ class BriefDocumentStore:
             raise ValueError("brief comparison binding is invalid")
         if comparison_document is not None and comparison_document.owner_ref != document.owner_ref:
             raise ValueError("brief comparison binding crosses owner scope")
+        item_count = len(document.editorial.stories) if document.editorial is not None else len(document.items)
+        if active_item_number is not None and (
+            type(active_item_number) is not int or not 1 <= active_item_number <= item_count
+        ):
+            raise ValueError("brief active item binding is invalid")
         durable_owner_ref = brief_owner_ref_from_authenticated_private_tuple(
             authenticated_chat_id,
             authenticated_actor_id,
@@ -1138,7 +1186,7 @@ class BriefDocumentStore:
             if comparison_document is not None:
                 assert comparison_key is not None
                 self._documents[comparison_key] = comparison_document
-            self._bindings[conversation_id] = (response_ref, key, comparison_key, history)
+            self._bindings[conversation_id] = (response_ref, key, comparison_key, history, active_item_number)
 
     def resolve_visible(
         self,
@@ -1157,6 +1205,17 @@ class BriefDocumentStore:
                 self._bindings.pop(conversation_id, None)
                 return None
             return document, self._documents.get(binding[2]) if binding[2] is not None else None
+
+    def visible_item_number(self, *, conversation_id: str, response_ref: str | None) -> int | None:
+        """Return only the exact current item's ephemeral reference."""
+
+        if not response_ref:
+            return None
+        with self._lock:
+            binding = self._bindings.get(conversation_id)
+            if binding is None or binding[0] != response_ref:
+                return None
+            return binding[4]
 
     def forget_conversation(self, conversation_id: str) -> None:
         """Remove only the current dialogue binding, never immutable history."""
@@ -1335,7 +1394,10 @@ class BriefDocumentStore:
         # owner/history key is required. There is no global/latest lookup.
         if document is None:
             return None
-        if view not in {"telegram", "short", "item", "topics", "comparison", "less_technical", "apply", "full"}:
+        if view not in {
+            "telegram", "short", "item", "topics", "comparison", "less_technical", "apply", "full",
+            "why", "simplify", "next_step", "sources", "caveat",
+        }:
             raise ValueError("brief view is invalid")
         if view == "comparison":
             # Resolve the immutable companion through the same authenticated
@@ -1433,10 +1495,11 @@ class BriefDocumentStore:
                 tuple[str, str, int],
                 tuple[str, str, int] | None,
                 tuple[tuple[str, str, int], ...],
+                int | None,
             ],
         ] = {}
         for conversation_id, binding in self._bindings.items():
-            response_ref, current, comparison, history = binding
+            response_ref, current, comparison, history, active_item_number = binding
             if current == key:
                 # The response no longer has its actual source document, so
                 # resolving it must fail rather than showing a stale sibling.
@@ -1447,6 +1510,7 @@ class BriefDocumentStore:
                 current,
                 None if comparison == key else comparison,
                 reduced,
+                active_item_number,
             )
         self._bindings = updated
 
@@ -2304,6 +2368,11 @@ def _render_editorial(
         ))
     sources = document.evidence_by_ref()
     indexed = list(enumerate(editorial.stories, start=1))
+    if view in {"why", "simplify", "next_step", "sources", "caveat"}:
+        selected = [(i, story) for i, story in indexed if i == item_number]
+        if not selected:
+            return "В текущем брифе нет такого пункта; новый поиск источников не запускался."
+        return _render_editorial_item_continuation(document, selected[0][0], selected[0][1], view=view)
     if view == "item":
         indexed = [(i, story) for i, story in indexed if i == item_number]
     if topics:
@@ -2357,6 +2426,51 @@ def _render_editorial(
     else:
         example_number = 2 if len(editorial.stories) > 1 else 1
         lines.append(f"Спроси «объясни пункт {example_number}», «сделай короче» или «что попробовать?».")
+    return "\n".join(lines)
+
+
+def _render_editorial_item_continuation(
+    document: BriefDocument, item_number: int, story: BriefStory, *, view: str,
+) -> str:
+    """Answer one natural continuation from an exact saved story only."""
+
+    sources = document.evidence_by_ref()
+    refs = tuple(dict.fromkeys(anchor.evidence_ref for anchor in story.anchors))
+    source_lines = [_telegram_card_source_link(sources[ref].source_ref) for ref in refs]
+    title = _telegram_html(story.title, 140)
+    if view == "why":
+        lines = [
+            f"<b>Почему это важно — пункт {item_number}</b>", title, "",
+            _telegram_html(story.why_selected, 300), "", _telegram_html(story.explanation, 900),
+        ]
+        if story.caveat:
+            lines.append(f"<b>Ограничение:</b> {_telegram_html(story.caveat, 300)}")
+    elif view == "simplify":
+        explanation = story.plain_explanation or story.summary
+        lines = [
+            f"<b>Простыми словами — пункт {item_number}</b>", title, "",
+            _telegram_html(explanation, 500),
+        ]
+        if not story.plain_explanation:
+            lines.append("Отдельного упрощённого объяснения в сохранённой версии нет; это её краткий вывод без новых фактов.")
+    elif view == "next_step":
+        lines = [f"<b>Что можно сделать дальше — пункт {item_number}</b>", title, ""]
+        if story.next_step:
+            lines.append(_telegram_html(story.next_step, 300))
+        else:
+            lines.append("Из сохранённых материалов не следует конкретный следующий шаг. Можно сначала оценить применимость к своей ситуации.")
+        lines.append("Это условное предложение, а не выполненное действие или новая обязанность.")
+    elif view == "sources":
+        lines = [f"<b>Источники — пункт {item_number}</b>", title, "", *source_lines]
+    else:
+        lines = [f"<b>Что здесь неизвестно — пункт {item_number}</b>", title, ""]
+        if story.caveat:
+            lines.append(_telegram_html(story.caveat, 300))
+        else:
+            lines.append("В сохранённой версии нет отдельной оговорки. Это не доказывает отсутствие ограничений за пределами выбранных источников.")
+    if view != "sources":
+        lines.extend(("", *source_lines))
+    lines.extend(("", "Это ответ по сохранённому пункту брифа; новых фактов и поиска нет."))
     return "\n".join(lines)
 
 

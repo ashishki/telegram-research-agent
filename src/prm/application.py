@@ -109,7 +109,18 @@ class PersonalResearchAssistant:
             conversation_id=conversation.conversation_id,
             response_ref=visible_ref,
         )
-        brief_followup = classify_brief_followup(request.query) if visible_brief is not None else None
+        active_brief_item = (
+            self.briefs.visible_item_number(
+                conversation_id=conversation.conversation_id,
+                response_ref=visible_ref,
+            )
+            if visible_brief is not None and visible_brief[0].editorial is not None
+            else None
+        )
+        brief_followup = (
+            classify_brief_followup(request.query, active_item_number=active_brief_item)
+            if visible_brief is not None else None
+        )
         if brief_followup is not None:
             return self._brief_followup_result(
                 request,
@@ -117,6 +128,7 @@ class PersonalResearchAssistant:
                 document=visible_brief[0],
                 comparison_document=visible_brief[1],
                 followup=brief_followup,
+                active_item_number=active_brief_item,
             )
         if visible_brief is not None and _is_brief_refresh(request.query):
             refreshed_request = rebuild_brief_request(visible_brief[0])
@@ -670,6 +682,7 @@ class PersonalResearchAssistant:
         document: BriefDocument,
         comparison_document: BriefDocument | None,
         followup: BriefFollowup,
+        active_item_number: int | None,
     ) -> AssistantResult:
         """Use the current report object only; never fall through to retrieval."""
 
@@ -678,6 +691,21 @@ class PersonalResearchAssistant:
         if followup.kind == "explain_item":
             text = render_brief_document(document, view="item", item_number=followup.item_number)
             view = "item"
+        elif followup.kind == "why_item":
+            text = render_brief_document(document, view="why", item_number=followup.item_number)
+            view = "why"
+        elif followup.kind == "simplify_item":
+            text = render_brief_document(document, view="simplify", item_number=followup.item_number)
+            view = "simplify"
+        elif followup.kind == "next_step_item":
+            text = render_brief_document(document, view="next_step", item_number=followup.item_number)
+            view = "next_step"
+        elif followup.kind == "sources_item":
+            text = render_brief_document(document, view="sources", item_number=followup.item_number)
+            view = "sources"
+        elif followup.kind == "caveat_item":
+            text = render_brief_document(document, view="caveat", item_number=followup.item_number)
+            view = "caveat"
         elif followup.kind == "shorten":
             text = render_brief_document(document, view="short")
             view = "short"
@@ -723,12 +751,26 @@ class PersonalResearchAssistant:
             operator_context={"brief_retention": BRIEF_RETENTION},
             route={"mode": "brief", "primary_intent": "brief_document_followup"},
         )
+        story_count = len(document.editorial.stories) if document.editorial is not None else len(document.items)
+        if followup.kind == "explain_item":
+            next_active_item = (
+                followup.item_number
+                if followup.item_number is not None and 1 <= followup.item_number <= story_count
+                else None
+            )
+        elif followup.kind in {"why_item", "simplify_item", "next_step_item", "sources_item", "caveat_item"}:
+            next_active_item = active_item_number
+        else:
+            # A whole-brief projection has no single visible story.  Do not
+            # carry an earlier detail reference into an ambiguous shorthand.
+            next_active_item = None
         return self._remember_brief_document(
             request,
             result,
             document=document,
             comparison_document=comparison_document,
             topic=conversation.topic,
+            active_item_number=next_active_item,
         )
 
     def _remember_brief_document(
@@ -739,6 +781,7 @@ class PersonalResearchAssistant:
         document: BriefDocument,
         comparison_document: BriefDocument | None,
         topic: str,
+        active_item_number: int | None = None,
     ) -> AssistantResult:
         """Bind report state to precisely the response made visible this turn."""
 
@@ -754,6 +797,7 @@ class PersonalResearchAssistant:
             response_ref=response_ref,
             document=document,
             comparison_document=comparison_document,
+            active_item_number=active_item_number,
             authenticated_chat_id=authenticated_tuple[0],
             authenticated_actor_id=authenticated_tuple[1],
             authenticated_owner_chat_id=authenticated_tuple[2],

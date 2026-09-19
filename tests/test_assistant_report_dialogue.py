@@ -110,6 +110,25 @@ def test_report_followups_use_only_the_current_visible_brief_document(monkeypatc
     )
 
 
+def test_current_editorial_item_reference_is_ephemeral_and_exact() -> None:
+    document = build_brief_document(_request())
+    store = BriefDocumentStore()
+    conversation_id = "conversation_" + "a" * 24
+    response_ref = "response_" + "b" * 24
+    store.bind_visible(
+        conversation_id=conversation_id,
+        response_ref=response_ref,
+        document=document,
+        active_item_number=1,
+    )
+    # The store returns only the item bound to this exact visible response;
+    # the application additionally limits rich continuations to editorial reports.
+    assert store.visible_item_number(conversation_id=conversation_id, response_ref=response_ref) == 1
+    assert store.visible_item_number(conversation_id=conversation_id, response_ref="response_" + "c" * 24) is None
+    store.forget_conversation(conversation_id)
+    assert store.visible_item_number(conversation_id=conversation_id, response_ref=response_ref) is None
+
+
 def test_compare_weeks_uses_an_actual_bound_prior_brief_not_a_new_search(monkeypatch) -> None:
     prior = build_brief_document(
         BriefBuildRequest(
