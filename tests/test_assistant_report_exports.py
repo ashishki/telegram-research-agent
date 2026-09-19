@@ -46,7 +46,7 @@ def _editorial_document():
                 "2026-10-21T10:00:00+02:00",
             ),
             _source(
-                "second", "https://example.test/source/second", "Второй сигнал",
+                "second", "https://example.test/кириллица", "Второй сигнал",
                 "Второй источник описывает ограничение и сохраняет исходную оговорку.",
                 "2026-10-23T10:00:00+02:00",
             ),
@@ -122,7 +122,10 @@ def test_fallback_pdf_keeps_unicode_text_links_long_urls_and_page_numbers(monkey
     assert b"/ToUnicode" in pdf.body
     assert b"/Annots [" in pdf.body
     for source_ref in pdf.identity.source_refs:
-        assert f"/URI ({source_ref})".encode("ascii") in pdf.body
+        if source_ref.isascii():
+            assert f"/URI ({source_ref})".encode("ascii") in pdf.body
+        else:
+            assert ("FEFF" + source_ref.encode("utf-16-be").hex().upper()).encode("ascii") in pdf.body
     extracted = _fallback_pdf_text(pdf.body)
     assert "Отчёт получил проверяемую подробную форму" in extracted
     assert document.evidence[0].source_ref in extracted

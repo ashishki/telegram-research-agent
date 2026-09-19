@@ -923,7 +923,7 @@ def _build_unicode_pdf(
             objects[next_annotation] = (
                 "<< /Type /Annot /Subtype /Link /Rect "
                 f"[{left:.2f} {bottom:.2f} {right:.2f} {top:.2f}] /Border [0 0 0] "
-                f"/A << /S /URI /URI ({_pdf_literal(source_ref)}) >> >>"
+                f"/A << /S /URI /URI {_pdf_uri(source_ref)} >> >>"
             ).encode("ascii")
             next_annotation += 1
         annotations = " /Annots [" + " ".join(annotation_refs) + "]" if annotation_refs else ""
@@ -952,6 +952,16 @@ def _pdf_stream(data: bytes, *, extra: str) -> bytes:
 
 def _pdf_literal(value: str) -> str:
     return value.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+
+
+def _pdf_uri(value: str) -> str:
+    """Encode an annotation URI without losing valid Unicode source identity."""
+
+    try:
+        value.encode("ascii")
+    except UnicodeEncodeError:
+        return "<FEFF" + value.encode("utf-16-be").hex().upper() + ">"
+    return "(" + _pdf_literal(value) + ")"
 
 
 def _to_unicode_cmap(glyph_unicode: dict[int, str]) -> bytes:
