@@ -1,0 +1,539 @@
+"""Synthetic content-path cases; these are not a live-model quality receipt."""
+
+from dataclasses import replace
+import json
+from html.parser import HTMLParser
+from pathlib import Path
+from types import SimpleNamespace
+
+import jsonschema
+import pytest
+
+from prm.application import PersonalResearchAssistant
+from prm.brief_editorial import BriefEditorial, synthesize_brief_editorial
+from prm.briefs import (
+    BriefBuildRequest, BriefDocumentStore, BriefWindow, CoverageSource, build_brief_document,
+    classify_brief_followup, render_brief_document, _storage_document, _stored_document,
+)
+from prm.contracts import OperatorRequest
+from prm.conversation import ConversationStore
+from prm.routing import brief_topic_query
+from tests.test_prm_synthesis import _archive_access
+
+
+def _request():
+    window = BriefWindow.from_iso(timezone_name="Europe/Berlin", start_at="2026-09-12T00:00:00+02:00",
+                                 end_at="2026-09-19T00:00:00+02:00", generated_at="2026-09-19T01:00:00+02:00")
+    texts = (
+        "Orion SDK сохраняет результат завершённого шага. После перезапуска агент продолжает задачу с этого шага.",
+        "Документация Orion SDK описывает сохранение результатов шагов. Восстановление работает для завершённых шагов.",
+        "Личное поздравление автора канала и рекламная ссылка. Событий по теме в этом сообщении нет.",
+    )
+    evidence = tuple({
+        "local_archive_provenance": True, "evidence_id": f"evidence_source_{i}",
+        "source_url": f"https://example.org/source/{i}", "title": f"@channel_{i}",
+        "support_span": text, "topics": ["AI"], "posted_at": "2026-09-15T10:00:00+02:00",
+    } for i, text in enumerate(texts))
+    return BriefBuildRequest(topic="AI", window=window, evidence=evidence)
+
+
+def _editorial_data():
+    evidence = _request().evidence
+    return {"stories": [{
+        "title": "Orion SDK продолжает задачу после перезапуска",
+        "summary": "Агент сохраняет завершённые шаги и использует их при продолжении задачи.",
+        "explanation": "Сохранённый результат позволяет продолжить задачу после перезапуска. Документация ограничивает восстановление завершёнными шагами.",
+        "plain_explanation": "Если задача остановилась, агент может продолжить с уже готового этапа, а не начинать его заново.",
+        "why_selected": "Это полезный механизм для устойчивости длительных исследований.",
+        "next_step": "Если исследование прерывается, можно проверить восстановление на небольшой задаче.",
+        "caveat": "Поведение незавершённого шага в этих фрагментах не описано.",
+        "anchors": [{"evidence_ref": f"evidence_source_{i}", "quote": evidence[i]["support_span"]} for i in (0, 1)],
+    }], "omitted_refs": ["evidence_source_2"]}
+
+
+def _edited_document():
+    request = _request()
+    base = build_brief_document(request)
+    return build_brief_document(replace(request, editorial=BriefEditorial.from_dict(_editorial_data(), base.evidence)))
+
+
+@pytest.mark.parametrize("query,expected", [
+    ("AI за последнюю неделю", "AI"),
+    ("Собери полный бриф AI за прошлую неделю", "AI"),
+    ("бриф AI с 2026-09-12 по 2026-09-19 timezone Europe/Berlin", "AI"),
+    ("weekly brief agent evals last week", "agent evals"),
+])
+def test_brief_retrieval_separates_topic_from_time_and_presentation(query, expected):
+    assert brief_topic_query(query) == expected
+
+
+def test_event_groups_sources_without_priority_metadata_and_has_substantive_detail():
+    document = _edited_document()
+    assert all(item.importance == "unknown" for item in document.evidence)
+    assert len(document.editorial.stories) == 1
+    short = render_brief_document(document)
+    full = render_brief_document(document, view="full")
+    assert "Orion SDK продолжает задачу" in short
+    assert "@channel" not in short + full
+    assert "важности" not in short
+    assert "срок не указан" not in full
+    assert "Документация ограничивает" in full
+    assert "Если исследование прерывается" in full
+    assert "Личное поздравление" not in full
+    assert "https://example.org/source/0" in full and "https://example.org/source/1" in full
+    assert "это не полный" in full.casefold()
+    assert len(short) < 2400
+    schema = json.loads(Path("schemas/assistant_brief_document.v1.schema.json").read_text())
+    jsonschema.Draft202012Validator(schema).validate(document.to_dict())
+
+
+@pytest.mark.parametrize("mutation", ["source", "quote", "number", "plain_number", "omission", "handle", "markup"])
+def test_editorial_rejects_unbound_facts_and_unaccounted_sources(mutation):
+    data = _editorial_data()
+    story = data["stories"][0]
+    if mutation == "source":
+        story["anchors"][0]["evidence_ref"] = "evidence_not_selected"
+    elif mutation == "quote":
+        story["anchors"][0]["quote"] = "Invented claim that the source does not contain."
+    elif mutation == "number":
+        story["summary"] += " Производительность выросла в 99 раз."
+    elif mutation == "plain_number":
+        story["plain_explanation"] += " Это даёт 99 новых этапов."
+    elif mutation == "omission":
+        data["omitted_refs"] = []
+    elif mutation == "handle":
+        story["title"] = "@channel"
+    else:
+        story["summary"] = '<a href="https://evil.example/">Click</a>'
+    with pytest.raises(ValueError):
+        BriefEditorial.from_dict(data, build_brief_document(_request()).evidence)
+
+
+def test_editorial_content_is_durable_and_part_of_report_identity():
+    document = _edited_document()
+    assert _stored_document(_storage_document(document)) == document
+    altered = _storage_document(document)
+    altered["editorial"]["stories"][0]["explanation"] = "Другая версия объяснения."
+    with pytest.raises(ValueError, match="identity"):
+        _stored_document(altered)
+    plain = build_brief_document(_request())
+    assert _stored_document(_storage_document(plain)) == plain
+    assert plain.content_digest != document.content_digest
+    assert plain.brief_id != document.brief_id
+
+
+def test_editorial_followups_reuse_event_numbering_explanations_and_sources(monkeypatch):
+    doc = _edited_document()
+    request = replace(_request(), editorial=doc.editorial)
+    assistant = PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:"),
+        conversations=ConversationStore(), briefs=BriefDocumentStore())
+    def forbidden(*args, **kwargs):
+        raise AssertionError("saved story discussion must not call retrieval or a provider")
+    monkeypatch.setattr("prm.application.answer_memory_research", forbidden)
+    monkeypatch.setattr("prm.application.synthesize_brief_editorial", forbidden)
+    assistant.answer(OperatorRequest(query="AI", mode="brief", chat_id="42", brief_request=request))
+    for query, fragment in (("объясни 1", "Документация ограничивает"),
+                            ("что попробовать?", "Если исследование прерывается"),
+                            ("сделай короче", "Агент сохраняет завершённые шаги"),
+                            ("только AI", "Orion SDK")):
+        result = assistant.answer(OperatorRequest(query=query, chat_id="42"))
+        assert fragment in result.text
+        assert result.payload["telegram_parse_mode"] == "HTML"
+        assert "BriefDocument" not in result.text
+        assert "https://example.org/source/0" in result.text
+        assert result.payload["brief_document"]["brief_id"] == doc.brief_id
+
+
+def test_editorial_multistep_discussion_stays_on_the_exact_explained_story(monkeypatch):
+    """Natural short questions retain one ephemeral story reference, not a topic guess."""
+
+    doc = _edited_document()
+    assistant = PersonalResearchAssistant(
+        settings=SimpleNamespace(db_path=":memory:"), conversations=ConversationStore(), briefs=BriefDocumentStore(),
+    )
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("a saved story continuation must not retrieve or call a provider")
+
+    monkeypatch.setattr("prm.application.answer_memory_research", forbidden)
+    monkeypatch.setattr("prm.application.synthesize_brief_editorial", forbidden)
+    assistant.answer(OperatorRequest(
+        query="AI", mode="brief", chat_id="42", brief_request=replace(_request(), editorial=doc.editorial),
+    ))
+    explained = assistant.answer(OperatorRequest(query="объясни пункт 1", chat_id="42"))
+    assert explained.payload["brief_followup"]["kind"] == "explain_item"
+
+    invalid = assistant.answer(OperatorRequest(query="объясни пункт 99", chat_id="42"))
+    assert invalid.payload["brief_followup"]["kind"] == "explain_item"
+    assert "нет такого пункта" in invalid.text
+    invalid_conversation = invalid.payload["conversation"]
+    assert assistant.briefs.visible_item_number(
+        conversation_id=invalid_conversation["conversation_id"],
+        response_ref=invalid_conversation["response_refs"][0],
+    ) is None
+
+    # Restore an exact story reference before testing shorthand continuations.
+    assistant.answer(OperatorRequest(query="объясни пункт 1", chat_id="42"))
+
+    expected = (
+        ("почему это важно?", "why_item", "устойчивости длительных исследований"),
+        ("можно проще?", "simplify_item", "не начинать его заново"),
+        ("а что дальше?", "next_step_item", "проверить восстановление на небольшой задаче"),
+        ("какие ограничения?", "caveat_item", "Поведение незавершённого шага"),
+        ("покажи источники", "sources_item", "https://example.org/source/1"),
+    )
+    for query, kind, fragment in expected:
+        result = assistant.answer(OperatorRequest(query=query, chat_id="42"))
+        assert result.payload["brief_followup"]["kind"] == kind
+        assert result.payload["brief_followup"]["item_number"] == 1
+        assert fragment in result.text
+        assert result.payload["retrieval_performed"] is False
+        assert result.payload["brief_document"]["brief_id"] == doc.brief_id
+
+    full = assistant.answer(OperatorRequest(query="Показать полный бриф", chat_id="42"))
+    full_conversation = full.payload["conversation"]
+    assert assistant.briefs.visible_item_number(
+        conversation_id=full_conversation["conversation_id"],
+        response_ref=full_conversation["response_refs"][0],
+    ) is None
+
+    # A shorthand continuation has no meaning without the exact visible item.
+    assert classify_brief_followup("почему это важно?") is None
+
+
+def test_editorial_transport_keeps_paired_permission_and_active_application_path(monkeypatch):
+    calls = []
+    def create(**kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(output_text=json.dumps(_editorial_data() if len(calls) == 1 else {"verdict": "pass", "issues": []}, ensure_ascii=False))
+    monkeypatch.setenv("PRM_OPENAI_PROVIDER_ENABLED", "true")
+    monkeypatch.setenv("PRM_OPENAI_CONTEXT_EGRESS_ENABLED", "true")
+    monkeypatch.setenv("OPENAI_API_KEY", "synthetic-pa04-key")
+    monkeypatch.setattr("prm.archive_synthesis_transport._build_client",
+                        lambda _key: SimpleNamespace(responses=SimpleNamespace(create=create)))
+    assistant = PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:"),
+        conversations=ConversationStore(), briefs=BriefDocumentStore())
+    result = assistant.answer(OperatorRequest(query="AI", mode="brief", chat_id="42",
+        brief_request=_request(), archive_synthesis_access=_archive_access()))
+    assert len(calls) == 2
+    assert "group reports of the same event" in calls[0]["input"][0]["content"]
+    assert result.payload["brief_editorial"]["status"] == "source_anchored_reviewed"
+    assert result.payload["brief_editorial"]["semantic_verification"] == "model_review_passed"
+    assert "Orion SDK продолжает" in result.text
+    assert "editorial" in result.payload["brief_document"]
+
+
+def test_no_grant_never_calls_transport_and_rejected_generation_preserves_sources(monkeypatch):
+    def forbidden(**kwargs):
+        raise AssertionError("no authorization must mean no provider call")
+    monkeypatch.setattr("prm.archive_synthesis_transport.complete_archive_synthesis", forbidden)
+    document = build_brief_document(_request())
+    editorial, measurement = synthesize_brief_editorial(document, question="AI", access=None)
+    assert editorial is None and measurement["provider_egress_attempted"] is False
+    full = render_brief_document(document, view="full")
+    assert "Редакторский обзор пока не подготовлен" in full
+    assert "результат завершённого шага" in full
+
+
+def test_provider_failure_or_invalid_json_does_not_publish_editorial(monkeypatch):
+    class Receipt:
+        def public_measurement(self):
+            return {"provider_egress_attempted": True}
+    monkeypatch.setattr("prm.archive_synthesis_transport.complete_archive_synthesis",
+                        lambda **kwargs: SimpleNamespace(text='{"stories":[],"stories":[]}', receipt=Receipt()))
+    editorial, measurement = synthesize_brief_editorial(build_brief_document(_request()), question="AI", access=_archive_access())
+    assert editorial is None and measurement["status"] == "editorial_rejected"
+
+
+def test_generated_editorial_requires_a_saved_plain_language_explanation(monkeypatch):
+    class Receipt:
+        def public_measurement(self):
+            return {"provider_egress_attempted": True}
+
+    candidate = _editorial_data()
+    candidate["stories"][0].pop("plain_explanation")
+    monkeypatch.setattr(
+        "prm.archive_synthesis_transport.complete_archive_synthesis",
+        lambda **kwargs: SimpleNamespace(text=json.dumps(candidate, ensure_ascii=False), receipt=Receipt()),
+    )
+    editorial, measurement = synthesize_brief_editorial(
+        build_brief_document(_request()), question="AI", access=_archive_access(),
+    )
+    assert editorial is None
+    assert measurement["status"] == "editorial_rejected"
+
+
+def test_content_review_rejection_preserves_raw_report_instead_of_publishing(monkeypatch):
+    class Receipt:
+        def public_measurement(self):
+            return {"provider_egress_attempted": True}
+    modes = []
+    def complete(**kwargs):
+        modes.append(kwargs["response_mode"])
+        text = _editorial_data() if len(modes) == 1 else {"verdict": "fail", "issues": ["unsupported_relationship"]}
+        return SimpleNamespace(text=json.dumps(text, ensure_ascii=False), receipt=Receipt())
+    monkeypatch.setattr("prm.archive_synthesis_transport.complete_archive_synthesis", complete)
+    result = PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:"), briefs=BriefDocumentStore(),
+        conversations=ConversationStore()).answer(OperatorRequest(query="AI", mode="brief", chat_id="42",
+        brief_request=_request(), archive_synthesis_access=_archive_access()))
+    assert modes == ["brief_editorial", "brief_review"]
+    assert result.payload["brief_editorial"]["status"] == "content_review_failed"
+    assert "editorial" not in result.payload["brief_document"]
+
+
+def test_review_budget_is_reserved_before_generation_and_never_bypassed(monkeypatch):
+    from prm.brief_editorial import _reserve_content_review
+    access = _archive_access()
+    competing = _reserve_content_review(access)
+    assert competing is not None
+    monkeypatch.setattr("prm.archive_synthesis_transport._build_client",
+                        lambda *_: pytest.fail("insufficient review budget must stop before transport"))
+    editorial, measurement = synthesize_brief_editorial(build_brief_document(_request()), question="AI", access=access)
+    assert editorial is None
+    assert measurement == {"status": "review_budget_or_authorization_required", "provider_egress_attempted": False}
+
+
+def test_expired_or_revoked_permission_prevents_editorial_transport(monkeypatch):
+    access = _archive_access()
+    registry = access.query_authorization.reservation.registry
+    registry.revoke_grant(access.context_authorization.grant_ref)
+    monkeypatch.setattr("prm.archive_synthesis_transport._build_client", lambda *_: pytest.fail("revoked context egress"))
+    editorial, measurement = synthesize_brief_editorial(build_brief_document(_request()), question="AI", access=access)
+    assert editorial is None and measurement["provider_egress_attempted"] is False
+
+
+def test_normal_brief_route_retrieves_then_synthesizes_and_reuses_result(monkeypatch):
+    requests = []
+    def retrieve(question, **kwargs):
+        requests.append(kwargs)
+        return {"archive_evidence": {"items": [dict(item, archive_document_id=item["evidence_id"])
+                                                for item in _request().evidence]}}
+    monkeypatch.setattr("prm.application.answer_memory_research", retrieve)
+    calls = []
+    class Receipt:
+        def public_measurement(self):
+            return {"provider_egress_attempted": True}
+    def complete(**kwargs):
+        calls.append(kwargs["response_mode"])
+        data = _editorial_data() if len(calls) == 1 else {"verdict": "pass", "issues": []}
+        return SimpleNamespace(text=json.dumps(data, ensure_ascii=False), receipt=Receipt())
+    monkeypatch.setattr("prm.archive_synthesis_transport.complete_archive_synthesis", complete)
+    assistant = PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:"),
+        conversations=ConversationStore(), briefs=BriefDocumentStore())
+    result = assistant.answer(OperatorRequest(
+        query="бриф AI с 2026-09-12 по 2026-09-19 timezone Europe/Berlin", mode="brief", chat_id="42",
+        archive_synthesis_access=_archive_access(),
+    ))
+    assert requests[0]["archive_query"] == "AI"
+    assert requests[0]["budget"].max_archive_candidates == 32
+    assert requests[0]["limit"] == 8
+    assert result.payload["brief_editorial"]["status"] == "source_anchored_reviewed"
+    assert "Orion SDK продолжает" in result.text
+    followup = assistant.answer(OperatorRequest(query="объясни 1", chat_id="42"))
+    assert "Документация ограничивает" in followup.text
+    assert len(requests) == 1 and calls == ["brief_editorial", "brief_review"]
+
+
+@pytest.mark.parametrize("complete", [False, True])
+def test_noise_only_brief_is_valid_empty_editorial_with_honest_coverage(monkeypatch, complete):
+    request = _request()
+    request = replace(request, evidence=(request.evidence[2],),
+                      coverage=(CoverageSource("synthetic_archive", "checked" if complete else "partial"),))
+    candidate = {"stories": [], "omitted_refs": ["evidence_source_2"]}
+    calls = []
+    class Receipt:
+        def public_measurement(self):
+            return {"provider_egress_attempted": True}
+    def generate(**kwargs):
+        calls.append(kwargs["response_mode"])
+        output = candidate if len(calls) == 1 else {"verdict": "pass", "issues": []}
+        return SimpleNamespace(text=json.dumps(output), receipt=Receipt())
+    monkeypatch.setattr("prm.archive_synthesis_transport.complete_archive_synthesis", generate)
+    assistant = PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:"),
+        conversations=ConversationStore(), briefs=BriefDocumentStore())
+    result = assistant.answer(OperatorRequest(query="AI", mode="brief", chat_id="42",
+        brief_request=request, archive_synthesis_access=_archive_access()))
+    assert calls == ["brief_editorial", "brief_review"]
+    assert result.payload["brief_document"]["editorial"] == candidate
+    assert result.payload["brief_editorial"]["status"] == "source_anchored_reviewed"
+    full = assistant.answer(OperatorRequest(query="Показать полный бриф", chat_id="42"))
+    for text in (result.text, full.text):
+        assert "Личное поздравление" not in text and "@channel" not in text
+        assert "Редакторский обзор пока не подготовлен" not in text
+        if complete:
+            assert "В проверенной области важных изменений" in text
+        else:
+            assert "Это не вывод за весь период" in text
+            assert "важных изменений по теме не найдено" not in text
+    document = build_brief_document(replace(request, editorial=BriefEditorial.from_dict(candidate, build_brief_document(request).evidence)))
+    assert _stored_document(_storage_document(document)) == document
+    jsonschema.Draft202012Validator(json.loads(Path("schemas/assistant_brief_document.v1.schema.json").read_text())).validate(document.to_dict())
+    with pytest.raises(ValueError):
+        BriefEditorial.from_dict({"stories": [], "omitted_refs": []}, document.evidence)
+
+
+@pytest.mark.parametrize("populated", [False, True])
+def test_editorial_comparison_never_reintroduces_omitted_noise(populated):
+    request = _request()
+    prior_base = build_brief_document(request)
+    empty = {"stories": [], "omitted_refs": [item.evidence_ref for item in prior_base.evidence]}
+    prior = build_brief_document(replace(request, editorial=BriefEditorial.from_dict(empty, prior_base.evidence)))
+    data = _editorial_data() if populated else empty
+    current = build_brief_document(replace(request, comparison_document=prior,
+        editorial=BriefEditorial.from_dict(data, prior_base.evidence)))
+    rendered = render_brief_document(current, view="comparison", comparison_document=prior)
+    assert "@channel" not in rendered and "Личное поздравление" not in rendered
+    assert "source/2" not in rendered
+    assert "BriefDocument" not in rendered and current.brief_id not in rendered
+    assert "не означает исчезновения события" in rendered
+    if populated:
+        assert "Вошло в текущий обзор" in rendered and "Orion SDK" in rendered
+        assert "Поведение незавершённого шага" in rendered
+        assert "https://example.org/source/0" in rendered and "https://example.org/source/1" in rendered
+    else:
+        assert "В обеих сохранённых подборках" in rendered
+        assert "https://" not in rendered
+
+
+def test_comparison_with_one_unedited_report_does_not_downgrade_to_source_feed():
+    prior = build_brief_document(_request())
+    current = build_brief_document(replace(_request(), comparison_document=prior,
+        editorial=BriefEditorial.from_dict(_editorial_data(), prior.evidence)))
+    result = render_brief_document(current, view="comparison", comparison_document=prior)
+    assert "для одного из двух обзоров" in result
+    assert "@channel" not in result and "https://" not in result
+
+
+def test_editorial_comparison_reports_revised_wording_with_bound_sources():
+    prior = _edited_document()
+    data = _editorial_data()
+    data["stories"][0]["summary"] = "При продолжении задачи агент использует сохранённые завершённые шаги."
+    current = build_brief_document(replace(_request(), comparison_document=prior,
+        editorial=BriefEditorial.from_dict(data, prior.evidence)))
+    result = render_brief_document(current, view="comparison", comparison_document=prior)
+    assert "Изменились формулировки" in result
+    assert data["stories"][0]["summary"] in result
+    assert "https://example.org/source/0" in result
+    assert "source/2" not in result
+
+
+@pytest.mark.parametrize("length", [261, 500])
+def test_expanded_editorial_preserves_long_source_urls(length):
+    prefix = "https://example.org/source?value="
+    url = prefix + "&" * (length - len(prefix))
+    request = _request()
+    request = replace(request, evidence=tuple(dict(item, source_url=url) if i == 0 else item
+                                             for i, item in enumerate(request.evidence)))
+    base = build_brief_document(request)
+    document = build_brief_document(replace(request,
+        editorial=BriefEditorial.from_dict(_editorial_data(), base.evidence)))
+    class Links(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.urls = []
+        def handle_starttag(self, tag, attrs):
+            if tag == "a":
+                self.urls.append(dict(attrs)["href"])
+    for view in ("full", "item"):
+        parser = Links()
+        parser.feed(render_brief_document(document, view=view, item_number=1))
+        assert url in parser.urls
+    assert "Источник — в полном брифе" in render_brief_document(document, view="short")
+
+
+@pytest.mark.parametrize("restart", [False, True])
+def test_store_comparison_resolves_only_the_bound_owner_scoped_version(tmp_path, monkeypatch, restart):
+    from db.migrate import run_migrations
+    from prm.briefs import brief_owner_ref_from_authenticated_private_tuple
+    db_path = tmp_path / "briefs.db"
+    monkeypatch.setenv("AGENT_DB_PATH", str(db_path))
+    run_migrations()
+    auth = dict(authenticated_chat_id="42", authenticated_actor_id="42", authenticated_owner_chat_id="42")
+    request = replace(_request(), owner_ref=brief_owner_ref_from_authenticated_private_tuple("42", "42", "42"))
+    base = build_brief_document(request)
+    prior = build_brief_document(replace(request,
+        editorial=BriefEditorial.from_dict(_editorial_data(), base.evidence)))
+    data = _editorial_data()
+    data["stories"][0]["summary"] = "При продолжении задачи агент использует сохранённые завершённые шаги."
+    current = build_brief_document(replace(request, comparison_document=prior,
+        editorial=BriefEditorial.from_dict(data, base.evidence)))
+    store = BriefDocumentStore(db_path=str(db_path))
+    store.bind_visible(conversation_id="conversation_editorial", response_ref="response_" + "e" * 24,
+                       document=current, comparison_document=prior, **auth)
+    if restart:
+        store = BriefDocumentStore(db_path=str(db_path))
+        scope = auth
+    else:
+        scope = {"conversation_id": "conversation_editorial"}
+    # Caller-supplied companion cannot override the saved exact reference.
+    result = store.render_brief(current.brief_id, current.version, "comparison",
+                                comparison_document=current, **scope)
+    assert "Изменились формулировки" in result
+    assert data["stories"][0]["summary"] in result
+    assert "source/2" not in result
+    assert store.render_brief(current.brief_id, current.version, "comparison",
+                             conversation_id="conversation_other") is None
+    assert store.render_brief(current.brief_id, current.version, "comparison",
+        authenticated_chat_id="43", authenticated_actor_id="43", authenticated_owner_chat_id="43") is None
+    for view, fragment in (
+        ("why", "устойчивости длительных исследований"),
+        ("simplify", "не начинать его заново"),
+        ("next_step", "проверить восстановление на небольшой задаче"),
+        ("sources", "https://example.org/source/0"),
+        ("caveat", "Поведение незавершённого шага"),
+    ):
+        rendered = store.render_brief(current.brief_id, current.version, view, item_number=1, **scope)
+        assert rendered is not None and fragment in rendered
+    if not restart:
+        store = BriefDocumentStore()
+        store.bind_visible(conversation_id="conversation_editorial", response_ref="response_" + "e" * 24, document=current)
+        unavailable = store.render_brief(current.brief_id, current.version, "comparison",
+            comparison_document=prior, conversation_id="conversation_editorial")
+        assert "Изменились формулировки" not in unavailable
+
+
+def test_maximum_changed_editorial_comparison_and_full_view_fit_safe_delivery():
+    from bot.prm_handlers import _split_telegram_text
+    request = _request()
+    source = request.evidence[0]
+    request = replace(request, evidence=tuple(dict(source,
+        evidence_id=f"evidence_source_{i}",
+        source_url=f"https://example.org/{i}?v=" + "&x=" * 150,
+    ) for i in range(8)))
+    base = build_brief_document(request)
+    def editorial(prefix):
+        stories = []
+        for letter in "ABCDE":
+            story = dict(_editorial_data()["stories"][0])
+            story.update(title=prefix + letter, summary="Сохранение результатов. " * 12,
+                         explanation="&" * 900, caveat="Ограничение источника. " * 12,
+                         anchors=[{"evidence_ref": item.evidence_ref, "quote": item.summary} for item in base.evidence])
+            stories.append(story)
+        return BriefEditorial.from_dict({"stories": stories, "omitted_refs": []}, base.evidence)
+    prior = build_brief_document(replace(request, editorial=editorial("Ранее ")))
+    current = build_brief_document(replace(request, editorial=editorial("Сейчас "), comparison_document=prior))
+    comparison = render_brief_document(current, view="comparison", comparison_document=prior)
+    assert len(comparison) <= 2400
+    assert "не показано пунктов" in comparison
+    assert "Сейчас A" in comparison
+    assert "не означает исчезновения" in comparison
+    assert len(_split_telegram_text(comparison)) == 1
+    class BalancedHTML(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.stack = []
+        def handle_starttag(self, tag, attrs):
+            self.stack.append(tag)
+        def handle_endtag(self, tag):
+            assert self.stack.pop() == tag
+    for view in ("full", "item"):
+        rendered = render_brief_document(current, view=view, item_number=1)
+        chunks = _split_telegram_text(rendered)
+        assert len(chunks) <= 8
+        for chunk in chunks:
+            assert len(chunk) <= 3400
+            parser = BalancedHTML()
+            parser.feed(chunk)
+            parser.close()
+            assert parser.stack == []
+            assert not chunk.endswith(("&", "&a", "&am", "&amp"))

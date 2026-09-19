@@ -5,14 +5,13 @@ from __future__ import annotations
 import logging
 import os
 import hashlib
+import inspect
+import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, Mapping
+from threading import RLock
+from typing import Any, Mapping, Sequence
 
-from assistant.prm_post_answer_actions import (
-    PRM_ACTION_PREFIX,
-    build_post_answer_actions,
-    handle_post_answer_callback,
-)
+from assistant.prm_post_answer_actions import build_post_answer_actions, canonical_private_owner_id
 from assistant.utd_profile import (
     is_utd_profile_intent,
     is_utd_question,
@@ -22,7 +21,20 @@ from assistant.utd_profile import (
 from bot.telegram_delivery import _send_text_internal
 from config.settings import Settings
 from prm.application import PersonalResearchAssistant
-from prm.contracts import OperatorRequest
+from prm.briefs import BriefDocumentStore
+from prm.capabilities import (
+    AuthorizationDecision,
+    AuthorizationRequest,
+    CapabilityGrant,
+    CapabilityRegistry,
+    CapabilityDenied,
+    ProviderPolicy,
+    describe_current_capability_scope,
+    require_authorized_operation,
+    transport_purpose,
+)
+from prm.contracts import ArchiveSynthesisAccess, ModelEgressAccess, OperatorRequest
+from prm.conversation import GLOBAL_CONVERSATIONS, compose_object_bound_archive_followup
 
 LOGGER = logging.getLogger(__name__)
 PRM_SAFE_COMMANDS = frozenset(
@@ -34,8 +46,11 @@ PRM_SAFE_COMMANDS = frozenset(
         "/research",
         "/brief",
         "/chat",
+        "/new",
+        "/cancel",
         "/utd",
         "/status",
+        "/privacy",
         "/refresh",
         "/reactions",
     }
@@ -43,6 +58,38 @@ PRM_SAFE_COMMANDS = frozenset(
 _PRM_DIALOG_TTL = timedelta(minutes=20)
 _MAX_PRM_DIALOGS = 200
 _PRM_DIALOG_STATE: dict[str, dict[str, Any]] = {}
+_PRM_BRIEF_STORES: dict[str, BriefDocumentStore] = {}
+_PRM_BRIEF_STORES_LOCK = RLock()
+_MAX_PRM_BRIEF_STORES = 4
+TELEGRAM_PROVIDER_REF = "provider_telegram"
+RESULT_DELIVERY_CAPABILITY = "assistant.result_delivery"
+RESULT_DELIVERY_DATA_CLASS = "private_archive"
+UTD_DRAFT_CAPABILITY = "assistant.utd_draft"
+LOCAL_PROVIDER_REF = "provider_local"
+MAX_EPHEMERAL_REPLY_SENDS = 8
+
+
+def _assistant_for_prm(settings: Settings) -> PersonalResearchAssistant:
+    """Keep only the bounded visible BriefDocument projection across turns."""
+
+    db_path = str(settings.db_path)
+    with _PRM_BRIEF_STORES_LOCK:
+        briefs = _PRM_BRIEF_STORES.get(db_path)
+        if briefs is None:
+            if len(_PRM_BRIEF_STORES) >= _MAX_PRM_BRIEF_STORES:
+                _PRM_BRIEF_STORES.pop(next(iter(_PRM_BRIEF_STORES)))
+            briefs = BriefDocumentStore(db_path=db_path)
+            _PRM_BRIEF_STORES[db_path] = briefs
+    parameters = inspect.signature(PersonalResearchAssistant).parameters
+    if "briefs" not in parameters and not any(
+        parameter.kind is inspect.Parameter.VAR_KEYWORD
+        for parameter in parameters.values()
+    ):
+        # Narrow injected test/compatibility facades predate the PA-07 store
+        # seam. They cannot model report navigation, so preserve their old
+        # settings-only constructor without weakening the real ingress.
+        return PersonalResearchAssistant(settings=settings)
+    return PersonalResearchAssistant(settings=settings, briefs=briefs)
 
 
 def send_message(
@@ -52,8 +99,26 @@ def send_message(
     parse_mode: str | None = None,
     escape_markdown: bool = False,
     reply_markup: dict | None = None,
+    delivery_authorization: AuthorizationDecision | None = None,
+    actor_id: str | None = None,
+    owner_chat_id: str | None = None,
 ) -> None:
+    """Send PA-originated Telegram content only with a current grant.
+
+    Calls from text, voice and UTD/callback paths share this single final-send
+    boundary. An omitted decision denies before the Telegram transport rather
+    than treating a token or private chat as authority.
+    """
+
     del escape_markdown
+    if not _require_prm_delivery_authorization(
+        token=token,
+        chat_id=chat_id,
+        authorization=delivery_authorization,
+        actor_id=actor_id,
+        owner_chat_id=owner_chat_id,
+    ):
+        return
     try:
         kwargs: dict[str, object] = {
             "chat_id": chat_id,
@@ -65,41 +130,134 @@ def send_message(
             kwargs["reply_markup"] = reply_markup
         _send_text_internal(**kwargs)
     except Exception:
-        LOGGER.warning("Failed to send PRM Telegram message chat_id=%s", chat_id, exc_info=True)
+        LOGGER.warning("Failed to send PRM Telegram message")
 
 
-def dispatch_prm_command(chat_id: str, text: str, settings: Settings) -> None:
+def consume_private_reply_authorization(
+    *,
+    token: str,
+    chat_id: str,
+    authorization: AuthorizationDecision | None,
+    actor_id: str | None,
+    owner_chat_id: str | None,
+) -> bool:
+    """Consume the exact-private decision before any PA Telegram response."""
+
+    return _require_prm_delivery_authorization(
+        token=token,
+        chat_id=chat_id,
+        authorization=authorization,
+        actor_id=actor_id,
+        owner_chat_id=owner_chat_id,
+    )
+
+
+def dispatch_prm_command(
+    chat_id: str,
+    text: str,
+    settings: Settings,
+    *,
+    actor_id: str | None = None,
+    owner_chat_id: str | None = None,
+    delivery_authorizations: Sequence[AuthorizationDecision] = (),
+    utd_draft_authorization: AuthorizationDecision | None = None,
+    model_access: ModelEgressAccess | None = None,
+    archive_synthesis_access: ArchiveSynthesisAccess | None = None,
+) -> None:
     command, args = _split_command(text)
-    if command not in PRM_SAFE_COMMANDS:
+
+    def send_private_reply(
+        message: str,
+        *,
+        reply_markup: dict | None = None,
+    ) -> None:
+        """Use one turn-bound return-envelope decision for a short reply."""
+
         send_message(
             _token(),
             chat_id,
+            message,
+            reply_markup=reply_markup,
+            delivery_authorization=_first_delivery_authorization(delivery_authorizations),
+            actor_id=actor_id,
+            owner_chat_id=owner_chat_id,
+        )
+
+    if command not in PRM_SAFE_COMMANDS:
+        send_private_reply(
             "Эта команда не входит в активный интерфейс. Используй обычный вопрос или /help.",
         )
         return
     if command in {"/start", "/help"}:
-        send_message(_token(), chat_id, _help_text())
+        send_private_reply(_help_text())
+        return
+    if command == "/privacy":
+        if actor_id != chat_id or owner_chat_id != chat_id:
+            send_private_reply("Сведения о правах недоступны для этого чата.")
+            return
+        # PA-02 has no durable grant source yet. Rendering the empty registry is
+        # intentional: it shows the exact default-deny scope without creating,
+        # persisting, or pretending to revoke a connection.
+        send_private_reply(describe_current_capability_scope(()))
+        return
+    if command in {"/new", "/cancel"}:
+        assistant = _assistant_for_prm(settings)
+        try:
+            result = assistant.answer(
+                OperatorRequest(
+                    query=command,
+                    mode="chat",
+                    chat_id=chat_id,
+                    input_kind="text",
+                    actor_id=actor_id,
+                    owner_chat_id=owner_chat_id,
+                )
+            )
+        except Exception as exc:
+            LOGGER.warning("PRM conversation control failed: %s", type(exc).__name__)
+            send_private_reply("Не удалось обновить состояние диалога. Ничего не было подтверждено или сохранено.")
+            return
+        _send_chunks(
+            chat_id,
+            result.text,
+            reply_markup=None,
+            actor_id=actor_id,
+            owner_chat_id=owner_chat_id,
+            delivery_authorizations=delivery_authorizations,
+        )
         return
     if command == "/utd":
-        _start_utd_profile(chat_id, settings=settings, seed_text=args)
+        _start_utd_profile(
+            chat_id,
+            settings=settings,
+            seed_text=args,
+            authorization=utd_draft_authorization,
+            delivery_authorization=_first_delivery_authorization(delivery_authorizations),
+            actor_id=actor_id,
+            owner_chat_id=owner_chat_id,
+        )
         return
     if command in {"/status", "/refresh", "/reactions"}:
         _delegate_safe_ops(command, chat_id, args, settings)
         return
     content_commands = {"/auto", "/auto_voice", "/research", "/brief", "/chat"}
     if command in content_commands and is_utd_profile_intent(args):
-        _start_utd_profile(chat_id, settings=settings, seed_text=args)
+        _start_utd_profile(
+            chat_id,
+            settings=settings,
+            seed_text=args,
+            authorization=utd_draft_authorization,
+            delivery_authorization=_first_delivery_authorization(delivery_authorizations),
+            actor_id=actor_id,
+            owner_chat_id=owner_chat_id,
+        )
         return
     if (
         command in content_commands
         and is_utd_question(args)
         and not _explicit_archive_request(args)
     ):
-        send_message(
-            _token(),
-            chat_id,
-            render_utd_question_preview(args, db_path=settings.db_path),
-        )
+        send_private_reply(render_utd_question_preview(args, db_path=settings.db_path))
         return
 
     mode = {"/research": "research", "/brief": "brief", "/chat": "chat"}.get(
@@ -107,39 +265,24 @@ def dispatch_prm_command(chat_id: str, text: str, settings: Settings) -> None:
     )
     input_kind = "voice_transcript" if command == "/auto_voice" else "text"
     if not args:
-        send_message(
-            _token(),
-            chat_id,
-            "Напиши вопрос после команды или просто отправь обычное сообщение.",
+        send_private_reply("Напиши вопрос после команды или просто отправь обычное сообщение.")
+        return
+    if _is_memory_action_followup(args):
+        send_private_reply(
+            "Это действие недоступно. Отправь запрос заново, чтобы получить новую кнопку действия."
         )
         return
-    dialog = _resolve_prm_dialog_query(chat_id, args, mode=mode)
-    if dialog.get("kind") == "post_answer_action":
-        context_id = str(dialog.get("action_context_id") or "")
-        action = str(dialog.get("post_answer_action") or "")
-        if context_id and action:
-            result = handle_post_answer_callback(
-                settings.db_path,
-                f"{PRM_ACTION_PREFIX}:{context_id}:{action}",
-                chat_id=chat_id,
-                actor_id=chat_id,
-            )
-            message = str(result.get("message") or "Черновик недоступен. Запроси ответ заново.")
-            if str(result.get("status") or "") == "needs_confirmation":
-                _remember_pending_prm_action(chat_id, action=action, message=message)
-            send_message(
-                _token(),
-                chat_id,
-                message,
-                reply_markup=result.get("reply_markup"),
-            )
-            return
-    if dialog.get("kind") == "short_next_step":
-        send_message(_token(), chat_id, str(dialog.get("message") or "Следующий шаг не найден."))
-        return
-
-    effective_args = str(dialog.get("effective_query") or args)
-    assistant = PersonalResearchAssistant(settings=settings)
+    # PA-03 no longer consults the historic `_PRM_DIALOG_STATE` on active
+    # ingress. A read-only archive refinement is possible only while an actual
+    # visible ConversationState response remains current; confirmation and
+    # action selection are handled separately by the application and fail
+    # closed without an immutable proposal/version.
+    effective_args = compose_object_bound_archive_followup(
+        GLOBAL_CONVERSATIONS.load(chat_id),
+        args,
+        mode=mode,
+    ) or args
+    assistant = _assistant_for_prm(settings)
     try:
         result = assistant.answer(
             OperatorRequest(
@@ -147,54 +290,56 @@ def dispatch_prm_command(chat_id: str, text: str, settings: Settings) -> None:
                 mode=mode,
                 chat_id=chat_id,
                 input_kind=input_kind,
+                actor_id=actor_id,
+                owner_chat_id=owner_chat_id,
+                model_access=model_access,
+                archive_synthesis_access=archive_synthesis_access,
             )
         )  # type: ignore[arg-type]
     except Exception as exc:
-        LOGGER.warning("PRM request failed command=%s", command, exc_info=True)
-        send_message(_token(), chat_id, f"Не смог обработать запрос: {type(exc).__name__}")
+        # Model, archive and provider exceptions can carry request-derived
+        # content.  Keep the normal PA log metadata-only.
+        LOGGER.warning("PRM request failed")
+        send_private_reply(f"Не смог обработать запрос: {type(exc).__name__}")
         return
-    action_bundle = _post_answer_action_bundle(result.payload, settings=settings, chat_id=chat_id)
-    markup = action_bundle.get("reply_markup") if isinstance(action_bundle, Mapping) else None
-    _send_chunks(chat_id, result.text, reply_markup=markup)
-    result_status = str(getattr(result, "status", "ok") or "ok")
-    result_mode = str(getattr(result, "mode", mode) or mode)
-    if result_status == "ok" and result_mode in {"research", "brief"}:
-        result_route = _mapping(getattr(result, "route", {}))
-        _remember_prm_dialog(
-            chat_id,
-            effective_args,
-            mode=result_mode,
-            # A prior topic belongs only to a composed follow-up.  For a new
-            # explicit query, preserve the answered route so the next short
-            # follow-up cannot resurrect Topic A over Topic B.
-            topic=str(
-                (dialog.get("previous_topic") if bool(dialog.get("used")) else "")
-                or result_route.get("retrieval_query")
-                or effective_args
-            ),
-            project_name=str(result_route.get("project_name") or _mapping(result.payload).get("project_name") or ""),
-            action_context_id=str(action_bundle.get("context_id") or "") if isinstance(action_bundle, Mapping) else "",
-                action_codes=[
-                    str(code)
-                    for code in ((action_bundle.get("action_codes") or []) if isinstance(action_bundle, Mapping) else [])
-                    if str(code)
-                ],
-            last_answer=result.text,
-            direct_count=_archive_result_count(result.payload, "direct_count"),
-            partial_count=_archive_result_count(result.payload, "partial_count"),
-            adjacent_count=_archive_result_count(result.payload, "adjacent_count"),
-            current_fact_boundary=_current_fact_boundary(result.payload),
-            direct_only_filter=bool(dialog.get("previous_direct_only")) or _is_direct_only_request(effective_args),
+    markup = _brief_navigation_markup(result.payload)
+    if markup is None:
+        action_bundle = _post_answer_action_bundle(
+            result.payload,
+            settings=settings,
+            chat_id=chat_id,
+            actor_id=actor_id,
+            owner_chat_id=owner_chat_id,
         )
-    elif result_status == "needs_confirmation" and _mapping(getattr(result, "route", {})).get("primary_intent") == "memory_action":
-        _remember_pending_prm_action(
-            chat_id,
-            action=_memory_action_code(args),
-            message=result.text,
-        )
+        markup = action_bundle.get("reply_markup") if isinstance(action_bundle, Mapping) else None
+    _send_chunks(
+        chat_id,
+        result.text,
+        reply_markup=markup,
+        parse_mode=_brief_telegram_parse_mode(result.payload),
+        actor_id=actor_id,
+        owner_chat_id=owner_chat_id,
+        delivery_authorizations=delivery_authorizations,
+    )
 
 
-def _start_utd_profile(chat_id: str, *, settings: Settings, seed_text: str) -> None:
+def _start_utd_profile(
+    chat_id: str,
+    *,
+    settings: Settings,
+    seed_text: str,
+    authorization: AuthorizationDecision | None = None,
+    delivery_authorization: AuthorizationDecision | None = None,
+    actor_id: str | None = None,
+    owner_chat_id: str | None = None,
+) -> None:
+    if not _require_utd_draft_authorization(
+        chat_id=chat_id,
+        authorization=authorization,
+        actor_id=actor_id,
+        owner_chat_id=owner_chat_id,
+    ):
+        return
     result = start_utd_profile_onboarding(
         settings.db_path,
         chat_id=chat_id,
@@ -205,24 +350,18 @@ def _start_utd_profile(chat_id: str, *, settings: Settings, seed_text: str) -> N
         chat_id,
         str(result.get("message") or "UTD-черновик недоступен."),
         reply_markup=result.get("reply_markup"),
+        delivery_authorization=delivery_authorization,
+        actor_id=actor_id,
+        owner_chat_id=owner_chat_id,
     )
 
 
 def _delegate_safe_ops(command: str, chat_id: str, args: str, settings: Settings) -> None:
-    from bot import legacy_handlers
-
-    handler_name = {
-        "/status": "handle_status",
-        "/refresh": "handle_refresh",
-        "/reactions": "handle_reactions",
-    }[command]
-    handler = getattr(legacy_handlers, handler_name, None)
-    if handler is None:
-        send_message(
-            _token(), chat_id, "Операционная команда пока недоступна в текущей сборке."
-        )
-        return
-    handler(chat_id, args, settings)
+    # Legacy handlers own their historical Telegram sends and have no PA-02
+    # capability boundary.  Do not route PA ingress through them until their
+    # exact operations/receipts receive a separately scoped implementation.
+    del command, chat_id, args, settings
+    LOGGER.warning("PA operation denied before legacy dispatch")
 
 
 def _post_answer_markup(
@@ -232,9 +371,51 @@ def _post_answer_markup(
     return bundle.get("reply_markup") if isinstance(bundle, Mapping) else None
 
 
+def _brief_navigation_markup(payload: Mapping[str, Any]) -> dict | None:
+    """Render PA-07's one-shot, non-callback full-brief navigation button.
+
+    This is a ReplyKeyboard text control, not a durable action or callback.
+    Its text is accepted only if the application still has the matching
+    current visible report in its bounded in-process store.
+    """
+
+    navigation = _mapping(payload.get("telegram_navigation"))
+    if (
+        navigation.get("kind") != "reply_keyboard"
+        or navigation.get("button_text") != "Показать полный бриф"
+        or navigation.get("current_visible_brief_only") is not True
+    ):
+        return None
+    return {
+        "keyboard": [[{"text": "Показать полный бриф"}]],
+        "resize_keyboard": True,
+        "one_time_keyboard": True,
+    }
+
+
+def _brief_telegram_parse_mode(payload: Mapping[str, Any]) -> str | None:
+    """Enable HTML only for the renderer that escaped its archive fields."""
+
+    return "HTML" if payload.get("telegram_parse_mode") == "HTML" else None
+
+
 def _post_answer_action_bundle(
-    payload: Mapping[str, Any], *, settings: Settings, chat_id: str
+    payload: Mapping[str, Any], *, settings: Settings, chat_id: str,
+    actor_id: str | None = None, owner_chat_id: str | None = None,
+    persistence_authorized: bool = False,
 ) -> dict[str, Any]:
+    """Build durable action state only after its owning slice grants a write.
+
+    The PA-02 private reply envelope authorizes a bounded Telegram response,
+    not local retention.  In particular, it cannot be used to store an
+    answer-derived action snapshot or interaction receipt before a response
+    might be denied.  PA-13 will supply an explicit, confirmation-bound local
+    persistence authority if it enables this surface.  Until then all active
+    PA callers receive no post-answer controls and make no durable write here.
+    """
+
+    if not persistence_authorized:
+        return {"context_id": None, "reply_markup": None, "action_codes": []}
     gate = _mapping(payload.get("answer_gate"))
     if not bool(gate.get("allow_answer", True)):
         return {}
@@ -279,6 +460,8 @@ def _post_answer_action_bundle(
         },
         db_path=settings.db_path,
         chat_id=chat_id,
+        actor_id=actor_id,
+        owner_chat_id=owner_chat_id,
     )
 
 
@@ -287,16 +470,196 @@ def _send_chunks(
     text: str,
     *,
     reply_markup: dict | None,
+    parse_mode: str | None = None,
+    actor_id: str | None = None,
+    owner_chat_id: str | None = None,
+    delivery_authorizations: Sequence[AuthorizationDecision] = (),
     limit: int = 3400,
 ) -> None:
+    """Deliver a PA answer only through exact one-use Telegram grants.
+
+    Omitted decisions deny the final Telegram side effect rather than treating
+    a bot token or a private chat as consent. Runtime ingress supplies only a
+    short-lived, exact private return envelope, one decision per transport
+    chunk.
+    """
+
+    delivery_owner_ref = _private_delivery_owner_ref(chat_id, actor_id, owner_chat_id)
     chunks = _split_telegram_text(text, limit=limit)
+    if delivery_owner_ref is None or len(delivery_authorizations) < len(chunks):
+        LOGGER.warning("PRM result delivery denied before Telegram send")
+        return
+    decisions = iter(delivery_authorizations)
     for index, chunk in enumerate(chunks):
+        decision = next(decisions, None)
+        if decision is None:
+            LOGGER.warning("PRM result delivery denied before Telegram send")
+            return
         send_message(
             _token(),
             chat_id,
             chunk,
+            parse_mode=parse_mode,
             reply_markup=reply_markup if index == len(chunks) - 1 else None,
+            delivery_authorization=decision,
+            actor_id=actor_id,
+            owner_chat_id=owner_chat_id,
         )
+
+
+def _private_delivery_owner_ref(
+    chat_id: str,
+    actor_id: str | None,
+    owner_chat_id: str | None,
+) -> str | None:
+    """Map the authenticated private Telegram tuple to a policy owner ref."""
+
+    values = tuple(canonical_private_owner_id(value) for value in (chat_id, actor_id, owner_chat_id))
+    if any(value is None for value in values) or len(set(values)) != 1:
+        return None
+    return f"owner_telegram_{values[0]}"
+
+
+def issue_private_reply_authorizations(
+    *,
+    token: str,
+    chat_id: str,
+    actor_id: str | None,
+    owner_chat_id: str | None,
+    maximum_send_count: int = MAX_EPHEMERAL_REPLY_SENDS,
+) -> tuple[AuthorizationDecision, ...]:
+    """Mint bounded in-memory return-envelope decisions for one inbound turn.
+
+    This is not a durable grant source and grants no read, provider-egress,
+    background-job, connection-management, or third-party send authority. It
+    can only return a response to the authenticated private Telegram tuple over
+    the exact bot connection that received the turn.
+    """
+
+    owner_ref = _private_delivery_owner_ref(chat_id, actor_id, owner_chat_id)
+    connection_ref = _telegram_connection_ref(token)
+    if owner_ref is None or connection_ref is None or maximum_send_count < 1:
+        return ()
+    now = datetime.now(timezone.utc)
+    grant = CapabilityGrant(
+        grant_id=f"grant_ephemeral_reply_{uuid.uuid4().hex}",
+        owner_ref=owner_ref,
+        connection_ref=connection_ref,
+        capability=RESULT_DELIVERY_CAPABILITY,
+        resource_refs=(chat_id,),
+        operations=("deliver",),
+        data_classes=(RESULT_DELIVERY_DATA_CLASS,),
+        purpose="answer.delivery",
+        provider_policy=ProviderPolicy(
+            (TELEGRAM_PROVIDER_REF,),
+            maximum_request_count=maximum_send_count,
+        ),
+        issued_at=now,
+        expires_at=now + timedelta(minutes=2),
+        revision=1,
+    )
+    request = AuthorizationRequest(
+        owner_ref=owner_ref,
+        connection_ref=connection_ref,
+        capability=RESULT_DELIVERY_CAPABILITY,
+        resource_ref=chat_id,
+        operation="deliver",
+        data_class=RESULT_DELIVERY_DATA_CLASS,
+        provider_ref=TELEGRAM_PROVIDER_REF,
+        purpose="answer.delivery",
+        expected_grant_revision=1,
+    )
+    registry = CapabilityRegistry((grant,))
+    return tuple(registry.authorize_and_reserve(request, now=now) for _ in range(maximum_send_count))
+
+
+def _first_delivery_authorization(
+    authorizations: Sequence[AuthorizationDecision],
+) -> AuthorizationDecision | None:
+    return authorizations[0] if authorizations else None
+
+
+def _require_utd_draft_authorization(
+    *,
+    chat_id: str,
+    authorization: AuthorizationDecision | None,
+    actor_id: str | None,
+    owner_chat_id: str | None,
+) -> bool:
+    owner_ref = _private_delivery_owner_ref(chat_id, actor_id, owner_chat_id)
+    if owner_ref is None:
+        LOGGER.warning("UTD draft denied before local write")
+        return False
+    try:
+        require_authorized_operation(
+            authorization,
+            capability=UTD_DRAFT_CAPABILITY,
+            operation="write",
+            provider_ref=LOCAL_PROVIDER_REF,
+            data_class="user_provided",
+            owner_ref=owner_ref,
+            connection_ref=None,
+            resource_ref=chat_id,
+            purpose=transport_purpose(
+                provider_ref=LOCAL_PROVIDER_REF,
+                capability=UTD_DRAFT_CAPABILITY,
+                operation="write",
+            ),
+        )
+    except CapabilityDenied:
+        LOGGER.warning("UTD draft denied before local write")
+        return False
+    return True
+
+
+def _require_prm_delivery_authorization(
+    *,
+    token: str,
+    chat_id: str,
+    authorization: AuthorizationDecision | None,
+    actor_id: str | None,
+    owner_chat_id: str | None,
+) -> bool:
+    delivery_owner_ref = _private_delivery_owner_ref(chat_id, actor_id, owner_chat_id)
+    delivery_connection_ref = _telegram_connection_ref(token)
+    if delivery_owner_ref is None or delivery_connection_ref is None:
+        LOGGER.warning("PRM result delivery denied before Telegram send")
+        return False
+    try:
+        require_authorized_operation(
+            authorization,
+            capability=RESULT_DELIVERY_CAPABILITY,
+            operation="deliver",
+            provider_ref=TELEGRAM_PROVIDER_REF,
+            data_class=RESULT_DELIVERY_DATA_CLASS,
+            owner_ref=delivery_owner_ref,
+            connection_ref=delivery_connection_ref,
+            resource_ref=chat_id,
+            purpose=transport_purpose(
+                provider_ref=TELEGRAM_PROVIDER_REF,
+                capability=RESULT_DELIVERY_CAPABILITY,
+                operation="deliver",
+            ),
+        )
+    except CapabilityDenied:
+        LOGGER.warning("PRM result delivery denied before Telegram send")
+        return False
+    return True
+
+
+def _telegram_connection_ref(token: str) -> str | None:
+    """Bind the policy connection ref to the exact configured bot token.
+
+    The token is never returned, logged or stored.  Only a bounded opaque
+    digest-derived connection reference participates in the in-memory grant
+    comparison, so a reservation for another Telegram bot cannot authorize this
+    transport.
+    """
+
+    clean_token = str(token or "").strip()
+    if not clean_token:
+        return None
+    return f"connection_telegram_{hashlib.sha256(clean_token.encode('utf-8')).hexdigest()[:32]}"
 
 
 def _split_telegram_text(text: str, *, limit: int = 3400) -> list[str]:
@@ -735,6 +1098,8 @@ def _help_text() -> str:
         "Чтобы собрать персональный scope, напиши: «Настроить мой UTD-профиль». "
         "Сначала будет черновик и полный предпросмотр; ничего постоянного не сохранится без "
         "отдельного подтверждения.\n\n"
+        "Команда /privacy показывает действующие границы прав. Если активных прав нет, "
+        "внешние модели и передача материалов заблокированы.\n\n"
         "Примеры обычных сообщений:\n"
         "• Что в архиве есть про agent evals?\n"
         "• Что из найденного применимо к моему проекту?\n"

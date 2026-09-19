@@ -662,6 +662,23 @@ CREATE TABLE IF NOT EXISTS prm_interaction_feedback_transitions (
     FOREIGN KEY(interaction_id) REFERENCES prm_interaction_ledger(interaction_id) ON DELETE RESTRICT
 );
 
+-- PA-07: derived, owner-scoped immutable BriefDocument versions.  The JSON
+-- stores only the already selected bounded evidence excerpts and inspection
+-- fields, never the source archive corpus.  Retention/deletion policy is
+-- enforced by BriefDocumentStore; this table does not schedule or deliver.
+CREATE TABLE IF NOT EXISTS assistant_brief_documents (
+    owner_ref TEXT NOT NULL CHECK(length(trim(owner_ref)) BETWEEN 10 AND 128),
+    brief_id TEXT NOT NULL CHECK(length(trim(brief_id)) BETWEEN 9 AND 128),
+    version INTEGER NOT NULL CHECK(version >= 1),
+    content_digest TEXT NOT NULL CHECK(length(trim(content_digest)) = 71),
+    document_json TEXT NOT NULL
+        CHECK(json_valid(document_json) AND json_type(document_json) = 'object'),
+    created_at TEXT NOT NULL,
+    PRIMARY KEY(owner_ref, brief_id, version)
+);
+CREATE INDEX IF NOT EXISTS idx_assistant_brief_documents_owner_history
+    ON assistant_brief_documents(owner_ref, brief_id, version DESC);
+
 CREATE TABLE IF NOT EXISTS projects (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,

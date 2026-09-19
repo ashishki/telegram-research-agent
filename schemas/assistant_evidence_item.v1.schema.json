@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://telegram-research-agent.local/schemas/assistant_evidence_item.v1.schema.json",
+  "title": "EvidenceItem v1",
+  "description": "A provenance-preserving evidence record. source_ref is opaque and must be carried byte-for-byte by downstream contracts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "evidence_id", "source_kind", "source_ref", "canonical_url", "source_version", "excerpts", "published_at", "event_at", "retrieved_at", "access_scope", "conflicts_with"],
+  "properties": {
+    "schema_version": {"const": "assistant.evidence_item.v1"},
+    "evidence_id": {"type": "string", "pattern": "^evidence_[a-z0-9_-]{3,120}$"},
+    "source_kind": {"type": "string", "enum": ["telegram_archive", "public_web", "mail", "calendar", "canvas", "github", "document", "academic_public", "user_provided"]},
+    "source_ref": {"type": "string", "minLength": 1, "maxLength": 512},
+    "canonical_url": {"type": ["string", "null"], "pattern": "^https://[^\\s]{1,2040}$"},
+    "source_version": {"type": "string", "minLength": 1, "maxLength": 256},
+    "excerpts": {"type": "array", "maxItems": 5, "items": {"type": "object", "additionalProperties": false, "required": ["excerpt_ref", "text"], "properties": {"excerpt_ref": {"type": "string", "pattern": "^excerpt_[a-z0-9_-]{3,120}$"}, "text": {"type": "string", "minLength": 1, "maxLength": 500}}}},
+    "published_at": {"type": ["string", "null"], "format": "date-time"},
+    "event_at": {"type": ["string", "null"], "format": "date-time"},
+    "retrieved_at": {"type": "string", "format": "date-time"},
+    "access_scope": {"type": "string", "enum": ["public", "owner_private", "connection_private"]},
+    "conflicts_with": {"type": "array", "maxItems": 32, "uniqueItems": true, "items": {"type": "string", "pattern": "^evidence_[a-z0-9_-]{3,120}$"}}
+  }
+}

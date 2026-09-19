@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import sqlite3
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from assistant.utd_profile import UTD_CONFIRM_PREFIX, UTD_DRAFT_PREFIX, build_utd_subscription_cancel_proposal, confirm_utd_subscription_cancel, handle_utd_profile_callback, handle_utd_subscription_callback, load_confirmed_utd_profile, start_utd_profile_onboarding, start_utd_subscription_cancel, start_utd_subscription_pause
 from assistant.utd_profile_schema import _apply_draft_action, _default_draft, render_utd_onboarding, render_utd_watch_preview
+from assistant.utd_profile_store import decode_utd_proposal_state, transition_utd_context
 from external_watch.subscription import subscription_effect
 from external_watch.profile import load_confirmed_utd_profile as load_runtime_utd_profile
 
@@ -13,7 +15,7 @@ from external_watch.profile import load_confirmed_utd_profile as load_runtime_ut
 def _init_db(path: Path) -> None:
     with sqlite3.connect(path) as c:
         c.executescript("""
-        CREATE TABLE prm_post_answer_proposals (context_id TEXT PRIMARY KEY, chat_id_hash TEXT NOT NULL, summary_json TEXT NOT NULL, proposals_json TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL, expires_at TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'draft');
+        CREATE TABLE prm_post_answer_proposals (context_id TEXT PRIMARY KEY, chat_id_hash TEXT NOT NULL, summary_json TEXT NOT NULL, proposals_json TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL, expires_at TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'ready' CHECK(status IN ('ready', 'pending', 'confirmed', 'cancelled')));
         CREATE TABLE personal_memory_events (id INTEGER PRIMARY KEY AUTOINCREMENT, memory_id TEXT NOT NULL, object_type TEXT NOT NULL, event_type TEXT NOT NULL, title TEXT NOT NULL, body TEXT, rationale TEXT, source_refs_json TEXT NOT NULL, metadata_json TEXT NOT NULL, proposal_id TEXT NOT NULL, rollback_of_event_id INTEGER, created_at TEXT NOT NULL, created_by TEXT NOT NULL, confirmation_token_hash TEXT NOT NULL, confirmation_receipt_json TEXT NOT NULL);
         CREATE UNIQUE INDEX uq_personal_memory_confirmation ON personal_memory_events(proposal_id, confirmation_token_hash);
         """)
@@ -110,12 +112,12 @@ def test_cancel_and_expiry_scrub_draft_payload(tmp_path: Path) -> None:
     cid = start_utd_profile_onboarding(db, chat_id="42", now=now)["context_id"]
     handle_utd_profile_callback(db, f"{UTD_DRAFT_PREFIX}:{cid}:cx", chat_id="42", now=now)
     with sqlite3.connect(db) as c:
-        assert c.execute("SELECT summary_json, proposals_json, status FROM prm_post_answer_proposals WHERE context_id=?", (cid,)).fetchone() == ("{}", "{}", "cancelled")
+        assert c.execute("SELECT summary_json, proposals_json, status FROM prm_post_answer_proposals WHERE context_id=?", (cid,)).fetchone() == ('{"kind":"utd_profile_draft","utd_state":"cancelled"}', "{}", "cancelled")
     cid2 = start_utd_profile_onboarding(db, chat_id="42", now=now)["context_id"]
     result = handle_utd_profile_callback(db, f"{UTD_DRAFT_PREFIX}:{cid2}:pv", chat_id="42", now=now+timedelta(minutes=31))
     assert result["status"] == "expired"
     with sqlite3.connect(db) as c:
-        assert c.execute("SELECT summary_json, proposals_json, status FROM prm_post_answer_proposals WHERE context_id=?", (cid2,)).fetchone() == ("{}", "{}", "expired")
+        assert c.execute("SELECT summary_json, proposals_json, status FROM prm_post_answer_proposals WHERE context_id=?", (cid2,)).fetchone() == ('{"kind":"utd_profile_draft","utd_state":"cancelled"}', "{}", "cancelled")
 
 
 def test_confirmed_unsubscribe_appends_tombstone_and_blocks_profile(tmp_path: Path) -> None:
@@ -187,7 +189,7 @@ def test_confirmation_claim_prevents_cancel_race_for_profile_pause_and_unsubscri
     handle_utd_profile_callback(db, f"{UTD_DRAFT_PREFIX}:{profile_context}:pv", chat_id="42", now=now)
     assert utd._claim_utd_preview(db, context_id=profile_context, chat_id="42", now=now)
     assert handle_utd_profile_callback(db, f"{UTD_DRAFT_PREFIX}:{profile_context}:cx", chat_id="42", now=now)["status"] == "expired"
-    assert utd._finish_utd_preview_claim(db, context_id=profile_context, status="previewed") is None
+    assert utd._finish_utd_preview_claim(db, context_id=profile_context, chat_id="42", status="previewed") is None
     handle_utd_profile_callback(db, f"{UTD_CONFIRM_PREFIX}:{profile_context}:save", chat_id="42", now=now)
     for action in ("pause", "cancel"):
         preview = (start_utd_subscription_pause if action == "pause" else start_utd_subscription_cancel)(db, chat_id="42", now=now)
@@ -195,5 +197,48 @@ def test_confirmation_claim_prevents_cancel_race_for_profile_pause_and_unsubscri
         assert utd._claim_utd_preview(db, context_id=context_id, chat_id="42", now=now)
         assert handle_utd_subscription_callback(db, f"utds:{context_id}:cancel", chat_id="42", now=now)["status"] == "expired"
         with sqlite3.connect(db) as c:
-            assert c.execute("SELECT status FROM prm_post_answer_proposals WHERE context_id=?", (context_id,)).fetchone()[0] == "confirming"
-        utd._finish_utd_preview_claim(db, context_id=context_id, status="previewed")
+            assert c.execute("SELECT status FROM prm_post_answer_proposals WHERE context_id=?", (context_id,)).fetchone()[0] == "pending"
+        utd._finish_utd_preview_claim(db, context_id=context_id, chat_id="42", status="previewed")
+
+
+def test_utd_state_transitions_use_guarded_cas_on_canonical_schema(tmp_path: Path) -> None:
+    db = tmp_path / "m.db"; _init_db(db); now = datetime(2026, 8, 28, 12, tzinfo=timezone.utc)
+    context_id = start_utd_profile_onboarding(db, chat_id="42", now=now)["context_id"]
+    with sqlite3.connect(db) as connection:
+        summary_json, status = connection.execute(
+            "SELECT summary_json, status FROM prm_post_answer_proposals WHERE context_id = ?", (context_id,)
+        ).fetchone()
+    assert decode_utd_proposal_state(summary_json, status)[1] == "draft"
+    _select_program(db, context_id, now)  # draft -> draft
+    preview = handle_utd_profile_callback(db, f"{UTD_DRAFT_PREFIX}:{context_id}:pv", chat_id="42", now=now)
+    assert preview["status"] == "needs_confirmation"  # draft -> previewed
+    back = handle_utd_profile_callback(db, f"{UTD_DRAFT_PREFIX}:{context_id}:back", chat_id="42", now=now)
+    assert back["status"] == "draft_updated"  # previewed -> draft invalidates old confirmation
+    assert handle_utd_profile_callback(db, f"{UTD_CONFIRM_PREFIX}:{context_id}:save", chat_id="42", now=now)["status"] == "missing_preview"
+    assert handle_utd_profile_callback(db, f"{UTD_DRAFT_PREFIX}:{context_id}:pv", chat_id="42", now=now)["status"] == "needs_confirmation"
+
+    def transition(next_state: str):
+        return transition_utd_context(
+            db, context_id=context_id, chat_id="42", expected="previewed", next_state=next_state,
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(transition, ("confirming", "cancelled")))
+    assert sum(result.applied for result in results) == 1
+    winner = next(result.logical_state for result in results if result.applied)
+    if winner == "confirming":
+        assert transition_utd_context(
+            db, context_id=context_id, chat_id="42", expected="confirming", next_state="previewed",
+        ).applied
+    else:
+        # A terminal cancel has no valid outgoing transition; use a separate
+        # preview context to exercise confirming -> confirmed below.
+        context_id = start_utd_profile_onboarding(db, chat_id="42", now=now)["context_id"]
+        _select_program(db, context_id, now)
+        handle_utd_profile_callback(db, f"{UTD_DRAFT_PREFIX}:{context_id}:pv", chat_id="42", now=now)
+    assert transition_utd_context(
+        db, context_id=context_id, chat_id="42", expected="previewed", next_state="confirming",
+    ).applied
+    assert transition_utd_context(
+        db, context_id=context_id, chat_id="42", expected="confirming", next_state="confirmed",
+    ).applied

@@ -31,6 +31,16 @@ PRM_ACTIVE_TESTS = (
     "tests/test_prm_product_ux_eval.py",
     "tests/test_callbacks.py",
     "tests/test_prm_application.py",
+    # PA-06 is a high-risk worker/checkpoint boundary. Keep its dedicated
+    # adversarial suite in the required active tier rather than relying on a
+    # separate optional command.
+    "tests/test_assistant_research.py",
+    # PA-07 must keep the exact BriefDocument/history and report-follow-up
+    # contracts in the active regression tier, not only in a manual command.
+    "tests/test_assistant_briefs.py",
+    "tests/test_assistant_brief_editorial.py",
+    "tests/test_assistant_report_dialogue.py",
+    "tests/test_prm_synthesis.py",
     "tests/test_prm_bot_dispatch.py",
     "tests/test_prm_cli.py",
     "tests/test_retrofit_boundaries.py",
@@ -80,6 +90,10 @@ RETROFIT_TESTS = (
 )
 
 FAST_CONTRACT_TESTS = (
+    "tests/test_assistant_contracts.py",
+    "tests/test_assistant_grant_codec.py",
+    "tests/test_assistant_permissions.py",
+    "tests/test_assistant_egress.py",
     "tests/test_core_boundaries.py",
     "tests/test_delivery_health.py",
     "tests/test_cost_stats.py",

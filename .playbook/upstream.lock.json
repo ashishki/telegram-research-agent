@@ -1,0 +1,14 @@
+{
+  "schema_version": "telegram-research-agent.playbook-pin.v1",
+  "repository": "https://github.com/ashishki/AI_workflow_playbook.git",
+  "path": ".playbook/upstream",
+  "commit": "d570163ab17ec3b4245187c778f1e8d89af9690f",
+  "previous_documented_pin": "965612aa463fca1a35a55104633d0e09da33d615",
+  "adopted_at": "2026-09-18",
+  "scope": "development tooling only; no runtime, accounts, skills or hooks enabled",
+  "entrypoint": "tools/playbook.py",
+  "mode": "standard",
+  "planning_depth": "designed_slices",
+  "token_savings_evidence": "not measured in this repository",
+  "legacy_tools": "Existing copied scripts remain compatibility paths; new development uses the verified entrypoint."
+}

@@ -1,9 +1,25 @@
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
-from prm.application import PersonalResearchAssistant, _final_answer_publication_allowed, _render_terminal_empty_answer, _render_verified_evidence_fallback
+import pytest
+
 from assistant.claim_ledger import verify_answer_against_evidence
-from prm.contracts import AssistantResult, OperatorRequest
+from prm.application import (
+    PersonalResearchAssistant,
+    _final_answer_publication_allowed,
+    _render_terminal_empty_answer,
+    _render_verified_evidence_fallback,
+)
+from prm.archive_synthesis_transport import (
+    ArchiveSynthesisReceipt,
+    ArchiveSynthesisTransportResult,
+    _openai_connection_ref,
+)
+from prm.capabilities import AuthorizationRequest, CapabilityGrant, CapabilityRegistry, ProviderPolicy
+from prm.contracts import ArchiveSynthesisAccess, AssistantResult, OperatorRequest
+from prm.deep_research import build_research_plan
 from prm.presentation import render_payload
+from prm.synthesis import ArchiveSynthesisOutcome
 
 
 def _payload():
@@ -17,7 +33,7 @@ def _payload():
             "matched_query_variant": "agent evals",
         }]},
         "evidence_quality": {"items": [{
-            "evidence_id": "e1", "support_span": "Agent evals use task success and groundedness.",
+            "evidence_id": "tg:1", "support_span": "Agent evals use task success and groundedness.",
             "source_url": "https://t.me/example/1", "source_group_id": "g1", "freshness_status": "fresh",
             "relevance_label": "direct",
         }]},
@@ -30,10 +46,131 @@ def _payload():
     }
 
 
+class _ArchiveHoldoutFacade:
+    """Representative offline archive corpus; the production retriever ranks it."""
+
+    def __init__(self, items):
+        self.items = list(items)
+        self.archive_queries = []
+
+    def search_telegram_archive(self, query, filters=None, limit=5):
+        self.archive_queries.append((query, dict(filters or {}), limit))
+        return {
+            "status": "ok" if self.items else "insufficient_evidence",
+            "query": query,
+            "retrieval_mode": "sqlite_fts_archive",
+            "items": self.items[:limit],
+        }
+
+    def search_intelligence_items(self, query, filters=None, limit=5):
+        return {"status": "empty", "query": query, "items": []}
+
+    def analyze_project_context(self, query, project_name=None, week_label=None, limit=5):
+        return {
+            "status": "empty",
+            "query": query,
+            "project_name": project_name or "",
+            "relevance_label": "no_match",
+            "source_refs": [],
+            "unknowns": [],
+            "decision_support": {},
+        }
+
+
+def _archive_synthesis_access() -> ArchiveSynthesisAccess:
+    now = datetime.now(timezone.utc)
+    connection_ref = _openai_connection_ref("synthetic-pa04-holdout-key")
+    assert connection_ref is not None
+    text = CapabilityGrant(
+        grant_id="grant_pa04_holdout_text",
+        owner_ref="owner_pa04_holdout",
+        connection_ref=connection_ref,
+        capability="model.generate",
+        resource_refs=("resource_conversation",),
+        operations=("model_egress",),
+        data_classes=("user_provided",),
+        purpose="answer.request",
+        provider_policy=ProviderPolicy(("provider_openai",), maximum_request_count=2),
+        issued_at=now - timedelta(minutes=1),
+        expires_at=now + timedelta(minutes=5),
+        revision=1,
+    )
+    context = CapabilityGrant(
+        grant_id="grant_pa04_holdout_context",
+        owner_ref=text.owner_ref,
+        connection_ref=connection_ref,
+        capability="model.context_egress",
+        resource_refs=("resource_archive",),
+        operations=("model_egress",),
+        data_classes=("private_archive",),
+        purpose="answer.context",
+        provider_policy=ProviderPolicy(("provider_openai",), maximum_request_count=2),
+        issued_at=now - timedelta(minutes=1),
+        expires_at=now + timedelta(minutes=5),
+        revision=1,
+    )
+    registry = CapabilityRegistry((text, context))
+    operation_ref = "operation_pa04_holdout"
+    query = registry.authorize_and_reserve(AuthorizationRequest(
+        owner_ref=text.owner_ref,
+        connection_ref=connection_ref,
+        capability="model.generate",
+        resource_ref="resource_conversation",
+        operation="model_egress",
+        data_class="user_provided",
+        provider_ref="provider_openai",
+        purpose="answer.request",
+        expected_grant_revision=1,
+        operation_ref=operation_ref,
+    ))
+    archive = registry.authorize_and_reserve(AuthorizationRequest(
+        owner_ref=text.owner_ref,
+        connection_ref=connection_ref,
+        capability="model.context_egress",
+        resource_ref="resource_archive",
+        operation="model_egress",
+        data_class="private_archive",
+        provider_ref="provider_openai",
+        purpose="answer.context",
+        expected_grant_revision=1,
+        operation_ref=operation_ref,
+    ))
+    return ArchiveSynthesisAccess(
+        query_authorization=query,
+        context_authorization=archive,
+        owner_ref=text.owner_ref,
+        connection_ref=connection_ref,
+        query_resource_ref="resource_conversation",
+        context_resource_ref="resource_archive",
+    )
+
+
+def _synthetic_archive_receipt() -> ArchiveSynthesisReceipt:
+    return ArchiveSynthesisReceipt(
+        provider="openai",
+        model="synthetic-pa04-holdout",
+        external_call_attempted=True,
+        external_call_performed=True,
+        context_egress_attempted=True,
+        context_egress_performed=True,
+        delivery_outcome="accepted",
+        context_binding_digest="synthetic-pa04-holdout",
+    )
+
+
+def _holdout_item(*, document_id: str, source_url: str, snippet: str) -> dict:
+    return {
+        "archive_document_id": document_id,
+        "posted_at": "2026-09-01T10:00:00Z",
+        "channel_username": "eval_holdout",
+        "source_url": source_url,
+        "snippet": snippet,
+    }
+
+
 def test_application_returns_intent_specific_archive_contract(monkeypatch):
     monkeypatch.setattr("prm.application.answer_memory_research", lambda *args, **kwargs: _payload())
     monkeypatch.setattr("prm.application.build_research_facade", lambda **kwargs: SimpleNamespace())
-    monkeypatch.setattr("prm.application.synthesize_answer", lambda *args, **kwargs: None)
     assistant = PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:"))
     result = assistant.answer(OperatorRequest(
         query="Что в моём архиве есть про agent evals и что из этого реально применимо сейчас?",
@@ -48,6 +185,264 @@ def test_application_returns_intent_specific_archive_contract(monkeypatch):
     assert "Agent evals use task success and groundedness." in result.text
     assert "https://t.me/example/1" in result.text
     assert result.payload["final_answer_publication"]["fallback_used"] is True
+
+
+def test_application_uses_verified_pa04_synthesis_and_records_retrieval_generation(monkeypatch):
+    monkeypatch.setattr("prm.application.answer_memory_research", lambda *args, **kwargs: _payload())
+    monkeypatch.setattr("prm.application.build_research_facade", lambda **kwargs: SimpleNamespace())
+    seen = []
+
+    def synthesize(*_args, **kwargs):
+        seen.append(kwargs["access"])
+        return ArchiveSynthesisOutcome(
+            text="Agent evals use task success and groundedness (https://t.me/example/1).",
+            status="generated_verified",
+            measurement={
+                "selected_source_count": 1,
+                "provider_egress_attempted": True,
+                "context_egress_attempted": True,
+                "context_egress_performed": True,
+            },
+        )
+
+    marker = object()
+    monkeypatch.setattr("prm.application.synthesize_archive_response", synthesize)
+    result = PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:")).answer(OperatorRequest(
+        query="Что в моём архиве есть про agent evals?",
+        mode="auto",
+        archive_synthesis_access=marker,  # the transport independently requires the concrete typed carrier
+    ))
+
+    assert seen == [marker]
+    assert result.text == "Agent evals use task success and groundedness (https://t.me/example/1)."
+    assert result.payload["final_answer_publication"]["fallback_used"] is False
+    measurement = result.payload["retrieval_generation_measurement"]
+    assert measurement["retrieval"]["selected_source_count"] == 1
+    assert measurement["generation"]["status"] == "generated_verified"
+    assert measurement["generation"]["context_egress_performed"] is True
+
+
+def test_pa04_application_rejects_claim_cited_only_by_unselected_evidence(monkeypatch):
+    payload = _payload()
+    payload["evidence_quality"]["items"].append({
+        "evidence_id": "tg:unselected",
+        "support_span": "Unselected provider claim must not be published.",
+        "source_url": "https://t.me/example/unselected",
+        "source_group_id": "g-unselected",
+        "freshness_status": "fresh",
+        "relevance_label": "unrelated",
+    })
+    monkeypatch.setattr("prm.application.answer_memory_research", lambda *args, **kwargs: payload)
+    monkeypatch.setattr("prm.application.build_research_facade", lambda **_kwargs: SimpleNamespace())
+    monkeypatch.setattr(
+        "prm.synthesis.complete_archive_synthesis",
+        lambda **_kwargs: ArchiveSynthesisTransportResult(
+            text=(
+                "Agent evals use task success and groundedness (https://t.me/example/1). "
+                "Unselected provider claim must not be published (https://t.me/example/unselected)."
+            ),
+            receipt=_synthetic_archive_receipt(),
+        ),
+    )
+
+    result = PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:")).answer(OperatorRequest(
+        query="What does my archive say about agent evals?",
+        mode="research",
+        chat_id="unselected-evidence-holdout",
+        archive_synthesis_access=_archive_synthesis_access(),
+    ))
+
+    generation = result.payload["retrieval_generation_measurement"]["generation"]
+    assert generation["status"] == "generated_answer_rejected"
+    assert result.payload["final_answer_publication"]["fallback_used"] is True
+    assert "https://t.me/example/1" in result.text
+    assert "https://t.me/example/unselected" not in result.text
+
+
+@pytest.mark.parametrize(
+    ("question", "support_span", "generated", "source_url"),
+    [
+        (
+            "What does my archive say about service message retention?",
+            "Service has no message retention.",
+            "Service has message retention (https://t.me/example/negation-en).",
+            "https://t.me/example/negation-en",
+        ),
+        (
+            "Что в моём архиве есть: сервис хранит сообщения?",
+            "Сервис не хранит сообщения.",
+            "Сервис хранит сообщения (https://t.me/example/negation-ru).",
+            "https://t.me/example/negation-ru",
+        ),
+    ],
+)
+def test_pa04_application_rejects_negation_removal_before_publication(
+    monkeypatch, question, support_span, generated, source_url,
+):
+    payload = _payload()
+    payload["archive_evidence"]["items"][0].update({
+        "archive_document_id": "tg:negation",
+        "snippet": support_span,
+        "source_url": source_url,
+    })
+    payload["evidence_quality"]["items"][0].update({
+        "evidence_id": "tg:negation",
+        "support_span": support_span,
+        "source_url": source_url,
+    })
+    monkeypatch.setattr("prm.application.answer_memory_research", lambda *args, **kwargs: payload)
+    monkeypatch.setattr("prm.application.build_research_facade", lambda **_kwargs: SimpleNamespace())
+    monkeypatch.setattr(
+        "prm.synthesis.complete_archive_synthesis",
+        lambda **_kwargs: ArchiveSynthesisTransportResult(text=generated, receipt=_synthetic_archive_receipt()),
+    )
+
+    result = PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:")).answer(OperatorRequest(
+        query=question,
+        mode="research",
+        chat_id=f"negation-{source_url.rsplit('-', 1)[-1]}",
+        archive_synthesis_access=_archive_synthesis_access(),
+    ))
+
+    generation = result.payload["retrieval_generation_measurement"]["generation"]
+    assert generation["status"] == "generated_answer_rejected"
+    assert result.payload["final_answer_publication"]["fallback_used"] is True
+    assert support_span in result.text
+    assert generated not in result.text
+
+
+@pytest.mark.parametrize(
+    ("question", "source_url", "support_span"),
+    [
+        (
+            "What does my archive say about agent evals?",
+            "https://t.me/eval_holdout/english",
+            "Agent evals use task success and groundedness.",
+        ),
+        (
+            "Что в моём архиве есть про agent evals?",
+            "https://t.me/eval_holdout/russian",
+            "В архиве есть практика: измерять task success и groundedness для agent evals.",
+        ),
+    ],
+)
+def test_pa04_bilingual_holdout_uses_actual_retriever_ranking_and_publication(
+    monkeypatch, question, source_url, support_span,
+):
+    direct = _holdout_item(
+        document_id=f"tg:holdout:{source_url.rsplit('/', 1)[-1]}",
+        source_url=source_url,
+        snippet=support_span,
+    )
+    facade = _ArchiveHoldoutFacade([
+        _holdout_item(
+            document_id="tg:holdout:partial",
+            source_url="https://t.me/eval_holdout/partial",
+            snippet="Evaluation notes mention gold labels.",
+        ),
+        _holdout_item(
+            document_id="tg:holdout:unrelated",
+            source_url="https://t.me/eval_holdout/unrelated",
+            snippet="Travel planning notes have no evaluation practice.",
+        ),
+        direct,
+    ])
+    monkeypatch.setattr("prm.application.build_research_facade", lambda **_kwargs: facade)
+
+    def complete(*, context, access):
+        del access
+        selected = context.items[0]
+        return ArchiveSynthesisTransportResult(
+            text=f"{selected.text.rstrip('.!?…')} ({selected.source_ref}).",
+            receipt=_synthetic_archive_receipt(),
+        )
+
+    monkeypatch.setattr("prm.synthesis.complete_archive_synthesis", complete)
+    result = PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:")).answer(
+        OperatorRequest(
+            query=question,
+            mode="research",
+            chat_id=f"holdout-{source_url.rsplit('/', 1)[-1]}",
+            archive_synthesis_access=_archive_synthesis_access(),
+        )
+    )
+
+    contract = result.payload["archive_contract"]
+    selected = result.payload["archive_evidence"]["items"]
+    measurement = result.payload["retrieval_generation_measurement"]
+    assert facade.archive_queries
+    assert selected[0]["source_url"] == source_url
+    assert selected[0]["relevance_label"] == "direct"
+    assert contract["result_summary"]["direct_count"] == 1
+    assert source_url in result.text
+    assert result.payload["final_answer_publication"]["allowed"] is True
+    assert measurement["retrieval"]["candidate_count"] >= 3
+    assert measurement["retrieval"]["selected_source_count"] >= 1
+    assert measurement["retrieval"]["attempted_query_count"] >= 1
+    assert measurement["generation"]["status"] == "generated_verified"
+    assert result.payload["final_answer_publication"]["fallback_used"] is False
+
+
+def test_pa04_partial_result_publishes_useful_cited_support_and_rejects_false_refusal(monkeypatch):
+    partial = _holdout_item(
+        document_id="tg:holdout:partial-only",
+        source_url="https://t.me/eval_holdout/partial-only",
+        snippet="Evaluation gates measure task success with gold labels.",
+    )
+
+    def run_with(provider_text):
+        facade = _ArchiveHoldoutFacade([partial])
+        monkeypatch.setattr("prm.application.build_research_facade", lambda **_kwargs: facade)
+        monkeypatch.setattr(
+            "prm.synthesis.complete_archive_synthesis",
+            lambda **_kwargs: ArchiveSynthesisTransportResult(text=provider_text, receipt=_synthetic_archive_receipt()),
+        )
+        return PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:")).answer(OperatorRequest(
+            query="What does my archive say about agent evals?",
+            mode="research",
+            chat_id=f"partial-{len(provider_text)}",
+            archive_synthesis_access=_archive_synthesis_access(),
+        ))
+
+    positive = run_with(
+        "Partial: Evaluation gates measure task success with gold labels "
+        "(https://t.me/eval_holdout/partial-only)."
+    )
+    assert positive.payload["archive_contract"]["result_summary"] == {
+        "direct_count": 0,
+        "partial_count": 1,
+        "adjacent_count": 0,
+        "unrelated_count": 0,
+        "selected_count": 1,
+        "actionable_count": 0,
+    }
+    assert positive.payload["retrieval_generation_measurement"]["generation"]["status"] == "generated_verified"
+    assert positive.payload["final_answer_publication"]["fallback_used"] is False
+    assert "https://t.me/eval_holdout/partial-only" in positive.text
+
+    false_refusal = run_with("No direct evidence.")
+    assert false_refusal.payload["retrieval_generation_measurement"]["generation"]["status"] == "generated_answer_rejected"
+    assert false_refusal.payload["final_answer_publication"]["fallback_used"] is True
+    assert "Evaluation gates measure task success with gold labels." in false_refusal.text
+    assert "https://t.me/eval_holdout/partial-only" in false_refusal.text
+
+
+def test_pa04_truthful_empty_archive_result_publishes_without_generation_or_citation(monkeypatch):
+    facade = _ArchiveHoldoutFacade([])
+    monkeypatch.setattr("prm.application.build_research_facade", lambda **_kwargs: facade)
+    result = PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:")).answer(OperatorRequest(
+        query="What does my archive say about agent evals?",
+        mode="research",
+        chat_id="empty-archive-holdout",
+    ))
+
+    assert facade.archive_queries
+    assert result.payload["archive_contract"]["result_summary"]["selected_count"] == 0
+    assert result.payload["retrieval_generation_measurement"]["generation"]["status"] == "context_unavailable"
+    assert result.payload["final_answer_publication"]["allowed"] is True
+    assert result.payload["final_answer_publication"]["fallback_used"] is True
+    assert "не удалось собрать проверяемый ответ" in result.text.casefold()
+    assert "https://" not in result.text
 
 
 def test_explicit_topic_edition_is_application_path_without_fetch_send_or_write():
@@ -98,7 +493,6 @@ def test_archive_to_action_uses_bounded_research_plan(monkeypatch):
     ]
     monkeypatch.setattr("prm.application.answer_memory_research", lambda *args, **kwargs: payload)
     monkeypatch.setattr("prm.application.build_research_facade", lambda **kwargs: SimpleNamespace())
-    monkeypatch.setattr("prm.application.synthesize_answer", lambda *args, **kwargs: None)
     monkeypatch.setattr("prm.application.plan_archive_evidence", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("provider-capable planner must remain disabled")))
 
     result = PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:")).answer(OperatorRequest(
@@ -178,7 +572,6 @@ def test_current_fact_boundary_suppresses_archive_snippets_and_sources(monkeypat
     }
     monkeypatch.setattr("prm.application.answer_memory_research", lambda *args, **kwargs: payload)
     monkeypatch.setattr("prm.application.build_research_facade", lambda **kwargs: SimpleNamespace())
-    monkeypatch.setattr("prm.application.synthesize_answer", lambda *args, **kwargs: None)
 
     result = PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:")).answer(
         OperatorRequest(query="какая текущая цена акций Nvidia сегодня?", mode="auto")
@@ -268,7 +661,6 @@ def test_terminal_empty_answer_keeps_a_contextual_next_step_without_factual_clai
 def test_mixed_archive_and_current_question_keeps_archive_part_without_claiming_current_fact(monkeypatch):
     monkeypatch.setattr("prm.application.answer_memory_research", lambda *args, **kwargs: _payload())
     monkeypatch.setattr("prm.application.build_research_facade", lambda **kwargs: SimpleNamespace())
-    monkeypatch.setattr("prm.application.synthesize_answer", lambda *args, **kwargs: None)
     result = PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:")).answer(
         OperatorRequest(query="Что в моём архиве про agent evals и какая сейчас текущая цена Nvidia?", mode="auto")
     )
@@ -299,7 +691,6 @@ def test_explicit_project_name_is_not_replaced_by_downstream_project_fit(monkeyp
     }
     monkeypatch.setattr("prm.application.answer_memory_research", lambda *args, **kwargs: payload)
     monkeypatch.setattr("prm.application.build_research_facade", lambda **kwargs: SimpleNamespace())
-    monkeypatch.setattr("prm.application.synthesize_answer", lambda *args, **kwargs: None)
 
     result = PersonalResearchAssistant(settings=SimpleNamespace(db_path=":memory:")).answer(
         OperatorRequest(
@@ -312,3 +703,35 @@ def test_explicit_project_name_is_not_replaced_by_downstream_project_fit(monkeyp
     assert result.payload["project_fit"]["project_name"] == "Workflow-to-Agent-Studio"
     assert "AI_workflow_playbook" in result.payload["project_fit"]["inferred_project_name"]
     assert result.payload["final_answer_publication"]["fallback_used"] is True
+
+
+def test_active_deep_research_ingress_is_covered_by_focused_prm_tier():
+    class _DeepArchive:
+        def __init__(self):
+            self.calls = []
+
+        def search_archive(self, query, *, limit):
+            self.calls.append((query, limit))
+            return {
+                "status": "ok",
+                "items": [{
+                    "archive_document_id": "tg:deep", "source_url": "https://t.me/example/deep",
+                    "snippet": "A replayable fixture is direct archive evidence.",
+                    "relevance_label": "direct", "supports_action": True,
+                }],
+            }
+
+    archive = _DeepArchive()
+    plan = build_research_plan("What applies?", archive_query="replayable fixture")
+    result = PersonalResearchAssistant(
+        settings=SimpleNamespace(db_path=":memory:"), deep_archive_reader=archive,
+    ).answer(OperatorRequest(query="What applies?", deep_research_plan=plan))
+
+    assert result.status == "complete"
+    assert result.payload["research_result"]["status"] == "complete"
+    assert result.payload["research_result"]["facts"] == [{
+        "kind": "fact",
+        "source_kind": "archive",
+        "support_span": "A replayable fixture is direct archive evidence.",
+        "source_url": "https://t.me/example/deep",
+    }]

@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://telegram-research-agent.local/schemas/assistant_tool_result.v1.schema.json",
+  "title": "ToolResult v1",
+  "description": "A sanitized, typed tool outcome. Payloads are referenced by schema and result ID rather than copied into logs or receipts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "result_id", "tool_ref", "grant_ref", "grant_revision", "status", "data", "evidence_refs", "fetched_at", "coverage", "errors", "retryable"],
+  "properties": {
+    "schema_version": {"const": "assistant.tool_result.v1"},
+    "result_id": {"type": "string", "pattern": "^result_[a-z0-9_-]{3,120}$"},
+    "tool_ref": {"type": "string", "pattern": "^tool_[a-z0-9_.-]{3,120}$"},
+    "grant_ref": {"type": "string", "pattern": "^grant_[a-z0-9_-]{3,120}$"},
+    "grant_revision": {"type": "integer", "minimum": 1},
+    "status": {"type": "string", "enum": ["succeeded", "partial", "unavailable", "denied", "cancelled", "failed"]},
+    "data": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["schema_ref", "result_ref"],
+      "properties": {
+        "schema_ref": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{2,160}$"},
+        "result_ref": {"type": "string", "pattern": "^result_[a-z0-9_-]{3,120}$"}
+      }
+    },
+    "evidence_refs": {"type": "array", "maxItems": 100, "uniqueItems": true, "items": {"type": "string", "pattern": "^evidence_[a-z0-9_-]{3,120}$"}},
+    "fetched_at": {"type": ["string", "null"], "format": "date-time"},
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_classes_checked", "source_refs_checked", "complete", "limitations"],
+      "properties": {
+        "source_classes_checked": {"type": "array", "maxItems": 16, "uniqueItems": true, "items": {"type": "string", "enum": ["telegram_archive", "public_web", "mail", "calendar", "canvas", "github", "document", "academic_public", "user_provided"]}},
+        "source_refs_checked": {"type": "array", "maxItems": 100, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 512}},
+        "complete": {"type": "boolean"},
+        "limitations": {"type": "array", "maxItems": 32, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{2,120}$"}}
+      }
+    },
+    "errors": {"type": "array", "maxItems": 16, "items": {"type": "object", "additionalProperties": false, "required": ["code", "safe_message"], "properties": {"code": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{2,120}$"}, "safe_message": {"type": "string", "minLength": 1, "maxLength": 500}}}},
+    "retryable": {"type": "boolean"}
+  },
+  "allOf": [
+    {"if": {"properties": {"status": {"enum": ["succeeded", "partial"]}}, "required": ["status"]}, "then": {"properties": {"data": {"type": "object"}, "fetched_at": {"type": "string"}}}},
+    {"if": {"properties": {"status": {"const": "denied"}}, "required": ["status"]}, "then": {"properties": {"data": {"type": "null"}, "evidence_refs": {"maxItems": 0}}}}
+  ]
+}

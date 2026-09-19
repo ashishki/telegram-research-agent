@@ -6,8 +6,8 @@ import pytest
 
 from assistant.prm_post_answer_actions import (
     PRM_ACTION_PREFIX,
-    build_post_answer_actions,
-    handle_post_answer_callback,
+    build_post_answer_actions as _build_post_answer_actions,
+    handle_post_answer_callback as _handle_post_answer_callback,
 )
 from db.migrate import run_migrations
 from db.prm19_dogfood_receipts import (
@@ -33,6 +33,20 @@ def _answer() -> dict:
         "evidence_classes": ["telegram_archive"],
         "primary_workflow": "research",
     }
+
+
+def build_post_answer_actions(answer, *, db_path, chat_id):
+    """Use the exact synthetic private tuple required by PA-00."""
+    return _build_post_answer_actions(
+        answer, db_path=db_path, chat_id=chat_id, actor_id=chat_id, owner_chat_id=chat_id
+    )
+
+
+def handle_post_answer_callback(db_path, callback_data, *, chat_id, actor_id=None):
+    return _handle_post_answer_callback(
+        db_path, callback_data, chat_id=chat_id,
+        actor_id=actor_id if actor_id is not None else chat_id, owner_chat_id=chat_id,
+    )
 
 
 def test_one_receipt_per_answer_and_no_raw_question(monkeypatch):
@@ -71,7 +85,7 @@ def test_feedback_transition_updates_same_interaction_once(monkeypatch):
             ).fetchone()[0]
 
     assert first["status"] == "needs_confirmation"
-    assert replay["status"] == "needs_confirmation"
+    assert replay["status"] == "action_unavailable"
     assert transition_count == 1
     assert useful_label == "yes"
 
@@ -176,18 +190,19 @@ def test_owner_review_and_aggregate_are_private_and_scoped(monkeypatch):
         run_migrations()
         context_id = build_post_answer_actions(_answer(), db_path=db_path, chat_id="42")["context_id"]
         build_post_answer_actions(_answer(), db_path=db_path, chat_id="43")
-        handle_post_answer_callback(db_path, f"{PRM_ACTION_PREFIX}:{context_id}:s", chat_id="42")
+        rejected = handle_post_answer_callback(db_path, f"{PRM_ACTION_PREFIX}:{context_id}:s", chat_id="42")
 
         rows = list_interaction_receipts(db_path, chat_id_hash=_chat_hash(db_path, "42"))
         aggregate = export_interaction_aggregate(db_path)
 
     assert len(rows) == 1
-    assert rows[0]["useful_label"] == "partial"
+    assert rejected["status"] == "action_unavailable"
+    assert rows[0]["useful_label"] == "unknown"
     assert "chat_id_hash" not in rows[0]
     assert aggregate == {
         "schema_version": "prm_interaction_aggregate.v1",
         "receipt_count": 2,
-        "useful_labels": {"yes": 0, "partial": 1, "no": 0, "unknown": 1},
+        "useful_labels": {"yes": 0, "partial": 0, "no": 0, "unknown": 2},
         "public_export": False,
         "dogfood_started": False,
     }

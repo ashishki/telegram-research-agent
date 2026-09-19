@@ -21,6 +21,20 @@ def test_current_public_fact_has_preview_but_capability_stays_off():
     assert plan["public_verification"]["max_calls"] == 0
 
 
+def test_current_public_fact_needs_separate_capability_ready_mode_for_execution():
+    route = decide_route("What is the current price of OpenAI API?").to_dict()
+    plan = build_request_plan(
+        "What is the current price of OpenAI API?",
+        route,
+        public_mode_consented=True,
+    )
+
+    assert plan["public_verification"]["allowed"] is True
+    assert plan["public_verification"]["execution"] == "adapter_and_capability_required"
+    assert plan["public_verification"]["query"] == ""
+    assert plan["public_verification"]["max_calls"] == 5
+
+
 def test_private_archive_context_is_never_constructed_as_public_query():
     route = decide_route("В моём Telegram архиве: текущая цена проекта X?").to_dict()
     plan = build_request_plan("В моём Telegram архиве: текущая цена проекта X?", route)

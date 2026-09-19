@@ -392,6 +392,35 @@ def _add_prm_one_turn_cases(cases: list[dict[str, Any]]) -> None:
             },
         }
     )
+    cases.append(
+        {
+            "case_id": "one:prm:bound_inline:project_provenance",
+            "surface": "prm_application",
+            "message": "inline control fixture",
+            "bound_inline_source": {
+                "title": "Связанный вывод",
+                "query": "agent evaluation",
+                "body": "Точный сохранённый вывод из ответа.",
+                "source_refs": ["https://t.me/example/agent-evals"],
+                "evidence_items": [{
+                    "source_url": "https://t.me/example/agent-evals",
+                    "snippet": "Точный сохранённый вывод из ответа.",
+                }],
+                "project_name": "telegram-research-agent",
+                "primary_intent": "archive_to_action",
+                "response_contract_id": "archive_research.v2",
+                "direct_count": 1,
+                "partial_count": 0,
+                "offered_action_codes": ["n", "p"],
+            },
+            "expected": {
+                "surface": "prm_application",
+                "primary_intent": "archive_to_action",
+                "mode": "research",
+                "project_context_required": True,
+            },
+        }
+    )
 
 
 def _add_utd_one_turn_cases(cases: list[dict[str, Any]]) -> None:
@@ -511,16 +540,10 @@ def _add_prm_dialogues(dialogues: list[dict[str, Any]]) -> None:
                         _prm_turn(
                             f"turn:06:{slug}",
                             "сохрани заметку, но сначала покажи что именно сохранишь",
-                            expected_intent="memory_action",
-                            expected_project_context=True,
-                            expects_confirmation=True,
                         ),
                         _prm_turn(
                             f"turn:07:{slug}",
                             "следи за этой темой, но без автомутации профиля",
-                            expected_intent="memory_action",
-                            expected_project_context=True,
-                            expects_confirmation=True,
                         ),
                         _prm_turn(
                             f"turn:08:{slug}",
@@ -946,7 +969,7 @@ def _simulate_prm_application(
     state: Mapping[str, Any],
     assistant_cache: dict[str, Any],
 ) -> SimulatedTurn:
-    from assistant.prm_post_answer_actions import select_post_answer_action_codes
+    from assistant.prm_post_answer_actions import canonicalize_prm_action_snapshot, select_post_answer_action_codes
     from bot import prm_handlers
     from config.settings import load_settings
     from llm.client import suppress_usage_recording
@@ -958,6 +981,33 @@ def _simulate_prm_application(
         assistant = PersonalResearchAssistant(settings=load_settings())
         assistant_cache["assistant"] = assistant
     message = str(turn.get("message") or "")
+    bound_source = turn.get("bound_inline_source")
+    if isinstance(bound_source, Mapping):
+        snapshot = canonicalize_prm_action_snapshot(bound_source)
+        if snapshot is None:
+            return _turn_result(
+                turn,
+                index=index,
+                message="Bound inline source is unavailable.",
+                actual={"surface": "prm_application", "status": "action_unavailable"},
+            )
+        return _turn_result(
+            turn,
+            index=index,
+            message=snapshot["body"],
+            actual={
+                "surface": "prm_application", "status": "bound_inline", "mode": "research",
+                "primary_intent": snapshot["primary_intent"],
+                "response_contract_id": snapshot["response_contract_id"],
+                "project_context_required": bool(snapshot["project_name"]),
+                "external_verification_required": False, "current_fact_boundary": False,
+                "source_count": len(snapshot["source_refs"]), "direct_count": snapshot["direct_count"],
+                "partial_count": snapshot["partial_count"], "adjacent_count": 0,
+                "answer_chars": len(snapshot["body"]), "action_codes": snapshot["offered_action_codes"],
+                "dialog_context_used": False, "unsupported_claim_rate": 0.0,
+                "current_fact_violations": 0,
+            },
+        )
     if str(turn.get("synthetic_fixture") or "") == "positive_topic_edition":
         result = assistant.render_topic_edition(
             OperatorRequest(query=message, mode="brief", chat_id="product-ux-edition"),
@@ -1005,23 +1055,32 @@ def _simulate_prm_application(
         )
     mode = str(turn.get("mode") or "auto")
     chat_id = str(state.get("prm_chat_id") or f"product-ux-eval-{_stable_hash(message)[:10]}")
-    dialog = prm_handlers._resolve_prm_dialog_query(chat_id, message, mode=mode)
-    if dialog.get("kind") == "post_answer_action":
-        preview = _simulate_post_answer_preview(dialog, state=state)
-        prm_handlers._remember_pending_prm_action(
-            chat_id,
-            action=str(dialog.get("post_answer_action") or ""),
-            message=preview,
-        )
+    if prm_handlers._is_memory_action_followup(message):
         return _turn_result(
             turn,
             index=index,
-            message=preview,
+            message="Это действие недоступно. Отправь запрос заново, чтобы получить новую кнопку действия.",
+            actual={
+                "surface": "prm_application", "status": "action_unavailable", "mode": "research",
+                "primary_intent": "", "response_contract_id": "archive_research.v2",
+                "project_context_required": False, "external_verification_required": False,
+                "current_fact_boundary": False, "source_count": 0, "direct_count": 0,
+                "partial_count": 0, "adjacent_count": 0, "answer_chars": 87,
+                "action_codes": [], "dialog_context_used": False,
+                "unsupported_claim_rate": 0.0, "current_fact_violations": 0,
+            },
+        )
+    dialog = prm_handlers._resolve_prm_dialog_query(chat_id, message, mode=mode)
+    if dialog.get("kind") == "post_answer_action":
+        return _turn_result(
+            turn,
+            index=index,
+            message="Это действие недоступно. Отправь запрос заново, чтобы получить новую кнопку действия.",
             actual={
                 "surface": "prm_application",
-                "status": "needs_confirmation",
+                "status": "action_unavailable",
                 "mode": "research",
-                "primary_intent": "memory_action",
+                "primary_intent": "",
                 "response_contract_id": "archive_research.v2",
                 "project_context_required": False,
                 "external_verification_required": False,
@@ -1030,9 +1089,9 @@ def _simulate_prm_application(
                 "direct_count": 0,
                 "partial_count": 0,
                 "adjacent_count": 0,
-                "answer_chars": 180,
-                "action_codes": ["confirm"],
-                "dialog_context_used": True,
+                "answer_chars": 87,
+                "action_codes": [],
+                "dialog_context_used": False,
                 "unsupported_claim_rate": 0.0,
                 "current_fact_violations": 0,
             },
