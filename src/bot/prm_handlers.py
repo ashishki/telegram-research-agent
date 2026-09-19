@@ -30,7 +30,8 @@ from prm.capabilities import (
     require_authorized_operation,
     transport_purpose,
 )
-from prm.contracts import OperatorRequest
+from prm.contracts import ModelEgressAccess, OperatorRequest
+from prm.conversation import GLOBAL_CONVERSATIONS, compose_object_bound_archive_followup
 
 LOGGER = logging.getLogger(__name__)
 PRM_SAFE_COMMANDS = frozenset(
@@ -131,6 +132,7 @@ def dispatch_prm_command(
     owner_chat_id: str | None = None,
     delivery_authorizations: Sequence[AuthorizationDecision] = (),
     utd_draft_authorization: AuthorizationDecision | None = None,
+    model_access: ModelEgressAccess | None = None,
 ) -> None:
     command, args = _split_command(text)
 
@@ -240,17 +242,16 @@ def dispatch_prm_command(
             "Это действие недоступно. Отправь запрос заново, чтобы получить новую кнопку действия."
         )
         return
-    dialog = _resolve_prm_dialog_query(chat_id, args, mode=mode)
-    if dialog.get("kind") == "post_answer_action":
-        send_private_reply(
-            "Это действие недоступно. Отправь запрос заново, чтобы получить новую кнопку действия."
-        )
-        return
-    if dialog.get("kind") == "short_next_step":
-        send_private_reply(str(dialog.get("message") or "Следующий шаг не найден."))
-        return
-
-    effective_args = str(dialog.get("effective_query") or args)
+    # PA-03 no longer consults the historic `_PRM_DIALOG_STATE` on active
+    # ingress. A read-only archive refinement is possible only while an actual
+    # visible ConversationState response remains current; confirmation and
+    # action selection are handled separately by the application and fail
+    # closed without an immutable proposal/version.
+    effective_args = compose_object_bound_archive_followup(
+        GLOBAL_CONVERSATIONS.load(chat_id),
+        args,
+        mode=mode,
+    ) or args
     assistant = PersonalResearchAssistant(settings=settings)
     try:
         result = assistant.answer(
@@ -261,6 +262,7 @@ def dispatch_prm_command(
                 input_kind=input_kind,
                 actor_id=actor_id,
                 owner_chat_id=owner_chat_id,
+                model_access=model_access,
             )
         )  # type: ignore[arg-type]
     except Exception as exc:
@@ -285,42 +287,6 @@ def dispatch_prm_command(
         owner_chat_id=owner_chat_id,
         delivery_authorizations=delivery_authorizations,
     )
-    result_status = str(getattr(result, "status", "ok") or "ok")
-    result_mode = str(getattr(result, "mode", mode) or mode)
-    if result_status == "ok" and result_mode in {"research", "brief"}:
-        result_route = _mapping(getattr(result, "route", {}))
-        _remember_prm_dialog(
-            chat_id,
-            effective_args,
-            mode=result_mode,
-            # A prior topic belongs only to a composed follow-up.  For a new
-            # explicit query, preserve the answered route so the next short
-            # follow-up cannot resurrect Topic A over Topic B.
-            topic=str(
-                (dialog.get("previous_topic") if bool(dialog.get("used")) else "")
-                or result_route.get("retrieval_query")
-                or effective_args
-            ),
-            project_name=str(result_route.get("project_name") or _mapping(result.payload).get("project_name") or ""),
-            action_context_id=str(action_bundle.get("context_id") or "") if isinstance(action_bundle, Mapping) else "",
-                action_codes=[
-                    str(code)
-                    for code in ((action_bundle.get("action_codes") or []) if isinstance(action_bundle, Mapping) else [])
-                    if str(code)
-                ],
-            last_answer=result.text,
-            direct_count=_archive_result_count(result.payload, "direct_count"),
-            partial_count=_archive_result_count(result.payload, "partial_count"),
-            adjacent_count=_archive_result_count(result.payload, "adjacent_count"),
-            current_fact_boundary=_current_fact_boundary(result.payload),
-            direct_only_filter=bool(dialog.get("previous_direct_only")) or _is_direct_only_request(effective_args),
-        )
-    elif result_status == "needs_confirmation" and _mapping(getattr(result, "route", {})).get("primary_intent") == "memory_action":
-        _remember_pending_prm_action(
-            chat_id,
-            action=_memory_action_code(args),
-            message=result.text,
-        )
 
 
 def _start_utd_profile(

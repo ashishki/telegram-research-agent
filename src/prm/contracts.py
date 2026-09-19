@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal, Mapping
 
+from prm.capabilities import AuthorizationDecision
+
 RequestMode = Literal["auto", "research", "brief", "chat"]
 ResponseMode = Literal["research", "brief", "chat", "project_clarify", "clarify"]
 PrimaryIntent = Literal[
@@ -30,6 +32,36 @@ ResponseContractId = Literal[
 
 
 @dataclass(frozen=True, slots=True)
+class ModelEgressAccess:
+    """One PA-02 reservation carried unchanged into an explicit chat turn."""
+
+    authorization: AuthorizationDecision
+    owner_ref: str
+    connection_ref: str
+    resource_ref: str
+
+    def __post_init__(self) -> None:
+        if type(self.authorization) is not AuthorizationDecision or not self.authorization.allowed:
+            raise ValueError("model access requires an allowed typed authorization")
+        if self.authorization.reservation is None:
+            raise ValueError("model access requires a sealed reservation")
+        if (
+            self.authorization.owner_ref != self.owner_ref
+            or self.authorization.connection_ref != self.connection_ref
+            or self.authorization.resource_ref != self.resource_ref
+            or self.authorization.capability != "model.generate"
+            or self.authorization.operation != "model_egress"
+            or self.authorization.data_class != "user_provided"
+            or self.authorization.purpose != "answer.request"
+            # The active PA-03 application invokes the sealed Anthropic
+            # adapter. OpenAI has a separate adapter contract and must not be
+            # silently substituted through this ingress carrier.
+            or self.authorization.provider_ref != "provider_anthropic"
+        ):
+            raise ValueError("model access does not preserve the PA-02 reservation scope")
+
+
+@dataclass(frozen=True, slots=True)
 class OperatorRequest:
     query: str
     mode: RequestMode = "auto"
@@ -42,12 +74,9 @@ class OperatorRequest:
     # confirmation must fail closed rather than synthesizing an actor.
     actor_id: str | None = None
     owner_chat_id: str | None = None
-    # PA-03 receives model access only as an already-reserved PA-02 decision.
-    # These opaque fields contain no prompt, credential or provider payload.
-    model_authorization: Any | None = None
-    model_owner_ref: str = ""
-    model_connection_ref: str | None = None
-    model_resource_ref: str = ""
+    # PA-03 receives model access only as a typed, already-reserved PA-02
+    # decision. It contains no prompt, credential or provider payload.
+    model_access: ModelEgressAccess | None = None
 
 
 @dataclass(frozen=True, slots=True)

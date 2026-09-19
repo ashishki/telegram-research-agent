@@ -33,13 +33,15 @@ the two untracked local files. Do not run the full historical pytest suite.
 ## Current slice: PA-03
 
 PA-03 has a locally tested initial implementation and evidence at
-`docs/verification/PA-03-conversation-evidence-2026-09-19.md`; its required
-independent Conversation/Test Critic review is pending. The new state is
-ephemeral (restart clears it), object-bound, and fails closed for plain `yes`
-until PA-13 supplies the authoritative proposal/version loader and execution
-reconciliation. General chat routes explicitly and remains default-deny unless
-a PA-02 reserved model decision is supplied; the model receives only current
-direct user text, never archive/history/old response context.
+`docs/verification/PA-03-conversation-evidence-2026-09-19.md`. Its fresh
+Terra/high `slice_review` returned STOP_SHIP on three P1s; the scoped
+remediation is ready for a new independent recheck. Active ingress no longer
+uses legacy keyword state; model access is a typed PA-02 reservation injected
+per private turn; and confirmation requires a canonical equal private tuple.
+The new state is ephemeral (restart clears it), object-bound, and fails closed
+for plain `yes` until PA-13 supplies authoritative proposal/version loading and
+execution reconciliation. The model receives only current direct user text,
+never archive/history/old response context.
 
 Do not call PA-03 formally accepted or start PA-04 until the PA-03 review and
 any P0/P1 remediation are recorded. After that boundary, PA-04 connects

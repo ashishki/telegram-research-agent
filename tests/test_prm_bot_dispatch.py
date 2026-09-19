@@ -1,4 +1,5 @@
 import sqlite3
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 from assistant.prm_post_answer_actions import PRM_ACTION_PREFIX, build_post_answer_actions
@@ -7,18 +8,85 @@ from bot import callbacks, handlers, legacy_handlers, prm_handlers
 from bot.runtime import BOT_RUNTIME_LEGACY, BOT_RUNTIME_PRM_ASSISTANT, normalize_bot_runtime_mode
 from bot.prm_handlers import PRM_SAFE_COMMANDS
 from db.migrate import run_migrations
+from prm.capabilities import AuthorizationRequest, CapabilityGrant, CapabilityRegistry, ProviderPolicy
+from prm.contracts import ModelEgressAccess
+
+
+def _model_access() -> ModelEgressAccess:
+    now = datetime.now(timezone.utc)
+    grant = CapabilityGrant(
+        grant_id="grant_synthetic_chat",
+        owner_ref="owner_synthetic_primary",
+        connection_ref="connection_synthetic_model",
+        capability="model.generate",
+        resource_refs=("resource_conversation",),
+        operations=("model_egress",),
+        data_classes=("user_provided",),
+        purpose="answer.request",
+        provider_policy=ProviderPolicy(("provider_anthropic",)),
+        issued_at=now - timedelta(minutes=1),
+        expires_at=now + timedelta(minutes=5),
+        revision=1,
+    )
+    registry = CapabilityRegistry((grant,))
+    decision = registry.authorize_and_reserve(AuthorizationRequest(
+        owner_ref=grant.owner_ref,
+        connection_ref=grant.connection_ref,
+        capability=grant.capability,
+        resource_ref="resource_conversation",
+        operation="model_egress",
+        data_class="user_provided",
+        provider_ref="provider_anthropic",
+        purpose="answer.request",
+        expected_grant_revision=1,
+        operation_ref="operation_synthetic_chat",
+    ))
+    return ModelEgressAccess(
+        authorization=decision,
+        owner_ref=grant.owner_ref,
+        connection_ref=grant.connection_ref or "",
+        resource_ref="resource_conversation",
+    )
 
 
 def test_runtime_mode_is_explicit():
     assert normalize_bot_runtime_mode("prm") == BOT_RUNTIME_PRM_ASSISTANT
     assert normalize_bot_runtime_mode("legacy") == BOT_RUNTIME_LEGACY
-    assert bot_runtime.run_bot.__kwdefaults__ == {"runtime_mode": BOT_RUNTIME_PRM_ASSISTANT}
+    assert bot_runtime.run_bot.__kwdefaults__["runtime_mode"] == BOT_RUNTIME_PRM_ASSISTANT
+    assert bot_runtime.run_bot.__kwdefaults__["model_access_provider"] is None
 
 
 def test_active_registry_contains_only_prm_commands():
     assert "/weekly" not in PRM_SAFE_COMMANDS
     assert "/run_digest" not in PRM_SAFE_COMMANDS
     assert {"/auto", "/research", "/brief", "/chat"}.issubset(PRM_SAFE_COMMANDS)
+
+
+def test_active_bot_ingress_forwards_only_typed_reserved_model_access(monkeypatch, tmp_path):
+    access = _model_access()
+    forwarded = []
+    monkeypatch.setattr(bot_runtime, "dispatch_prm_command", lambda *args, **kwargs: forwarded.append((args, kwargs)))
+
+    bot_runtime.dispatch_command(
+        "42", "/chat rewrite this", SimpleNamespace(db_path=str(tmp_path / "memory.db")),
+        runtime_mode=BOT_RUNTIME_PRM_ASSISTANT, actor_id="42", owner_chat_id="42", model_access=access,
+    )
+
+    assert forwarded[0][1]["model_access"] is access
+    assert bot_runtime._model_access_for_private_turn(lambda *_args: access, chat_id="42", actor_id="42", owner_chat_id="42") is access
+    assert bot_runtime._model_access_for_private_turn(
+        lambda *_args: SimpleNamespace(allowed=True), chat_id="42", actor_id="42", owner_chat_id="42",
+    ) is None
+    provider_calls = []
+    provider = lambda *_args: (provider_calls.append(True) or access)
+    assert bot_runtime._model_access_for_command(
+        provider, command="/research в архиве про evals", chat_id="42", actor_id="42", owner_chat_id="42",
+    ) is None
+    assert provider_calls == []
+    assert bot_runtime._model_access_for_command(
+        provider, command="/chat rewrite this", chat_id="42", actor_id="42", owner_chat_id="42",
+    ) is access
+    assert provider_calls == [True]
 
 
 def test_prm_entrypoints_do_not_register_post_answer_state_during_pa02(monkeypatch, tmp_path):

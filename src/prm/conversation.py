@@ -26,6 +26,7 @@ _CANCEL = frozenset({"/cancel", "cancel", "отмена"})
 _NEW = frozenset({"/new", "new", "новая тема"})
 _SHORTEN = frozenset({"сделай короче", "сократи", "shorten it", "make it shorter"})
 _SECOND = frozenset({"а второе", "второе", "second item", "the second one"})
+_NEXT_STEP = frozenset({"какой следующий шаг", "следующий шаг", "next step"})
 _OBJECT_REF = re.compile(r"^response_[a-f0-9]{24}$")
 _PROPOSAL_REF = re.compile(r"^(?:proposal|prm)_[a-z0-9_-]{3,120}$")
 _VERSION = re.compile(r"^[A-Za-z0-9._:-]{1,256}$")
@@ -85,6 +86,8 @@ class ConfirmationRef:
             raise ValueError("invalid confirmation response reference")
         if any(not _identity_hash(value) for value in (self.chat_id_hash, self.actor_id_hash, self.owner_id_hash)):
             raise ValueError("invalid confirmation identity binding")
+        if len({self.chat_id_hash, self.actor_id_hash, self.owner_id_hash}) != 1:
+            raise ValueError("confirmation requires one private owner tuple")
         if self.expires_at.tzinfo is None:
             raise ValueError("confirmation expiry must be timezone-aware")
         if not isinstance(self.visible, bool):
@@ -167,6 +170,8 @@ def classify_turn(text: str, state: ConversationState | None) -> ConversationTur
     if clean in _YES:
         return ConversationTurn("plain_yes")
     current = _current_response(state)
+    if current is not None and (clean in _NEXT_STEP or clean.startswith("коротко: какой следующий шаг")):
+        return ConversationTurn("next_step", response_ref=current.response_ref)
     if clean in _SHORTEN and current is not None:
         return ConversationTurn("shorten", response_ref=current.response_ref)
     if clean in _SECOND and current is not None and len(current.item_refs) >= 2:
@@ -190,6 +195,40 @@ def assemble_safe_dialogue_context(state: ConversationState, direct_user_text: s
         direct_user_text=clean[:2_400],
         omitted_state=("prior_messages", "response_objects", "topic_summary", "confirmations"),
     )
+
+
+def compose_object_bound_archive_followup(
+    state: ConversationState | None,
+    text: str,
+    *,
+    mode: str,
+) -> str | None:
+    """Compose a read-only archive refinement only from a visible response.
+
+    This replaces active use of the historical ``last_topic`` dictionary. It
+    is deliberately unavailable for a new/anchored query and cannot select an
+    action or confirmation.
+    """
+
+    current = _current_response(state)
+    clean = _clean(text)
+    lowered = clean.casefold()
+    if current is None or mode not in {"auto", "research", "brief"} or not clean or len(clean) > 160:
+        return None
+    if any(marker in lowered for marker in ("в архиве", "мой архив", "моём архиве", "new topic", "новая тема")):
+        return None
+    if not any(
+        marker in lowered
+        for marker in (
+            "за прошл", "за последн", "last week", "покажи только", "только прям",
+            "подробнее", "разверни", "сравни", "а примен", "применимо это", "к проекту", "для проекта",
+        )
+    ):
+        return None
+    topic = _clean(state.topic)
+    if not topic:
+        return None
+    return _clean(f"В архиве по теме {topic}. Уточнение: {clean}")[:900]
 
 
 class ConversationStore:
@@ -308,7 +347,7 @@ class ConversationStore:
         proposal_versions: Mapping[str, str] | None = None,
         now: datetime | None = None,
     ) -> ConfirmationResolution:
-        if not str(chat_id or "").strip() or not str(actor_id or "").strip() or not str(owner_chat_id or "").strip():
+        if _canonical_private_tuple(chat_id, actor_id, owner_chat_id) is None:
             return ConfirmationResolution("unavailable")
         state = self.load(chat_id, now=now)
         if state is None:
@@ -443,3 +482,16 @@ def _clean(value: object) -> str:
 
 def _utc(value: datetime | None) -> datetime:
     return (value or datetime.now(timezone.utc)).astimezone(timezone.utc)
+
+
+def _canonical_private_tuple(
+    chat_id: str | None,
+    actor_id: str | None,
+    owner_chat_id: str | None,
+) -> tuple[str, str, str] | None:
+    values = (str(chat_id or ""), str(actor_id or ""), str(owner_chat_id or ""))
+    if any(not re.fullmatch(r"[1-9][0-9]{0,18}", value) for value in values):
+        return None
+    if any(int(value) > 9223372036854775807 for value in values) or len(set(values)) != 1:
+        return None
+    return values

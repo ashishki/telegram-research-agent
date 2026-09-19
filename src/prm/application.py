@@ -89,6 +89,20 @@ class PersonalResearchAssistant:
                 ),
                 confirmation_status=resolution.status,
             )
+        if turn.kind == "next_step" and turn.response_ref:
+            response = next((item for item in conversation.object_refs if item.response_ref == turn.response_ref), None)
+            if response is not None:
+                topic = conversation.topic or "этой теме"
+                return self._conversation_control_result(
+                    request,
+                    conversation,
+                    status="ok",
+                    text=(
+                        f"Следующий шаг: уточни один термин, источник или период по теме {topic}; "
+                        "предыдущий ответ не запускает действие сам по себе."
+                    ),
+                    response_ref=response.response_ref,
+                )
         if turn.kind == "shorten" and turn.response_ref:
             response = next((item for item in conversation.object_refs if item.response_ref == turn.response_ref), None)
             if response is not None:
@@ -392,14 +406,8 @@ class PersonalResearchAssistant:
         conversation: ConversationState,
     ) -> AssistantResult:
         safe_context = assemble_safe_dialogue_context(conversation, request.query)
-        authorization = request.model_authorization
-        if (
-            authorization is None
-            or not bool(getattr(authorization, "allowed", False))
-            or not request.model_owner_ref
-            or not request.model_connection_ref
-            or not request.model_resource_ref
-        ):
+        model_access = request.model_access
+        if model_access is None:
             return AssistantResult(
                 interaction_id=str(context.get("interaction_id") or ""),
                 status="provider_egress_required",
@@ -445,11 +453,11 @@ class PersonalResearchAssistant:
                     ),
                     max_tokens=700,
                     category="pa_dialogue",
-                    authorization=authorization,
+                    authorization=model_access.authorization,
                     data_class="user_provided",
-                    owner_ref=request.model_owner_ref,
-                    connection_ref=request.model_connection_ref,
-                    resource_ref=request.model_resource_ref,
+                    owner_ref=model_access.owner_ref,
+                    connection_ref=model_access.connection_ref,
+                    resource_ref=model_access.resource_ref,
                 )
             answer = _clean_model_answer(getattr(receipt, "text", ""))
             if not answer:

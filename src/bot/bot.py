@@ -7,7 +7,7 @@ import json
 import logging
 import os
 import signal
-from typing import Any
+from typing import Any, Callable
 from urllib import parse, request
 
 from config.settings import Settings
@@ -21,6 +21,8 @@ from .prm_handlers import (
     send_message,
 )
 from prm.capabilities import AuthorizationDecision
+from prm.contracts import ModelEgressAccess
+from prm.routing import decide_route
 from .runtime import (
     BOT_RUNTIME_LEGACY,
     BOT_RUNTIME_PRM_ASSISTANT,
@@ -148,6 +150,7 @@ def dispatch_command(
     owner_chat_id: str | None = None,
     delivery_authorizations: tuple[AuthorizationDecision, ...] = (),
     utd_draft_authorization: AuthorizationDecision | None = None,
+    model_access: ModelEgressAccess | None = None,
 ) -> None:
     """Stable patch point and explicit compatibility dispatcher."""
 
@@ -161,6 +164,8 @@ def dispatch_command(
             prm_kwargs["delivery_authorizations"] = delivery_authorizations
         if utd_draft_authorization is not None:
             prm_kwargs["utd_draft_authorization"] = utd_draft_authorization
+        if model_access is not None:
+            prm_kwargs["model_access"] = model_access
         dispatch_prm_command(chat_id, text, settings, **prm_kwargs)
         return
     legacy = import_module("bot.legacy_handlers")
@@ -212,7 +217,12 @@ def _voice_failed_message(runtime_mode: str) -> str:
     return "Не смог распознать голосовое. Отправь сообщение текстом."
 
 
-def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_PRM_ASSISTANT) -> None:
+def run_bot(
+    settings: Settings,
+    *,
+    runtime_mode: str = BOT_RUNTIME_PRM_ASSISTANT,
+    model_access_provider: Callable[[str, str, str], ModelEgressAccess | None] | None = None,
+) -> None:
     """Run the PA-safe polling surface; legacy polling is opt-in only.
 
     The historical legacy runtime retains unguarded compatibility transports.
@@ -289,6 +299,13 @@ def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_PRM_ASSISTANT
                     else _operator_text_command(text, runtime_mode=runtime_mode)
                 )
                 if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
+                    model_access = _model_access_for_command(
+                        model_access_provider,
+                        command=command,
+                        chat_id=chat_id,
+                        actor_id=actor_id,
+                        owner_chat_id=owner_chat_id,
+                    )
                     dispatch_command(
                         chat_id=chat_id,
                         text=command,
@@ -297,6 +314,7 @@ def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_PRM_ASSISTANT
                         actor_id=actor_id,
                         owner_chat_id=owner_chat_id,
                         delivery_authorizations=delivery_authorizations,
+                        model_access=model_access,
                     )
                 else:
                     dispatch_command(chat_id=chat_id, text=command, settings=settings)
@@ -306,6 +324,13 @@ def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_PRM_ASSISTANT
             if transcript:
                 command = _voice_text_command(transcript, runtime_mode=runtime_mode)
                 if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
+                    model_access = _model_access_for_command(
+                        model_access_provider,
+                        command=command,
+                        chat_id=chat_id,
+                        actor_id=actor_id,
+                        owner_chat_id=owner_chat_id,
+                    )
                     dispatch_command(
                         chat_id=chat_id,
                         text=command,
@@ -314,6 +339,7 @@ def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_PRM_ASSISTANT
                         actor_id=actor_id,
                         owner_chat_id=owner_chat_id,
                         delivery_authorizations=delivery_authorizations,
+                        model_access=model_access,
                     )
                 else:
                     dispatch_command(chat_id=chat_id, text=command, settings=settings)
@@ -359,6 +385,13 @@ def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_PRM_ASSISTANT
                 continue
             command = _voice_text_command(transcript, runtime_mode=runtime_mode)
             if runtime_mode == BOT_RUNTIME_PRM_ASSISTANT:
+                model_access = _model_access_for_command(
+                    model_access_provider,
+                    command=command,
+                    chat_id=chat_id,
+                    actor_id=actor_id,
+                    owner_chat_id=owner_chat_id,
+                )
                 dispatch_command(
                     chat_id=chat_id,
                     text=command,
@@ -367,6 +400,7 @@ def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_PRM_ASSISTANT
                     actor_id=actor_id,
                     owner_chat_id=owner_chat_id,
                     delivery_authorizations=delivery_authorizations[1:],
+                    model_access=model_access,
                 )
             else:
                 dispatch_command(chat_id=chat_id, text=command, settings=settings)
@@ -375,6 +409,55 @@ def run_bot(settings: Settings, *, runtime_mode: str = BOT_RUNTIME_PRM_ASSISTANT
             break
 
     LOGGER.info("Telegram polling stopped runtime_mode=%s", runtime_mode)
+
+
+def _model_access_for_private_turn(
+    provider: Callable[[str, str, str], ModelEgressAccess | None] | None,
+    *,
+    chat_id: str,
+    actor_id: str,
+    owner_chat_id: str,
+) -> ModelEgressAccess | None:
+    """Obtain one injected, already-reserved model access without minting grants.
+
+    The runtime has no durable grant source. A separately authorized deployment
+    may provide a fresh typed reservation per private turn; malformed values or
+    provider failures remain default-deny.
+    """
+
+    if provider is None:
+        return None
+    try:
+        access = provider(chat_id, actor_id, owner_chat_id)
+    except Exception:
+        LOGGER.warning("PA model access provider failed")
+        return None
+    return access if isinstance(access, ModelEgressAccess) else None
+
+
+def _model_access_for_command(
+    provider: Callable[[str, str, str], ModelEgressAccess | None] | None,
+    *,
+    command: str,
+    chat_id: str,
+    actor_id: str,
+    owner_chat_id: str,
+) -> ModelEgressAccess | None:
+    """Reserve model access only for a turn that the local router classifies as chat."""
+
+    clean = str(command or "").strip()
+    parts = clean.split(maxsplit=1)
+    name = parts[0].split("@", 1)[0].casefold() if parts else "/auto"
+    query = parts[1].strip() if len(parts) > 1 else ""
+    requested_mode = {"/chat": "chat", "/research": "research", "/brief": "brief"}.get(name, "auto")
+    if decide_route(query, requested_mode=requested_mode).mode != "chat":
+        return None
+    return _model_access_for_private_turn(
+        provider,
+        chat_id=chat_id,
+        actor_id=actor_id,
+        owner_chat_id=owner_chat_id,
+    )
 
 
 def _handle_callback(

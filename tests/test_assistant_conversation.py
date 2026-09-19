@@ -4,15 +4,18 @@ from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
+import pytest
+
 from llm.client import LLMOutcomeUnknown
 from prm.application import PersonalResearchAssistant
+from prm.capabilities import AuthorizationRequest, CapabilityGrant, CapabilityRegistry, ProviderPolicy
 from prm.conversation import (
     ConfirmationRef,
     ConversationStore,
     classify_turn,
     identity_hash,
 )
-from prm.contracts import OperatorRequest
+from prm.contracts import ModelEgressAccess, OperatorRequest
 
 
 NOW = datetime(2026, 9, 19, 10, tzinfo=timezone.utc)
@@ -27,6 +30,43 @@ def _confirmation(state, *, proposal_ref="proposal_note_001", version="version-1
         actor_id_hash=identity_hash("42"),
         owner_id_hash=identity_hash("42"),
         expires_at=NOW + timedelta(minutes=5),
+    )
+
+
+def _model_access() -> ModelEgressAccess:
+    now = datetime.now(timezone.utc)
+    grant = CapabilityGrant(
+        grant_id="grant_synthetic_chat",
+        owner_ref="owner_synthetic_primary",
+        connection_ref="connection_synthetic_model",
+        capability="model.generate",
+        resource_refs=("resource_conversation",),
+        operations=("model_egress",),
+        data_classes=("user_provided",),
+        purpose="answer.request",
+        provider_policy=ProviderPolicy(("provider_anthropic",)),
+        issued_at=now - timedelta(minutes=1),
+        expires_at=now + timedelta(minutes=5),
+        revision=1,
+    )
+    registry = CapabilityRegistry((grant,))
+    decision = registry.authorize_and_reserve(AuthorizationRequest(
+        owner_ref=grant.owner_ref,
+        connection_ref=grant.connection_ref,
+        capability=grant.capability,
+        resource_ref="resource_conversation",
+        operation="model_egress",
+        data_class="user_provided",
+        provider_ref="provider_anthropic",
+        purpose="answer.request",
+        expected_grant_revision=1,
+        operation_ref="operation_synthetic_chat",
+    ))
+    return ModelEgressAccess(
+        authorization=decision,
+        owner_ref=grant.owner_ref,
+        connection_ref=grant.connection_ref or "",
+        resource_ref="resource_conversation",
     )
 
 
@@ -85,6 +125,22 @@ def test_plain_yes_fails_closed_for_ambiguous_stale_expired_or_identity_mismatch
         "42", actor_id="42", owner_chat_id="42",
         proposal_versions={first.proposal_ref: first.proposal_version}, now=NOW + timedelta(minutes=6),
     ).status == "unavailable"
+
+
+def test_confirmation_rejects_group_or_mismatched_private_tuple_at_construction() -> None:
+    store = ConversationStore()
+    state = store.record_response("42", text="Preview A", now=NOW)
+
+    with pytest.raises(ValueError, match="one private owner tuple"):
+        ConfirmationRef(
+            proposal_ref="proposal_note_001",
+            proposal_version="version-1",
+            response_ref=state.object_refs[0].response_ref,
+            chat_id_hash=identity_hash("-10042"),
+            actor_id_hash=identity_hash("42"),
+            owner_id_hash=identity_hash("42"),
+            expires_at=NOW + timedelta(minutes=5),
+        )
 
 
 def test_new_topic_cancellation_and_restart_clear_plain_language_confirmation() -> None:
@@ -192,10 +248,7 @@ def test_authorized_chat_sends_only_current_direct_text_not_prior_response_or_to
         query="Перепиши это дружелюбнее",
         mode="chat",
         chat_id="42",
-        model_authorization=SimpleNamespace(allowed=True),
-        model_owner_ref="owner_synthetic_primary",
-        model_connection_ref="connection_synthetic_model",
-        model_resource_ref="resource_conversation",
+        model_access=_model_access(),
     ))
 
     assert result.status == "ok"
@@ -222,9 +275,7 @@ def test_authorized_chat_reports_unknown_provider_outcome_without_retry() -> Non
     )
     result = assistant.answer(OperatorRequest(
         query="Объясни идею", mode="chat", chat_id="42",
-        model_authorization=SimpleNamespace(allowed=True),
-        model_owner_ref="owner_synthetic_primary", model_connection_ref="connection_synthetic_model",
-        model_resource_ref="resource_conversation",
+        model_access=_model_access(),
     ))
 
     assert len(calls) == 1
@@ -255,9 +306,7 @@ def test_cancel_request_discards_a_model_result_after_the_model_boundary(monkeyp
     )
     result = assistant.answer(OperatorRequest(
         query="Сделай черновик", mode="chat", chat_id="42",
-        model_authorization=SimpleNamespace(allowed=True),
-        model_owner_ref="owner_synthetic_primary", model_connection_ref="connection_synthetic_model",
-        model_resource_ref="resource_conversation",
+        model_access=_model_access(),
     ))
 
     assert result.status == "cancelled_after_model_boundary"

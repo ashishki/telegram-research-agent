@@ -3,6 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from bot import prm_handlers
+from prm.conversation import GLOBAL_CONVERSATIONS
 
 
 def _settings(tmp_path):
@@ -105,7 +106,7 @@ def test_new_topic_replaces_volatile_topic_and_last_week_followup_keeps_it() -> 
     assert "за прошлую неделю" in followup["effective_query"]
 
 
-def test_live_dispatch_persists_explicit_replacement_topic_for_week_followup(monkeypatch, tmp_path) -> None:
+def test_active_dispatch_does_not_mutate_legacy_topic_state(monkeypatch, tmp_path) -> None:
     prm_handlers._PRM_DIALOG_STATE.clear()
     prm_handlers._remember_prm_dialog("42", "В архиве по теме Topic A", mode="research", topic="Topic A")
 
@@ -125,8 +126,57 @@ def test_live_dispatch_persists_explicit_replacement_topic_for_week_followup(mon
     prm_handlers.dispatch_prm_command("42", "/research В архиве по теме Topic B", _settings(tmp_path))
     followup = prm_handlers._resolve_prm_dialog_query("42", "за прошлую неделю", mode="auto")
 
-    assert "Topic B" in followup["effective_query"]
-    assert "Topic A" not in followup["effective_query"]
+    assert "Topic A" in followup["effective_query"]
+    assert "Topic B" not in followup["effective_query"]
+
+
+def test_active_dispatch_uses_visible_conversation_object_not_legacy_last_topic(monkeypatch, tmp_path) -> None:
+    prm_handlers._PRM_DIALOG_STATE.clear()
+    GLOBAL_CONVERSATIONS.clear()
+    prm_handlers._remember_prm_dialog("42", "В архиве по теме Topic A", mode="research", topic="Topic A")
+    GLOBAL_CONVERSATIONS.record_response("42", text="Topic B result", topic="Topic B")
+    requests = []
+
+    class FakeAssistant:
+        def __init__(self, *, settings):
+            pass
+
+        def answer(self, request):
+            requests.append(request)
+            return SimpleNamespace(text="result", payload={}, status="ok", mode="research", route={})
+
+    monkeypatch.setattr(prm_handlers, "PersonalResearchAssistant", FakeAssistant)
+    monkeypatch.setattr(prm_handlers, "send_message", lambda *_args, **_kwargs: None)
+
+    prm_handlers.dispatch_prm_command("42", "/auto за прошлую неделю", _settings(tmp_path))
+
+    assert len(requests) == 1
+    assert "Topic B" in requests[0].query
+    assert "Topic A" not in requests[0].query
+    GLOBAL_CONVERSATIONS.clear()
+
+
+def test_active_dispatch_does_not_recover_keyword_followup_from_legacy_state(monkeypatch, tmp_path) -> None:
+    prm_handlers._PRM_DIALOG_STATE.clear()
+    GLOBAL_CONVERSATIONS.clear()
+    prm_handlers._remember_prm_dialog("42", "В архиве по теме Topic A", mode="research", topic="Topic A")
+    requests = []
+
+    class FakeAssistant:
+        def __init__(self, *, settings):
+            pass
+
+        def answer(self, request):
+            requests.append(request)
+            return SimpleNamespace(text="result", payload={}, status="ok", mode="research", route={})
+
+    monkeypatch.setattr(prm_handlers, "PersonalResearchAssistant", FakeAssistant)
+    monkeypatch.setattr(prm_handlers, "send_message", lambda *_args, **_kwargs: None)
+
+    prm_handlers.dispatch_prm_command("42", "/auto за прошлую неделю", _settings(tmp_path))
+
+    assert len(requests) == 1
+    assert requests[0].query == "за прошлую неделю"
 
 
 def test_plain_language_action_selection_rejects_stale_or_cross_topic_context(monkeypatch, tmp_path) -> None:
@@ -155,6 +205,7 @@ def test_plain_language_action_selection_rejects_stale_or_cross_topic_context(mo
 
 def test_short_next_step_followup_does_not_rerun_archive_search(monkeypatch, tmp_path) -> None:
     prm_handlers._PRM_DIALOG_STATE.clear()
+    GLOBAL_CONVERSATIONS.clear()
     prm_handlers._remember_prm_dialog(
         "42",
         "Что в моём архиве было про agent evals и что мне с этим делать?",
@@ -165,17 +216,19 @@ def test_short_next_step_followup_does_not_rerun_archive_search(monkeypatch, tmp
     )
     sent = []
 
-    class ForbiddenAssistant:
-        def __init__(self, *args, **kwargs): raise AssertionError("short next step must not rerun archive search")
-
-    monkeypatch.setattr(prm_handlers, "PersonalResearchAssistant", ForbiddenAssistant)
-    monkeypatch.setattr(prm_handlers, "send_message", lambda _token, _chat, text, **_kwargs: sent.append(text))
+    GLOBAL_CONVERSATIONS.record_response("42", text="Visible agent evals result", topic="agent evals")
+    monkeypatch.setattr(
+        "prm.application.answer_memory_research",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("short next step must not rerun archive search")),
+    )
+    monkeypatch.setattr(prm_handlers, "_send_chunks", lambda _chat, text, **_kwargs: sent.append(text))
 
     prm_handlers.dispatch_prm_command("42", "/auto коротко: какой следующий шаг?", _settings(tmp_path))
 
     assert len(sent) == 1
     assert sent[0].startswith("Следующий шаг:")
     assert "agent evals" in sent[0]
+    GLOBAL_CONVERSATIONS.clear()
 
 
 def test_short_next_step_after_watch_preview_points_to_confirmation() -> None:
