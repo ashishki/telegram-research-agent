@@ -302,6 +302,15 @@ Acceptance-Criteria:
   - Restart/double execution/unknown-send scenarios avoid blind retries, preserve receipts and expose reconciliation needs.
 Verification:
   - python tools/test_tiers.py focused-prm
+Scope-Amendment:
+  - 2026-09-20 owner direction for this dependency-ready local slice authorizes
+    the narrowly necessary PA-02 transport-purpose registration in
+    `src/prm/capabilities.py` and registration of the two PA-09 synthetic
+    holdout suites in `tools/test_tiers.py`'s `focused-prm` floor. This permits
+    neither a service/timer nor a provider, Telegram-account, delivery,
+    migration, deployment or runtime-acceptance action. The canonical design
+    registry remains mechanically `review_required`; this is not a human
+    approval or a release decision.
 Context-Refs:
   - docs/design/PA-PRODUCT-QUALITY.md
   - docs/design/PA.md

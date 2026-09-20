@@ -6,16 +6,19 @@ from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 
 from prm.capabilities import AuthorizationRequest, CapabilityGrant, CapabilityRegistry, ProviderPolicy
-from prm.watch_jobs import WatchCollectionAccess, WatchJobStore, WatchNotification, WatchSubscription
+from prm.watch_jobs import WatchCollectionAccess, WatchJobStore, WatchNotification, WatchSubscription, watch_owner_ref_from_authenticated_private_tuple
 
 
 NOW = datetime.now(timezone.utc).replace(microsecond=0)
+OWNER_TUPLE = ("42", "42", "42")
+OWNER_REF = watch_owner_ref_from_authenticated_private_tuple(*OWNER_TUPLE)
+assert OWNER_REF is not None
 
 
 def _subscription(**changes: object) -> WatchSubscription:
     values: dict[str, object] = {
         "subscription_id": "watch_synthetic_001",
-        "owner_ref": "owner_synthetic_primary",
+        "owner_ref": OWNER_REF,
         "consent_revision": 1,
         "source_refs": ("source_synthetic_calendar",),
         "destination_ref": "destination_private_telegram",
@@ -33,7 +36,7 @@ def _subscription(**changes: object) -> WatchSubscription:
 def _notification(**changes: object) -> WatchNotification:
     values: dict[str, object] = {
         "subscription_id": "watch_synthetic_001",
-        "owner_ref": "owner_synthetic_primary",
+        "owner_ref": OWNER_REF,
         "subject_ref": "subject_deadline_001",
         "change_version": "version_001",
         "delivery_stage": "change",
@@ -50,17 +53,17 @@ def _notification(**changes: object) -> WatchNotification:
 def _collection_access(registry: CapabilityRegistry):
     decision = registry.authorize_and_reserve(
         AuthorizationRequest(
-            owner_ref="owner_synthetic_primary", connection_ref=None, capability="assistant.watch_collection",
+            owner_ref=OWNER_REF, connection_ref=None, capability="assistant.watch_collection",
             resource_ref="source_synthetic_calendar", operation="read", data_class="private_connector_metadata",
             provider_ref="provider_watch_source", purpose="watch.collection",
         ), now=NOW,
     )
-    return WatchCollectionAccess(decision, "owner_synthetic_primary", "source_synthetic_calendar")
+    return WatchCollectionAccess(decision, OWNER_REF, "source_synthetic_calendar")
 
 
 def _read_grant(*, revoked: bool = False) -> CapabilityGrant:
     return CapabilityGrant(
-        grant_id="grant_watch_read_001", owner_ref="owner_synthetic_primary", connection_ref=None,
+        grant_id="grant_watch_read_001", owner_ref=OWNER_REF, connection_ref=None,
         capability="assistant.watch_collection", resource_refs=("source_synthetic_calendar",), operations=("read",),
         data_classes=("private_connector_metadata",), purpose="watch.collection",
         provider_policy=ProviderPolicy(("provider_watch_source",), maximum_request_count=2),
@@ -69,9 +72,19 @@ def _read_grant(*, revoked: bool = False) -> CapabilityGrant:
     )
 
 
+def _register(store: WatchJobStore, subscription: WatchSubscription) -> WatchSubscription:
+    registered = store.register_subscription(
+        subscription,
+        authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1],
+        authenticated_owner_chat_id=OWNER_TUPLE[2],
+    )
+    assert registered is not None
+    return registered
+
+
 def test_collection_rechecks_active_subscription_and_current_read_grant(tmp_path) -> None:
     store = WatchJobStore(tmp_path / "watch-jobs.db")
-    subscription = store.register_subscription(_subscription())
+    subscription = _register(store, _subscription())
     assert store.collection_allowed(subscription.subscription_id, _collection_access(CapabilityRegistry((_read_grant(),))), now=NOW)
 
     revoked_registry = CapabilityRegistry((_read_grant(),))
@@ -80,13 +93,13 @@ def test_collection_rechecks_active_subscription_and_current_read_grant(tmp_path
     assert not store.collection_allowed(subscription.subscription_id, access, now=NOW)
 
     paused = replace(subscription, consent_revision=2, lifecycle="paused")
-    assert store.revise_subscription(paused, expected_revision=1, now=NOW)
+    assert store.revise_subscription(paused, expected_revision=1, authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1], authenticated_owner_chat_id=OWNER_TUPLE[2], now=NOW)
     assert not store.collection_allowed(paused.subscription_id, _collection_access(CapabilityRegistry((_read_grant(),))), now=NOW)
 
 
 def test_queue_requires_source_scope_material_change_and_exact_revision(tmp_path) -> None:
     store = WatchJobStore(tmp_path / "watch-jobs.db")
-    store.register_subscription(_subscription())
+    _register(store, _subscription())
     notification = _notification()
     first = store.queue_notification(notification, expected_subscription_revision=1, now=NOW)
     assert first.status == "queued" and first.job is not None
@@ -116,7 +129,7 @@ def test_quiet_hours_and_dst_schedule_do_not_turn_an_ordinary_digest_into_a_floo
         trigger="digest", delivery_time="02:30", quiet_start=None, quiet_end=None,
         frequency="daily", expires_at=datetime(2027, 1, 1, tzinfo=timezone.utc),
     )
-    store.register_subscription(digest)
+    _register(store, digest)
     notification = _notification(delivery_stage="digest:2026-03-08", change_version="version_digest_001", due_at=spring_queue_time)
     queued = store.queue_notification(notification, expected_subscription_revision=1, now=spring_queue_time)
     assert queued.job is not None
@@ -128,7 +141,7 @@ def test_quiet_hours_and_dst_schedule_do_not_turn_an_ordinary_digest_into_a_floo
     assert store.claim_due_jobs(now=spring_forward + timedelta(minutes=30)) == ()
 
     quiet_store = WatchJobStore(tmp_path / "quiet.db")
-    quiet_store.register_subscription(_subscription())
+    _register(quiet_store, _subscription())
     quiet = quiet_store.queue_notification(_notification(), expected_subscription_revision=1, now=NOW)
     assert quiet.job is not None
     assert quiet_store.claim_due_jobs(now=datetime(2026, 11, 1, 5, 30, tzinfo=timezone.utc)) == ()  # 01:30 local
