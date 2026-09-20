@@ -7,6 +7,8 @@ from datetime import datetime, timedelta, timezone
 from itertools import count
 from threading import Barrier, Event, Thread
 
+import pytest
+
 from prm.capabilities import AuthorizationRequest, CapabilityGrant, CapabilityRegistry, ProviderPolicy
 from prm.watch_jobs import WatchDeliveryAccess, WatchJobStore, WatchNotification, WatchReconciliationEvidence, WatchSubscription, watch_owner_ref_from_authenticated_private_tuple
 
@@ -150,18 +152,48 @@ def test_revoked_delivery_grant_blocks_final_send_and_unknown_is_never_blindly_r
         leased.job_key, authenticated_chat_id="43", authenticated_actor_id="43", authenticated_owner_chat_id="43",
     ) is None
     assert not unknown_store.reconcile_unknown(
-        WatchReconciliationEvidence(leased.job_key, OWNER_REF, "operation_wrong_101", "delivered", "receipt_fixture_101", NOW),
-        access=unknown_access, authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1], authenticated_owner_chat_id=OWNER_TUPLE[2],
+        WatchReconciliationEvidence(leased.job_key, OWNER_REF, requirement.destination_ref, "operation_wrong_101", requirement.attempt_ref, "delivered", "receipt_fixture_101", NOW),
+        authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1], authenticated_owner_chat_id=OWNER_TUPLE[2],
     )
     assert not unknown_store.reconcile_unknown(
-        WatchReconciliationEvidence(leased.job_key, OWNER_REF, requirement.operation_ref, "delivered", "receipt_fixture_101", NOW),
-        access=unknown_access, authenticated_chat_id="43", authenticated_actor_id="43", authenticated_owner_chat_id="43",
+        WatchReconciliationEvidence(leased.job_key, OWNER_REF, requirement.destination_ref, requirement.operation_ref, requirement.attempt_ref, "delivered", "receipt_fixture_101", NOW),
+        authenticated_chat_id="43", authenticated_actor_id="43", authenticated_owner_chat_id="43",
     )
     assert unknown_store.reconcile_unknown(
-        WatchReconciliationEvidence(leased.job_key, OWNER_REF, requirement.operation_ref, "delivered", "receipt_fixture_101", NOW),
-        access=unknown_access, authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1], authenticated_owner_chat_id=OWNER_TUPLE[2],
+        WatchReconciliationEvidence(leased.job_key, OWNER_REF, requirement.destination_ref, requirement.operation_ref, requirement.attempt_ref, "delivered", "receipt_fixture_101", NOW),
+        authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1], authenticated_owner_chat_id=OWNER_TUPLE[2],
     )
     assert unknown_store.receipt(leased.job_key) is not None
+
+
+def test_restart_after_sender_started_preserves_bound_unknown_reconciliation(tmp_path) -> None:
+    path = tmp_path / "crash-during-send.db"
+    store = WatchJobStore(path)
+    queued = _queued(store)
+    leased = store.claim_due_jobs(now=NOW)[0]
+    registry = _delivery_registry()
+
+    def crash_after_sender_started(_text: str) -> str:
+        raise SystemExit("synthetic process loss after sender start")
+
+    with pytest.raises(SystemExit, match="process loss"):
+        store.deliver_claimed_job(leased, _delivery_access(registry), sender=crash_after_sender_started, now=NOW)
+    restarted = WatchJobStore(path)
+    assert restarted.claim_due_jobs(now=NOW + timedelta(minutes=2)) == ()
+    assert restarted.job_state(queued.job_key) == "unknown"
+    requirement = restarted.reconciliation_requirement(
+        queued.job_key, authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1],
+        authenticated_owner_chat_id=OWNER_TUPLE[2],
+    )
+    assert requirement is not None
+    assert restarted.reconcile_unknown(
+        WatchReconciliationEvidence(
+            queued.job_key, OWNER_REF, requirement.destination_ref, requirement.operation_ref,
+            requirement.attempt_ref, "not_delivered", "provider_receipt_after_restart_001", NOW + timedelta(minutes=2),
+        ),
+        authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1], authenticated_owner_chat_id=OWNER_TUPLE[2],
+    )
+    assert len(restarted.claim_due_jobs(now=NOW + timedelta(minutes=2))) == 1
 
 
 def test_receipt_is_separate_from_job_state_and_daily_cap_is_conservative(tmp_path) -> None:

@@ -52,7 +52,7 @@ _TIME = re.compile(r"^([01][0-9]|2[0-3]):[0-5][0-9]$")
 _SAFE_URL = re.compile(r"^https://[^\s<>]{1,2048}$", re.IGNORECASE)
 _LIFECYCLES = frozenset({"active", "paused", "cancelled", "completed"})
 _SUBJECT_STATES = frozenset({"active", "completed", "cancelled", "not_relevant"})
-_JOB_STATES = frozenset({"queued", "leased", "deferred", "unknown", "sent", "cancelled"})
+_JOB_STATES = frozenset({"queued", "leased", "dispatching", "deferred", "unknown", "sent", "cancelled"})
 _TRIGGERS = frozenset({"meaningful_change", "deadline_reminder", "digest"})
 _FREQUENCIES = frozenset({"immediate", "daily", "weekly"})
 _DATA_CLASSES = frozenset({
@@ -282,11 +282,19 @@ class WatchSubscriptionPreview:
 
 @dataclass(frozen=True, slots=True)
 class WatchReconciliationEvidence:
-    """A typed observation bound to one owner and PA-02 delivery operation."""
+    """An adapter observation bound to one durable pre-send attempt.
+
+    The local store only verifies the sealed attempt fields below. A future
+    authorized adapter remains responsible for establishing the provider or
+    operator evidence represented by ``evidence_ref``; this type never claims
+    that an opaque string itself proves delivery.
+    """
 
     job_key: str
     owner_ref: str
+    destination_ref: str
     operation_ref: str
+    attempt_ref: str
     outcome: Literal["delivered", "not_delivered"]
     evidence_ref: str
     observed_at: datetime
@@ -294,7 +302,9 @@ class WatchReconciliationEvidence:
     def __post_init__(self) -> None:
         _ref(self.job_key, field="job_key")
         _ref(self.owner_ref, field="owner_ref")
+        _ref(self.destination_ref, field="destination_ref")
         _ref(self.operation_ref, field="operation_ref")
+        _ref(self.attempt_ref, field="attempt_ref")
         if self.outcome not in {"delivered", "not_delivered"}:
             raise ValueError("reconciliation outcome is invalid")
         _ref(self.evidence_ref, field="evidence_ref")
@@ -309,6 +319,7 @@ class WatchReconciliationRequirement:
     owner_ref: str
     destination_ref: str
     operation_ref: str
+    attempt_ref: str
     unknown_at: datetime
 
     def __post_init__(self) -> None:
@@ -316,6 +327,7 @@ class WatchReconciliationRequirement:
         _ref(self.owner_ref, field="owner_ref")
         _ref(self.destination_ref, field="destination_ref")
         _ref(self.operation_ref, field="operation_ref")
+        _ref(self.attempt_ref, field="attempt_ref")
         _utc(self.unknown_at)
 
 
@@ -446,7 +458,7 @@ CREATE TABLE IF NOT EXISTS pa_watch_jobs(
  change_version TEXT NOT NULL,
  delivery_stage TEXT NOT NULL,
  notification_json TEXT NOT NULL,
- state TEXT NOT NULL CHECK(state IN ('queued','leased','deferred','unknown','sent','cancelled')),
+ state TEXT NOT NULL CHECK(state IN ('queued','leased','dispatching','deferred','unknown','sent','cancelled')),
  due_at TEXT NOT NULL,
  lease_token TEXT NOT NULL DEFAULT '',
  lease_until TEXT NOT NULL DEFAULT '',
@@ -469,14 +481,15 @@ CREATE TABLE IF NOT EXISTS pa_watch_quota_reservations(
  local_day TEXT NOT NULL,
  created_at TEXT NOT NULL
 );
-CREATE TABLE IF NOT EXISTS pa_watch_unknown_attempts(
+CREATE TABLE IF NOT EXISTS pa_watch_delivery_attempts(
  job_key TEXT PRIMARY KEY,
  owner_ref TEXT NOT NULL,
  destination_ref TEXT NOT NULL,
  operation_ref TEXT NOT NULL,
+ attempt_ref TEXT NOT NULL,
  grant_ref TEXT NOT NULL,
  grant_revision INTEGER NOT NULL,
- unknown_at TEXT NOT NULL
+ prepared_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS pa_watch_feedback(
  job_key TEXT NOT NULL,
@@ -765,7 +778,7 @@ class WatchJobStore:
         with sqlite3.connect(self.path) as db:
             db.execute("BEGIN IMMEDIATE")
             db.execute(
-                "UPDATE pa_watch_jobs SET state='unknown',lease_token='',lease_until='',last_reason='lease_expired_reconciliation_required',updated_at=? WHERE state='leased' AND lease_until<>'' AND lease_until<=?",
+                "UPDATE pa_watch_jobs SET state='unknown',lease_token='',lease_until='',last_reason='lease_expired_reconciliation_required',updated_at=? WHERE state IN ('leased','dispatching') AND lease_until<>'' AND lease_until<=?",
                 (current_text, current_text),
             )
             rows = db.execute(
@@ -940,6 +953,85 @@ class WatchJobStore:
             attempt.authorization.reservation.record_delivery_outcome(recorded_outcome)
         return True
 
+    def _persist_delivery_attempt(
+        self,
+        attempt: DeliveryAttempt,
+        access: WatchDeliveryAccess,
+        *,
+        current: datetime,
+    ) -> bool:
+        """Durably record a no-retry attempt before any injected callback.
+
+        This first phase makes a crash after a sender has started recover as
+        ``unknown`` with its owner/destination/operation binding intact. The
+        second phase in ``deliver_claimed_job`` takes the final exclusive
+        policy lock and consumes the reservation immediately before sending.
+        """
+        job = attempt.job
+        if not job.lease_token:
+            return False
+        decision = attempt.authorization
+        if (
+            decision.grant_ref is None
+            or decision.grant_revision is None
+            or decision.operation_ref is None
+            or decision.reservation is None
+            or decision.reservation.operation_ref != decision.operation_ref
+        ):
+            return False
+        with sqlite3.connect(self.path) as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute(
+                "SELECT notification_json,subscription_revision,state,lease_until FROM pa_watch_jobs WHERE job_key=? AND lease_token=?",
+                (job.job_key, job.lease_token),
+            ).fetchone()
+            if row is None or str(row[2]) != "leased" or (str(row[3]) and str(row[3]) <= _iso(current)):
+                db.rollback()
+                return False
+            try:
+                notification = _notification_from_payload(json.loads(str(row[0])))
+            except (TypeError, json.JSONDecodeError, ValueError):
+                self._cancel_leased_in(db, job.job_key, job.lease_token, "invalid_notification", current)
+                db.commit()
+                return False
+            subscription = self._load_subscription_in(db, notification.subscription_id)
+            subject = db.execute(
+                "SELECT current_version,lifecycle FROM pa_watch_subjects WHERE subscription_id=? AND subject_ref=?",
+                (notification.subscription_id, notification.subject_ref),
+            ).fetchone()
+            if (
+                subscription is None
+                or int(row[1]) != subscription.consent_revision
+                or _job_policy(subscription, notification, now=current) != "active"
+                or subject is None
+                or str(subject[0]) != notification.change_version
+                or str(subject[1]) != "active"
+                or access.owner_ref != subscription.owner_ref
+                or access.destination_ref != subscription.destination_ref
+                or access.data_class != notification.data_class
+            ):
+                self._cancel_leased_in(db, job.job_key, job.lease_token, "dispatch_policy_or_scope_changed", current)
+                db.commit()
+                return False
+            attempt_ref = "attempt_" + secrets.token_hex(16)
+            updated = db.execute(
+                "UPDATE pa_watch_jobs SET state='dispatching',last_reason='dispatch_prepared',updated_at=? WHERE job_key=? AND lease_token=? AND state='leased'",
+                (_iso(current), job.job_key, job.lease_token),
+            )
+            if updated.rowcount != 1:
+                db.rollback()
+                return False
+            db.execute(
+                "INSERT INTO pa_watch_delivery_attempts(job_key,owner_ref,destination_ref,operation_ref,attempt_ref,grant_ref,grant_revision,prepared_at) VALUES(?,?,?,?,?,?,?,?)",
+                (
+                    job.job_key, decision.owner_ref, access.destination_ref,
+                    decision.operation_ref, attempt_ref, decision.grant_ref,
+                    decision.grant_revision, _iso(current),
+                ),
+            )
+            db.commit()
+        return True
+
     def deliver_claimed_job(
         self,
         job: WatchJob,
@@ -962,13 +1054,15 @@ class WatchJobStore:
         attempt = self.prepare_delivery(job, access, now=current)
         if attempt is None:
             return "blocked"
+        if not self._persist_delivery_attempt(attempt, access, current=current):
+            return "blocked"
         # Keep the SQLite write transaction through the injected callback. It
         # linearizes the exact final policy decision, quota reservation and
         # one transport attempt: a concurrent pause/revision waits until this
         # callback has an honest outcome, and a second holder of the same
-        # lease sees the terminal state instead of double-sending. A process
-        # crash during the callback rolls the transaction back; the expired
-        # lease is then deliberately unknown rather than eligible for retry.
+        # lease sees the terminal state instead of double-sending. The prior
+        # committed attempt record survives a process crash in this callback;
+        # lease recovery marks it unknown rather than eligible for blind retry.
         result: Literal["sent", "deferred", "unknown", "blocked"]
         recorded_outcome: Literal["accepted", "unknown"] | None = None
         with sqlite3.connect(self.path) as db:
@@ -977,7 +1071,7 @@ class WatchJobStore:
                 "SELECT notification_json,subscription_revision,state,lease_until FROM pa_watch_jobs WHERE job_key=? AND lease_token=?",
                 (attempt.job.job_key, attempt.job.lease_token),
             ).fetchone()
-            if row is None or str(row[2]) != "leased" or (str(row[3]) and str(row[3]) <= _iso(current)):
+            if row is None or str(row[2]) != "dispatching" or (str(row[3]) and str(row[3]) <= _iso(current)):
                 db.rollback()
                 return "blocked"
             try:
@@ -1005,7 +1099,22 @@ class WatchJobStore:
                 self._cancel_leased_in(db, attempt.job.job_key, attempt.job.lease_token or "", "terminal_policy_or_scope_changed", current)
                 db.commit()
                 return "blocked"
+            attempt_row = db.execute(
+                "SELECT owner_ref,destination_ref,operation_ref,grant_ref,grant_revision FROM pa_watch_delivery_attempts WHERE job_key=?",
+                (attempt.job.job_key,),
+            ).fetchone()
             decision = attempt.authorization
+            if (
+                attempt_row is None
+                or str(attempt_row[0]) != notification.owner_ref
+                or str(attempt_row[1]) != access.destination_ref
+                or str(attempt_row[2]) != decision.operation_ref
+                or str(attempt_row[3]) != decision.grant_ref
+                or int(attempt_row[4]) != decision.grant_revision
+            ):
+                self._cancel_leased_in(db, attempt.job.job_key, attempt.job.lease_token or "", "dispatch_attempt_mismatch", current)
+                db.commit()
+                return "blocked"
             try:
                 # This consumes the current PA-02 reservation while the local
                 # policy state is locked, immediately before ``sender``.
@@ -1029,7 +1138,7 @@ class WatchJobStore:
                 db.commit()
                 return "blocked"
             try:
-                receipt_ref = sender(attempt.text)
+                receipt_ref = sender(render_watch_notification(notification))
             except KnownWatchDeliveryFailure as exc:
                 final_state = self._finish_delivery_in(
                     db, attempt, outcome="known_not_delivered", detail=type(exc).__name__,
@@ -1104,7 +1213,7 @@ class WatchJobStore:
         authenticated_actor_id: str | None,
         authenticated_owner_chat_id: str | None,
     ) -> WatchReconciliationRequirement | None:
-        """Return the sealed past operation only to its exact private owner."""
+        """Return one durable pre-send attempt only to its exact owner."""
         _ref(job_key, field="job_key")
         owner_ref = watch_owner_ref_from_authenticated_private_tuple(
             authenticated_chat_id, authenticated_actor_id, authenticated_owner_chat_id,
@@ -1113,27 +1222,26 @@ class WatchJobStore:
             return None
         with sqlite3.connect(self.path) as db:
             row = db.execute(
-                "SELECT a.owner_ref,a.destination_ref,a.operation_ref,a.unknown_at "
-                "FROM pa_watch_unknown_attempts a JOIN pa_watch_jobs j ON j.job_key=a.job_key "
+                "SELECT a.owner_ref,a.destination_ref,a.operation_ref,a.attempt_ref,a.prepared_at "
+                "FROM pa_watch_delivery_attempts a JOIN pa_watch_jobs j ON j.job_key=a.job_key "
                 "WHERE a.job_key=? AND j.state='unknown'",
                 (job_key,),
             ).fetchone()
         if row is None or str(row[0]) != owner_ref:
             return None
         return WatchReconciliationRequirement(
-            job_key, str(row[0]), str(row[1]), str(row[2]), _parse_utc(row[3]),
+            job_key, str(row[0]), str(row[1]), str(row[2]), str(row[3]), _parse_utc(row[4]),
         )
 
     def reconcile_unknown(
         self,
         evidence: WatchReconciliationEvidence,
         *,
-        access: WatchDeliveryAccess,
         authenticated_chat_id: str | None,
         authenticated_actor_id: str | None,
         authenticated_owner_chat_id: str | None,
     ) -> bool:
-        """Reconcile a known PA-02 unknown, never a caller assertion alone."""
+        """Reconcile one durable attempt; local checks cannot prove provider truth."""
         if type(evidence) is not WatchReconciliationEvidence:
             raise ValueError("reconciliation evidence is invalid")
         evidence.__post_init__()
@@ -1142,40 +1250,22 @@ class WatchJobStore:
         )
         if owner_ref is None or owner_ref != evidence.owner_ref:
             return False
-        decision = access.authorization
-        if (
-            access.owner_ref != evidence.owner_ref
-            or decision.owner_ref != evidence.owner_ref
-            or decision.operation_ref != evidence.operation_ref
-            or decision.reservation is None
-            or decision.reservation.operation_ref != evidence.operation_ref
-        ):
-            return False
         job_key, outcome, current = evidence.job_key, evidence.outcome, _utc(evidence.observed_at)
         with sqlite3.connect(self.path) as db:
             db.execute("BEGIN IMMEDIATE")
             row = db.execute(
-                "SELECT a.owner_ref,a.destination_ref,a.operation_ref,a.grant_ref,a.grant_revision,a.unknown_at,j.state "
-                "FROM pa_watch_unknown_attempts a JOIN pa_watch_jobs j ON j.job_key=a.job_key WHERE a.job_key=?",
+                "SELECT a.owner_ref,a.destination_ref,a.operation_ref,a.attempt_ref,a.prepared_at,j.state "
+                "FROM pa_watch_delivery_attempts a JOIN pa_watch_jobs j ON j.job_key=a.job_key WHERE a.job_key=?",
                 (job_key,),
             ).fetchone()
             if (
                 row is None
-                or str(row[6]) != "unknown"
+                or str(row[5]) != "unknown"
                 or str(row[0]) != evidence.owner_ref
-                or str(row[1]) != access.destination_ref
+                or str(row[1]) != evidence.destination_ref
                 or str(row[2]) != evidence.operation_ref
-                or str(row[3]) != decision.grant_ref
-                or int(row[4]) != decision.grant_revision
-                or current < _parse_utc(row[5])
-            ):
-                db.rollback()
-                return False
-            # The sealed original PA-02 reservation must itself still be in
-            # the unknown state. This is the local linkage a future authorized
-            # provider adapter supplies alongside its provider evidence.
-            if not decision.reservation.registry.reconcile_unknown_operation(
-                evidence.operation_ref, delivery_outcome=outcome,
+                or str(row[3]) != evidence.attempt_ref
+                or current < _parse_utc(row[4])
             ):
                 db.rollback()
                 return False
@@ -1195,7 +1285,7 @@ class WatchJobStore:
                     (_iso(current), job_key),
                 )
                 self._release_quota_in(db, job_key)
-            db.execute("DELETE FROM pa_watch_unknown_attempts WHERE job_key=?", (job_key,))
+            db.execute("DELETE FROM pa_watch_delivery_attempts WHERE job_key=?", (job_key,))
             db.commit()
         return True
 
@@ -1353,7 +1443,7 @@ class WatchJobStore:
             "SELECT state,attempts FROM pa_watch_jobs WHERE job_key=? AND lease_token=?",
             (job.job_key, job.lease_token),
         ).fetchone()
-        if row is None or str(row[0]) != "leased":
+        if row is None or str(row[0]) not in {"leased", "dispatching"}:
             return None
         if outcome == "sent":
             db.execute(
@@ -1364,7 +1454,7 @@ class WatchJobStore:
                 "INSERT OR IGNORE INTO pa_watch_receipts(job_key,outcome,delivered_at,transport_receipt_ref,detail) VALUES(?,?,?,?,?)",
                 (job.job_key, "sent", _iso(current), transport_receipt_ref, _bounded_text(detail or "sent", field="detail", maximum=500)),
             )
-            db.execute("DELETE FROM pa_watch_unknown_attempts WHERE job_key=?", (job.job_key,))
+            db.execute("DELETE FROM pa_watch_delivery_attempts WHERE job_key=?", (job.job_key,))
             self._release_quota_in(db, job.job_key)
             return "sent"
         if outcome == "unknown":
@@ -1380,14 +1470,6 @@ class WatchJobStore:
             db.execute(
                 "UPDATE pa_watch_jobs SET state='unknown',lease_token='',lease_until='',last_reason='transport_outcome_unknown',updated_at=? WHERE job_key=? AND lease_token=?",
                 (_iso(current), job.job_key, job.lease_token),
-            )
-            db.execute(
-                "INSERT INTO pa_watch_unknown_attempts(job_key,owner_ref,destination_ref,operation_ref,grant_ref,grant_revision,unknown_at) VALUES(?,?,?,?,?,?,?) "
-                "ON CONFLICT(job_key) DO UPDATE SET owner_ref=excluded.owner_ref,destination_ref=excluded.destination_ref,operation_ref=excluded.operation_ref,grant_ref=excluded.grant_ref,grant_revision=excluded.grant_revision,unknown_at=excluded.unknown_at",
-                (
-                    job.job_key, decision.owner_ref, decision.resource_ref,
-                    decision.operation_ref, decision.grant_ref, decision.grant_revision, _iso(current),
-                ),
             )
             return "unknown"
         attempts = int(row[1])
@@ -1459,9 +1541,10 @@ class WatchJobStore:
     @staticmethod
     def _cancel_leased_in(db: sqlite3.Connection, job_key: str, lease_token: str, reason: str, current: datetime) -> None:
         db.execute(
-            "UPDATE pa_watch_jobs SET state='cancelled',lease_token='',lease_until='',last_reason=?,updated_at=? WHERE job_key=? AND lease_token=? AND state='leased'",
+            "UPDATE pa_watch_jobs SET state='cancelled',lease_token='',lease_until='',last_reason=?,updated_at=? WHERE job_key=? AND lease_token=? AND state IN ('leased','dispatching')",
             (reason[:500], _iso(current), job_key, lease_token),
         )
+        db.execute("DELETE FROM pa_watch_delivery_attempts WHERE job_key=?", (job_key,))
         db.execute("DELETE FROM pa_watch_quota_reservations WHERE job_key=?", (job_key,))
 
     @staticmethod
