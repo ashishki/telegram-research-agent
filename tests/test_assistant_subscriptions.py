@@ -73,8 +73,14 @@ def _read_grant(*, revoked: bool = False) -> CapabilityGrant:
 
 
 def _register(store: WatchJobStore, subscription: WatchSubscription) -> WatchSubscription:
-    registered = store.register_subscription(
+    preview = store.preview_subscription(
         subscription,
+        authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1],
+        authenticated_owner_chat_id=OWNER_TUPLE[2],
+    )
+    assert preview is not None
+    registered = store.confirm_subscription(
+        preview.confirmation_ref,
         authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1],
         authenticated_owner_chat_id=OWNER_TUPLE[2],
     )
@@ -95,6 +101,25 @@ def test_collection_rechecks_active_subscription_and_current_read_grant(tmp_path
     paused = replace(subscription, consent_revision=2, lifecycle="paused")
     assert store.revise_subscription(paused, expected_revision=1, authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1], authenticated_owner_chat_id=OWNER_TUPLE[2], now=NOW)
     assert not store.collection_allowed(paused.subscription_id, _collection_access(CapabilityRegistry((_read_grant(),))), now=NOW)
+
+
+def test_subscription_requires_one_exact_unexpired_private_preview_confirmation(tmp_path) -> None:
+    store = WatchJobStore(tmp_path / "confirm.db")
+    preview = store.preview_subscription(
+        _subscription(), authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1],
+        authenticated_owner_chat_id=OWNER_TUPLE[2], now=NOW,
+    )
+    assert preview is not None
+    assert store.confirm_subscription(preview.confirmation_ref, authenticated_chat_id="43", authenticated_actor_id="43", authenticated_owner_chat_id="43", now=NOW) is None
+    assert store.subscription("watch_synthetic_001") is None
+    confirmed = store.confirm_subscription(preview.confirmation_ref, authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1], authenticated_owner_chat_id=OWNER_TUPLE[2], now=NOW)
+    assert confirmed == _subscription()
+    assert store.confirm_subscription(preview.confirmation_ref, authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1], authenticated_owner_chat_id=OWNER_TUPLE[2], now=NOW) is None
+
+    stale = WatchJobStore(tmp_path / "stale-confirm.db")
+    preview = stale.preview_subscription(_subscription(), authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1], authenticated_owner_chat_id=OWNER_TUPLE[2], now=NOW)
+    assert preview is not None
+    assert stale.confirm_subscription(preview.confirmation_ref, authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1], authenticated_owner_chat_id=OWNER_TUPLE[2], now=NOW + timedelta(minutes=10)) is None
 
 
 def test_queue_requires_source_scope_material_change_and_exact_revision(tmp_path) -> None:

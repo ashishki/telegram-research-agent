@@ -271,6 +271,33 @@ class WatchQueueResult:
 
 
 @dataclass(frozen=True, slots=True)
+class WatchSubscriptionPreview:
+    """One expiring exact subscription preview, before durable confirmation."""
+
+    confirmation_ref: str
+    subscription: WatchSubscription
+    expires_at: datetime
+    content_digest: str
+
+
+@dataclass(frozen=True, slots=True)
+class WatchReconciliationEvidence:
+    """A typed provider/operator observation; booleans are not reconciliation."""
+
+    job_key: str
+    outcome: Literal["delivered", "not_delivered"]
+    evidence_ref: str
+    observed_at: datetime
+
+    def __post_init__(self) -> None:
+        _ref(self.job_key, field="job_key")
+        if self.outcome not in {"delivered", "not_delivered"}:
+            raise ValueError("reconciliation outcome is invalid")
+        _ref(self.evidence_ref, field="evidence_ref")
+        _utc(self.observed_at)
+
+
+@dataclass(frozen=True, slots=True)
 class WatchDeliveryAccess:
     """One freshly reserved PA-02 Telegram watch-delivery decision."""
 
@@ -368,6 +395,16 @@ CREATE TABLE IF NOT EXISTS pa_watch_subscriptions(
  document_json TEXT NOT NULL,
  updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS pa_watch_subscription_confirmations(
+ confirmation_ref TEXT PRIMARY KEY,
+ owner_ref TEXT NOT NULL,
+ subscription_json TEXT NOT NULL,
+ content_digest TEXT NOT NULL,
+ expires_at TEXT NOT NULL,
+ state TEXT NOT NULL CHECK(state IN ('previewed','confirmed','cancelled','expired')),
+ created_at TEXT NOT NULL,
+ confirmed_at TEXT NOT NULL DEFAULT ''
+);
 CREATE TABLE IF NOT EXISTS pa_watch_subjects(
  subscription_id TEXT NOT NULL,
  subject_ref TEXT NOT NULL,
@@ -426,7 +463,7 @@ class WatchJobStore:
         with sqlite3.connect(self.path) as db:
             db.executescript(WATCH_JOB_SCHEMA)
 
-    def register_subscription(
+    def preview_subscription(
         self,
         subscription: WatchSubscription,
         *,
@@ -434,32 +471,93 @@ class WatchJobStore:
         authenticated_actor_id: str | None,
         authenticated_owner_chat_id: str | None,
         now: datetime | None = None,
-    ) -> WatchSubscription | None:
-        """Persist one confirmed intent once; a changed intent needs a revision."""
+    ) -> WatchSubscriptionPreview | None:
+        """Store one owner-bound expiring preview; it creates no active watch."""
         self._validate_subscription(subscription)
+        current = _utc(now or datetime.now(timezone.utc))
         if watch_owner_ref_from_authenticated_private_tuple(
             authenticated_chat_id, authenticated_actor_id, authenticated_owner_chat_id,
         ) != subscription.owner_ref:
             return None
-        current = _utc(now or datetime.now(timezone.utc))
         payload = _subscription_payload(subscription)
+        digest = _digest_payload(payload)
+        preview = WatchSubscriptionPreview(
+            "watchconfirm_" + secrets.token_hex(16), subscription,
+            current + timedelta(minutes=10), digest,
+        )
         with sqlite3.connect(self.path) as db:
-            row = db.execute(
-                "SELECT document_json FROM pa_watch_subscriptions WHERE subscription_id=?",
-                (subscription.subscription_id,),
-            ).fetchone()
-            if row is not None:
-                stored = _subscription_from_payload(json.loads(str(row[0])))
-                if stored != subscription:
-                    raise ValueError("subscription already exists; a revision is required")
-                return stored
             db.execute(
-                "INSERT INTO pa_watch_subscriptions(subscription_id,owner_ref,consent_revision,lifecycle,expires_at,document_json,updated_at) VALUES(?,?,?,?,?,?,?)",
+                "INSERT INTO pa_watch_subscription_confirmations(confirmation_ref,owner_ref,subscription_json,content_digest,expires_at,state,created_at) VALUES(?,?,?,?,?,'previewed',?)",
                 (
-                    subscription.subscription_id, subscription.owner_ref, subscription.consent_revision,
-                    subscription.lifecycle, _iso(subscription.expires_at), json.dumps(payload, sort_keys=True), _iso(current),
+                    preview.confirmation_ref, subscription.owner_ref, json.dumps(payload, sort_keys=True),
+                    preview.content_digest, _iso(preview.expires_at), _iso(current),
                 ),
             )
+            db.commit()
+        return preview
+
+    def confirm_subscription(
+        self,
+        confirmation_ref: str,
+        *,
+        authenticated_chat_id: str | None,
+        authenticated_actor_id: str | None,
+        authenticated_owner_chat_id: str | None,
+        now: datetime | None = None,
+    ) -> WatchSubscription | None:
+        """Consume one exact unexpired preview; no caller-built subscription is accepted."""
+        _ref(confirmation_ref, field="confirmation_ref")
+        current = _utc(now or datetime.now(timezone.utc))
+        owner_ref = watch_owner_ref_from_authenticated_private_tuple(
+            authenticated_chat_id, authenticated_actor_id, authenticated_owner_chat_id,
+        )
+        if owner_ref is None:
+            return None
+        with sqlite3.connect(self.path) as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute(
+                "SELECT owner_ref,subscription_json,content_digest,expires_at,state FROM pa_watch_subscription_confirmations WHERE confirmation_ref=?",
+                (confirmation_ref,),
+            ).fetchone()
+            if row is None or str(row[0]) != owner_ref or str(row[4]) != "previewed":
+                db.rollback()
+                return None
+            if _parse_utc(row[3]) <= current:
+                db.execute("UPDATE pa_watch_subscription_confirmations SET state='expired' WHERE confirmation_ref=? AND state='previewed'", (confirmation_ref,))
+                db.commit()
+                return None
+            try:
+                payload = json.loads(str(row[1]))
+                subscription = _subscription_from_payload(payload)
+            except (TypeError, json.JSONDecodeError, ValueError):
+                db.execute("UPDATE pa_watch_subscription_confirmations SET state='cancelled' WHERE confirmation_ref=?", (confirmation_ref,))
+                db.commit()
+                return None
+            if subscription.owner_ref != owner_ref or _digest_payload(_subscription_payload(subscription)) != str(row[2]):
+                db.execute("UPDATE pa_watch_subscription_confirmations SET state='cancelled' WHERE confirmation_ref=?", (confirmation_ref,))
+                db.commit()
+                return None
+            existing = db.execute("SELECT document_json FROM pa_watch_subscriptions WHERE subscription_id=?", (subscription.subscription_id,)).fetchone()
+            if existing is not None:
+                try:
+                    same = _subscription_from_payload(json.loads(str(existing[0]))) == subscription
+                except (TypeError, json.JSONDecodeError, ValueError):
+                    same = False
+                if not same:
+                    db.rollback()
+                    return None
+            else:
+                db.execute(
+                    "INSERT INTO pa_watch_subscriptions(subscription_id,owner_ref,consent_revision,lifecycle,expires_at,document_json,updated_at) VALUES(?,?,?,?,?,?,?)",
+                    (subscription.subscription_id, subscription.owner_ref, subscription.consent_revision, subscription.lifecycle, _iso(subscription.expires_at), json.dumps(_subscription_payload(subscription), sort_keys=True), _iso(current)),
+                )
+            updated = db.execute(
+                "UPDATE pa_watch_subscription_confirmations SET state='confirmed',confirmed_at=? WHERE confirmation_ref=? AND state='previewed'",
+                (_iso(current), confirmation_ref),
+            )
+            if updated.rowcount != 1:
+                db.rollback()
+                return None
             db.commit()
         return subscription
 
@@ -959,6 +1057,9 @@ class WatchJobStore:
             except Exception:
                 access = None
             if access is None:
+                # No reservation means no transport attempt occurred. Do not
+                # convert a known no-send into an ambiguous lease expiry.
+                self._cancel_known_not_sent(job, reason="delivery_access_unavailable", now=current)
                 outcomes["blocked"] += 1
                 continue
             try:
@@ -967,21 +1068,12 @@ class WatchJobStore:
                 outcomes["blocked"] += 1
         return WatchRunResult(len(claimed), outcomes["sent"], outcomes["deferred"], outcomes["unknown"], outcomes["blocked"])
 
-    def reconcile_unknown(
-        self,
-        job_key: str,
-        *,
-        outcome: Literal["delivered", "not_delivered"],
-        transport_receipt_ref: str | None = None,
-        now: datetime | None = None,
-    ) -> bool:
+    def reconcile_unknown(self, evidence: WatchReconciliationEvidence) -> bool:
         """Explicitly reconcile unknown delivery before any possible retry."""
-        _ref(job_key, field="job_key")
-        if outcome not in {"delivered", "not_delivered"}:
-            raise ValueError("reconciliation outcome is invalid")
-        if transport_receipt_ref is not None:
-            _ref(transport_receipt_ref, field="transport_receipt_ref")
-        current = _utc(now or datetime.now(timezone.utc))
+        if type(evidence) is not WatchReconciliationEvidence:
+            raise ValueError("reconciliation evidence is invalid")
+        evidence.__post_init__()
+        job_key, outcome, current = evidence.job_key, evidence.outcome, _utc(evidence.observed_at)
         with sqlite3.connect(self.path) as db:
             db.execute("BEGIN IMMEDIATE")
             row = db.execute("SELECT state FROM pa_watch_jobs WHERE job_key=?", (job_key,)).fetchone()
@@ -995,7 +1087,7 @@ class WatchJobStore:
                 )
                 db.execute(
                     "INSERT OR IGNORE INTO pa_watch_receipts(job_key,outcome,delivered_at,transport_receipt_ref,detail) VALUES(?,?,?,?,?)",
-                    (job_key, "reconciled_delivered", _iso(current), transport_receipt_ref, "reconciliation established delivery"),
+                    (job_key, "reconciled_delivered", _iso(current), evidence.evidence_ref, "reconciliation established delivery"),
                 )
                 self._release_quota_in(db, job_key)
             else:
@@ -1169,6 +1261,14 @@ class WatchJobStore:
             and str(subject[0]) == notification.change_version
             and str(subject[1]) == "active"
         )
+
+    def _cancel_known_not_sent(self, job: WatchJob, *, reason: str, now: datetime) -> None:
+        if not job.lease_token:
+            return
+        with sqlite3.connect(self.path) as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._cancel_leased_in(db, job.job_key, job.lease_token, reason, now)
+            db.commit()
 
     def _load_subscription_in(self, db: sqlite3.Connection, subscription_id: str) -> WatchSubscription | None:
         row = db.execute(
@@ -1344,6 +1444,11 @@ def _subscription_payload(subscription: WatchSubscription) -> dict[str, object]:
         "paused_until": _iso(subscription.paused_until) if subscription.paused_until else None,
         "allow_urgent_during_quiet_hours": subscription.allow_urgent_during_quiet_hours,
     }
+
+
+def _digest_payload(payload: Mapping[str, object]) -> str:
+    canonical = json.dumps(dict(payload), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def _subscription_from_payload(payload: object) -> WatchSubscription:

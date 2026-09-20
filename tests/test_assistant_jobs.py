@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from threading import Barrier, Thread
 
 from prm.capabilities import AuthorizationRequest, CapabilityGrant, CapabilityRegistry, ProviderPolicy
-from prm.watch_jobs import WatchDeliveryAccess, WatchJobStore, WatchNotification, WatchSubscription, watch_owner_ref_from_authenticated_private_tuple
+from prm.watch_jobs import WatchDeliveryAccess, WatchJobStore, WatchNotification, WatchReconciliationEvidence, WatchSubscription, watch_owner_ref_from_authenticated_private_tuple
 
 
 NOW = datetime.now(timezone.utc).replace(microsecond=0)
@@ -61,7 +61,9 @@ def _delivery_access(registry: CapabilityRegistry, *, operation_ref: str | None 
 
 
 def _queued(store: WatchJobStore, notification: WatchNotification | None = None):
-    registered = store.register_subscription(_subscription(), authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1], authenticated_owner_chat_id=OWNER_TUPLE[2])
+    preview = store.preview_subscription(_subscription(), authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1], authenticated_owner_chat_id=OWNER_TUPLE[2])
+    assert preview is not None
+    registered = store.confirm_subscription(preview.confirmation_ref, authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1], authenticated_owner_chat_id=OWNER_TUPLE[2])
     assert registered is not None
     result = store.queue_notification(notification or _notification(), expected_subscription_revision=1, now=NOW)
     assert result.job is not None
@@ -97,7 +99,7 @@ def test_one_lease_wins_and_expired_lease_becomes_unknown_until_reconciliation(t
     assert store.job_state(queued.job_key) == "leased"
     assert store.claim_due_jobs(now=NOW + timedelta(minutes=2)) == ()
     assert store.job_state(queued.job_key) == "unknown"
-    assert store.reconcile_unknown(queued.job_key, outcome="not_delivered", now=NOW + timedelta(minutes=2))
+    assert store.reconcile_unknown(WatchReconciliationEvidence(queued.job_key, "not_delivered", "evidence_fixture_100", NOW + timedelta(minutes=2)))
     assert len(store.claim_due_jobs(now=NOW + timedelta(minutes=2))) == 1
 
 
@@ -119,7 +121,7 @@ def test_revoked_delivery_grant_blocks_final_send_and_unknown_is_never_blindly_r
     assert unknown_store.finish_delivery(attempt, outcome="unknown", detail="fixture timeout", now=NOW)
     assert unknown_store.job_state(leased.job_key) == "unknown"
     assert unknown_store.claim_due_jobs(now=NOW + timedelta(days=1)) == ()
-    assert unknown_store.reconcile_unknown(leased.job_key, outcome="delivered", transport_receipt_ref="receipt_fixture_101", now=NOW)
+    assert unknown_store.reconcile_unknown(WatchReconciliationEvidence(leased.job_key, "delivered", "receipt_fixture_101", NOW))
     assert unknown_store.receipt(leased.job_key) is not None
 
 
@@ -188,13 +190,16 @@ def test_one_shot_runner_owns_final_preflight_but_has_no_default_transport(tmp_p
     assert len(sent) == 1 and "Почему это важно" in sent[0]
 
     blocked = WatchJobStore(tmp_path / "runner-blocked.db")
-    _queued(blocked)
+    blocked_job = _queued(blocked)
     no_transport = blocked.run_once(
         access_for_job=lambda _job: None,
         sender=lambda _text: (_ for _ in ()).throw(AssertionError("must not send")),
         now=NOW,
     )
     assert no_transport.claimed == no_transport.blocked == 1 and no_transport.sent == 0
+    assert blocked.job_state(blocked_job.job_key) == "cancelled"
+    job = blocked.claim_due_jobs(now=NOW + timedelta(minutes=2))
+    assert job == ()  # known no-send was cancelled, not converted to unknown
 
 
 def test_runner_rechecks_revocation_and_pause_after_preflight_before_sender(tmp_path) -> None:
