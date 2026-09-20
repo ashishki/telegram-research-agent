@@ -5,12 +5,13 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from itertools import count
+import sqlite3
 from threading import Barrier, Event, Thread
 
 import pytest
 
 from prm.capabilities import AuthorizationRequest, CapabilityGrant, CapabilityRegistry, ProviderPolicy
-from prm.watch_jobs import WatchDeliveryAccess, WatchJobStore, WatchNotification, WatchReconciliationEvidence, WatchSubscription, watch_owner_ref_from_authenticated_private_tuple
+from prm.watch_jobs import WatchDeliveryAccess, WatchJobStore, WatchNotification, WatchReconciliationAttestation, WatchReconciliationEvidence, WatchSubscription, render_watch_notification, watch_owner_ref_from_authenticated_private_tuple
 
 
 NOW = datetime.now(timezone.utc).replace(microsecond=0)
@@ -84,6 +85,18 @@ def _revise(store: WatchJobStore, subscription: WatchSubscription) -> WatchSubsc
     return revised
 
 
+class _SyntheticReconciliationVerifier:
+    """Test-only stand-in for the separately authorized future adapter."""
+
+    def verify(self, requirement, evidence):
+        return WatchReconciliationAttestation(
+            "authority_synthetic_reconcile",
+            requirement.job_key, requirement.owner_ref, requirement.destination_ref,
+            requirement.operation_ref, requirement.attempt_ref, evidence.outcome,
+            evidence.evidence_ref, evidence.observed_at, evidence.observed_at,
+        )
+
+
 def test_changed_version_and_completed_subject_cancel_waiting_or_leased_jobs(tmp_path) -> None:
     store = WatchJobStore(tmp_path / "jobs.db")
     old = _queued(store)
@@ -93,7 +106,10 @@ def test_changed_version_and_completed_subject_cancel_waiting_or_leased_jobs(tmp
     claimed = store.claim_due_jobs(now=NOW)
     assert len(claimed) == 1
     assert store.complete_subject("watch_synthetic_101", "subject_due_101", expected_subscription_revision=1, authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1], authenticated_owner_chat_id=OWNER_TUPLE[2], now=NOW)
-    assert store.prepare_delivery(claimed[0], _delivery_access(_delivery_registry()), now=NOW) is None
+    assert store.deliver_claimed_job(
+        claimed[0], _delivery_access(_delivery_registry()),
+        sender=lambda _text: (_ for _ in ()).throw(AssertionError("completed subject must not send")), now=NOW,
+    ) == "blocked"
     assert store.job_state(claimed[0].job_key) == "cancelled"
 
 
@@ -129,10 +145,13 @@ def test_revoked_delivery_grant_blocks_final_send_and_unknown_is_never_blindly_r
     registry = _delivery_registry()
     access = _delivery_access(registry, operation_ref="operation_watch_101")
     registry.revoke_grant("grant_watch_delivery_101", revoked_at=NOW)
-    assert store.prepare_delivery(leased, access, now=NOW) is None
+    assert store.deliver_claimed_job(
+        leased, access,
+        sender=lambda _text: (_ for _ in ()).throw(AssertionError("revoked grant must not send")), now=NOW,
+    ) == "blocked"
     assert store.job_state(queued.job_key) == "cancelled" and store.receipt(queued.job_key) is None
 
-    unknown_store = WatchJobStore(tmp_path / "unknown.db")
+    unknown_store = WatchJobStore(tmp_path / "unknown.db", reconciliation_verifier=_SyntheticReconciliationVerifier())
     _queued(unknown_store)
     leased = unknown_store.claim_due_jobs(now=NOW)[0]
     unknown_registry = _delivery_registry()
@@ -159,11 +178,22 @@ def test_revoked_delivery_grant_blocks_final_send_and_unknown_is_never_blindly_r
         WatchReconciliationEvidence(leased.job_key, OWNER_REF, requirement.destination_ref, requirement.operation_ref, requirement.attempt_ref, "delivered", "receipt_fixture_101", NOW),
         authenticated_chat_id="43", authenticated_actor_id="43", authenticated_owner_chat_id="43",
     )
+    unverified_restart = WatchJobStore(tmp_path / "unknown.db")
+    assert not unverified_restart.reconcile_unknown(
+        WatchReconciliationEvidence(leased.job_key, OWNER_REF, requirement.destination_ref, requirement.operation_ref, requirement.attempt_ref, "delivered", "receipt_fixture_101", NOW),
+        authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1], authenticated_owner_chat_id=OWNER_TUPLE[2],
+    )
     assert unknown_store.reconcile_unknown(
         WatchReconciliationEvidence(leased.job_key, OWNER_REF, requirement.destination_ref, requirement.operation_ref, requirement.attempt_ref, "delivered", "receipt_fixture_101", NOW),
         authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1], authenticated_owner_chat_id=OWNER_TUPLE[2],
     )
     assert unknown_store.receipt(leased.job_key) is not None
+    with sqlite3.connect(unknown_store.path) as db:
+        audit = db.execute(
+            "SELECT authority_ref,outcome,evidence_ref FROM pa_watch_reconciliation_audit WHERE job_key=?",
+            (leased.job_key,),
+        ).fetchone()
+    assert audit == ("authority_synthetic_reconcile", "delivered", "receipt_fixture_101")
 
 
 def test_restart_after_sender_started_preserves_bound_unknown_reconciliation(tmp_path) -> None:
@@ -178,7 +208,7 @@ def test_restart_after_sender_started_preserves_bound_unknown_reconciliation(tmp
 
     with pytest.raises(SystemExit, match="process loss"):
         store.deliver_claimed_job(leased, _delivery_access(registry), sender=crash_after_sender_started, now=NOW)
-    restarted = WatchJobStore(path)
+    restarted = WatchJobStore(path, reconciliation_verifier=_SyntheticReconciliationVerifier())
     assert restarted.claim_due_jobs(now=NOW + timedelta(minutes=2)) == ()
     assert restarted.job_state(queued.job_key) == "unknown"
     requirement = restarted.reconciliation_requirement(
@@ -204,8 +234,8 @@ def test_receipt_is_separate_from_job_state_and_daily_cap_is_conservative(tmp_pa
     assert second.job is not None
     registry = _delivery_registry()
     lease = {job.job_key: job for job in store.claim_due_jobs(now=NOW)}
-    attempt = store.prepare_delivery(lease[first.job_key], _delivery_access(registry), now=NOW)
-    assert attempt is not None and "Что изменилось" in attempt.text and "Почему это важно" in attempt.text
+    rendered = render_watch_notification(lease[first.job_key].notification)
+    assert "Что изменилось" in rendered and "Почему это важно" in rendered
     assert store.receipt(first.job_key) is None
     assert store.deliver_claimed_job(lease[first.job_key], _delivery_access(registry), sender=lambda _text: "receipt_fixture_102", now=NOW) == "sent"
     assert store.job_state(first.job_key) == "sent" and store.receipt(first.job_key)["outcome"] == "sent"  # type: ignore[index]
@@ -226,8 +256,9 @@ def test_explicit_feedback_pauses_or_unsubscribes_without_claiming_a_hidden_pref
     store = WatchJobStore(tmp_path / "feedback.db")
     first = _queued(store)
     leased = store.claim_due_jobs(now=NOW)[0]
-    attempt = store.prepare_delivery(leased, _delivery_access(_delivery_registry()), now=NOW)
-    assert attempt is not None and store.finish_delivery(attempt, outcome="sent", now=NOW)
+    assert store.deliver_claimed_job(
+        leased, _delivery_access(_delivery_registry()), sender=lambda _text: "receipt_feedback_101", now=NOW,
+    ) == "sent"
     assert not store.record_feedback(first.job_key, action="pause", authenticated_chat_id="43", authenticated_actor_id="43", authenticated_owner_chat_id="43", now=NOW)
     assert store.subscription("watch_synthetic_101").lifecycle == "active"  # type: ignore[union-attr]
     assert store.record_feedback(first.job_key, action="less", authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1], authenticated_owner_chat_id=OWNER_TUPLE[2], now=NOW)
@@ -240,8 +271,9 @@ def test_explicit_feedback_pauses_or_unsubscribes_without_claiming_a_hidden_pref
     unsubscribe = WatchJobStore(tmp_path / "unsubscribe.db")
     job = _queued(unsubscribe)
     leased = unsubscribe.claim_due_jobs(now=NOW)[0]
-    attempt = unsubscribe.prepare_delivery(leased, _delivery_access(_delivery_registry()), now=NOW)
-    assert attempt is not None and unsubscribe.finish_delivery(attempt, outcome="sent", now=NOW)
+    assert unsubscribe.deliver_claimed_job(
+        leased, _delivery_access(_delivery_registry()), sender=lambda _text: "receipt_feedback_102", now=NOW,
+    ) == "sent"
     assert unsubscribe.record_feedback(job.job_key, action="unsubscribe", authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1], authenticated_owner_chat_id=OWNER_TUPLE[2], now=NOW)
     stopped = unsubscribe.subscription("watch_synthetic_101")
     assert stopped is not None and stopped.lifecycle == "cancelled" and stopped.consent_revision == 2
@@ -371,14 +403,14 @@ def test_runner_rechecks_revocation_and_pause_after_preflight_before_sender(tmp_
     store = WatchJobStore(tmp_path / "terminal-recheck.db")
     _queued(store)
     registry = _delivery_registry()
-    original_prepare = store.prepare_delivery
+    original_persist = store._persist_delivery_attempt
 
-    def prepare_then_revoke(*args, **kwargs):
-        prepared = original_prepare(*args, **kwargs)
+    def persist_then_revoke(*args, **kwargs):
+        prepared = original_persist(*args, **kwargs)
         registry.revoke_grant("grant_watch_delivery_101", revoked_at=NOW)
         return prepared
 
-    store.prepare_delivery = prepare_then_revoke  # type: ignore[method-assign]
+    store._persist_delivery_attempt = persist_then_revoke  # type: ignore[method-assign]
     outcome = store.run_once(
         access_for_job=lambda _job: _delivery_access(registry),
         sender=lambda _text: (_ for _ in ()).throw(AssertionError("revoked grant must block sender")),
@@ -389,16 +421,16 @@ def test_runner_rechecks_revocation_and_pause_after_preflight_before_sender(tmp_
     paused = WatchJobStore(tmp_path / "terminal-pause.db")
     _queued(paused)
     registry = _delivery_registry()
-    original_prepare = paused.prepare_delivery
+    original_persist = paused._persist_delivery_attempt
 
-    def prepare_then_pause(*args, **kwargs):
-        prepared = original_prepare(*args, **kwargs)
+    def persist_then_pause(*args, **kwargs):
+        prepared = original_persist(*args, **kwargs)
         current = paused.subscription("watch_synthetic_101")
         assert current is not None
         assert _revise(paused, replace(current, consent_revision=2, lifecycle="paused"))
         return prepared
 
-    paused.prepare_delivery = prepare_then_pause  # type: ignore[method-assign]
+    paused._persist_delivery_attempt = persist_then_pause  # type: ignore[method-assign]
     outcome = paused.run_once(
         access_for_job=lambda _job: _delivery_access(registry),
         sender=lambda _text: (_ for _ in ()).throw(AssertionError("paused watch must block sender")),

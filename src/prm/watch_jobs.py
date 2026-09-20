@@ -22,7 +22,7 @@ from pathlib import Path
 import re
 import secrets
 import sqlite3
-from typing import Callable, Literal, Mapping
+from typing import Callable, Literal, Mapping, Protocol
 from zoneinfo import ZoneInfo
 
 from prm.capabilities import (
@@ -332,6 +332,45 @@ class WatchReconciliationRequirement:
 
 
 @dataclass(frozen=True, slots=True)
+class WatchReconciliationAttestation:
+    """A future adapter's verified observation for one durable attempt."""
+
+    authority_ref: str
+    job_key: str
+    owner_ref: str
+    destination_ref: str
+    operation_ref: str
+    attempt_ref: str
+    outcome: Literal["delivered", "not_delivered"]
+    evidence_ref: str
+    observed_at: datetime
+    verified_at: datetime
+
+    def __post_init__(self) -> None:
+        for field, value in (
+            ("authority_ref", self.authority_ref), ("job_key", self.job_key),
+            ("owner_ref", self.owner_ref), ("destination_ref", self.destination_ref),
+            ("operation_ref", self.operation_ref), ("attempt_ref", self.attempt_ref),
+            ("evidence_ref", self.evidence_ref),
+        ):
+            _ref(value, field=field)
+        if self.outcome not in {"delivered", "not_delivered"}:
+            raise ValueError("reconciliation outcome is invalid")
+        _utc(self.observed_at)
+        _utc(self.verified_at)
+
+
+class WatchReconciliationVerifier(Protocol):
+    """An authorized adapter-owned verifier; the local store has no provider."""
+
+    def verify(
+        self,
+        requirement: WatchReconciliationRequirement,
+        evidence: WatchReconciliationEvidence,
+    ) -> WatchReconciliationAttestation | None: ...
+
+
+@dataclass(frozen=True, slots=True)
 class WatchDeliveryAccess:
     """One freshly reserved PA-02 Telegram watch-delivery decision."""
 
@@ -491,6 +530,19 @@ CREATE TABLE IF NOT EXISTS pa_watch_delivery_attempts(
  grant_revision INTEGER NOT NULL,
  prepared_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS pa_watch_reconciliation_audit(
+ job_key TEXT PRIMARY KEY,
+ authority_ref TEXT NOT NULL,
+ owner_ref TEXT NOT NULL,
+ destination_ref TEXT NOT NULL,
+ operation_ref TEXT NOT NULL,
+ attempt_ref TEXT NOT NULL,
+ outcome TEXT NOT NULL CHECK(outcome IN ('delivered','not_delivered')),
+ evidence_ref TEXT NOT NULL,
+ observed_at TEXT NOT NULL,
+ verified_at TEXT NOT NULL,
+ reconciled_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS pa_watch_feedback(
  job_key TEXT NOT NULL,
  action TEXT NOT NULL,
@@ -503,8 +555,16 @@ CREATE TABLE IF NOT EXISTS pa_watch_feedback(
 class WatchJobStore:
     """An explicit-path local durable sidecar for watch state and receipts."""
 
-    def __init__(self, path: str | Path) -> None:
+    def __init__(
+        self,
+        path: str | Path,
+        *,
+        reconciliation_verifier: WatchReconciliationVerifier | None = None,
+    ) -> None:
         self.path = Path(path)
+        if reconciliation_verifier is not None and not callable(getattr(reconciliation_verifier, "verify", None)):
+            raise ValueError("reconciliation_verifier is invalid")
+        self._reconciliation_verifier = reconciliation_verifier
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(self.path) as db:
             db.executescript(WATCH_JOB_SCHEMA)
@@ -833,19 +893,14 @@ class WatchJobStore:
             db.commit()
         return tuple(claimed)
 
-    def prepare_delivery(
+    def _prepare_delivery(
         self,
         job: WatchJob,
         access: WatchDeliveryAccess,
         *,
         now: datetime | None = None,
     ) -> DeliveryAttempt | None:
-        """Run the final policy/grant/quota check immediately before transport.
-
-        This is intentionally not a sender.  An authorized adapter must call
-        ``finish_delivery`` with the honest transport outcome; no code here can
-        make a network request or infer that a message was received.
-        """
+        """Internal precheck; only ``deliver_claimed_job`` owns dispatch."""
         if type(job) is not WatchJob or job.state != "leased" or not job.lease_token:
             return None
         current = _utc(now or datetime.now(timezone.utc))
@@ -910,48 +965,6 @@ class WatchJobStore:
             return None
         refreshed = WatchJob(job.job_key, notification, job.subscription_revision, "leased", job.attempts, job.lease_token, job.lease_until)
         return DeliveryAttempt(refreshed, render_watch_notification(notification), decision)
-
-    def finish_delivery(
-        self,
-        attempt: DeliveryAttempt,
-        *,
-        outcome: Literal["sent", "unknown", "known_not_delivered"],
-        transport_receipt_ref: str | None = None,
-        detail: str = "",
-        now: datetime | None = None,
-        max_attempts: int = 3,
-    ) -> bool:
-        """Separate a truthful transport result from the durable job receipt."""
-        if type(attempt) is not DeliveryAttempt or outcome not in {"sent", "unknown", "known_not_delivered"}:
-            raise ValueError("delivery outcome is invalid")
-        if transport_receipt_ref is not None:
-            _ref(transport_receipt_ref, field="transport_receipt_ref")
-        if not isinstance(max_attempts, int) or isinstance(max_attempts, bool) or not 1 <= max_attempts <= 10:
-            raise ValueError("max_attempts is invalid")
-        current = _utc(now or datetime.now(timezone.utc))
-        job = attempt.job
-        if not job.lease_token:
-            return False
-        recorded_outcome: Literal["accepted", "unknown"] | None = None
-        with sqlite3.connect(self.path) as db:
-            db.execute("BEGIN IMMEDIATE")
-            result = self._finish_delivery_in(
-                db, attempt, outcome=outcome,
-                transport_receipt_ref=transport_receipt_ref, detail=detail,
-                current=current, max_attempts=max_attempts,
-            )
-            if result is None:
-                db.rollback()
-                return False
-            db.commit()
-        if outcome == "sent":
-            recorded_outcome = "accepted"
-        elif outcome == "unknown":
-            recorded_outcome = "unknown"
-        if recorded_outcome is not None:
-            assert attempt.authorization.reservation is not None
-            attempt.authorization.reservation.record_delivery_outcome(recorded_outcome)
-        return True
 
     def _persist_delivery_attempt(
         self,
@@ -1044,14 +1057,14 @@ class WatchJobStore:
 
         ``sender`` is injected: this module has no Telegram client, token,
         account or default delivery path. A future authorized adapter calls
-        this method rather than using ``prepare_delivery`` as a detached,
-        stale preflight. The lifecycle is reloaded immediately before the
-        callback and every callback outcome reaches durable state.
+        this one atomic local entrypoint; detached preflight/finalize methods
+        are deliberately private. The lifecycle is reloaded immediately
+        before the callback and every callback outcome reaches durable state.
         """
         if not callable(sender):
             raise ValueError("sender is invalid")
         current = _utc(now or datetime.now(timezone.utc))
-        attempt = self.prepare_delivery(job, access, now=current)
+        attempt = self._prepare_delivery(job, access, now=current)
         if attempt is None:
             return "blocked"
         if not self._persist_delivery_attempt(attempt, access, current=current):
@@ -1154,7 +1167,7 @@ class WatchJobStore:
                 assert final_state == "unknown"
                 recorded_outcome, result = "unknown", "unknown"
             else:
-                if receipt_ref is not None and (not isinstance(receipt_ref, str) or not _REF.fullmatch(receipt_ref)):
+                if not isinstance(receipt_ref, str) or not _REF.fullmatch(receipt_ref):
                     final_state = self._finish_delivery_in(
                         db, attempt, outcome="unknown", detail="invalid_transport_receipt",
                         current=current, max_attempts=3,
@@ -1250,6 +1263,48 @@ class WatchJobStore:
         )
         if owner_ref is None or owner_ref != evidence.owner_ref:
             return False
+        requirement = self.reconciliation_requirement(
+            evidence.job_key,
+            authenticated_chat_id=authenticated_chat_id,
+            authenticated_actor_id=authenticated_actor_id,
+            authenticated_owner_chat_id=authenticated_owner_chat_id,
+        )
+        if (
+            requirement is None
+            or requirement.owner_ref != evidence.owner_ref
+            or requirement.destination_ref != evidence.destination_ref
+            or requirement.operation_ref != evidence.operation_ref
+            or requirement.attempt_ref != evidence.attempt_ref
+        ):
+            return False
+        verifier = self._reconciliation_verifier
+        if verifier is None:
+            # No local bool, opaque reference or owner assertion can reopen an
+            # unknown send. A future authorized provider/operator adapter must
+            # be installed explicitly and return a typed attestation.
+            return False
+        try:
+            attestation = verifier.verify(requirement, evidence)
+        except Exception:
+            return False
+        if type(attestation) is not WatchReconciliationAttestation:
+            return False
+        try:
+            attestation.__post_init__()
+        except ValueError:
+            return False
+        if (
+            attestation.job_key != evidence.job_key
+            or attestation.owner_ref != evidence.owner_ref
+            or attestation.destination_ref != evidence.destination_ref
+            or attestation.operation_ref != evidence.operation_ref
+            or attestation.attempt_ref != evidence.attempt_ref
+            or attestation.outcome != evidence.outcome
+            or attestation.evidence_ref != evidence.evidence_ref
+            or _utc(attestation.observed_at) != _utc(evidence.observed_at)
+            or _utc(attestation.verified_at) < _utc(evidence.observed_at)
+        ):
+            return False
         job_key, outcome, current = evidence.job_key, evidence.outcome, _utc(evidence.observed_at)
         with sqlite3.connect(self.path) as db:
             db.execute("BEGIN IMMEDIATE")
@@ -1285,6 +1340,16 @@ class WatchJobStore:
                     (_iso(current), job_key),
                 )
                 self._release_quota_in(db, job_key)
+            db.execute(
+                "INSERT INTO pa_watch_reconciliation_audit(job_key,authority_ref,owner_ref,destination_ref,operation_ref,attempt_ref,outcome,evidence_ref,observed_at,verified_at,reconciled_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    job_key, attestation.authority_ref, attestation.owner_ref,
+                    attestation.destination_ref, attestation.operation_ref,
+                    attestation.attempt_ref, attestation.outcome,
+                    attestation.evidence_ref, _iso(attestation.observed_at),
+                    _iso(attestation.verified_at), _iso(current),
+                ),
+            )
             db.execute("DELETE FROM pa_watch_delivery_attempts WHERE job_key=?", (job_key,))
             db.commit()
         return True
