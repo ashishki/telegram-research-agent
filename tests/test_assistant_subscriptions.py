@@ -271,9 +271,50 @@ def test_quiet_hours_and_dst_schedule_do_not_turn_an_ordinary_digest_into_a_floo
 def test_deadline_stage_dedupe_is_exact_without_suppressing_a_later_stage(tmp_path) -> None:
     store = WatchJobStore(tmp_path / "deadline-stage.db")
     _register(store, _subscription(trigger="deadline_reminder", expires_at=datetime(2027, 1, 1, tzinfo=timezone.utc)))
-    reminder = _notification(delivery_stage="deadline:7d", change_version="deadline_version_001")
+    reminder = _notification(
+        delivery_stage="deadline:7d", change_version="deadline_version_001",
+        source_deadline_at=datetime(2026, 12, 1, 17, tzinfo=timezone.utc), source_deadline_timezone="America/New_York",
+    )
     assert store.queue_notification(reminder, expected_subscription_revision=1, now=NOW).status == "queued"
     assert store.queue_notification(reminder, expected_subscription_revision=1, now=NOW).reason == "same_evidence_fingerprint"
     assert store.queue_notification(
         replace(reminder, delivery_stage="deadline:1d"), expected_subscription_revision=1, now=NOW,
     ).status == "queued"
+
+
+def test_source_deadline_recalculation_replaces_all_future_reminder_stages_atomically(tmp_path) -> None:
+    store = WatchJobStore(tmp_path / "deadline-recalculation.db")
+    _register(store, _subscription(trigger="deadline_reminder", expires_at=datetime(2027, 1, 1, tzinfo=timezone.utc)))
+    template = _notification(
+        delivery_stage="deadline:due", change_version="deadline_version_010",
+        due_at=datetime(2026, 1, 1, tzinfo=timezone.utc),  # ignored by the recalculator
+        source_deadline_at=datetime(2026, 12, 15, 17, tzinfo=timezone.utc), source_deadline_timezone="America/New_York",
+    )
+    first = store.recalculate_deadline_reminders(template, expected_subscription_revision=1, now=NOW)
+    assert first.status == "scheduled" and [result.status for result in first.stages] == ["queued"] * 4
+    first_jobs = {result.job.notification.delivery_stage: result.job for result in first.stages if result.job is not None}
+    assert first_jobs["deadline:14d"].notification.due_at == datetime(2026, 12, 1, 17, tzinfo=timezone.utc)
+    assert first_jobs["deadline:due"].notification.due_at == datetime(2026, 12, 15, 17, tzinfo=timezone.utc)
+
+    moved = store.recalculate_deadline_reminders(
+        replace(
+            template, change_version="deadline_version_011",
+            source_deadline_at=datetime(2026, 12, 20, 17, tzinfo=timezone.utc),
+        ), expected_subscription_revision=1, now=NOW,
+    )
+    assert moved.status == "scheduled" and [result.status for result in moved.stages] == ["queued"] * 4
+    assert all(store.job_state(job.job_key) == "cancelled" for job in first_jobs.values())
+    moved_jobs = [result.job for result in moved.stages if result.job is not None]
+    assert all(job.notification.source_deadline_at == datetime(2026, 12, 20, 17, tzinfo=timezone.utc) for job in moved_jobs)
+
+    reverted = store.recalculate_deadline_reminders(
+        replace(
+            template, change_version="deadline_version_012",
+            source_deadline_at=datetime(2026, 12, 10, 17, tzinfo=timezone.utc),
+        ), expected_subscription_revision=1, now=NOW,
+    )
+    assert reverted.status == "scheduled" and [result.status for result in reverted.stages] == ["queued"] * 4
+    assert all(store.job_state(job.job_key) == "cancelled" for job in moved_jobs)
+    reverted_jobs = [result.job for result in reverted.stages if result.job is not None]
+    assert store.recalculate_deadline_reminders(template, expected_subscription_revision=2, now=NOW).status == "blocked"
+    assert all(store.job_state(job.job_key) == "queued" for job in reverted_jobs)

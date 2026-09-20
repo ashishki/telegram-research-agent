@@ -202,6 +202,8 @@ class WatchNotification:
     relevance_reason: str
     source_ref: str
     due_at: datetime
+    source_deadline_at: datetime | None = None
+    source_deadline_timezone: str | None = None
     data_class: str = "model_generated"
     source_url: str | None = None
     urgent: bool = False
@@ -221,6 +223,16 @@ class WatchNotification:
         _bounded_text(self.relevance_reason, field="relevance_reason", maximum=800)
         _ref(self.source_ref, field="source_ref")
         _utc(self.due_at)
+        if self.delivery_stage in _DEADLINE_STAGES:
+            if self.source_deadline_at is None or not isinstance(self.source_deadline_timezone, str):
+                raise ValueError("deadline reminders require source deadline and timezone")
+            _utc(self.source_deadline_at)
+            try:
+                ZoneInfo(self.source_deadline_timezone)
+            except Exception as exc:
+                raise ValueError("source_deadline_timezone is invalid") from exc
+        elif self.source_deadline_at is not None or self.source_deadline_timezone is not None:
+            raise ValueError("source deadline is only valid for deadline reminders")
         if self.data_class not in _DATA_CLASSES:
             raise ValueError("data_class is invalid")
         if self.source_url is not None and (not isinstance(self.source_url, str) or not _SAFE_URL.fullmatch(self.source_url)):
@@ -238,6 +250,8 @@ class WatchNotification:
             "change_summary": self.change_summary,
             "relevance_reason": self.relevance_reason,
             "source_url": self.source_url,
+            "source_deadline_at": None if self.source_deadline_at is None else _iso(self.source_deadline_at),
+            "source_deadline_timezone": self.source_deadline_timezone,
             "data_class": self.data_class,
             "urgent": self.urgent,
         }
@@ -296,6 +310,15 @@ class WatchQueueResult:
     status: Literal["queued", "duplicate", "blocked"]
     reason: str
     job: WatchJob | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class WatchDeadlineScheduleResult:
+    """One atomic calculation of every future stage for a source deadline."""
+
+    status: Literal["scheduled", "duplicate", "blocked"]
+    reason: str
+    stages: tuple[WatchQueueResult, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -799,95 +822,135 @@ class WatchJobStore:
         current = _utc(now or datetime.now(timezone.utc))
         with sqlite3.connect(self.path) as db:
             db.execute("BEGIN IMMEDIATE")
-            subscription = self._load_subscription_in(db, notification.subscription_id)
-            if subscription is None or subscription.owner_ref != notification.owner_ref:
+            result = self._queue_notification_in(db, notification, expected_subscription_revision, current)
+            if result.status == "queued":
+                db.commit()
+            else:
                 db.rollback()
-                return WatchQueueResult("blocked", "subscription_unavailable")
-            if subscription.consent_revision != expected_subscription_revision:
-                db.rollback()
-                return WatchQueueResult("blocked", "subscription_revision_mismatch")
-            effect = _subscription_effect(subscription, now=current)
-            if effect != "active":
-                db.rollback()
-                return WatchQueueResult("blocked", effect)
-            if notification.source_ref not in subscription.source_refs:
-                db.rollback()
-                return WatchQueueResult("blocked", "source_not_confirmed")
-            if not _stage_matches_trigger(notification.delivery_stage, subscription.trigger):
-                db.rollback()
-                return WatchQueueResult("blocked", "trigger_mismatch")
-            subject = db.execute(
-                "SELECT current_version,current_evidence_fingerprint,lifecycle FROM pa_watch_subjects WHERE subscription_id=? AND subject_ref=?",
-                (notification.subscription_id, notification.subject_ref),
-            ).fetchone()
-            if subject is not None and str(subject[2]) in {"completed", "cancelled", "not_relevant"}:
-                db.rollback()
-                return WatchQueueResult("blocked", "subject_" + str(subject[2]))
-            if subject is None:
-                db.execute(
-                    "INSERT INTO pa_watch_subjects(subscription_id,subject_ref,current_version,current_evidence_fingerprint,lifecycle,updated_at) VALUES(?,?,?,?,'active',?)",
-                    (
-                        notification.subscription_id, notification.subject_ref, notification.change_version,
-                        notification.evidence_fingerprint, _iso(current),
-                    ),
-                )
-            elif str(subject[1]) != notification.evidence_fingerprint:
-                # Changed evidence: old waiting versions/fingerprints must not
-                # alert; a leased old record is checked again at final send.
-                db.execute(
-                    "UPDATE pa_watch_subjects SET current_version=?,current_evidence_fingerprint=?,updated_at=? WHERE subscription_id=? AND subject_ref=?",
-                    (
-                        notification.change_version, notification.evidence_fingerprint,
-                        _iso(current), notification.subscription_id, notification.subject_ref,
-                    ),
-                )
-                db.execute(
-                    "UPDATE pa_watch_jobs SET state='cancelled',last_reason='superseded_evidence',updated_at=? WHERE subscription_id=? AND subject_ref=? AND change_evidence_fingerprint<>? AND state IN ('queued','deferred')",
-                    (
-                        _iso(current), notification.subscription_id, notification.subject_ref,
-                        notification.evidence_fingerprint,
-                    ),
-                )
-            baseline = db.execute(
-                "SELECT current_evidence_fingerprint FROM pa_watch_event_baselines WHERE subscription_id=? AND subject_ref=? AND source_ref=? AND delivery_stage=?",
-                (
-                    notification.subscription_id, notification.subject_ref,
-                    notification.source_ref, notification.delivery_stage,
-                ),
-            ).fetchone()
-            previous_fingerprint = None if baseline is None else str(baseline[0])
-            if previous_fingerprint == notification.evidence_fingerprint:
-                # A source or caller may churn a version/timestamp while the
-                # evidence and explanation are unchanged. Baselines are per
-                # stage, so a later deadline reminder is not suppressed.
-                db.rollback()
-                return WatchQueueResult("duplicate", "same_evidence_fingerprint")
-            key = notification.idempotency_key(previous_evidence_fingerprint=previous_fingerprint)
-            existing = db.execute("SELECT state FROM pa_watch_jobs WHERE job_key=?", (key,)).fetchone()
-            if existing is not None:
-                db.rollback()
-                return WatchQueueResult("duplicate", "same_evidence_transition_stage")
+        return result
+
+    def _queue_notification_in(
+        self,
+        db: sqlite3.Connection,
+        notification: WatchNotification,
+        expected_subscription_revision: int,
+        current: datetime,
+    ) -> WatchQueueResult:
+        """Queue one candidate in the caller's atomic transaction."""
+        subscription = self._load_subscription_in(db, notification.subscription_id)
+        if subscription is None or subscription.owner_ref != notification.owner_ref:
+            return WatchQueueResult("blocked", "subscription_unavailable")
+        if subscription.consent_revision != expected_subscription_revision:
+            return WatchQueueResult("blocked", "subscription_revision_mismatch")
+        effect = _subscription_effect(subscription, now=current)
+        if effect != "active":
+            return WatchQueueResult("blocked", effect)
+        if notification.source_ref not in subscription.source_refs:
+            return WatchQueueResult("blocked", "source_not_confirmed")
+        if not _stage_matches_trigger(notification.delivery_stage, subscription.trigger):
+            return WatchQueueResult("blocked", "trigger_mismatch")
+        subject = db.execute(
+            "SELECT current_version,current_evidence_fingerprint,lifecycle FROM pa_watch_subjects WHERE subscription_id=? AND subject_ref=?",
+            (notification.subscription_id, notification.subject_ref),
+        ).fetchone()
+        if subject is not None and str(subject[2]) in {"completed", "cancelled", "not_relevant"}:
+            return WatchQueueResult("blocked", "subject_" + str(subject[2]))
+        if subject is None:
             db.execute(
-                "INSERT INTO pa_watch_jobs(job_key,subscription_id,owner_ref,subscription_revision,subject_ref,change_version,change_evidence_fingerprint,delivery_stage,notification_json,state,due_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?, 'queued',?,?,?)",
+                "INSERT INTO pa_watch_subjects(subscription_id,subject_ref,current_version,current_evidence_fingerprint,lifecycle,updated_at) VALUES(?,?,?,?,'active',?)",
                 (
-                    key, notification.subscription_id, notification.owner_ref, subscription.consent_revision,
-                    notification.subject_ref, notification.change_version, notification.evidence_fingerprint,
-                    notification.delivery_stage,
-                    json.dumps(_notification_payload(notification), sort_keys=True), _iso(notification.due_at), _iso(current), _iso(current),
-                ),
-            )
-            db.execute(
-                "INSERT INTO pa_watch_event_baselines(subscription_id,subject_ref,source_ref,delivery_stage,current_evidence_fingerprint,updated_at) VALUES(?,?,?,?,?,?) "
-                "ON CONFLICT(subscription_id,subject_ref,source_ref,delivery_stage) DO UPDATE SET current_evidence_fingerprint=excluded.current_evidence_fingerprint,updated_at=excluded.updated_at",
-                (
-                    notification.subscription_id, notification.subject_ref,
-                    notification.source_ref, notification.delivery_stage,
+                    notification.subscription_id, notification.subject_ref, notification.change_version,
                     notification.evidence_fingerprint, _iso(current),
                 ),
             )
-            db.commit()
+        elif str(subject[1]) != notification.evidence_fingerprint:
+            # Changed evidence: old waiting versions/fingerprints must not
+            # alert; a leased old record is checked again at final send.
+            db.execute(
+                "UPDATE pa_watch_subjects SET current_version=?,current_evidence_fingerprint=?,updated_at=? WHERE subscription_id=? AND subject_ref=?",
+                (
+                    notification.change_version, notification.evidence_fingerprint,
+                    _iso(current), notification.subscription_id, notification.subject_ref,
+                ),
+            )
+            db.execute(
+                "UPDATE pa_watch_jobs SET state='cancelled',last_reason='superseded_evidence',updated_at=? WHERE subscription_id=? AND subject_ref=? AND change_evidence_fingerprint<>? AND state IN ('queued','deferred')",
+                (
+                    _iso(current), notification.subscription_id, notification.subject_ref,
+                    notification.evidence_fingerprint,
+                ),
+            )
+        baseline = db.execute(
+            "SELECT current_evidence_fingerprint FROM pa_watch_event_baselines WHERE subscription_id=? AND subject_ref=? AND source_ref=? AND delivery_stage=?",
+            (
+                notification.subscription_id, notification.subject_ref,
+                notification.source_ref, notification.delivery_stage,
+            ),
+        ).fetchone()
+        previous_fingerprint = None if baseline is None else str(baseline[0])
+        if previous_fingerprint == notification.evidence_fingerprint:
+            return WatchQueueResult("duplicate", "same_evidence_fingerprint")
+        key = notification.idempotency_key(previous_evidence_fingerprint=previous_fingerprint)
+        if db.execute("SELECT 1 FROM pa_watch_jobs WHERE job_key=?", (key,)).fetchone() is not None:
+            return WatchQueueResult("duplicate", "same_evidence_transition_stage")
+        db.execute(
+            "INSERT INTO pa_watch_jobs(job_key,subscription_id,owner_ref,subscription_revision,subject_ref,change_version,change_evidence_fingerprint,delivery_stage,notification_json,state,due_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?, 'queued',?,?,?)",
+            (
+                key, notification.subscription_id, notification.owner_ref, subscription.consent_revision,
+                notification.subject_ref, notification.change_version, notification.evidence_fingerprint,
+                notification.delivery_stage,
+                json.dumps(_notification_payload(notification), sort_keys=True), _iso(notification.due_at), _iso(current), _iso(current),
+            ),
+        )
+        db.execute(
+            "INSERT INTO pa_watch_event_baselines(subscription_id,subject_ref,source_ref,delivery_stage,current_evidence_fingerprint,updated_at) VALUES(?,?,?,?,?,?) "
+            "ON CONFLICT(subscription_id,subject_ref,source_ref,delivery_stage) DO UPDATE SET current_evidence_fingerprint=excluded.current_evidence_fingerprint,updated_at=excluded.updated_at",
+            (
+                notification.subscription_id, notification.subject_ref,
+                notification.source_ref, notification.delivery_stage,
+                notification.evidence_fingerprint, _iso(current),
+            ),
+        )
         job = WatchJob(key, notification, subscription.consent_revision, "queued", 0)
         return WatchQueueResult("queued", "meaningful_change", job)
+
+    def recalculate_deadline_reminders(
+        self,
+        notification: WatchNotification,
+        *,
+        expected_subscription_revision: int,
+        now: datetime | None = None,
+    ) -> WatchDeadlineScheduleResult:
+        """Atomically replace all future stages from one source-bound deadline.
+
+        ``due_at`` on the supplied notification is deliberately ignored: it is
+        a candidate job time, while this method derives every reminder stage
+        from the source deadline instant and its declared timezone.
+        """
+        self._validate_notification(notification)
+        if notification.delivery_stage not in _DEADLINE_STAGES:
+            raise ValueError("deadline recalculation requires a deadline notification")
+        if not isinstance(expected_subscription_revision, int) or isinstance(expected_subscription_revision, bool):
+            raise ValueError("expected_subscription_revision is invalid")
+        current = _utc(now or datetime.now(timezone.utc))
+        candidates = tuple(
+            replace(notification, delivery_stage=stage, due_at=_deadline_stage_due_at(notification, stage))
+            for stage in ("deadline:14d", "deadline:7d", "deadline:1d", "deadline:due")
+        )
+        with sqlite3.connect(self.path) as db:
+            db.execute("BEGIN IMMEDIATE")
+            results = tuple(
+                self._queue_notification_in(db, candidate, expected_subscription_revision, current)
+                for candidate in candidates
+            )
+            if any(result.status == "blocked" for result in results):
+                db.rollback()
+                return WatchDeadlineScheduleResult("blocked", "stage_policy_blocked", results)
+            if any(result.status == "queued" for result in results):
+                db.commit()
+                return WatchDeadlineScheduleResult("scheduled", "source_deadline_recalculated", results)
+            db.rollback()
+        return WatchDeadlineScheduleResult("duplicate", "same_deadline_evidence", results)
 
     def claim_due_jobs(
         self,
@@ -1784,6 +1847,15 @@ def _scheduled_digest_due(subscription: WatchSubscription, *, local: datetime) -
     return bool(0 < delta <= 120 and local.hour >= 3 and local.utcoffset() != scheduled.utcoffset())
 
 
+def _deadline_stage_due_at(notification: WatchNotification, stage: str) -> datetime:
+    """Calculate one reminder against the source deadline's civil timezone."""
+    if stage not in _DEADLINE_STAGES or notification.source_deadline_at is None or notification.source_deadline_timezone is None:
+        raise ValueError("deadline stage is invalid")
+    offsets = {"deadline:14d": 14, "deadline:7d": 7, "deadline:1d": 1, "deadline:due": 0}
+    local_deadline = _utc(notification.source_deadline_at).astimezone(ZoneInfo(notification.source_deadline_timezone))
+    return _utc(local_deadline - timedelta(days=offsets[stage]))
+
+
 def render_watch_notification(notification: WatchNotification) -> str:
     """Render the stored explanation without new generation or source reads."""
     notification.__post_init__()
@@ -1847,7 +1919,10 @@ def _notification_payload(notification: WatchNotification) -> dict[str, object]:
         "subscription_id": notification.subscription_id, "owner_ref": notification.owner_ref, "subject_ref": notification.subject_ref,
         "change_version": notification.change_version, "delivery_stage": notification.delivery_stage, "title": notification.title,
         "change_summary": notification.change_summary, "relevance_reason": notification.relevance_reason, "source_ref": notification.source_ref,
-        "due_at": _iso(notification.due_at), "data_class": notification.data_class, "source_url": notification.source_url,
+        "due_at": _iso(notification.due_at),
+        "source_deadline_at": None if notification.source_deadline_at is None else _iso(notification.source_deadline_at),
+        "source_deadline_timezone": notification.source_deadline_timezone,
+        "data_class": notification.data_class, "source_url": notification.source_url,
         "urgent": notification.urgent,
     }
 
@@ -1855,7 +1930,7 @@ def _notification_payload(notification: WatchNotification) -> dict[str, object]:
 def _notification_from_payload(payload: object) -> WatchNotification:
     fields = {
         "subscription_id", "owner_ref", "subject_ref", "change_version", "delivery_stage", "title", "change_summary",
-        "relevance_reason", "source_ref", "due_at", "data_class", "source_url", "urgent",
+        "relevance_reason", "source_ref", "due_at", "source_deadline_at", "source_deadline_timezone", "data_class", "source_url", "urgent",
     }
     if not isinstance(payload, Mapping) or set(payload) != fields:
         raise ValueError("stored notification is invalid")
@@ -1863,5 +1938,8 @@ def _notification_from_payload(payload: object) -> WatchNotification:
         subscription_id=payload["subscription_id"], owner_ref=payload["owner_ref"], subject_ref=payload["subject_ref"],
         change_version=payload["change_version"], delivery_stage=payload["delivery_stage"], title=payload["title"],
         change_summary=payload["change_summary"], relevance_reason=payload["relevance_reason"], source_ref=payload["source_ref"],
-        due_at=_parse_utc(payload["due_at"]), data_class=payload["data_class"], source_url=payload["source_url"], urgent=payload["urgent"],
+        due_at=_parse_utc(payload["due_at"]),
+        source_deadline_at=None if payload["source_deadline_at"] is None else _parse_utc(payload["source_deadline_at"]),
+        source_deadline_timezone=payload["source_deadline_timezone"],
+        data_class=payload["data_class"], source_url=payload["source_url"], urgent=payload["urgent"],
     )
