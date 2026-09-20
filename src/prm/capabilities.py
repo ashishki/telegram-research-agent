@@ -55,6 +55,9 @@ TRANSPORT_PURPOSES: dict[tuple[str, str, str], str] = {
     # for one must never be reused for the other merely because both happen to
     # use Telegram as their transport.
     ("provider_telegram", "assistant.watch_delivery", "deliver"): "watch.delivery",
+    # Collection is a separate background capability. A foreground calendar
+    # read cannot become recurring watch polling by reusing its grant.
+    ("provider_watch_source", "assistant.watch_collection", "read"): "watch.collection",
     ("provider_local", "assistant.utd_draft", "write"): "utd.draft",
     # PA-05 has distinct public search and document-read reservations.  A
     # search snippet is discovery-only; it cannot consume a primary-document

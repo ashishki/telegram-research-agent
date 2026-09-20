@@ -50,9 +50,9 @@ def _notification(**changes: object) -> WatchNotification:
 def _collection_access(registry: CapabilityRegistry):
     decision = registry.authorize_and_reserve(
         AuthorizationRequest(
-            owner_ref="owner_synthetic_primary", connection_ref=None, capability="calendar.read",
+            owner_ref="owner_synthetic_primary", connection_ref=None, capability="assistant.watch_collection",
             resource_ref="source_synthetic_calendar", operation="read", data_class="private_connector_metadata",
-            provider_ref="provider_calendar_fixture", purpose="calendar.watch_read",
+            provider_ref="provider_watch_source", purpose="watch.collection",
         ), now=NOW,
     )
     return WatchCollectionAccess(decision, "owner_synthetic_primary", "source_synthetic_calendar")
@@ -61,9 +61,9 @@ def _collection_access(registry: CapabilityRegistry):
 def _read_grant(*, revoked: bool = False) -> CapabilityGrant:
     return CapabilityGrant(
         grant_id="grant_watch_read_001", owner_ref="owner_synthetic_primary", connection_ref=None,
-        capability="calendar.read", resource_refs=("source_synthetic_calendar",), operations=("read",),
-        data_classes=("private_connector_metadata",), purpose="calendar.watch_read",
-        provider_policy=ProviderPolicy(("provider_calendar_fixture",), maximum_request_count=2),
+        capability="assistant.watch_collection", resource_refs=("source_synthetic_calendar",), operations=("read",),
+        data_classes=("private_connector_metadata",), purpose="watch.collection",
+        provider_policy=ProviderPolicy(("provider_watch_source",), maximum_request_count=2),
         issued_at=NOW - timedelta(hours=1), expires_at=NOW + timedelta(hours=1), revision=1,
         revoked_at=NOW - timedelta(seconds=1) if revoked else None,
     )
@@ -101,6 +101,13 @@ def test_queue_requires_source_scope_material_change_and_exact_revision(tmp_path
     else:
         raise AssertionError("a timestamp-only update must not become an alert")
 
+    try:
+        _notification(delivery_stage="change:noise")
+    except ValueError as exc:
+        assert "delivery_stage" in str(exc)
+    else:
+        raise AssertionError("a caller must not manufacture extra change stages")
+
 
 def test_quiet_hours_and_dst_schedule_do_not_turn_an_ordinary_digest_into_a_flood(tmp_path) -> None:
     store = WatchJobStore(tmp_path / "watch-jobs.db")
@@ -110,7 +117,7 @@ def test_quiet_hours_and_dst_schedule_do_not_turn_an_ordinary_digest_into_a_floo
         frequency="daily", expires_at=datetime(2027, 1, 1, tzinfo=timezone.utc),
     )
     store.register_subscription(digest)
-    notification = _notification(delivery_stage="digest", change_version="version_digest_001", due_at=spring_queue_time)
+    notification = _notification(delivery_stage="digest:2026-03-08", change_version="version_digest_001", due_at=spring_queue_time)
     queued = store.queue_notification(notification, expected_subscription_revision=1, now=spring_queue_time)
     assert queued.job is not None
     # 02:30 does not exist in New York on this spring-forward day. The first

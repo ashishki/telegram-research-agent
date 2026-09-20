@@ -41,6 +41,10 @@ PRM_ACTIVE_TESTS = (
     "tests/test_assistant_brief_editorial.py",
     "tests/test_assistant_report_dialogue.py",
     "tests/test_prm_synthesis.py",
+    # PA-09 has local durable state and safety-critical reconciliation paths.
+    # Keep the dedicated holdouts in its required active regression tier.
+    "tests/test_assistant_jobs.py",
+    "tests/test_assistant_subscriptions.py",
     "tests/test_prm_bot_dispatch.py",
     "tests/test_prm_cli.py",
     "tests/test_retrofit_boundaries.py",

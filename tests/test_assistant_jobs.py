@@ -166,3 +166,26 @@ def test_explicit_feedback_pauses_or_unsubscribes_without_claiming_a_hidden_pref
     assert unsubscribe.record_feedback(job.job_key, action="unsubscribe", now=NOW)
     stopped = unsubscribe.subscription("watch_synthetic_101")
     assert stopped is not None and stopped.lifecycle == "cancelled" and stopped.consent_revision == 2
+
+
+def test_one_shot_runner_owns_final_preflight_but_has_no_default_transport(tmp_path) -> None:
+    store = WatchJobStore(tmp_path / "runner.db")
+    _queued(store)
+    registry = _delivery_registry()
+    sent: list[str] = []
+    result = store.run_once(
+        access_for_job=lambda _job: _delivery_access(registry),
+        sender=lambda text: sent.append(text) or "receipt_runner_101",
+        now=NOW,
+    )
+    assert result.claimed == result.sent == 1 and result.unknown == result.deferred == result.blocked == 0
+    assert len(sent) == 1 and "Почему это важно" in sent[0]
+
+    blocked = WatchJobStore(tmp_path / "runner-blocked.db")
+    _queued(blocked)
+    no_transport = blocked.run_once(
+        access_for_job=lambda _job: None,
+        sender=lambda _text: (_ for _ in ()).throw(AssertionError("must not send")),
+        now=NOW,
+    )
+    assert no_transport.claimed == no_transport.blocked == 1 and no_transport.sent == 0

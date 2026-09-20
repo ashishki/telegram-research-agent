@@ -22,7 +22,7 @@ from pathlib import Path
 import re
 import secrets
 import sqlite3
-from typing import Literal, Mapping
+from typing import Callable, Literal, Mapping
 from zoneinfo import ZoneInfo
 
 from prm.capabilities import (
@@ -39,10 +39,14 @@ WATCH_JOB_SCHEMA_VERSION = "assistant.watch_job.v1"
 WATCH_DELIVERY_CAPABILITY = "assistant.watch_delivery"
 WATCH_DELIVERY_PROVIDER = "provider_telegram"
 WATCH_DELIVERY_PURPOSE = "watch.delivery"
+WATCH_COLLECTION_CAPABILITY = "assistant.watch_collection"
+WATCH_COLLECTION_PROVIDER = "provider_watch_source"
+WATCH_COLLECTION_PURPOSE = "watch.collection"
 _REF = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:/@+-]{0,511}$")
 _SUBSCRIPTION = re.compile(r"^watch_[a-z0-9_-]{3,120}$")
 _VERSION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:/@+-]{0,191}$")
 _STAGE = re.compile(r"^[a-z][a-z0-9_.:-]{2,95}$")
+_DIGEST_STAGE = re.compile(r"^digest:[0-9]{4}-[0-9]{2}-[0-9]{2}$")
 _TIME = re.compile(r"^([01][0-9]|2[0-3]):[0-5][0-9]$")
 _SAFE_URL = re.compile(r"^https://[^\s<>]{1,2048}$", re.IGNORECASE)
 _LIFECYCLES = frozenset({"active", "paused", "cancelled", "completed"})
@@ -55,6 +59,7 @@ _DATA_CLASSES = frozenset({
     "private_connector_content", "model_generated",
 })
 _FEEDBACK_ACTIONS = frozenset({"pause", "unsubscribe", "done", "not_relevant", "less"})
+_DEADLINE_STAGES = frozenset({"deadline:14d", "deadline:7d", "deadline:1d", "deadline:due"})
 
 
 def _utc(value: datetime) -> datetime:
@@ -197,6 +202,8 @@ class WatchNotification:
         _ref(self.subject_ref, field="subject_ref")
         _ref(self.change_version, field="change_version", pattern=_VERSION)
         _ref(self.delivery_stage, field="delivery_stage", pattern=_STAGE)
+        if self.delivery_stage != "change" and self.delivery_stage not in _DEADLINE_STAGES and not _valid_digest_stage(self.delivery_stage):
+            raise ValueError("delivery_stage is invalid")
         _bounded_text(self.title, field="title", maximum=240)
         # These two fields are a materiality gate.  A timestamp-only or
         # relevance-free candidate cannot create a watch alert.
@@ -309,10 +316,16 @@ class WatchCollectionAccess:
             or decision.reservation is None
             or decision.owner_ref != self.owner_ref
             or decision.resource_ref != self.source_ref
+            or decision.provider_ref != WATCH_COLLECTION_PROVIDER
+            or decision.capability != WATCH_COLLECTION_CAPABILITY
             or decision.operation != "read"
-            or not decision.provider_ref
+            or decision.purpose != WATCH_COLLECTION_PURPOSE
         ):
             raise ValueError("watch collection authorization is out of scope")
+
+
+class KnownWatchDeliveryFailure(Exception):
+    """A synthetic/adapter failure known to have made no external send."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -322,6 +335,17 @@ class DeliveryAttempt:
     job: WatchJob
     text: str
     authorization: AuthorizationDecision
+
+
+@dataclass(frozen=True, slots=True)
+class WatchRunResult:
+    """A local one-shot runner receipt; it does not imply a service exists."""
+
+    claimed: int
+    sent: int
+    deferred: int
+    unknown: int
+    blocked: int
 
 
 WATCH_JOB_SCHEMA = """
@@ -494,27 +518,27 @@ class WatchJobStore:
         decision = access.authorization
         if not is_authorized_operation(
             decision,
-            capability=decision.capability,
+            capability=WATCH_COLLECTION_CAPABILITY,
             operation="read",
-            provider_ref=str(decision.provider_ref),
+            provider_ref=WATCH_COLLECTION_PROVIDER,
             data_class=decision.data_class,
             owner_ref=subscription.owner_ref,
             connection_ref=decision.connection_ref,
             resource_ref=access.source_ref,
-            purpose=decision.purpose,
+            purpose=WATCH_COLLECTION_PURPOSE,
         ):
             return False
         try:
             require_authorized_operation(
                 decision,
-                capability=decision.capability,
+                capability=WATCH_COLLECTION_CAPABILITY,
                 operation="read",
-                provider_ref=str(decision.provider_ref),
+                provider_ref=WATCH_COLLECTION_PROVIDER,
                 data_class=decision.data_class,
                 owner_ref=subscription.owner_ref,
                 connection_ref=decision.connection_ref,
                 resource_ref=access.source_ref,
-                purpose=decision.purpose,
+                purpose=WATCH_COLLECTION_PURPOSE,
             )
         except CapabilityDenied:
             return False
@@ -548,11 +572,7 @@ class WatchJobStore:
             if notification.source_ref not in subscription.source_refs:
                 db.rollback()
                 return WatchQueueResult("blocked", "source_not_confirmed")
-            is_digest = _is_digest_stage(notification.delivery_stage)
-            if is_digest and subscription.trigger != "digest":
-                db.rollback()
-                return WatchQueueResult("blocked", "trigger_mismatch")
-            if not is_digest and subscription.trigger == "digest":
+            if not _stage_matches_trigger(notification.delivery_stage, subscription.trigger):
                 db.rollback()
                 return WatchQueueResult("blocked", "trigger_mismatch")
             subject = db.execute(
@@ -840,6 +860,77 @@ class WatchJobStore:
             db.commit()
         return True
 
+    def deliver_claimed_job(
+        self,
+        job: WatchJob,
+        access: WatchDeliveryAccess,
+        *,
+        sender: Callable[[str], str | None],
+        now: datetime | None = None,
+    ) -> Literal["sent", "deferred", "unknown", "blocked"]:
+        """Own the last local guard and truthful outcome around one transport.
+
+        ``sender`` is injected: this module has no Telegram client, token,
+        account or default delivery path. A future authorized adapter calls
+        this method rather than using ``prepare_delivery`` as a detached,
+        stale preflight. The lifecycle is reloaded immediately before the
+        callback and every callback outcome reaches durable state.
+        """
+        if not callable(sender):
+            raise ValueError("sender is invalid")
+        current = _utc(now or datetime.now(timezone.utc))
+        attempt = self.prepare_delivery(job, access, now=current)
+        if attempt is None:
+            return "blocked"
+        if not self._terminal_send_current(attempt.job, now=current):
+            with sqlite3.connect(self.path) as db:
+                db.execute("BEGIN IMMEDIATE")
+                self._release_quota_in(db, attempt.job.job_key)
+                self._cancel_leased_in(db, attempt.job.job_key, attempt.job.lease_token or "", "terminal_policy_changed", current)
+                db.commit()
+            return "blocked"
+        try:
+            receipt_ref = sender(attempt.text)
+        except KnownWatchDeliveryFailure as exc:
+            self.finish_delivery(attempt, outcome="known_not_delivered", detail=type(exc).__name__, now=current)
+            return "deferred" if self.job_state(attempt.job.job_key) == "deferred" else "unknown"
+        except Exception as exc:
+            self.finish_delivery(attempt, outcome="unknown", detail=type(exc).__name__, now=current)
+            return "unknown"
+        if receipt_ref is not None and (not isinstance(receipt_ref, str) or not _REF.fullmatch(receipt_ref)):
+            self.finish_delivery(attempt, outcome="unknown", detail="invalid_transport_receipt", now=current)
+            return "unknown"
+        self.finish_delivery(attempt, outcome="sent", transport_receipt_ref=receipt_ref, now=current)
+        return "sent"
+
+    def run_once(
+        self,
+        *,
+        access_for_job: Callable[[WatchJob], WatchDeliveryAccess | None],
+        sender: Callable[[str], str | None],
+        now: datetime | None = None,
+        limit: int = 8,
+    ) -> WatchRunResult:
+        """Run at most one bounded local batch; it never installs a timer."""
+        if not callable(access_for_job) or not callable(sender):
+            raise ValueError("runner callbacks are invalid")
+        current = _utc(now or datetime.now(timezone.utc))
+        claimed = self.claim_due_jobs(now=current, limit=limit)
+        outcomes = {"sent": 0, "deferred": 0, "unknown": 0, "blocked": 0}
+        for job in claimed:
+            try:
+                access = access_for_job(job)
+            except Exception:
+                access = None
+            if access is None:
+                outcomes["blocked"] += 1
+                continue
+            try:
+                outcomes[self.deliver_claimed_job(job, access, sender=sender, now=current)] += 1
+            except (ValueError, TypeError):
+                outcomes["blocked"] += 1
+        return WatchRunResult(len(claimed), outcomes["sent"], outcomes["deferred"], outcomes["unknown"], outcomes["blocked"])
+
     def reconcile_unknown(
         self,
         job_key: str,
@@ -992,6 +1083,34 @@ class WatchJobStore:
             return None
         return {"outcome": str(row[0]), "delivered_at": str(row[1]), "transport_receipt_ref": str(row[2] or ""), "detail": str(row[3])}
 
+    def _terminal_send_current(self, job: WatchJob, *, now: datetime) -> bool:
+        if not job.lease_token:
+            return False
+        with sqlite3.connect(self.path) as db:
+            row = db.execute(
+                "SELECT notification_json,subscription_revision,state,lease_token,lease_until FROM pa_watch_jobs WHERE job_key=?",
+                (job.job_key,),
+            ).fetchone()
+            if row is None or str(row[2]) != "leased" or str(row[3]) != job.lease_token or (str(row[4]) and str(row[4]) <= _iso(now)):
+                return False
+            try:
+                notification = _notification_from_payload(json.loads(str(row[0])))
+            except (TypeError, json.JSONDecodeError, ValueError):
+                return False
+            subscription = self._load_subscription_in(db, notification.subscription_id)
+            subject = db.execute(
+                "SELECT current_version,lifecycle FROM pa_watch_subjects WHERE subscription_id=? AND subject_ref=?",
+                (notification.subscription_id, notification.subject_ref),
+            ).fetchone()
+        return bool(
+            subscription is not None
+            and subscription.consent_revision == int(row[1])
+            and _job_policy(subscription, notification, now=now) == "active"
+            and subject is not None
+            and str(subject[0]) == notification.change_version
+            and str(subject[1]) == "active"
+        )
+
     def _load_subscription_in(self, db: sqlite3.Connection, subscription_id: str) -> WatchSubscription | None:
         row = db.execute(
             "SELECT document_json FROM pa_watch_subscriptions WHERE subscription_id=?", (subscription_id,)
@@ -1086,7 +1205,25 @@ def _job_policy(subscription: WatchSubscription | None, notification: WatchNotif
 
 
 def _is_digest_stage(stage: str) -> bool:
-    return stage == "digest" or stage.startswith("digest:")
+    return _valid_digest_stage(stage)
+
+
+def _valid_digest_stage(stage: str) -> bool:
+    if not _DIGEST_STAGE.fullmatch(stage):
+        return False
+    try:
+        datetime.fromisoformat(stage.removeprefix("digest:"))
+    except ValueError:
+        return False
+    return True
+
+
+def _stage_matches_trigger(stage: str, trigger: str) -> bool:
+    return bool(
+        (trigger == "meaningful_change" and stage == "change")
+        or (trigger == "deadline_reminder" and stage in _DEADLINE_STAGES)
+        or (trigger == "digest" and _is_digest_stage(stage))
+    )
 
 
 def _in_quiet_hours(subscription: WatchSubscription, *, local: datetime) -> bool:
