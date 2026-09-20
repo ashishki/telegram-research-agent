@@ -1,6 +1,6 @@
 # Current Session Handoff
 
-Updated: 2026-09-19
+Updated: 2026-09-20
 Workstream: PA — full Personal AI Assistant, not an MVP
 Branch: `docs/personal-assistant-blueprint-playbook-20260918`
 Baseline: `f011d3b8641aab862f29b8e975ef2d5e647bc89c`
@@ -33,45 +33,34 @@ made on 2026-09-19 using the documented secret path; it skipped migrations,
 was stopped cleanly, and the pre-existing service was restored. It produced no
 test brief or human-review receipt, so it grants no continuing live authority.
 
-## Current slice: PA-08 private report views and exports
+## Current slice: PA-09 local durable watch contracts
 
-PA-07 is complete as a local dependency checkpoint. Its final Terra/high
-recheck at `065033c` found no further local P0/P1; do not repeat that review.
-The open provider/runtime, private Telegram/mobile and owner-content acceptance
-gate is still an acceptance/release boundary, not authority to start a service
-or collect live evidence.
+PA-08 is locally complete and published; do not repeat its review. PA-09's
+local contract is at `289269d` plus the final evidence/handoff commit. It adds
+explicit-path SQLite watch subscriptions/jobs, exact private-owner
+preview/confirm for creation and consent-bearing revision, independently scoped
+watch collection/delivery grants, material-change fingerprints, source-bound
+deadline stage recalculation, quiet/DST handling, leases/restart records,
+receipts, fail-closed unknown-send reconciliation and idempotent feedback.
+It deliberately has no default DB, scheduler, source collector, Telegram
+client, provider, account, timer or deployment path.
 
-PA-08 projects one immutable, owner-scoped `BriefDocument` into static HTML,
-PDF and Markdown. Each artifact carries the exact `brief_id`, version, content
-digest and ordered source URLs from the stored object; rendering must not
-retrieve, generate facts, persist an export, send it, create a public link, or
-call a provider. HTML has a restrictive CSP and no executable/tracking
-resources. Its mobile/dark/print CSS preserves the editorial hierarchy, caveat,
-source timeline and coverage table; a chart is omitted because this document
-has no comparable measurement that could justify one.
+The dedicated PA-09 tests cover version churn/reversal, source-deadline
+forward/backward recalculation, quiet hours/DST, private ownership, revocation,
+same-lease double send, pause/revision ordering, restart, unknown reconciliation
+and duplicate/concurrent feedback. The required local tier passed at the final
+code SHA: `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 tools/test_tiers.py
+focused-prm` — `470 passed in 93.81s`.
 
-The local reader uses PA-07's exact persisted owner/version lookup. It issues
-an opaque process-local handle for at most 20 minutes, then rechecks the
-canonical private tuple and stored content digest before every render. Restart,
-wrong owner, altered version/digest, expiry, malformed format and deleted or
-tampered history all fail closed. A sharing request stops at an exact rendered
-content and recipient-label preview with `preview_only_no_delivery`; there is
-no delivery implementation in this slice.
-
-The preferred local PDF backend is the declared WeasyPrint dependency with an
-external-resource-denying fetcher. The current environment's WeasyPrint/pydyf
-pair imports but fails before a PDF is created, so the renderer falls back only
-to an in-memory Unicode PDF projection with an embedded local font. It does
-not use a network or change dependencies. Record the backend limitation in the
-PA-08 evidence; actual rendered PDF/mobile owner inspection remains a required
-external acceptance gate.
-
-Run `tests/test_assistant_report_exports.py` and
-`tests/test_assistant_report_access.py`, then `python tools/test_tiers.py
-fast-contract`. Record the exact scoped commit, all commands/results, and a
-fresh independent Terra/high PA-08 slice review in
-`docs/verification/PA-08-report-export-evidence-2026-09-19.md`. The design
-remains mechanically `review_required`; no human approval is inferred.
+Fresh read-only `gpt-5.6-terra`/`high` slice reviews were run through the
+pinned Role Runner. The final review of `289269d` resolves local code findings
+but remains `STOP_SHIP` solely because PA-09 requires runtime/observable
+delivery verification, while this owner-authorized slice explicitly forbids
+that integration. Its report is
+`docs/verification/PA-09-slice-deadline-289269d.md`. This is an open external
+acceptance gate, not authority to enable a service or to claim watches arrive
+reliably. The design remains mechanically `review_required`; no human/runtime
+acceptance, release, delivery or provider authority is inferred.
 
 The checkpoints below are historical dependency evidence. The owner's newer
 quality amendment governs current local work; live/runtime gates remain.
