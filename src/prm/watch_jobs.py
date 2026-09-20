@@ -1513,10 +1513,15 @@ class WatchJobStore:
             ):
                 db.rollback()
                 return False
-            db.execute(
+            recorded = db.execute(
                 "INSERT OR IGNORE INTO pa_watch_feedback(job_key,action,recorded_at) VALUES(?,?,?)",
                 (job_key, action, _iso(current)),
             )
+            if recorded.rowcount != 1:
+                # The first feedback receipt owns the one permitted mutation.
+                # Repeated/double callbacks are read-only no-ops.
+                db.rollback()
+                return False
             if action in {"pause", "unsubscribe"}:
                 subscription = self._load_subscription_in(db, str(row[0]))
                 if subscription is None:

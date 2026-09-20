@@ -298,6 +298,8 @@ def test_explicit_feedback_pauses_or_unsubscribes_without_claiming_a_hidden_pref
     assert store.record_feedback(first.job_key, action="pause", authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1], authenticated_owner_chat_id=OWNER_TUPLE[2], now=NOW)
     paused = store.subscription("watch_synthetic_101")
     assert paused is not None and paused.lifecycle == "paused" and paused.consent_revision == 2
+    assert not store.record_feedback(first.job_key, action="pause", authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1], authenticated_owner_chat_id=OWNER_TUPLE[2], now=NOW)
+    assert store.subscription("watch_synthetic_101").consent_revision == 2  # type: ignore[union-attr]
     assert store.queue_notification(_notification(subject_ref="subject_due_102", change_version="version_102"), expected_subscription_revision=2, now=NOW).reason == "paused"
 
     unsubscribe = WatchJobStore(tmp_path / "unsubscribe.db")
@@ -309,6 +311,27 @@ def test_explicit_feedback_pauses_or_unsubscribes_without_claiming_a_hidden_pref
     assert unsubscribe.record_feedback(job.job_key, action="unsubscribe", authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1], authenticated_owner_chat_id=OWNER_TUPLE[2], now=NOW)
     stopped = unsubscribe.subscription("watch_synthetic_101")
     assert stopped is not None and stopped.lifecycle == "cancelled" and stopped.consent_revision == 2
+
+    concurrent = WatchJobStore(tmp_path / "feedback-concurrent.db")
+    concurrent_job = _queued(concurrent)
+    concurrent_lease = concurrent.claim_due_jobs(now=NOW)[0]
+    assert concurrent.deliver_claimed_job(
+        concurrent_lease, _delivery_access(_delivery_registry()), sender=lambda _text: "receipt_feedback_103", now=NOW,
+    ) == "sent"
+    barrier = Barrier(2)
+    outcomes: list[bool] = []
+
+    def pause_once() -> None:
+        barrier.wait()
+        outcomes.append(concurrent.record_feedback(
+            concurrent_job.job_key, action="pause", authenticated_chat_id=OWNER_TUPLE[0],
+            authenticated_actor_id=OWNER_TUPLE[1], authenticated_owner_chat_id=OWNER_TUPLE[2], now=NOW,
+        ))
+
+    first, second = Thread(target=pause_once), Thread(target=pause_once)
+    first.start(); second.start(); first.join(); second.join()
+    assert sorted(outcomes) == [False, True]
+    assert concurrent.subscription("watch_synthetic_101").consent_revision == 2  # type: ignore[union-attr]
 
 
 def test_one_shot_runner_owns_final_preflight_but_has_no_default_transport(tmp_path) -> None:
