@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
-from threading import Barrier, Thread
+from itertools import count
+from threading import Barrier, Event, Thread
 
 from prm.capabilities import AuthorizationRequest, CapabilityGrant, CapabilityRegistry, ProviderPolicy
 from prm.watch_jobs import WatchDeliveryAccess, WatchJobStore, WatchNotification, WatchReconciliationEvidence, WatchSubscription, watch_owner_ref_from_authenticated_private_tuple
@@ -14,6 +15,7 @@ NOW = datetime.now(timezone.utc).replace(microsecond=0)
 OWNER_TUPLE = ("42", "42", "42")
 OWNER_REF = watch_owner_ref_from_authenticated_private_tuple(*OWNER_TUPLE)
 assert OWNER_REF is not None
+_OPERATION_SEQUENCE = count(1000)
 
 
 def _subscription(**changes: object) -> WatchSubscription:
@@ -50,6 +52,8 @@ def _delivery_registry() -> CapabilityRegistry:
 
 
 def _delivery_access(registry: CapabilityRegistry, *, operation_ref: str | None = None) -> WatchDeliveryAccess:
+    if operation_ref is None:
+        operation_ref = f"operation_watch_{next(_OPERATION_SEQUENCE)}"
     decision = registry.authorize_and_reserve(
         AuthorizationRequest(
             owner_ref=OWNER_REF, connection_ref=None, capability="assistant.watch_delivery",
@@ -68,6 +72,14 @@ def _queued(store: WatchJobStore, notification: WatchNotification | None = None)
     result = store.queue_notification(notification or _notification(), expected_subscription_revision=1, now=NOW)
     assert result.job is not None
     return result.job
+
+
+def _revise(store: WatchJobStore, subscription: WatchSubscription) -> WatchSubscription:
+    preview = store.preview_subscription(subscription, authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1], authenticated_owner_chat_id=OWNER_TUPLE[2], now=NOW)
+    assert preview is not None
+    revised = store.confirm_subscription(preview.confirmation_ref, authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1], authenticated_owner_chat_id=OWNER_TUPLE[2], now=NOW)
+    assert revised is not None
+    return revised
 
 
 def test_changed_version_and_completed_subject_cancel_waiting_or_leased_jobs(tmp_path) -> None:
@@ -99,8 +111,13 @@ def test_one_lease_wins_and_expired_lease_becomes_unknown_until_reconciliation(t
     assert store.job_state(queued.job_key) == "leased"
     assert store.claim_due_jobs(now=NOW + timedelta(minutes=2)) == ()
     assert store.job_state(queued.job_key) == "unknown"
-    assert store.reconcile_unknown(WatchReconciliationEvidence(queued.job_key, "not_delivered", "evidence_fixture_100", NOW + timedelta(minutes=2)))
-    assert len(store.claim_due_jobs(now=NOW + timedelta(minutes=2))) == 1
+    # A crash/expired lease has no durable PA-02 operation record. It is
+    # deliberately unknown and cannot be relabelled as a safe retry.
+    assert store.reconciliation_requirement(
+        queued.job_key, authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1],
+        authenticated_owner_chat_id=OWNER_TUPLE[2],
+    ) is None
+    assert store.claim_due_jobs(now=NOW + timedelta(days=1)) == ()
 
 
 def test_revoked_delivery_grant_blocks_final_send_and_unknown_is_never_blindly_retried(tmp_path) -> None:
@@ -116,12 +133,34 @@ def test_revoked_delivery_grant_blocks_final_send_and_unknown_is_never_blindly_r
     unknown_store = WatchJobStore(tmp_path / "unknown.db")
     _queued(unknown_store)
     leased = unknown_store.claim_due_jobs(now=NOW)[0]
-    attempt = unknown_store.prepare_delivery(leased, _delivery_access(_delivery_registry()), now=NOW)
-    assert attempt is not None
-    assert unknown_store.finish_delivery(attempt, outcome="unknown", detail="fixture timeout", now=NOW)
+    unknown_registry = _delivery_registry()
+    unknown_access = _delivery_access(unknown_registry)
+    assert unknown_store.deliver_claimed_job(
+        leased, unknown_access,
+        sender=lambda _text: (_ for _ in ()).throw(RuntimeError("fixture timeout")), now=NOW,
+    ) == "unknown"
     assert unknown_store.job_state(leased.job_key) == "unknown"
     assert unknown_store.claim_due_jobs(now=NOW + timedelta(days=1)) == ()
-    assert unknown_store.reconcile_unknown(WatchReconciliationEvidence(leased.job_key, "delivered", "receipt_fixture_101", NOW))
+    requirement = unknown_store.reconciliation_requirement(
+        leased.job_key, authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1],
+        authenticated_owner_chat_id=OWNER_TUPLE[2],
+    )
+    assert requirement is not None
+    assert unknown_store.reconciliation_requirement(
+        leased.job_key, authenticated_chat_id="43", authenticated_actor_id="43", authenticated_owner_chat_id="43",
+    ) is None
+    assert not unknown_store.reconcile_unknown(
+        WatchReconciliationEvidence(leased.job_key, OWNER_REF, "operation_wrong_101", "delivered", "receipt_fixture_101", NOW),
+        access=unknown_access, authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1], authenticated_owner_chat_id=OWNER_TUPLE[2],
+    )
+    assert not unknown_store.reconcile_unknown(
+        WatchReconciliationEvidence(leased.job_key, OWNER_REF, requirement.operation_ref, "delivered", "receipt_fixture_101", NOW),
+        access=unknown_access, authenticated_chat_id="43", authenticated_actor_id="43", authenticated_owner_chat_id="43",
+    )
+    assert unknown_store.reconcile_unknown(
+        WatchReconciliationEvidence(leased.job_key, OWNER_REF, requirement.operation_ref, "delivered", "receipt_fixture_101", NOW),
+        access=unknown_access, authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1], authenticated_owner_chat_id=OWNER_TUPLE[2],
+    )
     assert unknown_store.receipt(leased.job_key) is not None
 
 
@@ -142,7 +181,7 @@ def test_receipt_is_separate_from_job_state_and_daily_cap_is_conservative(tmp_pa
     # A revision with a cap of one refuses the next final preflight rather than
     # sending it and attempting to correct the quota afterward.
     capped = replace(_subscription(), consent_revision=2, daily_cap=1)
-    assert store.revise_subscription(capped, expected_revision=1, authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1], authenticated_owner_chat_id=OWNER_TUPLE[2], now=NOW)
+    assert _revise(store, capped) == capped
     again = store.queue_notification(_notification(subject_ref="subject_due_103", change_version="version_103"), expected_subscription_revision=2, now=NOW)
     assert again.job is not None
     lease = store.claim_due_jobs(now=NOW)
@@ -202,6 +241,100 @@ def test_one_shot_runner_owns_final_preflight_but_has_no_default_transport(tmp_p
     assert job == ()  # known no-send was cancelled, not converted to unknown
 
 
+def test_delivery_holds_one_terminal_transaction_across_sender_and_prevents_double_send(tmp_path) -> None:
+    store = WatchJobStore(tmp_path / "terminal-lease.db")
+    queued = _queued(store)
+    leased = store.claim_due_jobs(now=NOW)[0]
+    registry = _delivery_registry()
+    first_access = _delivery_access(registry)
+    second_access = _delivery_access(registry)
+    entered, release = Event(), Event()
+    sender_calls: list[str] = []
+    outcomes: list[str] = []
+
+    def sender(_text: str) -> str:
+        sender_calls.append("called")
+        entered.set()
+        assert release.wait(timeout=2)
+        return "receipt_terminal_lease_001"
+
+    first = Thread(target=lambda: outcomes.append(store.deliver_claimed_job(leased, first_access, sender=sender, now=NOW)))
+    first.start()
+    assert entered.wait(timeout=2)
+    second = Thread(target=lambda: outcomes.append(store.deliver_claimed_job(
+        leased, second_access, sender=lambda _text: (_ for _ in ()).throw(AssertionError("second sender must not run")), now=NOW,
+    )))
+    second.start()
+    assert sender_calls == ["called"]
+    release.set()
+    first.join(timeout=3); second.join(timeout=3)
+    assert not first.is_alive() and not second.is_alive()
+    assert sorted(outcomes) == ["blocked", "sent"]
+    assert sender_calls == ["called"] and store.job_state(queued.job_key) == "sent"
+
+
+def test_restart_keeps_subscription_receipt_and_idempotency_state_without_replay(tmp_path) -> None:
+    path = tmp_path / "restart-sidecar.db"
+    original = WatchJobStore(path)
+    queued = _queued(original)
+    recovered = WatchJobStore(path)
+    claimed = recovered.claim_due_jobs(now=NOW)
+    assert len(claimed) == 1 and claimed[0].job_key == queued.job_key
+    assert recovered.deliver_claimed_job(
+        claimed[0], _delivery_access(_delivery_registry()), sender=lambda _text: "receipt_restart_001", now=NOW,
+    ) == "sent"
+    restarted = WatchJobStore(path)
+    assert restarted.subscription("watch_synthetic_101") is not None
+    assert restarted.receipt(queued.job_key) is not None
+    assert restarted.claim_due_jobs(now=NOW + timedelta(days=1)) == ()
+    assert restarted.queue_notification(_notification(), expected_subscription_revision=1, now=NOW).reason == "same_subject_version_stage"
+
+
+def test_pause_revision_cannot_commit_between_terminal_policy_and_sender(tmp_path) -> None:
+    store = WatchJobStore(tmp_path / "terminal-pause-linearized.db")
+    queued = _queued(store)
+    leased = store.claim_due_jobs(now=NOW)[0]
+    current = store.subscription("watch_synthetic_101")
+    assert current is not None
+    preview = store.preview_subscription(
+        replace(current, consent_revision=2, lifecycle="paused"),
+        authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1], authenticated_owner_chat_id=OWNER_TUPLE[2], now=NOW,
+    )
+    assert preview is not None
+    entered, release, revision_done = Event(), Event(), Event()
+    outcomes: list[str] = []
+    revisions: list[WatchSubscription | None] = []
+
+    def sender(_text: str) -> str:
+        entered.set()
+        assert release.wait(timeout=2)
+        return "receipt_terminal_pause_001"
+
+    delivery = Thread(target=lambda: outcomes.append(store.deliver_claimed_job(
+        leased, _delivery_access(_delivery_registry()), sender=sender, now=NOW,
+    )))
+    delivery.start()
+    assert entered.wait(timeout=2)
+
+    def confirm_pause() -> None:
+        revisions.append(store.confirm_subscription(
+            preview.confirmation_ref,
+            authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1],
+            authenticated_owner_chat_id=OWNER_TUPLE[2], now=NOW,
+        ))
+        revision_done.set()
+
+    reviser = Thread(target=confirm_pause)
+    reviser.start()
+    assert not revision_done.wait(timeout=0.1)
+    release.set()
+    delivery.join(timeout=3); reviser.join(timeout=3)
+    assert not delivery.is_alive() and not reviser.is_alive()
+    assert outcomes == ["sent"] and revisions and revisions[0] is not None
+    assert store.job_state(queued.job_key) == "sent"
+    assert store.subscription("watch_synthetic_101").lifecycle == "paused"  # type: ignore[union-attr]
+
+
 def test_runner_rechecks_revocation_and_pause_after_preflight_before_sender(tmp_path) -> None:
     store = WatchJobStore(tmp_path / "terminal-recheck.db")
     _queued(store)
@@ -230,7 +363,7 @@ def test_runner_rechecks_revocation_and_pause_after_preflight_before_sender(tmp_
         prepared = original_prepare(*args, **kwargs)
         current = paused.subscription("watch_synthetic_101")
         assert current is not None
-        assert paused.revise_subscription(replace(current, consent_revision=2, lifecycle="paused"), expected_revision=1, authenticated_chat_id=OWNER_TUPLE[0], authenticated_actor_id=OWNER_TUPLE[1], authenticated_owner_chat_id=OWNER_TUPLE[2], now=NOW)
+        assert _revise(paused, replace(current, consent_revision=2, lifecycle="paused"))
         return prepared
 
     paused.prepare_delivery = prepare_then_pause  # type: ignore[method-assign]
