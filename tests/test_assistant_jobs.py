@@ -113,6 +113,38 @@ def test_changed_version_and_completed_subject_cancel_waiting_or_leased_jobs(tmp
     assert store.job_state(claimed[0].job_key) == "cancelled"
 
 
+def test_evidence_baseline_rejects_version_churn_but_keeps_a_deadline_reversal(tmp_path) -> None:
+    store = WatchJobStore(tmp_path / "evidence-baseline.db")
+    initial = _queued(store)
+    # A caller-supplied/source timestamp version alone cannot make an alert.
+    churn = store.queue_notification(
+        _notification(change_version="version_102"), expected_subscription_revision=1, now=NOW,
+    )
+    assert churn.status == "duplicate" and churn.reason == "same_evidence_fingerprint"
+    assert store.job_state(initial.job_key) == "queued"
+
+    moved = store.queue_notification(
+        _notification(
+            change_version="version_103",
+            change_summary="The source moved the deadline to Wednesday.",
+        ), expected_subscription_revision=1, now=NOW,
+    )
+    assert moved.status == "queued" and moved.job is not None
+    assert store.job_state(initial.job_key) == "cancelled"
+
+    # The same nominal deadline returning after a distinct intermediate fact
+    # is a meaningful B→A reversal, not a duplicate version churn.
+    reverted = store.queue_notification(
+        _notification(
+            change_version="version_104",
+            change_summary="The source moved the deadline back to Tuesday.",
+        ), expected_subscription_revision=1, now=NOW,
+    )
+    assert reverted.status == "queued" and reverted.job is not None
+    assert reverted.job.job_key != moved.job.job_key
+    assert store.job_state(moved.job.job_key) == "cancelled"
+
+
 def test_one_lease_wins_and_expired_lease_becomes_unknown_until_reconciliation(tmp_path) -> None:
     store = WatchJobStore(tmp_path / "jobs.db")
     queued = _queued(store)
@@ -351,7 +383,7 @@ def test_restart_keeps_subscription_receipt_and_idempotency_state_without_replay
     assert restarted.subscription("watch_synthetic_101") is not None
     assert restarted.receipt(queued.job_key) is not None
     assert restarted.claim_due_jobs(now=NOW + timedelta(days=1)) == ()
-    assert restarted.queue_notification(_notification(), expected_subscription_revision=1, now=NOW).reason == "same_subject_version_stage"
+    assert restarted.queue_notification(_notification(), expected_subscription_revision=1, now=NOW).reason == "same_evidence_fingerprint"
 
 
 def test_pause_revision_cannot_commit_between_terminal_policy_and_sender(tmp_path) -> None:

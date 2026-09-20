@@ -229,10 +229,38 @@ class WatchNotification:
             raise ValueError("urgent is invalid")
 
     @property
-    def idempotency_key(self) -> str:
+    def evidence_fingerprint(self) -> str:
+        """Canonical material change evidence, excluding caller version churn."""
+        payload = {
+            "subject_ref": self.subject_ref,
+            "source_ref": self.source_ref,
+            "title": self.title,
+            "change_summary": self.change_summary,
+            "relevance_reason": self.relevance_reason,
+            "source_url": self.source_url,
+            "data_class": self.data_class,
+            "urgent": self.urgent,
+        }
+        return "watchchange_" + hashlib.sha256(
+            json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()[:40]
+
+    @property
+    def event_identity(self) -> str:
+        """The per-subscription event/stage identity independent of a version."""
         material = "\x1f".join((
             self.subscription_id, self.owner_ref, self.subject_ref,
-            self.change_version, self.delivery_stage,
+            self.source_ref, self.delivery_stage,
+        ))
+        return "watchevent_" + hashlib.sha256(material.encode("utf-8")).hexdigest()[:40]
+
+    def idempotency_key(self, *, previous_evidence_fingerprint: str | None) -> str:
+        """Deduplicate repeats yet retain a meaningful A→B→A reversal."""
+        if previous_evidence_fingerprint is not None:
+            _ref(previous_evidence_fingerprint, field="previous_evidence_fingerprint")
+        material = "\x1f".join((
+            self.event_identity, previous_evidence_fingerprint or "initial",
+            self.evidence_fingerprint,
         ))
         return "watchjob_" + hashlib.sha256(material.encode("utf-8")).hexdigest()[:40]
 
@@ -484,9 +512,19 @@ CREATE TABLE IF NOT EXISTS pa_watch_subjects(
  subscription_id TEXT NOT NULL,
  subject_ref TEXT NOT NULL,
  current_version TEXT NOT NULL,
+ current_evidence_fingerprint TEXT NOT NULL,
  lifecycle TEXT NOT NULL,
  updated_at TEXT NOT NULL,
  PRIMARY KEY(subscription_id, subject_ref)
+);
+CREATE TABLE IF NOT EXISTS pa_watch_event_baselines(
+ subscription_id TEXT NOT NULL,
+ subject_ref TEXT NOT NULL,
+ source_ref TEXT NOT NULL,
+ delivery_stage TEXT NOT NULL,
+ current_evidence_fingerprint TEXT NOT NULL,
+ updated_at TEXT NOT NULL,
+ PRIMARY KEY(subscription_id, subject_ref, source_ref, delivery_stage)
 );
 CREATE TABLE IF NOT EXISTS pa_watch_jobs(
  job_key TEXT PRIMARY KEY,
@@ -495,6 +533,7 @@ CREATE TABLE IF NOT EXISTS pa_watch_jobs(
  subscription_revision INTEGER NOT NULL,
  subject_ref TEXT NOT NULL,
  change_version TEXT NOT NULL,
+ change_evidence_fingerprint TEXT NOT NULL,
  delivery_stage TEXT NOT NULL,
  notification_json TEXT NOT NULL,
  state TEXT NOT NULL CHECK(state IN ('queued','leased','dispatching','deferred','unknown','sent','cancelled')),
@@ -778,39 +817,72 @@ class WatchJobStore:
                 db.rollback()
                 return WatchQueueResult("blocked", "trigger_mismatch")
             subject = db.execute(
-                "SELECT current_version,lifecycle FROM pa_watch_subjects WHERE subscription_id=? AND subject_ref=?",
+                "SELECT current_version,current_evidence_fingerprint,lifecycle FROM pa_watch_subjects WHERE subscription_id=? AND subject_ref=?",
                 (notification.subscription_id, notification.subject_ref),
             ).fetchone()
-            if subject is not None and str(subject[1]) in {"completed", "cancelled", "not_relevant"}:
+            if subject is not None and str(subject[2]) in {"completed", "cancelled", "not_relevant"}:
                 db.rollback()
-                return WatchQueueResult("blocked", "subject_" + str(subject[1]))
+                return WatchQueueResult("blocked", "subject_" + str(subject[2]))
             if subject is None:
                 db.execute(
-                    "INSERT INTO pa_watch_subjects(subscription_id,subject_ref,current_version,lifecycle,updated_at) VALUES(?,?,?,'active',?)",
-                    (notification.subscription_id, notification.subject_ref, notification.change_version, _iso(current)),
+                    "INSERT INTO pa_watch_subjects(subscription_id,subject_ref,current_version,current_evidence_fingerprint,lifecycle,updated_at) VALUES(?,?,?,?,'active',?)",
+                    (
+                        notification.subscription_id, notification.subject_ref, notification.change_version,
+                        notification.evidence_fingerprint, _iso(current),
+                    ),
                 )
-            elif str(subject[0]) != notification.change_version:
-                # Changed deadline/fact: old waiting versions must not alert;
-                # a leased old version is checked again at terminal preflight.
+            elif str(subject[1]) != notification.evidence_fingerprint:
+                # Changed evidence: old waiting versions/fingerprints must not
+                # alert; a leased old record is checked again at final send.
                 db.execute(
-                    "UPDATE pa_watch_subjects SET current_version=?,updated_at=? WHERE subscription_id=? AND subject_ref=?",
-                    (notification.change_version, _iso(current), notification.subscription_id, notification.subject_ref),
+                    "UPDATE pa_watch_subjects SET current_version=?,current_evidence_fingerprint=?,updated_at=? WHERE subscription_id=? AND subject_ref=?",
+                    (
+                        notification.change_version, notification.evidence_fingerprint,
+                        _iso(current), notification.subscription_id, notification.subject_ref,
+                    ),
                 )
                 db.execute(
-                    "UPDATE pa_watch_jobs SET state='cancelled',last_reason='superseded_change_version',updated_at=? WHERE subscription_id=? AND subject_ref=? AND change_version<>? AND state IN ('queued','deferred')",
-                    (_iso(current), notification.subscription_id, notification.subject_ref, notification.change_version),
+                    "UPDATE pa_watch_jobs SET state='cancelled',last_reason='superseded_evidence',updated_at=? WHERE subscription_id=? AND subject_ref=? AND change_evidence_fingerprint<>? AND state IN ('queued','deferred')",
+                    (
+                        _iso(current), notification.subscription_id, notification.subject_ref,
+                        notification.evidence_fingerprint,
+                    ),
                 )
-            key = notification.idempotency_key
+            baseline = db.execute(
+                "SELECT current_evidence_fingerprint FROM pa_watch_event_baselines WHERE subscription_id=? AND subject_ref=? AND source_ref=? AND delivery_stage=?",
+                (
+                    notification.subscription_id, notification.subject_ref,
+                    notification.source_ref, notification.delivery_stage,
+                ),
+            ).fetchone()
+            previous_fingerprint = None if baseline is None else str(baseline[0])
+            if previous_fingerprint == notification.evidence_fingerprint:
+                # A source or caller may churn a version/timestamp while the
+                # evidence and explanation are unchanged. Baselines are per
+                # stage, so a later deadline reminder is not suppressed.
+                db.rollback()
+                return WatchQueueResult("duplicate", "same_evidence_fingerprint")
+            key = notification.idempotency_key(previous_evidence_fingerprint=previous_fingerprint)
             existing = db.execute("SELECT state FROM pa_watch_jobs WHERE job_key=?", (key,)).fetchone()
             if existing is not None:
                 db.rollback()
-                return WatchQueueResult("duplicate", "same_subject_version_stage")
+                return WatchQueueResult("duplicate", "same_evidence_transition_stage")
             db.execute(
-                "INSERT INTO pa_watch_jobs(job_key,subscription_id,owner_ref,subscription_revision,subject_ref,change_version,delivery_stage,notification_json,state,due_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?, 'queued',?,?,?)",
+                "INSERT INTO pa_watch_jobs(job_key,subscription_id,owner_ref,subscription_revision,subject_ref,change_version,change_evidence_fingerprint,delivery_stage,notification_json,state,due_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?, 'queued',?,?,?)",
                 (
                     key, notification.subscription_id, notification.owner_ref, subscription.consent_revision,
-                    notification.subject_ref, notification.change_version, notification.delivery_stage,
+                    notification.subject_ref, notification.change_version, notification.evidence_fingerprint,
+                    notification.delivery_stage,
                     json.dumps(_notification_payload(notification), sort_keys=True), _iso(notification.due_at), _iso(current), _iso(current),
+                ),
+            )
+            db.execute(
+                "INSERT INTO pa_watch_event_baselines(subscription_id,subject_ref,source_ref,delivery_stage,current_evidence_fingerprint,updated_at) VALUES(?,?,?,?,?,?) "
+                "ON CONFLICT(subscription_id,subject_ref,source_ref,delivery_stage) DO UPDATE SET current_evidence_fingerprint=excluded.current_evidence_fingerprint,updated_at=excluded.updated_at",
+                (
+                    notification.subscription_id, notification.subject_ref,
+                    notification.source_ref, notification.delivery_stage,
+                    notification.evidence_fingerprint, _iso(current),
                 ),
             )
             db.commit()
@@ -867,10 +939,15 @@ class WatchJobStore:
                     )
                     continue
                 subject = db.execute(
-                    "SELECT current_version,lifecycle FROM pa_watch_subjects WHERE subscription_id=? AND subject_ref=?",
+                    "SELECT current_version,current_evidence_fingerprint,lifecycle FROM pa_watch_subjects WHERE subscription_id=? AND subject_ref=?",
                     (notification.subscription_id, notification.subject_ref),
                 ).fetchone()
-                if subject is None or str(subject[0]) != notification.change_version or str(subject[1]) != "active":
+                if (
+                    subject is None
+                    or str(subject[0]) != notification.change_version
+                    or str(subject[1]) != notification.evidence_fingerprint
+                    or str(subject[2]) != "active"
+                ):
                     db.execute(
                         "UPDATE pa_watch_jobs SET state='cancelled',last_reason='subject_not_current',updated_at=? WHERE job_key=?",
                         (current_text, job_key),
@@ -923,7 +1000,7 @@ class WatchJobStore:
             subscription = self._load_subscription_in(db, notification.subscription_id)
             policy = _job_policy(subscription, notification, now=current)
             subject = db.execute(
-                "SELECT current_version,lifecycle FROM pa_watch_subjects WHERE subscription_id=? AND subject_ref=?",
+                "SELECT current_version,current_evidence_fingerprint,lifecycle FROM pa_watch_subjects WHERE subscription_id=? AND subject_ref=?",
                 (notification.subscription_id, notification.subject_ref),
             ).fetchone()
             if (
@@ -932,7 +1009,8 @@ class WatchJobStore:
                 or policy != "active"
                 or subject is None
                 or str(subject[0]) != notification.change_version
-                or str(subject[1]) != "active"
+                or str(subject[1]) != notification.evidence_fingerprint
+                or str(subject[2]) != "active"
             ):
                 self._cancel_leased_in(db, job.job_key, job.lease_token, policy if policy != "active" else "subscription_or_subject_changed", current)
                 db.commit()
@@ -1009,7 +1087,7 @@ class WatchJobStore:
                 return False
             subscription = self._load_subscription_in(db, notification.subscription_id)
             subject = db.execute(
-                "SELECT current_version,lifecycle FROM pa_watch_subjects WHERE subscription_id=? AND subject_ref=?",
+                "SELECT current_version,current_evidence_fingerprint,lifecycle FROM pa_watch_subjects WHERE subscription_id=? AND subject_ref=?",
                 (notification.subscription_id, notification.subject_ref),
             ).fetchone()
             if (
@@ -1018,7 +1096,8 @@ class WatchJobStore:
                 or _job_policy(subscription, notification, now=current) != "active"
                 or subject is None
                 or str(subject[0]) != notification.change_version
-                or str(subject[1]) != "active"
+                or str(subject[1]) != notification.evidence_fingerprint
+                or str(subject[2]) != "active"
                 or access.owner_ref != subscription.owner_ref
                 or access.destination_ref != subscription.destination_ref
                 or access.data_class != notification.data_class
@@ -1095,7 +1174,7 @@ class WatchJobStore:
                 return "blocked"
             subscription = self._load_subscription_in(db, notification.subscription_id)
             subject = db.execute(
-                "SELECT current_version,lifecycle FROM pa_watch_subjects WHERE subscription_id=? AND subject_ref=?",
+                "SELECT current_version,current_evidence_fingerprint,lifecycle FROM pa_watch_subjects WHERE subscription_id=? AND subject_ref=?",
                 (notification.subscription_id, notification.subject_ref),
             ).fetchone()
             if (
@@ -1104,7 +1183,8 @@ class WatchJobStore:
                 or _job_policy(subscription, notification, now=current) != "active"
                 or subject is None
                 or str(subject[0]) != notification.change_version
-                or str(subject[1]) != "active"
+                or str(subject[1]) != notification.evidence_fingerprint
+                or str(subject[2]) != "active"
                 or access.owner_ref != subscription.owner_ref
                 or access.destination_ref != subscription.destination_ref
                 or access.data_class != notification.data_class

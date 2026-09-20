@@ -1,0 +1,9 @@
+SLICE_REVIEW: STOP_SHIP
+
+Reviewed read-only at `937e41d5b74c2eebd0e0d1531e7226f63bb8ccd5` (PA-09 diff from `065033c`). `git diff --check` passed; tests were not run.
+
+P1 — meaningful-change deduplication is still caller-controlled. `WatchNotification` accepts arbitrary `change_version`, and the idempotency key is only subscription/owner/subject/version/stage. A repeated event with a newly supplied version queues another alert even if its evidence, summary, and relevance are unchanged. This does not meet PA-09’s “repeated reports of one event do not create noisy new alerts” criterion. Define canonical event identity plus evidence/change fingerprint and a per-subscription delivered baseline; add holdouts for version churn, reverted deadlines, and repeated evidence. [watch_jobs.py](/srv/openclaw-you/workspace/telegram-research-agent/src/prm/watch_jobs.py:209) [queueing](/srv/openclaw-you/workspace/telegram-research-agent/src/prm/watch_jobs.py:749)
+
+P1 — required runtime verification and observable delivery cannot be satisfied by the current slice contract. The task requires it, but its amendment forbids service, provider, Telegram delivery, migration, and runtime-acceptance actions. Correspondingly, the runner explicitly has no service and delivery remains an injected callback. The design must split the locally verifiable durable-state contract from a separately authorized runtime-integration acceptance gate; it must not claim “notifications arrive reliably” before that gate. [tasks](/srv/openclaw-you/workspace/telegram-research-agent/docs/tasks.md:286) [runner](/srv/openclaw-you/workspace/telegram-research-agent/src/prm/watch_jobs.py:1190)
+
+The durable attempt, owner-bound confirmation, final preflight, and verifier-gated reconciliation contracts address prior findings, but do not close these blockers. No design, completion, runtime use, or release is approved.

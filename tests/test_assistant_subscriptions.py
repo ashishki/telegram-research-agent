@@ -273,7 +273,7 @@ def test_deadline_stage_dedupe_is_exact_without_suppressing_a_later_stage(tmp_pa
     _register(store, _subscription(trigger="deadline_reminder", expires_at=datetime(2027, 1, 1, tzinfo=timezone.utc)))
     reminder = _notification(delivery_stage="deadline:7d", change_version="deadline_version_001")
     assert store.queue_notification(reminder, expected_subscription_revision=1, now=NOW).status == "queued"
-    assert store.queue_notification(reminder, expected_subscription_revision=1, now=NOW).reason == "same_subject_version_stage"
+    assert store.queue_notification(reminder, expected_subscription_revision=1, now=NOW).reason == "same_evidence_fingerprint"
     assert store.queue_notification(
         replace(reminder, delivery_stage="deadline:1d"), expected_subscription_revision=1, now=NOW,
     ).status == "queued"
