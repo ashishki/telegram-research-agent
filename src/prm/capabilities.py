@@ -51,6 +51,10 @@ TRANSPORT_PURPOSES: dict[tuple[str, str, str], str] = {
     ("provider_telegram", "media.voice_download", "read"): "voice.transcription",
     ("provider_openai", "media.transcribe", "model_egress"): "voice.transcription",
     ("provider_telegram", "assistant.result_delivery", "deliver"): "answer.delivery",
+    # PA-09 keeps watch delivery separate from a foreground answer.  A grant
+    # for one must never be reused for the other merely because both happen to
+    # use Telegram as their transport.
+    ("provider_telegram", "assistant.watch_delivery", "deliver"): "watch.delivery",
     ("provider_local", "assistant.utd_draft", "write"): "utd.draft",
     # PA-05 has distinct public search and document-read reservations.  A
     # search snippet is discovery-only; it cannot consume a primary-document
