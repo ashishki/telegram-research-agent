@@ -7,6 +7,73 @@ Baseline: `f011d3b8641aab862f29b8e975ef2d5e647bc89c`
 Last PA-02 code SHA: `779454705928e90a9ecf922ab0bdc3f11f4c17ab`
 Playbook pin: `d570163ab17ec3b4245187c778f1e8d89af9690f`
 
+## Owner amendment 2026-09-23 — solution-first, non-Codex judge
+
+The owner directed a working-mode change for the PA programme:
+
+- Stop the per-patch Codex review gate. Implement solutions first; batch the
+  independent Deep Review at the declared phase boundaries instead of blocking
+  every small patch. This relaxes the *review cadence*, not the safety or
+  runtime gates below.
+- Reviews and answer quality are assessed with a non-Codex model through the
+  OpenCode Go gateway (OpenAI-compatible). The local secret file historically
+  named `openrouter_api_key` (in the neighbouring
+  `Georgia-Community-Navigator/secrets/`) actually holds the OpenCode Go key
+  (`OPENCODE_API_KEY`); the endpoint is `https://opencode.ai/zen/go/v1` and the
+  default judge model is `mimo-v2.6-pro`.
+- The judge is wired into `tools/prm_product_ux_eval.py` as
+  `--provider opencode-go` (alias `openrouter`). It stays fail-closed: without
+  `--allow-provider-egress` and a resolved `OPENCODE_API_KEY`/
+  `OPENCODE_API_KEY_FILE` it writes a deterministic dataset and a
+  `skipped_fail_closed`/`no_provider_credentials` report rather than inventing
+  verdicts. `--judge-api-key-file` and `--judge-base-url` override the local
+  endpoint; the key is never logged or committed.
+
+Unchanged boundaries: the design registry remains mechanically
+`review_required`; no human approval, release, live-account, delivery, timer,
+provider-egress or production-migration authority is created here, and no
+unimplemented slice is marked done. Runtime-observable gates (PA-09 delivery,
+connectors) still require real evidence before acceptance. The next
+dependency-ready slice is PA-10.
+
+PA-10 (selected mail) has started locally. The owner's actual provider is
+confirmed as Microsoft 365 / Exchange Online, so the first adapter target is
+Microsoft Graph delegated read scopes, not Gmail/IMAP-password. Local contract
+`src/prm/mail_connector.py` + `tests/test_assistant_mail.py` add documented
+provider profiles, a bounded read-only scope that refuses bodies/attachments,
+owner-bound expiring consent preview/confirmation, a fail-closed `mail.read`
+PA-02 reservation check (purpose registered in `src/prm/capabilities.py`),
+normalized thread summaries with deadline-conflict detection, and an
+explicit-path derived store with revoke/delete. No OAuth flow, token storage,
+live Graph/Canvas call, scheduler, delivery or default database is implemented
+or authorized. Access and parsing plan: `docs/security/PA-10-mail-access-plan.md`,
+owner request checklist: `docs/security/OWNER-ACCESS-REQUEST.md`.
+
+An independent read-only review of the uncommitted diff returned
+`FIX_P1_FIRST` (2 P1, several P2). Fixed and covered by tests: `from_payload`
+now rejects a foreign summary schema; the judge credential resolver no longer
+falls back to any `OPENROUTER_*` value for the OpenCode Go endpoint and prefers
+the explicit key file; the derived store closes connections and creates its
+parent directory; `MailFetchRequest` enforces typed authorization and bounds
+`page_size` by the confirmed `max_items`; `MailFetchPage` bounds and de-dupes
+its page; the deadline authority literal matches the verification set; and the
+consent helper is documented as stateless. Not verified here: any live Graph or
+OpenCode Go call, and that a future adapter actually invokes
+`require_mail_read_access` before `fetch_page`.
+
+Legacy-hygiene safety fix (owner-directed 2026-09-23): both compatibility
+dispatch facades (`bot.bot.dispatch_command`, `bot.handlers.dispatch_command`)
+now default to the gated `prm_assistant` mode instead of `legacy`, and the
+`run_bot` legacy branch passes its mode explicitly, so omitting `runtime_mode`
+can no longer silently reach the ungated legacy sender. This remediates the
+PA-02 P2 facade debt; the `legacy_handlers` bundle itself is unchanged and its
+deletion still requires the RFX-8/RFX-9/PRM-20 gates. The 37 MB untracked
+private DB backup was moved out of the repo to
+`/srv/openclaw-you/backups/telegram-research-agent/` and
+`data/agent.db.pre-*`/`data/agent.db.bak-*`/`data/*.sqlite*` are now
+git-ignored. `tests/test_handlers.py` remains a pre-existing stale report-era
+suite with 56 failures at baseline; it is in no tier and is not a regression.
+
 ## Authority and current boundary
 
 The owner directed implementation through dependency-ready slices and accepted
