@@ -1,8 +1,8 @@
 # PA-09 — local durable-watch evidence
 
-Date: 2026-09-20  
+Date: 2026-09-20
 Implementation range: `788414f..289269d` (local PA-09 code); handoff/evidence
-is recorded in the following documentation commit.  
+is recorded in the following documentation commit.
 Boundary: explicit local SQLite paths and synthetic fixtures only. No service,
 timer, provider, Telegram account, credential, migration, delivery, deployment
 or runtime acceptance was enabled.
