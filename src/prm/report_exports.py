@@ -245,6 +245,165 @@ def render_pdf(document: BriefDocument) -> BriefReportArtifact:
     return BriefReportArtifact("pdf", "application/pdf", body, html_artifact.identity)
 
 
+def render_designed_html(document: BriefDocument) -> BriefReportArtifact:
+    """A richer analytical layout: cover, KPI blocks, chart, then the same facts."""
+
+    _require_document(document)
+    identity = report_identity(document)
+    topic = _html_text(document.topic)
+    story_or_items = _html_story_or_item_sections(document)
+    chart = _designed_chart_svg(document)
+    sources = document.evidence_by_ref()
+    source_cards = "".join(
+        "<article class=\"source-card\"><h3>{title}</h3><p>{summary}</p><p>{source}</p>"
+        "<p class=\"source-meta\">{time} · {state}</p></article>".format(
+            title=_html_text(evidence.title),
+            summary=_html_text(evidence.summary),
+            source=_html_source(evidence.source_ref),
+            time=_html_text(_display_time(evidence)),
+            state=_html_text(evidence.source_state),
+        )
+        for evidence in document.evidence
+    )
+    limitation = "".join(f"<li>{_html_text(item)}</li>" for item in document.coverage_manifest.limitations)
+    coverage_rows = "".join(
+        "<tr><td>{source}</td><td>{state}</td><td>{reason}</td></tr>".format(
+            source=_html_source_label(item.source_ref),
+            state=_html_text(item.state),
+            reason=_html_text(item.reason or "—"),
+        )
+        for item in document.coverage_manifest.sources
+    )
+    kpis = (
+        ("items", len(document.items), "пунктов"),
+        ("sources", len(document.evidence), "источников"),
+        ("conflicts", len(document.conflicts), "конфликтов дат"),
+        ("coverage", "полное" if document.coverage_manifest.complete else "частичное", "покрытие"),
+    )
+    kpi_html = "".join(
+        f'<div class="kpi"><span class="kpi-value">{_html_text(value)}</span>'
+        f'<span class="kpi-label">{_html_text(label)}</span></div>'
+        for _, value, label in kpis
+    )
+    chart_section = (
+        f'  <section aria-labelledby="chart-heading"><p class="eyebrow">Динамика</p>'
+        f'<h2 id="chart-heading">Наблюдения по дням</h2>{chart}</section>'
+        if chart
+        else ""
+    )
+    sources_section = (
+        f'  <section aria-labelledby="sources-heading"><p class="eyebrow">Проверяемые основания</p>'
+        f'<h2 id="sources-heading">Источники</h2><div class="source-grid">{source_cards}</div></section>'
+        if source_cards
+        else
+        '  <section aria-labelledby="sources-heading"><p class="eyebrow">Проверяемые основания</p>'
+        '<h2 id="sources-heading">Источники</h2>'
+        '<p class="caveat">В выбранном окне нет источников для показа.</p></section>'
+    )
+    html = f"""<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="{_CSP}">
+<title>{topic}</title>
+<style>{_stylesheet()}{_designed_stylesheet()}</style>
+</head>
+<body>
+<main class="brief-report brief-report--designed" data-surface="private_brief_report" data-brief-id="{_html_attr(document.brief_id)}" data-version="{document.version}" data-content-digest="{_html_attr(document.content_digest)}">
+  <header class="cover">
+    <p class="eyebrow">Аналитический бриф</p>
+    <h1>{topic}</h1>
+    <p class="period">{_html_text(_period_text(document))}</p>
+    <div class="kpis">{kpi_html}</div>
+  </header>
+  <section aria-labelledby="main-heading"><p class="eyebrow">Главное</p><h2 id="main-heading">События и объяснения</h2>{story_or_items}</section>
+{chart_section}
+  <section aria-labelledby="coverage-heading"><p class="eyebrow">Границы выборки</p><h2 id="coverage-heading">Покрытие</h2><div class="table-wrap"><table><thead><tr><th>Источник</th><th>Состояние</th><th>Ограничение</th></tr></thead><tbody>{coverage_rows}</tbody></table></div>{_html_limitations(limitation)}</section>
+{sources_section}
+</main>
+</body>
+</html>"""
+    validate_report_html(html)
+    return BriefReportArtifact("html", "text/html; charset=utf-8", html, identity)
+
+
+def render_designed_pdf(document: BriefDocument) -> BriefReportArtifact:
+    """Render the designed HTML to PDF locally; fall back to the plain PDF."""
+
+    html_artifact = render_designed_html(document)
+    try:
+        body = _render_with_weasyprint(str(html_artifact.body))
+    except Exception:
+        body = _render_fallback_pdf(document)
+    if not isinstance(body, bytes) or not body.startswith(b"%PDF-"):
+        raise BriefReportRenderUnavailable("local PDF renderer returned an invalid artifact")
+    return BriefReportArtifact("pdf", "application/pdf", body, html_artifact.identity)
+
+
+def _designed_chart_svg(document: BriefDocument) -> str:
+    """Deterministic inline-SVG bar chart of observations per day (no egress)."""
+
+    from collections import Counter
+
+    counts: Counter[str] = Counter()
+    for evidence in document.evidence:
+        try:
+            counts[evidence.observed_at.date().isoformat()] += 1
+        except Exception:
+            continue
+    if not counts:
+        return ""
+    days = sorted(counts)
+    maximum = max(counts.values())
+    width, height, pad = 720, 210, 30
+    baseline = height - pad - 22
+    usable = height - pad - pad - 22
+    slot = (width - 2 * pad) / max(1, len(days))
+    bar_width = slot * 0.68
+    parts: list[str] = []
+    for index, day in enumerate(days):
+        value = counts[day]
+        bar_height = usable * (value / maximum)
+        x = pad + index * slot + (slot - bar_width) / 2
+        y = baseline - bar_height
+        centre = x + bar_width / 2
+        parts.append(
+            f'<rect class="chart-bar" x="{x:.1f}" y="{y:.1f}" width="{bar_width:.1f}" '
+            f'height="{bar_height:.1f}" rx="4"/>'
+        )
+        parts.append(
+            f'<text class="chart-label" x="{centre:.1f}" y="{height - pad + 2:.1f}" '
+            f'text-anchor="middle">{_html_text(day[5:])}</text>'
+        )
+        parts.append(
+            f'<text class="chart-value" x="{centre:.1f}" y="{y - 5:.1f}" '
+            f'text-anchor="middle">{value}</text>'
+        )
+    return (
+        f'<svg class="chart" width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
+        f'role="img" aria-label="Наблюдения по дням">{"".join(parts)}</svg>'
+    )
+
+
+def _designed_stylesheet() -> str:
+    return """
+.brief-report--designed .cover { padding: 40px 0 28px; border-bottom: 2px solid var(--accent); }
+.brief-report--designed .cover h1 { font-size: clamp(2.2rem, 8vw, 3.8rem); max-width: 24ch; }
+.kpis { display: flex; flex-wrap: wrap; gap: 12px; margin: 22px 0 0; }
+.kpi { flex: 1 1 120px; min-width: 120px; display: block; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+.kpi-value { display: block; font-size: 1.6rem; font-weight: 800; line-height: 1.1; overflow-wrap: normal; word-break: keep-all; }
+.kpi-label { display: block; margin-top: 4px; font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; overflow-wrap: normal; }
+.chart { width: 100%; height: 210px; margin-top: 8px; }
+.chart-bar { fill: var(--accent); }
+.chart-label { fill: #586161; font-size: 12px; }
+.chart-value { fill: #1e2525; font-size: 12px; font-weight: 700; }
+.source-meta { margin: 4px 0 0; font-size: .85rem; color: var(--muted); }
+@media (prefers-color-scheme: dark) { .chart-label { fill: #b7c2bd; } .chart-value { fill: #edf3f0; } }
+@media print { .brief-report--designed .cover { padding-top: 8px; } .kpi { background: #fff; } .chart-bar { fill: #146b5c; } }
+"""
+
+
 def _render_with_weasyprint(html: str) -> bytes:
     """Use only the declared local backend and reject every attempted fetch."""
 
@@ -264,6 +423,16 @@ def render_report(document: BriefDocument, format: Literal["html", "markdown", "
         return render_markdown(document)
     if format == "pdf":
         return render_pdf(document)
+    raise BriefReportRenderError("report format is invalid")
+
+
+def render_designed_report(document: BriefDocument, format: Literal["html", "pdf"]) -> BriefReportArtifact:
+    """Dispatch the richer analytical layout; same facts, no new generation."""
+
+    if format == "html":
+        return render_designed_html(document)
+    if format == "pdf":
+        return render_designed_pdf(document)
     raise BriefReportRenderError("report format is invalid")
 
 
@@ -1006,8 +1175,9 @@ def _to_unicode_cmap(glyph_unicode: dict[int, str]) -> bytes:
 
 def _stylesheet() -> str:
     return """
-@page { size: A4; margin: 20mm 13mm 16mm; @top-left { content: string(brieftitle); font-size: 8.5pt; color: #586161; } @top-center { content: string(briefsection); font-size: 8pt; color: #586161; } @top-right { content: string(briefperiod); font-size: 8pt; color: #586161; } @bottom-center { content: "Страница " counter(page) " / " counter(pages); font-size: 8pt; color: #586161; } }
-:root { color-scheme: light dark; --bg: #f5f5f0; --panel: #ffffff; --ink: #1e2525; --muted: #586161; --line: #cbd2cc; --accent: #146b5c; --caveat: #7b4a13; }
+@page { size: A4; margin: 22mm 13mm 20mm; @top-left { content: string(brieftitle); font-size: 9pt; color: #4f5858; } @top-center { content: string(briefsection); font-size: 8.5pt; color: #4f5858; } @top-right { content: string(briefperiod); font-size: 8.5pt; color: #4f5858; } @bottom-center { content: "Страница " counter(page) " / " counter(pages); font-size: 8.5pt; color: #4f5858; } }
+@page :first { @top-left { content: none; } @top-center { content: none; } @top-right { content: none; } }
+:root { color-scheme: light dark; --bg: #f5f5f0; --panel: #ffffff; --ink: #1e2525; --muted: #4f5858; --line: #cbd2cc; --accent: #146b5c; --caveat: #7b4a13; }
 * { box-sizing: border-box; }
 html { background: var(--bg); }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
@@ -1022,7 +1192,7 @@ h3 { margin: 0 0 8px; font-size: 1.15rem; }
 h4 { margin: 18px 0 8px; font-size: 1rem; }
 p, li { orphans: 2; widows: 2; }
 p, li, td, th, dd, code, a, blockquote { overflow-wrap: anywhere; }
-h2 + div, h2 + ol, h2 + p, h2 + .table-wrap, h2 + .source-grid { break-before: avoid; }
+h2 + div, h2 + ol, h2 + p, h2 + svg, h2 + .table-wrap, h2 + .source-grid { break-before: avoid; }
 .brief-report > section:last-of-type { border-bottom: 0; padding-bottom: 0; }
 .period { color: var(--muted); string-set: briefperiod content(text); }
 .identity, .source-card dl { color: var(--muted); }

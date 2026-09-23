@@ -7,7 +7,15 @@ import pytest
 
 from prm.brief_editorial import BriefEditorial
 from prm.briefs import BriefBuildRequest, BriefWindow, CoverageSource, build_brief_document
-from prm.report_exports import BriefReportRenderError, render_html, render_markdown, render_pdf, validate_report_html
+from prm.report_exports import (
+    BriefReportRenderError,
+    render_designed_html,
+    render_designed_pdf,
+    render_html,
+    render_markdown,
+    render_pdf,
+    validate_report_html,
+)
 
 
 def _window() -> BriefWindow:
@@ -234,3 +242,25 @@ def test_pdf_layout_has_running_header_and_orphan_control() -> None:
     assert "break-after: avoid" in body
     assert "orphans: 2" in body
     assert "widows: 2" in body
+
+
+def test_designed_export_has_cover_kpis_and_safe_chart_svg() -> None:
+    document = _editorial_document()
+    html = render_designed_html(document)
+    body = str(html.body)
+    assert "brief-report--designed" in body
+    assert 'class="kpis"' in body
+    assert 'class="kpi-value"' in body
+    assert '<svg class="chart"' in body
+    assert "chart-bar" in body
+    # Same safety contract as the standard export (validated internally).
+    assert "Content-Security-Policy" in body
+    assert "<img" not in body.casefold()
+    assert "<script>" not in body.casefold()
+    validate_report_html(body)
+
+
+def test_designed_pdf_is_a_local_pdf() -> None:
+    pdf = render_designed_pdf(_editorial_document())
+    assert pdf.media_type == "application/pdf"
+    assert isinstance(pdf.body, bytes) and pdf.body.startswith(b"%PDF-")

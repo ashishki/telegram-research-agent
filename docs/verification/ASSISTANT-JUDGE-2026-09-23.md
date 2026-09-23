@@ -138,6 +138,23 @@ Telegram view of the same real brief (353 chars, HTML) judged `pass` with one
 real product fix: it is too thin — add inline summary items and at least one
 source link in the card instead of hiding everything behind a button.
 
+## Designed analytical format (`render_designed_html` / `render_designed_pdf`)
+
+A second, richer layout was added: cover, KPI blocks (items/sources/conflicts/
+coverage), a deterministic inline-SVG bar chart of observations per day, then
+the same facts/sources. It uses only inline SVG (no external resources) and
+passes the same `validate_report_html` safety contract.
+
+First real run (6 pages) failed on: KPI labels overlapping values (WeasyPrint
+grid), an empty "Динамика" section (SVG with no intrinsic size + orphan
+heading), and the running header duplicating the cover. Fixes: flex KPIs,
+explicit SVG width/height and `h2 + svg { break-before: avoid }`, `@page:first`
+suppresses the running header, larger margins, darker/slightly larger running
+text, and no mid-word breaks in KPI text. Second run: overlap gone, fails 2 → 0,
+all pages pass/warn. Remaining nits: muted header contrast, long identifiers in
+the coverage table, and an empty block on the last page — plus the known vision
+noise.
+
 ## How to run
 
 ```bash
