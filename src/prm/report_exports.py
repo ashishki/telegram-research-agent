@@ -655,10 +655,17 @@ def _iso(value: datetime) -> str:
 
 
 def _period_text(document: BriefDocument) -> str:
-    return (
-        f"{document.window.start_at.astimezone(timezone.utc):%Y-%m-%d %H:%M UTC} — "
-        f"{document.window.end_at.astimezone(timezone.utc):%Y-%m-%d %H:%M UTC}; {document.window.timezone}"
-    )
+    from zoneinfo import ZoneInfo
+
+    tz_name = document.window.timezone or "UTC"
+    try:
+        tzinfo = ZoneInfo(tz_name)
+    except Exception:
+        tzinfo = timezone.utc
+        tz_name = "UTC"
+    start = document.window.start_at.astimezone(tzinfo)
+    end = document.window.end_at.astimezone(tzinfo)
+    return f"{start:%Y-%m-%d %H:%M} — {end:%Y-%m-%d %H:%M} {tz_name}"
 
 
 def _display_time(evidence: BriefEvidence) -> str:

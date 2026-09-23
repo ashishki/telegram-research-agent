@@ -155,6 +155,28 @@ all pages pass/warn. Remaining nits: muted header contrast, long identifiers in
 the coverage table, and an empty block on the last page — plus the known vision
 noise.
 
+## Model editorial pass + brief studio (`tools/brief_studio.py`)
+
+The studio builds a real BriefDocument from the local archive (read-only),
+optionally drafts editorial stories with the OpenCode Go model, then writes
+standard + designed HTML/PDF/Markdown, Telegram text and a dialogue JSON. The
+model draft is validated by `BriefEditorial.from_dict`; invalid tries are
+retried with the validation error fed back, and a tolerant parser accepts code
+fences and literal newlines inside strings (a common model failure).
+
+Results on the real archive brief: editorial drafted on attempt 2 (5 stories),
+no deterministic failures, no tofu; standard PDF 12 pages / 13062 chars,
+designed PDF 10 pages / 10339 chars, Telegram text 1220 chars.
+
+Telegram view of the editorial brief: vision `pass`, all scores 5/5 — "пузыри
+на своих сторонах, структура с заголовками и источниками, кнопки видимы"
+(up from the earlier thin 353-char pass). Fixed a real period bug: the header
+showed a duplicated "UTC" (`… UTC — … UTC; UTC`) and now renders in the window
+timezone with the zone name once.
+
+Still open: WeasyPrint can still orphan a section heading above a large
+`break-inside: avoid` story block; the coverage-table identifiers stay long.
+
 ## How to run
 
 ```bash
