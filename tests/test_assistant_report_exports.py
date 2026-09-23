@@ -226,8 +226,10 @@ def test_pdf_layout_has_running_header_and_orphan_control() -> None:
     # Running header/footer: title and period repeat on every printed page.
     assert "string-set: brieftitle content(text)" in body
     assert "string-set: briefperiod content(text)" in body
+    assert "string-set: briefsection content(text)" in body
     assert "content: string(brieftitle)" in body
     assert "content: string(briefperiod)" in body
+    assert "content: string(briefsection)" in body
     # Orphan/widow and heading-break control so a heading never hangs alone.
     assert "break-after: avoid" in body
     assert "orphans: 2" in body

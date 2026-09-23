@@ -192,6 +192,65 @@ def _dialogue_html_escape(value: object) -> str:
     return escape(str(value or ""), quote=True)
 
 
+_TELEGRAM_ALLOWED_TAGS = frozenset(
+    {"b", "strong", "i", "em", "u", "s", "code", "pre", "br", "hr", "blockquote", "a"}
+)
+
+
+class _TelegramHtmlSanitizer:
+    """Keep Telegram's safe formatting tags; drop everything else (text kept)."""
+
+    def __init__(self) -> None:
+        self._parts: list[str] = []
+
+    def feed(self, raw: str) -> str:
+        from html.parser import HTMLParser
+
+        outer = self
+
+        class _Parser(HTMLParser):
+            def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+                lowered = tag.casefold()
+                if lowered not in _TELEGRAM_ALLOWED_TAGS:
+                    return
+                if lowered == "a":
+                    href = dict((k.casefold(), v) for k, v in attrs).get("href") or ""
+                    if not str(href).lower().startswith(("https://", "http://", "tg://")):
+                        return
+                    from html import escape
+
+                    outer._parts.append(f'<a href="{escape(str(href), quote=True)}">')
+                    return
+                if lowered in {"br", "hr"}:
+                    outer._parts.append(f"<{lowered}>")
+                    return
+                outer._parts.append(f"<{lowered}>")
+
+            def handle_endtag(self, tag: str) -> None:
+                lowered = tag.casefold()
+                if lowered in _TELEGRAM_ALLOWED_TAGS and lowered not in {"br", "hr"}:
+                    outer._parts.append(f"</{lowered}>")
+
+            def handle_data(self, data: str) -> None:
+                from html import escape
+
+                outer._parts.append(escape(data, quote=False))
+
+            def handle_entityref(self, name: str) -> None:
+                from html import escape
+
+                outer._parts.append(f"&{escape(name)};")
+
+        parser = _Parser(convert_charrefs=True)
+        parser.feed(str(raw or ""))
+        parser.close()
+        return "".join(self._parts)
+
+
+def _sanitize_telegram_html(value: object) -> str:
+    return _TelegramHtmlSanitizer().feed(str(value or ""))
+
+
 def render_telegram_dialogue_html(
     dialogue: Mapping[str, Any],
     output_html: Path,
@@ -225,7 +284,10 @@ def render_telegram_dialogue_html(
         if not isinstance(turn, Mapping):
             continue
         role = "user" if str(turn.get("role") or "assistant").casefold() == "user" else "assistant"
-        text = _dialogue_html_escape(turn.get("text"))
+        if str(turn.get("format") or "plain").casefold() == "html":
+            text = _sanitize_telegram_html(turn.get("text"))
+        else:
+            text = _dialogue_html_escape(turn.get("text"))
         body = text
         sources = turn.get("sources")
         if isinstance(sources, list) and sources:
@@ -476,6 +538,7 @@ def run_visual_judge(
     md_report_path: Path,
     judge_caller: Any = None,
     pdf_inspections: Sequence[Mapping[str, Any]] | None = None,
+    max_retries: int = 2,
 ) -> dict[str, Any]:
     write_ndjson(dataset_output_path, [_public_case(case) for case in cases])
     started = time.perf_counter()
@@ -498,8 +561,19 @@ def run_visual_judge(
         reason = "OPENCODE_API_KEY was not present in the process environment"
     else:
         caller = judge_caller or judge_one_case
+        attempts = max(1, int(max_retries) + 1)
         for case in cases:
-            result = caller(case, resolved_model, timeout, max_output_tokens)
+            result: dict[str, Any] = {"status": "provider_error", "error": "not_attempted"}
+            for attempt in range(attempts):
+                result = caller(case, resolved_model, timeout, max_output_tokens)
+                if result.get("status") == "judged":
+                    break
+                # A transient invalid/provider error (e.g. the vision model
+                # returning non-JSON) is retried before being reported.
+                if result.get("status") not in {"provider_error", "invalid_response"}:
+                    break
+                if attempt + 1 < attempts:
+                    time.sleep(min(5.0, 1.0 * (attempt + 1)))
             if result.get("status") == "judged":
                 verdicts.append(result)
             else:
@@ -662,6 +736,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--judge-api-key-file", default=os.environ.get("OPENCODE_API_KEY_FILE", ""))
     parser.add_argument("--allow-provider-egress", action="store_true")
     parser.add_argument("--provider-timeout", type=int, default=150)
+    parser.add_argument("--provider-retries", type=int, default=2)
     parser.add_argument("--max-output-tokens", type=int, default=2500)
     parser.add_argument("--quality-floor", type=float, default=4.0)
     parser.add_argument("--render-dir", type=Path, default=PROJECT_ROOT / ".playbook-artifacts/visual/renders")
@@ -748,6 +823,7 @@ def main() -> int:
         dataset_output_path=args.dataset_output,
         md_report_path=args.md_report,
         pdf_inspections=pdf_inspections,
+        max_retries=args.provider_retries,
     )
     print(
         json.dumps(

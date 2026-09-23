@@ -119,13 +119,24 @@ Vision judge on the 9 PDF pages found: tiny body text, no running page
 header with period/section, an orphaned section heading at a page bottom, and
 a large empty block at the end.
 
-`src/prm/report_exports.py` now adds a running print header (title + period via
-CSS `string-set`), `break-after: avoid` on headings and `orphans/widows: 2`,
-plus a slightly larger source-card/timeline font. Re-run on the regenerated
-PDF: layout failures 1 → 0, pass 5 → 6, `mobile_fit` 3.89 → 4.13, no orphan
-heading; status moved from `failed_closed` to `needs_human_review`. Remaining
-warns: an empty "Проверяемые основания" section and a bottom empty block on
-the last page; one page's vision reply was transiently invalid JSON.
+`src/prm/report_exports.py` now adds a running print header/centre
+(title + section + period via CSS `string-set`), `break-after: avoid` on
+headings and `break-before: avoid` on content after a heading, `orphans/widows`
+and a trailing-section border fix, host-label source links in the coverage
+table (no mid-word URL breaks), a slightly larger source-card/timeline font,
+and a caveat instead of an empty sources grid.
+
+Measured across repeated runs the layout converges (e.g. 6 pass / 2-3 warn,
+layout failures 0-1), but **the vision judge is noisy**: identical-PDF runs
+gave different verdicts, and one recurring "orphaned "Проверяемые основания"
+heading on page 5" was not reproducible in the extracted text (page 6 starts
+with the heading immediately followed by a source card). Treat vision output as
+hypotheses and confirm each against `pdf_inspection` text before acting; the
+deterministic checks are the reliable gate.
+
+Telegram view of the same real brief (353 chars, HTML) judged `pass` with one
+real product fix: it is too thin — add inline summary items and at least one
+source link in the card instead of hiding everything behind a button.
 
 ## How to run
 

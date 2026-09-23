@@ -168,7 +168,7 @@ def render_html(document: BriefDocument) -> BriefReportArtifact:
     )
     coverage_rows = "".join(
         "<tr><td>{source}</td><td>{state}</td><td>{reason}</td></tr>".format(
-            source=_html_text(item.source_ref),
+            source=_html_source_label(item.source_ref),
             state=_html_text(item.state),
             reason=_html_text(item.reason or "—"),
         )
@@ -187,6 +187,15 @@ def render_html(document: BriefDocument) -> BriefReportArtifact:
             relation=_html_text(evidence.period_relation),
         )
         for evidence in document.evidence
+    )
+    sources_section = (
+        f'  <section aria-labelledby="sources-heading"><p class="eyebrow">Проверяемые основания</p>'
+        f'<h2 id="sources-heading">Источники</h2><div class="source-grid">{source_rows}</div></section>'
+        if source_rows
+        else
+        '  <section aria-labelledby="sources-heading"><p class="eyebrow">Проверяемые основания</p>'
+        '<h2 id="sources-heading">Источники</h2>'
+        '<p class="caveat">В выбранном окне нет источников для показа.</p></section>'
     )
     html = f"""<!doctype html>
 <html lang="ru">
@@ -208,7 +217,7 @@ def render_html(document: BriefDocument) -> BriefReportArtifact:
   <section aria-labelledby="main-heading"><p class="eyebrow">Главное</p><h2 id="main-heading">События и объяснения</h2>{story_or_items}</section>
   <section aria-labelledby="timeline-heading"><p class="eyebrow">Контекст времени</p><h2 id="timeline-heading">Временная линия источников</h2><ol class="timeline">{timeline_rows}</ol></section>
   <section aria-labelledby="coverage-heading"><p class="eyebrow">Границы выборки</p><h2 id="coverage-heading">Покрытие</h2><div class="table-wrap"><table><thead><tr><th>Источник</th><th>Состояние</th><th>Ограничение</th></tr></thead><tbody>{coverage_rows}</tbody></table></div>{_html_limitations(limitation)}</section>
-  <section aria-labelledby="sources-heading"><p class="eyebrow">Проверяемые основания</p><h2 id="sources-heading">Источники</h2><div class="source-grid">{source_rows}</div></section>
+{sources_section}
 </main>
 </body>
 </html>"""
@@ -641,6 +650,19 @@ def _html_source(value: str) -> str:
     return f"<code>{shown}</code>"
 
 
+def _html_source_label(value: str) -> str:
+    """Link with a short host label so long URLs never break mid-token."""
+
+    from urllib.parse import urlparse
+
+    shown = _html_text(value)
+    if _safe_https_url(value):
+        host = urlparse(value).hostname or ""
+        label = host[4:] if host.startswith("www.") else host
+        return f"<a href=\"{_html_attr(value)}\">{_html_text(label or shown)}</a>"
+    return f"<code>{shown}</code>"
+
+
 def _markdown_text(value: object) -> str:
     result = str(value).replace("\\", "\\\\").replace("`", "\\`")
     result = result.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
@@ -984,7 +1006,7 @@ def _to_unicode_cmap(glyph_unicode: dict[int, str]) -> bytes:
 
 def _stylesheet() -> str:
     return """
-@page { size: A4; margin: 18mm 13mm 16mm; @top-left { content: string(brieftitle); font-size: 8.5pt; color: #586161; } @top-right { content: string(briefperiod); font-size: 8pt; color: #586161; } @bottom-center { content: "Страница " counter(page) " / " counter(pages); font-size: 8pt; color: #586161; } }
+@page { size: A4; margin: 20mm 13mm 16mm; @top-left { content: string(brieftitle); font-size: 8.5pt; color: #586161; } @top-center { content: string(briefsection); font-size: 8pt; color: #586161; } @top-right { content: string(briefperiod); font-size: 8pt; color: #586161; } @bottom-center { content: "Страница " counter(page) " / " counter(pages); font-size: 8pt; color: #586161; } }
 :root { color-scheme: light dark; --bg: #f5f5f0; --panel: #ffffff; --ink: #1e2525; --muted: #586161; --line: #cbd2cc; --accent: #146b5c; --caveat: #7b4a13; }
 * { box-sizing: border-box; }
 html { background: var(--bg); }
@@ -995,11 +1017,13 @@ body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 syst
 .eyebrow, .story-number { margin: 0 0 7px; color: var(--accent); font-size: .76rem; font-weight: 760; letter-spacing: .04em; text-transform: uppercase; }
 h1, h2, h3, h4 { line-height: 1.18; break-after: avoid; }
 h1 { max-width: 20ch; margin: 0 0 12px; font-size: clamp(2rem, 7vw, 3.6rem); string-set: brieftitle content(text); }
-h2 { margin: 0 0 18px; font-size: clamp(1.45rem, 5vw, 2rem); }
+h2 { margin: 0 0 18px; font-size: clamp(1.45rem, 5vw, 2rem); string-set: briefsection content(text); }
 h3 { margin: 0 0 8px; font-size: 1.15rem; }
 h4 { margin: 18px 0 8px; font-size: 1rem; }
 p, li { orphans: 2; widows: 2; }
-p, li, td, th, dd, code, a, blockquote { overflow-wrap: anywhere; word-break: break-word; }
+p, li, td, th, dd, code, a, blockquote { overflow-wrap: anywhere; }
+h2 + div, h2 + ol, h2 + p, h2 + .table-wrap, h2 + .source-grid { break-before: avoid; }
+.brief-report > section:last-of-type { border-bottom: 0; padding-bottom: 0; }
 .period { color: var(--muted); string-set: briefperiod content(text); }
 .identity, .source-card dl { color: var(--muted); }
 .identity { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 18px 0 0; }
