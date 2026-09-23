@@ -419,6 +419,7 @@ class TestIdeaCallbacks(unittest.TestCase):
             chat_id="12345",
             text="/voice Too shallow target=eval-gates.",
             settings=settings,
+            runtime_mode=bot_runtime.BOT_RUNTIME_LEGACY,
         )
 
     def test_run_bot_prm_safe_dispatches_transcribed_voice_as_auto(self):
@@ -519,6 +520,7 @@ class TestIdeaCallbacks(unittest.TestCase):
             chat_id="12345",
             text="/message Что мне делать с weekly workbook?",
             settings=settings,
+            runtime_mode=bot_runtime.BOT_RUNTIME_LEGACY,
         )
 
     def test_run_bot_prm_safe_dispatches_plain_text_as_auto(self):
@@ -627,6 +629,7 @@ class TestIdeaCallbacks(unittest.TestCase):
             chat_id="12345",
             text="/voice Useful workbook. target=claim-cards.",
             settings=settings,
+            runtime_mode=bot_runtime.BOT_RUNTIME_LEGACY,
         )
 
     def test_run_bot_voice_without_openai_key_returns_text_fallback(self):

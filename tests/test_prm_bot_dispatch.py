@@ -109,6 +109,11 @@ def test_active_registry_contains_only_prm_commands():
     assert {"/auto", "/research", "/brief", "/chat"}.issubset(PRM_SAFE_COMMANDS)
 
 
+def test_compatibility_dispatch_facades_default_to_gated_prm_assistant():
+    assert bot_runtime.dispatch_command.__kwdefaults__["runtime_mode"] == BOT_RUNTIME_PRM_ASSISTANT
+    assert handlers.dispatch_command.__kwdefaults__["runtime_mode"] == BOT_RUNTIME_PRM_ASSISTANT
+
+
 def test_active_bot_ingress_forwards_only_typed_reserved_model_access(monkeypatch, tmp_path):
     access = _model_access()
     forwarded = []

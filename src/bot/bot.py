@@ -146,7 +146,7 @@ def dispatch_command(
     text: str,
     settings: Settings,
     *,
-    runtime_mode: str = BOT_RUNTIME_LEGACY,
+    runtime_mode: str = BOT_RUNTIME_PRM_ASSISTANT,
     actor_id: str | None = None,
     owner_chat_id: str | None = None,
     delivery_authorizations: tuple[AuthorizationDecision, ...] = (),
@@ -154,7 +154,12 @@ def dispatch_command(
     model_access: ModelEgressAccess | None = None,
     archive_synthesis_access: ArchiveSynthesisAccess | None = None,
 ) -> None:
-    """Stable patch point and explicit compatibility dispatcher."""
+    """Stable patch point and explicit compatibility dispatcher.
+
+    The default is the gated PRM assistant so that omitting ``runtime_mode``
+    can never silently reach the ungated legacy sender. Legacy dispatch still
+    works when a caller passes ``runtime_mode="legacy"`` explicitly.
+    """
 
     mode = normalize_bot_runtime_mode(runtime_mode)
     if mode == BOT_RUNTIME_PRM_ASSISTANT:
@@ -330,7 +335,7 @@ def run_bot(
                         archive_synthesis_access=archive_synthesis_access,
                     )
                 else:
-                    dispatch_command(chat_id=chat_id, text=command, settings=settings)
+                    dispatch_command(chat_id=chat_id, text=command, settings=settings, runtime_mode=runtime_mode)
                 continue
 
             transcript = _embedded_voice_transcript(message)
@@ -363,7 +368,7 @@ def run_bot(
                         archive_synthesis_access=archive_synthesis_access,
                     )
                 else:
-                    dispatch_command(chat_id=chat_id, text=command, settings=settings)
+                    dispatch_command(chat_id=chat_id, text=command, settings=settings, runtime_mode=runtime_mode)
                 continue
             if not message.get("voice"):
                 continue
@@ -432,7 +437,7 @@ def run_bot(
                     archive_synthesis_access=archive_synthesis_access,
                 )
             else:
-                dispatch_command(chat_id=chat_id, text=command, settings=settings)
+                dispatch_command(chat_id=chat_id, text=command, settings=settings, runtime_mode=runtime_mode)
 
         if state.stop_requested:
             break

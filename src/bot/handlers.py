@@ -16,11 +16,16 @@ from .runtime import BOT_RUNTIME_LEGACY, BOT_RUNTIME_MODES, BOT_RUNTIME_PRM_ASSI
 
 
 def dispatch_command(
-    chat_id: str, text: str, settings: Settings, *, runtime_mode: str = BOT_RUNTIME_LEGACY,
+    chat_id: str, text: str, settings: Settings, *, runtime_mode: str = BOT_RUNTIME_PRM_ASSISTANT,
     actor_id: str | None = None, owner_chat_id: str | None = None,
     model_access: ModelEgressAccess | None = None,
     archive_synthesis_access: ArchiveSynthesisAccess | None = None,
 ) -> None:
+    """Compatibility dispatcher; the default is the gated PRM assistant.
+
+    Passing ``runtime_mode="legacy"`` is still honored explicitly, but omitting
+    the mode can no longer reach the ungated legacy sender by default.
+    """
     mode = normalize_bot_runtime_mode(runtime_mode)
     if mode == BOT_RUNTIME_PRM_ASSISTANT:
         kwargs: dict[str, object] = {"actor_id": actor_id, "owner_chat_id": owner_chat_id}
