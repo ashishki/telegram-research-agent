@@ -984,7 +984,7 @@ def _to_unicode_cmap(glyph_unicode: dict[int, str]) -> bytes:
 
 def _stylesheet() -> str:
     return """
-@page { size: A4; margin: 15mm 13mm; @bottom-center { content: "Страница " counter(page) " / " counter(pages); font-size: 8pt; } }
+@page { size: A4; margin: 18mm 13mm 16mm; @top-left { content: string(brieftitle); font-size: 8.5pt; color: #586161; } @top-right { content: string(briefperiod); font-size: 8pt; color: #586161; } @bottom-center { content: "Страница " counter(page) " / " counter(pages); font-size: 8pt; color: #586161; } }
 :root { color-scheme: light dark; --bg: #f5f5f0; --panel: #ffffff; --ink: #1e2525; --muted: #586161; --line: #cbd2cc; --accent: #146b5c; --caveat: #7b4a13; }
 * { box-sizing: border-box; }
 html { background: var(--bg); }
@@ -993,17 +993,19 @@ body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 syst
 .hero, .brief-report > section { border-bottom: 1px solid var(--line); padding: 24px 0; }
 .hero { padding-top: 0; }
 .eyebrow, .story-number { margin: 0 0 7px; color: var(--accent); font-size: .76rem; font-weight: 760; letter-spacing: .04em; text-transform: uppercase; }
-h1, h2, h3, h4 { line-height: 1.18; }
-h1 { max-width: 20ch; margin: 0 0 12px; font-size: clamp(2rem, 7vw, 3.6rem); }
+h1, h2, h3, h4 { line-height: 1.18; break-after: avoid; }
+h1 { max-width: 20ch; margin: 0 0 12px; font-size: clamp(2rem, 7vw, 3.6rem); string-set: brieftitle content(text); }
 h2 { margin: 0 0 18px; font-size: clamp(1.45rem, 5vw, 2rem); }
 h3 { margin: 0 0 8px; font-size: 1.15rem; }
-h4 { margin: 18px 0 8px; font-size: .94rem; }
+h4 { margin: 18px 0 8px; font-size: 1rem; }
+p, li { orphans: 2; widows: 2; }
 p, li, td, th, dd, code, a, blockquote { overflow-wrap: anywhere; word-break: break-word; }
-.period, .identity, .source-card dl { color: var(--muted); }
+.period { color: var(--muted); string-set: briefperiod content(text); }
+.identity, .source-card dl { color: var(--muted); }
 .identity { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 18px 0 0; }
 .identity dt, .source-card dt { font-weight: 700; }
 .identity dd, .source-card dd { margin: 0; }
-.story, .source-card { break-inside: avoid; margin: 14px 0; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+.story, .source-card { break-inside: avoid; margin: 14px 0; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); font-size: .97rem; }
 .story .takeaway { margin: 0 0 14px; font-size: 1.1rem; font-weight: 620; }
 .caveat { border-left: 4px solid var(--caveat); padding-left: 12px; }
 blockquote { margin: 7px 0; padding-left: 12px; border-left: 2px solid var(--line); color: var(--muted); }

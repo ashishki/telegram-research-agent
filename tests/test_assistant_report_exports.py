@@ -218,3 +218,17 @@ def test_source_text_is_escaped_and_static_html_rejects_active_or_tracking_marku
         validate_report_html(str(html.body).replace("</body>", "<script>bad()</script></body>"))
     with pytest.raises(BriefReportRenderError, match="safe_source_links"):
         validate_report_html(str(html.body).replace("https://example.test", "javascript:alert(1)", 1))
+
+
+def test_pdf_layout_has_running_header_and_orphan_control() -> None:
+    html = render_html(_editorial_document())
+    body = str(html.body)
+    # Running header/footer: title and period repeat on every printed page.
+    assert "string-set: brieftitle content(text)" in body
+    assert "string-set: briefperiod content(text)" in body
+    assert "content: string(brieftitle)" in body
+    assert "content: string(briefperiod)" in body
+    # Orphan/widow and heading-break control so a heading never hangs alone.
+    assert "break-after: avoid" in body
+    assert "orphans: 2" in body
+    assert "widows: 2" in body

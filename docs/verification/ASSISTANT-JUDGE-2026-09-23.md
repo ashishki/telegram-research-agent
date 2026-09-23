@@ -107,6 +107,26 @@ flagged the injected "ЭТОГО НЕТ" as missing → `failed_closed`.
 Telegram dialogue probe: rendered chat judged `pass`, "бабблы на своих
 сторонах, источник и кнопки видимы, текст хорошо читается".
 
+## Real-brief experiment (owner-authorized)
+
+A real brief was generated locally from the operator archive (read-only, no
+provider, no write): 8 items, 8 evidence, status `partial`; PDF 38 KB, 9 pages,
+7161 text chars, 0 replacement chars, 24 https links, embedded DejaVu fonts.
+SotaOCR cross-check: 8088 chars, no missing expected text — the text layer is
+sound, so the problems are layout, not copyability.
+
+Vision judge on the 9 PDF pages found: tiny body text, no running page
+header with period/section, an orphaned section heading at a page bottom, and
+a large empty block at the end.
+
+`src/prm/report_exports.py` now adds a running print header (title + period via
+CSS `string-set`), `break-after: avoid` on headings and `orphans/widows: 2`,
+plus a slightly larger source-card/timeline font. Re-run on the regenerated
+PDF: layout failures 1 → 0, pass 5 → 6, `mobile_fit` 3.89 → 4.13, no orphan
+heading; status moved from `failed_closed` to `needs_human_review`. Remaining
+warns: an empty "Проверяемые основания" section and a bottom empty block on
+the last page; one page's vision reply was transiently invalid JSON.
+
 ## How to run
 
 ```bash
