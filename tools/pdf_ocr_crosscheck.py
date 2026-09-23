@@ -23,10 +23,16 @@ import sys
 import time
 from typing import Any, Mapping, Sequence
 
-import requests
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _requests():
+    """Import requests lazily so the module/tests load without it installed."""
+
+    import requests
+
+    return requests
 SCHEMA_VERSION = "assistant_pdf_ocr_crosscheck.v1"
 DEFAULT_BASE_URL = os.environ.get("SOTAOCR_BASE_URL", "https://sotaocr.com")
 DEFAULT_OUTPUT = PROJECT_ROOT / ".playbook-artifacts/ocr/assistant_pdf_ocr_crosscheck_latest.json"
@@ -89,6 +95,7 @@ def compare_expected(ocr_text: str, expected: Sequence[str]) -> tuple[str, ...]:
 
 def _submit(*, base_url: str, headers: dict[str, str], pdf_path: Path, data: dict[str, str], timeout: int) -> dict[str, Any]:
     with pdf_path.open("rb") as stream:
+        requests = _requests()
         response = requests.post(
             f"{base_url}/v1/extract",
             headers=headers,
@@ -103,6 +110,7 @@ def _submit(*, base_url: str, headers: dict[str, str], pdf_path: Path, data: dic
 def _poll(*, base_url: str, headers: dict[str, str], job_id: str, poll_interval: float, timeout: int) -> dict[str, Any]:
     deadline = time.monotonic() + timeout
     while True:
+        requests = _requests()
         response = requests.get(f"{base_url}/v1/jobs/{job_id}", headers=headers, timeout=min(30, timeout))
         response.raise_for_status()
         payload = response.json()
@@ -188,6 +196,7 @@ def run_crosscheck(
         write_json(output_path, report)
         return report
 
+    requests = _requests()
     headers = {"Authorization": f"Bearer {api_key}"}
     data: dict[str, str] = {}
     if model_profile:
@@ -217,6 +226,7 @@ def run_crosscheck(
         if not job_id:
             raise RuntimeError("SotaOCR did not return a job id")
         _poll(base_url=base_url, headers=headers, job_id=job_id, poll_interval=poll_interval, timeout=timeout)
+        requests = _requests()
         response = requests.get(
             f"{base_url}/v1/jobs/{job_id}/result",
             headers=headers,

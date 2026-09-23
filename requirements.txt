@@ -13,3 +13,5 @@ pydyf>=0.10,<0.11
 # Local PDF inspection/rasterization for the quality judge (no system deps).
 pypdf>=4,<7
 pypdfium2>=4,<6
+# Optional external OCR cross-check transport (lazy import in the tool).
+requests>=2.31,<3
