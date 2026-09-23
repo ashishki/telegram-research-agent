@@ -78,10 +78,15 @@ The judge layer is now three tools: text/product-UX
 (`tools/prm_product_ux_eval.py --provider opencode-go`, model `mimo-v2.6-pro`),
 text answer/brief (`tools/assistant_answer_judge.py`), and visual/layout
 (`tools/assistant_visual_judge.py`, vision model
-`deepseek-v4-flash-vision-exp`, headless-Chrome rendering). All are fail-closed
-and advisory only. Mechanics and first synthetic probes:
-`docs/verification/ASSISTANT-JUDGE-2026-09-23.md`. The PR whitespace gate was
-also fixed (`docs/verification/PA-09-durable-watch-evidence-2026-09-20.md`).
+`deepseek-v4-flash-vision-exp`, headless-Chrome rendering). The visual judge
+also accepts `--pdf`: `src/prm/pdf_inspection.py` (pypdf/pypdfium2) extracts the
+text layer, checks expected strings case-insensitively and rasterizes pages for
+the vision model. All are fail-closed and advisory only. Mechanics and first
+synthetic probes: `docs/verification/ASSISTANT-JUDGE-2026-09-23.md`. The PR
+whitespace gate was also fixed
+(`docs/verification/PA-09-durable-watch-evidence-2026-09-20.md`), and
+`requirements.txt` now pins `pydyf<0.11` (weasyprint 62.x) plus pypdf/
+pypdfium2. External SotaOCR cross-check is documented but not wired.
 
 ## Authority and current boundary
 

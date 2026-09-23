@@ -37,6 +37,7 @@ PRM_ACTIVE_TESTS = (
     # must keep its fail-closed holdouts in the active tier.
     "tests/test_assistant_answer_judge.py",
     "tests/test_assistant_visual_judge.py",
+    "tests/test_pdf_inspection.py",
     "tests/test_callbacks.py",
     "tests/test_prm_application.py",
     # PA-06 is a high-risk worker/checkpoint boundary. Keep its dedicated

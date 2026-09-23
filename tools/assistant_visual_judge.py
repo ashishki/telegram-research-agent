@@ -37,6 +37,8 @@ SRC_ROOT = PROJECT_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
+from prm.pdf_inspection import inspect_pdf, rasterize_pdf  # noqa: E402
+
 SCHEMA_VERSION = "assistant_visual_judge.v1"
 PROMPT_VERSION = "assistant-visual-layout-judge-v1"
 
@@ -380,12 +382,19 @@ def run_visual_judge(
     dataset_output_path: Path,
     md_report_path: Path,
     judge_caller: Any = None,
+    pdf_inspections: Sequence[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     write_ndjson(dataset_output_path, [_public_case(case) for case in cases])
     started = time.perf_counter()
     resolved_model = model or DEFAULT_MODEL
     verdicts: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
+    inspections = [dict(item) for item in (pdf_inspections or [])]
+    deterministic_failures = [
+        {"pdf": item.get("pdf"), "failures": item.get("failures")}
+        for item in inspections
+        if item.get("failures")
+    ]
     if not provider_egress:
         judge_status = "no_model_configured"
         status = "skipped_fail_closed"
@@ -403,6 +412,10 @@ def run_visual_judge(
             else:
                 failures.append(result)
         status, judge_status, reason = _visual_status(verdicts, failures, quality_floor)
+    if deterministic_failures and status == "pass":
+        status = "failed_closed"
+        judge_status = "executed" if verdicts else judge_status
+        reason = "deterministic PDF checks failed"
     report = {
         "schema_version": SCHEMA_VERSION,
         "generated_at": utc_now(),
@@ -429,6 +442,7 @@ def run_visual_judge(
             "score_means": {field: _field_mean(verdicts, field) for field in VISUAL_SCORE_FIELDS},
             "score_floor_failure_count": len(_score_floor_failures(verdicts, quality_floor)),
             "layout_failure_count": sum(1 for item in verdicts if _is_layout_failure(item)),
+            "deterministic_failure_count": len(deterministic_failures),
             "elapsed_ms": round((time.perf_counter() - started) * 1000, 3),
         },
         "privacy": {
@@ -438,6 +452,8 @@ def run_visual_judge(
         },
         "provider_failures": failures[:20],
         "score_floor_failures": _score_floor_failures(verdicts, quality_floor)[:80],
+        "deterministic_failures": deterministic_failures[:40],
+        "pdf_checks": inspections,
         "cases": verdicts[:120],
     }
     write_json(output_path, report)
@@ -508,10 +524,19 @@ def write_markdown(path: Path, report: Mapping[str, Any]) -> None:
         f"- model: `{report.get('model')}`",
         f"- cases judged: {metrics.get('judged_count')}/{metrics.get('case_count')}",
         f"- verdicts: `{json.dumps(metrics.get('verdict_counts'), ensure_ascii=False)}`",
-        "",
-        "## Cases",
+        f"- deterministic PDF failures: {metrics.get('deterministic_failure_count', 0)}",
         "",
     ]
+    for check in report.get("pdf_checks") or []:
+        lines.append(f"### PDF `{check.get('pdf')}`")
+        lines.append("")
+        lines.append(
+            f"- pages: {check.get('page_count')} | text chars: {check.get('total_text_chars')} "
+            f"| https links: {check.get('https_link_count')} | non-https: {check.get('non_https_link_count')}"
+        )
+        lines.append(f"- failures: `{json.dumps(check.get('failures'), ensure_ascii=False)}`")
+        lines.append("")
+    lines.extend(["## Cases", ""])
     for case in report.get("cases") or []:
         lines.append(f"### {case.get('case_id')} — `{case.get('verdict')}`")
         lines.append("")
@@ -527,6 +552,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--html", action="append", default=[], help="HTML file to render and judge (repeatable)")
     parser.add_argument("--image", action="append", default=[], help="Existing PNG/JPG to judge (repeatable)")
+    parser.add_argument("--pdf", action="append", default=[], help="PDF to inspect and judge page-by-page (repeatable)")
+    parser.add_argument("--pdf-scale", type=float, default=2.0, help="Rasterization scale for PDF pages")
+    parser.add_argument("--expect", action="append", default=[], help="Expected substring in the PDF text layer (repeatable)")
     parser.add_argument("--view", choices=tuple(VISUAL_VIEW_PRESETS), default="telegram_mobile")
     parser.add_argument("--title", default="")
     parser.add_argument("--model", default=DEFAULT_MODEL)
@@ -572,8 +600,24 @@ def main() -> int:
                 title=args.title,
             )
         )
+    pdf_inspections: list[dict[str, Any]] = []
+    for pdf in args.pdf:
+        pdf_path = Path(pdf)
+        pages = rasterize_pdf(pdf_path, args.render_dir, scale=args.pdf_scale)
+        inspection = inspect_pdf(pdf_path, expected_strings=args.expect)
+        pdf_inspections.append({"pdf": pdf_path.name, **inspection.to_payload()})
+        for page_index, page_png in enumerate(pages, start=1):
+            cases.append(
+                build_case(
+                    case_id=f"visual:pdf:{pdf_path.stem}:page-{page_index:03d}",
+                    view="pdf_page",
+                    image_path=page_png,
+                    title=args.title,
+                    context=f"pdf page {page_index} of {len(pages)}",
+                )
+            )
     if not cases:
-        print(json.dumps({"status": "no_cases", "reason": "pass --html or --image"}, ensure_ascii=False))
+        print(json.dumps({"status": "no_cases", "reason": "pass --html, --image or --pdf"}, ensure_ascii=False))
         return 2
     report = run_visual_judge(
         cases,
@@ -585,6 +629,7 @@ def main() -> int:
         output_path=args.output,
         dataset_output_path=args.dataset_output,
         md_report_path=args.md_report,
+        pdf_inspections=pdf_inspections,
     )
     print(
         json.dumps(

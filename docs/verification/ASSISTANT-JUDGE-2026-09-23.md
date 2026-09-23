@@ -37,14 +37,22 @@ Models (verified 2026-09-23):
    Critical flags or privacy findings fail closed.
 
 3. Visual/layout judge — `tools/assistant_visual_judge.py`.
-   Renders an HTML view to PNG with headless Chrome (view presets
-   `telegram_mobile`, `html_mobile`, `html_desktop`, `pdf_page`) or accepts an
-   existing PNG, then sends the image plus redacted metadata to the vision
-   model. Scores readability, hierarchy, scanability, spacing, contrast,
-   mobile fit, source clarity, completeness; flags `text_cropped`,
-   `horizontal_overflow`, `overlapping`, `low_contrast`, `missing_hierarchy`,
-   `broken_table`, `tiny_text`. Any layout failure fails closed. A 0..10 reply
-   is rescaled to 1..5 (documented slippage).
+   Accepts `--html` (rendered to PNG with headless Chrome), `--image`
+   (existing PNG/JPG), or `--pdf` (inspected and rasterized page-by-page with
+   `src/prm/pdf_inspection.py`, `pypdfium2`), then sends each page image plus
+   redacted metadata to the vision model. Scores readability, hierarchy,
+   scanability, spacing, contrast, mobile fit, source clarity, completeness;
+   flags `text_cropped`, `horizontal_overflow`, `overlapping`, `low_contrast`,
+   `missing_hierarchy`, `broken_table`, `tiny_text`. Any layout failure fails
+   closed. A 0..10 reply is rescaled to 1..5 (documented slippage).
+
+4. Deterministic PDF inspection — `src/prm/pdf_inspection.py` (`pypdf`).
+   Runs offline and never uploads the document. Reports page count, text-layer
+   presence, replacement-character (tofu) count, https vs non-https links,
+   embedded fonts, and case-insensitive `--expect` substring coverage.
+   Failures (`empty`, `no_text_layer`, `replacement_chars`,
+   `missing_expected:...`, `non_https_links`, `too_many_pages`, `encrypted`)
+   force `failed_closed` even when the vision judge passes.
 
 ## What is sent (and not)
 
@@ -64,10 +72,25 @@ Models (verified 2026-09-23):
 - `tools/assistant_answer_judge.py` on two synthetic cases: both `fail` with
   `unverifiable_citation`/`invented_deadline` because the synthetic references
   do not support the claims — the expected strict behaviour.
+- `tools/assistant_visual_judge.py --pdf` on a synthetic brief PDF rendered by
+  weasyprint: page rasterized, text layer present (769 chars), 3 https links,
+  0 non-https, DejaVu fonts embedded; vision judge `pass` (all scores 4-5) but
+  a missing `--expect` substring forced `failed_closed` — the layered gate
+  behaved correctly.
 
 These probes prove the mechanics, not content acceptance. Real archive answers
 and the generated weekly brief still need an owner-authorized run with
 sanitized/redacted inputs.
+
+## Optional external OCR cross-check (not implemented)
+
+Georgia-Community-Navigator uses SotaOCR (`https://sotaocr.com/v1/extract` →
+job → result + page-preview PNGs, `SOTAOCR_API_KEY`) for an independent OCR
+read. Wiring it here would add a second, OCR-derived text layer to catch
+missing/overlapping glyphs the vision model can miss. It is deliberately **not
+implemented**: it uploads the generated document to a third party, so it needs
+an explicit owner consent and key before any private brief is sent. The local
+PDF + vision + deterministic layers above require no such upload.
 
 ## How to run
 

@@ -8,3 +8,8 @@ jsonschema>=4.18.0
 numpy>=1.26.0
 jinja2>=3.1,<4
 weasyprint>=61,<63
+# weasyprint 62.x breaks with pydyf >= 0.11; pin the compatible range.
+pydyf>=0.10,<0.11
+# Local PDF inspection/rasterization for the quality judge (no system deps).
+pypdf>=4,<7
+pypdfium2>=4,<6
