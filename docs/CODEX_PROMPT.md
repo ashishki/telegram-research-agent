@@ -74,6 +74,15 @@ private DB backup was moved out of the repo to
 git-ignored. `tests/test_handlers.py` remains a pre-existing stale report-era
 suite with 56 failures at baseline; it is in no tier and is not a regression.
 
+The judge layer is now three tools: text/product-UX
+(`tools/prm_product_ux_eval.py --provider opencode-go`, model `mimo-v2.6-pro`),
+text answer/brief (`tools/assistant_answer_judge.py`), and visual/layout
+(`tools/assistant_visual_judge.py`, vision model
+`deepseek-v4-flash-vision-exp`, headless-Chrome rendering). All are fail-closed
+and advisory only. Mechanics and first synthetic probes:
+`docs/verification/ASSISTANT-JUDGE-2026-09-23.md`. The PR whitespace gate was
+also fixed (`docs/verification/PA-09-durable-watch-evidence-2026-09-20.md`).
+
 ## Authority and current boundary
 
 The owner directed implementation through dependency-ready slices and accepted

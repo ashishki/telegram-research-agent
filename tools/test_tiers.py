@@ -33,6 +33,10 @@ PRM_ACTIVE_TESTS = (
     # PA-10 mail connector is a private-connector read boundary; keep its
     # fail-closed scope/consent/store holdouts in the required active tier.
     "tests/test_assistant_mail.py",
+    # The judge layer (text answers + visual layout) is safety-relevant and
+    # must keep its fail-closed holdouts in the active tier.
+    "tests/test_assistant_answer_judge.py",
+    "tests/test_assistant_visual_judge.py",
     "tests/test_callbacks.py",
     "tests/test_prm_application.py",
     # PA-06 is a high-risk worker/checkpoint boundary. Keep its dedicated
