@@ -177,6 +177,39 @@ timezone with the zone name once.
 Still open: WeasyPrint can still orphan a section heading above a large
 `break-inside: avoid` story block; the coverage-table identifiers stay long.
 
+## Content transformation (what the brief actually shows)
+
+Two modes, deliberately distinct:
+- **Deterministic** (`render_brief_document` without editorial): item text is a
+  bounded `support_span`/`snippet` copied from the selected archive post — an
+  excerpt, not a rewrite. The designed export now labels this honestly
+  ("Выдержки из источников (без редакторской переработки)").
+- **Editorial** (model pass): the model rewrites titles/summaries/explanations,
+  but `BriefEditorial.from_dict` enforces exact verbatim quotes from the source,
+  no new numeric claims, one anchor binding per story and every source either
+  used or omitted. So it is a summary without meaning loss and without invented
+  facts. This is the intended default for a real brief.
+
+## Designed layout iteration and the pagination finding
+
+Added a top-sources bar chart, a cover pull-quote (first story summary), an
+honest non-editorial label, and meaningful source labels (e.g. `@channel/post`
+instead of a bare `t.me`). The cover no longer forces a page break and stories
+flow after it, which removed the orphaned "Главное" heading.
+
+Best run: 8 pages, 0 layout failures, `needs_human_review` (3 pass / 5 warn).
+Across runs the vision judge swings between 0 and 2 layout failures on the same
+document, and the recurring real defects are structural: a nearly-empty page
+when a `break-inside: avoid` story block is pushed past a page boundary, and an
+empty trailing block on the last page.
+
+Conclusion: WeasyPrint/Chrome **flow pagination is the wrong tool** for a
+magazine-grade PDF. Reaching the red_mad_robot reference needs **explicit
+fixed-page composition** (place content into A4 page containers in code, so
+there are no orphan headings or empty fragments), not more CSS tuning. A Chrome
+`--print-to-pdf` path is available in the studio (`--chrome-pdf`) but scored the
+same, confirming the issue is composition, not the engine.
+
 ## How to run
 
 ```bash

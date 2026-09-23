@@ -285,12 +285,30 @@ def render_designed_html(document: BriefDocument) -> BriefReportArtifact:
         f'<span class="kpi-label">{_html_text(label)}</span></div>'
         for _, value, label in kpis
     )
+    top_sources = _designed_top_sources_svg(document)
     chart_section = (
-        f'  <section aria-labelledby="chart-heading"><p class="eyebrow">Динамика</p>'
+        f'  <section class="keep" aria-labelledby="chart-heading"><p class="eyebrow">Динамика</p>'
         f'<h2 id="chart-heading">Наблюдения по дням</h2>{chart}</section>'
         if chart
         else ""
     )
+    sources_chart_section = (
+        f'  <section class="keep" aria-labelledby="topsources-heading"><p class="eyebrow">Источники</p>'
+        f'<h2 id="topsources-heading">Пункты по источникам</h2>{top_sources}</section>'
+        if top_sources
+        else ""
+    )
+    cover_lead = ""
+    if document.editorial is not None and document.editorial.stories:
+        cover_lead = f'<p class="cover-lead">{_html_text(document.editorial.stories[0].summary)}</p>'
+    # The cover carries the editorial label; stories then start immediately, so
+    # no section heading can be orphaned at a page bottom.
+    cover_eyebrow = (
+        "Аналитический бриф"
+        if document.editorial is not None
+        else "Выдержки из источников (без редакторской переработки)"
+    )
+    story_or_items = f'<div class="story-stack">{story_or_items}</div>'
     sources_section = (
         f'  <section aria-labelledby="sources-heading"><p class="eyebrow">Проверяемые основания</p>'
         f'<h2 id="sources-heading">Источники</h2><div class="source-grid">{source_cards}</div></section>'
@@ -312,13 +330,15 @@ def render_designed_html(document: BriefDocument) -> BriefReportArtifact:
 <body>
 <main class="brief-report brief-report--designed" data-surface="private_brief_report" data-brief-id="{_html_attr(document.brief_id)}" data-version="{document.version}" data-content-digest="{_html_attr(document.content_digest)}">
   <header class="cover">
-    <p class="eyebrow">Аналитический бриф</p>
+    <p class="eyebrow">{cover_eyebrow}</p>
     <h1>{topic}</h1>
     <p class="period">{_html_text(_period_text(document))}</p>
+{cover_lead}
     <div class="kpis">{kpi_html}</div>
   </header>
-  <section aria-labelledby="main-heading"><p class="eyebrow">Главное</p><h2 id="main-heading">События и объяснения</h2>{story_or_items}</section>
+  <section class="main" aria-label="Главное">{story_or_items}</section>
 {chart_section}
+{sources_chart_section}
   <section aria-labelledby="coverage-heading"><p class="eyebrow">Границы выборки</p><h2 id="coverage-heading">Покрытие</h2><div class="table-wrap"><table><thead><tr><th>Источник</th><th>Состояние</th><th>Ограничение</th></tr></thead><tbody>{coverage_rows}</tbody></table></div>{_html_limitations(limitation)}</section>
 {sources_section}
 </main>
@@ -386,18 +406,61 @@ def _designed_chart_svg(document: BriefDocument) -> str:
     )
 
 
+def _designed_top_sources_svg(document: BriefDocument) -> str:
+    """Deterministic horizontal bars: selected items per source host."""
+
+    from collections import Counter
+    from urllib.parse import urlparse
+
+    counts: Counter[str] = Counter()
+    for evidence in document.evidence:
+        host = urlparse(str(evidence.source_ref)).hostname or ""
+        host = host[4:] if host.startswith("www.") else host
+        if host:
+            counts[host] += 1
+    if not counts:
+        return ""
+    items = counts.most_common(6)
+    maximum = max(counts.values())
+    width, row_height, pad, label_width = 720, 30, 12, 220
+    height = pad * 2 + len(items) * row_height
+    parts: list[str] = []
+    for index, (host, value) in enumerate(items):
+        y = pad + index * row_height
+        bar_width = (width - label_width - 70) * (value / maximum)
+        parts.append(
+            f'<text class="hbar-label" x="{label_width - 12}" y="{y + 15}" text-anchor="end">{_html_text(host)}</text>'
+        )
+        parts.append(
+            f'<rect class="hbar-bar" x="{label_width}" y="{y + 3}" width="{bar_width:.1f}" height="16" rx="4"/>'
+        )
+        parts.append(
+            f'<text class="hbar-value" x="{label_width + bar_width + 8:.1f}" y="{y + 16}">{value}</text>'
+        )
+    return (
+        f'<svg class="hbar" width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
+        f'role="img" aria-label="Пункты по источникам">{"".join(parts)}</svg>'
+    )
+
+
 def _designed_stylesheet() -> str:
     return """
-.brief-report--designed .cover { padding: 40px 0 28px; border-bottom: 2px solid var(--accent); }
+.brief-report--designed .cover { padding: 28px 0 22px; border-bottom: 2px solid var(--accent); }
+.keep { break-inside: avoid; }
 .brief-report--designed .cover h1 { font-size: clamp(2.2rem, 8vw, 3.8rem); max-width: 24ch; }
 .kpis { display: flex; flex-wrap: wrap; gap: 12px; margin: 22px 0 0; }
-.kpi { flex: 1 1 120px; min-width: 120px; display: block; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
-.kpi-value { display: block; font-size: 1.6rem; font-weight: 800; line-height: 1.1; overflow-wrap: normal; word-break: keep-all; }
+.kpi { flex: 1 1 150px; min-width: 140px; display: block; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+.kpi-value { display: block; font-size: 1.35rem; font-weight: 800; line-height: 1.15; overflow-wrap: break-word; }
 .kpi-label { display: block; margin-top: 4px; font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; overflow-wrap: normal; }
 .chart { width: 100%; height: 210px; margin-top: 8px; }
 .chart-bar { fill: var(--accent); }
 .chart-label { fill: #586161; font-size: 12px; }
 .chart-value { fill: #1e2525; font-size: 12px; font-weight: 700; }
+.hbar { width: 100%; height: auto; margin-top: 8px; }
+.hbar-bar { fill: #146b5c; }
+.hbar-label { fill: #4f5858; font-size: 12px; }
+.hbar-value { fill: #1e2525; font-size: 12px; font-weight: 700; }
+.cover-lead { margin: 18px 0 0; padding: 14px 16px; border-left: 4px solid var(--accent); background: var(--panel); font-size: 1.05rem; line-height: 1.45; }
 .source-meta { margin: 4px 0 0; font-size: .85rem; color: var(--muted); }
 @media (prefers-color-scheme: dark) { .chart-label { fill: #b7c2bd; } .chart-value { fill: #edf3f0; } }
 @media print { .brief-report--designed .cover { padding-top: 8px; } .kpi { background: #fff; } .chart-bar { fill: #146b5c; } }
@@ -734,7 +797,7 @@ def _html_story_or_item_sections(document: BriefDocument) -> str:
         for number, story in enumerate(document.editorial.stories, start=1):
             anchors = "".join(
                 "<li>{source}<blockquote>{quote}</blockquote></li>".format(
-                    source=_html_source(sources[anchor.evidence_ref].source_ref), quote=_html_text(anchor.quote),
+                    source=_html_source_label(sources[anchor.evidence_ref].source_ref), quote=_html_text(anchor.quote),
                 )
                 for anchor in story.anchors
             )
@@ -767,7 +830,7 @@ def _html_story_or_item_sections(document: BriefDocument) -> str:
             "<ul>{sources}</ul></article>".format(
                 title=_html_text(item.title),
                 summary=_html_text(item.summary),
-                sources="".join(f"<li>{_html_source(sources[ref].source_ref)}</li>" for ref in item.evidence_refs),
+                sources="".join(f"<li>{_html_source_label(sources[ref].source_ref)}</li>" for ref in item.evidence_refs),
             )
             for item in section.items
         )
@@ -827,16 +890,27 @@ def _html_source(value: str) -> str:
 
 
 def _html_source_label(value: str) -> str:
-    """Link with a short host label so long URLs never break mid-token."""
+    """Link with a short, meaningful label so long URLs never break mid-token."""
 
     from urllib.parse import urlparse
 
     shown = _html_text(value)
-    if _safe_https_url(value):
-        host = urlparse(value).hostname or ""
-        label = host[4:] if host.startswith("www.") else host
-        return f"<a href=\"{_html_attr(value)}\">{_html_text(label or shown)}</a>"
-    return f"<code>{shown}</code>"
+    if not _safe_https_url(value):
+        return f"<code>{shown}</code>"
+    parsed = urlparse(value)
+    host = parsed.hostname or ""
+    path = parsed.path.strip("/")
+    if host in {"t.me", "telegram.me"} and path:
+        label = "@" + path
+    elif host:
+        label = (host[4:] if host.startswith("www.") else host)
+        if path:
+            label = f"{label}/{path.split('/')[0]}"
+    else:
+        label = shown
+    if len(label) > 44:
+        label = label[:41] + "…"
+    return f"<a href=\"{_html_attr(value)}\">{_html_text(label or shown)}</a>"
 
 
 def _markdown_text(value: object) -> str:
@@ -1206,7 +1280,8 @@ h2 + div, h2 + ol, h2 + p, h2 + svg, h2 + .table-wrap, h2 + .source-grid { break
 .identity { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 18px 0 0; }
 .identity dt, .source-card dt { font-weight: 700; }
 .identity dd, .source-card dd { margin: 0; }
-.story, .source-card { break-inside: avoid; margin: 14px 0; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); font-size: .97rem; }
+.story { margin: 14px 0; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); font-size: .97rem; }
+.source-card { break-inside: avoid; margin: 14px 0; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); font-size: .97rem; }
 .story .takeaway { margin: 0 0 14px; font-size: 1.1rem; font-weight: 620; }
 .caveat { border-left: 4px solid var(--caveat); padding-left: 12px; }
 blockquote { margin: 7px 0; padding-left: 12px; border-left: 2px solid var(--line); color: var(--muted); }

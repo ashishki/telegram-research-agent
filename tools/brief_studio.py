@@ -19,8 +19,10 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import glob
 import re
 import shutil
+import subprocess
 import sys
 from typing import Any, Mapping
 from urllib.error import HTTPError, URLError
@@ -61,7 +63,9 @@ Hard rules:
   omitted_refs; anchors use the real evidence_ref values;
 - each quote MUST be a verbatim substring (at least 16 characters) of that
   evidence item's summary; never paraphrase a quote;
-- do not introduce numbers that are not present in the quoted text;
+- never write a digit in title/summary/explanation/plain_explanation unless
+  that exact number appears in one of your chosen quotes; the safest rule is to
+  avoid digits in your own prose entirely and keep numbers only inside quotes;
 - a title must describe an event, never start with '@';
 - keep every story bound to its sources; no new facts, deadlines or claims.
 Fields: title (<=140), summary (<=300), explanation (<=900),
@@ -206,6 +210,36 @@ def draft_editorial(
     return None, {"status": "failed", "error": last_error[:200]}
 
 
+def _find_chrome() -> str | None:
+    explicit = os.environ.get("ASSISTANT_CHROME", "").strip()
+    if explicit and Path(explicit).is_file():
+        return explicit
+    candidates = sorted(glob.glob(str(Path.home() / ".cache/ms-playwright/chromium-*/chrome-linux64/chrome")))
+    return candidates[-1] if candidates else shutil.which("chromium") or shutil.which("google-chrome")
+
+
+def _render_pdf_chrome(html_path: Path, output_path: Path, *, timeout: int = 90) -> Path:
+    """Print the designed HTML to PDF with headless Chrome (better CSS support)."""
+
+    binary = _find_chrome()
+    if not binary:
+        raise RuntimeError("no chrome/chromium binary found")
+    command = [
+        binary,
+        "--headless=new",
+        "--disable-gpu",
+        "--no-sandbox",
+        "--no-pdf-header-footer",
+        "--virtual-time-budget=4000",
+        f"--print-to-pdf={output_path}",
+        html_path.resolve().as_uri(),
+    ]
+    completed = subprocess.run(command, capture_output=True, text=True, timeout=timeout, check=False)
+    if not output_path.is_file():
+        raise RuntimeError(f"chrome print-to-pdf failed: {completed.stderr.strip()[:200]}")
+    return output_path
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--question", default="AI и research за неделю")
@@ -219,6 +253,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--editorial-retries", type=int, default=3)
     parser.add_argument("--provider-timeout", type=int, default=150)
     parser.add_argument("--max-output-tokens", type=int, default=6000)
+    parser.add_argument("--chrome-pdf", action="store_true", help="Also render the designed HTML to PDF with headless Chrome")
     return parser
 
 
@@ -267,6 +302,13 @@ def main() -> int:
         body = artifact.body if isinstance(artifact.body, bytes) else artifact.body.encode("utf-8")
         (out / name).write_bytes(body)
         written[name] = str(out / name)
+    if args.chrome_pdf:
+        try:
+            chrome_pdf = out / "brief_designed_chrome.pdf"
+            _render_pdf_chrome(out / "brief_designed.html", chrome_pdf)
+            written["brief_designed_chrome.pdf"] = str(chrome_pdf)
+        except Exception as error:  # pragma: no cover - environment dependent
+            written["brief_designed_chrome.pdf"] = f"failed:{type(error).__name__}"
     telegram_text = render_brief_document(document, view="telegram")
     (out / "telegram.txt").write_text(telegram_text, encoding="utf-8")
     dialogue = {

@@ -253,6 +253,9 @@ def test_designed_export_has_cover_kpis_and_safe_chart_svg() -> None:
     assert 'class="kpi-value"' in body
     assert '<svg class="chart"' in body
     assert "chart-bar" in body
+    assert '<svg class="hbar"' in body
+    assert "hbar-bar" in body
+    assert 'class="cover-lead"' in body
     # Same safety contract as the standard export (validated internally).
     assert "Content-Security-Policy" in body
     assert "<img" not in body.casefold()
