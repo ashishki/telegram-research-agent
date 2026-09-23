@@ -43,6 +43,31 @@ def test_build_case_hashes_and_redacts(tmp_path):
         module.build_case(case_id="x", view="nope", image_path=_png(tmp_path))
 
 
+def test_render_telegram_dialogue_html_sides_and_escaping(tmp_path):
+    module = _module("assistant_visual_judge_dialogue")
+    dialogue = {
+        "title": "Assistant",
+        "turns": [
+            {"role": "user", "text": "Привет <script>alert(1)</script>"},
+            {
+                "role": "assistant",
+                "text": "Ответ",
+                "buttons": ["Показать все"],
+                "sources": ["https://example.org/x"],
+            },
+        ],
+    }
+    html_path = module.render_telegram_dialogue_html(dialogue, tmp_path / "d.html")
+    html = html_path.read_text(encoding="utf-8")
+    assert "row user" in html and "row assistant" in html
+    assert "<script>alert(1)</script>" not in html
+    assert "&lt;script&gt;" in html
+    assert "Показать все" in html
+    assert "Источник:" in html
+    with pytest.raises(ValueError):
+        module.render_telegram_dialogue_html({"turns": []}, tmp_path / "bad.html")
+
+
 def test_image_data_url_mime_and_rejection(tmp_path):
     module = _module("assistant_visual_judge_url")
     assert module.build_image_data_url(_png(tmp_path)).startswith("data:image/png;base64,")

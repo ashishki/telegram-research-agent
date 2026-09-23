@@ -82,15 +82,30 @@ These probes prove the mechanics, not content acceptance. Real archive answers
 and the generated weekly brief still need an owner-authorized run with
 sanitized/redacted inputs.
 
-## Optional external OCR cross-check (not implemented)
+5. Telegram dialogue renderer — `tools/assistant_visual_judge.py --dialogue`.
+   Converts a dialogue JSON (`{title, turns:[{role,text,buttons,sources}]}`) to
+   a Telegram-like private-chat HTML (correct bubble sides, chips, sources),
+   screenshots it at `telegram_mobile` and judges it with the same vision
+   rubric, now including bubble alignment and button-chip clarity
+   (`confusing_controls`).
 
-Georgia-Community-Navigator uses SotaOCR (`https://sotaocr.com/v1/extract` →
-job → result + page-preview PNGs, `SOTAOCR_API_KEY`) for an independent OCR
-read. Wiring it here would add a second, OCR-derived text layer to catch
-missing/overlapping glyphs the vision model can miss. It is deliberately **not
-implemented**: it uploads the generated document to a third party, so it needs
-an explicit owner consent and key before any private brief is sent. The local
-PDF + vision + deterministic layers above require no such upload.
+6. External SotaOCR cross-check — `tools/pdf_ocr_crosscheck.py` (owner-approved
+   2026-09-23). Uploads one PDF to `https://sotaocr.com/v1/extract`, polls the
+   job and fetches the OCR text (`--format markdown|json|...`), then checks that
+   expected substrings survive rendering (case-insensitive). Fail-closed: needs
+   `--allow-provider-egress` *and* `--i-understand-third-party-upload` plus a
+   key (`--api-key-file`, default `/srv/openclaw-you/secrets/sotaocr_api_key`).
+   The OCR text is never written to the report — only length, SHA-256 and the
+   missing list. This is the only layer that sends a document to a third party.
+
+## External OCR evidence
+
+`tools/pdf_ocr_crosscheck.py` on the synthetic brief PDF: uploaded, OCR
+returned 899 chars, reproduced "Еженедельный бриф" and "Дедлайн", correctly
+flagged the injected "ЭТОГО НЕТ" as missing → `failed_closed`.
+
+Telegram dialogue probe: rendered chat judged `pass`, "бабблы на своих
+сторонах, источник и кнопки видимы, текст хорошо читается".
 
 ## How to run
 
