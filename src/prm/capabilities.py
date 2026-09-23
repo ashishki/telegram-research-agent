@@ -67,6 +67,10 @@ TRANSPORT_PURPOSES: dict[tuple[str, str, str], str] = {
     # PA-06 repository context is a separately scoped, read-only transport;
     # it cannot reuse either public-document or private archive authority.
     ("provider_github", "github.repository_context", "read"): "project.context",
+    # PA-10 selected mail is its own read-only delegated transport. A public
+    # web read, Telegram archive read or watch collection grant must never be
+    # reused to read a private mailbox.
+    ("provider_microsoft_graph", "assistant.mail_read", "read"): "mail.read",
 }
 
 
