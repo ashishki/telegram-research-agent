@@ -84,6 +84,10 @@ TRANSPORT_PURPOSES: dict[tuple[str, str, str], str] = {
     ("provider_google", "assistant.contacts_read", "read"): "contacts.read",
     # PA-12 Academic Inbox reads Canvas separately from mail or calendar.
     ("provider_canvas", "assistant.academic_read", "read"): "academic.read",
+    # PA-13 confirmed external writes are their own purpose; a read grant can
+    # never authorize sending mail or changing a calendar event.
+    ("provider_microsoft_graph", "assistant.action_execute", "write"): "action.execute",
+    ("provider_google", "assistant.action_execute", "write"): "action.execute",
 }
 
 

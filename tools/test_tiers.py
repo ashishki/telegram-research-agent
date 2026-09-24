@@ -38,6 +38,8 @@ PRM_ACTIVE_TESTS = (
     "tests/test_assistant_contacts.py",
     # PA-12 Academic Inbox normalization/authority/conflict/reminder contracts.
     "tests/test_assistant_academic.py",
+    # PA-13 one-use confirmed external actions, idempotency and reconciliation.
+    "tests/test_assistant_actions.py",
     # The judge layer (text answers + visual layout) is safety-relevant and
     # must keep its fail-closed holdouts in the active tier.
     "tests/test_assistant_answer_judge.py",
