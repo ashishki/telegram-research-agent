@@ -93,6 +93,12 @@ TRANSPORT_PURPOSES: dict[tuple[str, str, str], str] = {
     ("provider_local", "assistant.memory", "read"): "memory.manage",
     ("provider_local", "assistant.memory", "write"): "memory.manage",
     ("provider_local", "assistant.memory", "delete"): "memory.manage",
+    # PA-15 media surfaces obey the same policy as text. Vision, document and
+    # speech are distinct from voice transcription, so a grant for one cannot
+    # authorize another.
+    ("provider_openai", "media.vision", "model_egress"): "media.vision",
+    ("provider_openai", "media.document", "model_egress"): "media.document",
+    ("provider_openai", "media.speech", "model_egress"): "media.speech",
 }
 
 
