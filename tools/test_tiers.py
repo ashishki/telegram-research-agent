@@ -46,6 +46,8 @@ PRM_ACTIVE_TESTS = (
     "tests/test_assistant_media.py",
     # PA-16 quality-first routing, honest cost accounting and matched-quality savings.
     "tests/test_assistant_cost.py",
+    # PA-17 operations: health, failure policy, recovery, rehearsal, approval, secrets.
+    "tests/test_assistant_ops.py",
     # The judge layer (text answers + visual layout) is safety-relevant and
     # must keep its fail-closed holdouts in the active tier.
     "tests/test_assistant_answer_judge.py",
