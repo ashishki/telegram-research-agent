@@ -40,6 +40,7 @@ PRM_ACTIVE_TESTS = (
     "tests/test_pdf_inspection.py",
     "tests/test_pdf_ocr_crosscheck.py",
     "tests/test_brief_studio.py",
+    "tests/test_editorial_transport.py",
     "tests/test_callbacks.py",
     "tests/test_prm_application.py",
     # PA-06 is a high-risk worker/checkpoint boundary. Keep its dedicated

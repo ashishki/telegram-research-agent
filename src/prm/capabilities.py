@@ -71,6 +71,11 @@ TRANSPORT_PURPOSES: dict[tuple[str, str, str], str] = {
     # web read, Telegram archive read or watch collection grant must never be
     # reused to read a private mailbox.
     ("provider_microsoft_graph", "assistant.mail_read", "read"): "mail.read",
+    # Default-off OpenCode Go editorial route. It mirrors the OpenAI paired
+    # request/context purposes so a grant for one provider can never be reused
+    # for the other.
+    ("provider_opencode_go", "model.generate", "model_egress"): "answer.request",
+    ("provider_opencode_go", "model.context_egress", "model_egress"): "answer.context",
 }
 
 

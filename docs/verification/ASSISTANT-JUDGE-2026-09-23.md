@@ -229,6 +229,25 @@ y-axis with gridlines (the "no axis scale" warn), and remaining warns are minor
 (short pages leave whitespace on 2-source pages, a long table identifier
 breaks) plus the usual vision noise.
 
+## Default-off product editorial route (`src/prm/editorial_transport.py`)
+
+A product seam for the model editorial pass, deliberately **off by default**:
+`OpenCodeEditorialAccess` carries one typed PA-02 egress reservation
+(`provider_opencode_go`, `model.context_egress`, data class `private_archive`,
+purpose `answer.context`; purpose mappings added to `capabilities.py`).
+`synthesize_opencode_editorial` refuses unless `PRM_EDITORIAL_OPENCODE_ENABLED`
+is set, a real key is present, and a matching reservation passes
+`require_authorized_egress`; the model output must pass
+`BriefEditorial.from_dict`. `build_operator_editorial_access` requires the
+exact `enable-opencode-editorial` consent literal, so a stray flag cannot mint
+egress.
+
+Operator entrypoint: `python -m prm.cli editorial-brief "<question>"
+--consent enable-opencode-editorial` writes `brief_paginated.html`/`.pdf` to a
+git-ignored directory. Verified fail-closed: with the env flag unset it prints
+"disabled" and performs no network call. Enabling it is a separate live
+decision; the Telegram assistant remains fail-closed regardless.
+
 ## How to run
 
 ```bash
