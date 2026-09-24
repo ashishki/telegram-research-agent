@@ -518,16 +518,27 @@ def _designed_chart_svg(document: BriefDocument) -> str:
         return ""
     days = sorted(counts)
     maximum = max(counts.values())
-    width, height, pad = 720, 210, 30
+    width, height, pad = 720, 220, 30
+    left = pad + 34
     baseline = height - pad - 22
     usable = height - pad - pad - 22
-    slot = (width - 2 * pad) / max(1, len(days))
+    slot = (width - left - pad) / max(1, len(days))
     bar_width = slot * 0.68
     parts: list[str] = []
+    # Light y-axis with gridlines and value labels so the chart is readable.
+    parts.append(f'<line class="chart-axis" x1="{left - 6}" y1="{baseline}" x2="{width - pad}" y2="{baseline}"/>')
+    parts.append(f'<line class="chart-axis" x1="{left - 6}" y1="{pad}" x2="{left - 6}" y2="{baseline}"/>')
+    for step in (0, maximum / 2, maximum):
+        y = baseline - usable * (step / maximum) if maximum else baseline
+        parts.append(f'<line class="chart-grid" x1="{left - 6}" y1="{y:.1f}" x2="{width - pad}" y2="{y:.1f}"/>')
+        parts.append(
+            f'<text class="chart-ylabel" x="{left - 10}" y="{y + 3:.1f}" text-anchor="end">'
+            f'{int(step) if float(step).is_integer() else round(step, 1)}</text>'
+        )
     for index, day in enumerate(days):
         value = counts[day]
         bar_height = usable * (value / maximum)
-        x = pad + index * slot + (slot - bar_width) / 2
+        x = left + index * slot + (slot - bar_width) / 2
         y = baseline - bar_height
         centre = x + bar_width / 2
         parts.append(
@@ -598,6 +609,9 @@ def _designed_stylesheet() -> str:
 .chart-bar { fill: var(--accent); }
 .chart-label { fill: #586161; font-size: 12px; }
 .chart-value { fill: #1e2525; font-size: 12px; font-weight: 700; }
+.chart-axis { stroke: #9aa4a0; stroke-width: 1; }
+.chart-grid { stroke: #e3e8e4; stroke-width: 1; }
+.chart-ylabel { fill: #4f5858; font-size: 10px; }
 .hbar { width: 100%; height: auto; margin-top: 8px; }
 .hbar-bar { fill: #146b5c; }
 .hbar-label { fill: #4f5858; font-size: 12px; }

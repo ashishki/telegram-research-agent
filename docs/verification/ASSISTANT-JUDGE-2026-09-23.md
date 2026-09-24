@@ -224,9 +224,10 @@ Results on the real archive brief: best run 12 pages, **0 layout failures**,
 7 pass / 5 warn; non-editorial run 9 pages, 5 pass / 4 warn, layout 1. Mean
 scores now all ≥ 4 (contrast 4.9, readability 4.75 on the best run). The cover
 carries a table of contents and the observations chart, so it is full; the
-source chart is merged onto the coverage page. Remaining warns are minor
-(chart has no axis scale, short pages leave whitespace on 2-source pages, a
-long table identifier breaks) and the usual vision noise.
+source chart is merged onto the coverage page. The observations chart now has a labelled
+y-axis with gridlines (the "no axis scale" warn), and remaining warns are minor
+(short pages leave whitespace on 2-source pages, a long table identifier
+breaks) plus the usual vision noise.
 
 ## How to run
 
